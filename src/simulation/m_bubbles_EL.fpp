@@ -27,6 +27,10 @@ module m_bubbles_EL
 
     use m_helper
 
+    use m_mpi_common
+
+    use m_ibm
+
     implicit none
 
     !(nBub)
@@ -67,12 +71,21 @@ module m_bubbles_EL
 
     $:GPU_DECLARE(create='[lag_num_ts]')
 
-    integer :: nBubs                            !< Number of bubbles in the local domain
     real(wp) :: Rmax_glb, Rmin_glb       !< Maximum and minimum bubbe size in the local domain
     type(vector_field) :: q_beta                !< Projection of the lagrangian particles in the Eulerian framework
     integer :: q_beta_idx                       !< Size of the q_beta vector field
 
-    $:GPU_DECLARE(create='[nBubs,Rmax_glb,Rmin_glb,q_beta,q_beta_idx]')
+    $:GPU_DECLARE(create='[Rmax_glb,Rmin_glb,q_beta,q_beta_idx]')
+
+    integer, parameter :: LAG_EVOL_ID = 11 ! File id for lag_bubbles_evol_*.dat
+    integer, parameter :: LAG_STATS_ID = 12 ! File id for stats_lag_bubbles_*.dat
+    integer, parameter :: LAG_VOID_ID = 13 ! File id for voidfraction.dat
+
+    integer, allocatable, dimension(:) :: keep_bubble, prefix_sum
+    integer, allocatable, dimension(:,:) :: wrap_bubble_loc, wrap_bubble_dir
+    integer :: active_bubs
+    $:GPU_DECLARE(create='[keep_bubble, prefix_sum, active_bubs]')
+    $:GPU_DECLARE(create='[wrap_bubble_loc, wrap_bubble_dir]')
 
 contains
 
@@ -102,6 +115,20 @@ contains
             call s_mpi_abort('Please check the lag_params%solver_approach input')
         end if
 
+        pcomm_coords(1)%beg = x_cb(buff_size - fd_number - 1)
+        pcomm_coords(1)%end = x_cb(m - buff_size + fd_number)
+        $:GPU_UPDATE(device='[pcomm_coords(1)]')
+        if (n > 0) then
+            pcomm_coords(2)%beg = y_cb(buff_size - fd_number - 1)
+            pcomm_coords(2)%end = y_cb(n - buff_size + fd_number)
+            $:GPU_UPDATE(device='[pcomm_coords(2)]')
+            if (p > 0) then
+                pcomm_coords(3)%beg = z_cb(buff_size - fd_number - 1)
+                pcomm_coords(3)%end = z_cb(p - buff_size + fd_number)
+                $:GPU_UPDATE(device='[pcomm_coords(3)]')
+            end if
+        end if
+
         $:GPU_UPDATE(device='[lag_num_ts, q_beta_idx]')
 
         @:ALLOCATE(q_beta%vf(1:q_beta_idx))
@@ -117,7 +144,6 @@ contains
         ! Allocating space for lagrangian variables
         nBubs_glb = lag_params%nBubs_glb
 
-        @:ALLOCATE(lag_id(1:nBubs_glb, 1:2))
         @:ALLOCATE(bub_R0(1:nBubs_glb))
         @:ALLOCATE(Rmax_stats(1:nBubs_glb))
         @:ALLOCATE(Rmin_stats(1:nBubs_glb))
@@ -125,6 +151,7 @@ contains
         @:ALLOCATE(gas_betaT(1:nBubs_glb))
         @:ALLOCATE(gas_betaC(1:nBubs_glb))
         @:ALLOCATE(bub_dphidt(1:nBubs_glb))
+        @:ALLOCATE(lag_id(1:nBubs_glb, 1:2))
         @:ALLOCATE(gas_p(1:nBubs_glb, 1:2))
         @:ALLOCATE(gas_mv(1:nBubs_glb, 1:2))
         @:ALLOCATE(intfc_rad(1:nBubs_glb, 1:2))
@@ -140,9 +167,18 @@ contains
         @:ALLOCATE(mtn_dposdt(1:nBubs_glb, 1:3, 1:lag_num_ts))
         @:ALLOCATE(mtn_dveldt(1:nBubs_glb, 1:3, 1:lag_num_ts))
 
+        @:ALLOCATE(keep_bubble(1:nBubs_glb), prefix_sum(1:nBubs_glb))
+        @:ALLOCATE(wrap_bubble_loc(1:nBubs_glb, 1:num_dims), wrap_bubble_dir(1:nBubs_glb, 1:num_dims))
+
         if (adap_dt .and. f_is_default(adap_dt_tol)) adap_dt_tol = dflt_adap_dt_tol
 
+        if (num_procs > 1) call s_initialize_particles_mpi(lag_num_ts)
+
         ! Starting bubbles
+        if (lag_params%write_void_evol) call s_open_void_evol
+        if (lag_params%write_bubbles) call s_open_lag_bubble_evol()
+        if (lag_params%write_bubbles_stats) call s_open_lag_bubble_stats()
+
         call s_start_lagrange_inputs()
         call s_read_input_bubbles(q_cons_vf)
 
@@ -178,6 +214,16 @@ contains
         lag_params%diffcoefvap = lag_params%diffcoefvap/(x0*c0)
         ss = fluid_pp(id_host)%ss/(rho0*x0*c0*c0)
         mul0 = fluid_pp(id_host)%mul0/(rho0*x0*c0)
+
+        if (lag_params%vel_model > 0) then
+            moving_lag_bubbles = .true.
+            lag_pressure_force = lag_params%pressure_force
+            lag_gravity_force = lag_params%gravity_force
+            lag_vel_model = lag_params%vel_model
+            lag_drag_model = lag_params%drag_model
+        end if
+        $:GPU_UPDATE(device='[moving_lag_bubbles, lag_pressure_force, &
+            & lag_gravity_force, lag_vel_model, lag_drag_model]')
 
         ! Parameters used in bubble_model
         Web = 1._wp/ss
@@ -220,9 +266,9 @@ contains
 
         if (save_count == 0) then
             if (proc_rank == 0) print *, 'Reading lagrange bubbles input file.'
-            inquire (file='input/lag_bubbles.dat', exist=file_exist)
+            call my_inquire(trim(lag_params%input_path), file_exist)
             if (file_exist) then
-                open (94, file='input/lag_bubbles.dat', form='formatted', iostat=ios)
+                open (94, file=trim(lag_params%input_path), form='formatted', iostat=ios)
                 do while (ios == 0)
                     read (94, *, iostat=ios) (inputBubble(i), i=1, 8)
                     if (ios /= 0) cycle
@@ -236,12 +282,12 @@ contains
                         call s_add_bubbles(inputBubble, q_cons_vf, bub_id)
                         lag_id(bub_id, 1) = id      !global ID
                         lag_id(bub_id, 2) = bub_id  !local ID
-                        nBubs = bub_id              ! local number of bubbles
+                        n_el_bubs_loc = bub_id              ! local number of bubbles
                     end if
                 end do
                 close (94)
             else
-                call s_mpi_abort("Initialize the lagrange bubbles in input/lag_bubbles.dat")
+                call s_mpi_abort("Initialize the lagrange bubbles in"//trim(lag_params%input_path))
             end if
         else
             if (proc_rank == 0) print *, 'Restarting lagrange bubbles at save_count: ', save_count
@@ -250,13 +296,33 @@ contains
 
         print *, " Lagrange bubbles running, in proc", proc_rank, "number:", bub_id, "/", id
 
+        if (num_procs > 1) then
+            call s_mpi_reduce_int_sum(n_el_bubs_loc, n_el_bubs_glb)
+        else
+            n_el_bubs_glb = n_el_bubs_loc
+        end if
+
+        if (proc_rank == 0) then
+            if (n_el_bubs_glb == 0) call s_mpi_abort('No bubbles in the domain. Check '//trim(lag_params%input_path))
+        end if
+
+        if (num_procs > 1) then
+            call s_add_particles_to_transfer_list(n_el_bubs_loc, mtn_pos(:, :, 1))
+            call s_mpi_sendrecv_particles(bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, &
+                                          gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, &
+                                          intfc_rad, intfc_vel, mtn_pos, mtn_posPrev, mtn_vel, &
+                                          mtn_s, intfc_draddt, intfc_dveldt, gas_dpdt, &
+                                          gas_dmvdt, mtn_dposdt, mtn_dveldt, lag_num_ts, n_el_bubs_loc, &
+                                          dest=1)
+        end if
+
         $:GPU_UPDATE(device='[bubbles_lagrange, lag_params]')
 
         $:GPU_UPDATE(device='[lag_id,bub_R0,Rmax_stats,Rmin_stats,gas_mg, &
             & gas_betaT,gas_betaC,bub_dphidt,gas_p,gas_mv, &
             & intfc_rad,intfc_vel,mtn_pos,mtn_posPrev,mtn_vel, &
             & mtn_s,intfc_draddt,intfc_dveldt,gas_dpdt,gas_dmvdt, &
-            & mtn_dposdt,mtn_dveldt,nBubs]')
+            & mtn_dposdt,mtn_dveldt,n_el_bubs_loc]')
 
         Rmax_glb = min(dflt_real, -dflt_real)
         Rmin_glb = max(dflt_real, -dflt_real)
@@ -268,16 +334,19 @@ contains
         call s_transfer_data_to_tmp()
         call s_smear_voidfraction()
 
-        if (lag_params%write_bubbles) call s_write_lag_particles(qtime)
-
         if (save_count == 0) then
             ! Create ./D directory
-            write (path_D_dir, '(A,I0,A,I0)') trim(case_dir)//'/D'
-            call my_inquire(path_D_dir, file_exist)
-            if (.not. file_exist) call s_create_directory(trim(path_D_dir))
+            if (proc_rank == 0) then
+                write (path_D_dir, '(A,I0,A,I0)') trim(case_dir)//'/D'
+                call my_inquire(trim(path_D_dir), file_exist)
+                if (.not. file_exist) call s_create_directory(trim(path_D_dir))
+            end if
+            call s_mpi_barrier()
             call s_write_restart_lag_bubbles(save_count) ! Needed for post_processing
-            call s_write_void_evol(qtime)
+            if (lag_params%write_void_evol) call s_write_void_evol(qtime)
         end if
+
+        if (lag_params%write_bubbles) call s_write_lag_bubble_evol(qtime)
 
     end subroutine s_read_input_bubbles
 
@@ -321,7 +390,7 @@ contains
             mtn_posPrev(bub_id, 1:3, 1) = mtn_pos(bub_id, 1:3, 1)
         end if
 
-        cell = -buff_size
+        cell = fd_number - buff_size
         call s_locate_cell(mtn_pos(bub_id, 1:3, 1), cell, mtn_s(bub_id, 1:3, 1))
 
         ! Check if the bubble is located in the ghost cell of a symmetric, or wall boundary
@@ -507,7 +576,7 @@ contains
             call MPI_FILE_CLOSE(ifile, ierr)
             call MPI_TYPE_FREE(view, ierr)
 
-            nBubs = bub_id
+            n_el_bubs_loc = bub_id
 
             do i = 1, bub_id
                 lag_id(i, 1) = int(MPI_IO_DATA_lag_bubbles(i, 1))
@@ -532,7 +601,7 @@ contains
             deallocate (MPI_IO_DATA_lag_bubbles)
 
         else
-            nBubs = 0
+            n_el_bubs_loc = 0
 
             call MPI_TYPE_CONTIGUOUS(0, mpi_p, view, ierr)
             call MPI_TYPE_COMMIT(view, ierr)
@@ -577,7 +646,8 @@ contains
         real(wp) :: myR_m, mygamma_m, myPb, myMass_n, myMass_v
         real(wp) :: myR, myV, myBeta_c, myBeta_t, myR0, myPbdot, myMvdot
         real(wp) :: myPinf, aux1, aux2, myCson, myRho
-        real(wp) :: gamma, pi_inf, qv
+        real(wp), dimension(3) :: myPos, myVel
+        real(wp) :: gamma, pi_inf, qv, f_b
         real(wp), dimension(contxe) :: myalpha_rho, myalpha
         real(wp), dimension(2) :: Re
         integer, dimension(3) :: cell
@@ -585,7 +655,7 @@ contains
         integer :: adap_dt_stop_max, adap_dt_stop !< Fail-safe exit if max iteration count reached
         real(wp) :: dmalf, dmntait, dmBtait, dm_bub_adv_src, dm_divu !< Dummy variables for unified subgrid bubble subroutines
 
-        integer :: i, k, l
+        integer :: i, j, k, l
 
         call nvtxStartRange("LAGRANGE-BUBBLE-DYNAMICS")
 
@@ -593,7 +663,7 @@ contains
         if (lag_params%pressure_corrector) then
             ! Calculate velocity potentials (valid for one bubble per cell)
             $:GPU_PARALLEL_LOOP(private='[k,cell]')
-            do k = 1, nBubs
+            do k = 1, n_el_bubs_loc
                 call s_get_pinf(k, q_prim_vf, 2, paux, cell, preterm1, term2, Romega)
                 myR0 = bub_R0(k)
                 myR = intfc_rad(k, 2)
@@ -613,10 +683,10 @@ contains
 
         ! Radial motion model
         adap_dt_stop_max = 0
-        $:GPU_PARALLEL_LOOP(private='[k,myalpha_rho,myalpha,Re,cell]', &
+        $:GPU_PARALLEL_LOOP(private='[k,myalpha_rho,myalpha,Re,cell,myPos,myVel]', &
             & reduction='[[adap_dt_stop_max]]',reductionOp='[MAX]', &
             & copy='[adap_dt_stop_max]',copyin='[stage]')
-        do k = 1, nBubs
+        do k = 1, n_el_bubs_loc
             ! Keller-Miksis model
 
             ! Current bubble state
@@ -628,6 +698,8 @@ contains
             myBeta_c = gas_betaC(k)
             myBeta_t = gas_betaT(k)
             myR0 = bub_R0(k)
+            myPos = mtn_pos(k, :, 2)
+            myVel = mtn_vel(k, :, 2)
 
             ! Vapor and heat fluxes
             call s_vflux(myR, myV, myPb, myMass_v, k, myVapFlux, myMass_n, myBeta_c, myR_m, mygamma_m)
@@ -655,13 +727,20 @@ contains
                 call s_advance_step(myRho, myPinf, myR, myV, myR0, myPb, myPbdot, dmalf, &
                                     dmntait, dmBtait, dm_bub_adv_src, dm_divu, &
                                     k, myMass_v, myMass_n, myBeta_c, &
-                                    myBeta_t, myCson, adap_dt_stop)
+                                    myBeta_t, myCson, adap_dt_stop, Re(1), &
+                                    myPos, myVel, cell, q_prim_vf)
 
                 ! Update bubble state
                 intfc_rad(k, 1) = myR
                 intfc_vel(k, 1) = myV
                 gas_p(k, 1) = myPb
                 gas_mv(k, 1) = myMass_v
+
+                if (moving_lag_bubbles) then
+                    mtn_posPrev(k, :, 1) = mtn_pos(k, :, 2)
+                    mtn_pos(k, :, 1) = myPos
+                    mtn_vel(k, :, 1) = myVel
+                end if
 
             else
 
@@ -674,6 +753,31 @@ contains
                 gas_dmvdt(k, stage) = myMvdot
                 gas_dpdt(k, stage) = myPbdot
 
+                do l = 1, num_dims
+                    select case (lag_vel_model)
+                    case (1)
+                        mtn_dposdt(k, l, stage) = f_interpolate_velocity(myPos(l), &
+                                                                         cell, l, q_prim_vf)
+                        mtn_dveldt(k, l, stage) = 0._wp
+                    case (2)
+                        mtn_dposdt(k, l, stage) = myVel(l)
+                        f_b = f_get_bubble_force(myPos(l), &
+                                                 myR, myV, myVel(l), &
+                                                 myMass_n, myMass_v, &
+                                                 Re(1), myRho, cell, l, q_prim_vf)
+                        mtn_dveldt(k, l, stage) = f_b / (myMass_n + myMass_v)
+                    case (3)
+                        mtn_dposdt(k, l, stage) = myVel(l)
+                        f_b = f_get_bubble_force(myPos(l), &
+                                                 myR, myV, myVel(l), &
+                                                 myMass_n, myMass_v, &
+                                                 Re(1), myRho, cell, l, q_prim_vf)
+                        mtn_dveldt(k, l, stage) = 2._wp * f_b / (myMass_n + myMass_v) - 3._wp * myV * myVel(l) / myR
+                    case default
+                        mtn_dposdt(k, l, stage) = 0._wp
+                        mtn_dveldt(k, l, stage) = 0._wp
+                    end select
+                end do
             end if
 
             adap_dt_stop_max = max(adap_dt_stop_max, adap_dt_stop)
@@ -682,14 +786,9 @@ contains
 
         if (adap_dt .and. adap_dt_stop_max > 0) call s_mpi_abort("Adaptive time stepping failed to converge.")
 
-        ! Bubbles remain in a fixed position
-        $:GPU_PARALLEL_LOOP(collapse=2, private='[k]', copyin='[stage]')
-        do k = 1, nBubs
-            do l = 1, 3
-                mtn_dposdt(k, l, stage) = 0._wp
-                mtn_dveldt(k, l, stage) = 0._wp
-            end do
-        end do
+        if (adap_dt .and. moving_lag_bubbles) then
+            call s_enforce_EL_bubbles_boundary_conditions(q_prim_vf, dest=1)
+        end if
 
         call nvtxEndRange
 
@@ -846,7 +945,7 @@ contains
             end do
         end do
 
-        call s_smoothfunction(nBubs, intfc_rad, intfc_vel, &
+        call s_smoothfunction(n_el_bubs_loc, intfc_rad, intfc_vel, &
                               mtn_s, mtn_pos, q_beta)
 
         !Store 1-beta
@@ -873,7 +972,7 @@ contains
         !! @param f_pinfl Driving pressure
         !! @param cell Bubble cell
         !! @param Romega Control volume radius
-    pure subroutine s_get_pinf(bub_id, q_prim_vf, ptype, f_pinfl, cell, preterm1, term2, Romega)
+    impure subroutine s_get_pinf(bub_id, q_prim_vf, ptype, f_pinfl, cell, preterm1, term2, Romega)
         $:GPU_ROUTINE(function_name='s_get_pinf',parallelism='[seq]', &
             & cray_inline=True)
 
@@ -883,7 +982,8 @@ contains
         integer, dimension(3), intent(out) :: cell
         real(wp), intent(out), optional :: preterm1, term2, Romega
 
-        real(wp), dimension(3) :: scoord, psi
+        real(wp), dimension(3) :: scoord, psi_pos, psi_x, psi_y, psi_z
+        real(wp) :: xi, eta, zeta
         real(wp) :: dc, vol, aux
         real(wp) :: volgas, term1, Rbeq, denom
         real(wp) :: charvol, charpres, charvol2, charpres2
@@ -892,83 +992,167 @@ contains
         integer :: smearGrid, smearGridz
         logical :: celloutside
 
-        scoord = mtn_s(bub_id, 1:3, 2)
         f_pinfl = 0._wp
 
-        !< Find current bubble cell
-        cell(:) = int(scoord(:))
-        $:GPU_LOOP(parallelism='[seq]')
-        do i = 1, num_dims
-            if (scoord(i) < 0._wp) cell(i) = cell(i) - 1
-        end do
+        if (moving_lag_bubbles) then
+            cell = fd_number - buff_size
+            call s_locate_cell(mtn_pos(bub_id, 1:3, 2), cell, mtn_s(bub_id, 1:3, 2))
+            scoord = mtn_s(bub_id, 1:3, 2)
+        else
+            scoord = mtn_s(bub_id, 1:3, 2)
+            cell(:) = int(scoord(:))
+            $:GPU_LOOP(parallelism='[seq]')
+            do i = 1, num_dims
+                if (scoord(i) < 0._wp) cell(i) = cell(i) - 1
+            end do
+        end if
 
         if ((lag_params%cluster_type == 1)) then
             !< Getting p_cell in terms of only the current cell by interpolation
 
-            !< Getting the cell volulme as Omega
-            if (p > 0) then
-                vol = dx(cell(1))*dy(cell(2))*dz(cell(3))
-            else
-                if (cyl_coord) then
-                    vol = dx(cell(1))*dy(cell(2))*y_cc(cell(2))*2._wp*pi
+            if (fd_order == 2) then ! Bilinear interpolation
+
+                if (p > 0) then
+                    vol = dx(cell(1))*dy(cell(2))*dz(cell(3))
                 else
-                    vol = dx(cell(1))*dy(cell(2))*lag_params%charwidth
+                    if (cyl_coord) then
+                        vol = dx(cell(1))*dy(cell(2))*y_cc(cell(2))*2._wp*pi
+                    else
+                        vol = dx(cell(1))*dy(cell(2))*lag_params%charwidth
+                    end if
                 end if
-            end if
 
-            !< Obtain bilinear interpolation coefficients, based on the current location of the bubble.
-            psi(1) = (scoord(1) - real(cell(1)))*dx(cell(1)) + x_cb(cell(1) - 1)
-            if (cell(1) == (m + buff_size)) then
-                cell(1) = cell(1) - 1
-                psi(1) = 1._wp
-            else if (cell(1) == (-buff_size)) then
-                psi(1) = 0._wp
-            else
-                if (psi(1) < x_cc(cell(1))) cell(1) = cell(1) - 1
-                psi(1) = abs((psi(1) - x_cc(cell(1)))/(x_cc(cell(1) + 1) - x_cc(cell(1))))
-            end if
+                !< Obtain bilinear interpolation coefficients, based on the current location of the bubble.
+                psi_pos(1) = (scoord(1) - real(cell(1)))*dx(cell(1)) + x_cb(cell(1) - 1)
+                psi_pos(1) = abs((psi_pos(1) - x_cc(cell(1)))/(x_cc(cell(1) + 1) - x_cc(cell(1))))
 
-            psi(2) = (scoord(2) - real(cell(2)))*dy(cell(2)) + y_cb(cell(2) - 1)
-            if (cell(2) == (n + buff_size)) then
-                cell(2) = cell(2) - 1
-                psi(2) = 1._wp
-            else if (cell(2) == (-buff_size)) then
-                psi(2) = 0._wp
-            else
-                if (psi(2) < y_cc(cell(2))) cell(2) = cell(2) - 1
-                psi(2) = abs((psi(2) - y_cc(cell(2)))/(y_cc(cell(2) + 1) - y_cc(cell(2))))
-            end if
+                psi_pos(2) = (scoord(2) - real(cell(2)))*dy(cell(2)) + y_cb(cell(2) - 1)
+                psi_pos(2) = abs((psi_pos(2) - y_cc(cell(2)))/(y_cc(cell(2) + 1) - y_cc(cell(2))))
 
-            if (p > 0) then
-                psi(3) = (scoord(3) - real(cell(3)))*dz(cell(3)) + z_cb(cell(3) - 1)
-                if (cell(3) == (p + buff_size)) then
-                    cell(3) = cell(3) - 1
-                    psi(3) = 1._wp
-                else if (cell(3) == (-buff_size)) then
-                    psi(3) = 0._wp
+                if (p > 0) then
+                    psi_pos(3) = (scoord(3) - real(cell(3)))*dz(cell(3)) + z_cb(cell(3) - 1)
+                    psi_pos(3) = abs((psi_pos(3) - z_cc(cell(3)))/(z_cc(cell(3) + 1) - z_cc(cell(3))))
                 else
-                    if (psi(3) < z_cc(cell(3))) cell(3) = cell(3) - 1
-                    psi(3) = abs((psi(3) - z_cc(cell(3)))/(z_cc(cell(3) + 1) - z_cc(cell(3))))
+                    psi_pos(3) = 0._wp
                 end if
-            else
-                psi(3) = 0._wp
-            end if
 
-            !< Perform bilinear interpolation
-            if (p == 0) then  !2D
-                f_pinfl = q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3))*(1._wp - psi(1))*(1._wp - psi(2))
-                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2), cell(3))*psi(1)*(1._wp - psi(2))
-                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2) + 1, cell(3))*psi(1)*psi(2)
-                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1), cell(2) + 1, cell(3))*(1._wp - psi(1))*psi(2)
-            else              !3D
-                f_pinfl = q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3))*(1._wp - psi(1))*(1._wp - psi(2))*(1._wp - psi(3))
-                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2), cell(3))*psi(1)*(1._wp - psi(2))*(1._wp - psi(3))
-                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2) + 1, cell(3))*psi(1)*psi(2)*(1._wp - psi(3))
-                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1), cell(2) + 1, cell(3))*(1._wp - psi(1))*psi(2)*(1._wp - psi(3))
-                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3) + 1)*(1._wp - psi(1))*(1._wp - psi(2))*psi(3)
-                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2), cell(3) + 1)*psi(1)*(1._wp - psi(2))*psi(3)
-                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2) + 1, cell(3) + 1)*psi(1)*psi(2)*psi(3)
-                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1), cell(2) + 1, cell(3) + 1)*(1._wp - psi(1))*psi(2)*psi(3)
+                ! Calculate bilinear basis functions for each direction
+                ! For normalized coordinate xi in [0, 1], the two basis functions are:
+                ! phi_0(xi) = 1 - xi, phi_1(xi) = xi
+
+                ! X-direction basis functions
+                psi_x(1) = 1._wp - psi_pos(1)  ! Left basis function
+                psi_x(2) = psi_pos(1)          ! Right basis function
+
+                ! Y-direction basis functions
+                psi_y(1) = 1._wp - psi_pos(2)  ! Left basis function
+                psi_y(2) = psi_pos(2)          ! Right basis function
+
+                if (p > 0) then
+                    ! Z-direction basis functions
+                    psi_z(1) = 1._wp - psi_pos(3)  ! Left basis function
+                    psi_z(2) = psi_pos(3)          ! Right basis function
+                else
+                    psi_z(1) = 1._wp
+                    psi_z(2) = 0._wp
+                end if
+
+                !< Perform bilinear interpolation
+                f_pinfl = 0._wp
+
+                if (p == 0) then  !2D - 4 point interpolation (2x2)
+                    do j = 1, 2
+                        do i = 1, 2
+                            f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + i - 1, cell(2) + j - 1, cell(3))* &
+                                      psi_x(i)*psi_y(j)
+                        end do
+                    end do
+                else              !3D - 8 point interpolation (2x2x2)
+                    do k = 1, 2
+                        do j = 1, 2
+                            do i = 1, 2
+                                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + i - 1, cell(2) + j - 1, cell(3) + k - 1)* &
+                                          psi_x(i)*psi_y(j)*psi_z(k)
+                            end do
+                        end do
+                    end do
+                end if
+
+            elseif (fd_order == 4) then ! Biquadratic interpolation
+
+                if (p > 0) then
+                    vol = dx(cell(1))*dy(cell(2))*dz(cell(3))
+                else
+                    if (cyl_coord) then
+                        vol = dx(cell(1))*dy(cell(2))*y_cc(cell(2))*2._wp*pi
+                    else
+                        vol = dx(cell(1))*dy(cell(2))*lag_params%charwidth
+                    end if
+                end if
+
+                !< Obtain biquadratic interpolation coefficients, based on the current location of the bubble.
+                ! For biquadratic interpolation, we need coefficients for 3 points in each direction
+                psi_pos(1) = (scoord(1) - real(cell(1)))*dx(cell(1)) + x_cb(cell(1) - 1)
+                psi_pos(1) = (psi_pos(1) - x_cc(cell(1)))/(x_cc(cell(1) + 1) - x_cc(cell(1)))
+
+                psi_pos(2) = (scoord(2) - real(cell(2)))*dy(cell(2)) + y_cb(cell(2) - 1)
+                psi_pos(2) = (psi_pos(2) - y_cc(cell(2)))/(y_cc(cell(2) + 1) - y_cc(cell(2)))
+
+                if (p > 0) then
+                    psi_pos(3) = (scoord(3) - real(cell(3)))*dz(cell(3)) + z_cb(cell(3) - 1)
+                    psi_pos(3) = (psi_pos(3) - z_cc(cell(3)))/(z_cc(cell(3) + 1) - z_cc(cell(3)))
+                else
+                    psi_pos(3) = 0._wp
+                end if
+
+                ! Calculate biquadratic basis functions for each direction
+                ! For normalized coordinate xi in [-1, 1], the three basis functions are:
+                ! phi_0(xi) = xi*(xi-1)/2, phi_1(xi) = (1-xi)*(1+xi), phi_2(xi) = xi*(xi+1)/2
+
+                ! X-direction basis functions
+                xi = 2._wp*psi_pos(1) - 1._wp  ! Convert to [-1, 1] range
+                psi_x(1) = xi*(xi - 1._wp)/2._wp        ! Left basis function
+                psi_x(2) = (1._wp - xi)*(1._wp + xi)    ! Center basis function
+                psi_x(3) = xi*(xi + 1._wp)/2._wp        ! Right basis function
+
+                ! Y-direction basis functions
+                eta = 2._wp*psi_pos(2) - 1._wp  ! Convert to [-1, 1] range
+                psi_y(1) = eta*(eta - 1._wp)/2._wp      ! Left basis function
+                psi_y(2) = (1._wp - eta)*(1._wp + eta)  ! Center basis function
+                psi_y(3) = eta*(eta + 1._wp)/2._wp      ! Right basis function
+
+                if (p > 0) then
+                    ! Z-direction basis functions
+                    zeta = 2._wp*psi_pos(3) - 1._wp  ! Convert to [-1, 1] range
+                    psi_z(1) = zeta*(zeta - 1._wp)/2._wp      ! Left basis function
+                    psi_z(2) = (1._wp - zeta)*(1._wp + zeta)  ! Center basis function
+                    psi_z(3) = zeta*(zeta + 1._wp)/2._wp      ! Right basis function
+                else
+                    psi_z(1) = 0._wp
+                    psi_z(2) = 1._wp
+                    psi_z(3) = 0._wp
+                end if
+
+                !< Perform biquadratic interpolation
+                f_pinfl = 0._wp
+
+                if (p == 0) then  !2D - 9 point interpolation (3x3)
+                    do j = 1, 3
+                        do i = 1, 3
+                            f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + i - 2, cell(2) + j - 2, cell(3))* &
+                                      psi_x(i)*psi_y(j)
+                        end do
+                    end do
+                else              !3D - 27 point interpolation (3x3x3)
+                    do k = 1, 3
+                        do j = 1, 3
+                            do i = 1, 3
+                                f_pinfl = f_pinfl + q_prim_vf(E_idx)%sf(cell(1) + i - 2, cell(2) + j - 2, cell(3) + k - 2)* &
+                                          psi_x(i)*psi_y(j)*psi_z(k)
+                            end do
+                        end do
+                    end do
+                end if
             end if
 
             !R_Omega
@@ -1002,26 +1186,32 @@ contains
                         !< check if the current cell is outside the computational domain or not (including ghost cells)
                         celloutside = .false.
                         if (num_dims == 2) then
-                            if ((cellaux(1) < -buff_size) .or. (cellaux(2) < -buff_size)) then
+                            if ((cellaux(1) < fd_number - buff_size) .or. &
+                                (cellaux(2) < fd_number - buff_size)) then
                                 celloutside = .true.
                             end if
-                            if (cyl_coord .and. y_cc(cellaux(2)) < 0._wp) then
+                            if (cyl_coord .and. cellaux(2) < 0) then
                                 celloutside = .true.
                             end if
-                            if ((cellaux(2) > n + buff_size) .or. (cellaux(1) > m + buff_size)) then
+                            if ((cellaux(2) > n + buff_size - fd_number) .or. &
+                                (cellaux(1) > m + buff_size - fd_number)) then
                                 celloutside = .true.
                             end if
                         else
-                            if ((cellaux(3) < -buff_size) .or. (cellaux(1) < -buff_size) .or. (cellaux(2) < -buff_size)) then
+                            if ((cellaux(3) < fd_number - buff_size) .or. &
+                                (cellaux(1) < fd_number - buff_size) .or. &
+                                (cellaux(2) < fd_number - buff_size)) then
                                 celloutside = .true.
                             end if
 
-                            if ((cellaux(3) > p + buff_size) .or. (cellaux(2) > n + buff_size) .or. (cellaux(1) > m + buff_size)) then
+                            if ((cellaux(3) > p + buff_size - fd_number) .or. &
+                                (cellaux(2) > n + buff_size - fd_number) .or. &
+                                (cellaux(1) > m + buff_size - fd_number)) then
                                 celloutside = .true.
                             end if
                         end if
                         if (.not. celloutside) then
-                            if (cyl_coord .and. (p == 0) .and. (y_cc(cellaux(2)) < 0._wp)) then
+                            if (cyl_coord .and. (p == 0) .and. (cellaux(2) < 0)) then
                                 celloutside = .true.
                             end if
                         end if
@@ -1084,65 +1274,73 @@ contains
     !>  This subroutine updates the Lagrange variables using the tvd RK time steppers.
         !!      The time derivative of the bubble variables must be stored at every stage to avoid precision errors.
         !! @param stage Current tvd RK stage
-    impure subroutine s_update_lagrange_tdv_rk(stage)
+    impure subroutine s_update_lagrange_tdv_rk(q_prim_vf, stage)
 
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         integer, intent(in) :: stage
 
         integer :: k
 
         if (time_stepper == 1) then ! 1st order TVD RK
             $:GPU_PARALLEL_LOOP(private='[k]')
-            do k = 1, nBubs
+            do k = 1, n_el_bubs_loc
                 !u{1} = u{n} +  dt * RHS{n}
                 intfc_rad(k, 1) = intfc_rad(k, 1) + dt*intfc_draddt(k, 1)
                 intfc_vel(k, 1) = intfc_vel(k, 1) + dt*intfc_dveldt(k, 1)
+                mtn_posPrev(k, 1:3, 1) = mtn_pos(k, 1:3, 1)
                 mtn_pos(k, 1:3, 1) = mtn_pos(k, 1:3, 1) + dt*mtn_dposdt(k, 1:3, 1)
                 mtn_vel(k, 1:3, 1) = mtn_vel(k, 1:3, 1) + dt*mtn_dveldt(k, 1:3, 1)
                 gas_p(k, 1) = gas_p(k, 1) + dt*gas_dpdt(k, 1)
                 gas_mv(k, 1) = gas_mv(k, 1) + dt*gas_dmvdt(k, 1)
             end do
 
-            call s_transfer_data_to_tmp()
-            call s_write_void_evol(mytime)
-            if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
+            if (moving_lag_bubbles) call s_enforce_EL_bubbles_boundary_conditions(q_prim_vf, dest=1)
 
+            call s_transfer_data_to_tmp()
+            if (lag_params%write_void_evol) call s_write_void_evol(mytime)
+            if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
             if (lag_params%write_bubbles) then
                 $:GPU_UPDATE(host='[gas_p,gas_mv,intfc_rad,intfc_vel]')
-                call s_write_lag_particles(mytime)
+                call s_write_lag_bubble_evol(mytime)
             end if
 
         elseif (time_stepper == 2) then ! 2nd order TVD RK
             if (stage == 1) then
                 $:GPU_PARALLEL_LOOP(private='[k]')
-                do k = 1, nBubs
+                do k = 1, n_el_bubs_loc
                     !u{1} = u{n} +  dt * RHS{n}
                     intfc_rad(k, 2) = intfc_rad(k, 1) + dt*intfc_draddt(k, 1)
                     intfc_vel(k, 2) = intfc_vel(k, 1) + dt*intfc_dveldt(k, 1)
+                    mtn_posPrev(k, 1:3, 2) = mtn_pos(k, 1:3, 1)
                     mtn_pos(k, 1:3, 2) = mtn_pos(k, 1:3, 1) + dt*mtn_dposdt(k, 1:3, 1)
                     mtn_vel(k, 1:3, 2) = mtn_vel(k, 1:3, 1) + dt*mtn_dveldt(k, 1:3, 1)
                     gas_p(k, 2) = gas_p(k, 1) + dt*gas_dpdt(k, 1)
                     gas_mv(k, 2) = gas_mv(k, 1) + dt*gas_dmvdt(k, 1)
                 end do
 
+                if (moving_lag_bubbles) call s_enforce_EL_bubbles_boundary_conditions(q_prim_vf, dest=2)
+
             elseif (stage == 2) then
                 $:GPU_PARALLEL_LOOP(private='[k]')
-                do k = 1, nBubs
+                do k = 1, n_el_bubs_loc
                     !u{1} = u{n} + (1/2) * dt * (RHS{n} + RHS{1})
                     intfc_rad(k, 1) = intfc_rad(k, 1) + dt*(intfc_draddt(k, 1) + intfc_draddt(k, 2))/2._wp
                     intfc_vel(k, 1) = intfc_vel(k, 1) + dt*(intfc_dveldt(k, 1) + intfc_dveldt(k, 2))/2._wp
+                    mtn_posPrev(k, 1:3, 1) = mtn_pos(k, 1:3, 2)
                     mtn_pos(k, 1:3, 1) = mtn_pos(k, 1:3, 1) + dt*(mtn_dposdt(k, 1:3, 1) + mtn_dposdt(k, 1:3, 2))/2._wp
                     mtn_vel(k, 1:3, 1) = mtn_vel(k, 1:3, 1) + dt*(mtn_dveldt(k, 1:3, 1) + mtn_dveldt(k, 1:3, 2))/2._wp
                     gas_p(k, 1) = gas_p(k, 1) + dt*(gas_dpdt(k, 1) + gas_dpdt(k, 2))/2._wp
                     gas_mv(k, 1) = gas_mv(k, 1) + dt*(gas_dmvdt(k, 1) + gas_dmvdt(k, 2))/2._wp
                 end do
 
-                call s_transfer_data_to_tmp()
-                call s_write_void_evol(mytime)
-                if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
+                if (moving_lag_bubbles) call s_enforce_EL_bubbles_boundary_conditions(q_prim_vf, dest=1)
 
+                call s_transfer_data_to_tmp()
+                if (lag_params%write_void_evol) call s_write_void_evol(mytime)
+                if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
                 if (lag_params%write_bubbles) then
                     $:GPU_UPDATE(host='[gas_p,gas_mv,intfc_rad,intfc_vel]')
-                    call s_write_lag_particles(mytime)
+                    call s_write_lag_bubble_evol(mytime)
                 end if
 
             end if
@@ -1150,46 +1348,55 @@ contains
         elseif (time_stepper == 3) then ! 3rd order TVD RK
             if (stage == 1) then
                 $:GPU_PARALLEL_LOOP(private='[k]')
-                do k = 1, nBubs
+                do k = 1, n_el_bubs_loc
                     !u{1} = u{n} +  dt * RHS{n}
                     intfc_rad(k, 2) = intfc_rad(k, 1) + dt*intfc_draddt(k, 1)
                     intfc_vel(k, 2) = intfc_vel(k, 1) + dt*intfc_dveldt(k, 1)
+                    mtn_posPrev(k, 1:3, 2) = mtn_pos(k, 1:3, 1)
                     mtn_pos(k, 1:3, 2) = mtn_pos(k, 1:3, 1) + dt*mtn_dposdt(k, 1:3, 1)
                     mtn_vel(k, 1:3, 2) = mtn_vel(k, 1:3, 1) + dt*mtn_dveldt(k, 1:3, 1)
                     gas_p(k, 2) = gas_p(k, 1) + dt*gas_dpdt(k, 1)
                     gas_mv(k, 2) = gas_mv(k, 1) + dt*gas_dmvdt(k, 1)
                 end do
 
+                if (moving_lag_bubbles) call s_enforce_EL_bubbles_boundary_conditions(q_prim_vf, dest=2)
+
             elseif (stage == 2) then
                 $:GPU_PARALLEL_LOOP(private='[k]')
-                do k = 1, nBubs
+                do k = 1, n_el_bubs_loc
                     !u{2} = u{n} + (1/4) * dt * [RHS{n} + RHS{1}]
                     intfc_rad(k, 2) = intfc_rad(k, 1) + dt*(intfc_draddt(k, 1) + intfc_draddt(k, 2))/4._wp
                     intfc_vel(k, 2) = intfc_vel(k, 1) + dt*(intfc_dveldt(k, 1) + intfc_dveldt(k, 2))/4._wp
+                    mtn_posPrev(k, 1:3, 2) = mtn_pos(k, 1:3, 2)
                     mtn_pos(k, 1:3, 2) = mtn_pos(k, 1:3, 1) + dt*(mtn_dposdt(k, 1:3, 1) + mtn_dposdt(k, 1:3, 2))/4._wp
                     mtn_vel(k, 1:3, 2) = mtn_vel(k, 1:3, 1) + dt*(mtn_dveldt(k, 1:3, 1) + mtn_dveldt(k, 1:3, 2))/4._wp
                     gas_p(k, 2) = gas_p(k, 1) + dt*(gas_dpdt(k, 1) + gas_dpdt(k, 2))/4._wp
                     gas_mv(k, 2) = gas_mv(k, 1) + dt*(gas_dmvdt(k, 1) + gas_dmvdt(k, 2))/4._wp
                 end do
+
+                if (moving_lag_bubbles) call s_enforce_EL_bubbles_boundary_conditions(q_prim_vf, dest=2)
+
             elseif (stage == 3) then
                 $:GPU_PARALLEL_LOOP(private='[k]')
-                do k = 1, nBubs
+                do k = 1, n_el_bubs_loc
                     !u{n+1} = u{n} + (2/3) * dt * [(1/4)* RHS{n} + (1/4)* RHS{1} + RHS{2}]
                     intfc_rad(k, 1) = intfc_rad(k, 1) + (2._wp/3._wp)*dt*(intfc_draddt(k, 1)/4._wp + intfc_draddt(k, 2)/4._wp + intfc_draddt(k, 3))
                     intfc_vel(k, 1) = intfc_vel(k, 1) + (2._wp/3._wp)*dt*(intfc_dveldt(k, 1)/4._wp + intfc_dveldt(k, 2)/4._wp + intfc_dveldt(k, 3))
+                    mtn_posPrev(k, 1:3, 1) = mtn_pos(k, 1:3, 2)
                     mtn_pos(k, 1:3, 1) = mtn_pos(k, 1:3, 1) + (2._wp/3._wp)*dt*(mtn_dposdt(k, 1:3, 1)/4._wp + mtn_dposdt(k, 1:3, 2)/4._wp + mtn_dposdt(k, 1:3, 3))
                     mtn_vel(k, 1:3, 1) = mtn_vel(k, 1:3, 1) + (2._wp/3._wp)*dt*(mtn_dveldt(k, 1:3, 1)/4._wp + mtn_dveldt(k, 1:3, 2)/4._wp + mtn_dveldt(k, 1:3, 3))
                     gas_p(k, 1) = gas_p(k, 1) + (2._wp/3._wp)*dt*(gas_dpdt(k, 1)/4._wp + gas_dpdt(k, 2)/4._wp + gas_dpdt(k, 3))
                     gas_mv(k, 1) = gas_mv(k, 1) + (2._wp/3._wp)*dt*(gas_dmvdt(k, 1)/4._wp + gas_dmvdt(k, 2)/4._wp + gas_dmvdt(k, 3))
                 end do
 
-                call s_transfer_data_to_tmp()
-                call s_write_void_evol(mytime)
-                if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
+                if (moving_lag_bubbles) call s_enforce_EL_bubbles_boundary_conditions(q_prim_vf, dest=1)
 
+                call s_transfer_data_to_tmp()
+                if (lag_params%write_void_evol) call s_write_void_evol(mytime)
+                if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
                 if (lag_params%write_bubbles) then
                     $:GPU_UPDATE(host='[gas_p,gas_mv,gas_mg,intfc_rad,intfc_vel]')
-                    call s_write_lag_particles(mytime)
+                    call s_write_lag_bubble_evol(mytime)
                 end if
 
             end if
@@ -1198,11 +1405,212 @@ contains
 
     end subroutine s_update_lagrange_tdv_rk
 
+    !> This subroutine enforces reflective and wall boundary conditions for EL bubbles
+        !! @param dest Destination for the bubble position update
+    impure subroutine s_enforce_EL_bubbles_boundary_conditions(q_prim_vf, dest)
+
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        integer, intent(in) :: dest
+        integer :: k, i, q
+        integer ::  patch_id, newBubs, new_idx
+        real(wp) :: offset
+        integer, dimension(3) :: cell
+
+        $:GPU_PARALLEL_LOOP(private='[cell]')
+        do k = 1, n_el_bubs_loc
+            keep_bubble(k) = 1
+            wrap_bubble_loc(k,:) = 0
+            wrap_bubble_dir(k,:) = 0
+
+            ! Relocate bubbles at solid boundaries and delete bubbles that leave
+            ! buffer regions
+            if (any(bc_x%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
+                .and. mtn_pos(k, 1, dest) < x_cb(-1) + intfc_rad(k, dest)) then
+                mtn_pos(k, 1, dest) = x_cb(-1) + intfc_rad(k, dest)
+            elseif (any(bc_x%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
+                    .and. mtn_pos(k, 1, dest) > x_cb(m) - intfc_rad(k, dest)) then
+                mtn_pos(k, 1, dest) = x_cb(m) - intfc_rad(k, dest)
+            elseif (bc_x%beg == BC_PERIODIC .and. mtn_pos(k, 1, dest) < pcomm_coords(1)%beg .and. &
+                    mtn_posPrev(k, 1, dest) > pcomm_coords(1)%beg) then
+                wrap_bubble_dir(k,1) = 1
+                wrap_bubble_loc(k,1) = -1
+            elseif (bc_x%end == BC_PERIODIC .and. mtn_pos(k, 1, dest) > pcomm_coords(1)%end .and. &
+                    mtn_posPrev(k, 1, dest) < pcomm_coords(1)%end) then
+                wrap_bubble_dir(k,1) = 1
+                wrap_bubble_loc(k,1) = 1
+            elseif (mtn_pos(k, 1, dest) >= x_cb(m + buff_size - fd_number)) then
+                keep_bubble(k) = 0
+            elseif (mtn_pos(k, 1, dest) < x_cb(fd_number - buff_size - 1)) then
+                keep_bubble(k) = 0
+            end if
+
+            if (any(bc_y%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
+                .and. mtn_pos(k, 2, dest) < y_cb(-1) + intfc_rad(k, dest)) then
+                mtn_pos(k, 2, dest) = y_cb(-1) + intfc_rad(k, dest)
+            else if (any(bc_y%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
+                     .and. mtn_pos(k, 2, dest) > y_cb(n) - intfc_rad(k, dest)) then
+                mtn_pos(k, 2, dest) = y_cb(n) - intfc_rad(k, dest)
+            elseif (bc_y%beg == BC_PERIODIC .and. mtn_pos(k, 2, dest) < pcomm_coords(2)%beg .and. &
+                    mtn_posPrev(k, 2, dest) > pcomm_coords(2)%beg) then
+                wrap_bubble_dir(k,2) = 1
+                wrap_bubble_loc(k,2) = -1
+            elseif (bc_y%end == BC_PERIODIC .and. mtn_pos(k, 2, dest) > pcomm_coords(2)%end .and. &
+                    mtn_posPrev(k, 2, dest) < pcomm_coords(2)%end) then
+                wrap_bubble_dir(k,2) = 1
+                wrap_bubble_loc(k,2) = 1
+            elseif (mtn_pos(k, 2, dest) >= y_cb(n + buff_size - fd_number)) then
+                keep_bubble(k) = 0
+            elseif (mtn_pos(k, 2, dest) < y_cb(fd_number - buff_size - 1)) then
+                keep_bubble(k) = 0
+            end if
+
+            if (p > 0) then
+                if (any(bc_z%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
+                    .and. mtn_pos(k, 3, dest) < z_cb(-1) + intfc_rad(k, dest)) then
+                    mtn_pos(k, 3, dest) = z_cb(-1) + intfc_rad(k, dest)
+                else if (any(bc_z%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
+                         .and. mtn_pos(k, 3, dest) > z_cb(p) - intfc_rad(k, dest)) then
+                    mtn_pos(k, 3, dest) = z_cb(p) - intfc_rad(k, dest)
+                elseif (bc_z%beg == BC_PERIODIC .and. mtn_pos(k, 3, dest) < pcomm_coords(3)%beg .and. &
+                        mtn_posPrev(k, 3, dest) > pcomm_coords(3)%beg) then
+                    wrap_bubble_dir(k,3) = 1
+                    wrap_bubble_loc(k,3) = -1
+                elseif (bc_z%end == BC_PERIODIC .and. mtn_pos(k, 3, dest) > pcomm_coords(3)%end .and. &
+                        mtn_posPrev(k, 3, dest) < pcomm_coords(3)%end) then
+                    wrap_bubble_dir(k,3) = 1
+                    wrap_bubble_loc(k,3) = 1
+                elseif (mtn_pos(k, 3, dest) >= z_cb(p + buff_size - fd_number)) then
+                    keep_bubble(k) = 0
+                elseif (mtn_pos(k, 3, dest) < z_cb(fd_number - buff_size - 1)) then
+                    keep_bubble(k) = 0
+                end if
+            end if
+
+            if (keep_bubble(k) == 1) then
+                ! Remove bubbles that are no longer in a liquid
+                cell = fd_number - buff_size
+                call s_locate_cell(mtn_pos(k, 1:3, dest), cell, mtn_s(k, 1:3, dest))
+
+                if (q_prim_vf(advxb)%sf(cell(1), cell(2), cell(3)) < (1._wp - lag_params%valmaxvoid)) then
+                    keep_bubble(k) = 0
+                end if
+
+                ! Move bubbles back to surface of IB
+                if (ib) then
+                    cell = fd_number - buff_size
+                    call s_locate_cell(mtn_pos(k, 1:3, dest), cell, mtn_s(k, 1:3, dest))
+
+                    if (ib_markers%sf(cell(1), cell(2), cell(3)) /= 0) then
+                        patch_id = ib_markers%sf(cell(1), cell(2), cell(3))
+
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = 1, num_dims
+                            mtn_pos(k, i, dest) = mtn_pos(k, i, dest) - &
+                                                  levelset_norm%sf(cell(1), cell(2), cell(3), patch_id, i) &
+                                                  *levelset%sf(cell(1), cell(2), cell(3), patch_id)
+                        end do
+
+                        cell = fd_number - buff_size
+                        call s_locate_cell(mtn_pos(k, 1:3, dest), cell, mtn_s(k, 1:3, dest))
+                    end if
+                end if
+            end if
+        end do
+
+        call nvtxStartRange("LAG-BC")
+        call nvtxStartRange("LAG-BC-DEV2HOST")
+        $:GPU_UPDATE(host='[bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, &
+            & gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, intfc_rad, intfc_vel, &
+            & mtn_pos, mtn_posPrev, mtn_vel, mtn_s, intfc_draddt, intfc_dveldt, &
+            & gas_dpdt, gas_dmvdt, mtn_dposdt, mtn_dveldt, keep_bubble, n_el_bubs_loc, &
+            & wrap_bubble_dir, wrap_bubble_loc]')
+        call nvtxEndRange
+
+        if (n_el_bubs_loc > 0) then
+            ! Handle deletion of bubbles leaving local domain
+            do k = 1, n_el_bubs_loc
+                if (k == 1) then
+                    prefix_sum(k) = keep_bubble(k)
+                else
+                    prefix_sum(k) = prefix_sum(k - 1) + keep_bubble(k)
+                end if
+            end do
+
+            active_bubs = prefix_sum(n_el_bubs_loc)
+
+            do k = 1, n_el_bubs_loc
+                if (keep_bubble(k) == 1) then
+                    if (prefix_sum(k) /= k) then
+                        call s_copy_lag_bubble(prefix_sum(k), k)
+                        wrap_bubble_dir(prefix_sum(k), :) = wrap_bubble_dir(k, :)
+                        wrap_bubble_loc(prefix_sum(k), :) = wrap_bubble_loc(k, :)
+                    end if
+                end if
+            end do
+
+            n_el_bubs_loc = active_bubs
+
+            ! Handle periodic wrapping of bubbles on same processor
+            newBubs = 0
+            do k = 1, n_el_bubs_loc
+                if (any(wrap_bubble_dir(k, :) == 1)) then
+                    newBubs = newBubs + 1
+                    new_idx = n_el_bubs_loc + newBubs
+                    call s_copy_lag_bubble(new_idx, k)
+                    do i = 1, num_dims
+                        if (wrap_bubble_dir(k, i) == 1) then
+                            offset = glb_bounds(i)%end - glb_bounds(i)%beg
+                            if (wrap_bubble_loc(k,i) == 1) then
+                                do q = 1, 2
+                                    mtn_pos(new_idx, i, q) = mtn_pos(new_idx, i, q) - offset
+                                    mtn_posPrev(new_idx, i, q) = mtn_posPrev(new_idx, i, q) - offset
+                                end do
+                            else if (wrap_bubble_loc(k,i) == -1) then
+                                do q = 1, 2
+                                    mtn_pos(new_idx, i, q) = mtn_pos(new_idx, i, q) + offset
+                                    mtn_posPrev(new_idx, i, q) = mtn_posPrev(new_idx, i, q) + offset
+                                end do
+                            end if
+                        end if
+                    end do
+                end if
+            end do
+            n_el_bubs_loc = n_el_bubs_loc + newBubs
+        end if
+
+        ! Handle MPI transfer of bubbles going to another processor's local domain
+        if (num_procs > 1) then
+            call nvtxStartRange("LAG-BC-TRANSFER-LIST")
+            call s_add_particles_to_transfer_list(n_el_bubs_loc, mtn_pos(:, :, dest), mtn_posPrev(:, :, dest))
+            call nvtxEndRange
+
+            call nvtxStartRange("LAG-BC-SENDRECV")
+            call s_mpi_sendrecv_particles(bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, &
+                                          gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, &
+                                          intfc_rad, intfc_vel, mtn_pos, mtn_posPrev, mtn_vel, &
+                                          mtn_s, intfc_draddt, intfc_dveldt, gas_dpdt, &
+                                          gas_dmvdt, mtn_dposdt, mtn_dveldt, lag_num_ts, n_el_bubs_loc, &
+                                          dest)
+            call nvtxEndRange
+        end if
+
+        call nvtxStartRange("LAG-BC-HOST2DEV")
+        $:GPU_UPDATE(device='[bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, &
+            & gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, intfc_rad, intfc_vel, &
+            & mtn_pos, mtn_posPrev, mtn_vel, mtn_s, intfc_draddt, intfc_dveldt, &
+            & gas_dpdt, gas_dmvdt, mtn_dposdt, mtn_dveldt, n_el_bubs_loc]')
+        call nvtxEndRange
+        call nvtxEndRange
+
+    end subroutine s_enforce_EL_bubbles_boundary_conditions
+
     !> This subroutine returns the computational coordinate of the cell for the given position.
           !! @param pos Input coordinates
           !! @param cell Computational coordinate of the cell
           !! @param scoord Calculated particle coordinates
     pure subroutine s_locate_cell(pos, cell, scoord)
+        $:GPU_ROUTINE(function_name='s_locate_cell',parallelism='[seq]', &
+            & cray_inline=True)
 
         real(wp), dimension(3), intent(in) :: pos
         real(wp), dimension(3), intent(out) :: scoord
@@ -1214,7 +1622,7 @@ contains
             cell(1) = cell(1) - 1
         end do
 
-        do while (pos(1) > x_cb(cell(1)))
+        do while (pos(1) >= x_cb(cell(1)))
             cell(1) = cell(1) + 1
         end do
 
@@ -1222,7 +1630,7 @@ contains
             cell(2) = cell(2) - 1
         end do
 
-        do while (pos(2) > y_cb(cell(2)))
+        do while (pos(2) >= y_cb(cell(2)))
             cell(2) = cell(2) + 1
         end do
 
@@ -1230,7 +1638,7 @@ contains
             do while (pos(3) < z_cb(cell(3) - 1))
                 cell(3) = cell(3) - 1
             end do
-            do while (pos(3) > z_cb(cell(3)))
+            do while (pos(3) >= z_cb(cell(3)))
                 cell(3) = cell(3) + 1
             end do
         end if
@@ -1259,7 +1667,7 @@ contains
         integer :: k
 
         $:GPU_PARALLEL_LOOP(private='[k]')
-        do k = 1, nBubs
+        do k = 1, n_el_bubs_loc
             gas_p(k, 2) = gas_p(k, 1)
             gas_mv(k, 2) = gas_mv(k, 1)
             intfc_rad(k, 2) = intfc_rad(k, 1)
@@ -1284,20 +1692,27 @@ contains
         if (p == 0 .and. cyl_coord .neqv. .true.) then
             ! Defining a virtual z-axis that has the same dimensions as y-axis
             ! defined in the input file
-            particle_in_domain = ((pos_part(1) < x_cb(m + buff_size)) .and. (pos_part(1) >= x_cb(-buff_size - 1)) .and. &
-                                  (pos_part(2) < y_cb(n + buff_size)) .and. (pos_part(2) >= y_cb(-buff_size - 1)) .and. &
-                                  (pos_part(3) < lag_params%charwidth/2._wp) .and. (pos_part(3) >= -lag_params%charwidth/2._wp))
+            particle_in_domain = ((pos_part(1) < x_cb(m + buff_size - fd_number)) .and. &
+                                  (pos_part(1) >= x_cb(fd_number - buff_size - 1)) .and. &
+                                  (pos_part(2) < y_cb(n + buff_size - fd_number)) .and. &
+                                  (pos_part(2) >= y_cb(fd_number - buff_size - 1)) .and. &
+                                  (pos_part(3) < lag_params%charwidth/2._wp) .and. (pos_part(3) > -lag_params%charwidth/2._wp))
         else
             ! cyl_coord
-            particle_in_domain = ((pos_part(1) < x_cb(m + buff_size)) .and. (pos_part(1) >= x_cb(-buff_size - 1)) .and. &
-                                  (abs(pos_part(2)) < y_cb(n + buff_size)) .and. (abs(pos_part(2)) >= max(y_cb(-buff_size - 1), 0._wp)))
+            particle_in_domain = ((pos_part(1) < x_cb(m + buff_size - fd_number)) .and. &
+                                  (pos_part(1) >= x_cb(fd_number - buff_size - 1)) .and. &
+                                  (abs(pos_part(2)) < y_cb(n + buff_size - fd_number)) .and. &
+                                  (abs(pos_part(2)) >= max(y_cb(fd_number - buff_size - 1), 0._wp)))
         end if
 
         ! 3D
-        if (p > 0) then
-            particle_in_domain = ((pos_part(1) < x_cb(m + buff_size)) .and. (pos_part(1) >= x_cb(-buff_size - 1)) .and. &
-                                  (pos_part(2) < y_cb(n + buff_size)) .and. (pos_part(2) >= y_cb(-buff_size - 1)) .and. &
-                                  (pos_part(3) < z_cb(p + buff_size)) .and. (pos_part(3) >= z_cb(-buff_size - 1)))
+        if (p > 1) then
+            particle_in_domain = ((pos_part(1) < x_cb(m + buff_size - fd_number)) .and. &
+                                  (pos_part(1) >= x_cb(fd_number - buff_size - 1)) .and. &
+                                  (pos_part(2) < y_cb(n + buff_size - fd_number)) .and. &
+                                  (pos_part(2) >= y_cb(fd_number - buff_size - 1)) .and. &
+                                  (pos_part(3) < z_cb(p + buff_size - fd_number)) .and. &
+                                  (pos_part(3) >= z_cb(fd_number - buff_size - 1)))
         end if
 
         ! For symmetric and wall boundary condition
@@ -1400,21 +1815,15 @@ contains
 
     end subroutine s_gradient_dir
 
-    !> Subroutine that writes on each time step the changes of the lagrangian bubbles.
-        !!  @param q_time Current time
-    impure subroutine s_write_lag_particles(qtime)
-
-        real(wp), intent(in) :: qtime
-        integer :: k
+    impure subroutine s_open_lag_bubble_evol
 
         character(LEN=path_len + 2*name_len) :: file_loc
-        logical :: file_exist
-
+        logical file_exist
         character(LEN=25) :: FMT
 
         write (file_loc, '(A,I0,A)') 'lag_bubble_evol_', proc_rank, '.dat'
         file_loc = trim(case_dir)//'/D/'//trim(file_loc)
-        inquire (FILE=trim(file_loc), EXIST=file_exist)
+        call my_inquire(trim(file_loc), file_exist)
 
         if (precision == 1) then
             FMT = "(A16,A14,8A16)"
@@ -1423,13 +1832,26 @@ contains
         end if
 
         if (.not. file_exist) then
-            open (11, FILE=trim(file_loc), FORM='formatted', position='rewind')
-            write (11, FMT) 'currentTime', 'particleID', 'x', 'y', 'z', &
+            open (LAG_EVOL_ID, FILE=trim(file_loc), FORM='formatted', position='rewind')
+            write (LAG_EVOL_ID, FMT) 'currentTime', 'particleID', 'x', 'y', 'z', &
                 'coreVaporMass', 'coreVaporConcentration', 'radius', 'interfaceVelocity', &
                 'corePressure'
         else
-            open (11, FILE=trim(file_loc), FORM='formatted', position='append')
+            open (LAG_EVOL_ID, FILE=trim(file_loc), FORM='formatted', position='append')
         end if
+
+    end subroutine s_open_lag_bubble_evol
+
+    !> Subroutine that writes on each time step the changes of the lagrangian bubbles.
+        !!  @param q_time Current time
+    impure subroutine s_write_lag_bubble_evol(qtime)
+
+        real(wp), intent(in) :: qtime
+        integer :: k, ios
+        character(LEN=25) :: FMT
+
+        character(LEN=path_len + 2*name_len) :: file_loc, path
+        logical :: file_exist
 
         if (precision == 1) then
             FMT = "(F16.8,I14,8F16.8)"
@@ -1438,8 +1860,8 @@ contains
         end if
 
         ! Cycle through list
-        do k = 1, nBubs
-            write (11, FMT) &
+        do k = 1, n_el_bubs_loc
+            write (LAG_EVOL_ID, FMT) &
                 qtime, &
                 lag_id(k, 1), &
                 mtn_pos(k, 1, 1), &
@@ -1452,9 +1874,36 @@ contains
                 gas_p(k, 1)
         end do
 
-        close (11)
+    end subroutine s_write_lag_bubble_evol
 
-    end subroutine s_write_lag_particles
+    impure subroutine s_close_lag_bubble_evol
+
+        close (LAG_EVOL_ID)
+
+    end subroutine s_close_lag_bubble_evol
+
+    subroutine s_open_void_evol
+
+        character(LEN=path_len + 2*name_len) :: file_loc
+        logical :: file_exist
+
+        if (proc_rank == 0) then
+            write (file_loc, '(A)') 'voidfraction.dat'
+            file_loc = trim(case_dir)//'/D/'//trim(file_loc)
+            call my_inquire(trim(file_loc), file_exist)
+            if (.not. file_exist) then
+                open (LAG_VOID_ID, FILE=trim(file_loc), FORM='formatted', position='rewind')
+                !write (12, *) 'currentTime, averageVoidFraction, ', &
+                !    'maximumVoidFraction, totalParticlesVolume'
+                !write (12, *) 'The averageVoidFraction value does ', &
+                !    'not reflect the real void fraction in the cloud since the ', &
+                !    'cells which do not have bubbles are not accounted'
+            else
+                open (LAG_VOID_ID, FILE=trim(file_loc), FORM='formatted', position='append')
+            end if
+        end if
+
+    end subroutine s_open_void_evol
 
     !>  Subroutine that writes some useful statistics related to the volume fraction
             !!       of the particles (void fraction) in the computatioational domain
@@ -1471,22 +1920,6 @@ contains
 
         character(LEN=path_len + 2*name_len) :: file_loc
         logical :: file_exist
-
-        if (proc_rank == 0) then
-            write (file_loc, '(A)') 'voidfraction.dat'
-            file_loc = trim(case_dir)//'/D/'//trim(file_loc)
-            inquire (FILE=trim(file_loc), EXIST=file_exist)
-            if (.not. file_exist) then
-                open (12, FILE=trim(file_loc), FORM='formatted', position='rewind')
-                !write (12, *) 'currentTime, averageVoidFraction, ', &
-                !    'maximumVoidFraction, totalParticlesVolume'
-                !write (12, *) 'The averageVoidFraction value does ', &
-                !    'not reflect the real void fraction in the cloud since the ', &
-                !    'cells which do not have bubbles are not accounted'
-            else
-                open (12, FILE=trim(file_loc), FORM='formatted', position='append')
-            end if
-        end if
 
         lag_void_max = 0._wp
         lag_void_avg = 0._wp
@@ -1523,15 +1956,20 @@ contains
         if (lag_vol > 0._wp) lag_void_avg = lag_void_avg/lag_vol
 
         if (proc_rank == 0) then
-            write (12, '(6X,4e24.8)') &
+            write (LAG_VOID_ID, '(6X,4e24.8)') &
                 qtime, &
                 lag_void_avg, &
                 lag_void_max, &
                 voltot
-            close (12)
         end if
 
     end subroutine s_write_void_evol
+
+    subroutine s_close_void_evol
+
+        if (proc_rank == 0) close (LAG_VOID_ID)
+
+    end subroutine s_close_void_evol
 
     !>  Subroutine that writes the restarting files for the particles in the lagrangian solver.
         !!  @param t_step Current time step
@@ -1558,8 +1996,8 @@ contains
         dummy = 0._wp
 
         bub_id = 0._wp
-        if (nBubs /= 0) then
-            do k = 1, nBubs
+        if (n_el_bubs_loc /= 0) then
+            do k = 1, n_el_bubs_loc
                 if (particle_in_domain_physical(mtn_pos(k, 1:3, 1))) then
                     bub_id = bub_id + 1
                 end if
@@ -1620,7 +2058,7 @@ contains
             allocate (MPI_IO_DATA_lag_bubbles(max(1, bub_id), 1:lag_io_vars))
 
             i = 1
-            do k = 1, nBubs
+            do k = 1, n_el_bubs_loc
                 if (particle_in_domain_physical(mtn_pos(k, 1:3, 1))) then
                     MPI_IO_DATA_lag_bubbles(i, 1) = real(lag_id(k, 1))
                     MPI_IO_DATA_lag_bubbles(i, 2:4) = mtn_pos(k, 1:3, 1)
@@ -1690,7 +2128,7 @@ contains
 
         $:GPU_PARALLEL_LOOP(reduction='[[Rmax_glb], [Rmin_glb]]', &
             & reductionOp='[MAX, MIN]', copy='[Rmax_glb,Rmin_glb]')
-        do k = 1, nBubs
+        do k = 1, n_el_bubs_loc
             Rmax_glb = max(Rmax_glb, intfc_rad(k, 1)/bub_R0(k))
             Rmin_glb = min(Rmin_glb, intfc_rad(k, 1)/bub_R0(k))
             Rmax_stats(k) = max(Rmax_stats(k), intfc_rad(k, 1)/bub_R0(k))
@@ -1699,18 +2137,15 @@ contains
 
     end subroutine s_calculate_lag_bubble_stats
 
-    !>  Subroutine that writes the maximum and minimum radius of each bubble.
-    impure subroutine s_write_lag_bubble_stats()
+    impure subroutine s_open_lag_bubble_stats()
 
-        integer :: k
         character(LEN=path_len + 2*name_len) :: file_loc
-
-        character(len=20) :: FMT
+        character(LEN=20) :: FMT
+        logical :: file_exist
 
         write (file_loc, '(A,I0,A)') 'stats_lag_bubbles_', proc_rank, '.dat'
         file_loc = trim(case_dir)//'/D/'//trim(file_loc)
-
-        $:GPU_UPDATE(host='[Rmax_glb,Rmin_glb]')
+        call my_inquire(trim(file_loc), file_exist)
 
         if (precision == 1) then
             FMT = "(A10,A14,5A16)"
@@ -1718,8 +2153,23 @@ contains
             FMT = "(A10,A14,5A24)"
         end if
 
-        open (13, FILE=trim(file_loc), FORM='formatted', position='rewind')
-        write (13, FMT) 'proc_rank', 'particleID', 'x', 'y', 'z', 'Rmax_glb', 'Rmin_glb'
+        if (.not. file_exist) then
+            open (LAG_STATS_ID, FILE=trim(file_loc), FORM='formatted', position='rewind')
+            write (LAG_STATS_ID, *) 'proc_rank, particleID, x, y, z, Rmax_glb, Rmin_glb'
+        else
+            open (LAG_STATS_ID, FILE=trim(file_loc), FORM='formatted', position='append')
+        end if
+
+    end subroutine s_open_lag_bubble_stats
+
+    !>  Subroutine that writes the maximum and minimum radius of each bubble.
+    impure subroutine s_write_lag_bubble_stats()
+
+        integer :: k
+        character(LEN=path_len + 2*name_len) :: file_loc
+        character(LEN=20) :: FMT
+
+        $:GPU_UPDATE(host='[Rmax_glb,Rmin_glb]')
 
         if (precision == 1) then
             FMT = "(I10,I14,5F16.8)"
@@ -1727,8 +2177,8 @@ contains
             FMT = "(I10,I14,5F24.16)"
         end if
 
-        do k = 1, nBubs
-            write (13, FMT) &
+        do k = 1, n_el_bubs_loc
+            write (LAG_STATS_ID, FMT) &
                 proc_rank, &
                 lag_id(k, 1), &
                 mtn_pos(k, 1, 1), &
@@ -1738,51 +2188,53 @@ contains
                 Rmin_stats(k)
         end do
 
-        close (13)
-
     end subroutine s_write_lag_bubble_stats
+
+    subroutine s_close_lag_bubble_stats
+
+        close (LAG_STATS_ID)
+
+    end subroutine s_close_lag_bubble_stats
 
     !> The purpose of this subroutine is to remove one specific particle if dt is too small.
           !! @param bub_id Particle id
-    impure subroutine s_remove_lag_bubble(bub_id)
+    impure subroutine s_copy_lag_bubble(dest, src)
 
-        integer, intent(in) :: bub_id
+        integer, intent(in) :: src, dest
 
-        integer :: i
+        bub_R0(dest) = bub_R0(src)
+        Rmax_stats(dest) = Rmax_stats(src)
+        Rmin_stats(dest) = Rmin_stats(src)
+        gas_mg(dest) = gas_mg(src)
+        gas_betaT(dest) = gas_betaT(src)
+        gas_betaC(dest) = gas_betaC(src)
+        bub_dphidt(dest) = bub_dphidt(src)
+        lag_id(dest, 1) = lag_id(src, 1)
+        gas_p(dest, 1:2) = gas_p(src, 1:2)
+        gas_mv(dest, 1:2) = gas_mv(src, 1:2)
+        intfc_rad(dest, 1:2) = intfc_rad(src, 1:2)
+        intfc_vel(dest, 1:2) = intfc_vel(src, 1:2)
+        mtn_vel(dest, 1:3, 1:2) = mtn_vel(src, 1:3, 1:2)
+        mtn_s(dest, 1:3, 1:2) = mtn_s(src, 1:3, 1:2)
+        mtn_pos(dest, 1:3, 1:2) = mtn_pos(src, 1:3, 1:2)
+        mtn_posPrev(dest, 1:3, 1:2) = mtn_posPrev(src, 1:3, 1:2)
+        intfc_draddt(dest, 1:lag_num_ts) = intfc_draddt(src, 1:lag_num_ts)
+        intfc_dveldt(dest, 1:lag_num_ts) = intfc_dveldt(src, 1:lag_num_ts)
+        gas_dpdt(dest, 1:lag_num_ts) = gas_dpdt(src, 1:lag_num_ts)
+        gas_dmvdt(dest, 1:lag_num_ts) = gas_dmvdt(src, 1:lag_num_ts)
+        mtn_dposdt(dest, 1:3, 1:lag_num_ts) = mtn_dposdt(src, 1:3, 1:lag_num_ts)
+        mtn_dveldt(dest, 1:3, 1:lag_num_ts) = mtn_dveldt(src, 1:3, 1:lag_num_ts)
 
-        $:GPU_LOOP(parallelism='[seq]')
-        do i = bub_id, nBubs - 1
-            lag_id(i, 1) = lag_id(i + 1, 1)
-            bub_R0(i) = bub_R0(i + 1)
-            Rmax_stats(i) = Rmax_stats(i + 1)
-            Rmin_stats(i) = Rmin_stats(i + 1)
-            gas_mg(i) = gas_mg(i + 1)
-            gas_betaT(i) = gas_betaT(i + 1)
-            gas_betaC(i) = gas_betaC(i + 1)
-            bub_dphidt(i) = bub_dphidt(i + 1)
-            gas_p(i, 1:2) = gas_p(i + 1, 1:2)
-            gas_mv(i, 1:2) = gas_mv(i + 1, 1:2)
-            intfc_rad(i, 1:2) = intfc_rad(i + 1, 1:2)
-            intfc_vel(i, 1:2) = intfc_vel(i + 1, 1:2)
-            mtn_pos(i, 1:3, 1:2) = mtn_pos(i + 1, 1:3, 1:2)
-            mtn_posPrev(i, 1:3, 1:2) = mtn_posPrev(i + 1, 1:3, 1:2)
-            mtn_vel(i, 1:3, 1:2) = mtn_vel(i + 1, 1:3, 1:2)
-            mtn_s(i, 1:3, 1:2) = mtn_s(i + 1, 1:3, 1:2)
-            intfc_draddt(i, 1:lag_num_ts) = intfc_draddt(i + 1, 1:lag_num_ts)
-            intfc_dveldt(i, 1:lag_num_ts) = intfc_dveldt(i + 1, 1:lag_num_ts)
-            gas_dpdt(i, 1:lag_num_ts) = gas_dpdt(i + 1, 1:lag_num_ts)
-            gas_dmvdt(i, 1:lag_num_ts) = gas_dmvdt(i + 1, 1:lag_num_ts)
-        end do
-
-        nBubs = nBubs - 1
-        $:GPU_UPDATE(device='[nBubs]')
-
-    end subroutine s_remove_lag_bubble
+    end subroutine s_copy_lag_bubble
 
     !> The purpose of this subroutine is to deallocate variables
     impure subroutine s_finalize_lagrangian_solver()
 
         integer :: i
+
+        if (lag_params%write_void_evol) call s_close_void_evol
+        if (lag_params%write_bubbles) call s_close_lag_bubble_evol()
+        if (lag_params%write_bubbles_stats) call s_close_lag_bubble_stats()
 
         do i = 1, q_beta_idx
             @:DEALLOCATE(q_beta%vf(i)%sf)

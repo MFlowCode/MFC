@@ -106,6 +106,7 @@ PRE_PROCESS.update({
     'elliptic_smoothing_iters': ParamType.INT,
     'viscous': ParamType.LOG,
     'bubbles_lagrange': ParamType.LOG,
+    'fd_number': ParamType.INT,
     'fft_wrt': ParamType.LOG,
 })
 
@@ -327,15 +328,19 @@ SIMULATION.update({
 })
 
 for var in [ 'heatTransfer_model', 'massTransfer_model', 'pressure_corrector',
-             'write_bubbles', 'write_bubbles_stats' ]:
+             'write_bubbles', 'write_bubbles_stats', 'pressure_force', 'gravity_force',
+             'write_void_evol' ]:
     SIMULATION[f'lag_params%{var}'] = ParamType.LOG
 
-for var in [ 'solver_approach', 'cluster_type', 'smooth_type', 'nBubs_glb']:
+for var in [ 'solver_approach', 'cluster_type', 'smooth_type', 'nBubs_glb',
+             'vel_model', 'drag_model']:
     SIMULATION[f'lag_params%{var}'] = ParamType.INT
 
 for var in [ 'epsilonb', 'valmaxvoid', 'charwidth', 'diffcoefvap',
             'c0', 'rho0', 'T0', 'x0', 'Thost' ]:
     SIMULATION[f'lag_params%{var}'] = ParamType.REAL
+
+SIMULATION[f'lag_params%input_path'] = ParamType.STR
 
 for var in [ 'diffusion', 'reactions' ]:
     SIMULATION[f'chem_params%{var}'] = ParamType.LOG
@@ -387,10 +392,6 @@ for cmp in ["x", "y", "z"]:
     for var in ["k", "w", "p", "g"]:
         SIMULATION[f'{var}_{cmp}'] = ParamType.REAL
     SIMULATION[f'bf_{cmp}'] = ParamType.LOG
-
-
-    for prepend in ["domain%beg", "domain%end"]:
-        SIMULATION[f"{cmp}_{prepend}"] = ParamType.REAL
 
 for probe_id in range(1,10+1):
     for cmp in ["x", "y", "z"]:

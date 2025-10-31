@@ -1003,13 +1003,6 @@ contains
         end if
 
         if (bubbles_lagrange) then
-            ! RHS additions for sub-grid bubbles_lagrange
-            call nvtxStartRange("RHS-EL-BUBBLES-SRC")
-            call s_compute_bubbles_EL_source( &
-                q_cons_qp%vf(1:sys_size), &
-                q_prim_qp%vf(1:sys_size), &
-                rhs_vf)
-            call nvtxEndRange
             ! Compute bubble dynamics
             if (.not. adap_dt) then
                 call nvtxStartRange("RHS-EL-BUBBLES-DYN")
@@ -1018,6 +1011,14 @@ contains
                     stage)
                 call nvtxEndRange
             end if
+
+            ! RHS additions for sub-grid bubbles_lagrange
+            call nvtxStartRange("RHS-EL-BUBBLES-SRC")
+            call s_compute_bubbles_EL_source( &
+                q_cons_qp%vf(1:sys_size), &
+                q_prim_qp%vf(1:sys_size), &
+                rhs_vf)
+            call nvtxEndRange
         end if
 
         if (chemistry .and. chem_params%reactions) then

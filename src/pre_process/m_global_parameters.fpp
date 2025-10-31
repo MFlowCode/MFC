@@ -131,6 +131,21 @@ module m_global_parameters
     ! Stands for "InDices With BUFFer".
     type(int_bounds_info) :: idwbuff(1:3)
 
+    integer :: fd_order !<
+    !! The order of the finite-difference (fd) approximations of the first-order
+    !! derivatives that need to be evaluated when the CoM or flow probe data
+    !! files are to be written at each time step
+
+    integer :: fd_number !<
+    !! The finite-difference number is given by MAX(1, fd_order/2). Essentially,
+    !! it is a measure of the half-size of the finite-difference stencil for the
+    !! selected order of accuracy.
+
+    !> @name lagrangian subgrid bubble parameters
+    !> @{!
+    type(bubbles_lagrange_parameters) :: lag_params     !< Lagrange bubbles' parameters
+    !> @}
+
     type(int_bounds_info) :: bc_x, bc_y, bc_z !<
     !! Boundary conditions in the x-, y- and z-coordinate directions
 
@@ -174,6 +189,11 @@ module m_global_parameters
 
     integer, allocatable, dimension(:) :: proc_coords !<
     !! Processor coordinates in MPI_CART_COMM
+
+    type(int_bounds_info), dimension(3) :: nidx
+
+    integer, allocatable, dimension(:, :, :) :: neighbor_ranks
+    !! Neighbor ranks
 
     integer, allocatable, dimension(:) :: start_idx !<
     !! Starting cell-center index of local processor in global grid
@@ -401,6 +421,27 @@ contains
 
         ! Initial condition parameters
         num_patches = dflt_int
+
+        fd_order = dflt_int
+        lag_params%cluster_type = dflt_int
+        lag_params%pressure_corrector = .false.
+        lag_params%smooth_type = dflt_int
+        lag_params%heatTransfer_model = .false.
+        lag_params%massTransfer_model = .false.
+        lag_params%write_bubbles = .false.
+        lag_params%write_bubbles_stats = .false.
+        lag_params%nBubs_glb = dflt_int
+        lag_params%vel_model = dflt_int
+        lag_params%drag_model = dflt_int
+        lag_params%epsilonb = 1._wp
+        lag_params%charwidth = dflt_real
+        lag_params%valmaxvoid = dflt_real
+        lag_params%c0 = dflt_real
+        lag_params%rho0 = dflt_real
+        lag_params%T0 = dflt_real
+        lag_params%Thost = dflt_real
+        lag_params%x0 = dflt_real
+        lag_params%diffcoefvap = dflt_real
 
         do i = 1, num_patches_max
             patch_icpp(i)%geometry = dflt_int
@@ -897,11 +938,15 @@ contains
         chemxb = species_idx%beg
         chemxe = species_idx%end
 
+        if (lag_params%vel_model /= 0) then
+            fd_number = max(1, fd_order/2)
+        end if
+
         call s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, &
                                            igr_order, buff_size, &
                                            idwint, idwbuff, viscous, &
                                            bubbles_lagrange, m, n, p, &
-                                           num_dims, igr, ib)
+                                           num_dims, igr, ib, fd_number)
 
 #ifdef MFC_MPI
 

@@ -17,6 +17,8 @@ module m_bubbles
 
     use m_helper_basic         !< Functions to compare floating point numbers
 
+    use m_bubbles_EL_kernels
+
     implicit none
 
     real(wp) :: chi_vw  !< Bubble wall properties (Ando 2010)
@@ -467,7 +469,8 @@ contains
     pure subroutine s_advance_step(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
                                    fntait, fBtait, f_bub_adv_src, f_divu, &
                                    bub_id, fmass_v, fmass_n, fbeta_c, &
-                                   fbeta_t, fCson, adap_dt_stop)
+                                   fbeta_t, fCson, adap_dt_stop, fRe, fPos, &
+                                   fVel, cell, q_prim_vf)
         $:GPU_ROUTINE(function_name='s_advance_step',parallelism='[seq]', &
             & cray_inline=True)
 
@@ -477,14 +480,18 @@ contains
         integer, intent(in) :: bub_id
         real(wp), intent(in) :: fmass_n, fbeta_c, fbeta_t, fCson
         integer, intent(inout) :: adap_dt_stop
+        real(wp), intent(inout), dimension(3), optional :: fPos, fVel
+        real(wp), intent(in), optional :: fRe
+        integer, intent(in), dimension(3), optional :: cell
+        type(scalar_field), intent(in), dimension(sys_size), optional :: q_prim_vf
 
         real(wp), dimension(5) :: err !< Error estimates for adaptive time stepping
         real(wp) :: t_new !< Updated time step size
         real(wp) :: h !< Time step size
         real(wp), dimension(4) :: myR_tmp1, myV_tmp1, myR_tmp2, myV_tmp2 !< Bubble radius, radial velocity, and radial acceleration for the inner loop
         real(wp), dimension(4) :: myPb_tmp1, myMv_tmp1, myPb_tmp2, myMv_tmp2 !< Gas pressure and vapor mass for the inner loop (EL)
-        real(wp) :: fR2, fV2, fpb2, fmass_v2
-        integer :: iter_count
+        real(wp) :: fR2, fV2, fpb2, fmass_v2, vTemp, aTemp, f_bTemp
+        integer :: l, iter_count
 
         call s_initial_substep_h(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
                                  fntait, fBtait, f_bub_adv_src, f_divu, fCson, h)
@@ -555,6 +562,26 @@ contains
                         ! Update pb and mass_v
                         fpb = myPb_tmp1(4)
                         fmass_v = myMv_tmp1(4)
+                        do l = 1, num_dims
+                            select case(lag_vel_model)
+                            case (1)
+                                vTemp = f_interpolate_velocity(fR, cell, l, q_prim_vf)
+                                fPos(l) = fPos(l) + h*vTemp
+                                fVel(l) = vTemp
+                            case (2)
+                                f_bTemp = f_get_bubble_force(fPos(l), fR, fV, fVel(l), fmass_n, fmass_v, &
+                                                           fRe, fRho, cell, l, q_prim_vf)
+                                aTemp = f_bTemp/(fmass_n + fmass_v)
+                                fPos(l) = fPos(l) + h * fVel(l)
+                                fVel(l) = fVel(l) + h * aTemp
+                            case (3)
+                                f_bTemp = f_get_bubble_force(fPos(l), fR, fV, fVel(l), fmass_n, fmass_v, &
+                                                           fRe, fRho, cell, l, q_prim_vf)
+                                aTemp = 2._wp * f_bTemp / (fmass_n + fmass_v) - 3 * fV * fVel(l) / fR
+                                fPos(l) = fPos(l) + h * fVel(l)
+                                fVel(l) = fVel(l) + h * aTemp
+                            end select
+                        end do
                     end if
 
                     ! Update step size for the next sub-step

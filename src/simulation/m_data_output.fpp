@@ -36,7 +36,7 @@ module m_data_output
 
     implicit none
 
-    private; 
+    private;
     public :: s_initialize_data_output_module, &
               s_open_run_time_information_file, &
               s_open_com_files, &
@@ -165,6 +165,10 @@ contains
                 trim('VCFL Max'), trim('Rc Min')
         end if
 
+        if (bubbles_lagrange) then
+            write (3, '(13X,A10)', advance="no") trim('N Bubbles')
+        end if
+
         write (3, *) ! new line
 
     end subroutine s_open_run_time_information_file
@@ -279,7 +283,8 @@ contains
         integer :: j, k, l
 
         ! Computing Stability Criteria at Current Time-step
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re]', &
+        & reduction='[[icfl_max_loc, vcfl_max_loc],[Rc_min_loc]]', reductionOp='[MAX,MIN]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -296,48 +301,23 @@ contains
                 end do
             end do
         end do
-
         ! end: Computing Stability Criteria at Current Time-step
-
-        ! Determining local stability criteria extrema at current time-step
-
-#ifdef _CRAYFTN
-        $:GPU_UPDATE(host='[icfl_sf]')
-
-        if (viscous) then
-            $:GPU_UPDATE(host='[vcfl_sf,Rc_sf]')
-        end if
-
-        icfl_max_loc = maxval(icfl_sf)
-
-        if (viscous) then
-            vcfl_max_loc = maxval(vcfl_sf)
-            Rc_min_loc = minval(Rc_sf)
-        end if
-#else
-        #:call GPU_PARALLEL(copyout='[icfl_max_loc]', copyin='[icfl_sf]')
-            icfl_max_loc = maxval(icfl_sf)
-        #:endcall GPU_PARALLEL
-        if (viscous) then
-            #:call GPU_PARALLEL(copyout='[vcfl_max_loc, Rc_min_loc]', copyin='[vcfl_sf,Rc_sf]')
-                vcfl_max_loc = maxval(vcfl_sf)
-                Rc_min_loc = minval(Rc_sf)
-            #:endcall GPU_PARALLEL
-        end if
-#endif
 
         ! Determining global stability criteria extrema at current time-step
         if (num_procs > 1) then
             call s_mpi_reduce_stability_criteria_extrema(icfl_max_loc, &
                                                          vcfl_max_loc, &
                                                          Rc_min_loc, &
+                                                         n_el_bubs_loc, &
                                                          icfl_max_glb, &
                                                          vcfl_max_glb, &
-                                                         Rc_min_glb)
+                                                         Rc_min_glb, &
+                                                         n_el_bubs_glb)
         else
             icfl_max_glb = icfl_max_loc
             if (viscous) vcfl_max_glb = vcfl_max_loc
             if (viscous) Rc_min_glb = Rc_min_loc
+            if (bubbles_lagrange) n_el_bubs_glb = n_el_bubs_loc
         end if
 
         ! Determining the stability criteria extrema over all the time-steps
@@ -359,6 +339,10 @@ contains
                     Rc_min_glb
             end if
 
+            if (bubbles_lagrange) then
+                write (3, '(13X,I10)', advance="no") n_el_bubs_glb
+            end if
+
             write (3, *) ! new line
 
             if (.not. f_approx_equal(icfl_max_glb, icfl_max_glb)) then
@@ -374,6 +358,12 @@ contains
                 elseif (vcfl_max_glb > 1._wp) then
                     print *, 'vcfl', vcfl_max_glb
                     call s_mpi_abort('VCFL is greater than 1.0. Exiting.')
+                end if
+            end if
+
+            if (bubbles_lagrange) then
+                if (n_el_bubs_glb == 0) then
+                    call s_mpi_abort('No Lagrangian bubbles remain in the domain. Exiting.')
                 end if
             end if
         end if
@@ -1749,7 +1739,7 @@ contains
 
         write (3, '(A,F9.6)') 'ICFL Max: ', icfl_max
         if (viscous) write (3, '(A,F9.6)') 'VCFL Max: ', vcfl_max
-        if (viscous) write (3, '(A,F10.6)') 'Rc Min: ', Rc_min
+        if (viscous) write (3, '(A,ES16.6)') 'Rc Min: ', Rc_min
 
         call cpu_time(run_time)
 
@@ -1798,7 +1788,7 @@ contains
                 @:ALLOCATE(Rc_sf  (0:m, 0:n, 0:p))
 
                 vcfl_max = 0._wp
-                Rc_min = 1.e3_wp
+                Rc_min = 1.e12_wp
             end if
         end if
 

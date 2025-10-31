@@ -128,6 +128,7 @@ contains
             s_coord(1:3) = lbk_s(l, 1:3, 2)
             center(1:2) = lbk_pos(l, 1:2, 2)
             if (p > 0) center(3) = lbk_pos(l, 3, 2)
+            cell = fd_number - buff_size
             call s_get_cell(s_coord, cell)
             call s_compute_stddsv(cell, volpart, stddsv)
 
@@ -248,7 +249,7 @@ contains
                 theta = 0._wp
                 Nr = ceiling(lag_params%charwidth/(y_cb(cellaux(2)) - y_cb(cellaux(2) - 1)))
                 Nr_count = 1._wp - mapCells*1._wp
-                dzp = y_cb(cellaux(2) + 1) - y_cb(cellaux(2))
+                dzp = y_cb(cellaux(2)) - y_cb(cellaux(2) - 1)
                 Lz2 = (center(3) - (dzp*(0.5_wp + Nr_count) - lag_params%charwidth/2._wp))**2._wp
                 distance = sqrt((center(1) - nodecoord(1))**2._wp + (center(2) - nodecoord(2))**2._wp + Lz2)
                 func = dzp/lag_params%charwidth*exp(-0.5_wp*(distance/stddsv)**2._wp)/(sqrt(2._wp*pi)*stddsv)**3._wp
@@ -277,21 +278,21 @@ contains
         celloutside = .false.
 
         if (num_dims == 2) then
-            if ((cellaux(1) < -buff_size) .or. (cellaux(2) < -buff_size)) then
+            if ((cellaux(1) < fd_number - buff_size) .or. (cellaux(2) < fd_number - buff_size)) then
                 celloutside = .true.
             end if
-            if (cyl_coord .and. y_cc(cellaux(2)) < 0._wp) then
+            if (cyl_coord .and. cellaux(2) < 0) then
                 celloutside = .true.
             end if
-            if ((cellaux(2) > n + buff_size) .or. (cellaux(1) > m + buff_size)) then
+            if ((cellaux(2) > n + buff_size - fd_number) .or. (cellaux(1) > m + buff_size - fd_number)) then
                 celloutside = .true.
             end if
         else
-            if ((cellaux(3) < -buff_size) .or. (cellaux(1) < -buff_size) .or. (cellaux(2) < -buff_size)) then
+            if ((cellaux(3) < fd_number - buff_size) .or. (cellaux(1) < fd_number - buff_size) .or. (cellaux(2) < fd_number - buff_size)) then
                 celloutside = .true.
             end if
 
-            if ((cellaux(3) > p + buff_size) .or. (cellaux(2) > n + buff_size) .or. (cellaux(1) > m + buff_size)) then
+            if ((cellaux(3) > p + buff_size - fd_number) .or. (cellaux(2) > n + buff_size - fd_number) .or. (cellaux(1) > m + buff_size - fd_number)) then
                 celloutside = .true.
             end if
         end if
@@ -416,5 +417,215 @@ contains
         end do
 
     end subroutine s_get_cell
+
+    !! This function interpolates the velocity of Eulerian field at the position
+            !! of the bubble.
+            !! @param pos Position of the bubble in directiion i
+            !! @param cell Computational coordinates of the bubble
+            !! @param i Direction of the velocity (1: x, 2: y, 3: z)
+            !! @param q_prim_vf Eulerian field with primitive variables
+            !! @return v Interpolated velocity at the position of the bubble
+    pure function f_interpolate_velocity(pos, cell, i, q_prim_vf) result(v)
+        $:GPU_ROUTINE(parallelism='[seq]')
+        real(wp), intent(in) :: pos
+        integer, dimension(3), intent(in) :: cell
+        integer, intent(in) :: i
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+
+        real(wp) :: v
+        real(wp), dimension(fd_order + 1) :: xi, eta, L
+
+        if (fd_order == 2) then
+            if (i == 1) then
+                xi(1) = x_cc(cell(1) - 1)
+                eta(1) = q_prim_vf(momxb)%sf(cell(1) - 1, cell(2), cell(3))
+                xi(2) = x_cc(cell(1))
+                eta(2) = q_prim_vf(momxb)%sf(cell(1), cell(2), cell(3))
+                xi(3) = x_cc(cell(1) + 1)
+                eta(3) = q_prim_vf(momxb)%sf(cell(1) + 1, cell(2), cell(3))
+            elseif (i == 2) then
+                xi(1) = y_cc(cell(2) - 1)
+                eta(1) = q_prim_vf(momxb + 1)%sf(cell(1), cell(2) - 1, cell(3))
+                xi(2) = y_cc(cell(2))
+                eta(2) = q_prim_vf(momxb + 1)%sf(cell(1), cell(2), cell(3))
+                xi(3) = y_cc(cell(2) + 1)
+                eta(3) = q_prim_vf(momxb + 1)%sf(cell(1), cell(2) + 1, cell(3))
+            elseif (i == 3) then
+                xi(1) = z_cc(cell(3) - 1)
+                eta(1) = q_prim_vf(momxe)%sf(cell(1), cell(2), cell(3) - 1)
+                xi(2) = z_cc(cell(3))
+                eta(2) = q_prim_vf(momxe)%sf(cell(1), cell(2), cell(3))
+                xi(3) = z_cc(cell(3) + 1)
+                eta(3) = q_prim_vf(momxe)%sf(cell(1), cell(2), cell(3) + 1)
+            end if
+
+            L(1) = ((pos - xi(2))*(pos - xi(3)))/((xi(1) - xi(2))*(xi(1) - xi(3)))
+            L(2) = ((pos - xi(1))*(pos - xi(3)))/((xi(2) - xi(1))*(xi(2) - xi(3)))
+            L(3) = ((pos - xi(1))*(pos - xi(2)))/((xi(3) - xi(1))*(xi(3) - xi(2)))
+
+            v = L(1)*eta(1) + L(2)*eta(2) + L(3)*eta(3)
+        elseif (fd_order == 4) then
+            if (i == 1) then
+                xi(1) = x_cc(cell(1) - 2)
+                eta(1) = q_prim_vf(momxb)%sf(cell(1) - 2, cell(2), cell(3))
+                xi(2) = x_cc(cell(1) - 1)
+                eta(2) = q_prim_vf(momxb)%sf(cell(1) - 1, cell(2), cell(3))
+                xi(3) = x_cc(cell(1))
+                eta(3) = q_prim_vf(momxb)%sf(cell(1), cell(2), cell(3))
+                xi(4) = x_cc(cell(1) + 1)
+                eta(4) = q_prim_vf(momxb)%sf(cell(1) + 1, cell(2), cell(3))
+                xi(5) = x_cc(cell(1) + 2)
+                eta(5) = q_prim_vf(momxb)%sf(cell(1) + 2, cell(2), cell(3))
+            elseif (i == 2) then
+                xi(1) = y_cc(cell(2) - 2)
+                eta(1) = q_prim_vf(momxb + 1)%sf(cell(1), cell(2) - 2, cell(3))
+                xi(2) = y_cc(cell(2) - 1)
+                eta(2) = q_prim_vf(momxb + 1)%sf(cell(1), cell(2) - 1, cell(3))
+                xi(3) = y_cc(cell(2))
+                eta(3) = q_prim_vf(momxb + 1)%sf(cell(1), cell(2), cell(3))
+                xi(4) = y_cc(cell(2) + 1)
+                eta(4) = q_prim_vf(momxb + 1)%sf(cell(1), cell(2) + 1, cell(3))
+                xi(5) = y_cc(cell(2) + 2)
+                eta(5) = q_prim_vf(momxb + 1)%sf(cell(1), cell(2) + 2, cell(3))
+            elseif (i == 3) then
+                xi(1) = z_cc(cell(3) - 2)
+                eta(1) = q_prim_vf(momxe)%sf(cell(1), cell(2), cell(3) - 2)
+                xi(2) = z_cc(cell(3) - 1)
+                eta(2) = q_prim_vf(momxe)%sf(cell(1), cell(2), cell(3) - 1)
+                xi(3) = z_cc(cell(3))
+                eta(3) = q_prim_vf(momxe)%sf(cell(1), cell(2), cell(3))
+                xi(4) = z_cc(cell(3) + 1)
+                eta(4) = q_prim_vf(momxe)%sf(cell(1), cell(2), cell(3) + 1)
+                xi(5) = z_cc(cell(3) + 2)
+                eta(5) = q_prim_vf(momxe)%sf(cell(1), cell(2), cell(3) + 2)
+            end if
+
+            L(1) = ((pos - xi(2))*(pos - xi(3))*(pos - xi(4))*(pos - xi(5)))/ &
+                   ((xi(1) - xi(2))*(xi(1) - xi(3))*(xi(1) - xi(3))*(xi(2) - xi(5)))
+            L(2) = ((pos - xi(1))*(pos - xi(3))*(pos - xi(4))*(pos - xi(5)))/ &
+                   ((xi(2) - xi(1))*(xi(2) - xi(3))*(xi(2) - xi(3))*(xi(2) - xi(5)))
+            L(3) = ((pos - xi(1))*(pos - xi(2))*(pos - xi(4))*(pos - xi(5)))/ &
+                   ((xi(3) - xi(1))*(xi(3) - xi(2))*(xi(3) - xi(4))*(xi(3) - xi(5)))
+            L(4) = ((pos - xi(1))*(pos - xi(2))*(pos - xi(3))*(pos - xi(4)))/ &
+                   ((xi(4) - xi(1))*(xi(4) - xi(2))*(xi(4) - xi(3))*(xi(4) - xi(5)))
+            L(5) = ((pos - xi(1))*(pos - xi(2))*(pos - xi(3))*(pos - xi(4)))/ &
+                   ((xi(5) - xi(1))*(xi(5) - xi(2))*(xi(5) - xi(3))*(xi(5) - xi(4)))
+
+            v = L(1)*eta(1) + L(2)*eta(2) + L(3)*eta(3) + L(4)*eta(4) + L(5)*eta(5)
+        end if
+
+    end function f_interpolate_velocity
+
+    !! This function calculates the force on a bubble
+            !!      based on the pressure gradient, velocity, and drag model.
+            !! @param pos Position of the bubble in direction i
+            !! @param rad Radius of the bubble
+            !! @param rdot Radial velocity of the bubble
+            !! @param vel Velocity of the bubble
+            !! @param mg Mass of the gas in the bubble
+            !! @param mv Mass of the liquid in the bubble
+            !! @param Re Reynolds number
+            !! @param rho Density of the fluid
+            !! @param cell Computational coordinates of the bubble
+            !! @param i Direction of the velocity (1: x, 2: y, 3: z)
+            !! @param q_prim_vf Eulerian field with primitive variables
+            !! @return a Acceleration of the bubble in direction i
+    pure function f_get_bubble_force(pos, rad, rdot, vel, mg, mv, Re, rho, cell, i, q_prim_vf) result(force)
+        $:GPU_ROUTINE(parallelism='[seq]')
+        real(wp), intent(in) :: pos, rad, rdot, mg, mv, Re, rho, vel
+        integer, dimension(3), intent(in) :: cell
+        integer, intent(in) :: i
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+
+        real(wp) :: a, dp, vol, force
+        real(wp) :: v_rel
+        real(wp), dimension(fd_order - 1) :: xi, eta, L
+
+        if (fd_order == 2) then
+            if (i == 1) then
+                dp = (q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2), cell(3)) - &
+                      q_prim_vf(E_idx)%sf(cell(1) - 1, cell(2), cell(3)))/ &
+                     (x_cc(cell(1) + 1) - x_cc(cell(1) - 1))
+            elseif (i == 2) then
+                dp = (q_prim_vf(E_idx)%sf(cell(1), cell(2) + 1, cell(3)) - &
+                      q_prim_vf(E_idx)%sf(cell(1), cell(2) - 1, cell(3)))/ &
+                     (y_cc(cell(2) + 1) - y_cc(cell(2) - 1))
+            elseif (i == 3) then
+                dp = (q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3) + 1) - &
+                      q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3) - 1))/ &
+                     (z_cc(cell(3) + 1) - z_cc(cell(3) - 1))
+            end if
+        elseif (fd_order == 4) then
+            if (i == 1) then
+                xi(1) = x_cc(cell(1) - 1)
+                eta(1) = (q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3)) - &
+                          q_prim_vf(E_idx)%sf(cell(1) - 2, cell(2), cell(3)))/ &
+                         (x_cc(cell(1)) - x_cc(cell(1) - 2))
+                xi(2) = x_cc(cell(1))
+                eta(2) = (q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2), cell(3)) - &
+                          q_prim_vf(E_idx)%sf(cell(1) - 1, cell(2), cell(3)))/ &
+                         (x_cc(cell(1) + 1) - x_cc(cell(1) - 1))
+                xi(3) = x_cc(cell(1) + 1)
+                eta(3) = (q_prim_vf(E_idx)%sf(cell(1) + 2, cell(2), cell(3)) - &
+                          q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3)))/ &
+                         (x_cc(cell(1) + 2) - x_cc(cell(1)))
+            elseif (i == 2) then
+                xi(1) = y_cc(cell(2) - 1)
+                eta(1) = (q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3)) - &
+                          q_prim_vf(E_idx)%sf(cell(1), cell(2) - 2, cell(3)))/ &
+                         (y_cc(cell(2)) - y_cc(cell(2) - 2))
+                xi(2) = y_cc(cell(2))
+                eta(2) = (q_prim_vf(E_idx)%sf(cell(1), cell(2) + 1, cell(3)) - &
+                          q_prim_vf(E_idx)%sf(cell(1), cell(2) - 1, cell(3)))/ &
+                         (y_cc(cell(2) + 1) - y_cc(cell(2) - 1))
+                xi(3) = y_cc(cell(2) + 1)
+                eta(3) = (q_prim_vf(E_idx)%sf(cell(1), cell(2) + 2, cell(3)) - &
+                          q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3)))/ &
+                         (y_cc(cell(2) + 2) - y_cc(cell(2)))
+            elseif (i == 3) then
+                xi(1) = z_cc(cell(3) - 1)
+                eta(1) = (q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3)) - &
+                          q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3) - 2))/ &
+                         (z_cc(cell(3)) - z_cc(cell(3) - 2))
+                xi(2) = z_cc(cell(3))
+                eta(2) = (q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3) + 1) - &
+                          q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3) - 1))/ &
+                         (z_cc(cell(3) + 1) - z_cc(cell(3) - 1))
+                xi(3) = z_cc(cell(3) + 1)
+                eta(3) = (q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3) + 2) - &
+                          q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3)))/ &
+                         (z_cc(cell(3) + 2) - z_cc(cell(3)))
+            end if
+
+            L(1) = ((pos - xi(2))*(pos - xi(3)))/((xi(1) - xi(2))*(xi(1) - xi(3)))
+            L(2) = ((pos - xi(1))*(pos - xi(3)))/((xi(2) - xi(1))*(xi(2) - xi(3)))
+            L(3) = ((pos - xi(1))*(pos - xi(2)))/((xi(3) - xi(1))*(xi(3) - xi(2)))
+
+            dp = L(1)*eta(1) + L(2)*eta(2) + L(3)*eta(3)
+        end if
+
+        vol = (4._wp/3._wp) * pi * (rad**3._wp)
+
+        v_rel = vel - f_interpolate_velocity(pos, cell, i, q_prim_vf)
+
+        force = 0._wp
+
+        if (lag_params%drag_model == 1) then ! Free slip Stokes drag
+            force = force - (4._wp*pi*rad*v_rel)/Re
+        else if (lag_params%drag_model == 2) then ! No slip Stokes drag
+            force = force - (6._wp*pi*rad*v_rel)/Re
+        else if (lag_params%drag_model == 3) then ! Levich drag
+            force = force - (12._wp*pi*rad*v_rel)/Re
+        end if
+
+        if (lag_params%pressure_force) then
+            force = force - vol * dp
+        end if
+
+        if (lag_params%gravity_force) then
+            force = force + (mg + mv) * accel_bf(i)
+        end if
+
+    end function f_get_bubble_force
 
 end module m_bubbles_EL_kernels

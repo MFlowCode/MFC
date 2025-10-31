@@ -114,7 +114,7 @@ contains
                 & 'lag_pos_wrt', 'lag_pos_prev_wrt', 'lag_vel_wrt', 'lag_rad_wrt', &
                 & 'lag_rvel_wrt', 'lag_r0_wrt', 'lag_rmax_wrt', 'lag_rmin_wrt',    &
                 & 'lag_dphidt_wrt', 'lag_pres_wrt', 'lag_mv_wrt', 'lag_mg_wrt',    &
-                & 'lag_betaT_wrt', 'lag_betaC_wrt', 'bc_io', 'down_sample' ]
+                & 'lag_betaT_wrt', 'lag_betaC_wrt']
                 call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
             #:endfor
         end if

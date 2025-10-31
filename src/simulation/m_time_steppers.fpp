@@ -506,7 +506,7 @@ contains
                 end if
             end if
 
-            if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=s)
+            if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(q_prim_vf, stage=s)
 
             $:GPU_PARALLEL_LOOP(collapse=4)
             do i = 1, sys_size
@@ -648,9 +648,9 @@ contains
                 if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
                 if (lag_params%write_bubbles) then
                     $:GPU_UPDATE(host='[gas_p,gas_mv,intfc_rad,intfc_vel]')
-                    call s_write_lag_particles(mytime)
+                    call s_write_lag_bubble_evol(mytime)
                 end if
-                call s_write_void_evol(mytime)
+                if (lag_params%write_void_evol) call s_write_void_evol(mytime)
             end if
 
         end if

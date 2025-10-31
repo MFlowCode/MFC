@@ -947,12 +947,8 @@ contains
         integer :: size_n(1), inembed(1), onembed(1)
 
         call s_initialize_global_parameters_module()
-        if (bubbles_euler .and. nb > 1) then
-            call s_simpson(weight, R0)
-        end if
-        if (bubbles_euler .and. .not. polytropic) then
-            call s_initialize_nonpoly()
-        end if
+        if (bubbles_euler .and. nb > 1) call s_simpson(weight, R0)
+        if (bubbles_euler .and. .not. polytropic) call s_initialize_nonpoly()
         if (num_procs > 1) then
             call s_initialize_mpi_proxy_module()
             call s_initialize_mpi_common_module()

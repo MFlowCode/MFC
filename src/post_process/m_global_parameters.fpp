@@ -177,6 +177,11 @@ module m_global_parameters
     integer, allocatable, dimension(:) :: proc_coords !<
     !! Processor coordinates in MPI_CART_COMM
 
+    type(int_bounds_info), dimension(3) :: nidx
+
+    integer, allocatable, dimension(:, :, :) :: neighbor_ranks
+    !! Neighbor processor ranks
+
     integer, allocatable, dimension(:) :: start_idx !<
     !! Starting cell-center index of local processor in global grid
 

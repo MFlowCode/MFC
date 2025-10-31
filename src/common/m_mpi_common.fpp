@@ -404,17 +404,21 @@ contains
     impure subroutine s_mpi_reduce_stability_criteria_extrema(icfl_max_loc, &
                                                               vcfl_max_loc, &
                                                               Rc_min_loc, &
+                                                              bubs_loc, &
                                                               icfl_max_glb, &
                                                               vcfl_max_glb, &
-                                                              Rc_min_glb)
+                                                              Rc_min_glb, &
+                                                              bubs_glb)
 
         real(wp), intent(in) :: icfl_max_loc
         real(wp), intent(in) :: vcfl_max_loc
         real(wp), intent(in) :: Rc_min_loc
+        integer, intent(in) :: bubs_loc
 
         real(wp), intent(out) :: icfl_max_glb
         real(wp), intent(out) :: vcfl_max_glb
         real(wp), intent(out) :: Rc_min_glb
+        integer, intent(out) :: bubs_glb
 
 #ifdef MFC_SIMULATION
 #ifdef MFC_MPI
@@ -435,6 +439,11 @@ contains
                             MPI_COMM_WORLD, ierr)
         end if
 
+        if (bubbles_lagrange) then
+            call MPI_REDUCE(bubs_loc, bubs_glb, 1, &
+                            MPI_INTEGER, MPI_SUM, 0, &
+                            MPI_COMM_WORLD, ierr)
+        end if
 #else
 
         icfl_max_glb = icfl_max_loc
@@ -444,10 +453,33 @@ contains
             Rc_min_glb = Rc_min_loc
         end if
 
+        if (bubbles_lagrange) bubs_glb = bubs_loc
 #endif
 #endif
 
     end subroutine s_mpi_reduce_stability_criteria_extrema
+
+    !>  The following subroutine takes the inputted variable and
+        !!     determines its sum on the entire computational domain.
+        !!  @param var_loc holds the local value to be reduced among
+        !!      all the processors in communicator. On output, the variable holds
+        !!      the sum, reduced amongst all of the local values.
+    subroutine s_mpi_reduce_int_sum(var_loc, sum)
+
+        integer, intent(inout) :: var_loc
+        integer, intent(inout) :: sum
+
+#ifdef MFC_MPI
+        integer :: ierr !< Generic flag used to identify and report MPI errors
+
+        ! Performing reduction procedure and eventually storing its result
+        ! into the variable that was initially inputted into the subroutine
+        call MPI_REDUCE(var_loc, sum, 1, MPI_INTEGER, &
+                        MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+
+#endif
+
+    end subroutine s_mpi_reduce_int_sum
 
     !>  The following subroutine takes the input local variable
         !!      from all processors and reduces to the sum of all
@@ -1148,8 +1180,16 @@ contains
         integer :: recon_order !<
             !! WENO or MUSCL reconstruction order
 
-        integer :: i, j !< Generic loop iterators
+        integer :: i, j, k !< Generic loop iterators
         integer :: ierr !< Generic flag used to identify and report MPI errors
+
+        ! temp array to store neighbor rank coordinates
+        integer, dimension(1:num_dims) :: neighbor_coords
+
+        ! Zeroing out communication needs for moving EL bubbles/particles
+        nidx(1)%beg = 0; nidx(1)%end = 0
+        nidx(2)%beg = 0; nidx(2)%end = 0
+        nidx(3)%beg = 0; nidx(3)%end = 0
 
         if (recon_type == WENO_TYPE) then
             recon_order = weno_order
@@ -1371,6 +1411,7 @@ contains
                     call MPI_CART_RANK(MPI_COMM_CART, proc_coords, &
                                        bc_z%beg, ierr)
                     proc_coords(3) = proc_coords(3) + 1
+                    nidx(3)%beg = -1
                 end if
 
                 ! Boundary condition at the end
@@ -1379,6 +1420,7 @@ contains
                     call MPI_CART_RANK(MPI_COMM_CART, proc_coords, &
                                        bc_z%end, ierr)
                     proc_coords(3) = proc_coords(3) - 1
+                    nidx(3)%end = 1
                 end if
 
 #ifdef MFC_POST_PROCESS
@@ -1510,6 +1552,7 @@ contains
                 call MPI_CART_RANK(MPI_COMM_CART, proc_coords, &
                                    bc_y%beg, ierr)
                 proc_coords(2) = proc_coords(2) + 1
+                nidx(2)%beg = -1
             end if
 
             ! Boundary condition at the end
@@ -1518,6 +1561,7 @@ contains
                 call MPI_CART_RANK(MPI_COMM_CART, proc_coords, &
                                    bc_y%end, ierr)
                 proc_coords(2) = proc_coords(2) - 1
+                nidx(2)%end = 1
             end if
 
 #ifdef MFC_POST_PROCESS
@@ -1603,6 +1647,7 @@ contains
             proc_coords(1) = proc_coords(1) - 1
             call MPI_CART_RANK(MPI_COMM_CART, proc_coords, bc_x%beg, ierr)
             proc_coords(1) = proc_coords(1) + 1
+            nidx(1)%beg = -1
         end if
 
         ! Boundary condition at the end
@@ -1610,6 +1655,7 @@ contains
             proc_coords(1) = proc_coords(1) + 1
             call MPI_CART_RANK(MPI_COMM_CART, proc_coords, bc_x%end, ierr)
             proc_coords(1) = proc_coords(1) - 1
+            nidx(1)%end = 1
         end if
 
 #ifdef MFC_POST_PROCESS
@@ -1655,6 +1701,23 @@ contains
             end if
 #endif
         end if
+
+        @:ALLOCATE(neighbor_ranks(nidx(1)%beg:nidx(1)%end, &
+            nidx(2)%beg:nidx(2)%end, &
+            nidx(3)%beg:nidx(3)%end))
+        do k = nidx(3)%beg, nidx(3)%end
+            do j = nidx(2)%beg, nidx(2)%end
+                do i = nidx(1)%beg, nidx(1)%end
+                    if (abs(i) + abs(j) + abs(k) > 0) then
+                        neighbor_coords(1) = proc_coords(1) + i
+                        if (num_dims > 1) neighbor_coords(2) = proc_coords(2) + j
+                        if (num_dims > 2) neighbor_coords(3) = proc_coords(3) + k
+                        call MPI_CART_RANK(MPI_COMM_CART, neighbor_coords, &
+                                           neighbor_ranks(i, j, k), ierr)
+                    end if
+                end do
+            end do
+        end do
 #endif
 
     end subroutine s_mpi_decompose_computational_domain
