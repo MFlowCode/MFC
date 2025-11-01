@@ -14,6 +14,7 @@ CMake Configuration:
 
     MPI     : ${MFC_MPI}
     OpenACC : ${MFC_OpenACC}
+    OpenMP  : ${MFC_OpenMP}
 
     Fypp    : ${FYPP_EXE}
     Doxygen : ${DOXYGEN_EXECUTABLE}

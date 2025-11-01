@@ -53,10 +53,10 @@ module m_variables_conversion
     $:GPU_DECLARE(create='[gammas,gs_min,pi_infs,ps_inf,cvs,qvs,qvps]')
 #endif
 
-    real(wp), allocatable, dimension(:) :: Gs
-    integer, allocatable, dimension(:) :: bubrs
-    real(wp), allocatable, dimension(:, :) :: Res
-    $:GPU_DECLARE(create='[bubrs,Gs,Res]')
+    real(wp), allocatable, dimension(:) :: Gs_vc
+    integer, allocatable, dimension(:) :: bubrs_vc
+    real(wp), allocatable, dimension(:, :) :: Res_vc
+    $:GPU_DECLARE(create='[bubrs_vc,Gs_vc,Res_vc]')
 
     integer :: is1b, is2b, is3b, is1e, is2e, is3e
     $:GPU_DECLARE(create='[is1b,is2b,is3b,is1e,is2e,is3e]')
@@ -464,10 +464,10 @@ contains
 
     end subroutine s_convert_species_to_mixture_variables
 
-    pure subroutine s_convert_species_to_mixture_variables_acc(rho_K, &
-                                                               gamma_K, pi_inf_K, qv_K, &
-                                                               alpha_K, alpha_rho_K, Re_K, &
-                                                               G_K, G)
+    subroutine s_convert_species_to_mixture_variables_acc(rho_K, &
+                                                          gamma_K, pi_inf_K, qv_K, &
+                                                          alpha_K, alpha_rho_K, Re_K, &
+                                                          G_K, G)
         $:GPU_ROUTINE(function_name='s_convert_species_to_mixture_variables_acc', &
             & parallelism='[seq]', cray_inline=True)
 
@@ -516,7 +516,7 @@ contains
         if (present(G_K)) then
             G_K = 0._wp
             do i = 1, num_fluids
-                !TODO: change to use Gs directly here?
+                !TODO: change to use Gs_vc directly here?
                 !TODO: Make this changes as well for GPUs
                 G_K = G_K + alpha_K(i)*G(i)
             end do
@@ -531,7 +531,7 @@ contains
                 if (Re_size(i) > 0) Re_K(i) = 0._wp
 
                 do j = 1, Re_size(i)
-                    Re_K(i) = alpha_K(Re_idx(i, j))/Res(i, j) &
+                    Re_K(i) = alpha_K(Re_idx(i, j))/Res_vc(i, j) &
                               + Re_K(i)
                 end do
 
@@ -543,9 +543,9 @@ contains
 
     end subroutine s_convert_species_to_mixture_variables_acc
 
-    pure subroutine s_convert_species_to_mixture_variables_bubbles_acc(rho_K, &
-                                                                       gamma_K, pi_inf_K, qv_K, &
-                                                                       alpha_K, alpha_rho_K, Re_K)
+    subroutine s_convert_species_to_mixture_variables_bubbles_acc(rho_K, &
+                                                                  gamma_K, pi_inf_K, qv_K, &
+                                                                  alpha_K, alpha_rho_K, Re_K)
         $:GPU_ROUTINE(function_name='s_convert_species_to_mixture_variables_bubbles_acc', &
             & parallelism='[seq]', cray_inline=True)
 
@@ -594,7 +594,7 @@ contains
                     if (Re_size(i) > 0) Re_K(i) = 0._wp
 
                     do j = 1, Re_size(i)
-                        Re_K(i) = (1._wp - alpha_K(Re_idx(i, j)))/Res(i, j) &
+                        Re_K(i) = (1._wp - alpha_K(Re_idx(i, j)))/Res_vc(i, j) &
                                   + Re_K(i)
                     end do
 
@@ -624,7 +624,7 @@ contains
         @:ALLOCATE(cvs    (1:num_fluids))
         @:ALLOCATE(qvs    (1:num_fluids))
         @:ALLOCATE(qvps    (1:num_fluids))
-        @:ALLOCATE(Gs     (1:num_fluids))
+        @:ALLOCATE(Gs_vc     (1:num_fluids))
 #else
         @:ALLOCATE(gammas (1:num_fluids))
         @:ALLOCATE(gs_min (1:num_fluids))
@@ -633,46 +633,46 @@ contains
         @:ALLOCATE(cvs    (1:num_fluids))
         @:ALLOCATE(qvs    (1:num_fluids))
         @:ALLOCATE(qvps    (1:num_fluids))
-        @:ALLOCATE(Gs     (1:num_fluids))
+        @:ALLOCATE(Gs_vc     (1:num_fluids))
 #endif
 
         do i = 1, num_fluids
             gammas(i) = fluid_pp(i)%gamma
             gs_min(i) = 1.0_wp/gammas(i) + 1.0_wp
             pi_infs(i) = fluid_pp(i)%pi_inf
-            Gs(i) = fluid_pp(i)%G
+            Gs_vc(i) = fluid_pp(i)%G
             ps_inf(i) = pi_infs(i)/(1.0_wp + gammas(i))
             cvs(i) = fluid_pp(i)%cv
             qvs(i) = fluid_pp(i)%qv
             qvps(i) = fluid_pp(i)%qvp
         end do
-        $:GPU_UPDATE(device='[gammas,gs_min,pi_infs,ps_inf,cvs,qvs,qvps,Gs]')
+        $:GPU_UPDATE(device='[gammas,gs_min,pi_infs,ps_inf,cvs,qvs,qvps,Gs_vc]')
 
 #ifdef MFC_SIMULATION
 
         if (viscous) then
-            @:ALLOCATE(Res(1:2, 1:Re_size_max))
+            @:ALLOCATE(Res_vc(1:2, 1:Re_size_max))
             do i = 1, 2
                 do j = 1, Re_size(i)
-                    Res(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
+                    Res_vc(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
                 end do
             end do
 
-            $:GPU_UPDATE(device='[Res,Re_idx,Re_size]')
+            $:GPU_UPDATE(device='[Res_vc,Re_idx,Re_size]')
         end if
 #endif
 
         if (bubbles_euler) then
 #ifdef MFC_SIMULATION
-            @:ALLOCATE(bubrs(1:nb))
+            @:ALLOCATE(bubrs_vc(1:nb))
 #else
-            @:ALLOCATE(bubrs(1:nb))
+            @:ALLOCATE(bubrs_vc(1:nb))
 #endif
 
             do i = 1, nb
-                bubrs(i) = bub_idx%rs(i)
+                bubrs_vc(i) = bub_idx%rs(i)
             end do
-            $:GPU_UPDATE(device='[bubrs]')
+            $:GPU_UPDATE(device='[bubrs_vc]')
         end if
 
 #ifdef MFC_POST_PROCESS
@@ -737,7 +737,7 @@ contains
     end subroutine s_initialize_variables_conversion_module
 
     !Initialize mv at the quadrature nodes based on the initialized moments and sigma
-    pure subroutine s_initialize_mv(qK_cons_vf, mv)
+    subroutine s_initialize_mv(qK_cons_vf, mv)
 
         type(scalar_field), dimension(sys_size), intent(in) :: qK_cons_vf
 
@@ -770,7 +770,7 @@ contains
     end subroutine s_initialize_mv
 
     !Initialize pb at the quadrature nodes using isothermal relations (Preston model)
-    pure subroutine s_initialize_pb(qK_cons_vf, mv, pb)
+    subroutine s_initialize_pb(qK_cons_vf, mv, pb)
         type(scalar_field), dimension(sys_size), intent(in) :: qK_cons_vf
 
         real(wp), dimension(idwint(1)%beg:, idwint(2)%beg:, idwint(3)%beg:, 1:, 1:), intent(in) :: mv
@@ -873,300 +873,299 @@ contains
             end if
         #:endif
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_K, alpha_rho_K, Re_K, &
-            & nRtmp, rho_K, gamma_K, pi_inf_K,qv_K, &
-            & dyn_pres_K, rhoYks, B]')
-        do l = ibounds(3)%beg, ibounds(3)%end
-            do k = ibounds(2)%beg, ibounds(2)%end
-                do j = ibounds(1)%beg, ibounds(1)%end
-                    dyn_pres_K = 0._wp
+        #:call GPU_PARALLEL_LOOP(collapse=3, private='[alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K,qv_K, dyn_pres_K, rhoYks, B, T]')
+            do l = ibounds(3)%beg, ibounds(3)%end
+                do k = ibounds(2)%beg, ibounds(2)%end
+                    do j = ibounds(1)%beg, ibounds(1)%end
+                        dyn_pres_K = 0._wp
 
-                    if (igr) then
-                        if (num_fluids == 1) then
-                            alpha_rho_K(1) = qK_cons_vf(contxb)%sf(j, k, l)
-                            alpha_K(1) = 1._wp
+                        if (igr) then
+                            if (num_fluids == 1) then
+                                alpha_rho_K(1) = qK_cons_vf(contxb)%sf(j, k, l)
+                                alpha_K(1) = 1._wp
+                            else
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, num_fluids - 1
+                                    alpha_rho_K(i) = qK_cons_vf(i)%sf(j, k, l)
+                                    alpha_K(i) = qK_cons_vf(advxb + i - 1)%sf(j, k, l)
+                                end do
+
+                                alpha_rho_K(num_fluids) = qK_cons_vf(num_fluids)%sf(j, k, l)
+                                alpha_K(num_fluids) = 1._wp - sum(alpha_K(1:num_fluids - 1))
+                            end if
                         else
                             $:GPU_LOOP(parallelism='[seq]')
-                            do i = 1, num_fluids - 1
+                            do i = 1, num_fluids
                                 alpha_rho_K(i) = qK_cons_vf(i)%sf(j, k, l)
                                 alpha_K(i) = qK_cons_vf(advxb + i - 1)%sf(j, k, l)
                             end do
-
-                            alpha_rho_K(num_fluids) = qK_cons_vf(num_fluids)%sf(j, k, l)
-                            alpha_K(num_fluids) = 1._wp - sum(alpha_K(1:num_fluids - 1))
                         end if
-                    else
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = 1, num_fluids
-                            alpha_rho_K(i) = qK_cons_vf(i)%sf(j, k, l)
-                            alpha_K(i) = qK_cons_vf(advxb + i - 1)%sf(j, k, l)
-                        end do
-                    end if
 
-                    if (model_eqns /= 4) then
+                        if (model_eqns /= 4) then
 #ifdef MFC_SIMULATION
-                        ! If in simulation, use acc mixture subroutines
-                        if (elasticity) then
-                            call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
-                                                                            alpha_rho_K, Re_K, G_K, Gs)
-                        else if (bubbles_euler) then
-                            call s_convert_species_to_mixture_variables_bubbles_acc(rho_K, gamma_K, pi_inf_K, qv_K, &
-                                                                                    alpha_K, alpha_rho_K, Re_K)
-                        else
-                            call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, &
-                                                                            alpha_K, alpha_rho_K, Re_K)
-                        end if
+                            ! If in simulation, use acc mixture subroutines
+                            if (elasticity) then
+                                call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
+                                                                                alpha_rho_K, Re_K, G_K, Gs_vc)
+                            else if (bubbles_euler) then
+                                call s_convert_species_to_mixture_variables_bubbles_acc(rho_K, gamma_K, pi_inf_K, qv_K, &
+                                                                                        alpha_K, alpha_rho_K, Re_K)
+                            else
+                                call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, &
+                                                                                alpha_K, alpha_rho_K, Re_K)
+                            end if
 #else
-                        ! If pre-processing, use non acc mixture subroutines
-                        if (elasticity) then
-                            call s_convert_to_mixture_variables(qK_cons_vf, j, k, l, &
-                                                                rho_K, gamma_K, pi_inf_K, qv_K, Re_K, G_K, fluid_pp(:)%G)
-                        else
-                            call s_convert_to_mixture_variables(qK_cons_vf, j, k, l, &
-                                                                rho_K, gamma_K, pi_inf_K, qv_K)
-                        end if
+                            ! If pre-processing, use non acc mixture subroutines
+                            if (elasticity) then
+                                call s_convert_to_mixture_variables(qK_cons_vf, j, k, l, &
+                                                                    rho_K, gamma_K, pi_inf_K, qv_K, Re_K, G_K, fluid_pp(:)%G)
+                            else
+                                call s_convert_to_mixture_variables(qK_cons_vf, j, k, l, &
+                                                                    rho_K, gamma_K, pi_inf_K, qv_K)
+                            end if
 #endif
-                    end if
-
-                    if (relativity) then
-                        if (n == 0) then
-                            B(1) = Bx0
-                            B(2) = qK_cons_vf(B_idx%beg)%sf(j, k, l)
-                            B(3) = qK_cons_vf(B_idx%beg + 1)%sf(j, k, l)
-                        else
-                            B(1) = qK_cons_vf(B_idx%beg)%sf(j, k, l)
-                            B(2) = qK_cons_vf(B_idx%beg + 1)%sf(j, k, l)
-                            B(3) = qK_cons_vf(B_idx%beg + 2)%sf(j, k, l)
                         end if
-                        B2 = B(1)**2 + B(2)**2 + B(3)**2
 
-                        m2 = 0._wp
+                        if (relativity) then
+                            if (n == 0) then
+                                B(1) = Bx0
+                                B(2) = qK_cons_vf(B_idx%beg)%sf(j, k, l)
+                                B(3) = qK_cons_vf(B_idx%beg + 1)%sf(j, k, l)
+                            else
+                                B(1) = qK_cons_vf(B_idx%beg)%sf(j, k, l)
+                                B(2) = qK_cons_vf(B_idx%beg + 1)%sf(j, k, l)
+                                B(3) = qK_cons_vf(B_idx%beg + 2)%sf(j, k, l)
+                            end if
+                            B2 = B(1)**2 + B(2)**2 + B(3)**2
+
+                            m2 = 0._wp
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = momxb, momxe
+                                m2 = m2 + qK_cons_vf(i)%sf(j, k, l)**2
+                            end do
+
+                            S = 0._wp
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, 3
+                                S = S + qK_cons_vf(momxb + i - 1)%sf(j, k, l)*B(i)
+                            end do
+
+                            E = qK_cons_vf(E_idx)%sf(j, k, l)
+
+                            D = 0._wp
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, contxe
+                                D = D + qK_cons_vf(i)%sf(j, k, l)
+                            end do
+
+                            ! Newton-Raphson
+                            W = E + D
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do iter = 1, relativity_cons_to_prim_max_iter
+                                Ga = (W + B2)*W/sqrt((W + B2)**2*W**2 - (m2*W**2 + S**2*(2*W + B2)))
+                                pres = (W - D*Ga)/((gamma_K + 1)*Ga**2) ! Thermal pressure from EOS
+                                f = W - pres + (1 - 1/(2*Ga**2))*B2 - S**2/(2*W**2) - E - D
+
+                                ! The first equation below corrects a typo in (Mignone & Bodo, 2006)
+                                ! m2*W**2 → 2*m2*W**2, which would cancel with the 2* in other terms
+                                ! This corrected version is not used as the second equation empirically converges faster.
+                                ! First equation is kept for further investigation.
+                                ! dGa_dW = -Ga**3 * ( S**2*(3*W**2+3*W*B2+B2**2) + m2*W**2 ) / (W**3 * (W+B2)**3) ! first (corrected)
+                                dGa_dW = -Ga**3*(2*S**2*(3*W**2 + 3*W*B2 + B2**2) + m2*W**2)/(2*W**3*(W + B2)**3) ! second (in paper)
+
+                                dp_dW = (Ga*(1 + D*dGa_dW) - 2*W*dGa_dW)/((gamma_K + 1)*Ga**3)
+                                df_dW = 1 - dp_dW + (B2/Ga**3)*dGa_dW + S**2/W**3
+
+                                dW = -f/df_dW
+                                W = W + dW
+                                if (abs(dW) < 1.e-12_wp*W) exit
+                            end do
+
+                            ! Recalculate pressure using converged W
+                            Ga = (W + B2)*W/sqrt((W + B2)**2*W**2 - (m2*W**2 + S**2*(2*W + B2)))
+                            qK_prim_vf(E_idx)%sf(j, k, l) = (W - D*Ga)/((gamma_K + 1)*Ga**2)
+
+                            ! Recover the other primitive variables
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, 3
+                                qK_prim_vf(momxb + i - 1)%sf(j, k, l) = (qK_cons_vf(momxb + i - 1)%sf(j, k, l) + (S/W)*B(i))/(W + B2)
+                            end do
+                            qK_prim_vf(1)%sf(j, k, l) = D/Ga ! Hard-coded for single-component for now
+
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = B_idx%beg, B_idx%end
+                                qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
+                            end do
+
+                            cycle ! skip all the non-relativistic conversions below
+                        end if
+
+                        if (chemistry) then
+                            rho_K = 0._wp
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = chemxb, chemxe
+                                rho_K = rho_K + max(0._wp, qK_cons_vf(i)%sf(j, k, l))
+                            end do
+
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, contxe
+                                qK_prim_vf(i)%sf(j, k, l) = rho_K
+                            end do
+
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = chemxb, chemxe
+                                qK_prim_vf(i)%sf(j, k, l) = max(0._wp, qK_cons_vf(i)%sf(j, k, l)/rho_K)
+                            end do
+                        else
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, contxe
+                                qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
+                            end do
+                        end if
+
+#ifdef MFC_SIMULATION
+                        rho_K = max(rho_K, sgm_eps)
+#endif
+
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = momxb, momxe
-                            m2 = m2 + qK_cons_vf(i)%sf(j, k, l)**2
-                        end do
-
-                        S = 0._wp
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = 1, 3
-                            S = S + qK_cons_vf(momxb + i - 1)%sf(j, k, l)*B(i)
-                        end do
-
-                        E = qK_cons_vf(E_idx)%sf(j, k, l)
-
-                        D = 0._wp
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = 1, contxe
-                            D = D + qK_cons_vf(i)%sf(j, k, l)
-                        end do
-
-                        ! Newton-Raphson
-                        W = E + D
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do iter = 1, relativity_cons_to_prim_max_iter
-                            Ga = (W + B2)*W/sqrt((W + B2)**2*W**2 - (m2*W**2 + S**2*(2*W + B2)))
-                            pres = (W - D*Ga)/((gamma_K + 1)*Ga**2) ! Thermal pressure from EOS
-                            f = W - pres + (1 - 1/(2*Ga**2))*B2 - S**2/(2*W**2) - E - D
-
-                            ! The first equation below corrects a typo in (Mignone & Bodo, 2006)
-                            ! m2*W**2 → 2*m2*W**2, which would cancel with the 2* in other terms
-                            ! This corrected version is not used as the second equation empirically converges faster.
-                            ! First equation is kept for further investigation.
-                            ! dGa_dW = -Ga**3 * ( S**2*(3*W**2+3*W*B2+B2**2) + m2*W**2 ) / (W**3 * (W+B2)**3) ! first (corrected)
-                            dGa_dW = -Ga**3*(2*S**2*(3*W**2 + 3*W*B2 + B2**2) + m2*W**2)/(2*W**3*(W + B2)**3) ! second (in paper)
-
-                            dp_dW = (Ga*(1 + D*dGa_dW) - 2*W*dGa_dW)/((gamma_K + 1)*Ga**3)
-                            df_dW = 1 - dp_dW + (B2/Ga**3)*dGa_dW + S**2/W**3
-
-                            dW = -f/df_dW
-                            W = W + dW
-                            if (abs(dW) < 1.e-12_wp*W) exit
-                        end do
-
-                        ! Recalculate pressure using converged W
-                        Ga = (W + B2)*W/sqrt((W + B2)**2*W**2 - (m2*W**2 + S**2*(2*W + B2)))
-                        qK_prim_vf(E_idx)%sf(j, k, l) = (W - D*Ga)/((gamma_K + 1)*Ga**2)
-
-                        ! Recover the other primitive variables
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = 1, 3
-                            qK_prim_vf(momxb + i - 1)%sf(j, k, l) = (qK_cons_vf(momxb + i - 1)%sf(j, k, l) + (S/W)*B(i))/(W + B2)
-                        end do
-                        qK_prim_vf(1)%sf(j, k, l) = D/Ga ! Hard-coded for single-component for now
-
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = B_idx%beg, B_idx%end
-                            qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
-                        end do
-
-                        cycle ! skip all the non-relativistic conversions below
-                    end if
-
-                    if (chemistry) then
-                        rho_K = 0._wp
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = chemxb, chemxe
-                            rho_K = rho_K + max(0._wp, qK_cons_vf(i)%sf(j, k, l))
-                        end do
-
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = 1, contxe
-                            qK_prim_vf(i)%sf(j, k, l) = rho_K
-                        end do
-
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = chemxb, chemxe
-                            qK_prim_vf(i)%sf(j, k, l) = max(0._wp, qK_cons_vf(i)%sf(j, k, l)/rho_K)
-                        end do
-                    else
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = 1, contxe
-                            qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
-                        end do
-                    end if
-
-#ifdef MFC_SIMULATION
-                    rho_K = max(rho_K, sgm_eps)
-#endif
-
-                    $:GPU_LOOP(parallelism='[seq]')
-                    do i = momxb, momxe
-                        if (model_eqns /= 4) then
-                            qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) &
-                                                        /rho_K
-                            dyn_pres_K = dyn_pres_K + 5.e-1_wp*qK_cons_vf(i)%sf(j, k, l) &
-                                         *qK_prim_vf(i)%sf(j, k, l)
-                        else
-                            qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) &
-                                                        /qK_cons_vf(1)%sf(j, k, l)
-                        end if
-                    end do
-
-                    if (chemistry) then
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = 1, num_species
-                            rhoYks(i) = qK_cons_vf(chemxb + i - 1)%sf(j, k, l)
-                        end do
-
-                        T = q_T_sf%sf(j, k, l)
-                    end if
-
-                    if (mhd) then
-                        if (n == 0) then
-                            pres_mag = 0.5_wp*(Bx0**2 + qK_cons_vf(B_idx%beg)%sf(j, k, l)**2 + qK_cons_vf(B_idx%beg + 1)%sf(j, k, l)**2)
-                        else
-                            pres_mag = 0.5_wp*(qK_cons_vf(B_idx%beg)%sf(j, k, l)**2 + qK_cons_vf(B_idx%beg + 1)%sf(j, k, l)**2 + qK_cons_vf(B_idx%beg + 2)%sf(j, k, l)**2)
-                        end if
-                    else
-                        pres_mag = 0._wp
-                    end if
-
-                    call s_compute_pressure(qK_cons_vf(E_idx)%sf(j, k, l), &
-                                            qK_cons_vf(alf_idx)%sf(j, k, l), &
-                                            dyn_pres_K, pi_inf_K, gamma_K, rho_K, &
-                                            qv_K, rhoYks, pres, T, pres_mag=pres_mag)
-
-                    qK_prim_vf(E_idx)%sf(j, k, l) = pres
-
-                    if (chemistry) then
-                        q_T_sf%sf(j, k, l) = T
-                    end if
-
-                    if (bubbles_euler) then
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = 1, nb
-                            nRtmp(i) = qK_cons_vf(bubrs(i))%sf(j, k, l)
-                        end do
-
-                        vftmp = qK_cons_vf(alf_idx)%sf(j, k, l)
-
-                        if (qbmm) then
-                            !Get nb (constant across all R0 bins)
-                            nbub_sc = qK_cons_vf(bubxb)%sf(j, k, l)
-
-                            !Convert cons to prim
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do i = bubxb, bubxe
-                                qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/nbub_sc
-                            end do
-                            !Need to keep track of nb in the primitive variable list (converted back to true value before output)
-#ifdef MFC_SIMULATION
-                            qK_prim_vf(bubxb)%sf(j, k, l) = qK_cons_vf(bubxb)%sf(j, k, l)
-#endif
-
-                        else
-                            if (adv_n) then
-                                qK_prim_vf(n_idx)%sf(j, k, l) = qK_cons_vf(n_idx)%sf(j, k, l)
-                                nbub_sc = qK_prim_vf(n_idx)%sf(j, k, l)
+                            if (model_eqns /= 4) then
+                                qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) &
+                                                            /rho_K
+                                dyn_pres_K = dyn_pres_K + 5.e-1_wp*qK_cons_vf(i)%sf(j, k, l) &
+                                             *qK_prim_vf(i)%sf(j, k, l)
                             else
-                                call s_comp_n_from_cons(vftmp, nRtmp, nbub_sc, weight)
+                                qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l) &
+                                                            /qK_cons_vf(1)%sf(j, k, l)
                             end if
+                        end do
 
+                        if (chemistry) then
                             $:GPU_LOOP(parallelism='[seq]')
-                            do i = bubxb, bubxe
-                                qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/nbub_sc
+                            do i = 1, num_species
+                                rhoYks(i) = qK_cons_vf(chemxb + i - 1)%sf(j, k, l)
+                            end do
+
+                            T = q_T_sf%sf(j, k, l)
+                        end if
+
+                        if (mhd) then
+                            if (n == 0) then
+                                pres_mag = 0.5_wp*(Bx0**2 + qK_cons_vf(B_idx%beg)%sf(j, k, l)**2 + qK_cons_vf(B_idx%beg + 1)%sf(j, k, l)**2)
+                            else
+                                pres_mag = 0.5_wp*(qK_cons_vf(B_idx%beg)%sf(j, k, l)**2 + qK_cons_vf(B_idx%beg + 1)%sf(j, k, l)**2 + qK_cons_vf(B_idx%beg + 2)%sf(j, k, l)**2)
+                            end if
+                        else
+                            pres_mag = 0._wp
+                        end if
+
+                        call s_compute_pressure(qK_cons_vf(E_idx)%sf(j, k, l), &
+                                                qK_cons_vf(alf_idx)%sf(j, k, l), &
+                                                dyn_pres_K, pi_inf_K, gamma_K, rho_K, &
+                                                qv_K, rhoYks, pres, T, pres_mag=pres_mag)
+
+                        qK_prim_vf(E_idx)%sf(j, k, l) = pres
+
+                        if (chemistry) then
+                            q_T_sf%sf(j, k, l) = T
+                        end if
+
+                        if (bubbles_euler) then
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, nb
+                                nRtmp(i) = qK_cons_vf(bubrs_vc(i))%sf(j, k, l)
+                            end do
+
+                            vftmp = qK_cons_vf(alf_idx)%sf(j, k, l)
+
+                            if (qbmm) then
+                                !Get nb (constant across all R0 bins)
+                                nbub_sc = qK_cons_vf(bubxb)%sf(j, k, l)
+
+                                !Convert cons to prim
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = bubxb, bubxe
+                                    qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/nbub_sc
+                                end do
+                                !Need to keep track of nb in the primitive variable list (converted back to true value before output)
+#ifdef MFC_SIMULATION
+                                qK_prim_vf(bubxb)%sf(j, k, l) = qK_cons_vf(bubxb)%sf(j, k, l)
+#endif
+
+                            else
+                                if (adv_n) then
+                                    qK_prim_vf(n_idx)%sf(j, k, l) = qK_cons_vf(n_idx)%sf(j, k, l)
+                                    nbub_sc = qK_prim_vf(n_idx)%sf(j, k, l)
+                                else
+                                    call s_comp_n_from_cons(vftmp, nRtmp, nbub_sc, weight)
+                                end if
+
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = bubxb, bubxe
+                                    qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/nbub_sc
+                                end do
+                            end if
+                        end if
+
+                        if (mhd) then
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = B_idx%beg, B_idx%end
+                                qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
                             end do
                         end if
-                    end if
 
-                    if (mhd) then
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = B_idx%beg, B_idx%end
-                            qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
-                        end do
-                    end if
+                        if (elasticity) then
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = strxb, strxe
+                                qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/rho_K
+                            end do
+                        end if
 
-                    if (elasticity) then
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = strxb, strxe
-                            qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/rho_K
-                        end do
-                    end if
-
-                    if (hypoelasticity) then
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = strxb, strxe
-                            ! subtracting elastic contribution for pressure calculation
-                            if (G_K > verysmall) then
-                                if (cont_damage) G_K = G_K*max((1._wp - qK_cons_vf(damage_idx)%sf(j, k, l)), 0._wp)
-                                qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - &
-                                                                ((qK_prim_vf(i)%sf(j, k, l)**2._wp)/(4._wp*G_K))/gamma_K
-                                ! Double for shear stresses
-                                if (any(i == shear_indices)) then
+                        if (hypoelasticity) then
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = strxb, strxe
+                                ! subtracting elastic contribution for pressure calculation
+                                if (G_K > verysmall) then
+                                    if (cont_damage) G_K = G_K*max((1._wp - qK_cons_vf(damage_idx)%sf(j, k, l)), 0._wp)
                                     qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - &
                                                                     ((qK_prim_vf(i)%sf(j, k, l)**2._wp)/(4._wp*G_K))/gamma_K
+                                    ! Double for shear stresses
+                                    if (any(i == shear_indices)) then
+                                        qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - &
+                                                                        ((qK_prim_vf(i)%sf(j, k, l)**2._wp)/(4._wp*G_K))/gamma_K
+                                    end if
                                 end if
-                            end if
-                        end do
-                    end if
+                            end do
+                        end if
 
-                    if (hyperelasticity) then
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = xibeg, xiend
-                            qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/rho_K
-                        end do
-                    end if
+                        if (hyperelasticity) then
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = xibeg, xiend
+                                qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/rho_K
+                            end do
+                        end if
 
-                    if (.not. igr .or. num_fluids > 1) then
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = advxb, advxe
-                            qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
-                        end do
-                    end if
+                        if (.not. igr .or. num_fluids > 1) then
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = advxb, advxe
+                                qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
+                            end do
+                        end if
 
-                    if (surface_tension) then
-                        qK_prim_vf(c_idx)%sf(j, k, l) = qK_cons_vf(c_idx)%sf(j, k, l)
-                    end if
+                        if (surface_tension) then
+                            qK_prim_vf(c_idx)%sf(j, k, l) = qK_cons_vf(c_idx)%sf(j, k, l)
+                        end if
 
-                    if (cont_damage) qK_prim_vf(damage_idx)%sf(j, k, l) = qK_cons_vf(damage_idx)%sf(j, k, l)
+                        if (cont_damage) qK_prim_vf(damage_idx)%sf(j, k, l) = qK_cons_vf(damage_idx)%sf(j, k, l)
 
 #ifdef MFC_POST_PROCESS
-                    if (bubbles_lagrange) qK_prim_vf(beta_idx)%sf(j, k, l) = qK_cons_vf(beta_idx)%sf(j, k, l)
+                        if (bubbles_lagrange) qK_prim_vf(beta_idx)%sf(j, k, l) = qK_cons_vf(beta_idx)%sf(j, k, l)
 #endif
 
+                    end do
                 end do
             end do
-        end do
+        #:endcall GPU_PARALLEL_LOOP
 
     end subroutine s_convert_conservative_to_primitive_variables
 
@@ -1493,113 +1492,113 @@ contains
         ! Computing the flux variables from the primitive variables, without
         ! accounting for the contribution of either viscosity or capillarity
 #ifdef MFC_SIMULATION
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_K, vel_K, &
-            & alpha_K, Re_K, Y_K]')
-        do l = is3b, is3e
-            do k = is2b, is2e
-                do j = is1b, is1e
+        #:call GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_K, vel_K, alpha_K, Re_K, Y_K]')
+            do l = is3b, is3e
+                do k = is2b, is2e
+                    do j = is1b, is1e
 
-                    $:GPU_LOOP(parallelism='[seq]')
-                    do i = 1, contxe
-                        alpha_rho_K(i) = qK_prim_vf(j, k, l, i)
-                    end do
-
-                    $:GPU_LOOP(parallelism='[seq]')
-                    do i = advxb, advxe
-                        alpha_K(i - E_idx) = qK_prim_vf(j, k, l, i)
-                    end do
-                    $:GPU_LOOP(parallelism='[seq]')
-                    do i = 1, num_vels
-                        vel_K(i) = qK_prim_vf(j, k, l, contxe + i)
-                    end do
-
-                    vel_K_sum = 0._wp
-                    $:GPU_LOOP(parallelism='[seq]')
-                    do i = 1, num_vels
-                        vel_K_sum = vel_K_sum + vel_K(i)**2._wp
-                    end do
-
-                    pres_K = qK_prim_vf(j, k, l, E_idx)
-                    if (elasticity) then
-                        call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, &
-                                                                        alpha_K, alpha_rho_K, Re_K, &
-                                                                        G_K, Gs)
-                    else if (bubbles_euler) then
-                        call s_convert_species_to_mixture_variables_bubbles_acc(rho_K, gamma_K, &
-                                                                                pi_inf_K, qv_K, alpha_K, alpha_rho_K, Re_K)
-                    else
-                        call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, &
-                                                                        alpha_K, alpha_rho_K, Re_K)
-                    end if
-
-                    ! Computing the energy from the pressure
-
-                    if (chemistry) then
                         $:GPU_LOOP(parallelism='[seq]')
-                        do i = chemxb, chemxe
-                            Y_K(i - chemxb + 1) = qK_prim_vf(j, k, l, i)
+                        do i = 1, contxe
+                            alpha_rho_K(i) = qK_prim_vf(j, k, l, i)
                         end do
-                        !Computing the energy from the internal energy of the mixture
-                        call get_mixture_molecular_weight(Y_k, mix_mol_weight)
-                        R_gas = gas_constant/mix_mol_weight
-                        T_K = pres_K/rho_K/R_gas
-                        call get_mixture_energy_mass(T_K, Y_K, E_K)
-                        E_K = rho_K*E_K + 5.e-1_wp*rho_K*vel_K_sum
-                    else
+
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = advxb, advxe
+                            alpha_K(i - E_idx) = qK_prim_vf(j, k, l, i)
+                        end do
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = 1, num_vels
+                            vel_K(i) = qK_prim_vf(j, k, l, contxe + i)
+                        end do
+
+                        vel_K_sum = 0._wp
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = 1, num_vels
+                            vel_K_sum = vel_K_sum + vel_K(i)**2._wp
+                        end do
+
+                        pres_K = qK_prim_vf(j, k, l, E_idx)
+                        if (elasticity) then
+                            call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, &
+                                                                            alpha_K, alpha_rho_K, Re_K, &
+                                                                            G_K, Gs_vc)
+                        else if (bubbles_euler) then
+                            call s_convert_species_to_mixture_variables_bubbles_acc(rho_K, gamma_K, &
+                                                                                    pi_inf_K, qv_K, alpha_K, alpha_rho_K, Re_K)
+                        else
+                            call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, &
+                                                                            alpha_K, alpha_rho_K, Re_K)
+                        end if
+
                         ! Computing the energy from the pressure
-                        E_K = gamma_K*pres_K + pi_inf_K &
-                              + 5.e-1_wp*rho_K*vel_K_sum + qv_K
-                    end if
 
-                    ! mass flux, this should be \alpha_i \rho_i u_i
-                    $:GPU_LOOP(parallelism='[seq]')
-                    do i = 1, contxe
-                        FK_vf(j, k, l, i) = alpha_rho_K(i)*vel_K(dir_idx(1))
+                        if (chemistry) then
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = chemxb, chemxe
+                                Y_K(i - chemxb + 1) = qK_prim_vf(j, k, l, i)
+                            end do
+                            !Computing the energy from the internal energy of the mixture
+                            call get_mixture_molecular_weight(Y_k, mix_mol_weight)
+                            R_gas = gas_constant/mix_mol_weight
+                            T_K = pres_K/rho_K/R_gas
+                            call get_mixture_energy_mass(T_K, Y_K, E_K)
+                            E_K = rho_K*E_K + 5.e-1_wp*rho_K*vel_K_sum
+                        else
+                            ! Computing the energy from the pressure
+                            E_K = gamma_K*pres_K + pi_inf_K &
+                                  + 5.e-1_wp*rho_K*vel_K_sum + qv_K
+                        end if
+
+                        ! mass flux, this should be \alpha_i \rho_i u_i
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = 1, contxe
+                            FK_vf(j, k, l, i) = alpha_rho_K(i)*vel_K(dir_idx(1))
+                        end do
+
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = 1, num_vels
+                            FK_vf(j, k, l, contxe + dir_idx(i)) = &
+                                rho_K*vel_K(dir_idx(1)) &
+                                *vel_K(dir_idx(i)) &
+                                + pres_K*dir_flg(dir_idx(i))
+                        end do
+
+                        ! energy flux, u(E+p)
+                        FK_vf(j, k, l, E_idx) = vel_K(dir_idx(1))*(E_K + pres_K)
+
+                        ! Species advection Flux, \rho*u*Y
+                        if (chemistry) then
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, num_species
+                                FK_vf(j, k, l, i - 1 + chemxb) = vel_K(dir_idx(1))*(rho_K*Y_K(i))
+                            end do
+                        end if
+
+                        if (riemann_solver == 1 .or. riemann_solver == 4) then
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = advxb, advxe
+                                FK_vf(j, k, l, i) = 0._wp
+                                FK_src_vf(j, k, l, i) = alpha_K(i - E_idx)
+                            end do
+
+                        else
+                            ! Could be bubbles_euler!
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = advxb, advxe
+                                FK_vf(j, k, l, i) = vel_K(dir_idx(1))*alpha_K(i - E_idx)
+                            end do
+
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = advxb, advxe
+                                FK_src_vf(j, k, l, i) = vel_K(dir_idx(1))
+                            end do
+
+                        end if
+
                     end do
-
-                    $:GPU_LOOP(parallelism='[seq]')
-                    do i = 1, num_vels
-                        FK_vf(j, k, l, contxe + dir_idx(i)) = &
-                            rho_K*vel_K(dir_idx(1)) &
-                            *vel_K(dir_idx(i)) &
-                            + pres_K*dir_flg(dir_idx(i))
-                    end do
-
-                    ! energy flux, u(E+p)
-                    FK_vf(j, k, l, E_idx) = vel_K(dir_idx(1))*(E_K + pres_K)
-
-                    ! Species advection Flux, \rho*u*Y
-                    if (chemistry) then
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = 1, num_species
-                            FK_vf(j, k, l, i - 1 + chemxb) = vel_K(dir_idx(1))*(rho_K*Y_K(i))
-                        end do
-                    end if
-
-                    if (riemann_solver == 1 .or. riemann_solver == 4) then
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = advxb, advxe
-                            FK_vf(j, k, l, i) = 0._wp
-                            FK_src_vf(j, k, l, i) = alpha_K(i - E_idx)
-                        end do
-
-                    else
-                        ! Could be bubbles_euler!
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = advxb, advxe
-                            FK_vf(j, k, l, i) = vel_K(dir_idx(1))*alpha_K(i - E_idx)
-                        end do
-
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = advxb, advxe
-                            FK_src_vf(j, k, l, i) = vel_K(dir_idx(1))
-                        end do
-
-                    end if
-
                 end do
             end do
-        end do
+        #:endcall GPU_PARALLEL_LOOP
 #endif
     end subroutine s_convert_primitive_to_flux_variables
 
@@ -1612,21 +1611,21 @@ contains
 #endif
 
 #ifdef MFC_SIMULATION
-        @:DEALLOCATE(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs)
+        @:DEALLOCATE(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs_vc)
         if (bubbles_euler) then
-            @:DEALLOCATE(bubrs)
+            @:DEALLOCATE(bubrs_vc)
         end if
 #else
-        @:DEALLOCATE(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs)
+        @:DEALLOCATE(gammas, gs_min, pi_infs, ps_inf, cvs, qvs, qvps, Gs_vc)
         if (bubbles_euler) then
-            @:DEALLOCATE(bubrs)
+            @:DEALLOCATE(bubrs_vc)
         end if
 #endif
 
     end subroutine s_finalize_variables_conversion_module
 
 #ifndef MFC_PRE_PROCESS
-    pure subroutine s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_sum, c_c, c)
+    subroutine s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_sum, c_c, c)
         $:GPU_ROUTINE(function_name='s_compute_speed_of_sound', &
             & parallelism='[seq]', cray_inline=True)
 
@@ -1692,7 +1691,7 @@ contains
 #endif
 
 #ifndef MFC_PRE_PROCESS
-    pure subroutine s_compute_fast_magnetosonic_speed(rho, c, B, norm, c_fast, h)
+    subroutine s_compute_fast_magnetosonic_speed(rho, c, B, norm, c_fast, h)
         $:GPU_ROUTINE(function_name='s_compute_fast_magnetosonic_speed', &
             & parallelism='[seq]', cray_inline=True)
 
