@@ -52,19 +52,8 @@ module m_data_output
               s_close_probe_files, &
               s_finalize_data_output_module
 
-    real(wp), allocatable, dimension(:, :, :) :: icfl_sf  !< ICFL stability criterion
-    real(wp), allocatable, dimension(:, :, :) :: vcfl_sf  !< VCFL stability criterion
-    real(wp), allocatable, dimension(:, :, :) :: ccfl_sf  !< CCFL stability criterion
-    real(wp), allocatable, dimension(:, :, :) :: Rc_sf  !< Rc stability criterion
     real(wp), public, allocatable, dimension(:, :) :: c_mass
-    $:GPU_DECLARE(create='[icfl_sf,vcfl_sf,ccfl_sf,Rc_sf,c_mass]')
-
-    real(wp) :: icfl_max_loc, icfl_max_glb !< ICFL stability extrema on local and global grids
-    real(wp) :: vcfl_max_loc, vcfl_max_glb !< VCFL stability extrema on local and global grids
-    real(wp) :: ccfl_max_loc, ccfl_max_glb !< CCFL stability extrema on local and global grids
-    real(wp) :: Rc_min_loc, Rc_min_glb !< Rc   stability extrema on local and global grids
-    $:GPU_DECLARE(create='[icfl_max_loc,icfl_max_glb,vcfl_max_loc,vcfl_max_glb]')
-    $:GPU_DECLARE(create='[ccfl_max_loc,ccfl_max_glb,Rc_min_loc,Rc_min_glb]')
+    $:GPU_DECLARE(create='[c_mass]')
 
     !> @name ICFL, VCFL, CCFL and Rc stability criteria extrema over all the time-steps
     !> @{
@@ -281,9 +270,20 @@ contains
         real(wp) :: H          !< Cell-avg. enthalpy
         real(wp), dimension(2) :: Re         !< Cell-avg. Reynolds numbers
         integer :: j, k, l
+        real(wp) :: icfl_max_loc, icfl_max_glb !< ICFL stability extrema on local and global grids
+        real(wp) :: vcfl_max_loc, vcfl_max_glb !< VCFL stability extrema on local and global grids
+        real(wp) :: ccfl_max_loc, ccfl_max_glb !< CCFL stability extrema on local and global grids
+        real(wp) :: Rc_min_loc, Rc_min_glb !< Rc   stability extrema on local and global grids
+        real(wp) :: icfl, vcfl, Rc
 
         ! Computing Stability Criteria at Current Time-step
-        #:call GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re]')
+        icfl_max_loc = 0.0_wp
+        if (viscous) then
+            vcfl_max_loc = 0.0_wp
+            Rc_min_loc = huge(1.0_wp)  ! Initialize to large value for min reduction
+        end if
+        #:call GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re]', &
+            & reduction='[[icfl_max_loc,vcfl_max_loc],[Rc_min_loc]]', reductionOp='[max,min]')
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -292,31 +292,19 @@ contains
                         call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, 0._wp, c)
 
                         if (viscous) then
-                            call s_compute_stability_from_dt(vel, c, rho, Re, j, k, l, icfl_sf, vcfl_sf, Rc_sf)
+                            call s_compute_stability_from_dt(vel, c, rho, Re, j, k, l, icfl, vcfl, Rc)
                         else
-                            call s_compute_stability_from_dt(vel, c, rho, Re, j, k, l, icfl_sf)
+                            call s_compute_stability_from_dt(vel, c, rho, Re, j, k, l, icfl)
                         end if
 
+                        icfl_max_loc = max(icfl_max_loc, icfl)
+                        vcfl_max_loc = max(vcfl_max_loc, merge(vcfl, 0.0_wp, viscous))
+                        Rc_min_loc   = min(Rc_min_loc,   merge(Rc, huge(1.0_wp), viscous))
                     end do
                 end do
             end do
         #:endcall GPU_PARALLEL_LOOP
         ! end: Computing Stability Criteria at Current Time-step
-
-        ! Determining local stability criteria extrema at current time-step
-
-        $:GPU_UPDATE(host='[icfl_sf]')
-
-        if (viscous) then
-            $:GPU_UPDATE(host='[vcfl_sf,Rc_sf]')
-        end if
-
-        icfl_max_loc = maxval(icfl_sf)
-
-        if (viscous) then
-            vcfl_max_loc = maxval(vcfl_sf)
-            Rc_min_loc = minval(Rc_sf)
-        end if
 
         ! Determining global stability criteria extrema at current time-step
         if (num_procs > 1) then
@@ -1795,13 +1783,8 @@ contains
 
         ! Allocating/initializing ICFL, VCFL, CCFL and Rc stability criteria
         if (run_time_info) then
-            @:ALLOCATE(icfl_sf(0:m, 0:n, 0:p))
-            icfl_max = 0._wp
-
+           icfl_max = 0._wp
             if (viscous) then
-                @:ALLOCATE(vcfl_sf(0:m, 0:n, 0:p))
-                @:ALLOCATE(Rc_sf  (0:m, 0:n, 0:p))
-
                 vcfl_max = 0._wp
                 Rc_min = 1.e12_wp
             end if
@@ -1831,14 +1814,6 @@ contains
 
         if (probe_wrt) then
             @:DEALLOCATE(c_mass)
-        end if
-
-        if (run_time_info) then
-            ! Deallocating the ICFL, VCFL, CCFL, and Rc stability criteria
-            @:DEALLOCATE(icfl_sf)
-            if (viscous) then
-                @:DEALLOCATE(vcfl_sf, Rc_sf)
-            end if
         end if
 
         if (down_sample) then
