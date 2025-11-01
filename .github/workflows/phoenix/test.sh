@@ -3,6 +3,11 @@
 build_opts=""
 if [ "$job_device" = "gpu" ]; then
     build_opts="--gpu"
+    if [ "$job_interface" = "omp" ]; then
+      build_opts+=" mp"
+    elif [ "$job_interface" = "acc" ]; then
+      build_opts+=" acc"
+    fi
 fi
 
 ./mfc.sh test --dry-run -j 8 $build_opts

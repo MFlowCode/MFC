@@ -30,7 +30,7 @@ jobs:
 
     - name: Looking for raw directives
       run: |
-        ! grep -iR '!\$acc\|!\$omp' --exclude="parallel_macros.fpp" --exclude="syscheck.fpp" ./src/*
+        ! grep -iR '!\$acc\|!\$omp' --exclude="parallel_macros.fpp" --exclude="acc_macros.fpp" --exclude="omp_macros.fpp" --exclude="shared_parallel_macros.fpp" --exclude="syscheck.fpp" ./src/*
         
     - name: No double precision intrinsics
       run: |

@@ -20,7 +20,7 @@ contains
         !! @param k y coordinate index
         !! @param l z coordinate index
         !! @return fltr_dtheta Modified dtheta value for cylindrical coordinates
-    pure function f_compute_filtered_dtheta(k, l) result(fltr_dtheta)
+    function f_compute_filtered_dtheta(k, l) result(fltr_dtheta)
         $:GPU_ROUTINE(parallelism='[seq]')
         integer, intent(in) :: k, l
         real(wp) :: fltr_dtheta
@@ -47,7 +47,7 @@ contains
         !! @param k y coordinate index
         !! @param l z coordinate index
         !! @return cfl_terms computed CFL terms for 2D/3D cases
-    pure function f_compute_multidim_cfl_terms(vel, c, j, k, l) result(cfl_terms)
+    function f_compute_multidim_cfl_terms(vel, c, j, k, l) result(cfl_terms)
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), dimension(num_vels), intent(in) :: vel
         real(wp), intent(in) :: c
@@ -89,7 +89,7 @@ contains
         !! @param j x index
         !! @param k y index
         !! @param l z index
-    pure subroutine s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, j, k, l)
+    subroutine s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, j, k, l)
         $:GPU_ROUTINE(function_name='s_compute_enthalpy',parallelism='[seq]', &
             & cray_inline=True)
 
@@ -181,7 +181,7 @@ contains
         !! @param icfl_sf cell-centered inviscid cfl number
         !! @param vcfl_sf (optional) cell-centered viscous CFL number
         !! @param Rc_sf (optional) cell centered Rc
-    pure subroutine s_compute_stability_from_dt(vel, c, rho, Re_l, j, k, l, icfl_sf, vcfl_sf, Rc_sf)
+    subroutine s_compute_stability_from_dt(vel, c, rho, Re_l, j, k, l, icfl_sf, vcfl_sf, Rc_sf)
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in), dimension(num_vels) :: vel
         real(wp), intent(in) :: c, rho
@@ -244,7 +244,7 @@ contains
         !! @param j x coordinate
         !! @param k y coordinate
         !! @param l z coordinate
-    pure subroutine s_compute_dt_from_cfl(vel, c, max_dt, rho, Re_l, j, k, l)
+    subroutine s_compute_dt_from_cfl(vel, c, max_dt, rho, Re_l, j, k, l)
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), dimension(num_vels), intent(in) :: vel
         real(wp), intent(in) :: c, rho

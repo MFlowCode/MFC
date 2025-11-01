@@ -25,7 +25,7 @@ module m_nvtx
         type(c_ptr) :: message          ! ascii char
     end type nvtxEventAttributes
 
-#if defined(MFC_OpenACC) && defined(__PGI)
+#if defined(MFC_GPU) && defined(__PGI)
 
     interface nvtxRangePush
         ! push range with custom label and standard color
@@ -58,7 +58,7 @@ contains
         integer, intent(IN), optional :: id
         type(nvtxEventAttributes) :: event
 
-#if defined(MFC_OpenACC) && defined(__PGI)
+#if defined(MFC_GPU) && defined(__PGI)
 
         tempName = trim(name)//c_null_char
 
@@ -74,7 +74,7 @@ contains
     end subroutine nvtxStartRange
 
     subroutine nvtxEndRange
-#if defined(MFC_OpenACC) && defined(__PGI)
+#if defined(MFC_GPU) && defined(__PGI)
         call nvtxRangePop
 #endif
     end subroutine nvtxEndRange

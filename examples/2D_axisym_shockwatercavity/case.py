@@ -59,7 +59,7 @@ piw = 3.43e08
 c_w = math.sqrt(gamw * (p0w + piw) / rho0w)
 
 # Shock Mach number of interest. Note that the post-shock properties can be defined in terms of either
-# Min or psOp0a. Just comment/uncomment appropriatelly
+# Min or psOp0a. Just comment/uncomment appropriately
 Min = 2.146
 
 ## Pos to pre shock ratios - AIR
