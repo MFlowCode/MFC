@@ -153,6 +153,7 @@ print(
             "lag_params%valmaxvoid": 0.9,
             "lag_params%write_bubbles": "F",
             "lag_params%write_bubbles_stats": "F",
+            "lag_params%write_void_evol": "T",
             "lag_params%c0": c0,
             "lag_params%rho0": rho0,
             "lag_params%T0": T0,
