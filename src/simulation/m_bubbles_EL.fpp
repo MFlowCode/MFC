@@ -83,8 +83,7 @@ module m_bubbles_EL
 
     integer, allocatable, dimension(:) :: keep_bubble, prefix_sum
     integer, allocatable, dimension(:,:) :: wrap_bubble_loc, wrap_bubble_dir
-    integer :: active_bubs
-    $:GPU_DECLARE(create='[keep_bubble, prefix_sum, active_bubs]')
+    $:GPU_DECLARE(create='[keep_bubble, prefix_sum]')
     $:GPU_DECLARE(create='[wrap_bubble_loc, wrap_bubble_dir]')
 
 contains
@@ -1536,8 +1535,6 @@ contains
                 end if
             end do
 
-            active_bubs = prefix_sum(n_el_bubs_loc)
-
             do k = 1, n_el_bubs_loc
                 if (keep_bubble(k) == 1) then
                     if (prefix_sum(k) /= k) then
@@ -1548,7 +1545,7 @@ contains
                 end if
             end do
 
-            n_el_bubs_loc = active_bubs
+            n_el_bubs_loc = prefix_sum(n_el_bubs_loc)
 
             ! Handle periodic wrapping of bubbles on same processor
             newBubs = 0

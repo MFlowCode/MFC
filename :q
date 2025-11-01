@@ -1,0 +1,68 @@
+[1mdiff --git a/src/simulation/m_bubbles_EL.fpp b/src/simulation/m_bubbles_EL.fpp[m
+[1mindex 5d0dd954..3b0f25a5 100644[m
+[1m--- a/src/simulation/m_bubbles_EL.fpp[m
+[1m+++ b/src/simulation/m_bubbles_EL.fpp[m
+[36m@@ -83,8 +83,7 @@[m [mmodule m_bubbles_EL[m
+ [m
+     integer, allocatable, dimension(:) :: keep_bubble, prefix_sum[m
+     integer, allocatable, dimension(:,:) :: wrap_bubble_loc, wrap_bubble_dir[m
+[31m-    integer :: active_bubs[m
+[31m-    $:GPU_DECLARE(create='[keep_bubble, prefix_sum, active_bubs]')[m
+[32m+[m[32m    $:GPU_DECLARE(create='[keep_bubble, prefix_sum]')[m
+     $:GPU_DECLARE(create='[wrap_bubble_loc, wrap_bubble_dir]')[m
+ [m
+ contains[m
+[36m@@ -1536,8 +1535,6 @@[m [mcontains[m
+                 end if[m
+             end do[m
+ [m
+[31m-            active_bubs = prefix_sum(n_el_bubs_loc)[m
+[31m-[m
+             do k = 1, n_el_bubs_loc[m
+                 if (keep_bubble(k) == 1) then[m
+                     if (prefix_sum(k) /= k) then[m
+[36m@@ -1548,7 +1545,7 @@[m [mcontains[m
+                 end if[m
+             end do[m
+ [m
+[31m-            n_el_bubs_loc = active_bubs[m
+[32m+[m[32m            n_el_bubs_loc = prefix_sum(n_el_bubs_loc)[m
+ [m
+             ! Handle periodic wrapping of bubbles on same processor[m
+             newBubs = 0[m
+[1mdiff --git a/src/simulation/m_data_output.fpp b/src/simulation/m_data_output.fpp[m
+[1mindex cfea6de0..521067e9 100644[m
+[1m--- a/src/simulation/m_data_output.fpp[m
+[1m+++ b/src/simulation/m_data_output.fpp[m
+[36m@@ -283,8 +283,7 @@[m [mcontains[m
+         integer :: j, k, l[m
+ [m
+         ! Computing Stability Criteria at Current Time-step[m
+[31m-        $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re]', &[m
+[31m-        & reduction='[[icfl_max_loc, vcfl_max_loc],[Rc_min_loc]]', reductionOp='[MAX,MIN]')[m
+[32m+[m[32m        $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re]')[m
+         do l = 0, p[m
+             do k = 0, n[m
+                 do j = 0, m[m
+[36m@@ -303,6 +302,21 @@[m [mcontains[m
+         end do[m
+         ! end: Computing Stability Criteria at Current Time-step[m
+ [m
+[32m+[m[32m        ! Determining local stability criteria extrema at current time-step[m
+[32m+[m
+[32m+[m[32m        $:GPU_UPDATE(host='[icfl_sf]')[m
+[32m+[m
+[32m+[m[32m        if (viscous) then[m
+[32m+[m[32m            $:GPU_UPDATE(host='[vcfl_sf,Rc_sf]')[m
+[32m+[m[32m        end if[m
+[32m+[m
+[32m+[m[32m        icfl_max_loc = maxval(icfl_sf)[m
+[32m+[m
+[32m+[m[32m        if (viscous) then[m
+[32m+[m[32m            vcfl_max_loc = maxval(vcfl_sf)[m
+[32m+[m[32m            Rc_min_loc = minval(Rc_sf)[m
+[32m+[m[32m        end if[m
+[32m+[m
+         ! Determining global stability criteria extrema at current time-step[m
+         if (num_procs > 1) then[m
+             call s_mpi_reduce_stability_criteria_extrema(icfl_max_loc, &[m

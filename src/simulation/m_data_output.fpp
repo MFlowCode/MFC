@@ -283,8 +283,7 @@ contains
         integer :: j, k, l
 
         ! Computing Stability Criteria at Current Time-step
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re]', &
-        & reduction='[[icfl_max_loc, vcfl_max_loc],[Rc_min_loc]]', reductionOp='[MAX,MIN]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -302,6 +301,21 @@ contains
             end do
         end do
         ! end: Computing Stability Criteria at Current Time-step
+
+        ! Determining local stability criteria extrema at current time-step
+
+        $:GPU_UPDATE(host='[icfl_sf]')
+
+        if (viscous) then
+            $:GPU_UPDATE(host='[vcfl_sf,Rc_sf]')
+        end if
+
+        icfl_max_loc = maxval(icfl_sf)
+
+        if (viscous) then
+            vcfl_max_loc = maxval(vcfl_sf)
+            Rc_min_loc = minval(Rc_sf)
+        end if
 
         ! Determining global stability criteria extrema at current time-step
         if (num_procs > 1) then
