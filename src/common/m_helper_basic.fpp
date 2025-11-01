@@ -26,7 +26,7 @@ contains
     !! @param b Second number.
     !! @param tol_input Relative error (default = 1.e-10_wp).
     !! @return Result of the comparison.
-    logical pure elemental function f_approx_equal(a, b, tol_input) result(res)
+    logical elemental function f_approx_equal(a, b, tol_input) result(res)
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: a, b
         real(wp), optional, intent(in) :: tol_input
@@ -52,7 +52,7 @@ contains
     !! @param b Array that contains several point numbers.
     !! @param tol_input Relative error (default = 1e-10_wp).
     !! @return Result of the comparison.
-    logical pure function f_approx_in_array(a, b, tol_input) result(res)
+    logical function f_approx_in_array(a, b, tol_input) result(res)
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: a
         real(wp), intent(in) :: b(:)
@@ -78,7 +78,7 @@ contains
 
     !> Checks if a real(wp) variable is of default value.
     !! @param var Variable to check.
-    logical pure elemental function f_is_default(var) result(res)
+    logical elemental function f_is_default(var) result(res)
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: var
 
@@ -87,12 +87,13 @@ contains
 
     !> Checks if ALL elements of a real(wp) array are of default value.
     !! @param var_array Array to check.
-    logical pure function f_all_default(var_array) result(res)
+    logical function f_all_default(var_array) result(res)
         real(wp), intent(in) :: var_array(:)
-        ! logical :: res_array(size(var_array))
-        ! integer :: i
 
         res = all(f_is_default(var_array))
+
+        !logical :: res_array(size(var_array))
+        !integer :: i
 
         ! do i = 1, size(var_array)
         !     res_array(i) = f_is_default(var_array(i))
@@ -103,16 +104,16 @@ contains
 
     !> Checks if a real(wp) variable is an integer.
     !! @param var Variable to check.
-    logical pure elemental function f_is_integer(var) result(res)
+    logical elemental function f_is_integer(var) result(res)
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: var
 
         res = f_approx_equal(var, real(nint(var), wp))
     end function f_is_integer
 
-    pure subroutine s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, &
-                                                  igr_order, buff_size, idwint, idwbuff, &
-                                                  viscous, bubbles_lagrange, m, n, p, num_dims, igr, ib)
+    subroutine s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, &
+                                             igr_order, buff_size, idwint, idwbuff, &
+                                             viscous, bubbles_lagrange, m, n, p, num_dims, igr, ib)
 
         integer, intent(in) :: recon_type, weno_polyn, muscl_polyn
         integer, intent(in) :: m, n, p, num_dims, igr_order
@@ -166,7 +167,7 @@ contains
     !! @param m Number of cells in x-axis
     !! @param n Number of cells in y-axis
     !! @param p Number of cells in z-axis
-    pure elemental subroutine s_update_cell_bounds(bounds, m, n, p)
+    elemental subroutine s_update_cell_bounds(bounds, m, n, p)
         type(cell_num_bounds), intent(out) :: bounds
         integer, intent(in) :: m, n, p
 
