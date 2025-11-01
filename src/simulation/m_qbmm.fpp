@@ -37,9 +37,9 @@ module m_qbmm
     type(int_bounds_info) :: is1_qbmm, is2_qbmm, is3_qbmm
     $:GPU_DECLARE(create='[is1_qbmm,is2_qbmm,is3_qbmm]')
 
-    integer, allocatable, dimension(:) :: bubrs
+    integer, allocatable, dimension(:) :: bubrs_qbmm
     integer, allocatable, dimension(:, :) :: bubmoms
-    $:GPU_DECLARE(create='[bubrs,bubmoms]')
+    $:GPU_DECLARE(create='[bubrs_qbmm,bubmoms]')
 
 contains
 
@@ -394,13 +394,13 @@ contains
 
         $:GPU_UPDATE(device='[momrhs]')
 
-        @:ALLOCATE(bubrs(1:nb))
+        @:ALLOCATE(bubrs_qbmm(1:nb))
         @:ALLOCATE(bubmoms(1:nb, 1:nmom))
 
         do i = 1, nb
-            bubrs(i) = bub_idx%rs(i)
+            bubrs_qbmm(i) = bub_idx%rs(i)
         end do
-        $:GPU_UPDATE(device='[bubrs]')
+        $:GPU_UPDATE(device='[bubrs_qbmm]')
 
         do j = 1, nmom
             do i = 1, nb
@@ -411,7 +411,7 @@ contains
 
     end subroutine s_initialize_qbmm_module
 
-    pure subroutine s_compute_qbmm_rhs(idir, q_cons_vf, q_prim_vf, rhs_vf, flux_n_vf, pb, rhs_pb)
+    subroutine s_compute_qbmm_rhs(idir, q_cons_vf, q_prim_vf, rhs_vf, flux_n_vf, pb, rhs_pb)
 
         integer, intent(in) :: idir
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf, q_prim_vf
@@ -433,136 +433,138 @@ contains
         end select
 
         if (.not. polytropic) then
-            $:GPU_PARALLEL_LOOP(collapse=5,private='[nb_q,nR,nR2,R,R2,nb_dot,nR_dot,nR2_dot,var,AX]')
-            do i = 1, nb
-                do q = 1, nnode
-                    do l = 0, p
-                        do k = 0, n
-                            do j = 0, m
-                                nb_q = q_cons_vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
-                                nR = q_cons_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
-                                nR2 = q_cons_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
-                                R = q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
-                                R2 = q_prim_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
-                                var = max(R2 - R**2._wp, verysmall)
-                                if (q <= 2) then
-                                    AX = R - sqrt(var)
-                                else
-                                    AX = R + sqrt(var)
-                                end if
-                                select case (idir)
-                                case (1)
-                                    nb_dot = flux_n_vf(bubxb + (i - 1)*nmom)%sf(j - 1, k, l) - flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
-                                    nR_dot = flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j - 1, k, l) - flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
-                                    nR2_dot = flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j - 1, k, l) - flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
-                                    rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dx(j)*AX*nb_q**2)* &
-                                                            (nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, q, i))
-                                case (2)
-                                    nb_dot = flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k - 1, l) - flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
-                                    nR_dot = flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k - 1, l) - flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
-                                    nR2_dot = flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k - 1, l) - flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
-                                    rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dy(k)*AX*nb_q**2)* &
-                                                            (nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, q, i))
-                                case (3)
-                                    if (is_axisym) then
-                                        nb_dot = q_prim_vf(contxe + idir)%sf(j, k, l)*(flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l))
-                                        nR_dot = q_prim_vf(contxe + idir)%sf(j, k, l)*(flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l))
-                                        nR2_dot = q_prim_vf(contxe + idir)%sf(j, k, l)*(flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l))
-                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dz(l)*y_cc(k)*AX*nb_q**2)* &
-                                                                (nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, q, i))
+            #:call GPU_PARALLEL_LOOP(collapse=5,private='[nb_q,nR,nR2,R,R2,nb_dot,nR_dot,nR2_dot,var,AX]')
+                do i = 1, nb
+                    do q = 1, nnode
+                        do l = 0, p
+                            do k = 0, n
+                                do j = 0, m
+                                    nb_q = q_cons_vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
+                                    nR = q_cons_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
+                                    nR2 = q_cons_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
+                                    R = q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
+                                    R2 = q_prim_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
+                                    var = max(R2 - R**2._wp, verysmall)
+                                    if (q <= 2) then
+                                        AX = R - sqrt(var)
                                     else
-                                        nb_dot = flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
-                                        nR_dot = flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
-                                        nR2_dot = flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
-                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dz(l)*AX*nb_q**2)* &
-                                                                (nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, q, i))
+                                        AX = R + sqrt(var)
                                     end if
-                                end select
-                                if (q <= 2) then
                                     select case (idir)
                                     case (1)
-                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3._wp*gam/(dx(j)*AX*nb_q**2*sqrt(var)*2._wp)* &
-                                                                (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
-                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3._wp*gam/(dx(j)*AX*nb_q**2*sqrt(var)*2._wp)* &
-                                                                (-2._wp*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
+                                        nb_dot = flux_n_vf(bubxb + (i - 1)*nmom)%sf(j - 1, k, l) - flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
+                                        nR_dot = flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j - 1, k, l) - flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
+                                        nR2_dot = flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j - 1, k, l) - flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
+                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dx(j)*AX*nb_q**2)* &
+                                                                (nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, q, i))
                                     case (2)
-                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3._wp*gam/(dy(k)*AX*nb_q**2*sqrt(var)*2._wp)* &
-                                                                (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
-                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3._wp*gam/(dy(k)*AX*nb_q**2*sqrt(var)*2._wp)* &
-                                                                (-2._wp*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
+                                        nb_dot = flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k - 1, l) - flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
+                                        nR_dot = flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k - 1, l) - flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
+                                        nR2_dot = flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k - 1, l) - flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
+                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dy(k)*AX*nb_q**2)* &
+                                                                (nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, q, i))
                                     case (3)
                                         if (is_axisym) then
-                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3._wp*gam/(dz(l)*y_cc(k)*AX*nb_q**2*sqrt(var)*2._wp)* &
-                                                                    (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
-                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3._wp*gam/(dz(l)*y_cc(k)*AX*nb_q**2*sqrt(var)*2._wp)* &
-                                                                    (-2._wp*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
+                                            nb_dot = q_prim_vf(contxe + idir)%sf(j, k, l)*(flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l))
+                                            nR_dot = q_prim_vf(contxe + idir)%sf(j, k, l)*(flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l))
+                                            nR2_dot = q_prim_vf(contxe + idir)%sf(j, k, l)*(flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l))
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dz(l)*y_cc(k)*AX*nb_q**2)* &
+                                                                    (nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, q, i))
                                         else
-                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3._wp*gam/(dz(l)*AX*nb_q**2*sqrt(var)*2._wp)* &
-                                                                    (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
-                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3._wp*gam/(dz(l)*AX*nb_q**2*sqrt(var)*2._wp)* &
-                                                                    (-2._wp*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
+                                            nb_dot = flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
+                                            nR_dot = flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
+                                            nR2_dot = flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l - 1) - flux_n_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dz(l)*AX*nb_q**2)* &
+                                                                    (nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, q, i))
                                         end if
                                     end select
-                                else
-                                    select case (idir)
-                                    case (1)
-                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dx(j)*AX*nb_q**2*sqrt(var)*2._wp)* &
-                                                                (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
-                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dx(j)*AX*nb_q**2*sqrt(var)*2._wp)* &
-                                                                (-2._wp*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
-                                    case (2)
-                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dy(k)*AX*nb_q**2*sqrt(var)*2._wp)* &
-                                                                (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
-                                        rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dy(k)*AX*nb_q**2*sqrt(var)*2._wp)* &
-                                                                (-2._wp*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
-                                    case (3)
-                                        if (is_axisym) then
-                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dz(l)*y_cc(k)*AX*nb_q**2*sqrt(var)*2._wp)* &
+                                    if (q <= 2) then
+                                        select case (idir)
+                                        case (1)
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3._wp*gam/(dx(j)*AX*nb_q**2*sqrt(var)*2._wp)* &
                                                                     (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
-                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dz(l)*y_cc(k)*AX*nb_q**2*sqrt(var)*2._wp)* &
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3._wp*gam/(dx(j)*AX*nb_q**2*sqrt(var)*2._wp)* &
                                                                     (-2._wp*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
-                                        else
-                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dz(l)*AX*nb_q**2*sqrt(var)*2._wp)* &
+                                        case (2)
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3._wp*gam/(dy(k)*AX*nb_q**2*sqrt(var)*2._wp)* &
                                                                     (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
-                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dz(l)*AX*nb_q**2*sqrt(var)*2._wp)* &
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3._wp*gam/(dy(k)*AX*nb_q**2*sqrt(var)*2._wp)* &
                                                                     (-2._wp*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
-                                        end if
-                                    end select
-                                end if
+                                        case (3)
+                                            if (is_axisym) then
+                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3._wp*gam/(dz(l)*y_cc(k)*AX*nb_q**2*sqrt(var)*2._wp)* &
+                                                                        (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
+                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3._wp*gam/(dz(l)*y_cc(k)*AX*nb_q**2*sqrt(var)*2._wp)* &
+                                                                        (-2._wp*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
+                                            else
+                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3._wp*gam/(dz(l)*AX*nb_q**2*sqrt(var)*2._wp)* &
+                                                                        (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
+                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) + 3._wp*gam/(dz(l)*AX*nb_q**2*sqrt(var)*2._wp)* &
+                                                                        (-2._wp*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
+                                            end if
+                                        end select
+                                    else
+                                        select case (idir)
+                                        case (1)
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dx(j)*AX*nb_q**2*sqrt(var)*2._wp)* &
+                                                                    (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dx(j)*AX*nb_q**2*sqrt(var)*2._wp)* &
+                                                                    (-2._wp*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
+                                        case (2)
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dy(k)*AX*nb_q**2*sqrt(var)*2._wp)* &
+                                                                    (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
+                                            rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dy(k)*AX*nb_q**2*sqrt(var)*2._wp)* &
+                                                                    (-2._wp*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
+                                        case (3)
+                                            if (is_axisym) then
+                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dz(l)*y_cc(k)*AX*nb_q**2*sqrt(var)*2._wp)* &
+                                                                        (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
+                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dz(l)*y_cc(k)*AX*nb_q**2*sqrt(var)*2._wp)* &
+                                                                        (-2._wp*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
+                                            else
+                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dz(l)*AX*nb_q**2*sqrt(var)*2._wp)* &
+                                                                        (nR2_dot*nb_q - nR2*nb_dot)*(pb(j, k, l, q, i))
+                                                rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, i) - 3._wp*gam/(dz(l)*AX*nb_q**2*sqrt(var)*2._wp)* &
+                                                                        (-2._wp*(nR/nb_q)*(nR_dot*nb_q - nR*nb_dot))*(pb(j, k, l, q, i))
+                                            end if
+                                        end select
+                                    end if
+                                end do
                             end do
                         end do
                     end do
                 end do
-            end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
         ! The following block is not repeated and is left as is
         if (idir == 1) then
-            $:GPU_PARALLEL_LOOP(collapse=3)
-            do l = 0, p
-                do q = 0, n
-                    do i = 0, m
-                        rhs_vf(alf_idx)%sf(i, q, l) = rhs_vf(alf_idx)%sf(i, q, l) + mom_sp(2)%sf(i, q, l)
-                        j = bubxb
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do k = 1, nb
-                            rhs_vf(j)%sf(i, q, l) = rhs_vf(j)%sf(i, q, l) + mom_3d(0, 0, k)%sf(i, q, l)
-                            rhs_vf(j + 1)%sf(i, q, l) = rhs_vf(j + 1)%sf(i, q, l) + mom_3d(1, 0, k)%sf(i, q, l)
-                            rhs_vf(j + 2)%sf(i, q, l) = rhs_vf(j + 2)%sf(i, q, l) + mom_3d(0, 1, k)%sf(i, q, l)
-                            rhs_vf(j + 3)%sf(i, q, l) = rhs_vf(j + 3)%sf(i, q, l) + mom_3d(2, 0, k)%sf(i, q, l)
-                            rhs_vf(j + 4)%sf(i, q, l) = rhs_vf(j + 4)%sf(i, q, l) + mom_3d(1, 1, k)%sf(i, q, l)
-                            rhs_vf(j + 5)%sf(i, q, l) = rhs_vf(j + 5)%sf(i, q, l) + mom_3d(0, 2, k)%sf(i, q, l)
-                            j = j + 6
+            #:call GPU_PARALLEL_LOOP(collapse=3)
+                do l = 0, p
+                    do q = 0, n
+                        do i = 0, m
+                            rhs_vf(alf_idx)%sf(i, q, l) = rhs_vf(alf_idx)%sf(i, q, l) + mom_sp(2)%sf(i, q, l)
+                            j = bubxb
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do k = 1, nb
+                                rhs_vf(j)%sf(i, q, l) = rhs_vf(j)%sf(i, q, l) + mom_3d(0, 0, k)%sf(i, q, l)
+                                rhs_vf(j + 1)%sf(i, q, l) = rhs_vf(j + 1)%sf(i, q, l) + mom_3d(1, 0, k)%sf(i, q, l)
+                                rhs_vf(j + 2)%sf(i, q, l) = rhs_vf(j + 2)%sf(i, q, l) + mom_3d(0, 1, k)%sf(i, q, l)
+                                rhs_vf(j + 3)%sf(i, q, l) = rhs_vf(j + 3)%sf(i, q, l) + mom_3d(2, 0, k)%sf(i, q, l)
+                                rhs_vf(j + 4)%sf(i, q, l) = rhs_vf(j + 4)%sf(i, q, l) + mom_3d(1, 1, k)%sf(i, q, l)
+                                rhs_vf(j + 5)%sf(i, q, l) = rhs_vf(j + 5)%sf(i, q, l) + mom_3d(0, 2, k)%sf(i, q, l)
+                                j = j + 6
+                            end do
                         end do
                     end do
                 end do
-            end do
+            #:endcall GPU_PARALLEL_LOOP
         end if
 
     end subroutine s_compute_qbmm_rhs
 
     !Coefficient array for non-polytropic model (pb and mv values are accounted in wght_pb and wght_mv)
-    pure subroutine s_coeff_nonpoly(pres, rho, c, coeffs)
+    subroutine s_coeff_nonpoly(pres, rho, c, coeffs)
         $:GPU_ROUTINE(function_name='s_coeff_nonpoly',parallelism='[seq]', &
             & cray_inline=True)
 
@@ -633,7 +635,7 @@ contains
     end subroutine s_coeff_nonpoly
 
 !Coefficient array for polytropic model (pb for each R0 bin accounted for in wght_pb)
-    pure subroutine s_coeff(pres, rho, c, coeffs)
+    subroutine s_coeff(pres, rho, c, coeffs)
         $:GPU_ROUTINE(function_name='s_coeff',parallelism='[seq]', &
             & cray_inline=True)
 
@@ -712,146 +714,144 @@ contains
         is1_qbmm = ix; is2_qbmm = iy; is3_qbmm = iz
         $:GPU_UPDATE(device='[is1_qbmm,is2_qbmm,is3_qbmm]')
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[moms, msum, wght, abscX, &
-            & abscY, wght_pb, wght_mv, wght_ht, coeff, ht, r, q, &
-            & n_tait, B_tait, pres, rho, nbub, c, alf, momsum, &
-            & drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T]')
-        do id3 = is3_qbmm%beg, is3_qbmm%end
-            do id2 = is2_qbmm%beg, is2_qbmm%end
-                do id1 = is1_qbmm%beg, is1_qbmm%end
+        #:call GPU_PARALLEL_LOOP(collapse=3, private='[moms, msum, wght, abscX, abscY, wght_pb, wght_mv, wght_ht, coeff, ht, r, q, n_tait, B_tait, pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T]')
+            do id3 = is3_qbmm%beg, is3_qbmm%end
+                do id2 = is2_qbmm%beg, is2_qbmm%end
+                    do id1 = is1_qbmm%beg, is1_qbmm%end
 
-                    alf = q_prim_vf(alf_idx)%sf(id1, id2, id3)
-                    pres = q_prim_vf(E_idx)%sf(id1, id2, id3)
-                    rho = q_prim_vf(contxb)%sf(id1, id2, id3)
+                        alf = q_prim_vf(alf_idx)%sf(id1, id2, id3)
+                        pres = q_prim_vf(E_idx)%sf(id1, id2, id3)
+                        rho = q_prim_vf(contxb)%sf(id1, id2, id3)
 
-                    if (bubble_model == 2) then
-                        n_tait = 1._wp/gammas(1) + 1._wp
-                        B_tait = pi_infs(1)*(n_tait - 1)/n_tait
-                        c = n_tait*(pres + B_tait)*(1._wp - alf)/(rho)
-                        c = merge(sqrt(c), sgm_eps, c > 0._wp)
-                    end if
-
-                    call s_coeff_selector(pres, rho, c, coeff, polytropic)
-
-                    if (alf > small_alf) then
-                        nbub = q_cons_vf(bubxb)%sf(id1, id2, id3)
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do q = 1, nb
-                            ! Gather moments for this bubble bin
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do r = 2, nmom
-                                moms(r) = q_prim_vf(bubmoms(q, r))%sf(id1, id2, id3)
-                            end do
-                            moms(1) = 1._wp
-                            call s_chyqmom(moms, wght(:, q), abscX(:, q), abscY(:, q))
-
-                            if (polytropic) then
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do j = 1, nnode
-                                    wght_pb(j, q) = wght(j, q)*(pb0(q) - pv)
-                                end do
-                            else
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do j = 1, nnode
-                                    chi_vw = 1._wp/(1._wp + R_v/R_n*(pb(id1, id2, id3, j, q)/pv - 1._wp))
-                                    x_vw = M_n*chi_vw/(M_v + (M_n - M_v)*chi_vw)
-                                    k_mw = x_vw*k_v(q)/(x_vw + (1._wp - x_vw)*phi_vn) + (1._wp - x_vw)*k_n(q)/(x_vw*phi_nv + 1._wp - x_vw)
-                                    rho_mw = pv/(chi_vw*R_v*Tw)
-                                    rhs_mv(id1, id2, id3, j, q) = -Re_trans_c(q)*((mv(id1, id2, id3, j, q)/(mv(id1, id2, id3, j, q) + mass_n0(q))) - chi_vw)
-                                    rhs_mv(id1, id2, id3, j, q) = rho_mw*rhs_mv(id1, id2, id3, j, q)/Pe_c/(1._wp - chi_vw)/abscX(j, q)
-                                    T_bar = Tw*(pb(id1, id2, id3, j, q)/pb0(q))*(abscX(j, q)/R0(q))**3*(mass_n0(q) + mass_v0(q))/(mass_n0(q) + mv(id1, id2, id3, j, q))
-                                    grad_T = -Re_trans_T(q)*(T_bar - Tw)
-                                    ht(j, q) = pb0(q)*k_mw*grad_T/Pe_T(q)/abscX(j, q)
-                                    wght_pb(j, q) = wght(j, q)*(pb(id1, id2, id3, j, q))
-                                    wght_mv(j, q) = wght(j, q)*(rhs_mv(id1, id2, id3, j, q))
-                                    wght_ht(j, q) = wght(j, q)*ht(j, q)
-                                end do
-                            end if
-
-                            ! Compute change in moments due to bubble dynamics
-                            r = 1
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do i2 = 0, 2
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do i1 = 0, 2
-                                    if ((i1 + i2) <= 2) then
-                                        momsum = 0._wp
-                                        $:GPU_LOOP(parallelism='[seq]')
-                                        do j = 1, nterms
-                                            select case (bubble_model)
-                                            case (3)
-                                                if (j == 3) then
-                                                    momsum = momsum + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, q))*f_quad2D(abscX(:, q), abscY(:, q), wght_pb(:, q), momrhs(:, i1, i2, j, q))
-                                                else
-                                                    momsum = momsum + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, q))*f_quad2D(abscX(:, q), abscY(:, q), wght(:, q), momrhs(:, i1, i2, j, q))
-                                                end if
-                                            case (2)
-                                                if ((j >= 7 .and. j <= 9) .or. (j >= 22 .and. j <= 23) .or. (j >= 10 .and. j <= 11) .or. (j == 26)) then
-                                                    momsum = momsum + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, q))*f_quad2D(abscX(:, q), abscY(:, q), wght_pb(:, q), momrhs(:, i1, i2, j, q))
-                                                else if ((j >= 27 .and. j <= 29) .and. (.not. polytropic)) then
-                                                    momsum = momsum + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, q))*f_quad2D(abscX(:, q), abscY(:, q), wght_mv(:, q), momrhs(:, i1, i2, j, q))
-                                                else if ((j >= 30 .and. j <= 32) .and. (.not. polytropic)) then
-                                                    momsum = momsum + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, q))*f_quad2D(abscX(:, q), abscY(:, q), wght_ht(:, q), momrhs(:, i1, i2, j, q))
-                                                else
-                                                    momsum = momsum + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, q))*f_quad2D(abscX(:, q), abscY(:, q), wght(:, q), momrhs(:, i1, i2, j, q))
-                                                end if
-                                            end select
-                                        end do
-                                        moms3d(i1, i2, q)%sf(id1, id2, id3) = nbub*momsum
-                                        msum(r) = momsum
-                                        r = r + 1
-                                    end if
-                                end do
-                            end do
-
-                            ! Compute change in pb and mv for non-polytropic model
-                            if (.not. polytropic) then
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do j = 1, nnode
-                                    drdt = msum(2)
-                                    drdt2 = merge(-1._wp, 1._wp, j == 1 .or. j == 2)/(2._wp*sqrt(merge(moms(4) - moms(2)**2._wp, verysmall, moms(4) - moms(2)**2._wp > 0._wp)))
-                                    drdt2 = drdt2*(msum(3) - 2._wp*moms(2)*msum(2))
-                                    drdt = drdt + drdt2
-                                    rhs_pb(id1, id2, id3, j, q) = (-3._wp*gam*drdt/abscX(j, q))*(pb(id1, id2, id3, j, q))
-                                    rhs_pb(id1, id2, id3, j, q) = rhs_pb(id1, id2, id3, j, q) + (3._wp*gam/abscX(j, q))*rhs_mv(id1, id2, id3, j, q)*R_v*Tw
-                                    rhs_pb(id1, id2, id3, j, q) = rhs_pb(id1, id2, id3, j, q) + (3._wp*gam/abscX(j, q))*ht(j, q)
-                                    rhs_mv(id1, id2, id3, j, q) = rhs_mv(id1, id2, id3, j, q)*(4._wp*pi*abscX(j, q)**2._wp)
-                                end do
-                            end if
-                        end do
-
-                        ! Compute special high-order moments
-                        momsp(1)%sf(id1, id2, id3) = f_quad(abscX, abscY, wght, 3._wp, 0._wp, 0._wp)
-                        momsp(2)%sf(id1, id2, id3) = 4._wp*pi*nbub*f_quad(abscX, abscY, wght, 2._wp, 1._wp, 0._wp)
-                        momsp(3)%sf(id1, id2, id3) = f_quad(abscX, abscY, wght, 3._wp, 2._wp, 0._wp)
-                        if (abs(gam - 1._wp) <= 1.e-4_wp) then
-                            momsp(4)%sf(id1, id2, id3) = 1._wp
-                        else
-                            if (polytropic) then
-                                momsp(4)%sf(id1, id2, id3) = f_quad(abscX, abscY, wght_pb, 3._wp*(1._wp - gam), 0._wp, 3._wp*gam) + pv*f_quad(abscX, abscY, wght, 3._wp, 0._wp, 0._wp) - 4._wp*Re_inv*f_quad(abscX, abscY, wght, 2._wp, 1._wp, 0._wp) - (2._wp/Web)*f_quad(abscX, abscY, wght, 2._wp, 0._wp, 0._wp)
-                            else
-                                momsp(4)%sf(id1, id2, id3) = f_quad(abscX, abscY, wght_pb, 3._wp, 0._wp, 0._wp) - 4._wp*Re_inv*f_quad(abscX, abscY, wght, 2._wp, 1._wp, 0._wp) - (2._wp/Web)*f_quad(abscX, abscY, wght, 2._wp, 0._wp, 0._wp)
-                            end if
+                        if (bubble_model == 2) then
+                            n_tait = 1._wp/gammas(1) + 1._wp
+                            B_tait = pi_infs(1)*(n_tait - 1)/n_tait
+                            c = n_tait*(pres + B_tait)*(1._wp - alf)/(rho)
+                            c = merge(sqrt(c), sgm_eps, c > 0._wp)
                         end if
-                    else
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do q = 1, nb
+
+                        call s_coeff_selector(pres, rho, c, coeff, polytropic)
+
+                        if (alf > small_alf) then
+                            nbub = q_cons_vf(bubxb)%sf(id1, id2, id3)
                             $:GPU_LOOP(parallelism='[seq]')
-                            do i1 = 0, 2
+                            do q = 1, nb
+                                ! Gather moments for this bubble bin
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do r = 2, nmom
+                                    moms(r) = q_prim_vf(bubmoms(q, r))%sf(id1, id2, id3)
+                                end do
+                                moms(1) = 1._wp
+                                call s_chyqmom(moms, wght(:, q), abscX(:, q), abscY(:, q))
+
+                                if (polytropic) then
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do j = 1, nnode
+                                        wght_pb(j, q) = wght(j, q)*(pb0(q) - pv)
+                                    end do
+                                else
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do j = 1, nnode
+                                        chi_vw = 1._wp/(1._wp + R_v/R_n*(pb(id1, id2, id3, j, q)/pv - 1._wp))
+                                        x_vw = M_n*chi_vw/(M_v + (M_n - M_v)*chi_vw)
+                                        k_mw = x_vw*k_v(q)/(x_vw + (1._wp - x_vw)*phi_vn) + (1._wp - x_vw)*k_n(q)/(x_vw*phi_nv + 1._wp - x_vw)
+                                        rho_mw = pv/(chi_vw*R_v*Tw)
+                                        rhs_mv(id1, id2, id3, j, q) = -Re_trans_c(q)*((mv(id1, id2, id3, j, q)/(mv(id1, id2, id3, j, q) + mass_n0(q))) - chi_vw)
+                                        rhs_mv(id1, id2, id3, j, q) = rho_mw*rhs_mv(id1, id2, id3, j, q)/Pe_c/(1._wp - chi_vw)/abscX(j, q)
+                                        T_bar = Tw*(pb(id1, id2, id3, j, q)/pb0(q))*(abscX(j, q)/R0(q))**3*(mass_n0(q) + mass_v0(q))/(mass_n0(q) + mv(id1, id2, id3, j, q))
+                                        grad_T = -Re_trans_T(q)*(T_bar - Tw)
+                                        ht(j, q) = pb0(q)*k_mw*grad_T/Pe_T(q)/abscX(j, q)
+                                        wght_pb(j, q) = wght(j, q)*(pb(id1, id2, id3, j, q))
+                                        wght_mv(j, q) = wght(j, q)*(rhs_mv(id1, id2, id3, j, q))
+                                        wght_ht(j, q) = wght(j, q)*ht(j, q)
+                                    end do
+                                end if
+
+                                ! Compute change in moments due to bubble dynamics
+                                r = 1
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i2 = 0, 2
-                                    moms3d(i1, i2, q)%sf(id1, id2, id3) = 0._wp
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i1 = 0, 2
+                                        if ((i1 + i2) <= 2) then
+                                            momsum = 0._wp
+                                            $:GPU_LOOP(parallelism='[seq]')
+                                            do j = 1, nterms
+                                                select case (bubble_model)
+                                                case (3)
+                                                    if (j == 3) then
+                                                        momsum = momsum + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, q))*f_quad2D(abscX(:, q), abscY(:, q), wght_pb(:, q), momrhs(:, i1, i2, j, q))
+                                                    else
+                                                        momsum = momsum + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, q))*f_quad2D(abscX(:, q), abscY(:, q), wght(:, q), momrhs(:, i1, i2, j, q))
+                                                    end if
+                                                case (2)
+                                                    if ((j >= 7 .and. j <= 9) .or. (j >= 22 .and. j <= 23) .or. (j >= 10 .and. j <= 11) .or. (j == 26)) then
+                                                        momsum = momsum + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, q))*f_quad2D(abscX(:, q), abscY(:, q), wght_pb(:, q), momrhs(:, i1, i2, j, q))
+                                                    else if ((j >= 27 .and. j <= 29) .and. (.not. polytropic)) then
+                                                        momsum = momsum + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, q))*f_quad2D(abscX(:, q), abscY(:, q), wght_mv(:, q), momrhs(:, i1, i2, j, q))
+                                                    else if ((j >= 30 .and. j <= 32) .and. (.not. polytropic)) then
+                                                        momsum = momsum + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, q))*f_quad2D(abscX(:, q), abscY(:, q), wght_ht(:, q), momrhs(:, i1, i2, j, q))
+                                                    else
+                                                        momsum = momsum + coeff(j, i1, i2)*(R0(q)**momrhs(3, i1, i2, j, q))*f_quad2D(abscX(:, q), abscY(:, q), wght(:, q), momrhs(:, i1, i2, j, q))
+                                                    end if
+                                                end select
+                                            end do
+                                            moms3d(i1, i2, q)%sf(id1, id2, id3) = nbub*momsum
+                                            msum(r) = momsum
+                                            r = r + 1
+                                        end if
+                                    end do
+                                end do
+
+                                ! Compute change in pb and mv for non-polytropic model
+                                if (.not. polytropic) then
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do j = 1, nnode
+                                        drdt = msum(2)
+                                        drdt2 = merge(-1._wp, 1._wp, j == 1 .or. j == 2)/(2._wp*sqrt(merge(moms(4) - moms(2)**2._wp, verysmall, moms(4) - moms(2)**2._wp > 0._wp)))
+                                        drdt2 = drdt2*(msum(3) - 2._wp*moms(2)*msum(2))
+                                        drdt = drdt + drdt2
+                                        rhs_pb(id1, id2, id3, j, q) = (-3._wp*gam*drdt/abscX(j, q))*(pb(id1, id2, id3, j, q))
+                                        rhs_pb(id1, id2, id3, j, q) = rhs_pb(id1, id2, id3, j, q) + (3._wp*gam/abscX(j, q))*rhs_mv(id1, id2, id3, j, q)*R_v*Tw
+                                        rhs_pb(id1, id2, id3, j, q) = rhs_pb(id1, id2, id3, j, q) + (3._wp*gam/abscX(j, q))*ht(j, q)
+                                        rhs_mv(id1, id2, id3, j, q) = rhs_mv(id1, id2, id3, j, q)*(4._wp*pi*abscX(j, q)**2._wp)
+                                    end do
+                                end if
+                            end do
+
+                            ! Compute special high-order moments
+                            momsp(1)%sf(id1, id2, id3) = f_quad(abscX, abscY, wght, 3._wp, 0._wp, 0._wp)
+                            momsp(2)%sf(id1, id2, id3) = 4._wp*pi*nbub*f_quad(abscX, abscY, wght, 2._wp, 1._wp, 0._wp)
+                            momsp(3)%sf(id1, id2, id3) = f_quad(abscX, abscY, wght, 3._wp, 2._wp, 0._wp)
+                            if (abs(gam - 1._wp) <= 1.e-4_wp) then
+                                momsp(4)%sf(id1, id2, id3) = 1._wp
+                            else
+                                if (polytropic) then
+                                    momsp(4)%sf(id1, id2, id3) = f_quad(abscX, abscY, wght_pb, 3._wp*(1._wp - gam), 0._wp, 3._wp*gam) + pv*f_quad(abscX, abscY, wght, 3._wp, 0._wp, 0._wp) - 4._wp*Re_inv*f_quad(abscX, abscY, wght, 2._wp, 1._wp, 0._wp) - (2._wp/Web)*f_quad(abscX, abscY, wght, 2._wp, 0._wp, 0._wp)
+                                else
+                                    momsp(4)%sf(id1, id2, id3) = f_quad(abscX, abscY, wght_pb, 3._wp, 0._wp, 0._wp) - 4._wp*Re_inv*f_quad(abscX, abscY, wght, 2._wp, 1._wp, 0._wp) - (2._wp/Web)*f_quad(abscX, abscY, wght, 2._wp, 0._wp, 0._wp)
+                                end if
+                            end if
+                        else
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do q = 1, nb
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i1 = 0, 2
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i2 = 0, 2
+                                        moms3d(i1, i2, q)%sf(id1, id2, id3) = 0._wp
+                                    end do
                                 end do
                             end do
-                        end do
-                        momsp(1)%sf(id1, id2, id3) = 0._wp
-                        momsp(2)%sf(id1, id2, id3) = 0._wp
-                        momsp(3)%sf(id1, id2, id3) = 0._wp
-                        momsp(4)%sf(id1, id2, id3) = 0._wp
-                    end if
+                            momsp(1)%sf(id1, id2, id3) = 0._wp
+                            momsp(2)%sf(id1, id2, id3) = 0._wp
+                            momsp(3)%sf(id1, id2, id3) = 0._wp
+                            momsp(4)%sf(id1, id2, id3) = 0._wp
+                        end if
+                    end do
                 end do
             end do
-        end do
+        #:endcall GPU_PARALLEL_LOOP
 
     contains
         ! Helper to select the correct coefficient routine
@@ -868,7 +868,7 @@ contains
             end if
         end subroutine s_coeff_selector
 
-        pure subroutine s_chyqmom(momin, wght, abscX, abscY)
+        subroutine s_chyqmom(momin, wght, abscX, abscY)
             $:GPU_ROUTINE(function_name='s_chyqmom',parallelism='[seq]', &
                 & cray_inline=True)
 
@@ -926,7 +926,7 @@ contains
 
         end subroutine s_chyqmom
 
-        pure subroutine s_hyqmom(frho, fup, fmom)
+        subroutine s_hyqmom(frho, fup, fmom)
             $:GPU_ROUTINE(function_name='s_hyqmom',parallelism='[seq]', &
                 & cray_inline=True)
 
@@ -946,7 +946,7 @@ contains
 
         end subroutine s_hyqmom
 
-        pure function f_quad(abscX, abscY, wght_in, q, r, s)
+        function f_quad(abscX, abscY, wght_in, q, r, s)
             $:GPU_ROUTINE(parallelism='[seq]')
             real(wp), dimension(nnode, nb), intent(in) :: abscX, abscY, wght_in
             real(wp), intent(in) :: q, r, s
@@ -962,7 +962,7 @@ contains
 
         end function f_quad
 
-        pure function f_quad2D(abscX, abscY, wght_in, pow)
+        function f_quad2D(abscX, abscY, wght_in, pow)
             $:GPU_ROUTINE(parallelism='[seq]')
             real(wp), dimension(nnode), intent(in) :: abscX, abscY, wght_in
             real(wp), dimension(3), intent(in) :: pow

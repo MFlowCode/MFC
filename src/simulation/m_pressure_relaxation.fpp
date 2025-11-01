@@ -23,8 +23,8 @@ module m_pressure_relaxation
     real(wp), allocatable, dimension(:) :: gamma_min, pres_inf
     $:GPU_DECLARE(create='[gamma_min, pres_inf]')
 
-    real(wp), allocatable, dimension(:, :) :: Res
-    $:GPU_DECLARE(create='[Res]')
+    real(wp), allocatable, dimension(:, :) :: Res_pr
+    $:GPU_DECLARE(create='[Res_pr]')
 
 contains
 
@@ -42,13 +42,13 @@ contains
         $:GPU_UPDATE(device='[gamma_min, pres_inf]')
 
         if (viscous) then
-            @:ALLOCATE(Res(1:2, 1:Re_size_max))
+            @:ALLOCATE(Res_pr(1:2, 1:Re_size_max))
             do i = 1, 2
                 do j = 1, Re_size(i)
-                    Res(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
+                    Res_pr(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
                 end do
             end do
-            $:GPU_UPDATE(device='[Res, Re_idx, Re_size]')
+            $:GPU_UPDATE(device='[Res_pr, Re_idx, Re_size]')
         end if
 
     end subroutine s_initialize_pressure_relaxation_module
@@ -58,31 +58,32 @@ contains
 
         @:DEALLOCATE(gamma_min, pres_inf)
         if (viscous) then
-            @:DEALLOCATE(Res)
+            @:DEALLOCATE(Res_pr)
         end if
 
     end subroutine s_finalize_pressure_relaxation_module
 
     !> The main pressure relaxation procedure
     !! @param q_cons_vf Cell-average conservative variables
-    pure subroutine s_pressure_relaxation_procedure(q_cons_vf)
+    subroutine s_pressure_relaxation_procedure(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         integer :: j, k, l
 
-        $:GPU_PARALLEL_LOOP(collapse=3)
-        do l = 0, p
-            do k = 0, n
-                do j = 0, m
-                    call s_relax_cell_pressure(q_cons_vf, j, k, l)
+        #:call GPU_PARALLEL_LOOP(collapse=3)
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        call s_relax_cell_pressure(q_cons_vf, j, k, l)
+                    end do
                 end do
             end do
-        end do
+        #:endcall GPU_PARALLEL_LOOP
 
     end subroutine s_pressure_relaxation_procedure
 
     !> Process pressure relaxation for a single cell
-    pure subroutine s_relax_cell_pressure(q_cons_vf, j, k, l)
+    subroutine s_relax_cell_pressure(q_cons_vf, j, k, l)
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
@@ -102,7 +103,7 @@ contains
     end subroutine s_relax_cell_pressure
 
     !> Check if pressure relaxation is needed for this cell
-    pure logical function s_needs_pressure_relaxation(q_cons_vf, j, k, l)
+    logical function s_needs_pressure_relaxation(q_cons_vf, j, k, l)
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
@@ -120,7 +121,7 @@ contains
     end function s_needs_pressure_relaxation
 
     !> Correct volume fractions to physical bounds
-    pure subroutine s_correct_volume_fractions(q_cons_vf, j, k, l)
+    subroutine s_correct_volume_fractions(q_cons_vf, j, k, l)
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
@@ -150,7 +151,7 @@ contains
     end subroutine s_correct_volume_fractions
 
     !> Main pressure equilibration using Newton-Raphson
-    pure subroutine s_equilibrate_pressure(q_cons_vf, j, k, l)
+    subroutine s_equilibrate_pressure(q_cons_vf, j, k, l)
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
@@ -219,7 +220,7 @@ contains
     end subroutine s_equilibrate_pressure
 
     !> Correct internal energies using equilibrated pressure
-    pure subroutine s_correct_internal_energies(q_cons_vf, j, k, l)
+    subroutine s_correct_internal_energies(q_cons_vf, j, k, l)
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
@@ -287,7 +288,7 @@ contains
                     if (Re_size(i) > 0) Re(i) = 0._wp
                     $:GPU_LOOP(parallelism='[seq]')
                     do q = 1, Re_size(i)
-                        Re(i) = alpha(Re_idx(i, q))/Res(i, q) + Re(i)
+                        Re(i) = alpha(Re_idx(i, q))/Res_pr(i, q) + Re(i)
                     end do
                     Re(i) = 1._wp/max(Re(i), sgm_eps)
                 end do
