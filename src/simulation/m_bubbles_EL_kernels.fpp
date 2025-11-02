@@ -542,7 +542,7 @@ contains
         real(wp) :: v_rel
         real(wp), dimension(fd_order - 1) :: xi, eta, L
 
-        if (fd_order == 2) then
+        if (fd_order <= 2) then
             if (i == 1) then
                 dp = (q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2), cell(3)) - &
                       q_prim_vf(E_idx)%sf(cell(1) - 1, cell(2), cell(3)))/ &
@@ -607,7 +607,11 @@ contains
 
         vol = (4._wp/3._wp) * pi * (rad**3._wp)
 
-        v_rel = vel - f_interpolate_velocity(pos, cell, i, q_prim_vf)
+        if (fd_order > 1) then
+            v_rel = vel - f_interpolate_velocity(pos, cell, i, q_prim_vf)
+        else
+            v_rel = vel - q_prim_vf(momxb + i - 1)%sf(cell(1), cell(2), cell(3))
+        end if
 
         force = 0._wp
 
