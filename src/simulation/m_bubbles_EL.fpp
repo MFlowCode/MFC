@@ -1287,11 +1287,13 @@ contains
                     !u{1} = u{n} +  dt * RHS{n}
                     intfc_rad(k, 1) = intfc_rad(k, 1) + dt*intfc_draddt(k, 1)
                     intfc_vel(k, 1) = intfc_vel(k, 1) + dt*intfc_dveldt(k, 1)
-                    mtn_posPrev(k, 1:3, 1) = mtn_pos(k, 1:3, 1)
-                    mtn_pos(k, 1:3, 1) = mtn_pos(k, 1:3, 1) + dt*mtn_dposdt(k, 1:3, 1)
-                    mtn_vel(k, 1:3, 1) = mtn_vel(k, 1:3, 1) + dt*mtn_dveldt(k, 1:3, 1)
                     gas_p(k, 1) = gas_p(k, 1) + dt*gas_dpdt(k, 1)
                     gas_mv(k, 1) = gas_mv(k, 1) + dt*gas_dmvdt(k, 1)
+                    if (moving_lag_bubbles) then
+                        mtn_posPrev(k, 1:3, 1) = mtn_pos(k, 1:3, 1)
+                        mtn_pos(k, 1:3, 1) = mtn_pos(k, 1:3, 1) + dt*mtn_dposdt(k, 1:3, 1)
+                        mtn_vel(k, 1:3, 1) = mtn_vel(k, 1:3, 1) + dt*mtn_dveldt(k, 1:3, 1)
+                    end if
                 end do
             #:endcall GPU_PARALLEL_LOOP
 
@@ -1312,11 +1314,13 @@ contains
                         !u{1} = u{n} +  dt * RHS{n}
                         intfc_rad(k, 2) = intfc_rad(k, 1) + dt*intfc_draddt(k, 1)
                         intfc_vel(k, 2) = intfc_vel(k, 1) + dt*intfc_dveldt(k, 1)
-                        mtn_posPrev(k, 1:3, 2) = mtn_pos(k, 1:3, 1)
-                        mtn_pos(k, 1:3, 2) = mtn_pos(k, 1:3, 1) + dt*mtn_dposdt(k, 1:3, 1)
-                        mtn_vel(k, 1:3, 2) = mtn_vel(k, 1:3, 1) + dt*mtn_dveldt(k, 1:3, 1)
                         gas_p(k, 2) = gas_p(k, 1) + dt*gas_dpdt(k, 1)
                         gas_mv(k, 2) = gas_mv(k, 1) + dt*gas_dmvdt(k, 1)
+                        if (moving_lag_bubbles) then
+                            mtn_posPrev(k, 1:3, 2) = mtn_pos(k, 1:3, 1)
+                            mtn_pos(k, 1:3, 2) = mtn_pos(k, 1:3, 1) + dt*mtn_dposdt(k, 1:3, 1)
+                            mtn_vel(k, 1:3, 2) = mtn_vel(k, 1:3, 1) + dt*mtn_dveldt(k, 1:3, 1)
+                        end if
                     end do
                 #:endcall GPU_PARALLEL_LOOP
 
@@ -1328,11 +1332,13 @@ contains
                         !u{1} = u{n} + (1/2) * dt * (RHS{n} + RHS{1})
                         intfc_rad(k, 1) = intfc_rad(k, 1) + dt*(intfc_draddt(k, 1) + intfc_draddt(k, 2))/2._wp
                         intfc_vel(k, 1) = intfc_vel(k, 1) + dt*(intfc_dveldt(k, 1) + intfc_dveldt(k, 2))/2._wp
-                        mtn_posPrev(k, 1:3, 1) = mtn_pos(k, 1:3, 2)
-                        mtn_pos(k, 1:3, 1) = mtn_pos(k, 1:3, 1) + dt*(mtn_dposdt(k, 1:3, 1) + mtn_dposdt(k, 1:3, 2))/2._wp
-                        mtn_vel(k, 1:3, 1) = mtn_vel(k, 1:3, 1) + dt*(mtn_dveldt(k, 1:3, 1) + mtn_dveldt(k, 1:3, 2))/2._wp
                         gas_p(k, 1) = gas_p(k, 1) + dt*(gas_dpdt(k, 1) + gas_dpdt(k, 2))/2._wp
                         gas_mv(k, 1) = gas_mv(k, 1) + dt*(gas_dmvdt(k, 1) + gas_dmvdt(k, 2))/2._wp
+                        if (moving_lag_bubbles) then
+                            mtn_posPrev(k, 1:3, 1) = mtn_pos(k, 1:3, 2)
+                            mtn_pos(k, 1:3, 1) = mtn_pos(k, 1:3, 1) + dt*(mtn_dposdt(k, 1:3, 1) + mtn_dposdt(k, 1:3, 2))/2._wp
+                            mtn_vel(k, 1:3, 1) = mtn_vel(k, 1:3, 1) + dt*(mtn_dveldt(k, 1:3, 1) + mtn_dveldt(k, 1:3, 2))/2._wp
+                        end if
                     end do
                 #:endcall GPU_PARALLEL_LOOP
 
@@ -1355,11 +1361,13 @@ contains
                         !u{1} = u{n} +  dt * RHS{n}
                         intfc_rad(k, 2) = intfc_rad(k, 1) + dt*intfc_draddt(k, 1)
                         intfc_vel(k, 2) = intfc_vel(k, 1) + dt*intfc_dveldt(k, 1)
-                        mtn_posPrev(k, 1:3, 2) = mtn_pos(k, 1:3, 1)
-                        mtn_pos(k, 1:3, 2) = mtn_pos(k, 1:3, 1) + dt*mtn_dposdt(k, 1:3, 1)
-                        mtn_vel(k, 1:3, 2) = mtn_vel(k, 1:3, 1) + dt*mtn_dveldt(k, 1:3, 1)
                         gas_p(k, 2) = gas_p(k, 1) + dt*gas_dpdt(k, 1)
                         gas_mv(k, 2) = gas_mv(k, 1) + dt*gas_dmvdt(k, 1)
+                        if (moving_lag_bubbles) then
+                            mtn_posPrev(k, 1:3, 2) = mtn_pos(k, 1:3, 1)
+                            mtn_pos(k, 1:3, 2) = mtn_pos(k, 1:3, 1) + dt*mtn_dposdt(k, 1:3, 1)
+                            mtn_vel(k, 1:3, 2) = mtn_vel(k, 1:3, 1) + dt*mtn_dveldt(k, 1:3, 1)
+                        end if
                     end do
                 #:endcall GPU_PARALLEL_LOOP
 
@@ -1371,11 +1379,13 @@ contains
                         !u{2} = u{n} + (1/4) * dt * [RHS{n} + RHS{1}]
                         intfc_rad(k, 2) = intfc_rad(k, 1) + dt*(intfc_draddt(k, 1) + intfc_draddt(k, 2))/4._wp
                         intfc_vel(k, 2) = intfc_vel(k, 1) + dt*(intfc_dveldt(k, 1) + intfc_dveldt(k, 2))/4._wp
-                        mtn_posPrev(k, 1:3, 2) = mtn_pos(k, 1:3, 2)
-                        mtn_pos(k, 1:3, 2) = mtn_pos(k, 1:3, 1) + dt*(mtn_dposdt(k, 1:3, 1) + mtn_dposdt(k, 1:3, 2))/4._wp
-                        mtn_vel(k, 1:3, 2) = mtn_vel(k, 1:3, 1) + dt*(mtn_dveldt(k, 1:3, 1) + mtn_dveldt(k, 1:3, 2))/4._wp
                         gas_p(k, 2) = gas_p(k, 1) + dt*(gas_dpdt(k, 1) + gas_dpdt(k, 2))/4._wp
                         gas_mv(k, 2) = gas_mv(k, 1) + dt*(gas_dmvdt(k, 1) + gas_dmvdt(k, 2))/4._wp
+                        if (moving_lag_bubbles) then
+                            mtn_posPrev(k, 1:3, 2) = mtn_pos(k, 1:3, 2)
+                            mtn_pos(k, 1:3, 2) = mtn_pos(k, 1:3, 1) + dt*(mtn_dposdt(k, 1:3, 1) + mtn_dposdt(k, 1:3, 2))/4._wp
+                            mtn_vel(k, 1:3, 2) = mtn_vel(k, 1:3, 1) + dt*(mtn_dveldt(k, 1:3, 1) + mtn_dveldt(k, 1:3, 2))/4._wp
+                        end if
                     end do
                 #:endcall GPU_PARALLEL_LOOP
 
@@ -1387,11 +1397,13 @@ contains
                         !u{n+1} = u{n} + (2/3) * dt * [(1/4)* RHS{n} + (1/4)* RHS{1} + RHS{2}]
                         intfc_rad(k, 1) = intfc_rad(k, 1) + (2._wp/3._wp)*dt*(intfc_draddt(k, 1)/4._wp + intfc_draddt(k, 2)/4._wp + intfc_draddt(k, 3))
                         intfc_vel(k, 1) = intfc_vel(k, 1) + (2._wp/3._wp)*dt*(intfc_dveldt(k, 1)/4._wp + intfc_dveldt(k, 2)/4._wp + intfc_dveldt(k, 3))
-                        mtn_posPrev(k, 1:3, 1) = mtn_pos(k, 1:3, 2)
-                        mtn_pos(k, 1:3, 1) = mtn_pos(k, 1:3, 1) + (2._wp/3._wp)*dt*(mtn_dposdt(k, 1:3, 1)/4._wp + mtn_dposdt(k, 1:3, 2)/4._wp + mtn_dposdt(k, 1:3, 3))
-                        mtn_vel(k, 1:3, 1) = mtn_vel(k, 1:3, 1) + (2._wp/3._wp)*dt*(mtn_dveldt(k, 1:3, 1)/4._wp + mtn_dveldt(k, 1:3, 2)/4._wp + mtn_dveldt(k, 1:3, 3))
                         gas_p(k, 1) = gas_p(k, 1) + (2._wp/3._wp)*dt*(gas_dpdt(k, 1)/4._wp + gas_dpdt(k, 2)/4._wp + gas_dpdt(k, 3))
                         gas_mv(k, 1) = gas_mv(k, 1) + (2._wp/3._wp)*dt*(gas_dmvdt(k, 1)/4._wp + gas_dmvdt(k, 2)/4._wp + gas_dmvdt(k, 3))
+                        if (moving_lag_bubbles) then
+                            mtn_posPrev(k, 1:3, 1) = mtn_pos(k, 1:3, 2)
+                            mtn_pos(k, 1:3, 1) = mtn_pos(k, 1:3, 1) + (2._wp/3._wp)*dt*(mtn_dposdt(k, 1:3, 1)/4._wp + mtn_dposdt(k, 1:3, 2)/4._wp + mtn_dposdt(k, 1:3, 3))
+                            mtn_vel(k, 1:3, 1) = mtn_vel(k, 1:3, 1) + (2._wp/3._wp)*dt*(mtn_dveldt(k, 1:3, 1)/4._wp + mtn_dveldt(k, 1:3, 2)/4._wp + mtn_dveldt(k, 1:3, 3))
+                        end if
                     end do
                 #:endcall GPU_PARALLEL_LOOP
 
