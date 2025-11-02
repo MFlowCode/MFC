@@ -723,11 +723,11 @@ contains
                 adap_dt_stop = 0
 
                 if (adap_dt) then
-
                     call s_advance_step(myRho, myPinf, myR, myV, myR0, myPb, myPbdot, dmalf, &
-                                        dmntait, dmBtait, dm_bub_adv_src, dm_divu, &
-                                        k, myMass_v, myMass_n, myBeta_c, &
-                                        myBeta_t, myCson, adap_dt_stop)
+                                    dmntait, dmBtait, dm_bub_adv_src, dm_divu, &
+                                    k, myMass_v, myMass_n, myBeta_c, &
+                                    myBeta_t, myCson, adap_dt_stop, Re(1), &
+                                    myPos, myVel, cell, q_prim_vf)
 
                     ! Update bubble state
                     intfc_rad(k, 1) = myR
@@ -736,7 +736,6 @@ contains
                     gas_mv(k, 1) = myMass_v
 
                 else
-
                     ! Radial acceleration from bubble models
                     intfc_dveldt(k, stage) = f_rddot(myRho, myPinf, myR, myV, myR0, &
                                                      myPb, myPbdot, dmalf, dmntait, dmBtait, &

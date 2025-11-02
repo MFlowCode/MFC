@@ -562,6 +562,7 @@ contains
                         ! Update pb and mass_v
                         fpb = myPb_tmp1(4)
                         fmass_v = myMv_tmp1(4)
+
                         do l = 1, num_dims
                             select case(lag_vel_model)
                             case (1)
