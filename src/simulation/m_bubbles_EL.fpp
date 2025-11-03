@@ -735,6 +735,11 @@ contains
                     gas_p(k, 1) = myPb
                     gas_mv(k, 1) = myMass_v
 
+                    if (moving_lag_bubbles) then
+                        mtn_pos(k, :, 1) = myPos
+                        mtn_vel(k, :, 1) = myVel
+                    end if
+
                 else
                     ! Radial acceleration from bubble models
                     intfc_dveldt(k, stage) = f_rddot(myRho, myPinf, myR, myV, myR0, &

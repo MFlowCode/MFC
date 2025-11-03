@@ -22,7 +22,7 @@
             inquire (file=trim(interface_file), exist=file_exist)
             if (file_exist) then
                 open(unit=10, file=trim(interface_file), status="old", action="read")
-                do i = 0, m_glb
+                do i = 0, n_glb
                     read(10, '(A)') line  ! Read a full line as a string
                     start = 1
 
