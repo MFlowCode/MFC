@@ -581,6 +581,9 @@ contains
                                 aTemp = 2._wp * f_bTemp / (fmass_n + fmass_v) - 3 * fV * fVel(l) / fR
                                 fPos(l) = fPos(l) + h * fVel(l)
                                 fVel(l) = fVel(l) + h * aTemp
+                            case default
+                                fPos(l) = fPos(l)
+                                fVel(l) = fVel(l)
                             end select
                         end do
                     end if
