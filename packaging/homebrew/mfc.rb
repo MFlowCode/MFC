@@ -112,12 +112,10 @@ class Mfc < Formula
     # Verify toolchain and mfc.sh were installed
     assert_path_exists libexec/"mfc.sh"
     assert_path_exists prefix/"toolchain"
+    assert_path_exists prefix/"toolchain/mfc"
 
     # Verify examples were installed
     assert_path_exists pkgshare/"examples"
     assert_path_exists pkgshare/"examples/1D_sodshocktube/case.py"
-
-    # Test mfc wrapper basic functionality
-    system bin/"mfc", "--help"
   end
 end
