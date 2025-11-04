@@ -92,7 +92,7 @@ Click <kbd> <> Code</kbd> (green button at top right) → <kbd>Codespaces</kbd> 
 > ****Note:**** Codespaces is a free service with a monthly quota of compute time and storage usage.
 > It is recommended for testing commands, troubleshooting, and running simple case files without installing dependencies or building MFC on your device.
 > Don't conduct any critical work here!
-> To learn more, please see [how Docker & Containers work](https://mflowcode.github.io/documentation/docker.html).
+> To learn more, please see [how Docker & Containers work](https://mflowcode.github.io/documentation/md_docker.html).
 
 You can navigate [to this webpage](https://mflowcode.github.io/documentation/md_getting-started.html) to get you get started using MFC on your local machine, cluster, or supercomputer!
 It's rather straightforward.
