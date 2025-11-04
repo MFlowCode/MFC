@@ -37,14 +37,22 @@ jobs:
       - name: Install Package into Spack
         run: |
           . spack/share/spack/setup-env.sh
-          # Copy package directly into Spack's builtin repo
-          mkdir -p spack/var/spack/repos/builtin/packages/mfc
-          cp packaging/spack/package.py spack/var/spack/repos/builtin/packages/mfc/
+          # Find the actual builtin repo location
+          BUILTIN_REPO=$(spack repo list | grep builtin | awk '{print $NF}')
+          echo "Builtin repo location: $BUILTIN_REPO"
+          # Copy package to the builtin repo
+          mkdir -p "$BUILTIN_REPO/packages/mfc"
+          cp packaging/spack/package.py "$BUILTIN_REPO/packages/mfc/"
+          # Verify package is visible
+          spack list mfc
+          # Show package info to confirm it loads
+          spack info mfc
 
       - name: Run Spack Style Check
         run: |
           . spack/share/spack/setup-env.sh
-          spack style spack/var/spack/repos/builtin/packages/mfc/package.py
+          # Use the package.py from the checkout, not the installed one
+          spack style packaging/spack/package.py
 
       - name: Run Spack Audit
         run: |
@@ -81,9 +89,16 @@ jobs:
       - name: Install Package into Spack
         run: |
           . spack/share/spack/setup-env.sh
-          # Copy package directly into Spack's builtin repo
-          mkdir -p spack/var/spack/repos/builtin/packages/mfc
-          cp packaging/spack/package.py spack/var/spack/repos/builtin/packages/mfc/
+          # Find the actual builtin repo location
+          BUILTIN_REPO=$(spack repo list | grep builtin | awk '{print $NF}')
+          echo "Builtin repo location: $BUILTIN_REPO"
+          # Copy package to the builtin repo
+          mkdir -p "$BUILTIN_REPO/packages/mfc"
+          cp packaging/spack/package.py "$BUILTIN_REPO/packages/mfc/"
+          # Verify package is visible
+          spack list mfc
+          # Show package info to confirm it loads
+          spack info mfc
 
       - name: Test Default Spec
         run: |
