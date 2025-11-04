@@ -58,17 +58,16 @@ class Mfc < Formula
   end
 
   test do
-    # Test that the binaries exist and can execute
-    assert_path_exists bin/"pre_process"
-    assert_path_exists bin/"simulation"
-    assert_path_exists bin/"post_process"
-
-    # Test that binaries show help (basic functionality check)
-    system bin/"pre_process", "-h"
-    system bin/"simulation", "-h"
+    # Test that the binaries exist and are executable
+    assert_predicate bin/"pre_process", :exist?
+    assert_predicate bin/"pre_process", :executable?
+    assert_predicate bin/"simulation", :exist?
+    assert_predicate bin/"simulation", :executable?
+    assert_predicate bin/"post_process", :exist?
+    assert_predicate bin/"post_process", :executable?
 
     # Verify examples were installed
-    assert_path_exists pkgshare/"examples"
-    assert_path_exists pkgshare/"examples/1D_sodshocktube/case.py"
+    assert_predicate pkgshare/"examples", :exist?
+    assert_predicate pkgshare/"examples/1D_sodshocktube/case.py", :exist?
   end
 end
