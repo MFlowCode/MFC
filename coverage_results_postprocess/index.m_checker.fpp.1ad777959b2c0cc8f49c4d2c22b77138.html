@@ -1,0 +1,3073 @@
+<!DOCTYPE html>
+<html class="theme-green">
+
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+    <title>GCC Code Coverage Report</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <link rel="stylesheet" href="index.css"/>
+  </head>
+
+  <body>
+
+    <header>
+      <h1>GCC Code Coverage Report</h1>
+      <hr/>
+      <div class="summary">
+<div>
+  <table class="legend">
+    <tr>
+      <th scope="row">Directory:</th>
+      <td>src/</td>
+    </tr>
+    <tr>
+      <th scope="row">File:</th>
+      <td>simulation/m_checker.fpp</td>
+    </tr>
+    <tr>
+      <th scope="row">Date:</th>
+      <td>2025-11-03 09:33:08</td>
+    </tr>
+  </table>
+</div>
+<div>
+  <table class="coverage">
+    <tr>
+      <th></th>
+      <th scope="col">Exec</th>
+      <th scope="col">Total</th>
+      <th scope="col">Coverage</th>
+    </tr>
+    <tr>
+      <th scope="row">Lines:</th>
+      <td>2</td>
+      <td>4</td>
+      <td class="coverage-low">50.0%</td>
+    </tr>
+    <tr>
+      <th scope="row">Functions:</th>
+      <td>0</td>
+      <td>0</td>
+      <td class="coverage-unknown">-%</td>
+    </tr>
+    <tr>
+      <th scope="row">Branches:</th>
+      <td>1</td>
+      <td>2</td>
+      <td class="coverage-low">50.0%</td>
+    </tr>
+  </table>
+</div>
+      </div>
+      <hr/>
+    </header>
+    <nav>
+
+    </nav>
+    <main>
+<div class="file-source">
+  <table>
+    <tr>
+      <th align="right">Line</th>
+      <th align="right">Branch</th>
+      <th align="right">Exec</th>
+      <th align="left" style="width: 100%;">Source</th>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l1" href="#l1">1</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">!&gt;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l2" href="#l2">2</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">!!@file m_start_up.f90</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l3" href="#l3">3</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">!!@brief Contains module m_checker</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l4" href="#l4">4</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l5" href="#l5">5</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">#:include &#39;macros.fpp&#39;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l6" href="#l6">6</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">#:include &#39;case.fpp&#39;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l7" href="#l7">7</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l8" href="#l8">8</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">!&gt; @brief The purpose of the module is to check for compatible input files</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l9" href="#l9">9</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">module m_checker</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l10" href="#l10">10</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l11" href="#l11">11</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    use m_global_parameters    !&lt; Definitions of the global parameters</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l12" href="#l12">12</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l13" href="#l13">13</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    use m_mpi_proxy            !&lt; Message passing interface (MPI) module proxy</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l14" href="#l14">14</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l15" href="#l15">15</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    use m_helper</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l16" href="#l16">16</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l17" href="#l17">17</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    use m_helper_basic         !&lt; Functions to compare floating point numbers</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l18" href="#l18">18</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l19" href="#l19">19</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    implicit none</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l20" href="#l20">20</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l21" href="#l21">21</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    private; public :: s_check_inputs</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l22" href="#l22">22</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l23" href="#l23">23</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">contains</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l24" href="#l24">24</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l25" href="#l25">25</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    !&gt; Checks compatibility of parameters in the input file.</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l26" href="#l26">26</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        !! Used by the simulation stage</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l27" href="#l27">27</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    impure subroutine s_check_inputs</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l28" href="#l28">28</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l29" href="#l29">29</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        call s_check_inputs_compilers</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l30" href="#l30">30</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l31" href="#l31">31</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        if (igr) then</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l32" href="#l32">32</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">            call s_check_inputs_igr</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l33" href="#l33">33</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">            call s_check_inputs_nvidia_uvm</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l34" href="#l34">34</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        else</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l35" href="#l35">35</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">            if (recon_type == WENO_TYPE) then</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l36" href="#l36">36</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                call s_check_inputs_weno</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l37" href="#l37">37</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">            else if (recon_type == MUSCL_TYPE) then</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l38" href="#l38">38</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                call s_check_inputs_muscl</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l39" href="#l39">39</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">            end if</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l40" href="#l40">40</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">            call s_check_inputs_riemann_solver</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l41" href="#l41">41</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">            call s_check_inputs_model_eqns</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l42" href="#l42">42</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">            call s_check_inputs_acoustic_src</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l43" href="#l43">43</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">            call s_check_inputs_hypoelasticity</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l44" href="#l44">44</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">            call s_check_inputs_bubbles_euler</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l45" href="#l45">45</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">            call s_check_inputs_bubbles_lagrange</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l46" href="#l46">46</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">            call s_check_inputs_adapt_dt</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l47" href="#l47">47</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">            call s_check_inputs_alt_soundspeed</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l48" href="#l48">48</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">            call s_check_inputs_grcbc</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l49" href="#l49">49</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">            call s_check_inputs_geometry_precision</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l50" href="#l50">50</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">            call s_check_inputs_mhd</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l51" href="#l51">51</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">            call s_check_inputs_continuum_damage</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l52" href="#l52">52</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        end if</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l53" href="#l53">53</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l54" href="#l54">54</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        call s_check_inputs_time_stepping</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l55" href="#l55">55</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        call s_check_inputs_stiffened_eos_viscosity</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l56" href="#l56">56</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        call s_check_inputs_body_forces</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l57" href="#l57">57</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        call s_check_inputs_misc</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l58" href="#l58">58</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l59" href="#l59">59</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    end subroutine s_check_inputs</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l60" href="#l60">60</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l61" href="#l61">61</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    !&gt; Checks constraints on compiler options</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l62" href="#l62">62</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    impure subroutine s_check_inputs_compilers</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l63" href="#l63">63</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">#if !defined(MFC_OpenACC) &amp;&amp; !(defined(__PGI) || defined(_CRAYFTN))</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l64" href="#l64">64</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount uncoveredLine">&cross;</td>
+      <td class="src uncoveredLine">        @:PROHIBIT(rdma_mpi, &#34;Unsupported value of rdma_mpi for the current compiler&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l65" href="#l65">65</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">#endif</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l66" href="#l66">66</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount coveredLine">1038</td>
+      <td class="src coveredLine">    end subroutine s_check_inputs_compilers</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l67" href="#l67">67</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l68" href="#l68">68</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">    impure subroutine s_check_inputs_igr</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l69" href="#l69">69</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(num_igr_iters &lt; 0, &#34;num_igr_iters must be greater than 0&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l70" href="#l70">70</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(num_igr_warm_start_iters &lt; 0, &#34;num_igr_warm_start_iters must be greater than 0&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l71" href="#l71">71</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT((igr_iter_solver /= 1 .and. igr_iter_solver /= 2), &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l72" href="#l72">72</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">            &#34;igr_iter_solver must be 1 or 2&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l73" href="#l73">73</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(alf_factor &lt; 0, &#34;alf factor must be positive&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l74" href="#l74">74</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(model_eqns /= 2, &#34;IGR only supports model_eqns = 2&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l75" href="#l75">75</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(ib, &#34;IGR does not support the immersed boundary method&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l76" href="#l76">76</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(bubbles_euler, &#34;IGR does not support Euler-Euler bubble models&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l77" href="#l77">77</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(bubbles_lagrange, &#34;IGR does not support Euler-Lagrange bubbles models&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l78" href="#l78">78</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(alt_soundspeed, &#34;IGR does not support alt_soundspeed = T&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l79" href="#l79">79</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(surface_tension, &#34;IGR does not support surface tension&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l80" href="#l80">80</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(hypoelasticity, &#34;IGR does not support hypoelasticity&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l81" href="#l81">81</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(acoustic_source, &#34;IGR does not support acoustic sources&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l82" href="#l82">82</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(relax, &#34;IGR does not support phase change&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l83" href="#l83">83</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(mhd, &#34;IGR does not support magnetohydrodynamics&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l84" href="#l84">84</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(hyperelasticity, &#34;IGR does not support hyperelasticity&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l85" href="#l85">85</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(cyl_coord, &#34;IGR does not support cylindrical or axisymmetric coordinates&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l86" href="#l86">86</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(probe_wrt, &#34;IGR does not support probe writes&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l87" href="#l87">87</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l88" href="#l88">88</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        #:for DIR in [(&#39;x&#39;), (&#39;y&#39;), (&#39;z&#39;)]</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l89" href="#l89">89</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">            #:for LOC in [(&#39;beg&#39;), (&#39;end&#39;)]</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l90" href="#l90">90</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">                @:PROHIBIT((bc_${DIR}$%${LOC}$ &lt;= -4 .and. bc_${DIR}$%${LOC}$ &gt;= -14), &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l91" href="#l91">91</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                    &#34;Characteristic boundary condition bc_${DIR}$%${LOC}$ is not compatible with IGR&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l92" href="#l92">92</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">            #:endfor</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l93" href="#l93">93</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        #:endfor</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l94" href="#l94">94</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l95" href="#l95">95</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">    end subroutine s_check_inputs_igr</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l96" href="#l96">96</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l97" href="#l97">97</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    !&gt; Checks constraints on WENO scheme parameters</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l98" href="#l98">98</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">    impure subroutine s_check_inputs_weno</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l99" href="#l99">99</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        character(len=5) :: numStr !&lt; for int to string conversion</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l100" href="#l100">100</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l101" href="#l101">101</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        call s_int_to_str(num_stcls_min*weno_order, numStr)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l102" href="#l102">102</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(m + 1 &lt; num_stcls_min*weno_order, &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l103" href="#l103">103</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">            &#34;m must be greater than or equal to (num_stcls_min*weno_order - 1), whose value is &#34;//trim(numStr))</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l104" href="#l104">104</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(n + 1 &lt; min(1, n)*num_stcls_min*weno_order, &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l105" href="#l105">105</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">            &#34;For 2D simulation, n must be greater than or equal to (num_stcls_min*weno_order - 1), whose value is &#34;//trim(numStr))</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l106" href="#l106">106</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(p + 1 &lt; min(1, p)*num_stcls_min*weno_order, &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l107" href="#l107">107</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">            &#34;For 3D simulation, p must be greater than or equal to (num_stcls_min*weno_order - 1), whose value is &#34;//trim(numStr))</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l108" href="#l108">108</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(weno_order /= 1 .and. f_is_default(weno_eps), &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l109" href="#l109">109</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">            &#34;weno_order != 1, but weno_eps is not set. A typical value of weno_eps is 1e-6&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l110" href="#l110">110</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l111" href="#l111">111</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(weno_eps &lt;= 0._wp, &#34;weno_eps must be positive. A typical value of weno_eps is 1e-6&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l112" href="#l112">112</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(wenoz .and. weno_order == 7 .and. f_is_default(real(wenoz_q, wp)), &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l113" href="#l113">113</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">            &#34;wenoz is used at 7th order, but wenoz_q is not set. It should be either 2, 3, or 4&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l114" href="#l114">114</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(wenoz .and. weno_order == 7 .and. .not. (f_approx_equal(real(wenoz_q, wp), real(2, wp)) .or. &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l115" href="#l115">115</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">            f_approx_equal(real(wenoz_q, wp), real(3, wp)) .or. f_approx_equal(real(wenoz_q, wp), real(4, wp))), &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l116" href="#l116">116</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">            &#34;wenoz_q must be either 2, 3, or 4&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l117" href="#l117">117</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(teno .and. f_is_default(teno_CT), &#34;teno is used, but teno_CT is not set. A typical value of teno_CT is 1e-6&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l118" href="#l118">118</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(teno .and. teno_CT &lt;= 0._wp, &#34;teno_CT must be positive. A typical value of teno_CT is 1e-6&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l119" href="#l119">119</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(count([mapped_weno, wenoz, teno]) &gt;= 2, &#34;Only one of mapped_weno, wenoz, or teno can be set to true&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l120" href="#l120">120</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(weno_order == 1 .and. mapped_weno)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l121" href="#l121">121</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(weno_order == 1 .and. wenoz)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l122" href="#l122">122</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT((weno_order == 1 .or. weno_order == 3) .and. teno)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l123" href="#l123">123</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(weno_order /= 5 .and. mp_weno)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l124" href="#l124">124</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(model_eqns == 1 .and. weno_avg)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l125" href="#l125">125</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">    end subroutine s_check_inputs_weno</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l126" href="#l126">126</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l127" href="#l127">127</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">    impure subroutine s_check_inputs_muscl</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l128" href="#l128">128</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        character(len=5) :: numStr !&lt; for int to string conversion</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l129" href="#l129">129</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l130" href="#l130">130</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        call s_int_to_str(num_stcls_min*muscl_order, numStr)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l131" href="#l131">131</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(m + 1 &lt; num_stcls_min*muscl_order, &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l132" href="#l132">132</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">            &#34;m must be greater than or equal to (num_stcls_min*muscl_order - 1), whose value is &#34;//trim(numStr))</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l133" href="#l133">133</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(n + 1 &lt; min(1, n)*num_stcls_min*muscl_order, &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l134" href="#l134">134</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">            &#34;For 2D simulation, n must be greater than or equal to (num_stcls_min*muscl_order - 1), whose value is &#34;//trim(numStr))</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l135" href="#l135">135</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(p + 1 &lt; min(1, p)*num_stcls_min*muscl_order, &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l136" href="#l136">136</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">            &#34;For 3D simulation, p must be greater than or equal to (num_stcls_min*muscl_order - 1), whose value is &#34;//trim(numStr))</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l137" href="#l137">137</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(muscl_order == 2 .and. muscl_lim == dflt_int, &#34;muscl_lim must be defined if using muscl_order = 2&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l138" href="#l138">138</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(muscl_order /= 1 .and. muscl_lim &lt; 1 .or. muscl_lim &gt; 5, &#34;muscl_lim must be 1,2,3,4, or 5&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l139" href="#l139">139</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l140" href="#l140">140</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">    end subroutine s_check_inputs_muscl</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l141" href="#l141">141</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l142" href="#l142">142</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    !&gt; Checks constraints on Riemann solver parameters</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l143" href="#l143">143</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">    impure subroutine s_check_inputs_riemann_solver</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l144" href="#l144">144</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(riemann_solver /= 2 .and. model_eqns == 3, &#34;6-equation model (model_eqns = 3) requires riemann_solver = 2&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l145" href="#l145">145</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(riemann_solver &lt; 1 .or. riemann_solver &gt; 5, &#34;riemann_solver must be 1, 2, 3, 4 or 5&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l146" href="#l146">146</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(all(wave_speeds /= (/dflt_int, 1, 2/)), &#34;wave_speeds must be 1 or 2&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l147" href="#l147">147</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(riemann_solver == 3 .and. wave_speeds /= dflt_int, &#34;Exact Riemann (riemann_solver = 3) does not support wave_speeds&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l148" href="#l148">148</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(all(avg_state /= (/dflt_int, 1, 2/)), &#34;Unsupported value of avg_state&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l149" href="#l149">149</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(riemann_solver /= 3 .and. riemann_solver /= 5 .and. wave_speeds == dflt_int, &#34;wave_speeds must be set if riemann_solver != 3,5&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l150" href="#l150">150</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(riemann_solver /= 3 .and. riemann_solver /= 5 .and. avg_state == dflt_int, &#34;avg_state must be set if riemann_solver != 3,5&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l151" href="#l151">151</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(all(low_Mach /= (/0, 1, 2/)), &#34;low_Mach must be 0, 1 or 2&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l152" href="#l152">152</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(riemann_solver /= 2 .and. low_Mach == 2, &#34;low_Mach = 2 requires riemann_solver = 2&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l153" href="#l153">153</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(low_Mach /= 0 .and. all(model_eqns /= (/2, 3/)), &#34;low_Mach = 1 or 2 requires model_eqns = 2 or 3&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l154" href="#l154">154</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(riemann_solver == 5 .and. cyl_coord .and. viscous, &#34;Lax Friedrichs with cylincrical viscous flux not supported&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l155" href="#l155">155</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">    end subroutine s_check_inputs_riemann_solver</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l156" href="#l156">156</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l157" href="#l157">157</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    !&gt; Checks constraints on geometry and precision</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l158" href="#l158">158</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">    impure subroutine s_check_inputs_geometry_precision</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l159" href="#l159">159</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        ! Prevent spherical geometry in single precision</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l160" href="#l160">160</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">#ifdef MFC_SINGLE_PRECISION</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l161" href="#l161">161</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        @:PROHIBIT(.not. (cyl_coord .neqv. .true. .or. (cyl_coord .and. p == 0)), &#34;Fully 3D cylindrical grid (geometry = 3) is not supported in single precision.&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l162" href="#l162">162</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">#endif</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l163" href="#l163">163</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    end subroutine s_check_inputs_geometry_precision</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l164" href="#l164">164</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l165" href="#l165">165</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    !&gt; Checks constraints on time stepping parameters</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l166" href="#l166">166</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    impure subroutine s_check_inputs_time_stepping</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l167" href="#l167">167</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        if (.not. cfl_dt) then</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l168" href="#l168">168</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount uncoveredLine">&cross;</td>
+      <td class="src uncoveredLine">            @:PROHIBIT(dt &lt;= 0)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l169" href="#l169">169</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        end if</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l170" href="#l170">170</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(time_stepper &lt; 1 .or. time_stepper &gt; 3)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l171" href="#l171">171</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">    end subroutine s_check_inputs_time_stepping</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l172" href="#l172">172</a></td>
+      <td class="linebranch">
+        <details class="linebranchDetails">
+          <summary class="linebranchSummary">1/2</summary>
+          <div class="linebranchContents">
+            <div class="notTakenBranch">&cross; Branch 0 (5&rightarrow;6) not taken.</div>
+            <div class="takenBranch">&check; Branch 1 (5&rightarrow;7) taken 1014 times.</div>
+          </div>
+        </details>
+      </td>
+      <td class="linecount partialCoveredLine">1014</td>
+      <td class="src partialCoveredLine"></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l173" href="#l173">173</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    !&gt; Checks constraints on parameters related to 6-equation model</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l174" href="#l174">174</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">    impure subroutine s_check_inputs_model_eqns</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l175" href="#l175">175</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(model_eqns == 3 .and. avg_state /= 2, &#34;6-equation model (model_eqns = 3) requires avg_state = 2&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l176" href="#l176">176</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(model_eqns == 3 .and. wave_speeds /= 1, &#34;6-equation model (model_eqns = 3) requires wave_speeds = 1&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l177" href="#l177">177</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">    end subroutine s_check_inputs_model_eqns</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l178" href="#l178">178</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l179" href="#l179">179</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    !&gt; Checks constraints for GRCBC</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l180" href="#l180">180</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">    impure subroutine s_check_inputs_grcbc</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l181" href="#l181">181</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        #:for DIR in [&#39;x&#39;, &#39;y&#39;, &#39;z&#39;]</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l182" href="#l182">182</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(bc_${DIR}$%grcbc_in .and. (bc_${DIR}$%beg /= -7 .and. bc_${DIR}$%end /= -7), &#34;Subsonic Inflow requires bc = -7&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l183" href="#l183">183</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(bc_${DIR}$%grcbc_out .and. (bc_${DIR}$%beg /= -8 .and. bc_${DIR}$%end /= -8), &#34;Subsonic Outflow requires bc = -8&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l184" href="#l184">184</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(bc_${DIR}$%grcbc_vel_out .and. (bc_${DIR}$%beg /= -8 .and. bc_${DIR}$%end /= -8), &#34;Subsonic Outflow requires bc = -8&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l185" href="#l185">185</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        #:endfor</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l186" href="#l186">186</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">    end subroutine s_check_inputs_grcbc</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l187" href="#l187">187</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l188" href="#l188">188</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    !&gt; Checks constraints on acoustic_source parameters</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l189" href="#l189">189</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">    impure subroutine s_check_inputs_acoustic_src</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l190" href="#l190">190</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l191" href="#l191">191</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        integer :: j, dim</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l192" href="#l192">192</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        character(len=5) :: jStr</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l193" href="#l193">193</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l194" href="#l194">194</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        !! When it&#39;s obvious that the checks are only relevant if acoustic_source is enabled,</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l195" href="#l195">195</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        !! `acoustic_source .and.` is removed from the conditions for clarity.</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l196" href="#l196">196</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        !! `if (.not. acoustic_source) return` ensures equivalent behavior</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l197" href="#l197">197</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        if (.not. acoustic_source) return</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l198" href="#l198">198</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l199" href="#l199">199</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        if (n == 0) then</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l200" href="#l200">200</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">            dim = 1</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l201" href="#l201">201</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        else if (p == 0) then</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l202" href="#l202">202</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">            dim = 2</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l203" href="#l203">203</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        else</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l204" href="#l204">204</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            dim = 3</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l205" href="#l205">205</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        end if</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l206" href="#l206">206</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l207" href="#l207">207</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(acoustic_source .and. num_source == dflt_int, &#34;num_source must be specified for acoustic_source&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l208" href="#l208">208</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(acoustic_source .and. num_source &lt; 0, &#34;num_source must be non-negative&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l209" href="#l209">209</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l210" href="#l210">210</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        do j = 1, num_source</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l211" href="#l211">211</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            call s_int_to_str(j, jStr)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l212" href="#l212">212</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l213" href="#l213">213</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(acoustic_source .and. acoustic(j)%support == dflt_int, &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l214" href="#l214">214</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;acoustic(&#34;//trim(jStr)//&#34;)%support must be specified for acoustic_source&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l215" href="#l215">215</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l216" href="#l216">216</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(dim == 1 .and. acoustic(j)%support /= 1, &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l217" href="#l217">217</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;Only acoustic(&#34;//trim(jStr)//&#34;)%support = 1 is allowed for 1D simulations&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l218" href="#l218">218</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(dim == 1 .and. acoustic(j)%support == 1 .and. f_is_default(acoustic(j)%loc(1)), &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l219" href="#l219">219</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;acoustic(&#34;//trim(jStr)//&#34;)%loc(1) must be specified for acoustic(&#34;//trim(jStr)//&#34;)%support = 1&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l220" href="#l220">220</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT((dim == 2  .and. .not. cyl_coord) .and. (.not. any(acoustic(j)%support == (/2, 5, 9/))), &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l221" href="#l221">221</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;Only acoustic(&#34;//trim(jStr)//&#34;)%support = 2, 5, 6, 9, or 10 is allowed for 2D simulations&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l222" href="#l222">222</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT((dim == 2  .and. cyl_coord) .and. (.not. any(acoustic(j)%support == (/2, 6, 10/))), &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l223" href="#l223">223</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;Only acoustic(&#34;//trim(jStr)//&#34;)%support = 6 or 10 is allowed for 2D axisymmetric simulations&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l224" href="#l224">224</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(dim == 2 .and. any(acoustic(j)%support == (/2, 5, 6, 9, 10/)) .and. &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l225" href="#l225">225</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                (f_is_default(acoustic(j)%loc(1)) .or. f_is_default(acoustic(j)%loc(2))), &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l226" href="#l226">226</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;acoustic(&#34;//trim(jStr)//&#34;)%loc(1:2) must be specified for acoustic(&#34;//trim(jStr)//&#34;)%support = 2&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l227" href="#l227">227</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(dim == 3 .and. (.not. any(acoustic(j)%support == (/3, 7, 11/))), &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l228" href="#l228">228</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;Only acoustic(&#34;//trim(jStr)//&#34;)%support = 3, 7, or 11 is allowed for 3D simulations&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l229" href="#l229">229</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(dim == 3 .and. cyl_coord, &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l230" href="#l230">230</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;Acoustic source is not supported in 3D cylindrical simulations&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l231" href="#l231">231</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(dim == 3 .and. acoustic(j)%support == 3 .and. &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l232" href="#l232">232</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                (f_is_default(acoustic(j)%loc(1)) .or. f_is_default(acoustic(j)%loc(2))), &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l233" href="#l233">233</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;acoustic(&#34;//trim(jStr)//&#34;)%loc(1:2) must be specified for acoustic(&#34;//trim(jStr)//&#34;)%support = 3&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l234" href="#l234">234</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(dim == 3 .and. any(acoustic(j)%support == (/7, 11/)) .and. &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l235" href="#l235">235</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                (f_is_default(acoustic(j)%loc(1)) .or. &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l236" href="#l236">236</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                 f_is_default(acoustic(j)%loc(2)) .or. &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l237" href="#l237">237</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                 f_is_default(acoustic(j)%loc(3))), &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l238" href="#l238">238</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;acoustic(&#34;//trim(jStr)//&#34;)%loc(1:3) must be specified for acoustic(&#34;//trim(jStr)//&#34;)%support = 7 or 11&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l239" href="#l239">239</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l240" href="#l240">240</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(f_is_default(acoustic(j)%mag), &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l241" href="#l241">241</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;acoustic(&#34;//trim(jStr)//&#34;)%mag must be specified&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l242" href="#l242">242</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(acoustic(j)%pulse == dflt_int, &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l243" href="#l243">243</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;acoustic(&#34;//trim(jStr)//&#34;)%pulse must be specified&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l244" href="#l244">244</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(.not. any(acoustic(j)%pulse == (/1, 2, 3, 4/)), &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l245" href="#l245">245</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;Only acoustic(&#34;//trim(jStr)//&#34;)%pulse = 1, 2, 3 or 4 is allowed&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l246" href="#l246">246</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l247" href="#l247">247</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(any(acoustic(j)%pulse == (/1, 3/)) .and. &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l248" href="#l248">248</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                (f_is_default(acoustic(j)%frequency) .eqv. f_is_default(acoustic(j)%wavelength)), &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l249" href="#l249">249</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;One and only one of acoustic(&#34;//trim(jStr)//&#34;)%frequency &#34;// &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l250" href="#l250">250</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;or acoustic(&#34;//trim(jStr)//&#34;)%wavelength must be specified for pulse = 1 or 3&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l251" href="#l251">251</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(acoustic(j)%pulse == 2 .and. &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l252" href="#l252">252</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                (f_is_default(acoustic(j)%gauss_sigma_time) .eqv. f_is_default(acoustic(j)%gauss_sigma_dist)), &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l253" href="#l253">253</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;One and only one of acoustic(&#34;//trim(jStr)//&#34;)%gauss_sigma_time &#34;// &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l254" href="#l254">254</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;or acoustic(&#34;//trim(jStr)//&#34;)%gauss_sigma_dist must be specified for pulse = 2&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l255" href="#l255">255</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(acoustic(j)%pulse == 4 .and. acoustic(j)%bb_num_freq == dflt_int, &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l256" href="#l256">256</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;The number of broadband frequencies acoustic(&#34;//trim(jStr)//&#34;)%bb_num_freq must be specified for pulse = 4&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l257" href="#l257">257</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(acoustic(j)%pulse == 4 .and. f_is_default(acoustic(j)%bb_bandwidth), &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l258" href="#l258">258</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;The broadband wave band width acoustic(&#34;//trim(jStr)//&#34;)%bb_bandwidth must be specified for pulse = 4&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l259" href="#l259">259</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(acoustic(j)%pulse == 4 .and. f_is_default(acoustic(j)%bb_lowest_freq), &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l260" href="#l260">260</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;The broadband wave lower frequency bound acoustic(&#34;//trim(jStr)//&#34;)%bb_lowest_freq must be specified for pulse = 4&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l261" href="#l261">261</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l262" href="#l262">262</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(f_is_default(acoustic(j)%npulse), &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l263" href="#l263">263</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;acoustic(&#34;//trim(jStr)//&#34;)%npulse must be specified&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l264" href="#l264">264</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(acoustic(j)%support &gt;= 5 .and. (.not. f_is_integer(acoustic(j)%npulse)), &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l265" href="#l265">265</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;acoustic(&#34;//trim(jStr)//&#34;)%npulse must be an integer for support &gt;= 5 (non-planar supports)&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l266" href="#l266">266</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(acoustic(j)%npulse &gt;= 5 .and. acoustic(j)%dipole, &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l267" href="#l267">267</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;acoustic(&#34;//trim(jStr)//&#34;)%dipole is not supported for support &gt;= 5 (non-planar supports)&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l268" href="#l268">268</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(acoustic(j)%support &lt; 5 .and. f_is_default(acoustic(j)%dir), &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l269" href="#l269">269</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;acoustic(&#34;//trim(jStr)//&#34;)%dir must be specified for support &lt; 5 (planer support)&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l270" href="#l270">270</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(acoustic(j)%support == 1 .and. f_approx_equal(acoustic(j)%dir, 0._wp), &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l271" href="#l271">271</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;acoustic(&#34;//trim(jStr)//&#34;)dir must be non-zero for support = 1&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l272" href="#l272">272</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(acoustic(j)%pulse == 2 .and. f_is_default(acoustic(j)%delay), &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l273" href="#l273">273</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;acoustic(&#34;//trim(jStr)//&#34;)%delay must be specified for pulse = 2 (Gaussian)&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l274" href="#l274">274</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(acoustic(j)%pulse == 3 .and. acoustic(j)%support &gt;= 5, &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l275" href="#l275">275</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;acoustic(&#34;//trim(jStr)//&#34;)%support &gt;= 5 (Cylindrical or Spherical support) is not allowed for pulse = 3 (square wave)&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l276" href="#l276">276</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l277" href="#l277">277</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT((acoustic(j)%support == 2 .or. acoustic(j)%support == 3) .and. f_is_default(acoustic(j)%length), &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l278" href="#l278">278</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;acoustic(&#34;//trim(jStr)//&#34;)%length must be specified for support = 2 or 3&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l279" href="#l279">279</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT((acoustic(j)%support == 2 .or. acoustic(j)%support == 3) .and. acoustic(j)%length &lt;= 0._wp, &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l280" href="#l280">280</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;acoustic(&#34;//trim(jStr)//&#34;)%length must be positive for support = 2 or 3&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l281" href="#l281">281</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(acoustic(j)%support == 3 .and. f_is_default(acoustic(j)%height), &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l282" href="#l282">282</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;acoustic(&#34;//trim(jStr)//&#34;)%height must be specified for support = 3&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l283" href="#l283">283</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(acoustic(j)%support == 3 .and. acoustic(j)%height &lt;= 0._wp, &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l284" href="#l284">284</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;acoustic(&#34;//trim(jStr)//&#34;)%height must be positive for support = 3&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l285" href="#l285">285</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l286" href="#l286">286</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(acoustic(j)%support &gt;= 5 .and. f_is_default(acoustic(j)%foc_length), &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l287" href="#l287">287</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;acoustic(&#34;//trim(jStr)//&#34;)%foc_length must be specified for support &gt;= 5 (non-planar supports)&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l288" href="#l288">288</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(acoustic(j)%support &gt;= 5 .and. acoustic(j)%foc_length &lt;= 0._wp, &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l289" href="#l289">289</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;acoustic(&#34;//trim(jStr)//&#34;)%foc_length must be positive for support &gt;= 5 (non-planar supports)&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l290" href="#l290">290</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(acoustic(j)%support &gt;= 5 .and. f_is_default(acoustic(j)%aperture), &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l291" href="#l291">291</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;acoustic(&#34;//trim(jStr)//&#34;)%aperture must be specified for support &gt;= 5 (non-planar supports)&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l292" href="#l292">292</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(acoustic(j)%support &gt;= 5 .and. acoustic(j)%aperture &lt;= 0._wp, &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l293" href="#l293">293</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;acoustic(&#34;//trim(jStr)//&#34;)%aperture must be positive for support &gt;= 5 (non-planar supports)&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l294" href="#l294">294</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l295" href="#l295">295</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(any(acoustic(j)%support == (/9, 10, 11/)) .and. acoustic(j)%num_elements == dflt_int, &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l296" href="#l296">296</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;acoustic(&#34;//trim(jStr)//&#34;)%num_elements must be specified for support = 9, 10, or 11 (transducer array)&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l297" href="#l297">297</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(any(acoustic(j)%support == (/9, 10, 11/)) .and. acoustic(j)%num_elements &lt;= 0, &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l298" href="#l298">298</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;acoustic(&#34;//trim(jStr)//&#34;)%num_elements must be positive for support = 9, 10, or 11 (transducer array)&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l299" href="#l299">299</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(acoustic(j)%element_on /= dflt_int .and. acoustic(j)%element_on &lt; 0, &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l300" href="#l300">300</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;acoustic(&#34;//trim(jStr)//&#34;)%element_on must be non-negative for support = 9, 10, or 11 (transducer array)&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l301" href="#l301">301</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(acoustic(j)%element_on /= dflt_int .and. acoustic(j)%element_on &gt; acoustic(j)%num_elements, &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l302" href="#l302">302</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;acoustic(&#34;//trim(jStr)//&#34;)%element_on must be less than or equal to num_elements for support = 9, 10, or 11 (transducer array)&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l303" href="#l303">303</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(any(acoustic(j)%support == (/9, 10/)) .and. f_is_default(acoustic(j)%element_spacing_angle), &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l304" href="#l304">304</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;acoustic(&#34;//trim(jStr)//&#34;)%element_spacing_angle must be specified for support = 9 or 10 (2D transducer array)&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l305" href="#l305">305</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(any(acoustic(j)%support == (/9, 10/)) .and. acoustic(j)%element_spacing_angle &lt; 0._wp, &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l306" href="#l306">306</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;acoustic(&#34;//trim(jStr)//&#34;)%element_spacing_angle must be non-negative for support = 9 or 10 (2D transducer array)&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l307" href="#l307">307</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(acoustic(j)%support == 11 .and. f_is_default(acoustic(j)%element_polygon_ratio), &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l308" href="#l308">308</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;acoustic(&#34;//trim(jStr)//&#34;)%element_polygon_ratio must be specified for support = 11 (3D transducer array)&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l309" href="#l309">309</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(acoustic(j)%support == 11 .and. acoustic(j)%element_polygon_ratio &lt;= 0._wp, &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l310" href="#l310">310</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;acoustic(&#34;//trim(jStr)//&#34;)%element_polygon_ratio must be positive for support = 11 (3D transducer array)&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l311" href="#l311">311</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        end do</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l312" href="#l312">312</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l313" href="#l313">313</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">    end subroutine s_check_inputs_acoustic_src</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l314" href="#l314">314</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l315" href="#l315">315</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    !&gt; Checks constraints on hypoelasticity parameters</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l316" href="#l316">316</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">    impure subroutine s_check_inputs_hypoelasticity</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l317" href="#l317">317</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(hypoelasticity .and. riemann_solver /= 1, &#34;hypoelasticity requires HLL Riemann solver (riemann_solver = 1)&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l318" href="#l318">318</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">    end subroutine</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l319" href="#l319">319</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l320" href="#l320">320</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    !&gt; Checks constraints on bubble parameters</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l321" href="#l321">321</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">    impure subroutine s_check_inputs_bubbles_euler</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l322" href="#l322">322</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(bubbles_euler .and. bubbles_lagrange, &#34;Activate only one of the bubble subgrid models&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l323" href="#l323">323</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(bubbles_euler .and. riemann_solver /= 2, &#34;Bubble modeling requires HLLC Riemann solver (riemann_solver = 2)&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l324" href="#l324">324</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(bubbles_euler .and. avg_state /= 2, &#34;Bubble modeling requires arithmetic average (avg_state = 2)&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l325" href="#l325">325</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(bubbles_euler .and. model_eqns == 2 .and. bubble_model == 1, &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l326" href="#l326">326</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">            &#34;The 5-equation bubbly flow model does not support bubble_model = 1 (Gilmore)&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l327" href="#l327">327</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">    end subroutine s_check_inputs_bubbles_euler</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l328" href="#l328">328</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l329" href="#l329">329</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    !&gt; Checks constraints on adaptive time stepping parameters (adap_dt)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l330" href="#l330">330</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">    impure subroutine s_check_inputs_adapt_dt</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l331" href="#l331">331</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(adap_dt .and. time_stepper /= 3, &#34;adapt_dt requires Runge-Kutta 3 (time_stepper = 3)&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l332" href="#l332">332</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(adap_dt .and. qbmm)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l333" href="#l333">333</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(adap_dt .and. (.not. polytropic) .and. (.not. bubbles_lagrange))</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l334" href="#l334">334</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(adap_dt .and. (.not. adv_n) .and. (.not. bubbles_lagrange))</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l335" href="#l335">335</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">    end subroutine s_check_inputs_adapt_dt</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l336" href="#l336">336</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l337" href="#l337">337</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    !&gt; Checks constraints on alternative sound speed parameters (alt_soundspeed)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l338" href="#l338">338</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">    impure subroutine s_check_inputs_alt_soundspeed</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l339" href="#l339">339</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(alt_soundspeed .and. model_eqns /= 2, &#34;5-equation model (model_eqns = 2) is required for alt_soundspeed&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l340" href="#l340">340</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(alt_soundspeed .and. riemann_solver /= 2, &#34;alt_soundspeed requires HLLC Riemann solver (riemann_solver = 2)&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l341" href="#l341">341</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(alt_soundspeed .and. num_fluids /= 2 .and. num_fluids /= 3)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l342" href="#l342">342</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">    end subroutine s_check_inputs_alt_soundspeed</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l343" href="#l343">343</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l344" href="#l344">344</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    !&gt; Checks constraints on viscosity parameters (fluid_pp(i)%Re(1:2))</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l345" href="#l345">345</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        !! of the stiffened gas equation of state</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l346" href="#l346">346</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">    impure subroutine s_check_inputs_stiffened_eos_viscosity</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l347" href="#l347">347</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        character(len=5) :: iStr, jStr</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l348" href="#l348">348</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        integer :: i, j</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l349" href="#l349">349</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l350" href="#l350">350</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        do i = 1, num_fluids</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l351" href="#l351">351</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            do j = 1, 2</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l352" href="#l352">352</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">                call s_int_to_str(j, jStr)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l353" href="#l353">353</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">                @:PROHIBIT((.not. f_is_default(fluid_pp(i)%Re(j))) .and. fluid_pp(i)%Re(j) &lt;= 0._wp, &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l354" href="#l354">354</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                    &#34;fluid_pp(&#34;//trim(iStr)//&#34;)%&#34;// &#34;Re(&#34;//trim(jStr)//&#34;) must be positive.&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l355" href="#l355">355</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">                @:PROHIBIT(model_eqns == 1 .and. (.not. f_is_default(fluid_pp(i)%Re(j))), &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l356" href="#l356">356</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                    &#34;model_eqns = 1 does not support fluid_pp(&#34;//trim(iStr)//&#34;)%&#34;// &#34;Re(&#34;//trim(jStr)//&#34;)&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l357" href="#l357">357</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">                @:PROHIBIT(i &gt; num_fluids .and. (.not. f_is_default(fluid_pp(i)%Re(j))), &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l358" href="#l358">358</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                    &#34;First index (&#34;//trim(iStr)//&#34;) of fluid_pp(&#34;//trim(iStr)//&#34;)%&#34;// &#34;Re(&#34;//trim(jStr)//&#34;) exceeds num_fluids&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l359" href="#l359">359</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">                if (.not. igr) then</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l360" href="#l360">360</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">                    @:PROHIBIT(weno_order == 1 .and. (.not. weno_avg) .and. (.not. f_is_default(fluid_pp(i)%Re(j))), &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l361" href="#l361">361</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                        &#34;weno_order = 1 without weno_avg does not support fluid_pp(&#34;//trim(iStr)//&#34;)%&#34;// &#34;Re(&#34;//trim(jStr)//&#34;)&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l362" href="#l362">362</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                end if</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l363" href="#l363">363</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">            end do</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l364" href="#l364">364</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(.not. f_is_default(fluid_pp(i)%Re(1)) .and. .not. viscous, &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l365" href="#l365">365</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;Re(1) is specified, but viscous is not set to true&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l366" href="#l366">366</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(.not. f_is_default(fluid_pp(i)%Re(2)) .and. .not. viscous, &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l367" href="#l367">367</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;Re(2) is specified, but viscous is not set to true&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l368" href="#l368">368</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(f_is_default(fluid_pp(i)%Re(1)) .and. viscous, &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l369" href="#l369">369</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                &#34;Re(1) is not specified, but viscous is set to true&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l370" href="#l370">370</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        end do</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l371" href="#l371">371</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l372" href="#l372">372</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">    end subroutine s_check_inputs_stiffened_eos_viscosity</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l373" href="#l373">373</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l374" href="#l374">374</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    !&gt; Checks constraints on body forces parameters (bf_x[y,z], etc.)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l375" href="#l375">375</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">    impure subroutine s_check_inputs_body_forces</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l376" href="#l376">376</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        #:for DIR in [&#39;x&#39;, &#39;y&#39;, &#39;z&#39;]</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l377" href="#l377">377</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(bf_${DIR}$ .and. f_is_default(k_${DIR}$), &#34;k_${DIR}$ must be specified if bf_${DIR}$ is true&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l378" href="#l378">378</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(bf_${DIR}$ .and. f_is_default(w_${DIR}$), &#34;w_${DIR}$ must be specified if bf_${DIR}$ is true&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l379" href="#l379">379</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(bf_${DIR}$ .and. f_is_default(p_${DIR}$), &#34;p_${DIR}$ must be specified if bf_${DIR}$ is true&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l380" href="#l380">380</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:PROHIBIT(bf_${DIR}$ .and. f_is_default(g_${DIR}$), &#34;g_${DIR}$ must be specified if bf_${DIR}$ is true&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l381" href="#l381">381</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        #:endfor</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l382" href="#l382">382</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">    end subroutine s_check_inputs_body_forces</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l383" href="#l383">383</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l384" href="#l384">384</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    !&gt; Checks constraints on lagrangian bubble parameters</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l385" href="#l385">385</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">    impure subroutine s_check_inputs_bubbles_lagrange</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l386" href="#l386">386</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(bubbles_lagrange .and. file_per_process, &#34;file_per_process must be false for bubbles_lagrange&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l387" href="#l387">387</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(bubbles_lagrange .and. n==0, &#34;bubbles_lagrange accepts 2D and 3D simulations only&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l388" href="#l388">388</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(bubbles_lagrange .and. model_eqns==3, &#34;The 6-equation flow model does not support bubbles_lagrange&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l389" href="#l389">389</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(bubbles_lagrange .and. lag_params%cluster_type&gt;=2 .and. lag_params%smooth_type/=1, &#34;cluster_type=2 requires smooth_type=1&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l390" href="#l390">390</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">    end subroutine s_check_inputs_bubbles_lagrange</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l391" href="#l391">391</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l392" href="#l392">392</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    !&gt; Checks constraints on continuum damage model parameters</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l393" href="#l393">393</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">    impure subroutine s_check_inputs_continuum_damage</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l394" href="#l394">394</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(cont_damage .and. f_is_default(tau_star))</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l395" href="#l395">395</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(cont_damage .and. f_is_default(cont_damage_s))</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l396" href="#l396">396</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(cont_damage .and. f_is_default(alpha_bar))</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l397" href="#l397">397</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">    end subroutine s_check_inputs_continuum_damage</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l398" href="#l398">398</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l399" href="#l399">399</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    !&gt; Checks miscellaneous constraints,</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l400" href="#l400">400</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        !! including constraints on probe_wrt and integral_wrt</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l401" href="#l401">401</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">    impure subroutine s_check_inputs_misc</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l402" href="#l402">402</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(probe_wrt .and. fd_order == dflt_int, &#34;fd_order must be specified for probe_wrt&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l403" href="#l403">403</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(integral_wrt .and. (.not. bubbles_euler))</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l404" href="#l404">404</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">    end subroutine s_check_inputs_misc</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l405" href="#l405">405</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l406" href="#l406">406</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">    impure subroutine s_check_inputs_mhd</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l407" href="#l407">407</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(mhd .and. (riemann_solver /= 1 .and. riemann_solver /= 4), &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l408" href="#l408">408</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">            &#34;MHD simulations require riemann_solver = 1 (HLL) or riemann_solver = 4 (HLLD)&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l409" href="#l409">409</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(riemann_solver == 4 .and. .not. mhd, &#34;HLLD is only available for MHD simulations&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l410" href="#l410">410</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(riemann_solver == 4 .and. relativity, &#34;HLLD is not available for RMHD&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l411" href="#l411">411</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(powell .and. .not. mhd)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l412" href="#l412">412</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(powell .and. n == 0, &#34;Powell&#39;s method is not supported for 1D simulations&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l413" href="#l413">413</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:PROHIBIT(powell .and. fd_order == dflt_int, &#34;fd_order must be set if Powell&#39;s method is enabled&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l414" href="#l414">414</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">    end subroutine s_check_inputs_mhd</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l415" href="#l415">415</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l416" href="#l416">416</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">    impure subroutine s_check_inputs_nvidia_uvm</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l417" href="#l417">417</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">#ifdef __NVCOMPILER_GPU_UNIFIED_MEM</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l418" href="#l418">418</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        @:PROHIBIT(nv_uvm_igr_temps_on_gpu &gt; 3 .or. nv_uvm_igr_temps_on_gpu &lt; 0, &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l419" href="#l419">419</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">            &#34;nv_uvm_igr_temps_on_gpu must be in the range [0, 3]&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l420" href="#l420">420</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        @:PROHIBIT(nv_uvm_igr_temps_on_gpu == 3 .and. igr_iter_solver == 2, &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l421" href="#l421">421</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">            &#34;nv_uvm_igr_temps_on_gpu must be in the range [0, 2] for igr_iter_solver == 2&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l422" href="#l422">422</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">#endif</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l423" href="#l423">423</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    end subroutine s_check_inputs_nvidia_uvm</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l424" href="#l424">424</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l425" href="#l425">425</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">end module m_checker</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l426" href="#l426">426</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+  </table>
+</div>
+      <hr/>
+    </main>
+    <footer>
+      Generated by: <a href="http://gcovr.com/en/8.3">GCOVR (Version 8.3)</a>
+    </footer>
+  </body>
+</html>

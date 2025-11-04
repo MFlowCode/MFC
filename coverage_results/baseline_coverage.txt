@@ -1,0 +1,695 @@
+(INFO) Reading coverage data...
+(WARNING) File /Users/spencer/Downloads/MFC/src/simulation/m_acoustic_src.fpp has 737 line(s) but coverage data has 747 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/common/m_boundary_common.fpp has 2154 line(s) but coverage data has 2160 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/simulation/m_bubbles.fpp has 800 line(s) but coverage data has 810 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/common/include/macros.fpp has 166 line(s) but coverage data has 218 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/simulation/m_checker.fpp has 425 line(s) but coverage data has 431 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/common/include/macros.fpp has 166 line(s) but coverage data has 234 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/common/include/macros.fpp has 166 line(s) but coverage data has 184 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/common/include/macros.fpp has 166 line(s) but coverage data has 728 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/common/include/macros.fpp has 166 line(s) but coverage data has 629 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/simulation/m_derived_variables.fpp has 616 line(s) but coverage data has 622 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/common/include/macros.fpp has 166 line(s) but coverage data has 434 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/simulation/m_fftw.fpp has 340 line(s) but coverage data has 370 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/common/include/macros.fpp has 166 line(s) but coverage data has 185 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/common/include/macros.fpp has 166 line(s) but coverage data has 216 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/common/m_helper.fpp has 713 line(s) but coverage data has 767 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/common/include/macros.fpp has 166 line(s) but coverage data has 191 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/common/m_helper_basic.fpp has 185 line(s) but coverage data has 195 line(s).
+(WARNING) Ignoring suspicious hits in line "                #:call GPU_PARALLEL_LOOP(collapse=3, private='[rho_L, rho_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, mu_L, mu_R, vel_L, vel_R, pres_L, pres_R, alpha_L, alpha_R, alpha_rho_L, alpha_rho_R, F_L, F_R, E_L, E_R, cfl, dvel, dvel_small, rho_sf_small, vflux_L_arr, vflux_R_arr]')".
+(WARNING) File /Users/spencer/Downloads/MFC/src/common/include/macros.fpp has 166 line(s) but coverage data has 1391 line(s).
+(WARNING) Ignoring suspicious hits in line '            do while ((abs(FT) > ptgalpha_eps) .or. (ns == 0))'.
+(WARNING) Ignoring suspicious hits in line '            do while ((abs(FT) > ptgalpha_eps) .or. (ns == 0))'.
+(WARNING) Ignoring suspicious hits in line '                ns = ns + 1'.
+(WARNING) Ignoring suspicious hits in line '                FT = TSat*((cvs(lp)*gs_min(lp) - cvs(vp)*gs_min(vp)) &'.
+(WARNING) Ignoring suspicious hits in line '                FT = TSat*((cvs(lp)*gs_min(lp) - cvs(vp)*gs_min(vp)) &'.
+(WARNING) Ignoring suspicious hits in line '                FT = TSat*((cvs(lp)*gs_min(lp) - cvs(vp)*gs_min(vp)) &'.
+(WARNING) Ignoring suspicious hits in line '                FT = TSat*((cvs(lp)*gs_min(lp) - cvs(vp)*gs_min(vp)) &'.
+(WARNING) Ignoring suspicious hits in line '                FT = TSat*((cvs(lp)*gs_min(lp) - cvs(vp)*gs_min(vp)) &'.
+(WARNING) Ignoring suspicious hits in line '                           *(1 - log(TSat)) - (qvps(lp) - qvps(vp)) &'.
+(WARNING) Ignoring suspicious hits in line '                           *(1 - log(TSat)) - (qvps(lp) - qvps(vp)) &'.
+(WARNING) Ignoring suspicious hits in line '                           *(1 - log(TSat)) - (qvps(lp) - qvps(vp)) &'.
+(WARNING) Ignoring suspicious hits in line '                           - cvs(vp)*(gs_min(vp) - 1)*log(pSat + ps_inf(vp))) &'.
+(WARNING) Ignoring suspicious hits in line '                           - cvs(vp)*(gs_min(vp) - 1)*log(pSat + ps_inf(vp))) &'.
+(WARNING) Ignoring suspicious hits in line '                           - cvs(vp)*(gs_min(vp) - 1)*log(pSat + ps_inf(vp))) &'.
+(WARNING) Ignoring suspicious hits in line '                     + qvs(lp) - qvs(vp)'.
+(WARNING) Ignoring suspicious hits in line '                     + qvs(lp) - qvs(vp)'.
+(WARNING) Ignoring suspicious hits in line '                     + qvs(lp) - qvs(vp)'.
+(WARNING) Ignoring suspicious hits in line '                     + qvs(lp) - qvs(vp)'.
+(WARNING) Ignoring suspicious hits in line '                     + qvs(lp) - qvs(vp)'.
+(WARNING) Ignoring suspicious hits in line '                     + qvs(lp) - qvs(vp)'.
+(WARNING) Ignoring suspicious hits in line '                     + qvs(lp) - qvs(vp)'.
+(WARNING) Ignoring suspicious hits in line '                     + qvs(lp) - qvs(vp)'.
+(WARNING) Ignoring suspicious hits in line '                     + qvs(lp) - qvs(vp)'.
+(WARNING) Ignoring suspicious hits in line '                     + qvs(lp) - qvs(vp)'.
+(WARNING) Ignoring suspicious hits in line '                     + qvs(lp) - qvs(vp)'.
+(WARNING) Ignoring suspicious hits in line '                     + qvs(lp) - qvs(vp)'.
+(WARNING) Ignoring suspicious hits in line '                     + qvs(lp) - qvs(vp)'.
+(WARNING) Ignoring suspicious hits in line '                    - cvs(vp)*(gs_min(vp) - 1)*log(pSat + ps_inf(vp))'.
+(WARNING) Ignoring suspicious hits in line '                TSat = TSat - Om*FT/dFdT'.
+(WARNING) File /Users/spencer/Downloads/MFC/src/simulation/m_pressure_relaxation.fpp has 316 line(s) but coverage data has 322 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/simulation/m_qbmm.fpp has 977 line(s) but coverage data has 985 line(s).
+(WARNING) Ignoring suspicious hits in line '        coeffs = 0._wp'.
+(WARNING) Ignoring suspicious hits in line '        coeffs = 0._wp'.
+(WARNING) Ignoring suspicious hits in line "        #:call GPU_PARALLEL_LOOP(collapse=3, private='[moms, msum, wght, abscX, abscY, wght_pb, wght_mv, wght_ht, coeff, ht, r, q, n_tait, B_tait, pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T]')".
+(WARNING) Ignoring suspicious hits in line "        #:call GPU_PARALLEL_LOOP(collapse=3, private='[moms, msum, wght, abscX, abscY, wght_pb, wght_mv, wght_ht, coeff, ht, r, q, n_tait, B_tait, pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T]')".
+(WARNING) Ignoring suspicious hits in line "        #:call GPU_PARALLEL_LOOP(collapse=3, private='[moms, msum, wght, abscX, abscY, wght_pb, wght_mv, wght_ht, coeff, ht, r, q, n_tait, B_tait, pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T]')".
+(WARNING) Ignoring suspicious hits in line "        #:call GPU_PARALLEL_LOOP(collapse=3, private='[moms, msum, wght, abscX, abscY, wght_pb, wght_mv, wght_ht, coeff, ht, r, q, n_tait, B_tait, pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T]')".
+(WARNING) Ignoring suspicious hits in line "        #:call GPU_PARALLEL_LOOP(collapse=3, private='[moms, msum, wght, abscX, abscY, wght_pb, wght_mv, wght_ht, coeff, ht, r, q, n_tait, B_tait, pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T]')".
+(WARNING) Ignoring suspicious hits in line "        #:call GPU_PARALLEL_LOOP(collapse=3, private='[moms, msum, wght, abscX, abscY, wght_pb, wght_mv, wght_ht, coeff, ht, r, q, n_tait, B_tait, pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T]')".
+(WARNING) Ignoring suspicious hits in line "        #:call GPU_PARALLEL_LOOP(collapse=3, private='[moms, msum, wght, abscX, abscY, wght_pb, wght_mv, wght_ht, coeff, ht, r, q, n_tait, B_tait, pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T]')".
+(WARNING) Ignoring suspicious hits in line "        #:call GPU_PARALLEL_LOOP(collapse=3, private='[moms, msum, wght, abscX, abscY, wght_pb, wght_mv, wght_ht, coeff, ht, r, q, n_tait, B_tait, pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T]')".
+(WARNING) Ignoring suspicious hits in line "        #:call GPU_PARALLEL_LOOP(collapse=3, private='[moms, msum, wght, abscX, abscY, wght_pb, wght_mv, wght_ht, coeff, ht, r, q, n_tait, B_tait, pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T]')".
+(WARNING) Ignoring suspicious hits in line "        #:call GPU_PARALLEL_LOOP(collapse=3, private='[moms, msum, wght, abscX, abscY, wght_pb, wght_mv, wght_ht, coeff, ht, r, q, n_tait, B_tait, pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T]')".
+(WARNING) Ignoring suspicious hits in line "        #:call GPU_PARALLEL_LOOP(collapse=3, private='[moms, msum, wght, abscX, abscY, wght_pb, wght_mv, wght_ht, coeff, ht, r, q, n_tait, B_tait, pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T]')".
+(WARNING) Ignoring suspicious hits in line "        #:call GPU_PARALLEL_LOOP(collapse=3, private='[moms, msum, wght, abscX, abscY, wght_pb, wght_mv, wght_ht, coeff, ht, r, q, n_tait, B_tait, pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T]')".
+(WARNING) Ignoring suspicious hits in line "        #:call GPU_PARALLEL_LOOP(collapse=3, private='[moms, msum, wght, abscX, abscY, wght_pb, wght_mv, wght_ht, coeff, ht, r, q, n_tait, B_tait, pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T]')".
+(WARNING) Ignoring suspicious hits in line "        #:call GPU_PARALLEL_LOOP(collapse=3, private='[moms, msum, wght, abscX, abscY, wght_pb, wght_mv, wght_ht, coeff, ht, r, q, n_tait, B_tait, pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T]')".
+(WARNING) Ignoring suspicious hits in line "        #:call GPU_PARALLEL_LOOP(collapse=3, private='[moms, msum, wght, abscX, abscY, wght_pb, wght_mv, wght_ht, coeff, ht, r, q, n_tait, B_tait, pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T]')".
+(WARNING) Ignoring suspicious hits in line "        #:call GPU_PARALLEL_LOOP(collapse=3, private='[moms, msum, wght, abscX, abscY, wght_pb, wght_mv, wght_ht, coeff, ht, r, q, n_tait, B_tait, pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T]')".
+(WARNING) Ignoring suspicious hits in line "        #:call GPU_PARALLEL_LOOP(collapse=3, private='[moms, msum, wght, abscX, abscY, wght_pb, wght_mv, wght_ht, coeff, ht, r, q, n_tait, B_tait, pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T]')".
+(WARNING) Ignoring suspicious hits in line "        #:call GPU_PARALLEL_LOOP(collapse=3, private='[moms, msum, wght, abscX, abscY, wght_pb, wght_mv, wght_ht, coeff, ht, r, q, n_tait, B_tait, pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T]')".
+(WARNING) Ignoring suspicious hits in line "        #:call GPU_PARALLEL_LOOP(collapse=3, private='[moms, msum, wght, abscX, abscY, wght_pb, wght_mv, wght_ht, coeff, ht, r, q, n_tait, B_tait, pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T]')".
+(WARNING) Ignoring suspicious hits in line "        #:call GPU_PARALLEL_LOOP(collapse=3, private='[moms, msum, wght, abscX, abscY, wght_pb, wght_mv, wght_ht, coeff, ht, r, q, n_tait, B_tait, pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T]')".
+(WARNING) Ignoring suspicious hits in line "        #:call GPU_PARALLEL_LOOP(collapse=3, private='[moms, msum, wght, abscX, abscY, wght_pb, wght_mv, wght_ht, coeff, ht, r, q, n_tait, B_tait, pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T]')".
+(WARNING) Ignoring suspicious hits in line "        #:call GPU_PARALLEL_LOOP(collapse=3, private='[moms, msum, wght, abscX, abscY, wght_pb, wght_mv, wght_ht, coeff, ht, r, q, n_tait, B_tait, pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T]')".
+(WARNING) Ignoring suspicious hits in line "        #:call GPU_PARALLEL_LOOP(collapse=3, private='[moms, msum, wght, abscX, abscY, wght_pb, wght_mv, wght_ht, coeff, ht, r, q, n_tait, B_tait, pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T]')".
+(WARNING) Ignoring suspicious hits in line "        #:call GPU_PARALLEL_LOOP(collapse=3, private='[moms, msum, wght, abscX, abscY, wght_pb, wght_mv, wght_ht, coeff, ht, r, q, n_tait, B_tait, pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T]')".
+(WARNING) Ignoring suspicious hits in line "        #:call GPU_PARALLEL_LOOP(collapse=3, private='[moms, msum, wght, abscX, abscY, wght_pb, wght_mv, wght_ht, coeff, ht, r, q, n_tait, B_tait, pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T]')".
+(WARNING) Ignoring suspicious hits in line "        #:call GPU_PARALLEL_LOOP(collapse=3, private='[moms, msum, wght, abscX, abscY, wght_pb, wght_mv, wght_ht, coeff, ht, r, q, n_tait, B_tait, pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T]')".
+(WARNING) Ignoring suspicious hits in line "        #:call GPU_PARALLEL_LOOP(collapse=3, private='[moms, msum, wght, abscX, abscY, wght_pb, wght_mv, wght_ht, coeff, ht, r, q, n_tait, B_tait, pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T]')".
+(WARNING) Ignoring suspicious hits in line 'end module m_qbmm'.
+(WARNING) Ignoring suspicious hits in line 'end module m_qbmm'.
+(WARNING) Ignoring suspicious hits in line '/*EOF*/'.
+(WARNING) Ignoring suspicious hits in line '/*EOF*/'.
+(WARNING) Ignoring suspicious hits in line '/*EOF*/'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '                #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '                #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '                #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '                #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '                #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '                #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '                #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '                #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '                #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '                #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '                #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '                #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '                #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '                #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '                #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '                #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '                #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '                #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '                #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line "            #:call GPU_PARALLEL_LOOP(collapse=4,private='[inv_ds,flux_face1,flux_face2]')".
+(WARNING) Ignoring suspicious hits in line "                #:call GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, tau_e_L, tau_e_R,G_L, G_R, Re_L, Re_R, rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, Ys_L, Ys_R, xi_field_L, xi_field_R, Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, c_fast, pres_mag, B, Ga, vdotB, B2, b4, cm, pcorr, zcoef, vel_L_tmp, vel_R_tmp]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3, private='[R0_L, R0_R, V0_L, V0_R, P0_L, P0_R, pbw_L, pbw_R, vel_L, vel_R, rho_avg, alpha_L, alpha_R, h_avg, gamma_avg, s_L, s_R, s_S, nbub_L, nbub_R, ptilde_L, ptilde_R, vel_avg_rms, Re_L, Re_R, pcorr, zcoef, vel_L_tmp, vel_R_tmp]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3, private='[T_L, T_R, vel_L, vel_R, Re_L, Re_R, rho_avg, h_avg, gamma_avg, alpha_L, alpha_R, s_L, s_R, s_S, vel_avg_rms, pcorr, zcoef, vel_L_tmp, vel_R_tmp, Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, tau_e_L, tau_e_R, xi_field_L, xi_field_R, Yi_avg,Phi_avg, h_iL, h_iR, h_avg_2]', copyin='[is1, is2, is3]')".
+(WARNING) Ignoring suspicious hits in line "        #:call GPU_PARALLEL_LOOP(collapse=3, private='[idx_right_phys, vel_grad_avg, current_tau_shear, current_tau_bulk, vel_src_at_interface, Re_shear, Re_bulk, divergence_v, i_dim, vel_comp_idx]')".
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) File /Users/spencer/Downloads/MFC/src/common/include/macros.fpp has 166 line(s) but coverage data has 189 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/simulation/m_sim_helpers.fpp has 296 line(s) but coverage data has 306 line(s).
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line "        #:call GPU_PARALLEL_LOOP(collapse=3, private='[alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K,qv_K, dyn_pres_K, rhoYks, B, T]')".
+(WARNING) Ignoring suspicious hits in line '        real(wp) :: blkmod1, blkmod2'.
+(WARNING) Ignoring suspicious hits in line '        integer :: q'.
+(WARNING) Ignoring suspicious hits in line '        elseif (relativity) then'.
+(WARNING) Ignoring suspicious hits in line '            if (alt_soundspeed) then'.
+(WARNING) Ignoring suspicious hits in line '            if (alt_soundspeed) then'.
+(WARNING) Ignoring suspicious hits in line '            elseif (model_eqns == 3) then'.
+(WARNING) Ignoring suspicious hits in line '            elseif (model_eqns == 3) then'.
+(WARNING) Ignoring suspicious hits in line '                        (1._wp/gamma + 1._wp)* &'.
+(WARNING) Ignoring suspicious hits in line '                        (1._wp/gamma + 1._wp)* &'.
+(WARNING) Ignoring suspicious hits in line '                        (1._wp/gamma + 1._wp)* &'.
+(WARNING) Ignoring suspicious hits in line '            end if'.
+(WARNING) Ignoring suspicious hits in line '            end if'.
+(WARNING) Ignoring suspicious hits in line ''.
+(WARNING) Ignoring suspicious hits in line ''.
+(WARNING) Ignoring suspicious hits in line "        $:GPU_ROUTINE(function_name='s_compute_fast_magnetosonic_speed', &".
+(WARNING) Ignoring suspicious hits in line '    end subroutine s_compute_fast_magnetosonic_speed'.
+(WARNING) Ignoring suspicious hits in line '    end subroutine s_compute_fast_magnetosonic_speed'.
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=4,private='[beta,dvd,poly,omega,alpha,tau]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[dvd,poly,beta,alpha,omega,tau,delta]')".
+(WARNING) Ignoring suspicious hits in line "                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[poly,beta,alpha,omega,tau,delta,dvd,v]')".
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) Ignoring suspicious hits in line '            #:call GPU_PARALLEL_LOOP(collapse=4)'.
+(WARNING) File /Users/spencer/Downloads/MFC/src/common/include/macros.fpp has 166 line(s) but coverage data has 267 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/pre_process/m_assign_variables.fpp has 704 line(s) but coverage data has 714 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/common/m_boundary_common.fpp has 2154 line(s) but coverage data has 2160 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/common/include/macros.fpp has 166 line(s) but coverage data has 207 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/common/include/macros.fpp has 166 line(s) but coverage data has 210 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/common/include/macros.fpp has 166 line(s) but coverage data has 210 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/common/include/macros.fpp has 166 line(s) but coverage data has 300 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/common/include/macros.fpp has 166 line(s) but coverage data has 728 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/common/include/macros.fpp has 166 line(s) but coverage data has 629 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/common/include/macros.fpp has 166 line(s) but coverage data has 185 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/common/include/macros.fpp has 166 line(s) but coverage data has 216 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/common/m_helper.fpp has 713 line(s) but coverage data has 719 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/common/include/macros.fpp has 166 line(s) but coverage data has 191 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/common/m_helper_basic.fpp has 185 line(s) but coverage data has 195 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/common/include/macros.fpp has 166 line(s) but coverage data has 360 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/pre_process/m_icpp_patches.fpp has 1731 line(s) but coverage data has 1741 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/common/include/macros.fpp has 166 line(s) but coverage data has 1391 line(s).
+(WARNING) Ignoring suspicious hits in line '/*EOF*/'.
+(WARNING) File /Users/spencer/Downloads/MFC/src/common/m_variables_conversion.fpp has 1728 line(s) but coverage data has 2492 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/common/m_boundary_common.fpp has 2154 line(s) but coverage data has 2160 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/common/include/macros.fpp has 166 line(s) but coverage data has 207 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/common/include/macros.fpp has 166 line(s) but coverage data has 234 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/common/include/macros.fpp has 166 line(s) but coverage data has 629 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/common/include/macros.fpp has 166 line(s) but coverage data has 185 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/common/include/macros.fpp has 166 line(s) but coverage data has 216 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/common/m_helper.fpp has 713 line(s) but coverage data has 719 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/common/include/macros.fpp has 166 line(s) but coverage data has 191 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/common/m_helper_basic.fpp has 185 line(s) but coverage data has 195 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/common/include/macros.fpp has 166 line(s) but coverage data has 1391 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/common/include/macros.fpp has 166 line(s) but coverage data has 1154 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/post_process/m_start_up.fpp has 1179 line(s) but coverage data has 1187 line(s).
+(WARNING) File /Users/spencer/Downloads/MFC/src/common/m_variables_conversion.fpp has 1728 line(s) but coverage data has 2497 line(s).
+(INFO) Writing coverage report...
+------------------------------------------------------------------------------
+                           GCC Code Coverage Report
+Directory: .
+------------------------------------------------------------------------------
+File                                       Lines    Exec  Cover   Missing
+------------------------------------------------------------------------------
+src/common/include/macros.fpp                 16       1     6%   183,185,1113,1120,1124,1126-1127,1129-1130,1133,1139,1143,1145-1146,1149
+src/common/m_boundary_common.fpp               5       5   100%
+src/common/m_checker_common.fpp               10       9    90%   72
+src/common/m_chemistry.fpp                     0       0    --%
+src/common/m_compile_specific.f90              0       0    --%
+src/common/m_delay_file_access.f90             0       0    --%
+src/common/m_finite_differences.fpp            2       0     0%   21,61
+src/common/m_helper.fpp                        4       4   100%
+src/common/m_helper_basic.fpp                 10       7    70%   48,50,54
+src/common/m_ib_patches.fpp                    1       0     0%   1073
+src/common/m_mpi_common.fpp                    0       0    --%
+src/common/m_nvtx.f90                          0       0    --%
+src/common/m_phase_change.fpp                  1       0     0%   57
+src/common/m_variables_conversion.fpp          1       0     0%   2497
+src/post_process/m_checker.fpp                 3       0     0%   45-46,48
+src/post_process/m_data_input.f90              0       0    --%
+src/post_process/m_data_output.fpp             0       0    --%
+src/post_process/m_derived_variables.fpp       0       0    --%
+src/post_process/m_global_parameters.fpp      84       0     0%   413-414,419-425,429,431-432,434-479,481,483-484,487-488,491-500,503,506,509-515,518,520
+src/post_process/m_mpi_proxy.fpp               0       0    --%
+src/post_process/m_start_up.fpp               34       0     0%   990-991,993-995,997-998,1008-1010,1013-1015,1017-1019,1022-1024,1026-1028,1031-1033,1038,1040,1042-1044,1046-1048,1051
+src/post_process/p_main.fpp                   36       0     0%   13,15,20,26-29,31,33,35-37,40,44,51,53,55,57,59,61,63-64,66,69-71,79-82,86-87,90,96,98,100
+src/pre_process/m_assign_variables.fpp        18       1     5%   127,129-130,135,138,140,143-144,147,149,153,155,158,163,166,168,197
+src/pre_process/m_boundary_conditions.fpp
+                                               0       0    --%
+src/pre_process/m_check_ib_patches.fpp        21      18    85%   44,59,68
+src/pre_process/m_check_patches.fpp           48      38    79%   49,70,78,80,82,85-86,89,104,133
+src/pre_process/m_checker.fpp                  9       8    88%   44
+src/pre_process/m_data_output.fpp              0       0    --%
+src/pre_process/m_global_parameters.fpp        0       0    --%
+src/pre_process/m_grid.f90                     0       0    --%
+src/pre_process/m_icpp_patches.fpp            23      21    91%   232,1724
+src/pre_process/m_initial_condition.fpp        0       0    --%
+src/pre_process/m_mpi_proxy.fpp                0       0    --%
+src/pre_process/m_perturbation.fpp             0       0    --%
+src/pre_process/m_start_up.fpp                 0       0    --%
+src/pre_process/p_main.f90                    14      14   100%
+src/simulation/m_acoustic_src.fpp              7       7   100%
+src/simulation/m_body_forces.fpp               2       2   100%
+src/simulation/m_bubbles.fpp                   0       0    --%
+src/simulation/m_bubbles_EE.fpp                4       4   100%
+src/simulation/m_bubbles_EL.fpp                3       2    66%   1104
+src/simulation/m_bubbles_EL_kernels.fpp        2       1    50%   58
+src/simulation/m_cbc.fpp                       0       0    --%
+src/simulation/m_checker.fpp                   4       2    50%   64,168
+src/simulation/m_compute_cbc.fpp               4       3    75%   101
+src/simulation/m_data_output.fpp               0       0    --%
+src/simulation/m_derived_variables.fpp         0       0    --%
+src/simulation/m_fftw.fpp                      2       2   100%
+src/simulation/m_global_parameters.fpp         0       0    --%
+src/simulation/m_hyperelastic.fpp              2       0     0%   51,53
+src/simulation/m_hypoelastic.fpp               3       3   100%
+src/simulation/m_ibm.fpp                       7       7   100%
+src/simulation/m_igr.fpp                       0       0    --%
+src/simulation/m_mhd.fpp                       2       2   100%
+src/simulation/m_mpi_proxy.fpp                 0       0    --%
+src/simulation/m_muscl.fpp                     0       0    --%
+src/simulation/m_pressure_relaxation.fpp       2       2   100%
+src/simulation/m_qbmm.fpp                     61      59    96%   977,984
+src/simulation/m_rhs.fpp                      62      61    98%   1117
+src/simulation/m_riemann_solvers.fpp           1       1   100%
+src/simulation/m_sim_helpers.fpp              10      10   100%
+src/simulation/m_start_up.fpp                  0       0    --%
+src/simulation/m_surface_tension.fpp           2       2   100%
+src/simulation/m_time_steppers.fpp             0       0    --%
+src/simulation/m_viscous.fpp                   1       1   100%
+src/simulation/m_weno.fpp                      0       0    --%
+src/simulation/p_main.fpp                     50      49    98%   66
+src/syscheck/syscheck.fpp                     31      28    90%   115-117
+------------------------------------------------------------------------------
+TOTAL                                        602     374    62%
+------------------------------------------------------------------------------
+lines: 62.1% (374 out of 602)
+functions: 86.7% (13 out of 15)
+branches: 37.8% (1946 out of 5146)

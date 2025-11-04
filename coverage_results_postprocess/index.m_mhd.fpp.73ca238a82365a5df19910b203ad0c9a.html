@@ -1,0 +1,1260 @@
+<!DOCTYPE html>
+<html class="theme-green">
+
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+    <title>GCC Code Coverage Report</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <link rel="stylesheet" href="index.css"/>
+  </head>
+
+  <body>
+
+    <header>
+      <h1>GCC Code Coverage Report</h1>
+      <hr/>
+      <div class="summary">
+<div>
+  <table class="legend">
+    <tr>
+      <th scope="row">Directory:</th>
+      <td>src/</td>
+    </tr>
+    <tr>
+      <th scope="row">File:</th>
+      <td>simulation/m_mhd.fpp</td>
+    </tr>
+    <tr>
+      <th scope="row">Date:</th>
+      <td>2025-11-03 09:33:08</td>
+    </tr>
+  </table>
+</div>
+<div>
+  <table class="coverage">
+    <tr>
+      <th></th>
+      <th scope="col">Exec</th>
+      <th scope="col">Total</th>
+      <th scope="col">Coverage</th>
+    </tr>
+    <tr>
+      <th scope="row">Lines:</th>
+      <td>2</td>
+      <td>2</td>
+      <td class="coverage-high">100.0%</td>
+    </tr>
+    <tr>
+      <th scope="row">Functions:</th>
+      <td>0</td>
+      <td>0</td>
+      <td class="coverage-unknown">-%</td>
+    </tr>
+    <tr>
+      <th scope="row">Branches:</th>
+      <td>58</td>
+      <td>116</td>
+      <td class="coverage-low">50.0%</td>
+    </tr>
+  </table>
+</div>
+      </div>
+      <hr/>
+    </header>
+    <nav>
+
+    </nav>
+    <main>
+<div class="file-source">
+  <table>
+    <tr>
+      <th align="right">Line</th>
+      <th align="right">Branch</th>
+      <th align="right">Exec</th>
+      <th align="left" style="width: 100%;">Source</th>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l1" href="#l1">1</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">!&gt;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l2" href="#l2">2</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">!! @file m_mhd.f90</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l3" href="#l3">3</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">!! @brief Contains module m_mhd</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l4" href="#l4">4</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l5" href="#l5">5</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">#:include &#39;macros.fpp&#39;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l6" href="#l6">6</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l7" href="#l7">7</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">!&gt; @brief This module is used to compute source terms for magnetohydrodynamics</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l8" href="#l8">8</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">!!              Note: not applicable for 1D</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l9" href="#l9">9</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l10" href="#l10">10</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">module m_mhd</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l11" href="#l11">11</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l12" href="#l12">12</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    use m_derived_types        !&lt; Definitions of the derived types</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l13" href="#l13">13</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    use m_global_parameters    !&lt; Definitions of the global parameters</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l14" href="#l14">14</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    use m_finite_differences</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l15" href="#l15">15</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    use m_helper</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l16" href="#l16">16</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    use m_mpi_common</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l17" href="#l17">17</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l18" href="#l18">18</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    implicit none</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l19" href="#l19">19</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l20" href="#l20">20</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    private; public :: s_initialize_mhd_powell_module, &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l21" href="#l21">21</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "> s_finalize_mhd_powell_module, &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l22" href="#l22">22</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "> s_compute_mhd_powell_rhs</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l23" href="#l23">23</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l24" href="#l24">24</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    real(wp), allocatable, dimension(:, :, :) :: du_dx_mhd, du_dy_mhd, du_dz_mhd</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l25" href="#l25">25</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    real(wp), allocatable, dimension(:, :, :) :: dv_dx_mhd, dv_dy_mhd, dv_dz_mhd</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l26" href="#l26">26</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    real(wp), allocatable, dimension(:, :, :) :: dw_dx_mhd, dw_dy_mhd, dw_dz_mhd</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l27" href="#l27">27</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    $:GPU_DECLARE(create=&#39;[du_dx_mhd,du_dy_mhd,du_dz_mhd,dv_dx_mhd,dv_dy_mhd,dv_dz_mhd,dw_dx_mhd,dw_dy_mhd,dw_dz_mhd]&#39;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l28" href="#l28">28</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l29" href="#l29">29</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    real(wp), allocatable, dimension(:, :) :: fd_coeff_x_h</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l30" href="#l30">30</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    real(wp), allocatable, dimension(:, :) :: fd_coeff_y_h</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l31" href="#l31">31</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    real(wp), allocatable, dimension(:, :) :: fd_coeff_z_h</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l32" href="#l32">32</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    $:GPU_DECLARE(create=&#39;[fd_coeff_x_h,fd_coeff_y_h,fd_coeff_z_h]&#39;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l33" href="#l33">33</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l34" href="#l34">34</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">contains</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l35" href="#l35">35</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l36" href="#l36">36</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    impure subroutine s_initialize_mhd_powell_module</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l37" href="#l37">37</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l38" href="#l38">38</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        ! Additional safety check beyond m_checker</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l39" href="#l39">39</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        if (n == 0) call s_mpi_abort(&#39;Fatal Error: Powell correction is not applicable for 1D&#39;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l40" href="#l40">40</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l41" href="#l41">41</a></td>
+      <td class="linebranch">
+        <details class="linebranchDetails">
+          <summary class="linebranchSummary">29/58</summary>
+          <div class="linebranchContents">
+            <div class="takenBranch">&check; Branch 0 (11&rightarrow;12) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 1 (11&rightarrow;14) not taken.</div>
+            <div class="takenBranch">&check; Branch 2 (12&rightarrow;13) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 3 (12&rightarrow;14) not taken.</div>
+            <div class="takenBranch">&check; Branch 4 (14&rightarrow;15) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 5 (14&rightarrow;17) not taken.</div>
+            <div class="takenBranch">&check; Branch 6 (15&rightarrow;16) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 7 (15&rightarrow;17) not taken.</div>
+            <div class="takenBranch">&check; Branch 8 (17&rightarrow;18) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 9 (17&rightarrow;20) not taken.</div>
+            <div class="takenBranch">&check; Branch 10 (18&rightarrow;19) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 11 (18&rightarrow;20) not taken.</div>
+            <div class="takenBranch">&check; Branch 12 (20&rightarrow;21) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 13 (20&rightarrow;22) not taken.</div>
+            <div class="takenBranch">&check; Branch 14 (22&rightarrow;23) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 15 (22&rightarrow;24) not taken.</div>
+            <div class="notTakenBranch">&cross; Branch 16 (24&rightarrow;25) not taken.</div>
+            <div class="takenBranch">&check; Branch 17 (24&rightarrow;26) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 18 (26&rightarrow;27) not taken.</div>
+            <div class="takenBranch">&check; Branch 19 (26&rightarrow;28) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 20 (28&rightarrow;29) not taken.</div>
+            <div class="takenBranch">&check; Branch 21 (28&rightarrow;30) taken 4 times.</div>
+            <div class="takenBranch">&check; Branch 22 (30&rightarrow;31) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 23 (30&rightarrow;33) not taken.</div>
+            <div class="takenBranch">&check; Branch 24 (31&rightarrow;32) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 25 (31&rightarrow;33) not taken.</div>
+            <div class="takenBranch">&check; Branch 26 (33&rightarrow;34) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 27 (33&rightarrow;36) not taken.</div>
+            <div class="takenBranch">&check; Branch 28 (34&rightarrow;35) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 29 (34&rightarrow;36) not taken.</div>
+            <div class="takenBranch">&check; Branch 30 (36&rightarrow;37) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 31 (36&rightarrow;39) not taken.</div>
+            <div class="takenBranch">&check; Branch 32 (37&rightarrow;38) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 33 (37&rightarrow;39) not taken.</div>
+            <div class="notTakenBranch">&cross; Branch 34 (39&rightarrow;40) not taken.</div>
+            <div class="takenBranch">&check; Branch 35 (39&rightarrow;41) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 36 (41&rightarrow;42) not taken.</div>
+            <div class="takenBranch">&check; Branch 37 (41&rightarrow;43) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 38 (43&rightarrow;44) not taken.</div>
+            <div class="takenBranch">&check; Branch 39 (43&rightarrow;45) taken 4 times.</div>
+            <div class="takenBranch">&check; Branch 40 (45&rightarrow;46) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 41 (45&rightarrow;48) not taken.</div>
+            <div class="takenBranch">&check; Branch 42 (46&rightarrow;47) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 43 (46&rightarrow;48) not taken.</div>
+            <div class="takenBranch">&check; Branch 44 (48&rightarrow;49) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 45 (48&rightarrow;51) not taken.</div>
+            <div class="takenBranch">&check; Branch 46 (49&rightarrow;50) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 47 (49&rightarrow;51) not taken.</div>
+            <div class="takenBranch">&check; Branch 48 (51&rightarrow;52) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 49 (51&rightarrow;54) not taken.</div>
+            <div class="takenBranch">&check; Branch 50 (52&rightarrow;53) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 51 (52&rightarrow;54) not taken.</div>
+            <div class="notTakenBranch">&cross; Branch 52 (54&rightarrow;55) not taken.</div>
+            <div class="takenBranch">&check; Branch 53 (54&rightarrow;56) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 54 (56&rightarrow;57) not taken.</div>
+            <div class="takenBranch">&check; Branch 55 (56&rightarrow;58) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 56 (58&rightarrow;59) not taken.</div>
+            <div class="takenBranch">&check; Branch 57 (58&rightarrow;60) taken 4 times.</div>
+          </div>
+        </details>
+      </td>
+      <td class="linecount partialCoveredLine">44</td>
+      <td class="src partialCoveredLine">        @:ALLOCATE(du_dx_mhd(0:m,0:n,0:p), dv_dx_mhd(0:m,0:n,0:p), dw_dx_mhd(0:m,0:n,0:p))</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l42" href="#l42">42</a></td>
+      <td class="linebranch">
+        <details class="linebranchDetails">
+          <summary class="linebranchSummary">29/58</summary>
+          <div class="linebranchContents">
+            <div class="takenBranch">&check; Branch 0 (65&rightarrow;66) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 1 (65&rightarrow;68) not taken.</div>
+            <div class="takenBranch">&check; Branch 2 (66&rightarrow;67) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 3 (66&rightarrow;68) not taken.</div>
+            <div class="takenBranch">&check; Branch 4 (68&rightarrow;69) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 5 (68&rightarrow;71) not taken.</div>
+            <div class="takenBranch">&check; Branch 6 (69&rightarrow;70) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 7 (69&rightarrow;71) not taken.</div>
+            <div class="takenBranch">&check; Branch 8 (71&rightarrow;72) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 9 (71&rightarrow;74) not taken.</div>
+            <div class="takenBranch">&check; Branch 10 (72&rightarrow;73) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 11 (72&rightarrow;74) not taken.</div>
+            <div class="takenBranch">&check; Branch 12 (74&rightarrow;75) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 13 (74&rightarrow;76) not taken.</div>
+            <div class="takenBranch">&check; Branch 14 (76&rightarrow;77) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 15 (76&rightarrow;78) not taken.</div>
+            <div class="notTakenBranch">&cross; Branch 16 (78&rightarrow;79) not taken.</div>
+            <div class="takenBranch">&check; Branch 17 (78&rightarrow;80) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 18 (80&rightarrow;81) not taken.</div>
+            <div class="takenBranch">&check; Branch 19 (80&rightarrow;82) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 20 (82&rightarrow;83) not taken.</div>
+            <div class="takenBranch">&check; Branch 21 (82&rightarrow;84) taken 4 times.</div>
+            <div class="takenBranch">&check; Branch 22 (84&rightarrow;85) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 23 (84&rightarrow;87) not taken.</div>
+            <div class="takenBranch">&check; Branch 24 (85&rightarrow;86) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 25 (85&rightarrow;87) not taken.</div>
+            <div class="takenBranch">&check; Branch 26 (87&rightarrow;88) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 27 (87&rightarrow;90) not taken.</div>
+            <div class="takenBranch">&check; Branch 28 (88&rightarrow;89) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 29 (88&rightarrow;90) not taken.</div>
+            <div class="takenBranch">&check; Branch 30 (90&rightarrow;91) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 31 (90&rightarrow;93) not taken.</div>
+            <div class="takenBranch">&check; Branch 32 (91&rightarrow;92) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 33 (91&rightarrow;93) not taken.</div>
+            <div class="notTakenBranch">&cross; Branch 34 (93&rightarrow;94) not taken.</div>
+            <div class="takenBranch">&check; Branch 35 (93&rightarrow;95) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 36 (95&rightarrow;96) not taken.</div>
+            <div class="takenBranch">&check; Branch 37 (95&rightarrow;97) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 38 (97&rightarrow;98) not taken.</div>
+            <div class="takenBranch">&check; Branch 39 (97&rightarrow;99) taken 4 times.</div>
+            <div class="takenBranch">&check; Branch 40 (99&rightarrow;100) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 41 (99&rightarrow;102) not taken.</div>
+            <div class="takenBranch">&check; Branch 42 (100&rightarrow;101) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 43 (100&rightarrow;102) not taken.</div>
+            <div class="takenBranch">&check; Branch 44 (102&rightarrow;103) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 45 (102&rightarrow;105) not taken.</div>
+            <div class="takenBranch">&check; Branch 46 (103&rightarrow;104) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 47 (103&rightarrow;105) not taken.</div>
+            <div class="takenBranch">&check; Branch 48 (105&rightarrow;106) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 49 (105&rightarrow;108) not taken.</div>
+            <div class="takenBranch">&check; Branch 50 (106&rightarrow;107) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 51 (106&rightarrow;108) not taken.</div>
+            <div class="notTakenBranch">&cross; Branch 52 (108&rightarrow;109) not taken.</div>
+            <div class="takenBranch">&check; Branch 53 (108&rightarrow;110) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 54 (110&rightarrow;111) not taken.</div>
+            <div class="takenBranch">&check; Branch 55 (110&rightarrow;112) taken 4 times.</div>
+            <div class="notTakenBranch">&cross; Branch 56 (112&rightarrow;113) not taken.</div>
+            <div class="takenBranch">&check; Branch 57 (112&rightarrow;114) taken 4 times.</div>
+          </div>
+        </details>
+      </td>
+      <td class="linecount partialCoveredLine">44</td>
+      <td class="src partialCoveredLine">        @:ALLOCATE(du_dy_mhd(0:m,0:n,0:p), dv_dy_mhd(0:m,0:n,0:p), dw_dy_mhd(0:m,0:n,0:p))</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l43" href="#l43">43</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        if (p &gt; 0) then</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l44" href="#l44">44</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:ALLOCATE(dw_dx_mhd(0:m,0:n,0:p), dw_dy_mhd(0:m,0:n,0:p), dw_dz_mhd(0:m,0:n,0:p))</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l45" href="#l45">45</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        end if</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l46" href="#l46">46</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l47" href="#l47">47</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:ALLOCATE(fd_coeff_x_h(-fd_number:fd_number, 0:m))</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l48" href="#l48">48</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:ALLOCATE(fd_coeff_y_h(-fd_number:fd_number, 0:n))</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l49" href="#l49">49</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        if (p &gt; 0) then</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l50" href="#l50">50</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:ALLOCATE(fd_coeff_z_h(-fd_number:fd_number, 0:p))</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l51" href="#l51">51</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        end if</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l52" href="#l52">52</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l53" href="#l53">53</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        ! Computing centered finite difference coefficients</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l54" href="#l54">54</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x_h, buff_size, fd_number, fd_order)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l55" href="#l55">55</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        $:GPU_UPDATE(device=&#39;[fd_coeff_x_h]&#39;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l56" href="#l56">56</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        call s_compute_finite_difference_coefficients(n, y_cc, fd_coeff_y_h, buff_size, fd_number, fd_order)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l57" href="#l57">57</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        $:GPU_UPDATE(device=&#39;[fd_coeff_y_h]&#39;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l58" href="#l58">58</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        if (p &gt; 0) then</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l59" href="#l59">59</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">            call s_compute_finite_difference_coefficients(p, z_cc, fd_coeff_z_h, buff_size, fd_number, fd_order)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l60" href="#l60">60</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">            $:GPU_UPDATE(device=&#39;[fd_coeff_z_h]&#39;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l61" href="#l61">61</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        end if</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l62" href="#l62">62</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine"></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l63" href="#l63">63</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    end subroutine s_initialize_mhd_powell_module</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l64" href="#l64">64</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine"></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l65" href="#l65">65</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    !&gt;  Compute the Powell source term to correct the magnetic field divergence.</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l66" href="#l66">66</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        !!      The Powell source term is:</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l67" href="#l67">67</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        !!      S = - (divB) [ 0, Bx, By, Bz, vdotB, vx, vy, vz ]^T</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l68" href="#l68">68</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        !!  @param q_prim_vf  Primitive variables</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l69" href="#l69">69</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        !!  @param rhs_vf     rhs variables</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l70" href="#l70">70</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    subroutine s_compute_mhd_powell_rhs(q_prim_vf, rhs_vf)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l71" href="#l71">71</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine"></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l72" href="#l72">72</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l73" href="#l73">73</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l74" href="#l74">74</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l75" href="#l75">75</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        integer :: k, l, q, r</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l76" href="#l76">76</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        real(wp), dimension(3) :: v, B</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l77" href="#l77">77</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        real(wp) :: divB, vdotB</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l78" href="#l78">78</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine"></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l79" href="#l79">79</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        #:call GPU_PARALLEL_LOOP(collapse=3, private=&#39;[v, B]&#39;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l80" href="#l80">80</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">            do q = 0, p</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l81" href="#l81">81</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                do l = 0, n</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l82" href="#l82">82</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                    do k = 0, m</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l83" href="#l83">83</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine"></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l84" href="#l84">84</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">                        divB = 0._wp</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l85" href="#l85">85</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">                        $:GPU_LOOP(parallelism=&#39;[seq]&#39;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l86" href="#l86">86</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                        do r = -fd_number, fd_number</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l87" href="#l87">87</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                            divB = divB + q_prim_vf(B_idx%beg)%sf(k + r, l, q)*fd_coeff_x_h(r, k)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l88" href="#l88">88</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                        end do</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l89" href="#l89">89</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                        $:GPU_LOOP(parallelism=&#39;[seq]&#39;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l90" href="#l90">90</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                        do r = -fd_number, fd_number</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l91" href="#l91">91</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                            divB = divB + q_prim_vf(B_idx%beg + 1)%sf(k, l + r, q)*fd_coeff_y_h(r, l)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l92" href="#l92">92</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                        end do</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l93" href="#l93">93</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                        if (p &gt; 0) then</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l94" href="#l94">94</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                            $:GPU_LOOP(parallelism=&#39;[seq]&#39;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l95" href="#l95">95</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                            do r = -fd_number, fd_number</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l96" href="#l96">96</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                                divB = divB + q_prim_vf(B_idx%beg + 2)%sf(k, l, q + r)*fd_coeff_z_h(r, q)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l97" href="#l97">97</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                            end do</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l98" href="#l98">98</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                        end if</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l99" href="#l99">99</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l100" href="#l100">100</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                        v(1) = q_prim_vf(momxb)%sf(k, l, q)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l101" href="#l101">101</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                        v(2) = q_prim_vf(momxb + 1)%sf(k, l, q)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l102" href="#l102">102</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                        v(3) = q_prim_vf(momxb + 2)%sf(k, l, q)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l103" href="#l103">103</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l104" href="#l104">104</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                        B(1) = q_prim_vf(B_idx%beg)%sf(k, l, q)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l105" href="#l105">105</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                        B(2) = q_prim_vf(B_idx%beg + 1)%sf(k, l, q)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l106" href="#l106">106</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                        B(3) = q_prim_vf(B_idx%beg + 2)%sf(k, l, q)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l107" href="#l107">107</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l108" href="#l108">108</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                        vdotB = sum(v*B)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l109" href="#l109">109</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l110" href="#l110">110</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                        ! 1: rho -&gt; unchanged</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l111" href="#l111">111</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                        ! 2: vx  -&gt; - (divB) * Bx</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l112" href="#l112">112</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                        ! 3: vy  -&gt; - (divB) * By</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l113" href="#l113">113</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                        ! 4: vz  -&gt; - (divB) * Bz</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l114" href="#l114">114</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                        ! 5: E   -&gt; - (divB) * (vdotB)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l115" href="#l115">115</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                        ! 6: Bx  -&gt; - (divB) * vx</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l116" href="#l116">116</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                        ! 7: By  -&gt; - (divB) * vy</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l117" href="#l117">117</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                        ! 8: Bz  -&gt; - (divB) * vz</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l118" href="#l118">118</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l119" href="#l119">119</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                        rhs_vf(momxb)%sf(k, l, q) = rhs_vf(momxb)%sf(k, l, q) - divB*B(1)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l120" href="#l120">120</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                        rhs_vf(momxb + 1)%sf(k, l, q) = rhs_vf(momxb + 1)%sf(k, l, q) - divB*B(2)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l121" href="#l121">121</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                        rhs_vf(momxb + 2)%sf(k, l, q) = rhs_vf(momxb + 2)%sf(k, l, q) - divB*B(3)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l122" href="#l122">122</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l123" href="#l123">123</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                        rhs_vf(E_idx)%sf(k, l, q) = rhs_vf(E_idx)%sf(k, l, q) - divB*vdotB</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l124" href="#l124">124</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l125" href="#l125">125</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                        rhs_vf(B_idx%beg)%sf(k, l, q) = rhs_vf(B_idx%beg)%sf(k, l, q) - divB*v(1)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l126" href="#l126">126</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                        rhs_vf(B_idx%beg + 1)%sf(k, l, q) = rhs_vf(B_idx%beg + 1)%sf(k, l, q) - divB*v(2)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l127" href="#l127">127</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                        rhs_vf(B_idx%beg + 2)%sf(k, l, q) = rhs_vf(B_idx%beg + 2)%sf(k, l, q) - divB*v(3)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l128" href="#l128">128</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l129" href="#l129">129</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                    end do</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l130" href="#l130">130</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                end do</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l131" href="#l131">131</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">            end do</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l132" href="#l132">132</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        #:endcall GPU_PARALLEL_LOOP</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l133" href="#l133">133</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l134" href="#l134">134</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">    end subroutine s_compute_mhd_powell_rhs</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l135" href="#l135">135</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l136" href="#l136">136</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">    impure subroutine s_finalize_mhd_powell_module</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l137" href="#l137">137</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l138" href="#l138">138</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:DEALLOCATE(du_dx_mhd, dv_dx_mhd, dw_dx_mhd)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l139" href="#l139">139</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:DEALLOCATE(fd_coeff_x_h)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l140" href="#l140">140</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:DEALLOCATE(du_dy_mhd, dv_dy_mhd, dw_dy_mhd)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l141" href="#l141">141</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        @:DEALLOCATE(fd_coeff_y_h)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l142" href="#l142">142</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">        if (p &gt; 0) then</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l143" href="#l143">143</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:DEALLOCATE(dw_dx_mhd, dw_dy_mhd, dw_dz_mhd)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l144" href="#l144">144</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">            @:DEALLOCATE(fd_coeff_z_h)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l145" href="#l145">145</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        end if</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l146" href="#l146">146</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l147" href="#l147">147</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount excludedLine">&minus;</td>
+      <td class="src excludedLine">    end subroutine s_finalize_mhd_powell_module</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l148" href="#l148">148</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l149" href="#l149">149</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">end module m_mhd</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l150" href="#l150">150</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+  </table>
+</div>
+      <hr/>
+    </main>
+    <footer>
+      Generated by: <a href="http://gcovr.com/en/8.3">GCOVR (Version 8.3)</a>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,18 @@
+========================================
+MFC Coverage Comparison - Started Mon Nov  3 00:34:55 EST 2025
+========================================
+Jobs: 10
+Gcov: /opt/homebrew/bin/gcov-15
+
+PHASE 1: Baseline Coverage - Mon Nov  3 00:34:55 EST 2025
+  Cleaning...
+  Building with coverage - Mon Nov  3 00:34:56 EST 2025
+  Build complete: 185s
+  Baseline tests: 528
+  Running tests - Mon Nov  3 00:38:05 EST 2025
+Some tests failed
+  Tests complete: 581s
+  Generating coverage report - Mon Nov  3 00:47:46 EST 2025
+Phase 1 complete - Mon Nov  3 00:47:49 EST 2025
+
+PHASE 2: Adding safe new tests - Mon Nov  3 00:47:49 EST 2025
