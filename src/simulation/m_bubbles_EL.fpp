@@ -700,6 +700,7 @@ contains
                 myR0 = bub_R0(k)
                 myPos = mtn_pos(k, :, 2)
                 myVel = mtn_vel(k, :, 2)
+                mtn_posPrev(k, :, 1) = myPos
 
                 ! Vapor and heat fluxes
                 call s_vflux(myR, myV, myPb, myMass_v, k, myVapFlux, myMass_n, myBeta_c, myR_m, mygamma_m)
