@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html class="theme-green">
+
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+    <title>GCC Code Coverage Report</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <link rel="stylesheet" href="index.css"/>
+  </head>
+
+  <body>
+
+    <header>
+      <h1>GCC Code Coverage Report</h1>
+      <hr/>
+      <div class="summary">
+<div>
+  <table class="legend">
+    <tr>
+      <th scope="row">Directory:</th>
+      <td>src/</td>
+    </tr>
+    <tr>
+      <th scope="row">File:</th>
+      <td>simulation/p_main.fpp</td>
+    </tr>
+    <tr>
+      <th scope="row">Date:</th>
+      <td>2025-11-03 09:33:08</td>
+    </tr>
+  </table>
+</div>
+<div>
+  <table class="coverage">
+    <tr>
+      <th></th>
+      <th scope="col">Exec</th>
+      <th scope="col">Total</th>
+      <th scope="col">Coverage</th>
+    </tr>
+    <tr>
+      <th scope="row">Lines:</th>
+      <td>49</td>
+      <td>50</td>
+      <td class="coverage-high">98.0%</td>
+    </tr>
+    <tr>
+      <th scope="row">Functions:</th>
+      <td>2</td>
+      <td>2</td>
+      <td class="coverage-high">100.0%</td>
+    </tr>
+    <tr>
+      <th scope="row">Branches:</th>
+      <td>31</td>
+      <td>46</td>
+      <td class="coverage-low">67.4%</td>
+    </tr>
+  </table>
+</div>
+      </div>
+      <hr/>
+    </header>
+    <nav>
+<details>
+  <summary>List of functions</summary>
+  <table class="listOfFunctions">
+    <tr>
+      <th>Function (Line)</th>
+      <th>Call count</th>
+      <th>Line coverage</th>
+      <th>Branch coverage</th>
+      <th>Condition coverage</th>
+      <th>Block coverage</th>
+    </tr>
+    <tr><td><a href="#l15">MAIN__ (line 15)</a></td><td>called 1044 times</td><td>98.0%</td><td>67.4%</td><td>-%</td><td>88.1%</td></tr>
+    <tr><td><a href="#l17">main (line 17)</a></td><td>called 1044 times</td><td>100.0%</td><td>-%</td><td>-%</td><td>100.0%</td></tr>
+  </table>
+</details>
+
+    </nav>
+    <main>
+<div class="file-source">
+  <table>
+    <tr>
+      <th align="right">Line</th>
+      <th align="right">Branch</th>
+      <th align="right">Exec</th>
+      <th align="left" style="width: 100%;">Source</th>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l1" href="#l1">1</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">!&gt;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l2" href="#l2">2</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">!! @file p_main.f90</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l3" href="#l3">3</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">!! @brief Contains program p_main</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l4" href="#l4">4</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l5" href="#l5">5</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">!&gt; @brief  Quasi-conservative, shock- and interface- capturing finite-volume</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l6" href="#l6">6</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">!!              scheme for the multicomponent Navier-Stokes equations. The system</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l7" href="#l7">7</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">!!              is augmented with the relevant advection equations to capture the</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l8" href="#l8">8</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">!!              material interfaces and closed by the stiffened equation of state</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l9" href="#l9">9</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">!!              as well as any required mixture relations. The effects of surface</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l10" href="#l10">10</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">!!              tension are included and modeled through a volume force that acts</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l11" href="#l11">11</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">!!              across the diffuse material interface regions. The implementation</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l12" href="#l12">12</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">!!              specifics of surface tension may be found in the work by Perigaud</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l13" href="#l13">13</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">!!              and Saurel (2005). Note that both viscous and capillarity effects</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l14" href="#l14">14</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">!!              are only available in the volume fraction model.</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l15" href="#l15">15</a></td>
+      <td class="linebranch">
+        <details class="linebranchDetails">
+          <summary class="linebranchSummary">1/2</summary>
+          <div class="linebranchContents">
+            <div class="notTakenBranch">&cross; Branch 0 (2&rightarrow;3) not taken.</div>
+            <div class="takenBranch">&check; Branch 1 (2&rightarrow;4) taken 1044 times.</div>
+          </div>
+        </details>
+      </td>
+      <td class="linecount partialCoveredLine">1044</td>
+      <td class="src partialCoveredLine">program p_main</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l16" href="#l16">16</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l17" href="#l17">17</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount coveredLine">1044</td>
+      <td class="src coveredLine">    use m_global_parameters    !&lt; Definitions of the global parameters</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l18" href="#l18">18</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l19" href="#l19">19</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    use m_start_up</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l20" href="#l20">20</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l21" href="#l21">21</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    use m_time_steppers</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l22" href="#l22">22</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l23" href="#l23">23</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    use m_nvtx</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l24" href="#l24">24</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l25" href="#l25">25</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    implicit none</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l26" href="#l26">26</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l27" href="#l27">27</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    integer :: t_step !&lt; Iterator for the time-stepping loop</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l28" href="#l28">28</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount coveredLine">1044</td>
+      <td class="src coveredLine">    real(wp) :: time_avg, time_final</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l29" href="#l29">29</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount coveredLine">1044</td>
+      <td class="src coveredLine">    real(wp) :: io_time_avg, io_time_final</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l30" href="#l30">30</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    real(wp), allocatable, dimension(:) :: proc_time</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l31" href="#l31">31</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    real(wp), allocatable, dimension(:) :: io_proc_time</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l32" href="#l32">32</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    logical :: file_exists</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l33" href="#l33">33</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount coveredLine">1044</td>
+      <td class="src coveredLine">    real(wp) :: start, finish</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l34" href="#l34">34</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount coveredLine">1044</td>
+      <td class="src coveredLine">    integer :: nt</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l35" href="#l35">35</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l36" href="#l36">36</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount coveredLine">1044</td>
+      <td class="src coveredLine">    call system_clock(COUNT=cpu_start, COUNT_RATE=cpu_rate)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l37" href="#l37">37</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l38" href="#l38">38</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount coveredLine">1044</td>
+      <td class="src coveredLine">    call nvtxStartRange(&#34;INIT&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l39" href="#l39">39</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l40" href="#l40">40</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    !Initialize MPI</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l41" href="#l41">41</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount coveredLine">1044</td>
+      <td class="src coveredLine">    call nvtxStartRange(&#34;INIT-MPI&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l42" href="#l42">42</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount coveredLine">1044</td>
+      <td class="src coveredLine">    call s_initialize_mpi_domain()</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l43" href="#l43">43</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount coveredLine">1044</td>
+      <td class="src coveredLine">    call nvtxEndRange</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l44" href="#l44">44</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l45" href="#l45">45</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    !Initialize Modules</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l46" href="#l46">46</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount coveredLine">1044</td>
+      <td class="src coveredLine">    call nvtxStartRange(&#34;INIT-MODULES&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l47" href="#l47">47</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount coveredLine">1044</td>
+      <td class="src coveredLine">    call s_initialize_modules()</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l48" href="#l48">48</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount coveredLine">1044</td>
+      <td class="src coveredLine">    call nvtxEndRange</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l49" href="#l49">49</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l50" href="#l50">50</a></td>
+      <td class="linebranch">
+        <details class="linebranchDetails">
+          <summary class="linebranchSummary">6/12</summary>
+          <div class="linebranchContents">
+            <div class="takenBranch">&check; Branch 0 (13&rightarrow;14) taken 1044 times.</div>
+            <div class="notTakenBranch">&cross; Branch 1 (13&rightarrow;16) not taken.</div>
+            <div class="takenBranch">&check; Branch 2 (14&rightarrow;15) taken 1044 times.</div>
+            <div class="notTakenBranch">&cross; Branch 3 (14&rightarrow;16) not taken.</div>
+            <div class="takenBranch">&check; Branch 4 (16&rightarrow;17) taken 1044 times.</div>
+            <div class="notTakenBranch">&cross; Branch 5 (16&rightarrow;18) not taken.</div>
+            <div class="takenBranch">&check; Branch 6 (18&rightarrow;19) taken 1044 times.</div>
+            <div class="notTakenBranch">&cross; Branch 7 (18&rightarrow;20) not taken.</div>
+            <div class="notTakenBranch">&cross; Branch 8 (20&rightarrow;21) not taken.</div>
+            <div class="takenBranch">&check; Branch 9 (20&rightarrow;22) taken 1044 times.</div>
+            <div class="notTakenBranch">&cross; Branch 10 (22&rightarrow;23) not taken.</div>
+            <div class="takenBranch">&check; Branch 11 (22&rightarrow;24) taken 1044 times.</div>
+          </div>
+        </details>
+      </td>
+      <td class="linecount partialCoveredLine">3132</td>
+      <td class="src partialCoveredLine">    allocate (proc_time(0:num_procs - 1))</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l51" href="#l51">51</a></td>
+      <td class="linebranch">
+        <details class="linebranchDetails">
+          <summary class="linebranchSummary">4/8</summary>
+          <div class="linebranchContents">
+            <div class="takenBranch">&check; Branch 0 (24&rightarrow;25) taken 1044 times.</div>
+            <div class="notTakenBranch">&cross; Branch 1 (24&rightarrow;27) not taken.</div>
+            <div class="takenBranch">&check; Branch 2 (25&rightarrow;26) taken 1044 times.</div>
+            <div class="notTakenBranch">&cross; Branch 3 (25&rightarrow;27) not taken.</div>
+            <div class="notTakenBranch">&cross; Branch 4 (27&rightarrow;28) not taken.</div>
+            <div class="takenBranch">&check; Branch 5 (27&rightarrow;29) taken 1044 times.</div>
+            <div class="notTakenBranch">&cross; Branch 6 (29&rightarrow;30) not taken.</div>
+            <div class="takenBranch">&check; Branch 7 (29&rightarrow;31) taken 1044 times.</div>
+          </div>
+        </details>
+      </td>
+      <td class="linecount partialCoveredLine">2088</td>
+      <td class="src partialCoveredLine">    allocate (io_proc_time(0:num_procs - 1))</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l52" href="#l52">52</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l53" href="#l53">53</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount coveredLine">1044</td>
+      <td class="src coveredLine">    call nvtxStartRange(&#34;INIT-GPU-VARS&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l54" href="#l54">54</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount coveredLine">1044</td>
+      <td class="src coveredLine">    call s_initialize_gpu_vars()</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l55" href="#l55">55</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount coveredLine">1044</td>
+      <td class="src coveredLine">    call nvtxEndRange</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l56" href="#l56">56</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l57" href="#l57">57</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    ! Setting the time-step iterator to the first time-step</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l58" href="#l58">58</a></td>
+      <td class="linebranch">
+        <details class="linebranchDetails">
+          <summary class="linebranchSummary">2/2</summary>
+          <div class="linebranchContents">
+            <div class="takenBranch">&check; Branch 0 (34&rightarrow;35) taken 24 times.</div>
+            <div class="takenBranch">&check; Branch 1 (34&rightarrow;36) taken 1020 times.</div>
+          </div>
+        </details>
+      </td>
+      <td class="linecount coveredLine">1044</td>
+      <td class="src coveredLine">    if (cfl_dt) then</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l59" href="#l59">59</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount coveredLine">24</td>
+      <td class="src coveredLine">        t_step = 0</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l60" href="#l60">60</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount coveredLine">24</td>
+      <td class="src coveredLine">        mytime = t_save*n_start</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l61" href="#l61">61</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    else</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l62" href="#l62">62</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount coveredLine">1020</td>
+      <td class="src coveredLine">        t_step = t_step_start</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l63" href="#l63">63</a></td>
+      <td class="linebranch">
+        <details class="linebranchDetails">
+          <summary class="linebranchSummary">1/2</summary>
+          <div class="linebranchContents">
+            <div class="takenBranch">&check; Branch 0 (36&rightarrow;37) taken 1020 times.</div>
+            <div class="notTakenBranch">&cross; Branch 1 (36&rightarrow;38) not taken.</div>
+          </div>
+        </details>
+      </td>
+      <td class="linecount partialCoveredLine">1020</td>
+      <td class="src partialCoveredLine">        if (t_step == 0) then</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l64" href="#l64">64</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount coveredLine">1020</td>
+      <td class="src coveredLine">            mytime = 0._wp</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l65" href="#l65">65</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        else</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l66" href="#l66">66</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount uncoveredLine">&cross;</td>
+      <td class="src uncoveredLine">            mytime = t_step*dt</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l67" href="#l67">67</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        end if</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l68" href="#l68">68</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount coveredLine">1020</td>
+      <td class="src coveredLine">        finaltime = t_step_stop*dt</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l69" href="#l69">69</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    end if</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l70" href="#l70">70</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l71" href="#l71">71</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount coveredLine">1044</td>
+      <td class="src coveredLine">    call nvtxEndRange ! INIT</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l72" href="#l72">72</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l73" href="#l73">73</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount coveredLine">1044</td>
+      <td class="src coveredLine">    call nvtxStartRange(&#34;SIMULATION-TIME-MARCH&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l74" href="#l74">74</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    ! Time-stepping Loop</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l75" href="#l75">75</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount coveredLine">57376</td>
+      <td class="src coveredLine">    do</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l76" href="#l76">76</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l77" href="#l77">77</a></td>
+      <td class="linebranch">
+        <details class="linebranchDetails">
+          <summary class="linebranchSummary">2/2</summary>
+          <div class="linebranchContents">
+            <div class="takenBranch">&check; Branch 0 (42&rightarrow;43) taken 1478 times.</div>
+            <div class="takenBranch">&check; Branch 1 (42&rightarrow;45) taken 56942 times.</div>
+          </div>
+        </details>
+      </td>
+      <td class="linecount coveredLine">58420</td>
+      <td class="src coveredLine">        if (cfl_dt) then</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l78" href="#l78">78</a></td>
+      <td class="linebranch">
+        <details class="linebranchDetails">
+          <summary class="linebranchSummary">2/2</summary>
+          <div class="linebranchContents">
+            <div class="takenBranch">&check; Branch 0 (43&rightarrow;44) taken 24 times.</div>
+            <div class="takenBranch">&check; Branch 1 (43&rightarrow;48) taken 1454 times.</div>
+          </div>
+        </details>
+      </td>
+      <td class="linecount coveredLine">1478</td>
+      <td class="src coveredLine">            if (mytime &gt;= t_stop) then</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l79" href="#l79">79</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                call s_save_performance_metrics(time_avg, time_final, io_time_avg, &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l80" href="#l80">80</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount coveredLine">24</td>
+      <td class="src coveredLine">                                                io_time_final, proc_time, io_proc_time, file_exists)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l81" href="#l81">81</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount coveredLine">24</td>
+      <td class="src coveredLine">                exit</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l82" href="#l82">82</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">            end if</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l83" href="#l83">83</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        else</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l84" href="#l84">84</a></td>
+      <td class="linebranch">
+        <details class="linebranchDetails">
+          <summary class="linebranchSummary">2/2</summary>
+          <div class="linebranchContents">
+            <div class="takenBranch">&check; Branch 0 (45&rightarrow;46) taken 1020 times.</div>
+            <div class="takenBranch">&check; Branch 1 (45&rightarrow;48) taken 55922 times.</div>
+          </div>
+        </details>
+      </td>
+      <td class="linecount coveredLine">56942</td>
+      <td class="src coveredLine">            if (t_step == t_step_stop) then</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l85" href="#l85">85</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">                call s_save_performance_metrics(time_avg, time_final, io_time_avg, &amp;</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l86" href="#l86">86</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount coveredLine">1020</td>
+      <td class="src coveredLine">                                                io_time_final, proc_time, io_proc_time, file_exists)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l87" href="#l87">87</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount coveredLine">1020</td>
+      <td class="src coveredLine">                exit</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l88" href="#l88">88</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">            end if</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l89" href="#l89">89</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        end if</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l90" href="#l90">90</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l91" href="#l91">91</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount coveredLine">57376</td>
+      <td class="src coveredLine">        call s_perform_time_step(t_step, time_avg)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l92" href="#l92">92</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l93" href="#l93">93</a></td>
+      <td class="linebranch">
+        <details class="linebranchDetails">
+          <summary class="linebranchSummary">2/2</summary>
+          <div class="linebranchContents">
+            <div class="takenBranch">&check; Branch 0 (49&rightarrow;50) taken 1454 times.</div>
+            <div class="takenBranch">&check; Branch 1 (49&rightarrow;53) taken 55922 times.</div>
+          </div>
+        </details>
+      </td>
+      <td class="linecount coveredLine">57376</td>
+      <td class="src coveredLine">        if (cfl_dt) then</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l94" href="#l94">94</a></td>
+      <td class="linebranch">
+        <details class="linebranchDetails">
+          <summary class="linebranchSummary">4/4</summary>
+          <div class="linebranchContents">
+            <div class="takenBranch">&check; Branch 0 (50&rightarrow;51) taken 1220 times.</div>
+            <div class="takenBranch">&check; Branch 1 (50&rightarrow;52) taken 234 times.</div>
+            <div class="takenBranch">&check; Branch 2 (51&rightarrow;52) taken 4 times.</div>
+            <div class="takenBranch">&check; Branch 3 (51&rightarrow;56) taken 1216 times.</div>
+          </div>
+        </details>
+      </td>
+      <td class="linecount coveredLine">1454</td>
+      <td class="src coveredLine">            if (abs(mod(mytime, t_save)) &lt; dt .or. mytime &gt;= t_stop) then</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l95" href="#l95">95</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount coveredLine">238</td>
+      <td class="src coveredLine">                call s_save_data(t_step, start, finish, io_time_avg, nt)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l96" href="#l96">96</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">            end if</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l97" href="#l97">97</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        else</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l98" href="#l98">98</a></td>
+      <td class="linebranch">
+        <details class="linebranchDetails">
+          <summary class="linebranchSummary">3/4</summary>
+          <div class="linebranchContents">
+            <div class="takenBranch">&check; Branch 0 (53&rightarrow;54) taken 54884 times.</div>
+            <div class="takenBranch">&check; Branch 1 (53&rightarrow;55) taken 1038 times.</div>
+            <div class="notTakenBranch">&cross; Branch 2 (54&rightarrow;55) not taken.</div>
+            <div class="takenBranch">&check; Branch 3 (54&rightarrow;56) taken 54884 times.</div>
+          </div>
+        </details>
+      </td>
+      <td class="linecount partialCoveredLine">55922</td>
+      <td class="src partialCoveredLine">            if (mod(t_step - t_step_start, t_step_save) == 0 .or. t_step == t_step_stop) then</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l99" href="#l99">99</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount coveredLine">1038</td>
+      <td class="src coveredLine">                call s_save_data(t_step, start, finish, io_time_avg, nt)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l100" href="#l100">100</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">            end if</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l101" href="#l101">101</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">        end if</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l102" href="#l102">102</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l103" href="#l103">103</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount coveredLine">57376</td>
+      <td class="src coveredLine">        call system_clock(cpu_end)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l104" href="#l104">104</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src ">    end do</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l105" href="#l105">105</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l106" href="#l106">106</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount coveredLine">1044</td>
+      <td class="src coveredLine">    call nvtxEndRange ! Simulation</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l107" href="#l107">107</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l108" href="#l108">108</a></td>
+      <td class="linebranch">
+        <details class="linebranchDetails">
+          <summary class="linebranchSummary">2/4</summary>
+          <div class="linebranchContents">
+            <div class="notTakenBranch">&cross; Branch 0 (60&rightarrow;61) not taken.</div>
+            <div class="takenBranch">&check; Branch 1 (60&rightarrow;62) taken 1044 times.</div>
+            <div class="notTakenBranch">&cross; Branch 2 (62&rightarrow;63) not taken.</div>
+            <div class="takenBranch">&check; Branch 3 (62&rightarrow;64) taken 1044 times.</div>
+          </div>
+        </details>
+      </td>
+      <td class="linecount partialCoveredLine">1044</td>
+      <td class="src partialCoveredLine">    deallocate (proc_time, io_proc_time)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l109" href="#l109">109</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l110" href="#l110">110</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount coveredLine">1044</td>
+      <td class="src coveredLine">    call nvtxStartRange(&#34;FINALIZE-MODULES&#34;)</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l111" href="#l111">111</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount coveredLine">1044</td>
+      <td class="src coveredLine">    call s_finalize_modules()</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l112" href="#l112">112</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount coveredLine">1044</td>
+      <td class="src coveredLine">    call nvtxEndRange</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l113" href="#l113">113</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l114" href="#l114">114</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount coveredLine">1044</td>
+      <td class="src coveredLine">end program p_main</td>
+    </tr>
+    <tr class="source-line">
+      <td class="lineno"><a id="l115" href="#l115">115</a></td>
+      <td class="linebranch">
+      </td>
+      <td class="linecount "></td>
+      <td class="src "></td>
+    </tr>
+  </table>
+</div>
+      <hr/>
+    </main>
+    <footer>
+      Generated by: <a href="http://gcovr.com/en/8.3">GCOVR (Version 8.3)</a>
+    </footer>
+  </body>
+</html>
