@@ -36,13 +36,53 @@ class Mfc < Formula
       bin.install binary_paths.first
     end
 
+    # Install mfc.sh script to libexec
+    libexec.install "mfc.sh"
+
+    # Install Python toolchain
+    # The entire toolchain directory is required for mfc.sh functionality
+    prefix.install "toolchain"
+
     # Install examples
     pkgshare.install "examples"
+
+    # Create a wrapper that sets up a working environment for mfc.sh
+    # The wrapper uses a temporary directory since Cellar is read-only
+    (bin/"mfc").write <<~EOS
+      #!/bin/bash
+      set -e
+
+      # Create a working directory for MFC in user's cache
+      MFC_WORK_DIR="${TMPDIR:-/tmp}/mfc-homebrew-$$"
+      mkdir -p "$MFC_WORK_DIR"
+
+      # Function to clean up on exit
+      cleanup() {
+        rm -rf "$MFC_WORK_DIR"
+      }
+      trap cleanup EXIT
+
+      # Create minimal directory structure that mfc.sh expects
+      cd "$MFC_WORK_DIR"
+      ln -sf "#{prefix}/toolchain" toolchain
+      ln -sf "#{libexec}/mfc.sh" mfc.sh
+      ln -sf "#{pkgshare}/examples" examples
+
+      # Set up environment variables
+      export MFC_INSTALL_DIR="#{prefix}"
+      export MFC_BIN_DIR="#{bin}"
+      export BOOST_INCLUDE="#{Formula["boost"].opt_include}"
+
+      # Run mfc.sh with all arguments
+      exec ./mfc.sh "$@"
+    EOS
+    chmod 0755, bin/"mfc"
   end
 
   def caveats
     <<~EOS
-      MFC has been installed with the following binaries:
+      MFC has been installed with:
+        - mfc command-line tool: #{bin}/mfc
         - pre_process: #{bin}/pre_process
         - simulation:  #{bin}/simulation
         - post_process: #{bin}/post_process
@@ -50,8 +90,9 @@ class Mfc < Formula
       Examples are available in:
         #{pkgshare}/examples
 
-      For full development functionality (build, test, etc.),
-      clone the repository from: https://github.com/MFlowCode/MFC
+      To run an example:
+        cd #{pkgshare}/examples/1D_sodshocktube
+        mfc run case.py
 
       Documentation: https://mflowcode.github.io/
     EOS
@@ -59,6 +100,8 @@ class Mfc < Formula
 
   test do
     # Test that the binaries exist and are executable
+    assert_path_exists bin/"mfc"
+    assert_predicate bin/"mfc", :executable?
     assert_path_exists bin/"pre_process"
     assert_predicate bin/"pre_process", :executable?
     assert_path_exists bin/"simulation"
@@ -66,8 +109,15 @@ class Mfc < Formula
     assert_path_exists bin/"post_process"
     assert_predicate bin/"post_process", :executable?
 
+    # Verify toolchain and mfc.sh were installed
+    assert_path_exists libexec/"mfc.sh"
+    assert_path_exists prefix/"toolchain"
+
     # Verify examples were installed
     assert_path_exists pkgshare/"examples"
     assert_path_exists pkgshare/"examples/1D_sodshocktube/case.py"
+
+    # Test mfc wrapper basic functionality
+    system bin/"mfc", "--help"
   end
 end
