@@ -36,68 +36,39 @@ class Mfc < Formula
       bin.install binary_paths.first
     end
 
-    # Install mfc.sh script to libexec (for executable scripts)
-    libexec.install "mfc.sh"
-
-    # Install Python toolchain
-    # The entire toolchain directory is required because mfc.sh depends on:
-    # - util.sh for shell utilities
-    # - main.py and mfc/ for the Python CLI
-    # - bootstrap/ for build/lint/format scripts
-    # - templates/ for HPC job submission
-    prefix.install "toolchain"
-
     # Install examples
     pkgshare.install "examples"
-
-    # Create a wrapper that sets up the environment and calls mfc.sh
-    # The wrapper changes to the installation directory because mfc.sh
-    # expects to be run from MFC's root (checks for toolchain/util.sh)
-    (bin/"mfc").write <<~EOS
-      #!/bin/bash
-      export BOOST_INCLUDE="#{Formula["boost"].opt_include}"
-      cd "#{prefix}" || exit 1
-      exec "#{libexec}/mfc.sh" "$@"
-    EOS
-    chmod 0755, bin/"mfc"
   end
 
   def caveats
     <<~EOS
-      MFC has been installed with:
+      MFC has been installed with the following binaries:
         - pre_process: #{bin}/pre_process
         - simulation:  #{bin}/simulation
         - post_process: #{bin}/post_process
-        - mfc wrapper: #{bin}/mfc
 
       Examples are available in:
         #{pkgshare}/examples
 
-      To run an example:
-        mfc run #{pkgshare}/examples/1D_sodshocktube/case.py
+      For full development functionality (build, test, etc.),
+      clone the repository from: https://github.com/MFlowCode/MFC
 
       Documentation: https://mflowcode.github.io/
     EOS
   end
 
   test do
-    # Test that the binaries exist
+    # Test that the binaries exist and can execute
     assert_path_exists bin/"pre_process"
     assert_path_exists bin/"simulation"
     assert_path_exists bin/"post_process"
 
-    # Test mfc wrapper
-    system bin/"mfc", "--help"
-
-    # Test that binaries can execute
+    # Test that binaries show help (basic functionality check)
     system bin/"pre_process", "-h"
     system bin/"simulation", "-h"
 
-    # Test that mfc.sh is accessible in libexec
-    assert_path_exists libexec/"mfc.sh"
-    assert_path_exists prefix/"toolchain"
-
-    # Test that mfc can parse a case file (lighter than full simulation)
-    system bin/"mfc", "count", "#{pkgshare}/examples/1D_sodshocktube/case.py"
+    # Verify examples were installed
+    assert_path_exists pkgshare/"examples"
+    assert_path_exists pkgshare/"examples/1D_sodshocktube/case.py"
   end
 end
