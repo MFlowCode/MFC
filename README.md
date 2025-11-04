@@ -72,8 +72,8 @@ MFC is a 2025 Gordon Bell Prize Finalist.
 <a href="https://doi.org/10.48550/arXiv.2503.07953" target="_blank">
     <img src="https://img.shields.io/badge/DOI-10.48550/arXiv.2503.07953-thistle.svg"/>
 </a>
-<a href="https://doi.org/10.5281/zenodo.17501213" target="_blank">
-    <img src="https://zenodo.org/badge/DOI/10.5281/zenodo.17501213.svg"/>
+<a href="https://doi.org/10.5281/zenodo.17049757" target="_blank">
+    <img src="https://zenodo.org/badge/DOI/10.5281/zenodo.17049757.svg"/>
 </a>
 <a href="https://github.com/MFlowCode/MFC/stargazers" target="_blank">
     <img src="https://img.shields.io/github/stars/MFlowCode/MFC?style=flat&color=maroon"/>
