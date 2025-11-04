@@ -34,18 +34,17 @@ jobs:
           . spack/share/spack/setup-env.sh
           spack compiler find
 
-      - name: Create Spack Repository
+      - name: Install Package into Spack
         run: |
           . spack/share/spack/setup-env.sh
-          spack repo create mfc-repo mfc
-          mkdir -p mfc-repo/spack_repo/mfc/packages/mfc
-          cp packaging/spack/package.py mfc-repo/spack_repo/mfc/packages/mfc/
-          spack repo add mfc-repo/spack_repo/mfc
+          # Copy package directly into Spack's builtin repo
+          mkdir -p spack/var/spack/repos/builtin/packages/mfc
+          cp packaging/spack/package.py spack/var/spack/repos/builtin/packages/mfc/
 
       - name: Run Spack Style Check
         run: |
           . spack/share/spack/setup-env.sh
-          spack style mfc-repo/spack_repo/mfc/packages/mfc/package.py
+          spack style spack/var/spack/repos/builtin/packages/mfc/package.py
 
       - name: Run Spack Audit
         run: |
@@ -79,13 +78,12 @@ jobs:
           . spack/share/spack/setup-env.sh
           spack compiler find
 
-      - name: Create Spack Repository
+      - name: Install Package into Spack
         run: |
           . spack/share/spack/setup-env.sh
-          spack repo create mfc-repo mfc
-          mkdir -p mfc-repo/spack_repo/mfc/packages/mfc
-          cp packaging/spack/package.py mfc-repo/spack_repo/mfc/packages/mfc/
-          spack repo add mfc-repo/spack_repo/mfc
+          # Copy package directly into Spack's builtin repo
+          mkdir -p spack/var/spack/repos/builtin/packages/mfc
+          cp packaging/spack/package.py spack/var/spack/repos/builtin/packages/mfc/
 
       - name: Test Default Spec
         run: |
