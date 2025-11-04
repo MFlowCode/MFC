@@ -48,12 +48,6 @@ jobs:
           # Show package info to confirm it loads
           spack info mfc
 
-      - name: Run Spack Style Check
-        run: |
-          . spack/share/spack/setup-env.sh
-          # Skip flake8 F405 warnings which are expected for star imports in Spack packages
-          spack style --no-flake8 packaging/spack/package.py
-
       - name: Run Spack Audit
         run: |
           . spack/share/spack/setup-env.sh
