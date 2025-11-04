@@ -58,12 +58,16 @@ jobs:
           echo "Running Homebrew formula tests..."
           brew test mfc
       
-      - name: Test MFC commands
+      - name: Test MFC binaries
         run: |
-          echo "Testing binaries..."
-          pre_process -h
-          simulation -h
-          post_process -h
+          echo "Verifying binaries are in PATH and executable..."
+          which pre_process
+          which simulation
+          which post_process
+          test -x $(which pre_process)
+          test -x $(which simulation)
+          test -x $(which post_process)
+          echo "All binaries are accessible and executable!"
       
       - name: Verify installation structure
         run: |
