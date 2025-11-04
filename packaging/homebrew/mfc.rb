@@ -29,37 +29,12 @@ class Mfc < Formula
   end
 
   def install
-    # MFC uses a Python wrapper script for building
-    # Homebrew's superenv handles compiler setup via gcc dependency
-    system "./mfc.sh", "build",
-           "-t", "pre_process", "simulation", "post_process",
-           "-j", ENV.make_jobs
-
-    # Install binaries
-    # MFC installs each binary to a separate hashed subdirectory, find them individually
-    %w[pre_process simulation post_process].each do |binary|
-      binary_paths = Dir.glob("build/install/*/bin/#{binary}")
-      raise "Could not find #{binary}" if binary_paths.empty?
-
-      bin.install binary_paths.first
-    end
-
-    # Install mfc.sh script to libexec
-    libexec.install "mfc.sh"
-
-    # Install Python toolchain
-    # The entire toolchain directory is required for mfc.sh functionality
-    prefix.install "toolchain"
-
-    # Install examples
-    pkgshare.install "examples"
-
-    # Create Python virtual environment first
+    # Create Python virtual environment first (before MFC build)
     venv = libexec/"venv"
     system Formula["python@3.12"].opt_bin/"python3.12", "-m", "venv", venv
     system venv/"bin/pip", "install", "--upgrade", "pip", "setuptools", "wheel"
 
-    # Build and install Cantera 3.1.0 from source
+    # Build and install Cantera 3.1.0 from source BEFORE MFC build
     resource("cantera").stage do
       # Install Cantera build dependencies
       system venv/"bin/pip", "install", "cython", "numpy", "ruamel.yaml"
@@ -86,8 +61,39 @@ class Mfc < Formula
       end
     end
 
-    # Install MFC Python package and remaining dependencies into venv
+    # Install Python toolchain (needed before build)
+    prefix.install "toolchain"
+
+    # Install MFC Python package and dependencies into venv
     system venv/"bin/pip", "install", "-e", prefix/"toolchain"
+
+    # Create symlink so mfc.sh uses our pre-installed venv
+    mkdir_p "build"
+    ln_sf venv, "build/venv"
+
+    # Now build MFC with pre-configured venv
+    # Set VIRTUAL_ENV so mfc.sh uses existing venv instead of creating new one
+    ENV["VIRTUAL_ENV"] = venv
+    ENV["PATH"] = "#{venv}/bin:#{ENV["PATH"]}"
+
+    system "./mfc.sh", "build",
+           "-t", "pre_process", "simulation", "post_process",
+           "-j", ENV.make_jobs
+
+    # Install binaries
+    # MFC installs each binary to a separate hashed subdirectory, find them individually
+    %w[pre_process simulation post_process].each do |binary|
+      binary_paths = Dir.glob("build/install/*/bin/#{binary}")
+      raise "Could not find #{binary}" if binary_paths.empty?
+
+      bin.install binary_paths.first
+    end
+
+    # Install mfc.sh script to libexec
+    libexec.install "mfc.sh"
+
+    # Install examples
+    pkgshare.install "examples"
 
     # Create a wrapper that sets up a working environment for mfc.sh
     # The wrapper uses a temporary directory since Cellar is read-only and
