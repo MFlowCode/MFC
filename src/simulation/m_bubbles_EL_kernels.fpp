@@ -540,7 +540,7 @@ contains
 
         real(wp) :: a, dp, vol, force
         real(wp) :: v_rel
-        real(wp), dimension(fd_order - 1) :: xi, eta, L
+        real(wp), dimension(fd_order) :: xi, eta, L
 
         if (fd_order <= 2) then
             if (i == 1) then
