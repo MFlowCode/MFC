@@ -38,10 +38,12 @@ class Mfc < Formula
     pkgshare.install "examples"
     
     # Create a wrapper that sets up the environment and calls mfc.sh
+    # The wrapper changes to the installation directory because mfc.sh
+    # expects to be run from MFC's root (checks for toolchain/util.sh)
     (bin/"mfc").write <<~EOS
       #!/bin/bash
       export BOOST_INCLUDE="#{Formula["boost"].opt_include}"
-      exec "#{libexec}/mfc.sh" "$@"
+      cd "#{prefix}" && exec "#{libexec}/mfc.sh" "$@"
     EOS
     chmod 0755, bin/"mfc"
   end

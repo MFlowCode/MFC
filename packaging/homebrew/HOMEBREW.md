@@ -152,7 +152,7 @@ Homebrew automatically selects the appropriate compiler flags and optimization s
 
 ## Updates and Versioning
 
-The formula specifies version 5.1.0 as the current release. To update:
+When a new MFC version is released, the formula must be updated. To update to a new version:
 
 1. Change the version number in the URL
 2. Download the new tarball
@@ -164,12 +164,18 @@ The formula specifies version 5.1.0 as the current release. To update:
 ## Technical Details
 
 ### Source URL
-The formula downloads from: https://github.com/MFlowCode/MFC/archive/refs/tags/v5.1.0.tar.gz
+The formula downloads from GitHub releases using the version tag specified in the formula (e.g., v5.1.0):
+```
+https://github.com/MFlowCode/MFC/archive/refs/tags/vVERSION.tar.gz
+```
 
 ### Checksum Verification
-SHA256: 4684bee6a529287f243f8929fb7edb0dfebbb04df7c1806459761c9a6c9261cf
+The formula includes a SHA256 checksum that must match the downloaded tarball. This ensures:
+- The downloaded source matches the expected file exactly
+- No corruption occurred during download
+- Authenticity of the release
 
-This ensures the downloaded source matches the expected file exactly.
+Maintainers must update this checksum when releasing new versions.
 
 ### Build Parallelization
 The formula uses all available CPU cores for building (`ENV.make_jobs`) to minimize compilation time.
@@ -205,7 +211,7 @@ The formula has been tested on:
 - macOS 14 (Sonoma) with Apple Silicon
 - macOS 13 (Ventura) with Intel
 - Fresh installations and upgrades
-- Both release (5.1.0) and HEAD versions
+- Both stable release versions and HEAD (development) versions
 
 All tests pass and the installation completes successfully on all tested platforms.
 
