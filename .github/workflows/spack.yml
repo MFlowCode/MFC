@@ -112,6 +112,8 @@ jobs:
 
   test-install:
     name: Test Installation & Execution
+    # Only run on pull requests or manual workflow dispatch to save CI time
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout MFC
@@ -125,17 +127,23 @@ jobs:
       - name: Install System Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y gfortran cmake
+          sudo apt-get install -y gfortran cmake libopenblas-dev libfftw3-dev libhdf5-dev
 
       - name: Install Spack
         run: |
           git clone --depth=1 https://github.com/spack/spack.git
           echo "${GITHUB_WORKSPACE}/spack/bin" >> $GITHUB_PATH
 
-      - name: Setup Spack
+      - name: Setup Spack with Binary Cache
         run: |
           . spack/share/spack/setup-env.sh
           spack compiler find
+          # Add binary cache mirror for pre-built packages
+          spack mirror add binary_mirror https://binaries.spack.io/v0.23.1
+          spack buildcache keys --install --trust
+          # Mark system packages as external to avoid building
+          spack external find --not-buildable cmake python perl gfortran gcc
+          spack config add "packages:all:target:[x86_64]"
 
       - name: Install Package into Spack
         run: |
@@ -152,9 +160,9 @@ jobs:
       - name: Install MFC via Spack
         run: |
           . spack/share/spack/setup-env.sh
-          # Install minimal configuration to save time
-          spack install --show-log-on-error mfc~mpi~post_process
-        timeout-minutes: 60
+          # Install minimal configuration, use binary cache when available
+          spack install --show-log-on-error --use-buildcache package:auto,dependencies:only mfc~mpi~post_process
+        timeout-minutes: 45
 
       - name: Test MFC Execution
         run: |
