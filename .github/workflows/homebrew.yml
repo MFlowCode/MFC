@@ -35,7 +35,7 @@ jobs:
       - name: Install formula dependencies
         run: |
           echo "Installing MFC dependencies..."
-          brew install cmake gcc scons python@3.12 boost fftw hdf5 open-mpi openblas sundials yaml-cpp
+          brew install cmake gcc python@3.12 boost fftw hdf5 open-mpi openblas sundials yaml-cpp
       
       - name: Validate formula syntax
         run: |
