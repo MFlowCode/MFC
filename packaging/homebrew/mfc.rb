@@ -12,6 +12,7 @@ class Mfc < Formula
 
   depends_on "cmake" => :build
   depends_on "gcc" => :build
+  depends_on "scons" => :build
 
   depends_on "boost"
   depends_on "fftw"
@@ -19,6 +20,14 @@ class Mfc < Formula
   depends_on "open-mpi"
   depends_on "openblas"
   depends_on "python@3.12"
+  depends_on "sundials"
+  depends_on "yaml-cpp"
+
+  resource "cantera" do
+    url "https://github.com/Cantera/cantera.git",
+        tag:      "v3.1.0",
+        revision: "3882f63dc48cc12bbc3cabb0c5c6e87e9bbaa8a0"
+  end
 
   def install
     # MFC uses a Python wrapper script for building
@@ -46,16 +55,39 @@ class Mfc < Formula
     # Install examples
     pkgshare.install "examples"
 
-    # Patch pyproject.toml to use available cantera version
-    # Version 3.1.0 doesn't exist on PyPI, use 3.0.1 instead
-    inreplace prefix/"toolchain/pyproject.toml", 'cantera==3.1.0', 'cantera>=3.0.0,<4.0'
-
-    # Create Python virtual environment with MFC dependencies
+    # Create Python virtual environment first
     venv = libexec/"venv"
     system Formula["python@3.12"].opt_bin/"python3.12", "-m", "venv", venv
-    
-    # Install MFC Python package and dependencies into venv
     system venv/"bin/pip", "install", "--upgrade", "pip", "setuptools", "wheel"
+
+    # Build and install Cantera 3.1.0 from source
+    resource("cantera").stage do
+      # Install Cantera build dependencies
+      system venv/"bin/pip", "install", "cython", "numpy", "ruamel.yaml"
+      
+      # Configure Cantera build
+      system "scons", "build",
+             "python_package=y",
+             "f90_interface=n",
+             "system_sundials=y",
+             "system_yamlcpp=y",
+             "system_fmt=n",
+             "extra_inc_dirs=#{Formula["sundials"].opt_include}:#{Formula["yaml-cpp"].opt_include}",
+             "extra_lib_dirs=#{Formula["sundials"].opt_lib}:#{Formula["yaml-cpp"].opt_lib}",
+             "prefix=#{libexec}/cantera",
+             "python_cmd=#{venv}/bin/python",
+             "-j#{ENV.make_jobs}"
+      
+      # Install Cantera
+      system "scons", "install"
+      
+      # Install Cantera Python package into venv
+      cd "build/python" do
+        system venv/"bin/pip", "install", "--no-build-isolation", "."
+      end
+    end
+    
+    # Install MFC Python package and remaining dependencies into venv
     system venv/"bin/pip", "install", "-e", prefix/"toolchain"
 
     # Create a wrapper that sets up a working environment for mfc.sh
