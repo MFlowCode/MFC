@@ -64,7 +64,7 @@ class Mfc < Formula
     resource("cantera").stage do
       # Install Cantera build dependencies
       system venv/"bin/pip", "install", "cython", "numpy", "ruamel.yaml"
-      
+
       # Configure Cantera build
       system "scons", "build",
              "python_package=y",
@@ -77,16 +77,16 @@ class Mfc < Formula
              "prefix=#{libexec}/cantera",
              "python_cmd=#{venv}/bin/python",
              "-j#{ENV.make_jobs}"
-      
+
       # Install Cantera
       system "scons", "install"
-      
+
       # Install Cantera Python package into venv
       cd "build/python" do
         system venv/"bin/pip", "install", "--no-build-isolation", "."
       end
     end
-    
+
     # Install MFC Python package and remaining dependencies into venv
     system venv/"bin/pip", "install", "-e", prefix/"toolchain"
 
@@ -115,7 +115,7 @@ class Mfc < Formula
       ln -sf "#{prefix}/toolchain" toolchain
       ln -sf "#{libexec}/mfc.sh" mfc.sh
       ln -sf "#{pkgshare}/examples" examples
-      
+
       # Link the venv so mfc.sh doesn't try to create its own
       mkdir -p build
       ln -sf "#{libexec}/venv" build/venv
