@@ -1494,11 +1494,11 @@ contains
             & Re_trans_c,Im_trans_T,Im_trans_c,omegaN,mul0,ss, &
             & gamma_v,mu_v,gamma_m,gamma_n,mu_n,gam]')
 
+        $:GPU_UPDATE(device='[adv_n,adap_dt,adap_dt_tol,adap_dt_max_iters,n_idx,pi_fac,low_Mach]')
         $:GPU_UPDATE(device='[acoustic_source, num_source]')
         $:GPU_UPDATE(device='[sigma, surface_tension]')
 
         $:GPU_UPDATE(device='[dx,dy,dz,x_cb,x_cc,y_cb,y_cc,z_cb,z_cc]')
-
         $:GPU_UPDATE(device='[bc_x%vb1,bc_x%vb2,bc_x%vb3,bc_x%ve1,bc_x%ve2,bc_x%ve3]')
         $:GPU_UPDATE(device='[bc_y%vb1,bc_y%vb2,bc_y%vb3,bc_y%ve1,bc_y%ve2,bc_y%ve3]')
         $:GPU_UPDATE(device='[bc_z%vb1,bc_z%vb2,bc_z%vb3,bc_z%ve1,bc_z%ve2,bc_z%ve3]')

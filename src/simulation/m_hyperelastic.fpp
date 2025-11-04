@@ -106,7 +106,7 @@ contains
         real(wp) :: G_local
         integer :: j, k, l, i, r
 
-        #:call GPU_PARALLEL_LOOP(collapse=3, private='[alpha_K, alpha_rho_K, rho, gamma, pi_inf, qv, G_local, Re, tensora, tensorb]')
+        #:call GPU_PARALLEL_LOOP(collapse=3, private='[alpha_K, alpha_rho_K, rho, gamma, pi_inf, qv, G_local, Re, tensora, tensorb, i]')
             do l = 0, p
                 do k = 0, n
                     do j = 0, m

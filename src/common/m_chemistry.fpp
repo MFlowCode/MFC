@@ -65,7 +65,6 @@ contains
         do z = bounds(3)%beg, bounds(3)%end
             do y = bounds(2)%beg, bounds(2)%end
                 do x = bounds(1)%beg, bounds(1)%end
-                    $:GPU_LOOP(parallelism='[seq]')
                     do eqn = chemxb, chemxe
                         Ys(eqn - chemxb + 1) = &
                             q_cons_vf(eqn)%sf(x, y, z)/q_cons_vf(contxb)%sf(x, y, z)
@@ -76,7 +75,6 @@ contains
                     ! cons. contxb    = \rho         (1-fluid model)
                     ! cons. momxb + i = \rho u_i
                     energy = q_cons_vf(E_idx)%sf(x, y, z)/q_cons_vf(contxb)%sf(x, y, z)
-                    $:GPU_LOOP(parallelism='[seq]')
                     do eqn = momxb, momxe
                         energy = energy - &
                                  0.5_wp*(q_cons_vf(eqn)%sf(x, y, z)/q_cons_vf(contxb)%sf(x, y, z))**2._wp
@@ -102,7 +100,6 @@ contains
         do z = bounds(3)%beg, bounds(3)%end
             do y = bounds(2)%beg, bounds(2)%end
                 do x = bounds(1)%beg, bounds(1)%end
-                    $:GPU_LOOP(parallelism='[seq]')
                     do i = chemxb, chemxe
                         Ys(i - chemxb + 1) = q_prim_vf(i)%sf(x, y, z)
                     end do
@@ -129,7 +126,7 @@ contains
         real(wp), dimension(num_species) :: Ys
         real(wp), dimension(num_species) :: omega
 
-        #:call GPU_PARALLEL_LOOP(collapse=3, private='[Ys, omega, T]')
+        #:call GPU_PARALLEL_LOOP(collapse=3, private='[Ys, omega, eqn, T, rho, omega_m]', copyin='[bounds]')
             do z = bounds(3)%beg, bounds(3)%end
                 do y = bounds(2)%beg, bounds(2)%end
                     do x = bounds(1)%beg, bounds(1)%end
