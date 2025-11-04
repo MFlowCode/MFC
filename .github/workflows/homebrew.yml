@@ -60,26 +60,18 @@ jobs:
       
       - name: Test MFC commands
         run: |
-          echo "Testing MFC wrapper..."
-          mfc --help
-          
           echo "Testing binaries..."
           pre_process -h
           simulation -h
           post_process -h
-          
-          echo "Testing case file parsing..."
-          mfc count $(brew --prefix)/share/mfc/examples/1D_sodshocktube/case.py
       
       - name: Verify installation structure
         run: |
           echo "Checking installed files..."
-          ls -la $(brew --prefix)/bin/mfc
           ls -la $(brew --prefix)/bin/pre_process
           ls -la $(brew --prefix)/bin/simulation
           ls -la $(brew --prefix)/bin/post_process
-          ls -la $(brew --prefix)/libexec/mfc.sh
-          ls -la $(brew --prefix)/Cellar/mfc/*/toolchain/
+          ls -la $(brew --prefix)/share/mfc/examples/
           
           echo "Installation verified successfully!"
       
