@@ -109,3 +109,73 @@ jobs:
         run: |
           . spack/share/spack/setup-env.sh
           spack spec mfc~mpi~post_process
+
+  test-install:
+    name: Test Installation & Execution
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout MFC
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gfortran cmake
+
+      - name: Install Spack
+        run: |
+          git clone --depth=1 https://github.com/spack/spack.git
+          echo "${GITHUB_WORKSPACE}/spack/bin" >> $GITHUB_PATH
+
+      - name: Setup Spack
+        run: |
+          . spack/share/spack/setup-env.sh
+          spack compiler find
+
+      - name: Install Package into Spack
+        run: |
+          . spack/share/spack/setup-env.sh
+          # Find the actual builtin repo location
+          BUILTIN_REPO=$(spack repo list | grep builtin | awk '{print $NF}')
+          echo "Builtin repo location: $BUILTIN_REPO"
+          # Copy package to the builtin repo
+          mkdir -p "$BUILTIN_REPO/packages/mfc"
+          cp packaging/spack/package.py "$BUILTIN_REPO/packages/mfc/"
+          # Verify package is visible
+          spack list mfc
+
+      - name: Install MFC via Spack
+        run: |
+          . spack/share/spack/setup-env.sh
+          # Install minimal configuration to save time
+          spack install --show-log-on-error mfc~mpi~post_process
+        timeout-minutes: 60
+
+      - name: Test MFC Execution
+        run: |
+          . spack/share/spack/setup-env.sh
+          spack load mfc
+          # Verify binaries are available
+          which pre_process
+          which simulation
+          echo "✓ Binaries found"
+          # Create test directory
+          mkdir -p test_run
+          cd test_run
+          # Copy example case
+          cp ../examples/1D_sodshocktube/case.py .
+          # Generate case configuration
+          python3 case.py > case.json
+          echo "✓ Generated case configuration"
+          # Run pre_process
+          pre_process < case.json
+          echo "✓ Pre-processing completed"
+          # Run simulation (just 1 step to verify it works)
+          simulation
+          echo "✓ Simulation completed"
+        timeout-minutes: 10
