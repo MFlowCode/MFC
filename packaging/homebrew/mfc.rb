@@ -37,7 +37,7 @@ class Mfc < Formula
     # Build and install Cantera 3.1.0 from source BEFORE MFC build
     resource("cantera").stage do
       # Install Cantera build dependencies
-      system venv/"bin/pip", "install", "cython", "numpy", "ruamel.yaml"
+      system venv/"bin/pip", "install", "cython", "numpy", "ruamel.yaml", "packaging"
 
       # Configure Cantera build
       system "scons", "build",
