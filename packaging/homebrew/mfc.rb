@@ -74,7 +74,7 @@ class Mfc < Formula
     # Now build MFC with pre-configured venv
     # Set VIRTUAL_ENV so mfc.sh uses existing venv instead of creating new one
     ENV["VIRTUAL_ENV"] = venv
-    ENV["PATH"] = "#{venv}/bin:#{ENV["PATH"]}"
+    ENV["PATH"] = "#{venv}/bin:#{ENV.fetch("PATH", nil)}"
 
     system "./mfc.sh", "build",
            "-t", "pre_process", "simulation", "post_process",
