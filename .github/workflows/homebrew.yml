@@ -45,7 +45,7 @@ jobs:
       - name: Install MFC from formula
         run: |
           echo "Installing MFC from local formula..."
-          brew install --build-from-source --verbose packaging/homebrew/mfc.rb
+          brew install --build-from-source --verbose ./packaging/homebrew/mfc.rb
       
       - name: Run formula tests
         run: |
