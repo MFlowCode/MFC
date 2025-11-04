@@ -61,8 +61,12 @@ class Mfc(CMakePackage):
     conflicts("%nvhpc@:21.6.999", msg="MFC requires NVHPC 21.7 or newer")
     conflicts("%apple-clang", msg="MFC does not support Apple Clang")
     conflicts("+openacc", when="%gcc", msg="OpenACC requires NVHPC or Cray compilers")
-    conflicts("+openacc", when="+openmp", msg="OpenACC and OpenMP GPU offload are mutually exclusive")
-    conflicts("+openmp", when="+openacc", msg="OpenACC and OpenMP GPU offload are mutually exclusive")
+    conflicts(
+        "+openacc", when="+openmp", msg="OpenACC and OpenMP GPU offload are mutually exclusive"
+    )
+    conflicts(
+        "+openmp", when="+openacc", msg="OpenACC and OpenMP GPU offload are mutually exclusive"
+    )
 
     def cmake_args(self):
         args = [
