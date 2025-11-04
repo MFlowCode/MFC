@@ -160,8 +160,9 @@ jobs:
       - name: Install MFC via Spack
         run: |
           . spack/share/spack/setup-env.sh
-          # Install minimal configuration, use binary cache when available
-          spack install --show-log-on-error --use-buildcache package:auto,dependencies:only mfc~mpi~post_process
+          # Install minimal configuration
+          # Binary cache is already configured, Spack will use it automatically when available
+          spack install --show-log-on-error mfc~mpi~post_process
         timeout-minutes: 45
 
       - name: Test MFC Execution
