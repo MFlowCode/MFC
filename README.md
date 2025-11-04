@@ -25,6 +25,43 @@
   </a>
 </p>
 
+<p align="center">
+  <a href="https://mflowcode.github.io/">
+    <img src="https://img.shields.io/badge/docs-mflowcode.github.io-blue" />
+  </a>
+  <a href="https://github.com/MFlowCode/MFC/discussions">
+    <img src="https://img.shields.io/badge/discussions-join-brightgreen" />
+  </a>
+  <a href="https://github.com/codespaces/new?hide_repo_select=true&ref=master&repo=MFlowCode%2FMFC">
+    <img src="https://img.shields.io/badge/Codespaces-Open%20in%201%20click-2ea44f?logo=github" />
+  </a>
+  <a href="https://github.com/MFlowCode/MFC/releases">
+    <img src="https://img.shields.io/github/v/release/MFlowCode/MFC?display_name=release&sort=semver" />
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://star-history.com/#MFlowCode/MFC&Date">
+    <img src="https://api.star-history.com/svg?repos=MFlowCode/MFC&type=Date" alt="Star History Chart" width="600"/>
+  </a>
+</p>
+
+> **If MFC helps your work, please ⭐ the repo and cite it!**
+
+### Who uses MFC
+
+MFC runs at exascale on the world's fastest supercomputers:
+- **OLCF Frontier** (>33K AMD MI250X GPUs)
+- **LLNL El Capitan** (>43K AMD MI300A APUs)
+- **LLNL Tuolumne**, **CSCS Alps**, and many others
+
+### Try MFC
+
+| Path | Command |
+| --- | --- |
+| **Codespaces** (fastest) | Click the "Codespaces" badge above to launch in 1 click |
+| **Local build** | `./mfc.sh build -j $(nproc) && ./mfc.sh test -j $(nproc)` |
+
 **Welcome!**
 MFC simulates compressible multi-phase flows, [among other things](#what-else-can-this-thing-do). 
 It uses metaprogramming and is short (20K lines) and portable.
@@ -34,6 +71,9 @@ MFC is a 2025 Gordon Bell Prize Finalist.
 <p align="center">
 <a href="https://doi.org/10.48550/arXiv.2503.07953" target="_blank">
     <img src="https://img.shields.io/badge/DOI-10.48550/arXiv.2503.07953-thistle.svg"/>
+</a>
+<a href="https://doi.org/10.5281/zenodo.17049757" target="_blank">
+    <img src="https://zenodo.org/badge/DOI/10.5281/zenodo.17049757.svg"/>
 </a>
 <a href="https://github.com/MFlowCode/MFC/stargazers" target="_blank">
     <img src="https://img.shields.io/github/stars/MFlowCode/MFC?style=flat&color=maroon"/>
