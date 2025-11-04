@@ -1,3 +1,7 @@
+# typed: true
+# frozen_string_literal: true
+
+# Homebrew formula for MFC (Multiphase Flow Code)
 class Mfc < Formula
   desc "Exascale multiphase/multiphysics compressible flow solver"
   homepage "https://mflowcode.github.io/"
@@ -38,10 +42,10 @@ class Mfc < Formula
     # - bootstrap/ for build/lint/format scripts
     # - templates/ for HPC job submission
     prefix.install "toolchain"
-    
+
     # Install examples
     pkgshare.install "examples"
-    
+
     # Create a wrapper that sets up the environment and calls mfc.sh
     # The wrapper changes to the installation directory because mfc.sh
     # expects to be run from MFC's root (checks for toolchain/util.sh)
@@ -74,23 +78,22 @@ class Mfc < Formula
 
   test do
     # Test that the binaries exist
-    assert_predicate bin/"pre_process", :exist?
-    assert_predicate bin/"simulation", :exist?
-    assert_predicate bin/"post_process", :exist?
-    
+    assert_path_exists bin/"pre_process"
+    assert_path_exists bin/"simulation"
+    assert_path_exists bin/"post_process"
+
     # Test mfc wrapper
     system bin/"mfc", "--help"
-    
+
     # Test that binaries can execute
     system bin/"pre_process", "-h"
     system bin/"simulation", "-h"
-    
+
     # Test that mfc.sh is accessible in libexec
-    assert_predicate libexec/"mfc.sh", :exist?
-    assert_predicate prefix/"toolchain", :exist?
-    
+    assert_path_exists libexec/"mfc.sh"
+    assert_path_exists prefix/"toolchain"
+
     # Test that mfc can parse a case file (lighter than full simulation)
     system bin/"mfc", "count", "#{pkgshare}/examples/1D_sodshocktube/case.py"
   end
 end
-

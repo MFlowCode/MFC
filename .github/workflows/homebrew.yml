@@ -40,7 +40,6 @@ jobs:
       - name: Validate formula syntax
         run: |
           echo "Checking formula syntax..."
-          brew audit --strict --online packaging/homebrew/mfc.rb || true
           brew style packaging/homebrew/mfc.rb
       
       - name: Install MFC from formula
