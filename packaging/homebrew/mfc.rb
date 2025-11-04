@@ -33,8 +33,8 @@ class Mfc < Formula
     bin.install "build/install/bin/simulation"
     bin.install "build/install/bin/post_process"
 
-    # Install the mfc.sh wrapper
-    bin.install "mfc.sh" => "mfc"
+    # Install mfc.sh script to prefix
+    prefix.install "mfc.sh"
 
     # Install Python toolchain
     prefix.install "toolchain"
@@ -42,7 +42,7 @@ class Mfc < Formula
     # Install examples
     pkgshare.install "examples"
     
-    # Create a simple wrapper that sets up the environment
+    # Create a wrapper that sets up the environment and calls mfc.sh
     (bin/"mfc").write <<~EOS
       #!/bin/bash
       export BOOST_INCLUDE="#{Formula["boost"].opt_include}"
@@ -70,13 +70,21 @@ class Mfc < Formula
   end
 
   test do
-    # Test that the binaries exist and run
+    # Test that the binaries exist
     assert_predicate bin/"pre_process", :exist?
     assert_predicate bin/"simulation", :exist?
     assert_predicate bin/"post_process", :exist?
     
     # Test mfc wrapper
     system bin/"mfc", "--help"
+    
+    # Test that binaries can execute
+    system bin/"pre_process", "-h"
+    system bin/"simulation", "-h"
+    
+    # Test that mfc.sh is accessible
+    assert_predicate prefix/"mfc.sh", :exist?
+    assert_predicate prefix/"toolchain", :exist?
   end
 end
 
