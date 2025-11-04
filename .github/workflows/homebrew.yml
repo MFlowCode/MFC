@@ -1,0 +1,87 @@
+name: Homebrew Formula Test
+
+on:
+  push:
+    branches:
+      - master
+      - homebrew-formula
+    paths:
+      - 'packaging/homebrew/**'
+      - '.github/workflows/homebrew.yml'
+  pull_request:
+    branches:
+      - master
+    paths:
+      - 'packaging/homebrew/**'
+      - '.github/workflows/homebrew.yml'
+  workflow_dispatch:
+
+jobs:
+  test-formula:
+    name: Test Homebrew Formula
+    runs-on: macos-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Homebrew
+        run: |
+          echo "Homebrew version:"
+          brew --version
+          echo "Updating Homebrew..."
+          brew update
+      
+      - name: Install formula dependencies
+        run: |
+          echo "Installing MFC dependencies..."
+          brew install cmake gcc python@3.12 boost fftw hdf5 open-mpi openblas
+      
+      - name: Validate formula syntax
+        run: |
+          echo "Checking formula syntax..."
+          brew audit --strict --online packaging/homebrew/mfc.rb || true
+          brew style packaging/homebrew/mfc.rb
+      
+      - name: Install MFC from formula
+        run: |
+          echo "Installing MFC from local formula..."
+          brew install --build-from-source --verbose packaging/homebrew/mfc.rb
+      
+      - name: Run formula tests
+        run: |
+          echo "Running Homebrew formula tests..."
+          brew test mfc
+      
+      - name: Test MFC commands
+        run: |
+          echo "Testing MFC wrapper..."
+          mfc --help
+          
+          echo "Testing binaries..."
+          pre_process -h
+          simulation -h
+          post_process -h
+          
+          echo "Testing case file parsing..."
+          mfc count $(brew --prefix)/share/mfc/examples/1D_sodshocktube/case.py
+      
+      - name: Verify installation structure
+        run: |
+          echo "Checking installed files..."
+          ls -la $(brew --prefix)/bin/mfc
+          ls -la $(brew --prefix)/bin/pre_process
+          ls -la $(brew --prefix)/bin/simulation
+          ls -la $(brew --prefix)/bin/post_process
+          ls -la $(brew --prefix)/libexec/mfc.sh
+          ls -la $(brew --prefix)/Cellar/mfc/*/toolchain/
+          
+          echo "Installation verified successfully!"
+      
+      - name: Uninstall and cleanup
+        if: always()
+        run: |
+          echo "Cleaning up..."
+          brew uninstall mfc || true
+          brew cleanup
+
