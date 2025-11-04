@@ -89,9 +89,9 @@ Runtime dependencies (always required):
 
 Optional dependencies (variant-controlled):
 - mpi - Message Passing Interface (when +mpi)
-- hdf5 - HDF5 data format (when +post_process)
-- silo - Silo data format (when +post_process)
-- cuda - NVIDIA CUDA toolkit (when +openacc with NVHPC)
+- silo - Silo data format with HDF5 support (when +post_process)
+- hdf5 - HDF5 data format (transitive dependency via Silo when +post_process)
+- cuda - NVIDIA CUDA toolkit (when +openacc or +openmp with NVHPC)
 - hip - AMD ROCm HIP (when +openacc or +openmp with Cray)
 
 ### Compiler Support
