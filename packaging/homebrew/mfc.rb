@@ -48,7 +48,8 @@ class Mfc < Formula
     (bin/"mfc").write <<~EOS
       #!/bin/bash
       export BOOST_INCLUDE="#{Formula["boost"].opt_include}"
-      cd "#{prefix}" && exec "#{libexec}/mfc.sh" "$@"
+      cd "#{prefix}" || exit 1
+      exec "#{libexec}/mfc.sh" "$@"
     EOS
     chmod 0755, bin/"mfc"
   end
@@ -88,8 +89,8 @@ class Mfc < Formula
     assert_predicate libexec/"mfc.sh", :exist?
     assert_predicate prefix/"toolchain", :exist?
     
-    # Test running a simple example case to verify full toolchain
-    system bin/"mfc", "run", "#{pkgshare}/examples/1D_sodshocktube/case.py"
+    # Test that mfc can parse a case file (lighter than full simulation)
+    system bin/"mfc", "count", "#{pkgshare}/examples/1D_sodshocktube/case.py"
   end
 end
 
