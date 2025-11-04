@@ -17,13 +17,8 @@ class Mfc < Formula
   depends_on "openblas"
 
   def install
-    # Set up environment for MFC
-    ENV["BOOST_INCLUDE"] = "#{Formula["boost"].opt_include}"
-    ENV["FC"] = "gfortran"
-    ENV["CC"] = "gcc"
-    ENV["CXX"] = "g++"
-
     # MFC uses a Python wrapper script for building
+    # Homebrew's superenv handles compiler setup via gcc dependency
     system "./mfc.sh", "build",
            "-t", "pre_process", "simulation", "post_process",
            "-j", ENV.make_jobs
@@ -33,8 +28,8 @@ class Mfc < Formula
     bin.install "build/install/bin/simulation"
     bin.install "build/install/bin/post_process"
 
-    # Install mfc.sh script to prefix
-    prefix.install "mfc.sh"
+    # Install mfc.sh script to libexec (for executable scripts)
+    libexec.install "mfc.sh"
 
     # Install Python toolchain
     prefix.install "toolchain"
@@ -46,7 +41,7 @@ class Mfc < Formula
     (bin/"mfc").write <<~EOS
       #!/bin/bash
       export BOOST_INCLUDE="#{Formula["boost"].opt_include}"
-      exec "#{prefix}/mfc.sh" "$@"
+      exec "#{libexec}/mfc.sh" "$@"
     EOS
     chmod 0755, bin/"mfc"
   end
@@ -82,9 +77,12 @@ class Mfc < Formula
     system bin/"pre_process", "-h"
     system bin/"simulation", "-h"
     
-    # Test that mfc.sh is accessible
-    assert_predicate prefix/"mfc.sh", :exist?
+    # Test that mfc.sh is accessible in libexec
+    assert_predicate libexec/"mfc.sh", :exist?
     assert_predicate prefix/"toolchain", :exist?
+    
+    # Test running a simple example case to verify full toolchain
+    system bin/"mfc", "run", "#{pkgshare}/examples/1D_sodshocktube/case.py"
   end
 end
 
