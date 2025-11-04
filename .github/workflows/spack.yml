@@ -38,14 +38,14 @@ jobs:
         run: |
           . spack/share/spack/setup-env.sh
           spack repo create mfc-repo mfc
-          mkdir -p mfc-repo/packages/mfc
-          cp packaging/spack/package.py mfc-repo/packages/mfc/
-          spack repo add mfc-repo
+          mkdir -p mfc-repo/spack_repo/mfc/packages/mfc
+          cp packaging/spack/package.py mfc-repo/spack_repo/mfc/packages/mfc/
+          spack repo add mfc-repo/spack_repo/mfc
 
       - name: Run Spack Style Check
         run: |
           . spack/share/spack/setup-env.sh
-          spack style mfc-repo/packages/mfc/package.py
+          spack style mfc-repo/spack_repo/mfc/packages/mfc/package.py
 
       - name: Run Spack Audit
         run: |
@@ -83,9 +83,9 @@ jobs:
         run: |
           . spack/share/spack/setup-env.sh
           spack repo create mfc-repo mfc
-          mkdir -p mfc-repo/packages/mfc
-          cp packaging/spack/package.py mfc-repo/packages/mfc/
-          spack repo add mfc-repo
+          mkdir -p mfc-repo/spack_repo/mfc/packages/mfc
+          cp packaging/spack/package.py mfc-repo/spack_repo/mfc/packages/mfc/
+          spack repo add mfc-repo/spack_repo/mfc
 
       - name: Test Default Spec
         run: |
