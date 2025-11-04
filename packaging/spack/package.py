@@ -41,15 +41,18 @@ class Mfc(CMakePackage):
     depends_on("python@3:", type="build")
 
     # Runtime dependencies
-    depends_on("fftw@3:")
+    depends_on("fftw@3:", when="~mpi")
+    depends_on("fftw@3:+mpi", when="+mpi")
     depends_on("lapack")
 
     # Optional dependencies
     depends_on("mpi", when="+mpi")
-    depends_on("silo+hdf5", when="+post_process")
+    depends_on("silo+hdf5", when="+post_process~mpi")
+    depends_on("silo+hdf5+mpi", when="+post_process+mpi")
 
     # GPU dependencies
     depends_on("cuda", when="+openacc %nvhpc")
+    depends_on("cuda", when="+openmp %nvhpc")
     depends_on("hip", when="+openacc %cce")
     depends_on("hip", when="+openmp %cce")
 
@@ -59,6 +62,7 @@ class Mfc(CMakePackage):
     conflicts("%apple-clang", msg="MFC does not support Apple Clang")
     conflicts("+openacc", when="%gcc", msg="OpenACC requires NVHPC or Cray compilers")
     conflicts("+openacc", when="+openmp", msg="OpenACC and OpenMP GPU offload are mutually exclusive")
+    conflicts("+openmp", when="+openacc", msg="OpenACC and OpenMP GPU offload are mutually exclusive")
 
     def cmake_args(self):
         args = [
