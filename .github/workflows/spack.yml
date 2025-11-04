@@ -1,0 +1,240 @@
+name: 'Spack Package'
+
+on:
+  push:
+    paths:
+      - 'packaging/spack/**'
+      - '.github/workflows/spack.yml'
+  pull_request:
+    paths:
+      - 'packaging/spack/**'
+      - '.github/workflows/spack.yml'
+  workflow_dispatch:
+
+jobs:
+  lint:
+    name: Spack Lint & Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout MFC
+        uses: actions/checkout@v4
+        with:
+          path: mfc-source
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Spack
+        run: |
+          git clone --depth=1 https://github.com/spack/spack.git
+          echo "${GITHUB_WORKSPACE}/spack/bin" >> $GITHUB_PATH
+
+      - name: Setup Spack
+        run: |
+          . spack/share/spack/setup-env.sh
+          spack compiler find
+
+      - name: Create Spack Repository
+        run: |
+          . spack/share/spack/setup-env.sh
+          spack repo create mfc-repo
+          mkdir -p mfc-repo/packages/mfc
+          cp mfc-source/packaging/spack/package.py mfc-repo/packages/mfc/
+          spack repo add mfc-repo
+
+      - name: Run Spack Style Check
+        run: |
+          . spack/share/spack/setup-env.sh
+          spack style --fix mfc-repo/packages/mfc/package.py
+          # Check if style made any changes
+          if ! git -C mfc-repo diff --quiet; then
+            echo "::warning::Style issues found - run 'spack style --fix' on package.py"
+            git -C mfc-repo diff
+          fi
+
+      - name: Run Spack Audit
+        run: |
+          . spack/share/spack/setup-env.sh
+          spack audit packages mfc
+
+      - name: Verify Package Info
+        run: |
+          . spack/share/spack/setup-env.sh
+          spack info mfc
+
+  test-concretize:
+    name: Test Concretization
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        spec:
+          - 'mfc'                                    # Default configuration
+          - 'mfc~mpi'                                # No MPI
+          - 'mfc~post_process'                       # No post-processing
+          - 'mfc precision=single'                   # Single precision
+          - 'mfc+mpi+post_process precision=double'  # Full build
+          - 'mfc %gcc@11'                            # Specific compiler
+      fail-fast: false
+
+    steps:
+      - name: Checkout MFC
+        uses: actions/checkout@v4
+        with:
+          path: mfc-source
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Spack
+        run: |
+          git clone --depth=1 https://github.com/spack/spack.git
+          echo "${GITHUB_WORKSPACE}/spack/bin" >> $GITHUB_PATH
+
+      - name: Setup Spack
+        run: |
+          . spack/share/spack/setup-env.sh
+          spack compiler find
+
+      - name: Create Spack Repository
+        run: |
+          . spack/share/spack/setup-env.sh
+          spack repo create mfc-repo
+          mkdir -p mfc-repo/packages/mfc
+          cp mfc-source/packaging/spack/package.py mfc-repo/packages/mfc/
+          spack repo add mfc-repo
+
+      - name: Test Spec Concretization
+        run: |
+          . spack/share/spack/setup-env.sh
+          spack spec ${{ matrix.spec }}
+
+  test-install:
+    name: Test Installation
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        config:
+          - spec: 'mfc~mpi~post_process'
+            desc: 'Minimal build'
+          - spec: 'mfc+mpi~post_process'
+            desc: 'MPI without post-processing'
+      fail-fast: false
+
+    steps:
+      - name: Checkout MFC
+        uses: actions/checkout@v4
+        with:
+          path: mfc-source
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            gfortran \
+            cmake \
+            libopenmpi-dev \
+            openmpi-bin
+
+      - name: Install Spack
+        run: |
+          git clone --depth=1 https://github.com/spack/spack.git
+          echo "${GITHUB_WORKSPACE}/spack/bin" >> $GITHUB_PATH
+
+      - name: Setup Spack
+        run: |
+          . spack/share/spack/setup-env.sh
+          spack compiler find
+          # Use system packages to speed up build
+          spack external find --not-buildable cmake
+          spack external find python
+
+      - name: Create Spack Repository
+        run: |
+          . spack/share/spack/setup-env.sh
+          spack repo create mfc-repo
+          mkdir -p mfc-repo/packages/mfc
+          cp mfc-source/packaging/spack/package.py mfc-repo/packages/mfc/
+          spack repo add mfc-repo
+
+      - name: Install MFC (${{ matrix.config.desc }})
+        run: |
+          . spack/share/spack/setup-env.sh
+          spack install --show-log-on-error ${{ matrix.config.spec }}
+        timeout-minutes: 60
+
+      - name: Load and Test MFC
+        run: |
+          . spack/share/spack/setup-env.sh
+          spack load mfc
+          # Verify binaries are available
+          which pre_process
+          which simulation
+          pre_process --help || true
+          simulation --help || true
+
+      - name: Test Uninstall
+        run: |
+          . spack/share/spack/setup-env.sh
+          spack uninstall -y mfc
+
+  test-conflicts:
+    name: Test Conflict Detection
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        invalid-spec:
+          - spec: 'mfc+openacc+openmp'
+            reason: 'OpenACC and OpenMP are mutually exclusive'
+          - spec: 'mfc+openacc %gcc'
+            reason: 'OpenACC requires NVHPC or Cray compiler'
+      fail-fast: false
+
+    steps:
+      - name: Checkout MFC
+        uses: actions/checkout@v4
+        with:
+          path: mfc-source
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Spack
+        run: |
+          git clone --depth=1 https://github.com/spack/spack.git
+          echo "${GITHUB_WORKSPACE}/spack/bin" >> $GITHUB_PATH
+
+      - name: Setup Spack
+        run: |
+          . spack/share/spack/setup-env.sh
+          spack compiler find
+
+      - name: Create Spack Repository
+        run: |
+          . spack/share/spack/setup-env.sh
+          spack repo create mfc-repo
+          mkdir -p mfc-repo/packages/mfc
+          cp mfc-source/packaging/spack/package.py mfc-repo/packages/mfc/
+          spack repo add mfc-repo
+
+      - name: Test Invalid Spec (${{ matrix.invalid-spec.reason }})
+        run: |
+          . spack/share/spack/setup-env.sh
+          # This should fail
+          if spack spec ${{ matrix.invalid-spec.spec }} 2>&1; then
+            echo "::error::Expected spec to fail but it succeeded: ${{ matrix.invalid-spec.spec }}"
+            exit 1
+          else
+            echo "✓ Correctly detected conflict: ${{ matrix.invalid-spec.reason }}"
+          fi

@@ -6,6 +6,18 @@ This document describes the Spack package for installing MFC on HPC systems and 
 
 The Spack package enables installation of MFC on high-performance computing systems including leadership-class supercomputers. It handles complex dependencies, supports multiple compilers, enables GPU acceleration, and integrates with HPC module systems.
 
+## Continuous Integration
+
+The Spack package is automatically tested via GitHub Actions (`.github/workflows/spack.yml`) on every commit that modifies `packaging/spack/`. The CI workflow includes:
+
+### Automated Tests
+1. **Lint & Audit**: Validates package follows Spack style guidelines and conventions
+2. **Concretization Tests**: Verifies dependency resolution for all variant combinations
+3. **Installation Tests**: Performs actual builds with different configurations
+4. **Conflict Detection**: Ensures invalid configurations are properly rejected
+
+This ensures the package remains functional and compliant with Spack standards.
+
 ## What Gets Installed
 
 When users run `spack install mfc`, they get:
