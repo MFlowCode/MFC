@@ -121,9 +121,10 @@ contains
         call s_mpi_allreduce_integer_sum(num_gps, max_num_gps)
         call s_mpi_allreduce_integer_sum(num_inner_gps, max_num_inner_gps)
 
+        ! set the size of the ghost point arrays to be the amount of points total, plus a factor of 2 buffer
         $:GPU_UPDATE(device='[num_gps, num_inner_gps]')
-        @:ALLOCATE(ghost_points(1:int(max_num_gps * 2.0)))
-        @:ALLOCATE(inner_points(1:int(max_num_inner_gps * 2.0)))
+        @:ALLOCATE(ghost_points(1:int((max_num_gps + max_num_inner_gps) * 2.0)))
+        @:ALLOCATE(inner_points(1:int((max_num_gps + max_num_inner_gps) * 2.0)))
 
         $:GPU_ENTER_DATA(copyin='[ghost_points,inner_points]')
 
@@ -262,6 +263,15 @@ contains
                         norm = norm/buf
                         vel_norm_IP = sum(vel_IP*norm)*norm
                         vel_g = vel_IP - vel_norm_IP
+                        if (patch_ib(patch_id)%moving_ibm /= 0) then
+                            ! compute the linear velocity of the ghost point due to rotation
+                            radial_vector = physical_loc - [patch_ib(patch_id)%x_centroid, &
+                                                            patch_ib(patch_id)%y_centroid, patch_ib(patch_id)%z_centroid]
+                            rotation_velocity = cross_product(matmul(patch_ib(patch_id)%rotation_matrix, patch_ib(patch_id)%angular_vel), radial_vector)
+
+                            ! add only the component of the IB's motion that is normal to the surface
+                            vel_g = vel_g + sum((patch_ib(patch_id)%vel + rotation_velocity)*norm)*norm
+                        end if
                     else
                         if (patch_ib(patch_id)%moving_ibm == 0) then
                             ! we know the object is not moving if moving_ibm is 0 (false)
@@ -922,7 +932,9 @@ contains
         integer :: i, ierr
 
         ! Clears the existing immersed boundary indices
-        ib_markers%sf = 0
+        ib_markers%sf = 0._wp
+        levelset%sf = 0._wp
+        levelset_norm%sf = 0._wp
 
         ! recalulcate the rotation matrix based upon the new angles
         do i = 1, num_ibs
@@ -936,7 +948,8 @@ contains
         ! recompute the new ib_patch locations and broadcast them.
         call s_apply_ib_patches(ib_markers%sf(0:m, 0:n, 0:p), levelset, levelset_norm)
         call s_populate_ib_buffers() ! transmits the new IB markers via MPI
-        $:GPU_UPDATE(device='[ib_markers%sf, levelset%sf, levelset_norm%sf]')
+        $:GPU_UPDATE(device='[ib_markers%sf]')
+        $:GPU_UPDATE(host='[levelset%sf, levelset_norm%sf]')
 
         ! recalculate the ghost point locations and coefficients
         call s_find_num_ghost_points(num_gps, num_inner_gps)
