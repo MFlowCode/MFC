@@ -230,8 +230,8 @@ contains
 
     impure subroutine s_apply_boundary_patches(q_prim_vf, bc_type)
 
-        type(scalar_field), dimension(sys_size) :: q_prim_vf
-        type(integer_field), dimension(1:num_dims, -1:1) :: bc_type
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        type(integer_field), dimension(1:num_dims, -1:1), intent(inout) :: bc_type
         integer :: i
 
         !< Apply 2D patches to 3D domain
