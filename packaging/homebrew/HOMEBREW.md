@@ -41,25 +41,25 @@ Runtime dependencies (needed to run MFC):
 
 The formula executes the following steps during installation:
 
-1. Sets up environment variables for compilers and libraries
-2. Runs `./mfc.sh build` to compile all three binaries
-3. Installs binaries to Homebrew's bin directory
-4. Creates a wrapper script that sets up the environment
-5. Installs Python toolchain and examples
+1. Runs `./mfc.sh build` to compile all three binaries
+2. Installs binaries to Homebrew's bin directory
+3. Installs mfc.sh to libexec for script execution
+4. Installs Python toolchain (required for mfc.sh functionality)
+5. Installs examples to share directory
+6. Creates a wrapper script that sets up the environment
 
 ### Environment Configuration
 
-The formula ensures proper environment setup:
-- BOOST_INCLUDE points to Homebrew's boost installation
-- FC (Fortran compiler) is set to gfortran
-- CC (C compiler) is set to gcc
-- CXX (C++ compiler) is set to g++
+The formula relies on Homebrew's automatic environment setup:
+- Compiler flags are set via the `gcc` dependency (Homebrew's superenv)
+- Library paths are automatically configured
+- The wrapper script sets BOOST_INCLUDE at runtime for user commands
 
 ### Wrapper Script
 
 The installed `mfc` wrapper provides the complete MFC interface. It automatically configures the environment and delegates to the main `mfc.sh` script. Users can run any MFC command through this wrapper:
 
-```
+```bash
 mfc build
 mfc run examples/case.py
 mfc test
@@ -71,7 +71,7 @@ mfc clean
 ### Standard Installation
 
 Users install MFC with:
-```
+```bash
 brew install mfc
 ```
 
@@ -80,7 +80,7 @@ This fetches the source tarball from GitHub releases, verifies the checksum, and
 ### Development Installation
 
 For the latest development version:
-```
+```bash
 brew install --HEAD mfc
 ```
 
@@ -134,7 +134,7 @@ Submit a pull request to homebrew-core for inclusion in the main Homebrew reposi
 
 ### Third-Party Tap
 Create a separate tap (custom repository) for immediate availability:
-```
+```bash
 brew tap organization/mfc
 brew install organization/mfc/mfc
 ```

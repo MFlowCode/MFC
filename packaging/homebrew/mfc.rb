@@ -32,6 +32,11 @@ class Mfc < Formula
     libexec.install "mfc.sh"
 
     # Install Python toolchain
+    # The entire toolchain directory is required because mfc.sh depends on:
+    # - util.sh for shell utilities
+    # - main.py and mfc/ for the Python CLI
+    # - bootstrap/ for build/lint/format scripts
+    # - templates/ for HPC job submission
     prefix.install "toolchain"
     
     # Install examples
