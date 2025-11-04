@@ -36,11 +36,12 @@ class Mfc < Formula
 
     # Build and install Cantera 3.1.0 from source BEFORE MFC build
     resource("cantera").stage do
-      # Install Cantera build dependencies
-      system venv/"bin/pip", "install", "cython", "numpy", "ruamel.yaml", "packaging"
+      # Install Cantera build dependencies (including scons)
+      system venv/"bin/pip", "install", "cython", "numpy", "ruamel.yaml", "packaging", "scons"
 
       # Configure Cantera build
-      system "scons", "build",
+      # Run scons with the venv's Python so it can find installed packages
+      system venv/"bin/python", "-m", "SCons", "build",
              "python_package=y",
              "f90_interface=n",
              "system_sundials=y",
@@ -53,7 +54,7 @@ class Mfc < Formula
              "-j#{ENV.make_jobs}"
 
       # Install Cantera
-      system "scons", "install"
+      system venv/"bin/python", "-m", "SCons", "install"
 
       # Install Cantera Python package into venv
       cd "build/python" do
