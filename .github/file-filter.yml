@@ -8,6 +8,7 @@ fortran_src: &fortran_src
 python_src: &python_src
   - '**/*.py'
   - 'toolchain/pyproject.toml'
+  - '!packaging/**'
 
 cmakelist: &cmakelist
   - 'CMakeLists.txt'
