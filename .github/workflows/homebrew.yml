@@ -61,20 +61,43 @@ jobs:
       - name: Test MFC binaries
         run: |
           echo "Verifying binaries are in PATH and executable..."
+          which mfc
           which pre_process
           which simulation
           which post_process
+          test -x $(which mfc)
           test -x $(which pre_process)
           test -x $(which simulation)
           test -x $(which post_process)
           echo "All binaries are accessible and executable!"
       
+      - name: Test MFC wrapper functionality
+        run: |
+          echo "Testing mfc command..."
+          mfc --help
+          
+          echo "Counting example cases..."
+          mfc count $(brew --prefix)/share/mfc/examples/1D_sodshocktube/case.py
+      
+      - name: Run MFC test case
+        run: |
+          echo "Running a simple test case (1D Sod shock tube)..."
+          cd $(mktemp -d)
+          cp $(brew --prefix)/share/mfc/examples/1D_sodshocktube/case.py .
+          
+          echo "Running with $(sysctl -n hw.ncpu) processors..."
+          mfc run case.py -j $(sysctl -n hw.ncpu)
+          
+          echo "Test case completed successfully!"
+      
       - name: Verify installation structure
         run: |
           echo "Checking installed files..."
+          ls -la $(brew --prefix)/bin/mfc
           ls -la $(brew --prefix)/bin/pre_process
           ls -la $(brew --prefix)/bin/simulation
           ls -la $(brew --prefix)/bin/post_process
+          ls -la $(brew --prefix)/libexec/mfc.sh
           ls -la $(brew --prefix)/share/mfc/examples/
           
           echo "Installation verified successfully!"
