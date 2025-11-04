@@ -86,3 +86,5 @@ benchmarks/*.png
 *.mov
 *.mkv
 *.avi
+
+packaging/spack/spack-test/
