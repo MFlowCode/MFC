@@ -25,8 +25,7 @@ class Mfc < Formula
 
   resource "cantera" do
     url "https://github.com/Cantera/cantera.git",
-        tag:      "v3.1.0",
-        revision: "3882f63dc48cc12bbc3cabb0c5c6e87e9bbaa8a0"
+        tag:      "v3.1.0"
   end
 
   def install
