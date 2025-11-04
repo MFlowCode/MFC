@@ -28,14 +28,13 @@ class Mfc < Formula
            "-j", ENV.make_jobs
 
     # Install binaries
-    # MFC installs to a hashed subdirectory, find it dynamically
-    install_dirs = Dir.glob("build/install/*/bin")
-    raise "Could not find MFC installation directory" if install_dirs.empty?
+    # MFC installs each binary to a separate hashed subdirectory, find them individually
+    %w[pre_process simulation post_process].each do |binary|
+      binary_paths = Dir.glob("build/install/*/bin/#{binary}")
+      raise "Could not find #{binary}" if binary_paths.empty?
 
-    bin_dir = install_dirs.first
-    bin.install "#{bin_dir}/pre_process"
-    bin.install "#{bin_dir}/simulation"
-    bin.install "#{bin_dir}/post_process"
+      bin.install binary_paths.first
+    end
 
     # Install mfc.sh script to libexec (for executable scripts)
     libexec.install "mfc.sh"
