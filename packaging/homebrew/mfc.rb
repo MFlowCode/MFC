@@ -14,7 +14,6 @@ class Mfc < Formula
   depends_on "gcc" => :build
 
   depends_on "boost"
-  depends_on "cantera"
   depends_on "fftw"
   depends_on "hdf5"
   depends_on "open-mpi"
@@ -46,6 +45,10 @@ class Mfc < Formula
 
     # Install examples
     pkgshare.install "examples"
+
+    # Patch pyproject.toml to use available cantera version
+    # Version 3.1.0 doesn't exist on PyPI, use 3.0.1 instead
+    inreplace prefix/"toolchain/pyproject.toml", 'cantera==3.1.0', 'cantera>=3.0.0,<4.0'
 
     # Create Python virtual environment with MFC dependencies
     venv = libexec/"venv"
