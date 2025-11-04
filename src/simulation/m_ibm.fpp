@@ -195,8 +195,9 @@ contains
         real(wp) :: buf
         type(ghost_point) :: gp
         type(ghost_point) :: innerp
+
         if (num_gps > 0) then
-            #:call GPU_PARALLEL_LOOP(private='[physical_loc,dyn_pres,alpha_rho_IP, alpha_IP,pres_IP,vel_IP,vel_g,vel_norm_IP,r_IP, v_IP,pb_IP,mv_IP,nmom_IP,presb_IP,massv_IP,rho, gamma,pi_inf,Re_K,G_K,Gs,gp,innerp,norm,buf, radial_vector, rotation_velocity, j,k,l,q]')
+            #:call GPU_PARALLEL_LOOP(private='[physical_loc,dyn_pres,alpha_rho_IP, alpha_IP,pres_IP,vel_IP,vel_g,vel_norm_IP,r_IP, v_IP,pb_IP,mv_IP,nmom_IP,presb_IP,massv_IP,rho, gamma,pi_inf,Re_K,G_K,Gs,gp,innerp,norm,buf, radial_vector, rotation_velocity, j,k,l,q,qv_K,c_IP,nbub,patch_id]')
                 do i = 1, num_gps
 
                     gp = ghost_points(i)

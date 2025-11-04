@@ -78,7 +78,7 @@ module m_time_steppers
     integer :: stor !< storage index
     real(wp), allocatable, dimension(:, :) :: rk_coef
 
-    $:GPU_DECLARE(create='[q_cons_ts,q_prim_vf,q_T_sf,rhs_vf,q_prim_ts,rhs_mv,rhs_pb,max_dt,rk_coef]')
+    $:GPU_DECLARE(create='[q_cons_ts,q_prim_vf,q_T_sf,rhs_vf,q_prim_ts,rhs_mv,rhs_pb,max_dt,rk_coef,bc_type]')
 
 #if defined(__NVCOMPILER_GPU_UNIFIED_MEM)
     real(wp), allocatable, dimension(:, :, :, :), pinned, target :: q_cons_ts_pool_host
@@ -422,21 +422,21 @@ contains
         end if
 
         ! Allocating arrays to store the bc types
-        @:ALLOCATE(bc_type(1:num_dims,-1:1))
+        @:ALLOCATE(bc_type(1:num_dims,1:2))
 
-        @:ALLOCATE(bc_type(1,-1)%sf(0:0,0:n,0:p))
         @:ALLOCATE(bc_type(1,1)%sf(0:0,0:n,0:p))
+        @:ALLOCATE(bc_type(1,2)%sf(0:0,0:n,0:p))
         if (n > 0) then
-            @:ALLOCATE(bc_type(2,-1)%sf(-buff_size:m+buff_size,0:0,0:p))
             @:ALLOCATE(bc_type(2,1)%sf(-buff_size:m+buff_size,0:0,0:p))
+            @:ALLOCATE(bc_type(2,2)%sf(-buff_size:m+buff_size,0:0,0:p))
             if (p > 0) then
-                @:ALLOCATE(bc_type(3,-1)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,0:0))
                 @:ALLOCATE(bc_type(3,1)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,0:0))
+                @:ALLOCATE(bc_type(3,2)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,0:0))
             end if
         end if
 
         do i = 1, num_dims
-            do j = -1, 1, 2
+            do j = 1, 2
                 @:ACC_SETUP_SFs(bc_type(i,j))
             end do
         end do

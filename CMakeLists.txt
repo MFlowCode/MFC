@@ -196,7 +196,7 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
     add_compile_options(
         $<$<COMPILE_LANGUAGE:Fortran>:-Mfreeform>
         $<$<COMPILE_LANGUAGE:Fortran>:-cpp>
-	      $<$<COMPILE_LANGUAGE:Fortran>:-Minfo=inline>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Minfo=inline>
         $<$<COMPILE_LANGUAGE:Fortran>:-Minfo=accel>
     )
 
@@ -474,10 +474,10 @@ function(MFC_SETUP_TARGET)
             endif()
         endif()
 
-				if (ARGS_LAPACK)
-					find_package(LAPACK REQUIRED)
-					target_link_libraries(${a_target} PRIVATE LAPACK::LAPACK)
-				endif()
+        if (ARGS_LAPACK)
+            find_package(LAPACK REQUIRED)
+            target_link_libraries(${a_target} PRIVATE LAPACK::LAPACK)
+        endif()
 
         if ((MFC_OpenACC AND ARGS_OpenACC) OR (MFC_OpenMP AND ARGS_OpenMP))
             if ((MFC_OpenACC AND ARGS_OpenACC))

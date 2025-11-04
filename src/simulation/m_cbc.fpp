@@ -17,7 +17,7 @@
 !!                           7) Supersonic Inflow
 !!                           8) Supersonic Outflow
 !!              Please refer to Thompson (1987, 1990) for detailed descriptions.
-
+#:include 'case.fpp'
 #:include 'macros.fpp'
 
 module m_cbc
@@ -788,7 +788,7 @@ contains
                 end if
 
                 ! FD2 or FD4 of RHS at j = 0
-                #:call GPU_PARALLEL_LOOP(collapse=2, private='[alpha_rho, vel, adv_local, mf, dvel_ds, dadv_ds, Re_cbc, dalpha_rho_ds,dvel_dt, dadv_dt, dalpha_rho_dt, L, lambda, Ys, dYs_dt, dYs_ds, h_k, Cp_i, Gamma_i, Xs]')
+                #:call GPU_PARALLEL_LOOP(collapse=2, private='[alpha_rho, vel, adv_local, mf, dvel_ds, dadv_ds, Re_cbc, dalpha_rho_ds,dvel_dt, dadv_dt, dalpha_rho_dt, L, lambda, Ys, dYs_dt, dYs_ds, h_k, Cp_i, Gamma_i, Xs, drho_dt, dpres_dt, dpi_inf_dt, dqv_dt, rho, pres, E, H, gamma, pi_inf, qv, c, Ma, T, sum_Enthalpies, Cv, Cp, e_mix, Mw, R_gas]')
                     do r = is3%beg, is3%end
                         do k = is2%beg, is2%end
 
@@ -1033,7 +1033,9 @@ contains
                             if (model_eqns == 1) then
                                 drho_dt = dalpha_rho_dt(1)
                                 dgamma_dt = dadv_dt(1)
-                                dpi_inf_dt = dadv_dt(2)
+                                #:if not MFC_CASE_OPTIMIZATION
+                                    dpi_inf_dt = dadv_dt(2)
+                                #:endif
                             else
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids

@@ -196,7 +196,7 @@ contains
                 end if
             end if
 
-            #:call GPU_PARALLEL_LOOP(collapse=3)
+            #:call GPU_PARALLEL_LOOP(collapse=3,private='[rho_K, G_K]')
                 do q = 0, p
                     do l = 0, n
                         do k = 0, m
@@ -411,7 +411,7 @@ contains
             #:endcall GPU_PARALLEL_LOOP
         elseif (p == 0) then
             q = 0
-            #:call GPU_PARALLEL_LOOP(collapse=2)
+            #:call GPU_PARALLEL_LOOP(collapse=2, private='[tau_p]')
                 do l = 0, n
                     do k = 0, m
                         ! Maximum principal stress
@@ -426,7 +426,7 @@ contains
                 end do
             #:endcall GPU_PARALLEL_LOOP
         else
-            #:call GPU_PARALLEL_LOOP(collapse=3)
+            #:call GPU_PARALLEL_LOOP(collapse=3, private='[tau_xx, tau_xy, tau_yy, tau_xz, tau_yz, tau_zz, I1, I2, I3, temp, sqrt_term_1, sqrt_term_2, argument, phi, tau_p]')
                 do q = 0, p
                     do l = 0, n
                         do k = 0, m

@@ -220,7 +220,7 @@ contains
 
                 deallocate (phi_rn)
 
-                #:call GPU_PARALLEL_LOOP(private='[myalpha,myalpha_rho]')
+                #:call GPU_PARALLEL_LOOP(private='[myalpha,myalpha_rho, myRho, B_tait,c,  small_gamma, frequency_local, gauss_sigma_time_local, mass_src_diff, mom_src_diff, source_temporal, j, k, l, q ]')
                     do i = 1, num_points
                         j = source_spatials(ai)%coord(1, i)
                         k = source_spatials(ai)%coord(2, i)

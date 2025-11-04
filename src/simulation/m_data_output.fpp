@@ -503,7 +503,7 @@ contains
                   FORM='unformatted', &
                   STATUS='new')
 
-            write (2) ib_markers%sf; close (2)
+            write (2) ib_markers%sf(0:m, 0:n, 0:p); close (2)
         end if
 
         gamma = fluid_pp(1)%gamma
@@ -1013,6 +1013,24 @@ contains
             end if
 
             call MPI_FILE_CLOSE(ifile, ierr)
+
+            !Write ib data
+            if (ib) then
+                write (file_loc, '(A)') 'ib.dat'
+                file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+                call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
+                                   mpi_info_int, ifile, ierr)
+
+                var_MOK = int(sys_size + 1, MPI_OFFSET_KIND)
+                disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1 + int(t_step/t_step_save))
+
+                call MPI_FILE_SET_VIEW(ifile, disp, MPI_INTEGER, MPI_IO_IB_DATA%view, &
+                                       'native', mpi_info_int, ierr)
+                call MPI_FILE_WRITE_ALL(ifile, MPI_IO_IB_DATA%var%sf, data_size, &
+                                        MPI_INTEGER, status, ierr)
+                call MPI_FILE_CLOSE(ifile, ierr)
+            end if
+
         end if
 #endif
 
