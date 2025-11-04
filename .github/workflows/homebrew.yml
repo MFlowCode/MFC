@@ -35,7 +35,7 @@ jobs:
       - name: Install formula dependencies
         run: |
           echo "Installing MFC dependencies..."
-          brew install cmake gcc python@3.12 boost fftw hdf5 open-mpi openblas
+          brew install cmake gcc python@3.12 boost cantera fftw hdf5 open-mpi openblas
       
       - name: Validate formula syntax
         run: |
@@ -99,6 +99,11 @@ jobs:
           ls -la $(brew --prefix)/bin/post_process
           ls -la $(brew --prefix)/libexec/mfc.sh
           ls -la $(brew --prefix)/share/mfc/examples/
+          
+          echo "Checking Python venv..."
+          ls -la $(brew --prefix)/Cellar/mfc/*/libexec/venv/
+          $(brew --prefix)/Cellar/mfc/*/libexec/venv/bin/python --version
+          $(brew --prefix)/Cellar/mfc/*/libexec/venv/bin/pip list | grep -E "(cantera|mfc)"
           
           echo "Installation verified successfully!"
       

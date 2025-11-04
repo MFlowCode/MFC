@@ -12,13 +12,14 @@ class Mfc < Formula
 
   depends_on "cmake" => :build
   depends_on "gcc" => :build
-  depends_on "python@3.12" => :build
 
   depends_on "boost"
+  depends_on "cantera"
   depends_on "fftw"
   depends_on "hdf5"
   depends_on "open-mpi"
   depends_on "openblas"
+  depends_on "python@3.12"
 
   def install
     # MFC uses a Python wrapper script for building
@@ -46,11 +47,23 @@ class Mfc < Formula
     # Install examples
     pkgshare.install "examples"
 
+    # Create Python virtual environment with MFC dependencies
+    venv = libexec/"venv"
+    system Formula["python@3.12"].opt_bin/"python3.12", "-m", "venv", venv
+    
+    # Install MFC Python package and dependencies into venv
+    system venv/"bin/pip", "install", "--upgrade", "pip", "setuptools", "wheel"
+    system venv/"bin/pip", "install", "-e", prefix/"toolchain"
+
     # Create a wrapper that sets up a working environment for mfc.sh
-    # The wrapper uses a temporary directory since Cellar is read-only
+    # The wrapper uses a temporary directory since Cellar is read-only and
+    # activates the pre-installed Python virtual environment
     (bin/"mfc").write <<~EOS
       #!/bin/bash
       set -e
+
+      # Activate the pre-installed Python virtual environment
+      source "#{libexec}/venv/bin/activate"
 
       # Create a working directory for MFC in user's cache
       MFC_WORK_DIR="${TMPDIR:-/tmp}/mfc-homebrew-$$"
@@ -67,6 +80,10 @@ class Mfc < Formula
       ln -sf "#{prefix}/toolchain" toolchain
       ln -sf "#{libexec}/mfc.sh" mfc.sh
       ln -sf "#{pkgshare}/examples" examples
+      
+      # Link the venv so mfc.sh doesn't try to create its own
+      mkdir -p build
+      ln -sf "#{libexec}/venv" build/venv
 
       # Set up environment variables
       export MFC_INSTALL_DIR="#{prefix}"
@@ -114,8 +131,16 @@ class Mfc < Formula
     assert_path_exists prefix/"toolchain"
     assert_path_exists prefix/"toolchain/mfc"
 
+    # Verify Python venv was created with dependencies
+    assert_path_exists libexec/"venv"
+    assert_path_exists libexec/"venv/bin/python"
+    assert_path_exists libexec/"venv/bin/pip"
+
     # Verify examples were installed
     assert_path_exists pkgshare/"examples"
     assert_path_exists pkgshare/"examples/1D_sodshocktube/case.py"
+
+    # Test mfc wrapper functionality with pre-installed venv
+    system bin/"mfc", "--help"
   end
 end
