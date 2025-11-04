@@ -42,10 +42,10 @@ class Mfc < Formula
     # - bootstrap/ for build/lint/format scripts
     # - templates/ for HPC job submission
     prefix.install "toolchain"
-    
+
     # Install examples
     pkgshare.install "examples"
-    
+
     # Create a wrapper that sets up the environment and calls mfc.sh
     # The wrapper changes to the installation directory because mfc.sh
     # expects to be run from MFC's root (checks for toolchain/util.sh)
@@ -81,7 +81,7 @@ class Mfc < Formula
     assert_path_exists bin/"pre_process"
     assert_path_exists bin/"simulation"
     assert_path_exists bin/"post_process"
-    
+
     # Test mfc wrapper
     system bin/"mfc", "--help"
 
