@@ -3,8 +3,6 @@
 #
 # SPDX-License-Identifier: (Apache-2.0 OR MIT)
 
-from spack_repo.builtin.build_systems.cmake import CMakePackage
-
 from spack.package import *
 
 
@@ -48,19 +46,19 @@ class Mfc(CMakePackage):
 
     # Optional dependencies
     depends_on("mpi", when="+mpi")
-    depends_on("hdf5", when="+post_process")
-    depends_on("silo", when="+post_process")
+    depends_on("silo+hdf5", when="+post_process")
 
     # GPU dependencies
-    depends_on("cuda", when="+openacc ^nvhpc")
-    depends_on("hip", when="+openacc ^cce")
-    depends_on("hip", when="+openmp ^cce")
+    depends_on("cuda", when="+openacc %nvhpc")
+    depends_on("hip", when="+openacc %cce")
+    depends_on("hip", when="+openmp %cce")
 
     # Compiler requirements
-    conflicts("%gcc@:4", msg="MFC requires GCC 5.0 or newer")
-    conflicts("%nvhpc@:21.6", msg="MFC requires NVHPC 21.7 or newer")
+    conflicts("%gcc@:4.999", msg="MFC requires GCC 5.0 or newer")
+    conflicts("%nvhpc@:21.6.999", msg="MFC requires NVHPC 21.7 or newer")
     conflicts("%apple-clang", msg="MFC does not support Apple Clang")
     conflicts("+openacc", when="%gcc", msg="OpenACC requires NVHPC or Cray compilers")
+    conflicts("+openacc", when="+openmp", msg="OpenACC and OpenMP GPU offload are mutually exclusive")
 
     def cmake_args(self):
         args = [

@@ -247,6 +247,7 @@ Submit to the official Spack repository at https://github.com/spack/spack:
 Create a custom repository for immediate availability:
 ```
 spack repo create my-repo
+mkdir -p my-repo/packages/mfc
 cp package.py my-repo/packages/mfc/package.py
 spack repo add my-repo
 spack install mfc
