@@ -44,8 +44,14 @@ jobs:
       
       - name: Install MFC from formula
         run: |
-          echo "Installing MFC from local formula..."
-          brew install --build-from-source --verbose ./packaging/homebrew/mfc.rb
+          echo "Creating temporary local tap..."
+          brew tap-new mflowcode/test
+          
+          echo "Copying formula to tap..."
+          cp packaging/homebrew/mfc.rb $(brew --repository)/Library/Taps/mflowcode/homebrew-test/Formula/mfc.rb
+          
+          echo "Installing MFC from local tap..."
+          brew install --build-from-source --verbose mflowcode/test/mfc
       
       - name: Run formula tests
         run: |
