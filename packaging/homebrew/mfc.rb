@@ -49,12 +49,18 @@ class Mfc < Formula
       ENV["CXXFLAGS"] = "-isysroot#{sdk_path} -stdlib=libc++"
       ENV["SDKROOT"] = sdk_path.to_s
 
-      # Run scons, explicitly telling it which compilers to use
-      # Add SDK C++ include path to extra_inc_dirs so scons can find standard headers
+      # Also set include path variables for libc++ headers
       cxx_inc_path = "#{sdk_path}/usr/include/c++/v1"
+      ENV["CPPFLAGS"] = ["-I#{cxx_inc_path}", ENV.fetch("CPPFLAGS", nil)].compact.join(" ")
+
+      # Run scons, explicitly passing compiler flags as scons variables
+      # This ensures they apply to scons' configuration test compiles
       system venv/"bin/python", "-m", "SCons", "build",
              "CC=#{ENV.cc}",
              "CXX=#{ENV.cxx}",
+             "CXXFLAGS=#{ENV["CXXFLAGS"]}",
+             "CCFLAGS=#{ENV["CFLAGS"]}",
+             "CPPFLAGS=#{ENV["CPPFLAGS"]}",
              "python_package=y",
              "f90_interface=n",
              "system_sundials=y",
