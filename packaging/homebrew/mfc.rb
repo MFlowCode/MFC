@@ -29,11 +29,9 @@ class Mfc < Formula
     # Install Cantera from PyPI (required dependency for MFC build)
     system venv/"bin/pip", "install", "cantera==3.1.0"
 
-    # Install Python toolchain (needed before build)
-    prefix.install "toolchain"
-
     # Install MFC Python package and dependencies into venv
-    system venv/"bin/pip", "install", "-e", prefix/"toolchain"
+    # Keep toolchain in buildpath for now - mfc.sh needs it there
+    system venv/"bin/pip", "install", "-e", buildpath/"toolchain"
 
     # Create symlink so mfc.sh uses our pre-installed venv
     mkdir_p "build"
@@ -44,17 +42,13 @@ class Mfc < Formula
     ENV["VIRTUAL_ENV"] = venv
 
     # Build MFC using pre-configured venv
-    # Must run from buildpath (MFC root directory)
-    ohai "DEBUG: buildpath = #{buildpath}"
-    ohai "DEBUG: pwd before chdir = #{Dir.pwd}"
-    ohai "DEBUG: buildpath contents = #{Dir.entries(buildpath).join(", ")}"
-
+    # Must run from buildpath (MFC root directory) where toolchain/ exists
     Dir.chdir(buildpath) do
-      ohai "DEBUG: pwd inside chdir = #{Dir.pwd}"
-      ohai "DEBUG: mfc.sh exists? #{File.exist?("./mfc.sh")}"
-      ohai "DEBUG: mfc.sh executable? #{File.executable?("./mfc.sh")}"
       system "./mfc.sh", "build", "-t", "pre_process", "simulation", "post_process", "-j", ENV.make_jobs.to_s
     end
+
+    # After build completes, install Python toolchain to prefix
+    prefix.install "toolchain"
 
     # Install binaries - they're in hashed subdirectories like build/install/<hash>/bin/*
     Dir.glob("build/install/*/bin/*").each do |binary_path|
@@ -63,9 +57,6 @@ class Mfc < Formula
 
     # Install main mfc.sh script
     libexec.install "mfc.sh"
-
-    # Install toolchain directory (already done above, but make sure it stays in prefix)
-    # (already done with prefix.install above)
 
     # Install examples
     prefix.install "examples"
