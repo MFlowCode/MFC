@@ -187,11 +187,19 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     cases.append(define_case_d(stack, f"muscl_lim={muscl_lim}", {'muscl_lim': muscl_lim}))
             stack.pop()
 
+    def alter_time_steppers_1d(dimInfo):
+        # Only add time_stepper tests for 1D to keep runtime low
+        # Tests alternate Runge-Kutta schemes: 1=Euler, 2=RK2, 4=RK4, 5=RK5
+        # (time_stepper=3 is default RK3, already tested everywhere)
+        if len(dimInfo[0]) == 1:  # 1D only
+            for time_stepper in [1, 2, 4, 5]:
+                cases.append(define_case_d(stack, f"time_stepper={time_stepper}",
+                    {'time_stepper': time_stepper, 't_step_stop': 5}))
+
 
     def alter_riemann_solvers(num_fluids):
-        # Test Riemann solvers: 1=HLL, 2=HLLC, 5=Viscous
-        # Note: Solver 3 (Exact) has parameter constraints, Solver 4 (HLLD) requires MHD
-        for riemann_solver in [1, 5, 2]:
+        # Test Riemann solvers: 1=HLL, 2=HLLC, 3=Exact, 5=Viscous
+        for riemann_solver in [1, 5, 2, 3]:
             stack.push(f"riemann_solver={riemann_solver}", {'riemann_solver': riemann_solver})
 
             cases.append(define_case_d(stack, "mixture_err",   {'mixture_err': 'T'}))
@@ -208,6 +216,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         cases.append(define_case_d(stack, 'alt_soundspeed', {'alt_soundspeed': 'T'}))
 
                     cases.append(define_case_d(stack, 'mpp_lim', {'mpp_lim': 'T'}))
+            # Solver 3 (Exact Riemann): Only basic test, no wave_speeds parameter
+            # This avoids "Prohibited condition: riemann_solver == 3 .and. wave_speeds /= dflt_int"
 
             stack.pop()
 
@@ -978,6 +988,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             alter_grcbc(dimInfo)
             alter_weno(dimInfo)
             alter_muscl()
+            alter_time_steppers_1d(dimInfo)
             alter_num_fluids(dimInfo)
             if len(dimInfo[0]) == 2:
                 alter_2d()
