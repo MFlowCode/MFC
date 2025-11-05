@@ -187,8 +187,37 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     cases.append(define_case_d(stack, f"muscl_lim={muscl_lim}", {'muscl_lim': muscl_lim}))
             stack.pop()
 
+    def alter_time_integrators():
+        # Test different Runge-Kutta time integrators
+        # time_stepper: 1=Euler, 2=RK2, 3=RK3 (default), 4=RK4, 5=RK5, 23=TVD-RK3
+        for time_stepper in [1, 2, 4, 5, 23]:
+            cases.append(define_case_d(stack, f"time_stepper={time_stepper}", 
+                {'time_stepper': time_stepper, 't_step_stop': 5}))
+
+    def alter_cfl_modes():
+        # Test CFL adaptation and constant CFL modes
+        cases.append(define_case_d(stack, "cfl_adap_dt=T", 
+            {'cfl_adap_dt': 'T', 'cfl_target': 0.5, 't_step_stop': 10}))
+        cases.append(define_case_d(stack, "cfl_const_dt=T", 
+            {'cfl_const_dt': 'T', 'cfl_target': 0.3, 't_step_stop': 10}))
+
+    def alter_model_equations():
+        # Test different model equation formulations
+        # 1=gamma model, 2=pi-gamma model, 3=5-equation model
+        for model_eqns in [1, 2, 3]:
+            cases.append(define_case_d(stack, f"model_eqns={model_eqns}",
+                {'model_eqns': model_eqns}))
+
+    def alter_grid_stretching():
+        # Test grid stretching options (for non-uniform grids)
+        cases.append(define_case_d(stack, "x_stretch=T",
+            {'x_stretch': 'T', 'a_x': 1.5, 'x_a': -1.0, 'x_b': 1.0}))
+        cases.append(define_case_d(stack, "loops_x=2",
+            {'loops_x': 2}))
+
     def alter_riemann_solvers(num_fluids):
-        for riemann_solver in [1, 5, 2]:
+        # Expanded to test all Riemann solvers: 1=HLL, 2=HLLC, 3=?, 4=HLLD, 5=Viscous
+        for riemann_solver in [1, 5, 2, 3, 4]:
             stack.push(f"riemann_solver={riemann_solver}", {'riemann_solver': riemann_solver})
 
             cases.append(define_case_d(stack, "mixture_err",   {'mixture_err': 'T'}))
@@ -975,6 +1004,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             alter_grcbc(dimInfo)
             alter_weno(dimInfo)
             alter_muscl()
+            alter_time_integrators()
+            alter_cfl_modes()
+            alter_model_equations()
+            alter_grid_stretching()
             alter_num_fluids(dimInfo)
             if len(dimInfo[0]) == 2:
                 alter_2d()
