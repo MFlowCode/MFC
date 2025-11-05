@@ -41,14 +41,14 @@ class Mfc < Formula
       # Configure Cantera build
       # Cantera's scons needs explicit compiler selection and environment variables
       sdk_path = MacOS.sdk_path
-      
+
       # Set environment variables that scons will use during compiler checks
       ENV["CC"] = ENV.cc
       ENV["CXX"] = ENV.cxx
       ENV["CFLAGS"] = "-isysroot#{sdk_path}"
       ENV["CXXFLAGS"] = "-isysroot#{sdk_path} -stdlib=libc++"
       ENV["SDKROOT"] = sdk_path.to_s
-      
+
       # Run scons, explicitly telling it which compilers to use
       system(
         { "SDKROOT" => sdk_path.to_s },
