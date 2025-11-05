@@ -45,7 +45,14 @@ class Mfc < Formula
 
     # Build MFC using pre-configured venv
     # Must run from buildpath (MFC root directory)
+    ohai "DEBUG: buildpath = #{buildpath}"
+    ohai "DEBUG: pwd before chdir = #{Dir.pwd}"
+    ohai "DEBUG: buildpath contents = #{Dir.entries(buildpath).join(", ")}"
+    
     Dir.chdir(buildpath) do
+      ohai "DEBUG: pwd inside chdir = #{Dir.pwd}"
+      ohai "DEBUG: mfc.sh exists? #{File.exist?("./mfc.sh")}"
+      ohai "DEBUG: mfc.sh executable? #{File.executable?("./mfc.sh")}"
       system "./mfc.sh", "build", "-t", "pre_process", "simulation", "post_process", "-j", ENV.make_jobs.to_s
     end
 
