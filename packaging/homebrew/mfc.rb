@@ -26,6 +26,9 @@ class Mfc < Formula
     system Formula["python@3.12"].opt_bin/"python3.12", "-m", "venv", venv
     system venv/"bin/pip", "install", "--upgrade", "pip", "setuptools", "wheel"
 
+    # Install Cantera from PyPI (required dependency for MFC build)
+    system venv/"bin/pip", "install", "cantera==3.1.0"
+
     # Install Python toolchain (needed before build)
     prefix.install "toolchain"
 
@@ -88,17 +91,10 @@ class Mfc < Formula
       To use MFC:
         mfc --help
 
-      Note: For cases requiring chemical kinetics (Cantera), you'll need to install
-      Cantera separately in the MFC virtual environment:
-
-        source #{libexec}/venv/bin/activate
-        pip install cantera
-
-      Alternatively, use conda:
-        conda install -c conda-forge cantera
-
       Examples are available in:
         #{prefix}/examples
+
+      Note: Cantera 3.1.0 is pre-installed in the MFC virtual environment.
     EOS
   end
 
