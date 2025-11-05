@@ -25,9 +25,6 @@ class Mfc(CMakePackage):
     version("master", branch="master")
     version("5.1.0", sha256="4684bee6a529287f243f8929fb7edb0dfebbb04df7c1806459761c9a6c9261cf")
 
-    # Patches
-    patch("fix-chemistry-disabled.patch", when="@5.1.0,master")
-
     # Build options
     variant("mpi", default=True, description="Build with MPI support")
     variant("openacc", default=False, description="Build with OpenACC GPU support")
@@ -44,6 +41,7 @@ class Mfc(CMakePackage):
     depends_on("cmake@3.20:", type="build")
     depends_on("py-fypp", type="build")
     depends_on("python@3:", type="build")
+    depends_on("py-cantera@3:", type="build")
 
     # Runtime dependencies
     depends_on("fftw@3:", when="~mpi")
