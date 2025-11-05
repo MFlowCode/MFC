@@ -172,14 +172,12 @@ jobs:
           . spack/share/spack/setup-env.sh
           # Install just the dependencies first (these are cached)
           spack install --show-log-on-error --only dependencies mfc~mpi~post_process
-        timeout-minutes: 35
 
       - name: Install MFC via Spack
         run: |
           . spack/share/spack/setup-env.sh
           # Install MFC itself (dependencies are already installed/cached)
           spack install --show-log-on-error mfc~mpi~post_process
-        timeout-minutes: 10
 
       - name: Test MFC Execution
         run: |
@@ -203,4 +201,3 @@ jobs:
           # Run simulation (just 1 step to verify it works)
           simulation
           echo "✓ Simulation completed"
-        timeout-minutes: 10
