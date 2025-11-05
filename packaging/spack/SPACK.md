@@ -94,6 +94,7 @@ Build-time dependencies (required during compilation):
 - cmake@3.20 or newer - Build system
 - py-fypp - Fortran preprocessor
 - python@3.0 or newer - Build scripts
+- py-cantera@3.0 or newer - Chemistry library (for future chemistry support)
 
 Runtime dependencies (always required):
 - fftw@3.0 or newer - Fast Fourier Transform library
@@ -145,11 +146,6 @@ The package configures the build environment:
 - Adds py-fypp to PATH for Fortran preprocessing
 - Sets up compiler wrappers for MPI when enabled
 - Configures GPU toolchains when GPU variants are selected
-
-### Patches
-
-The package includes patches to fix build issues:
-- `fix-chemistry-disabled.patch`: Fixes CMake-only builds by providing a stub `num_species` parameter when chemistry support is disabled (default for CMake builds). This allows `m_derived_types` to compile without requiring the generated `m_thermochem` module.
 
 ### CMake Integration
 
