@@ -40,6 +40,34 @@ jobs:
       - name: Test
         run: /bin/bash mfc.sh test -a -j $(nproc)
 
+      - name: Generate Coverage Reports
+        run: |
+          sudo apt install -y gcovr
+          gcovr build/staging --root . \
+            --gcov-executable gcov \
+            --filter 'src/.*' \
+            --html --html-details -o coverage_report.html \
+            --txt -o coverage_summary.txt \
+            --xml -o coverage.xml \
+            --print-summary
+
+      - name: Upload Coverage Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            coverage_report.html
+            coverage_summary.txt
+            coverage.xml
+
+      - name: Comment Coverage Summary
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "## 📊 Coverage Summary" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          cat coverage_summary.txt >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v4
         with:

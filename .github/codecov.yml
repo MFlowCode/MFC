@@ -2,9 +2,9 @@ coverage:
   status:
     project:
       default:
-        target: 1%
-        threshold: 1%
+        target: 80%       # Based on 83.7% baseline with -a flag
+        threshold: 2%     # Allow 2% drop (81.7% minimum)
     patch:
       default:
-        target: 1%
-        threshold: 1%
+        target: 70%       # New code should be reasonably tested
+        threshold: 10%    # Some flexibility for new features
