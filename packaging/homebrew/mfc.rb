@@ -42,7 +42,7 @@ class Mfc < Formula
       # Build flags that include SDK path and standard C++ include directories
       sdk_path = MacOS.sdk_path
       cxx_flags = "-isysroot#{sdk_path} -stdlib=libc++ -I#{sdk_path}/usr/include/c++/v1"
-      
+
       # Run scons with the venv's Python so it can find installed packages
       system venv/"bin/python", "-m", "SCons", "build",
              "python_package=y",
