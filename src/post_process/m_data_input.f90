@@ -674,7 +674,7 @@ contains
 
             ! Initialize MPI data I/O
 
-            call s_initialize_mpi_data_filtered(filtered_fluid_indicator_function, & 
+            call s_initialize_mpi_data_filtered(filtered_fluid_indicator_function, &
                                                 stat_q_cons_filtered, stat_filtered_pressure, &
                                                 stat_reynolds_stress, stat_eff_visc, stat_int_mom_exch)
 
@@ -691,7 +691,7 @@ contains
             WP_MOK = int(8._wp, MPI_OFFSET_KIND)
             MOK = int(1._wp, MPI_OFFSET_KIND)
             str_MOK = int(name_len, MPI_OFFSET_KIND)
-            NVARS_MOK = int(alt_sys, MPI_OFFSET_KIND) 
+            NVARS_MOK = int(alt_sys, MPI_OFFSET_KIND)
 
             call s_setup_mpi_io_params(data_size, m_MOK, n_MOK, p_MOK, WP_MOK, MOK, str_MOK, NVARS_MOK)
 
@@ -703,9 +703,9 @@ contains
                 disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
                 call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
-                                        'native', mpi_info_int, ierr)
+                                       'native', mpi_info_int, ierr)
                 call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                        mpi_p, status, ierr)
+                                       mpi_p, status, ierr)
             end do
 
             call s_mpi_barrier()

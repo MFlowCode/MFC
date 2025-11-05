@@ -842,9 +842,9 @@ contains
 
 #ifdef MFC_MPI
         if (q_filtered_wrt) then
-            allocate (MPI_IO_DATA%view(1:sys_size+1+4*9+4*9+3*4+6*4))
-            allocate (MPI_IO_DATA%var (1:sys_size+1+4*9+4*9+3*4+6*4))
-            do i = 1, sys_size+1+4*9+4*9+3*4+6*4
+            allocate (MPI_IO_DATA%view(1:sys_size + 1 + 4*9 + 4*9 + 3*4 + 6*4))
+            allocate (MPI_IO_DATA%var(1:sys_size + 1 + 4*9 + 4*9 + 3*4 + 6*4))
+            do i = 1, sys_size + 1 + 4*9 + 4*9 + 3*4 + 6*4
                 allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
                 MPI_IO_DATA%var(i)%sf => null()
             end do
@@ -1034,8 +1034,8 @@ contains
                 MPI_IO_DATA%var(i)%sf => null()
             end do
 
-            if (q_filtered_wrt) then 
-                do i = sys_size+1, sys_size+1+4*9+4*9+3*4+6*4
+            if (q_filtered_wrt) then
+                do i = sys_size + 1, sys_size + 1 + 4*9 + 4*9 + 3*4 + 6*4
                     MPI_IO_DATA%var(i)%sf => null()
                 end do
             end if

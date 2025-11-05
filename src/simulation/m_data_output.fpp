@@ -82,9 +82,9 @@ contains
         !! @param q_cons_vf Conservative variables
         !! @param q_prim_vf Primitive variables
         !! @param t_step Current time step
-    impure subroutine s_write_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, bc_type, beta, & 
-                                         filtered_fluid_indicator_function, & 
-                                         stat_q_cons_filtered, stat_filtered_pressure, & 
+    impure subroutine s_write_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, bc_type, beta, &
+                                         filtered_fluid_indicator_function, &
+                                         stat_q_cons_filtered, stat_filtered_pressure, &
                                          stat_reynolds_stress, stat_eff_visc, stat_int_mom_exch)
 
         type(scalar_field), &
@@ -117,9 +117,9 @@ contains
         if (.not. parallel_io) then
             call s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, bc_type, beta)
         else
-            call s_write_parallel_data_files(q_cons_vf, t_step, bc_type, beta, & 
-                                             filtered_fluid_indicator_function, & 
-                                             stat_q_cons_filtered, stat_filtered_pressure, & 
+            call s_write_parallel_data_files(q_cons_vf, t_step, bc_type, beta, &
+                                             filtered_fluid_indicator_function, &
+                                             stat_q_cons_filtered, stat_filtered_pressure, &
                                              stat_reynolds_stress, stat_eff_visc, stat_int_mom_exch)
         end if
 
@@ -798,7 +798,7 @@ contains
         !!  @param beta Eulerian void fraction from lagrangian bubbles
     impure subroutine s_write_parallel_data_files(q_cons_vf, t_step, bc_type, beta, &
                                                   filtered_fluid_indicator_function, &
-                                                  stat_q_cons_filtered, stat_filtered_pressure, & 
+                                                  stat_q_cons_filtered, stat_filtered_pressure, &
                                                   stat_reynolds_stress, stat_eff_visc, stat_int_mom_exch)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
@@ -957,8 +957,8 @@ contains
                 call s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm)
                 if (q_filtered_wrt .and. (t_step == 0 .or. t_step == t_step_stop)) then
                     call s_initialize_mpi_data_filtered(filtered_fluid_indicator_function, &
-                                                        stat_q_cons_filtered, stat_filtered_pressure, & 
-                                                        stat_reynolds_stress, stat_eff_visc, stat_int_mom_exch)                    
+                                                        stat_q_cons_filtered, stat_filtered_pressure, &
+                                                        stat_reynolds_stress, stat_eff_visc, stat_int_mom_exch)
                 end if
             elseif (present(beta)) then
                 call s_initialize_mpi_data(q_cons_vf, beta=beta)

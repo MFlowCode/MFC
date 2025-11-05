@@ -338,9 +338,9 @@ contains
 
         ! file for particle forces
         if (compute_particle_drag) then
-          if (proc_rank == 0) then
-              open (unit=100, file='particle_force.bin', status='replace', form='unformatted', access='stream', action='write')
-          end if
+            if (proc_rank == 0) then
+                open (unit=100, file='particle_force.bin', status='replace', form='unformatted', access='stream', action='write')
+            end if
         end if
 
     end subroutine s_initialize_fftw_explicit_filter_module
@@ -1915,10 +1915,10 @@ contains
         call fftw_destroy_plan(plan_z_c2c_kernelG)
 #endif
 
-        if (compute_particle_drag) then 
-          if (proc_rank == 0) then
-              close (100)
-          end if
+        if (compute_particle_drag) then
+            if (proc_rank == 0) then
+                close (100)
+            end if
         end if
 
     end subroutine s_finalize_fftw_explicit_filter_module
