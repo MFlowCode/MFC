@@ -73,9 +73,6 @@ class Mfc(CMakePackage):
         "+openmp", when="+openacc", msg="OpenACC and OpenMP GPU offload are mutually exclusive"
     )
 
-    # Disable parallel builds to avoid Fortran module dependency race conditions
-    parallel = False
-
     def cmake_args(self):
         args = [
             self.define_from_variant("MFC_MPI", "mpi"),
