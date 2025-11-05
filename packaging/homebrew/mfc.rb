@@ -38,25 +38,34 @@ class Mfc < Formula
       # Install Cantera build dependencies (including scons)
       system venv/"bin/pip", "install", "cython", "numpy", "ruamel.yaml", "packaging", "scons"
 
-      # Configure Cantera build - pass compiler and SDK paths to scons
-      # Build flags that include SDK path and standard C++ include directories
+      # Configure Cantera build
+      # Cantera's scons needs explicit compiler selection and environment variables
       sdk_path = MacOS.sdk_path
-      cxx_flags = "-isysroot#{sdk_path} -stdlib=libc++ -I#{sdk_path}/usr/include/c++/v1"
-
-      # Run scons with the venv's Python so it can find installed packages
-      system venv/"bin/python", "-m", "SCons", "build",
-             "python_package=y",
-             "f90_interface=n",
-             "system_sundials=y",
-             "system_yamlcpp=y",
-             "system_fmt=n",
-             "cc_flags=#{cxx_flags}",
-             "cxx_flags=#{cxx_flags}",
-             "extra_inc_dirs=#{Formula["sundials"].opt_include}:#{Formula["yaml-cpp"].opt_include}",
-             "extra_lib_dirs=#{Formula["sundials"].opt_lib}:#{Formula["yaml-cpp"].opt_lib}",
-             "prefix=#{libexec}/cantera",
-             "python_cmd=#{venv}/bin/python",
-             "-j#{ENV.make_jobs}"
+      
+      # Set environment variables that scons will use during compiler checks
+      ENV["CC"] = ENV.cc
+      ENV["CXX"] = ENV.cxx
+      ENV["CFLAGS"] = "-isysroot#{sdk_path}"
+      ENV["CXXFLAGS"] = "-isysroot#{sdk_path} -stdlib=libc++"
+      ENV["SDKROOT"] = sdk_path.to_s
+      
+      # Run scons, explicitly telling it which compilers to use
+      system(
+        { "SDKROOT" => sdk_path.to_s },
+        venv/"bin/python", "-m", "SCons", "build",
+        "CC=#{ENV.cc}",
+        "CXX=#{ENV.cxx}",
+        "python_package=y",
+        "f90_interface=n",
+        "system_sundials=y",
+        "system_yamlcpp=y",
+        "system_fmt=n",
+        "extra_inc_dirs=#{Formula["sundials"].opt_include}:#{Formula["yaml-cpp"].opt_include}",
+        "extra_lib_dirs=#{Formula["sundials"].opt_lib}:#{Formula["yaml-cpp"].opt_lib}",
+        "prefix=#{libexec}/cantera",
+        "python_cmd=#{venv}/bin/python",
+        "-j#{ENV.make_jobs}"
+      )
 
       # Install Cantera
       system venv/"bin/python", "-m", "SCons", "install"
