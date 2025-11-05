@@ -53,14 +53,14 @@ class Mfc < Formula
       cxx_inc_path = "#{sdk_path}/usr/include/c++/v1"
       ENV["CPPFLAGS"] = ["-I#{cxx_inc_path}", ENV.fetch("CPPFLAGS", nil)].compact.join(" ")
 
-      # Run scons, explicitly passing compiler flags as scons variables
+      # Run scons, explicitly passing compiler flags as Cantera scons variables
+      # Cantera uses cc_flags/cxx_flags, not CCFLAGS/CXXFLAGS
       # This ensures they apply to scons' configuration test compiles
       system venv/"bin/python", "-m", "SCons", "build",
              "CC=#{ENV.cc}",
              "CXX=#{ENV.cxx}",
-             "CXXFLAGS=#{ENV.fetch("CXXFLAGS", nil)}",
-             "CCFLAGS=#{ENV.fetch("CFLAGS", nil)}",
-             "CPPFLAGS=#{ENV.fetch("CPPFLAGS", nil)}",
+             "cc_flags=#{ENV.fetch("CFLAGS", nil)}",
+             "cxx_flags=#{ENV.fetch("CXXFLAGS", nil)}",
              "python_package=y",
              "f90_interface=n",
              "system_sundials=y",
