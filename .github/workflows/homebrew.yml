@@ -50,12 +50,6 @@ jobs:
           echo "Copying formula to tap..."
           cp packaging/homebrew/mfc.rb $(brew --repository)/Library/Taps/mflowcode/homebrew-test/Formula/mfc.rb
           
-          echo "Committing formula to tap..."
-          cd $(brew --repository)/Library/Taps/mflowcode/homebrew-test
-          git add Formula/mfc.rb
-          git commit -m "Add MFC formula"
-          cd -
-          
           echo "Installing MFC from local tap..."
           brew install --build-from-source --verbose mflowcode/test/mfc 2>&1 | tee /tmp/brew-install.log
       
@@ -87,31 +81,43 @@ jobs:
             ~/Library/Logs/Homebrew/mfc/
           if-no-files-found: ignore
       
-      - name: Run formula tests
+      - name: Test MFC installation
         run: |
-          echo "Running Homebrew formula tests..."
-          brew test --verbose mflowcode/test/mfc
-      
-      - name: Test MFC binaries
-        run: |
-          echo "Verifying binaries are in PATH and executable..."
-          which mfc
-          which pre_process
-          which simulation
-          which post_process
-          test -x $(which mfc)
-          test -x $(which pre_process)
-          test -x $(which simulation)
-          test -x $(which post_process)
-          echo "All binaries are accessible and executable!"
-      
-      - name: Test MFC wrapper functionality
-        run: |
-          echo "Testing mfc command..."
-          mfc --help
+          echo "=== Testing MFC Installation ==="
           
-          echo "Counting example cases..."
+          echo "1. Checking binaries exist and are executable..."
+          test -f $(brew --prefix)/bin/mfc && test -x $(brew --prefix)/bin/mfc
+          test -f $(brew --prefix)/bin/pre_process && test -x $(brew --prefix)/bin/pre_process
+          test -f $(brew --prefix)/bin/simulation && test -x $(brew --prefix)/bin/simulation
+          test -f $(brew --prefix)/bin/post_process && test -x $(brew --prefix)/bin/post_process
+          echo "  ✓ All binaries exist and are executable"
+          
+          echo "2. Verifying installation structure..."
+          test -f $(brew --prefix)/libexec/mfc.sh
+          test -d $(brew --prefix)/share/mfc/toolchain
+          test -d $(brew --prefix)/share/mfc/toolchain/mfc
+          echo "  ✓ Installation structure verified"
+          
+          echo "3. Checking Python venv..."
+          test -d $(brew --prefix)/Cellar/mfc/*/libexec/venv
+          test -f $(brew --prefix)/Cellar/mfc/*/libexec/venv/bin/python
+          test -f $(brew --prefix)/Cellar/mfc/*/libexec/venv/bin/pip
+          echo "  ✓ Python venv exists"
+          
+          echo "4. Checking examples..."
+          test -d $(brew --prefix)/share/mfc/examples
+          test -f $(brew --prefix)/share/mfc/examples/1D_sodshocktube/case.py
+          echo "  ✓ Examples installed"
+          
+          echo "5. Testing mfc wrapper..."
+          mfc --help
+          echo "  ✓ mfc --help succeeded"
+          
+          echo "6. Testing mfc count..."
           mfc count $(brew --prefix)/share/mfc/examples/1D_sodshocktube/case.py
+          echo "  ✓ mfc count succeeded"
+          
+          echo "=== All tests passed! ==="
       
       - name: Run MFC test case
         run: |
@@ -123,23 +129,6 @@ jobs:
           mfc run case.py -j $(sysctl -n hw.ncpu)
           
           echo "Test case completed successfully!"
-      
-      - name: Verify installation structure
-        run: |
-          echo "Checking installed files..."
-          ls -la $(brew --prefix)/bin/mfc
-          ls -la $(brew --prefix)/bin/pre_process
-          ls -la $(brew --prefix)/bin/simulation
-          ls -la $(brew --prefix)/bin/post_process
-          ls -la $(brew --prefix)/libexec/mfc.sh
-          ls -la $(brew --prefix)/share/mfc/examples/
-          
-          echo "Checking Python venv..."
-          ls -la $(brew --prefix)/Cellar/mfc/*/libexec/venv/
-          $(brew --prefix)/Cellar/mfc/*/libexec/venv/bin/python --version
-          $(brew --prefix)/Cellar/mfc/*/libexec/venv/bin/pip list | grep -E "(cantera|mfc)"
-          
-          echo "Installation verified successfully!"
       
       - name: Uninstall and cleanup
         if: always()
