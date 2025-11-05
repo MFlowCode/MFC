@@ -172,9 +172,10 @@ jobs:
           # Find the actual builtin repo location
           BUILTIN_REPO=$(spack repo list | grep builtin | awk '{print $NF}')
           echo "Builtin repo location: $BUILTIN_REPO"
-          # Copy package to the builtin repo
+          # Copy package and patch files to the builtin repo
           mkdir -p "$BUILTIN_REPO/packages/mfc"
           cp packaging/spack/package.py "$BUILTIN_REPO/packages/mfc/"
+          cp packaging/spack/*.patch "$BUILTIN_REPO/packages/mfc/" 2>/dev/null || true
           # Verify package is visible
           spack list mfc
 
