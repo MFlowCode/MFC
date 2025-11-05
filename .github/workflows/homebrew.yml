@@ -93,7 +93,7 @@ jobs:
           echo "  ✓ All binaries exist and are executable"
           
           echo "2. Verifying installation structure..."
-          test -f $(brew --prefix)/libexec/mfc.sh
+          test -f $(brew --prefix mfc)/libexec/mfc.sh
           test -d $(brew --prefix)/share/mfc/toolchain
           test -d $(brew --prefix)/share/mfc/toolchain/mfc
           echo "  ✓ Installation structure verified"
