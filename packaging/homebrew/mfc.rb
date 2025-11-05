@@ -50,22 +50,19 @@ class Mfc < Formula
       ENV["SDKROOT"] = sdk_path.to_s
 
       # Run scons, explicitly telling it which compilers to use
-      system(
-        { "SDKROOT" => sdk_path.to_s },
-        venv/"bin/python", "-m", "SCons", "build",
-        "CC=#{ENV.cc}",
-        "CXX=#{ENV.cxx}",
-        "python_package=y",
-        "f90_interface=n",
-        "system_sundials=y",
-        "system_yamlcpp=y",
-        "system_fmt=n",
-        "extra_inc_dirs=#{Formula["sundials"].opt_include}:#{Formula["yaml-cpp"].opt_include}",
-        "extra_lib_dirs=#{Formula["sundials"].opt_lib}:#{Formula["yaml-cpp"].opt_lib}",
-        "prefix=#{libexec}/cantera",
-        "python_cmd=#{venv}/bin/python",
-        "-j#{ENV.make_jobs}"
-      )
+      system venv/"bin/python", "-m", "SCons", "build",
+             "CC=#{ENV.cc}",
+             "CXX=#{ENV.cxx}",
+             "python_package=y",
+             "f90_interface=n",
+             "system_sundials=y",
+             "system_yamlcpp=y",
+             "system_fmt=n",
+             "extra_inc_dirs=#{Formula["sundials"].opt_include}:#{Formula["yaml-cpp"].opt_include}",
+             "extra_lib_dirs=#{Formula["sundials"].opt_lib}:#{Formula["yaml-cpp"].opt_lib}",
+             "prefix=#{libexec}/cantera",
+             "python_cmd=#{venv}/bin/python",
+             "-j#{ENV.make_jobs}"
 
       # Install Cantera
       system venv/"bin/python", "-m", "SCons", "install"
