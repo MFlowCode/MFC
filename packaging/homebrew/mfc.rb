@@ -50,6 +50,8 @@ class Mfc < Formula
       ENV["SDKROOT"] = sdk_path.to_s
 
       # Run scons, explicitly telling it which compilers to use
+      # Add SDK C++ include path to extra_inc_dirs so scons can find standard headers
+      cxx_inc_path = "#{sdk_path}/usr/include/c++/v1"
       system venv/"bin/python", "-m", "SCons", "build",
              "CC=#{ENV.cc}",
              "CXX=#{ENV.cxx}",
@@ -58,7 +60,7 @@ class Mfc < Formula
              "system_sundials=y",
              "system_yamlcpp=y",
              "system_fmt=n",
-             "extra_inc_dirs=#{Formula["sundials"].opt_include}:#{Formula["yaml-cpp"].opt_include}",
+             "extra_inc_dirs=#{cxx_inc_path}:#{Formula["sundials"].opt_include}:#{Formula["yaml-cpp"].opt_include}",
              "extra_lib_dirs=#{Formula["sundials"].opt_lib}:#{Formula["yaml-cpp"].opt_lib}",
              "prefix=#{libexec}/cantera",
              "python_cmd=#{venv}/bin/python",
