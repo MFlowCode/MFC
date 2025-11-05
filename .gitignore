@@ -8,6 +8,17 @@ yarn.lock
 src/*/include/case.fpp
 src/*/autogen/
 
+# Coverage results
+coverage_results/
+coverage_results_*/
+*.gcov
+*.gcda
+*.gcno
+coverage.html
+coverage.xml
+coverage_summary.txt
+coverage_report.html
+
 *.swo
 *.swp
 
