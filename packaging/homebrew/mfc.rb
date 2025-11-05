@@ -65,39 +65,55 @@ class Mfc < Formula
       sundials_lib = Formula["sundials"].opt_lib
       yamlcpp_lib = Formula["yaml-cpp"].opt_lib
 
-      unless system venv/"bin/python", "-m", "SCons", "build",
-                    "CC=#{ENV.cc}",
-                    "CXX=#{ENV.cxx}",
-                    "cc_flags=#{ENV.fetch("CFLAGS", nil)} -I#{sdk_inc_path}",
-                    "cxx_flags=#{cxx_flags_with_includes}",
-                    "python_package=y",
-                    "f90_interface=n",
-                    "system_sundials=y",
-                    "system_yamlcpp=y",
-                    "system_fmt=n",
-                    "extra_inc_dirs=#{cxx_inc_path}:#{sundials_inc}:#{yamlcpp_inc}",
-                    "extra_lib_dirs=#{sundials_lib}:#{yamlcpp_lib}",
-                    "prefix=#{libexec}/cantera",
-                    "python_cmd=#{venv}/bin/python",
-                    "-j#{ENV.make_jobs}"
-        # If scons failed, try to output config.log for debugging
-        ohai "Cantera scons failed. Searching for config.log..."
-        ohai "Current directory: #{Dir.pwd}"
-        system "ls", "-la"
+      # Debug: Show what we're about to run
+      opoo "About to run Cantera scons build in: #{Dir.pwd}"
+      opoo "SDK path: #{sdk_path}"
+      opoo "C++ flags: #{cxx_flags_with_includes}"
 
-        # Search for config.log in current directory and subdirectories
-        config_logs = Dir.glob("**/config.log")
-        if config_logs.any?
-          config_logs.each do |log_path|
-            ohai "Found config.log at: #{log_path}"
-            puts File.read(log_path)
+      success = system venv/"bin/python", "-m", "SCons", "build",
+                       "CC=#{ENV.cc}",
+                       "CXX=#{ENV.cxx}",
+                       "cc_flags=#{ENV.fetch("CFLAGS", nil)} -I#{sdk_inc_path}",
+                       "cxx_flags=#{cxx_flags_with_includes}",
+                       "python_package=y",
+                       "f90_interface=n",
+                       "system_sundials=y",
+                       "system_yamlcpp=y",
+                       "system_fmt=n",
+                       "extra_inc_dirs=#{cxx_inc_path}:#{sundials_inc}:#{yamlcpp_inc}",
+                       "extra_lib_dirs=#{sundials_lib}:#{yamlcpp_lib}",
+                       "prefix=#{libexec}/cantera",
+                       "python_cmd=#{venv}/bin/python",
+                       "-j#{ENV.make_jobs}"
+
+      unless success
+        opoo "=============================================="
+        opoo "Cantera scons build FAILED!"
+        opoo "Current directory: #{Dir.pwd}"
+        opoo "=============================================="
+
+        # Try to find and display config.log
+        config_log_candidates = ["config.log", "build/config.log", ".sconf_temp/conftest.out"]
+        config_log_candidates.each do |candidate|
+          next unless File.exist?(candidate)
+
+          opoo "Found #{candidate}:"
+          File.open(candidate, "r") do |f|
+            puts f.read
           end
-        else
-          ohai "No config.log found. Listing all files:"
-          system "find", ".", "-type", "f", "-name", "*.log"
         end
 
-        raise "Cantera scons build failed"
+        # Also search recursively
+        Dir.glob("**/config.log").each do |path|
+          opoo "Found config.log at: #{path}"
+          puts File.read(path)
+        end
+
+        # List directory contents
+        opoo "Directory listing:"
+        system "ls", "-laR"
+
+        odie "Cantera scons build failed - see config.log output above"
       end
 
       # Install Cantera
