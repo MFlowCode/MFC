@@ -97,3 +97,6 @@ benchmarks/*.png
 *.mov
 *.mkv
 *.avi
+
+
+*.log
