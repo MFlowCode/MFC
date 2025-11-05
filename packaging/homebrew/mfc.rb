@@ -58,21 +58,30 @@ class Mfc < Formula
       # Include both SDK include path and C++ header path for scons' configuration checks
       sdk_inc_path = "#{sdk_path}/usr/include"
       cxx_flags_with_includes = "#{ENV.fetch("CXXFLAGS", nil)} -I#{sdk_inc_path} -I#{cxx_inc_path}"
-      system venv/"bin/python", "-m", "SCons", "build",
-             "CC=#{ENV.cc}",
-             "CXX=#{ENV.cxx}",
-             "cc_flags=#{ENV.fetch("CFLAGS", nil)} -I#{sdk_inc_path}",
-             "cxx_flags=#{cxx_flags_with_includes}",
-             "python_package=y",
-             "f90_interface=n",
-             "system_sundials=y",
-             "system_yamlcpp=y",
-             "system_fmt=n",
-             "extra_inc_dirs=#{cxx_inc_path}:#{Formula["sundials"].opt_include}:#{Formula["yaml-cpp"].opt_include}",
-             "extra_lib_dirs=#{Formula["sundials"].opt_lib}:#{Formula["yaml-cpp"].opt_lib}",
-             "prefix=#{libexec}/cantera",
-             "python_cmd=#{venv}/bin/python",
-             "-j#{ENV.make_jobs}"
+      
+      # Run scons build - output config.log if it fails
+      unless system venv/"bin/python", "-m", "SCons", "build",
+                    "CC=#{ENV.cc}",
+                    "CXX=#{ENV.cxx}",
+                    "cc_flags=#{ENV.fetch("CFLAGS", nil)} -I#{sdk_inc_path}",
+                    "cxx_flags=#{cxx_flags_with_includes}",
+                    "python_package=y",
+                    "f90_interface=n",
+                    "system_sundials=y",
+                    "system_yamlcpp=y",
+                    "system_fmt=n",
+                    "extra_inc_dirs=#{cxx_inc_path}:#{Formula["sundials"].opt_include}:#{Formula["yaml-cpp"].opt_include}",
+                    "extra_lib_dirs=#{Formula["sundials"].opt_lib}:#{Formula["yaml-cpp"].opt_lib}",
+                    "prefix=#{libexec}/cantera",
+                    "python_cmd=#{venv}/bin/python",
+                    "-j#{ENV.make_jobs}"
+        # If scons failed, try to output config.log for debugging
+        if File.exist?("config.log")
+          ohai "Cantera config.log (for debugging):"
+          puts File.read("config.log")
+        end
+        raise "Cantera scons build failed"
+      end
 
       # Install Cantera
       system venv/"bin/python", "-m", "SCons", "install"
