@@ -81,10 +81,22 @@ class Mfc < Formula
                     "python_cmd=#{venv}/bin/python",
                     "-j#{ENV.make_jobs}"
         # If scons failed, try to output config.log for debugging
-        if File.exist?("config.log")
-          ohai "Cantera config.log (for debugging):"
-          puts File.read("config.log")
+        ohai "Cantera scons failed. Searching for config.log..."
+        ohai "Current directory: #{Dir.pwd}"
+        system "ls", "-la"
+        
+        # Search for config.log in current directory and subdirectories
+        config_logs = Dir.glob("**/config.log")
+        if config_logs.any?
+          config_logs.each do |log_path|
+            ohai "Found config.log at: #{log_path}"
+            puts File.read(log_path)
+          end
+        else
+          ohai "No config.log found. Listing all files:"
+          system "find", ".", "-type", "f", "-name", "*.log"
         end
+        
         raise "Cantera scons build failed"
       end
 
