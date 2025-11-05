@@ -48,7 +48,7 @@ class Mfc < Formula
     ohai "DEBUG: buildpath = #{buildpath}"
     ohai "DEBUG: pwd before chdir = #{Dir.pwd}"
     ohai "DEBUG: buildpath contents = #{Dir.entries(buildpath).join(", ")}"
-    
+
     Dir.chdir(buildpath) do
       ohai "DEBUG: pwd inside chdir = #{Dir.pwd}"
       ohai "DEBUG: mfc.sh exists? #{File.exist?("./mfc.sh")}"
