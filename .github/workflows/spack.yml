@@ -171,15 +171,14 @@ jobs:
         run: |
           . spack/share/spack/setup-env.sh
           # Install just the dependencies first (these are cached)
-          spack install --show-log-on-error --only dependencies mfc@master~mpi~post_process
+          spack install --show-log-on-error --only dependencies mfc~mpi~post_process
         timeout-minutes: 35
 
       - name: Install MFC via Spack
         run: |
           . spack/share/spack/setup-env.sh
-          # Install MFC from master branch (v5.1.0 has parallel build issues)
-          # This step is fast since dependencies are already installed
-          spack install --show-log-on-error mfc@master~mpi~post_process
+          # Install MFC itself (dependencies are already installed/cached)
+          spack install --show-log-on-error mfc~mpi~post_process
         timeout-minutes: 10
 
       - name: Test MFC Execution
