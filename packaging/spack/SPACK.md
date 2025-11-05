@@ -146,6 +146,11 @@ The package configures the build environment:
 - Sets up compiler wrappers for MPI when enabled
 - Configures GPU toolchains when GPU variants are selected
 
+### Patches
+
+The package includes patches to fix build issues:
+- `fix-chemistry-disabled.patch`: Fixes CMake-only builds by providing a stub `num_species` parameter when chemistry support is disabled (default for CMake builds). This allows `m_derived_types` to compile without requiring the generated `m_thermochem` module.
+
 ### CMake Integration
 
 Spack automatically handles CMake configuration:

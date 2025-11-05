@@ -1,0 +1,21 @@
+diff --git a/src/common/m_derived_types.fpp b/src/common/m_derived_types.fpp
+index 1234567..7654321 100644
+--- a/src/common/m_derived_types.fpp
++++ b/src/common/m_derived_types.fpp
+@@ -11,10 +11,16 @@ module m_derived_types
+     use m_constants  !< Constants
+ 
+     use m_precision_select
++#:if chemistry
+     use m_thermochem, only: num_species
++#:else
++    ! Chemistry disabled: use dummy value for num_species
++    integer, parameter :: num_species = 1
++#:endif
+ 
+     implicit none
+ 
+     !> Derived type adding the field position (fp) as an attribute
+     type field_position
+         real(wp), allocatable, dimension(:, :, :) :: fp !< Field position
+
