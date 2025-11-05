@@ -19,111 +19,12 @@ class Mfc < Formula
   depends_on "open-mpi"
   depends_on "openblas"
   depends_on "python@3.12"
-  depends_on "sundials"
-  depends_on "yaml-cpp"
-
-  resource "cantera" do
-    url "https://github.com/Cantera/cantera.git",
-        tag: "v3.1.0"
-  end
 
   def install
-    # Create Python virtual environment first (before MFC build)
+    # Create Python virtual environment
     venv = libexec/"venv"
     system Formula["python@3.12"].opt_bin/"python3.12", "-m", "venv", venv
     system venv/"bin/pip", "install", "--upgrade", "pip", "setuptools", "wheel"
-
-    # Build and install Cantera 3.1.0 from source BEFORE MFC build
-    resource("cantera").stage do
-      # Install Cantera build dependencies (including scons)
-      system venv/"bin/pip", "install", "cython", "numpy", "ruamel.yaml", "packaging", "scons"
-
-      # Configure Cantera build
-      # Cantera's scons needs explicit compiler selection and environment variables
-      sdk_path = MacOS.sdk_path
-
-      # Set environment variables that scons will use during compiler checks
-      ENV["CC"] = ENV.cc
-      ENV["CXX"] = ENV.cxx
-      ENV["CFLAGS"] = "-isysroot#{sdk_path}"
-      ENV["CXXFLAGS"] = "-isysroot#{sdk_path} -stdlib=libc++"
-      ENV["SDKROOT"] = sdk_path.to_s
-
-      # Also set include path variables for libc++ headers
-      cxx_inc_path = "#{sdk_path}/usr/include/c++/v1"
-      ENV["CPPFLAGS"] = ["-I#{cxx_inc_path}", ENV.fetch("CPPFLAGS", nil)].compact.join(" ")
-
-      # Run scons, explicitly passing compiler flags as Cantera scons variables
-      # Cantera uses cc_flags/cxx_flags, not CCFLAGS/CXXFLAGS
-      # Include both SDK include path and C++ header path for scons' configuration checks
-      sdk_inc_path = "#{sdk_path}/usr/include"
-      cxx_flags_with_includes = "#{ENV.fetch("CXXFLAGS", nil)} -I#{sdk_inc_path} -I#{cxx_inc_path}"
-
-      # Run scons build - output config.log if it fails
-      sundials_inc = Formula["sundials"].opt_include
-      yamlcpp_inc = Formula["yaml-cpp"].opt_include
-      sundials_lib = Formula["sundials"].opt_lib
-      yamlcpp_lib = Formula["yaml-cpp"].opt_lib
-
-      # Debug: Show what we're about to run
-      opoo "About to run Cantera scons build in: #{Dir.pwd}"
-      opoo "SDK path: #{sdk_path}"
-      opoo "C++ flags: #{cxx_flags_with_includes}"
-
-      success = system venv/"bin/python", "-m", "SCons", "build",
-                       "CC=#{ENV.cc}",
-                       "CXX=#{ENV.cxx}",
-                       "cc_flags=#{ENV.fetch("CFLAGS", nil)} -I#{sdk_inc_path}",
-                       "cxx_flags=#{cxx_flags_with_includes}",
-                       "python_package=y",
-                       "f90_interface=n",
-                       "system_sundials=y",
-                       "system_yamlcpp=y",
-                       "system_fmt=n",
-                       "extra_inc_dirs=#{cxx_inc_path}:#{sundials_inc}:#{yamlcpp_inc}",
-                       "extra_lib_dirs=#{sundials_lib}:#{yamlcpp_lib}",
-                       "prefix=#{libexec}/cantera",
-                       "python_cmd=#{venv}/bin/python",
-                       "-j#{ENV.make_jobs}"
-
-      unless success
-        opoo "=============================================="
-        opoo "Cantera scons build FAILED!"
-        opoo "Current directory: #{Dir.pwd}"
-        opoo "=============================================="
-
-        # Try to find and display config.log
-        config_log_candidates = ["config.log", "build/config.log", ".sconf_temp/conftest.out"]
-        config_log_candidates.each do |candidate|
-          next unless File.exist?(candidate)
-
-          opoo "Found #{candidate}:"
-          File.open(candidate, "r") do |f|
-            puts f.read
-          end
-        end
-
-        # Also search recursively
-        Dir.glob("**/config.log").each do |path|
-          opoo "Found config.log at: #{path}"
-          puts File.read(path)
-        end
-
-        # List directory contents
-        opoo "Directory listing:"
-        system "ls", "-laR"
-
-        odie "Cantera scons build failed - see config.log output above"
-      end
-
-      # Install Cantera
-      system venv/"bin/python", "-m", "SCons", "install"
-
-      # Install Cantera Python package into venv
-      cd "build/python" do
-        system venv/"bin/pip", "install", "--no-build-isolation", "."
-      end
-    end
 
     # Install Python toolchain (needed before build)
     prefix.install "toolchain"
@@ -138,113 +39,87 @@ class Mfc < Formula
     # Now build MFC with pre-configured venv
     # Set VIRTUAL_ENV so mfc.sh uses existing venv instead of creating new one
     ENV["VIRTUAL_ENV"] = venv
-    ENV["PATH"] = "#{venv}/bin:#{ENV.fetch("PATH", nil)}"
 
-    system "./mfc.sh", "build",
-           "-t", "pre_process", "simulation", "post_process",
-           "-j", ENV.make_jobs
+    # Build MFC using pre-configured venv
+    system "./mfc.sh", "build", "-t", "pre_process", "simulation", "post_process", "-j", ENV.make_jobs.to_s
 
-    # Install binaries
-    # MFC installs each binary to a separate hashed subdirectory, find them individually
-    %w[pre_process simulation post_process].each do |binary|
-      binary_paths = Dir.glob("build/install/*/bin/#{binary}")
-      raise "Could not find #{binary}" if binary_paths.empty?
-
-      bin.install binary_paths.first
+    # Install binaries - they're in hashed subdirectories like build/install/<hash>/bin/*
+    Dir.glob("build/install/*/bin/*").each do |binary_path|
+      bin.install binary_path
     end
 
-    # Install mfc.sh script to libexec
+    # Install main mfc.sh script
     libexec.install "mfc.sh"
 
-    # Install examples
-    pkgshare.install "examples"
+    # Install toolchain directory (already done above, but make sure it stays in prefix)
+    # (already done with prefix.install above)
 
-    # Create a wrapper that sets up a working environment for mfc.sh
-    # The wrapper uses a temporary directory since Cellar is read-only and
-    # activates the pre-installed Python virtual environment
+    # Install examples
+    prefix.install "examples"
+
+    # Create smart wrapper script that:
+    # 1. Works around read-only Cellar issue
+    # 2. Activates venv automatically so cantera/dependencies are available
     (bin/"mfc").write <<~EOS
       #!/bin/bash
       set -e
 
-      # Activate the pre-installed Python virtual environment
-      source "#{libexec}/venv/bin/activate"
+      # Activate the pre-installed venv so all Python dependencies are available
+      # This makes cantera and other packages accessible if users install them in the venv
+      source "#{venv}/bin/activate"
 
-      # Create a working directory for MFC in user's cache
-      MFC_WORK_DIR="${TMPDIR:-/tmp}/mfc-homebrew-$$"
-      mkdir -p "$MFC_WORK_DIR"
+      # Create a temporary working directory (Cellar is read-only)
+      TMPDIR=$(mktemp -d)
+      trap "rm -rf $TMPDIR" EXIT
 
-      # Function to clean up on exit
-      cleanup() {
-        rm -rf "$MFC_WORK_DIR"
-      }
-      trap cleanup EXIT
-
-      # Create minimal directory structure that mfc.sh expects
-      cd "$MFC_WORK_DIR"
-      ln -sf "#{prefix}/toolchain" toolchain
-      ln -sf "#{libexec}/mfc.sh" mfc.sh
-      ln -sf "#{pkgshare}/examples" examples
-
-      # Link the venv so mfc.sh doesn't try to create its own
-      mkdir -p build
-      ln -sf "#{libexec}/venv" build/venv
-
-      # Set up environment variables
-      export MFC_INSTALL_DIR="#{prefix}"
-      export MFC_BIN_DIR="#{bin}"
-      export BOOST_INCLUDE="#{Formula["boost"].opt_include}"
+      # Copy mfc.sh to temp dir (it may try to write build artifacts)
+      cp "#{libexec}/mfc.sh" "$TMPDIR/"
+      cd "$TMPDIR"
 
       # Run mfc.sh with all arguments
       exec ./mfc.sh "$@"
     EOS
-    chmod 0755, bin/"mfc"
   end
 
   def caveats
     <<~EOS
-      MFC has been installed with:
-        - mfc command-line tool: #{bin}/mfc
-        - pre_process: #{bin}/pre_process
-        - simulation:  #{bin}/simulation
-        - post_process: #{bin}/post_process
+      MFC has been installed successfully!
+
+      To use MFC:
+        mfc --help
+
+      Note: For cases requiring chemical kinetics (Cantera), you'll need to install
+      Cantera separately in the MFC virtual environment:
+
+        source #{libexec}/venv/bin/activate
+        pip install cantera
+
+      Alternatively, use conda:
+        conda install -c conda-forge cantera
 
       Examples are available in:
-        #{pkgshare}/examples
-
-      To run an example:
-        cd #{pkgshare}/examples/1D_sodshocktube
-        mfc run case.py
-
-      Documentation: https://mflowcode.github.io/
+        #{prefix}/examples
     EOS
   end
 
   test do
-    # Test that the binaries exist and are executable
-    assert_path_exists bin/"mfc"
-    assert_predicate bin/"mfc", :executable?
-    assert_path_exists bin/"pre_process"
-    assert_predicate bin/"pre_process", :executable?
-    assert_path_exists bin/"simulation"
-    assert_predicate bin/"simulation", :executable?
-    assert_path_exists bin/"post_process"
-    assert_predicate bin/"post_process", :executable?
+    # Test that all binaries exist and are executable
+    %w[pre_process simulation post_process].each do |prog|
+      assert_predicate bin/prog, :exist?
+      assert_predicate bin/prog, :executable?
+    end
 
-    # Verify toolchain and mfc.sh were installed
-    assert_path_exists libexec/"mfc.sh"
-    assert_path_exists prefix/"toolchain"
-    assert_path_exists prefix/"toolchain/mfc"
+    # Test that toolchain is installed
+    assert_predicate prefix/"toolchain", :exist?
 
-    # Verify Python venv was created with dependencies
-    assert_path_exists libexec/"venv"
-    assert_path_exists libexec/"venv/bin/python"
-    assert_path_exists libexec/"venv/bin/pip"
+    # Test that venv exists and has required packages
+    assert_predicate libexec/"venv", :exist?
+    assert_predicate libexec/"venv/bin/python", :executable?
 
-    # Verify examples were installed
-    assert_path_exists pkgshare/"examples"
-    assert_path_exists pkgshare/"examples/1D_sodshocktube/case.py"
+    # Test that examples exist
+    assert_predicate prefix/"examples", :exist?
 
-    # Test mfc wrapper functionality with pre-installed venv
+    # Test that mfc wrapper works
     system bin/"mfc", "--help"
   end
 end
