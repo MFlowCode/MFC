@@ -84,7 +84,7 @@ class Mfc < Formula
         ohai "Cantera scons failed. Searching for config.log..."
         ohai "Current directory: #{Dir.pwd}"
         system "ls", "-la"
-        
+
         # Search for config.log in current directory and subdirectories
         config_logs = Dir.glob("**/config.log")
         if config_logs.any?
@@ -96,7 +96,7 @@ class Mfc < Formula
           ohai "No config.log found. Listing all files:"
           system "find", ".", "-type", "f", "-name", "*.log"
         end
-        
+
         raise "Cantera scons build failed"
       end
 
