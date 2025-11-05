@@ -58,8 +58,13 @@ class Mfc < Formula
       # Include both SDK include path and C++ header path for scons' configuration checks
       sdk_inc_path = "#{sdk_path}/usr/include"
       cxx_flags_with_includes = "#{ENV.fetch("CXXFLAGS", nil)} -I#{sdk_inc_path} -I#{cxx_inc_path}"
-      
+
       # Run scons build - output config.log if it fails
+      sundials_inc = Formula["sundials"].opt_include
+      yamlcpp_inc = Formula["yaml-cpp"].opt_include
+      sundials_lib = Formula["sundials"].opt_lib
+      yamlcpp_lib = Formula["yaml-cpp"].opt_lib
+
       unless system venv/"bin/python", "-m", "SCons", "build",
                     "CC=#{ENV.cc}",
                     "CXX=#{ENV.cxx}",
@@ -70,8 +75,8 @@ class Mfc < Formula
                     "system_sundials=y",
                     "system_yamlcpp=y",
                     "system_fmt=n",
-                    "extra_inc_dirs=#{cxx_inc_path}:#{Formula["sundials"].opt_include}:#{Formula["yaml-cpp"].opt_include}",
-                    "extra_lib_dirs=#{Formula["sundials"].opt_lib}:#{Formula["yaml-cpp"].opt_lib}",
+                    "extra_inc_dirs=#{cxx_inc_path}:#{sundials_inc}:#{yamlcpp_inc}",
+                    "extra_lib_dirs=#{sundials_lib}:#{yamlcpp_lib}",
                     "prefix=#{libexec}/cantera",
                     "python_cmd=#{venv}/bin/python",
                     "-j#{ENV.make_jobs}"
