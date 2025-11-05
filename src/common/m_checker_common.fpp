@@ -184,6 +184,11 @@ contains
         @:PROHIBIT(ib .and. n <= 0, "Immersed Boundaries do not work in 1D")
         @:PROHIBIT(ib .and. (num_ibs <= 0 .or. num_ibs > num_patches_max), "num_ibs must be between 1 and num_patches_max")
         @:PROHIBIT((.not. ib) .and. num_ibs > 0, "num_ibs is set, but ib is not enabled")
+        #:for X in ['x', 'y', 'z']
+            #:for BOUND in ['beg', 'end']
+                @:PROHIBIT(periodic_ibs .and. bc_${X}$%${BOUND}$ /= BC_PERIODIC, "periodic ibs requires periodic BCs, bc_${X}$%${BOUND}$ must = -1")
+            #:endfor
+        #:endfor
     end subroutine s_check_inputs_ibm
 
 #endif

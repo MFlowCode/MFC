@@ -66,6 +66,9 @@ COMMON = {
     'down_sample': ParamType.LOG,
     'recon_type': ParamType.INT,
     'muscl_order': ParamType.INT,
+    'periodic_ibs': ParamType.LOG,
+    'store_levelset': ParamType.LOG,
+    'slab_domain_decomposition': ParamType.LOG,
 }
 
 PRE_PROCESS = COMMON.copy()
@@ -109,7 +112,7 @@ PRE_PROCESS.update({
     'fft_wrt': ParamType.LOG,
 })
 
-for ib_id in range(1, 10+1):
+for ib_id in range(1, 1000+1):
     for real_attr, ty in [("geometry", ParamType.INT), ("radius", ParamType.REAL),
                           ("theta", ParamType.REAL), ("slip", ParamType.LOG),
                           ("c", ParamType.REAL), ("p", ParamType.REAL),
@@ -324,6 +327,15 @@ SIMULATION.update({
     'nv_uvm_igr_temps_on_gpu': ParamType.INT,
     'nv_uvm_pref_gpu': ParamType.LOG,
     'fft_wrt': ParamType.LOG,
+    'compute_particle_drag': ParamType.LOG,
+    'u_inf_ref': ParamType.REAL,
+    'rho_inf_ref': ParamType.REAL,
+    'P_inf_ref': ParamType.REAL,
+    'periodic_forcing': ParamType.LOG,
+    'volume_filtering_momentum_eqn': ParamType.LOG,
+    't_step_stat_start': ParamType.INT,
+    'filter_width': ParamType.REAL,
+    'q_filtered_wrt': ParamType.LOG,
 })
 
 for var in [ 'heatTransfer_model', 'massTransfer_model', 'pressure_corrector',
@@ -343,7 +355,7 @@ for var in [ 'diffusion', 'reactions' ]:
 for var in [ 'gamma_method' ]:
     SIMULATION[f'chem_params%{var}'] = ParamType.INT
 
-for ib_id in range(1, 10+1):
+for ib_id in range(1, 1000+1):
     for real_attr, ty in [("geometry", ParamType.INT), ("radius", ParamType.REAL),
                           ("theta", ParamType.REAL), ("slip", ParamType.LOG),
                           ("c", ParamType.REAL), ("p", ParamType.REAL),
@@ -489,6 +501,7 @@ POST_PROCESS.update({
     'lag_mg_wrt': ParamType.LOG,
     'lag_betaT_wrt': ParamType.LOG,
     'lag_betaC_wrt': ParamType.LOG,
+    'q_filtered_wrt': ParamType.LOG,
 })
 
 for cmp in ["x", "y", "z"]:

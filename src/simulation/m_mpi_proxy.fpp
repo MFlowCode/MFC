@@ -100,7 +100,7 @@ contains
             & 'num_probes', 'num_integrals', 'bubble_model', 'thermal',        &
             & 'num_source', 'relax_model', 'num_ibs', 'n_start',    &
             & 'num_bc_patches', 'num_igr_iters', 'num_igr_warm_start_iters', &
-            & 'adap_dt_max_iters' ]
+            & 'adap_dt_max_iters', 't_step_stat_start' ]
             call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -116,7 +116,10 @@ contains
             & 'bc_z%grcbc_in', 'bc_z%grcbc_out', 'bc_z%grcbc_vel_out',          &
             & 'cfl_adap_dt', 'cfl_const_dt', 'cfl_dt', 'surface_tension',       &
             & 'shear_stress', 'bulk_stress', 'bubbles_lagrange',                &
-            & 'hyperelasticity', 'down_sample', 'int_comp','fft_wrt' ]
+            & 'hyperelasticity', 'down_sample', 'int_comp','fft_wrt',           &
+            & 'periodic_ibs', 'compute_particle_drag', 'periodic_forcing',      &
+            & 'volume_filtering_momentum_eqn', 'store_levelset',                &
+            'slab_domain_decomposition', 'q_filtered_wrt' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -156,7 +159,8 @@ contains
             & 'z_domain%beg', 'z_domain%end', 'x_a', 'x_b', 'y_a', 'y_b', 'z_a', &
             & 'z_b', 't_stop', 't_save', 'cfl_target', 'Bx0', 'alf_factor',  &
             & 'tau_star', 'cont_damage_s', 'alpha_bar', 'adap_dt_tol', &
-            & 'ic_eps', 'ic_beta' ]
+            & 'ic_eps', 'ic_beta', 'u_inf_ref', 'rho_inf_ref', 'P_inf_ref',      &
+            'filter_width' ]
             call MPI_BCAST(${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -202,8 +206,8 @@ contains
         end do
 
         do i = 1, num_ibs
-            #:for VAR in [ 'radius', 'length_x', 'length_y', &
-                & 'x_centroid', 'y_centroid', 'c', 'm', 'p', 't', 'theta', 'slip']
+            #:for VAR in [ 'radius', 'length_x', 'length_y', 'length_z', &
+                & 'x_centroid', 'y_centroid', 'z_centroid', 'c', 'm', 'p', 't', 'theta', 'slip']
                 call MPI_BCAST(patch_ib(i)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
             #:for VAR in ['vel', 'angular_vel', 'angles']

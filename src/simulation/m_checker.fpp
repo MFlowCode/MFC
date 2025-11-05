@@ -401,6 +401,14 @@ contains
     impure subroutine s_check_inputs_misc
         @:PROHIBIT(probe_wrt .and. fd_order == dflt_int, "fd_order must be specified for probe_wrt")
         @:PROHIBIT(integral_wrt .and. (.not. bubbles_euler))
+        #:for X in ['x', 'y', 'z']
+            #:for BOUND in ['beg', 'end']
+                @:PROHIBIT(periodic_forcing .and. bc_${X}$%${BOUND}$ /= BC_PERIODIC, &
+                    "Periodic forcing requires all BCs to be periodic")
+                @:PROHIBIT(volume_filtering_momentum_eqn .and. bc_${X}$%${BOUND}$ /= BC_PERIODIC, &
+                    "Explicit filtering of flow data requires all BCs to be periodic due to fourier transform")
+            #:endfor
+        #:endfor
     end subroutine s_check_inputs_misc
 
     impure subroutine s_check_inputs_mhd

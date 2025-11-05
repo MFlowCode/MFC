@@ -82,7 +82,10 @@ contains
         !! @param q_cons_vf Conservative variables
         !! @param q_prim_vf Primitive variables
         !! @param t_step Current time step
-    impure subroutine s_write_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, bc_type, beta)
+    impure subroutine s_write_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, bc_type, beta, & 
+                                         filtered_fluid_indicator_function, & 
+                                         stat_q_cons_filtered, stat_filtered_pressure, & 
+                                         stat_reynolds_stress, stat_eff_visc, stat_int_mom_exch)
 
         type(scalar_field), &
             dimension(sys_size), &
@@ -104,10 +107,20 @@ contains
             dimension(1:num_dims, -1:1), &
             intent(in) :: bc_type
 
+        type(scalar_field), intent(inout), optional :: filtered_fluid_indicator_function
+        type(vector_field), dimension(1:9), intent(inout), optional :: stat_reynolds_stress
+        type(vector_field), dimension(1:9), intent(inout), optional :: stat_eff_visc
+        type(vector_field), dimension(1:3), intent(inout), optional :: stat_int_mom_exch
+        type(vector_field), dimension(1:5), intent(inout), optional :: stat_q_cons_filtered
+        type(scalar_field), dimension(1:4), intent(inout), optional :: stat_filtered_pressure
+
         if (.not. parallel_io) then
             call s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, bc_type, beta)
         else
-            call s_write_parallel_data_files(q_cons_vf, t_step, bc_type, beta)
+            call s_write_parallel_data_files(q_cons_vf, t_step, bc_type, beta, & 
+                                             filtered_fluid_indicator_function, & 
+                                             stat_q_cons_filtered, stat_filtered_pressure, & 
+                                             stat_reynolds_stress, stat_eff_visc, stat_int_mom_exch)
         end if
 
     end subroutine s_write_data_files
@@ -783,11 +796,21 @@ contains
         !!  @param q_cons_vf Cell-average conservative variables
         !!  @param t_step Current time-step
         !!  @param beta Eulerian void fraction from lagrangian bubbles
-    impure subroutine s_write_parallel_data_files(q_cons_vf, t_step, bc_type, beta)
+    impure subroutine s_write_parallel_data_files(q_cons_vf, t_step, bc_type, beta, &
+                                                  filtered_fluid_indicator_function, &
+                                                  stat_q_cons_filtered, stat_filtered_pressure, & 
+                                                  stat_reynolds_stress, stat_eff_visc, stat_int_mom_exch)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         integer, intent(in) :: t_step
         type(scalar_field), intent(inout), optional :: beta
+        type(scalar_field), intent(inout), optional :: filtered_fluid_indicator_function
+        type(vector_field), dimension(1:sys_size - 1), intent(inout), optional :: stat_q_cons_filtered
+        type(scalar_field), dimension(1:4), intent(inout), optional :: stat_filtered_pressure
+        type(vector_field), dimension(1:9), intent(inout), optional :: stat_reynolds_stress
+        type(vector_field), dimension(1:9), intent(inout), optional :: stat_eff_visc
+        type(vector_field), dimension(1:3), intent(inout), optional :: stat_int_mom_exch
+
         type(integer_field), &
             dimension(1:num_dims, -1:1), &
             intent(in) :: bc_type
@@ -823,6 +846,8 @@ contains
 
         if (present(beta)) then
             alt_sys = sys_size + 1
+        else if (q_filtered_wrt .and. (t_step == 0 .or. t_step == t_step_stop)) then
+            alt_sys = sys_size + 1 + 9*4 + 9*4 + 3*4 + 6*4
         else
             alt_sys = sys_size
         end if
@@ -930,6 +955,11 @@ contains
 
             if (ib) then
                 call s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm)
+                if (q_filtered_wrt .and. (t_step == 0 .or. t_step == t_step_stop)) then
+                    call s_initialize_mpi_data_filtered(filtered_fluid_indicator_function, &
+                                                        stat_q_cons_filtered, stat_filtered_pressure, & 
+                                                        stat_reynolds_stress, stat_eff_visc, stat_int_mom_exch)                    
+                end if
             elseif (present(beta)) then
                 call s_initialize_mpi_data(q_cons_vf, beta=beta)
             else
@@ -984,6 +1014,18 @@ contains
                                                 mpi_p, status, ierr)
                     end do
                 end if
+            else if (volume_filtering_momentum_eqn) then
+                do i = 1, alt_sys
+                    var_MOK = int(i, MPI_OFFSET_KIND)
+
+                    ! Initial displacement to skip at beginning of file
+                    disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
+
+                    call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
+                                           'native', mpi_info_int, ierr)
+                    call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                                            mpi_p, status, ierr)
+                end do
             else
                 do i = 1, sys_size !TODO: check if correct (sys_size
                     var_MOK = int(i, MPI_OFFSET_KIND)

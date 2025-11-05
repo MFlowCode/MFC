@@ -825,45 +825,47 @@ contains
 
             call MPI_FILE_CLOSE(ifile, ierr)
 
-            ! Levelset
-            write (file_loc, '(A)') 'levelset.dat'
-            file_loc = trim(restart_dir)//trim(mpiiofs)//trim(file_loc)
-            inquire (FILE=trim(file_loc), EXIST=file_exist)
-            if (file_exist .and. proc_rank == 0) then
-                call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
+            if (store_levelset) then
+                ! Levelset
+                write (file_loc, '(A)') 'levelset.dat'
+                file_loc = trim(restart_dir)//trim(mpiiofs)//trim(file_loc)
+                inquire (FILE=trim(file_loc), EXIST=file_exist)
+                if (file_exist .and. proc_rank == 0) then
+                    call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
+                end if
+                call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
+                                   mpi_info_int, ifile, ierr)
+
+                ! Initial displacement to skip at beginning of file
+                disp = 0
+
+                call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_levelset_DATA%view, &
+                                       'native', mpi_info_int, ierr)
+                call MPI_FILE_WRITE_ALL(ifile, MPI_IO_levelset_DATA%var%sf, data_size*num_ibs, &
+                                        mpi_p, status, ierr)
+
+                call MPI_FILE_CLOSE(ifile, ierr)
+
+                ! Levelset Norm
+                write (file_loc, '(A)') 'levelset_norm.dat'
+                file_loc = trim(restart_dir)//trim(mpiiofs)//trim(file_loc)
+                inquire (FILE=trim(file_loc), EXIST=file_exist)
+                if (file_exist .and. proc_rank == 0) then
+                    call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
+                end if
+                call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
+                                   mpi_info_int, ifile, ierr)
+
+                ! Initial displacement to skip at beginning of file
+                disp = 0
+
+                call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_levelsetnorm_DATA%view, &
+                                       'native', mpi_info_int, ierr)
+                call MPI_FILE_WRITE_ALL(ifile, MPI_IO_levelsetnorm_DATA%var%sf, data_size*num_ibs*3, &
+                                        mpi_p, status, ierr)
+
+                call MPI_FILE_CLOSE(ifile, ierr)
             end if
-            call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
-                               mpi_info_int, ifile, ierr)
-
-            ! Initial displacement to skip at beginning of file
-            disp = 0
-
-            call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_levelset_DATA%view, &
-                                   'native', mpi_info_int, ierr)
-            call MPI_FILE_WRITE_ALL(ifile, MPI_IO_levelset_DATA%var%sf, data_size*num_ibs, &
-                                    mpi_p, status, ierr)
-
-            call MPI_FILE_CLOSE(ifile, ierr)
-
-            ! Levelset Norm
-            write (file_loc, '(A)') 'levelset_norm.dat'
-            file_loc = trim(restart_dir)//trim(mpiiofs)//trim(file_loc)
-            inquire (FILE=trim(file_loc), EXIST=file_exist)
-            if (file_exist .and. proc_rank == 0) then
-                call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
-            end if
-            call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
-                               mpi_info_int, ifile, ierr)
-
-            ! Initial displacement to skip at beginning of file
-            disp = 0
-
-            call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_levelsetnorm_DATA%view, &
-                                   'native', mpi_info_int, ierr)
-            call MPI_FILE_WRITE_ALL(ifile, MPI_IO_levelsetnorm_DATA%var%sf, data_size*num_ibs*3, &
-                                    mpi_p, status, ierr)
-
-            call MPI_FILE_CLOSE(ifile, ierr)
         end if
 
         if (ib) then

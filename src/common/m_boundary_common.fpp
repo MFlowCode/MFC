@@ -35,6 +35,7 @@ module m_boundary_common
 
     private; public :: s_initialize_boundary_common_module, &
  s_populate_variables_buffers, &
+ s_populate_scalarfield_buffers, & 
  s_create_mpi_types, &
  s_populate_capillary_buffers, &
  s_populate_F_igr_buffers, &
@@ -275,6 +276,109 @@ contains
         ! END: Population of Buffers in z-direction
 
     end subroutine s_populate_variables_buffers
+
+    !>  The purpose of this procedure is to populate the buffers
+    !!      of any scalarfield variable, currently only with periodic boundary conditions
+    impure subroutine s_populate_scalarfield_buffers(bc_type, q_temp)
+
+        type(scalar_field), intent(inout) :: q_temp
+        type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
+
+        integer :: k, l
+
+        ! Population of Buffers in x-direction
+        if (bc_x%beg >= 0) then
+            call s_mpi_sendrecv_variables_buffers_scalarfield(q_temp, 1, -1)
+        else
+            $:GPU_PARALLEL_LOOP(collapse=2)
+            do l = 0, p
+                do k = 0, n
+                    select case (int(bc_type(1, -1)%sf(0, k, l)))
+                    case (BC_PERIODIC)
+                        call s_periodic_scalarfield(q_temp, 1, -1, k, l)
+                    end select
+                end do
+            end do
+        end if
+
+        if (bc_x%end >= 0) then
+            call s_mpi_sendrecv_variables_buffers_scalarfield(q_temp, 1, 1)
+        else
+            $:GPU_PARALLEL_LOOP(collapse=2)
+            do l = 0, p
+                do k = 0, n
+                    select case (int(bc_type(1, 1)%sf(0, k, l)))
+                    case (BC_PERIODIC)
+                        call s_periodic_scalarfield(q_temp, 1, 1, k, l)
+                    end select
+                end do
+            end do
+        end if
+
+        ! Population of Buffers in y-direction
+        if (n == 0) return
+
+        if (bc_y%beg >= 0) then
+            call s_mpi_sendrecv_variables_buffers_scalarfield(q_temp, 2, -1)
+        else
+            $:GPU_PARALLEL_LOOP(collapse=2)
+            do l = 0, p
+                do k = -buff_size, m + buff_size
+                    select case (int(bc_type(2, -1)%sf(k, 0, l)))
+                    case (BC_PERIODIC)
+                        call s_periodic_scalarfield(q_temp, 2, -1, k, l)
+                    end select
+                end do
+            end do
+        end if
+
+        if (bc_y%end >= 0) then
+            call s_mpi_sendrecv_variables_buffers_scalarfield(q_temp, 2, 1)
+        else
+            $:GPU_PARALLEL_LOOP(collapse=2)
+            do l = 0, p
+                do k = -buff_size, m + buff_size
+                    select case (int(bc_type(2, 1)%sf(k, 0, l)))
+                    case (BC_PERIODIC)
+                        call s_periodic_scalarfield(q_temp, 2, 1, k, l)
+                    end select
+                end do
+            end do
+        end if
+
+        ! Population of Buffers in z-direction
+
+        if (p == 0) return
+        if (bc_z%beg >= 0) then
+            call s_mpi_sendrecv_variables_buffers_scalarfield(q_temp, 3, -1)
+        else
+            $:GPU_PARALLEL_LOOP(collapse=2)
+            do l = -buff_size, n + buff_size
+                do k = -buff_size, m + buff_size
+                    select case (int(bc_type(3, -1)%sf(k, l, 0)))
+                    case (BC_PERIODIC)
+                        call s_periodic_scalarfield(q_temp, 3, -1, k, l)
+                    end select
+                end do
+            end do
+        end if
+
+        if (bc_z%end >= 0) then
+            call s_mpi_sendrecv_variables_buffers_scalarfield(q_temp, 3, 1)
+        else
+            $:GPU_PARALLEL_LOOP(collapse=2)
+            do l = -buff_size, n + buff_size
+                do k = -buff_size, m + buff_size
+                    select case (int(bc_type(3, 1)%sf(k, l, 0)))
+                    case (BC_PERIODIC)
+                        call s_periodic_scalarfield(q_temp, 3, 1, k, l)
+                    end select
+                end do
+            end do
+        end if
+        ! END: Population of Buffers in z-direction
+
+    end subroutine s_populate_scalarfield_buffers
 
     pure subroutine s_ghost_cell_extrapolation(q_prim_vf, bc_dir, bc_loc, k, l)
         $:GPU_ROUTINE(function_name='s_ghost_cell_extrapolation', &
@@ -735,6 +839,61 @@ contains
         end if
 
     end subroutine s_periodic
+
+    !< Populate periodic boundaries for arbitrary scalarfield quantity
+    pure subroutine s_periodic_scalarfield(q_temp, bc_dir, bc_loc, k, l)
+        $:GPU_ROUTINE(parallelism='[seq]')
+        type(scalar_field), intent(inout) :: q_temp
+        integer, intent(in) :: bc_dir, bc_loc
+        integer, intent(in) :: k, l
+
+        integer :: j, q
+
+        if (bc_dir == 1) then !< x-direction
+            if (bc_loc == -1) then !< bc_x%beg
+                do j = 1, buff_size
+                    q_temp%sf(-j, k, l) = &
+                        q_temp%sf(m - (j - 1), k, l)
+                end do
+
+            else !< bc_x%end
+                do j = 1, buff_size
+                    q_temp%sf(m + j, k, l) = &
+                        q_temp%sf(j - 1, k, l)
+                end do
+            end if
+
+        elseif (bc_dir == 2) then !< y-direction
+            if (bc_loc == -1) then !< bc_y%beg
+                do j = 1, buff_size
+                    q_temp%sf(k, -j, l) = &
+                        q_temp%sf(k, n - (j - 1), l)
+                end do
+
+            else !< bc_y%end
+                do j = 1, buff_size
+                    q_temp%sf(k, n + j, l) = &
+                        q_temp%sf(k, j - 1, l)
+                end do
+            end if
+
+        elseif (bc_dir == 3) then !< z-direction
+            if (bc_loc == -1) then !< bc_z%beg
+                do j = 1, buff_size
+                    q_temp%sf(k, l, -j) = &
+                        q_temp%sf(k, l, p - (j - 1))
+                end do
+
+            else !< bc_z%end
+                do j = 1, buff_size
+                    q_temp%sf(k, l, p + j) = &
+                        q_temp%sf(k, l, j - 1)
+                end do
+
+            end if
+        end if
+
+    end subroutine s_periodic_scalarfield
 
     pure subroutine s_axis(q_prim_vf, pb_in, mv_in, k, l)
         $:GPU_ROUTINE(parallelism='[seq]')

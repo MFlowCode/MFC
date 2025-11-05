@@ -549,6 +549,21 @@ module m_global_parameters
     $:GPU_DECLARE(create='[tau_star,cont_damage_s,alpha_bar]')
     !> @}
 
+    logical :: periodic_ibs
+    logical :: compute_particle_drag
+    real(wp) :: u_inf_ref !< reference freestream velocity
+    real(wp) :: rho_inf_ref !< reference freestream density
+    real(wp) :: P_inf_ref !< reference freestream temperature
+    logical :: periodic_forcing
+    logical :: volume_filtering_momentum_eqn
+    logical :: store_levelset
+    logical :: slab_domain_decomposition
+    integer :: t_step_stat_start
+    real(wp) :: filter_width
+    logical :: q_filtered_wrt
+
+    $:GPU_DECLARE(create='[u_inf_ref, rho_inf_ref, P_inf_ref, filter_width]')
+
 contains
 
     !> Assigns default values to the user inputs before reading
@@ -834,6 +849,19 @@ contains
             mhd = .false.
             relativity = .false.
         #:endif
+
+        periodic_ibs = .false.
+        compute_particle_drag = .false.
+        u_inf_ref = dflt_real
+        rho_inf_ref = dflt_real
+        P_inf_ref = dflt_real
+        periodic_forcing = .false.
+        volume_filtering_momentum_eqn = .false.
+        store_levelset = .true.
+        slab_domain_decomposition = .false.
+        t_step_stat_start = dflt_int
+        filter_width = dflt_real
+        q_filtered_wrt = .false.
 
     end subroutine s_assign_default_values_to_user_inputs
 
@@ -1203,6 +1231,9 @@ contains
         elseif (bubbles_lagrange) then
             allocate (MPI_IO_DATA%view(1:sys_size + 1))
             allocate (MPI_IO_DATA%var(1:sys_size + 1))
+        else if (volume_filtering_momentum_eqn) then
+            allocate (MPI_IO_DATA%view(1:sys_size + 109))
+            allocate (MPI_IO_DATA%var(1:sys_size + 109))
         else
             allocate (MPI_IO_DATA%view(1:sys_size))
             allocate (MPI_IO_DATA%var(1:sys_size))
@@ -1221,6 +1252,11 @@ contains
             end do
         elseif (bubbles_lagrange) then
             do i = 1, sys_size + 1
+                allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
+                MPI_IO_DATA%var(i)%sf => null()
+            end do
+        else if (volume_filtering_momentum_eqn) then
+            do i = sys_size + 1, sys_size + 109
                 allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
                 MPI_IO_DATA%var(i)%sf => null()
             end do
@@ -1423,6 +1459,10 @@ contains
 
             if (bubbles_lagrange) then
                 do i = 1, sys_size + 1
+                    MPI_IO_DATA%var(i)%sf => null()
+                end do
+            else if (volume_filtering_momentum_eqn) then
+                do i = 1, sys_size + 109
                     MPI_IO_DATA%var(i)%sf => null()
                 end do
             else

@@ -348,6 +348,10 @@ module m_global_parameters
     real(wp) :: Bx0 !< Constant magnetic field in the x-direction (1D)
 
     real(wp) :: wall_time, wall_time_avg !< Wall time measurements
+    logical :: periodic_ibs !< Periodic immersed boundaries
+    logical :: store_levelset !< Store immersed boundary levelset info
+    logical :: slab_domain_decomposition !< MPI domain decomposition into slabs
+    logical :: q_filtered_wrt !< write FFT filtered quantities
 
 contains
 
@@ -516,6 +520,11 @@ contains
 
         ! MHD
         Bx0 = dflt_real
+
+        periodic_ibs = .false.
+        store_levelset = .true.
+        slab_domain_decomposition = .false.
+        q_filtered_wrt = .false.
 
     end subroutine s_assign_default_values_to_user_inputs
 
@@ -832,16 +841,25 @@ contains
         chemxe = species_idx%end
 
 #ifdef MFC_MPI
-        allocate (MPI_IO_DATA%view(1:sys_size))
-        allocate (MPI_IO_DATA%var(1:sys_size))
-        do i = 1, sys_size
-            if (down_sample) then
-                allocate (MPI_IO_DATA%var(i)%sf(-1:m + 1, -1:n + 1, -1:p + 1))
-            else
+        if (q_filtered_wrt) then
+            allocate (MPI_IO_DATA%view(1:sys_size+1+4*9+4*9+3*4+6*4))
+            allocate (MPI_IO_DATA%var (1:sys_size+1+4*9+4*9+3*4+6*4))
+            do i = 1, sys_size+1+4*9+4*9+3*4+6*4
                 allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
-            end if
-            MPI_IO_DATA%var(i)%sf => null()
-        end do
+                MPI_IO_DATA%var(i)%sf => null()
+            end do
+        else
+            allocate (MPI_IO_DATA%view(1:sys_size))
+            allocate (MPI_IO_DATA%var(1:sys_size))
+            do i = 1, sys_size
+                if (down_sample) then
+                    allocate (MPI_IO_DATA%var(i)%sf(-1:m + 1, -1:n + 1, -1:p + 1))
+                else
+                    allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
+                end if
+                MPI_IO_DATA%var(i)%sf => null()
+            end do
+        end if
 
         if (ib) allocate (MPI_IO_IB_DATA%var%sf(0:m, 0:n, 0:p))
 #endif
@@ -1015,6 +1033,12 @@ contains
             do i = 1, sys_size
                 MPI_IO_DATA%var(i)%sf => null()
             end do
+
+            if (q_filtered_wrt) then 
+                do i = sys_size+1, sys_size+1+4*9+4*9+3*4+6*4
+                    MPI_IO_DATA%var(i)%sf => null()
+                end do
+            end if
 
             deallocate (MPI_IO_DATA%var)
             deallocate (MPI_IO_DATA%view)

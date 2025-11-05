@@ -46,6 +46,10 @@ module m_time_steppers
 
     use m_body_forces
 
+    use m_volume_filtering
+
+    use m_compute_statistics
+
     implicit none
 
     type(vector_field), allocatable, dimension(:) :: q_cons_ts !<
@@ -57,7 +61,7 @@ module m_time_steppers
     type(scalar_field), allocatable, dimension(:) :: rhs_vf !<
     !! Cell-average RHS variables at the current time-stage
 
-    type(integer_field), allocatable, dimension(:, :) :: bc_type !<
+    type(integer_field), allocatable, dimension(:, :), public :: bc_type !<
     !! Boundary condition identifiers
 
     type(vector_field), allocatable, dimension(:) :: q_prim_ts !<

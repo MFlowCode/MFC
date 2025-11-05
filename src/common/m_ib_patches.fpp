@@ -557,6 +557,8 @@ contains
         ! Generic loop iterators
         integer :: i, j, k
         real(wp) :: radius
+        real(wp) :: x_domain_beg, x_domain_end, y_domain_beg, y_domain_end, z_domain_beg, z_domain_end
+        real(wp) :: x_pcen, y_pcen, z_pcen
 
         !! Variables to initialize the pressure field that corresponds to the
             !! bubble-collapse test case found in Tiwari et al. (2013)
@@ -577,6 +579,38 @@ contains
         ! and verifying whether the current patch has permission to write to
         ! that cell. If both queries check out, the primitive variables of
         ! the current patch are assigned to this cell.
+        call s_mpi_allreduce_min(x_domain%beg, x_domain_beg)
+        call s_mpi_allreduce_max(x_domain%end, x_domain_end)
+        call s_mpi_allreduce_min(y_domain%beg, y_domain_beg)
+        call s_mpi_allreduce_max(y_domain%end, y_domain_end)
+        call s_mpi_allreduce_min(z_domain%beg, z_domain_beg)
+        call s_mpi_allreduce_max(z_domain%end, z_domain_end)
+
+        ! periodically projected sphere centroid
+        if (periodic_ibs) then
+            if ((x_centroid - x_domain_beg) <= radius) then
+                x_pcen = x_domain_end + (x_centroid - x_domain_beg)
+            else if ((x_domain_end - x_centroid) <= radius) then
+                x_pcen = x_domain_beg - (x_domain_end - x_centroid)
+            else
+                x_pcen = x_centroid
+            end if
+            if ((y_centroid - y_domain_beg) <= radius) then
+                y_pcen = y_domain_end + (y_centroid - y_domain_beg)
+            else if ((y_domain_end - y_centroid) <= radius) then
+                y_pcen = y_domain_beg - (y_domain_end - y_centroid)
+            else
+                y_pcen = y_centroid
+            end if
+            if ((z_centroid - z_domain_beg) <= radius) then
+                z_pcen = z_domain_end + (z_centroid - z_domain_beg)
+            else if ((z_domain_end - z_centroid) <= radius) then
+                z_pcen = z_domain_beg - (z_domain_end - z_centroid)
+            else
+                z_pcen = z_centroid
+            end if
+        end if
+
         do k = 0, p
             do j = 0, n
                 do i = 0, m
@@ -591,6 +625,34 @@ contains
                          + (cart_y - y_centroid)**2 &
                          + (cart_z - z_centroid)**2 <= radius**2)) then
                         ib_markers_sf(i, j, k) = patch_id
+                    end if
+
+                    if (periodic_ibs) then ! check every permutation of the projected cell location
+                        if (((x_cc(i) - x_pcen)**2 &
+                             + (cart_y - y_pcen)**2 &
+                             + (cart_z - z_pcen)**2 <= radius**2) &
+                            .or. ((x_cc(i) - x_pcen)**2 &
+                                  + (cart_y - y_centroid)**2 &
+                                  + (cart_z - z_centroid)**2 <= radius**2) &
+                            .or. ((x_cc(i) - x_pcen)**2 &
+                                  + (cart_y - y_pcen)**2 &
+                                  + (cart_z - z_centroid)**2 <= radius**2) &
+                            .or. ((x_cc(i) - x_pcen)**2 &
+                                  + (cart_y - y_centroid)**2 &
+                                  + (cart_z - z_pcen)**2 <= radius**2) &
+                            .or. ((x_cc(i) - x_centroid)**2 &
+                                  + (cart_y - y_pcen)**2 &
+                                  + (cart_z - z_centroid)**2 <= radius**2) &
+                            .or. ((x_cc(i) - x_centroid)**2 &
+                                  + (cart_y - y_pcen)**2 &
+                                  + (cart_z - z_pcen)**2 <= radius**2) &
+                            .or. ((x_cc(i) - x_centroid)**2 &
+                                  + (cart_y - y_centroid)**2 &
+                                  + (cart_z - z_pcen)**2 <= radius**2)) &
+                            then
+                            ! Updating the patch identities bookkeeping variable
+                            ib_markers_sf(i, j, k) = patch_id
+                        end if
                     end if
                 end do
             end do

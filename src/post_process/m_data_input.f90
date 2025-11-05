@@ -64,6 +64,13 @@ module m_data_input
     ! type(scalar_field), public :: ib_markers !<
     type(integer_field), public :: ib_markers
 
+    type(scalar_field), public :: filtered_fluid_indicator_function
+    type(vector_field), allocatable, dimension(:), public :: stat_reynolds_stress
+    type(vector_field), allocatable, dimension(:), public :: stat_eff_visc
+    type(vector_field), allocatable, dimension(:), public :: stat_int_mom_exch
+    type(vector_field), allocatable, dimension(:), public :: stat_q_cons_filtered
+    type(scalar_field), allocatable, dimension(:), public :: stat_filtered_pressure
+
     procedure(s_read_abstract_data_files), pointer :: s_read_data_files => null()
 
 contains
@@ -217,6 +224,58 @@ contains
         end if
 
     end subroutine s_allocate_field_arrays
+
+    !> Helper subroutine to allocate filtered variable arrays for given dimensionality
+    !!  @param start_idx Starting index for allocation
+    !!  @param end_x, end_y, end_z End indices for each dimension
+    impure subroutine s_allocate_filtered_arrays(local_start_idx, end_x, end_y, end_z)
+
+        integer, intent(in) :: local_start_idx, end_x, end_y, end_z
+        integer :: i, j
+
+        allocate (filtered_fluid_indicator_function%sf(local_start_idx:end_x, local_start_idx:end_y, local_start_idx:end_z))
+
+        do i = 1, sys_size - 1
+            allocate (stat_q_cons_filtered(i)%vf(1:4))
+        end do
+        do i = 1, sys_size - 1
+            do j = 1, 4
+                allocate (stat_q_cons_filtered(i)%vf(j)%sf(local_start_idx:end_x, local_start_idx:end_y, local_start_idx:end_z))
+            end do
+        end do
+
+        do i = 1, 4
+            allocate (stat_filtered_pressure(i)%sf(local_start_idx:end_x, local_start_idx:end_y, local_start_idx:end_z))
+        end do
+
+        do i = 1, 9
+            allocate (stat_reynolds_stress(i)%vf(1:4))
+        end do
+        do i = 1, 9
+            do j = 1, 4
+                allocate (stat_reynolds_stress(i)%vf(j)%sf(local_start_idx:end_x, local_start_idx:end_y, local_start_idx:end_z))
+            end do
+        end do
+
+        do i = 1, 9
+            allocate (stat_eff_visc(i)%vf(1:4))
+        end do
+        do i = 1, 9
+            do j = 1, 4
+                allocate (stat_eff_visc(i)%vf(j)%sf(local_start_idx:end_x, local_start_idx:end_y, local_start_idx:end_z))
+            end do
+        end do
+
+        do i = 1, 3
+            allocate (stat_int_mom_exch(i)%vf(1:4))
+        end do
+        do i = 1, 3
+            do j = 1, 4
+                allocate (stat_int_mom_exch(i)%vf(j)%sf(local_start_idx:end_x, local_start_idx:end_y, local_start_idx:end_z))
+            end do
+        end do
+
+    end subroutine s_allocate_filtered_arrays
 
     !>  This subroutine is called at each time-step that has to
         !!      be post-processed in order to read the raw data files
@@ -449,6 +508,10 @@ contains
 
         call s_read_parallel_conservative_data(t_step, m_MOK, n_MOK, p_MOK, WP_MOK, MOK, str_MOK, NVARS_MOK)
 
+        if (q_filtered_wrt .and. (t_step == 0 .or. t_step == t_step_stop)) then
+            call s_read_parallel_filtered_data(t_step, m_MOK, n_MOK, p_MOK, WP_MOK, MOK, str_MOK, NVARS_MOK)
+        end if
+
         deallocate (x_cb_glb, y_cb_glb, z_cb_glb)
 
         if (bc_io) then
@@ -581,6 +644,81 @@ contains
     end subroutine s_read_parallel_conservative_data
 #endif
 
+#ifdef MFC_MPI
+    !> Helper subroutine to read parallel volume filtered data
+    !!  @param t_step Current time-step
+    !!  @param m_MOK, n_MOK, p_MOK MPI offset kinds for dimensions
+    !!  @param WP_MOK, MOK, str_MOK, NVARS_MOK Other MPI offset kinds
+    impure subroutine s_read_parallel_filtered_data(t_step, m_MOK, n_MOK, p_MOK, WP_MOK, MOK, str_MOK, NVARS_MOK)
+
+        integer, intent(in) :: t_step
+        integer(KIND=MPI_OFFSET_KIND), intent(inout) :: m_MOK, n_MOK, p_MOK
+        integer(KIND=MPI_OFFSET_KIND), intent(inout) :: WP_MOK, MOK, str_MOK, NVARS_MOK
+
+        integer :: ifile, ierr, data_size
+        integer, dimension(MPI_STATUS_SIZE) :: status
+        integer(KIND=MPI_OFFSET_KIND) :: disp, var_MOK
+        character(LEN=path_len + 2*name_len) :: file_loc
+        logical :: file_exist
+        character(len=10) :: t_step_string
+        integer :: alt_sys
+        integer :: i
+
+        ! Open the file to read volume filtered variables
+        write (file_loc, '(I0,A)') t_step, '.dat'
+        file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+        inquire (FILE=trim(file_loc), EXIST=file_exist)
+
+        if (file_exist) then
+            call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+
+            ! Initialize MPI data I/O
+
+            call s_initialize_mpi_data_filtered(filtered_fluid_indicator_function, & 
+                                                stat_q_cons_filtered, stat_filtered_pressure, &
+                                                stat_reynolds_stress, stat_eff_visc, stat_int_mom_exch)
+
+            ! Size of local arrays
+            data_size = (m + 1)*(n + 1)*(p + 1)
+
+            ! Total size of system
+            alt_sys = sys_size + 1 + 9*4 + 9*4 + 3*4 + 6*4 ! 109, filtered indicator, stats of: R_u, R_mu, F_imet, q_cons_filtered
+
+            ! Resize some integers so MPI can read even the biggest file
+            m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
+            n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
+            p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
+            WP_MOK = int(8._wp, MPI_OFFSET_KIND)
+            MOK = int(1._wp, MPI_OFFSET_KIND)
+            str_MOK = int(name_len, MPI_OFFSET_KIND)
+            NVARS_MOK = int(alt_sys, MPI_OFFSET_KIND) 
+
+            call s_setup_mpi_io_params(data_size, m_MOK, n_MOK, p_MOK, WP_MOK, MOK, str_MOK, NVARS_MOK)
+
+            ! Read the data for each variable
+            do i = sys_size, alt_sys
+                var_MOK = int(i, MPI_OFFSET_KIND)
+
+                ! Initial displacement to skip at beginning of file
+                disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
+
+                call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
+                                        'native', mpi_info_int, ierr)
+                call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
+                                        mpi_p, status, ierr)
+            end do
+
+            call s_mpi_barrier()
+            call MPI_FILE_CLOSE(ifile, ierr)
+
+            call s_read_ib_data_files(trim(case_dir)//'/restart_data'//trim(mpiiofs))
+        else
+            call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
+        end if
+
+    end subroutine s_read_parallel_filtered_data
+#endif
+
     !>  Computation of parameters, allocation procedures, and/or
         !!      any other tasks needed to properly setup the module
     impure subroutine s_initialize_data_input_module
@@ -594,9 +732,19 @@ contains
         allocate (q_prim_vf(1:sys_size))
         allocate (q_cons_temp(1:sys_size))
 
+        if (q_filtered_wrt) then
+            allocate (stat_q_cons_filtered(1:sys_size - 1))
+            allocate (stat_filtered_pressure(1:4))
+            allocate (stat_reynolds_stress(1:9))
+            allocate (stat_eff_visc(1:9))
+            allocate (stat_int_mom_exch(1:3))
+        end if
+
         ! Allocating the parts of the conservative and primitive variables
         ! that do require the direct knowledge of the dimensionality of
         ! the simulation using helper subroutine
+
+        if (q_filtered_wrt) call s_allocate_filtered_arrays(-buff_size, m + buff_size, n + buff_size, p + buff_size)
 
         ! Simulation is at least 2D
         if (n > 0) then
@@ -642,7 +790,7 @@ contains
     !> Deallocation procedures for the module
     impure subroutine s_finalize_data_input_module
 
-        integer :: i !< Generic loop iterator
+        integer :: i, j !< Generic loop iterator
 
         ! Deallocating the conservative and primitive variables
         do i = 1, sys_size
@@ -676,6 +824,47 @@ contains
         deallocate (bc_type)
 
         s_read_data_files => null()
+
+        if (q_filtered_wrt) then
+            deallocate (filtered_fluid_indicator_function%sf)
+
+            do i = 1, sys_size - 1
+                do j = 1, 4
+                    deallocate (stat_q_cons_filtered(i)%vf(j)%sf)
+                end do
+                deallocate (stat_q_cons_filtered(i)%vf)
+            end do
+            deallocate (stat_q_cons_filtered)
+
+            do i = 1, 4
+                deallocate (stat_filtered_pressure(i)%sf)
+            end do
+            deallocate (stat_filtered_pressure)
+
+            do i = 1, 9
+                do j = 1, 4
+                    deallocate (stat_reynolds_stress(i)%vf(j)%sf)
+                end do
+                deallocate (stat_reynolds_stress(i)%vf)
+            end do
+            deallocate (stat_reynolds_stress)
+
+            do i = 1, 9
+                do j = 1, 4
+                    deallocate (stat_eff_visc(i)%vf(j)%sf)
+                end do
+                deallocate (stat_eff_visc(i)%vf)
+            end do
+            deallocate (stat_eff_visc)
+
+            do i = 1, 3
+                do j = 1, 4
+                    deallocate (stat_int_mom_exch(i)%vf(j)%sf)
+                end do
+                deallocate (stat_int_mom_exch(i)%vf)
+            end do
+            deallocate (stat_int_mom_exch)
+        end if
 
     end subroutine s_finalize_data_input_module
 

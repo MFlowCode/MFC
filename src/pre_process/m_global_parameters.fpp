@@ -289,6 +289,9 @@ module m_global_parameters
     !! to the next time-step.
 
     logical :: fft_wrt
+    logical :: periodic_ibs
+    logical :: store_levelset
+    logical :: slab_domain_decomposition
 
 contains
 
@@ -575,6 +578,10 @@ contains
         end do
 
         Bx0 = dflt_real
+
+        periodic_ibs = .false.
+        store_levelset = .true.
+        slab_domain_decomposition = .false.
 
     end subroutine s_assign_default_values_to_user_inputs
 
