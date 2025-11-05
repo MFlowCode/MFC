@@ -182,13 +182,13 @@ jobs:
         run: |
           . spack/share/spack/setup-env.sh
           # Install just the dependencies first (these are cached)
-          spack install --show-log-on-error --only dependencies mfc~mpi~post_process
+          spack install --show-log-on-error --only dependencies mfc@master~mpi~post_process
 
       - name: Install MFC via Spack
         run: |
           . spack/share/spack/setup-env.sh
           # Install MFC itself (dependencies are already installed/cached)
-          spack install --show-log-on-error mfc~mpi~post_process
+          spack install --show-log-on-error mfc@master~mpi~post_process
 
       - name: Test MFC Execution
         run: |
