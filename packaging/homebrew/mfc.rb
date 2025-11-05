@@ -101,19 +101,19 @@ class Mfc < Formula
   test do
     # Test that all binaries exist and are executable
     %w[pre_process simulation post_process].each do |prog|
-      assert_predicate bin/prog, :exist?
+      assert_path_exists bin/prog
       assert_predicate bin/prog, :executable?
     end
 
     # Test that toolchain is installed
-    assert_predicate prefix/"toolchain", :exist?
+    assert_path_exists prefix/"toolchain"
 
     # Test that venv exists and has required packages
-    assert_predicate libexec/"venv", :exist?
+    assert_path_exists libexec/"venv"
     assert_predicate libexec/"venv/bin/python", :executable?
 
     # Test that examples exist
-    assert_predicate prefix/"examples", :exist?
+    assert_path_exists prefix/"examples"
 
     # Test that mfc wrapper works
     system bin/"mfc", "--help"
