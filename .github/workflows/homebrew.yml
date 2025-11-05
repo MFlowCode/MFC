@@ -70,6 +70,21 @@ jobs:
               fi
             done
           fi
+          
+          echo -e "\n=== Searching for Cantera config.log ==="
+          cantera_config_log=$(find /private/tmp -name "config.log" -path "*/mfc--cantera*" 2>/dev/null | head -1)
+          if [ -n "$cantera_config_log" ] && [ -f "$cantera_config_log" ]; then
+            echo -e "\n\n====== Cantera config.log ======"
+            echo "Found at: $cantera_config_log"
+            cat "$cantera_config_log"
+            # Copy to a known location for artifact upload
+            mkdir -p /tmp/cantera-logs
+            cp "$cantera_config_log" /tmp/cantera-logs/config.log
+          else
+            echo "Cantera config.log not found"
+            echo "Searching in all /private/tmp directories:"
+            find /private/tmp -name "config.log" 2>/dev/null || echo "No config.log files found"
+          fi
       
       - name: Upload Homebrew logs on failure
         if: failure()
@@ -78,6 +93,7 @@ jobs:
           name: homebrew-logs
           path: |
             /tmp/brew-install.log
+            /tmp/cantera-logs/
             ~/Library/Logs/Homebrew/mfc/
           if-no-files-found: ignore
       
