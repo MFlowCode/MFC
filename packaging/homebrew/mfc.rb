@@ -41,9 +41,9 @@ class Mfc < Formula
       # Configure Cantera build
       # Set compiler environment variables for scons (not as command-line args)
       cantera_env = {
-        "CC" => ENV.cc,
-        "CXX" => ENV.cxx,
-        "CFLAGS" => "-isysroot#{MacOS.sdk_path}",
+        "CC"       => ENV.cc,
+        "CXX"      => ENV.cxx,
+        "CFLAGS"   => "-isysroot#{MacOS.sdk_path}",
         "CXXFLAGS" => "-isysroot#{MacOS.sdk_path}",
       }
 
