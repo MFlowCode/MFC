@@ -39,16 +39,14 @@ class Mfc < Formula
       system venv/"bin/pip", "install", "cython", "numpy", "ruamel.yaml", "packaging", "scons"
 
       # Configure Cantera build
-      # Set compiler environment variables for scons (not as command-line args)
-      cantera_env = {
-        "CC"       => ENV.cc,
-        "CXX"      => ENV.cxx,
-        "CFLAGS"   => "-isysroot#{MacOS.sdk_path}",
-        "CXXFLAGS" => "-isysroot#{MacOS.sdk_path}",
-      }
+      # Set compiler environment variables for scons
+      ENV["CC"] = ENV.cc
+      ENV["CXX"] = ENV.cxx
+      ENV["CFLAGS"] = "-isysroot#{MacOS.sdk_path}"
+      ENV["CXXFLAGS"] = "-isysroot#{MacOS.sdk_path}"
 
       # Run scons with the venv's Python so it can find installed packages
-      system cantera_env, venv/"bin/python", "-m", "SCons", "build",
+      system venv/"bin/python", "-m", "SCons", "build",
              "python_package=y",
              "f90_interface=n",
              "system_sundials=y",
@@ -61,7 +59,7 @@ class Mfc < Formula
              "-j#{ENV.make_jobs}"
 
       # Install Cantera
-      system cantera_env, venv/"bin/python", "-m", "SCons", "install"
+      system venv/"bin/python", "-m", "SCons", "install"
 
       # Install Cantera Python package into venv
       cd "build/python" do
