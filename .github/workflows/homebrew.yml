@@ -50,6 +50,12 @@ jobs:
           echo "Copying formula to tap..."
           cp packaging/homebrew/mfc.rb $(brew --repository)/Library/Taps/mflowcode/homebrew-test/Formula/mfc.rb
           
+          echo "Committing formula to tap..."
+          cd $(brew --repository)/Library/Taps/mflowcode/homebrew-test
+          git add Formula/mfc.rb
+          git commit -m "Add MFC formula"
+          cd -
+          
           echo "Installing MFC from local tap..."
           brew install --build-from-source --verbose mflowcode/test/mfc 2>&1 | tee /tmp/brew-install.log
       
@@ -84,7 +90,7 @@ jobs:
       - name: Run formula tests
         run: |
           echo "Running Homebrew formula tests..."
-          brew test mfc
+          brew test --verbose mflowcode/test/mfc
       
       - name: Test MFC binaries
         run: |
