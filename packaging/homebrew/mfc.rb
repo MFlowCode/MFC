@@ -39,18 +39,21 @@ class Mfc < Formula
       system venv/"bin/pip", "install", "cython", "numpy", "ruamel.yaml", "packaging", "scons"
 
       # Configure Cantera build
+      # Set compiler environment variables for scons (not as command-line args)
+      cantera_env = {
+        "CC" => ENV.cc,
+        "CXX" => ENV.cxx,
+        "CFLAGS" => "-isysroot#{MacOS.sdk_path}",
+        "CXXFLAGS" => "-isysroot#{MacOS.sdk_path}",
+      }
+
       # Run scons with the venv's Python so it can find installed packages
-      # Pass compiler and SDK paths explicitly since Homebrew's env is isolated
-      system venv/"bin/python", "-m", "SCons", "build",
+      system cantera_env, venv/"bin/python", "-m", "SCons", "build",
              "python_package=y",
              "f90_interface=n",
              "system_sundials=y",
              "system_yamlcpp=y",
              "system_fmt=n",
-             "CC=#{ENV.cc}",
-             "CXX=#{ENV.cxx}",
-             "CFLAGS=-isysroot#{MacOS.sdk_path}",
-             "CXXFLAGS=-isysroot#{MacOS.sdk_path}",
              "extra_inc_dirs=#{Formula["sundials"].opt_include}:#{Formula["yaml-cpp"].opt_include}",
              "extra_lib_dirs=#{Formula["sundials"].opt_lib}:#{Formula["yaml-cpp"].opt_lib}",
              "prefix=#{libexec}/cantera",
@@ -58,7 +61,7 @@ class Mfc < Formula
              "-j#{ENV.make_jobs}"
 
       # Install Cantera
-      system venv/"bin/python", "-m", "SCons", "install"
+      system cantera_env, venv/"bin/python", "-m", "SCons", "install"
 
       # Install Cantera Python package into venv
       cd "build/python" do
