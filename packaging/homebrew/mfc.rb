@@ -44,7 +44,10 @@ class Mfc < Formula
     ENV["VIRTUAL_ENV"] = venv
 
     # Build MFC using pre-configured venv
-    system "./mfc.sh", "build", "-t", "pre_process", "simulation", "post_process", "-j", ENV.make_jobs.to_s
+    # Must run from buildpath (MFC root directory)
+    Dir.chdir(buildpath) do
+      system "./mfc.sh", "build", "-t", "pre_process", "simulation", "post_process", "-j", ENV.make_jobs.to_s
+    end
 
     # Install binaries - they're in hashed subdirectories like build/install/<hash>/bin/*
     Dir.glob("build/install/*/bin/*").each do |binary_path|
