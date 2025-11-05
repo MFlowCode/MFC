@@ -98,14 +98,14 @@ contains
 
 #ifdef MFC_SIMULATION
         if (volume_filtering_momentum_eqn) then
-          halo_size_sf = nint(-1._wp + 1._wp*buff_size* &
-                                         & (m + 2*buff_size + 1)* &
-                                         & (n + 2*buff_size + 1)* &
-                                         & (p + 2*buff_size + 1)/ &
-                                         & (cells_bounds%mnp_min + 2*buff_size + 1))
-          allocate (buff_send_scalarfield(0:halo_size_sf), buff_recv_scalarfield(0:halo_size_sf))
-          $:GPU_ENTER_DATA(create='[capture:buff_send_scalarfield]')
-          $:GPU_ENTER_DATA(create='[capture:buff_recv_scalarfield]')
+            halo_size_sf = nint(-1._wp + 1._wp*buff_size* &
+                                           & (m + 2*buff_size + 1)* &
+                                           & (n + 2*buff_size + 1)* &
+                                           & (p + 2*buff_size + 1)/ &
+                                           & (cells_bounds%mnp_min + 2*buff_size + 1))
+            allocate (buff_send_scalarfield(0:halo_size_sf), buff_recv_scalarfield(0:halo_size_sf))
+            $:GPU_ENTER_DATA(create='[capture:buff_send_scalarfield]')
+            $:GPU_ENTER_DATA(create='[capture:buff_recv_scalarfield]')
         end if
 #endif
 #endif
@@ -308,7 +308,7 @@ contains
     !! @param stat_reynolds_stress 1-4 order statistics of reynolds stress tensor
     !! @param stat_eff_visc 1-4 order statistics of unclosed effective viscosity tensor
     !! @param stat_int_mom_exch 1-4 order statistics of interphase momentum exchange vector
-    impure subroutine s_initialize_mpi_data_filtered(filtered_fluid_indicator_function, & 
+    impure subroutine s_initialize_mpi_data_filtered(filtered_fluid_indicator_function, &
                                                      stat_q_cons_filtered, stat_filtered_pressure, &
                                                      stat_reynolds_stress, stat_eff_visc, stat_int_mom_exch)
 
@@ -1536,13 +1536,13 @@ contains
 
                     end do
 
-                ! Decompose domain into z-slabs
-                else if (slab_domain_decomposition) then 
+                    ! Decompose domain into z-slabs
+                else if (slab_domain_decomposition) then
                     num_procs_x = 1
                     num_procs_y = 1
                     num_procs_z = num_procs
                     ierr = -1
-                    if (mod((p+1), num_procs_z) == 0) then 
+                    if (mod((p + 1), num_procs_z) == 0) then
                         ierr = 0
                     end if
                 else

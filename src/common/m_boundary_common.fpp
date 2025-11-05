@@ -35,7 +35,7 @@ module m_boundary_common
 
     private; public :: s_initialize_boundary_common_module, &
  s_populate_variables_buffers, &
- s_populate_scalarfield_buffers, & 
+ s_populate_scalarfield_buffers, &
  s_create_mpi_types, &
  s_populate_capillary_buffers, &
  s_populate_F_igr_buffers, &
