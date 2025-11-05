@@ -191,14 +191,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # Test different Runge-Kutta time integrators
         # time_stepper: 1=Euler, 2=RK2, 3=RK3 (default), 4=RK4, 5=RK5, 23=TVD-RK3
         for time_stepper in [1, 2, 4, 5, 23]:
-            cases.append(define_case_d(stack, f"time_stepper={time_stepper}", 
+            cases.append(define_case_d(stack, f"time_stepper={time_stepper}",
                 {'time_stepper': time_stepper, 't_step_stop': 5}))
 
     def alter_cfl_modes():
         # Test CFL adaptation and constant CFL modes
-        cases.append(define_case_d(stack, "cfl_adap_dt=T", 
+        cases.append(define_case_d(stack, "cfl_adap_dt=T",
             {'cfl_adap_dt': 'T', 'cfl_target': 0.5, 't_step_stop': 10}))
-        cases.append(define_case_d(stack, "cfl_const_dt=T", 
+        cases.append(define_case_d(stack, "cfl_const_dt=T",
             {'cfl_const_dt': 'T', 'cfl_target': 0.3, 't_step_stop': 10}))
 
     def alter_model_equations():
