@@ -55,12 +55,13 @@ class Mfc < Formula
 
       # Run scons, explicitly passing compiler flags as Cantera scons variables
       # Cantera uses cc_flags/cxx_flags, not CCFLAGS/CXXFLAGS
-      # Include C++ header path directly in cxx_flags for scons' configuration checks
-      cxx_flags_with_includes = "#{ENV.fetch("CXXFLAGS", nil)} -I#{cxx_inc_path}"
+      # Include both SDK include path and C++ header path for scons' configuration checks
+      sdk_inc_path = "#{sdk_path}/usr/include"
+      cxx_flags_with_includes = "#{ENV.fetch("CXXFLAGS", nil)} -I#{sdk_inc_path} -I#{cxx_inc_path}"
       system venv/"bin/python", "-m", "SCons", "build",
              "CC=#{ENV.cc}",
              "CXX=#{ENV.cxx}",
-             "cc_flags=#{ENV.fetch("CFLAGS", nil)}",
+             "cc_flags=#{ENV.fetch("CFLAGS", nil)} -I#{sdk_inc_path}",
              "cxx_flags=#{cxx_flags_with_includes}",
              "python_package=y",
              "f90_interface=n",
