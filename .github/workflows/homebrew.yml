@@ -44,6 +44,7 @@ jobs:
       
       - name: Install MFC from formula
         run: |
+          set -o pipefail  # Ensure pipe failures are caught
           echo "Creating temporary local tap..."
           brew tap-new mflowcode/test
           
