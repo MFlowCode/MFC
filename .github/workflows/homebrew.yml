@@ -51,7 +51,35 @@ jobs:
           cp packaging/homebrew/mfc.rb $(brew --repository)/Library/Taps/mflowcode/homebrew-test/Formula/mfc.rb
           
           echo "Installing MFC from local tap..."
-          brew install --build-from-source --verbose mflowcode/test/mfc
+          brew install --build-from-source --verbose mflowcode/test/mfc 2>&1 | tee /tmp/brew-install.log
+      
+      - name: Display error logs on failure
+        if: failure()
+        run: |
+          echo "=== Displaying last 200 lines of brew install log ==="
+          if [ -f /tmp/brew-install.log ]; then
+            tail -200 /tmp/brew-install.log
+          fi
+          
+          echo -e "\n=== Displaying Homebrew log files ==="
+          if [ -d ~/Library/Logs/Homebrew/mfc/ ]; then
+            for logfile in ~/Library/Logs/Homebrew/mfc/*; do
+              if [ -f "$logfile" ]; then
+                echo -e "\n\n====== $logfile ======"
+                cat "$logfile"
+              fi
+            done
+          fi
+      
+      - name: Upload Homebrew logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: homebrew-logs
+          path: |
+            /tmp/brew-install.log
+            ~/Library/Logs/Homebrew/mfc/
+          if-no-files-found: ignore
       
       - name: Run formula tests
         run: |
