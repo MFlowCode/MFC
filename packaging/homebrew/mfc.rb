@@ -40,12 +40,17 @@ class Mfc < Formula
 
       # Configure Cantera build
       # Run scons with the venv's Python so it can find installed packages
+      # Pass compiler and SDK paths explicitly since Homebrew's env is isolated
       system venv/"bin/python", "-m", "SCons", "build",
              "python_package=y",
              "f90_interface=n",
              "system_sundials=y",
              "system_yamlcpp=y",
              "system_fmt=n",
+             "CC=#{ENV.cc}",
+             "CXX=#{ENV.cxx}",
+             "CFLAGS=-isysroot#{MacOS.sdk_path}",
+             "CXXFLAGS=-isysroot#{MacOS.sdk_path}",
              "extra_inc_dirs=#{Formula["sundials"].opt_include}:#{Formula["yaml-cpp"].opt_include}",
              "extra_lib_dirs=#{Formula["sundials"].opt_lib}:#{Formula["yaml-cpp"].opt_lib}",
              "prefix=#{libexec}/cantera",
