@@ -20,6 +20,9 @@ class Mfc < Formula
   depends_on "openblas"
   depends_on "python@3.12"
 
+  # Preserve venv RECORD files (needed for pip to manage packages)
+  skip_clean "libexec/venv"
+
   def install
     # Create Python virtual environment
     venv = libexec/"venv"
@@ -31,6 +34,7 @@ class Mfc < Formula
 
     # Install MFC Python package and dependencies into venv
     # Keep toolchain in buildpath for now - mfc.sh needs it there
+    # Use editable install (-e) to avoid RECORD file issues when venv is copied
     system venv/"bin/pip", "install", "-e", buildpath/"toolchain"
 
     # Create symlink so mfc.sh uses our pre-installed venv
@@ -62,16 +66,15 @@ class Mfc < Formula
     prefix.install "examples"
 
     # Create smart wrapper script that:
-    # 1. Works around read-only Cellar issue
-    # 2. Activates venv automatically so cantera/dependencies are available
-    # 3. Sets up toolchain symlink so mfc.sh can find toolchain/util.sh
+    # 1. Works around read-only Cellar issue by copying venv to tmpdir
+    # 2. Sets up toolchain symlink so mfc.sh can find toolchain/util.sh
+    # 3. Ensures mfc.sh doesn't reinstall packages by copying pyproject.toml
     (bin/"mfc").write <<~EOS
       #!/bin/bash
       set -e
 
-      # Activate the pre-installed venv so all Python dependencies are available
-      # This makes cantera and other packages accessible if users install them in the venv
-      source "#{venv}/bin/activate"
+      # Unset VIRTUAL_ENV to ensure mfc.sh uses the copied venv, not the Cellar one
+      unset VIRTUAL_ENV
 
       # Create a temporary working directory (Cellar is read-only)
       TMPDIR=$(mktemp -d)
@@ -81,12 +84,20 @@ class Mfc < Formula
       cp "#{libexec}/mfc.sh" "$TMPDIR/"
       cd "$TMPDIR"
 
-      # Create toolchain symlink so mfc.sh can verify it's in MFC root folder
-      ln -s "#{prefix}/toolchain" toolchain
+      # Copy toolchain directory (not symlink) so Python paths resolve correctly
+      # This prevents paths from resolving back to read-only Cellar
+      cp -R "#{prefix}/toolchain" toolchain
 
-      # Create build directory for mfc.sh to write to (with pre-existing venv symlink)
+      # Copy examples directory (required by mfc.sh Python code)
+      cp -R "#{prefix}/examples" examples
+
+      # Create build directory and copy venv (not symlink - needs to be writable)
+      # Use cp -R for a full recursive copy
       mkdir -p build
-      ln -s "#{venv}" build/venv
+      cp -R "#{venv}" build/venv
+
+      # Copy pyproject.toml to build/ so mfc.sh thinks dependencies are already installed
+      cp "#{prefix}/toolchain/pyproject.toml" build/pyproject.toml
 
       # Run mfc.sh with all arguments
       exec ./mfc.sh "$@"
