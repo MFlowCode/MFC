@@ -118,7 +118,7 @@ contains
 
         if (muscl_order == 1) then
             if (muscl_dir == 1) then
-                #:call GPU_PARALLEL_LOOP(collapse=4)
+                $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
                     do i = 1, ubound(v_vf, 1)
                         do l = is3_muscl%beg, is3_muscl%end
                             do k = is2_muscl%beg, is2_muscl%end
@@ -131,7 +131,7 @@ contains
                     end do
                 #:endcall
             else if (muscl_dir == 2) then
-                #:call GPU_PARALLEL_LOOP(collapse=4)
+                $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
                     do i = 1, ubound(v_vf, 1)
                         do l = is3_muscl%beg, is3_muscl%end
                             do k = is2_muscl%beg, is2_muscl%end
@@ -144,7 +144,7 @@ contains
                     end do
                 #:endcall
             else if (muscl_dir == 3) then
-                #:call GPU_PARALLEL_LOOP(collapse=4)
+                $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
                     do i = 1, ubound(v_vf, 1)
                         do l = is3_muscl%beg, is3_muscl%end
                             do k = is2_muscl%beg, is2_muscl%end
@@ -162,7 +162,7 @@ contains
             ! MUSCL Reconstruction
             #:for MUSCL_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
                 if (muscl_dir == ${MUSCL_DIR}$) then
-                    #:call GPU_PARALLEL_LOOP(collapse=4,private='[slopeL,slopeR,slope]')
+                    $:GPU_PARALLEL_LOOP(collapse=4,private='[i,j,k,l,slopeL,slopeR,slope]')
                         do l = is3_muscl%beg, is3_muscl%end
                             do k = is2_muscl%beg, is2_muscl%end
                                 do j = is1_muscl%beg, is1_muscl%end
@@ -243,7 +243,7 @@ contains
         #:for MUSCL_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (muscl_dir == ${MUSCL_DIR}$) then
 
-                #:call GPU_PARALLEL_LOOP(collapse=3,private='[aCL,aC,aCR,aTHINC,moncon,sign,qmin,qmax]')
+                $:GPU_PARALLEL_LOOP(collapse=3,private='[j,k,l,aCL,aC,aCR,aTHINC,moncon,sign,qmin,qmax]')
                     do l = is3_muscl%beg, is3_muscl%end
                         do k = is2_muscl%beg, is2_muscl%end
                             do j = is1_muscl%beg, is1_muscl%end
@@ -318,7 +318,7 @@ contains
         $:GPU_UPDATE(device='[v_size]')
 
         if (muscl_dir == 1) then
-            #:call GPU_PARALLEL_LOOP(collapse=4)
+            $:GPU_PARALLEL_LOOP(private='[j,k,l,q]', collapse=4)
                 do j = 1, v_size
                     do q = is3_muscl%beg, is3_muscl%end
                         do l = is2_muscl%beg, is2_muscl%end
@@ -335,7 +335,7 @@ contains
         if (n == 0) return
 
         if (muscl_dir == 2) then
-            #:call GPU_PARALLEL_LOOP(collapse=4)
+            $:GPU_PARALLEL_LOOP(private='[j,k,l,q]', collapse=4)
                 do j = 1, v_size
                     do q = is3_muscl%beg, is3_muscl%end
                         do l = is2_muscl%beg, is2_muscl%end
@@ -351,7 +351,7 @@ contains
         ! Reshaping/Projecting onto Characteristic Fields in z-direction
         if (p == 0) return
         if (muscl_dir == 3) then
-            #:call GPU_PARALLEL_LOOP(collapse=4)
+            $:GPU_PARALLEL_LOOP(private='[j,k,l,q]', collapse=4)
                 do j = 1, v_size
                     do q = is3_muscl%beg, is3_muscl%end
                         do l = is2_muscl%beg, is2_muscl%end

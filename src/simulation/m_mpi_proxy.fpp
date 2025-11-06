@@ -313,7 +313,7 @@ contains
         #:for mpi_dir in [1, 2, 3]
             if (mpi_dir == ${mpi_dir}$) then
                 #:if mpi_dir == 1
-                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[r]')
+                    $:GPU_PARALLEL_LOOP(collapse=3,private='[j,k,l,r]')
                         do l = 0, p
                             do k = 0, n
                                 do j = 0, buff_size - 1
@@ -322,9 +322,9 @@ contains
                                 end do
                             end do
                         end do
-                    #:endcall GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP
                 #:elif mpi_dir == 2
-                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[r]')
+                    $:GPU_PARALLEL_LOOP(collapse=3,private='[j,k,l,r]')
                         do l = 0, p
                             do k = 0, buff_size - 1
                                 do j = -buff_size, m + buff_size
@@ -334,9 +334,9 @@ contains
                                 end do
                             end do
                         end do
-                    #:endcall GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP
                 #:else
-                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[r]')
+                    $:GPU_PARALLEL_LOOP(collapse=3,private='[j,k,l,r]')
                         do l = 0, buff_size - 1
                             do k = -buff_size, n + buff_size
                                 do j = -buff_size, m + buff_size
@@ -346,7 +346,7 @@ contains
                                 end do
                             end do
                         end do
-                    #:endcall GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP
                 #:endif
             end if
         #:endfor
@@ -390,7 +390,7 @@ contains
         #:for mpi_dir in [1, 2, 3]
             if (mpi_dir == ${mpi_dir}$) then
                 #:if mpi_dir == 1
-                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[r]')
+                    $:GPU_PARALLEL_LOOP(collapse=3,private='[j,k,l,r]')
                         do l = 0, p
                             do k = 0, n
                                 do j = -buff_size, -1
@@ -399,9 +399,9 @@ contains
                                 end do
                             end do
                         end do
-                    #:endcall GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP
                 #:elif mpi_dir == 2
-                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[r]')
+                    $:GPU_PARALLEL_LOOP(collapse=3,private='[j,k,l,r]')
                         do l = 0, p
                             do k = -buff_size, -1
                                 do j = -buff_size, m + buff_size
@@ -411,10 +411,10 @@ contains
                                 end do
                             end do
                         end do
-                    #:endcall GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP
                 #:else
                     ! Unpacking buffer from bc_z%beg
-                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[r]')
+                    $:GPU_PARALLEL_LOOP(collapse=3,private='[j,k,l,r]')
                         do l = -buff_size, -1
                             do k = -buff_size, n + buff_size
                                 do j = -buff_size, m + buff_size
@@ -425,7 +425,7 @@ contains
                                 end do
                             end do
                         end do
-                    #:endcall GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP
                 #:endif
             end if
         #:endfor

@@ -162,7 +162,7 @@ contains
         end if
 #endif
 
-        #:call GPU_PARALLEL_LOOP(collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
@@ -171,7 +171,7 @@ contains
                     end do
                 end do
             end do
-        #:endcall GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP
 
         if (p == 0) then
             alf_igr = alf_factor*max(dx(1), dy(1))**2._wp
@@ -244,7 +244,7 @@ contains
         end if
 
         do q = 1, num_iters
-            #:call GPU_PARALLEL_LOOP(collapse=3, private='[rho_lx, rho_rx, rho_ly, rho_ry, rho_lz, rho_rz, fd_coeff]')
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[j,k,l,rho_lx, rho_rx, rho_ly, rho_ry, rho_lz, rho_rz, fd_coeff]')
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
@@ -307,12 +307,12 @@ contains
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP
 
             call s_populate_F_igr_buffers(bc_type, jac_sf)
 
             if (igr_iter_solver == 1) then ! Jacobi iteration
-                #:call GPU_PARALLEL_LOOP(collapse=3)
+                $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
                     do l = idwbuff(3)%beg, idwbuff(3)%end
                         do k = idwbuff(2)%beg, idwbuff(2)%end
                             do j = idwbuff(1)%beg, idwbuff(1)%end
@@ -320,7 +320,7 @@ contains
                             end do
                         end do
                     end do
-                #:endcall GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP
             end if
         end do
 
@@ -340,7 +340,7 @@ contains
         real(wp) :: F_L, vel_L, rho_L, F_R, vel_R, rho_R
         real(wp), dimension(num_fluids) :: alpha_rho_L, alpha_rho_R
 
-        #:call GPU_PARALLEL_LOOP(collapse=3, private='[F_L, vel_L, alpha_rho_L, F_R, vel_R, alpha_rho_R]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[j,k,l,F_L, vel_L, alpha_rho_L, F_R, vel_R, alpha_rho_R]')
             do l = 0, p
                 do k = 0, n
                     do j = -1, m
@@ -391,7 +391,7 @@ contains
                     end do
                 end do
             end do
-        #:endcall GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP
 
     end subroutine s_igr_sigma_x
 
@@ -419,7 +419,7 @@ contains
 
         if (idir == 1) then
             if (p == 0) then
-                #:call GPU_PARALLEL_LOOP(collapse=3, private='[rho_L, rho_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, mu_L, mu_R, vel_L, vel_R, pres_L, pres_R, alpha_L, alpha_R, alpha_rho_L, alpha_rho_R, F_L, F_R, E_L, E_R, cfl, dvel, dvel_small, rho_sf_small, vflux_L_arr, vflux_R_arr]')
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[j,k,l,rho_L, rho_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, mu_L, mu_R, vel_L, vel_R, pres_L, pres_R, alpha_L, alpha_R, alpha_rho_L, alpha_rho_R, F_L, F_R, E_L, E_R, cfl, dvel, dvel_small, rho_sf_small, vflux_L_arr, vflux_R_arr]')
                     do l = 0, p
                         do k = 0, n
                             do j = -1, m
@@ -797,9 +797,9 @@ contains
                             end do
                         end do
                     end do
-                #:endcall GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP
             else
-                #:call GPU_PARALLEL_LOOP(collapse=3, private='[rho_L, rho_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, mu_L, mu_R, vel_L, vel_R, pres_L, pres_R, alpha_L, alpha_R, alpha_rho_L, alpha_rho_R, F_L, F_R, E_L, E_R, cfl, dvel, dvel_small, rho_sf_small, vflux_L_arr, vflux_R_arr]')
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[j,k,l,rho_L, rho_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, mu_L, mu_R, vel_L, vel_R, pres_L, pres_R, alpha_L, alpha_R, alpha_rho_L, alpha_rho_R, F_L, F_R, E_L, E_R, cfl, dvel, dvel_small, rho_sf_small, vflux_L_arr, vflux_R_arr]')
                     do l = 0, p
                         do k = 0, n
                             do j = -1, m
@@ -1268,11 +1268,11 @@ contains
                             end do
                         end do
                     end do
-                #:endcall GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP
             end if
         else if (idir == 2) then
             if (p == 0) then
-                #:call GPU_PARALLEL_LOOP(collapse=3, private='[rho_L, rho_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, mu_L, mu_R, vel_L, vel_R, pres_L, pres_R, alpha_L, alpha_R, alpha_rho_L, alpha_rho_R, F_L, F_R, E_L, E_R, cfl, dvel_small, rho_sf_small, vflux_L_arr, vflux_R_arr]')
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[j,k,l,rho_L, rho_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, mu_L, mu_R, vel_L, vel_R, pres_L, pres_R, alpha_L, alpha_R, alpha_rho_L, alpha_rho_R, F_L, F_R, E_L, E_R, cfl, dvel_small, rho_sf_small, vflux_L_arr, vflux_R_arr]')
                     do l = 0, p
                         do k = -1, n
                             do j = 0, m
@@ -1639,9 +1639,9 @@ contains
                             end do
                         end do
                     end do
-                #:endcall GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP
             else
-                #:call GPU_PARALLEL_LOOP(collapse=3, private='[rho_L, rho_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, mu_L, mu_R, vel_L, vel_R, pres_L, pres_R, alpha_L, alpha_R, alpha_rho_L, alpha_rho_R, F_L, F_R, E_L, E_R, cfl, dvel_small, rho_sf_small, vflux_L_arr, vflux_R_arr]')
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[j,k,l,rho_L, rho_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, mu_L, mu_R, vel_L, vel_R, pres_L, pres_R, alpha_L, alpha_R, alpha_rho_L, alpha_rho_R, F_L, F_R, E_L, E_R, cfl, dvel_small, rho_sf_small, vflux_L_arr, vflux_R_arr]')
                     do l = 0, p
                         do k = -1, n
                             do j = 0, m
@@ -2095,10 +2095,10 @@ contains
                             end do
                         end do
                     end do
-                #:endcall GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP
             end if
         elseif (idir == 3) then
-            #:call GPU_PARALLEL_LOOP(collapse=3, private='[rho_L, rho_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, mu_L, mu_R, vel_L, vel_R, pres_L, pres_R, alpha_L, alpha_R, alpha_rho_L, alpha_rho_R, F_L, F_R, E_L, E_R, cfl, dvel_small, rho_sf_small, vflux_L_arr, vflux_R_arr]')
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[j,k,l,rho_L, rho_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, mu_L, mu_R, vel_L, vel_R, pres_L, pres_R, alpha_L, alpha_R, alpha_rho_L, alpha_rho_R, F_L, F_R, E_L, E_R, cfl, dvel_small, rho_sf_small, vflux_L_arr, vflux_R_arr]')
                 do l = -1, p
                     do k = 0, n
                         do j = 0, m
@@ -2551,7 +2551,7 @@ contains
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP
         end if
 
     end subroutine s_igr_riemann_solver
@@ -2611,7 +2611,7 @@ contains
         integer, intent(in) :: idir
 
         if (idir == 1) then
-            #:call GPU_PARALLEL_LOOP(collapse=4)
+            $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
                 do i = 1, sys_size
                     do l = 0, p
                         do k = 0, n
@@ -2623,9 +2623,9 @@ contains
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP
         elseif (idir == 2) then
-            #:call GPU_PARALLEL_LOOP(collapse=4)
+            $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
                 do i = 1, sys_size
                     do l = 0, p
                         do k = 0, n
@@ -2638,9 +2638,9 @@ contains
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP
         elseif (idir == 3) then
-            #:call GPU_PARALLEL_LOOP(collapse=4)
+            $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
                 do i = 1, sys_size
                     do l = 0, p
                         do k = 0, n
@@ -2653,7 +2653,7 @@ contains
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP
         end if
 
     end subroutine s_igr_flux_add

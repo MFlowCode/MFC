@@ -681,7 +681,7 @@ contains
                             end do
                         end do
                     end do
-                #:endcall GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP
             else if (weno_dir == 2) then
                 #:call GPU_PARALLEL_LOOP(collapse=4)
                     do i = 1, ubound(v_vf, 1)
@@ -694,7 +694,7 @@ contains
                             end do
                         end do
                     end do
-                #:endcall GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP
             else if (weno_dir == 3) then
                 #:call GPU_PARALLEL_LOOP(collapse=4)
                     do i = 1, ubound(v_vf, 1)
@@ -707,7 +707,7 @@ contains
                             end do
                         end do
                     end do
-                #:endcall GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP
             end if
         elseif (weno_order == 3) then
             #:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
@@ -785,7 +785,7 @@ contains
                                 end do
                             end do
                         end do
-                    #:endcall GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP
                 end if
             #:endfor
         elseif (weno_order == 5) then
@@ -900,7 +900,7 @@ contains
                                 end do
                             end do
                         end do
-                    #:endcall GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP
 
                     if (mp_weno) then
                         call s_preserve_monotonicity(v_rs_ws_${XYZ}$, vL_rs_vf_${XYZ}$, &
@@ -1096,7 +1096,7 @@ contains
                                 end do
                             end do
                         end do
-                    #:endcall GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP
 
                 end if
             #:endfor
@@ -1149,7 +1149,7 @@ contains
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP
         end if
 
         ! Reshaping/Projecting onto Characteristic Fields in y-direction
@@ -1166,7 +1166,7 @@ contains
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP
         end if
 
         ! Reshaping/Projecting onto Characteristic Fields in z-direction
@@ -1183,7 +1183,7 @@ contains
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP
         end if
 
     end subroutine s_initialize_weno
@@ -1358,7 +1358,7 @@ contains
                     end do
                 end do
             end do
-        #:endcall GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP
 
     end subroutine s_preserve_monotonicity
 

@@ -70,7 +70,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         integer :: j, k, l
 
-        #:call GPU_PARALLEL_LOOP(collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -78,7 +78,7 @@ contains
                     end do
                 end do
             end do
-        #:endcall GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP
 
     end subroutine s_pressure_relaxation_procedure
 

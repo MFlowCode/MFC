@@ -76,7 +76,7 @@ contains
         real(wp), dimension(3) :: v, B
         real(wp) :: divB, vdotB
 
-        #:call GPU_PARALLEL_LOOP(collapse=3, private='[v, B]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[k,l,q,v, B]')
             do q = 0, p
                 do l = 0, n
                     do k = 0, m
@@ -129,7 +129,7 @@ contains
                     end do
                 end do
             end do
-        #:endcall GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP
 
     end subroutine s_compute_mhd_powell_rhs
 

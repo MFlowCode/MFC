@@ -146,7 +146,7 @@ contains
                                                      z_accel)
             end if
 
-            #:call GPU_PARALLEL_LOOP(collapse=3)
+            $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3)
                 do k = 0, p
                     do j = 0, n
                         do i = 0, m
@@ -163,7 +163,7 @@ contains
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP
 
             $:GPU_UPDATE(host='[accel_mag]')
 
@@ -204,7 +204,7 @@ contains
 
         ! Computing the acceleration component in the x-coordinate direction
         if (i == 1) then
-            #:call GPU_PARALLEL_LOOP(collapse=3)
+            $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
@@ -215,10 +215,10 @@ contains
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP
 
             if (n == 0) then
-                #:call GPU_PARALLEL_LOOP(collapse=4)
+                $:GPU_PARALLEL_LOOP(private='[j,k,l,r]', collapse=4)
                     do l = 0, p
                         do k = 0, n
                             do j = 0, m
@@ -230,9 +230,9 @@ contains
                             end do
                         end do
                     end do
-                #:endcall GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP
             elseif (p == 0) then
-                #:call GPU_PARALLEL_LOOP(collapse=4)
+                $:GPU_PARALLEL_LOOP(private='[j,k,l,r]', collapse=4)
                     do l = 0, p
                         do k = 0, n
                             do j = 0, m
@@ -246,10 +246,10 @@ contains
                             end do
                         end do
                     end do
-                #:endcall GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP
             else
                 if (grid_geometry == 3) then
-                    #:call GPU_PARALLEL_LOOP(collapse=4)
+                    $:GPU_PARALLEL_LOOP(private='[j,k,l,r]', collapse=4)
                         do l = 0, p
                             do k = 0, n
                                 do j = 0, m
@@ -265,9 +265,9 @@ contains
                                 end do
                             end do
                         end do
-                    #:endcall GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP
                 else
-                    #:call GPU_PARALLEL_LOOP(collapse=4)
+                    $:GPU_PARALLEL_LOOP(private='[j,k,l,r]', collapse=4)
                         do l = 0, p
                             do k = 0, n
                                 do j = 0, m
@@ -283,12 +283,12 @@ contains
                                 end do
                             end do
                         end do
-                    #:endcall GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP
                 end if
             end if
             ! Computing the acceleration component in the y-coordinate direction
         elseif (i == 2) then
-            #:call GPU_PARALLEL_LOOP(collapse=3)
+            $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
@@ -299,10 +299,10 @@ contains
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP
 
             if (p == 0) then
-                #:call GPU_PARALLEL_LOOP(collapse=4)
+                $:GPU_PARALLEL_LOOP(private='[j,k,l,r]', collapse=4)
                     do l = 0, p
                         do k = 0, n
                             do j = 0, m
@@ -316,10 +316,10 @@ contains
                             end do
                         end do
                     end do
-                #:endcall GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP
             else
                 if (grid_geometry == 3) then
-                    #:call GPU_PARALLEL_LOOP(collapse=4)
+                    $:GPU_PARALLEL_LOOP(private='[j,k,l,r]', collapse=4)
                         do l = 0, p
                             do k = 0, n
                                 do j = 0, m
@@ -336,9 +336,9 @@ contains
                                 end do
                             end do
                         end do
-                    #:endcall GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP
                 else
-                    #:call GPU_PARALLEL_LOOP(collapse=4)
+                    $:GPU_PARALLEL_LOOP(private='[j,k,l,r]', collapse=4)
                         do l = 0, p
                             do k = 0, n
                                 do j = 0, m
@@ -354,12 +354,12 @@ contains
                                 end do
                             end do
                         end do
-                    #:endcall GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP
                 end if
             end if
             ! Computing the acceleration component in the z-coordinate direction
         else
-            #:call GPU_PARALLEL_LOOP(collapse=3)
+            $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
@@ -370,10 +370,10 @@ contains
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP
 
             if (grid_geometry == 3) then
-                #:call GPU_PARALLEL_LOOP(collapse=4)
+                $:GPU_PARALLEL_LOOP(private='[j,k,l,r]', collapse=4)
                     do l = 0, p
                         do k = 0, n
                             do j = 0, m
@@ -391,9 +391,9 @@ contains
                             end do
                         end do
                     end do
-                #:endcall GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP
             else
-                #:call GPU_PARALLEL_LOOP(collapse=4)
+                $:GPU_PARALLEL_LOOP(private='[j,k,l,r]', collapse=4)
                     do l = 0, p
                         do k = 0, n
                             do j = 0, m
@@ -409,7 +409,7 @@ contains
                             end do
                         end do
                     end do
-                #:endcall GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP
             end if
         end if
 
@@ -438,7 +438,7 @@ contains
         end do
 
         if (n == 0) then !1D simulation
-            #:call GPU_PARALLEL_LOOP(collapse=3,private='[dV]')
+            $:GPU_PARALLEL_LOOP(collapse=3,private='[j,k,l,dV]')
                 do l = 0, p !Loop over grid
                     do k = 0, n
                         do j = 0, m
@@ -458,9 +458,9 @@ contains
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP
         elseif (p == 0) then !2D simulation
-            #:call GPU_PARALLEL_LOOP(collapse=3,private='[dV]')
+            $:GPU_PARALLEL_LOOP(collapse=3,private='[j,k,l,dV]')
                 do l = 0, p !Loop over grid
                     do k = 0, n
                         do j = 0, m
@@ -483,9 +483,9 @@ contains
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP
         else !3D simulation
-            #:call GPU_PARALLEL_LOOP(collapse=3,private='[dV]')
+            $:GPU_PARALLEL_LOOP(collapse=3,private='[j,k,l,dV]')
                 do l = 0, p !Loop over grid
                     do k = 0, n
                         do j = 0, m
@@ -512,7 +512,7 @@ contains
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP
         end if
 
         $:GPU_UPDATE(host='[c_m]')

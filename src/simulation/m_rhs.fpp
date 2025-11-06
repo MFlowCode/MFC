@@ -564,7 +564,7 @@ contains
                 end do
             end if ! end allocation of viscous variables
 
-            #:call GPU_PARALLEL_LOOP(collapse=4)
+            $:GPU_PARALLEL_LOOP(private='[i,j,k,l,id]', collapse=4)
                 do id = 1, num_dims
                     do i = 1, sys_size
                         do l = idwbuff(3)%beg, idwbuff(3)%end
@@ -576,7 +576,7 @@ contains
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP
 
         end if ! end allocation for .not. igr
 
@@ -647,7 +647,7 @@ contains
 
         if (.not. igr) then
             ! Association/Population of Working Variables
-            #:call GPU_PARALLEL_LOOP(collapse=4)
+            $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
                 do i = 1, sys_size
                     do l = idwbuff(3)%beg, idwbuff(3)%end
                         do k = idwbuff(2)%beg, idwbuff(2)%end
@@ -657,12 +657,12 @@ contains
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP
 
             ! Converting Conservative to Primitive Variables
 
             if (mpp_lim .and. bubbles_euler) then
-                #:call GPU_PARALLEL_LOOP(collapse=3)
+                $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
                     do l = idwbuff(3)%beg, idwbuff(3)%end
                         do k = idwbuff(2)%beg, idwbuff(2)%end
                             do j = idwbuff(1)%beg, idwbuff(1)%end
@@ -679,7 +679,7 @@ contains
                             end do
                         end do
                     end do
-                #:endcall GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP
             end if
         end if
 
@@ -739,7 +739,7 @@ contains
             if (igr) then
 
                 if (id == 1) then
-                    #:call GPU_PARALLEL_LOOP(collapse=4)
+                    $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
                         do l = -1, p + 1
                             do k = -1, n + 1
                                 do j = -1, m + 1
@@ -749,7 +749,7 @@ contains
                                 end do
                             end do
                         end do
-                    #:endcall GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP
                 end if
 
                 call nvtxStartRange("IGR_RIEMANN")
@@ -970,7 +970,7 @@ contains
         ! END: Dimensional Splitting Loop
 
         if (ib) then
-            #:call GPU_PARALLEL_LOOP(collapse=3)
+            $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=3)
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
@@ -982,7 +982,7 @@ contains
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP
         end if
 
         ! Additional Physics and Source Temrs
@@ -1037,7 +1037,7 @@ contains
 
         if (run_time_info .or. probe_wrt .or. ib .or. bubbles_lagrange) then
             if (.not. igr) then
-                #:call GPU_PARALLEL_LOOP(collapse=4)
+                $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
                     do i = 1, sys_size
                         do l = idwbuff(3)%beg, idwbuff(3)%end
                             do k = idwbuff(2)%beg, idwbuff(2)%end
@@ -1047,7 +1047,7 @@ contains
                             end do
                         end do
                     end do
-                #:endcall GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP
             end if
         end if
 
@@ -1079,7 +1079,7 @@ contains
         real(wp) :: advected_qty_val, pressure_val, velocity_val
 
         if (alt_soundspeed) then
-            #:call GPU_PARALLEL_LOOP(collapse=3)
+            $:GPU_PARALLEL_LOOP(private='[k_loop,l_loop,q_loop]', collapse=3)
                 do q_loop = 0, p
                     do l_loop = 0, n
                         do k_loop = 0, m
@@ -1102,7 +1102,7 @@ contains
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP
         end if
 
         select case (idir)
@@ -1114,7 +1114,7 @@ contains
                 call s_cbc(q_prim_vf%vf, flux_n(idir)%vf, flux_src_n_vf%vf, idir, 1, irx, iry, irz)
             end if
 
-            #:call GPU_PARALLEL_LOOP(collapse=4,private='[inv_ds,flux_face1,flux_face2]')
+            $:GPU_PARALLEL_LOOP(collapse=4,private='[j,k_loop,l_loop,q_loop,inv_ds,flux_face1,flux_face2]')
                 do j = 1, sys_size
                     do q_loop = 0, p
                         do l_loop = 0, n
@@ -1127,10 +1127,10 @@ contains
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP
 
             if (model_eqns == 3) then
-                #:call GPU_PARALLEL_LOOP(collapse=4,private='[inv_ds,advected_qty_val, pressure_val,flux_face1,flux_face2]')
+                $:GPU_PARALLEL_LOOP(collapse=4,private='[i_fluid_loop,k_loop,l_loop,q_loop,inv_ds,advected_qty_val, pressure_val,flux_face1,flux_face2]')
                     do q_loop = 0, p
                         do l_loop = 0, n
                             do k_loop = 0, m
@@ -1147,7 +1147,7 @@ contains
                             end do
                         end do
                     end do
-                #:endcall GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP
             end if
 
             call s_add_directional_advection_source_terms(idir, rhs_vf, q_cons_vf, q_prim_vf, flux_src_n_vf, Kterm)
@@ -1160,7 +1160,7 @@ contains
                 call s_cbc(q_prim_vf%vf, flux_n(idir)%vf, flux_src_n_vf%vf, idir, 1, irx, iry, irz)
             end if
 
-            #:call GPU_PARALLEL_LOOP(collapse=4,private='[inv_ds,flux_face1,flux_face2]')
+            $:GPU_PARALLEL_LOOP(collapse=4,private='[j,k,l,q,inv_ds,flux_face1,flux_face2]')
                 do j = 1, sys_size
                     do l = 0, p
                         do k = 0, n
@@ -1173,10 +1173,10 @@ contains
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP
 
             if (model_eqns == 3) then
-                #:call GPU_PARALLEL_LOOP(collapse=4,private='[inv_ds,advected_qty_val, pressure_val,flux_face1,flux_face2]')
+                $:GPU_PARALLEL_LOOP(collapse=4,private='[i_fluid_loop,k,l,q,inv_ds,advected_qty_val, pressure_val,flux_face1,flux_face2]')
                     do l = 0, p
                         do k = 0, n
                             do q = 0, m
@@ -1198,11 +1198,11 @@ contains
                             end do
                         end do
                     end do
-                #:endcall GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP
             end if
 
             if (cyl_coord) then
-                #:call GPU_PARALLEL_LOOP(collapse=4,private='[flux_face1,flux_face2]')
+                $:GPU_PARALLEL_LOOP(collapse=4,private='[j,k,l,q,flux_face1,flux_face2]')
                     do j = 1, sys_size
                         do l = 0, p
                             do k = 0, n
@@ -1215,7 +1215,7 @@ contains
                             end do
                         end do
                     end do
-                #:endcall GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP
             end if
 
             call s_add_directional_advection_source_terms(idir, rhs_vf, q_cons_vf, q_prim_vf, flux_src_n_vf, Kterm)
@@ -1229,7 +1229,7 @@ contains
             end if
 
             if (grid_geometry == 3) then ! Cylindrical Coordinates
-                #:call GPU_PARALLEL_LOOP(collapse=4,private='[inv_ds,velocity_val,flux_face1,flux_face2]')
+                $:GPU_PARALLEL_LOOP(collapse=4,private='[j,k,l,q,inv_ds,velocity_val,flux_face1,flux_face2]')
                     do j = 1, sys_size
                         do k = 0, p
                             do q = 0, n
@@ -1244,8 +1244,8 @@ contains
                             end do
                         end do
                     end do
-                #:endcall GPU_PARALLEL_LOOP
-                #:call GPU_PARALLEL_LOOP(collapse=4,private='[flux_face1,flux_face2]')
+                $:END_GPU_PARALLEL_LOOP
+                $:GPU_PARALLEL_LOOP(collapse=4,private='[j,k,l,q,flux_face1,flux_face2]')
                     do j = 1, sys_size
                         do k = 0, p
                             do q = 0, n
@@ -1258,9 +1258,9 @@ contains
                             end do
                         end do
                     end do
-                #:endcall GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP
             else ! Cartesian Coordinates
-                #:call GPU_PARALLEL_LOOP(collapse=4,private='[inv_ds,flux_face1,flux_face2]')
+                $:GPU_PARALLEL_LOOP(collapse=4,private='[j,k,l,q,inv_ds,flux_face1,flux_face2]')
                     do j = 1, sys_size
                         do k = 0, p
                             do q = 0, n
@@ -1273,11 +1273,11 @@ contains
                             end do
                         end do
                     end do
-                #:endcall GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP
             end if
 
             if (model_eqns == 3) then
-                #:call GPU_PARALLEL_LOOP(collapse=4,private='[inv_ds,advected_qty_val, pressure_val,flux_face1,flux_face2]')
+                $:GPU_PARALLEL_LOOP(collapse=4,private='[i_fluid_loop,k,l,q,inv_ds,advected_qty_val, pressure_val,flux_face1,flux_face2]')
                     do k = 0, p
                         do q = 0, n
                             do l = 0, m
@@ -1294,7 +1294,7 @@ contains
                             end do
                         end do
                     end do
-                #:endcall GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP
             end if
 
             call s_add_directional_advection_source_terms(idir, rhs_vf, q_cons_vf, q_prim_vf, flux_src_n_vf, Kterm)
@@ -1322,7 +1322,7 @@ contains
             case (1) ! x-direction
                 use_standard_riemann = (riemann_solver == 1 .or. riemann_solver == 4)
                 if (use_standard_riemann) then
-                    #:call GPU_PARALLEL_LOOP(collapse=4,private='[local_inv_ds, local_term_coeff,local_flux1,local_flux2]')
+                    $:GPU_PARALLEL_LOOP(collapse=4,private='[j_adv,k_idx,l_idx,q_idx,local_inv_ds, local_term_coeff,local_flux1,local_flux2]')
                         do j_adv = advxb, advxe
                             do q_idx = 0, p ! z_extent
                                 do l_idx = 0, n ! y_extent
@@ -1337,11 +1337,11 @@ contains
                                 end do
                             end do
                         end do
-                    #:endcall GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP
                 else ! Other Riemann solvers
                     if (alt_soundspeed) then
                         if (bubbles_euler .neqv. .true.) then
-                            #:call GPU_PARALLEL_LOOP(collapse=3, private='[local_inv_ds, local_q_cons_val, local_k_term_val, local_term_coeff, local_flux1, local_flux2]')
+                            $:GPU_PARALLEL_LOOP(collapse=3, private='[k_idx,l_idx,q_idx,local_inv_ds, local_q_cons_val, local_k_term_val, local_term_coeff, local_flux1, local_flux2]')
                                 do q_idx = 0, p; do l_idx = 0, n; do k_idx = 0, m
                                             local_inv_ds = 1._wp/dx(k_idx)
                                             local_q_cons_val = q_cons_vf_arg%vf(advxe)%sf(k_idx, l_idx, q_idx)
@@ -1352,9 +1352,9 @@ contains
                                             rhs_vf_arg(advxe)%sf(k_idx, l_idx, q_idx) = rhs_vf_arg(advxe)%sf(k_idx, l_idx, q_idx) + &
                                                                                         local_inv_ds*local_term_coeff*(local_flux1 - local_flux2)
                                         end do; end do; end do
-                            #:endcall GPU_PARALLEL_LOOP
+                            $:END_GPU_PARALLEL_LOOP
 
-                            #:call GPU_PARALLEL_LOOP(collapse=3, private='[local_inv_ds,local_q_cons_val, local_k_term_val,local_term_coeff, local_flux1, local_flux2]')
+                            $:GPU_PARALLEL_LOOP(collapse=3, private='[k_idx,l_idx,q_idx,local_inv_ds,local_q_cons_val, local_k_term_val,local_term_coeff, local_flux1, local_flux2]')
                                 do q_idx = 0, p; do l_idx = 0, n; do k_idx = 0, m
                                             local_inv_ds = 1._wp/dx(k_idx)
                                             local_q_cons_val = q_cons_vf_arg%vf(advxb)%sf(k_idx, l_idx, q_idx)
@@ -1365,10 +1365,10 @@ contains
                                             rhs_vf_arg(advxb)%sf(k_idx, l_idx, q_idx) = rhs_vf_arg(advxb)%sf(k_idx, l_idx, q_idx) + &
                                                                                         local_inv_ds*local_term_coeff*(local_flux1 - local_flux2)
                                         end do; end do; end do
-                            #:endcall GPU_PARALLEL_LOOP
+                            $:END_GPU_PARALLEL_LOOP
                         end if
                     else ! NOT alt_soundspeed
-                        #:call GPU_PARALLEL_LOOP(collapse=4,private='[local_inv_ds, local_term_coeff,local_flux1,local_flux2]')
+                        $:GPU_PARALLEL_LOOP(collapse=4,private='[j_adv,k_idx,l_idx,q_idx,local_inv_ds, local_term_coeff,local_flux1,local_flux2]')
                             do j_adv = advxb, advxe
                                 do q_idx = 0, p; do l_idx = 0, n; do k_idx = 0, m
                                             local_inv_ds = 1._wp/dx(k_idx)
@@ -1379,14 +1379,14 @@ contains
                                                                                         local_inv_ds*local_term_coeff*(local_flux1 - local_flux2)
                                         end do; end do; end do
                             end do
-                        #:endcall GPU_PARALLEL_LOOP
+                        $:END_GPU_PARALLEL_LOOP
                     end if
                 end if
 
             case (2) ! y-direction: loops q_idx (x), k_idx (y), l_idx (z); sf(q_idx, k_idx, l_idx); dy(k_idx); Kterm(q_idx,k_idx,l_idx)
                 use_standard_riemann = (riemann_solver == 1 .or. riemann_solver == 4)
                 if (use_standard_riemann) then
-                    #:call GPU_PARALLEL_LOOP(collapse=4,private='[local_inv_ds, local_term_coeff,local_flux1,local_flux2]')
+                    $:GPU_PARALLEL_LOOP(collapse=4,private='[j_adv,k_idx,l_idx,q_idx,local_inv_ds, local_term_coeff,local_flux1,local_flux2]')
                         do j_adv = advxb, advxe
                             do l_idx = 0, p ! z_extent
                                 do k_idx = 0, n ! y_extent
@@ -1401,11 +1401,11 @@ contains
                                 end do
                             end do
                         end do
-                    #:endcall GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP
                 else ! Other Riemann solvers
                     if (alt_soundspeed) then
                         if (bubbles_euler .neqv. .true.) then
-                            #:call GPU_PARALLEL_LOOP(collapse=3, private='[local_inv_ds, local_q_cons_val, local_k_term_val, local_term_coeff, local_flux1, local_flux2]')
+                            $:GPU_PARALLEL_LOOP(collapse=3, private='[k_idx,l_idx,q_idx,local_inv_ds, local_q_cons_val, local_k_term_val, local_term_coeff, local_flux1, local_flux2]')
                                 do l_idx = 0, p; do k_idx = 0, n; do q_idx = 0, m
                                             local_inv_ds = 1._wp/dy(k_idx)
                                             local_q_cons_val = q_cons_vf_arg%vf(advxe)%sf(q_idx, k_idx, l_idx)
@@ -1420,9 +1420,9 @@ contains
                                                                                             (local_k_term_val/(2._wp*y_cc(k_idx)))*(local_flux1 + local_flux2)
                                             end if
                                         end do; end do; end do
-                            #:endcall GPU_PARALLEL_LOOP
+                            $:END_GPU_PARALLEL_LOOP
 
-                            #:call GPU_PARALLEL_LOOP(collapse=3, private='[local_inv_ds, local_q_cons_val, local_k_term_val,local_term_coeff, local_flux1, local_flux2]')
+                            $:GPU_PARALLEL_LOOP(collapse=3, private='[k_idx,l_idx,q_idx,local_inv_ds, local_q_cons_val, local_k_term_val,local_term_coeff, local_flux1, local_flux2]')
                                 do l_idx = 0, p; do k_idx = 0, n; do q_idx = 0, m
                                             local_inv_ds = 1._wp/dy(k_idx)
                                             local_q_cons_val = q_cons_vf_arg%vf(advxb)%sf(q_idx, k_idx, l_idx)
@@ -1437,10 +1437,10 @@ contains
                                                                                             (local_k_term_val/(2._wp*y_cc(k_idx)))*(local_flux1 + local_flux2)
                                             end if
                                         end do; end do; end do
-                            #:endcall GPU_PARALLEL_LOOP
+                            $:END_GPU_PARALLEL_LOOP
                         end if
                     else ! NOT alt_soundspeed
-                        #:call GPU_PARALLEL_LOOP(collapse=4,private='[local_inv_ds, local_term_coeff,local_flux1,local_flux2]')
+                        $:GPU_PARALLEL_LOOP(collapse=4,private='[j_adv,k_idx,l_idx,q_idx,local_inv_ds, local_term_coeff,local_flux1,local_flux2]')
                             do j_adv = advxb, advxe
                                 do l_idx = 0, p; do k_idx = 0, n; do q_idx = 0, m
                                             local_inv_ds = 1._wp/dy(k_idx)
@@ -1451,7 +1451,7 @@ contains
                                                                                         local_inv_ds*local_term_coeff*(local_flux1 - local_flux2)
                                         end do; end do; end do
                             end do
-                        #:endcall GPU_PARALLEL_LOOP
+                        $:END_GPU_PARALLEL_LOOP
                     end if
                 end if
 
@@ -1463,7 +1463,7 @@ contains
                 end if
 
                 if (use_standard_riemann) then
-                    #:call GPU_PARALLEL_LOOP(collapse=4,private='[local_inv_ds, local_term_coeff,local_flux1,local_flux2]')
+                    $:GPU_PARALLEL_LOOP(collapse=4,private='[j_adv,k_idx,l_idx,q_idx,local_inv_ds, local_term_coeff,local_flux1,local_flux2]')
                         do j_adv = advxb, advxe
                             do k_idx = 0, p ! z_extent
                                 do q_idx = 0, n ! y_extent
@@ -1478,11 +1478,11 @@ contains
                                 end do
                             end do
                         end do
-                    #:endcall GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP
                 else ! Other Riemann solvers
                     if (alt_soundspeed) then
                         if (bubbles_euler .neqv. .true.) then
-                            #:call GPU_PARALLEL_LOOP(collapse=3, private='[local_inv_ds,local_q_cons_val, local_k_term_val, local_term_coeff, local_flux1, local_flux2]')
+                            $:GPU_PARALLEL_LOOP(collapse=3, private='[k_idx,l_idx,q_idx,local_inv_ds,local_q_cons_val, local_k_term_val, local_term_coeff, local_flux1, local_flux2]')
                                 do k_idx = 0, p; do q_idx = 0, n; do l_idx = 0, m
                                             local_inv_ds = 1._wp/dz(k_idx)
                                             local_q_cons_val = q_cons_vf_arg%vf(advxe)%sf(l_idx, q_idx, k_idx)
@@ -1493,9 +1493,9 @@ contains
                                             rhs_vf_arg(advxe)%sf(l_idx, q_idx, k_idx) = rhs_vf_arg(advxe)%sf(l_idx, q_idx, k_idx) + &
                                                                                         local_inv_ds*local_term_coeff*(local_flux1 - local_flux2)
                                         end do; end do; end do
-                            #:endcall GPU_PARALLEL_LOOP
+                            $:END_GPU_PARALLEL_LOOP
 
-                            #:call GPU_PARALLEL_LOOP(collapse=3, private='[local_inv_ds, local_q_cons_val, local_k_term_val, local_term_coeff, local_flux1, local_flux2]')
+                            $:GPU_PARALLEL_LOOP(collapse=3, private='[k_idx,l_idx,q_idx,local_inv_ds, local_q_cons_val, local_k_term_val, local_term_coeff, local_flux1, local_flux2]')
                                 do k_idx = 0, p; do q_idx = 0, n; do l_idx = 0, m
                                             local_inv_ds = 1._wp/dz(k_idx)
                                             local_q_cons_val = q_cons_vf_arg%vf(advxb)%sf(l_idx, q_idx, k_idx)
@@ -1506,10 +1506,10 @@ contains
                                             rhs_vf_arg(advxb)%sf(l_idx, q_idx, k_idx) = rhs_vf_arg(advxb)%sf(l_idx, q_idx, k_idx) + &
                                                                                         local_inv_ds*local_term_coeff*(local_flux1 - local_flux2)
                                         end do; end do; end do
-                            #:endcall GPU_PARALLEL_LOOP
+                            $:END_GPU_PARALLEL_LOOP
                         end if
                     else ! NOT alt_soundspeed
-                        #:call GPU_PARALLEL_LOOP(collapse=4,private='[local_inv_ds, local_term_coeff,local_flux1,local_flux2]')
+                        $:GPU_PARALLEL_LOOP(collapse=4, private='[j_adv,k_idx,l_idx,q_idx,local_inv_ds, local_term_coeff,local_flux1,local_flux2]')
                             do j_adv = advxb, advxe
                                 do k_idx = 0, p; do q_idx = 0, n; do l_idx = 0, m
                                             local_inv_ds = 1._wp/dz(k_idx)
@@ -1520,7 +1520,7 @@ contains
                                                                                         local_inv_ds*local_term_coeff*(local_flux1 - local_flux2)
                                         end do; end do; end do
                             end do
-                        #:endcall GPU_PARALLEL_LOOP
+                        $:END_GPU_PARALLEL_LOOP
                     end if
                 end if
             end select
@@ -1542,7 +1542,7 @@ contains
         if (idir == 1) then ! x-direction
 
             if (surface_tension) then
-                #:call GPU_PARALLEL_LOOP(collapse=3)
+                $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
                     do l = 0, p
                         do k = 0, n
                             do j = 0, m
@@ -1554,11 +1554,11 @@ contains
                             end do
                         end do
                     end do
-                #:endcall GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP
             end if
 
             if ((surface_tension .or. viscous) .or. chem_params%diffusion) then
-                #:call GPU_PARALLEL_LOOP(collapse=3)
+                $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
                     do l = 0, p
                         do k = 0, n
                             do j = 0, m
@@ -1591,13 +1591,13 @@ contains
                             end do
                         end do
                     end do
-                #:endcall GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP
             end if
 
         elseif (idir == 2) then ! y-direction
 
             if (surface_tension) then
-                #:call GPU_PARALLEL_LOOP(collapse=3)
+                $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
                     do l = 0, p
                         do k = 0, n
                             do j = 0, m
@@ -1609,7 +1609,7 @@ contains
                             end do
                         end do
                     end do
-                #:endcall GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP
             end if
 
             if (cyl_coord .and. ((bc_y%beg == -2) .or. (bc_y%beg == -14))) then
@@ -1630,7 +1630,7 @@ contains
                                                              idwbuff(1), idwbuff(2), idwbuff(3))
                     end if
 
-                    #:call GPU_PARALLEL_LOOP(collapse=2)
+                    $:GPU_PARALLEL_LOOP(private='[i,j,l]', collapse=2)
                         do l = 0, p
                             do j = 0, m
                                 $:GPU_LOOP(parallelism='[seq]')
@@ -1642,11 +1642,11 @@ contains
                                 end do
                             end do
                         end do
-                    #:endcall GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP
 
                 end if
 
-                #:call GPU_PARALLEL_LOOP(collapse=3)
+                $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=3)
                     do l = 0, p
                         do k = 1, n
                             do j = 0, m
@@ -1660,12 +1660,12 @@ contains
                             end do
                         end do
                     end do
-                #:endcall GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP
 
             else
 
                 if ((surface_tension .or. viscous) .or. chem_params%diffusion) then
-                    #:call GPU_PARALLEL_LOOP(collapse=3)
+                    $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=3)
                         do l = 0, p
                             do k = 0, n
                                 do j = 0, m
@@ -1697,7 +1697,7 @@ contains
                                 end do
                             end do
                         end do
-                    #:endcall GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP
                 end if
             end if
 
@@ -1706,7 +1706,7 @@ contains
             if (cyl_coord) then
                 if ((bc_y%beg == -2) .or. (bc_y%beg == -14)) then
 
-                    #:call GPU_PARALLEL_LOOP(collapse=3)
+                    $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=3)
                         do l = 0, p
                             do k = 1, n
                                 do j = 0, m
@@ -1720,10 +1720,10 @@ contains
                                 end do
                             end do
                         end do
-                    #:endcall GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP
 
                     if (viscous) then
-                        #:call GPU_PARALLEL_LOOP(collapse=2)
+                        $:GPU_PARALLEL_LOOP(private='[i,j,l]', collapse=2)
                             do l = 0, p
                                 do j = 0, m
                                     $:GPU_LOOP(parallelism='[seq]')
@@ -1734,11 +1734,11 @@ contains
                                     end do
                                 end do
                             end do
-                        #:endcall GPU_PARALLEL_LOOP
+                        $:END_GPU_PARALLEL_LOOP
                     end if
                 else
 
-                    #:call GPU_PARALLEL_LOOP(collapse=3)
+                    $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=3)
                         do l = 0, p
                             do k = 0, n
                                 do j = 0, m
@@ -1752,14 +1752,14 @@ contains
                                 end do
                             end do
                         end do
-                    #:endcall GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP
                 end if
             end if
 
         elseif (idir == 3) then ! z-direction
 
             if (surface_tension) then
-                #:call GPU_PARALLEL_LOOP(collapse=3)
+                $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
                     do l = 0, p
                         do k = 0, n
                             do j = 0, m
@@ -1771,11 +1771,11 @@ contains
                             end do
                         end do
                     end do
-                #:endcall GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP
             end if
 
             if ((surface_tension .or. viscous) .or. chem_params%diffusion) then
-                #:call GPU_PARALLEL_LOOP(collapse=3)
+                $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=3)
                     do l = 0, p
                         do k = 0, n
                             do j = 0, m
@@ -1807,11 +1807,11 @@ contains
                             end do
                         end do
                     end do
-                #:endcall GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP
             end if
 
             if (grid_geometry == 3) then
-                #:call GPU_PARALLEL_LOOP(collapse=3)
+                $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
                     do l = 0, p
                         do k = 0, n
                             do j = 0, m
@@ -1827,7 +1827,7 @@ contains
                             end do
                         end do
                     end do
-                #:endcall GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP
             end if
         end if
 
@@ -1939,7 +1939,7 @@ contains
                 $:GPU_UPDATE(device='[is1,is2,is3,iv]')
 
                 if (recon_dir == 1) then
-                    #:call GPU_PARALLEL_LOOP(collapse=4)
+                    $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
                         do i = iv%beg, iv%end
                             do l = is3%beg, is3%end
                                 do k = is2%beg, is2%end
@@ -1950,9 +1950,9 @@ contains
                                 end do
                             end do
                         end do
-                    #:endcall GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP
                 else if (recon_dir == 2) then
-                    #:call GPU_PARALLEL_LOOP(collapse=4)
+                    $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
                         do i = iv%beg, iv%end
                             do l = is3%beg, is3%end
                                 do k = is2%beg, is2%end
@@ -1963,9 +1963,9 @@ contains
                                 end do
                             end do
                         end do
-                    #:endcall GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP
                 else if (recon_dir == 3) then
-                    #:call GPU_PARALLEL_LOOP(collapse=4)
+                    $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
                         do i = iv%beg, iv%end
                             do l = is3%beg, is3%end
                                 do k = is2%beg, is2%end
@@ -1976,7 +1976,7 @@ contains
                                 end do
                             end do
                         end do
-                    #:endcall GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP
                 end if
             end if
         #:endfor

@@ -104,7 +104,7 @@ contains
             ! calculate velocity gradients + rho_K and G_K
             ! TODO: re-organize these loops one by one for GPU efficiency if possible?
 
-            #:call GPU_PARALLEL_LOOP(collapse=3)
+            $:GPU_PARALLEL_LOOP(private='[k,l,q]', collapse=3)
                 do q = 0, p
                     do l = 0, n
                         do k = 0, m
@@ -112,9 +112,9 @@ contains
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP
 
-            #:call GPU_PARALLEL_LOOP(collapse=3)
+            $:GPU_PARALLEL_LOOP(private='[k,l,q]', collapse=3)
                 do q = 0, p
                     do l = 0, n
                         do k = 0, m
@@ -127,10 +127,10 @@ contains
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP
 
             if (ndirs > 1) then
-                #:call GPU_PARALLEL_LOOP(collapse=3)
+                $:GPU_PARALLEL_LOOP(private='[k,l,q]', collapse=3)
                     do q = 0, p
                         do l = 0, n
                             do k = 0, m
@@ -138,9 +138,9 @@ contains
                             end do
                         end do
                     end do
-                #:endcall GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP
 
-                #:call GPU_PARALLEL_LOOP(collapse=3)
+                $:GPU_PARALLEL_LOOP(private='[k,l,q]', collapse=3)
                     do q = 0, p
                         do l = 0, n
                             do k = 0, m
@@ -156,12 +156,12 @@ contains
                             end do
                         end do
                     end do
-                #:endcall GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP
 
                 ! 3D
                 if (ndirs == 3) then
 
-                    #:call GPU_PARALLEL_LOOP(collapse=3)
+                    $:GPU_PARALLEL_LOOP(private='[k,l,q]', collapse=3)
                         do q = 0, p
                             do l = 0, n
                                 do k = 0, m
@@ -170,9 +170,9 @@ contains
                                 end do
                             end do
                         end do
-                    #:endcall GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP
 
-                    #:call GPU_PARALLEL_LOOP(collapse=3)
+                    $:GPU_PARALLEL_LOOP(private='[k,l,q]', collapse=3)
                         do q = 0, p
                             do l = 0, n
                                 do k = 0, m
@@ -192,11 +192,11 @@ contains
                                 end do
                             end do
                         end do
-                    #:endcall GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP
                 end if
             end if
 
-            #:call GPU_PARALLEL_LOOP(collapse=3)
+            $:GPU_PARALLEL_LOOP(private='[k,l,q]', collapse=3)
                 do q = 0, p
                     do l = 0, n
                         do k = 0, m
@@ -218,10 +218,10 @@ contains
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP
 
             ! apply rhs source term to elastic stress equation
-            #:call GPU_PARALLEL_LOOP(collapse=3)
+            $:GPU_PARALLEL_LOOP(private='[k,l,q]', collapse=3)
                 do q = 0, p
                     do l = 0, n
                         do k = 0, m
@@ -233,10 +233,10 @@ contains
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP
 
         elseif (idir == 2) then
-            #:call GPU_PARALLEL_LOOP(collapse=3)
+            $:GPU_PARALLEL_LOOP(private='[k,l,q]', collapse=3)
                 do q = 0, p
                     do l = 0, n
                         do k = 0, m
@@ -269,10 +269,10 @@ contains
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP
 
         elseif (idir == 3) then
-            #:call GPU_PARALLEL_LOOP(collapse=3)
+            $:GPU_PARALLEL_LOOP(private='[k,l,q]', collapse=3)
                 do q = 0, p
                     do l = 0, n
                         do k = 0, m
@@ -336,12 +336,12 @@ contains
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP
         end if
 
         if (cyl_coord .and. idir == 2) then
 
-            #:call GPU_PARALLEL_LOOP(collapse=3)
+            $:GPU_PARALLEL_LOOP(private='[k,l,q]', collapse=3)
                 do q = 0, p
                     do l = 0, n
                         do k = 0, m
@@ -369,7 +369,7 @@ contains
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP
 
         end if
 
@@ -404,14 +404,14 @@ contains
 
         if (n == 0) then
             l = 0; q = 0
-            #:call GPU_PARALLEL_LOOP()
+            $:GPU_PARALLEL_LOOP(private='[k]', copyin='[l,q]')
                 do k = 0, m
                     rhs_vf(damage_idx)%sf(k, l, q) = (alpha_bar*max(abs(q_cons_vf(stress_idx%beg)%sf(k, l, q)) - tau_star, 0._wp))**cont_damage_s
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP
         elseif (p == 0) then
             q = 0
-            #:call GPU_PARALLEL_LOOP(collapse=2)
+            $:GPU_PARALLEL_LOOP(private='[k,l]', copyin='[q]' collapse=2)
                 do l = 0, n
                     do k = 0, m
                         ! Maximum principal stress
@@ -424,9 +424,9 @@ contains
                         rhs_vf(damage_idx)%sf(k, l, q) = (alpha_bar*max(tau_p - tau_star, 0._wp))**cont_damage_s
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP
         else
-            #:call GPU_PARALLEL_LOOP(collapse=3)
+            $:GPU_PARALLEL_LOOP(private='[k,l,q]', collapse=3)
                 do q = 0, p
                     do l = 0, n
                         do k = 0, m
@@ -463,7 +463,7 @@ contains
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP
         end if
 
     end subroutine s_compute_damage_state

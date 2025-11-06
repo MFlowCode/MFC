@@ -279,7 +279,7 @@ contains
         integer :: j, k, l
 
         ! Computing Stability Criteria at Current Time-step
-        #:call GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[j,k,l,vel, alpha, Re]')
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -296,7 +296,7 @@ contains
                     end do
                 end do
             end do
-        #:endcall GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP
 
         ! end: Computing Stability Criteria at Current Time-step
 

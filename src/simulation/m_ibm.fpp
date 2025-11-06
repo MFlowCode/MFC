@@ -197,7 +197,7 @@ contains
         type(ghost_point) :: gp
         type(ghost_point) :: innerp
         if (num_gps > 0) then
-            $:NEW_GPU_PARALLEL_LOOP(private='[i,physical_loc,dyn_pres,alpha_rho_IP, alpha_IP,pres_IP,vel_IP,vel_g,vel_norm_IP,r_IP, v_IP,pb_IP,mv_IP,nmom_IP,presb_IP,massv_IP,rho, gamma,pi_inf,Re_K,G_K,Gs,gp,innerp,norm,buf, radial_vector, rotation_velocity, j,k,l,q]')
+            $:GPU_PARALLEL_LOOP(private='[i,physical_loc,dyn_pres,alpha_rho_IP, alpha_IP,pres_IP,vel_IP,vel_g,vel_norm_IP,r_IP, v_IP,pb_IP,mv_IP,nmom_IP,presb_IP,massv_IP,rho, gamma,pi_inf,Re_K,G_K,Gs,gp,innerp,norm,buf, radial_vector, rotation_velocity, j,k,l,q]')
                 do i = 1, num_gps
 
                     gp = ghost_points(i)
@@ -365,12 +365,12 @@ contains
                         end do
                     end if
                 end do
-            ! $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP
         end if
 
         !Correct the state of the inner points in IBs
         if (num_inner_gps > 0) then
-            #:call GPU_PARALLEL_LOOP(private='[physical_loc,dyn_pres,alpha_rho_IP, alpha_IP,vel_g,rho,gamma,pi_inf,Re_K,innerp,j,k,l,q]')
+            $:GPU_PARALLEL_LOOP(private='[i,physical_loc,dyn_pres,alpha_rho_IP, alpha_IP,vel_g,rho,gamma,pi_inf,Re_K,innerp,j,k,l,q]')
                 do i = 1, num_inner_gps
 
                     innerp = inner_points(i)
@@ -383,7 +383,7 @@ contains
                         q_cons_vf(q)%sf(j, k, l) = 0._wp
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP
         end if
 
     end subroutine s_ibm_correct_state

@@ -106,7 +106,7 @@ contains
         real(wp) :: G_local
         integer :: j, k, l, i, r
 
-        #:call GPU_PARALLEL_LOOP(collapse=3, private='[alpha_K, alpha_rho_K, rho, gamma, pi_inf, qv, G_local, Re, tensora, tensorb]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[j,k,l,alpha_K, alpha_rho_K, rho, gamma, pi_inf, qv, G_local, Re, tensora, tensorb]')
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -207,7 +207,7 @@ contains
                     end do
                 end do
             end do
-        #:endcall GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP
     end subroutine s_hyperelastic_rmt_stress_update
 
     !>  The following subroutine handles the calculation of the btensor.

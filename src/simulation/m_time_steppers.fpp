@@ -524,7 +524,7 @@ contains
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP
             !Evolve pb and mv for non-polytropic qbmm
             if (qbmm .and. (.not. polytropic)) then
                 #:call GPU_PARALLEL_LOOP(collapse=5)
@@ -552,7 +552,7 @@ contains
                             end do
                         end do
                     end do
-                #:endcall GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP
             end if
 
             if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, rk_coef(s, 3)*dt/rk_coef(s, 4))
@@ -699,7 +699,7 @@ contains
                     end do
                 end do
             end do
-        #:endcall GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP
 
         #:call GPU_PARALLEL(copyout='[dt_local]', copyin='[max_dt]')
             dt_local = minval(max_dt)
@@ -741,7 +741,7 @@ contains
                     end do
                 end do
             end do
-        #:endcall GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP
 
         call nvtxEndRange
 
@@ -767,7 +767,7 @@ contains
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP
         elseif (t_step == t_step_start + 1) then
             #:call GPU_PARALLEL_LOOP(collapse=4)
                 do i = 1, sys_size
@@ -779,7 +779,7 @@ contains
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP
         elseif (t_step == t_step_start + 2) then
             #:call GPU_PARALLEL_LOOP(collapse=4)
                 do i = 1, sys_size
@@ -791,7 +791,7 @@ contains
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP
         elseif (t_step == t_step_start + 3) then
             #:call GPU_PARALLEL_LOOP(collapse=4)
                 do i = 1, sys_size
@@ -803,7 +803,7 @@ contains
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP
         else ! All other timesteps
             #:call GPU_PARALLEL_LOOP(collapse=4)
                 do i = 1, sys_size
@@ -818,7 +818,7 @@ contains
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP
         end if
 
     end subroutine s_time_step_cycling

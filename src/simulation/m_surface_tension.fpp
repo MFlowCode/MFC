@@ -130,7 +130,7 @@ contains
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP
 
         elseif (id == 2) then
 
@@ -176,7 +176,7 @@ contains
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP
 
         elseif (id == 3) then
 
@@ -222,7 +222,7 @@ contains
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP
 
         end if
 
@@ -252,7 +252,7 @@ contains
                     end do
                 end do
             end do
-        #:endcall GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP
 
         #:call GPU_PARALLEL_LOOP(collapse=3)
             do l = 0, p
@@ -263,7 +263,7 @@ contains
                     end do
                 end do
             end do
-        #:endcall GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP
 
         if (p > 0) then
             #:call GPU_PARALLEL_LOOP(collapse=3)
@@ -275,7 +275,7 @@ contains
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP
         end if
 
         #:call GPU_PARALLEL_LOOP(collapse=3)
@@ -294,7 +294,7 @@ contains
                     end do
                 end do
             end do
-        #:endcall GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP
 
         call s_populate_capillary_buffers(c_divs, bc_type)
 
@@ -354,7 +354,7 @@ contains
                                 end do
                             end do
                         end do
-                    #:endcall GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP
                 else if (recon_dir == 2) then
                     #:call GPU_PARALLEL_LOOP(collapse=4)
                         do i = iv%beg, iv%end
@@ -367,7 +367,7 @@ contains
                                 end do
                             end do
                         end do
-                    #:endcall GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP
                 else if (recon_dir == 3) then
                     #:call GPU_PARALLEL_LOOP(collapse=4)
                         do i = iv%beg, iv%end
@@ -380,7 +380,7 @@ contains
                                 end do
                             end do
                         end do
-                    #:endcall GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP
                 end if
             end if
         #:endfor

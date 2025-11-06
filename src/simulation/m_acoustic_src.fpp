@@ -166,7 +166,7 @@ contains
 
         sim_time = t_step*dt
 
-        #:call GPU_PARALLEL_LOOP(collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -178,7 +178,7 @@ contains
                     end do
                 end do
             end do
-        #:endcall GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP
 
         ! Keep outer loop sequel because different sources can have very different number of points
         do ai = 1, num_source
@@ -220,7 +220,7 @@ contains
 
                 deallocate (phi_rn)
 
-                #:call GPU_PARALLEL_LOOP(private='[myalpha,myalpha_rho]')
+                $:GPU_PARALLEL_LOOP(private='[i,myalpha,myalpha_rho]')
                     do i = 1, num_points
                         j = source_spatials(ai)%coord(1, i)
                         k = source_spatials(ai)%coord(2, i)
@@ -317,12 +317,12 @@ contains
                         end if
 
                     end do
-                #:endcall GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP
             end if
         end do
 
         ! Update the rhs variables
-        #:call GPU_PARALLEL_LOOP(collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[j,k,l]',collapse=3)
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -338,7 +338,7 @@ contains
                     end do
                 end do
             end do
-        #:endcall GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP
     end subroutine s_acoustic_src_calculations
 
     !> This subroutine gives the temporally varying amplitude of the pulse
