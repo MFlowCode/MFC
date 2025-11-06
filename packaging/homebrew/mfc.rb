@@ -73,27 +73,27 @@ class Mfc < Formula
     # 2. Sets up toolchain symlink so mfc.sh can find toolchain/util.sh
     # 3. Ensures mfc.sh doesn't reinstall packages by copying pyproject.toml
     (bin/"mfc").write <<~EOS
-            #!/bin/bash
-            set -e
+                        #!/bin/bash
+                        set -e
 
-            # Unset VIRTUAL_ENV to ensure mfc.sh uses the copied venv, not the Cellar one
-            unset VIRTUAL_ENV
+                        # Unset VIRTUAL_ENV to ensure mfc.sh uses the copied venv, not the Cellar one
+                        unset VIRTUAL_ENV
 
-            # Create a temporary working directory (Cellar is read-only)
-            TMPDIR=$(mktemp -d)
-            trap "rm -rf $TMPDIR" EXIT
+                        # Create a temporary working directory (Cellar is read-only)
+                        TMPDIR=$(mktemp -d)
+                        trap "rm -rf $TMPDIR" EXIT
 
-            # Copy mfc.sh to temp dir (it may try to write build artifacts)
-            cp "#{libexec}/mfc.sh" "$TMPDIR/"
-            cd "$TMPDIR"
+                        # Copy mfc.sh to temp dir (it may try to write build artifacts)
+                        cp "#{libexec}/mfc.sh" "$TMPDIR/"
+                        cd "$TMPDIR"
 
-            # Copy toolchain directory (not symlink) so Python paths resolve correctly
-            # This prevents paths from resolving back to read-only Cellar
-            cp -R "#{prefix}/toolchain" toolchain
+                        # Copy toolchain directory (not symlink) so Python paths resolve correctly
+                        # This prevents paths from resolving back to read-only Cellar
+                        cp -R "#{prefix}/toolchain" toolchain
 
-            # Patch toolchain to use Homebrew-installed binaries
-            # Replace get_install_binpath to return Homebrew bin directory
-            cat >> toolchain/mfc/build.py << 'PATCH_EOF'
+                  # Patch toolchain to use Homebrew-installed binaries
+                  # Replace get_install_binpath to return Homebrew bin directory
+                  cat >> toolchain/mfc/build.py << 'PATCH_EOF'
 
       # Homebrew patch: Override get_install_binpath to use pre-installed binaries
       _original_get_install_binpath = MFCTarget.get_install_binpath
@@ -101,34 +101,36 @@ class Mfc < Formula
           return "#{bin}/" + self.name
       MFCTarget.get_install_binpath = _homebrew_get_install_binpath
 
-      # Also override is_built to check Homebrew bin directory
-      _original_is_built = MFCTarget.is_built
-      def _homebrew_is_built(self, case):
-          import os
-          if self.name in ["pre_process", "simulation", "post_process"]:
-              return os.path.isfile("#{bin}/" + self.name)
-          return _original_is_built(self, case)
-      MFCTarget.is_built = _homebrew_is_built
-      PATCH_EOF
+      # Override is_buildable to skip building main targets and syscheck
+      _original_is_buildable = MFCTarget.is_buildable
+      def _homebrew_is_buildable(self):
+          if self.name in ["pre_process", "simulation", "post_process", "syscheck"]:
+              return False  # Skip building - use pre-installed binaries
+          return _original_is_buildable(self)
+      MFCTarget.is_buildable = _homebrew_is_buildable
+            PATCH_EOF
 
-            # Copy examples directory (required by mfc.sh Python code)
-            cp -R "#{prefix}/examples" examples
+                        # Copy examples directory (required by mfc.sh Python code)
+                        cp -R "#{prefix}/examples" examples
 
-            # Create build directory and copy venv (not symlink - needs to be writable)
-            # Use cp -R for a full recursive copy
-            mkdir -p build
-            cp -R "#{venv}" build/venv
+                        # Create build directory and copy venv (not symlink - needs to be writable)
+                        # Use cp -R for a full recursive copy
+                        mkdir -p build
+                        cp -R "#{venv}" build/venv
 
-            # Copy pyproject.toml to build/ so mfc.sh thinks dependencies are already installed
-            cp "#{prefix}/toolchain/pyproject.toml" build/pyproject.toml
+                        # Copy pyproject.toml to build/ so mfc.sh thinks dependencies are already installed
+                        cp "#{prefix}/toolchain/pyproject.toml" build/pyproject.toml
 
-            # For 'mfc run', add --no-build flag to skip compilation
-            if [ "$1" = "run" ]; then
-              exec ./mfc.sh "$@" --no-build
-            else
-              exec ./mfc.sh "$@"
-            fi
+                        # For 'mfc run', add --no-build flag to skip compilation
+                        if [ "$1" = "run" ]; then
+                          exec ./mfc.sh "$@" --no-build
+                        else
+                          exec ./mfc.sh "$@"
+                        fi
     EOS
+
+    # Make the wrapper script executable
+    (bin/"mfc").chmod 0755
   end
 
   def caveats
