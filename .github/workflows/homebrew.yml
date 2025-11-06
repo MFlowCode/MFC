@@ -52,15 +52,17 @@ jobs:
           
           echo "Installing MFC from local tap..."
           # Note: brew may exit with code 1 due to dylib fixup warnings on some Python packages (non-fatal)
-          # We check for successful installation (🍺 symbol) rather than just exit code
+          # We verify installation using brew commands rather than parsing log output
           set +e  # Don't fail immediately on error
           brew install --build-from-source --verbose mflowcode/test/mfc 2>&1 | tee /tmp/brew-install.log
           brew_exit_code=$?
           set -e
           
-          # Check if the formula actually installed successfully
-          if grep -q "🍺.*mfc.*built in" /tmp/brew-install.log; then
+          # Verify installation using brew list (more robust than log parsing)
+          if brew list mflowcode/test/mfc &>/dev/null; then
             echo "✅ MFC installed successfully (ignoring dylib relocation warnings)"
+            # Optionally verify with brew info
+            brew info mflowcode/test/mfc
             exit 0
           else
             echo "❌ MFC installation failed"

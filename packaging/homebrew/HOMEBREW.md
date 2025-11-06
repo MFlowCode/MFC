@@ -6,6 +6,101 @@ This document describes the Homebrew formula for installing MFC on macOS systems
 
 The Homebrew formula enables one-command installation of MFC on macOS (both Intel and Apple Silicon). The formula handles all dependencies, builds the three main MFC binaries, and installs them in a standard Homebrew location.
 
+## Quick Start Guide
+
+### Prerequisites
+
+- macOS 11 (Big Sur) or later
+- [Homebrew](https://brew.sh/) installed on your system
+- Internet connection for downloading dependencies
+
+### Installation
+
+The installation method depends on how the formula is distributed:
+
+#### Option 1: Official Homebrew Repository (Future)
+
+Once the formula is accepted into `homebrew-core`, install with:
+
+```bash
+brew install mfc
+```
+
+#### Option 2: Third-Party Tap
+
+If the formula is available in a tap repository:
+
+```bash
+# Add the tap
+brew tap MFlowCode/mfc
+
+# Install MFC
+brew install MFlowCode/mfc/mfc
+```
+
+#### Option 3: Install from Local Formula File
+
+If you have the formula file locally (e.g., from cloning the MFC repository):
+
+```bash
+# Install directly from the formula file
+brew install --build-from-source /path/to/MFC/packaging/homebrew/mfc.rb
+```
+
+Or create a local tap:
+
+```bash
+# Create a local tap
+brew tap-new MFlowCode/local
+
+# Copy the formula to the tap
+cp packaging/homebrew/mfc.rb $(brew --repository)/Library/Taps/MFlowCode/homebrew-local/Formula/mfc.rb
+
+# Install from the local tap
+brew install MFlowCode/local/mfc
+```
+
+#### Option 4: Install from GitHub Repository
+
+If the formula is in a GitHub repository:
+
+```bash
+brew install MFlowCode/MFC/packaging/homebrew/mfc.rb
+```
+
+### Verification
+
+After installation, verify that MFC is installed correctly:
+
+```bash
+# Check that the mfc command is available
+mfc --help
+
+# Verify binaries are installed
+which pre_process simulation post_process
+
+# Run Homebrew's built-in tests
+brew test mfc
+```
+
+### Basic Usage
+
+Once installed, you can start using MFC immediately:
+
+```bash
+# Get help
+mfc --help
+
+# Copy an example case to your working directory
+cp $(brew --prefix mfc)/examples/1D_sodshocktube/case.py .
+
+# Run a simulation case
+mfc run case.py
+
+# Or run directly from the installed examples
+mfc run $(brew --prefix mfc)/examples/1D_sodshocktube/case.py
+```
+
 ## What Gets Installed
 
 When users run `brew install mfc`, they get:
@@ -141,29 +236,114 @@ After installation completes, Homebrew displays usage information including:
 
 ## Usage Examples
 
-Once installed, users can immediately start using MFC:
+Once installed, users can immediately start using MFC. Here are common usage patterns:
+
+### Running Example Cases
 
 ```bash
+# List available examples
+ls $(brew --prefix mfc)/examples
+
 # Copy an example case to your working directory
 cp $(brew --prefix mfc)/examples/1D_sodshocktube/case.py .
 
-# Run a test case
+# Run a test case (recommended: copy to working directory first)
 mfc run case.py
 
 # Or run directly from the installed examples directory
 mfc run $(brew --prefix mfc)/examples/1D_sodshocktube/case.py
 
-# Run just preprocessing
+# Run with specific number of processors
+mfc run case.py -j 4
+```
+
+### Using Individual Binaries
+
+You can also use the binaries directly:
+
+```bash
+# Run preprocessing step
 pre_process -i input.dat
 
 # Run simulation
 simulation -i input.dat
 
-# Post-process results
+# Run post-processing
 post_process -i input.dat
+
+# Check binary versions
+pre_process --version
+simulation --version
+post_process --version
 ```
 
-Note: The `brew --prefix mfc` command returns the "opt" symlink location (e.g., `/usr/local/opt/mfc` or `/opt/homebrew/opt/mfc`), not the actual versioned Cellar path. The "opt" directory points to the currently active version in the Cellar, making examples work on both Intel and Apple Silicon systems. If you need the actual versioned installation path, look in the Cellar directory (e.g., `/usr/local/Cellar/mfc/VERSION`).
+### Common MFC Commands
+
+```bash
+# Get help
+mfc --help
+
+# Build MFC (if you have source code)
+mfc build
+
+# Run tests
+mfc test
+
+# Clean build artifacts
+mfc clean
+
+# Check system requirements
+mfc syscheck
+```
+
+### Working with Your Own Cases
+
+```bash
+# Create a new case directory
+mkdir my_case
+cd my_case
+
+# Create your case.py file (see MFC documentation for format)
+# Then run it
+mfc run case.py
+
+# Run with custom parameters
+mfc run case.py --param value
+```
+
+### Finding Installed Files
+
+```bash
+# Get the installation prefix
+brew --prefix mfc
+
+# Find examples
+ls $(brew --prefix mfc)/examples
+
+# Find toolchain
+ls $(brew --prefix mfc)/toolchain
+
+# Check installed version
+brew info mfc
+```
+
+### Troubleshooting
+
+```bash
+# Verify installation
+brew list mfc
+
+# Check for issues
+brew doctor
+
+# Reinstall if needed
+brew reinstall mfc
+
+# View installation logs
+brew install --verbose mfc
+```
+
+**Note**: The `brew --prefix mfc` command returns the "opt" symlink location (e.g., `/usr/local/opt/mfc` or `/opt/homebrew/opt/mfc`), not the actual versioned Cellar path. The "opt" directory points to the currently active version in the Cellar, making examples work on both Intel and Apple Silicon systems. If you need the actual versioned installation path, look in the Cellar directory (e.g., `/usr/local/Cellar/mfc/VERSION`).
 
 ## Distribution
 
