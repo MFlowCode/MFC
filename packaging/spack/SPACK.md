@@ -94,7 +94,6 @@ Build-time dependencies (required during compilation):
 - cmake@3.20 or newer - Build system
 - py-fypp - Fortran preprocessor
 - python@3.0 or newer - Build scripts
-- py-cantera@3.0 or newer - Chemistry library (for future chemistry support)
 
 Runtime dependencies (always required):
 - fftw@3.0 or newer - Fast Fourier Transform library

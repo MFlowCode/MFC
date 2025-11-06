@@ -41,7 +41,8 @@ class Mfc(CMakePackage):
     depends_on("cmake@3.20:", type="build")
     depends_on("py-fypp", type="build")
     depends_on("python@3:", type="build")
-    depends_on("py-cantera@3:", type="build")
+    # Note: py-cantera is not yet available in Spack builtin repo
+    # Will add when chemistry variant is implemented
 
     # Runtime dependencies
     depends_on("fftw@3:", when="~mpi")
