@@ -417,7 +417,8 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf, q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         type(scalar_field), dimension(sys_size), intent(in) :: flux_n_vf
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, rhs_pb
+        real(stp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: rhs_pb  ! TODO :: I think that this should be stp as well.
 
         integer :: i, j, k, l, q
         real(wp) :: nb_q, nb_dot, R, R2, nR, nR2, nR_dot, nR2_dot, var, AX
@@ -578,15 +579,16 @@ contains
         do i2 = 0, 2; do i1 = 0, 2
                 if ((i1 + i2) <= 2) then
                     if (bubble_model == 3) then
-                        ! RPE
-                        coeffs(1, i1, i2) = -1._wp*i2*pres/rho
-                        coeffs(2, i1, i2) = -3._wp*i2/2._wp
-                        coeffs(3, i1, i2) = i2/rho
-                        coeffs(4, i1, i2) = i1
-                        if (.not. f_is_default(Re_inv)) coeffs(5, i1, i2) = -4._wp*i2*Re_inv/rho
-                        if (.not. f_is_default(Web)) coeffs(6, i1, i2) = -2._wp*i2/Web/rho
-                        coeffs(7, i1, i2) = 0._wp
-
+                        #:if not MFC_CASE_OPTIMIZATION or nterms > 1
+                            ! RPE
+                            coeffs(1, i1, i2) = -1._wp*i2*pres/rho
+                            coeffs(2, i1, i2) = -3._wp*i2/2._wp
+                            coeffs(3, i1, i2) = i2/rho
+                            coeffs(4, i1, i2) = i1
+                            if (.not. f_is_default(Re_inv)) coeffs(5, i1, i2) = -4._wp*i2*Re_inv/rho
+                            if (.not. f_is_default(Web)) coeffs(6, i1, i2) = -2._wp*i2/Web/rho
+                            coeffs(7, i1, i2) = 0._wp
+                        #:endif
                     else if (bubble_model == 2) then
                         ! KM with approximation of 1/(1-V/C) = 1+V/C
                         #:if not MFC_CASE_OPTIMIZATION or nterms > 7
@@ -653,13 +655,15 @@ contains
                 if ((i1 + i2) <= 2) then
                     if (bubble_model == 3) then
                         ! RPE
-                        coeffs(1, i1, i2) = -1._wp*i2*pres/rho
-                        coeffs(2, i1, i2) = -3._wp*i2/2._wp
-                        coeffs(3, i1, i2) = i2/rho
-                        coeffs(4, i1, i2) = i1
-                        if (.not. f_is_default(Re_inv)) coeffs(5, i1, i2) = -4._wp*i2*Re_inv/rho
-                        if (.not. f_is_default(Web)) coeffs(6, i1, i2) = -2._wp*i2/Web/rho
-                        coeffs(7, i1, i2) = i2*pv/rho
+                        #:if not MFC_CASE_OPTIMIZATION or nterms > 7
+                            coeffs(1, i1, i2) = -1._wp*i2*pres/rho
+                            coeffs(2, i1, i2) = -3._wp*i2/2._wp
+                            coeffs(3, i1, i2) = i2/rho
+                            coeffs(4, i1, i2) = i1
+                            if (.not. f_is_default(Re_inv)) coeffs(5, i1, i2) = -4._wp*i2*Re_inv/rho
+                            if (.not. f_is_default(Web)) coeffs(6, i1, i2) = -2._wp*i2/Web/rho
+                            coeffs(7, i1, i2) = i2*pv/rho
+                        #:endif
                     else if (bubble_model == 2) then
                         ! KM with approximation of 1/(1-V/C) = 1+V/C
                         #:if not MFC_CASE_OPTIMIZATION or nterms > 7
@@ -705,8 +709,10 @@ contains
         type(scalar_field), dimension(:), intent(inout) :: q_cons_vf, q_prim_vf
         type(scalar_field), dimension(:), intent(inout) :: momsp
         type(scalar_field), dimension(0:, 0:, :), intent(inout) :: moms3d
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, rhs_pb
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: mv, rhs_mv
+        real(stp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: rhs_pb
+        real(stp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: mv
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: rhs_mv
         type(int_bounds_info), intent(in) :: ix, iy, iz
 
         real(wp), dimension(nmom) :: moms, msum

@@ -552,8 +552,8 @@ contains
                         levelset_norm%sf(i, j, k, ib_patch_id, :) = &
                             xyz_local*dist_surface_vec
                         levelset_norm%sf(i, j, k, ib_patch_id, :) = &
-                            levelset_norm%sf(i, j, k, ib_patch_id, :)/ &
-                            norm2(levelset_norm%sf(i, j, k, ib_patch_id, :))
+                            real(levelset_norm%sf(i, j, k, ib_patch_id, :)/ &
+                                 norm2(real(levelset_norm%sf(i, j, k, ib_patch_id, :), kind=wp)), kind=stp)
                     end if
                     levelset_norm%sf(i, j, k, ib_patch_id, :) = &
                         matmul(rotation, levelset_norm%sf(i, j, k, ib_patch_id, :))

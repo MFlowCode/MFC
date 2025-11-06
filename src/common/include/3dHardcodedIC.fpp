@@ -4,10 +4,70 @@
 
     real(wp) :: eps
 
-    ! Case 302 - IGR Jet
+    ! IGR Jets
+    real(wp), dimension(:), allocatable :: y_th_arr, z_th_arr, r_th_arr
     real(wp) :: r, ux_th, ux_am, p_th, p_am, rho_th, rho_am, y_th, z_th, r_th, eps_smooth
+    real(wp) :: rcut, xcut
+
+    real(wp), dimension(0:n, 0:p) :: rcut_arr
+    integer :: l, q, s
+
+    integer :: pos, start, end
+
+    character(len=1000) :: line
+    character(len=25) :: value
+
+    integer :: nn, NJet
 
     eps = 1e-9_wp
+
+    eps_smooth = 3._wp
+    if (patch_icpp(patch_id)%hcid == 303) then
+        open (unit=10, file="njet.txt", status="old", action="read")
+        read (10, *) NJet
+        close (10)
+
+        allocate (y_th_arr(0:NJet - 1))
+        allocate (z_th_arr(0:NJet - 1))
+        allocate (r_th_arr(0:NJet - 1))
+
+        open (unit=10, file="jets.csv", status="old", action="read")
+        do q = 0, NJet - 1
+            read (10, '(A)') line  ! Read a full line as a string
+            start = 1
+
+            do l = 0, 2
+                end = index(line(start:), ',')  ! Find the next comma
+                if (end == 0) then
+                    value = trim(adjustl(line(start:)))  ! Last value in the line
+                else
+                    value = trim(adjustl(line(start:start + end - 2)))  ! Extract substring
+                    start = start + end  ! Move to next value
+                end if
+                if (l == 0) then
+                    read (value, *) y_th_arr(q)  ! Convert string to numeric value
+                elseif (l == 1) then
+                    read (value, *) z_th_arr(q)
+                else
+                    read (value, *) r_th_arr(q)
+                end if
+                y_th_arr(q) = 1.0_wp*y_th_arr(q)  ! Scale y-coordinate
+                z_th_arr(q) = 1.0_wp*z_th_arr(q)  ! Scale z-coordinate
+            end do
+        end do
+        close (10)
+
+        do q = 0, p
+            do l = 0, n
+                rcut = 0._wp
+                do s = 0, NJet - 1
+                    r = sqrt((y_cc(l) - y_th_arr(s))**2._wp + (z_cc(q) - z_th_arr(s))**2._wp)
+                    rcut = rcut + f_cut_on(r - r_th_arr(s), eps_smooth)
+                end do
+                rcut_arr(l, q) = rcut
+            end do
+        end do
+    end if
 
 #:enddef
 
@@ -63,8 +123,8 @@
 
         ux_th = 10*sqrt(1.4*0.4)
         ux_am = 0.0*sqrt(1.4)
-        p_th = 2.0_wp
-        p_am = 1.0_wp
+        p_th = 0.8_wp
+        p_am = 0.4_wp
         rho_th = 1._wp
         rho_am = 1._wp
         y_th = 0.0_wp
@@ -85,6 +145,58 @@
         q_prim_vf(contxe)%sf(i, j, k) = (1._wp - q_prim_vf(advxb)%sf(i, j, k))*rho_th
 
         q_prim_vf(E_idx)%sf(i, j, k) = p_th*f_cut_on(r - r_th, eps_smooth)*f_cut_on(x_cc(i), eps_smooth) + p_am
+
+    case (303) ! 3D Multijet
+
+        eps_smooth = 3.0_wp
+        ux_th = 10*sqrt(1.4*0.4)
+        ux_am = 2.5*sqrt(1.4*0.4)
+        p_th = 0.8_wp
+        p_am = 0.4_wp
+        rho_th = 1._wp
+        rho_am = 1._wp
+        eps = 1e-6
+
+        rcut = rcut_arr(j, k)
+        xcut = f_cut_on(x_cc(i), eps_smooth)
+
+        q_prim_vf(momxb)%sf(i, j, k) = ux_th*rcut*xcut + ux_am
+        q_prim_vf(momxb + 1)%sf(i, j, k) = 0._wp
+        q_prim_vf(momxe)%sf(i, j, k) = 0._wp
+
+        if (num_fluids == 1) then
+            q_prim_vf(contxb)%sf(i, j, k) = (rho_th - rho_am)*rcut*xcut + rho_am
+        else
+            q_prim_vf(advxb)%sf(i, j, k) = (1._wp - 2._wp*eps)*rcut*xcut + eps
+            q_prim_vf(contxb)%sf(i, j, k) = rho_th*q_prim_vf(advxb)%sf(i, j, k)
+            q_prim_vf(contxe)%sf(i, j, k) = rho_am*(1._wp - q_prim_vf(advxb)%sf(i, j, k))
+        end if
+
+        q_prim_vf(E_idx)%sf(i, j, k) = p_th*rcut*xcut + p_am
+
+    case (304) ! 3D 1 fluid IGR jet
+
+        ux_th = 10*sqrt(1.4*0.4)
+        ux_am = 0.0*sqrt(1.4)
+        p_th = 0.8_wp
+        p_am = 0.4_wp
+        rho_th = 1._wp
+        rho_am = 1._wp
+        y_th = 0.0_wp
+        z_th = 0.0_wp
+        r_th = 1._wp
+        eps_smooth = 1._wp
+        eps = 1e-6
+
+        r = sqrt((y_cc(j) - y_th)**2._wp + (z_cc(k) - z_th)**2._wp)
+        rcut = f_cut_on(r - r_th, eps_smooth)
+        xcut = f_cut_on(x_cc(i), eps_smooth)
+
+        q_prim_vf(momxb)%sf(i, j, k) = (ux_th - ux_am)*rcut*xcut + ux_am
+        q_prim_vf(momxb + 1)%sf(i, j, k) = 0._wp
+        q_prim_vf(momxe)%sf(i, j, k) = 0._wp
+        q_prim_vf(contxb)%sf(i, j, k) = (rho_th - rho_am)*rcut*xcut + rho_am
+        q_prim_vf(E_idx)%sf(i, j, k) = (p_th - p_am)*rcut*xcut + p_am
 
     case (370)
         ! This hardcoded case extrudes a 2D profile to initialize a 3D simulation domain

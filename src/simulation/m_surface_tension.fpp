@@ -291,8 +291,10 @@ contains
                                 c_divs(num_dims + 1)%sf(j, k, l) + &
                                 c_divs(i)%sf(j, k, l)**2._wp
                         end do
+                        !c_divs(num_dims + 1)%sf(j, k, l) = &
+                        !sqrt(c_divs(num_dims + 1)%sf(j, k, l))
                         c_divs(num_dims + 1)%sf(j, k, l) = &
-                            sqrt(c_divs(num_dims + 1)%sf(j, k, l))
+                            sqrt(real(c_divs(num_dims + 1)%sf(j, k, l), kind=wp))
                     end do
                 end do
             end do

@@ -406,7 +406,7 @@ contains
             l = 0; q = 0
             #:call GPU_PARALLEL_LOOP()
                 do k = 0, m
-                    rhs_vf(damage_idx)%sf(k, l, q) = (alpha_bar*max(abs(q_cons_vf(stress_idx%beg)%sf(k, l, q)) - tau_star, 0._wp))**cont_damage_s
+                    rhs_vf(damage_idx)%sf(k, l, q) = (alpha_bar*max(abs(real(q_cons_vf(stress_idx%beg)%sf(k, l, q), kind=wp)) - tau_star, 0._wp))**cont_damage_s
                 end do
             #:endcall GPU_PARALLEL_LOOP
         elseif (p == 0) then

@@ -648,10 +648,6 @@ contains
         n_glb_ds = int((n_glb + 1)/3) - 1
         p_glb_ds = int((p_glb + 1)/3) - 1
 
-        do i = 1, sys_size
-            $:GPU_UPDATE(host='[q_cons_vf(i)%sf]')
-        end do
-
         do l = -1, p_ds + 1
             do k = -1, n_ds + 1
                 do j = -1, m_ds + 1

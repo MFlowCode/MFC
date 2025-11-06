@@ -89,6 +89,10 @@ san   CSCS Santis
 san-all cmake python
 san-gpu nvhpc cuda cray-mpich
 
+san   CSCS Santis
+san-all cmake python
+san-gpu nvhpc cuda cray-mpich
+
 h     hipergator
 h-gpu nvhpc/25.9
 h-gpu CUDA_HOME="/apps/compilers/cuda/12.8.1"

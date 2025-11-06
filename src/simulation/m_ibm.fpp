@@ -165,7 +165,7 @@ contains
             dimension(sys_size), &
             intent(INOUT) :: q_prim_vf !< Primitive Variables
 
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), optional, intent(INOUT) :: pb_in, mv_in
+        real(stp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), optional, intent(INOUT) :: pb_in, mv_in
 
         integer :: i, j, k, l, q, r!< Iterator variables
         integer :: patch_id !< Patch ID of ghost point
@@ -225,11 +225,12 @@ contains
                     else if (qbmm .and. .not. polytropic) then
                         call s_interpolate_image_point(q_prim_vf, gp, &
                                                        alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, &
-                                                       r_IP, v_IP, pb_IP, mv_IP, nmom_IP, pb_in, mv_in, presb_IP, massv_IP)
+                                                       r_IP, v_IP, pb_IP, mv_IP, nmom_IP, real(pb_in, kind=wp), real(mv_in, kind=wp), presb_IP, massv_IP)
                     else
                         call s_interpolate_image_point(q_prim_vf, gp, &
                                                        alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP)
                     end if
+
                     dyn_pres = 0._wp
 
                     ! Set q_prim_vf params at GP so that mixture vars calculated properly
@@ -418,7 +419,7 @@ contains
 
             ! Calculate and store the precise location of the image point
             patch_id = gp%ib_patch_id
-            dist = abs(levelset_in%sf(i, j, k, patch_id))
+            dist = abs(real(levelset_in%sf(i, j, k, patch_id), kind=wp))
             norm(:) = levelset_norm_in%sf(i, j, k, patch_id, :)
             ghost_points_in(q)%ip_loc(:) = physical_loc(:) + 2*dist*norm(:)
 
@@ -798,7 +799,7 @@ contains
             dimension(sys_size), &
             intent(IN) :: q_prim_vf !< Primitive Variables
 
-        real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(INOUT) :: pb_in, mv_in
+        real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(IN) :: pb_in, mv_in
 
         type(ghost_point), intent(IN) :: gp
         real(wp), intent(INOUT) :: pres_IP
