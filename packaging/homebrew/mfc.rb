@@ -134,7 +134,12 @@ class Mfc < Formula
 
     # Make wrapper executable and install it
     wrapper_script.chmod 0755
-    install wrapper_script, bin/"mfc"
+    bin.install wrapper_script => "mfc"
+  end
+
+  def post_install
+    # Fix executable permissions (Homebrew sometimes overrides them)
+    (bin/"mfc").chmod 0755
   end
 
   def caveats
