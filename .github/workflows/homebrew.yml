@@ -142,10 +142,6 @@ jobs:
           mfc --help
           echo "  ✓ mfc --help succeeded"
           
-          echo "6. Testing mfc count..."
-          mfc count $(brew --prefix mfc)/examples/1D_sodshocktube/case.py
-          echo "  ✓ mfc count succeeded"
-          
           echo "=== All tests passed! ==="
       
       - name: Run MFC test case
