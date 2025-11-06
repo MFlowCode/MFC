@@ -25,9 +25,9 @@
     & no_create=None, present=None, deviceptr=None, attach=None, extraAccArgs=None, extraOmpArgs=None)
 
 #if defined(MFC_OpenACC)
-    #:set directive = NEW_ACC_PARALLEL_LOOP(collapse, private, parallelism, default, firstprivate, reduction, reductionOp, copy, copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, extraAccArgs)
+    #:set directive = ACC_PARALLEL_LOOP(collapse, private, parallelism, default, firstprivate, reduction, reductionOp, copy, copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, extraAccArgs)
 #elif defined(MFC_OpenMP)
-    #:set directive = NEW_OMP_PARALLEL_LOOP(collapse, private, parallelism, default, firstprivate, reduction, reductionOp, copy, copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, extraOmpArgs)
+    #:set directive = OMP_PARALLEL_LOOP(collapse, private, parallelism, default, firstprivate, reduction, reductionOp, copy, copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, extraOmpArgs)
 #endif
 
     $:directive
