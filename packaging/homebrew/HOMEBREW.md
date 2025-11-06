@@ -17,8 +17,11 @@ When users run `brew install mfc`, they get:
 - `mfc` - Wrapper script that provides the full MFC interface
 
 ### Additional Components
-- Python toolchain in `/usr/local/Cellar/mfc/VERSION/toolchain/`
-- Example cases in `/usr/local/Cellar/mfc/VERSION/share/mfc/examples/`
+- Python toolchain in `/usr/local/Cellar/mfc/VERSION/toolchain/` or `/opt/homebrew/Cellar/mfc/VERSION/toolchain/`
+- Python virtual environment in `/usr/local/Cellar/mfc/VERSION/libexec/venv/` or `/opt/homebrew/Cellar/mfc/VERSION/libexec/venv/`
+  - Pre-installed with Cantera 3.1.0 and MFC toolchain packages
+- Example cases in `/usr/local/Cellar/mfc/VERSION/examples/` or `/opt/homebrew/Cellar/mfc/VERSION/examples/`
+- Main `mfc.sh` script in `libexec/`
 - Documentation references and usage information
 
 ## Formula Structure
@@ -28,7 +31,6 @@ When users run `brew install mfc`, they get:
 Build-time dependencies (only needed during installation):
 - cmake - Build system generator
 - gcc - GNU Compiler Collection (provides gfortran)
-- python@3.12 - Python 3.12 for build scripts
 
 Runtime dependencies (needed to run MFC):
 - boost - C++ libraries
@@ -36,17 +38,36 @@ Runtime dependencies (needed to run MFC):
 - hdf5 - Hierarchical Data Format 5 for data storage
 - open-mpi - Message Passing Interface for parallel computing
 - openblas - Optimized BLAS library
+- python@3.12 - Python 3.12 (used for build scripts and runtime virtual environment)
+
+Python package dependencies (installed in virtual environment):
+- cantera==3.1.0 - Chemical kinetics library (required for MFC build and runtime)
+- MFC toolchain package - Python utilities for MFC operations (installed in editable mode)
+
+### Virtual Environment Setup
+
+Before building, the formula creates a Python virtual environment to isolate MFC's Python dependencies:
+
+1. Creates a new virtual environment in `libexec/venv` using Python 3.12
+2. Upgrades pip, setuptools, and wheel to latest versions
+3. Installs Cantera 3.1.0 from PyPI (required dependency for MFC)
+4. Installs the MFC toolchain package in editable mode (`-e`) to avoid RECORD file issues
+5. Creates a symlink from `build/venv` to the venv so `mfc.sh` can find it during build
+
+This virtual environment persists after installation and is used by the wrapper script at runtime.
 
 ### Build Process
 
 The formula executes the following steps during installation:
 
-1. Runs `./mfc.sh build` to compile all three binaries
-2. Installs binaries to Homebrew's bin directory
-3. Installs mfc.sh to libexec for script execution
-4. Installs Python toolchain (required for mfc.sh functionality)
-5. Installs examples to share directory
-6. Creates a wrapper script that sets up the environment
+1. **Virtual Environment Setup** (see section above)
+2. Sets `VIRTUAL_ENV` environment variable so `mfc.sh` uses the pre-configured venv
+3. Runs `./mfc.sh build -t pre_process simulation post_process -j <cores>` to compile all three binaries
+4. Installs binaries from `build/install/*/bin/*` to Homebrew's bin directory
+5. Installs `mfc.sh` to `libexec/` for script execution
+6. Installs Python toolchain directory to `prefix/toolchain/` (required for mfc.sh functionality)
+7. Installs examples directory to `prefix/examples/`
+8. Creates and installs the `mfc` wrapper script that handles runtime environment setup
 
 ### Environment Configuration
 
@@ -57,7 +78,18 @@ The formula relies on Homebrew's automatic environment setup:
 
 ### Wrapper Script
 
-The installed `mfc` wrapper provides the complete MFC interface. It automatically configures the environment and delegates to the main `mfc.sh` script. Users can run any MFC command through this wrapper:
+The installed `mfc` wrapper provides the complete MFC interface. Due to Homebrew's read-only Cellar structure, the wrapper implements a sophisticated workaround:
+
+**Key Features:**
+1. **Temporary Working Directory**: Creates a temporary directory since the Cellar is read-only and `mfc.sh` may need to write build artifacts
+2. **Environment Setup**: Copies `mfc.sh`, toolchain, examples, and the virtual environment to the temp directory
+3. **Toolchain Patching**: Dynamically patches the toolchain Python code to:
+   - Use pre-installed binaries from Homebrew's bin directory instead of building new ones
+   - Skip building main targets (`pre_process`, `simulation`, `post_process`, `syscheck`) since they're already installed
+4. **Build Optimization**: Automatically adds `--no-build` flag to `mfc run` commands to skip unnecessary compilation
+5. **Cleanup**: Automatically removes the temporary directory when the command completes
+
+Users can run any MFC command through this wrapper:
 
 ```bash
 mfc build
@@ -65,6 +97,8 @@ mfc run examples/case.py
 mfc test
 mfc clean
 ```
+
+The wrapper ensures all MFC functionality works correctly while respecting Homebrew's installation constraints.
 
 ## Installation Methods
 
@@ -89,9 +123,11 @@ This clones from the master branch instead of using a release tarball.
 ## Testing
 
 The formula includes automated tests that verify:
-- All three binary files exist after installation
-- The mfc wrapper script is functional
-- The help command executes without errors
+- All three binary files exist after installation and are executable
+- The Python toolchain directory is installed correctly
+- The virtual environment exists and contains an executable Python interpreter
+- The examples directory is installed
+- The mfc wrapper script is functional and responds to `--help`
 
 These tests run automatically during `brew install` and can be run manually with `brew test mfc`.
 
@@ -108,8 +144,14 @@ After installation completes, Homebrew displays usage information including:
 Once installed, users can immediately start using MFC:
 
 ```bash
+# Copy an example case to your working directory
+cp $(brew --prefix mfc)/examples/1D_sodshocktube/case.py .
+
 # Run a test case
-mfc run /usr/local/share/mfc/examples/1D_sodshocktube/case.py
+mfc run case.py
+
+# Or run directly from the installed examples directory
+mfc run $(brew --prefix mfc)/examples/1D_sodshocktube/case.py
 
 # Run just preprocessing
 pre_process -i input.dat
@@ -120,6 +162,8 @@ simulation -i input.dat
 # Post-process results
 post_process -i input.dat
 ```
+
+Note: The `brew --prefix mfc` command returns the installation prefix (e.g., `/usr/local/Cellar/mfc/VERSION` or `/opt/homebrew/Cellar/mfc/VERSION`), making examples work on both Intel and Apple Silicon systems.
 
 ## Distribution
 
@@ -183,8 +227,10 @@ The formula uses all available CPU cores for building (`ENV.make_jobs`) to minim
 ### Installation Prefix
 Files install to the standard Homebrew prefix:
 - Binaries: `/usr/local/bin/` (Intel) or `/opt/homebrew/bin/` (Apple Silicon)
-- Data: `/usr/local/share/mfc/` or `/opt/homebrew/share/mfc/`
-- Toolchain: `/usr/local/Cellar/mfc/VERSION/` or `/opt/homebrew/Cellar/mfc/VERSION/`
+- Main script: `/usr/local/Cellar/mfc/VERSION/libexec/mfc.sh` or `/opt/homebrew/Cellar/mfc/VERSION/libexec/mfc.sh`
+- Toolchain: `/usr/local/Cellar/mfc/VERSION/toolchain/` or `/opt/homebrew/Cellar/mfc/VERSION/toolchain/`
+- Virtual environment: `/usr/local/Cellar/mfc/VERSION/libexec/venv/` or `/opt/homebrew/Cellar/mfc/VERSION/libexec/venv/`
+- Examples: `/usr/local/Cellar/mfc/VERSION/examples/` or `/opt/homebrew/Cellar/mfc/VERSION/examples/`
 
 ## Advantages Over Manual Installation
 
