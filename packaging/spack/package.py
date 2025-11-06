@@ -6,6 +6,7 @@
 from spack_repo.builtin.build_systems.cmake import CMakePackage
 
 from spack.package import *
+from spack.util.path import join_path
 
 
 class Mfc(CMakePackage):

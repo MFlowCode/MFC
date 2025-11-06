@@ -45,9 +45,10 @@ else()
 endif()
 
 # Chemistry configuration
-set(_chem_str "False")
+# Pass 0/1 to Fypp so it interprets correctly as boolean (not string "False"/"True")
+set(_chem_str "0")
 if (MFC_CHEMISTRY)
-    set(_chem_str "True")
+    set(_chem_str "1")
 endif()
 
 # Optional: mechanism file name/path for Cantera
