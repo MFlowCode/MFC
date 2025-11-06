@@ -60,7 +60,7 @@ print(
             "igr": "T",
             "igr_order": 5,
             "igr_pres_lim": "T",
-            "igr_iter_solver": 2,
+            "igr_iter_solver": 1,
             "num_igr_iters": igrIters,
             "num_igr_warm_start_iters": igrIters,
             "alf_factor": 10,
@@ -77,7 +77,7 @@ print(
             "c_wrt": "F",
             "parallel_io": "T",
             "file_per_process": "T",
-            "down_sample": "T",
+            "down_sample": "F",
             # Background
             "patch_icpp(1)%geometry": 9,
             "patch_icpp(1)%x_centroid": (x1 + x0) / 2,
