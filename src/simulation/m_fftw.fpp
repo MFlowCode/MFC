@@ -149,7 +149,7 @@ contains
                         end do
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
 
             $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
                 do k = 1, sys_size
@@ -159,7 +159,7 @@ contains
                         end do
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
 
             #:if not USING_NVHPC
                 p_real => data_real_gpu
@@ -187,7 +187,7 @@ contains
                             end do
                         end do
                     end do
-                $:END_GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP()
 
                 #:call GPU_HOST_DATA(use_device_ptr='[p_real, p_fltr_cmplx]')
 #if defined(__PGI)
@@ -207,7 +207,7 @@ contains
                             end do
                         end do
                     end do
-                $:END_GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP()
 
                 do i = 1, fourier_rings
 
@@ -219,7 +219,7 @@ contains
                                 end do
                             end do
                         end do
-                    $:END_GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP()
 
                     $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3, firstprivate='[i]')
                         do k = 1, sys_size
@@ -229,7 +229,7 @@ contains
                                 end do
                             end do
                         end do
-                    $:END_GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP()
 
                     #:call GPU_HOST_DATA(use_device_ptr='[p_real, p_cmplx]')
 #if defined(__PGI)
@@ -251,7 +251,7 @@ contains
                                 end do
                             end do
                         end do
-                    $:END_GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP()
 
                     #:call GPU_HOST_DATA(use_device_ptr='[p_real, p_fltr_cmplx]')
 #if defined(__PGI)
@@ -271,7 +271,7 @@ contains
                                 end do
                             end do
                         end do
-                    $:END_GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP()
 
                 end do
             #:endcall GPU_DATA

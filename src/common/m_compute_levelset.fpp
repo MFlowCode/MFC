@@ -62,7 +62,7 @@ contains
 
                 end do
             end do
-        $:END_GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_circle_levelset
 
@@ -148,7 +148,7 @@ contains
 
                 end do
             end do
-        $:END_GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_airfoil_levelset
 
@@ -255,7 +255,7 @@ contains
                     end do
                 end do
             end do
-        $:END_GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_3D_airfoil_levelset
 
@@ -332,7 +332,7 @@ contains
                     end if
                 end do
             end do
-        $:END_GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_rectangle_levelset
 
@@ -441,7 +441,7 @@ contains
                     end do
                 end do
             end do
-        $:END_GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_cuboid_levelset
 
@@ -479,7 +479,7 @@ contains
                     end do
                 end do
             end do
-        $:END_GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_sphere_levelset
 
@@ -560,7 +560,7 @@ contains
                     end do
                 end do
             end do
-        $:END_GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_cylinder_levelset
 

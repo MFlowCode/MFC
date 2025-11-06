@@ -173,7 +173,7 @@ contains
                     end if
                 end do
             end do
-        $:END_GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_ib_circle
 
@@ -325,7 +325,7 @@ contains
                     end if
                 end do
             end do
-        $:END_GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_ib_airfoil
 
@@ -475,7 +475,7 @@ contains
                     end do
                 end do
             end do
-        $:END_GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_ib_3D_airfoil
 
@@ -541,7 +541,7 @@ contains
                     end if
                 end do
             end do
-        $:END_GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_ib_rectangle
 
@@ -602,7 +602,7 @@ contains
                     end do
                 end do
             end do
-        $:END_GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_ib_sphere
 
@@ -673,7 +673,7 @@ contains
                     end do
                 end do
             end do
-        $:END_GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_ib_cuboid
 
@@ -758,7 +758,7 @@ contains
                     end do
                 end do
             end do
-        $:END_GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_ib_cylinder
 

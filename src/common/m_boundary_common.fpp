@@ -112,7 +112,7 @@ contains
                         end if
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
         end if
 
         if (bc_x%end >= 0) then
@@ -142,7 +142,7 @@ contains
                         end if
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
         end if
 
         ! Population of Buffers in y-direction
@@ -179,7 +179,7 @@ contains
                         end if
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
         end if
 
         if (bc_y%end >= 0) then
@@ -209,7 +209,7 @@ contains
                         end if
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
         end if
 
         ! Population of Buffers in z-direction
@@ -243,7 +243,7 @@ contains
                         end if
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
         end if
 
         if (bc_z%end >= 0) then
@@ -273,7 +273,7 @@ contains
                         end if
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
         end if
         ! END: Population of Buffers in z-direction
 
@@ -1178,7 +1178,7 @@ contains
                         end select
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
         end if
 
         if (bc_x%end >= 0) then
@@ -1197,7 +1197,7 @@ contains
                         end select
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
         end if
 
         if (n == 0) return
@@ -1219,7 +1219,7 @@ contains
                         end select
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
         end if
 
         if (bc_y%end >= 0) then
@@ -1238,7 +1238,7 @@ contains
                         end select
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
         end if
 
         if (p == 0) return
@@ -1260,7 +1260,7 @@ contains
                         end select
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
         end if
 
         if (bc_z%end >= 0) then
@@ -1279,7 +1279,7 @@ contains
                         end select
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
         end if
     end subroutine s_populate_capillary_buffers
 
@@ -1501,7 +1501,7 @@ contains
                         end select
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
 
         end if
 
@@ -1527,7 +1527,7 @@ contains
                         end select
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
 
         end if
 
@@ -1555,7 +1555,7 @@ contains
                         end select
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
 
         end if
 
@@ -1581,7 +1581,7 @@ contains
                         end select
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
         end if
 
         if (p == 0) then
@@ -1608,7 +1608,7 @@ contains
                         end select
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
         end if
 
         if (bc_z%end >= 0) then
@@ -1633,7 +1633,7 @@ contains
                         end select
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
         end if
 
     end subroutine s_populate_F_igr_buffers

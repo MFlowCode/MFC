@@ -768,7 +768,7 @@ contains
                                 end do
                             end do
                         end do
-                    $:END_GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP()
 
                     if (qbmm_comm) then
                         $:GPU_PARALLEL_LOOP(collapse=4,private='[r,i,j,k,l]')
@@ -785,7 +785,7 @@ contains
                                     end do
                                 end do
                             end do
-                        $:END_GPU_PARALLEL_LOOP
+                        $:END_GPU_PARALLEL_LOOP()
 
                         $:GPU_PARALLEL_LOOP(collapse=5,private='[i,j,k,l,q,r]')
                             do l = 0, p
@@ -801,7 +801,7 @@ contains
                                     end do
                                 end do
                             end do
-                        $:END_GPU_PARALLEL_LOOP
+                        $:END_GPU_PARALLEL_LOOP()
                     end if
                 #:elif mpi_dir == 2
                     $:GPU_PARALLEL_LOOP(collapse=4,private='[i,j,k,l,r]')
@@ -817,7 +817,7 @@ contains
                                 end do
                             end do
                         end do
-                    $:END_GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP()
 
                     if (qbmm_comm) then
                         $:GPU_PARALLEL_LOOP(collapse=5,private='[i,j,k,l,q,r]')
@@ -835,7 +835,7 @@ contains
                                     end do
                                 end do
                             end do
-                        $:END_GPU_PARALLEL_LOOP
+                        $:END_GPU_PARALLEL_LOOP()
 
                         $:GPU_PARALLEL_LOOP(collapse=5,private='[i,j,k,l,q,r]')
                             do i = nVar + 1, nVar + 4
@@ -852,7 +852,7 @@ contains
                                     end do
                                 end do
                             end do
-                        $:END_GPU_PARALLEL_LOOP
+                        $:END_GPU_PARALLEL_LOOP()
                     end if
                 #:else
                     $:GPU_PARALLEL_LOOP(collapse=4,private='[i,j,k,l,r]')
@@ -868,7 +868,7 @@ contains
                                 end do
                             end do
                         end do
-                    $:END_GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP()
 
                     if (qbmm_comm) then
                         $:GPU_PARALLEL_LOOP(collapse=5,private='[i,j,k,l,q,r]')
@@ -886,7 +886,7 @@ contains
                                     end do
                                 end do
                             end do
-                        $:END_GPU_PARALLEL_LOOP
+                        $:END_GPU_PARALLEL_LOOP()
 
                         $:GPU_PARALLEL_LOOP(collapse=5,private='[i,j,k,l,q,r]')
                             do i = nVar + 1, nVar + 4
@@ -903,7 +903,7 @@ contains
                                     end do
                                 end do
                             end do
-                        $:END_GPU_PARALLEL_LOOP
+                        $:END_GPU_PARALLEL_LOOP()
                     end if
                 #:endif
             end if
@@ -976,7 +976,7 @@ contains
                                 end do
                             end do
                         end do
-                    $:END_GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP()
 
                     if (qbmm_comm) then
                         $:GPU_PARALLEL_LOOP(collapse=5,private='[i,j,k,l,q,r]')
@@ -993,7 +993,7 @@ contains
                                     end do
                                 end do
                             end do
-                        $:END_GPU_PARALLEL_LOOP
+                        $:END_GPU_PARALLEL_LOOP()
 
                         $:GPU_PARALLEL_LOOP(collapse=5,private='[i,j,k,l,q,r]')
                             do l = 0, p
@@ -1009,7 +1009,7 @@ contains
                                     end do
                                 end do
                             end do
-                        $:END_GPU_PARALLEL_LOOP
+                        $:END_GPU_PARALLEL_LOOP()
                     end if
                 #:elif mpi_dir == 2
                     $:GPU_PARALLEL_LOOP(collapse=4,private='[i,j,k,l,r]')
@@ -1031,7 +1031,7 @@ contains
                                 end do
                             end do
                         end do
-                    $:END_GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP()
 
                     if (qbmm_comm) then
                         $:GPU_PARALLEL_LOOP(collapse=5,private='[i,j,k,l,q,r]')
@@ -1049,7 +1049,7 @@ contains
                                     end do
                                 end do
                             end do
-                        $:END_GPU_PARALLEL_LOOP
+                        $:END_GPU_PARALLEL_LOOP()
 
                         $:GPU_PARALLEL_LOOP(collapse=5,private='[i,j,k,l,q,r]')
                             do i = nVar + 1, nVar + 4
@@ -1066,7 +1066,7 @@ contains
                                     end do
                                 end do
                             end do
-                        $:END_GPU_PARALLEL_LOOP
+                        $:END_GPU_PARALLEL_LOOP()
                     end if
                 #:else
                     ! Unpacking buffer from bc_z%beg
@@ -1090,7 +1090,7 @@ contains
                                 end do
                             end do
                         end do
-                    $:END_GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP()
 
                     if (qbmm_comm) then
                         $:GPU_PARALLEL_LOOP(collapse=5,private='[i,j,k,l,q,r]')
@@ -1109,7 +1109,7 @@ contains
                                     end do
                                 end do
                             end do
-                        $:END_GPU_PARALLEL_LOOP
+                        $:END_GPU_PARALLEL_LOOP()
 
                         $:GPU_PARALLEL_LOOP(collapse=5,private='[i,j,k,l,q,r]')
                             do i = nVar + 1, nVar + 4
@@ -1127,7 +1127,7 @@ contains
                                     end do
                                 end do
                             end do
-                        $:END_GPU_PARALLEL_LOOP
+                        $:END_GPU_PARALLEL_LOOP()
                     end if
                 #:endif
             end if

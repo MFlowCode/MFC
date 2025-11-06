@@ -129,7 +129,7 @@ contains
                             end do
                         end do
                     end do
-                #:endcall
+                $:END_OMP_PARALLEL_LOOP()
             else if (muscl_dir == 2) then
                 $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
                     do i = 1, ubound(v_vf, 1)
@@ -142,7 +142,7 @@ contains
                             end do
                         end do
                     end do
-                #:endcall
+                $:END_OMP_PARALLEL_LOOP()
             else if (muscl_dir == 3) then
                 $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
                     do i = 1, ubound(v_vf, 1)
@@ -155,7 +155,7 @@ contains
                             end do
                         end do
                     end do
-                #:endcall
+                $:END_OMP_PARALLEL_LOOP()
             end if
 
         else if (muscl_order == 2) then
@@ -212,7 +212,7 @@ contains
                                 end do
                             end do
                         end do
-                    #:endcall
+                    $:END_OMP_PARALLEL_LOOP()
                 end if
             #:endfor
         end if
@@ -296,7 +296,7 @@ contains
                             end do
                         end do
                     end do
-                #:endcall
+                $:END_OMP_PARALLEL_LOOP()
             end if
         #:endfor
 
@@ -328,7 +328,7 @@ contains
                         end do
                     end do
                 end do
-            #:endcall
+            $:END_OMP_PARALLEL_LOOP()
         end if
 
         ! Reshaping/Projecting onto Characteristic Fields in y-direction
@@ -345,7 +345,7 @@ contains
                         end do
                     end do
                 end do
-            #:endcall
+            $:END_OMP_PARALLEL_LOOP()
         end if
 
         ! Reshaping/Projecting onto Characteristic Fields in z-direction
@@ -361,7 +361,7 @@ contains
                         end do
                     end do
                 end do
-            #:endcall
+            $:END_OMP_PARALLEL_LOOP()
         end if
 
     end subroutine s_initialize_muscl

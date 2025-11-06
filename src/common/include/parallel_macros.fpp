@@ -39,7 +39,7 @@
 #if defined(MFC_OpenACC)
      #:set end_directive = '!$acc end parallel loop'
 #elif defined(MFC_OpenMP)
-    #:set end_directive = END_OMP_PARALLEL_LOOP(code, collapse, private, parallelism, default, firstprivate, reduction, reductionOp, copy, copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, extraOmpArgs)
+    #:set end_directive = END_OMP_PARALLEL_LOOP()
 #endif
 
     $:end_directive

@@ -159,7 +159,7 @@ contains
                     end do
                 end do
             end do
-        $:END_GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_compute_chemistry_reaction_flux
 
@@ -298,7 +298,7 @@ contains
                         end do
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
         end if
 
     end subroutine s_compute_chemistry_diffusion_flux

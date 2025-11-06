@@ -1165,7 +1165,7 @@ contains
                     end do
                 end do
             end do
-        $:END_GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_convert_conservative_to_primitive_variables
 
@@ -1598,7 +1598,7 @@ contains
                     end do
                 end do
             end do
-        $:END_GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP()
 #endif
     end subroutine s_convert_primitive_to_flux_variables
 

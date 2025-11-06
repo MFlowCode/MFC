@@ -365,7 +365,7 @@ contains
                         end do
                     end if
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
         end if
 
         !Correct the state of the inner points in IBs
@@ -383,7 +383,7 @@ contains
                         q_cons_vf(q)%sf(j, k, l) = 0._wp
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
         end if
 
     end subroutine s_ibm_correct_state

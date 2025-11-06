@@ -91,7 +91,7 @@ contains
                     end do
                 end do
             end do
-        $:END_GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP()
 
         if (shear_stress) then    ! Shear stresses
             $:GPU_PARALLEL_LOOP(collapse=3, private='[i,j,k,l,alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
@@ -198,7 +198,7 @@ contains
                         end do
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
         end if
 
         if (bulk_stress) then    ! Bulk stresses
@@ -301,7 +301,7 @@ contains
                         end do
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
         end if
 
         if (p == 0) return
@@ -412,7 +412,7 @@ contains
                         end do
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
         end if
 
         if (bulk_stress) then    ! Bulk stresses
@@ -513,7 +513,7 @@ contains
                         end do
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
         end if
     end subroutine s_compute_viscous_stress_tensor
 
@@ -612,7 +612,7 @@ contains
                         end do
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
 
             $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=3)
                 do l = is3_viscous%beg, is3_viscous%end
@@ -628,7 +628,7 @@ contains
                         end do
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
 
             if (n > 0) then
 
@@ -646,7 +646,7 @@ contains
                             end do
                         end do
                     end do
-                $:END_GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP()
 
                 $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=3)
                     do l = is3_viscous%beg, is3_viscous%end
@@ -662,7 +662,7 @@ contains
                             end do
                         end do
                     end do
-                $:END_GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP()
 
                 $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=3)
                     do l = is3_viscous%beg, is3_viscous%end
@@ -682,7 +682,7 @@ contains
                             end do
                         end do
                     end do
-                $:END_GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP()
 
                 $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=3)
                     do l = is3_viscous%beg, is3_viscous%end
@@ -703,7 +703,7 @@ contains
                             end do
                         end do
                     end do
-                $:END_GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP()
 
                 $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=3)
                     do l = is3_viscous%beg, is3_viscous%end
@@ -724,7 +724,7 @@ contains
                             end do
                         end do
                     end do
-                $:END_GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP()
 
                 $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=3)
                     do l = is3_viscous%beg, is3_viscous%end
@@ -745,7 +745,7 @@ contains
                             end do
                         end do
                     end do
-                $:END_GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP()
 
                 if (p > 0) then
 
@@ -764,7 +764,7 @@ contains
                                 end do
                             end do
                         end do
-                    $:END_GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP()
 
                     $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=3)
                         do j = is3_viscous%beg, is3_viscous%end - 1
@@ -781,7 +781,7 @@ contains
                                 end do
                             end do
                         end do
-                    $:END_GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP()
 
                     $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=3)
                         do l = is3_viscous%beg + 1, is3_viscous%end - 1
@@ -803,7 +803,7 @@ contains
                                 end do
                             end do
                         end do
-                    $:END_GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP()
 
                     $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=3)
                         do l = is3_viscous%beg + 1, is3_viscous%end - 1
@@ -825,7 +825,7 @@ contains
                                 end do
                             end do
                         end do
-                    $:END_GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP()
 
                     $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=3)
                         do l = is3_viscous%beg + 1, is3_viscous%end - 1
@@ -847,7 +847,7 @@ contains
                                 end do
                             end do
                         end do
-                    $:END_GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP()
 
                     $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=3)
                         do l = is3_viscous%beg + 1, is3_viscous%end - 1
@@ -869,7 +869,7 @@ contains
                                 end do
                             end do
                         end do
-                    $:END_GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP()
 
                     $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=3)
                         do j = is3_viscous%beg + 1, is3_viscous%end
@@ -891,7 +891,7 @@ contains
                                 end do
                             end do
                         end do
-                    $:END_GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP()
 
                     $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=3)
                         do j = is3_viscous%beg, is3_viscous%end - 1
@@ -913,7 +913,7 @@ contains
                                 end do
                             end do
                         end do
-                    $:END_GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP()
                     $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=3)
                         do j = is3_viscous%beg + 1, is3_viscous%end
                             do l = is2_viscous%beg, is2_viscous%end
@@ -934,7 +934,7 @@ contains
                                 end do
                             end do
                         end do
-                    $:END_GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP()
                     $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=3)
                         do j = is3_viscous%beg, is3_viscous%end - 1
                             do l = is2_viscous%beg, is2_viscous%end
@@ -954,7 +954,7 @@ contains
                                 end do
                             end do
                         end do
-                    $:END_GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP()
 
                     do i = iv%beg, iv%end
                         call s_compute_fd_gradient(q_prim_qp%vf(i), &
@@ -1058,7 +1058,7 @@ contains
                                         end do
                                     end do
                                 end do
-                            $:END_GPU_PARALLEL_LOOP
+                            $:END_GPU_PARALLEL_LOOP()
                         elseif (norm_dir == 3) then
                             $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
                                 do i = iv%beg, iv%end
@@ -1071,7 +1071,7 @@ contains
                                         end do
                                     end do
                                 end do
-                            $:END_GPU_PARALLEL_LOOP
+                            $:END_GPU_PARALLEL_LOOP()
                         elseif (norm_dir == 1) then
                             $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
                                 do i = iv%beg, iv%end
@@ -1084,7 +1084,7 @@ contains
                                         end do
                                     end do
                                 end do
-                            $:END_GPU_PARALLEL_LOOP
+                            $:END_GPU_PARALLEL_LOOP()
                         end if
                     end if
                 end if
@@ -1162,7 +1162,7 @@ contains
                                         end do
                                     end do
                                 end do
-                            $:END_GPU_PARALLEL_LOOP
+                            $:END_GPU_PARALLEL_LOOP()
                         elseif (norm_dir == 3) then
                             $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
                                 do i = iv%beg, iv%end
@@ -1175,7 +1175,7 @@ contains
                                         end do
                                     end do
                                 end do
-                            $:END_GPU_PARALLEL_LOOP
+                            $:END_GPU_PARALLEL_LOOP()
                         elseif (norm_dir == 1) then
                             $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
                                 do i = iv%beg, iv%end
@@ -1188,7 +1188,7 @@ contains
                                         end do
                                     end do
                                 end do
-                            $:END_GPU_PARALLEL_LOOP
+                            $:END_GPU_PARALLEL_LOOP()
                         end if
                     end if
                 end if
@@ -1260,7 +1260,7 @@ contains
                         end do
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
 
             ! END: First-Order Spatial Derivatives in x-direction
 
@@ -1289,7 +1289,7 @@ contains
                         end do
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
 
             ! END: First-Order Spatial Derivatives in y-direction
 
@@ -1318,7 +1318,7 @@ contains
                         end do
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
 
         end if
         ! END: First-Order Spatial Derivatives in z-direction
@@ -1368,7 +1368,7 @@ contains
                     end do
                 end do
             end do
-        $:END_GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP()
 
         if (n > 0) then
             $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
@@ -1381,7 +1381,7 @@ contains
                         end do
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
         end if
 
         if (p > 0) then
@@ -1395,7 +1395,7 @@ contains
                         end do
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
         end if
 
         $:GPU_PARALLEL_LOOP(private='[k,l]', collapse=2)
@@ -1409,7 +1409,7 @@ contains
                         (x_cc(idwbuff(1)%end) - x_cc(idwbuff(1)%end - 2))
                 end do
             end do
-        $:END_GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP()
         if (n > 0) then
             $:GPU_PARALLEL_LOOP(private='[j,l]', collapse=2)
                 do l = idwbuff(3)%beg, idwbuff(3)%end
@@ -1422,7 +1422,7 @@ contains
                             (y_cc(idwbuff(2)%end) - y_cc(idwbuff(2)%end - 2))
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
             if (p > 0) then
                 $:GPU_PARALLEL_LOOP(private='[j,k]', collapse=2)
                     do k = idwbuff(2)%beg, idwbuff(2)%end
@@ -1435,7 +1435,7 @@ contains
                                 (z_cc(idwbuff(3)%end) - z_cc(idwbuff(3)%end - 2))
                         end do
                     end do
-                $:END_GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP()
             end if
         end if
 
@@ -1447,7 +1447,7 @@ contains
                                              (x_cc(2) - x_cc(0))
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
         end if
         if (bc_x%end <= BC_GHOST_EXTRAP) then
             $:GPU_PARALLEL_LOOP(private='[k,l]', collapse=2)
@@ -1457,7 +1457,7 @@ contains
                                              (x_cc(m) - x_cc(m - 2))
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
         end if
         if (n > 0) then
             if (bc_y%beg <= BC_GHOST_EXTRAP .and. bc_y%beg /= BC_NULL) then
@@ -1468,7 +1468,7 @@ contains
                                                  (y_cc(2) - y_cc(0))
                         end do
                     end do
-                $:END_GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP()
             end if
             if (bc_y%end <= BC_GHOST_EXTRAP) then
                 $:GPU_PARALLEL_LOOP(private='[j,l]', collapse=2)
@@ -1478,7 +1478,7 @@ contains
                                                  (y_cc(n) - y_cc(n - 2))
                         end do
                     end do
-                $:END_GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP()
             end if
             if (p > 0) then
                 if (bc_z%beg <= BC_GHOST_EXTRAP) then
@@ -1490,7 +1490,7 @@ contains
                                     (z_cc(2) - z_cc(0))
                             end do
                         end do
-                    $:END_GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP()
                 end if
                 if (bc_z%end <= BC_GHOST_EXTRAP) then
                     $:GPU_PARALLEL_LOOP(private='[j,k]', collapse=2)
@@ -1501,7 +1501,7 @@ contains
                                     (z_cc(p) - z_cc(p - 2))
                             end do
                         end do
-                    $:END_GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP()
                 end if
             end if
         end if

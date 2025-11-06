@@ -89,7 +89,7 @@ contains
                     end do
                 end do
             end do
-        $:END_GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_comp_alpha_from_n
 
@@ -116,7 +116,7 @@ contains
                             end do
                         end do
                     end do
-                $:END_GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP()
             end if
 
         elseif (idir == 2) then
@@ -132,7 +132,7 @@ contains
                         end do
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
 
         elseif (idir == 3) then
 
@@ -147,7 +147,7 @@ contains
                         end do
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
 
         end if
 
@@ -193,10 +193,10 @@ contains
                     end do
                 end do
             end do
-        $:END_GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP()
 
         adap_dt_stop_max = 0
-        $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3, private='[Rtmp, Vtmp, myalpha_rho, myalpha]', &
+        $:GPU_PARALLEL_LOOP(private='[j,k,l,Rtmp, Vtmp, myalpha_rho, myalpha]', collapse=3, &
             & reduction='[[adap_dt_stop_max]]', reductionOp='[MAX]', &
             & copy='[adap_dt_stop_max]')
             do l = 0, p
@@ -326,7 +326,7 @@ contains
                     end do
                 end do
             end do
-        $:END_GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP()
 
         if (adap_dt .and. adap_dt_stop_max > 0) call s_mpi_abort("Adaptive time stepping failed to converge.")
 
@@ -350,7 +350,7 @@ contains
                         end do
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
         end if
     end subroutine s_compute_bubble_EE_source
 

@@ -163,7 +163,7 @@ contains
                         end do
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
 
             $:GPU_UPDATE(host='[accel_mag]')
 
@@ -215,7 +215,7 @@ contains
                         end do
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
 
             if (n == 0) then
                 $:GPU_PARALLEL_LOOP(private='[j,k,l,r]', collapse=4)
@@ -230,7 +230,7 @@ contains
                             end do
                         end do
                     end do
-                $:END_GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP()
             elseif (p == 0) then
                 $:GPU_PARALLEL_LOOP(private='[j,k,l,r]', collapse=4)
                     do l = 0, p
@@ -246,7 +246,7 @@ contains
                             end do
                         end do
                     end do
-                $:END_GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP()
             else
                 if (grid_geometry == 3) then
                     $:GPU_PARALLEL_LOOP(private='[j,k,l,r]', collapse=4)
@@ -265,7 +265,7 @@ contains
                                 end do
                             end do
                         end do
-                    $:END_GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP()
                 else
                     $:GPU_PARALLEL_LOOP(private='[j,k,l,r]', collapse=4)
                         do l = 0, p
@@ -283,7 +283,7 @@ contains
                                 end do
                             end do
                         end do
-                    $:END_GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP()
                 end if
             end if
             ! Computing the acceleration component in the y-coordinate direction
@@ -299,7 +299,7 @@ contains
                         end do
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
 
             if (p == 0) then
                 $:GPU_PARALLEL_LOOP(private='[j,k,l,r]', collapse=4)
@@ -316,7 +316,7 @@ contains
                             end do
                         end do
                     end do
-                $:END_GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP()
             else
                 if (grid_geometry == 3) then
                     $:GPU_PARALLEL_LOOP(private='[j,k,l,r]', collapse=4)
@@ -336,7 +336,7 @@ contains
                                 end do
                             end do
                         end do
-                    $:END_GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP()
                 else
                     $:GPU_PARALLEL_LOOP(private='[j,k,l,r]', collapse=4)
                         do l = 0, p
@@ -354,7 +354,7 @@ contains
                                 end do
                             end do
                         end do
-                    $:END_GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP()
                 end if
             end if
             ! Computing the acceleration component in the z-coordinate direction
@@ -370,7 +370,7 @@ contains
                         end do
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
 
             if (grid_geometry == 3) then
                 $:GPU_PARALLEL_LOOP(private='[j,k,l,r]', collapse=4)
@@ -391,7 +391,7 @@ contains
                             end do
                         end do
                     end do
-                $:END_GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP()
             else
                 $:GPU_PARALLEL_LOOP(private='[j,k,l,r]', collapse=4)
                     do l = 0, p
@@ -409,7 +409,7 @@ contains
                             end do
                         end do
                     end do
-                $:END_GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP()
             end if
         end if
 
@@ -458,7 +458,7 @@ contains
                         end do
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
         elseif (p == 0) then !2D simulation
             $:GPU_PARALLEL_LOOP(collapse=3,private='[j,k,l,dV]')
                 do l = 0, p !Loop over grid
@@ -483,7 +483,7 @@ contains
                         end do
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
         else !3D simulation
             $:GPU_PARALLEL_LOOP(collapse=3,private='[j,k,l,dV]')
                 do l = 0, p !Loop over grid
@@ -512,7 +512,7 @@ contains
                         end do
                     end do
                 end do
-            $:END_GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
         end if
 
         $:GPU_UPDATE(host='[c_m]')

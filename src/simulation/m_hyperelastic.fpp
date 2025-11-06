@@ -207,7 +207,7 @@ contains
                     end do
                 end do
             end do
-        $:END_GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP()
     end subroutine s_hyperelastic_rmt_stress_update
 
     !>  The following subroutine handles the calculation of the btensor.

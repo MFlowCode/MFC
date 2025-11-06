@@ -296,7 +296,7 @@ contains
                     end do
                 end do
             end do
-        $:END_GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP()
 
         ! end: Computing Stability Criteria at Current Time-step
 

@@ -322,7 +322,7 @@ contains
                                 end do
                             end do
                         end do
-                    $:END_GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP()
                 #:elif mpi_dir == 2
                     $:GPU_PARALLEL_LOOP(collapse=3,private='[j,k,l,r]')
                         do l = 0, p
@@ -334,7 +334,7 @@ contains
                                 end do
                             end do
                         end do
-                    $:END_GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP()
                 #:else
                     $:GPU_PARALLEL_LOOP(collapse=3,private='[j,k,l,r]')
                         do l = 0, buff_size - 1
@@ -346,7 +346,7 @@ contains
                                 end do
                             end do
                         end do
-                    $:END_GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP()
                 #:endif
             end if
         #:endfor
@@ -399,7 +399,7 @@ contains
                                 end do
                             end do
                         end do
-                    $:END_GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP()
                 #:elif mpi_dir == 2
                     $:GPU_PARALLEL_LOOP(collapse=3,private='[j,k,l,r]')
                         do l = 0, p
@@ -411,7 +411,7 @@ contains
                                 end do
                             end do
                         end do
-                    $:END_GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP()
                 #:else
                     ! Unpacking buffer from bc_z%beg
                     $:GPU_PARALLEL_LOOP(collapse=3,private='[j,k,l,r]')
@@ -425,7 +425,7 @@ contains
                                 end do
                             end do
                         end do
-                    $:END_GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP()
                 #:endif
             end if
         #:endfor
