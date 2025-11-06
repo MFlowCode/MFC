@@ -247,7 +247,7 @@ contains
         deallocate (patch_id_fp)
 
         if (ib) then
-            deallocate (ib_markers%sf, levelset%sf, levelset_norm%sf)
+            deallocate (levelset%sf, levelset_norm%sf)
         end if
 
         deallocate (bc_type(1, 1)%sf)
