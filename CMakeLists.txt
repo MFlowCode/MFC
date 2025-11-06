@@ -45,11 +45,7 @@ else()
 endif()
 
 # Chemistry configuration
-# Pass 0/1 to Fypp so it interprets correctly as boolean (not string "False"/"True")
-set(_chem_str "0")
-if (MFC_CHEMISTRY)
-    set(_chem_str "1")
-endif()
+# The chemistry flag is set locally in HANDLE_SOURCES macro to pass 0/1 to Fypp
 
 # Optional: mechanism file name/path for Cantera
 set(MFC_MECH_FILE "" CACHE STRING "Cantera mechanism (YAML) file name or path")
@@ -372,6 +368,13 @@ macro(HANDLE_SOURCES target useCommon)
         cmake_path(GET fpp FILENAME fpp_filename)
         set(f90 "${CMAKE_BINARY_DIR}/fypp/${target}/${fpp_filename}.f90")
 
+        # Set chemistry flag for Fypp: use 0/1 (not False/True) so Fypp evaluates as boolean
+        if (MFC_CHEMISTRY)
+            set(_chem_flag "1")
+        else()
+            set(_chem_flag "0")
+        endif()
+
         add_custom_command(
             OUTPUT   ${f90}
             COMMAND  ${FYPP_EXE} -m re
@@ -383,7 +386,7 @@ macro(HANDLE_SOURCES target useCommon)
                                  -D MFC_${${target}_UPPER}
                                  -D MFC_COMPILER="${CMAKE_Fortran_COMPILER_ID}"
                                  -D MFC_CASE_OPTIMIZATION=False
-                                 -D chemistry=${_chem_str}
+                                 -D chemistry=${_chem_flag}
                                  --line-numbering
                                  --no-folding
 								 --line-length=999
