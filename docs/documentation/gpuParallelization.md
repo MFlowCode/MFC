@@ -52,7 +52,7 @@ $:$GPU_PARALLEL_LOOP(...)
 $:END_GPU_PARALLEL_LOOP()
 ```
 
-This wraps the lines in `code` with parallelization calls to openACC or openMP, depending on environement and compiler settings.
+This wraps the lines in `code` with parallelization calls to openACC or openMP, depending on environment and compiler settings.
 
 **Parameters**
 
