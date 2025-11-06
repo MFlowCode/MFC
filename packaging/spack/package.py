@@ -3,10 +3,11 @@
 #
 # SPDX-License-Identifier: (Apache-2.0 OR MIT)
 
+import os
+
 from spack_repo.builtin.build_systems.cmake import CMakePackage
 
 from spack.package import *
-from spack.util.path import join_path
 
 
 class Mfc(CMakePackage):
@@ -106,4 +107,4 @@ class Mfc(CMakePackage):
         
         # Make vendored Pyrometheus importable when chemistry is enabled
         if "+chemistry" in self.spec:
-            env.prepend_path("PYTHONPATH", join_path(self.stage.source_path, "pydeps", "pyrometheus"))
+            env.prepend_path("PYTHONPATH", os.path.join(self.stage.source_path, "pydeps", "pyrometheus"))
