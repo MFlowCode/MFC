@@ -11,9 +11,15 @@ module m_derived_types
     use m_constants  !< Constants
 
     use m_precision_select
+#:if chemistry
     use m_thermochem, only: num_species
+#:endif
 
     implicit none
+
+#:if not chemistry
+    integer, parameter :: num_species = 1
+#:endif
 
     !> Derived type adding the field position (fp) as an attribute
     type field_position

@@ -153,6 +153,14 @@ class MFCTarget:
             flags.append(f"-DMFC_Unified={'ON' if ARG('unified') else 'OFF'}")
             flags.append(f"-DMFC_Fastmath={'ON' if ARG('fastmath') else 'OFF'}")
 
+            # Enable chemistry flags when requested by the case
+            if case.params.get('chemistry', 'F') == 'T':
+                flags.append("-DMFC_CHEMISTRY=ON")
+                # Pass mechanism if provided; otherwise Cantera defaults (e.g., h2o2.yaml)
+                mech = case.params.get("cantera_file", "")
+                if mech:
+                    flags.append(f"-DMFC_MECH_FILE={mech}")
+
         command = ["cmake"] + flags + ["-S", cmake_dirpath, "-B", build_dirpath]
 
         delete_directory(build_dirpath)

@@ -29,6 +29,7 @@ option(MFC_SYSCHECK      "Build syscheck"                                    OFF
 option(MFC_DOCUMENTATION "Build documentation"                               OFF)
 option(MFC_ALL           "Build everything"                                  OFF)
 option(MFC_SINGLE_PRECISION "Build single precision"                         OFF)
+option(MFC_CHEMISTRY        "Enable thermochemistry"                         OFF)
 
 if (MFC_ALL)
     set(MFC_PRE_PROCESS   ON FORCE)
@@ -42,6 +43,15 @@ if (MFC_SINGLE_PRECISION)
 else()
     add_compile_definitions(MFC_DOUBLE_PRECISION)
 endif()
+
+# Chemistry configuration
+set(_chem_str "False")
+if (MFC_CHEMISTRY)
+    set(_chem_str "True")
+endif()
+
+# Optional: mechanism file name/path for Cantera
+set(MFC_MECH_FILE "" CACHE STRING "Cantera mechanism (YAML) file name or path")
 
 
 # CMake Library Imports
@@ -89,6 +99,11 @@ endif()
 # returned in FYPP_EXE upon success. This is used later.
 
 find_program(FYPP_EXE fypp REQUIRED)
+
+# Python3 is required for chemistry code generation when MFC_CHEMISTRY is ON
+if (MFC_CHEMISTRY)
+    find_package(Python3 REQUIRED COMPONENTS Interpreter)
+endif()
 
 
 # Miscellaneous Configuration:
@@ -367,7 +382,7 @@ macro(HANDLE_SOURCES target useCommon)
                                  -D MFC_${${target}_UPPER}
                                  -D MFC_COMPILER="${CMAKE_Fortran_COMPILER_ID}"
                                  -D MFC_CASE_OPTIMIZATION=False
-                                 -D chemistry=False
+                                 -D chemistry=${_chem_str}
                                  --line-numbering
                                  --no-folding
 								 --line-length=999
@@ -380,6 +395,27 @@ macro(HANDLE_SOURCES target useCommon)
 
         list(APPEND ${target}_SRCs ${f90})
     endforeach()
+
+    # Generate m_thermochem.f90 when chemistry is enabled
+    if (MFC_CHEMISTRY)
+        file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/modules/${target}")
+
+        add_custom_command(
+            OUTPUT  "${CMAKE_BINARY_DIR}/modules/${target}/m_thermochem.f90"
+            COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/modules/${target}"
+            COMMAND ${Python3_EXECUTABLE}
+                    "${CMAKE_SOURCE_DIR}/toolchain/scripts/gen_thermochem.py"
+                    --module m_thermochem
+                    --out    "${CMAKE_BINARY_DIR}/modules/${target}/m_thermochem.f90"
+                    --mech   "${MFC_MECH_FILE}"
+            DEPENDS "${CMAKE_SOURCE_DIR}/toolchain/scripts/gen_thermochem.py"
+            COMMENT "Generating m_thermochem.f90 via Pyrometheus/Cantera for ${target}"
+            VERBATIM
+        )
+
+        list(APPEND ${target}_SRCs
+             "${CMAKE_BINARY_DIR}/modules/${target}/m_thermochem.f90")
+    endif()
 endmacro()
 
 

@@ -88,6 +88,12 @@ spack install mfc~post_process    # Skip post_process binary
 ```
 Controls whether the post-processing tool is built.
 
+#### Chemistry (default: disabled)
+```
+spack install mfc+chemistry
+```
+Enables thermochemistry support by generating the `m_thermochem.f90` module using Pyrometheus and Cantera during the build. When enabled, MFC can perform reactive flow simulations with detailed chemical kinetics. Requires `cantera+python` and vendors Pyrometheus automatically.
+
 ### Dependencies
 
 Build-time dependencies (required during compilation):
@@ -103,6 +109,8 @@ Optional dependencies (variant-controlled):
 - mpi - Message Passing Interface (when +mpi)
 - silo - Silo data format with HDF5 support (when +post_process)
 - hdf5 - HDF5 data format (transitive dependency via Silo when +post_process)
+- cantera+python - Thermochemical kinetics library (when +chemistry)
+- pyrometheus - Fortran code generator for chemistry (vendored automatically when +chemistry)
 - cuda - NVIDIA CUDA toolkit (when +openacc or +openmp with NVHPC)
 - hip - AMD ROCm HIP (when +openacc or +openmp with Cray)
 

@@ -36,13 +36,24 @@ class Mfc(CMakePackage):
         description="Floating point precision",
     )
     variant("post_process", default=True, description="Build post-processing tool")
+    variant("chemistry", default=False, description="Enable thermochemistry via Pyrometheus/Cantera")
 
     # Required dependencies
     depends_on("cmake@3.20:", type="build")
     depends_on("py-fypp", type="build")
     depends_on("python@3:", type="build")
-    # Note: py-cantera is not yet available in Spack builtin repo
-    # Will add when chemistry variant is implemented
+
+    # Chemistry dependencies
+    depends_on("cantera+python", type="build", when="+chemistry")
+    # Note: py-pyrometheus may not be in Spack yet; will be added to PYTHONPATH via resource
+    resource(
+        name="pyrometheus",
+        url="https://files.pythonhosted.org/packages/21/77/1e48bef25dfef5d9e35c1ab3a3a2ea1c82adb59aceb82b18d13b3d6c8a2b/pyrometheus-1.0.5.tar.gz",
+        sha256="a572ab6db954f4a850d1292bb1ef6d6055916784a894d149d657996fa98d0367",
+        when="+chemistry",
+        placement="pydeps/pyrometheus",
+        expand=True
+    )
 
     # Runtime dependencies
     depends_on("fftw@3:", when="~mpi")
@@ -80,6 +91,7 @@ class Mfc(CMakePackage):
             self.define("MFC_PRE_PROCESS", True),
             self.define("MFC_SIMULATION", True),
             self.define_from_variant("MFC_POST_PROCESS", "post_process"),
+            self.define_from_variant("MFC_CHEMISTRY", "chemistry"),
         ]
 
         if self.spec.variants["precision"].value == "single":
@@ -90,3 +102,7 @@ class Mfc(CMakePackage):
     def setup_build_environment(self, env):
         # Fypp is required for preprocessing
         env.prepend_path("PATH", self.spec["py-fypp"].prefix.bin)
+        
+        # Make vendored Pyrometheus importable when chemistry is enabled
+        if "+chemistry" in self.spec:
+            env.prepend_path("PYTHONPATH", join_path(self.stage.source_path, "pydeps", "pyrometheus"))
