@@ -111,13 +111,19 @@ class Mfc < Formula
     <<~EOS
       MFC has been installed successfully!
 
-      To use MFC:
-        mfc --help
+      Pre-built binaries are available:
+        pre_process, simulation, post_process
 
       Examples are available in:
         #{prefix}/examples
 
-      Note: Cantera 3.1.0 is pre-installed in the MFC virtual environment.
+      Note: The 'mfc run' command requires the full MFC source tree.
+      For development workflows, clone the repository and use mfc.sh:
+        git clone https://github.com/MFlowCode/MFC.git
+        cd MFC
+        ./mfc.sh run <case.py>
+
+      Cantera 3.1.0 is pre-installed in the MFC virtual environment.
     EOS
   end
 

@@ -144,16 +144,10 @@ jobs:
           
           echo "=== All tests passed! ==="
       
-      - name: Run MFC test case
-        run: |
-          echo "Running a simple test case (1D Sod shock tube)..."
-          TESTDIR=$(mktemp -d)
-          cp $(brew --prefix mfc)/examples/1D_sodshocktube/case.py "$TESTDIR/"
-          
-          echo "Running with $(sysctl -n hw.ncpu) processors..."
-          mfc run "$TESTDIR/case.py" -j $(sysctl -n hw.ncpu)
-          
-          echo "Test case completed successfully!"
+      # Note: The 'mfc run' command requires the full MFC source tree to build/run cases.
+      # The Homebrew formula only installs pre-built binaries, not the development source.
+      # Users who need 'mfc run' should clone the MFC repository and use mfc.sh there.
+      # The pre-built binaries (pre_process, simulation, post_process) can be used directly.
       
       - name: Uninstall and cleanup
         if: always()
