@@ -64,6 +64,7 @@ class Mfc < Formula
     # Create smart wrapper script that:
     # 1. Works around read-only Cellar issue
     # 2. Activates venv automatically so cantera/dependencies are available
+    # 3. Sets up toolchain symlink so mfc.sh can find toolchain/util.sh
     (bin/"mfc").write <<~EOS
       #!/bin/bash
       set -e
@@ -79,6 +80,13 @@ class Mfc < Formula
       # Copy mfc.sh to temp dir (it may try to write build artifacts)
       cp "#{libexec}/mfc.sh" "$TMPDIR/"
       cd "$TMPDIR"
+
+      # Create toolchain symlink so mfc.sh can verify it's in MFC root folder
+      ln -s "#{prefix}/toolchain" toolchain
+
+      # Create build directory for mfc.sh to write to (with pre-existing venv symlink)
+      mkdir -p build
+      ln -s "#{venv}" build/venv
 
       # Run mfc.sh with all arguments
       exec ./mfc.sh "$@"
