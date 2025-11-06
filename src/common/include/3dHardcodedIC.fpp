@@ -119,12 +119,11 @@
             q_prim_vf(advxe)%sf(i, j, k) = patch_icpp(1)%alpha(2)
         end if
 
-    case (302) ! 3D Jet with IGR
-
+    case (302) ! 3D Jet with IGR       
         ux_th = 10*sqrt(1.4*0.4)
         ux_am = 0.0*sqrt(1.4)
-        p_th = 0.8_wp
-        p_am = 0.4_wp
+        p_th = 2.0_wp
+        p_am = 1.0_wp
         rho_th = 1._wp
         rho_am = 1._wp
         y_th = 0.0_wp
