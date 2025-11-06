@@ -19,24 +19,7 @@
 
 #:enddef
 
-#:def GPU_PARALLEL_LOOP(code, collapse=None, private=None, parallelism='[gang, vector]', &
-    & default='present', firstprivate=None, reduction=None, reductionOp=None, &
-    & copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, &
-    & no_create=None, present=None, deviceptr=None, attach=None, extraAccArgs=None, extraOmpArgs=None)
-
-    #:set acc_code = ACC_PARALLEL_LOOP(code, collapse, private, parallelism, default, firstprivate, reduction, reductionOp, copy, copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, extraAccArgs)
-    #:set omp_code = OMP_PARALLEL_LOOP(code, collapse, private, parallelism, default, firstprivate, reduction, reductionOp, copy, copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, extraOmpArgs)
-
-#if defined(MFC_OpenACC)
-    $:acc_code
-#elif defined(MFC_OpenMP)
-    $:omp_code
-#else
-    $:code
-#endif
-#:enddef
-
-#:def NEW_GPU_PARALLEL_LOOP(collapse=None, private=None, parallelism='[gang, vector]', &
+#:def GPU_PARALLEL_LOOP(collapse=None, private=None, parallelism='[gang, vector]', &
     & default='present', firstprivate=None, reduction=None, reductionOp=None, &
     & copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, &
     & no_create=None, present=None, deviceptr=None, attach=None, extraAccArgs=None, extraOmpArgs=None)
@@ -53,14 +36,14 @@
 
 #:def END_GPU_PARALLEL_LOOP()
 
-    #:set acc_end_directive = '!$acc end parallel loop'
-    #:set omp_code = END_OMP_PARALLEL_LOOP(code, collapse, private, parallelism, default, firstprivate, reduction, reductionOp, copy, copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, extraOmpArgs)
-
 #if defined(MFC_OpenACC)
-    $:acc_end_directive
+     #:set end_directive = '!$acc end parallel loop'
 #elif defined(MFC_OpenMP)
-    $:omp_code
+    #:set end_directive = END_OMP_PARALLEL_LOOP(code, collapse, private, parallelism, default, firstprivate, reduction, reductionOp, copy, copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, extraOmpArgs)
 #endif
+
+    $:end_directive
+
 #:enddef
 
 #:def GPU_ROUTINE(function_name=None, parallelism=None, nohost=False, cray_inline=False, extraAccArgs=None, extraOmpArgs=None)

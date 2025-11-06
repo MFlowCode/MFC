@@ -43,7 +43,7 @@ contains
         center(1) = patch_ib(ib_patch_id)%x_centroid
         center(2) = patch_ib(ib_patch_id)%y_centroid
 
-        #:call GPU_PARALLEL_LOOP(private='[i,j,dist_vec,dist]', &
+        $:GPU_PARALLEL_LOOP(private='[i,j,dist_vec,dist]', &
                   & copyin='[ib_patch_id,center,radius]', collapse=2)
             do i = 0, m
                 do j = 0, n
@@ -62,7 +62,7 @@ contains
 
                 end do
             end do
-        #:endcall GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP
 
     end subroutine s_circle_levelset
 
@@ -87,7 +87,7 @@ contains
         inverse_rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:, :)
         rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix(:, :)
 
-        #:call GPU_PARALLEL_LOOP(private='[i,j,xy_local,k,dist_vec,dist,global_dist,global_id]', &
+        $:GPU_PARALLEL_LOOP(private='[i,j,xy_local,k,dist_vec,dist,global_dist,global_id]', &
                   & copyin='[ib_patch_id,center,rotation,inverse_rotation,airfoil_grid_u,airfoil_grid_l]', collapse=2)
             do i = 0, m
                 do j = 0, n
@@ -148,7 +148,7 @@ contains
 
                 end do
             end do
-        #:endcall GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP
 
     end subroutine s_airfoil_levelset
 
@@ -180,7 +180,7 @@ contains
         z_max = center(3) + lz/2
         z_min = center(3) - lz/2
 
-        #:call GPU_PARALLEL_LOOP(private='[i,j,l,xyz_local,k,dist_vec,dist,global_dist,global_id,dist_side,dist_surf]', &
+        $:GPU_PARALLEL_LOOP(private='[i,j,l,xyz_local,k,dist_vec,dist,global_dist,global_id,dist_side,dist_surf]', &
                   & copyin='[ib_patch_id,center,rotation,inverse_rotation,airfoil_grid_u,airfoil_grid_l,z_min,z_max]', collapse=3)
             do l = 0, p
                 do j = 0, n
@@ -255,7 +255,7 @@ contains
                     end do
                 end do
             end do
-        #:endcall GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP
 
     end subroutine s_3D_airfoil_levelset
 
@@ -290,7 +290,7 @@ contains
         bottom_left(1) = -length_x/2
         bottom_left(2) = -length_y/2
 
-        #:call GPU_PARALLEL_LOOP(private='[i,j,k,min_dist,idx,side_dists,xy_local,dist_vec]', &
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,min_dist,idx,side_dists,xy_local,dist_vec]', &
                   & copyin='[ib_patch_id,center,bottom_left,top_right,inverse_rotation,rotation]', collapse=2)
             do i = 0, m
                 do j = 0, n
@@ -332,7 +332,7 @@ contains
                     end if
                 end do
             end do
-        #:endcall GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP
 
     end subroutine s_rectangle_levelset
 
@@ -371,7 +371,7 @@ contains
         Front = length_z/2
         Back = -length_z/2
 
-        #:call GPU_PARALLEL_LOOP(private='[i,j,k,min_dist,side_dists,xyz_local,dist_vec]', &
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,min_dist,side_dists,xyz_local,dist_vec]', &
                   & copyin='[ib_patch_id,center,inverse_rotation,rotation,Right,Left,Top,Bottom,Front,Back]', collapse=3)
             do i = 0, m
                 do j = 0, n
@@ -441,7 +441,7 @@ contains
                     end do
                 end do
             end do
-        #:endcall GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP
 
     end subroutine s_cuboid_levelset
 
@@ -461,7 +461,7 @@ contains
         center(2) = patch_ib(ib_patch_id)%y_centroid
         center(3) = patch_ib(ib_patch_id)%z_centroid
 
-        #:call GPU_PARALLEL_LOOP(private='[i,j,k,dist_vec,dist]', &
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,dist_vec,dist]', &
                   & copyin='[ib_patch_id,center,radius]', collapse=3)
             do i = 0, m
                 do j = 0, n
@@ -479,7 +479,7 @@ contains
                     end do
                 end do
             end do
-        #:endcall GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP
 
     end subroutine s_sphere_levelset
 
@@ -526,7 +526,7 @@ contains
             dist_surface_vec = (/1, 1, 0/)
         end if
 
-        #:call GPU_PARALLEL_LOOP(private='[i,j,k,side_pos,dist_side,dist_surface,xyz_local]', &
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,side_pos,dist_side,dist_surface,xyz_local]', &
                   & copyin='[ib_patch_id,center,radius,inverse_rotation,rotation,dist_sides_vec,dist_surface_vec]', collapse=3)
             do i = 0, m
                 do j = 0, n
@@ -560,7 +560,7 @@ contains
                     end do
                 end do
             end do
-        #:endcall GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP
 
     end subroutine s_cylinder_levelset
 

@@ -162,7 +162,7 @@ contains
         ! that cell. If both queries check out, the primitive variables of
         ! the current patch are assigned to this cell.
 
-        #:call GPU_PARALLEL_LOOP(private='[i,j]', copy='[ib_markers_sf]',&
+        $:GPU_PARALLEL_LOOP(private='[i,j]', copy='[ib_markers_sf]',&
                   & copyin='[patch_id,center,radius]', collapse=2)
             do j = 0, n
                 do i = 0, m
@@ -173,7 +173,7 @@ contains
                     end if
                 end do
             end do
-        #:endcall GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP
 
     end subroutine s_ib_circle
 
@@ -270,7 +270,7 @@ contains
 
         end if
 
-        #:call GPU_PARALLEL_LOOP(private='[i,j,xy_local,k,f]', copy='[ib_markers_sf]',&
+        $:GPU_PARALLEL_LOOP(private='[i,j,xy_local,k,f]', copy='[ib_markers_sf]',&
                   & copyin='[patch_id,center,inverse_rotation,ma,ca_in,airfoil_grid_u,airfoil_grid_l]', collapse=2)
             do j = 0, n
                 do i = 0, m
@@ -325,7 +325,7 @@ contains
                     end if
                 end do
             end do
-        #:endcall GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP
 
     end subroutine s_ib_airfoil
 
@@ -423,7 +423,7 @@ contains
             airfoil_grid_l(Np)%y = 0._wp
         end if
 
-        #:call GPU_PARALLEL_LOOP(private='[i,j,l,xyz_local,k,f]', copy='[ib_markers_sf]',&
+        $:GPU_PARALLEL_LOOP(private='[i,j,l,xyz_local,k,f]', copy='[ib_markers_sf]',&
                   & copyin='[patch_id,center,inverse_rotation,ma,ca_in,airfoil_grid_u,airfoil_grid_l]', collapse=3)
             do l = 0, p
                 do j = 0, n
@@ -475,7 +475,7 @@ contains
                     end do
                 end do
             end do
-        #:endcall GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP
 
     end subroutine s_ib_3D_airfoil
 
@@ -522,7 +522,7 @@ contains
         ! domain and verifying whether the current patch has the permission
         ! to write to that cell. If both queries check out, the primitive
         ! variables of the current patch are assigned to this cell.
-        #:call GPU_PARALLEL_LOOP(private='[i,j, xy_local]', copy='[ib_markers_sf]',&
+        $:GPU_PARALLEL_LOOP(private='[i,j, xy_local]', copy='[ib_markers_sf]',&
                   & copyin='[patch_id,center,length,inverse_rotation,x_cc,y_cc]', collapse=2)
             do j = 0, n
                 do i = 0, m
@@ -541,7 +541,7 @@ contains
                     end if
                 end do
             end do
-        #:endcall GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP
 
     end subroutine s_ib_rectangle
 
@@ -582,7 +582,7 @@ contains
         ! and verifying whether the current patch has permission to write to
         ! that cell. If both queries check out, the primitive variables of
         ! the current patch are assigned to this cell.
-        #:call GPU_PARALLEL_LOOP(private='[i,j,k,cart_y,cart_z]', copy='[ib_markers_sf]',&
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,cart_y,cart_z]', copy='[ib_markers_sf]',&
                   & copyin='[patch_id,center,radius]', collapse=3)
             do k = 0, p
                 do j = 0, n
@@ -602,7 +602,7 @@ contains
                     end do
                 end do
             end do
-        #:endcall GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP
 
     end subroutine s_ib_sphere
 
@@ -644,7 +644,7 @@ contains
         ! and verifying whether the current patch has permission to write to
         ! to that cell. If both queries check out, the primitive variables
         ! of the current patch are assigned to this cell.
-        #:call GPU_PARALLEL_LOOP(private='[i,j,k,xyz_local,cart_y,cart_z]', copy='[ib_markers_sf]',&
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,xyz_local,cart_y,cart_z]', copy='[ib_markers_sf]',&
                   & copyin='[patch_id,center,length,inverse_rotation]', collapse=3)
             do k = 0, p
                 do j = 0, n
@@ -673,7 +673,7 @@ contains
                     end do
                 end do
             end do
-        #:endcall GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP
 
     end subroutine s_ib_cuboid
 
@@ -719,7 +719,7 @@ contains
         ! domain and verifying whether the current patch has the permission
         ! to write to that cell. If both queries check out, the primitive
         ! variables of the current patch are assigned to this cell.
-        #:call GPU_PARALLEL_LOOP(private='[i,j,k,xyz_local,cart_y,cart_z]', copy='[ib_markers_sf]',&
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,xyz_local,cart_y,cart_z]', copy='[ib_markers_sf]',&
                   & copyin='[patch_id,center,length,radius,inverse_rotation]', collapse=3)
             do k = 0, p
                 do j = 0, n
@@ -758,7 +758,7 @@ contains
                     end do
                 end do
             end do
-        #:endcall GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP
 
     end subroutine s_ib_cylinder
 
