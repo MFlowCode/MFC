@@ -1033,7 +1033,7 @@ contains
                             if (model_eqns == 1) then
                                 drho_dt = dalpha_rho_dt(1)
                                 dgamma_dt = dadv_dt(1)
-                                #:if not MFC_CASE_OPTIMIZATION
+                                #:if not MFC_CASE_OPTIMIZATION or num_fluids > 1
                                     dpi_inf_dt = dadv_dt(2)
                                 #:endif
                             else

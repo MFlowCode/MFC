@@ -17,7 +17,8 @@ class MFCConfig:
     gcov:      bool = False
     unified:   bool = False
     single:    bool = False
-    fastmath : bool = False
+    mixed:   bool = False
+    fastmath: bool = False
 
     @staticmethod
     def from_dict(d: dict):

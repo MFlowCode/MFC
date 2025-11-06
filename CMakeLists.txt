@@ -29,6 +29,7 @@ option(MFC_SYSCHECK      "Build syscheck"                                    OFF
 option(MFC_DOCUMENTATION "Build documentation"                               OFF)
 option(MFC_ALL           "Build everything"                                  OFF)
 option(MFC_SINGLE_PRECISION "Build single precision"                         OFF)
+option(MFC_MIXED_PRECISION "Build mixed precision"                           OFF)
 
 if (MFC_ALL)
     set(MFC_PRE_PROCESS   ON FORCE)
@@ -41,6 +42,10 @@ if (MFC_SINGLE_PRECISION)
     add_compile_definitions(MFC_SINGLE_PRECISION)
 else()
     add_compile_definitions(MFC_DOUBLE_PRECISION)
+endif()
+
+if (MFC_MIXED_PRECISION)
+    add_compile_definitions(MFC_MIXED_PRECISION)
 endif()
 
 
@@ -237,7 +242,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release")
             message(STATUS "LTO/IPO is not supported in NVHPC Version < 23.11. Use a newer version of NVHPC for best performance.")
         else()
             message(STATUS "Performing IPO using -Mextract followed by -Minline")
-            set(NVHPC_USE_TWO_PASS_IPO TRUE)
+            set(NVHPC_USE_TWO_PASS_IPO FALSE)
         endif()
     else()
         CHECK_IPO_SUPPORTED(RESULT SUPPORTS_IPO OUTPUT IPO_ERROR)
@@ -573,7 +578,13 @@ function(MFC_SETUP_TARGET)
                 find_package(hipfort COMPONENTS hip CONFIG REQUIRED)
                 target_link_libraries(${a_target} PRIVATE hipfort::hip hipfort::hipfort-amdgcn)
             elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
-                find_package(hipfort COMPONENTS hip CONFIG REQUIRED)
+
+                if (MFC_Unified)
+                    target_compile_options(${ARGS_TARGET}
+                        PRIVATE -DFRONTIER_UNIFIED)
+                endif()
+
+    		find_package(hipfort COMPONENTS hip CONFIG REQUIRED)
                 target_link_libraries(${a_target} PRIVATE hipfort::hip hipfort::hipfort-amdgcn flang_rt.hostdevice)
             endif()
         elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
