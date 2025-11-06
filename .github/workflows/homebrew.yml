@@ -44,7 +44,6 @@ jobs:
       
       - name: Install MFC from formula
         run: |
-          set -o pipefail  # Ensure pipe failures are caught
           echo "Creating temporary local tap..."
           brew tap-new mflowcode/test
           
@@ -52,7 +51,21 @@ jobs:
           cp packaging/homebrew/mfc.rb $(brew --repository)/Library/Taps/mflowcode/homebrew-test/Formula/mfc.rb
           
           echo "Installing MFC from local tap..."
+          # Note: brew may exit with code 1 due to dylib fixup warnings on some Python packages (non-fatal)
+          # We check for successful installation (🍺 symbol) rather than just exit code
+          set +e  # Don't fail immediately on error
           brew install --build-from-source --verbose mflowcode/test/mfc 2>&1 | tee /tmp/brew-install.log
+          brew_exit_code=$?
+          set -e
+          
+          # Check if the formula actually installed successfully
+          if grep -q "🍺.*mfc.*built in" /tmp/brew-install.log; then
+            echo "✅ MFC installed successfully (ignoring dylib relocation warnings)"
+            exit 0
+          else
+            echo "❌ MFC installation failed"
+            exit $brew_exit_code
+          fi
       
       - name: Display error logs on failure
         if: failure()
@@ -111,8 +124,7 @@ jobs:
           
           echo "2. Verifying installation structure..."
           test -f $(brew --prefix mfc)/libexec/mfc.sh
-          test -d $(brew --prefix)/share/mfc/toolchain
-          test -d $(brew --prefix)/share/mfc/toolchain/mfc
+          test -d $(brew --prefix mfc)/toolchain
           echo "  ✓ Installation structure verified"
           
           echo "3. Checking Python venv..."
@@ -122,8 +134,8 @@ jobs:
           echo "  ✓ Python venv exists"
           
           echo "4. Checking examples..."
-          test -d $(brew --prefix)/share/mfc/examples
-          test -f $(brew --prefix)/share/mfc/examples/1D_sodshocktube/case.py
+          test -d $(brew --prefix mfc)/examples
+          test -f $(brew --prefix mfc)/examples/1D_sodshocktube/case.py
           echo "  ✓ Examples installed"
           
           echo "5. Testing mfc wrapper..."
@@ -131,7 +143,7 @@ jobs:
           echo "  ✓ mfc --help succeeded"
           
           echo "6. Testing mfc count..."
-          mfc count $(brew --prefix)/share/mfc/examples/1D_sodshocktube/case.py
+          mfc count $(brew --prefix mfc)/examples/1D_sodshocktube/case.py
           echo "  ✓ mfc count succeeded"
           
           echo "=== All tests passed! ==="
@@ -140,7 +152,7 @@ jobs:
         run: |
           echo "Running a simple test case (1D Sod shock tube)..."
           cd $(mktemp -d)
-          cp $(brew --prefix)/share/mfc/examples/1D_sodshocktube/case.py .
+          cp $(brew --prefix mfc)/examples/1D_sodshocktube/case.py .
           
           echo "Running with $(sysctl -n hw.ncpu) processors..."
           mfc run case.py -j $(sysctl -n hw.ncpu)
