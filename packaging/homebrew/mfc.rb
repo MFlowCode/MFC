@@ -2,6 +2,7 @@
 # frozen_string_literal: true
 
 # Homebrew formula for MFC (Multiphase Flow Code)
+# This formula is automatically deployed to the MFlowCode/homebrew-mfc tap
 class Mfc < Formula
   desc "Exascale multiphase/multiphysics compressible flow solver"
   homepage "https://mflowcode.github.io/"
