@@ -89,29 +89,29 @@ contains
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, 1, -1, sys_size, pb_in, mv_in)
         else
             $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
-                do l = 0, p
-                    do k = 0, n
-                        select case (int(bc_type(1, -1)%sf(0, k, l)))
-                        case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)
-                            call s_ghost_cell_extrapolation(q_prim_vf, 1, -1, k, l)
-                        case (BC_REFLECTIVE)
-                            call s_symmetry(q_prim_vf, 1, -1, k, l, pb_in, mv_in)
-                        case (BC_PERIODIC)
-                            call s_periodic(q_prim_vf, 1, -1, k, l, pb_in, mv_in)
-                        case (BC_SLIP_WALL)
-                            call s_slip_wall(q_prim_vf, 1, -1, k, l)
-                        case (BC_NO_SLIP_WALL)
-                            call s_no_slip_wall(q_prim_vf, 1, -1, k, l)
-                        case (BC_DIRICHLET)
-                            call s_dirichlet(q_prim_vf, 1, -1, k, l)
-                        end select
+            do l = 0, p
+                do k = 0, n
+                    select case (int(bc_type(1, -1)%sf(0, k, l)))
+                    case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)
+                        call s_ghost_cell_extrapolation(q_prim_vf, 1, -1, k, l)
+                    case (BC_REFLECTIVE)
+                        call s_symmetry(q_prim_vf, 1, -1, k, l, pb_in, mv_in)
+                    case (BC_PERIODIC)
+                        call s_periodic(q_prim_vf, 1, -1, k, l, pb_in, mv_in)
+                    case (BC_SLIP_WALL)
+                        call s_slip_wall(q_prim_vf, 1, -1, k, l)
+                    case (BC_NO_SLIP_WALL)
+                        call s_no_slip_wall(q_prim_vf, 1, -1, k, l)
+                    case (BC_DIRICHLET)
+                        call s_dirichlet(q_prim_vf, 1, -1, k, l)
+                    end select
 
-                        if (qbmm .and. (.not. polytropic) .and. &
-                            (bc_type(1, -1)%sf(0, k, l) <= BC_GHOST_EXTRAP)) then
-                            call s_qbmm_extrapolation(1, -1, k, l, pb_in, mv_in)
-                        end if
-                    end do
+                    if (qbmm .and. (.not. polytropic) .and. &
+                        (bc_type(1, -1)%sf(0, k, l) <= BC_GHOST_EXTRAP)) then
+                        call s_qbmm_extrapolation(1, -1, k, l, pb_in, mv_in)
+                    end if
                 end do
+            end do
             $:END_GPU_PARALLEL_LOOP()
         end if
 
@@ -119,29 +119,29 @@ contains
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, 1, 1, sys_size, pb_in, mv_in)
         else
             $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
-                do l = 0, p
-                    do k = 0, n
-                        select case (int(bc_type(1, 1)%sf(0, k, l)))
-                        case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP) ! Ghost-cell extrap. BC at end
-                            call s_ghost_cell_extrapolation(q_prim_vf, 1, 1, k, l)
-                        case (BC_REFLECTIVE)
-                            call s_symmetry(q_prim_vf, 1, 1, k, l, pb_in, mv_in)
-                        case (BC_PERIODIC)
-                            call s_periodic(q_prim_vf, 1, 1, k, l, pb_in, mv_in)
-                        case (BC_SLIP_WALL)
-                            call s_slip_wall(q_prim_vf, 1, 1, k, l)
-                        case (BC_NO_SLIP_WALL)
-                            call s_no_slip_wall(q_prim_vf, 1, 1, k, l)
-                        case (BC_DIRICHLET)
-                            call s_dirichlet(q_prim_vf, 1, 1, k, l)
-                        end select
+            do l = 0, p
+                do k = 0, n
+                    select case (int(bc_type(1, 1)%sf(0, k, l)))
+                    case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP) ! Ghost-cell extrap. BC at end
+                        call s_ghost_cell_extrapolation(q_prim_vf, 1, 1, k, l)
+                    case (BC_REFLECTIVE)
+                        call s_symmetry(q_prim_vf, 1, 1, k, l, pb_in, mv_in)
+                    case (BC_PERIODIC)
+                        call s_periodic(q_prim_vf, 1, 1, k, l, pb_in, mv_in)
+                    case (BC_SLIP_WALL)
+                        call s_slip_wall(q_prim_vf, 1, 1, k, l)
+                    case (BC_NO_SLIP_WALL)
+                        call s_no_slip_wall(q_prim_vf, 1, 1, k, l)
+                    case (BC_DIRICHLET)
+                        call s_dirichlet(q_prim_vf, 1, 1, k, l)
+                    end select
 
-                        if (qbmm .and. (.not. polytropic) .and. &
-                            (bc_type(1, 1)%sf(0, k, l) <= BC_GHOST_EXTRAP)) then
-                            call s_qbmm_extrapolation(1, 1, k, l, pb_in, mv_in)
-                        end if
-                    end do
+                    if (qbmm .and. (.not. polytropic) .and. &
+                        (bc_type(1, 1)%sf(0, k, l) <= BC_GHOST_EXTRAP)) then
+                        call s_qbmm_extrapolation(1, 1, k, l, pb_in, mv_in)
+                    end if
                 end do
+            end do
             $:END_GPU_PARALLEL_LOOP()
         end if
 
@@ -153,32 +153,32 @@ contains
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, 2, -1, sys_size, pb_in, mv_in)
         else
             $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
-                do l = 0, p
-                    do k = -buff_size, m + buff_size
-                        select case (int(bc_type(2, -1)%sf(k, 0, l)))
-                        case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)
-                            call s_ghost_cell_extrapolation(q_prim_vf, 2, -1, k, l)
-                        case (BC_AXIS)
-                            call s_axis(q_prim_vf, pb_in, mv_in, k, l)
-                        case (BC_REFLECTIVE)
-                            call s_symmetry(q_prim_vf, 2, -1, k, l, pb_in, mv_in)
-                        case (BC_PERIODIC)
-                            call s_periodic(q_prim_vf, 2, -1, k, l, pb_in, mv_in)
-                        case (BC_SLIP_WALL)
-                            call s_slip_wall(q_prim_vf, 2, -1, k, l)
-                        case (BC_NO_SLIP_WALL)
-                            call s_no_slip_wall(q_prim_vf, 2, -1, k, l)
-                        case (BC_DIRICHLET)
-                            call s_dirichlet(q_prim_vf, 2, -1, k, l)
-                        end select
+            do l = 0, p
+                do k = -buff_size, m + buff_size
+                    select case (int(bc_type(2, -1)%sf(k, 0, l)))
+                    case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)
+                        call s_ghost_cell_extrapolation(q_prim_vf, 2, -1, k, l)
+                    case (BC_AXIS)
+                        call s_axis(q_prim_vf, pb_in, mv_in, k, l)
+                    case (BC_REFLECTIVE)
+                        call s_symmetry(q_prim_vf, 2, -1, k, l, pb_in, mv_in)
+                    case (BC_PERIODIC)
+                        call s_periodic(q_prim_vf, 2, -1, k, l, pb_in, mv_in)
+                    case (BC_SLIP_WALL)
+                        call s_slip_wall(q_prim_vf, 2, -1, k, l)
+                    case (BC_NO_SLIP_WALL)
+                        call s_no_slip_wall(q_prim_vf, 2, -1, k, l)
+                    case (BC_DIRICHLET)
+                        call s_dirichlet(q_prim_vf, 2, -1, k, l)
+                    end select
 
-                        if (qbmm .and. (.not. polytropic) .and. &
-                            (bc_type(2, -1)%sf(k, 0, l) <= BC_GHOST_EXTRAP) .and. &
-                            (bc_type(2, -1)%sf(k, 0, l) /= BC_AXIS)) then
-                            call s_qbmm_extrapolation(2, -1, k, l, pb_in, mv_in)
-                        end if
-                    end do
+                    if (qbmm .and. (.not. polytropic) .and. &
+                        (bc_type(2, -1)%sf(k, 0, l) <= BC_GHOST_EXTRAP) .and. &
+                        (bc_type(2, -1)%sf(k, 0, l) /= BC_AXIS)) then
+                        call s_qbmm_extrapolation(2, -1, k, l, pb_in, mv_in)
+                    end if
                 end do
+            end do
             $:END_GPU_PARALLEL_LOOP()
         end if
 
@@ -186,29 +186,29 @@ contains
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, 2, 1, sys_size, pb_in, mv_in)
         else
             $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
-                do l = 0, p
-                    do k = -buff_size, m + buff_size
-                        select case (int(bc_type(2, 1)%sf(k, 0, l)))
-                        case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)
-                            call s_ghost_cell_extrapolation(q_prim_vf, 2, 1, k, l)
-                        case (BC_REFLECTIVE)
-                            call s_symmetry(q_prim_vf, 2, 1, k, l, pb_in, mv_in)
-                        case (BC_PERIODIC)
-                            call s_periodic(q_prim_vf, 2, 1, k, l, pb_in, mv_in)
-                        case (BC_SLIP_WALL)
-                            call s_slip_wall(q_prim_vf, 2, 1, k, l)
-                        case (BC_NO_SLIP_WALL)
-                            call s_no_slip_wall(q_prim_vf, 2, 1, k, l)
-                        case (BC_DIRICHLET)
-                            call s_dirichlet(q_prim_vf, 2, 1, k, l)
-                        end select
+            do l = 0, p
+                do k = -buff_size, m + buff_size
+                    select case (int(bc_type(2, 1)%sf(k, 0, l)))
+                    case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)
+                        call s_ghost_cell_extrapolation(q_prim_vf, 2, 1, k, l)
+                    case (BC_REFLECTIVE)
+                        call s_symmetry(q_prim_vf, 2, 1, k, l, pb_in, mv_in)
+                    case (BC_PERIODIC)
+                        call s_periodic(q_prim_vf, 2, 1, k, l, pb_in, mv_in)
+                    case (BC_SLIP_WALL)
+                        call s_slip_wall(q_prim_vf, 2, 1, k, l)
+                    case (BC_NO_SLIP_WALL)
+                        call s_no_slip_wall(q_prim_vf, 2, 1, k, l)
+                    case (BC_DIRICHLET)
+                        call s_dirichlet(q_prim_vf, 2, 1, k, l)
+                    end select
 
-                        if (qbmm .and. (.not. polytropic) .and. &
-                            (bc_type(2, 1)%sf(k, 0, l) <= BC_GHOST_EXTRAP)) then
-                            call s_qbmm_extrapolation(2, 1, k, l, pb_in, mv_in)
-                        end if
-                    end do
+                    if (qbmm .and. (.not. polytropic) .and. &
+                        (bc_type(2, 1)%sf(k, 0, l) <= BC_GHOST_EXTRAP)) then
+                        call s_qbmm_extrapolation(2, 1, k, l, pb_in, mv_in)
+                    end if
                 end do
+            end do
             $:END_GPU_PARALLEL_LOOP()
         end if
 
@@ -220,29 +220,29 @@ contains
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, 3, -1, sys_size, pb_in, mv_in)
         else
             $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
-                do l = -buff_size, n + buff_size
-                    do k = -buff_size, m + buff_size
-                        select case (int(bc_type(3, -1)%sf(k, l, 0)))
-                        case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)
-                            call s_ghost_cell_extrapolation(q_prim_vf, 3, -1, k, l)
-                        case (BC_REFLECTIVE)
-                            call s_symmetry(q_prim_vf, 3, -1, k, l, pb_in, mv_in)
-                        case (BC_PERIODIC)
-                            call s_periodic(q_prim_vf, 3, -1, k, l, pb_in, mv_in)
-                        case (BC_SLIP_WALL)
-                            call s_slip_wall(q_prim_vf, 3, -1, k, l)
-                        case (BC_NO_SLIP_WALL)
-                            call s_no_slip_wall(q_prim_vf, 3, -1, k, l)
-                        case (BC_DIRICHLET)
-                            call s_dirichlet(q_prim_vf, 3, -1, k, l)
-                        end select
+            do l = -buff_size, n + buff_size
+                do k = -buff_size, m + buff_size
+                    select case (int(bc_type(3, -1)%sf(k, l, 0)))
+                    case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)
+                        call s_ghost_cell_extrapolation(q_prim_vf, 3, -1, k, l)
+                    case (BC_REFLECTIVE)
+                        call s_symmetry(q_prim_vf, 3, -1, k, l, pb_in, mv_in)
+                    case (BC_PERIODIC)
+                        call s_periodic(q_prim_vf, 3, -1, k, l, pb_in, mv_in)
+                    case (BC_SLIP_WALL)
+                        call s_slip_wall(q_prim_vf, 3, -1, k, l)
+                    case (BC_NO_SLIP_WALL)
+                        call s_no_slip_wall(q_prim_vf, 3, -1, k, l)
+                    case (BC_DIRICHLET)
+                        call s_dirichlet(q_prim_vf, 3, -1, k, l)
+                    end select
 
-                        if (qbmm .and. (.not. polytropic) .and. &
-                            (bc_type(3, -1)%sf(k, l, 0) <= BC_GHOST_EXTRAP)) then
-                            call s_qbmm_extrapolation(3, -1, k, l, pb_in, mv_in)
-                        end if
-                    end do
+                    if (qbmm .and. (.not. polytropic) .and. &
+                        (bc_type(3, -1)%sf(k, l, 0) <= BC_GHOST_EXTRAP)) then
+                        call s_qbmm_extrapolation(3, -1, k, l, pb_in, mv_in)
+                    end if
                 end do
+            end do
             $:END_GPU_PARALLEL_LOOP()
         end if
 
@@ -250,29 +250,29 @@ contains
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, 3, 1, sys_size, pb_in, mv_in)
         else
             $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
-                do l = -buff_size, n + buff_size
-                    do k = -buff_size, m + buff_size
-                        select case (int(bc_type(3, 1)%sf(k, l, 0)))
-                        case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)
-                            call s_ghost_cell_extrapolation(q_prim_vf, 3, 1, k, l)
-                        case (BC_REFLECTIVE)
-                            call s_symmetry(q_prim_vf, 3, 1, k, l, pb_in, mv_in)
-                        case (BC_PERIODIC)
-                            call s_periodic(q_prim_vf, 3, 1, k, l, pb_in, mv_in)
-                        case (BC_SlIP_WALL)
-                            call s_slip_wall(q_prim_vf, 3, 1, k, l)
-                        case (BC_NO_SLIP_WALL)
-                            call s_no_slip_wall(q_prim_vf, 3, 1, k, l)
-                        case (BC_DIRICHLET)
-                            call s_dirichlet(q_prim_vf, 3, 1, k, l)
-                        end select
+            do l = -buff_size, n + buff_size
+                do k = -buff_size, m + buff_size
+                    select case (int(bc_type(3, 1)%sf(k, l, 0)))
+                    case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)
+                        call s_ghost_cell_extrapolation(q_prim_vf, 3, 1, k, l)
+                    case (BC_REFLECTIVE)
+                        call s_symmetry(q_prim_vf, 3, 1, k, l, pb_in, mv_in)
+                    case (BC_PERIODIC)
+                        call s_periodic(q_prim_vf, 3, 1, k, l, pb_in, mv_in)
+                    case (BC_SlIP_WALL)
+                        call s_slip_wall(q_prim_vf, 3, 1, k, l)
+                    case (BC_NO_SLIP_WALL)
+                        call s_no_slip_wall(q_prim_vf, 3, 1, k, l)
+                    case (BC_DIRICHLET)
+                        call s_dirichlet(q_prim_vf, 3, 1, k, l)
+                    end select
 
-                        if (qbmm .and. (.not. polytropic) .and. &
-                            (bc_type(3, 1)%sf(k, l, 0) <= BC_GHOST_EXTRAP)) then
-                            call s_qbmm_extrapolation(3, 1, k, l, pb_in, mv_in)
-                        end if
-                    end do
+                    if (qbmm .and. (.not. polytropic) .and. &
+                        (bc_type(3, 1)%sf(k, l, 0) <= BC_GHOST_EXTRAP)) then
+                        call s_qbmm_extrapolation(3, 1, k, l, pb_in, mv_in)
+                    end if
                 end do
+            end do
             $:END_GPU_PARALLEL_LOOP()
         end if
         ! END: Population of Buffers in z-direction
@@ -1166,18 +1166,18 @@ contains
             call s_mpi_sendrecv_variables_buffers(c_divs, 1, -1, num_dims + 1)
         else
             $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
-                do l = 0, p
-                    do k = 0, n
-                        select case (bc_type(1, -1)%sf(0, k, l))
-                        case (BC_PERIODIC)
-                            call s_color_function_periodic(c_divs, 1, -1, k, l)
-                        case (BC_REFLECTIVE)
-                            call s_color_function_reflective(c_divs, 1, -1, k, l)
-                        case default
-                            call s_color_function_ghost_cell_extrapolation(c_divs, 1, -1, k, l)
-                        end select
-                    end do
+            do l = 0, p
+                do k = 0, n
+                    select case (bc_type(1, -1)%sf(0, k, l))
+                    case (BC_PERIODIC)
+                        call s_color_function_periodic(c_divs, 1, -1, k, l)
+                    case (BC_REFLECTIVE)
+                        call s_color_function_reflective(c_divs, 1, -1, k, l)
+                    case default
+                        call s_color_function_ghost_cell_extrapolation(c_divs, 1, -1, k, l)
+                    end select
                 end do
+            end do
             $:END_GPU_PARALLEL_LOOP()
         end if
 
@@ -1185,18 +1185,18 @@ contains
             call s_mpi_sendrecv_variables_buffers(c_divs, 1, 1, num_dims + 1)
         else
             $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
-                do l = 0, p
-                    do k = 0, n
-                        select case (bc_type(1, 1)%sf(0, k, l))
-                        case (BC_PERIODIC)
-                            call s_color_function_periodic(c_divs, 1, 1, k, l)
-                        case (BC_REFLECTIVE)
-                            call s_color_function_reflective(c_divs, 1, 1, k, l)
-                        case default
-                            call s_color_function_ghost_cell_extrapolation(c_divs, 1, 1, k, l)
-                        end select
-                    end do
+            do l = 0, p
+                do k = 0, n
+                    select case (bc_type(1, 1)%sf(0, k, l))
+                    case (BC_PERIODIC)
+                        call s_color_function_periodic(c_divs, 1, 1, k, l)
+                    case (BC_REFLECTIVE)
+                        call s_color_function_reflective(c_divs, 1, 1, k, l)
+                    case default
+                        call s_color_function_ghost_cell_extrapolation(c_divs, 1, 1, k, l)
+                    end select
                 end do
+            end do
             $:END_GPU_PARALLEL_LOOP()
         end if
 
@@ -1207,18 +1207,18 @@ contains
             call s_mpi_sendrecv_variables_buffers(c_divs, 2, -1, num_dims + 1)
         else
             $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
-                do l = 0, p
-                    do k = -buff_size, m + buff_size
-                        select case (bc_type(2, -1)%sf(k, 0, l))
-                        case (BC_PERIODIC)
-                            call s_color_function_periodic(c_divs, 2, -1, k, l)
-                        case (BC_REFLECTIVE)
-                            call s_color_function_reflective(c_divs, 2, -1, k, l)
-                        case default
-                            call s_color_function_ghost_cell_extrapolation(c_divs, 2, -1, k, l)
-                        end select
-                    end do
+            do l = 0, p
+                do k = -buff_size, m + buff_size
+                    select case (bc_type(2, -1)%sf(k, 0, l))
+                    case (BC_PERIODIC)
+                        call s_color_function_periodic(c_divs, 2, -1, k, l)
+                    case (BC_REFLECTIVE)
+                        call s_color_function_reflective(c_divs, 2, -1, k, l)
+                    case default
+                        call s_color_function_ghost_cell_extrapolation(c_divs, 2, -1, k, l)
+                    end select
                 end do
+            end do
             $:END_GPU_PARALLEL_LOOP()
         end if
 
@@ -1226,18 +1226,18 @@ contains
             call s_mpi_sendrecv_variables_buffers(c_divs, 2, 1, num_dims + 1)
         else
             $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
-                do l = 0, p
-                    do k = -buff_size, m + buff_size
-                        select case (bc_type(2, 1)%sf(k, 0, l))
-                        case (BC_PERIODIC)
-                            call s_color_function_periodic(c_divs, 2, 1, k, l)
-                        case (BC_REFLECTIVE)
-                            call s_color_function_reflective(c_divs, 2, 1, k, l)
-                        case default
-                            call s_color_function_ghost_cell_extrapolation(c_divs, 2, 1, k, l)
-                        end select
-                    end do
+            do l = 0, p
+                do k = -buff_size, m + buff_size
+                    select case (bc_type(2, 1)%sf(k, 0, l))
+                    case (BC_PERIODIC)
+                        call s_color_function_periodic(c_divs, 2, 1, k, l)
+                    case (BC_REFLECTIVE)
+                        call s_color_function_reflective(c_divs, 2, 1, k, l)
+                    case default
+                        call s_color_function_ghost_cell_extrapolation(c_divs, 2, 1, k, l)
+                    end select
                 end do
+            end do
             $:END_GPU_PARALLEL_LOOP()
         end if
 
@@ -1248,18 +1248,18 @@ contains
             call s_mpi_sendrecv_variables_buffers(c_divs, 3, -1, num_dims + 1)
         else
             $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
-                do l = -buff_size, n + buff_size
-                    do k = -buff_size, m + buff_size
-                        select case (bc_type(3, -1)%sf(k, l, 0))
-                        case (BC_PERIODIC)
-                            call s_color_function_periodic(c_divs, 3, -1, k, l)
-                        case (BC_REFLECTIVE)
-                            call s_color_function_reflective(c_divs, 3, -1, k, l)
-                        case default
-                            call s_color_function_ghost_cell_extrapolation(c_divs, 3, -1, k, l)
-                        end select
-                    end do
+            do l = -buff_size, n + buff_size
+                do k = -buff_size, m + buff_size
+                    select case (bc_type(3, -1)%sf(k, l, 0))
+                    case (BC_PERIODIC)
+                        call s_color_function_periodic(c_divs, 3, -1, k, l)
+                    case (BC_REFLECTIVE)
+                        call s_color_function_reflective(c_divs, 3, -1, k, l)
+                    case default
+                        call s_color_function_ghost_cell_extrapolation(c_divs, 3, -1, k, l)
+                    end select
                 end do
+            end do
             $:END_GPU_PARALLEL_LOOP()
         end if
 
@@ -1267,18 +1267,18 @@ contains
             call s_mpi_sendrecv_variables_buffers(c_divs, 3, 1, num_dims + 1)
         else
             $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
-                do l = -buff_size, n + buff_size
-                    do k = -buff_size, m + buff_size
-                        select case (bc_type(3, 1)%sf(k, l, 0))
-                        case (BC_PERIODIC)
-                            call s_color_function_periodic(c_divs, 3, 1, k, l)
-                        case (BC_REFLECTIVE)
-                            call s_color_function_reflective(c_divs, 3, 1, k, l)
-                        case default
-                            call s_color_function_ghost_cell_extrapolation(c_divs, 3, 1, k, l)
-                        end select
-                    end do
+            do l = -buff_size, n + buff_size
+                do k = -buff_size, m + buff_size
+                    select case (bc_type(3, 1)%sf(k, l, 0))
+                    case (BC_PERIODIC)
+                        call s_color_function_periodic(c_divs, 3, 1, k, l)
+                    case (BC_REFLECTIVE)
+                        call s_color_function_reflective(c_divs, 3, 1, k, l)
+                    case default
+                        call s_color_function_ghost_cell_extrapolation(c_divs, 3, 1, k, l)
+                    end select
                 end do
+            end do
             $:END_GPU_PARALLEL_LOOP()
         end if
     end subroutine s_populate_capillary_buffers
@@ -1483,24 +1483,24 @@ contains
             call s_mpi_sendrecv_variables_buffers(jac_sf, 1, -1, 1)
         else
             $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
-                do l = 0, p
-                    do k = 0, n
-                        select case (bc_type(1, -1)%sf(0, k, l))
-                        case (BC_PERIODIC)
-                            do j = 1, buff_size
-                                jac_sf(1)%sf(-j, k, l) = jac_sf(1)%sf(m - j + 1, k, l)
-                            end do
-                        case (BC_REFLECTIVE)
-                            do j = 1, buff_size
-                                jac_sf(1)%sf(-j, k, l) = jac_sf(1)%sf(j - 1, k, l)
-                            end do
-                        case default
-                            do j = 1, buff_size
-                                jac_sf(1)%sf(-j, k, l) = jac_sf(1)%sf(0, k, l)
-                            end do
-                        end select
-                    end do
+            do l = 0, p
+                do k = 0, n
+                    select case (bc_type(1, -1)%sf(0, k, l))
+                    case (BC_PERIODIC)
+                        do j = 1, buff_size
+                            jac_sf(1)%sf(-j, k, l) = jac_sf(1)%sf(m - j + 1, k, l)
+                        end do
+                    case (BC_REFLECTIVE)
+                        do j = 1, buff_size
+                            jac_sf(1)%sf(-j, k, l) = jac_sf(1)%sf(j - 1, k, l)
+                        end do
+                    case default
+                        do j = 1, buff_size
+                            jac_sf(1)%sf(-j, k, l) = jac_sf(1)%sf(0, k, l)
+                        end do
+                    end select
                 end do
+            end do
             $:END_GPU_PARALLEL_LOOP()
 
         end if
@@ -1509,24 +1509,24 @@ contains
             call s_mpi_sendrecv_variables_buffers(jac_sf, 1, 1, 1)
         else
             $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
-                do l = 0, p
-                    do k = 0, n
-                        select case (bc_type(1, 1)%sf(0, k, l))
-                        case (BC_PERIODIC)
-                            do j = 1, buff_size
-                                jac_sf(1)%sf(m + j, k, l) = jac_sf(1)%sf(j - 1, k, l)
-                            end do
-                        case (BC_REFLECTIVE)
-                            do j = 1, buff_size
-                                jac_sf(1)%sf(m + j, k, l) = jac_sf(1)%sf(m - (j - 1), k, l)
-                            end do
-                        case default
-                            do j = 1, buff_size
-                                jac_sf(1)%sf(m + j, k, l) = jac_sf(1)%sf(m, k, l)
-                            end do
-                        end select
-                    end do
+            do l = 0, p
+                do k = 0, n
+                    select case (bc_type(1, 1)%sf(0, k, l))
+                    case (BC_PERIODIC)
+                        do j = 1, buff_size
+                            jac_sf(1)%sf(m + j, k, l) = jac_sf(1)%sf(j - 1, k, l)
+                        end do
+                    case (BC_REFLECTIVE)
+                        do j = 1, buff_size
+                            jac_sf(1)%sf(m + j, k, l) = jac_sf(1)%sf(m - (j - 1), k, l)
+                        end do
+                    case default
+                        do j = 1, buff_size
+                            jac_sf(1)%sf(m + j, k, l) = jac_sf(1)%sf(m, k, l)
+                        end do
+                    end select
                 end do
+            end do
             $:END_GPU_PARALLEL_LOOP()
 
         end if
@@ -1537,24 +1537,24 @@ contains
             call s_mpi_sendrecv_variables_buffers(jac_sf, 2, -1, 1)
         else
             $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
-                do l = 0, p
-                    do k = idwbuff(1)%beg, idwbuff(1)%end
-                        select case (bc_type(2, -1)%sf(k, 0, l))
-                        case (BC_PERIODIC)
-                            do j = 1, buff_size
-                                jac_sf(1)%sf(k, -j, l) = jac_sf(1)%sf(k, n - j + 1, l)
-                            end do
-                        case (BC_REFLECTIVE)
-                            do j = 1, buff_size
-                                jac_sf(1)%sf(k, -j, l) = jac_sf(1)%sf(k, j - 1, l)
-                            end do
-                        case default
-                            do j = 1, buff_size
-                                jac_sf(1)%sf(k, -j, l) = jac_sf(1)%sf(k, 0, l)
-                            end do
-                        end select
-                    end do
+            do l = 0, p
+                do k = idwbuff(1)%beg, idwbuff(1)%end
+                    select case (bc_type(2, -1)%sf(k, 0, l))
+                    case (BC_PERIODIC)
+                        do j = 1, buff_size
+                            jac_sf(1)%sf(k, -j, l) = jac_sf(1)%sf(k, n - j + 1, l)
+                        end do
+                    case (BC_REFLECTIVE)
+                        do j = 1, buff_size
+                            jac_sf(1)%sf(k, -j, l) = jac_sf(1)%sf(k, j - 1, l)
+                        end do
+                    case default
+                        do j = 1, buff_size
+                            jac_sf(1)%sf(k, -j, l) = jac_sf(1)%sf(k, 0, l)
+                        end do
+                    end select
                 end do
+            end do
             $:END_GPU_PARALLEL_LOOP()
 
         end if
@@ -1563,24 +1563,24 @@ contains
             call s_mpi_sendrecv_variables_buffers(jac_sf, 2, 1, 1)
         else
             $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
-                do l = 0, p
-                    do k = idwbuff(1)%beg, idwbuff(1)%end
-                        select case (bc_type(2, 1)%sf(k, 0, l))
-                        case (BC_PERIODIC)
-                            do j = 1, buff_size
-                                jac_sf(1)%sf(k, n + j, l) = jac_sf(1)%sf(k, j - 1, l)
-                            end do
-                        case (BC_REFLECTIVE)
-                            do j = 1, buff_size
-                                jac_sf(1)%sf(k, n + j, l) = jac_sf(1)%sf(k, n - (j - 1), l)
-                            end do
-                        case default
-                            do j = 1, buff_size
-                                jac_sf(1)%sf(k, n + j, l) = jac_sf(1)%sf(k, n, l)
-                            end do
-                        end select
-                    end do
+            do l = 0, p
+                do k = idwbuff(1)%beg, idwbuff(1)%end
+                    select case (bc_type(2, 1)%sf(k, 0, l))
+                    case (BC_PERIODIC)
+                        do j = 1, buff_size
+                            jac_sf(1)%sf(k, n + j, l) = jac_sf(1)%sf(k, j - 1, l)
+                        end do
+                    case (BC_REFLECTIVE)
+                        do j = 1, buff_size
+                            jac_sf(1)%sf(k, n + j, l) = jac_sf(1)%sf(k, n - (j - 1), l)
+                        end do
+                    case default
+                        do j = 1, buff_size
+                            jac_sf(1)%sf(k, n + j, l) = jac_sf(1)%sf(k, n, l)
+                        end do
+                    end select
                 end do
+            end do
             $:END_GPU_PARALLEL_LOOP()
         end if
 
@@ -1590,24 +1590,24 @@ contains
             call s_mpi_sendrecv_variables_buffers(jac_sf, 3, -1, 1)
         else
             $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
-                do l = idwbuff(2)%beg, idwbuff(2)%end
-                    do k = idwbuff(1)%beg, idwbuff(1)%end
-                        select case (bc_type(3, -1)%sf(k, l, 0))
-                        case (BC_PERIODIC)
-                            do j = 1, buff_size
-                                jac_sf(1)%sf(k, l, -j) = jac_sf(1)%sf(k, l, p - j + 1)
-                            end do
-                        case (BC_REFLECTIVE)
-                            do j = 1, buff_size
-                                jac_sf(1)%sf(k, l, -j) = jac_sf(1)%sf(k, l, j - 1)
-                            end do
-                        case default
-                            do j = 1, buff_size
-                                jac_sf(1)%sf(k, l, -j) = jac_sf(1)%sf(k, l, 0)
-                            end do
-                        end select
-                    end do
+            do l = idwbuff(2)%beg, idwbuff(2)%end
+                do k = idwbuff(1)%beg, idwbuff(1)%end
+                    select case (bc_type(3, -1)%sf(k, l, 0))
+                    case (BC_PERIODIC)
+                        do j = 1, buff_size
+                            jac_sf(1)%sf(k, l, -j) = jac_sf(1)%sf(k, l, p - j + 1)
+                        end do
+                    case (BC_REFLECTIVE)
+                        do j = 1, buff_size
+                            jac_sf(1)%sf(k, l, -j) = jac_sf(1)%sf(k, l, j - 1)
+                        end do
+                    case default
+                        do j = 1, buff_size
+                            jac_sf(1)%sf(k, l, -j) = jac_sf(1)%sf(k, l, 0)
+                        end do
+                    end select
                 end do
+            end do
             $:END_GPU_PARALLEL_LOOP()
         end if
 
@@ -1615,24 +1615,24 @@ contains
             call s_mpi_sendrecv_variables_buffers(jac_sf, 3, 1, 1)
         else
             $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
-                do l = idwbuff(2)%beg, idwbuff(2)%end
-                    do k = idwbuff(1)%beg, idwbuff(1)%end
-                        select case (bc_type(3, 1)%sf(k, l, 0))
-                        case (BC_PERIODIC)
-                            do j = 1, buff_size
-                                jac_sf(1)%sf(k, l, p + j) = jac_sf(1)%sf(k, l, j - 1)
-                            end do
-                        case (BC_REFLECTIVE)
-                            do j = 1, buff_size
-                                jac_sf(1)%sf(k, l, p + j) = jac_sf(1)%sf(k, l, p - (j - 1))
-                            end do
-                        case default
-                            do j = 1, buff_size
-                                jac_sf(1)%sf(k, l, p + j) = jac_sf(1)%sf(k, l, p)
-                            end do
-                        end select
-                    end do
+            do l = idwbuff(2)%beg, idwbuff(2)%end
+                do k = idwbuff(1)%beg, idwbuff(1)%end
+                    select case (bc_type(3, 1)%sf(k, l, 0))
+                    case (BC_PERIODIC)
+                        do j = 1, buff_size
+                            jac_sf(1)%sf(k, l, p + j) = jac_sf(1)%sf(k, l, j - 1)
+                        end do
+                    case (BC_REFLECTIVE)
+                        do j = 1, buff_size
+                            jac_sf(1)%sf(k, l, p + j) = jac_sf(1)%sf(k, l, p - (j - 1))
+                        end do
+                    case default
+                        do j = 1, buff_size
+                            jac_sf(1)%sf(k, l, p + j) = jac_sf(1)%sf(k, l, p)
+                        end do
+                    end select
                 end do
+            end do
             $:END_GPU_PARALLEL_LOOP()
         end if
 

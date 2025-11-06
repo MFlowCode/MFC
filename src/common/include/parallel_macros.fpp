@@ -37,7 +37,7 @@
 #:def END_GPU_PARALLEL_LOOP()
 
 #if defined(MFC_OpenACC)
-     #:set end_directive = '!$acc end parallel loop'
+    #:set end_directive = '!$acc end parallel loop'
 #elif defined(MFC_OpenMP)
     #:set end_directive = END_OMP_PARALLEL_LOOP()
 #endif

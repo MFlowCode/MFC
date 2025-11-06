@@ -142,23 +142,23 @@ contains
 #if defined(MFC_GPU)
 
             $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
-                do k = 1, sys_size
-                    do j = 0, m
-                        do l = 1, cmplx_size
-                            data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = (0_dp, 0_dp)
-                        end do
+            do k = 1, sys_size
+                do j = 0, m
+                    do l = 1, cmplx_size
+                        data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = (0_dp, 0_dp)
                     end do
                 end do
+            end do
             $:END_GPU_PARALLEL_LOOP()
 
             $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
-                do k = 1, sys_size
-                    do j = 0, m
-                        do l = 0, p
-                            data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size) = q_cons_vf(k)%sf(j, 0, l)
-                        end do
+            do k = 1, sys_size
+                do j = 0, m
+                    do l = 0, p
+                        data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size) = q_cons_vf(k)%sf(j, 0, l)
                     end do
                 end do
+            end do
             $:END_GPU_PARALLEL_LOOP()
 
             #:if not USING_NVHPC
@@ -180,13 +180,13 @@ contains
                 $:GPU_UPDATE(device='[Nfq]')
 
                 $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
-                    do k = 1, sys_size
-                        do j = 0, m
-                            do l = 1, Nfq
-                                data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = data_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size)
-                            end do
+                do k = 1, sys_size
+                    do j = 0, m
+                        do l = 1, Nfq
+                            data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = data_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size)
                         end do
                     end do
+                end do
                 $:END_GPU_PARALLEL_LOOP()
 
                 #:call GPU_HOST_DATA(use_device_ptr='[p_real, p_fltr_cmplx]')
@@ -199,36 +199,36 @@ contains
                 #:endcall GPU_HOST_DATA
 
                 $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
-                    do k = 1, sys_size
-                        do j = 0, m
-                            do l = 0, p
-                                data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size) = data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size)/real(real_size, dp)
-                                q_cons_vf(k)%sf(j, 0, l) = data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size)
-                            end do
+                do k = 1, sys_size
+                    do j = 0, m
+                        do l = 0, p
+                            data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size) = data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size)/real(real_size, dp)
+                            q_cons_vf(k)%sf(j, 0, l) = data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size)
                         end do
                     end do
+                end do
                 $:END_GPU_PARALLEL_LOOP()
 
                 do i = 1, fourier_rings
 
                     $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
-                        do k = 1, sys_size
-                            do j = 0, m
-                                do l = 1, cmplx_size
-                                    data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = (0_dp, 0_dp)
-                                end do
+                    do k = 1, sys_size
+                        do j = 0, m
+                            do l = 1, cmplx_size
+                                data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = (0_dp, 0_dp)
                             end do
                         end do
+                    end do
                     $:END_GPU_PARALLEL_LOOP()
 
                     $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3, firstprivate='[i]')
-                        do k = 1, sys_size
-                            do j = 0, m
-                                do l = 0, p
-                                    data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size) = q_cons_vf(k)%sf(j, i, l)
-                                end do
+                    do k = 1, sys_size
+                        do j = 0, m
+                            do l = 0, p
+                                data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size) = q_cons_vf(k)%sf(j, i, l)
                             end do
                         end do
+                    end do
                     $:END_GPU_PARALLEL_LOOP()
 
                     #:call GPU_HOST_DATA(use_device_ptr='[p_real, p_cmplx]')
@@ -244,13 +244,13 @@ contains
                     $:GPU_UPDATE(device='[Nfq]')
 
                     $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
-                        do k = 1, sys_size
-                            do j = 0, m
-                                do l = 1, Nfq
-                                    data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = data_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size)
-                                end do
+                    do k = 1, sys_size
+                        do j = 0, m
+                            do l = 1, Nfq
+                                data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = data_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size)
                             end do
                         end do
+                    end do
                     $:END_GPU_PARALLEL_LOOP()
 
                     #:call GPU_HOST_DATA(use_device_ptr='[p_real, p_fltr_cmplx]')
@@ -263,14 +263,14 @@ contains
                     #:endcall GPU_HOST_DATA
 
                     $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3, firstprivate='[i]')
-                        do k = 1, sys_size
-                            do j = 0, m
-                                do l = 0, p
-                                    data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size) = data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size)/real(real_size, dp)
-                                    q_cons_vf(k)%sf(j, i, l) = data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size)
-                                end do
+                    do k = 1, sys_size
+                        do j = 0, m
+                            do l = 0, p
+                                data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size) = data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size)/real(real_size, dp)
+                                q_cons_vf(k)%sf(j, i, l) = data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size)
                             end do
                         end do
+                    end do
                     $:END_GPU_PARALLEL_LOOP()
 
                 end do
