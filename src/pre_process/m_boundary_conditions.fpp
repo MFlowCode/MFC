@@ -43,11 +43,15 @@ contains
             y_boundary%end = y_centroid + 0.5_wp*length_y
 
             ! Patch is a vertical line at x_beg and x_beg is a domain boundary
-            #:for BOUND, X, LOC in [('beg', '-i', 1), ('end', 'm+i', 2)]
+            #:for BOUND, X, LOC in [('beg', '-i', -1), ('end', 'm+i', 1)]
                 if (patch_bc(patch_id)%loc == ${LOC}$ .and. bc_x%${BOUND}$ < 0) then
                     do j = 0, n
                         if (y_cc(j) > y_boundary%beg .and. y_cc(j) < y_boundary%end) then
-                            bc_type(1, ${LOC}$)%sf(0, j, 0) = patch_bc(patch_id)%type
+                            if(${LOC}$ == -1) then 
+                                bc_type(1, 1)%sf(0, j, 0) = patch_bc(patch_id)%type
+                            else
+                                bc_type(1, 2)%sf(0, j, 0) = patch_bc(patch_id)%type
+                            end if
                         end if
                     end do
                 end if
@@ -63,11 +67,15 @@ contains
             x_boundary%end = x_centroid + 0.5_wp*length_x
 
             ! Patch is a vertical line at x_beg and x_beg is a domain boundary
-            #:for BOUND, Y, LOC in [('beg', '-i', 1), ('end', 'n+i', 2)]
+            #:for BOUND, Y, LOC in [('beg', '-i', -1), ('end', 'n+i', 1)]
                 if (patch_bc(patch_id)%loc == ${LOC}$ .and. bc_y%${BOUND}$ < 0) then
                     do j = 0, m
                         if (x_cc(j) > x_boundary%beg .and. x_cc(j) < x_boundary%end) then
-                            bc_type(2, ${LOC}$)%sf(j, 0, 0) = patch_bc(patch_id)%type
+                            if(${LOC}$ == -1) then 
+                                bc_type(2, 1)%sf(j, 0, 0) = patch_bc(patch_id)%type
+                            else
+                                bc_type(2, 2)%sf(j, 0, 0) = patch_bc(patch_id)%type
+                            end if
                         end if
                     end do
                 end if
@@ -88,7 +96,7 @@ contains
             z_centroid = patch_bc(patch_id)%centroid(3)
             radius = patch_bc(patch_id)%radius
             ! Patch is a circle at x_beg and x_beg is a domain boundary
-            #:for BOUND, X, LOC in [('beg', '-i', 1), ('end', 'm+i', 2)]
+            #:for BOUND, X, LOC in [('beg', '-i', -1), ('end', 'm+i', 1)]
                 if (patch_bc(patch_id)%loc == ${LOC}$ .and. bc_x%${BOUND}$ < 0) then
                     do k = 0, p
                         do j = 0, n
@@ -106,7 +114,7 @@ contains
             z_centroid = patch_bc(patch_id)%centroid(3)
             radius = patch_bc(patch_id)%radius
             ! Patch is a circle at y_beg and y_beg is a domain boundary
-            #:for BOUND, Y, LOC in [('beg', '-i', 1), ('end', 'n+i', 2)]
+            #:for BOUND, Y, LOC in [('beg', '-i', -1), ('end', 'n+i', 1)]
                 if (patch_bc(patch_id)%loc == ${LOC}$ .and. bc_y%${BOUND}$ < 0) then
                     do k = 0, p
                         do j = 0, m
@@ -123,7 +131,7 @@ contains
             x_centroid = patch_bc(patch_id)%centroid(1)
             y_centroid = patch_bc(patch_id)%centroid(2)
             radius = patch_bc(patch_id)%radius
-            #:for BOUND, Z, LOC in [('beg', '-i', 1), ('end', 'p+i', 2)]
+            #:for BOUND, Z, LOC in [('beg', '-i', -1), ('end', 'p+i', 1)]
                 if (patch_bc(patch_id)%loc == ${LOC}$ .and. bc_z%${BOUND}$ < 0) then
                     do k = 0, n
                         do j = 0, m
@@ -157,7 +165,7 @@ contains
             z_boundary%beg = z_centroid - 0.5_wp*length_z
             z_boundary%end = z_centroid + 0.5_wp*length_z
             ! Patch is a circle at x_beg and x_beg is a domain boundary
-            #:for BOUND, X, LOC in [('beg', '-i', 1), ('end', 'm+i', 2)]
+            #:for BOUND, X, LOC in [('beg', '-i', -1), ('end', 'm+i', 1)]
                 if (patch_bc(patch_id)%loc == ${LOC}$ .and. bc_x%${BOUND}$ < 0) then
                     do k = 0, p
                         do j = 0, n
@@ -184,7 +192,7 @@ contains
             z_boundary%beg = z_centroid - 0.5_wp*length_z
             z_boundary%end = z_centroid + 0.5_wp*length_z
             ! Patch is a circle at y_beg and y_beg is a domain boundary
-            #:for BOUND, Y, LOC in [('beg', '-i', 1), ('end', 'n+i', 2)]
+            #:for BOUND, Y, LOC in [('beg', '-i', -1), ('end', 'n+i', 1)]
                 if (patch_bc(patch_id)%loc == ${LOC}$ .and. bc_y%${BOUND}$ < 0) then
                     do k = 0, p
                         do j = 0, m
@@ -210,7 +218,7 @@ contains
 
             y_boundary%beg = y_centroid - 0.5_wp*length_y
             y_boundary%end = y_centroid + 0.5_wp*length_y
-            #:for BOUND, Z, LOC in [('beg', '-i', 1), ('end', 'p+i', 2)]
+            #:for BOUND, Z, LOC in [('beg', '-i', -1), ('end', 'p+i', 1)]
                 if (patch_bc(patch_id)%loc == ${LOC}$ .and. bc_z%${BOUND}$ < 0) then
                     do k = 0, n
                         do j = 0, m
