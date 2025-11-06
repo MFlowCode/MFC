@@ -24,8 +24,9 @@ class Mfc < Formula
   skip_clean "libexec/venv"
 
   def install
-    # Create Python virtual environment
+    # Create Python virtual environment (remove existing one first for clean reinstalls)
     venv = libexec/"venv"
+    rm_rf venv
     system Formula["python@3.12"].opt_bin/"python3.12", "-m", "venv", venv
     system venv/"bin/pip", "install", "--upgrade", "pip", "setuptools", "wheel"
 
@@ -35,6 +36,8 @@ class Mfc < Formula
     # Install MFC Python package and dependencies into venv
     # Keep toolchain in buildpath for now - mfc.sh needs it there
     # Use editable install (-e) to avoid RECORD file issues when venv is copied
+    # Note: Homebrew may warn about dylib fixup failures for some Python packages (e.g., orjson)
+    # This is non-fatal since the venv is copied (not linked) at runtime
     system venv/"bin/pip", "install", "-e", buildpath/"toolchain"
 
     # Create symlink so mfc.sh uses our pre-installed venv
