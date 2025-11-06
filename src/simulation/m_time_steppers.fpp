@@ -507,7 +507,7 @@ contains
             end if
 
             if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=s)
-            #:call GPU_PARALLEL_LOOP(collapse=4)
+            $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
                 do i = 1, sys_size
                     do l = 0, p
                         do k = 0, n
@@ -527,7 +527,7 @@ contains
             $:END_GPU_PARALLEL_LOOP
             !Evolve pb and mv for non-polytropic qbmm
             if (qbmm .and. (.not. polytropic)) then
-                #:call GPU_PARALLEL_LOOP(collapse=5)
+                $:GPU_PARALLEL_LOOP(private='[i,j,k,l,q]', collapse=5)
                     do i = 1, nb
                         do l = 0, p
                             do k = 0, n
@@ -682,7 +682,7 @@ contains
                 idwint)
         end if
 
-        #:call GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[j,k,l,vel, alpha, Re]')
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -730,7 +730,7 @@ contains
         call nvtxStartRange("RHS-BODYFORCES")
         call s_compute_body_forces_rhs(q_prim_vf_in, q_cons_vf, rhs_vf_in)
 
-        #:call GPU_PARALLEL_LOOP(collapse=4)
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
             do i = momxb, E_idx
                 do l = 0, p
                     do k = 0, n
@@ -757,7 +757,7 @@ contains
         integer :: i, j, k, l !< Generic loop iterator
 
         if (t_step == t_step_start) then
-            #:call GPU_PARALLEL_LOOP(collapse=4)
+            $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
                 do i = 1, sys_size
                     do l = 0, p
                         do k = 0, n
@@ -769,7 +769,7 @@ contains
                 end do
             $:END_GPU_PARALLEL_LOOP
         elseif (t_step == t_step_start + 1) then
-            #:call GPU_PARALLEL_LOOP(collapse=4)
+            $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
                 do i = 1, sys_size
                     do l = 0, p
                         do k = 0, n
@@ -781,7 +781,7 @@ contains
                 end do
             $:END_GPU_PARALLEL_LOOP
         elseif (t_step == t_step_start + 2) then
-            #:call GPU_PARALLEL_LOOP(collapse=4)
+            $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
                 do i = 1, sys_size
                     do l = 0, p
                         do k = 0, n
@@ -793,7 +793,7 @@ contains
                 end do
             $:END_GPU_PARALLEL_LOOP
         elseif (t_step == t_step_start + 3) then
-            #:call GPU_PARALLEL_LOOP(collapse=4)
+            $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
                 do i = 1, sys_size
                     do l = 0, p
                         do k = 0, n
@@ -805,7 +805,7 @@ contains
                 end do
             $:END_GPU_PARALLEL_LOOP
         else ! All other timesteps
-            #:call GPU_PARALLEL_LOOP(collapse=4)
+            $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
                 do i = 1, sys_size
                     do l = 0, p
                         do k = 0, n
