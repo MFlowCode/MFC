@@ -1368,7 +1368,7 @@ contains
         !! @param dir Gradient spatial direction
     subroutine s_gradient_dir(q, dq, dir)
 
-        real(stp), dimension(:, :, :), intent(inout) :: q, dq
+        real(stp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:), intent(inout) :: q, dq
         integer, intent(in) :: dir
 
         integer :: i, j, k

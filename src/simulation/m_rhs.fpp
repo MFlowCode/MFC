@@ -1043,37 +1043,6 @@ contains
 
         if (cont_damage) call s_compute_damage_state(q_cons_qp%vf, rhs_vf)
 
-        if (.not. igr) then
-            #:call GPU_PARALLEL_LOOP(collapse=4)
-                do i = 1, sys_size
-                    do l = 0, p
-                        do k = 0, n
-                            do j = 0, m
-                                rhs_vf(i)%sf(j, k, l) = dt*rhs_vf(i)%sf(j, k, l)
-                            end do
-                        end do
-                    end do
-                end do
-            #:endcall GPU_PARALLEL_LOOP
-
-            if (qbmm .and. (.not. polytropic)) then
-                #:call GPU_PARALLEL_LOOP(collapse=5)
-                    do i = 1, nb
-                        do l = 0, p
-                            do k = 0, n
-                                do j = 0, m
-                                    do q = 1, nnode
-                                        rhs_pb(j, k, l, q, i) = dt*rhs_pb(j, k, l, q, i)
-                                        rhs_mv(j, k, l, q, i) = dt*rhs_mv(j, k, l, q, i)
-                                    end do
-                                end do
-                            end do
-                        end do
-                    end do
-                #:endcall GPU_PARALLEL_LOOP
-            end if
-        end if
-
         ! END: Additional pphysics and source terms
 
         if (run_time_info .or. probe_wrt .or. ib .or. bubbles_lagrange) then
