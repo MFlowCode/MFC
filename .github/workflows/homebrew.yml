@@ -147,11 +147,11 @@ jobs:
       - name: Run MFC test case
         run: |
           echo "Running a simple test case (1D Sod shock tube)..."
-          cd $(mktemp -d)
-          cp $(brew --prefix mfc)/examples/1D_sodshocktube/case.py .
+          TESTDIR=$(mktemp -d)
+          cp $(brew --prefix mfc)/examples/1D_sodshocktube/case.py "$TESTDIR/"
           
           echo "Running with $(sysctl -n hw.ncpu) processors..."
-          mfc run case.py -j $(sysctl -n hw.ncpu)
+          mfc run "$TESTDIR/case.py" -j $(sysctl -n hw.ncpu)
           
           echo "Test case completed successfully!"
       
