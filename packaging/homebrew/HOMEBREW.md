@@ -26,9 +26,9 @@ Once the formula is accepted into `homebrew-core`, install with:
 brew install mfc
 ```
 
-#### Option 2: Third-Party Tap
+#### Option 2: Third-Party Tap (Recommended)
 
-If the formula is available in a tap repository:
+Install from the official MFC Homebrew tap:
 
 ```bash
 # Add the tap
@@ -37,6 +37,8 @@ brew tap MFlowCode/mfc
 # Install MFC
 brew install MFlowCode/mfc/mfc
 ```
+
+The tap is automatically kept up-to-date with the latest formula changes.
 
 #### Option 3: Install from Local Formula File
 
@@ -100,6 +102,26 @@ mfc run case.py
 # Or run directly from the installed examples
 mfc run $(brew --prefix mfc)/examples/1D_sodshocktube/case.py
 ```
+
+### Uninstallation
+
+To remove MFC from your system:
+
+```bash
+# Uninstall MFC
+brew uninstall mfc
+
+# If installed from a tap, you may also want to remove the tap
+brew untap MFlowCode/mfc  # Replace with your tap name if different
+```
+
+**Note**: Uninstalling MFC will remove:
+- All MFC binaries (`mfc`, `pre_process`, `simulation`, `post_process`)
+- The Python virtual environment and toolchain
+- Example cases
+- All associated files
+
+The uninstallation is clean and complete - Homebrew will remove all files that were installed by the formula.
 
 ## What Gets Installed
 
@@ -341,6 +363,12 @@ brew reinstall mfc
 
 # View installation logs
 brew install --verbose mfc
+
+# Uninstall MFC
+brew uninstall mfc
+
+# Remove tap (if installed from a tap)
+brew untap MFlowCode/mfc
 ```
 
 **Note**: The `brew --prefix mfc` command returns the "opt" symlink location (e.g., `/usr/local/opt/mfc` or `/opt/homebrew/opt/mfc`), not the actual versioned Cellar path. The "opt" directory points to the currently active version in the Cellar, making examples work on both Intel and Apple Silicon systems. If you need the actual versioned installation path, look in the Cellar directory (e.g., `/usr/local/Cellar/mfc/VERSION`).
@@ -357,13 +385,24 @@ Submit a pull request to homebrew-core for inclusion in the main Homebrew reposi
 - Automated testing passes
 
 ### Third-Party Tap
-Create a separate tap (custom repository) for immediate availability:
+
+MFC maintains an official Homebrew tap at `MFlowCode/homebrew-mfc` for easy installation:
+
 ```bash
-brew tap organization/mfc
-brew install organization/mfc/mfc
+# Add the tap
+brew tap MFlowCode/mfc
+
+# Install MFC
+brew install MFlowCode/mfc/mfc
 ```
 
-This allows distribution before official Homebrew acceptance.
+The tap is automatically updated whenever the formula changes in the main MFC repository. This allows distribution before official Homebrew acceptance and provides a convenient installation method for users.
+
+**Tap Repository**: https://github.com/MFlowCode/homebrew-mfc
+
+The tap repository contains:
+- `Formula/mfc.rb` - The Homebrew formula file (automatically synced from the main repository)
+- Automatic deployment via GitHub Actions when the formula is updated
 
 ## Platform Support
 

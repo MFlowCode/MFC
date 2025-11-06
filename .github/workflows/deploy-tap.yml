@@ -1,0 +1,71 @@
+name: Deploy to Homebrew Tap
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'packaging/homebrew/mfc.rb'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  deploy-tap:
+    name: Deploy Formula to Tap
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout MFC repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Checkout tap repository
+        uses: actions/checkout@v4
+        with:
+          repository: MFlowCode/homebrew-mfc
+          token: ${{ secrets.GITHUB_TOKEN }}
+          path: tap-repo
+      
+      - name: Setup Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+      
+      - name: Copy formula to tap
+        run: |
+          mkdir -p tap-repo/Formula
+          cp packaging/homebrew/mfc.rb tap-repo/Formula/mfc.rb
+      
+      - name: Check for changes
+        id: check-changes
+        run: |
+          cd tap-repo
+          if git ls-files --error-unmatch Formula/mfc.rb >/dev/null 2>&1; then
+            # File exists in repo, check if it changed
+            if git diff --quiet HEAD -- Formula/mfc.rb; then
+              echo "changed=false" >> $GITHUB_OUTPUT
+            else
+              echo "changed=true" >> $GITHUB_OUTPUT
+            fi
+          else
+            # File doesn't exist in repo, it's a new file
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Commit and push to tap
+        if: steps.check-changes.outputs.changed == 'true'
+        run: |
+          cd tap-repo
+          git add Formula/mfc.rb
+          git commit -m "Update mfc formula from MFC repository
+
+          Auto-deployed from MFlowCode/MFC@${{ github.sha }}"
+          git push
+      
+      - name: No changes detected
+        if: steps.check-changes.outputs.changed == 'false'
+        run: |
+          echo "No changes detected in formula. Skipping deployment."
+
