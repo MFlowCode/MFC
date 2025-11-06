@@ -137,10 +137,8 @@ contains
 
         if (viscous) then
             @:ALLOCATE(Res_igr(1:2, 1:maxval(Re_size)))
-            @:ALLOCATE(Res_igr(1:2, 1:maxval(Re_size)))
             do i = 1, 2
                 do j = 1, Re_size(i)
-                    Res_igr(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
                     Res_igr(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
                 end do
             end do

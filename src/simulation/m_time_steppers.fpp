@@ -535,10 +535,17 @@ contains
                                     q_cons_ts(stor)%vf(i)%sf(j, k, l) = &
                                         q_cons_ts(1)%vf(i)%sf(j, k, l)
                                 end if
-                                q_cons_ts(1)%vf(i)%sf(j, k, l) = &
-                                    (rk_coef(s, 1)*q_cons_ts(1)%vf(i)%sf(j, k, l) &
-                                     + rk_coef(s, 2)*q_cons_ts(stor)%vf(i)%sf(j, k, l) &
-                                     + rk_coef(s, 3)*dt*rhs_vf(i)%sf(j, k, l))/rk_coef(s, 4)
+                                if(igr) then 
+                                    q_cons_ts(1)%vf(i)%sf(j, k, l) = &
+                                        (rk_coef(s, 1)*q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                                         + rk_coef(s, 2)*q_cons_ts(stor)%vf(i)%sf(j, k, l) &
+                                         + rk_coef(s, 3)*rhs_vf(i)%sf(j, k, l))/rk_coef(s, 4)
+                                else
+                                    q_cons_ts(1)%vf(i)%sf(j, k, l) = &
+                                        (rk_coef(s, 1)*q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                                         + rk_coef(s, 2)*q_cons_ts(stor)%vf(i)%sf(j, k, l) &
+                                         + rk_coef(s, 3)*dt*rhs_vf(i)%sf(j, k, l))/rk_coef(s, 4)
+                                end if
                             end do
                         end do
                     end do
