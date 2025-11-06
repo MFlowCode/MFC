@@ -163,7 +163,7 @@ simulation -i input.dat
 post_process -i input.dat
 ```
 
-Note: The `brew --prefix mfc` command returns the installation prefix (e.g., `/usr/local/Cellar/mfc/VERSION` or `/opt/homebrew/Cellar/mfc/VERSION`), making examples work on both Intel and Apple Silicon systems.
+Note: The `brew --prefix mfc` command returns the "opt" symlink location (e.g., `/usr/local/opt/mfc` or `/opt/homebrew/opt/mfc`), not the actual versioned Cellar path. The "opt" directory points to the currently active version in the Cellar, making examples work on both Intel and Apple Silicon systems. If you need the actual versioned installation path, look in the Cellar directory (e.g., `/usr/local/Cellar/mfc/VERSION`).
 
 ## Distribution
 
