@@ -3102,7 +3102,7 @@ contains
                             do k = is2%beg, is2%end
                                 do j = is1%beg, is1%end
 
-                                    !idx1 = 1; if (dir_idx(1) == 2) idx1 = 2; if (dir_idx(1) == 3) idx1 = 3
+                                    idx1 = 1; if (dir_idx(1) == 2) idx1 = 2; if (dir_idx(1) == 3) idx1 = 3
 
                                     vel_L_rms = 0._wp; vel_R_rms = 0._wp
                                     rho_L = 0._wp; rho_R = 0._wp
