@@ -60,7 +60,8 @@ class Mfc < Formula
 
     # Install only executable files from hashed build dirs
     Dir.glob("build/install/*/bin/*").each do |p|
-      next unless File.file?(p) && File.executable?(p)
+      next if !File.file?(p) || !File.executable?(p)
+
       bin.install p
     end
 
