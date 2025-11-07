@@ -130,9 +130,9 @@ jobs:
           echo "  ✓ Installation structure verified"
           
           echo "3. Checking Python venv..."
-          test -d $(brew --prefix)/Cellar/mfc/*/libexec/venv
-          test -f $(brew --prefix)/Cellar/mfc/*/libexec/venv/bin/python
-          test -f $(brew --prefix)/Cellar/mfc/*/libexec/venv/bin/pip
+          test -d $(brew --prefix)/var/mfc/venv
+          test -f $(brew --prefix)/var/mfc/venv/bin/python
+          test -f $(brew --prefix)/var/mfc/venv/bin/pip
           echo "  ✓ Python venv exists"
           
           echo "4. Checking examples..."
