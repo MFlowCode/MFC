@@ -17,8 +17,107 @@ on:
   workflow_dispatch:
 
 jobs:
+  # Fast smoke tests that run before expensive operations
+  smoke-test:
+    name: Quick Formula Validation
+    runs-on: ubuntu-latest  # Use Linux for speed (Homebrew works on Linux too)
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Homebrew
+        uses: Homebrew/actions/setup-homebrew@master
+      
+      - name: Validate formula syntax with brew style
+        run: |
+          echo "Checking formula syntax..."
+          brew style packaging/homebrew/mfc.rb
+      
+      - name: Run brew audit (without installation)
+        run: |
+          echo "Creating temporary local tap..."
+          brew tap-new mflowcode/test
+          cp packaging/homebrew/mfc.rb $(brew --repository)/Library/Taps/mflowcode/homebrew-test/Formula/mfc.rb
+          
+          echo "Running brew audit (online checks)..."
+          brew audit --online --skip-style mflowcode/test/mfc || true
+          
+          echo "Cleaning up tap..."
+          brew untap mflowcode/test
+      
+      - name: Validate Ruby syntax
+        run: |
+          echo "Checking Ruby syntax..."
+          ruby -c packaging/homebrew/mfc.rb
+      
+      - name: Check for common formula issues
+        run: |
+          echo "Checking for common issues..."
+          
+          # Check that required fields are present
+          grep -q 'desc "' packaging/homebrew/mfc.rb || (echo "❌ Missing desc"; exit 1)
+          grep -q 'homepage "' packaging/homebrew/mfc.rb || (echo "❌ Missing homepage"; exit 1)
+          grep -q 'url "' packaging/homebrew/mfc.rb || (echo "❌ Missing url"; exit 1)
+          grep -q 'sha256 "' packaging/homebrew/mfc.rb || (echo "❌ Missing sha256"; exit 1)
+          grep -q 'license "' packaging/homebrew/mfc.rb || (echo "❌ Missing license"; exit 1)
+          
+          # Check that install method exists
+          grep -q 'def install' packaging/homebrew/mfc.rb || (echo "❌ Missing install method"; exit 1)
+          
+          # Check that test block exists
+          grep -q 'test do' packaging/homebrew/mfc.rb || (echo "❌ Missing test block"; exit 1)
+          
+          echo "✅ All required formula components present"
+      
+      - name: Verify URL is reachable
+        run: |
+          echo "Checking that source URL is reachable..."
+          URL=$(grep -E 'url "https://[^"]+' packaging/homebrew/mfc.rb | head -1 | sed 's/.*url "\([^"]*\)".*/\1/')
+          
+          if [ -z "$URL" ]; then
+            echo "❌ Could not extract URL from formula"
+            exit 1
+          fi
+          
+          echo "URL: $URL"
+          HTTP_CODE=$(curl -sI -w "%{http_code}" -o /dev/null "$URL")
+          
+          if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "302" ]; then
+            echo "✅ URL is reachable (HTTP $HTTP_CODE)"
+          else
+            echo "⚠️  URL returned HTTP $HTTP_CODE (may indicate an issue)"
+            # Don't fail here - could be a temporary issue
+          fi
+      
+      - name: Verify SHA256 checksum
+        run: |
+          echo "Verifying SHA256 checksum matches URL..."
+          URL=$(grep -E 'url "https://[^"]+' packaging/homebrew/mfc.rb | head -1 | sed 's/.*url "\([^"]*\)".*/\1/')
+          EXPECTED_SHA=$(grep 'sha256 "' packaging/homebrew/mfc.rb | head -1 | sed 's/.*sha256 "\([^"]*\)".*/\1/')
+          
+          if [ -z "$URL" ] || [ -z "$EXPECTED_SHA" ]; then
+            echo "❌ Could not extract URL or SHA256 from formula"
+            exit 1
+          fi
+          
+          echo "Downloading tarball to compute checksum..."
+          ACTUAL_SHA=$(curl -sL "$URL" | shasum -a 256 | awk '{print $1}')
+          
+          echo "Expected SHA256: $EXPECTED_SHA"
+          echo "Actual SHA256:   $ACTUAL_SHA"
+          
+          if [ "$EXPECTED_SHA" = "$ACTUAL_SHA" ]; then
+            echo "✅ SHA256 checksum matches!"
+          else
+            echo "❌ SHA256 mismatch!"
+            exit 1
+          fi
+
+  # Full installation test (only runs if smoke tests pass)
   test-formula:
-    name: Test Homebrew Formula
+    name: Full Installation Test
+    needs: smoke-test  # Only run after smoke tests pass
     runs-on: macos-latest
     
     steps:
@@ -36,11 +135,6 @@ jobs:
         run: |
           echo "Installing MFC dependencies..."
           brew install cmake gcc python@3.12 boost fftw hdf5 open-mpi openblas
-      
-      - name: Validate formula syntax
-        run: |
-          echo "Checking formula syntax..."
-          brew style packaging/homebrew/mfc.rb
       
       - name: Install MFC from formula
         run: |
@@ -164,4 +258,3 @@ jobs:
           echo "Cleaning up..."
           brew uninstall mfc || true
           brew cleanup
-
