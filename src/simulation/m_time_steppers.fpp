@@ -78,7 +78,7 @@ module m_time_steppers
     integer :: stor !< storage index
     real(wp), allocatable, dimension(:, :) :: rk_coef
 
-    $:GPU_DECLARE(create='[q_cons_ts,q_prim_vf,q_T_sf,rhs_vf,q_prim_ts,rhs_mv,rhs_pb,max_dt,rk_coef,bc_type]')
+    $:GPU_DECLARE(create='[q_cons_ts,q_prim_vf,q_T_sf,rhs_vf,q_prim_ts,rhs_mv,rhs_pb,max_dt,rk_coef,stor,bc_type]')
 
 #if defined(__NVCOMPILER_GPU_UNIFIED_MEM)
     real(stp), allocatable, dimension(:, :, :, :), pinned, target :: q_cons_ts_pool_host
@@ -479,7 +479,7 @@ contains
                 rk_coef(2, :) = (/1._wp, 3._wp, 1._wp, 4._wp/)
                 rk_coef(3, :) = (/2._wp, 1._wp, 2._wp, 3._wp/)
             end if
-            $:GPU_UPDATE(device='[rk_coef]')
+            $:GPU_UPDATE(device='[rk_coef, stor]')
         end if
 
     end subroutine s_initialize_time_steppers_module
