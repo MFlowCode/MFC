@@ -36,6 +36,10 @@ jobs:
       
       - name: Run brew audit (without installation)
         run: |
+          echo "Configuring git for brew tap-new..."
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          
           echo "Creating temporary local tap..."
           brew tap-new mflowcode/test
           cp packaging/homebrew/mfc.rb $(brew --repository)/Library/Taps/mflowcode/homebrew-test/Formula/mfc.rb
