@@ -1,71 +1,97 @@
-name: Deploy to Homebrew Tap
+name: Deploy Homebrew Tap
 
 on:
   push:
-    branches:
-      - master
+    branches: [ main, master, homebrew-formula ]
     paths:
       - 'packaging/homebrew/mfc.rb'
+  push:
+    tags:
+      - 'v*.*.*'
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   deploy-tap:
-    name: Deploy Formula to Tap
-    runs-on: ubuntu-latest
+    name: Sync/bump formula in tap
+    runs-on: macos-14
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - name: Checkout MFC repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
-      - name: Checkout tap repository
-        uses: actions/checkout@v4
-        with:
-          repository: MFlowCode/homebrew-mfc
-          token: ${{ secrets.GITHUB_TOKEN }}
-          path: tap-repo
-      
-      - name: Setup Git
+
+      - name: Determine event metadata
+        id: meta
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-      
-      - name: Copy formula to tap
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+            URL="https://github.com/${{ github.repository }}/archive/refs/tags/v${VERSION}.tar.gz"
+          else
+            # Extract URL from current formula to re-audit and sync
+            URL="$(grep -Eo 'https://github.com/.*/archive/refs/tags/v[0-9]+\.[0-9]+\.[0-9]+\.tar\.gz' packaging/homebrew/mfc.rb | head -n1)"
+            VERSION="$(echo "${URL}" | sed -E 's/.*v([0-9]+\.[0-9]+\.[0-9]+)\.tar\.gz/\1/')"
+          fi
+          SHASUM="$(curl -sL "${URL}" | shasum -a 256 | awk '{print $1}')"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "url=${URL}" >> $GITHUB_OUTPUT
+          echo "sha256=${SHASUM}" >> $GITHUB_OUTPUT
+
+      - name: Update formula (for tag events)
+        if: github.ref_type == 'tag'
+        run: |
+          /usr/bin/sed -i '' "s@^  url \".*\"@  url \"${{ steps.meta.outputs.url }}\"@" packaging/homebrew/mfc.rb
+          /usr/bin/sed -i '' "s@^  sha256 \".*\"@  sha256 \"${{ steps.meta.outputs.sha256 }}\"@" packaging/homebrew/mfc.rb
+
+      - name: Setup Homebrew
+        uses: Homebrew/actions/setup-homebrew@master
+
+      - name: Audit/style formula before pushing
+        run: |
+          brew style packaging/homebrew/mfc.rb
+          brew audit --online --strict --formula --new --except=homepage packaging/homebrew/mfc.rb || brew audit --online packaging/homebrew/mfc.rb
+
+      - name: Clone or bootstrap tap repository
+        env:
+          TAP_TOKEN: ${{ secrets.TAP_REPO_TOKEN }}
+        run: |
+          set -euo pipefail
+          REPO="https://x-access-token:${TAP_TOKEN}@github.com/MFlowCode/homebrew-mfc.git"
+          if git ls-remote "${REPO}" HEAD >/dev/null 2>&1; then
+            git clone "${REPO}" tap-repo
+          else
+            # Repo exists but might be empty; fall back to bootstrap
+            mkdir -p tap-repo
+            cd tap-repo
+            git init -b main
+            git remote add origin "${REPO}"
+            touch .keep
+            git add .keep
+            git -c user.name="github-actions[bot]" -c user.email="github-actions[bot]@users.noreply.github.com" commit -m "Initialize tap"
+            git push -u origin main
+          fi
+
+      - name: Copy formula into tap
         run: |
           mkdir -p tap-repo/Formula
           cp packaging/homebrew/mfc.rb tap-repo/Formula/mfc.rb
-      
-      - name: Check for changes
-        id: check-changes
-        run: |
-          cd tap-repo
-          if git ls-files --error-unmatch Formula/mfc.rb >/dev/null 2>&1; then
-            # File exists in repo, check if it changed
-            if git diff --quiet HEAD -- Formula/mfc.rb; then
-              echo "changed=false" >> $GITHUB_OUTPUT
-            else
-              echo "changed=true" >> $GITHUB_OUTPUT
-            fi
-          else
-            # File doesn't exist in repo, it's a new file
-            echo "changed=true" >> $GITHUB_OUTPUT
-          fi
-      
-      - name: Commit and push to tap
-        if: steps.check-changes.outputs.changed == 'true'
+
+      - name: Commit & push if changed
+        env:
+          TAP_TOKEN: ${{ secrets.TAP_REPO_TOKEN }}
         run: |
           cd tap-repo
           git add Formula/mfc.rb
-          git commit -m "Update mfc formula from MFC repository
-
-          Auto-deployed from MFlowCode/MFC@${{ github.sha }}"
-          git push
-      
-      - name: No changes detected
-        if: steps.check-changes.outputs.changed == 'false'
-        run: |
-          echo "No changes detected in formula. Skipping deployment."
+          if git diff --cached --quiet; then
+            echo "No changes in Formula/mfc.rb; skipping push."
+            exit 0
+          fi
+          git -c user.name="github-actions[bot]" -c user.email="github-actions[bot]@users.noreply.github.com" \
+            commit -m "mfc: v${{ steps.meta.outputs.version }}"
+          git push origin HEAD:main
 

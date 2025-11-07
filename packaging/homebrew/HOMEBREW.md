@@ -403,6 +403,17 @@ The tap is automatically updated whenever the formula changes in the main MFC re
 The tap repository contains:
 - `Formula/mfc.rb` - The Homebrew formula file (automatically synced from the main repository)
 - Automatic deployment via GitHub Actions when the formula is updated
+- Automatic bottle building for both macOS architectures (arm64 and x86_64)
+
+### Deployment Details
+
+The formula is automatically deployed from the main MFC repository using GitHub Actions:
+- Changes to `packaging/homebrew/mfc.rb` trigger automatic sync to the tap
+- Version tags (e.g., `v5.2.0`) automatically update the formula with new URLs and checksums
+- The workflow validates the formula with `brew audit` and `brew style` before deployment
+- A `TAP_REPO_TOKEN` secret (Personal Access Token with repo scope) is required in the main repository to push to the tap
+
+See `TAP_REPO_SETUP.md` in this directory for complete tap repository configuration.
 
 ## Platform Support
 
