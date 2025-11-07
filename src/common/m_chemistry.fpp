@@ -129,7 +129,7 @@ contains
         real(wp), dimension(num_species) :: Ys
         real(wp), dimension(num_species) :: omega
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[x,y,z,Ys, omega, T]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[x,y,z,eqn,Ys, omega, T]')
         do z = bounds(3)%beg, bounds(3)%end
             do y = bounds(2)%beg, bounds(2)%end
                 do x = bounds(1)%beg, bounds(1)%end
@@ -191,7 +191,7 @@ contains
             offsets = 0
             offsets(idir) = 1
 
-            $:GPU_PARALLEL_LOOP(collapse=3,  private='[x,y,z,Ys_L, Ys_R, Ys_cell, Xs_L, Xs_R, mass_diffusivities_mixavg1, mass_diffusivities_mixavg2, mass_diffusivities_mixavg_Cell, h_l, h_r, Xs_cell, h_k, dXk_dxi,Mass_Diffu_Flux]', copyin='[offsets]')
+            $:GPU_PARALLEL_LOOP(collapse=3,  private='[x,y,z,i,eqn,Ys_L, Ys_R, Ys_cell, Xs_L, Xs_R, mass_diffusivities_mixavg1, mass_diffusivities_mixavg2, mass_diffusivities_mixavg_Cell, h_l, h_r, Xs_cell, h_k, dXk_dxi,Mass_Diffu_Flux]', copyin='[offsets]')
             do z = isc3%beg, isc3%end
                 do y = isc2%beg, isc2%end
                     do x = isc1%beg, isc1%end
