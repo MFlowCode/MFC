@@ -1239,7 +1239,7 @@ contains
         call nvtxStartRange("SAVE-DATA")
         do i = 1, sys_size
 #ifndef FRONTIER_UNIFIED
-            $:GPU_UPDATE(host='[q_cons_ts(2)%vf(i)%sf]')
+            $:GPU_UPDATE(host='[q_cons_ts(stor)%vf(i)%sf]')
 #endif
             do l = 0, p
                 do k = 0, n
