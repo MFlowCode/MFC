@@ -24,25 +24,27 @@
     & copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, &
     & no_create=None, present=None, deviceptr=None, attach=None, extraAccArgs=None, extraOmpArgs=None)
 
-#if defined(MFC_OpenACC)
-    #:set directive = ACC_PARALLEL_LOOP(collapse, private, parallelism, default, firstprivate, reduction, reductionOp, copy, copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, extraAccArgs)
-#elif defined(MFC_OpenMP)
-    #:set directive = OMP_PARALLEL_LOOP(collapse, private, parallelism, default, firstprivate, reduction, reductionOp, copy, copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, extraOmpArgs)
-#endif
+    #:set acc_directive = ACC_PARALLEL_LOOP(collapse, private, parallelism, default, firstprivate, reduction, reductionOp, copy, copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, extraAccArgs)
+    #:set omp_directive = OMP_PARALLEL_LOOP(collapse, private, parallelism, default, firstprivate, reduction, reductionOp, copy, copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, extraOmpArgs)
 
-    $:directive
+#if defined(MFC_OpenACC)
+    $:acc_directive
+#elif defined(MFC_OpenMP)
+    $:omp_directive
+#endif
 
 #:enddef
 
 #:def END_GPU_PARALLEL_LOOP()
 
-#if defined(MFC_OpenACC)
-    #:set end_directive = '!$acc end parallel loop'
-#elif defined(MFC_OpenMP)
-    #:set end_directive = END_OMP_PARALLEL_LOOP()
-#endif
+    #:set acc_end_directive = '!$acc end parallel loop'
+    #:set omp_end_directive = END_OMP_PARALLEL_LOOP()
 
-    $:end_directive
+#if defined(MFC_OpenACC)
+    $:acc_end_directive
+#elif defined(MFC_OpenMP)
+    $:omp_end_directive
+#endif
 
 #:enddef
 
