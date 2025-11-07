@@ -14,16 +14,16 @@
     character(len=25) :: value
 
     if (patch_icpp(patch_id)%hcid == 303) then
-        allocate(ih(0:n_glb, 0:p_glb))
+        allocate (ih(0:n_glb, 0:p_glb))
 
         if (interface_file == '.') then
             call s_mpi_abort("Error: interface_file must be specified for hcid=303")
         else
             inquire (file=trim(interface_file), exist=file_exist)
             if (file_exist) then
-                open(unit=10, file=trim(interface_file), status="old", action="read")
+                open (unit=10, file=trim(interface_file), status="old", action="read")
                 do i = 0, n_glb
-                    read(10, '(A)') line  ! Read a full line as a string
+                    read (10, '(A)') line  ! Read a full line as a string
                     start = 1
 
                     do j = 0, p_glb
@@ -31,15 +31,15 @@
                         if (end == 0) then
                             value = trim(adjustl(line(start:)))  ! Last value in the line
                         else
-                            value = trim(adjustl(line(start:start+end-2)))  ! Extract substring
+                            value = trim(adjustl(line(start:start + end - 2)))  ! Extract substring
                             start = start + end  ! Move to next value
                         end if
-                        read(value, *) ih(i, j)  ! Convert string to numeric value
-                        if (.not. f_is_default(normMag)) ih(i, j) = ih(i, j) * normMag
+                        read (value, *) ih(i, j)  ! Convert string to numeric value
+                        if (.not. f_is_default(normMag)) ih(i, j) = ih(i, j)*normMag
                         if (.not. f_is_default(normFac)) ih(i, j) = ih(i, j) + normFac
                     end do
                 end do
-                close(10)
+                close (10)
             else
                 call s_mpi_abort("Error: interface_file specified for hcid=303 does not exist")
             end if
@@ -47,21 +47,21 @@
     end if
 
     if (patch_icpp(patch_id)%hcid == 304) then
-        allocate(ih(0:n_glb, 0:0))
+        allocate (ih(0:n_glb, 0:0))
         if (interface_file == '.') then
             call s_mpi_abort("Error: interface_file must be specified for hcid=304")
         else
             inquire (file=trim(interface_file), exist=file_exist)
             if (file_exist) then
-                open(unit=10, file=trim(interface_file), status="old", action="read")
+                open (unit=10, file=trim(interface_file), status="old", action="read")
                 do i = 0, n_glb
-                    read(10, '(A)') line  ! Read a full line as a string
+                    read (10, '(A)') line  ! Read a full line as a string
                     value = trim(line)
-                    read(value, *) ih(i, 0)  ! Convert string to numeric value
-                    if (.not. f_is_default(normMag)) ih(i, 0) = ih(i, 0) * normMag
+                    read (value, *) ih(i, 0)  ! Convert string to numeric value
+                    if (.not. f_is_default(normMag)) ih(i, 0) = ih(i, 0)*normMag
                     if (.not. f_is_default(normFac)) ih(i, 0) = ih(i, 0) + normFac
                 end do
-                close(10)
+                close (10)
             else
                 call s_mpi_abort("Error: interface_file specified for hcid=304 does not exist")
             end if
@@ -149,40 +149,40 @@
 
     case (303) ! 3D Interface from file cartesian
 
-        alph = 0.5_wp * (1 + (1._wp - 2._wp * eps) * &
-                    tanh((ih(start_idx(2) + j,start_idx(3) + k)  - x_cc(i))*(0.5_wp / dx)))
+        alph = 0.5_wp*(1 + (1._wp - 2._wp*eps)* &
+                       tanh((ih(start_idx(2) + j, start_idx(3) + k) - x_cc(i))*(0.5_wp/dx)))
 
-        q_prim_vf(advxb)%sf(i,j,k) = alph
-        q_prim_vf(advxe)%sf(i,j,k) = 1._wp - alph
+        q_prim_vf(advxb)%sf(i, j, k) = alph
+        q_prim_vf(advxe)%sf(i, j, k) = 1._wp - alph
 
-        q_prim_vf(contxb)%sf(i,j,k) = q_prim_vf(advxb)%sf(i,j,k) * (950._wp / 1000._wp)
-        q_prim_vf(contxe)%sf(i,j,k) = q_prim_vf(advxe)%sf(i,j,k) * (1._wp / 1000._wp)
+        q_prim_vf(contxb)%sf(i, j, k) = q_prim_vf(advxb)%sf(i, j, k)*(950._wp/1000._wp)
+        q_prim_vf(contxe)%sf(i, j, k) = q_prim_vf(advxe)%sf(i, j, k)*(1._wp/1000._wp)
 
         !h = x_cc(i) - ih(start_idx(2) + j, start_idx(3) + k)
         !q_prim_vf(momxb)%sf(i,j,k) = -1._wp * (ih(start_idx(2) + j, start_idx(3) + k) - normFac) * exp(-h * h / 1000) / 100._wp
 
-        q_prim_vf(E_idx)%sf(i,j,k) = p0_ic + &
-            (q_prim_vf(contxb)%sf(i,j,k) + q_prim_vf(contxe)%sf(i,j,k)) * g0_ic * &
-            (ih(start_idx(2) + j, start_idx(3) + k) - x_cc(i))
+        q_prim_vf(E_idx)%sf(i, j, k) = p0_ic + &
+                                       (q_prim_vf(contxb)%sf(i, j, k) + q_prim_vf(contxe)%sf(i, j, k))*g0_ic* &
+                                       (ih(start_idx(2) + j, start_idx(3) + k) - x_cc(i))
 
-        if (surface_tension) q_prim_vf(c_idx)%sf(i,j,k) = alph
+        if (surface_tension) q_prim_vf(c_idx)%sf(i, j, k) = alph
 
     case (304) ! 3D Interface from file axisymmetric
 
-        alph = 0.5_wp * (1 + (1._wp - 2._wp * eps) * &
-                    tanh((ih(start_idx(2) + j,0)  - x_cc(i))*(0.01_wp / dx)))
+        alph = 0.5_wp*(1 + (1._wp - 2._wp*eps)* &
+                       tanh((ih(start_idx(2) + j, 0) - x_cc(i))*(0.01_wp/dx)))
 
-        q_prim_vf(advxb)%sf(i,j,k) = alph
-        q_prim_vf(advxe)%sf(i,j,k) = 1._wp - alph
+        q_prim_vf(advxb)%sf(i, j, k) = alph
+        q_prim_vf(advxe)%sf(i, j, k) = 1._wp - alph
 
-        q_prim_vf(contxb)%sf(i,j,k) = q_prim_vf(advxb)%sf(i,j,k) * 1._wp
-        q_prim_vf(contxe)%sf(i,j,k) = q_prim_vf(advxe)%sf(i,j,k) * (1._wp / 950._wp)
+        q_prim_vf(contxb)%sf(i, j, k) = q_prim_vf(advxb)%sf(i, j, k)*1._wp
+        q_prim_vf(contxe)%sf(i, j, k) = q_prim_vf(advxe)%sf(i, j, k)*(1._wp/950._wp)
 
-        q_prim_vf(E_idx)%sf(i,j,k) = p0_ic + &
-            (q_prim_vf(contxb)%sf(i,j,k) + q_prim_vf(contxe)%sf(i,j,k)) * g0_ic * &
-            (ih(start_idx(1) + i, start_idx(3) + k) - y_cc(j))
+        q_prim_vf(E_idx)%sf(i, j, k) = p0_ic + &
+                                       (q_prim_vf(contxb)%sf(i, j, k) + q_prim_vf(contxe)%sf(i, j, k))*g0_ic* &
+                                       (ih(start_idx(1) + i, start_idx(3) + k) - y_cc(j))
 
-        if (surface_tension) q_prim_vf(c_idx)%sf(i,j,k) = alph
+        if (surface_tension) q_prim_vf(c_idx)%sf(i, j, k) = alph
 
     case (370)
         ! This hardcoded case extrudes a 2D profile to initialize a 3D simulation domain

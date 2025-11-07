@@ -112,9 +112,9 @@ contains
     end function f_is_integer
 
     subroutine s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, &
-                                                  igr_order, buff_size, idwint, idwbuff, &
-                                                  viscous, bubbles_lagrange, m, n, p, num_dims, &
-                                                  igr, ib, fd_number)
+                                             igr_order, buff_size, idwint, idwbuff, &
+                                             viscous, bubbles_lagrange, m, n, p, num_dims, &
+                                             igr, ib, fd_number)
 
         integer, intent(in) :: recon_type, weno_polyn, muscl_polyn
         integer, intent(in) :: m, n, p, num_dims, igr_order, fd_number

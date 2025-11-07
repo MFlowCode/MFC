@@ -121,7 +121,7 @@ contains
         smearGridz = smearGrid
         if (p == 0) smearGridz = 1
 
-        #:call GPU_PARALLEL_LOOP(private='[nodecoord,l,s_coord,cell,center]', copyin='[smearGrid,smearGridz]')
+        #:call GPU_PARALLEL_LOOP(private='[cellaux,nodecoord,l,s_coord,cell,center]', copyin='[smearGrid,smearGridz]')
             do l = 1, nBubs
                 nodecoord(1:3) = 0
                 center(1:3) = 0._wp
@@ -605,7 +605,7 @@ contains
             dp = L(1)*eta(1) + L(2)*eta(2) + L(3)*eta(3)
         end if
 
-        vol = (4._wp/3._wp) * pi * (rad**3._wp)
+        vol = (4._wp/3._wp)*pi*(rad**3._wp)
 
         if (fd_order > 1) then
             v_rel = vel - f_interpolate_velocity(pos, cell, i, q_prim_vf)
@@ -624,11 +624,11 @@ contains
         end if
 
         if (lag_params%pressure_force) then
-            force = force - vol * dp
+            force = force - vol*dp
         end if
 
         if (lag_params%gravity_force) then
-            force = force + (mg + mv) * accel_bf(i)
+            force = force + (mg + mv)*accel_bf(i)
         end if
 
     end function f_get_bubble_force

@@ -98,7 +98,7 @@ contains
         call MPI_Pack_size(1, mpi_p, MPI_COMM_WORLD, real_size, ierr)
         call MPI_Pack_size(1, MPI_INTEGER, MPI_COMM_WORLD, int_size, ierr)
         nReal = 7 + 16*2 + 10*lag_num_ts
-        p_var_size = (nReal*real_size + int_size)
+        p_var_size = 20*(nReal*real_size + int_size)
         p_buff_size = lag_params%nBubs_glb*p_var_size
         @:ALLOCATE(p_send_buff(0:p_buff_size), p_recv_buff(0:p_buff_size))
         @:ALLOCATE(p_send_ids(nidx(1)%beg:nidx(1)%end, nidx(2)%beg:nidx(2)%end, nidx(3)%beg:nidx(3)%end, 0:lag_params%nBubs_glb))
@@ -681,7 +681,7 @@ contains
 
     end subroutine s_add_particles_to_transfer_list
 
-        !> This subroutine performs the MPI communication for lagrangian particles/
+    !> This subroutine performs the MPI communication for lagrangian particles/
         !! bubbles.
         !! @param bub_R0 Initial radius of each bubble
         !! @param Rmax_stats Maximum radius of each bubble
@@ -737,7 +737,7 @@ contains
 
             recv_count = recv_count + 1
             call MPI_Irecv(p_recv_counts(i, j, k), 1, MPI_INTEGER, partner, recv_tag, &
-                          MPI_COMM_WORLD, recv_requests(recv_count), ierr)
+                           MPI_COMM_WORLD, recv_requests(recv_count), ierr)
         end do
 
         ! Post all sends
@@ -750,7 +750,7 @@ contains
 
             send_count = send_count + 1
             call MPI_Isend(p_send_counts(i, j, k), 1, MPI_INTEGER, partner, send_tag, &
-                          MPI_COMM_WORLD, send_requests(send_count), ierr)
+                           MPI_COMM_WORLD, send_requests(send_count), ierr)
         end do
 
         ! Wait for all count exchanges to complete
@@ -774,12 +774,12 @@ contains
 
             if (p_recv_counts(i, j, k) > 0) then
                 partner = neighbor_ranks(i, j, k)
-                p_recv_size = p_recv_counts(i, j, k) * p_var_size
+                p_recv_size = p_recv_counts(i, j, k)*p_var_size
                 recv_tag = neighbor_tag(i, j, k)
 
                 recv_count = recv_count + 1
                 call MPI_Irecv(p_recv_buff(recv_offset), p_recv_size, MPI_PACKED, partner, recv_tag, &
-                              MPI_COMM_WORLD, recv_requests(recv_count), ierr)
+                               MPI_COMM_WORLD, recv_requests(recv_count), ierr)
                 recv_offsets(l) = recv_offset
                 recv_offset = recv_offset + p_recv_size
             end if
@@ -830,7 +830,7 @@ contains
 
                 send_count = send_count + 1
                 call MPI_Isend(p_send_buff(send_offset), position, MPI_PACKED, partner, send_tag, &
-                              MPI_COMM_WORLD, send_requests(send_count), ierr)
+                               MPI_COMM_WORLD, send_requests(send_count), ierr)
                 send_offset = send_offset + position
             end if
         end do
@@ -845,7 +845,7 @@ contains
             k = neighbor_list(l, 3)
 
             if (p_recv_counts(i, j, k) > 0 .and. abs(i) + abs(j) + abs(k) /= 0) then
-                p_recv_size = p_recv_counts(i, j, k) * p_var_size
+                p_recv_size = p_recv_counts(i, j, k)*p_var_size
                 recv_offset = recv_offsets(l)
 
                 position = 0
@@ -925,13 +925,13 @@ contains
                         pos(i, 1, q) = pos(i, 1, q) - offset
                         posPrev(i, 1, q) = posPrev(i, 1, q) - offset
                     end do
-                endif
+                end if
                 if (pos(i, 1, dest) < x_cb(-1 - buff_size)) then
                     do q = 1, 2
                         pos(i, 1, q) = pos(i, 1, q) + offset
                         posPrev(i, 1, q) = posPrev(i, 1, q) + offset
                     end do
-                endif
+                end if
             end if
 
             if (periodic_bc(2)) then
@@ -941,13 +941,13 @@ contains
                         pos(i, 2, q) = pos(i, 2, q) - offset
                         posPrev(i, 2, q) = posPrev(i, 2, q) - offset
                     end do
-                endif
+                end if
                 if (pos(i, 2, dest) < y_cb(-buff_size - 1)) then
                     do q = 1, 2
                         pos(i, 2, q) = pos(i, 2, q) + offset
                         posPrev(i, 2, q) = posPrev(i, 2, q) + offset
                     end do
-                endif
+                end if
             end if
 
             if (periodic_bc(3)) then
@@ -957,13 +957,13 @@ contains
                         pos(i, 3, q) = pos(i, 3, q) - offset
                         posPrev(i, 3, q) = posPrev(i, 3, q) - offset
                     end do
-                endif
+                end if
                 if (pos(i, 3, dest) < z_cb(-1 - buff_size)) then
                     do q = 1, 2
                         pos(i, 3, q) = pos(i, 3, q) + offset
                         posPrev(i, 3, q) = posPrev(i, 3, q) + offset
                     end do
-                endif
+                end if
             end if
         end do
 

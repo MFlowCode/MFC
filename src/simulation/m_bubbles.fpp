@@ -467,12 +467,11 @@ contains
         !!  @param fCson Speed of sound (EL)
         !!  @param adap_dt_stop Fail-safe exit if max iteration count reached
     subroutine s_advance_step(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
-                                   fntait, fBtait, f_bub_adv_src, f_divu, &
-                                   bub_id, fmass_v, fmass_n, fbeta_c, &
-                                   fbeta_t, fCson, adap_dt_stop, fRe, fPos, &
-                                   fVel, cell, q_prim_vf)
-        $:GPU_ROUTINE(function_name='s_advance_step',parallelism='[seq]', &
-            & cray_inline=True)
+                              fntait, fBtait, f_bub_adv_src, f_divu, &
+                              bub_id, fmass_v, fmass_n, fbeta_c, &
+                              fbeta_t, fCson, adap_dt_stop, fRe, fPos, &
+                              fVel, cell, q_prim_vf)
+        $:GPU_ROUTINE(parallelism='[seq]')
 
         real(wp), intent(inout) :: fR, fV, fpb, fmass_v
         real(wp), intent(in) :: fRho, fP, fR0, fpbdot, alf
@@ -564,23 +563,23 @@ contains
                         fmass_v = myMv_tmp1(4)
 
                         do l = 1, num_dims
-                            select case(lag_vel_model)
+                            select case (lag_vel_model)
                             case (1)
                                 vTemp = f_interpolate_velocity(fR, cell, l, q_prim_vf)
                                 fPos(l) = fPos(l) + h*vTemp
                                 fVel(l) = vTemp
                             case (2)
                                 f_bTemp = f_get_bubble_force(fPos(l), fR, fV, fVel(l), fmass_n, fmass_v, &
-                                                           fRe, fRho, cell, l, q_prim_vf)
+                                                             fRe, fRho, cell, l, q_prim_vf)
                                 aTemp = f_bTemp/(fmass_n + fmass_v)
-                                fPos(l) = fPos(l) + h * fVel(l)
-                                fVel(l) = fVel(l) + h * aTemp
+                                fPos(l) = fPos(l) + h*fVel(l)
+                                fVel(l) = fVel(l) + h*aTemp
                             case (3)
                                 f_bTemp = f_get_bubble_force(fPos(l), fR, fV, fVel(l), fmass_n, fmass_v, &
-                                                           fRe, fRho, cell, l, q_prim_vf)
-                                aTemp = 2._wp * f_bTemp / (fmass_n + fmass_v) - 3 * fV * fVel(l) / fR
-                                fPos(l) = fPos(l) + h * fVel(l)
-                                fVel(l) = fVel(l) + h * aTemp
+                                                             fRe, fRho, cell, l, q_prim_vf)
+                                aTemp = 2._wp*f_bTemp/(fmass_n + fmass_v) - 3*fV*fVel(l)/fR
+                                fPos(l) = fPos(l) + h*fVel(l)
+                                fVel(l) = fVel(l) + h*aTemp
                             case default
                                 fPos(l) = fPos(l)
                                 fVel(l) = fVel(l)

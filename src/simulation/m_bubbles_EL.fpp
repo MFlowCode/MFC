@@ -82,7 +82,7 @@ module m_bubbles_EL
     integer, parameter :: LAG_VOID_ID = 13 ! File id for voidfraction.dat
 
     integer, allocatable, dimension(:) :: keep_bubble, prefix_sum
-    integer, allocatable, dimension(:,:) :: wrap_bubble_loc, wrap_bubble_dir
+    integer, allocatable, dimension(:, :) :: wrap_bubble_loc, wrap_bubble_dir
     $:GPU_DECLARE(create='[keep_bubble, prefix_sum]')
     $:GPU_DECLARE(create='[wrap_bubble_loc, wrap_bubble_dir]')
 
@@ -700,7 +700,6 @@ contains
                 myR0 = bub_R0(k)
                 myPos = mtn_pos(k, :, 2)
                 myVel = mtn_vel(k, :, 2)
-                mtn_posPrev(k, :, 1) = myPos
 
                 ! Vapor and heat fluxes
                 call s_vflux(myR, myV, myPb, myMass_v, k, myVapFlux, myMass_n, myBeta_c, myR_m, mygamma_m)
@@ -724,11 +723,14 @@ contains
                 adap_dt_stop = 0
 
                 if (adap_dt) then
+
+                    mtn_posPrev(k, :, 1) = myPos
+
                     call s_advance_step(myRho, myPinf, myR, myV, myR0, myPb, myPbdot, dmalf, &
-                                    dmntait, dmBtait, dm_bub_adv_src, dm_divu, &
-                                    k, myMass_v, myMass_n, myBeta_c, &
-                                    myBeta_t, myCson, adap_dt_stop, Re(1), &
-                                    myPos, myVel, cell, q_prim_vf)
+                                        dmntait, dmBtait, dm_bub_adv_src, dm_divu, &
+                                        k, myMass_v, myMass_n, myBeta_c, &
+                                        myBeta_t, myCson, adap_dt_stop, Re(1), &
+                                        myPos, myVel, cell, q_prim_vf)
 
                     ! Update bubble state
                     intfc_rad(k, 1) = myR
@@ -742,6 +744,7 @@ contains
                     end if
 
                 else
+
                     ! Radial acceleration from bubble models
                     intfc_dveldt(k, stage) = f_rddot(myRho, myPinf, myR, myV, myR0, &
                                                      myPb, myPbdot, dmalf, dmntait, dmBtait, &
@@ -763,14 +766,14 @@ contains
                                                      myR, myV, myVel(l), &
                                                      myMass_n, myMass_v, &
                                                      Re(1), myRho, cell, l, q_prim_vf)
-                            mtn_dveldt(k, l, stage) = f_b / (myMass_n + myMass_v)
+                            mtn_dveldt(k, l, stage) = f_b/(myMass_n + myMass_v)
                         case (3)
                             mtn_dposdt(k, l, stage) = myVel(l)
                             f_b = f_get_bubble_force(myPos(l), &
                                                      myR, myV, myVel(l), &
                                                      myMass_n, myMass_v, &
                                                      Re(1), myRho, cell, l, q_prim_vf)
-                            mtn_dveldt(k, l, stage) = 2._wp * f_b / (myMass_n + myMass_v) - 3._wp * myV * myVel(l) / myR
+                            mtn_dveldt(k, l, stage) = 2._wp*f_b/(myMass_n + myMass_v) - 3._wp*myV*myVel(l)/myR
                         case default
                             mtn_dposdt(k, l, stage) = 0._wp
                             mtn_dveldt(k, l, stage) = 0._wp
@@ -1436,15 +1439,15 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         integer, intent(in) :: dest
         integer :: k, i, q
-        integer ::  patch_id, newBubs, new_idx
+        integer :: patch_id, newBubs, new_idx
         real(wp) :: offset
         integer, dimension(3) :: cell
 
         #:call GPU_PARALLEL_LOOP(private='[cell]')
             do k = 1, n_el_bubs_loc
                 keep_bubble(k) = 1
-                wrap_bubble_loc(k,:) = 0
-                wrap_bubble_dir(k,:) = 0
+                wrap_bubble_loc(k, :) = 0
+                wrap_bubble_dir(k, :) = 0
 
                 ! Relocate bubbles at solid boundaries and delete bubbles that leave
                 ! buffer regions
@@ -1456,12 +1459,12 @@ contains
                     mtn_pos(k, 1, dest) = x_cb(m) - intfc_rad(k, dest)
                 elseif (bc_x%beg == BC_PERIODIC .and. mtn_pos(k, 1, dest) < pcomm_coords(1)%beg .and. &
                         mtn_posPrev(k, 1, dest) > pcomm_coords(1)%beg) then
-                    wrap_bubble_dir(k,1) = 1
-                    wrap_bubble_loc(k,1) = -1
+                    wrap_bubble_dir(k, 1) = 1
+                    wrap_bubble_loc(k, 1) = -1
                 elseif (bc_x%end == BC_PERIODIC .and. mtn_pos(k, 1, dest) > pcomm_coords(1)%end .and. &
                         mtn_posPrev(k, 1, dest) < pcomm_coords(1)%end) then
-                    wrap_bubble_dir(k,1) = 1
-                    wrap_bubble_loc(k,1) = 1
+                    wrap_bubble_dir(k, 1) = 1
+                    wrap_bubble_loc(k, 1) = 1
                 elseif (mtn_pos(k, 1, dest) >= x_cb(m + buff_size - fd_number)) then
                     keep_bubble(k) = 0
                 elseif (mtn_pos(k, 1, dest) < x_cb(fd_number - buff_size - 1)) then
@@ -1476,12 +1479,12 @@ contains
                     mtn_pos(k, 2, dest) = y_cb(n) - intfc_rad(k, dest)
                 elseif (bc_y%beg == BC_PERIODIC .and. mtn_pos(k, 2, dest) < pcomm_coords(2)%beg .and. &
                         mtn_posPrev(k, 2, dest) > pcomm_coords(2)%beg) then
-                    wrap_bubble_dir(k,2) = 1
-                    wrap_bubble_loc(k,2) = -1
+                    wrap_bubble_dir(k, 2) = 1
+                    wrap_bubble_loc(k, 2) = -1
                 elseif (bc_y%end == BC_PERIODIC .and. mtn_pos(k, 2, dest) > pcomm_coords(2)%end .and. &
                         mtn_posPrev(k, 2, dest) < pcomm_coords(2)%end) then
-                    wrap_bubble_dir(k,2) = 1
-                    wrap_bubble_loc(k,2) = 1
+                    wrap_bubble_dir(k, 2) = 1
+                    wrap_bubble_loc(k, 2) = 1
                 elseif (mtn_pos(k, 2, dest) >= y_cb(n + buff_size - fd_number)) then
                     keep_bubble(k) = 0
                 elseif (mtn_pos(k, 2, dest) < y_cb(fd_number - buff_size - 1)) then
@@ -1497,12 +1500,12 @@ contains
                         mtn_pos(k, 3, dest) = z_cb(p) - intfc_rad(k, dest)
                     elseif (bc_z%beg == BC_PERIODIC .and. mtn_pos(k, 3, dest) < pcomm_coords(3)%beg .and. &
                             mtn_posPrev(k, 3, dest) > pcomm_coords(3)%beg) then
-                        wrap_bubble_dir(k,3) = 1
-                        wrap_bubble_loc(k,3) = -1
+                        wrap_bubble_dir(k, 3) = 1
+                        wrap_bubble_loc(k, 3) = -1
                     elseif (bc_z%end == BC_PERIODIC .and. mtn_pos(k, 3, dest) > pcomm_coords(3)%end .and. &
                             mtn_posPrev(k, 3, dest) < pcomm_coords(3)%end) then
-                        wrap_bubble_dir(k,3) = 1
-                        wrap_bubble_loc(k,3) = 1
+                        wrap_bubble_dir(k, 3) = 1
+                        wrap_bubble_loc(k, 3) = 1
                     elseif (mtn_pos(k, 3, dest) >= z_cb(p + buff_size - fd_number)) then
                         keep_bubble(k) = 0
                     elseif (mtn_pos(k, 3, dest) < z_cb(fd_number - buff_size - 1)) then
@@ -1583,12 +1586,12 @@ contains
                     do i = 1, num_dims
                         if (wrap_bubble_dir(k, i) == 1) then
                             offset = glb_bounds(i)%end - glb_bounds(i)%beg
-                            if (wrap_bubble_loc(k,i) == 1) then
+                            if (wrap_bubble_loc(k, i) == 1) then
                                 do q = 1, 2
                                     mtn_pos(new_idx, i, q) = mtn_pos(new_idx, i, q) - offset
                                     mtn_posPrev(new_idx, i, q) = mtn_posPrev(new_idx, i, q) - offset
                                 end do
-                            else if (wrap_bubble_loc(k,i) == -1) then
+                            else if (wrap_bubble_loc(k, i) == -1) then
                                 do q = 1, 2
                                     mtn_pos(new_idx, i, q) = mtn_pos(new_idx, i, q) + offset
                                     mtn_posPrev(new_idx, i, q) = mtn_posPrev(new_idx, i, q) + offset

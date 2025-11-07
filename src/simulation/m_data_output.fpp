@@ -36,7 +36,7 @@ module m_data_output
 
     implicit none
 
-    private;
+    private; 
     public :: s_initialize_data_output_module, &
               s_open_run_time_information_file, &
               s_open_com_files, &
@@ -299,7 +299,7 @@ contains
 
                         icfl_max_loc = max(icfl_max_loc, icfl)
                         vcfl_max_loc = max(vcfl_max_loc, merge(vcfl, 0.0_wp, viscous))
-                        Rc_min_loc   = min(Rc_min_loc,   merge(Rc, huge(1.0_wp), viscous))
+                        Rc_min_loc = min(Rc_min_loc, merge(Rc, huge(1.0_wp), viscous))
                     end do
                 end do
             end do
@@ -1783,7 +1783,7 @@ contains
 
         ! Allocating/initializing ICFL, VCFL, CCFL and Rc stability criteria
         if (run_time_info) then
-           icfl_max = 0._wp
+            icfl_max = 0._wp
             if (viscous) then
                 vcfl_max = 0._wp
                 Rc_min = 1.e12_wp

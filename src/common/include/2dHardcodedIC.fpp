@@ -12,21 +12,21 @@
     character(len=25) :: value
 
     if (patch_icpp(patch_id)%hcid == 207) then
-        allocate(ih(0:n_glb, 0:0))
+        allocate (ih(0:n_glb, 0:0))
         if (interface_file == '.') then
             call s_mpi_abort("Error: interface_file must be specified for hcid=304")
         else
             inquire (file=trim(interface_file), exist=file_exist)
             if (file_exist) then
-                open(unit=10, file=trim(interface_file), status="old", action="read")
+                open (unit=10, file=trim(interface_file), status="old", action="read")
                 do i = 0, n_glb
-                    read(10, '(A)') line  ! Read a full line as a string
+                    read (10, '(A)') line  ! Read a full line as a string
                     value = trim(line)
-                    read(value, *) ih(i, 0)  ! Convert string to numeric value
-                    if (.not. f_is_default(normMag)) ih(i, 0) = ih(i, 0) * normMag
+                    read (value, *) ih(i, 0)  ! Convert string to numeric value
+                    if (.not. f_is_default(normMag)) ih(i, 0) = ih(i, 0)*normMag
                     if (.not. f_is_default(normFac)) ih(i, 0) = ih(i, 0) + normFac
                 end do
-                close(10)
+                close (10)
             else
                 call s_mpi_abort("Error: interface_file specified for hcid=207 does not exist")
             end if
@@ -159,20 +159,20 @@
 
     case (207) ! Axisymmetric vibrated interface
 
-        alph = 0.5_wp * (1 + (1._wp - 2._wp * eps) * &
-                    tanh((ih(start_idx(2) + j,0)  - x_cc(i))*(0.5_wp / dx)))
+        alph = 0.5_wp*(1 + (1._wp - 2._wp*eps)* &
+                       tanh((ih(start_idx(2) + j, 0) - x_cc(i))*(0.5_wp/dx)))
 
-        q_prim_vf(advxb)%sf(i,j,0) = alph
-        q_prim_vf(advxe)%sf(i,j,0) = 1._wp - alph
+        q_prim_vf(advxb)%sf(i, j, 0) = alph
+        q_prim_vf(advxe)%sf(i, j, 0) = 1._wp - alph
 
-        q_prim_vf(contxb)%sf(i,j,0) = q_prim_vf(advxb)%sf(i,j,0) * 1._wp
-        q_prim_vf(contxe)%sf(i,j,0) = q_prim_vf(advxe)%sf(i,j,0) * (1._wp / 997._wp)
+        q_prim_vf(contxb)%sf(i, j, 0) = q_prim_vf(advxb)%sf(i, j, 0)*1._wp
+        q_prim_vf(contxe)%sf(i, j, 0) = q_prim_vf(advxe)%sf(i, j, 0)*(1._wp/997._wp)
 
-        q_prim_vf(E_idx)%sf(i,j,0) = p0_ic + &
-            (q_prim_vf(contxb)%sf(i,j,k) + q_prim_vf(contxe)%sf(i,j,0)) * g0_ic * &
-            (ih(start_idx(2) + j, 0) - x_cc(i))
+        q_prim_vf(E_idx)%sf(i, j, 0) = p0_ic + &
+                                       (q_prim_vf(contxb)%sf(i, j, k) + q_prim_vf(contxe)%sf(i, j, 0))*g0_ic* &
+                                       (ih(start_idx(2) + j, 0) - x_cc(i))
 
-        if (surface_tension) q_prim_vf(c_idx)%sf(i,j,0) = alph
+        if (surface_tension) q_prim_vf(c_idx)%sf(i, j, 0) = alph
 
     case (250) ! MHD Orszag-Tang vortex
         ! gamma = 5/3
