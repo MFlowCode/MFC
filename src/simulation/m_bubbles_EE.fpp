@@ -76,7 +76,7 @@ contains
         real(wp) :: nR3bar
         integer(wp) :: i, j, k, l
 
-        $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -177,7 +177,7 @@ contains
         integer :: dmBub_id !< Dummy variables for unified subgrid bubble subroutines
         real(wp) :: dmMass_v, dmMass_n, dmBeta_c, dmBeta_t, dmCson
 
-        $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[j,k,l,q]', collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -196,7 +196,7 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
         adap_dt_stop_max = 0
-        $:GPU_PARALLEL_LOOP(private='[j,k,l,Rtmp, Vtmp, myalpha_rho, myalpha]', collapse=3, &
+        $:GPU_PARALLEL_LOOP(private='[j,k,l,q,Rtmp, Vtmp, myalpha_rho, myalpha]', collapse=3, &
             & reduction='[[adap_dt_stop_max]]', reductionOp='[MAX]', &
             & copy='[adap_dt_stop_max]')
         do l = 0, p
@@ -331,7 +331,7 @@ contains
         if (adap_dt .and. adap_dt_stop_max > 0) call s_mpi_abort("Adaptive time stepping failed to converge.")
 
         if (.not. adap_dt) then
-            $:GPU_PARALLEL_LOOP(private='[i,l,q]', collapse=3)
+            $:GPU_PARALLEL_LOOP(private='[i,k,l,q]', collapse=3)
             do l = 0, p
                 do q = 0, n
                     do i = 0, m

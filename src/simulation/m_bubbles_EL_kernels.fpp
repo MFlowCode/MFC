@@ -121,7 +121,7 @@ contains
         smearGridz = smearGrid
         if (p == 0) smearGridz = 1
 
-        $:GPU_PARALLEL_LOOP(private='[nodecoord,l,s_coord,cell,center]', copyin='[smearGrid,smearGridz]')
+        $:GPU_PARALLEL_LOOP(private='[nodecoord,i,j,k,l,s_coord,cell,center]', copyin='[smearGrid,smearGridz]')
         do l = 1, nBubs
             nodecoord(1:3) = 0
             center(1:3) = 0._wp
