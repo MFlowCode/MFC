@@ -58,9 +58,10 @@ class Mfc < Formula
     # After build completes, install Python toolchain to prefix
     prefix.install "toolchain"
 
-    # Install binaries - they're in hashed subdirectories like build/install/<hash>/bin/*
-    Dir.glob("build/install/*/bin/*").each do |binary_path|
-      bin.install binary_path
+    # Install only executable files from hashed build dirs
+    Dir.glob("build/install/*/bin/*").each do |p|
+      next unless File.file?(p) && File.executable?(p)
+      bin.install p
     end
 
     # Install main mfc.sh script
