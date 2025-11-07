@@ -96,20 +96,20 @@ class Mfc < Formula
       # Replace get_install_binpath to return Homebrew bin directory
       cat >> "toolchain/mfc/build.py" << 'PATCH_EOF'
 
-  # Homebrew patch: Override get_install_binpath to use pre-installed binaries
-  _original_get_install_binpath = MFCTarget.get_install_binpath
-  def _homebrew_get_install_binpath(self, case):
-      return "#{bin}/" + self.name
-  MFCTarget.get_install_binpath = _homebrew_get_install_binpath
+        # Homebrew patch: Override get_install_binpath to use pre-installed binaries
+        _original_get_install_binpath = MFCTarget.get_install_binpath
+        def _homebrew_get_install_binpath(self, case):
+            return "#{bin}/" + self.name
+        MFCTarget.get_install_binpath = _homebrew_get_install_binpath
 
-  # Override is_buildable to skip building main targets and syscheck
-  _original_is_buildable = MFCTarget.is_buildable
-  def _homebrew_is_buildable(self):
-      if self.name in ["pre_process", "simulation", "post_process", "syscheck"]:
-          return False  # Skip building - use pre-installed binaries
-      return _original_is_buildable(self)
-  MFCTarget.is_buildable = _homebrew_is_buildable
-  PATCH_EOF
+        # Override is_buildable to skip building main targets and syscheck
+        _original_is_buildable = MFCTarget.is_buildable
+        def _homebrew_is_buildable(self):
+            if self.name in ["pre_process", "simulation", "post_process", "syscheck"]:
+                return False  # Skip building - use pre-installed binaries
+            return _original_is_buildable(self)
+        MFCTarget.is_buildable = _homebrew_is_buildable
+      PATCH_EOF
 
       # Copy examples directory (required by mfc.sh Python code)
       cp -R "#{prefix}/examples" "examples"
