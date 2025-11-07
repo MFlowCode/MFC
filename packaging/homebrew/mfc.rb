@@ -27,7 +27,7 @@ class Mfc < Formula
   def install
     # Create Python virtual environment (remove existing one first for clean reinstalls)
     venv = libexec/"venv"
-    rm_rf venv
+    rm_r(venv, force: true)
     system Formula["python@3.12"].opt_bin/"python3.12", "-m", "venv", venv
     system venv/"bin/pip", "install", "--upgrade", "pip", "setuptools", "wheel"
 
