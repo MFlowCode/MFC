@@ -53,7 +53,11 @@ jobs:
       - name: Audit/style formula before pushing
         run: |
           brew style packaging/homebrew/mfc.rb
-          brew audit --online --strict --formula --new --except=homepage packaging/homebrew/mfc.rb || brew audit --online packaging/homebrew/mfc.rb
+          # Create temporary tap to audit the formula
+          brew tap-new mfc/local
+          cp packaging/homebrew/mfc.rb "$(brew --repository)/Library/Taps/mfc/homebrew-local/Formula/mfc.rb"
+          brew audit --online --strict --new --except=homepage mfc/local/mfc || brew audit --online mfc/local/mfc
+          brew untap mfc/local
 
       - name: Clone or bootstrap tap repository
         env:
