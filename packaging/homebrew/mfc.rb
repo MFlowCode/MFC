@@ -27,22 +27,21 @@ class Mfc < Formula
     system Formula["python@3.12"].opt_bin/"python3.12", "-m", "venv", venv
     system venv/"bin/pip", "install", "--upgrade", "pip", "setuptools", "wheel"
 
+    # Install Cantera from PyPI using pre-built wheel (complex package, doesn't need custom flags)
+    # Cantera has CMake compatibility issues when building from source with newer CMake versions
+    system venv/"bin/pip", "install", "cantera==3.1.0"
+
     # Set LDFLAGS to ensure Python C extensions (like orjson) are compiled with enough
     # header padding for Homebrew's bottle relocation process
     # This fixes "Failed changing dylib ID" errors during bottling
     ENV.append "LDFLAGS", "-Wl,-headerpad_max_install_names"
 
-    # Force pip to compile from source (not use pre-built wheels) to ensure
-    # our LDFLAGS are applied. Pre-built wheels don't have proper header padding.
-    pip_install_args = ["--no-binary", ":all:"]
-
-    # Install Cantera from PyPI (required dependency for MFC build)
-    system venv/"bin/pip", "install", *pip_install_args, "cantera==3.1.0"
-
     # Install MFC Python package and dependencies into venv
+    # Force compilation from source (--no-binary :all:) to ensure our LDFLAGS are applied
+    # Pre-built wheels don't have proper header padding for bottle relocation
     # Keep toolchain in buildpath for now - mfc.sh needs it there
     # Use editable install (-e) to avoid RECORD file issues when venv is symlinked at runtime
-    system venv/"bin/pip", "install", *pip_install_args, "-e", buildpath/"toolchain"
+    system venv/"bin/pip", "install", "--no-binary", ":all:", "-e", buildpath/"toolchain"
 
     # Create symlink so mfc.sh uses our pre-installed venv
     mkdir_p "build"
