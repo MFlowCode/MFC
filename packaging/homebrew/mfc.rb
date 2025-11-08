@@ -21,6 +21,10 @@ class Mfc < Formula
   depends_on "openblas"
   depends_on "python@3.12"
 
+  # Skip relocation for Python C extensions in the venv
+  # The venv is self-contained in libexec and doesn't need Homebrew's relocation
+  skip_clean "libexec/venv"
+
   def install
     # Create Python virtual environment inside libexec (inside Cellar for proper bottling)
     venv = libexec/"venv"
