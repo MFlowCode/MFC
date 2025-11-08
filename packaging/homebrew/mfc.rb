@@ -21,6 +21,11 @@ class Mfc < Formula
   depends_on "openblas"
   depends_on "python@3.12"
 
+  # Disable bottles due to Python venv with compiled extensions that can't be relocated
+  def pour_bottle?
+    false
+  end
+
   def install
     # Create Python virtual environment inside libexec (inside Cellar for proper bottling)
     venv = libexec/"venv"
