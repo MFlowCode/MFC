@@ -209,7 +209,7 @@ class Mfc < Formula
     # This ensures the wrapper script correctly handles relative paths
     testpath_case = testpath/"test_run"
     testpath_case.mkpath
-    
+
     # Copy case.py from examples to an independent test directory
     cp prefix/"examples/1D_sodshocktube/case.py", testpath_case/"case.py"
 
