@@ -11,10 +11,6 @@ class Mfc < Formula
   license "MIT"
   head "https://github.com/MFlowCode/MFC.git", branch: "master"
 
-  # Bottles are not created because this formula contains a Python virtual environment
-  # with pre-built C extensions (orjson, etc.) that cannot be reliably relocated
-  bottle :unneeded
-
   depends_on "cmake" => :build
   depends_on "gcc" => :build
 
