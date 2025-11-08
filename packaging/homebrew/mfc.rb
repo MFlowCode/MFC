@@ -23,7 +23,6 @@ class Mfc < Formula
 
   def install
     # Create Python virtual environment (remove existing one first for clean reinstalls)
-    # Store in var/ instead of keg to avoid Homebrew dylib fixups on Python .so files
     venv = var/"mfc/venv"
     mkdir_p venv.parent
     rm_r(venv, force: true)
