@@ -21,24 +21,28 @@ class Mfc < Formula
   depends_on "openblas"
   depends_on "python@3.12"
 
-  # Disable bottles due to Python venv with compiled extensions that can't be relocated
-  def pour_bottle?
-    false
-  end
-
   def install
     # Create Python virtual environment inside libexec (inside Cellar for proper bottling)
     venv = libexec/"venv"
     system Formula["python@3.12"].opt_bin/"python3.12", "-m", "venv", venv
     system venv/"bin/pip", "install", "--upgrade", "pip", "setuptools", "wheel"
 
+    # Set LDFLAGS to ensure Python C extensions (like orjson) are compiled with enough
+    # header padding for Homebrew's bottle relocation process
+    # This fixes "Failed changing dylib ID" errors during bottling
+    ENV.append "LDFLAGS", "-Wl,-headerpad_max_install_names"
+
+    # Force pip to compile from source (not use pre-built wheels) to ensure
+    # our LDFLAGS are applied. Pre-built wheels don't have proper header padding.
+    pip_install_args = ["--no-binary", ":all:"]
+
     # Install Cantera from PyPI (required dependency for MFC build)
-    system venv/"bin/pip", "install", "cantera==3.1.0"
+    system venv/"bin/pip", "install", *pip_install_args, "cantera==3.1.0"
 
     # Install MFC Python package and dependencies into venv
     # Keep toolchain in buildpath for now - mfc.sh needs it there
     # Use editable install (-e) to avoid RECORD file issues when venv is symlinked at runtime
-    system venv/"bin/pip", "install", "-e", buildpath/"toolchain"
+    system venv/"bin/pip", "install", *pip_install_args, "-e", buildpath/"toolchain"
 
     # Create symlink so mfc.sh uses our pre-installed venv
     mkdir_p "build"
@@ -77,7 +81,7 @@ class Mfc < Formula
     # 3. Minimal copying - only what needs to be writable
     # 4. Resolves input file paths before changing directories
     (bin/"mfc").write <<~EOS
-        #!/bin/bash
+        #!/usr/bin/env bash
         set -euo pipefail
 
         # Unset VIRTUAL_ENV to ensure mfc.sh uses our configured venv
