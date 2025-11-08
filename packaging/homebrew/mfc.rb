@@ -11,6 +11,10 @@ class Mfc < Formula
   license "MIT"
   head "https://github.com/MFlowCode/MFC.git", branch: "master"
 
+  # Bottles are not created because this formula contains a Python virtual environment
+  # with pre-built C extensions (orjson, etc.) that cannot be reliably relocated
+  bottle :unneeded
+
   depends_on "cmake" => :build
   depends_on "gcc" => :build
 
@@ -31,25 +35,11 @@ class Mfc < Formula
     # Cantera has CMake compatibility issues when building from source with newer CMake versions
     system venv/"bin/pip", "install", "cantera==3.1.0"
 
-    # Set LDFLAGS to ensure Python C extensions are compiled with enough
-    # header padding for Homebrew's bottle relocation process
-    # This fixes "Failed changing dylib ID" errors during bottling
-    ENV.append "LDFLAGS", "-Wl,-headerpad_max_install_names"
-    ENV.append "CFLAGS", "-Wl,-headerpad_max_install_names"
-    ENV.append "CXXFLAGS", "-Wl,-headerpad_max_install_names"
-
     # Install MFC Python package and dependencies into venv
     # Use editable install (-e) to avoid RECORD file issues when venv is symlinked at runtime
-    # Most dependencies use pre-built wheels initially
+    # Dependencies will use pre-built wheels from PyPI (no bottling needed)
     # Keep toolchain in buildpath for now - mfc.sh needs it there
     system venv/"bin/pip", "install", "-e", buildpath/"toolchain"
-
-    # Force-reinstall packages with C extensions from source with proper LDFLAGS
-    # This ensures they have correct header padding for bottle relocation
-    # orjson is a transitive dependency that comes from pre-built wheels without proper padding
-    # --no-deps prevents reinstalling dependencies, only the target package
-    system venv/"bin/pip", "install", "--no-binary", ":all:", "--force-reinstall",
-           "--no-deps", "orjson"
 
     # Create symlink so mfc.sh uses our pre-installed venv
     mkdir_p "build"
