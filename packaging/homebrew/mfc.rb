@@ -13,6 +13,7 @@ class Mfc < Formula
 
   depends_on "cmake" => :build
   depends_on "gcc" => :build
+  depends_on "rust" => :build
 
   depends_on "boost"
   depends_on "fftw"
@@ -36,6 +37,10 @@ class Mfc < Formula
     # Dependencies will use pre-built wheels from PyPI (no bottling needed)
     # Keep toolchain in buildpath for now - mfc.sh needs it there
     system venv/"bin/pip", "install", "-e", buildpath/"toolchain"
+
+    # Rebuild orjson from source with headerpad to enable bottle relocation
+    ENV["RUSTFLAGS"] = "-C link-arg=-Wl,-headerpad_max_install_names"
+    system venv/"bin/pip", "install", "--no-binary", ":all:", "--force-reinstall", "--no-deps", "orjson"
 
     # Create symlink so mfc.sh uses our pre-installed venv
     mkdir_p "build"
