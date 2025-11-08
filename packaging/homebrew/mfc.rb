@@ -122,42 +122,53 @@ class Mfc < Formula
         # Copy only pyproject.toml (tiny file, prevents reinstall checks)
         cp "#{prefix}/toolchain/pyproject.toml" build/pyproject.toml
 
-        # Create a minimal patch file for build.py overrides and path redirection
-        mkdir -p .mfc_patch
-        cat > .mfc_patch/build_patch.py << 'PATCH_EOF'
+        # Create a sitecustomize.py file that patches MFC paths before any imports
+        # This runs automatically at Python startup and ensures paths are correct
+        cat > sitecustomize.py << 'SITECUSTOMIZE_EOF'
       import sys
       import os
+
+      # Add toolchain to path
       sys.path.insert(0, "#{prefix}/toolchain")
 
-      # Override MFC_ROOT_DIR to point to our temporary directory
-      # This ensures lock.yaml and other build artifacts are written to writable temp location
-      import mfc.common
-      mfc.common.MFC_ROOT_DIR = os.getcwd()
-      mfc.common.MFC_BUILD_DIR = os.path.join(mfc.common.MFC_ROOT_DIR, "build")
-      mfc.common.MFC_LOCK_FILEPATH = os.path.join(mfc.common.MFC_BUILD_DIR, "lock.yaml")
-      # Keep toolchain and examples pointing to Homebrew installation
-      mfc.common.MFC_TOOLCHAIN_DIR = "#{prefix}/toolchain"
-      mfc.common.MFC_EXAMPLE_DIRPATH = "#{prefix}/examples"
+      # Patch MFC paths before mfc.common is imported anywhere
+      _mfc_temp_root = os.getcwd()
 
-      from mfc.build import MFCTarget
+      def _patch_mfc_common():
+          """Patches mfc.common module to use temp directory for writable files."""
+          import mfc.common
+          mfc.common.MFC_ROOT_DIR = _mfc_temp_root
+          mfc.common.MFC_BUILD_DIR = os.path.join(_mfc_temp_root, "build")
+          mfc.common.MFC_LOCK_FILEPATH = os.path.join(mfc.common.MFC_BUILD_DIR, "lock.yaml")
+          # Keep toolchain and examples pointing to Homebrew installation
+          mfc.common.MFC_TOOLCHAIN_DIR = "#{prefix}/toolchain"
+          mfc.common.MFC_EXAMPLE_DIRPATH = "#{prefix}/examples"
 
-      # Override get_install_binpath to use pre-installed binaries
-      _original_get_install_binpath = MFCTarget.get_install_binpath
-      def _homebrew_get_install_binpath(self, case):
-          return "#{bin}/" + self.name
-      MFCTarget.get_install_binpath = _homebrew_get_install_binpath
+      def _patch_mfc_build():
+          """Patches MFCTarget to use pre-installed binaries."""
+          from mfc.build import MFCTarget
 
-      # Override is_buildable to skip building main targets
-      _original_is_buildable = MFCTarget.is_buildable
-      def _homebrew_is_buildable(self):
-          if self.name in ["pre_process", "simulation", "post_process", "syscheck"]:
-              return False
-          return _original_is_buildable(self)
-      MFCTarget.is_buildable = _homebrew_is_buildable
-      PATCH_EOF
+          # Override get_install_binpath to use pre-installed binaries
+          _original_get_install_binpath = MFCTarget.get_install_binpath
+          def _homebrew_get_install_binpath(self, case):
+              return "#{bin}/" + self.name
+          MFCTarget.get_install_binpath = _homebrew_get_install_binpath
 
-        # Set PYTHONPATH to load our patch before running mfc.sh
-        export PYTHONPATH="${TMPDIR}/.mfc_patch:#{prefix}/toolchain:${PYTHONPATH:-}"
+          # Override is_buildable to skip building main targets
+          _original_is_buildable = MFCTarget.is_buildable
+          def _homebrew_is_buildable(self):
+              if self.name in ["pre_process", "simulation", "post_process", "syscheck"]:
+                  return False
+              return _original_is_buildable(self)
+          MFCTarget.is_buildable = _homebrew_is_buildable
+
+      # Apply patches immediately
+      _patch_mfc_common()
+      _patch_mfc_build()
+      SITECUSTOMIZE_EOF
+
+        # Set PYTHONPATH to include current directory so sitecustomize.py is found
+        export PYTHONPATH="${TMPDIR}:#{prefix}/toolchain:${PYTHONPATH:-}"
 
         # For 'mfc run', add --no-build flag to skip compilation
         if [ "${1-}" = "run" ]; then
