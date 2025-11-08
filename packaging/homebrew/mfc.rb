@@ -37,11 +37,10 @@ class Mfc < Formula
     ENV.append "LDFLAGS", "-Wl,-headerpad_max_install_names"
 
     # Install MFC Python package and dependencies into venv
-    # Force compilation from source (--no-binary :all:) to ensure our LDFLAGS are applied
-    # Pre-built wheels don't have proper header padding for bottle relocation
-    # Keep toolchain in buildpath for now - mfc.sh needs it there
     # Use editable install (-e) to avoid RECORD file issues when venv is symlinked at runtime
-    system venv/"bin/pip", "install", "--no-binary", ":all:", "-e", buildpath/"toolchain"
+    # Most dependencies use pre-built wheels; only packages with C extensions will be compiled
+    # Keep toolchain in buildpath for now - mfc.sh needs it there
+    system venv/"bin/pip", "install", "-e", buildpath/"toolchain"
 
     # Create symlink so mfc.sh uses our pre-installed venv
     mkdir_p "build"
