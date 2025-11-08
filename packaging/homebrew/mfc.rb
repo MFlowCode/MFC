@@ -22,10 +22,8 @@ class Mfc < Formula
   depends_on "python@3.12"
 
   def install
-    # Create Python virtual environment (remove existing one first for clean reinstalls)
-    venv = var/"mfc/venv"
-    mkdir_p venv.parent
-    rm_r(venv, force: true)
+    # Create Python virtual environment inside libexec (inside Cellar for proper bottling)
+    venv = libexec/"venv"
     system Formula["python@3.12"].opt_bin/"python3.12", "-m", "venv", venv
     system venv/"bin/pip", "install", "--upgrade", "pip", "setuptools", "wheel"
 
@@ -119,7 +117,7 @@ class Mfc < Formula
         mkdir -p build
 
         # Symlink the persistent venv (no copy)
-        ln -s "#{var}/mfc/venv" build/venv
+        ln -s "#{libexec}/venv" build/venv
 
         # Copy only pyproject.toml (tiny file, prevents reinstall checks)
         cp "#{prefix}/toolchain/pyproject.toml" build/pyproject.toml
@@ -196,8 +194,8 @@ class Mfc < Formula
     assert_path_exists prefix/"toolchain"
 
     # Test that venv exists and has required packages
-    assert_path_exists var/"mfc/venv"
-    assert_predicate (var/"mfc/venv/bin/python"), :executable?
+    assert_path_exists libexec/"venv"
+    assert_predicate (libexec/"venv/bin/python"), :executable?
 
     # Test that examples exist
     assert_path_exists prefix/"examples"
