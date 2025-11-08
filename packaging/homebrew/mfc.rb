@@ -122,11 +122,23 @@ class Mfc < Formula
         # Copy only pyproject.toml (tiny file, prevents reinstall checks)
         cp "#{prefix}/toolchain/pyproject.toml" build/pyproject.toml
 
-        # Create a minimal patch file for build.py overrides
+        # Create a minimal patch file for build.py overrides and path redirection
         mkdir -p .mfc_patch
         cat > .mfc_patch/build_patch.py << 'PATCH_EOF'
       import sys
+      import os
       sys.path.insert(0, "#{prefix}/toolchain")
+
+      # Override MFC_ROOT_DIR to point to our temporary directory
+      # This ensures lock.yaml and other build artifacts are written to writable temp location
+      import mfc.common
+      mfc.common.MFC_ROOT_DIR = os.getcwd()
+      mfc.common.MFC_BUILD_DIR = os.path.join(mfc.common.MFC_ROOT_DIR, "build")
+      mfc.common.MFC_LOCK_FILEPATH = os.path.join(mfc.common.MFC_BUILD_DIR, "lock.yaml")
+      # Keep toolchain and examples pointing to Homebrew installation
+      mfc.common.MFC_TOOLCHAIN_DIR = "#{prefix}/toolchain"
+      mfc.common.MFC_EXAMPLE_DIRPATH = "#{prefix}/examples"
+
       from mfc.build import MFCTarget
 
       # Override get_install_binpath to use pre-installed binaries
