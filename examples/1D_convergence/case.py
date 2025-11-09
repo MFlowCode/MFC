@@ -4,10 +4,8 @@ import json
 import argparse
 
 # Parsing command line arguments
-parser = argparse.ArgumentParser(
-    description="Generate JSON case configuration for two-fluid convergence simulation."
-)
-parser.add_argument("--mfc", type=json.loads,default="{}",metavar="DICT",help="MFC's toolchain's internal state.")
+parser = argparse.ArgumentParser(description="Generate JSON case configuration for two-fluid convergence simulation.")
+parser.add_argument("--mfc", type=json.loads, default="{}", metavar="DICT", help="MFC's toolchain's internal state.")
 parser.add_argument("--order", type=int, default=5, help="WENO order (default: 5)")
 parser.add_argument("--meqns", type=int, default=2, help="Model equations (default: 2 (five-equation model))")
 parser.add_argument("--rs", type=int, default=2, help="Riemann solver (default: 2 (HLLC))")
