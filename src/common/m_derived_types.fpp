@@ -404,10 +404,11 @@ module m_derived_types
 
     !> Acoustic source source_spatial pre-calculated values
     type source_spatial_type
-        integer, dimension(:, :), allocatable :: coord !< List of grid points indices with non-zero source_spatial values
-        real(wp), dimension(:), allocatable :: val !< List of non-zero source_spatial values
-        real(wp), dimension(:), allocatable :: angle !< List of angles with x-axis for mom source term vector
-        real(wp), dimension(:, :), allocatable :: xyz_to_r_ratios !< List of [xyz]/r for mom source term vector
+        integer, pointer, dimension(:, :) :: coord => null() !< List of grid points indices with non-zero source_spatial values
+        real(wp), pointer, dimension(:) :: val => null() !< List of non-zero source_spatial values
+        real(wp), pointer, dimension(:) :: angle => null() !< List of angles with x-axis for mom source term vector
+        real(wp), pointer, dimension(:, :) :: xyz_to_r_ratios => null() !< List of [xyz]/r for mom source term vector
+
     end type source_spatial_type
 
     !> Ghost Point for Immersed Boundaries

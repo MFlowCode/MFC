@@ -824,16 +824,7 @@ contains
         real(wp), dimension(num_fluids) :: alpha_K, alpha_rho_K
         real(wp), dimension(2) :: Re_K
         real(wp) :: rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K
-
-        #:if MFC_CASE_OPTIMIZATION
-#ifndef MFC_SIMULATION
-            real(wp), dimension(:), allocatable :: nRtmp
-#else
-            real(wp), dimension(nb) :: nRtmp
-#endif
-        #:else
-            real(wp), dimension(:), allocatable :: nRtmp
-        #:endif
+        real(wp), dimension(nb) :: nRtmp
 
         real(wp) :: rhoYks(1:num_species)
 
@@ -857,22 +848,6 @@ contains
         real(wp) :: E, D ! Prim/Cons variables within Newton-Raphson iteration
         real(wp) :: f, dGa_dW, dp_dW, df_dW ! Functions within Newton-Raphson iteration
         integer :: iter ! Newton-Raphson iteration counter
-
-        #:if MFC_CASE_OPTIMIZATION
-#ifndef MFC_SIMULATION
-            if (bubbles_euler) then
-                allocate (nRtmp(nb))
-            else
-                allocate (nRtmp(0))
-            end if
-#endif
-        #:else
-            if (bubbles_euler) then
-                allocate (nRtmp(nb))
-            else
-                allocate (nRtmp(0))
-            end if
-        #:endif
 
         #:call GPU_PARALLEL_LOOP(collapse=3, private='[alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K,qv_K, dyn_pres_K, rhoYks, B, pres, vftmp, nbub_sc, G_K, T, pres_mag, Ga, B2, m2, S, W, dW, E, D, f, dGa_dW, dp_dW, df_dW, iter ]')
             do l = ibounds(3)%beg, ibounds(3)%end
