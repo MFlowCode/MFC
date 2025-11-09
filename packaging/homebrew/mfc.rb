@@ -84,7 +84,7 @@ class Mfc < Formula
         ORIG_DIR="$(pwd)"
 
         # Process arguments and convert relative paths to absolute paths
-        ARGS=()
+        declare -a ARGS=()
         for arg in "$@"; do
           # If argument looks like a file path and exists as relative path
           if [[ "$arg" =~ \\.(py|txt|json|yaml|yml)$ ]] && [ -e "${ORIG_DIR}/${arg}" ]; then
@@ -93,6 +93,33 @@ class Mfc < Formula
             ARGS+=("$arg")
           fi
         done
+
+        SUBCMD="${ARGS[0]-}"
+
+        # Friendly help and guardrails
+        if [[ ${#ARGS[@]} -eq 0 ]] || [[ "${SUBCMD}" == "--help" ]] || [[ "${SUBCMD}" == "-h" ]]; then
+          cat <<'HHELP'
+      MFC (Homebrew) #{version}
+
+      Usage:
+        mfc run <case.py> [options]
+
+      Examples:
+        mfc run case.py -j 1
+
+      Notes:
+        - This Homebrew wrapper uses prebuilt binaries and a preinstalled venv.
+        - Developer commands (build, clean, test, etc.) are not available here.
+          Clone the MFC repo for the full developer workflow.
+      HHELP
+          exit 0
+        fi
+
+        if [[ "${SUBCMD}" != "run" ]]; then
+          echo "mfc (Homebrew): only 'run' is supported in the Homebrew package."
+          echo "Use 'mfc run <case.py>' or clone the repository for developer commands."
+          exit 2
+        fi
 
         # Create a temporary working directory (Cellar is read-only)
         TMPDIR="$(mktemp -d)"
@@ -172,12 +199,8 @@ class Mfc < Formula
         # Set PYTHONPATH to include current directory so sitecustomize.py is found
         export PYTHONPATH="${TMPDIR}:#{prefix}/toolchain:${PYTHONPATH:-}"
 
-        # For 'mfc run', add --no-build flag to skip compilation
-        if [ "${1-}" = "run" ]; then
-          exec ./mfc.sh "${ARGS[@]}" --no-build
-        else
-          exec ./mfc.sh "${ARGS[@]}"
-        fi
+        # Always run with --no-build in Homebrew package
+        exec ./mfc.sh "${ARGS[@]}" --no-build
     EOS
     (libexec/"mfc").chmod 0755
 
