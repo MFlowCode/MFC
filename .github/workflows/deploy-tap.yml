@@ -79,19 +79,20 @@ jobs:
             git push -u origin main
           fi
 
-      - name: Copy formula into tap
+      - name: Copy formula and README into tap
         run: |
           mkdir -p tap-repo/Formula
           cp packaging/homebrew/mfc.rb tap-repo/Formula/mfc.rb
+          cp packaging/homebrew/README.md tap-repo/README.md
 
       - name: Commit & push if changed
         env:
           TAP_TOKEN: ${{ secrets.TAP_REPO_TOKEN }}
         run: |
           cd tap-repo
-          git add Formula/mfc.rb
+          git add Formula/mfc.rb README.md
           if git diff --cached --quiet; then
-            echo "No changes in Formula/mfc.rb; skipping push."
+            echo "No changes in Formula/mfc.rb or README.md; skipping push."
             exit 0
           fi
           git -c user.name="github-actions[bot]" -c user.email="github-actions[bot]@users.noreply.github.com" \
