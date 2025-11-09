@@ -60,7 +60,7 @@ module m_time_steppers
     type(integer_field), allocatable, dimension(:, :) :: bc_type !<
     !! Boundary condition identifiers
 
-    type(vector_field), allocatable, dimension(:) :: q_prim_ts !<
+    type(vector_field), allocatable, dimension(:) :: q_prim_ts1, q_prim_ts2 !<
     !! Cell-average primitive variables at consecutive TIMESTEPS
 
     real(wp), allocatable, dimension(:, :, :, :, :) :: rhs_pb
@@ -77,8 +77,9 @@ module m_time_steppers
 
     integer :: stor !< storage index
     real(wp), allocatable, dimension(:, :) :: rk_coef
+    integer, private :: num_probe_ts
 
-    $:GPU_DECLARE(create='[q_cons_ts,q_prim_vf,q_T_sf,rhs_vf,q_prim_ts,rhs_mv,rhs_pb,max_dt,rk_coef,stor,bc_type]')
+    $:GPU_DECLARE(create='[q_cons_ts,q_prim_vf,q_T_sf,rhs_vf,q_prim_ts1,q_prim_ts2,rhs_mv,rhs_pb,max_dt,rk_coef,stor,bc_type]')
 
 #if defined(__NVCOMPILER_GPU_UNIFIED_MEM)
     real(stp), allocatable, dimension(:, :, :, :), pinned, target :: q_cons_ts_pool_host
@@ -111,6 +112,10 @@ contains
         elseif (any(time_stepper == (/2, 3/))) then
             num_ts = 2
         end if
+
+        if(probe_wrt) then 
+            num_probe_ts = 2 
+        end if 
 
         ! Allocating the cell-average conservative variables
         @:ALLOCATE(q_cons_ts(1:num_ts))
@@ -222,22 +227,34 @@ contains
 
         ! Allocating the cell-average primitive ts variables
         if (probe_wrt) then
-            @:ALLOCATE(q_prim_ts(0:3))
+            @:ALLOCATE(q_prim_ts1(1:num_probe_ts))
 
-            do i = 0, 3
-                @:ALLOCATE(q_prim_ts(i)%vf(1:sys_size))
+            do i = 1, num_probe_ts
+                @:ALLOCATE(q_prim_ts1(i)%vf(1:sys_size))
             end do
 
-            do i = 0, 3
+            do i = 1, num_probe_ts
                 do j = 1, sys_size
-                    @:ALLOCATE(q_prim_ts(i)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                    @:ALLOCATE(q_prim_ts1(i)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                         idwbuff(2)%beg:idwbuff(2)%end, &
                         idwbuff(3)%beg:idwbuff(3)%end))
                 end do
+                  @:ACC_SETUP_VFs(q_prim_ts1(i))
             end do
 
-            do i = 0, 3
-                @:ACC_SETUP_VFs(q_prim_ts(i))
+            @:ALLOCATE(q_prim_ts2(1:num_probe_ts))
+
+            do i = 1, num_probe_ts
+                @:ALLOCATE(q_prim_ts2(i)%vf(1:sys_size))
+            end do
+
+            do i = 1, num_probe_ts
+                do j = 1, sys_size
+                    @:ALLOCATE(q_prim_ts2(i)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                        idwbuff(2)%beg:idwbuff(2)%end, &
+                        idwbuff(3)%beg:idwbuff(3)%end))
+                end do
+                  @:ACC_SETUP_VFs(q_prim_ts2(i))
             end do
         end if
 
@@ -708,7 +725,7 @@ contains
                 idwint)
         end if
 
-        #:call GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re]')
+        #:call GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H]')
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -788,7 +805,7 @@ contains
                     do l = 0, p
                         do k = 0, n
                             do j = 0, m
-                                q_prim_ts(3)%vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
+                                q_prim_ts2(2)%vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
                             end do
                         end do
                     end do
@@ -800,7 +817,7 @@ contains
                     do l = 0, p
                         do k = 0, n
                             do j = 0, m
-                                q_prim_ts(2)%vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
+                                q_prim_ts2(1)%vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
                             end do
                         end do
                     end do
@@ -812,7 +829,7 @@ contains
                     do l = 0, p
                         do k = 0, n
                             do j = 0, m
-                                q_prim_ts(1)%vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
+                                q_prim_ts1(2)%vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
                             end do
                         end do
                     end do
@@ -824,7 +841,7 @@ contains
                     do l = 0, p
                         do k = 0, n
                             do j = 0, m
-                                q_prim_ts(0)%vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
+                                q_prim_ts1(1)%vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
                             end do
                         end do
                     end do
@@ -836,10 +853,10 @@ contains
                     do l = 0, p
                         do k = 0, n
                             do j = 0, m
-                                q_prim_ts(3)%vf(i)%sf(j, k, l) = q_prim_ts(2)%vf(i)%sf(j, k, l)
-                                q_prim_ts(2)%vf(i)%sf(j, k, l) = q_prim_ts(1)%vf(i)%sf(j, k, l)
-                                q_prim_ts(1)%vf(i)%sf(j, k, l) = q_prim_ts(0)%vf(i)%sf(j, k, l)
-                                q_prim_ts(0)%vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
+                                q_prim_ts2(2)%vf(i)%sf(j, k, l) = q_prim_ts2(1)%vf(i)%sf(j, k, l)
+                                q_prim_ts2(1)%vf(i)%sf(j, k, l) = q_prim_ts1(2)%vf(i)%sf(j, k, l)
+                                q_prim_ts1(2)%vf(i)%sf(j, k, l) = q_prim_ts1(1)%vf(i)%sf(j, k, l)
+                                q_prim_ts1(1)%vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
                             end do
                         end do
                     end do
@@ -903,13 +920,13 @@ contains
 
         ! Deallocating the cell-average primitive ts variables
         if (probe_wrt) then
-            do i = 0, 3
+            do i = 1, num_probe_ts
                 do j = 1, sys_size
-                    @:DEALLOCATE(q_prim_ts(i)%vf(j)%sf)
+                    @:DEALLOCATE(q_prim_ts1(i)%vf(j)%sf,q_prim_ts2(i)%vf(j)%sf )
                 end do
-                @:DEALLOCATE(q_prim_ts(i)%vf)
+                @:DEALLOCATE(q_prim_ts1(i)%vf, q_prim_ts2(i)%vf)
             end do
-            @:DEALLOCATE(q_prim_ts)
+            @:DEALLOCATE(q_prim_ts1, q_prim_ts2)
         end if
 
         if (.not. igr) then
