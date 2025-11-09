@@ -1000,9 +1000,9 @@ contains
         if (acoustic_source) then
             call nvtxStartRange("RHS-ACOUSTIC-SRC")
             call s_acoustic_src_calculations(q_cons_qp%vf(1:sys_size), &
-                                             q_prim_qp%vf(1:sys_size), &
-                                             t_step, &
-                                             rhs_vf)
+                                            q_prim_qp%vf(1:sys_size), &
+                                            t_step, &
+                                            rhs_vf)
             call nvtxEndRange
         end if
 

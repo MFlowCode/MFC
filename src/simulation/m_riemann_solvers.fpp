@@ -358,7 +358,7 @@ contains
         #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
 
             if (norm_dir == ${NORM_DIR}$) then
-                #:call GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, tau_e_L, tau_e_R, Re_L, Re_R, s_L, s_R, s_S, Ys_L, Ys_R, xi_field_L, xi_field_R, Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, c_fast, pres_mag, B, Ga, vdotB, B2, b4, cm, pcorr, zcoef, vel_L_tmp, vel_R_tmp, rho_L, rho_R, pres_L, pres_R, E_L, E_R, H_L, H_R, Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi, T_L, T_R, Y_L, Y_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Gamm_L, Gamm_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, c_L, c_R, G_L, G_R, rho_avg, H_avg, c_avg, gamma_avg, ptilde_L, ptilde_R, vel_L_rms, vel_R_rms, vel_avg_rms, Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, flux_tau_L, flux_tau_R]')
+                #:call GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, tau_e_L, tau_e_R, Re_L, Re_R, s_L, s_R, s_S, Ys_L, Ys_R, xi_field_L, xi_field_R, Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, c_fast, pres_mag, B, Ga, vdotB, B2, b4, cm, pcorr, zcoef, vel_L_tmp, vel_R_tmp, rho_L, rho_R, pres_L, pres_R, E_L, E_R, H_L, H_R, Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi, T_L, T_R, Y_L, Y_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Gamm_L, Gamm_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, c_L, c_R, G_L, G_R, rho_avg, H_avg, c_avg, gamma_avg, ptilde_L, ptilde_R, vel_L_rms, vel_R_rms, vel_avg_rms, Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, flux_tau_L, flux_tau_R]', copyin='[norm_dir]')
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -1125,7 +1125,7 @@ contains
         #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
 
             if (norm_dir == ${NORM_DIR}$) then
-                #:call GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, tau_e_L, tau_e_R, G_L, G_R, Re_L, Re_R, rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, Ys_L, Ys_R, xi_field_L, xi_field_R, Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, c_fast, pres_mag, B, Ga, vdotB, B2, b4, cm, pcorr, zcoef, vel_L_tmp, vel_R_tmp, vel_grad_L, vel_grad_R, idx_right_phys]')
+                #:call GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, tau_e_L, tau_e_R, G_L, G_R, Re_L, Re_R, rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, Ys_L, Ys_R, xi_field_L, xi_field_R, Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, c_fast, pres_mag, B, Ga, vdotB, B2, b4, cm, pcorr, zcoef, vel_grad_L, vel_grad_R, idx_right_phys, vel_L_rms, vel_R_rms, vel_avg_rms, vel_L_tmp, vel_R_tmp, Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, rho_avg, H_avg, gamma_avg, c_avg, pres_L, pres_R, rho_L, rho_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, c_L, c_R, E_L, E_R, H_L, H_R, Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi, ptilde_L, ptilde_R, s_M, s_P, xi_M, xi_P, Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi, Cp_L, Cp_R, Cv_L, Cv_R, R_gas_L, R_gas_R, MW_L, MW_R, T_L, T_R, Y_L, Y_R]', copyin='[norm_dir]')
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -1648,7 +1648,7 @@ contains
         #:endfor
 
         if (viscous) then
-            #:call GPU_PARALLEL_LOOP(collapse=3, private='[idx_right_phys, vel_grad_L, vel_grad_R, alpha_L, alpha_R, vel_L, vel_R, Re_L, Re_R]')
+            #:call GPU_PARALLEL_LOOP(collapse=3, private='[idx_right_phys, vel_grad_L, vel_grad_R, alpha_L, alpha_R, vel_L, vel_R, Re_L, Re_R]', copyin='[norm_dir]')
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
@@ -3688,7 +3688,7 @@ contains
         #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (norm_dir == ${NORM_DIR}$) then
                 #:block UNDEF_AMD
-                    #:call GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_L, alpha_rho_R, vel, alpha_L, alpha_R, rho, pres,E, H_no_mag, gamma, pi_inf, qv, vel_rms, B, c, c_fast, pres_mag, U_L, U_R, U_starL, U_starR, U_doubleL, U_doubleR, F_L, F_R, F_starL, F_starR, F_hlld]')
+                    #:call GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_L, alpha_rho_R, vel, alpha_L, alpha_R, rho, pres,E, H_no_mag, gamma, pi_inf, qv, vel_rms, B, c, c_fast, pres_mag, U_L, U_R, U_starL, U_starR, U_doubleL, U_doubleR, F_L, F_R, F_starL, F_starR, F_hlld, s_L, s_R, s_M, s_starL, s_starR, pTot_L, pTot_R, p_star, rhoL_star, rhoR_star, E_starL, E_starR, sqrt_rhoL_star, sqrt_rhoR_star, denom_ds, sign_Bx, vL_star, vR_star, wL_star, wR_star, v_double, w_double, By_double, Bz_double, E_doubleL, E_doubleR, E_double]', copyin='[norm_dir]')
                         do l = is3%beg, is3%end
                             do k = is2%beg, is2%end
                                 do j = is1%beg, is1%end
