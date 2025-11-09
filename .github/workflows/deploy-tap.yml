@@ -5,6 +5,7 @@ on:
     branches: [ main, master, homebrew-formula ]
     paths:
       - 'packaging/homebrew/mfc.rb'
+      - 'packaging/homebrew/README.md'
     tags:
       - 'v*.*.*'
   workflow_dispatch:
