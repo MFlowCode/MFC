@@ -1,13 +1,14 @@
 #!/usr/bin/env sh
 Nx=(32 64 128 256 512 1024)
 Order=(1 3 5)
+
 ME=2 # Model equations = 2 for five-equation model
 RS=2 # Riemann solver = 2 for HLLC
 
-#ROOT_DIR=<WORKING DIRECTORY>
-#MFC_DIR=<MFC ROOT DIR>
-ROOT_DIR="/Users/benwilfong/Documents/software/MFC-Wilfong/examples/1D_convergence"
-MFC_DIR="/Users/benwilfong/Documents/software/MFC-Wilfong"
+# Get the directory of the script itself
+ROOT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+# Assume the script is in examples/1D_convergence, so MFC_DIR is two levels up
+MFC_DIR="$(dirname "$(dirname "$ROOT_DIR")")"
 
 for i in "${Nx[@]}"; do
     for j in "${Order[@]}"; do
