@@ -76,7 +76,7 @@ contains
         real(wp) :: nR3bar
         integer(wp) :: i, j, k, l
 
-        #:call GPU_PARALLEL_LOOP(collapse=3)
+        #:call GPU_PARALLEL_LOOP(collapse=3, private ='[nR3bar, i]')
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -196,7 +196,7 @@ contains
         #:endcall GPU_PARALLEL_LOOP
 
         adap_dt_stop_max = 0
-        #:call GPU_PARALLEL_LOOP(collapse=3, private='[Rtmp, Vtmp, myalpha_rho, myalpha]', &
+        #:call GPU_PARALLEL_LOOP(collapse=3, private='[Rtmp, Vtmp, myalpha_rho, myalpha, myR, myV, alf, myP, myRho, R2Vav, R3, nbub, pb_local, mv_local, vflux, pbdot, rddot, n_tait, B_tait]', &
             & reduction='[[adap_dt_stop_max]]', reductionOp='[MAX]', &
             & copy='[adap_dt_stop_max]')
             do l = 0, p
