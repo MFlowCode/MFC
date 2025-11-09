@@ -21,7 +21,7 @@ mfc run case.py -n 2
 ## What's Included
 
 - **Prebuilt binaries**: `pre_process`, `simulation`, `post_process`
-- **Python toolchain**: Pre-configured virtual environment with all dependencies (including Cantera)
+- **Python toolchain**: Pre-configured virtual environment with all dependencies
 - **Examples**: Located at `$(brew --prefix mfc)/examples/`
 - **`mfc` wrapper**: Simplified command-line interface for running cases
 
