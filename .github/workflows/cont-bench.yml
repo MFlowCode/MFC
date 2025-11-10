@@ -1,0 +1,168 @@
+name: 'Continuous Benchmarking'
+
+on:
+  pull_request_review:
+    types: [submitted]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'tag to CB'
+        required: true
+
+permissions:
+  contents: write
+  deployments: write
+  pages: write
+  id-token: write
+
+jobs:
+  file-changes:
+    name: Detect File Changes
+    runs-on: 'ubuntu-latest'
+    outputs: 
+      checkall: ${{ steps.changes.outputs.checkall }}
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
+
+      - name: Detect Changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with: 
+          filters: ".github/file-filter.yml"
+
+  self:
+    name: "${{ matrix.name }} (${{ matrix.device }})"
+    needs: file-changes
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cluster: phoenix
+            name: Georgia Tech | Phoenix (NVHPC)
+            group: phoenix
+            labels: gt
+            flag: p
+            device: cpu
+            interface: none
+            build_script: ""
+          - cluster: phoenix
+            name: Georgia Tech | Phoenix (NVHPC)
+            group: phoenix
+            labels: gt
+            flag: p
+            device: gpu
+            interface: acc
+            build_script: ""
+          - cluster: phoenix
+            name: Georgia Tech | Phoenix (NVHPC)
+            group: phoenix
+            labels: gt
+            flag: p
+            device: gpu
+            interface: omp
+            build_script: ""
+          - cluster: frontier
+            name: Oak Ridge | Frontier (CCE)
+            group: phoenix
+            labels: frontier
+            flag: f
+            device: gpu
+            interface: acc
+            build_script: "bash .github/workflows/frontier/build.sh gpu acc bench"
+    runs-on:
+      group: ${{ matrix.group }}
+      labels: ${{ matrix.labels }}
+    timeout-minutes: 1400
+    env:
+      ACTIONS_RUNNER_FORCE_ACTIONS_NODE_VERSION: node16
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+    steps:
+      - name: Clone - PR
+        uses: actions/checkout@v4
+        with:
+          path: pr
+
+      - name: Clone - Master
+        uses: actions/checkout@v4
+        with:
+          repository: MFlowCode/MFC
+          ref: master
+          path: master
+
+      - name: Setup & Build
+        if: matrix.build_script != ''
+        run: | 
+          (cd pr     && ${{ matrix.build_script }}) &
+          (cd master && ${{ matrix.build_script }}) &
+          wait %1 && wait %2
+
+      - name: Bench (Master v. PR)
+        run: |
+          (cd pr     && bash .github/workflows/${{ matrix.cluster }}/submit-bench.sh .github/workflows/${{ matrix.cluster }}/bench.sh ${{ matrix.device }} ${{ matrix.interface }}) &
+          (cd master && bash .github/workflows/${{ matrix.cluster }}/submit-bench.sh .github/workflows/${{ matrix.cluster }}/bench.sh ${{ matrix.device }} ${{ matrix.interface }}) &
+          wait %1 && wait %2
+
+      - name: Generate & Post Comment
+        run: |
+          git clone "${{ secrets.DOC_PUSH_URL }}" ../www
+          cp ../www/documentation/data.js ./pr/data.js
+          (cd pr && . ./mfc.sh load -c ${{ matrix.flag }} -m g)
+          (cd pr && ./mfc.sh bench_diff ../master/bench-${{ matrix.device }}-${{ matrix.interface }}.yaml ../pr/bench-${{ matrix.device }}-${{ matrix.interface }}.yaml -f data.js -n "${{ matrix.name }} (${{ matrix.device }}/${{ matrix.interface }})")
+
+      - name: Prep Benchmark Results
+        run: |
+          # should fill in the template in pr/cont-bench-template.json
+
+      - name: Post Benchmark Results
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          name: "${{ matrix.name }} (${{ matrix.device }}/${{ matrix.interface }})"
+          tool: 'googlecpp'
+          output-file-path: pr/report.json
+          github-token: ${{ secrets.TOKEN }}
+          auto-push: true
+          alert-threshold: '200%'
+          comment-on-alert: true
+          fail-on-alert: true
+          gh-repository: 'github.com/MFlowCode/MFlowCode.github.io'
+          gh-pages-branch: 'main'
+          benchmark-data-dir-path: 'documentation'
+
+      - name: Polishing Results
+        run:  |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "TAG=$TAG" >> $GITHUB_ENV
+
+          set +e
+          git ls-remote "${{ secrets.DOC_PUSH_URL }}" -q
+          if [ "$?" -ne "0" ]; then exit 0; fi
+          set -e
+          git config --global user.name  'MFC Action'
+          git config --global user.email '<>'
+          git clone "${{ secrets.DOC_PUSH_URL }}" ../www
+          sed -i 's/"unit": "s\/iter"/"unit": "s"/g; s/cpu: /runtime: /g; s/iterations: /time steps: /g' ../www/documentation/data.js
+          sed -i "s/${GITHUB_SHA::7}/$TAG/g" ../www/documentation/data.js
+
+          git -C ../www add -A
+          git -C ../www commit -m "Docs @ ${GITHUB_SHA::7}" || true
+          git -C ../www push
+
+      - name: Print Logs
+        if:   always()
+        run: |
+          cat pr/bench-${{ matrix.device }}-${{ matrix.interface }}.* 2>/dev/null || true
+          cat master/bench-${{ matrix.device }}-${{ matrix.interface }}.* 2>/dev/null || true
+
+      # All other runners (non-Phoenix) just run without special env
+      - name: Archive Logs (Frontier)
+        if: always() && matrix.cluster != 'phoenix'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.cluster }}-${{ matrix.device }}-${{ matrix.interface }}
+          path: |
+            pr/bench-${{ matrix.device }}-${{ matrix.interface }}.*
+            pr/build/benchmarks/*
+            master/bench-${{ matrix.device }}-${{ matrix.interface }}.*
+            master/build/benchmarks/*
