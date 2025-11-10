@@ -28,7 +28,7 @@ module m_precision_select
     integer, parameter :: wp = double_precision
 #endif
 
-    ! Set the storage preceision (stp) to half if mixed precision is requested
+    ! Set the storage precision (stp) to half if mixed precision is requested
 #ifdef MFC_MIXED_PRECISION
     integer, parameter :: stp = half_precision
 #else
@@ -41,12 +41,12 @@ module m_precision_select
     integer, parameter :: mpi_2p = merge(MPI_2DOUBLE_PRECISION, MPI_2REAL, wp == double_precision)
     integer, parameter :: mpi_io_p = merge(MPI_BYTE, mpi_p, stp == half_precision)
     ! MPI types per element. IE Real(kind=2) <=> 2 MPI_BYTE
-    integer, parameter :: mpi_io_tpe = merge(2, 1, stp == half_precision)
+    integer, parameter :: mpi_io_type = merge(2, 1, stp == half_precision)
 #else
     integer, parameter :: mpi_p = -100  ! Default value when MPI is not used
     integer, parameter :: mpi_2p = -100
     integer, parameter :: mpi_io_p = -100
-    integer, parameter :: mpi_io_tpe = -100
+    integer, parameter :: mpi_io_type = -100
 #endif
 
 end module m_precision_select

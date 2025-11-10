@@ -1672,7 +1672,7 @@ contains
                 sf_start_idx = (/0, 0, 0/)
                 sf_extents_loc = shape(bc_buffers(dir, loc)%sf)
 
-                call MPI_TYPE_CREATE_SUBARRAY(num_dims, sf_extents_loc*mpi_io_tpe, sf_extents_loc*mpi_io_tpe, sf_start_idx, &
+                call MPI_TYPE_CREATE_SUBARRAY(num_dims, sf_extents_loc*mpi_io_type, sf_extents_loc*mpi_io_type, sf_start_idx, &
                                               MPI_ORDER_FORTRAN, mpi_io_p, MPI_BC_BUFFER_TYPE(dir, loc), ierr)
                 call MPI_TYPE_COMMIT(MPI_BC_BUFFER_TYPE(dir, loc), ierr)
             end do
@@ -1777,7 +1777,7 @@ contains
         ! Write bc_buffers
         do dir = 1, num_dims
             do loc = 1, 2
-                nelements = sizeof(bc_buffers(dir, loc)%sf)*mpi_io_tpe/stp
+                nelements = sizeof(bc_buffers(dir, loc)%sf)*mpi_io_type/stp
                 call MPI_File_write_all(file_id, bc_buffers(dir, loc)%sf, nelements, mpi_io_p, MPI_STATUS_IGNORE, ierr)
             end do
         end do
@@ -1888,7 +1888,7 @@ contains
         ! Read bc_buffers
         do dir = 1, num_dims
             do loc = 1, 2
-                nelements = sizeof(bc_buffers(dir, loc)%sf)*mpi_io_tpe/stp
+                nelements = sizeof(bc_buffers(dir, loc)%sf)*mpi_io_type/stp
                 call MPI_File_read_all(file_id, bc_buffers(dir, loc)%sf, nelements, mpi_io_p, MPI_STATUS_IGNORE, ierr)
                 $:GPU_UPDATE(device='[bc_buffers(dir, loc)%sf]')
             end do
