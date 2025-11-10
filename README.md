@@ -60,6 +60,7 @@ MFC runs at exascale on the world's fastest supercomputers:
 | Path | Command |
 | --- | --- |
 | **Codespaces** (fastest) | Click the "Codespaces" badge above to launch in 1 click |
+| **Homebrew (macOS)** | `brew install mflowcode/mfc/mfc && mfc run $(brew --prefix mfc)/examples/1D_sodshocktube/case.py -n 2` |
 | **Local build** | `./mfc.sh build -j $(nproc) && ./mfc.sh test -j $(nproc)` |
 
 **Welcome!**

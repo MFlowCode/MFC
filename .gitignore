@@ -100,3 +100,5 @@ benchmarks/*.png
 
 
 *.log
+packaging/spack/spack-test
+.spack 
