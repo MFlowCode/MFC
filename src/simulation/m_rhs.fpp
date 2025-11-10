@@ -106,8 +106,12 @@ module m_rhs
     !> @{
     type(vector_field), allocatable, dimension(:) :: dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n
     type(vector_field), allocatable, dimension(:) :: dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n
-    ! $:GPU_DECLARE(create='[dqL_prim_dx_n,dqL_prim_dy_n,dqL_prim_dz_n]')
-    ! $:GPU_DECLARE(create='[dqR_prim_dx_n,dqR_prim_dy_n,dqR_prim_dz_n]')
+#if defined(MFC_OpenACC)
+#ifndef __CRAYFTN
+    $:GPU_DECLARE(create='[dqL_prim_dx_n,dqL_prim_dy_n,dqL_prim_dz_n]')
+    $:GPU_DECLARE(create='[dqR_prim_dx_n,dqR_prim_dy_n,dqR_prim_dz_n]')
+#endif
+#endif
     !> @}
 
     type(scalar_field), allocatable, dimension(:) :: tau_Re_vf
@@ -125,7 +129,11 @@ module m_rhs
     !> @{
     type(vector_field), allocatable, dimension(:) :: gm_alphaL_n
     type(vector_field), allocatable, dimension(:) :: gm_alphaR_n
-    ! $:GPU_DECLARE(create='[gm_alphaL_n,gm_alphaR_n]')
+#if defined(MFC_OpenACC)
+#ifndef __CRAYFTN
+    $:GPU_DECLARE(create='[gm_alphaL_n,gm_alphaR_n]')
+#endif
+#endif
     !> @}
 
     !> @name The cell-boundary values of the fluxes (src - source, gsrc - geometrical
@@ -135,11 +143,21 @@ module m_rhs
     type(vector_field), allocatable, dimension(:) :: flux_n
     type(vector_field), allocatable, dimension(:) :: flux_src_n
     type(vector_field), allocatable, dimension(:) :: flux_gsrc_n
-    ! $:GPU_DECLARE(create='[flux_n,flux_src_n,flux_gsrc_n]')
+
+#if defined(MFC_OpenACC)
+#ifndef __CRAYFTN
+    $:GPU_DECLARE(create='[flux_n,flux_src_n,flux_gsrc_n]')
+#endif
+#endif
+
     !> @}
 
     type(vector_field), allocatable, dimension(:) :: qL_prim, qR_prim
-    ! $:GPU_DECLARE(create='[qL_prim,qR_prim]')
+#if defined(MFC_OpenACC)
+#ifndef __CRAYFTN
+    $:GPU_DECLARE(create='[qL_prim,qR_prim]')
+#endif
+#endif
 
     type(int_bounds_info) :: iv !< Vector field indical bounds
     $:GPU_DECLARE(create='[iv]')
@@ -239,7 +257,7 @@ contains
         if (.not. igr) then
             @:ALLOCATE(flux_n(1:num_dims))
             @:ALLOCATE(flux_src_n(1:num_dims))
-            @:ALLOCATE(flux_gsrc_n(1:num_dims))
+            @:ALLOCATE(flux_gsrc_n(1:num_dims))   
 
             do i = 1, num_dims
 
