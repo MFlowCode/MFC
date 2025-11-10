@@ -65,6 +65,233 @@ For example, to run the `scaling` case in "weak-scaling" mode:
 ```shell
 ./mfc.sh run examples/scaling/case.py -t pre_process -j 8 -- --scaling weak
 ```
+## Features
+The following diagram displays feature-mapping hierarchy. To properly setup, ensure there is a direct correlation from parent feature to sub-features.
+
+\dot
+digraph MFC_features
+{
+    newrank=true
+    compound=true;
+    fontsize="10";
+    fontname="Open Sans";
+
+    node [shape=plaintext, fontsize="10", fontname="Open Sans"]
+                           
+    Bootstrap      [label= "Bootstrap"   shape= "box"        color="black" penwidth=2];
+
+    //--- ALib Camps ---
+//  Application    [label= Application     shape= "component" style="bold" color="chocolate"];
+    ALox           [label= ALox            shape= "component" style="bold" color="chocolate"];
+    Camp           [label= Camp            shape= "component" style="bold" color="chocolate4"];
+    CLI            [label= CLI             shape= "component" style="bold" color="chocolate"];
+    Expressions    [label= Expressions     shape= "component" style="bold" color="chocolate"];
+    Files          [label= Files           shape= "component" style="bold" color="chocolate"];
+
+    Bootstrap      -> { ALox CLI Expressions Files }          [ color="gray69"  style=dotted, penwidth=2 ];
+
+    //--- Below Camp ---
+    Format           [label= Format       shape= "box" color="dodgerblue4"  ];
+    Exceptions       [label= Exceptions   shape= "box" color="dodgerblue4"  ];
+    Resources        [label= Resources    shape= "box" color="dodgerblue4"  ];
+    System           [label= System       shape= "box" color="dodgerblue4"  ];
+    Variables        [label= Variables    shape= "box" color="dodgerblue4"  ];
+
+
+  //Application     -> { CLI ALox                      }  [ color="midnightblue" ];
+  //Application     -> { Files Expressions ThreadModel }  [ color="gray69"  style=dotted, penwidth=2 ];
+    Files           -> { Expressions ALox                }  [ color="gray69"  style=dotted, penwidth=2 ];
+    Files           -> { Camp                            }  [ color="midnightblue" ];
+    CLI             -> { Camp                            }  [ color="midnightblue" ];
+    Expressions     -> { Camp                            }  [ color="midnightblue" ];
+    ALox            -> { Camp                            }  [ color="midnightblue" ];
+
+    Variables       -> { System Monomem Containers       }  [ color="gray15" ];
+    Camp            -> { Format Variables                }  [ color="gray15" ];
+    Format          -> { Exceptions                      }  [ color="gray15" ];
+    Exceptions      -> { Resources Boxing EnumRecords    }  [ color="gray15" ];
+    System          -> { Boxing EnumRecords              }  [ color="gray15" ];
+    Resources       -> { Strings Containers Monomem      }  [ color="gray15" ];
+
+                            
+    ThreadModel    [label= ThreadModel           shape= "box"        color="dodgerblue4"     style="bold" ];
+    BitBuffer      [label= BitBuffer             shape= "box"        color="dodgerblue4"     style="bold"  ];
+                                                 
+    Boxing         [label= Boxing                shape= "box"        color="dodgerblue4"   ];
+    Containers     [label= Containers            shape= "box"        color="dodgerblue4"   ];
+    EnumRecords    [label= EnumRecords           shape= "box"        color="dodgerblue4"   ];
+    Monomem        [label= Monomem               shape= "box"        color="dodgerblue4"   ];
+    Singletons     [label= Singletons            shape= "box"        color="dodgerblue4"   ];
+    Strings        [label= Strings               shape= "box"        color="dodgerblue4"   ];
+
+    subgraph Modules2        {  rank="same"  ALox CLI Expressions                  color="dodgerblue4" }
+    //subgraph Modules3        {  rank="same"  Monomem Strings                       color="dodgerblue4" }
+                                                
+    //--- dependencies base module -> base module 
+    BitBuffer       -> { Monomem Containers }            [ color="gray15"  ];
+    ThreadModel     -> { Boxing Containers Monomem }     [ color="gray15"  ];
+
+
+    //--- dependencies base module -> base module 
+    Boxing          -> { Singletons          }            [ color="gray15"  ];
+    EnumRecords     -> { Singletons  Strings }            [ color="gray15"  ];
+
+     
+    // optional dependencies
+    Singletons      -> { Monomem Containers }          [ color="gray69"  style=dotted, penwidth=2 ];
+    Boxing          -> { Monomem Containers Strings}   [ color="gray69"  style=dotted, penwidth=2 ];
+    Containers      -> { Strings  }                    [ color="gray69"  style=dotted, penwidth=2 ];
+    Strings         -> { Monomem  }                    [ color="gray69"  style=dotted, penwidth=2 ];
+    EnumRecords     -> { Monomem Containers Boxing }   [ color="gray69"  style=dotted, penwidth=2 ];
+    Containers      -> { Monomem  }                    [ color="gray69"  style=dotted, penwidth=2 ];
+    BitBuffer       -> { EnumRecords  }                [ color="gray69"  style=dotted, penwidth=2 ];
+    Resources       -> { EnumRecords  }                [ color="gray69"  style=dotted, penwidth=2 ];
+    ThreadModel     -> { EnumRecords Strings }         [ color="gray69"  style=dotted, penwidth=2 ];
+    System          -> { Monomem Exceptions }          [ color="gray69"  style=dotted, penwidth=2 ];
+}
+\enddot       
+
+
+\htmlonly
+<div id="features-map" style="max-width:900px;margin:16px auto;border-radius:8px;overflow:hidden;">
+<div id="mapContainer" style="position:relative;width:100%;height:480px;background:transparent;">
+    <canvas id="canvas" style="position:absolute;inset:0;width:100%;height:100%;"></canvas>
+    <div id="featureNodes" style="position:relative;width:100%;height:100%;"></div>
+    <button id="resetBtn" style="position:absolute;right:10px;top:10px;z-index:30;padding:6px 10px;border-radius:6px;border:1px solid #ddd;background:#fff;cursor:pointer;">reset</button>
+</div>
+</div>
+
+<style>
+#mapContainer .feature-node { color: #222 !important; }
+#mapContainer .feature-node.selected { color: #fff !important; } /* keep selected text white */
+#mapContainer #resetBtn { color: #222 !important; }
+
+.feature-node{
+    position:absolute;padding:10px 14px;border-radius:999px;font-weight:600;font-size:13px;
+    transform:translate(-50%,-50%);cursor:pointer;z-index:20;background:#fff;border:2px solid transparent;
+    box-shadow:0 4px 14px rgba(0,0,0,0.06);white-space:nowrap;
+}
+.feature-node.compatible{border-color:#28a745;opacity:1}
+.feature-node.incompatible{opacity:.28;filter:grayscale(.6);cursor:not-allowed}
+.feature-node.selected{background:#3572a5;color:#fff;border-color:#3572a5;box-shadow:0 8px 24px rgba(53,114,165,.18)}
+</style>
+
+<script>
+    // Define features and their positions on the map
+    const features = [
+        { id: 'A', name: 'Feature A', x: 15, y: 20 },
+        { id: 'B', name: 'Feature B', x: 45, y: 15 },
+        { id: 'C', name: 'Feature C', x: 75, y: 20 },
+        { id: 'D', name: 'Feature D', x: 25, y: 50 },
+        { id: 'E', name: 'Feature E', x: 55, y: 45 },
+        { id: 'F', name: 'Feature F', x: 85, y: 55 },
+        { id: 'G', name: 'Feature G', x: 35, y: 80 },
+        { id: 'H', name: 'Feature H', x: 70, y: 85 }
+    ];
+    
+    // Compatibility matrix
+    const compatibility = {
+        'A': ['A', 'B', 'D', 'E', 'G'],
+        'B': ['A', 'B', 'C', 'E', 'F', 'H'],
+        'C': ['B', 'C', 'F', 'H'],
+        'D': ['A', 'D', 'E', 'G'],
+        'E': ['A', 'B', 'D', 'E', 'F', 'G', 'H'],
+        'F': ['B', 'C', 'E', 'F', 'H'],
+        'G': ['A', 'D', 'E', 'G'],
+        'H': ['B', 'C', 'E', 'F', 'H']
+    };
+    
+      let selected = [];
+      let available = features.map(f=>f.id);
+      const elMap = document.getElementById('mapContainer');
+      const nodesEl = document.getElementById('featureNodes');
+      const canvas = document.getElementById('canvas');
+      const ctx = canvas.getContext && canvas.getContext('2d');
+      const elems = {};
+
+      function resizeCanvas(){
+        const r = elMap.getBoundingClientRect();
+        canvas.width = r.width * devicePixelRatio;
+        canvas.height = r.height * devicePixelRatio;
+        canvas.style.width = r.width + 'px';
+        canvas.style.height = r.height + 'px';
+        if(ctx) ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+      }
+
+      function init(){
+        features.forEach(f=>{
+          const d = document.createElement('div');
+          d.className = 'feature-node';
+          d.textContent = f.name;
+          d.style.left = f.x + '%';
+          d.style.top = f.y + '%';
+          d.addEventListener('click',()=>onClick(f.id));
+          nodesEl.appendChild(d);
+          elems[f.id]=d;
+        });
+        window.addEventListener('resize',()=>{ resizeCanvas(); draw(); });
+        document.getElementById('resetBtn').addEventListener('click',reset);
+        resizeCanvas(); updateStates(); draw();
+      }
+
+      function onClick(id){
+        if(!available.includes(id) && !selected.includes(id)) return;
+        if(selected.includes(id)) {
+          const i = selected.indexOf(id);
+          selected = selected.slice(0,i);
+        } else selected.push(id);
+        updateAvailable();
+        updateStates();
+        draw();
+      }
+
+      function updateAvailable(){
+        if(selected.length===0){ available = features.map(f=>f.id); return; }
+        available = features.map(f=>f.id).filter(id=>{
+          if (selected.includes(id)) return false;
+          return selected.every(s=> (compatibility[s]||[]).includes(id) );
+        });
+      }
+
+      function updateStates(){
+        features.forEach(f=>{
+          const n = elems[f.id];
+          n.classList.remove('compatible','incompatible','selected');
+          if(selected.includes(f.id)) n.classList.add('selected');
+          else if(available.includes(f.id)) n.classList.add('compatible');
+          else n.classList.add('incompatible');
+        });
+      }
+
+      function draw(){
+        if(!ctx) return;
+        const rect = elMap.getBoundingClientRect();
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+        if(selected.length===0) return;
+        selected.forEach(sid=>{
+          const sEl = elems[sid].getBoundingClientRect();
+          const sx = sEl.left - rect.left + sEl.width/2;
+          const sy = sEl.top  - rect.top  + sEl.height/2;
+          available.forEach(aid=>{
+            if(!(compatibility[sid]||[]).includes(aid)) return;
+            const aEl = elems[aid].getBoundingClientRect();
+            const ex = aEl.left - rect.left + aEl.width/2;
+            const ey = aEl.top  - rect.top  + aEl.height/2;
+            ctx.beginPath();
+            ctx.strokeStyle = '#28a745'; ctx.lineWidth = 2; ctx.globalAlpha = 0.28;
+            const mx = (sx+ex)/2, my = (sy+ey)/2;
+            ctx.moveTo(sx,sy); ctx.quadraticCurveTo(mx,my-30,ex,ey); ctx.stroke();
+          });
+        });
+        ctx.globalAlpha = 1;
+      }
+      function reset(){ selected=[]; available = features.map(f=>f.id); updateStates(); draw(); }
+      init();
+  </script>
+</script>
+\endhtmlonly
+
+
 
 ## Parameters
 
