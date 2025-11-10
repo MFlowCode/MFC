@@ -1509,7 +1509,7 @@ contains
 
         $:GPU_UPDATE(device='[chem_params]')
 
-        $:GPU_UPDATE(device='[nb,R0ref,Ca,Web,Re_inv,weight,R0, &
+        $:GPU_UPDATE(device='[R0ref,Ca,Web,Re_inv,weight,R0, &
             & bubbles_euler,polytropic,polydisperse,qbmm, &
             & ptil,bubble_model,thermal,poly_sigma,adv_n,adap_dt, &
             & adap_dt_tol,adap_dt_max_iters,n_idx,pi_fac,low_Mach]')
@@ -1549,9 +1549,9 @@ contains
         if (ib) then
             $:GPU_UPDATE(device='[ib_markers%sf]')
         end if
-
-        $:GPU_UPDATE(device='[igr, igr_order]')
-
+#:if not MFC_CASE_OPTIMIZATION
+        $:GPU_UPDATE(device='[igr,nb,igr_order]')
+#:endif
         #:block DEF_AMD
             block
                 use m_thermochem, only: molecular_weights
