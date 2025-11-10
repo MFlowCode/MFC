@@ -97,8 +97,10 @@ jobs:
 
       - name: Generate & Post Comment
         run: |
+          git clone "${{ secrets.DOC_PUSH_URL }}" ../www
+          cp ../www/documentation/data.js ./pr/data.js
           (cd pr && . ./mfc.sh load -c ${{ matrix.flag }} -m g)
-          (cd pr && ./mfc.sh bench_diff ../master/bench-${{ matrix.device }}-${{ matrix.interface }}.yaml ../pr/bench-${{ matrix.device }}-${{ matrix.interface }}.yaml)
+          (cd pr && ./mfc.sh bench_diff ../master/bench-${{ matrix.device }}-${{ matrix.interface }}.yaml ../pr/bench-${{ matrix.device }}-${{ matrix.interface }}.yaml -f data.js -n "${{ matrix.name }} (${{ matrix.device }}/${{ matrix.interface }})")
 
       - name: Print Logs
         if:   always()
