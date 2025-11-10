@@ -130,8 +130,6 @@ contains
     impure subroutine s_apply_fourier_filter(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        real(c_double), pointer :: p_real(:)
-        complex(c_double_complex), pointer :: p_cmplx(:), p_fltr_cmplx(:)
         integer :: i, j, k, l !< Generic loop iterators
         integer :: ierr !< Generic flag used to identify and report GPU errors
 
@@ -159,16 +157,12 @@ contains
             end do
         #:endcall GPU_PARALLEL_LOOP
 
-        p_real => data_real_gpu
-        p_cmplx => data_cmplx_gpu
-        p_fltr_cmplx => data_fltr_cmplx_gpu
 
-        #:call GPU_DATA(attach='[p_real, p_cmplx, p_fltr_cmplx]')
-            #:call GPU_HOST_DATA(use_device_ptr='[p_real, p_cmplx, p_fltr_cmplx]')
+            #:call GPU_HOST_DATA(use_device_addr='[data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu]')
 #if defined(__PGI)
                 ierr = cufftExecD2Z(fwd_plan_gpu, data_real_gpu, data_cmplx_gpu)
 #else
-                ierr = hipfftExecD2Z(fwd_plan_gpu, c_loc(p_real), c_loc(p_cmplx))
+                ierr = hipfftExecD2Z(fwd_plan_gpu, data_real_gpu, data_cmplx_gpu)
                 call hipCheck(hipDeviceSynchronize())
 #endif
             #:endcall GPU_HOST_DATA
@@ -185,11 +179,11 @@ contains
                 end do
             #:endcall GPU_PARALLEL_LOOP
 
-            #:call GPU_HOST_DATA(use_device_ptr='[p_real, p_fltr_cmplx]')
+            #:call GPU_HOST_DATA(use_device_addr='[data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu]')
 #if defined(__PGI)
                 ierr = cufftExecZ2D(bwd_plan_gpu, data_fltr_cmplx_gpu, data_real_gpu)
 #else
-                ierr = hipfftExecZ2D(bwd_plan_gpu, c_loc(p_fltr_cmplx), c_loc(p_real))
+                ierr = hipfftExecZ2D(bwd_plan_gpu, data_fltr_cmplx_gpu, data_real_gpu)
                 call hipCheck(hipDeviceSynchronize())
 #endif
             #:endcall GPU_HOST_DATA
@@ -227,11 +221,11 @@ contains
                     end do
                 #:endcall GPU_PARALLEL_LOOP
 
-                #:call GPU_HOST_DATA(use_device_ptr='[p_real, p_cmplx]')
+                #:call GPU_HOST_DATA(use_device_addr='[data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu]')
 #if defined(__PGI)
                     ierr = cufftExecD2Z(fwd_plan_gpu, data_real_gpu, data_cmplx_gpu)
 #else
-                    ierr = hipfftExecD2Z(fwd_plan_gpu, c_loc(p_real), c_loc(p_cmplx))
+                    ierr = hipfftExecD2Z(fwd_plan_gpu, data_real_gpu, data_cmplx_gpu)
                     call hipCheck(hipDeviceSynchronize())
 #endif
                 #:endcall GPU_HOST_DATA
@@ -249,11 +243,11 @@ contains
                     end do
                 #:endcall GPU_PARALLEL_LOOP
 
-                #:call GPU_HOST_DATA(use_device_ptr='[p_real, p_fltr_cmplx]')
+                #:call GPU_HOST_DATA(use_device_addr='[data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu]')
 #if defined(__PGI)
                     ierr = cufftExecZ2D(bwd_plan_gpu, data_fltr_cmplx_gpu, data_real_gpu)
 #else
-                    ierr = hipfftExecZ2D(bwd_plan_gpu, c_loc(p_fltr_cmplx), c_loc(p_real))
+                    ierr = hipfftExecZ2D(bwd_plan_gpu, data_fltr_cmplx_gpu, data_real_gpu)
                     call hipCheck(hipDeviceSynchronize())
 #endif
                 #:endcall GPU_HOST_DATA
@@ -268,9 +262,7 @@ contains
                         end do
                     end do
                 #:endcall GPU_PARALLEL_LOOP
-
             end do
-        #:endcall GPU_DATA
 
 #else
         Nfq = 3
