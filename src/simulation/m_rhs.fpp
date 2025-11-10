@@ -109,11 +109,6 @@ module m_rhs
 #if defined(MFC_OpenACC)
     $:GPU_DECLARE(create='[dqL_prim_dx_n,dqL_prim_dy_n,dqL_prim_dz_n]')
     $:GPU_DECLARE(create='[dqR_prim_dx_n,dqR_prim_dy_n,dqR_prim_dz_n]')
-#else
-#ifndef __CRAYFTN
-    $:GPU_DECLARE(create='[dqL_prim_dx_n,dqL_prim_dy_n,dqL_prim_dz_n]')
-    $:GPU_DECLARE(create='[dqR_prim_dx_n,dqR_prim_dy_n,dqR_prim_dz_n]')
-#endif
 #endif
     !> @}
 
@@ -134,10 +129,6 @@ module m_rhs
     type(vector_field), allocatable, dimension(:) :: gm_alphaR_n
 #if defined(MFC_OpenACC)
     $:GPU_DECLARE(create='[gm_alphaL_n,gm_alphaR_n]')
-#else
-#ifndef __CRAYFTN
-    $:GPU_DECLARE(create='[gm_alphaL_n,gm_alphaR_n]')
-#endif
 #endif
     !> @}
 
@@ -151,10 +142,6 @@ module m_rhs
 
 #if defined(MFC_OpenACC)
     $:GPU_DECLARE(create='[flux_n,flux_src_n,flux_gsrc_n]')
-#else
-#ifndef __CRAYFTN
-    $:GPU_DECLARE(create='[flux_n,flux_src_n,flux_gsrc_n]')
-#endif
 #endif
 
     !> @}
@@ -162,10 +149,6 @@ module m_rhs
     type(vector_field), allocatable, dimension(:) :: qL_prim, qR_prim
 #if defined(MFC_OpenACC)
     $:GPU_DECLARE(create='[qL_prim,qR_prim]')
-#else
-#ifndef __CRAYFTN
-    $:GPU_DECLARE(create='[qL_prim,qR_prim]')
-#endif
 #endif
 
     type(int_bounds_info) :: iv !< Vector field indical bounds
