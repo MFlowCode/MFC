@@ -181,8 +181,8 @@ started, run ./mfc.sh build -h.""",
         if args["binary"] is not None and args["engine"] != "interactive":
             raise MFCException("./mfc.sh run's --binary can only be used with --engine=interactive.")
         if isinstance(args["name"], str):
-          # "Slugify" the name of the job
-          args["name"] = re.sub(r'[\W_]+', '-', args["name"]).strip('-')
+            # "Slugify" the name of the job
+            args["name"] = re.sub(r'[\W_]+', '-', args["name"]).strip('-')
     elif args["command"] == "bench_diff" and len(args["name"]) > 0:
         args["name"] = " ".join(args["name"])
 

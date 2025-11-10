@@ -1,0 +1,285 @@
+cases:
+  5eq_rk3_weno3_hllc:
+    description:
+      args:
+      - -c
+      - phoenix
+      - --gpu
+      - -g
+      - '0'
+      - '1'
+      - -n
+      - '2'
+      path: /opt/MFC/benchmarks/5eq_rk3_weno3_hllc/case.py
+      slug: 5eq_rk3_weno3_hllc
+    output_summary:
+      invocation:
+      - run
+      - /opt/MFC/benchmarks/5eq_rk3_weno3_hllc/case.py
+      - --case-optimization
+      - --targets
+      - pre_process
+      - simulation
+      - post_process
+      - --output-summary
+      - /opt/MFC/build/benchmarks/9de1/5eq_rk3_weno3_hllc.yaml
+      - -c
+      - phoenix
+      - --gpu
+      - -g
+      - '0'
+      - '1'
+      - -n
+      - '2'
+      - --
+      - --gbpp
+      - '12'
+      lock:
+        debug: false
+        fastmath: false
+        gcov: false
+        gpu: true
+        mpi: true
+        single: false
+        unified: false
+      post_process:
+        exec: 4.8194991
+      pre_process:
+        exec: 10.0581012
+      simulation:
+        exec: 47.2468157
+        grind: 0.67073686
+      syscheck:
+        exec: 1.3798784
+  hypo_hll:
+    description:
+      args:
+      - -c
+      - phoenix
+      - --gpu
+      - -g
+      - '0'
+      - '1'
+      - -n
+      - '2'
+      path: /opt/MFC/benchmarks/hypo_hll/case.py
+      slug: hypo_hll
+    output_summary:
+      invocation:
+      - run
+      - /opt/MFC/benchmarks/hypo_hll/case.py
+      - --case-optimization
+      - --targets
+      - pre_process
+      - simulation
+      - post_process
+      - --output-summary
+      - /opt/MFC/build/benchmarks/9de1/hypo_hll.yaml
+      - -c
+      - phoenix
+      - --gpu
+      - -g
+      - '0'
+      - '1'
+      - -n
+      - '2'
+      - --
+      - --gbpp
+      - '12'
+      lock:
+        debug: false
+        fastmath: false
+        gcov: false
+        gpu: true
+        mpi: true
+        single: false
+        unified: false
+      post_process:
+        exec: 9.2257145
+      pre_process:
+        exec: 92.3468801
+      simulation:
+        exec: 245.5551634
+        grind: 323170
+      syscheck:
+        exec: 1.2918744
+  ibm:
+    description:
+      args:
+      - -c
+      - phoenix
+      - --gpu
+      - -g
+      - '0'
+      - '1'
+      - -n
+      - '2'
+      path: /opt/MFC/benchmarks/ibm/case.py
+      slug: ibm
+    output_summary:
+      invocation:
+      - run
+      - /opt/MFC/benchmarks/ibm/case.py
+      - --case-optimization
+      - --targets
+      - pre_process
+      - simulation
+      - post_process
+      - --output-summary
+      - /opt/MFC/build/benchmarks/9de1/ibm.yaml
+      - -c
+      - phoenix
+      - --gpu
+      - -g
+      - '0'
+      - '1'
+      - -n
+      - '2'
+      - --
+      - --gbpp
+      - '12'
+      lock:
+        debug: false
+        fastmath: false
+        gcov: false
+        gpu: true
+        mpi: true
+        single: false
+        unified: false
+      post_process:
+        exec: 4.9753983
+      pre_process:
+        exec: 11.9773121
+      simulation:
+        exec: 148.6407971
+        grind: 32317
+      syscheck:
+        exec: 1.230999
+  igr:
+    description:
+      args:
+      - -c
+      - phoenix
+      - --gpu
+      - -g
+      - '0'
+      - '1'
+      - -n
+      - '2'
+      path: /opt/MFC/benchmarks/igr/case.py
+      slug: igr
+    output_summary:
+      invocation:
+      - run
+      - /opt/MFC/benchmarks/igr/case.py
+      - --case-optimization
+      - --targets
+      - pre_process
+      - simulation
+      - post_process
+      - --output-summary
+      - /opt/MFC/build/benchmarks/9de1/igr.yaml
+      - -c
+      - phoenix
+      - --gpu
+      - -g
+      - '0'
+      - '1'
+      - -n
+      - '2'
+      - --
+      - --gbpp
+      - '12'
+      lock:
+        debug: false
+        fastmath: false
+        gcov: false
+        gpu: true
+        mpi: true
+        single: false
+        unified: false
+      pre_process:
+        exec: 8.1699418
+      simulation:
+        exec: 36.3594534
+        grind: 0.72979167
+      syscheck:
+        exec: 1.3865383
+  viscous_weno5_sgb_acoustic:
+    description:
+      args:
+      - -c
+      - phoenix
+      - --gpu
+      - -g
+      - '0'
+      - '1'
+      - -n
+      - '2'
+      path: /opt/MFC/benchmarks/viscous_weno5_sgb_acoustic/case.py
+      slug: viscous_weno5_sgb_acoustic
+    output_summary:
+      invocation:
+      - run
+      - /opt/MFC/benchmarks/viscous_weno5_sgb_acoustic/case.py
+      - --case-optimization
+      - --targets
+      - pre_process
+      - simulation
+      - post_process
+      - --output-summary
+      - /opt/MFC/build/benchmarks/9de1/viscous_weno5_sgb_acoustic.yaml
+      - -c
+      - phoenix
+      - --gpu
+      - -g
+      - '0'
+      - '1'
+      - -n
+      - '2'
+      - --
+      - --gbpp
+      - '12'
+      lock:
+        debug: false
+        fastmath: false
+        gcov: false
+        gpu: true
+        mpi: true
+        single: false
+        unified: false
+      post_process:
+        exec: 4.8518692
+      pre_process:
+        exec: 8.7731736
+      simulation:
+        exec: 94.3440505
+        grind: 1.99630224
+      syscheck:
+        exec: 1.2763789
+metadata:
+  invocation:
+  - bench
+  - --mem
+  - '12'
+  - -j
+  - '24'
+  - -o
+  - v5.0.6-gpu.yaml
+  - --
+  - -c
+  - phoenix
+  - --gpu
+  - -g
+  - '0'
+  - '1'
+  - -n
+  - '2'
+  lock:
+    debug: false
+    fastmath: false
+    gcov: false
+    gpu: true
+    mpi: true
+    single: false
+    unified: false

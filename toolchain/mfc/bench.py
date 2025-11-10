@@ -107,36 +107,28 @@ def diff():
         """)
 
     cb_stats = {}
-    if ARG("file") is not None and ARG("name") is not None:
-        try:
-            with open(ARG("file"), 'r') as f:
-                data_json = json.load(f)
-            
-            cb_test = ARG("name")
-            if "entries" in data_json and cb_test in data_json["entries"]:
-                benchmark_runs = data_json["entries"][cb_test]
-                case_times = {}
-                for run in benchmark_runs:
-                    if "benches" not in run:
-                        continue
-                    for bench in run["benches"]:
-                        case_name = bench.get("name")
-                        grind_value = bench.get("value")
-                        if case_name is None or grind_value is None:
-                            continue
-                        if case_name not in case_times:
-                            case_times[case_name] = []
-                        case_times[case_name].append(grind_value)
-                for case_name, values in case_times.items():
-                    if len(values) > 0:
-                        avg = sum(values) / len(values)
-                        cb_stats[case_name] = {"avg": avg, "count": len(values)}
-                                
-                cons.print(f"[bold]Loaded cb data for test: [bold]{cb_test}[/bold] ({len(cb_stats)} cases)[/bold]")
-            else:
-                cons.print(f"[bold yellow]Warning[/bold yellow]: Test '[bold]{cb_test}[/bold]' not found in data file.")
-        except Exception as e:
-            cons.print(f"[bold yellow]Warning[/bold yellow]: Could not load data file: {e}")
+    try:
+        with open(ARG("file"), 'r') as f:
+            data_json = json.load(f)
+        cb_test = ARG("name")
+        if "entries" in data_json and cb_test in data_json["entries"]:
+            benchmark_runs = data_json["entries"][cb_test]
+            case_times = {}
+            for run in benchmark_runs:
+                for benches in run["benches"]:
+                    case_name = benches.get("name")
+                    grind_value = benches.get("value")
+                    if (case_name is None or case_name not in case_times) or grind_value is None:
+                        case_times[case_name] = []
+                    case_times[case_name].append(grind_value)
+            for case_name, values in case_times.items():
+                avg = sum(values) / len(values)
+                cb_stats[case_name] = {"avg": avg, "count": len(values)}
+            cons.print(f"[bold]Loaded cb data for test: [bold]{cb_test}[/bold] ({len(cb_stats)} cases)[/bold]")
+        else:
+            cons.print(f"[bold yellow]Warning[/bold yellow]: Test '[bold]{cb_test}[/bold]' not found in data file.")
+    except Exception as e:
+        cons.print(f"[bold yellow]Warning[/bold yellow]: Could not load data file: {e}")
 
     table = rich.table.Table(show_header=True, box=rich.table.box.SIMPLE)
     table.add_column("[bold]Case[/bold]",    justify="left")
@@ -177,10 +169,9 @@ def diff():
                         err = 1
                     if slug in cb_stats:
                         rhs_grind = rhs_summary[target.name]["grind"]
-                        stats = cb_stats[slug]
-                        avg = stats["avg"]
-                        offset_pct = ((rhs_grind - avg) / avg * 100)
-                        color = "red" if (offset_pct) > 0 else "yellow" if abs(offset_pct) == 0 else "green"
+                        avg = cb_stats[slug]["avg"]
+                        offset_pct = (rhs_grind - avg) / avg * 100
+                        color = "red" if (offset_pct) > 0 else "yellow" if (offset_pct) == 0 else "green"
                         grind_comparison = f"[{color}]{offset_pct:+.2f}%[/{color}] (avg: {avg:.2f})"
 
             except Exception as _:
@@ -194,4 +185,3 @@ def diff():
     cons.raw.print(table)
     if err:
         raise MFCException("Benchmarking failed")
-        
