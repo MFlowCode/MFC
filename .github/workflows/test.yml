@@ -111,10 +111,6 @@ jobs:
           - device: 'cpu'
             interface: 'none'
             lbl: 'frontier'
-        exclude:
-          - device: 'gpu'
-            interface: 'omp'
-            lbl: 'frontier'
     runs-on:
       group:  phoenix
       labels: ${{ matrix.lbl }}
