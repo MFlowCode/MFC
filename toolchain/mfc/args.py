@@ -138,6 +138,8 @@ started, run ./mfc.sh build -h.""",
     add_common_arguments(bench_diff, "t")
     bench_diff.add_argument("lhs", metavar="LHS", type=str, help="Path to a benchmark result YAML file.")
     bench_diff.add_argument("rhs", metavar="RHS", type=str, help="Path to a benchmark result YAML file.")
+    bench_diff.add_argument("-f", "--file", metavar="FILE", type=str, required=False, default=None, help="Path to the data file (e.g., data.js).")
+    bench_diff.add_argument("-n", "--name", metavar="NAME", nargs="+", type=str, required=False, default=[], help="Test name (e.g. GT Phoenix (CPU)).")
 
     # COUNT
     add_common_arguments(count, "g")
@@ -170,9 +172,6 @@ started, run ./mfc.sh build -h.""",
         parser.print_help()
         exit(-1)
 
-    # "Slugify" the name of the job
-    args["name"] = re.sub(r'[\W_]+', '-', args["name"])
-
     # We need to check for some invalid combinations of arguments because of
     # the limitations of argparse.
     if args["command"] == "build":
@@ -181,6 +180,11 @@ started, run ./mfc.sh build -h.""",
     if args["command"] == "run":
         if args["binary"] is not None and args["engine"] != "interactive":
             raise MFCException("./mfc.sh run's --binary can only be used with --engine=interactive.")
+        if isinstance(args["name"], str):
+          # "Slugify" the name of the job
+          args["name"] = re.sub(r'[\W_]+', '-', args["name"]).strip('-')
+    elif args["command"] == "bench_diff" and len(args["name"]) > 0:
+        args["name"] = " ".join(args["name"])
 
     # Input files to absolute paths
     for e in ["input", "input1", "input2"]:
