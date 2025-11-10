@@ -110,9 +110,6 @@ def __generate_job_script(targets, case: input.MFCInputFile):
         profiler=shlex.join(__profiler_prepend())
     )
 
-    # print(content)
-
-
     file_write(__job_script_filepath(), content)
 
 
