@@ -157,6 +157,68 @@ contains
             end do
         #:endcall GPU_PARALLEL_LOOP
 
+        #:call GPU_HOST_DATA(use_device_addr='[data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu]')
+#if defined(__PGI)
+            ierr = cufftExecD2Z(fwd_plan_gpu, data_real_gpu, data_cmplx_gpu)
+#else
+            ierr = hipfftExecD2Z(fwd_plan_gpu, data_real_gpu, data_cmplx_gpu)
+            call hipCheck(hipDeviceSynchronize())
+#endif
+        #:endcall GPU_HOST_DATA
+        Nfq = 3
+        $:GPU_UPDATE(device='[Nfq]')
+
+        #:call GPU_PARALLEL_LOOP(collapse=3)
+            do k = 1, sys_size
+                do j = 0, m
+                    do l = 1, Nfq
+                        data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = data_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size)
+                    end do
+                end do
+            end do
+        #:endcall GPU_PARALLEL_LOOP
+
+        #:call GPU_HOST_DATA(use_device_addr='[data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu]')
+#if defined(__PGI)
+            ierr = cufftExecZ2D(bwd_plan_gpu, data_fltr_cmplx_gpu, data_real_gpu)
+#else
+            ierr = hipfftExecZ2D(bwd_plan_gpu, data_fltr_cmplx_gpu, data_real_gpu)
+            call hipCheck(hipDeviceSynchronize())
+#endif
+        #:endcall GPU_HOST_DATA
+
+        #:call GPU_PARALLEL_LOOP(collapse=3)
+            do k = 1, sys_size
+                do j = 0, m
+                    do l = 0, p
+                        data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size) = data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size)/real(real_size, dp)
+                        q_cons_vf(k)%sf(j, 0, l) = data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size)
+                    end do
+                end do
+            end do
+        #:endcall GPU_PARALLEL_LOOP
+
+        do i = 1, fourier_rings
+
+            #:call GPU_PARALLEL_LOOP(collapse=3)
+                do k = 1, sys_size
+                    do j = 0, m
+                        do l = 1, cmplx_size
+                            data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = (0_dp, 0_dp)
+                        end do
+                    end do
+                end do
+            #:endcall GPU_PARALLEL_LOOP
+
+            #:call GPU_PARALLEL_LOOP(collapse=3, firstprivate='[i]')
+                do k = 1, sys_size
+                    do j = 0, m
+                        do l = 0, p
+                            data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size) = q_cons_vf(k)%sf(j, i, l)
+                        end do
+                    end do
+                end do
+            #:endcall GPU_PARALLEL_LOOP
 
             #:call GPU_HOST_DATA(use_device_addr='[data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu]')
 #if defined(__PGI)
@@ -166,7 +228,8 @@ contains
                 call hipCheck(hipDeviceSynchronize())
 #endif
             #:endcall GPU_HOST_DATA
-            Nfq = 3
+
+            Nfq = min(floor(2_dp*real(i, dp)*pi), cmplx_size)
             $:GPU_UPDATE(device='[Nfq]')
 
             #:call GPU_PARALLEL_LOOP(collapse=3)
@@ -188,81 +251,17 @@ contains
 #endif
             #:endcall GPU_HOST_DATA
 
-            #:call GPU_PARALLEL_LOOP(collapse=3)
+            #:call GPU_PARALLEL_LOOP(collapse=3, firstprivate='[i]')
                 do k = 1, sys_size
                     do j = 0, m
                         do l = 0, p
                             data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size) = data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size)/real(real_size, dp)
-                            q_cons_vf(k)%sf(j, 0, l) = data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size)
+                            q_cons_vf(k)%sf(j, i, l) = data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size)
                         end do
                     end do
                 end do
             #:endcall GPU_PARALLEL_LOOP
-
-            do i = 1, fourier_rings
-
-                #:call GPU_PARALLEL_LOOP(collapse=3)
-                    do k = 1, sys_size
-                        do j = 0, m
-                            do l = 1, cmplx_size
-                                data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = (0_dp, 0_dp)
-                            end do
-                        end do
-                    end do
-                #:endcall GPU_PARALLEL_LOOP
-
-                #:call GPU_PARALLEL_LOOP(collapse=3, firstprivate='[i]')
-                    do k = 1, sys_size
-                        do j = 0, m
-                            do l = 0, p
-                                data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size) = q_cons_vf(k)%sf(j, i, l)
-                            end do
-                        end do
-                    end do
-                #:endcall GPU_PARALLEL_LOOP
-
-                #:call GPU_HOST_DATA(use_device_addr='[data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu]')
-#if defined(__PGI)
-                    ierr = cufftExecD2Z(fwd_plan_gpu, data_real_gpu, data_cmplx_gpu)
-#else
-                    ierr = hipfftExecD2Z(fwd_plan_gpu, data_real_gpu, data_cmplx_gpu)
-                    call hipCheck(hipDeviceSynchronize())
-#endif
-                #:endcall GPU_HOST_DATA
-
-                Nfq = min(floor(2_dp*real(i, dp)*pi), cmplx_size)
-                $:GPU_UPDATE(device='[Nfq]')
-
-                #:call GPU_PARALLEL_LOOP(collapse=3)
-                    do k = 1, sys_size
-                        do j = 0, m
-                            do l = 1, Nfq
-                                data_fltr_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size) = data_cmplx_gpu(l + j*cmplx_size + (k - 1)*cmplx_size*x_size)
-                            end do
-                        end do
-                    end do
-                #:endcall GPU_PARALLEL_LOOP
-
-                #:call GPU_HOST_DATA(use_device_addr='[data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu]')
-#if defined(__PGI)
-                    ierr = cufftExecZ2D(bwd_plan_gpu, data_fltr_cmplx_gpu, data_real_gpu)
-#else
-                    ierr = hipfftExecZ2D(bwd_plan_gpu, data_fltr_cmplx_gpu, data_real_gpu)
-                    call hipCheck(hipDeviceSynchronize())
-#endif
-                #:endcall GPU_HOST_DATA
-
-                #:call GPU_PARALLEL_LOOP(collapse=3, firstprivate='[i]')
-                    do k = 1, sys_size
-                        do j = 0, m
-                            do l = 0, p
-                                data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size) = data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size)/real(real_size, dp)
-                                q_cons_vf(k)%sf(j, i, l) = data_real_gpu(l + j*real_size + 1 + (k - 1)*real_size*x_size)
-                            end do
-                        end do
-                    end do
-                #:endcall GPU_PARALLEL_LOOP
-            end do
+        end do
 
 #else
         Nfq = 3

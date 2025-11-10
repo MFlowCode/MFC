@@ -442,7 +442,7 @@ contains
             source_spatials_num_points(ai) = count
 
             ! Allocate arrays with the correct size
-            
+
             @:ALLOCATE(source_spatials(ai)%coord(1:3, 1:count))
             @:ALLOCATE(source_spatials(ai)%val(1:count))
             @:ALLOCATE(source_spatials(ai)%angle(1:count))
