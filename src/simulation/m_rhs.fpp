@@ -133,7 +133,6 @@ module m_rhs
     type(vector_field), allocatable, dimension(:) :: gm_alphaL_n
     type(vector_field), allocatable, dimension(:) :: gm_alphaR_n
 #if defined(MFC_OpenACC)
-#ifndef __CRAYFTN
     $:GPU_DECLARE(create='[gm_alphaL_n,gm_alphaR_n]')
 #else
 #ifndef __CRAYFTN
