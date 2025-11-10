@@ -68,6 +68,15 @@ For example, to run the `scaling` case in "weak-scaling" mode:
 ## Features
 The following diagram displays feature-mapping hierarchy. To properly setup, ensure there is a direct correlation from parent feature to sub-features.
 
+| Feature A | Feature B | Feature C | Feature D | Feature E | Feature F |
+| ---: | :----:  | :----:  | :----:  | :----:  | :--- |
+Feature A | .. | .. | .. | .. | .. | .. |
+Feature B | .. | .. | .. | .. | .. | .. |
+Feature C | .. | .. | .. | .. | .. | .. |
+Feature D | .. | .. | .. | .. | .. | .. |
+Feature E | .. | .. | .. | .. | .. | .. |
+Feature F | .. | .. | .. | .. | .. | .. |
+
 \dot
 digraph MFC_features
 {
