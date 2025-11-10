@@ -9,10 +9,9 @@ class gpuConfigOptions(Enum):
 
 @dataclasses.dataclass
 class MFCConfig:
+    # pylint: disable=too-many-instance-attributes
     mpi:       bool = True
     gpu:     str = gpuConfigOptions.NONE.value
-    # mp:      bool = False
-    # acc:       bool = False
     debug:     bool = False
     gcov:      bool = False
     unified:   bool = False
