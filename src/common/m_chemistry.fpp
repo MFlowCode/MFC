@@ -190,7 +190,7 @@ contains
             ! Set offsets based on direction using array indexing
             offsets = 0
             offsets(idir) = 1
-
+            #:block UNDEF_AMD
             #:call GPU_PARALLEL_LOOP(collapse=3,  private='[Ys_L, Ys_R, Ys_cell, Xs_L, Xs_R, mass_diffusivities_mixavg1, mass_diffusivities_mixavg2, mass_diffusivities_mixavg_Cell, h_l, h_r, Xs_cell, h_k, dXk_dxi,Mass_Diffu_Flux, Mass_Diffu_Energy, MW_L, MW_R, MW_cell, Rgas_L, Rgas_R, T_L, T_R, P_L, P_R, rho_L, rho_R, rho_cell, rho_Vic, lambda_L, lambda_R, lambda_Cell, dT_dxi, grid_spacing]', copyin='[offsets]')
                 do z = isc3%beg, isc3%end
                     do y = isc2%beg, isc2%end
@@ -299,6 +299,7 @@ contains
                     end do
                 end do
             #:endcall GPU_PARALLEL_LOOP
+            #:endblock UNDEF_AMD
         end if
 
     end subroutine s_compute_chemistry_diffusion_flux
