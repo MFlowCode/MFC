@@ -99,10 +99,6 @@ find_program(FYPP_EXE fypp REQUIRED)
 link_libraries("${CMAKE_DL_LIBS}")
 set_property(GLOBAL PROPERTY FIND_LIBRARY_USE_LIB64_PATHS ON)
 list(PREPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/cmake/regular")
-if (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
-    list(PREPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/cmake/cce")
-endif()
-
 
 # Compiler Flags: Here, we specify our own compiler flags for both release and
 # debug builds. These include optimization and debug flags, as well as some that
