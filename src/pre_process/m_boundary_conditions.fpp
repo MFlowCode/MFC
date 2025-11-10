@@ -47,7 +47,7 @@ contains
                 if (patch_bc(patch_id)%loc == ${LOC}$ .and. bc_x%${BOUND}$ < 0) then
                     do j = 0, n
                         if (y_cc(j) > y_boundary%beg .and. y_cc(j) < y_boundary%end) then
-                            if(${LOC}$ == -1) then 
+                            if (${LOC}$ == -1) then
                                 bc_type(1, 1)%sf(0, j, 0) = patch_bc(patch_id)%type
                             else
                                 bc_type(1, 2)%sf(0, j, 0) = patch_bc(patch_id)%type
@@ -71,7 +71,7 @@ contains
                 if (patch_bc(patch_id)%loc == ${LOC}$ .and. bc_y%${BOUND}$ < 0) then
                     do j = 0, m
                         if (x_cc(j) > x_boundary%beg .and. x_cc(j) < x_boundary%end) then
-                            if(${LOC}$ == -1) then 
+                            if (${LOC}$ == -1) then
                                 bc_type(2, 1)%sf(j, 0, 0) = patch_bc(patch_id)%type
                             else
                                 bc_type(2, 2)%sf(j, 0, 0) = patch_bc(patch_id)%type

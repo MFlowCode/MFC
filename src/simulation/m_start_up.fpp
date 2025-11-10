@@ -1219,7 +1219,7 @@ contains
 
         stor = 1
 
-        if(time_stepper /= 1) then 
+        if (time_stepper /= 1) then
             #:call GPU_PARALLEL_LOOP(collapse=4, copyin='[idwbuff]')
                 do i = 1, sys_size
                     do l = idwbuff(3)%beg, idwbuff(3)%end

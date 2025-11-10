@@ -249,7 +249,7 @@ contains
         if (.not. igr) then
             @:ALLOCATE(flux_n(1:num_dims))
             @:ALLOCATE(flux_src_n(1:num_dims))
-            @:ALLOCATE(flux_gsrc_n(1:num_dims))   
+            @:ALLOCATE(flux_gsrc_n(1:num_dims))
 
             do i = 1, num_dims
 
@@ -1010,9 +1010,9 @@ contains
         if (acoustic_source) then
             call nvtxStartRange("RHS-ACOUSTIC-SRC")
             call s_acoustic_src_calculations(q_cons_qp%vf(1:sys_size), &
-                                            q_prim_qp%vf(1:sys_size), &
-                                            t_step, &
-                                            rhs_vf)
+                                             q_prim_qp%vf(1:sys_size), &
+                                             t_step, &
+                                             rhs_vf)
             call nvtxEndRange
         end if
 
