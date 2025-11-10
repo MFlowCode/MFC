@@ -113,9 +113,9 @@ contains
             num_ts = 2
         end if
 
-        if(probe_wrt) then 
-            num_probe_ts = 2 
-        end if 
+        if (probe_wrt) then
+            num_probe_ts = 2
+        end if
 
         ! Allocating the cell-average conservative variables
         @:ALLOCATE(q_cons_ts(1:num_ts))
@@ -239,7 +239,7 @@ contains
                         idwbuff(2)%beg:idwbuff(2)%end, &
                         idwbuff(3)%beg:idwbuff(3)%end))
                 end do
-                  @:ACC_SETUP_VFs(q_prim_ts1(i))
+                @:ACC_SETUP_VFs(q_prim_ts1(i))
             end do
 
             @:ALLOCATE(q_prim_ts2(1:num_probe_ts))
@@ -254,7 +254,7 @@ contains
                         idwbuff(2)%beg:idwbuff(2)%end, &
                         idwbuff(3)%beg:idwbuff(3)%end))
                 end do
-                  @:ACC_SETUP_VFs(q_prim_ts2(i))
+                @:ACC_SETUP_VFs(q_prim_ts2(i))
             end do
         end if
 
@@ -552,7 +552,7 @@ contains
                                     q_cons_ts(stor)%vf(i)%sf(j, k, l) = &
                                         q_cons_ts(1)%vf(i)%sf(j, k, l)
                                 end if
-                                if(igr) then 
+                                if (igr) then
                                     q_cons_ts(1)%vf(i)%sf(j, k, l) = &
                                         (rk_coef(s, 1)*q_cons_ts(1)%vf(i)%sf(j, k, l) &
                                          + rk_coef(s, 2)*q_cons_ts(stor)%vf(i)%sf(j, k, l) &
