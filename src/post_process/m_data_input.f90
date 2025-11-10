@@ -526,13 +526,13 @@ contains
                 if (bubbles_euler .or. elasticity .or. mhd) then
                     do i = 1, sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
-                        call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_tpe, &
+                        call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, &
                                                mpi_io_p, status, ierr)
                     end do
                 else
                     do i = 1, sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
-                        call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_tpe, &
+                        call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, &
                                                mpi_io_p, status, ierr)
                     end do
                 end if
@@ -570,7 +570,7 @@ contains
 
                     call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
                                            'native', mpi_info_int, ierr)
-                    call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_tpe, &
+                    call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, &
                                            mpi_io_p, status, ierr)
                 end do
 
