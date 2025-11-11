@@ -622,16 +622,16 @@ contains
         end if
 
         ! Allocating arrays to store the bc types
-        allocate (bc_type(1:num_dims, -1:1))
+        allocate (bc_type(1:num_dims, 1:2))
 
-        allocate (bc_type(1, -1)%sf(0:0, 0:n, 0:p))
         allocate (bc_type(1, 1)%sf(0:0, 0:n, 0:p))
+        allocate (bc_type(1, 2)%sf(0:0, 0:n, 0:p))
         if (n > 0) then
-            allocate (bc_type(2, -1)%sf(-buff_size:m + buff_size, 0:0, 0:p))
             allocate (bc_type(2, 1)%sf(-buff_size:m + buff_size, 0:0, 0:p))
+            allocate (bc_type(2, 2)%sf(-buff_size:m + buff_size, 0:0, 0:p))
             if (p > 0) then
-                allocate (bc_type(3, -1)%sf(-buff_size:m + buff_size, -buff_size:n + buff_size, 0:0))
                 allocate (bc_type(3, 1)%sf(-buff_size:m + buff_size, -buff_size:n + buff_size, 0:0))
+                allocate (bc_type(3, 2)%sf(-buff_size:m + buff_size, -buff_size:n + buff_size, 0:0))
             end if
         end if
 
