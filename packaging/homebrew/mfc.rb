@@ -118,7 +118,7 @@ class Mfc < Formula
         fi
 
         # Smart detection: if first arg looks like a case file, auto-prepend "run"
-        if [[ "${SUBCMD}" =~ \.py$ ]] || [[ -f "${SUBCMD}" ]]; then
+        if [[ "${SUBCMD}" =~ .py$ ]] || [[ -f "${SUBCMD}" ]]; then
           ARGS=("run" "${ARGS[@]}")
           SUBCMD="run"
         fi
