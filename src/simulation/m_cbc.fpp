@@ -72,9 +72,6 @@ module m_cbc
     real(wp), allocatable, dimension(:, :, :, :) :: flux_rsz_vf_l, flux_src_rsz_vf_l
     $:GPU_DECLARE(create='[flux_rsx_vf_l,flux_src_rsx_vf_l,flux_rsy_vf_l,flux_src_rsy_vf_l,flux_rsz_vf_l,flux_src_rsz_vf_l]')
 
-    real(wp) :: dpres_ds !< Spatial derivatives in s-dir of pressure
-    $:GPU_DECLARE(create='[dpres_ds]')
-
     real(wp), allocatable, dimension(:) :: ds !< Cell-width distribution in the s-direction
 
     ! CBC Coefficients
@@ -660,6 +657,7 @@ contains
         real(wp) :: dgamma_dt
         real(wp) :: dpi_inf_dt
         real(wp) :: dqv_dt
+        real(wp) :: dpres_ds
         real(wp), dimension(contxe) :: alpha_rho, dalpha_rho_ds, mf
         real(wp), dimension(2) :: Re_cbc
         real(wp), dimension(num_vels) :: vel, dvel_ds
