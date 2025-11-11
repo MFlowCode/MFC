@@ -2,7 +2,7 @@
 import json
 import math
 
-# Case for smooth Alfven waves from:
+# Case for smoothmagnetic vortex from:
 # Implicit hybridized discontinuous Galerkin methods for
 # compressible magnetohydrodynamics
 # C. Ciuca, P. Fernandez, A. Christophe, N.C. Nguyen, J. Peraire
@@ -20,13 +20,13 @@ print(
             "x_domain%end":  5.0,
             "y_domain%beg": -5.0,
             "y_domain%end":  5.0,
-            "m": 511,
-            "n": 511,
+            "m": 256,
+            "n": 256,
             "p": 0,
             "dt": 1.e-4,
             "t_step_start": 0,
             "t_step_stop": 100000,
-            "t_step_save": 100000,
+            "t_step_save": 1000,
             # Simulation Algorithm Parameters
             "num_patches": 1,
             "model_eqns": 2,
