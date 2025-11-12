@@ -23,11 +23,12 @@ Run a quick example:
 mkdir -p ~/mfc_quickstart && cd ~/mfc_quickstart
 cp $(brew --prefix mfc)/examples/1D_sodshocktube/case.py .
 # Use -n X to choose the number of MPI processes
-mfc run case.py -n 2
+mfc case.py -n 2
 ```
 
 Notes:
-- The Homebrew wrapper supports only `mfc run ...`. Developer commands like `build`, `test`, `clean` are available when you clone the repo and use `./mfc.sh`.
+- Both `mfc case.py` and `mfc run case.py` work (shorthand auto-detects case files).
+- Developer commands like `build`, `test`, `clean` are available when you clone the repo and use `./mfc.sh`.
 - The package bundles a Python venv and prebuilt binaries; no additional setup is required.
 - Examples are installed at `$(brew --prefix mfc)/examples/`.
 

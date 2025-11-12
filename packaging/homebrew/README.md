@@ -15,7 +15,7 @@ Run the 1D Sod shock tube example:
 ```bash
 mkdir -p ~/mfc_example && cd ~/mfc_example
 cp $(brew --prefix mfc)/examples/1D_sodshocktube/case.py .
-mfc run case.py -n 2
+mfc case.py -n 2
 ```
 
 ## What's Included
@@ -28,12 +28,14 @@ mfc run case.py -n 2
 ## Usage
 
 ```bash
+mfc <case.py> -n <processes>
+# or explicitly:
 mfc run <case.py> -n <processes>
 ```
 
-Use `-n X` to set the number of MPI processes.
+Use `-n X` to set the number of MPI processes. Both syntaxes work (the shorthand version auto-detects case files).
 
-**Note**: The Homebrew wrapper supports only `mfc run`. For developer commands (`build`, `test`, `clean`, etc.), [clone the repository](https://github.com/MFlowCode/MFC) and use `./mfc.sh`.
+**Note**: The Homebrew wrapper supports only running cases. For developer commands (`build`, `test`, `clean`, etc.), [clone the repository](https://github.com/MFlowCode/MFC) and use `./mfc.sh`.
 
 ## Documentation
 
