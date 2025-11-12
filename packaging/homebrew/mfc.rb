@@ -114,6 +114,14 @@ class Mfc < Formula
           exit 0
         fi
 
+        # Check if user accidentally used 'mfc run' syntax
+        if [[ "${ARGS[0]}" == "run" ]]; then
+          echo "mfc (Homebrew): The 'run' command is not needed."
+          echo "Usage: mfc <case.py> [options]"
+          echo "Example: mfc case.py -n 2"
+          exit 2
+        fi
+
         # Always prepend "run" since this wrapper only supports running cases
         ARGS=("run" "${ARGS[@]}")
 
