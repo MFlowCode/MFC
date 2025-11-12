@@ -114,11 +114,40 @@ class Mfc < Formula
           exit 0
         fi
 
+        # Handle --version flag
+        if [[ "${ARGS[0]-}" == "--version" ]] || [[ "${ARGS[0]-}" == "-v" ]]; then
+          echo "MFC (Homebrew) #{version}"
+          exit 0
+        fi
+
         # Check if user accidentally used 'mfc run' syntax
         if [[ "${ARGS[0]}" == "run" ]]; then
           echo "mfc (Homebrew): The 'run' command is not needed."
           echo "Usage: mfc <case.py> [options]"
           echo "Example: mfc case.py -n 2"
+          exit 2
+        fi
+
+        # Validate that first non-flag argument is a Python case file
+        first_nonflag=""
+        for arg in "${ARGS[@]}"; do
+          if [[ "$arg" != -* ]]; then
+            first_nonflag="$arg"
+            break
+          fi
+        done
+
+        if [[ -z "${first_nonflag}" ]]; then
+          echo "mfc (Homebrew): missing case file."
+          echo "Usage: mfc <case.py> [options]"
+          echo "Example: mfc case.py -n 2"
+          exit 2
+        fi
+
+        if [[ ! "${first_nonflag}" =~ \.py$ ]] && [[ ! -f "${first_nonflag}" ]]; then
+          echo "mfc (Homebrew): first argument must be a Python case file."
+          echo "Given: ${first_nonflag}"
+          echo "Usage: mfc <case.py> [options]"
           exit 2
         fi
 
