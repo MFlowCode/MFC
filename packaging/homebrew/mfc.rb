@@ -144,7 +144,7 @@ class Mfc < Formula
           exit 2
         fi
 
-        if [[ ! "${first_nonflag}" =~ \.py$ ]] && [[ ! -f "${first_nonflag}" ]]; then
+        if [[ ! "${first_nonflag}" =~ .py$ ]] && [[ ! -f "${first_nonflag}" ]]; then
           echo "mfc (Homebrew): first argument must be a Python case file."
           echo "Given: ${first_nonflag}"
           echo "Usage: mfc <case.py> [options]"
