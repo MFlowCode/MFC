@@ -36,13 +36,13 @@
     <img src="https://img.shields.io/badge/Codespaces-Open%20in%201%20click-2ea44f?logo=github" />
   </a>
   <a href="https://github.com/MFlowCode/MFC/releases">
-    <img src="https://img.shields.io/github/v/release/MFlowCode/MFC?display_name=release&sort=semver" />
+    <img src="https://img.shields.io/github/v/release/MFlowCode/MFC?display_name=release" />
   </a>
 </p>
 
 <p align="center">
   <a href="https://star-history.com/#MFlowCode/MFC&Date">
-    <img src="https://api.star-history.com/svg?repos=MFlowCode/MFC&type=Date" alt="Star History Chart" width="600"/>
+    <img src="https://api.star-history.com/svg?repos=MFlowCode/MFC&type=Date&theme=dark" alt="Star History Chart" width="600"/>
   </a>
 </p>
 
@@ -60,7 +60,7 @@ MFC runs at exascale on the world's fastest supercomputers:
 | Path | Command |
 | --- | --- |
 | **Codespaces** (fastest) | Click the "Codespaces" badge above to launch in 1 click |
-| **Homebrew (macOS)** | `brew install mflowcode/mfc/mfc && mfc run $(brew --prefix mfc)/examples/1D_sodshocktube/case.py -n 2` |
+| **Homebrew** (macOS) | `brew install mflowcode/mfc/mfc && mfc $(brew --prefix mfc)/examples/1D_sodshocktube/case.py -n 2` |
 | **Local build** | `./mfc.sh build -j $(nproc) && ./mfc.sh test -j $(nproc)` |
 
 **Welcome!**
