@@ -102,10 +102,12 @@ class Mfc < Formula
       MFC (Homebrew) #{version}
 
       Usage:
+        mfc <case.py> [options]
         mfc run <case.py> [options]
 
       Examples:
-        mfc run case.py -j 1
+        mfc case.py -n 2
+        mfc run case.py -n 2 -t pre_process simulation
 
       Notes:
         - This Homebrew wrapper uses prebuilt binaries and a preinstalled venv.
@@ -115,9 +117,15 @@ class Mfc < Formula
           exit 0
         fi
 
+        # Smart detection: if first arg looks like a case file, auto-prepend "run"
+        if [[ "${SUBCMD}" =~ .py$ ]] || [[ -f "${SUBCMD}" ]]; then
+          ARGS=("run" "${ARGS[@]}")
+          SUBCMD="run"
+        fi
+
         if [[ "${SUBCMD}" != "run" ]]; then
           echo "mfc (Homebrew): only 'run' is supported in the Homebrew package."
-          echo "Use 'mfc run <case.py>' or clone the repository for developer commands."
+          echo "Use 'mfc <case.py>' or clone the repository for developer commands."
           exit 2
         fi
 
@@ -218,7 +226,8 @@ class Mfc < Formula
       MFC has been installed successfully!
 
       To run a case:
-        mfc run <case.py>
+        mfc <case.py>
+        mfc run <case.py>  (explicit form)
 
       Pre-built binaries are also available directly:
         pre_process, simulation, post_process
@@ -226,9 +235,9 @@ class Mfc < Formula
       Examples are available in:
         #{prefix}/examples
 
-      Example:
+      Quick start:
         cp #{prefix}/examples/1D_sodshocktube/case.py .
-        mfc run case.py
+        mfc case.py -n 2
 
       Note: Cantera 3.1.0 is pre-installed in the MFC virtual environment.
     EOS
