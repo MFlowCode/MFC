@@ -94,20 +94,17 @@ class Mfc < Formula
           fi
         done
 
-        SUBCMD="${ARGS[0]-}"
-
         # Friendly help and guardrails
-        if [[ ${#ARGS[@]} -eq 0 ]] || [[ "${SUBCMD}" == "--help" ]] || [[ "${SUBCMD}" == "-h" ]]; then
+        if [[ ${#ARGS[@]} -eq 0 ]] || [[ "${ARGS[0]-}" == "--help" ]] || [[ "${ARGS[0]-}" == "-h" ]]; then
           cat <<'HHELP'
       MFC (Homebrew) #{version}
 
       Usage:
         mfc <case.py> [options]
-        mfc run <case.py> [options]
 
       Examples:
         mfc case.py -n 2
-        mfc run case.py -n 2 -t pre_process simulation
+        mfc examples/1D_sodshocktube/case.py -n 2 -t pre_process simulation
 
       Notes:
         - This Homebrew wrapper uses prebuilt binaries and a preinstalled venv.
@@ -117,17 +114,8 @@ class Mfc < Formula
           exit 0
         fi
 
-        # Smart detection: if first arg looks like a case file, auto-prepend "run"
-        if [[ "${SUBCMD}" =~ .py$ ]] || [[ -f "${SUBCMD}" ]]; then
-          ARGS=("run" "${ARGS[@]}")
-          SUBCMD="run"
-        fi
-
-        if [[ "${SUBCMD}" != "run" ]]; then
-          echo "mfc (Homebrew): only 'run' is supported in the Homebrew package."
-          echo "Use 'mfc <case.py>' or clone the repository for developer commands."
-          exit 2
-        fi
+        # Always prepend "run" since this wrapper only supports running cases
+        ARGS=("run" "${ARGS[@]}")
 
         # Create a temporary working directory (Cellar is read-only)
         TMPDIR="$(mktemp -d)"
@@ -226,8 +214,7 @@ class Mfc < Formula
       MFC has been installed successfully!
 
       To run a case:
-        mfc <case.py>
-        mfc run <case.py>  (explicit form)
+        mfc <case.py> [options]
 
       Pre-built binaries are also available directly:
         pre_process, simulation, post_process

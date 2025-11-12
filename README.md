@@ -149,7 +149,7 @@ cp $(brew --prefix mfc)/examples/1D_sodshocktube/case.py .
 mfc case.py -n 2
 ```
 
-Use `-n X` to select the number of MPI processes. Both `mfc case.py` and `mfc run case.py` work. For developer commands (`build`, `test`, etc.), clone the repo and use `./mfc.sh`.
+Use `-n X` to select the number of MPI processes. For developer commands (`build`, `test`, etc.), clone the repo and use `./mfc.sh`.
 
 ### macOS from source
 

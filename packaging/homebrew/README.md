@@ -29,11 +29,9 @@ mfc case.py -n 2
 
 ```bash
 mfc <case.py> -n <processes>
-# or explicitly:
-mfc run <case.py> -n <processes>
 ```
 
-Use `-n X` to set the number of MPI processes. Both syntaxes work (the shorthand version auto-detects case files).
+Use `-n X` to set the number of MPI processes.
 
 **Note**: The Homebrew wrapper supports only running cases. For developer commands (`build`, `test`, `clean`, etc.), [clone the repository](https://github.com/MFlowCode/MFC) and use `./mfc.sh`.
 

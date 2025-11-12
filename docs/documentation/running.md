@@ -14,12 +14,10 @@ If you installed MFC via Homebrew, run cases with the `mfc` wrapper:
 
 ```bash
 mfc <path/to/case.py> -n 2
-# or explicitly:
-mfc run <path/to/case.py> -n 2
 ```
 
 - Use `-n X` to control the number of MPI processes (ranks).
-- Both `mfc case.py` and `mfc run case.py` work (shorthand auto-detects case files).
+- The Homebrew package uses a simplified syntax: just `mfc <case.py>` to run cases.
 - To use developer commands (`build`, `test`, `clean`, etc.), clone the repository and use `./mfc.sh`.
 - The wrapper passes through runtime flags like `-t pre_process simulation`, `-n`, and others; it always runs with preinstalled binaries.
 - Examples live at `$(brew --prefix mfc)/examples/`.

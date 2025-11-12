@@ -27,7 +27,7 @@ mfc case.py -n 2
 ```
 
 Notes:
-- Both `mfc case.py` and `mfc run case.py` work (shorthand auto-detects case files).
+- The Homebrew package uses a simplified syntax: just `mfc <case.py>` to run cases.
 - Developer commands like `build`, `test`, `clean` are available when you clone the repo and use `./mfc.sh`.
 - The package bundles a Python venv and prebuilt binaries; no additional setup is required.
 - Examples are installed at `$(brew --prefix mfc)/examples/`.
