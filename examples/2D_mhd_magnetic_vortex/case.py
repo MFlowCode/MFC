@@ -7,7 +7,7 @@ import math
 # compressible magnetohydrodynamics
 # C. Ciuca, P. Fernandez, A. Christophe, N.C. Nguyen, J. Peraire
 
-# A 2D magnetic vortex advects at for a period of T=10 diagonally
+# A 2D magnetic vortex advects for a period of T=10 diagonally
 
 # Configuring case dictionary
 print(
