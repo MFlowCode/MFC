@@ -19,7 +19,7 @@ print(
             "x_domain%beg": -5.0,
             "x_domain%end": 5.0,
             "y_domain%beg": -5.0,
-            "y_domain%end":  5.0,
+            "y_domain%end": 5.0,
             "m": 1024,
             "n": 1024,
             "p": 0,
