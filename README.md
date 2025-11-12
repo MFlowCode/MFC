@@ -36,13 +36,13 @@
     <img src="https://img.shields.io/badge/Codespaces-Open%20in%201%20click-2ea44f?logo=github" />
   </a>
   <a href="https://github.com/MFlowCode/MFC/releases">
-    <img src="https://img.shields.io/github/v/release/MFlowCode/MFC?display_name=release&sort=semver" />
+    <img src="https://img.shields.io/github/v/release/MFlowCode/MFC?display_name=release" />
   </a>
 </p>
 
 <p align="center">
   <a href="https://star-history.com/#MFlowCode/MFC&Date">
-    <img src="https://api.star-history.com/svg?repos=MFlowCode/MFC&type=Date" alt="Star History Chart" width="600"/>
+    <img src="https://api.star-history.com/svg?repos=MFlowCode/MFC&type=Date&theme=dark" alt="Star History Chart" width="600"/>
   </a>
 </p>
 
@@ -60,6 +60,7 @@ MFC runs at exascale on the world's fastest supercomputers:
 | Path | Command |
 | --- | --- |
 | **Codespaces** (fastest) | Click the "Codespaces" badge above to launch in 1 click |
+| **Homebrew** (macOS) | `brew install mflowcode/mfc/mfc && mfc $(brew --prefix mfc)/examples/1D_sodshocktube/case.py -n 2` |
 | **Local build** | `./mfc.sh build -j $(nproc) && ./mfc.sh test -j $(nproc)` |
 
 **Welcome!**
@@ -136,7 +137,23 @@ Click <kbd> <> Code</kbd> (green button at top right) → <kbd>Codespaces</kbd> 
 
 You can navigate [to this webpage](https://mflowcode.github.io/documentation/md_getting-started.html) to get you get started using MFC on your local machine, cluster, or supercomputer!
 It's rather straightforward.
-We'll give a brief introdocution for MacOS below.
+
+### macOS quick start (Homebrew)
+
+Install the prebuilt package and run an example:
+
+```bash
+brew install mflowcode/mfc/mfc
+mkdir -p ~/mfc_quickstart && cd ~/mfc_quickstart
+cp $(brew --prefix mfc)/examples/1D_sodshocktube/case.py .
+mfc run case.py -n 2
+```
+
+Use `-n X` to select the number of MPI processes. For developer commands (`build`, `test`, etc.), clone the repo and use `./mfc.sh`.
+
+### macOS from source
+
+We'll give a brief introduction for building from source on MacOS below.
 Using [brew](https://brew.sh), install MFC's dependencies:
 ```shell
 brew install coreutils python cmake fftw hdf5 gcc boost open-mpi lapack
