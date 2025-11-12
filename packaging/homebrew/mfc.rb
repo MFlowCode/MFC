@@ -120,15 +120,7 @@ class Mfc < Formula
           exit 0
         fi
 
-        # Check if user accidentally used 'mfc run' syntax
-        if [[ "${ARGS[0]}" == "run" ]]; then
-          echo "mfc (Homebrew): The 'run' command is not needed."
-          echo "Usage: mfc <case.py> [options]"
-          echo "Example: mfc case.py -n 2"
-          exit 2
-        fi
-
-        # Validate that first non-flag argument is a Python case file
+        # Find first non-flag argument
         first_nonflag=""
         for arg in "${ARGS[@]}"; do
           if [[ "$arg" != -* ]]; then
@@ -137,8 +129,17 @@ class Mfc < Formula
           fi
         done
 
+        # Check if no case file provided
         if [[ -z "${first_nonflag}" ]]; then
           echo "mfc (Homebrew): missing case file."
+          echo "Usage: mfc <case.py> [options]"
+          echo "Example: mfc case.py -n 2"
+          exit 2
+        fi
+
+        # Check if user accidentally used 'mfc run' syntax (even with flags before it)
+        if [[ "${first_nonflag}" == "run" ]]; then
+          echo "mfc (Homebrew): The 'run' command is not needed."
           echo "Usage: mfc <case.py> [options]"
           echo "Example: mfc case.py -n 2"
           exit 2
