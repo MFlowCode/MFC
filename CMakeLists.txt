@@ -741,6 +741,7 @@ if (MFC_DOCUMENTATION)
             DESTINATION "docs/mfc")
 endif()
 
+
 site_name(SITE_NAME)
 
 configure_file(

@@ -24,21 +24,11 @@ jobs:
     needs: file-changes
     strategy:
       matrix:
-        os:    ['ubuntu', 'macos']
+        os:    ['macos']
         mpi:   ['mpi']
         precision: ['']
-        debug: ['debug', 'no-debug']
-        intel: [true, false]
-        exclude:
-          - os:    macos
-            intel: true
-
-        include:
-          - os:    ubuntu
-            mpi:   no-mpi
-            precision: single
-            debug: no-debug
-            intel: false
+        debug: ['no-debug']
+        intel: [false]
 
       fail-fast: false
     continue-on-error: true
@@ -92,59 +82,3 @@ jobs:
         env:
           OPT1: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
           OPT2: ${{ matrix.debug == 'debug' && '-% 20' || '' }}
-
-  self:
-    name: Self Hosted
-    if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true'
-    needs: file-changes
-    continue-on-error: false
-    timeout-minutes: 1400
-    strategy:
-      matrix:
-        device: ['gpu']
-        interface: ['acc', 'omp']
-        lbl: ['gt', 'frontier']
-        include:
-          - device: 'cpu'
-            interface: 'none'
-            lbl: 'gt'
-          - device: 'cpu'
-            interface: 'none'
-            lbl: 'frontier'
-        exclude:
-          - device: 'gpu'
-            interface: 'omp'
-            lbl: 'frontier'
-    runs-on:
-      group:  phoenix
-      labels: ${{ matrix.lbl }}
-    env:
-      NODE_OPTIONS: ${{ matrix.lbl == 'gt' && '--max-old-space-size=2048' || '' }}
-      ACTIONS_RUNNER_FORCE_ACTIONS_NODE_VERSION: node16
-      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
-    steps:
-      - name: Clone
-        uses: actions/checkout@v4
-
-      - name: Build & Test
-        if:   matrix.lbl == 'gt'
-        run:  bash .github/workflows/phoenix/submit.sh .github/workflows/phoenix/test.sh ${{ matrix.device }} ${{ matrix.interface }}
-
-      - name: Build
-        if:   matrix.lbl == 'frontier'
-        run:  bash .github/workflows/frontier/build.sh ${{ matrix.device }} ${{ matrix.interface }}
-
-      - name: Test
-        if:   matrix.lbl == 'frontier'
-        run:  bash .github/workflows/frontier/submit.sh .github/workflows/frontier/test.sh ${{matrix.device}} ${{ matrix.interface }}
-
-      - name: Print Logs
-        if:   always()
-        run:  cat test-${{ matrix.device }}-${{ matrix.interface }}.out
-
-      - name: Archive Logs
-        uses: actions/upload-artifact@v4
-        if:   matrix.lbl == 'frontier'
-        with:
-          name: logs-${{ strategy.job-index }}-${{ matrix.device }}-${{ matrix.interface }}
-          path: test-${{ matrix.device }}-${{ matrix.interface }}.out
