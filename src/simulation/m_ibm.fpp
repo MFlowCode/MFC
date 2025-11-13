@@ -147,7 +147,7 @@ contains
     end subroutine s_ibm_setup
 
     subroutine s_populate_ib_buffers()
-      integer :: j, k, l
+        integer :: j, k, l
 
         #:for DIRC, DIRI in [('x', 1), ('y', 2), ('z', 3)]
             #:for LOCC, LOCI in [('beg', -1), ('end', 1)]
@@ -157,75 +157,81 @@ contains
             #:endfor
         #:endfor
 
-        if (periodic_ibs) then 
+        if (periodic_ibs) then
             ! Population of Buffers in x-direction
-            do l = 0, p
-                do k = 0, n
-                    if (bc_x%beg == BC_PERIODIC) then 
+            if (bc_x%beg == BC_PERIODIC) then
+                $:GPU_PARALLEL_LOOP(collapse=3)
+                do l = 0, p
+                    do k = 0, n
                         do j = 1, buff_size
                             ib_markers%sf(-j, k, l) = &
-                            ib_markers%sf(m - (j - 1), k, l)
+                                ib_markers%sf(m - (j - 1), k, l)
                         end do
-                    end if
+                    end do
                 end do
-            end do
+            end if
 
-            do l = 0, p
-                do k = 0, n
-                    if (bc_x%end == BC_PERIODIC) then 
+            if (bc_x%end == BC_PERIODIC) then
+                $:GPU_PARALLEL_LOOP(collapse=3)
+                do l = 0, p
+                    do k = 0, n
                         do j = 1, buff_size
-                              ib_markers%sf(m + j, k, l) = &
-                              ib_markers%sf(j - 1, k, l)
-                          end do
-                    end if
+                            ib_markers%sf(m + j, k, l) = &
+                                ib_markers%sf(j - 1, k, l)
+                        end do
+                    end do
                 end do
-            end do
-            
+            end if
+
             ! Population of Buffers in y-direction
-            do l = 0, p
-                do k = -buff_size, m + buff_size
-                    if (bc_y%beg == BC_PERIODIC) then 
+            if (bc_y%beg == BC_PERIODIC) then
+                $:GPU_PARALLEL_LOOP(collapse=3)
+                do l = 0, p
+                    do k = -buff_size, m + buff_size
                         do j = 1, buff_size
                             ib_markers%sf(k, -j, l) = &
-                            ib_markers%sf(k, n - (j - 1), l)
+                                ib_markers%sf(k, n - (j - 1), l)
                         end do
-                    end if
+                    end do
                 end do
-            end do
+            end if
 
-            do l = 0, p
-                do k = -buff_size, m + buff_size
-                    if (bc_y%end == BC_PERIODIC) then 
+            if (bc_y%end == BC_PERIODIC) then
+                $:GPU_PARALLEL_LOOP(collapse=3)
+                do l = 0, p
+                    do k = -buff_size, m + buff_size
                         do j = 1, buff_size
                             ib_markers%sf(k, n + j, l) = &
-                            ib_markers%sf(k, j - 1, l)
+                                ib_markers%sf(k, j - 1, l)
                         end do
-                    end if
+                    end do
                 end do
-            end do
+            end if
 
             ! Population of Buffers in z-direction
-            do l = -buff_size, n + buff_size
-                do k = -buff_size, m + buff_size
-                    if (bc_z%beg == BC_PERIODIC) then
+            if (bc_z%beg == BC_PERIODIC) then
+                $:GPU_PARALLEL_LOOP(collapse=3)
+                do l = -buff_size, n + buff_size
+                    do k = -buff_size, m + buff_size
                         do j = 1, buff_size
                             ib_markers%sf(k, l, -j) = &
-                            ib_markers%sf(k, l, p - (j - 1))
+                                ib_markers%sf(k, l, p - (j - 1))
                         end do
-                    end if
+                    end do
                 end do
-            end do
+            end if
 
-            do l = -buff_size, n + buff_size
-                do k = -buff_size, m + buff_size
-                    if (bc_z%end == BC_PERIODIC) then 
+            if (bc_z%end == BC_PERIODIC) then
+                $:GPU_PARALLEL_LOOP(collapse=3)
+                do l = -buff_size, n + buff_size
+                    do k = -buff_size, m + buff_size
                         do j = 1, buff_size
                             ib_markers%sf(k, l, p + j) = &
-                            ib_markers%sf(k, l, j - 1)
+                                ib_markers%sf(k, l, j - 1)
                         end do
-                    end if
+                    end do
                 end do
-            end do
+            end if
         end if
 
     end subroutine s_populate_ib_buffers
@@ -610,13 +616,13 @@ contains
                 ! s_cc points to the dim array we need
                 if (dim == 1) then
                     s_cc => x_cc
-                    bound = m + buff_size 
+                    bound = m + buff_size
                 elseif (dim == 2) then
                     s_cc => y_cc
-                    bound = n + buff_size 
+                    bound = n + buff_size
                 else
                     s_cc => z_cc
-                    bound = p + buff_size 
+                    bound = p + buff_size
                 end if
 
                 if (f_approx_equal(norm(dim), 0._wp)) then
@@ -635,10 +641,7 @@ contains
                                .or. temp_loc > s_cc(index + 1)))
                         index = index + dir
                         if (index < -buff_size .or. index > bound) then
-                            print *, "proc_rank=", proc_rank, "temp_loc=", temp_loc, " index=", index, "ib=", patch_id, "dim", dim, "dir", dir 
-                            print *, i, j, k, physical_loc, ghost_points_in(q)%ip_loc(:)
-                            print *, x_centroid, y_centroid, z_centroid
-                            print *, norm, dist
+                            print *, "proc_rank=", proc_rank, "temp_loc=", temp_loc, " index=", index, "ib=", patch_id, "dim", dim, "dir", dir, "i, j, k", i, j, k
                             print *, "Increase buff_size further in m_helper_basic (currently set to a minimum of 10)"
                             error stop "Increase buff_size"
                         end if
@@ -703,13 +706,12 @@ contains
                             subsection_x = ib_markers%sf(i - gp_layers:i + gp_layers, j, k)
                             subsection_y = ib_markers%sf(i, j - gp_layers:j + gp_layers, k)
                             subsection_z = ib_markers%sf(i, j, k - gp_layers:k + gp_layers)
-
-                            if (any(subsection_x == 0) .or. & 
-                                any(subsection_y == 0) .or. & 
-                                any(subsection_z == 0)) then 
-                                  num_gps_out = num_gps_out + 1
+                            if (any(subsection_x == 0) .or. &
+                                any(subsection_y == 0) .or. &
+                                any(subsection_z == 0)) then
+                                num_gps_out = num_gps_out + 1
                             else
-                                  num_inner_gps_out = num_inner_gps_out + 1
+                                num_inner_gps_out = num_inner_gps_out + 1
                             end if
                         end if
                     end do
@@ -791,23 +793,15 @@ contains
                             !                 i - gp_layers:i + gp_layers, &
                             !                 j - gp_layers:j + gp_layers, &
                             !                 k - gp_layers:k + gp_layers)
+                            ! if (any(subsection_3D == 0)) then
 
                             subsection_x = ib_markers%sf(i - gp_layers:i + gp_layers, j, k)
                             subsection_y = ib_markers%sf(i, j - gp_layers:j + gp_layers, k)
                             subsection_z = ib_markers%sf(i, j, k - gp_layers:k + gp_layers)
+                            if (any(subsection_x == 0) .or. &
+                                any(subsection_y == 0) .or. &
+                                any(subsection_z == 0)) then
 
-                            if (any(subsection_x == 0) .or. & 
-                                any(subsection_y == 0) .or. & 
-                                any(subsection_z == 0)) then 
-                                
-                                if (i==  7  .and.    j==    26     .and. k==      0) then 
-                                    print *, 'HERE' 
-                                    print *, 'x', subsection_x, 'y', subsection_y, 'z', subsection_z
-                                    print *, proc_rank, ib_markers%sf(7, 26, -1)
-                                end if
-
-
-                            ! if (any(subsection_3D == 0)) then
                                 ghost_points_in(count)%loc = [i, j, k]
                                 patch_id = ib_markers%sf(i, j, k)
                                 ghost_points_in(count)%ib_patch_id = &

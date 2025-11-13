@@ -105,7 +105,7 @@ contains
                                            & (n + 2*buff_size + 1)* &
                                            & (p + 2*buff_size + 1)/ &
                                            & (cells_bounds%mnp_min + 2*buff_size + 1))
-#ifndef __NVCOMPILER_GPU_UNIFIED_MEM                          
+#ifndef __NVCOMPILER_GPU_UNIFIED_MEM
             @:ALLOCATE(buff_send_scalarfield(0:halo_size_sf), buff_recv_scalarfield(0:halo_size_sf))
 #else
             allocate (buff_send_scalarfield(0:halo_size_sf), buff_recv_scalarfield(0:halo_size_sf))

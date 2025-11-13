@@ -2,45 +2,34 @@ import json
 import math
 import numpy as np
 
-'''
-need to store
-full stats of unclosed term tensors (1, 2, 3, 4) - only at end time
-stats of flow quantities - only at end time
-flow quantities
-filtered fluid indicator function
-drag force on each particle
-'''
 
-Mu = 1.84e-05
 gam_a = 1.4
-R = 287.0
 
 D = 0.1
+L = 10 * D
 
-P = 101325 # Pa
-rho = 1.225 # kg/m^3
-
-T = P/(rho*R)
-
-M = 1.2
+M = 0.8
 Re = 1500.0
-v1 = M*(gam_a*P/rho)**(1.0/2.0)
 
-mu = rho*v1*D/Re # dynamic viscosity for current case
+P = 101325
+rho = 1.225
+
+v1 = M * np.sqrt(gam_a * P / rho) 
+mu = rho * v1 * D / Re
 
 #print('mu: ', mu)
 #print('v1: ', v1)
 #print('rho: ', rho)
 #print('Kn = ' + str( np.sqrt(np.pi*gam_a/2)*(M/Re) )) # Kn < 0.01 = continuum flow
 
-dt = 4.0E-06
-Nt = 100
-t_save = 10
-t_step_start_stats = 50
+dt = 5.0E-06
+Nt = 200 #int(1 * L / v1 / dt)
+t_save = Nt//5
+t_step_start_stats = Nt//2
 
-Nx = 99
-Ny = 99
-Nz = 99
+Nx = 199
+Ny = Nx
+Nz = Ny
 
 # load initial sphere locations
 sphere_loc = np.loadtxt('sphere_array_locations.txt')
@@ -57,6 +46,15 @@ for i in range(N_sphere):
         f"patch_ib({i+1})%radius": D / 2,
         f"patch_ib({i+1})%slip": "F",
         })
+
+# ib_dict.update({
+#     f"patch_ib({1})%geometry": 8,
+#     f"patch_ib({1})%x_centroid": sphere_loc[20, 0],
+#     f"patch_ib({1})%y_centroid": sphere_loc[20, 1],
+#     f"patch_ib({1})%z_centroid": sphere_loc[20, 2],
+#     f"patch_ib({1})%radius": D / 2,
+#     f"patch_ib({1})%slip": "F",
+#     })
 
 # Configuring case dictionary
 case_dict = {
@@ -78,8 +76,8 @@ case_dict = {
     "p": Nz,
     "dt": dt,
     "t_step_start": 0,
-    "t_step_stop": Nt,  # 3000
-    "t_step_save": t_save,  # 10
+    "t_step_stop": Nt,  
+    "t_step_save": t_save,  
     "t_step_stat_start": t_step_start_stats,
     # Simulation Algorithm Parameters
     # Only one patches are necessary, the air tube
@@ -154,11 +152,12 @@ case_dict = {
     "periodic_forcing": "T",
     "periodic_ibs": "T",
     "volume_filtering_momentum_eqn": "T",
-    "filter_width": 3.0*D/2,
+    "filter_width": 3.0*D/2 * np.sqrt(2/(9*np.pi)),
+    "compute_particle_drag": "T",
 
     "u_inf_ref": v1,
     "rho_inf_ref": rho,
-    "T_inf_ref": T,
+    "P_inf_ref": P,
 
     "store_levelset": "F",
     "slab_domain_decomposition": "T", 
