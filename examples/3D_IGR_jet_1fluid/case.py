@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
-import math
 import json
 
 # Domain parameters
-
-
 alfFactor = 10
 igrIters = 3
 
@@ -24,7 +21,6 @@ N = 1383
 Nx = N * NPx - 1
 Ny = N * NPy - 1
 Nz = N * NPz - 1
-
 
 dx = (x1 - x0) / Nx
 dt = dx / 20000
@@ -64,7 +60,7 @@ print(
             "num_igr_iters": igrIters,
             "num_igr_warm_start_iters": igrIters,
             "alf_factor": 10,
-            "bc_x%beg": -3,
+            "bc_x%beg": -17,
             "bc_x%end": -3,
             "bc_y%beg": -3,
             "bc_y%end": -3,
@@ -86,7 +82,7 @@ print(
             "patch_icpp(1)%length_x": (x1 - x0),
             "patch_icpp(1)%length_y": (y1 - y0),
             "patch_icpp(1)%length_z": (z1 - z0),
-            "patch_icpp(1)%hcid": 304,
+            "patch_icpp(1)%hcid": 302,
             "patch_icpp(1)%vel(1)": 1.0,
             "patch_icpp(1)%vel(2)": 0.0e00,
             "patch_icpp(1)%vel(3)": 0.0e00,
