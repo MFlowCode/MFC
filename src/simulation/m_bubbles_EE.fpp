@@ -37,10 +37,8 @@ contains
 
         @:ALLOCATE(rs(1:nb))
         @:ALLOCATE(vs(1:nb))
-        if (.not. polytropic) then
-            @:ALLOCATE(ps(1:nb))
-            @:ALLOCATE(ms(1:nb))
-        end if
+        @:ALLOCATE(ps(1:nb))
+        @:ALLOCATE(ms(1:nb))
 
         do l = 1, nb
             rs(l) = bub_idx%rs(l)
@@ -48,13 +46,14 @@ contains
             if (.not. polytropic) then
                 ps(l) = bub_idx%ps(l)
                 ms(l) = bub_idx%ms(l)
+            else
+                ps(l) = rs(l)
+                ms(l) = rs(l)
             end if
         end do
 
         $:GPU_UPDATE(device='[rs, vs]')
-        if (.not. polytropic) then
-            $:GPU_UPDATE(device='[ps, ms]')
-        end if
+        $:GPU_UPDATE(device='[ps, ms]')
 
         @:ALLOCATE(divu%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
         @:ACC_SETUP_SFs(divu)
