@@ -1034,8 +1034,6 @@ contains
             deallocate (MPI_IO_DATA%view)
         end if
 
-        if (ib) deallocate (MPI_IO_IB_DATA%var%sf)
-
 #endif
 
     end subroutine s_finalize_global_parameters_module
