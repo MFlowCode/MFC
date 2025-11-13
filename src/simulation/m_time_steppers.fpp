@@ -577,11 +577,17 @@ contains
                             patch_ib(i)%step_y_centroid = patch_ib(i)%y_centroid
                             patch_ib(i)%step_z_centroid = patch_ib(i)%z_centroid
                         end if
+                        
+                        if (patch_ib(i)%moving_ibm > 0) then
 
-                        if (patch_ib(i)%moving_ibm == 1) then
+                            ! integrate the force and tourque in two-way coupling
+                            if (patch_ib(i)%moving_ibm == 2) then
+                                call s_compute_ib_forces
+                            end if
+
                             do j = 1, 3
-                                patch_ib(i)%vel(j) = (rk_coef(s, 1)*patch_ib(i)%step_vel(j) + rk_coef(s, 2)*patch_ib(i)%vel(j) + rk_coef(s, 3)*0._wp*dt)/rk_coef(s, 4) ! 0.0 is a placeholder for accelerations
-                                patch_ib(i)%angular_vel(j) = (rk_coef(s, 1)*patch_ib(i)%step_angular_vel(j) + rk_coef(s, 2)*patch_ib(i)%angular_vel(j) + rk_coef(s, 3)*0._wp*dt)/rk_coef(s, 4)
+                                patch_ib(i)%vel(j) = (rk_coef(s, 1)*patch_ib(i)%step_vel(j) + rk_coef(s, 2)*patch_ib(i)%vel(j) + rk_coef(s, 3)*patch_ib(i)%force*dt)/rk_coef(s, 4) 
+                                patch_ib(i)%angular_vel(j) = (rk_coef(s, 1)*patch_ib(i)%step_angular_vel(j) + rk_coef(s, 2)*patch_ib(i)%angular_vel(j) + rk_coef(s, 3)*patch_ib(i)%tourque*dt)/rk_coef(s, 4)
 
                                 ! Update the angle of the IB
                                 patch_ib(i)%angles(j) = (rk_coef(s, 1)*patch_ib(i)%step_angles(j) + rk_coef(s, 2)*patch_ib(i)%angles(j) + rk_coef(s, 3)*patch_ib(i)%angular_vel(j)*dt)/rk_coef(s, 4)

@@ -966,6 +966,53 @@ contains
 
     end subroutine s_update_mib
 
+    ! compute the surface integrals of the IB via a volume integraion method described in
+    ! "A coupled IBM/Euler-Lagrange framework for simulating shock-induced particle size segregation"
+    ! by Archana Sridhar and Jesse Capecelatro
+    subroutine s_compute_ib_forces()
+
+        integer :: i, j, k, ib_idx
+        real(wp), dimension(:, :, :) :: pressure
+        real(wp), dimension(num_ibs) :: forces, torques
+        real(wp), dimension(1:3) :: pressure_divergence, radial_vector
+        real(wp) :: cell_volume
+
+        forces = 0._wp
+        torques = 0._wp
+        pressure => q_prim_vf(E_idx)%sf ! pressure is the 3rd primitive variable in our array
+
+        ! TODO :: This is currently only valid inviscid, and needs to be extended to add viscocity
+        do i = 0, m
+            do j = 0, n
+                do k = 0, p
+                    ib_idx = ib_markers%sf(i, j, k)
+                    if (ib_idx /= 0) then ! only need to compute the gradient for cells inside a IB
+                        if (patch_ib(ib_idx)%moving_ibm == 2) then
+                            radial_vector = [x_cc(i), y_cc(j), z_cc(k)] - [patch_ib(ib_dx)%x_centroid, patch_ib(ib_dx)%y_centroid, patch_ib(ib_dx)%z_centroid] ! get the vector pointing to the grid cell
+                            pressure_divergence(1) = (pressure(i+1, j, k) - pressure(i-1, j, k)) / (2._wp * x_cc(i))
+                            pressure_divergence(2) = (pressure(i, j+1, k) - pressure(i, j-1, k)) / (2._wp * y_cc(j))
+                            cell_volume = x_cc(i) * y_cc(j)
+                            if (num_dims == 3) then
+                                pressure_divergence(3) = (pressure(i, j, k+1) - pressure(i, j, k-1)) / (2._wp * z_cc(k))
+                                cell_volume = cell_volume * z_cc(k)
+                            else
+                                pressure_divergence(3) = 0._wp
+                            end if
+
+                            forces(ib_idx) = forces(ib_idx) + pressure_divergence * cell_volume
+                            torques(ib_idx) = torques(ib_idx) + cross_product(radial_vector, pressure_divergence) * cell_volume
+                        end if
+                    end if
+                end do
+            end do
+        end do
+
+        do i = 1, num_ibs
+            patch_ib(i)%force = forces(i)
+            patch_ib(i)%torque = torques(i)
+        end do
+    end subroutine s_compute_ib_forces
+
     !> Subroutine to deallocate memory reserved for the IBM module
     impure subroutine s_finalize_ibm_module()
 
