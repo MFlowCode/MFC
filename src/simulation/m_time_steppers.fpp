@@ -582,8 +582,9 @@ contains
                         
                         if (patch_ib(i)%moving_ibm > 0) then
                             patch_ib(i)%vel = (rk_coef(s, 1)*patch_ib(i)%step_vel + rk_coef(s, 2)*patch_ib(i)%vel + rk_coef(s, 3)*dt*patch_ib(i)%force/patch_ib(i)%mass)/rk_coef(s, 4) 
-                            patch_ib(i)%angular_vel = (rk_coef(s, 1)*patch_ib(i)%step_angular_vel + rk_coef(s, 2)*patch_ib(i)%angular_vel)/rk_coef(s, 4) ! take a step without additional angular momentum
-                            if (patch_ib(i)%moving_ibm == 2) then ! if we are using two-way coupling, apply force
+                            patch_ib(i)%angular_vel = (rk_coef(s, 1)*patch_ib(i)%step_angular_vel + rk_coef(s, 2)*patch_ib(i)%angular_vel)/rk_coef(s, 4)
+
+                            if (patch_ib(i)%moving_ibm == 2) then ! if we are using two-way coupling, apply force and torque
                                 ! update the velocity from the force value
                                 patch_ib(i)%vel = patch_ib(i)%vel + rk_coef(s, 3) * dt * (patch_ib(i)%force/patch_ib(i)%mass)/rk_coef(s, 4) 
                                 
