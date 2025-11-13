@@ -251,8 +251,8 @@ jobs:
           cp $(brew --prefix mfc)/examples/1D_sodshocktube/case.py "$TESTDIR/"
           
           echo "Running with $(sysctl -n hw.ncpu) processors..."
-          # Use absolute path since mfc wrapper creates its own tmpdir
-          mfc run "$TESTDIR/case.py" -j $(sysctl -n hw.ncpu)
+          # Use absolute path and shorthand syntax (mfc auto-detects and prepends 'run')
+          mfc "$TESTDIR/case.py" -j $(sysctl -n hw.ncpu)
           
           echo "Test case completed successfully!"
       
