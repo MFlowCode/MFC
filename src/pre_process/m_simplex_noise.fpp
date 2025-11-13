@@ -201,9 +201,9 @@ contains
         ii = mod(i, 255)
         jj = mod(j, 255)
 
-        gi0 = mod(p_vec(ii + p_vec(jj)), 12) + 1
-        gi1 = mod(p_vec(ii + i1 + p_vec(jj + j1)), 12) + 1
-        gi2 = mod(p_vec(ii + 1 + p_vec(jj + 1)), 12) + 1
+        gi0 = mod(p_vec(ii + p_vec(jj)), 10) + 1
+        gi1 = mod(p_vec(ii + i1 + p_vec(jj + j1)), 10) + 1
+        gi2 = mod(p_vec(ii + 1 + p_vec(jj + 1)), 10) + 1
 
         t0 = 0.5_wp - x0*x0 - y0*y0
         if (t0 < 0._wp) then
