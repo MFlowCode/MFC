@@ -33,8 +33,6 @@ program p_main
     real(wp) :: start, finish
     integer :: nt
 
-    logical :: status
-
     call system_clock(COUNT=cpu_start, COUNT_RATE=cpu_rate)
 
     call nvtxStartRange("INIT")
