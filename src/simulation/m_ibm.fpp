@@ -975,6 +975,78 @@ contains
 
     end subroutine s_finalize_ibm_module
 
+    subroutine s_compute_moment_of_inertia(ib_marker, axis)
+
+        real(wp), dimension(3), optional :: axis !< the axis about which we compute the moment. Only required in 3D.
+        integer, intent(in) :: ib_marker
+        
+        real (wp) :: moment, distance_to_axis, cell_volume
+        real (wp), dimension(3) :: position, closest_point_along_axis, vector_to_axis
+        integer :: i, j, k, count
+
+        if (p == 0) then
+            axis = [0, 1, 0]
+        else if (sqrt(sum(axis**2)) == 0) then
+            ! if the object is not actually rotating at this time, return a dummy value and exit
+            patch_ib(ib_marker)%moment = 1._wp
+            return
+        else
+            axis = axis / sqrt(sum(axis))
+        end if
+        
+        ! if the IB is in 2D or a 3D sphere, we can compute this exactly
+        if (patch_ib(ib_marker)%geometry == 2) then ! circle
+            patch_ib(ib_marker)%moment = 0.5 * patch_ib(ib_marker)%mass * (patch_ib(ib_marker)%radius)**2
+        elseif (patch_ib(ib_marker)%geometry == 3) then ! rectangle
+            patch_ib(ib_marker)%moment = patch_ib(i)%mass * (patch_ib(ib_marker)%length_x**2 + patch_ib(ib_marker)%length_y**2) / 6._wp                
+        elseif (patch_ib(ib_marker)%geometry == 8) then ! sphere
+            patch_ib(ib_marker)%moment = 0.4 * patch_ib(ib_marker)%mass * (patch_ib(ib_marker)%radius)**2
+          
+        else ! we do not have an analytic moment of intertia calculation and need to approximate it directly
+            count = 0
+            moment = 0._wp
+            cell_volume = (x_cc(1) - x_cc(0))*(y_cc(1) - y_cc(0)) ! computed without grid stretching. Update in the loop to perform with stretching
+            if (p /= 0) then
+              cell_volume = cell_volume * (z_cc(1) - z_cc(0))
+            end if
+
+            
+            #:call GPU_PARALLEL_LOOP(private='[position,closest_point_along_axis,vector_to_axis,distance_to_axis]', copy='[moment,count]', copyin='[ib_marker,cell_volume,axis]', collapse=3)
+            do i = 0, m
+                do j = 0, j
+                    do k = 0, p
+                        if (ib_markers%sf(i, j, k) == ib_marker) then
+                            $:GPU_ATOMIC(atomic='update')
+                            count = count + 1 ! incriment the count of total cells in the boundary
+
+                            ! get the position in local coordinates so that the axis passes through 0, 0, 0
+                            if (p == 0) then
+                                position = [x_cc(i), y_cc(j), 0._wp] - [patch_ib(ib_marker)%x_centroid, patch_ib(ib_marker)%y_centroid, 0._wp]
+                            else
+                                position = [x_cc(i), y_cc(j), z_cc(k)] - [patch_ib(ib_marker)%x_centroid, patch_ib(ib_marker)%y_centroid, patch_ib(ib_marker)%z_centroid]
+                            end if
+
+                            ! project the position along the axis to find the closest distance to the rotation axis
+                            closest_point_along_axis = axis*dot_product(axis, position)
+                            vector_to_axis = position - closest_point_along_axis
+                            distance_to_axis = sum(vector_to_axis) ! saves the distance to the axis squared
+
+                            ! compute the position component of the moment
+                            $:GPU_ATOMIC(atomic='update')
+                            moment = moment + distance_to_axis
+                        end if
+                    end do
+                end do
+            end do
+            #:endcall GPU_PARALLEL_LOOP
+
+            ! write the final moment assuming the points are all uniform density
+            patch_ib(ib_marker)%moment = moment * patch_ib(ib_marker)%mass / (count * cell_volume)
+            $:GPU_UPDATE(device='[patch_ib(ib_marker)%moment]')
+        end if
+
+    end subroutine s_compute_moment_of_inertia
+
     function cross_product(a, b) result(c)
         implicit none
         real(wp), intent(in) :: a(3), b(3)
