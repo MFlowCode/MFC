@@ -1010,7 +1010,7 @@ contains
         ! apply the summed forces
         do i = 1, num_ibs
             patch_ib(i)%force = forces(i)
-            patch_ib(i)%torque = matmul(patch_ib(i)%inverse_rotation_matrix, torques(i)) ! torques must be computed in the local coordinates of the IB
+            patch_ib(i)%torque = matmul(patch_ib(i)%rotation_matrix_inverse, torques(i)) ! torques must be computed in the local coordinates of the IB
         end do
     end subroutine s_compute_ib_forces
 
