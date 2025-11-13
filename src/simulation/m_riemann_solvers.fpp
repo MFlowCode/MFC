@@ -2468,8 +2468,6 @@ contains
 
                                     H_L = (E_L + pres_L)/rho_L
                                     H_R = (E_R + pres_R)/rho_R
-                                    H_L = (E_L + pres_L)/rho_L
-                                    H_R = (E_R + pres_R)/rho_R
 
                                     @:compute_average_state()
 
