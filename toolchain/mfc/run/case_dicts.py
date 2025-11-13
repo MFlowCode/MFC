@@ -259,6 +259,8 @@ SIMULATION.update({
     'weno_avg': ParamType.LOG,
     'weno_Re_flux': ParamType.LOG,
     'riemann_solver': ParamType.INT,
+    'riemann_ADC': ParamType.LOG,
+    'ADC_kappa': ParamType.REAL,
     'wave_speeds': ParamType.INT,
     'avg_state': ParamType.INT,
     'prim_vars_wrt': ParamType.LOG,

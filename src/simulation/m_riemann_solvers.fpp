@@ -1281,6 +1281,19 @@ contains
         real(wp) :: pres_tot_star
         real(wp) :: E_L_star, E_R_star
         real(wp) :: S_Mid             ! contact speed used in star formulas
+
+        ! --- ADC (HLL -> HLLC) ---
+        real(wp), dimension(sys_size) :: F_HLL
+        real(wp) :: u_n_HLL, u_t_HLL
+        real(wp) :: phi
+
+        real(wp) :: Sigma_L, Sigma_R, dSigma, Sigma_ref
+        real(wp) :: a_L_ref, a_R_ref, a_ref
+        real(wp) :: du_t, dtau_nt
+        real(wp) :: sensor_ptot, sensor_vt, sensor_tnt, sensor_combined
+
+        real(wp), parameter :: ADC_power = 1.0 ! Fixed for now
+
         
         ! Populating the buffers of the left and right Riemann problem
         ! states variables, based on the choice of boundary conditions
@@ -3124,15 +3137,66 @@ contains
                                         u_t_HLLC = u_t_R
                                     else if (S_mid >= 0d0) then
                                         F_HLLC = F_star_L
-                                        u_n_HLLC = u_n_L + S_L * (rho_L_star / (rho_L + eps) - 1d0)
+                                        u_n_HLLC = S_Mid
                                         u_t_HLLC = u_t_star
                                     else
                                         F_HLLC = F_star_R
-                                        u_n_HLLC = u_n_R + S_R * (rho_R_star / (rho_R + eps) - 1d0)
+                                        u_n_HLLC = S_Mid
                                         u_t_HLLC = u_t_star
                                     end if
 
                                     ! print *, "F_HLLC", F_HLLC
+
+                                    ! === ADC BLENDING ===
+                                    if (riemann_ADC) then
+
+                                        ! Find F_HLL and velocity fluxes for ADC
+                                        F_HLL = F_HLLC
+                                        u_n_HLL = u_n_HLLC
+                                        u_t_HLL = u_t_HLLC
+                                        if (S_L < 0d0 .and. S_R > 0d0) then
+                                            F_HLL   = (S_R*F_L - S_L*F_R + S_L*S_R*(U_R-U_L)) / (S_R-S_L + eps)
+                                            u_n_HLL = (S_R*u_n_L - S_L*u_n_R) / (S_R-S_L + eps)
+                                            u_t_HLL = (S_R*u_t_L - S_L*u_t_R) / (S_R-S_L + eps)
+                                        end if
+
+                                        ! Find phi
+                                        ! Total normal stress Σ = p - tau_nn on each side
+                                        Sigma_L   = pres_tot_L
+                                        Sigma_R   = pres_tot_R
+                                        dSigma    = Sigma_R - Sigma_L
+                                        Sigma_ref = max( max(abs(Sigma_L), abs(Sigma_R)), eps )
+
+                                        ! Directional fast speeds (normal), matching Python _a_normal:
+                                        ! a^2 = c^2 + ( (4/3)G + tau_nn ) / ρ
+                                        a_L_ref = sqrt( max( eps, c_L*c_L + (((4._wp/3._wp)*G_L + tau_nn_L)/rho_L) ) )
+                                        a_R_ref = sqrt( max( eps, c_R*c_R + (((4._wp/3._wp)*G_R + tau_nn_R)/rho_R) ) )
+                                        a_ref   = max( max(a_L_ref, a_R_ref), eps )
+
+                                        ! Tangential jumps
+                                        du_t    = u_t_R    - u_t_L
+                                        dtau_nt = tau_nt_R - tau_nt_L
+
+                                        ! Multi-sensor:
+                                        sensor_ptot = (dSigma*dSigma)   / ( (ADC_kappa*Sigma_ref)**2 + eps )
+                                        sensor_vt   = (du_t*du_t)       / ( (ADC_kappa*a_ref    )**2 + eps )
+                                        sensor_tnt  = (dtau_nt*dtau_nt) / ( (ADC_kappa*Sigma_ref)**2 + eps )
+
+                                        sensor_combined = sensor_ptot + sensor_tnt + sensor_vt
+
+                                        phi = exp( - (sensor_combined**ADC_power) )
+
+                                        ! print *, phi, sensor_ptot, sensor_tnt, sensor_vt
+
+                                        ! Replace F_HLLC and velocity fluxes with blended fluxes
+                                        F_HLLC   = F_HLL   + phi*(F_HLLC   - F_HLL  )
+                                        u_n_HLLC = u_n_HLL + phi*(u_n_HLLC - u_n_HLL)
+                                        u_t_HLLC = u_t_HLL + phi*(u_t_HLLC - u_t_HLL)
+
+                                    end if
+
+                                    ! === END ADC BLENDING ===
+
 
                                     ! Assign flux_rs to F_HLLC with the right indexing order
                                     do i = 1, num_fluids
@@ -3176,6 +3240,10 @@ contains
 
                                     flux_rs${XYZ}$_vf(j, k, l, E_idx) = F_HLLC(E_idx)
                                 end if
+
+                                ! if (riemann_ADC) call exit(66) ! DEBUG
+
+                                
 
 
                                 ! Geometrical source flux for cylindrical coordinates

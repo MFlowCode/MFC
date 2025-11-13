@@ -101,6 +101,9 @@ contains
 
         ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
 
+        ! hypo RHS is now done outside the flux dir-loops
+        ! so idir conditions are no longer needed
+
         ! print *, '=== DEBUG PRINT ==='
         ! print *, vel_x_flux(1)%sf(5,5,0)
         ! print *, vel_x_flux(2)%sf(5,5,0)
@@ -168,7 +171,7 @@ contains
                 end do
             end do
 
-        if (ndirs > 1) then
+        if (ndirs > 1) then ! no longer (idir == 2) as hypo rhs is now outside the flux dir loops
             !$acc parallel loop collapse(3) gang vector default(present)
             do q = 0, p
                 do l = 0, n
