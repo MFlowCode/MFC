@@ -347,11 +347,11 @@ contains
 
     !< initialize the gaussian filtering kernel in real space and then compute its DFT
     subroutine s_initialize_filtering_kernel
-        real(dp) :: sigma_stddev
-        real(dp) :: Lx, Ly, Lz
-        real(dp) :: x_r, y_r, z_r
-        real(dp) :: r2
-        real(dp) :: G_norm_int, G_norm_int_glb
+        real(wp) :: sigma_stddev
+        real(wp) :: Lx, Ly, Lz
+        real(wp) :: x_r, y_r, z_r
+        real(wp) :: r2
+        real(wp) :: G_norm_int, G_norm_int_glb
         integer :: i, j, k
 
         ! gaussian filter
@@ -361,7 +361,7 @@ contains
         Ly = y_domain_end_glb - y_domain_beg_glb
         Lz = z_domain_end_glb - z_domain_beg_glb
 
-        G_norm_int = 0.0_dp
+        G_norm_int = 0.0_wp
 
         $:GPU_PARALLEL_LOOP(collapse=3, reduction='[[G_norm_int]]', reductionOp='[+]', copyin='[Lx, Ly, Lz, sigma_stddev]', private='[x_r, y_r, z_r, r2]')
         do i = 0, m
@@ -373,7 +373,7 @@ contains
 
                     r2 = x_r**2 + y_r**2 + z_r**2
 
-                    real_kernelG_in(i + 1, j + 1, k + 1) = exp(-r2/(2.0_dp*sigma_stddev**2))
+                    real_kernelG_in(i + 1, j + 1, k + 1) = exp(-r2/(2.0_wp*sigma_stddev**2))
 
                     G_norm_int = G_norm_int + real_kernelG_in(i + 1, j + 1, k + 1)*dx(i)*dy(j)*dz(k)
                 end do
@@ -462,7 +462,7 @@ contains
         do i = 1, NxC
             do j = 1, Nyloc
                 do k = 1, Nz
-                    cmplx_kernelG1d(k + (i - 1)*Nz + (j - 1)*Nz*NxC) = cmplx_kernelG1d(k + (i - 1)*Nz + (j - 1)*Nz*NxC)/(real(Nx*Ny*Nz, dp))
+                    cmplx_kernelG1d(k + (i - 1)*Nz + (j - 1)*Nz*NxC) = cmplx_kernelG1d(k + (i - 1)*Nz + (j - 1)*Nz*NxC)/(real(Nx*Ny*Nz, wp))
                 end do
             end do
         end do
@@ -486,9 +486,9 @@ contains
             do j = 0, n
                 do k = 0, p
                     if (ib_markers%sf(i, j, k) == 0) then
-                        fluid_indicator_function%sf(i, j, k) = 1.0_dp
+                        fluid_indicator_function%sf(i, j, k) = 1.0_wp
                     else
-                        fluid_indicator_function%sf(i, j, k) = 0.0_dp
+                        fluid_indicator_function%sf(i, j, k) = 0.0_wp
                     end if
                 end do
             end do
@@ -531,7 +531,7 @@ contains
         do i = 1, Nx
             do j = 1, Ny
                 do k = 1, Nzloc
-                    filtered_fluid_indicator_function%sf(i - 1, j - 1, k - 1) = data_real_3D_slabz(i, j, k)/(real(Nx*Ny*Nz, dp))
+                    filtered_fluid_indicator_function%sf(i - 1, j - 1, k - 1) = data_real_3D_slabz(i, j, k)/(real(Nx*Ny*Nz, wp))
                 end do
             end do
         end do
@@ -616,7 +616,7 @@ contains
             do i = 0, m
                 do j = 0, n
                     do k = 0, p
-                        data_real_3D_slabz(i + 1, j + 1, k + 1) = q_temp_in%sf(i, j, k)*(1.0_dp - fluid_indicator_function%sf(i, j, k))
+                        data_real_3D_slabz(i + 1, j + 1, k + 1) = q_temp_in%sf(i, j, k)*(1.0_wp - fluid_indicator_function%sf(i, j, k))
                     end do
                 end do
             end do
@@ -644,7 +644,7 @@ contains
             do i = 0, m
                 do j = 0, n
                     do k = 0, p
-                        q_temp_out%sf(i, j, k) = data_real_3D_slabz(i + 1, j + 1, k + 1)/(real(Nx*Ny*Nz, dp)*filtered_fluid_indicator_function%sf(i, j, k))
+                        q_temp_out%sf(i, j, k) = data_real_3D_slabz(i + 1, j + 1, k + 1)/(real(Nx*Ny*Nz, wp)*filtered_fluid_indicator_function%sf(i, j, k))
                     end do
                 end do
             end do
@@ -653,7 +653,7 @@ contains
             do i = 0, m
                 do j = 0, n
                     do k = 0, p
-                        q_temp_in%sf(i, j, k) = data_real_3D_slabz(i + 1, j + 1, k + 1)/(real(Nx*Ny*Nz, dp)*filtered_fluid_indicator_function%sf(i, j, k))
+                        q_temp_in%sf(i, j, k) = data_real_3D_slabz(i + 1, j + 1, k + 1)/(real(Nx*Ny*Nz, wp)*filtered_fluid_indicator_function%sf(i, j, k))
                     end do
                 end do
             end do
@@ -938,7 +938,7 @@ contains
             do i = 0, m
                 do j = 0, n
                     do k = 0, p
-                        int_mom_exch(l)%sf(i, j, k) = data_real_3D_slabz(i + 1, j + 1, k + 1)/(real(Nx*Ny*Nz, dp))
+                        int_mom_exch(l)%sf(i, j, k) = data_real_3D_slabz(i + 1, j + 1, k + 1)/(real(Nx*Ny*Nz, wp))
                     end do
                 end do
             end do
@@ -1535,7 +1535,7 @@ contains
             do i = 0, m
                 do j = 0, n
                     do k = 0, p
-                        q_cons_filtered(l)%sf(i, j, k) = data_real_3D_slabz(i + 1, j + 1, k + 1)/(real(Nx*Ny*Nz, dp)*filtered_fluid_indicator_function%sf(i, j, k))
+                        q_cons_filtered(l)%sf(i, j, k) = data_real_3D_slabz(i + 1, j + 1, k + 1)/(real(Nx*Ny*Nz, wp)*filtered_fluid_indicator_function%sf(i, j, k))
                     end do
                 end do
             end do
@@ -1580,7 +1580,7 @@ contains
         do i = 0, m
             do j = 0, n
                 do k = 0, p
-                    filtered_pressure%sf(i, j, k) = data_real_3D_slabz(i + 1, j + 1, k + 1)/(real(Nx*Ny*Nz, dp)*filtered_fluid_indicator_function%sf(i, j, k))
+                    filtered_pressure%sf(i, j, k) = data_real_3D_slabz(i + 1, j + 1, k + 1)/(real(Nx*Ny*Nz, wp)*filtered_fluid_indicator_function%sf(i, j, k))
                 end do
             end do
         end do
@@ -1626,7 +1626,7 @@ contains
                 do i = 0, m
                     do j = 0, n
                         do k = 0, p
-                            reynolds_stress(l)%vf(q)%sf(i, j, k) = data_real_3D_slabz(i + 1, j + 1, k + 1)/(real(Nx*Ny*Nz, dp)*filtered_fluid_indicator_function%sf(i, j, k))
+                            reynolds_stress(l)%vf(q)%sf(i, j, k) = data_real_3D_slabz(i + 1, j + 1, k + 1)/(real(Nx*Ny*Nz, wp)*filtered_fluid_indicator_function%sf(i, j, k))
                         end do
                     end do
                 end do
@@ -1674,7 +1674,7 @@ contains
                 do i = 0, m
                     do j = 0, n
                         do k = 0, p
-                            eff_visc(l)%vf(q)%sf(i, j, k) = data_real_3D_slabz(i + 1, j + 1, k + 1)/(real(Nx*Ny*Nz, dp)*filtered_fluid_indicator_function%sf(i, j, k))
+                            eff_visc(l)%vf(q)%sf(i, j, k) = data_real_3D_slabz(i + 1, j + 1, k + 1)/(real(Nx*Ny*Nz, wp)*filtered_fluid_indicator_function%sf(i, j, k))
                         end do
                     end do
                 end do

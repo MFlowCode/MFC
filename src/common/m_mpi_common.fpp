@@ -51,7 +51,9 @@ module m_mpi_common
     real(wp), private, allocatable, dimension(:), target :: buff_recv_scalarfield
     !! This variable is utilized to receive and unpack the buffer of any scalar field from neighboring processors
 
+#ifndef __NVCOMPILER_GPU_UNIFIED_MEM
     $:GPU_DECLARE(create='[buff_send_scalarfield, buff_recv_scalarfield]')
+#endif
 
 contains
 
@@ -103,9 +105,13 @@ contains
                                            & (n + 2*buff_size + 1)* &
                                            & (p + 2*buff_size + 1)/ &
                                            & (cells_bounds%mnp_min + 2*buff_size + 1))
+#ifndef __NVCOMPILER_GPU_UNIFIED_MEM                          
+            @:ALLOCATE(buff_send_scalarfield(0:halo_size_sf), buff_recv_scalarfield(0:halo_size_sf))
+#else
             allocate (buff_send_scalarfield(0:halo_size_sf), buff_recv_scalarfield(0:halo_size_sf))
             $:GPU_ENTER_DATA(create='[capture:buff_send_scalarfield]')
             $:GPU_ENTER_DATA(create='[capture:buff_recv_scalarfield]')
+#endif
         end if
 #endif
 #endif
