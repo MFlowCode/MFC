@@ -3,18 +3,18 @@ import math
 import json
 
 # Domain parameters
-D = 2.5       # Jet diameter
+D = 2.5  # Jet diameter
 Nd = 711  # Cells per jet diameter
 
-x0 = 0    # x_beg coordinate
-x1 = 19*D   # x_end coordinate
-y0 = -22*D/2   # y_beg coordinate
-y1 = 22*D/2    # y_end coordinate
-z0 = -22*D/2   # y_beg coordinate
-z1 = 22*D/2   # y_end coordinate
-Nx = int(Nd*(x1 - x0)/D) - 1
-Ny = int(Nd*(y1 - y0)/D) - 1
-Nz = int(Nd*(z1 - z0)/D) - 1
+x0 = 0  # x_beg coordinate
+x1 = 19 * D  # x_end coordinate
+y0 = -22 * D / 2  # y_beg coordinate
+y1 = 22 * D / 2  # y_end coordinate
+z0 = -22 * D / 2  # y_beg coordinate
+z1 = 22 * D / 2  # y_end coordinate
+Nx = int(Nd * (x1 - x0) / D) - 1
+Ny = int(Nd * (y1 - y0) / D) - 1
+Nz = int(Nd * (z1 - z0) / D) - 1
 
 time_end = 5
 igrIters = 5
@@ -42,8 +42,8 @@ print(
             "p": int(Nz),
             "dt": dt,
             "t_step_start": 0,
-            "t_step_stop": 10, #Nt,
-            "t_step_save": 10, #int(Nt/50),
+            "t_step_stop": 10,  # Nt,
+            "t_step_save": 10,  # int(Nt/50),
             # Simulation Algorithm Parameters
             "num_patches": 1,
             "num_bc_patches": 0,
@@ -74,12 +74,12 @@ print(
             "down_sample": "T",
             # Patch
             "patch_icpp(1)%geometry": 9,
-            "patch_icpp(1)%x_centroid": (x1 + x0)/2,
-            "patch_icpp(1)%y_centroid": (y1 + y0)/2,
-            "patch_icpp(1)%z_centroid": (z1 + z0)/2,
-            "patch_icpp(1)%length_x": 2*(x1 - x0),
-            "patch_icpp(1)%length_y": 2*(y1 - y0),
-            "patch_icpp(1)%length_z": 2*(z1 - z0),
+            "patch_icpp(1)%x_centroid": (x1 + x0) / 2,
+            "patch_icpp(1)%y_centroid": (y1 + y0) / 2,
+            "patch_icpp(1)%z_centroid": (z1 + z0) / 2,
+            "patch_icpp(1)%length_x": 2 * (x1 - x0),
+            "patch_icpp(1)%length_y": 2 * (y1 - y0),
+            "patch_icpp(1)%length_z": 2 * (z1 - z0),
             "patch_icpp(1)%hcid": 303,
             "patch_icpp(1)%vel(1)": 0.0e00,
             "patch_icpp(1)%vel(2)": 0.0e00,
@@ -112,6 +112,7 @@ print(
             "fluid_pp(1)%pi_inf": 0.0,
             "viscous": "T",
             "fluid_pp(1)%Re(1)": 5e5,
-        }, indent=4
+        },
+        indent=4,
     )
 )

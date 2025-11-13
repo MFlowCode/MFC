@@ -132,19 +132,19 @@
         rcut = f_cut_on(r - r_th, eps_smooth)
         xcut = f_cut_on(x_cc(i), eps_smooth)
 
-        q_prim_vf(momxb)%sf(i, j, k) = ux_th * rcut * xcut + ux_am
+        q_prim_vf(momxb)%sf(i, j, k) = ux_th*rcut*xcut + ux_am
         q_prim_vf(momxb + 1)%sf(i, j, k) = 0._wp
         q_prim_vf(momxe)%sf(i, j, k) = 0._wp
 
         if (num_fluids == 1) then
-            q_prim_vf(contxb)%sf(i, j, k) = (rho_th - rho_am) * rcut * xcut + rho_am
+            q_prim_vf(contxb)%sf(i, j, k) = (rho_th - rho_am)*rcut*xcut + rho_am
         else
-            q_prim_vf(advxb)%sf(i, j, k) = (1._wp - 2._wp*eps) * rcut * xcut + eps
+            q_prim_vf(advxb)%sf(i, j, k) = (1._wp - 2._wp*eps)*rcut*xcut + eps
             q_prim_vf(contxb)%sf(i, j, k) = rho_th*q_prim_vf(advxb)%sf(i, j, k)
             q_prim_vf(contxe)%sf(i, j, k) = rho_am*(1._wp - q_prim_vf(advxb)%sf(i, j, k))
         end if
 
-        q_prim_vf(E_idx)%sf(i, j, k) = p_th * rcut * xcut + p_am
+        q_prim_vf(E_idx)%sf(i, j, k) = p_th*rcut*xcut + p_am
 
     case (303) ! 3D Multijet
 
@@ -160,19 +160,19 @@
         rcut = rcut_arr(j, k)
         xcut = f_cut_on(x_cc(i), eps_smooth)
 
-        q_prim_vf(momxb)%sf(i, j, k) = ux_th * rcut * xcut + ux_am
+        q_prim_vf(momxb)%sf(i, j, k) = ux_th*rcut*xcut + ux_am
         q_prim_vf(momxb + 1)%sf(i, j, k) = 0._wp
         q_prim_vf(momxe)%sf(i, j, k) = 0._wp
 
         if (num_fluids == 1) then
-            q_prim_vf(contxb)%sf(i, j, k) = (rho_th - rho_am) * rcut * xcut + rho_am
+            q_prim_vf(contxb)%sf(i, j, k) = (rho_th - rho_am)*rcut*xcut + rho_am
         else
-            q_prim_vf(advxb)%sf(i, j, k) = (1._wp - 2._wp*eps) * rcut * xcut + eps
+            q_prim_vf(advxb)%sf(i, j, k) = (1._wp - 2._wp*eps)*rcut*xcut + eps
             q_prim_vf(contxb)%sf(i, j, k) = rho_th*q_prim_vf(advxb)%sf(i, j, k)
             q_prim_vf(contxe)%sf(i, j, k) = rho_am*(1._wp - q_prim_vf(advxb)%sf(i, j, k))
         end if
 
-        q_prim_vf(E_idx)%sf(i, j, k) = p_th * rcut * xcut + p_am
+        q_prim_vf(E_idx)%sf(i, j, k) = p_th*rcut*xcut + p_am
 
     case (370)
         ! This hardcoded case extrudes a 2D profile to initialize a 3D simulation domain
