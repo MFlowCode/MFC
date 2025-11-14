@@ -9,6 +9,7 @@ url: "https://github.com/MFlowCode/MFC"
 preferred-citation:
   type: article
   title: "MFC 5.0: An exascale many-physics flow solver"
+  journal: "arXiv preprint arXiv.2503.07953"
   doi: "10.48550/arXiv.2503.07953"
   year: 2025
   authors:
