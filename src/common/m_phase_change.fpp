@@ -99,177 +99,177 @@ contains
         integer :: i, j, k, l
 
         ! starting equilibrium solver
-        #:call GPU_PARALLEL_LOOP(collapse=3, private='[p_infOV, p_infpT, p_infSL, sk, hk, gk, ek, rhok,pS, pSOV, pSSL, TS, TSOV, TSatOV, TSatSL, TSSL, rhoe, dynE, rhos, rho, rM, m1, m2, MCT, TvF]')
-            do j = 0, m
-                do k = 0, n
-                    do l = 0, p
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[j,k,l,p_infOV, p_infpT, p_infSL, sk, hk, gk, ek, rhok,pS, pSOV, pSSL, TS, TSOV, TSatOV, TSatSL, TSSL, rhoe, dynE, rhos, rho, rM, m1, m2, MCT, TvF]')
+        do j = 0, m
+            do k = 0, n
+                do l = 0, p
 
-                        rho = 0.0_wp; TvF = 0.0_wp
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = 1, num_fluids
+                    rho = 0.0_wp; TvF = 0.0_wp
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do i = 1, num_fluids
 
-                            ! Mixture density
-                            rho = rho + q_cons_vf(i + contxb - 1)%sf(j, k, l)
+                        ! Mixture density
+                        rho = rho + q_cons_vf(i + contxb - 1)%sf(j, k, l)
 
-                            ! Total Volume Fraction
-                            TvF = TvF + q_cons_vf(i + advxb - 1)%sf(j, k, l)
+                        ! Total Volume Fraction
+                        TvF = TvF + q_cons_vf(i + advxb - 1)%sf(j, k, l)
 
-                        end do
+                    end do
 
-                        ! calculating the total reacting mass for the phase change process. By hypothesis, this should not change
-                        ! throughout the phase-change process.
-                        rM = q_cons_vf(lp + contxb - 1)%sf(j, k, l) + q_cons_vf(vp + contxb - 1)%sf(j, k, l)
+                    ! calculating the total reacting mass for the phase change process. By hypothesis, this should not change
+                    ! throughout the phase-change process.
+                    rM = q_cons_vf(lp + contxb - 1)%sf(j, k, l) + q_cons_vf(vp + contxb - 1)%sf(j, k, l)
 
-                        ! correcting negative (reacting) mass fraction values in case they happen
-                        call s_correct_partial_densities(MCT, q_cons_vf, rM, j, k, l)
+                    ! correcting negative (reacting) mass fraction values in case they happen
+                    call s_correct_partial_densities(MCT, q_cons_vf, rM, j, k, l)
 
-                        ! fixing m1 and m2 AFTER correcting the partial densities. Note that these values must be stored for the phase
-                        ! change process that will happen a posteriori
-                        m1 = q_cons_vf(lp + contxb - 1)%sf(j, k, l)
+                    ! fixing m1 and m2 AFTER correcting the partial densities. Note that these values must be stored for the phase
+                    ! change process that will happen a posteriori
+                    m1 = q_cons_vf(lp + contxb - 1)%sf(j, k, l)
 
-                        m2 = q_cons_vf(vp + contxb - 1)%sf(j, k, l)
+                    m2 = q_cons_vf(vp + contxb - 1)%sf(j, k, l)
 
-                        ! kinetic energy as an auxiliary variable to the calculation of the total internal energy
-                        dynE = 0.0_wp
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = momxb, momxe
+                    ! kinetic energy as an auxiliary variable to the calculation of the total internal energy
+                    dynE = 0.0_wp
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do i = momxb, momxe
 
-                            dynE = dynE + 5.0e-1_wp*q_cons_vf(i)%sf(j, k, l)**2/rho
+                        dynE = dynE + 5.0e-1_wp*q_cons_vf(i)%sf(j, k, l)**2/rho
 
-                        end do
+                    end do
 
-                        ! calculating the total energy that MUST be preserved throughout the pT- and pTg-relaxation procedures
-                        ! at each of the cells. The internal energy is calculated as the total energy minus the kinetic
-                        ! energy to preserved its value at sharp interfaces
-                        rhoe = q_cons_vf(E_idx)%sf(j, k, l) - dynE
+                    ! calculating the total energy that MUST be preserved throughout the pT- and pTg-relaxation procedures
+                    ! at each of the cells. The internal energy is calculated as the total energy minus the kinetic
+                    ! energy to preserved its value at sharp interfaces
+                    rhoe = q_cons_vf(E_idx)%sf(j, k, l) - dynE
 
-                        ! Calling pT-equilibrium for either finishing phase-change module, or as an IC for the pTg-equilibrium
-                        ! for this case, MFL cannot be either 0 or 1, so I chose it to be 2
-                        call s_infinite_pt_relaxation_k(j, k, l, 2, pS, p_infpT, q_cons_vf, rhoe, TS)
+                    ! Calling pT-equilibrium for either finishing phase-change module, or as an IC for the pTg-equilibrium
+                    ! for this case, MFL cannot be either 0 or 1, so I chose it to be 2
+                    call s_infinite_pt_relaxation_k(j, k, l, 2, pS, p_infpT, q_cons_vf, rhoe, TS)
 
-                        ! check if pTg-equilibrium is required
-                        ! NOTE that NOTHING else needs to be updated OTHER than the individual partial densities
-                        ! given the outputs from the pT- and pTg-equilibrium solvers are just p and one of the partial masses
-                        ! (pTg- case)
-                        if ((relax_model == 6) .and. ((q_cons_vf(lp + contxb - 1)%sf(j, k, l) > mixM*rM) &
-                                                      .and. (q_cons_vf(vp + contxb - 1)%sf(j, k, l) > mixM*rM)) &
-                            .and. (pS < pCr) .and. (TS < TCr)) then
+                    ! check if pTg-equilibrium is required
+                    ! NOTE that NOTHING else needs to be updated OTHER than the individual partial densities
+                    ! given the outputs from the pT- and pTg-equilibrium solvers are just p and one of the partial masses
+                    ! (pTg- case)
+                    if ((relax_model == 6) .and. ((q_cons_vf(lp + contxb - 1)%sf(j, k, l) > mixM*rM) &
+                                                  .and. (q_cons_vf(vp + contxb - 1)%sf(j, k, l) > mixM*rM)) &
+                        .and. (pS < pCr) .and. (TS < TCr)) then
 
-                            ! Checking if phase change is needed, by checking whether the final solution is either subcoooled
-                            ! liquid or overheated vapor.
+                        ! Checking if phase change is needed, by checking whether the final solution is either subcoooled
+                        ! liquid or overheated vapor.
 
-                            ! overheated vapor case
-                            ! depleting the mass of liquid
+                        ! overheated vapor case
+                        ! depleting the mass of liquid
+                        q_cons_vf(lp + contxb - 1)%sf(j, k, l) = mixM*rM
+
+                        ! transferring the total mass to vapor
+                        q_cons_vf(vp + contxb - 1)%sf(j, k, l) = (1.0_wp - mixM)*rM
+
+                        ! calling pT-equilibrium for overheated vapor, which is MFL = 0
+                        call s_infinite_pt_relaxation_k(j, k, l, 0, pSOV, p_infOV, q_cons_vf, rhoe, TSOV)
+
+                        ! calculating Saturation temperature
+                        call s_TSat(pSOV, TSatOV, TSOV)
+
+                        ! subcooled liquid case
+                        ! transferring the total mass to liquid
+                        q_cons_vf(lp + contxb - 1)%sf(j, k, l) = (1.0_wp - mixM)*rM
+
+                        ! depleting the mass of vapor
+                        q_cons_vf(vp + contxb - 1)%sf(j, k, l) = mixM*rM
+
+                        ! calling pT-equilibrium for subcooled liquid, which is MFL = 1
+                        call s_infinite_pt_relaxation_k(j, k, l, 1, pSSL, p_infSL, q_cons_vf, rhoe, TSSL)
+
+                        ! calculating Saturation temperature
+                        call s_TSat(pSSL, TSatSL, TSSL)
+
+                        ! checking the conditions for overheated vapor and subcooled liquide
+                        if (TSOV > TSatOV) then
+
+                            ! Assigning pressure
+                            pS = pSOV
+
+                            ! Assigning Temperature
+                            TS = TSOV
+
+                            ! correcting the liquid partial density
                             q_cons_vf(lp + contxb - 1)%sf(j, k, l) = mixM*rM
 
-                            ! transferring the total mass to vapor
+                            ! correcting the vapor partial density
                             q_cons_vf(vp + contxb - 1)%sf(j, k, l) = (1.0_wp - mixM)*rM
 
-                            ! calling pT-equilibrium for overheated vapor, which is MFL = 0
-                            call s_infinite_pt_relaxation_k(j, k, l, 0, pSOV, p_infOV, q_cons_vf, rhoe, TSOV)
+                        elseif (TSSL < TSatSL) then
 
-                            ! calculating Saturation temperature
-                            call s_TSat(pSOV, TSatOV, TSOV)
+                            ! Assigning pressure
+                            pS = pSSL
 
-                            ! subcooled liquid case
-                            ! transferring the total mass to liquid
+                            ! Assigning Temperature
+                            TS = TSSL
+
+                            ! correcting the liquid partial density
                             q_cons_vf(lp + contxb - 1)%sf(j, k, l) = (1.0_wp - mixM)*rM
 
-                            ! depleting the mass of vapor
+                            ! correcting the vapor partial density
                             q_cons_vf(vp + contxb - 1)%sf(j, k, l) = mixM*rM
 
-                            ! calling pT-equilibrium for subcooled liquid, which is MFL = 1
-                            call s_infinite_pt_relaxation_k(j, k, l, 1, pSSL, p_infSL, q_cons_vf, rhoe, TSSL)
+                        else
 
-                            ! calculating Saturation temperature
-                            call s_TSat(pSSL, TSatSL, TSSL)
+                            ! returning partial pressures to what they were from the homogeneous solver
+                            ! liquid
+                            q_cons_vf(lp + contxb - 1)%sf(j, k, l) = m1
 
-                            ! checking the conditions for overheated vapor and subcooled liquide
-                            if (TSOV > TSatOV) then
+                            ! vapor
+                            q_cons_vf(vp + contxb - 1)%sf(j, k, l) = m2
 
-                                ! Assigning pressure
-                                pS = pSOV
-
-                                ! Assigning Temperature
-                                TS = TSOV
-
-                                ! correcting the liquid partial density
-                                q_cons_vf(lp + contxb - 1)%sf(j, k, l) = mixM*rM
-
-                                ! correcting the vapor partial density
-                                q_cons_vf(vp + contxb - 1)%sf(j, k, l) = (1.0_wp - mixM)*rM
-
-                            elseif (TSSL < TSatSL) then
-
-                                ! Assigning pressure
-                                pS = pSSL
-
-                                ! Assigning Temperature
-                                TS = TSSL
-
-                                ! correcting the liquid partial density
-                                q_cons_vf(lp + contxb - 1)%sf(j, k, l) = (1.0_wp - mixM)*rM
-
-                                ! correcting the vapor partial density
-                                q_cons_vf(vp + contxb - 1)%sf(j, k, l) = mixM*rM
-
-                            else
-
-                                ! returning partial pressures to what they were from the homogeneous solver
-                                ! liquid
-                                q_cons_vf(lp + contxb - 1)%sf(j, k, l) = m1
-
-                                ! vapor
-                                q_cons_vf(vp + contxb - 1)%sf(j, k, l) = m2
-
-                                ! calling the pTg-equilibrium solver
-                                call s_infinite_ptg_relaxation_k(j, k, l, pS, p_infpT, rhoe, q_cons_vf, TS)
-
-                            end if
+                            ! calling the pTg-equilibrium solver
+                            call s_infinite_ptg_relaxation_k(j, k, l, pS, p_infpT, rhoe, q_cons_vf, TS)
 
                         end if
 
-                        ! Calculations AFTER equilibrium
+                    end if
 
-                        ! entropy
-                        sk(1:num_fluids) = cvs(1:num_fluids)*log((TS**gs_min(1:num_fluids)) &
-                                                                 /((pS + ps_inf(1:num_fluids))**(gs_min(1:num_fluids) - 1.0_wp))) + qvps(1:num_fluids)
+                    ! Calculations AFTER equilibrium
 
-                        ! enthalpy
-                        hk(1:num_fluids) = gs_min(1:num_fluids)*cvs(1:num_fluids)*TS &
-                                           + qvs(1:num_fluids)
+                    ! entropy
+                    sk(1:num_fluids) = cvs(1:num_fluids)*log((TS**gs_min(1:num_fluids)) &
+                                                             /((pS + ps_inf(1:num_fluids))**(gs_min(1:num_fluids) - 1.0_wp))) + qvps(1:num_fluids)
 
-                        ! Gibbs-free energy
-                        gk(1:num_fluids) = hk(1:num_fluids) - TS*sk(1:num_fluids)
+                    ! enthalpy
+                    hk(1:num_fluids) = gs_min(1:num_fluids)*cvs(1:num_fluids)*TS &
+                                       + qvs(1:num_fluids)
 
-                        ! densities
-                        rhok(1:num_fluids) = (pS + ps_inf(1:num_fluids)) &
-                                             /((gs_min(1:num_fluids) - 1)*cvs(1:num_fluids)*TS)
+                    ! Gibbs-free energy
+                    gk(1:num_fluids) = hk(1:num_fluids) - TS*sk(1:num_fluids)
 
-                        ! internal energy
-                        ek(1:num_fluids) = (pS + gs_min(1:num_fluids) &
-                                            *ps_inf(1:num_fluids))/(pS + ps_inf(1:num_fluids)) &
-                                           *cvs(1:num_fluids)*TS + qvs(1:num_fluids)
+                    ! densities
+                    rhok(1:num_fluids) = (pS + ps_inf(1:num_fluids)) &
+                                         /((gs_min(1:num_fluids) - 1)*cvs(1:num_fluids)*TS)
 
-                        ! calculating volume fractions, internal energies, and total entropy
-                        rhos = 0.0_wp
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = 1, num_fluids
+                    ! internal energy
+                    ek(1:num_fluids) = (pS + gs_min(1:num_fluids) &
+                                        *ps_inf(1:num_fluids))/(pS + ps_inf(1:num_fluids)) &
+                                       *cvs(1:num_fluids)*TS + qvs(1:num_fluids)
 
-                            ! volume fractions
-                            q_cons_vf(i + advxb - 1)%sf(j, k, l) = q_cons_vf(i + contxb - 1)%sf(j, k, l)/rhok(i)
+                    ! calculating volume fractions, internal energies, and total entropy
+                    rhos = 0.0_wp
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do i = 1, num_fluids
 
-                            ! alpha*rho*e
-                            q_cons_vf(i + intxb - 1)%sf(j, k, l) = q_cons_vf(i + contxb - 1)%sf(j, k, l)*ek(i)
+                        ! volume fractions
+                        q_cons_vf(i + advxb - 1)%sf(j, k, l) = q_cons_vf(i + contxb - 1)%sf(j, k, l)/rhok(i)
 
-                            ! Total entropy
-                            rhos = rhos + q_cons_vf(i + contxb - 1)%sf(j, k, l)*sk(i)
+                        ! alpha*rho*e
+                        q_cons_vf(i + intxb - 1)%sf(j, k, l) = q_cons_vf(i + contxb - 1)%sf(j, k, l)*ek(i)
 
-                        end do
+                        ! Total entropy
+                        rhos = rhos + q_cons_vf(i + contxb - 1)%sf(j, k, l)*sk(i)
+
                     end do
                 end do
             end do
-        #:endcall GPU_PARALLEL_LOOP
+        end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_infinite_relaxation_k
 

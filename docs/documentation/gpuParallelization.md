@@ -44,13 +44,15 @@ Note: Ordering is not guaranteed or stable, so use key-value pairing when using 
 
 **Macro Invocation**
 
-Uses FYPP eval directive using `#:call`
+In order to parallelize a loop, simply place two macro calls on either end of the loop:
 
 ```C
-#:call GPU_PARALLEL_LOOP(...)
+$:$GPU_PARALLEL_LOOP(...)
    {code}
-#:endcall GPU_PARALLEL_LOOP
+$:END_GPU_PARALLEL_LOOP()
 ```
+
+This wraps the lines in `code` with parallelization calls to openACC or openMP, depending on environment and compiler settings.
 
 **Parameters**
 

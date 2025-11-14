@@ -18,45 +18,45 @@ contains
 
         real(wp) :: divergence
 
-        #:call GPU_PARALLEL_LOOP(collapse=3, private='[divergence]')
-            do x = ix_s%beg, ix_s%end
-                do y = iy_s%beg, iy_s%end
-                    do z = iz_s%beg, iz_s%end
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[x,y,z,divergence]')
+        do x = ix_s%beg, ix_s%end
+            do y = iy_s%beg, iy_s%end
+                do z = iz_s%beg, iz_s%end
 
-                        if (x == ix_s%beg) then
-                            divergence = (-3._wp*fields(1)%sf(x, y, z) + 4._wp*fields(1)%sf(x + 1, y, z) - fields(1)%sf(x + 2, y, z))/(x_cc(x + 2) - x_cc(x))
-                        else if (x == ix_s%end) then
-                            divergence = (+3._wp*fields(1)%sf(x, y, z) - 4._wp*fields(1)%sf(x - 1, y, z) + fields(1)%sf(x - 2, y, z))/(x_cc(x) - x_cc(x - 2))
+                    if (x == ix_s%beg) then
+                        divergence = (-3._wp*fields(1)%sf(x, y, z) + 4._wp*fields(1)%sf(x + 1, y, z) - fields(1)%sf(x + 2, y, z))/(x_cc(x + 2) - x_cc(x))
+                    else if (x == ix_s%end) then
+                        divergence = (+3._wp*fields(1)%sf(x, y, z) - 4._wp*fields(1)%sf(x - 1, y, z) + fields(1)%sf(x - 2, y, z))/(x_cc(x) - x_cc(x - 2))
+                    else
+                        divergence = (fields(1)%sf(x + 1, y, z) - fields(1)%sf(x - 1, y, z))/(x_cc(x + 1) - x_cc(x - 1))
+                    end if
+
+                    if (n > 0) then
+                        if (y == iy_s%beg) then
+                            divergence = divergence + (-3._wp*fields(2)%sf(x, y, z) + 4._wp*fields(2)%sf(x, y + 1, z) - fields(2)%sf(x, y + 2, z))/(y_cc(y + 2) - y_cc(y))
+                        else if (y == iy_s%end) then
+                            divergence = divergence + (+3._wp*fields(2)%sf(x, y, z) - 4._wp*fields(2)%sf(x, y - 1, z) + fields(2)%sf(x, y - 2, z))/(y_cc(y) - y_cc(y - 2))
                         else
-                            divergence = (fields(1)%sf(x + 1, y, z) - fields(1)%sf(x - 1, y, z))/(x_cc(x + 1) - x_cc(x - 1))
+                            divergence = divergence + (fields(2)%sf(x, y + 1, z) - fields(2)%sf(x, y - 1, z))/(y_cc(y + 1) - y_cc(y - 1))
                         end if
+                    end if
 
-                        if (n > 0) then
-                            if (y == iy_s%beg) then
-                                divergence = divergence + (-3._wp*fields(2)%sf(x, y, z) + 4._wp*fields(2)%sf(x, y + 1, z) - fields(2)%sf(x, y + 2, z))/(y_cc(y + 2) - y_cc(y))
-                            else if (y == iy_s%end) then
-                                divergence = divergence + (+3._wp*fields(2)%sf(x, y, z) - 4._wp*fields(2)%sf(x, y - 1, z) + fields(2)%sf(x, y - 2, z))/(y_cc(y) - y_cc(y - 2))
-                            else
-                                divergence = divergence + (fields(2)%sf(x, y + 1, z) - fields(2)%sf(x, y - 1, z))/(y_cc(y + 1) - y_cc(y - 1))
-                            end if
+                    if (p > 0) then
+                        if (z == iz_s%beg) then
+                            divergence = divergence + (-3._wp*fields(3)%sf(x, y, z) + 4._wp*fields(3)%sf(x, y, z + 1) - fields(3)%sf(x, y, z + 2))/(z_cc(z + 2) - z_cc(z))
+                        else if (z == iz_s%end) then
+                            divergence = divergence + (+3._wp*fields(3)%sf(x, y, z) - 4._wp*fields(3)%sf(x, y, z - 1) + fields(2)%sf(x, y, z - 2))/(z_cc(z) - z_cc(z - 2))
+                        else
+                            divergence = divergence + (fields(3)%sf(x, y, z + 1) - fields(3)%sf(x, y, z - 1))/(z_cc(z + 1) - z_cc(z - 1))
                         end if
+                    end if
 
-                        if (p > 0) then
-                            if (z == iz_s%beg) then
-                                divergence = divergence + (-3._wp*fields(3)%sf(x, y, z) + 4._wp*fields(3)%sf(x, y, z + 1) - fields(3)%sf(x, y, z + 2))/(z_cc(z + 2) - z_cc(z))
-                            else if (z == iz_s%end) then
-                                divergence = divergence + (+3._wp*fields(3)%sf(x, y, z) - 4._wp*fields(3)%sf(x, y, z - 1) + fields(2)%sf(x, y, z - 2))/(z_cc(z) - z_cc(z - 2))
-                            else
-                                divergence = divergence + (fields(3)%sf(x, y, z + 1) - fields(3)%sf(x, y, z - 1))/(z_cc(z + 1) - z_cc(z - 1))
-                            end if
-                        end if
+                    div%sf(x, y, z) = div%sf(x, y, z) + divergence
 
-                        div%sf(x, y, z) = div%sf(x, y, z) + divergence
-
-                    end do
                 end do
             end do
-        #:endcall GPU_PARALLEL_LOOP
+        end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_compute_fd_divergence
 
