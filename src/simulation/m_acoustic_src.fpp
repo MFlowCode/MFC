@@ -144,7 +144,7 @@ contains
 
         integer, intent(in) :: t_step
 
-        real(wp) :: myalpha(num_fluids), myalpha_rho(num_fluids)
+        real(wp), dimension(num_fluids) :: myalpha, myalpha_rho
         real(wp) :: myRho, B_tait
         real(wp) :: sim_time, c, small_gamma
         real(wp) :: frequency_local, gauss_sigma_time_local
@@ -199,6 +199,7 @@ contains
 
                 ! Allocate buffers for random phase shift
                 allocate (phi_rn(1:bb_num_freq(ai)))
+                phi_rn(1:bb_num_freq(ai)) = 0._wp
 
                 if (pulse(ai) == 4) then
                     call random_number(phi_rn(1:bb_num_freq(ai)))
@@ -206,7 +207,6 @@ contains
                     call s_mpi_send_random_number(phi_rn, bb_num_freq(ai))
                 end if
 
-                $:GPU_LOOP(reduction='[[sum_BB]]', reductionOp='[+]')
                 do k = 1, bb_num_freq(ai)
                     ! Acoustic period of the wave at each discrete frequency
                     period_BB = 1._wp/(bb_lowest_freq(ai) + k*bb_bandwidth(ai))
@@ -220,7 +220,7 @@ contains
 
                 deallocate (phi_rn)
 
-                #:call GPU_PARALLEL_LOOP(private='[myalpha,myalpha_rho]')
+                #:call GPU_PARALLEL_LOOP(private='[myalpha,myalpha_rho, myRho, B_tait,c,  small_gamma, frequency_local, gauss_sigma_time_local, mass_src_diff, mom_src_diff, source_temporal, j, k, l, q ]', copyin = '[sum_BB, freq_conv_flag, gauss_conv_flag, sim_time]')
                     do i = 1, num_points
                         j = source_spatials(ai)%coord(1, i)
                         k = source_spatials(ai)%coord(2, i)
@@ -442,15 +442,12 @@ contains
             source_spatials_num_points(ai) = count
 
             ! Allocate arrays with the correct size
+
             @:ALLOCATE(source_spatials(ai)%coord(1:3, 1:count))
             @:ALLOCATE(source_spatials(ai)%val(1:count))
-            if (support(ai) >= 5) then ! Planar supports don't need angle or xyz_to_r_ratios
-                if (dim == 2) then
-                    @:ALLOCATE(source_spatials(ai)%angle(1:count))
-                elseif (dim == 3) then
-                    @:ALLOCATE(source_spatials(ai)%xyz_to_r_ratios(1:3, 1:count))
-                end if
-            end if
+            @:ALLOCATE(source_spatials(ai)%angle(1:count))
+            @:ALLOCATE(source_spatials(ai)%xyz_to_r_ratios(1:3, 1:count))
+
             @:ACC_SETUP_source_spatials(source_spatials(ai))
 
             ! Second pass: Store the values
@@ -467,7 +464,7 @@ contains
                         source_spatials(ai)%val(count) = source_spatial
                         if (support(ai) >= 5) then
                             if (dim == 2) source_spatials(ai)%angle(count) = angle
-                            if (dim == 3) source_spatials(ai)%xyz_to_r_ratios(:, count) = xyz_to_r_ratios
+                            if (dim == 3) source_spatials(ai)%xyz_to_r_ratios(1:3, count) = xyz_to_r_ratios
                         end if
                     end do
                 end do

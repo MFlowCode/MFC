@@ -155,7 +155,7 @@ contains
                     do k = 0, n
                         do j = 0, m
                             rhs_vf(momxe)%sf(j, k, l) = rhs_vf(momxe)%sf(j, k, l) + &
-                                                        (rhoM(j, k, l))*accel_bf(3)
+                                                        rhoM(j, k, l)*accel_bf(3)
                             rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + &
                                                         q_cons_vf(momxe)%sf(j, k, l)*accel_bf(3)
                         end do
