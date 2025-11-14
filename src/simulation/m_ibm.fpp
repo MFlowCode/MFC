@@ -196,9 +196,8 @@ contains
         type(ghost_point) :: gp
         type(ghost_point) :: innerp
         if (num_gps > 0) then
-            #:call GPU_PARALLEL_LOOP(private='[physical_loc,dyn_pres,alpha_rho_IP, alpha_IP,pres_IP,vel_IP,vel_g,vel_norm_IP,r_IP, v_IP,pb_IP,mv_IP,nmom_IP,presb_IP,massv_IP,rho, gamma,pi_inf,Re_K,G_K,Gs,gp,innerp,norm,buf, radial_vector, rotation_velocity, j,k,l,q]')
+            ! #:call GPU_PARALLEL_LOOP(private='[physical_loc,dyn_pres,alpha_rho_IP, alpha_IP,pres_IP,vel_IP,vel_g,vel_norm_IP,r_IP, v_IP,pb_IP,mv_IP,nmom_IP,presb_IP,massv_IP,rho, gamma,pi_inf,Re_K,G_K,Gs,gp,innerp,norm,buf, radial_vector, rotation_velocity, j,k,l,q]')
                 do i = 1, num_gps
-
                     gp = ghost_points(i)
                     j = gp%loc(1)
                     k = gp%loc(2)
@@ -237,10 +236,21 @@ contains
                         q_prim_vf(q)%sf(j, k, l) = alpha_rho_IP(q)
                         q_prim_vf(advxb + q - 1)%sf(j, k, l) = alpha_IP(q)
                     end do
-
+                    
                     if (surface_tension) then
                         q_prim_vf(c_idx)%sf(j, k, l) = c_IP
                     end if
+
+                    ! set the pressure
+                    do q = 1, num_fluids
+                        if (patch_ib(patch_id)%moving_ibm == 0) then
+                            q_prim_vf(E_idx)%sf(j, k, l) = pres_IP
+                        else
+                          ! TODO :: imporve for two fluid
+                          q_prim_vf(E_idx)%sf(j, k, l) = pres_IP / (1._wp - 2._wp*abs(levelset%sf(j,k,l,patch_id)*alpha_rho_IP(q)/pres_IP) * dot_product(patch_ib(patch_id)%force/patch_ib(patch_id)%mass, levelset_norm%sf(j,k,l,patch_id,:)))
+                        end if
+                    end do
+
                     if (model_eqns /= 4) then
                         ! If in simulation, use acc mixture subroutines
                         if (elasticity) then
@@ -364,7 +374,7 @@ contains
                         end do
                     end if
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            ! #:endcall GPU_PARALLEL_LOOP
         end if
 
         !Correct the state of the inner points in IBs
@@ -1002,7 +1012,7 @@ contains
                                 pressure_divergence(3) = 0._wp
                             end if
 
-                            forces(ib_idx, :) = forces(ib_idx, :) + pressure_divergence * cell_volume
+                            forces(ib_idx, :) = forces(ib_idx, :) - pressure_divergence * cell_volume
                             torques(ib_idx, :) = torques(ib_idx, :) + cross_product(radial_vector, pressure_divergence) * cell_volume
                         end if
                     end if

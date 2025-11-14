@@ -29,7 +29,7 @@ module m_constants
     integer, parameter :: dflt_num_igr_iters = 2 !< number of iterations for IGR elliptic solve
     integer, parameter :: dflt_num_igr_warm_start_iters = 50 !< default number of iterations for IGR elliptic solve
     real(wp), parameter :: dflt_alf_factor = 10._wp !< scaling factor for IGR alpha
-    integer, parameter :: gp_layers = 3 !< Number of ghost point layers for IBM
+    integer, parameter :: gp_layers = 50 !< Number of ghost point layers for IBM
     real(wp), parameter :: capillary_cutoff = 1.e-6 !< color function gradient magnitude at which to apply the surface tension fluxes
     real(wp), parameter :: acoustic_spatial_support_width = 2.5_wp !< Spatial support width of acoustic source, used in s_source_spatial
     real(wp), parameter :: dflt_vcfl_dt = 100._wp !< value of vcfl_dt when viscosity is off for computing adaptive timestep size
