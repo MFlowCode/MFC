@@ -3154,9 +3154,9 @@ contains
                                         qv_R = qv_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)*qvs(i)
                                     end do
 
-                                    Re_max = 0 
-                                    if(Re_size(1) > 0) Re_max = 1
-                                    if(Re_size(2) > 0) Re_max = 2
+                                    Re_max = 0
+                                    if (Re_size(1) > 0) Re_max = 1
+                                    if (Re_size(2) > 0) Re_max = 2
 
                                     if (viscous) then
                                         $:GPU_LOOP(parallelism='[seq]')
@@ -3166,12 +3166,12 @@ contains
 
                                             $:GPU_LOOP(parallelism='[seq]')
                                             do q = 1, Re_size(i)
-                                                Re_L(i) = alpha_L(Re_idx(i,q))/Res_gs(i, q) &
+                                                Re_L(i) = alpha_L(Re_idx(i, q))/Res_gs(i, q) &
                                                           + Re_L(i)
-                                                Re_R(i) = alpha_R(Re_idx(i,q))/Res_gs(i, q) &
+                                                Re_R(i) = alpha_R(Re_idx(i, q))/Res_gs(i, q) &
                                                           + Re_R(i)
                                             end do
-                                            
+
                                             Re_L(i) = 1._wp/max(Re_L(i), sgm_eps)
                                             Re_R(i) = 1._wp/max(Re_R(i), sgm_eps)
                                         end do
