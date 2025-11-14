@@ -1968,7 +1968,7 @@ contains
         real(wp) :: flux_ene_e
         real(wp) :: zcoef, pcorr !< low Mach number correction
 
-        integer :: i, j, k, l, q !< Generic loop iterators
+        integer :: Re_max, i, j, k, l, q !< Generic loop iterators
         integer :: idx1, idxi
 
         ! Populating the buffers of the left and right Riemann problem
@@ -3090,7 +3090,7 @@ contains
                     #:endcall GPU_PARALLEL_LOOP
                 else
                     ! 5-EQUATION MODEL WITH HLLC
-                    #:call GPU_PARALLEL_LOOP(collapse=3, private='[i,q, T_L, T_R, idx1, idxi, vel_L_rms, vel_R_rms, pres_L, pres_R, rho_L, gamma_L, pi_inf_L, qv_L, rho_R, gamma_R, pi_inf_R, qv_R, alpha_L_sum, alpha_R_sum, E_L, E_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Gamm_L, Gamm_R, Y_L, Y_R, H_L, H_R, rho_avg, gamma_avg, H_avg, c_L, c_R, c_avg, s_P, s_M, xi_P, xi_M, xi_L, xi_R, Ms_L, Ms_R, pres_SL, pres_SR, vel_L, vel_R, Re_L, Re_R, alpha_L, alpha_R, s_L, s_R, s_S, vel_avg_rms, pcorr, zcoef, vel_L_tmp, vel_R_tmp, Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, tau_e_L, tau_e_R, xi_field_L, xi_field_R, Yi_avg,Phi_avg, h_iL, h_iR, h_avg_2, G_L, G_R]', copyin='[is1, is2, is3]')
+                    #:call GPU_PARALLEL_LOOP(collapse=3, private='[Re_max, i, q, T_L, T_R, idx1, idxi, vel_L_rms, vel_R_rms, pres_L, pres_R, rho_L, gamma_L, pi_inf_L, qv_L, rho_R, gamma_R, pi_inf_R, qv_R, alpha_L_sum, alpha_R_sum, E_L, E_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Gamm_L, Gamm_R, Y_L, Y_R, H_L, H_R, rho_avg, gamma_avg, H_avg, c_L, c_R, c_avg, s_P, s_M, xi_P, xi_M, xi_L, xi_R, Ms_L, Ms_R, pres_SL, pres_SR, vel_L, vel_R, Re_L, Re_R, alpha_L, alpha_R, s_L, s_R, s_S, vel_avg_rms, pcorr, zcoef, vel_L_tmp, vel_R_tmp, Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, tau_e_L, tau_e_R, xi_field_L, xi_field_R, Yi_avg,Phi_avg, h_iL, h_iR, h_avg_2, G_L, G_R]', copyin='[is1, is2, is3]')
                         do l = is3%beg, is3%end
                             do k = is2%beg, is2%end
                                 do j = is1%beg, is1%end
@@ -3154,22 +3154,24 @@ contains
                                         qv_R = qv_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)*qvs(i)
                                     end do
 
+                                    Re_max = 0 
+                                    if(Re_size(1) > 0) Re_max = 1
+                                    if(Re_size(2) > 0) Re_max = 2
+
                                     if (viscous) then
                                         $:GPU_LOOP(parallelism='[seq]')
-                                        do i = 1, 2
-                                            Re_L(i) = dflt_real
-                                            Re_R(i) = dflt_real
-
-                                            if (Re_size(i) > 0) Re_L(i) = 0._wp
-                                            if (Re_size(i) > 0) Re_R(i) = 0._wp
+                                        do i = 1, Re_max
+                                            Re_L(i) = 0._wp
+                                            Re_R(i) = 0._wp
 
                                             $:GPU_LOOP(parallelism='[seq]')
                                             do q = 1, Re_size(i)
-                                                Re_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + Re_idx(i, q))/Res_gs(i, q) &
+                                                Re_L(i) = alpha_L(Re_idx(i,q))/Res_gs(i, q) &
                                                           + Re_L(i)
-                                                Re_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + Re_idx(i, q))/Res_gs(i, q) &
+                                                Re_R(i) = alpha_R(Re_idx(i,q))/Res_gs(i, q) &
                                                           + Re_R(i)
                                             end do
+                                            
                                             Re_L(i) = 1._wp/max(Re_L(i), sgm_eps)
                                             Re_R(i) = 1._wp/max(Re_R(i), sgm_eps)
                                         end do
