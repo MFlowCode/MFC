@@ -581,21 +581,22 @@ contains
                         end if
                         
                         if (patch_ib(i)%moving_ibm > 0) then
-                            patch_ib(i)%vel = (rk_coef(s, 1)*patch_ib(i)%step_vel + rk_coef(s, 2)*patch_ib(i)%vel + rk_coef(s, 3)*dt*patch_ib(i)%force/patch_ib(i)%mass)/rk_coef(s, 4) 
-                            patch_ib(i)%angular_vel = (rk_coef(s, 1)*patch_ib(i)%step_angular_vel + rk_coef(s, 2)*patch_ib(i)%angular_vel)/rk_coef(s, 4)
+                            patch_ib(i)%vel = (rk_coef(s, 1)*patch_ib(i)%step_vel + rk_coef(s, 2)*patch_ib(i)%vel)/rk_coef(s, 4) 
+                            patch_ib(i)%angular_vel =(rk_coef(s, 1)*patch_ib(i)%step_angular_vel + rk_coef(s, 2)*patch_ib(i)%angular_vel)/rk_coef(s, 4)
 
                             if (patch_ib(i)%moving_ibm == 2) then ! if we are using two-way coupling, apply force and torque
                                 ! update the velocity from the force value
-                                patch_ib(i)%vel = patch_ib(i)%vel + rk_coef(s, 3) * dt * (patch_ib(i)%force/patch_ib(i)%mass)/rk_coef(s, 4) 
+                                print *, "V_diff:", patch_ib(i)%force / patch_ib(i)%mass
+                                patch_ib(i)%vel = patch_ib(i)%vel + rk_coef(s, 3) * dt * (patch_ib(i)%force/patch_ib(i)%mass)/rk_coef(s, 4)
                                 
                                 ! update the angular velocity with the torque value
-                                patch_ib(i)%angular_vel = (patch_ib(i)%angular_vel * patch_ib(i)%moment) + (rk_coef(s, 3)*dt*patch_ib(i)%torque/rk_coef(s, 4)) ! add the torque to the angular momentum
-                                call s_compute_moment_of_inertia(i, patch_ib(i)%angular_vel) ! update the moment of inertia to be based on the direction of the angular momentum
-                                patch_ib(i)%angular_vel = patch_ib(i)%angular_vel / patch_ib(i)%moment ! convert back to angular velocity with the new moment of inertia
+                                ! patch_ib(i)%angular_vel = (patch_ib(i)%angular_vel * patch_ib(i)%moment) + (rk_coef(s, 3)*dt*patch_ib(i)%torque/rk_coef(s, 4)) ! add the torque to the angular momentum
+                                ! call s_compute_moment_of_inertia(i, patch_ib(i)%angular_vel) ! update the moment of inertia to be based on the direction of the angular momentum
+                                ! patch_ib(i)%angular_vel = patch_ib(i)%angular_vel / patch_ib(i)%moment ! convert back to angular velocity with the new moment of inertia
                             end if
 
                             ! Update the angle of the IB
-                            patch_ib(i)%angles(j) = (rk_coef(s, 1)*patch_ib(i)%step_angles(j) + rk_coef(s, 2)*patch_ib(i)%angles(j) + rk_coef(s, 3)*patch_ib(i)%angular_vel(j)*dt)/rk_coef(s, 4)
+                            patch_ib(i)%angles = (rk_coef(s, 1)*patch_ib(i)%step_angles + rk_coef(s, 2)*patch_ib(i)%angles + rk_coef(s, 3)*patch_ib(i)%angular_vel*dt)/rk_coef(s, 4)
 
                             ! Update the position of the IB
                             patch_ib(i)%x_centroid = (rk_coef(s, 1)*patch_ib(i)%step_x_centroid + rk_coef(s, 2)*patch_ib(i)%x_centroid + rk_coef(s, 3)*patch_ib(i)%vel(1)*dt)/rk_coef(s, 4)

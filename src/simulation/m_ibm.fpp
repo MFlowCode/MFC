@@ -101,7 +101,6 @@ contains
             end if
             call s_update_ib_rotation_matrix(i)
         end do
-
         $:GPU_ENTER_DATA(copyin='[patch_ib]')
 
         ! Allocating the patch identities bookkeeping variable
@@ -971,7 +970,7 @@ contains
     ! by Archana Sridhar and Jesse Capecelatro
     subroutine s_compute_ib_forces(pressure)
 
-        real(wp), dimension(:, :, :), intent(in) :: pressure
+        real(wp), dimension(0:m, 0:n, 0:p), intent(in) :: pressure
 
         integer :: i, j, k, ib_idx
         real(wp), dimension(num_ibs, 3) :: forces, torques
@@ -988,7 +987,11 @@ contains
                     ib_idx = ib_markers%sf(i, j, k)
                     if (ib_idx /= 0) then ! only need to compute the gradient for cells inside a IB
                         if (patch_ib(ib_idx)%moving_ibm == 2) then
-                            radial_vector = [x_cc(i), y_cc(j), z_cc(k)] - [patch_ib(ib_idx)%x_centroid, patch_ib(ib_idx)%y_centroid, patch_ib(ib_idx)%z_centroid] ! get the vector pointing to the grid cell
+                            if (num_dims == 3) then
+                                radial_vector = [x_cc(i), y_cc(j), z_cc(k)] - [patch_ib(ib_idx)%x_centroid, patch_ib(ib_idx)%y_centroid, patch_ib(ib_idx)%z_centroid] ! get the vector pointing to the grid cell
+                            else 
+                                radial_vector = [x_cc(i), y_cc(j), 0._wp] - [patch_ib(ib_idx)%x_centroid, patch_ib(ib_idx)%y_centroid, 0._wp] ! get the vector pointing to the grid cell
+                            end if
                             pressure_divergence(1) = (pressure(i+1, j, k) - pressure(i-1, j, k)) / (2._wp * x_cc(i))
                             pressure_divergence(2) = (pressure(i, j+1, k) - pressure(i, j-1, k)) / (2._wp * y_cc(j))
                             cell_volume = x_cc(i) * y_cc(j)
