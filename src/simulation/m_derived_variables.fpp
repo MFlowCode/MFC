@@ -126,23 +126,23 @@ contains
         integer :: i, j, k !< Generic loop iterators
 
         if (probe_wrt) then
-            call s_derive_acceleration_component(1, q_prim_ts(0)%vf, &
-                                                 q_prim_ts(1)%vf, &
-                                                 q_prim_ts(2)%vf, &
-                                                 q_prim_ts(3)%vf, &
+            call s_derive_acceleration_component(1, q_prim_ts1(1)%vf, &
+                                                 q_prim_ts1(2)%vf, &
+                                                 q_prim_ts2(1)%vf, &
+                                                 q_prim_ts2(2)%vf, &
                                                  x_accel)
             if (n > 0) then
-                call s_derive_acceleration_component(2, q_prim_ts(0)%vf, &
-                                                     q_prim_ts(1)%vf, &
-                                                     q_prim_ts(2)%vf, &
-                                                     q_prim_ts(3)%vf, &
+                call s_derive_acceleration_component(2, q_prim_ts1(1)%vf, &
+                                                     q_prim_ts1(2)%vf, &
+                                                     q_prim_ts2(1)%vf, &
+                                                     q_prim_ts2(2)%vf, &
                                                      y_accel)
             end if
             if (p > 0) then
-                call s_derive_acceleration_component(3, q_prim_ts(0)%vf, &
-                                                     q_prim_ts(1)%vf, &
-                                                     q_prim_ts(2)%vf, &
-                                                     q_prim_ts(3)%vf, &
+                call s_derive_acceleration_component(3, q_prim_ts1(1)%vf, &
+                                                     q_prim_ts1(2)%vf, &
+                                                     q_prim_ts2(1)%vf, &
+                                                     q_prim_ts2(2)%vf, &
                                                      z_accel)
             end if
 
@@ -167,7 +167,7 @@ contains
 
             $:GPU_UPDATE(host='[accel_mag]')
 
-            call s_derive_center_of_mass(q_prim_ts(3)%vf, c_mass)
+            call s_derive_center_of_mass(q_prim_ts2(2)%vf, c_mass)
 
             call s_write_probe_files(t_step, q_cons_ts(1)%vf, accel_mag)
 
@@ -436,6 +436,8 @@ contains
                 c_m(i, j) = 0.0_wp
             end do
         end do
+
+        $:GPU_UPDATE(device='[c_m]')
 
         if (n == 0) then !1D simulation
             #:call GPU_PARALLEL_LOOP(collapse=3,private='[dV]')

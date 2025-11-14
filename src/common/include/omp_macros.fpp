@@ -26,7 +26,7 @@
             #:if MFC_COMPILER == NVIDIA_COMPILER_ID or MFC_COMPILER == PGI_COMPILER_ID
                 #:set default_val = 'defaultmap(tofrom:aggregate) defaultmap(tofrom:allocatable) defaultmap(tofrom:pointer) '
             #:elif MFC_COMPILER == CCE_COMPILER_ID
-                #:set default_val = 'defaultmap(present:aggregate) defaultmap(present:allocatable) defaultmap(present:pointer) '
+                #:set default_val = 'defaultmap(tofrom:aggregate) defaultmap(present:allocatable) defaultmap(present:pointer) '
             #:elif MFC_COMPILER == AMD_COMPILER_ID
                 #:set default_val = ''
             #:else
@@ -337,6 +337,30 @@
 
 #:def UNDEF_AMD(code)
     #:if MFC_COMPILER != AMD_COMPILER_ID
+        $:code
+    #:endif
+#:enddef
+
+#:def DEF_AMD(code)
+    #:if MFC_COMPILER == AMD_COMPILER_ID
+        $:code
+    #:endif
+#:enddef
+
+#:def UNDEF_CCE(code)
+    #:if MFC_COMPILER != CCE_COMPILER_ID
+        $:code
+    #:endif
+#:enddef
+
+#:def DEF_CCE(code)
+    #:if MFC_COMPILER == CCE_COMPILER_ID
+        $:code
+    #:endif
+#:enddef
+
+#:def UNDEF_NVIDIA(code)
+    #:if MFC_COMPILER != NVIDIA_COMPILER_ID and MFC_COMPILER != PGI_COMPILER_ID
         $:code
     #:endif
 #:enddef

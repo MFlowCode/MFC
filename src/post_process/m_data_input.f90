@@ -311,6 +311,7 @@ contains
                       STATUS='old', ACTION='read')
                 read (1) q_cons_vf(i)%sf(0:m, 0:n, 0:p)
                 close (1)
+                print *, q_cons_vf(i)%sf(:, 0, 0)
             else
                 call s_mpi_abort('File q_cons_vf'//trim(file_num)// &
                                  '.dat is missing in '//trim(t_step_dir)// &
@@ -525,14 +526,14 @@ contains
                 if (bubbles_euler .or. elasticity .or. mhd) then
                     do i = 1, sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
-                        call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                               mpi_p, status, ierr)
+                        call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, &
+                                               mpi_io_p, status, ierr)
                     end do
                 else
                     do i = 1, sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
-                        call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                               mpi_p, status, ierr)
+                        call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, &
+                                               mpi_io_p, status, ierr)
                     end do
                 end if
 
@@ -569,8 +570,8 @@ contains
 
                     call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
                                            'native', mpi_info_int, ierr)
-                    call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                           mpi_p, status, ierr)
+                    call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, &
+                                           mpi_io_p, status, ierr)
                 end do
 
                 call s_mpi_barrier()
@@ -621,16 +622,16 @@ contains
         end if
 
         ! Allocating arrays to store the bc types
-        allocate (bc_type(1:num_dims, -1:1))
+        allocate (bc_type(1:num_dims, 1:2))
 
-        allocate (bc_type(1, -1)%sf(0:0, 0:n, 0:p))
         allocate (bc_type(1, 1)%sf(0:0, 0:n, 0:p))
+        allocate (bc_type(1, 2)%sf(0:0, 0:n, 0:p))
         if (n > 0) then
-            allocate (bc_type(2, -1)%sf(-buff_size:m + buff_size, 0:0, 0:p))
             allocate (bc_type(2, 1)%sf(-buff_size:m + buff_size, 0:0, 0:p))
+            allocate (bc_type(2, 2)%sf(-buff_size:m + buff_size, 0:0, 0:p))
             if (p > 0) then
-                allocate (bc_type(3, -1)%sf(-buff_size:m + buff_size, -buff_size:n + buff_size, 0:0))
                 allocate (bc_type(3, 1)%sf(-buff_size:m + buff_size, -buff_size:n + buff_size, 0:0))
+                allocate (bc_type(3, 2)%sf(-buff_size:m + buff_size, -buff_size:n + buff_size, 0:0))
             end if
         end if
 
@@ -668,11 +669,11 @@ contains
             deallocate (q_T_sf%sf)
         end if
 
-        deallocate (bc_type(1, -1)%sf, bc_type(1, 1)%sf)
+        deallocate (bc_type(1, 1)%sf, bc_type(1, 2)%sf)
         if (n > 0) then
-            deallocate (bc_type(2, -1)%sf, bc_type(2, 1)%sf)
+            deallocate (bc_type(2, 1)%sf, bc_type(2, 2)%sf)
             if (p > 0) then
-                deallocate (bc_type(3, -1)%sf, bc_type(3, 1)%sf)
+                deallocate (bc_type(3, 1)%sf, bc_type(3, 2)%sf)
             end if
         end if
 

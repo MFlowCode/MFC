@@ -74,7 +74,7 @@ module m_data_output
     real(wp) :: Rc_min !< Rc criterion maximum
     !> @}
 
-    type(scalar_field), allocatable, dimension(:) :: q_cons_temp
+    type(scalar_field), allocatable, dimension(:) :: q_cons_temp_ds
 
 contains
 
@@ -279,7 +279,7 @@ contains
         integer :: j, k, l
 
         ! Computing Stability Criteria at Current Time-step
-        #:call GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re]')
+        #:call GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H]')
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -525,7 +525,7 @@ contains
 
         if (.not. file_exist) call s_create_directory(trim(t_step_dir))
 
-        if (prim_vars_wrt .or. (n == 0 .and. p == 0)) then
+        if ((prim_vars_wrt .or. (n == 0 .and. p == 0)) .and. (.not. igr)) then
             call s_convert_conservative_to_primitive_variables(q_cons_vf, q_T_sf, q_prim_vf, idwint)
             do i = 1, sys_size
                 $:GPU_UPDATE(host='[q_prim_vf(i)%sf(:,:,:)]')
@@ -817,8 +817,7 @@ contains
         integer :: m_glb_save, n_glb_save, p_glb_save ! Global save size
 
         if (down_sample) then
-            call s_populate_variables_buffers(bc_type, q_cons_vf)
-            call s_downsample_data(q_cons_vf, q_cons_temp, &
+            call s_downsample_data(q_cons_vf, q_cons_temp_ds, &
                                    m_ds, n_ds, p_ds, m_glb_ds, n_glb_ds, p_glb_ds)
         end if
 
@@ -834,7 +833,7 @@ contains
 
             ! Initialize MPI data I/O
             if (down_sample) then
-                call s_initialize_mpi_data_ds(q_cons_temp)
+                call s_initialize_mpi_data_ds(q_cons_temp_ds)
             else
                 if (ib) then
                     call s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm)
@@ -895,16 +894,16 @@ contains
                 do i = 1, sys_size
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
-                    call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                            mpi_p, status, ierr)
+                    call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, &
+                                            mpi_io_p, status, ierr)
                 end do
                 !Write pb and mv for non-polytropic qbmm
                 if (qbmm .and. .not. polytropic) then
                     do i = sys_size + 1, sys_size + 2*nb*nnode
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
-                        call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                                mpi_p, status, ierr)
+                        call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, &
+                                                mpi_io_p, status, ierr)
                     end do
                 end if
             else
@@ -912,15 +911,15 @@ contains
                     do i = 1, sys_size !TODO: check if correct (sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
-                        call MPI_FILE_WRITE_ALL(ifile, q_cons_temp(i)%sf, data_size, &
-                                                mpi_p, status, ierr)
+                        call MPI_FILE_WRITE_ALL(ifile, q_cons_temp_ds(i)%sf, data_size*mpi_io_type, &
+                                                mpi_io_p, status, ierr)
                     end do
                 else
                     do i = 1, sys_size !TODO: check if correct (sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
-                        call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                                mpi_p, status, ierr)
+                        call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, &
+                                                mpi_io_p, status, ierr)
                     end do
                 end if
             end if
@@ -968,8 +967,8 @@ contains
 
                     call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
                                            'native', mpi_info_int, ierr)
-                    call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                            mpi_p, status, ierr)
+                    call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, &
+                                            mpi_io_p, status, ierr)
                 end do
                 !Write pb and mv for non-polytropic qbmm
                 if (qbmm .and. .not. polytropic) then
@@ -981,8 +980,8 @@ contains
 
                         call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
                                                'native', mpi_info_int, ierr)
-                        call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                                mpi_p, status, ierr)
+                        call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, &
+                                                mpi_io_p, status, ierr)
                     end do
                 end if
             else
@@ -994,8 +993,8 @@ contains
 
                     call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
                                            'native', mpi_info_int, ierr)
-                    call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size, &
-                                            mpi_p, status, ierr)
+                    call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, &
+                                            mpi_io_p, status, ierr)
                 end do
             end if
 
@@ -1008,8 +1007,8 @@ contains
 
                 call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(sys_size + 1), &
                                        'native', mpi_info_int, ierr)
-                call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(sys_size + 1)%sf, data_size, &
-                                        mpi_p, status, ierr)
+                call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(sys_size + 1)%sf, data_size*mpi_io_type, &
+                                        mpi_io_p, status, ierr)
             end if
 
             call MPI_FILE_CLOSE(ifile, ierr)
@@ -1830,9 +1829,9 @@ contains
             n_ds = int((n + 1)/3) - 1
             p_ds = int((p + 1)/3) - 1
 
-            allocate (q_cons_temp(1:sys_size))
+            allocate (q_cons_temp_ds(1:sys_size))
             do i = 1, sys_size
-                allocate (q_cons_temp(i)%sf(-1:m_ds + 1, -1:n_ds + 1, -1:p_ds + 1))
+                allocate (q_cons_temp_ds(i)%sf(-1:m_ds + 1, -1:n_ds + 1, -1:p_ds + 1))
             end do
         end if
 
@@ -1857,9 +1856,9 @@ contains
 
         if (down_sample) then
             do i = 1, sys_size
-                deallocate (q_cons_temp(i)%sf)
+                deallocate (q_cons_temp_ds(i)%sf)
             end do
-            deallocate (q_cons_temp)
+            deallocate (q_cons_temp_ds)
         end if
 
     end subroutine s_finalize_data_output_module

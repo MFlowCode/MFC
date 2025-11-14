@@ -196,7 +196,7 @@ contains
                 end if
             end if
 
-            #:call GPU_PARALLEL_LOOP(collapse=3)
+            #:call GPU_PARALLEL_LOOP(collapse=3,private='[rho_K, G_K]')
                 do q = 0, p
                     do l = 0, n
                         do k = 0, m
@@ -406,12 +406,12 @@ contains
             l = 0; q = 0
             #:call GPU_PARALLEL_LOOP()
                 do k = 0, m
-                    rhs_vf(damage_idx)%sf(k, l, q) = (alpha_bar*max(abs(q_cons_vf(stress_idx%beg)%sf(k, l, q)) - tau_star, 0._wp))**cont_damage_s
+                    rhs_vf(damage_idx)%sf(k, l, q) = (alpha_bar*max(abs(real(q_cons_vf(stress_idx%beg)%sf(k, l, q), kind=wp)) - tau_star, 0._wp))**cont_damage_s
                 end do
             #:endcall GPU_PARALLEL_LOOP
         elseif (p == 0) then
             q = 0
-            #:call GPU_PARALLEL_LOOP(collapse=2)
+            #:call GPU_PARALLEL_LOOP(collapse=2, private='[tau_p]')
                 do l = 0, n
                     do k = 0, m
                         ! Maximum principal stress
@@ -426,7 +426,7 @@ contains
                 end do
             #:endcall GPU_PARALLEL_LOOP
         else
-            #:call GPU_PARALLEL_LOOP(collapse=3)
+            #:call GPU_PARALLEL_LOOP(collapse=3, private='[tau_xx, tau_xy, tau_yy, tau_xz, tau_yz, tau_zz, I1, I2, I3, temp, sqrt_term_1, sqrt_term_2, argument, phi, tau_p]')
                 do q = 0, p
                     do l = 0, n
                         do k = 0, m

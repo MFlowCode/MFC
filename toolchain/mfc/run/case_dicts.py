@@ -106,6 +106,7 @@ PRE_PROCESS.update({
     'elliptic_smoothing_iters': ParamType.INT,
     'viscous': ParamType.LOG,
     'bubbles_lagrange': ParamType.LOG,
+    'simplex_perturb': ParamType.LOG,
     'fft_wrt': ParamType.LOG,
 })
 
@@ -152,6 +153,14 @@ for f_id in range(1, 10+1):
     for real_attr in ["gamma", "pi_inf", "mul0", "ss", "pv", "gamma_v", "M_v",
                       "mu_v", "k_v", "cp_v", "G", "cv", "qv", "qvp" ]:
         PRE_PROCESS[f"fluid_pp({f_id})%{real_attr}"] = ParamType.REAL
+
+    PRE_PROCESS[f"simplex_params%perturb_dens({f_id})"] = ParamType.LOG
+    PRE_PROCESS[f"simplex_params%perturb_dens_freq({f_id})"] = ParamType.REAL
+    PRE_PROCESS[f"simplex_params%perturb_dens_scale({f_id})"] = ParamType.REAL
+
+    for dir in range(1, 3+1):
+        PRE_PROCESS[f"simplex_params%perturb_dens_offset({f_id}, {dir})"] = ParamType.REAL
+
 
 for bc_p_id in range(1, 10+1):
     for attribute in ["geometry","type","dir","loc"]:
@@ -243,6 +252,13 @@ for p_id in range(1, 10+1):
         for int_id in range(1, 3+1):
             PRE_PROCESS[f"bc_{cmp}%vel_in({int_id})"] = ParamType.REAL
             PRE_PROCESS[f"bc_{cmp}%vel_out({int_id})"] = ParamType.REAL
+
+for d_id in range(1, 3+1):
+    PRE_PROCESS[f"simplex_params%perturb_vel({d_id})"] = ParamType.LOG
+    PRE_PROCESS[f"simplex_params%perturb_vel_freq({d_id})"] = ParamType.REAL
+    PRE_PROCESS[f"simplex_params%perturb_vel_scale({d_id})"] = ParamType.REAL
+    for dir in range(1, 3+1):
+        PRE_PROCESS[f"simplex_params%perturb_vel_offset({d_id},{dir})"] = ParamType.REAL
 
 # NOTE: Currently unused.
 # for f_id in range(1, 10+1):
