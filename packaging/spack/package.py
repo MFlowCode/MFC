@@ -40,6 +40,22 @@ class Mfc(CMakePackage):
     variant("post_process", default=True, description="Build post-processing tool")
     variant("chemistry", default=False, description="Enable thermochemistry via Pyrometheus/Cantera")
 
+    # GPU architecture variants for performance optimization
+    variant(
+        "cuda_arch",
+        default="none",
+        values=("none", "60", "70", "75", "80", "90"),
+        multi=False,
+        description="CUDA architecture for NVIDIA GPUs (60=P100, 70=V100, 80=A100, 90=H100)"
+    )
+    variant(
+        "amdgpu_target",
+        default="none",
+        values=("none", "gfx908", "gfx90a", "gfx940", "gfx941", "gfx942"),
+        multi=False,
+        description="AMD GPU architecture (gfx908=MI100, gfx90a=MI250X, gfx940/941/942=MI300)"
+    )
+
     # Required dependencies
     depends_on("cmake@3.20:", type="build")
     depends_on("py-fypp", type="build")
@@ -99,6 +115,26 @@ class Mfc(CMakePackage):
         if self.spec.variants["precision"].value == "single":
             args.append(self.define("MFC_SINGLE_PRECISION", True))
 
+        # GPU architecture targeting for optimal performance
+        if "+openacc" in self.spec or "+openmp" in self.spec:
+            # NVIDIA GPU architecture
+            if self.spec.variants["cuda_arch"].value != "none":
+                cuda_arch = self.spec.variants["cuda_arch"].value
+                if self.spec.satisfies("%nvhpc"):
+                    args.append(self.define("CMAKE_CUDA_ARCHITECTURES", cuda_arch))
+                    # Add NVHPC-specific GPU flags
+                    args.append(self.define("CMAKE_Fortran_FLAGS", 
+                                          f"-gpu=cc{cuda_arch} -acc -Minfo=accel"))
+            
+            # AMD GPU architecture
+            if self.spec.variants["amdgpu_target"].value != "none":
+                amdgpu = self.spec.variants["amdgpu_target"].value
+                if self.spec.satisfies("%cce") or self.spec.satisfies("%rocmcc"):
+                    args.append(self.define("CMAKE_HIP_ARCHITECTURES", amdgpu))
+                    # Add Cray/ROCm-specific GPU flags
+                    args.append(self.define("CMAKE_Fortran_FLAGS",
+                                          f"-fopenmp-targets=amdgcn-amd-amdhsa -Xopenmp-target=amdgcn-amd-amdhsa -march={amdgpu}"))
+
         return args
 
     def setup_build_environment(self, env):
@@ -108,3 +144,31 @@ class Mfc(CMakePackage):
         # Make vendored Pyrometheus importable when chemistry is enabled
         if "+chemistry" in self.spec:
             env.prepend_path("PYTHONPATH", os.path.join(self.stage.source_path, "pydeps", "pyrometheus"))
+        
+        # Cray system-specific configuration
+        # On Cray systems, use compiler wrappers that automatically include system libraries
+        if self.spec.satisfies("%cce") or self.spec.satisfies("^cray-mpich"):
+            env.set("CC", "cc")
+            env.set("CXX", "CC")
+            env.set("FC", "ftn")
+            # Cray wrappers handle MPI automatically
+            if "+mpi" in self.spec:
+                env.set("MPI_CC", "cc")
+                env.set("MPI_CXX", "CC")
+                env.set("MPI_FC", "ftn")
+        
+        # Enable GPU-aware MPI if available
+        if "+mpi" in self.spec and ("+openacc" in self.spec or "+openmp" in self.spec):
+            # NVIDIA GPU-aware MPI
+            if self.spec.satisfies("^cuda"):
+                env.set("MPICH_GPU_SUPPORT_ENABLED", "1")
+                env.set("OMPI_MCA_opal_cuda_support", "true")
+            # AMD GPU-aware MPI
+            if self.spec.satisfies("^hip") or self.spec.satisfies("^rocm"):
+                env.set("MPICH_GPU_SUPPORT_ENABLED", "1")
+                env.set("HSA_ENABLE_SDMA", "0")  # Better performance for small messages
+        
+        # Set parallel build jobs based on available resources
+        # HPC nodes often have many cores
+        import multiprocessing
+        env.set("CMAKE_BUILD_PARALLEL_LEVEL", str(min(multiprocessing.cpu_count(), 64)))
