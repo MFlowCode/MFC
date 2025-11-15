@@ -16,6 +16,8 @@ module m_perturbation
 
     use m_helper
 
+    use m_simplex_noise
+
     use ieee_arithmetic
 
     implicit none
@@ -92,7 +94,7 @@ contains
     impure subroutine s_elliptic_smoothing(q_prim_vf, bc_type)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
+        type(integer_field), dimension(1:num_dims, 1:2), intent(in) :: bc_type
         integer :: i, j, k, l, q
 
         do q = 1, elliptic_smoothing_iters
@@ -149,6 +151,93 @@ contains
         end do
 
     end subroutine s_elliptic_smoothing
+
+    subroutine s_perturb_simplex(q_prim_vf)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        real(wp) :: mag, freq, scale, vel_rsm
+        real(wp), dimension(:, :), allocatable :: ofs
+        integer :: nOffsets
+        real(wp) :: xl, yl, zl
+
+        integer :: i, j, k, l, q
+
+        nOffsets = max(num_dims, num_fluids)
+
+        allocate (ofs(nOffsets, num_dims))
+
+        ! Store offsets
+        do i = 1, num_dims
+            do j = 1, num_dims
+                ofs(j, i) = simplex_params%perturb_vel_offset(j, i)
+            end do
+        end do
+
+        ! Perturb velocities
+        do i = 1, num_dims
+            if (simplex_params%perturb_vel(i)) then
+                freq = simplex_params%perturb_vel_freq(i)
+                scale = simplex_params%perturb_vel_scale(i)
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            xl = freq*(x_cc(j) + ofs(i, 1))
+                            yl = freq*(y_cc(k) + ofs(i, 2))
+                            if (num_dims == 2) then
+                                mag = f_simplex2d(xl, yl)
+                            elseif (num_dims == 3) then
+                                zl = freq*(z_cc(l) + ofs(i, 3))
+                                mag = f_simplex3d(xl, yl, zl)
+                            end if
+
+                            vel_rsm = 0._wp
+                            do q = 1, num_dims
+                                vel_rsm = vel_rsm + q_prim_vf(momxb + q - 1)%sf(j, k, l)**2._wp
+                            end do
+                            vel_rsm = sqrt(vel_rsm)
+
+                            q_prim_vf(momxb + i - 1)%sf(j, k, l) = q_prim_vf(momxb + i - 1)%sf(j, k, l) + &
+                                                                   vel_rsm*scale*mag
+                        end do
+                    end do
+                end do
+            end if
+        end do
+
+        ! Store offsets
+        do i = 1, num_dims
+            do j = 1, num_fluids
+                ofs(j, i) = simplex_params%perturb_dens_offset(j, i)
+            end do
+        end do
+
+        ! Perturb densities
+        do i = 1, num_fluids
+            if (simplex_params%perturb_dens(i)) then
+                freq = simplex_params%perturb_dens_freq(i)
+                scale = simplex_params%perturb_dens_scale(i)
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            xl = freq*(x_cc(j) + ofs(i, 1))
+                            yl = freq*(y_cc(k) + ofs(i, 2))
+                            if (num_dims == 2) then
+                                mag = f_simplex2d(xl, yl)
+                            elseif (num_dims == 3) then
+                                zl = freq*(z_cc(l) + ofs(i, 3))
+                                mag = f_simplex3d(xl, yl, zl)
+                            end if
+                            q_prim_vf(contxb + i - 1)%sf(j, k, l) = q_prim_vf(contxb + i - 1)%sf(j, k, l) + &
+                                                                    q_prim_vf(contxb + i - 1)%sf(j, k, l)*scale*mag
+                        end do
+                    end do
+                end do
+            end if
+        end do
+
+        deallocate (ofs)
+
+    end subroutine s_perturb_simplex
 
     !>  This subroutine computes velocity perturbations for a temporal mixing
         !!              layer with a hyperbolic tangent mean streamwise velocity

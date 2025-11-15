@@ -358,7 +358,7 @@ contains
         #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
 
             if (norm_dir == ${NORM_DIR}$) then
-                #:call GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, tau_e_L, tau_e_R,G_L, G_R, Re_L, Re_R, rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, Ys_L, Ys_R, xi_field_L, xi_field_R, Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, c_fast, pres_mag, B, Ga, vdotB, B2, b4, cm, pcorr, zcoef, vel_L_tmp, vel_R_tmp]')
+                #:call GPU_PARALLEL_LOOP(collapse=3, private='[i, q, alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, tau_e_L, tau_e_R, Re_L, Re_R, s_L, s_R, s_S, Ys_L, Ys_R, xi_field_L, xi_field_R, Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, c_fast, pres_mag, B, Ga, vdotB, B2, b4, cm, pcorr, zcoef, vel_L_tmp, vel_R_tmp, rho_L, rho_R, pres_L, pres_R, E_L, E_R, H_L, H_R, Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi, T_L, T_R, Y_L, Y_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Gamm_L, Gamm_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, c_L, c_R, G_L, G_R, rho_avg, H_avg, c_avg, gamma_avg, ptilde_L, ptilde_R, vel_L_rms, vel_R_rms, vel_avg_rms, Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, flux_tau_L, flux_tau_R]', copyin='[norm_dir]')
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -522,13 +522,15 @@ contains
                                 elseif (mhd .and. relativity) then
                                     Ga%L = 1._wp/sqrt(1._wp - vel_L_rms)
                                     Ga%R = 1._wp/sqrt(1._wp - vel_R_rms)
-                                    vdotB%L = vel_L(1)*B%L(1) + vel_L(2)*B%L(2) + vel_L(3)*B%L(3)
-                                    vdotB%R = vel_R(1)*B%R(1) + vel_R(2)*B%R(2) + vel_R(3)*B%R(3)
+                                    #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                                        vdotB%L = vel_L(1)*B%L(1) + vel_L(2)*B%L(2) + vel_L(3)*B%L(3)
+                                        vdotB%R = vel_R(1)*B%R(1) + vel_R(2)*B%R(2) + vel_R(3)*B%R(3)
 
-                                    b4%L(1:3) = B%L(1:3)/Ga%L + Ga%L*vel_L(1:3)*vdotB%L
-                                    b4%R(1:3) = B%R(1:3)/Ga%R + Ga%R*vel_R(1:3)*vdotB%R
-                                    B2%L = B%L(1)**2._wp + B%L(2)**2._wp + B%L(3)**2._wp
-                                    B2%R = B%R(1)**2._wp + B%R(2)**2._wp + B%R(3)**2._wp
+                                        b4%L(1:3) = B%L(1:3)/Ga%L + Ga%L*vel_L(1:3)*vdotB%L
+                                        b4%R(1:3) = B%R(1:3)/Ga%R + Ga%R*vel_R(1:3)*vdotB%R
+                                        B2%L = B%L(1)**2._wp + B%L(2)**2._wp + B%L(3)**2._wp
+                                        B2%R = B%R(1)**2._wp + B%R(2)**2._wp + B%R(3)**2._wp
+                                    #:endif
 
                                     pres_mag%L = 0.5_wp*(B2%L/Ga%L**2._wp + vdotB%L**2._wp)
                                     pres_mag%R = 0.5_wp*(B2%R/Ga%R**2._wp + vdotB%R**2._wp)
@@ -536,15 +538,18 @@ contains
                                     ! Hard-coded EOS
                                     H_L = 1._wp + (gamma_L + 1)*pres_L/rho_L
                                     H_R = 1._wp + (gamma_R + 1)*pres_R/rho_R
-
-                                    cm%L(1:3) = (rho_L*H_L*Ga%L**2 + B2%L)*vel_L(1:3) - vdotB%L*B%L(1:3)
-                                    cm%R(1:3) = (rho_R*H_R*Ga%R**2 + B2%R)*vel_R(1:3) - vdotB%R*B%R(1:3)
+                                    #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                                        cm%L(1:3) = (rho_L*H_L*Ga%L**2 + B2%L)*vel_L(1:3) - vdotB%L*B%L(1:3)
+                                        cm%R(1:3) = (rho_R*H_R*Ga%R**2 + B2%R)*vel_R(1:3) - vdotB%R*B%R(1:3)
+                                    #:endif
 
                                     E_L = rho_L*H_L*Ga%L**2 - pres_L + 0.5_wp*(B2%L + vel_L_rms*B2%L - vdotB%L**2._wp) - rho_L*Ga%L
                                     E_R = rho_R*H_R*Ga%R**2 - pres_R + 0.5_wp*(B2%R + vel_R_rms*B2%R - vdotB%R**2._wp) - rho_R*Ga%R
                                 elseif (mhd .and. .not. relativity) then
-                                    pres_mag%L = 0.5_wp*(B%L(1)**2._wp + B%L(2)**2._wp + B%L(3)**2._wp)
-                                    pres_mag%R = 0.5_wp*(B%R(1)**2._wp + B%R(2)**2._wp + B%R(3)**2._wp)
+                                    #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                                        pres_mag%L = 0.5_wp*(B%L(1)**2._wp + B%L(2)**2._wp + B%L(3)**2._wp)
+                                        pres_mag%R = 0.5_wp*(B%R(1)**2._wp + B%R(2)**2._wp + B%R(3)**2._wp)
+                                    #:endif
                                     E_L = gamma_L*pres_L + pi_inf_L + 0.5_wp*rho_L*vel_L_rms + qv_L + pres_mag%L
                                     E_R = gamma_R*pres_R + pi_inf_R + 0.5_wp*rho_R*vel_R_rms + qv_R + pres_mag%R ! includes magnetic energy
                                     H_L = (E_L + pres_L - pres_mag%L)/rho_L
@@ -826,11 +831,13 @@ contains
                                 ! Energy
                                 if (mhd .and. (.not. relativity)) then
                                     ! energy flux = (E + p + p_mag) * v_${XYZ}$ - B_${XYZ}$ * (v_x*B_x + v_y*B_y + v_z*B_z)
-                                    flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
-                                        (s_M*(vel_R(norm_dir)*(E_R + pres_R + pres_mag%R) - B%R(norm_dir)*(vel_R(1)*B%R(1) + vel_R(2)*B%R(2) + vel_R(3)*B%R(3))) &
-                                         - s_P*(vel_L(norm_dir)*(E_L + pres_L + pres_mag%L) - B%L(norm_dir)*(vel_L(1)*B%L(1) + vel_L(2)*B%L(2) + vel_L(3)*B%L(3))) &
-                                         + s_M*s_P*(E_L - E_R)) &
-                                        /(s_M - s_P)
+                                    #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                                        flux_rs${XYZ}$_vf(j, k, l, E_idx) = &
+                                            (s_M*(vel_R(norm_dir)*(E_R + pres_R + pres_mag%R) - B%R(norm_dir)*(vel_R(1)*B%R(1) + vel_R(2)*B%R(2) + vel_R(3)*B%R(3))) &
+                                             - s_P*(vel_L(norm_dir)*(E_L + pres_L + pres_mag%L) - B%L(norm_dir)*(vel_L(1)*B%L(1) + vel_L(2)*B%L(2) + vel_L(3)*B%L(3))) &
+                                             + s_M*s_P*(E_L - E_R)) &
+                                            /(s_M - s_P)
+                                    #:endif
                                 elseif (mhd .and. relativity) then
                                     ! energy flux = m_${XYZ}$ - mass flux
                                     ! Hard-coded for single-component for now
@@ -1118,7 +1125,7 @@ contains
         #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
 
             if (norm_dir == ${NORM_DIR}$) then
-                #:call GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, tau_e_L, tau_e_R, G_L, G_R, Re_L, Re_R, rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, Ys_L, Ys_R, xi_field_L, xi_field_R, Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, c_fast, pres_mag, B, Ga, vdotB, B2, b4, cm, pcorr, zcoef, vel_L_tmp, vel_R_tmp, vel_grad_L, vel_grad_R, idx_right_phys]')
+                #:call GPU_PARALLEL_LOOP(collapse=3, private='[i, q, alpha_rho_L,alpha_rho_R,vel_L,vel_R,alpha_L,alpha_R,tau_e_L,tau_e_R,G_L,G_R,Re_L,Re_R,rho_avg,h_avg,gamma_avg,s_L,s_R,s_S,Ys_L,Ys_R,xi_field_L,xi_field_R,Cp_iL,Cp_iR,Xs_L,Xs_R,Gamma_iL,Gamma_iR,Yi_avg,Phi_avg,h_iL,h_iR,h_avg_2,c_fast,pres_mag,B,Ga,vdotB,B2,b4,cm,pcorr,zcoef,vel_grad_L,vel_grad_R,idx_right_phys,vel_L_rms,vel_R_rms,vel_avg_rms,vel_L_tmp,vel_R_tmp,Ms_L,Ms_R,pres_SL,pres_SR,alpha_L_sum,alpha_R_sum,c_avg,pres_L,pres_R,rho_L,rho_R,gamma_L,gamma_R,pi_inf_L,pi_inf_R,qv_L,qv_R,c_L,c_R,E_L,E_R,H_L,H_R,ptilde_L,ptilde_R,s_M,s_P,xi_M,xi_P,Cp_avg,Cv_avg,T_avg,eps,c_sum_Yi_Phi,Cp_L,Cp_R,Cv_L,Cv_R,R_gas_L,R_gas_R,MW_L,MW_R,T_L,T_R,Y_L,Y_R]')
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -1641,7 +1648,7 @@ contains
         #:endfor
 
         if (viscous) then
-            #:call GPU_PARALLEL_LOOP(collapse=3, private='[idx_right_phys, vel_grad_L, vel_grad_R, alpha_L, alpha_R, vel_L, vel_R, Re_L, Re_R]')
+            #:call GPU_PARALLEL_LOOP(collapse=3, private='[i, idx_right_phys, vel_grad_L, vel_grad_R, alpha_L, alpha_R, vel_L, vel_R, Re_L, Re_R]', copyin='[norm_dir]')
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
@@ -1961,7 +1968,7 @@ contains
         real(wp) :: flux_ene_e
         real(wp) :: zcoef, pcorr !< low Mach number correction
 
-        integer :: i, j, k, l, q !< Generic loop iterators
+        integer :: Re_max, i, j, k, l, q !< Generic loop iterators
         integer :: idx1, idxi
 
         ! Populating the buffers of the left and right Riemann problem
@@ -1991,7 +1998,7 @@ contains
                 ! 6-EQUATION MODEL WITH HLLC
                 if (model_eqns == 3) then
                     !ME3
-                    #:call GPU_PARALLEL_LOOP(collapse=3, private='[vel_L, vel_R, vel_K_Star, Re_L, Re_R, rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, vel_avg_rms, alpha_L, alpha_R, Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, tau_e_L, tau_e_R, G_L, G_R, flux_ene_e, xi_field_L, xi_field_R, pcorr, zcoef, vel_L_tmp, vel_R_tmp]')
+                    #:call GPU_PARALLEL_LOOP(collapse=3, private='[i, q, vel_L, vel_R, Re_L, Re_R, alpha_L, alpha_R, Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, tau_e_L, tau_e_R, flux_ene_e, xi_field_L, xi_field_R, pcorr, zcoef, rho_L, rho_R, pres_L, pres_R, E_L, E_R, H_L, H_R, Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi, T_L, T_R, Y_L, Y_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Gamm_L, Gamm_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, c_L, c_R, G_L, G_R, rho_avg, H_avg, c_avg, gamma_avg, ptilde_L, ptilde_R, vel_L_rms, vel_R_rms, vel_avg_rms, vel_L_tmp, vel_R_tmp, Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, rho_Star, E_Star, p_Star, p_K_Star, vel_K_star, s_L, s_R, s_M, s_P, s_S, xi_M, xi_P, xi_L, xi_R, xi_MP, xi_PP, idx1, idxi]')
                         do l = is3%beg, is3%end
                             do k = is2%beg, is2%end
                                 do j = is1%beg, is1%end
@@ -2016,14 +2023,31 @@ contains
                                     pres_L = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx)
                                     pres_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx)
 
+                                    rho_L = 0._wp
+                                    gamma_L = 0._wp
+                                    pi_inf_L = 0._wp
+                                    qv_L = 0._wp
+
+                                    rho_R = 0._wp
+                                    gamma_R = 0._wp
+                                    pi_inf_R = 0._wp
+                                    qv_R = 0._wp
+
+                                    alpha_L_sum = 0._wp
+                                    alpha_R_sum = 0._wp
+
                                     if (mpp_lim) then
                                         $:GPU_LOOP(parallelism='[seq]')
                                         do i = 1, num_fluids
                                             qL_prim_rs${XYZ}$_vf(j, k, l, i) = max(0._wp, qL_prim_rs${XYZ}$_vf(j, k, l, i))
                                             qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i) = min(max(0._wp, qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)), 1._wp)
+                                            alpha_L_sum = alpha_L_sum + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)
+                                        end do
+
+                                        $:GPU_LOOP(parallelism='[seq]')
+                                        do i = 1, num_fluids
                                             qR_prim_rs${XYZ}$_vf(j + 1, k, l, i) = max(0._wp, qR_prim_rs${XYZ}$_vf(j + 1, k, l, i))
                                             qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i) = min(max(0._wp, qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)), 1._wp)
-                                            alpha_L_sum = alpha_L_sum + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)
                                             alpha_R_sum = alpha_R_sum + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)
                                         end do
 
@@ -2387,7 +2411,7 @@ contains
 
                 elseif (model_eqns == 4) then
                     !ME4
-                    #:call GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, rho_avg, h_avg, gamma_avg, s_L, s_R, s_S, vel_avg_rms, nbub_L, nbub_R, ptilde_L, ptilde_R]')
+                    #:call GPU_PARALLEL_LOOP(collapse=3, private='[i, q, alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, nbub_L, nbub_R, rho_L, rho_R, pres_L, pres_R, E_L, E_R, H_L, H_R, Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi, T_L, T_R, Y_L, Y_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Gamm_L, Gamm_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, c_L, c_R, G_L, G_R, rho_avg, H_avg, c_avg, gamma_avg, ptilde_L, ptilde_R, vel_L_rms, vel_R_rms, vel_avg_rms, vel_L_tmp, vel_R_tmp, Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, rho_Star, E_Star, p_Star, p_K_Star, vel_K_star, s_L, s_R, s_M, s_P, s_S, xi_M, xi_P, xi_L, xi_R, xi_MP, xi_PP]')
                         do l = is3%beg, is3%end
                             do k = is2%beg, is2%end
                                 do j = is1%beg, is1%end
@@ -2412,6 +2436,11 @@ contains
                                         vel_R_rms = vel_R_rms + vel_R(i)**2._wp
                                     end do
 
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = 1, num_fluids
+                                        alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)
+                                        alpha_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)
+                                    end do
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_fluids
                                         alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)
@@ -2626,7 +2655,7 @@ contains
                     #:endcall GPU_PARALLEL_LOOP
 
                 elseif (model_eqns == 2 .and. bubbles_euler) then
-                    #:call GPU_PARALLEL_LOOP(collapse=3, private='[R0_L, R0_R, V0_L, V0_R, P0_L, P0_R, pbw_L, pbw_R, vel_L, vel_R, rho_avg, alpha_L, alpha_R, h_avg, gamma_avg, s_L, s_R, s_S, nbub_L, nbub_R, ptilde_L, ptilde_R, vel_avg_rms, Re_L, Re_R, pcorr, zcoef, vel_L_tmp, vel_R_tmp]')
+                    #:call GPU_PARALLEL_LOOP(collapse=3, private='[i, q, R0_L, R0_R, V0_L, V0_R, P0_L, P0_R, pbw_L, pbw_R, vel_L, vel_R, rho_avg, alpha_L, alpha_R, h_avg, gamma_avg, nbub_L, nbub_R, Re_L, Re_R, pcorr, zcoef, rho_L, rho_R, pres_L, pres_R, E_L, E_R, H_L, H_R, Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi, T_L, T_R, Y_L, Y_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Gamm_L, Gamm_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, c_L, c_R, c_avg, ptilde_L, ptilde_R, vel_L_rms, vel_R_rms, vel_avg_rms, vel_L_tmp, vel_R_tmp, Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, rho_Star, E_Star, p_Star, p_K_Star, vel_K_star, s_L, s_R, s_M, s_P, s_S, xi_M, xi_P, xi_L, xi_R, xi_MP, xi_PP, nbub_L_denom, nbub_R_denom, Pbwr3Lbar, PbwR3Rbar, R3Lbar, R3Rbar, R3V2Lbar, R3V2Rbar]')
                         do l = is3%beg, is3%end
                             do k = is2%beg, is2%end
                                 do j = is1%beg, is1%end
@@ -2642,6 +2671,8 @@ contains
                                         alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)
                                         alpha_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)
                                     end do
+
+                                    vel_L_rms = 0._wp; vel_R_rms = 0._wp
 
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, num_dims
@@ -2759,13 +2790,8 @@ contains
                                         $:GPU_LOOP(parallelism='[seq]')
                                         do i = 1, nb
                                             if (.not. qbmm) then
-                                                if (polytropic) then
-                                                    pbw_L(i) = f_cpbw_KM(R0(i), R0_L(i), V0_L(i), 0._wp)
-                                                    pbw_R(i) = f_cpbw_KM(R0(i), R0_R(i), V0_R(i), 0._wp)
-                                                else
-                                                    pbw_L(i) = f_cpbw_KM(R0(i), R0_L(i), V0_L(i), P0_L(i))
-                                                    pbw_R(i) = f_cpbw_KM(R0(i), R0_R(i), V0_R(i), P0_R(i))
-                                                end if
+                                                pbw_L(i) = f_cpbw_KM(R0(i), R0_L(i), V0_L(i), P0_L(i))
+                                                pbw_R(i) = f_cpbw_KM(R0(i), R0_R(i), V0_R(i), P0_R(i))
                                             end if
                                         end do
 
@@ -3064,12 +3090,12 @@ contains
                     #:endcall GPU_PARALLEL_LOOP
                 else
                     ! 5-EQUATION MODEL WITH HLLC
-                    #:call GPU_PARALLEL_LOOP(collapse=3, private='[T_L, T_R, vel_L, vel_R, Re_L, Re_R, rho_avg, h_avg, gamma_avg, alpha_L, alpha_R, s_L, s_R, s_S, vel_avg_rms, pcorr, zcoef, vel_L_tmp, vel_R_tmp, Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, tau_e_L, tau_e_R, xi_field_L, xi_field_R, Yi_avg,Phi_avg, h_iL, h_iR, h_avg_2]', copyin='[is1, is2, is3]')
+                    #:call GPU_PARALLEL_LOOP(collapse=3, private='[Re_max, i, q, T_L, T_R, idx1, idxi, vel_L_rms, vel_R_rms, pres_L, pres_R, rho_L, gamma_L, pi_inf_L, qv_L, rho_R, gamma_R, pi_inf_R, qv_R, alpha_L_sum, alpha_R_sum, E_L, E_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Gamm_L, Gamm_R, Y_L, Y_R, H_L, H_R, rho_avg, gamma_avg, H_avg, c_L, c_R, c_avg, s_P, s_M, xi_P, xi_M, xi_L, xi_R, Ms_L, Ms_R, pres_SL, pres_SR, vel_L, vel_R, Re_L, Re_R, alpha_L, alpha_R, s_L, s_R, s_S, vel_avg_rms, pcorr, zcoef, vel_L_tmp, vel_R_tmp, Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, tau_e_L, tau_e_R, xi_field_L, xi_field_R, Yi_avg,Phi_avg, h_iL, h_iR, h_avg_2, G_L, G_R]', copyin='[is1, is2, is3]')
                         do l = is3%beg, is3%end
                             do k = is2%beg, is2%end
                                 do j = is1%beg, is1%end
 
-                                    !idx1 = 1; if (dir_idx(1) == 2) idx1 = 2; if (dir_idx(1) == 3) idx1 = 3
+                                    idx1 = 1; if (dir_idx(1) == 2) idx1 = 2; if (dir_idx(1) == 3) idx1 = 3
 
                                     vel_L_rms = 0._wp; vel_R_rms = 0._wp
                                     rho_L = 0._wp; rho_R = 0._wp
@@ -3128,22 +3154,24 @@ contains
                                         qv_R = qv_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)*qvs(i)
                                     end do
 
+                                    Re_max = 0
+                                    if (Re_size(1) > 0) Re_max = 1
+                                    if (Re_size(2) > 0) Re_max = 2
+
                                     if (viscous) then
                                         $:GPU_LOOP(parallelism='[seq]')
-                                        do i = 1, 2
-                                            Re_L(i) = dflt_real
-                                            Re_R(i) = dflt_real
-
-                                            if (Re_size(i) > 0) Re_L(i) = 0._wp
-                                            if (Re_size(i) > 0) Re_R(i) = 0._wp
+                                        do i = 1, Re_max
+                                            Re_L(i) = 0._wp
+                                            Re_R(i) = 0._wp
 
                                             $:GPU_LOOP(parallelism='[seq]')
                                             do q = 1, Re_size(i)
-                                                Re_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + Re_idx(i, q))/Res_gs(i, q) &
+                                                Re_L(i) = alpha_L(Re_idx(i, q))/Res_gs(i, q) &
                                                           + Re_L(i)
-                                                Re_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + Re_idx(i, q))/Res_gs(i, q) &
+                                                Re_R(i) = alpha_R(Re_idx(i, q))/Res_gs(i, q) &
                                                           + Re_R(i)
                                             end do
+
                                             Re_L(i) = 1._wp/max(Re_L(i), sgm_eps)
                                             Re_R(i) = 1._wp/max(Re_R(i), sgm_eps)
                                         end do
@@ -3655,7 +3683,7 @@ contains
         #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (norm_dir == ${NORM_DIR}$) then
                 #:block UNDEF_AMD
-                    #:call GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_L, alpha_rho_R, vel, alpha_L, alpha_R, rho, pres,E, H_no_mag, gamma, pi_inf, qv, vel_rms, B, c, c_fast, pres_mag, U_L, U_R, U_starL, U_starR, U_doubleL, U_doubleR, F_L, F_R, F_starL, F_starR, F_hlld]')
+                    #:call GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_L, alpha_rho_R, vel, alpha_L, alpha_R, rho, pres,E, H_no_mag, gamma, pi_inf, qv, vel_rms, B, c, c_fast, pres_mag, U_L, U_R, U_starL, U_starR, U_doubleL, U_doubleR, F_L, F_R, F_starL, F_starR, F_hlld, s_L, s_R, s_M, s_starL, s_starR, pTot_L, pTot_R, p_star, rhoL_star, rhoR_star, E_starL, E_starR, sqrt_rhoL_star, sqrt_rhoR_star, denom_ds, sign_Bx, vL_star, vR_star, wL_star, wR_star, v_double, w_double, By_double, Bz_double, E_doubleL, E_doubleR, E_double]', copyin='[norm_dir]')
                         do l = is3%beg, is3%end
                             do k = is2%beg, is2%end
                                 do j = is1%beg, is1%end
@@ -4643,7 +4671,9 @@ contains
                         ! Divergence in cylindrical coordinates (vx=vz_cyl, vy=vr_cyl, vz=vtheta_cyl)
                         divergence_cyl = avg_dvdx_int(1) + avg_dvdy_int(2) + avg_v_int(2)/r_eff
                         if (num_dims > 2) then
-                            divergence_cyl = divergence_cyl + avg_dvdz_int(3)/r_eff
+                            #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                                divergence_cyl = divergence_cyl + avg_dvdz_int(3)/r_eff
+                            #:endif
                         end if
 
                         stress_vector_shear = 0.0_wp
@@ -4659,23 +4689,29 @@ contains
                                     stress_vector_shear(2) = (avg_dvdy_int(1) + avg_dvdx_int(2))/Re_s
                                 end if
                                 if (num_dims > 2) then
-                                    stress_vector_shear(3) = (avg_dvdz_int(1)/r_eff + avg_dvdx_int(3))/Re_s
+                                    #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                                        stress_vector_shear(3) = (avg_dvdz_int(1)/r_eff + avg_dvdx_int(3))/Re_s
+                                    #:endif
                                 end if
                             case (2) ! Y-face (radial normal, r_cyl)
                                 if (num_dims > 1) then
                                     stress_vector_shear(1) = (avg_dvdy_int(1) + avg_dvdx_int(2))/Re_s
                                     stress_vector_shear(2) = (2.0_wp*avg_dvdy_int(2))/Re_s + div_v_term_const
                                     if (num_dims > 2) then
-                                        stress_vector_shear(3) = (avg_dvdz_int(2)/r_eff - avg_v_int(3)/r_eff + avg_dvdy_int(3))/Re_s
+                                        #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                                            stress_vector_shear(3) = (avg_dvdz_int(2)/r_eff - avg_v_int(3)/r_eff + avg_dvdy_int(3))/Re_s
+                                        #:endif
                                     end if
                                 else
                                     stress_vector_shear(1) = (2.0_wp*avg_dvdx_int(1))/Re_s + div_v_term_const
                                 end if
                             case (3) ! Z-face (azimuthal normal, theta_cyl)
                                 if (num_dims > 2) then
-                                    stress_vector_shear(1) = (avg_dvdz_int(1)/r_eff + avg_dvdx_int(3))/Re_s
-                                    stress_vector_shear(2) = (avg_dvdz_int(2)/r_eff - avg_v_int(3)/r_eff + avg_dvdy_int(3))/Re_s
-                                    stress_vector_shear(3) = (2.0_wp*(avg_dvdz_int(3)/r_eff + avg_v_int(2)/r_eff))/Re_s + div_v_term_const
+                                    #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                                        stress_vector_shear(1) = (avg_dvdz_int(1)/r_eff + avg_dvdx_int(3))/Re_s
+                                        stress_vector_shear(2) = (avg_dvdz_int(2)/r_eff - avg_v_int(3)/r_eff + avg_dvdy_int(3))/Re_s
+                                        stress_vector_shear(3) = (2.0_wp*(avg_dvdz_int(3)/r_eff + avg_v_int(2)/r_eff))/Re_s + div_v_term_const
+                                    #:endif
                                 end if
                             end select
 
@@ -4769,8 +4805,10 @@ contains
                                                                         dvelR_dy_vf(vel_comp_idx)%sf(idx_right_phys(1), idx_right_phys(2), idx_right_phys(3)))
                             end if
                             if (num_dims > 2) then
-                                vel_grad_avg(vel_comp_idx, 3) = 0.5_wp*(dvelL_dz_vf(vel_comp_idx)%sf(j_loop, k_loop, l_loop) + &
-                                                                        dvelR_dz_vf(vel_comp_idx)%sf(idx_right_phys(1), idx_right_phys(2), idx_right_phys(3)))
+                                #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                                    vel_grad_avg(vel_comp_idx, 3) = 0.5_wp*(dvelL_dz_vf(vel_comp_idx)%sf(j_loop, k_loop, l_loop) + &
+                                                                            dvelR_dz_vf(vel_comp_idx)%sf(idx_right_phys(1), idx_right_phys(2), idx_right_phys(3)))
+                                #:endif
                             end if
                         end do
 

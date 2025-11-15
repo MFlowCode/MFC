@@ -17,7 +17,7 @@
 !!                           7) Supersonic Inflow
 !!                           8) Supersonic Outflow
 !!              Please refer to Thompson (1987, 1990) for detailed descriptions.
-
+#:include 'case.fpp'
 #:include 'macros.fpp'
 
 module m_cbc
@@ -71,9 +71,6 @@ module m_cbc
     real(wp), allocatable, dimension(:, :, :, :) :: flux_rsy_vf_l, flux_src_rsy_vf_l
     real(wp), allocatable, dimension(:, :, :, :) :: flux_rsz_vf_l, flux_src_rsz_vf_l
     $:GPU_DECLARE(create='[flux_rsx_vf_l,flux_src_rsx_vf_l,flux_rsy_vf_l,flux_src_rsy_vf_l,flux_rsz_vf_l,flux_src_rsz_vf_l]')
-
-    real(wp) :: dpres_ds !< Spatial derivatives in s-dir of pressure
-    $:GPU_DECLARE(create='[dpres_ds]')
 
     real(wp), allocatable, dimension(:) :: ds !< Cell-width distribution in the s-direction
 
@@ -451,8 +448,7 @@ contains
                 end do
             end if
         #:endfor
-        $:GPU_UPDATE(device='[vel_in,vel_out,pres_in,pres_out, &
-            & Del_in,Del_out,alpha_rho_in,alpha_in]')
+        $:GPU_UPDATE(device='[vel_in,vel_out,pres_in,pres_out,Del_in,Del_out,alpha_rho_in,alpha_in]')
 
     end subroutine s_initialize_cbc_module
 
@@ -661,6 +657,7 @@ contains
         real(wp) :: dgamma_dt
         real(wp) :: dpi_inf_dt
         real(wp) :: dqv_dt
+        real(wp) :: dpres_ds
         real(wp), dimension(contxe) :: alpha_rho, dalpha_rho_ds, mf
         real(wp), dimension(2) :: Re_cbc
         real(wp), dimension(num_vels) :: vel, dvel_ds
@@ -788,7 +785,7 @@ contains
                 end if
 
                 ! FD2 or FD4 of RHS at j = 0
-                #:call GPU_PARALLEL_LOOP(collapse=2, private='[alpha_rho, vel, adv_local, mf, dvel_ds, dadv_ds, Re_cbc, dalpha_rho_ds,dvel_dt, dadv_dt, dalpha_rho_dt, L, lambda, Ys, dYs_dt, dYs_ds, h_k, Cp_i, Gamma_i, Xs]')
+                #:call GPU_PARALLEL_LOOP(collapse=2, private='[alpha_rho, vel, adv_local, mf, dvel_ds, dadv_ds, Re_cbc, dalpha_rho_ds, dpres_ds, dvel_dt, dadv_dt, dalpha_rho_dt, L, lambda, Ys, dYs_dt, dYs_ds, h_k, Cp_i, Gamma_i, Xs, drho_dt, dpres_dt, dpi_inf_dt, dqv_dt, dgamma_dt, rho, pres, E, H, gamma, pi_inf, qv, c, Ma, T, sum_Enthalpies, Cv, Cp, e_mix, Mw, R_gas, vel_K_sum, vel_dv_dt_sum, i, j]', copyin='[dir_idx]')
                     do r = is3%beg, is3%end
                         do k = is2%beg, is2%end
 
@@ -1033,7 +1030,9 @@ contains
                             if (model_eqns == 1) then
                                 drho_dt = dalpha_rho_dt(1)
                                 dgamma_dt = dadv_dt(1)
-                                dpi_inf_dt = dadv_dt(2)
+                                #:if not MFC_CASE_OPTIMIZATION or num_fluids > 1
+                                    dpi_inf_dt = dadv_dt(2)
+                                #:endif
                             else
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids

@@ -106,8 +106,10 @@ module m_rhs
     !> @{
     type(vector_field), allocatable, dimension(:) :: dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n
     type(vector_field), allocatable, dimension(:) :: dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n
+#if defined(MFC_OpenACC)
     $:GPU_DECLARE(create='[dqL_prim_dx_n,dqL_prim_dy_n,dqL_prim_dz_n]')
     $:GPU_DECLARE(create='[dqR_prim_dx_n,dqR_prim_dy_n,dqR_prim_dz_n]')
+#endif
     !> @}
 
     type(scalar_field), allocatable, dimension(:) :: tau_Re_vf
@@ -125,7 +127,9 @@ module m_rhs
     !> @{
     type(vector_field), allocatable, dimension(:) :: gm_alphaL_n
     type(vector_field), allocatable, dimension(:) :: gm_alphaR_n
+#if defined(MFC_OpenACC)
     $:GPU_DECLARE(create='[gm_alphaL_n,gm_alphaR_n]')
+#endif
     !> @}
 
     !> @name The cell-boundary values of the fluxes (src - source, gsrc - geometrical
@@ -135,11 +139,17 @@ module m_rhs
     type(vector_field), allocatable, dimension(:) :: flux_n
     type(vector_field), allocatable, dimension(:) :: flux_src_n
     type(vector_field), allocatable, dimension(:) :: flux_gsrc_n
+
+#if defined(MFC_OpenACC)
     $:GPU_DECLARE(create='[flux_n,flux_src_n,flux_gsrc_n]')
+#endif
+
     !> @}
 
     type(vector_field), allocatable, dimension(:) :: qL_prim, qR_prim
+#if defined(MFC_OpenACC)
     $:GPU_DECLARE(create='[qL_prim,qR_prim]')
+#endif
 
     type(int_bounds_info) :: iv !< Vector field indical bounds
     $:GPU_DECLARE(create='[iv]')
@@ -236,17 +246,16 @@ contains
         end if
 
         ! Allocation/Association of flux_n, flux_src_n, and flux_gsrc_n
-        @:ALLOCATE(flux_n(1:num_dims))
-        @:ALLOCATE(flux_src_n(1:num_dims))
-        @:ALLOCATE(flux_gsrc_n(1:num_dims))
+        if (.not. igr) then
+            @:ALLOCATE(flux_n(1:num_dims))
+            @:ALLOCATE(flux_src_n(1:num_dims))
+            @:ALLOCATE(flux_gsrc_n(1:num_dims))
 
-        do i = 1, num_dims
+            do i = 1, num_dims
 
-            @:ALLOCATE(flux_n(i)%vf(1:sys_size))
-            @:ALLOCATE(flux_src_n(i)%vf(1:sys_size))
-            @:ALLOCATE(flux_gsrc_n(i)%vf(1:sys_size))
-
-            if (.not. igr) then
+                @:ALLOCATE(flux_n(i)%vf(1:sys_size))
+                @:ALLOCATE(flux_src_n(i)%vf(1:sys_size))
+                @:ALLOCATE(flux_gsrc_n(i)%vf(1:sys_size))
 
                 if (i == 1) then
                     do l = 1, sys_size
@@ -325,28 +334,28 @@ contains
                         $:GPU_ENTER_DATA(attach='[flux_src_n(i)%vf(l)%sf]')
                     end do
                 end if
-            end if
-        end do
 
-        ! END: Allocation/Association of flux_n, flux_src_n, and flux_gsrc_n
-
-        ! Allocation of dq_prim_ds_qp
-        @:ALLOCATE(dq_prim_dx_qp(1:1))
-        @:ALLOCATE(dq_prim_dy_qp(1:1))
-        @:ALLOCATE(dq_prim_dz_qp(1:1))
-
-        @:ALLOCATE(qL_prim(1:num_dims))
-        @:ALLOCATE(qR_prim(1:num_dims))
-
-        ! Allocation/Association of dqK_prim_ds_n
-        @:ALLOCATE(dqL_prim_dx_n(1:num_dims))
-        @:ALLOCATE(dqL_prim_dy_n(1:num_dims))
-        @:ALLOCATE(dqL_prim_dz_n(1:num_dims))
-        @:ALLOCATE(dqR_prim_dx_n(1:num_dims))
-        @:ALLOCATE(dqR_prim_dy_n(1:num_dims))
-        @:ALLOCATE(dqR_prim_dz_n(1:num_dims))
+            end do
+            ! END: Allocation/Association of flux_n, flux_src_n, and flux_gsrc_n
+        end if
 
         if (.not. igr) then
+
+            ! Allocation of dq_prim_ds_qp
+            @:ALLOCATE(dq_prim_dx_qp(1:1))
+            @:ALLOCATE(dq_prim_dy_qp(1:1))
+            @:ALLOCATE(dq_prim_dz_qp(1:1))
+
+            @:ALLOCATE(qL_prim(1:num_dims))
+            @:ALLOCATE(qR_prim(1:num_dims))
+
+            ! Allocation/Association of dqK_prim_ds_n
+            @:ALLOCATE(dqL_prim_dx_n(1:num_dims))
+            @:ALLOCATE(dqL_prim_dy_n(1:num_dims))
+            @:ALLOCATE(dqL_prim_dz_n(1:num_dims))
+            @:ALLOCATE(dqR_prim_dx_n(1:num_dims))
+            @:ALLOCATE(dqR_prim_dy_n(1:num_dims))
+            @:ALLOCATE(dqR_prim_dz_n(1:num_dims))
 
             do i = 1, num_dims
                 @:ALLOCATE(qL_prim(i)%vf(1:sys_size))
@@ -610,8 +619,10 @@ contains
         ! END: Allocation/Association of qK_cons_n and qK_prim_n
 
         ! Allocation of gm_alphaK_n
-        @:ALLOCATE(gm_alphaL_n(1:num_dims))
-        @:ALLOCATE(gm_alphaR_n(1:num_dims))
+        if (.not. igr) then
+            @:ALLOCATE(gm_alphaL_n(1:num_dims))
+            @:ALLOCATE(gm_alphaR_n(1:num_dims))
+        end if
 
         if (alt_soundspeed) then
             @:ALLOCATE(blkmod1(0:m, 0:n, 0:p), blkmod2(0:m, 0:n, 0:p), alpha1(0:m, 0:n, 0:p), alpha2(0:m, 0:n, 0:p), Kterm(0:m, 0:n, 0:p))
@@ -630,16 +641,19 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         type(scalar_field), intent(inout) :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
+        type(integer_field), dimension(1:num_dims, 1:2), intent(in) :: bc_type
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb_in, rhs_pb
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: mv_in, rhs_mv
+        real(stp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb_in
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: rhs_pb  ! TODO :: I think these other two variables need to be stp as well, but it doesn't compile like that right now
+        real(stp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: mv_in
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: rhs_mv
         integer, intent(in) :: t_step
         real(wp), intent(inout) :: time_avg
         integer, intent(in) :: stage
 
         real(wp) :: t_start, t_finish
-        integer :: i, j, k, l, id !< Generic loop iterators
+        integer :: id
+        integer(kind=8) :: i, j, k, l, q !< Generic loop iterators
 
         call nvtxStartRange("COMPUTE-RHS")
 
@@ -744,7 +758,7 @@ contains
                             do k = -1, n + 1
                                 do j = -1, m + 1
                                     do i = 1, sys_size
-                                        rhs_vf(i)%sf(j, k, l) = 0._wp
+                                        rhs_vf(i)%sf(j, k, l) = 0._stp
                                     end do
                                 end do
                             end do
@@ -881,6 +895,9 @@ contains
                     irx%beg = 0; iry%beg = 0; irz%beg = -1
                 end if
                 irx%end = m; iry%end = n; irz%end = p
+                ! $:GPU_UPDATE(host='[qL_rsx_vf,qR_rsx_vf]')
+                ! print *, "L", qL_rsx_vf(100:300, 0, 0, 1)
+                ! print *, "R", qR_rsx_vf(100:300, 0, 0, 1)
 
                 !Computing Riemann Solver Flux and Source Flux
                 call nvtxStartRange("RHS-RIEMANN-SOLVER")
@@ -900,6 +917,9 @@ contains
                                       flux_gsrc_n(id)%vf, &
                                       id, irx, iry, irz)
                 call nvtxEndRange
+
+                !$:GPU_UPDATE(host='[flux_n(1)%vf(1)%sf]')
+                !print *, "FLUX", flux_n(1)%vf(1)%sf(100:300, 0, 0)
 
                 ! Additional physics and source terms
                 ! RHS addition for advection source
@@ -1833,13 +1853,6 @@ contains
 
     end subroutine s_compute_additional_physics_rhs
 
-    !>  The purpose of this procedure is to infinitely relax
-        !!      the pressures from the internal-energy equations to a
-        !!      unique pressure, from which the corresponding volume
-        !!      fraction of each phase are recomputed. For conservation
-        !!      purpose, this pressure is finally corrected using the
-        !!      mixture-total-energy equation.
-
     !>  The purpose of this subroutine is to WENO-reconstruct the
         !!      left and the right cell-boundary values, including values
         !!      at the Gaussian quadrature points, from the cell-averaged
@@ -1997,13 +2010,11 @@ contains
                     @:DEALLOCATE(q_cons_qp%vf(j)%sf)
                     @:DEALLOCATE(q_prim_qp%vf(j)%sf)
                 else
-                    $:GPU_EXIT_DATA(detach='[q_prim_qp%vf(j)%sf]')
                     nullify (q_prim_qp%vf(j)%sf)
                 end if
             end do
 
             do j = adv_idx%beg, adv_idx%end
-                $:GPU_EXIT_DATA(detach='[q_prim_qp%vf(j)%sf]')
                 nullify (q_prim_qp%vf(j)%sf)
             end do
 
@@ -2098,15 +2109,14 @@ contains
                     @:DEALLOCATE(tau_re_vf)
                 end if
             end if
+            @:DEALLOCATE(dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n)
+            @:DEALLOCATE(dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n)
         end if
 
         if (mpp_lim .and. bubbles_euler) then
             $:GPU_EXIT_DATA(delete='[alf_sum%sf]')
             deallocate (alf_sum%sf)
         end if
-
-        @:DEALLOCATE(dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n)
-        @:DEALLOCATE(dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n)
 
         if (.not. igr) then
             do i = num_dims, 1, -1

@@ -1,3 +1,4 @@
+#:include 'case.fpp'
 #:include 'macros.fpp'
 
 !>
@@ -257,7 +258,6 @@ contains
 
         real(wp), dimension(:), intent(inout) :: local_weight
         real(wp), dimension(:), intent(inout) :: local_R0
-
         integer :: ir
         real(wp) :: R0mn, R0mx, dphi, tmp, sd
         real(wp), dimension(nb) :: phi
@@ -272,7 +272,10 @@ contains
                       + (ir - 1._wp)*log(R0mx/R0mn)/(nb - 1._wp)
             local_R0(ir) = exp(phi(ir))
         end do
-        dphi = phi(2) - phi(1)
+
+        #:if not MFC_CASE_OPTIMIZATION or nb > 1
+            dphi = phi(2) - phi(1)
+        #:endif
 
         ! weights for quadrature using Simpson's rule
         do ir = 2, nb - 1
@@ -288,6 +291,7 @@ contains
         local_weight(1) = tmp*dphi/3._wp
         tmp = exp(-0.5_wp*(phi(nb)/sd)**2)/sqrt(2._wp*pi)/sd
         local_weight(nb) = tmp*dphi/3._wp
+
     end subroutine s_simpson
 
     !> This procedure computes the cross product of two vectors.
@@ -643,10 +647,6 @@ contains
         m_glb_ds = int((m_glb + 1)/3) - 1
         n_glb_ds = int((n_glb + 1)/3) - 1
         p_glb_ds = int((p_glb + 1)/3) - 1
-
-        do i = 1, sys_size
-            $:GPU_UPDATE(host='[q_cons_vf(i)%sf]')
-        end do
 
         do l = -1, p_ds + 1
             do k = -1, n_ds + 1

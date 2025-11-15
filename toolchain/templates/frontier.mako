@@ -9,6 +9,7 @@
 #SBATCH --output="${name}.out"
 #SBATCH --time=${walltime}
 #SBATCH --cpus-per-task=7
+#SBATCH -C nvme
 % if gpu:
 #SBATCH --gpus-per-task=1
 #SBATCH --gpu-bind=closest
@@ -53,25 +54,25 @@ ulimit -s unlimited
 % for target in targets:
     ${helpers.run_prologue(target)}
 
+    % if engine == 'batch':
+        # Broadcast binary to compute nodes
+        sbcast --send-libs -pf ${target.get_install_binpath(case)} /mnt/bb/$USER/${target.name}
+    % endif
+
     % if not mpi:
-        (set -x; \
-            % if target.name == 'simulation':
-            ${profiler} \
-        % endif
-            "${target.get_install_binpath(case)}")
+        (set -x; ${profiler} "${target.get_install_binpath(case)}")
     % else:
-        (set -x; srun \
+        (set -x; srun --unbuffered \
         % if engine == 'interactive':
                 --unbuffered --nodes ${nodes} --ntasks-per-node ${tasks_per_node} \
                 --cpus-per-task 7                                    \
             % if gpu:
                 --gpus-per-task 1 --gpu-bind closest                 \
             % endif
+            ${profiler} "${target.get_install_binpath(case)}")
+        % else:
+            ${profiler} "/mnt/bb/$USER/${target.name}")
         % endif
-        % if target.name == 'simulation':
-                ${profiler} \
-        % endif
-                "${target.get_install_binpath(case)}")
     % endif
 
     ${helpers.run_epilogue(target)}
