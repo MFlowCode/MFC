@@ -298,9 +298,8 @@ class Mfc < Formula
     cp prefix/"examples/1D_sodshocktube/case.py", testpath_case/"case.py"
 
     # Run the case from the test directory (this will execute pre_process and simulation)
-    # Limit to 1 processor and reduce runtime for testing
     cd testpath_case do
-      system bin/"mfc", "run", "case.py", "-j", "1"
+      system bin/"mfc", "case.py", "-n", "1"
     end
 
     # Verify output files were created in the test directory
