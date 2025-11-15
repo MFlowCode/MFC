@@ -2,15 +2,10 @@ name: Homebrew Formula Test
 
 on:
   push:
-    branches:
-      - master
-      - homebrew-formula
     paths:
       - 'packaging/homebrew/**'
       - '.github/workflows/homebrew.yml'
   pull_request:
-    branches:
-      - master
     paths:
       - 'packaging/homebrew/**'
       - '.github/workflows/homebrew.yml'

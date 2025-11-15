@@ -2,7 +2,7 @@ name: Deploy Homebrew Tap
 
 on:
   push:
-    branches: [ main, master, homebrew-formula ]
+    branches: [ master, homebrew-new ]
     paths:
       - 'packaging/homebrew/mfc.rb'
       - 'packaging/homebrew/README.md'
