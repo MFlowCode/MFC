@@ -21,8 +21,8 @@ class Mfc < Formula
   depends_on "openblas"
   depends_on "python@3.12"
 
-  # Skip relocation for Python C extensions in the venv
-  # The venv is self-contained in libexec and doesn't need Homebrew's relocation
+  # Skip cleanup for Python venv to preserve C extensions as-is
+  # Python wheels manage their own RPATHs and don't need Homebrew's relocation
   skip_clean "libexec/venv"
 
   def install
@@ -246,6 +246,16 @@ class Mfc < Formula
   def post_install
     # Fix executable permissions for libexec wrapper
     (libexec/"mfc").chmod 0755
+  end
+
+  # Override to skip relocation checks for Python C extensions in venv
+  # Python wheels (especially orjson, cantera) have Mach-O headers without enough
+  # padding for Homebrew's longer paths. This is safe because:
+  # 1. The venv is self-contained in libexec and uses relative paths
+  # 2. Python manages its own RPATH for C extensions
+  # 3. The venv is never relocated after installation
+  def skip_relocation?(file, _type)
+    file.to_s.include?("/libexec/venv/")
   end
 
   def caveats
