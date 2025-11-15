@@ -60,6 +60,7 @@ MFC runs at exascale on the world's fastest supercomputers:
 | Path | Command |
 | --- | --- |
 | **Codespaces** (fastest) 💨 | Click the "Codespaces" badge above to launch in 1 click |
+| **Docker** 🐳 | `docker run -it --rm --entrypoint bash sbryngelson/mfc:latest-cpu` |
 | **Homebrew** (macOS) 🍺 | `brew install mflowcode/mfc/mfc && mfc $(brew --prefix mfc)/examples/1D_sodshocktube/case.py -n 2` |
 | **Local build** 💻 | `./mfc.sh build -j $(nproc) && ./mfc.sh test -j $(nproc)` |
 
@@ -139,6 +140,12 @@ Some examples are below.
   
 For a _very_ quick start, open a GitHub Codespace to load a pre-configured Docker container and familiarize yourself with MFC commands.
 Click <kbd> <> Code</kbd> (green button at top right) → <kbd>Codespaces</kbd> (right tab) → <kbd>+</kbd> (create a codespace).
+
+Alternatively, run MFC directly with Docker on your local machine:
+```bash
+docker run -it --rm --entrypoint bash sbryngelson/mfc:latest-cpu
+```
+Once inside the container, navigate to `/opt/MFC` to access MFC and run examples.
 
 > ****Note:**** Codespaces is a free service with a monthly quota of compute time and storage usage.
 > It is recommended for testing commands, troubleshooting, and running simple case files without installing dependencies or building MFC on your device.
