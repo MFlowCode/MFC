@@ -2,7 +2,6 @@ name: Deploy Homebrew Tap
 
 on:
   push:
-    branches: [ main, master, homebrew-formula ]
     paths:
       - 'packaging/homebrew/mfc.rb'
       - 'packaging/homebrew/README.md'
@@ -20,6 +19,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+
     steps:
       - name: Checkout MFC repository
         uses: actions/checkout@v4
@@ -38,9 +38,9 @@ jobs:
             VERSION="$(echo "${URL}" | sed -E 's/.*v([0-9]+\.[0-9]+\.[0-9]+)\.tar\.gz/\1/')"
           fi
           SHASUM="$(curl -sL "${URL}" | shasum -a 256 | awk '{print $1}')"
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          echo "url=${URL}" >> $GITHUB_OUTPUT
-          echo "sha256=${SHASUM}" >> $GITHUB_OUTPUT
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "url=${URL}" >> "$GITHUB_OUTPUT"
+          echo "sha256=${SHASUM}" >> "$GITHUB_OUTPUT"
 
       - name: Update formula (for tag events)
         if: github.ref_type == 'tag'
@@ -99,4 +99,3 @@ jobs:
           git -c user.name="github-actions[bot]" -c user.email="github-actions[bot]@users.noreply.github.com" \
             commit -m "mfc: v${{ steps.meta.outputs.version }}"
           git push origin HEAD:main
-
