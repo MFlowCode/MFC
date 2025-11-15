@@ -1,6 +1,13 @@
 name: Deploy Homebrew Tap
 
 on:
+  # Test formula on PRs (audit only, don't deploy)
+  pull_request:
+    branches: [ master ]
+    paths:
+      - 'packaging/homebrew/mfc.rb'
+      - 'packaging/homebrew/README.md'
+  # Deploy to tap on push to master
   push:
     branches: [ master, homebrew-new ]
     paths:
@@ -8,6 +15,7 @@ on:
       - 'packaging/homebrew/README.md'
     tags:
       - 'v*.*.*'
+  # Allow manual trigger for testing
   workflow_dispatch:
 
 permissions:
@@ -15,7 +23,7 @@ permissions:
 
 jobs:
   deploy-tap:
-    name: Sync/bump formula in tap
+    name: Audit and deploy formula
     runs-on: macos-14
     permissions:
       contents: write
@@ -41,6 +49,13 @@ jobs:
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "url=${URL}" >> $GITHUB_OUTPUT
           echo "sha256=${SHASUM}" >> $GITHUB_OUTPUT
+          echo "Event: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "Version: ${VERSION}" >> $GITHUB_STEP_SUMMARY
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "Mode: Audit only (PR)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Mode: Audit and deploy" >> $GITHUB_STEP_SUMMARY
+          fi
 
       - name: Update formula (for tag events)
         if: github.ref_type == 'tag'
@@ -61,6 +76,7 @@ jobs:
           brew untap mfc/local
 
       - name: Clone or bootstrap tap repository
+        if: github.event_name != 'pull_request'
         env:
           TAP_TOKEN: ${{ secrets.TAP_REPO_TOKEN }}
         run: |
@@ -81,12 +97,14 @@ jobs:
           fi
 
       - name: Copy formula and README into tap
+        if: github.event_name != 'pull_request'
         run: |
           mkdir -p tap-repo/Formula
           cp packaging/homebrew/mfc.rb tap-repo/Formula/mfc.rb
           cp packaging/homebrew/README.md tap-repo/README.md
 
       - name: Commit & push if changed
+        if: github.event_name != 'pull_request'
         env:
           TAP_TOKEN: ${{ secrets.TAP_REPO_TOKEN }}
         run: |
