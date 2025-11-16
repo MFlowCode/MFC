@@ -118,7 +118,7 @@ contains
 
         if (muscl_order == 1) then
             if (muscl_dir == 1) then
-                #: call GPU_PARALLEL_LOOP(collapse=4)
+                $:GPU_PARALLEL_LOOP(collapse=4)
                 do i = 1, ubound(v_vf, 1)
                     do l = is3_muscl%beg, is3_muscl%end
                         do k = is2_muscl%beg, is2_muscl%end

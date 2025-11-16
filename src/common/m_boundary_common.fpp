@@ -1507,7 +1507,6 @@ contains
                                 jac_sf(1)%sf(-j, k, l) = jac_sf(1)%sf(0, k, l)
                             end do
                         end select
-                    end do
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
@@ -1536,7 +1535,6 @@ contains
                         end select
                     end do
                 end do
-            end do
             $:END_GPU_PARALLEL_LOOP()
 
         end if
@@ -1565,7 +1563,6 @@ contains
                         end select
                     end do
                 end do
-            end do
             $:END_GPU_PARALLEL_LOOP()
 
         end if
@@ -1592,7 +1589,6 @@ contains
                         end select
                     end do
                 end do
-            end do
             $:END_GPU_PARALLEL_LOOP()
         end if
 
