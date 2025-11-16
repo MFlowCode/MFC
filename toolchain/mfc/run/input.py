@@ -71,7 +71,7 @@ class MFCInputFile(Case):
         common.create_directory(modules_dir)
 
         # Determine the real type based on the single precision flag
-        real_type = 'real(sp)' if ARG('single') else 'real(dp)'
+        real_type = 'real(sp)' if (ARG('single') or ARG('mixed')) else 'real(dp)'
 
         if ARG("gpu") == gpuConfigOptions.MP.value:
             directive_str = 'mp'

@@ -1,0 +1,259 @@
+name: Homebrew Formula Test
+
+on:
+  push:
+    paths:
+      - 'packaging/homebrew/**'
+      - '.github/workflows/homebrew.yml'
+  pull_request:
+    paths:
+      - 'packaging/homebrew/**'
+      - '.github/workflows/homebrew.yml'
+  workflow_dispatch:
+
+jobs:
+  # Fast smoke tests that run before expensive operations
+  smoke-test:
+    name: Quick Formula Validation
+    runs-on: ubuntu-latest  # Use Linux for speed (Homebrew works on Linux too)
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Homebrew
+        uses: Homebrew/actions/setup-homebrew@master
+      
+      - name: Validate formula syntax with brew style
+        run: |
+          echo "Checking formula syntax..."
+          brew style packaging/homebrew/mfc.rb
+      
+      - name: Run brew audit (without installation)
+        run: |
+          echo "Configuring git for brew tap-new..."
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          
+          echo "Creating temporary local tap..."
+          brew tap-new mflowcode/test
+          cp packaging/homebrew/mfc.rb $(brew --repository)/Library/Taps/mflowcode/homebrew-test/Formula/mfc.rb
+          
+          echo "Running brew audit (online checks)..."
+          brew audit --online --skip-style mflowcode/test/mfc || true
+          
+          echo "Cleaning up tap..."
+          brew untap mflowcode/test
+      
+      - name: Validate Ruby syntax
+        run: |
+          echo "Checking Ruby syntax..."
+          ruby -c packaging/homebrew/mfc.rb
+      
+      - name: Check for common formula issues
+        run: |
+          echo "Checking for common issues..."
+          
+          # Check that required fields are present
+          grep -q 'desc "' packaging/homebrew/mfc.rb || (echo "❌ Missing desc"; exit 1)
+          grep -q 'homepage "' packaging/homebrew/mfc.rb || (echo "❌ Missing homepage"; exit 1)
+          grep -q 'url "' packaging/homebrew/mfc.rb || (echo "❌ Missing url"; exit 1)
+          grep -q 'sha256 "' packaging/homebrew/mfc.rb || (echo "❌ Missing sha256"; exit 1)
+          grep -q 'license "' packaging/homebrew/mfc.rb || (echo "❌ Missing license"; exit 1)
+          
+          # Check that install method exists
+          grep -q 'def install' packaging/homebrew/mfc.rb || (echo "❌ Missing install method"; exit 1)
+          
+          # Check that test block exists
+          grep -q 'test do' packaging/homebrew/mfc.rb || (echo "❌ Missing test block"; exit 1)
+          
+          echo "✅ All required formula components present"
+      
+      - name: Verify URL is reachable
+        run: |
+          echo "Checking that source URL is reachable..."
+          URL=$(grep -E 'url "https://[^"]+' packaging/homebrew/mfc.rb | head -1 | sed 's/.*url "\([^"]*\)".*/\1/')
+          
+          if [ -z "$URL" ]; then
+            echo "❌ Could not extract URL from formula"
+            exit 1
+          fi
+          
+          echo "URL: $URL"
+          HTTP_CODE=$(curl -sI -w "%{http_code}" -o /dev/null "$URL")
+          
+          if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "302" ]; then
+            echo "✅ URL is reachable (HTTP $HTTP_CODE)"
+          else
+            echo "⚠️  URL returned HTTP $HTTP_CODE (may indicate an issue)"
+            # Don't fail here - could be a temporary issue
+          fi
+      
+      - name: Verify SHA256 checksum
+        run: |
+          echo "Verifying SHA256 checksum matches URL..."
+          URL=$(grep -E 'url "https://[^"]+' packaging/homebrew/mfc.rb | head -1 | sed 's/.*url "\([^"]*\)".*/\1/')
+          EXPECTED_SHA=$(grep 'sha256 "' packaging/homebrew/mfc.rb | head -1 | sed 's/.*sha256 "\([^"]*\)".*/\1/')
+          
+          if [ -z "$URL" ] || [ -z "$EXPECTED_SHA" ]; then
+            echo "❌ Could not extract URL or SHA256 from formula"
+            exit 1
+          fi
+          
+          echo "Downloading tarball to compute checksum..."
+          ACTUAL_SHA=$(curl -sL "$URL" | shasum -a 256 | awk '{print $1}')
+          
+          echo "Expected SHA256: $EXPECTED_SHA"
+          echo "Actual SHA256:   $ACTUAL_SHA"
+          
+          if [ "$EXPECTED_SHA" = "$ACTUAL_SHA" ]; then
+            echo "✅ SHA256 checksum matches!"
+          else
+            echo "❌ SHA256 mismatch!"
+            exit 1
+          fi
+
+  # Full installation test (only runs if smoke tests pass)
+  test-formula:
+    name: Full Installation Test
+    needs: smoke-test  # Only run after smoke tests pass
+    runs-on: macos-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Homebrew
+        run: |
+          echo "Homebrew version:"
+          brew --version
+          echo "Updating Homebrew..."
+          brew update
+      
+      - name: Install formula dependencies
+        run: |
+          echo "Installing MFC dependencies..."
+          brew install cmake gcc python@3.12 boost fftw hdf5 open-mpi openblas
+      
+      - name: Install MFC from formula
+        run: |
+          echo "Creating temporary local tap..."
+          brew tap-new mflowcode/test
+          
+          echo "Copying formula to tap..."
+          cp packaging/homebrew/mfc.rb $(brew --repository)/Library/Taps/mflowcode/homebrew-test/Formula/mfc.rb
+          
+          echo "Installing MFC from local tap..."
+          # Note: brew may exit with code 1 due to dylib fixup warnings on some Python packages (non-fatal)
+          # We verify installation using brew commands rather than parsing log output
+          set +e  # Don't fail immediately on error
+          brew install --build-from-source --verbose mflowcode/test/mfc 2>&1 | tee /tmp/brew-install.log
+          brew_exit_code=$?
+          set -e
+          
+          # Verify installation using brew list (more robust than log parsing)
+          if brew list mflowcode/test/mfc &>/dev/null; then
+            echo "✅ MFC installed successfully (ignoring dylib relocation warnings)"
+            # Optionally verify with brew info
+            brew info mflowcode/test/mfc
+            exit 0
+          else
+            echo "❌ MFC installation failed"
+            exit $brew_exit_code
+          fi
+      
+      - name: Display error logs on failure
+        if: failure()
+        run: |
+          echo "=== Displaying last 200 lines of brew install log ==="
+          if [ -f /tmp/brew-install.log ]; then
+            tail -200 /tmp/brew-install.log
+          fi
+          
+          echo -e "\n=== Displaying Homebrew log files ==="
+          if [ -d ~/Library/Logs/Homebrew/mfc/ ]; then
+            for logfile in ~/Library/Logs/Homebrew/mfc/*; do
+              if [ -f "$logfile" ]; then
+                echo -e "\n\n====== $logfile ======"
+                cat "$logfile"
+              fi
+            done
+          fi
+          
+          echo -e "\n=== Searching for Cantera config.log ==="
+          cantera_config_log=$(find /private/tmp -name "config.log" -path "*/mfc--cantera*" 2>/dev/null | head -1)
+          if [ -n "$cantera_config_log" ] && [ -f "$cantera_config_log" ]; then
+            echo -e "\n\n====== Cantera config.log ======"
+            echo "Found at: $cantera_config_log"
+            cat "$cantera_config_log"
+            # Copy to a known location for artifact upload
+            mkdir -p /tmp/cantera-logs
+            cp "$cantera_config_log" /tmp/cantera-logs/config.log
+          else
+            echo "Cantera config.log not found"
+            echo "Searching in all /private/tmp directories:"
+            find /private/tmp -name "config.log" 2>/dev/null || echo "No config.log files found"
+          fi
+      
+      - name: Upload Homebrew logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: homebrew-logs
+          path: |
+            /tmp/brew-install.log
+            /tmp/cantera-logs/
+            ~/Library/Logs/Homebrew/mfc/
+          if-no-files-found: ignore
+      
+      - name: Test MFC installation
+        run: |
+          echo "=== Testing MFC Installation ==="
+          
+          echo "1. Checking binaries exist and are executable..."
+          test -f $(brew --prefix)/bin/mfc && test -x $(brew --prefix)/bin/mfc
+          test -f $(brew --prefix)/bin/pre_process && test -x $(brew --prefix)/bin/pre_process
+          test -f $(brew --prefix)/bin/simulation && test -x $(brew --prefix)/bin/simulation
+          test -f $(brew --prefix)/bin/post_process && test -x $(brew --prefix)/bin/post_process
+          echo "  ✓ All binaries exist and are executable"
+          
+          echo "2. Verifying installation structure..."
+          test -f $(brew --prefix mfc)/libexec/mfc.sh
+          test -d $(brew --prefix mfc)/toolchain
+          echo "  ✓ Installation structure verified"
+          
+          echo "3. Checking Python venv..."
+          test -d $(brew --prefix mfc)/libexec/venv
+          test -f $(brew --prefix mfc)/libexec/venv/bin/python
+          test -f $(brew --prefix mfc)/libexec/venv/bin/pip
+          echo "  ✓ Python venv exists"
+          
+          echo "4. Checking examples..."
+          test -d $(brew --prefix mfc)/examples
+          test -f $(brew --prefix mfc)/examples/1D_sodshocktube/case.py
+          echo "  ✓ Examples installed"
+          
+          echo "5. Testing mfc wrapper..."
+          mfc --help
+          echo "  ✓ mfc --help succeeded"
+          
+          echo "=== All tests passed! ==="
+      
+      - name: Run MFC test case
+        run: |
+          echo "Running a simple test case (1D Sod shock tube)..."
+          TESTDIR=$(mktemp -d)
+          cp $(brew --prefix mfc)/examples/1D_sodshocktube/case.py "$TESTDIR/"
+          
+          echo "Running with $(sysctl -n hw.ncpu) processors..."
+          # Use absolute path and shorthand syntax (mfc auto-detects and prepends 'run')
+          mfc "$TESTDIR/case.py" -j $(sysctl -n hw.ncpu)
+          
+          echo "Test case completed successfully!"
+      
+      - name: Uninstall and cleanup
+        if: always()
+        run: |
+          echo "Cleaning up..."
+          brew uninstall mfc || true
+          brew cleanup

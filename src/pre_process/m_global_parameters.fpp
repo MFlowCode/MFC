@@ -155,6 +155,8 @@ module m_global_parameters
     real(wp) :: mixlayer_perturb_k0  !< Peak wavenumber of prescribed energy spectra with mixlayer_perturb flag
                                      !! Default value (k0 = 0.4446) is most unstable mode obtained from linear stability analysis
                                      !! See Michalke (1964, JFM) for details
+    logical :: simplex_perturb
+    type(simplex_noise_params) :: simplex_params
 
     real(wp) :: pi_fac !< Factor for artificial pi_inf
 
@@ -398,6 +400,16 @@ contains
         elliptic_smoothing = .false.
 
         fft_wrt = .false.
+
+        simplex_perturb = .false.
+        simplex_params%perturb_vel(:) = .false.
+        simplex_params%perturb_vel_freq(:) = dflt_real
+        simplex_params%perturb_vel_scale(:) = dflt_real
+        simplex_params%perturb_vel_offset(:, :) = dflt_real
+        simplex_params%perturb_dens(:) = .false.
+        simplex_params%perturb_dens_freq(:) = dflt_real
+        simplex_params%perturb_dens_scale(:) = dflt_real
+        simplex_params%perturb_dens_offset(:, :) = dflt_real
 
         ! Initial condition parameters
         num_patches = dflt_int
@@ -1021,8 +1033,6 @@ contains
             deallocate (MPI_IO_DATA%var)
             deallocate (MPI_IO_DATA%view)
         end if
-
-        if (ib) deallocate (MPI_IO_IB_DATA%var%sf)
 
 #endif
 
