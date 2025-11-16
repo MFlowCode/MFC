@@ -199,7 +199,7 @@ contains
 
         if (num_gps > 0) then
             $:GPU_PARALLEL_LOOP(private='[i,physical_loc,dyn_pres,alpha_rho_IP, alpha_IP,pres_IP,vel_IP,vel_g,vel_norm_IP,r_IP, v_IP,pb_IP,mv_IP,nmom_IP,presb_IP,massv_IP,rho, gamma,pi_inf,Re_K,G_K,Gs,gp,innerp,norm,buf, radial_vector, rotation_velocity, j,k,l,q,qv_K,c_IP,nbub,patch_id]')
-                do i = 1, num_gps
+            do i = 1, num_gps
 
                 gp = ghost_points(i)
                 j = gp%loc(1)
@@ -214,25 +214,25 @@ contains
                     physical_loc = [x_cc(j), y_cc(k), 0._wp]
                 end if
 
-                    !Interpolate primitive variables at image point associated w/ GP
-                    if (bubbles_euler .and. .not. qbmm) then
-                        call s_interpolate_image_point(q_prim_vf, gp, &
-                                                       alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, &
-                                                       r_IP, v_IP, pb_IP, mv_IP)
-                    else if (qbmm .and. polytropic) then
-                        call s_interpolate_image_point(q_prim_vf, gp, &
-                                                       alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, &
-                                                       r_IP, v_IP, pb_IP, mv_IP, nmom_IP)
-                    else if (qbmm .and. .not. polytropic) then
-                        call s_interpolate_image_point(q_prim_vf, gp, &
-                                                       alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, &
-                                                       r_IP, v_IP, pb_IP, mv_IP, nmom_IP, pb_in, mv_in, presb_IP, massv_IP)
-                    else
-                        call s_interpolate_image_point(q_prim_vf, gp, &
-                                                       alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP)
-                    end if
+                !Interpolate primitive variables at image point associated w/ GP
+                if (bubbles_euler .and. .not. qbmm) then
+                    call s_interpolate_image_point(q_prim_vf, gp, &
+                                                   alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, &
+                                                   r_IP, v_IP, pb_IP, mv_IP)
+                else if (qbmm .and. polytropic) then
+                    call s_interpolate_image_point(q_prim_vf, gp, &
+                                                   alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, &
+                                                   r_IP, v_IP, pb_IP, mv_IP, nmom_IP)
+                else if (qbmm .and. .not. polytropic) then
+                    call s_interpolate_image_point(q_prim_vf, gp, &
+                                                   alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, &
+                                                   r_IP, v_IP, pb_IP, mv_IP, nmom_IP, pb_in, mv_in, presb_IP, massv_IP)
+                else
+                    call s_interpolate_image_point(q_prim_vf, gp, &
+                                                   alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP)
+                end if
 
-                    dyn_pres = 0._wp
+                dyn_pres = 0._wp
 
                 ! Set q_prim_vf params at GP so that mixture vars calculated properly
                 $:GPU_LOOP(parallelism='[seq]')

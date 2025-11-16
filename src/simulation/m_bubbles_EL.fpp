@@ -721,14 +721,14 @@ contains
             ! (q / (1 - beta)) * d(beta)/dt source
             if (p == 0) then
                 $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
-                    do k = 0, p
-                        do j = 0, n
-                            do i = 0, m
-                                do l = 1, E_idx
-                                    if (q_beta(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
-                                        rhs_vf(l)%sf(i, j, k) = rhs_vf(l)%sf(i, j, k) + &
-                                                                q_cons_vf(l)%sf(i, j, k)*(q_beta(2)%sf(i, j, k) + &
-                                                                                          q_beta(5)%sf(i, j, k))
+                do k = 0, p
+                    do j = 0, n
+                        do i = 0, m
+                            do l = 1, E_idx
+                                if (q_beta(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
+                                    rhs_vf(l)%sf(i, j, k) = rhs_vf(l)%sf(i, j, k) + &
+                                                            q_cons_vf(l)%sf(i, j, k)*(q_beta(2)%sf(i, j, k) + &
+                                                                                      q_beta(5)%sf(i, j, k))
 
                                 end if
                             end do
@@ -760,15 +760,15 @@ contains
 
                 ! (q / (1 - beta)) * d(beta)/dt source
                 $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3)
-                    do k = 0, p
-                        do j = 0, n
-                            do i = 0, m
-                                if (q_beta(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
-                                    rhs_vf(contxe + l)%sf(i, j, k) = rhs_vf(contxe + l)%sf(i, j, k) - &
-                                                                     (1._wp - q_beta(1)%sf(i, j, k))/ &
-                                                                     q_beta(1)%sf(i, j, k)* &
-                                                                     q_beta(3)%sf(i, j, k)
-                                end if
+                do k = 0, p
+                    do j = 0, n
+                        do i = 0, m
+                            if (q_beta(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
+                                rhs_vf(contxe + l)%sf(i, j, k) = rhs_vf(contxe + l)%sf(i, j, k) - &
+                                                                 (1._wp - q_beta(1)%sf(i, j, k))/ &
+                                                                 q_beta(1)%sf(i, j, k)* &
+                                                                 q_beta(3)%sf(i, j, k)
+                            end if
                         end do
                     end do
                 end do
@@ -776,10 +776,10 @@ contains
 
                 !source in energy
                 $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3)
-                    do k = idwbuff(3)%beg, idwbuff(3)%end
-                        do j = idwbuff(2)%beg, idwbuff(2)%end
-                            do i = idwbuff(1)%beg, idwbuff(1)%end
-                                q_beta(3)%sf(i, j, k) = q_prim_vf(E_idx)%sf(i, j, k)*q_prim_vf(contxe + l)%sf(i, j, k)
+                do k = idwbuff(3)%beg, idwbuff(3)%end
+                    do j = idwbuff(2)%beg, idwbuff(2)%end
+                        do i = idwbuff(1)%beg, idwbuff(1)%end
+                            q_beta(3)%sf(i, j, k) = q_prim_vf(E_idx)%sf(i, j, k)*q_prim_vf(contxe + l)%sf(i, j, k)
                         end do
                     end do
                 end do
@@ -789,14 +789,14 @@ contains
 
                 ! (beta / (1 - beta)) * d(Pu)/dl source
                 $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3)
-                    do k = 0, p
-                        do j = 0, n
-                            do i = 0, m
-                                if (q_beta(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
-                                    rhs_vf(E_idx)%sf(i, j, k) = rhs_vf(E_idx)%sf(i, j, k) - &
-                                                                q_beta(4)%sf(i, j, k)*(1._wp - q_beta(1)%sf(i, j, k))/ &
-                                                                q_beta(1)%sf(i, j, k)
-                                end if
+                do k = 0, p
+                    do j = 0, n
+                        do i = 0, m
+                            if (q_beta(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
+                                rhs_vf(E_idx)%sf(i, j, k) = rhs_vf(E_idx)%sf(i, j, k) - &
+                                                            q_beta(4)%sf(i, j, k)*(1._wp - q_beta(1)%sf(i, j, k))/ &
+                                                            q_beta(1)%sf(i, j, k)
+                            end if
                         end do
                     end do
                 end do
@@ -847,11 +847,11 @@ contains
         call nvtxStartRange("BUBBLES-LAGRANGE-KERNELS")
 
         $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
-            do i = 1, q_beta_idx
-                do l = idwbuff(3)%beg, idwbuff(3)%end
-                    do k = idwbuff(2)%beg, idwbuff(2)%end
-                        do j = idwbuff(1)%beg, idwbuff(1)%end
-                            q_beta(i)%sf(j, k, l) = 0._wp
+        do i = 1, q_beta_idx
+            do l = idwbuff(3)%beg, idwbuff(3)%end
+                do k = idwbuff(2)%beg, idwbuff(2)%end
+                    do j = idwbuff(1)%beg, idwbuff(1)%end
+                        q_beta(i)%sf(j, k, l) = 0._wp
                     end do
                 end do
             end do
@@ -863,13 +863,13 @@ contains
 
         !Store 1-beta
         $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
-            do l = idwbuff(3)%beg, idwbuff(3)%end
-                do k = idwbuff(2)%beg, idwbuff(2)%end
-                    do j = idwbuff(1)%beg, idwbuff(1)%end
-                        q_beta(1)%sf(j, k, l) = 1._wp - q_beta(1)%sf(j, k, l)
-                        ! Limiting void fraction given max value
-                        q_beta(1)%sf(j, k, l) = max(q_beta(1)%sf(j, k, l), &
-                                                    1._wp - lag_params%valmaxvoid)
+        do l = idwbuff(3)%beg, idwbuff(3)%end
+            do k = idwbuff(2)%beg, idwbuff(2)%end
+                do j = idwbuff(1)%beg, idwbuff(1)%end
+                    q_beta(1)%sf(j, k, l) = 1._wp - q_beta(1)%sf(j, k, l)
+                    ! Limiting void fraction given max value
+                    q_beta(1)%sf(j, k, l) = max(q_beta(1)%sf(j, k, l), &
+                                                1._wp - lag_params%valmaxvoid)
                 end do
             end do
         end do
@@ -1376,14 +1376,14 @@ contains
         if (dir == 1) then
             ! Gradient in x dir.
             $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3)
-                do k = 0, p
-                    do j = 0, n
-                        do i = 0, m
-                            dq(i, j, k) = q(i, j, k)*(dx(i + 1) - dx(i - 1)) &
-                                          + q(i + 1, j, k)*(dx(i) + dx(i - 1)) &
-                                          - q(i - 1, j, k)*(dx(i) + dx(i + 1))
-                            dq(i, j, k) = dq(i, j, k)/ &
-                                          ((dx(i) + dx(i - 1))*(dx(i) + dx(i + 1)))
+            do k = 0, p
+                do j = 0, n
+                    do i = 0, m
+                        dq(i, j, k) = q(i, j, k)*(dx(i + 1) - dx(i - 1)) &
+                                      + q(i + 1, j, k)*(dx(i) + dx(i - 1)) &
+                                      - q(i - 1, j, k)*(dx(i) + dx(i + 1))
+                        dq(i, j, k) = dq(i, j, k)/ &
+                                      ((dx(i) + dx(i - 1))*(dx(i) + dx(i + 1)))
                     end do
                 end do
             end do
@@ -1391,14 +1391,14 @@ contains
         elseif (dir == 2) then
             ! Gradient in y dir.
             $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3)
-                do k = 0, p
-                    do j = 0, n
-                        do i = 0, m
-                            dq(i, j, k) = q(i, j, k)*(dy(j + 1) - dy(j - 1)) &
-                                          + q(i, j + 1, k)*(dy(j) + dy(j - 1)) &
-                                          - q(i, j - 1, k)*(dy(j) + dy(j + 1))
-                            dq(i, j, k) = dq(i, j, k)/ &
-                                          ((dy(j) + dy(j - 1))*(dy(j) + dy(j + 1)))
+            do k = 0, p
+                do j = 0, n
+                    do i = 0, m
+                        dq(i, j, k) = q(i, j, k)*(dy(j + 1) - dy(j - 1)) &
+                                      + q(i, j + 1, k)*(dy(j) + dy(j - 1)) &
+                                      - q(i, j - 1, k)*(dy(j) + dy(j + 1))
+                        dq(i, j, k) = dq(i, j, k)/ &
+                                      ((dy(j) + dy(j - 1))*(dy(j) + dy(j + 1)))
                     end do
                 end do
             end do
@@ -1406,14 +1406,14 @@ contains
         elseif (dir == 3) then
             ! Gradient in z dir.
             $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3)
-                do k = 0, p
-                    do j = 0, n
-                        do i = 0, m
-                            dq(i, j, k) = q(i, j, k)*(dz(k + 1) - dz(k - 1)) &
-                                          + q(i, j, k + 1)*(dz(k) + dz(k - 1)) &
-                                          - q(i, j, k - 1)*(dz(k) + dz(k + 1))
-                            dq(i, j, k) = dq(i, j, k)/ &
-                                          ((dz(k) + dz(k - 1))*(dz(k) + dz(k + 1)))
+            do k = 0, p
+                do j = 0, n
+                    do i = 0, m
+                        dq(i, j, k) = q(i, j, k)*(dz(k + 1) - dz(k - 1)) &
+                                      + q(i, j, k + 1)*(dz(k) + dz(k - 1)) &
+                                      - q(i, j, k - 1)*(dz(k) + dz(k + 1))
+                        dq(i, j, k) = dq(i, j, k)/ &
+                                      ((dz(k) + dz(k - 1))*(dz(k) + dz(k + 1)))
                     end do
                 end do
             end do
@@ -1514,15 +1514,15 @@ contains
         lag_void_avg = 0._wp
         lag_vol = 0._wp
         $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3, reduction='[[lag_vol, lag_void_avg], [lag_void_max]]', reductionOp='[+, MAX]', copy='[lag_vol, lag_void_avg, lag_void_max]')
-            do k = 0, p
-                do j = 0, n
-                    do i = 0, m
-                        lag_void_max = max(lag_void_max, 1._wp - q_beta(1)%sf(i, j, k))
-                        call s_get_char_vol(i, j, k, volcell)
-                        if ((1._wp - q_beta(1)%sf(i, j, k)) > 5.0d-11) then
-                            lag_void_avg = lag_void_avg + (1._wp - q_beta(1)%sf(i, j, k))*volcell
-                            lag_vol = lag_vol + volcell
-                        end if
+        do k = 0, p
+            do j = 0, n
+                do i = 0, m
+                    lag_void_max = max(lag_void_max, 1._wp - q_beta(1)%sf(i, j, k))
+                    call s_get_char_vol(i, j, k, volcell)
+                    if ((1._wp - q_beta(1)%sf(i, j, k)) > 5.0d-11) then
+                        lag_void_avg = lag_void_avg + (1._wp - q_beta(1)%sf(i, j, k))*volcell
+                        lag_vol = lag_vol + volcell
+                    end if
                 end do
             end do
         end do

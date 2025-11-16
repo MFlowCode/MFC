@@ -293,25 +293,25 @@ contains
 
                         if (adap_dt) then
 
-                                my_divu = real(divu_in%sf(j, k, l), kind=wp)
-                                call s_advance_step(myRho, myP, myR, myV, R0(q), &
-                                                    pb_local, pbdot, alf, n_tait, B_tait, &
-                                                    bub_adv_src(j, k, l), my_divu, &
-                                                    dmBub_id, dmMass_v, dmMass_n, dmBeta_c, &
-                                                    dmBeta_t, dmCson, adap_dt_stop)
-
-                                q_cons_vf(rs(q))%sf(j, k, l) = nbub*myR
-                                q_cons_vf(vs(q))%sf(j, k, l) = nbub*myV
-
-                            else
-                                my_divu = real(divu_in%sf(j, k, l), kind=wp)
-                                rddot = f_rddot(myRho, myP, myR, myV, R0(q), &
+                            my_divu = real(divu_in%sf(j, k, l), kind=wp)
+                            call s_advance_step(myRho, myP, myR, myV, R0(q), &
                                                 pb_local, pbdot, alf, n_tait, B_tait, &
                                                 bub_adv_src(j, k, l), my_divu, &
-                                                dmCson)
-                                bub_v_src(j, k, l, q) = nbub*rddot
-                                bub_r_src(j, k, l, q) = q_cons_vf(vs(q))%sf(j, k, l)
-                            end if
+                                                dmBub_id, dmMass_v, dmMass_n, dmBeta_c, &
+                                                dmBeta_t, dmCson, adap_dt_stop)
+
+                            q_cons_vf(rs(q))%sf(j, k, l) = nbub*myR
+                            q_cons_vf(vs(q))%sf(j, k, l) = nbub*myV
+
+                        else
+                            my_divu = real(divu_in%sf(j, k, l), kind=wp)
+                            rddot = f_rddot(myRho, myP, myR, myV, R0(q), &
+                                            pb_local, pbdot, alf, n_tait, B_tait, &
+                                            bub_adv_src(j, k, l), my_divu, &
+                                            dmCson)
+                            bub_v_src(j, k, l, q) = nbub*rddot
+                            bub_r_src(j, k, l, q) = q_cons_vf(vs(q))%sf(j, k, l)
+                        end if
 
                         adap_dt_stop_max = max(adap_dt_stop_max, adap_dt_stop)
 

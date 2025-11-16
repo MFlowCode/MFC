@@ -1221,16 +1221,16 @@ contains
 
         if (time_stepper /= 1) then
             $:GPU_PARALLEL_LOOP(collapse=4, copyin='[idwbuff]')
-                do i = 1, sys_size
-                    do l = idwbuff(3)%beg, idwbuff(3)%end
-                        do k = idwbuff(2)%beg, idwbuff(2)%end
-                            do j = idwbuff(1)%beg, idwbuff(1)%end
-                                q_cons_ts(2)%vf(i)%sf(j, k, l) = &
-                                    q_cons_ts(1)%vf(i)%sf(j, k, l)
-                            end do
+            do i = 1, sys_size
+                do l = idwbuff(3)%beg, idwbuff(3)%end
+                    do k = idwbuff(2)%beg, idwbuff(2)%end
+                        do j = idwbuff(1)%beg, idwbuff(1)%end
+                            q_cons_ts(2)%vf(i)%sf(j, k, l) = &
+                                q_cons_ts(1)%vf(i)%sf(j, k, l)
                         end do
                     end do
                 end do
+            end do
             $:END_GPU_PARALLEL_LOOP()
             stor = 2
         end if
