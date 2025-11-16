@@ -121,6 +121,7 @@ contains
         smearGridz = smearGrid
         if (p == 0) smearGridz = 1
 
+<<<<<<< HEAD
         $:GPU_PARALLEL_LOOP(private='[nodecoord,l,s_coord,cell,center]', copyin='[smearGrid,smearGridz]')
             do l = 1, nBubs
                 nodecoord(1:3) = 0
@@ -131,6 +132,18 @@ contains
                 if (p > 0) center(3) = lbk_pos(l, 3, 2)
                 call s_get_cell(s_coord, cell)
                 call s_compute_stddsv(cell, volpart, stddsv)
+=======
+        $:GPU_PARALLEL_LOOP(private='[nodecoord,i,j,k,l,s_coord,cell,center]', copyin='[smearGrid,smearGridz]')
+        do l = 1, nBubs
+            nodecoord(1:3) = 0
+            center(1:3) = 0._wp
+            volpart = 4._wp/3._wp*pi*lbk_rad(l, 2)**3._wp
+            s_coord(1:3) = lbk_s(l, 1:3, 2)
+            center(1:2) = lbk_pos(l, 1:2, 2)
+            if (p > 0) center(3) = lbk_pos(l, 3, 2)
+            call s_get_cell(s_coord, cell)
+            call s_compute_stddsv(cell, volpart, stddsv)
+>>>>>>> 723822d0b71c437e734f7ca0fcd386b0e3884a79
 
                 strength_vol = volpart
                 strength_vel = 4._wp*pi*lbk_rad(l, 2)**2._wp*lbk_vel(l, 2)
@@ -381,7 +394,7 @@ contains
     !> The purpose of this procedure is to calculate the characteristic cell volume
             !! @param cell Computational coordinates (x, y, z)
             !! @param Charvol Characteristic volume
-    elemental subroutine s_get_char_vol(cellx, celly, cellz, Charvol)
+    subroutine s_get_char_vol(cellx, celly, cellz, Charvol)
         $:GPU_ROUTINE(function_name='s_get_char_vol',parallelism='[seq]', &
             & cray_inline=True)
 
