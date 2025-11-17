@@ -3732,6 +3732,7 @@ contains
 
         real(wp), dimension(10) :: U_L, U_R, U_starL, U_starR, U_starstarL, U_starstarR
         real(wp), dimension(10) :: F_L, F_R, F_starL, F_starR, F_hlld
+        real(wp), dimension(10) :: F_HLL  ! for ADC blending
 
         ! HLLD Hypo variables
 
@@ -3758,6 +3759,14 @@ contains
         real(wp), dimension(num_fluids) :: alpha_hat, alpha_rho_hat
         real(wp), dimension(num_vels) :: vel_hat
         real(wp), dimension(strxe-strxb+1) :: tau_e_hat
+
+        real(wp) :: Sigma_L, Sigma_R, dSigma, Sigma_ref
+        real(wp) :: a_L_ref, a_R_ref, a_ref
+        real(wp) :: du_t, dtau_nt
+        real(wp) :: sensor_ptot, sensor_vt, sensor_tnt, sensor_combined
+        real(wp) :: phi
+
+        real(wp), parameter :: ADC_power = 1.0 ! Fixed for now
 
         integer :: i, j, k, l
 
@@ -3869,6 +3878,15 @@ contains
                                 u_n_R = vel%R(1)
 
                                 u_n_hat = vel_hat(1)
+
+                                ! No tangential component in 1D
+                                u_t_L      = 0._wp
+                                u_t_R      = 0._wp
+                                u_t_hat    = 0._wp
+                                tau_nt_L   = 0._wp
+                                tau_nt_R   = 0._wp
+                                tau_nt_hat = 0._wp
+
                             else
                                 ! Shear stress
                                 tau_nt_L = tau_e_L(2)
@@ -4012,10 +4030,7 @@ contains
                             F_R(9) = U_R(9)*u_n_R - rho_hat * (G_hat + tau_nn_hat) * u_t_R
                             F_R(10) = U_R(10)*u_n_R + rho_hat * (2.0/3.0*G_hat + tau_tt_hat) * u_n_R - 2.0 * rho_hat * tau_nt_hat * u_t_R
 
-                            ! K div U is not implemented here yet (need to copy K formula from m_rhs's s_compute_advection_source_term)
-
-                            ! The Python code computes F_HLL_hatL/R (for ADC) here but we skip ADC for now
-                            ! Also it might be cleaner to compute F_HLL later at the end
+                            ! Note: K div U is not implemented here yet (need to copy K formula from m_rhs's s_compute_advection_source_term)
 
                             A_L = rho%L*(S_L - u_n_L)
                             A_R = rho%R*(S_R - u_n_R)
@@ -4135,6 +4150,50 @@ contains
                                 F_hlld = F_starR
                             else
                                 F_hlld = F_R
+                            end if
+
+                            ! ==================== ADC blending (HLLD ↔ HLL) ====================
+
+                            if (riemann_ADC) then
+
+                                ! Build HLL flux as reference (only in the fan region)
+                                F_HLL = F_hlld
+                                if (S_L < 0._wp .and. S_R > 0._wp) then
+                                    do i = 1, 10
+                                        F_HLL(i) = ( S_R*F_L(i) - S_L*F_R(i) + S_L*S_R*(U_R(i) - U_L(i)) ) &
+                                                   / (S_R - S_L + sgm_eps)
+                                    end do
+                                end if
+
+                                ! Total normal stress Sigma = p - tau_nn on each side
+                                Sigma_L   = pTot_L
+                                Sigma_R   = pTot_R
+                                dSigma    = Sigma_R - Sigma_L
+                                Sigma_ref = max( max(abs(Sigma_L), abs(Sigma_R)), sgm_eps )
+
+                                ! Directional fast speeds (normal), matching HLLC-Hypo ADC
+                                a_L_ref = sqrt( max( sgm_eps, c%L*c%L + ((4._wp/3._wp)*G_L + tau_nn_L)/rho%L ) )
+                                a_R_ref = sqrt( max( sgm_eps, c%R*c%R + ((4._wp/3._wp)*G_R + tau_nn_R)/rho%R ) )
+                                a_ref   = max( max(a_L_ref, a_R_ref), sgm_eps )
+
+                                ! Tangential jumps
+                                du_t    = u_t_R    - u_t_L
+                                dtau_nt = tau_nt_R - tau_nt_L
+
+                                ! Multi-sensor (same structure as HLLC Hypo ADC)
+                                sensor_ptot = (dSigma*dSigma)      / ( (ADC_kappa*Sigma_ref)**2 + sgm_eps )
+                                sensor_vt   = (du_t*du_t)          / ( (ADC_kappa*a_ref     )**2 + sgm_eps )
+                                sensor_tnt  = (dtau_nt*dtau_nt)    / ( (ADC_kappa*Sigma_ref)**2 + sgm_eps )
+
+                                sensor_combined = sensor_ptot + sensor_tnt + sensor_vt
+
+                                phi = exp( - (sensor_combined**ADC_power) )
+
+                                ! Blend HLLD with HLL based on phi
+                                do i = 1, 10
+                                    F_hlld(i) = F_HLL(i) + phi*(F_hlld(i) - F_HLL(i))
+                                end do
+
                             end if
 
                             ! ==================== Reorder F_HLLD (temporary variables) for output ====================
