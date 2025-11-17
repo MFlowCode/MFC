@@ -136,6 +136,10 @@ def compile(casepath: str) -> typing.Tuple[Pack, str]:
                 lines = content.splitlines()
                 content = "\n".join(lines[1:])  # Skip the first line
                 doubles = _extract_doubles(content)
+            elif 'probe' in short_filepath:
+                # Probes are constructed as <time> <value1> <value2> ...
+                # Just discard the first column
+                doubles = [float(e) for line in content.strip().splitlines() if line.strip() for e in _extract_doubles(line)[1:]]
             else:
                 # Every line is <x> <y> <z> <value> (<y> and <z> are optional). So the
                 # number of dimensions is the number of doubles in the first line minus 1.

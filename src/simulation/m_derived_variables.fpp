@@ -168,9 +168,7 @@ contains
             $:GPU_UPDATE(host='[accel_mag]')
 
             call s_derive_center_of_mass(q_prim_ts2(2)%vf, c_mass)
-
             call s_write_probe_files(t_step, q_cons_ts(1)%vf, accel_mag)
-
             call s_write_com_files(t_step, c_mass)
         end if
 
