@@ -1171,7 +1171,7 @@ contains
         if (bc_x%beg >= 0) then
             call s_mpi_sendrecv_variables_buffers(c_divs, 1, -1, num_dims + 1)
         else
-            $:END_GPU_PARALLEL_LOOP()
+            $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
             do l = 0, p
                 do k = 0, n
                     select case (bc_type(1, 1)%sf(0, k, l))
@@ -1190,7 +1190,7 @@ contains
         if (bc_x%end >= 0) then
             call s_mpi_sendrecv_variables_buffers(c_divs, 1, 1, num_dims + 1)
         else
-            $:END_GPU_PARALLEL_LOOP()
+            $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
             do l = 0, p
                 do k = 0, n
                     select case (bc_type(1, 2)%sf(0, k, l))
@@ -1212,7 +1212,7 @@ contains
         if (bc_y%beg >= 0) then
             call s_mpi_sendrecv_variables_buffers(c_divs, 2, -1, num_dims + 1)
         else
-            $:END_GPU_PARALLEL_LOOP()
+            $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
             do l = 0, p
                 do k = -buff_size, m + buff_size
                     select case (bc_type(2, 1)%sf(k, 0, l))
@@ -1231,7 +1231,7 @@ contains
         if (bc_y%end >= 0) then
             call s_mpi_sendrecv_variables_buffers(c_divs, 2, 1, num_dims + 1)
         else
-            $:END_GPU_PARALLEL_LOOP()
+            $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
             do l = 0, p
                 do k = -buff_size, m + buff_size
                     select case (bc_type(2, 2)%sf(k, 0, l))
@@ -1254,7 +1254,7 @@ contains
             if (bc_z%beg >= 0) then
                 call s_mpi_sendrecv_variables_buffers(c_divs, 3, -1, num_dims + 1)
             else
-                $:END_GPU_PARALLEL_LOOP()
+                $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
                 do l = -buff_size, n + buff_size
                     do k = -buff_size, m + buff_size
                         select case (bc_type(3, 1)%sf(k, l, 0))
@@ -1273,7 +1273,7 @@ contains
             if (bc_z%end >= 0) then
                 call s_mpi_sendrecv_variables_buffers(c_divs, 3, 1, num_dims + 1)
             else
-                $:END_GPU_PARALLEL_LOOP()
+                $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
                 do l = -buff_size, n + buff_size
                     do k = -buff_size, m + buff_size
                         select case (bc_type(3, 2)%sf(k, l, 0))
