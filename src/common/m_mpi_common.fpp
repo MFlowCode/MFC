@@ -896,7 +896,7 @@ contains
                                         do q = 1, nb
                                             r = (i - 1) + (q - 1)*4 + nb*4 + v_size* &
                                                 ((j + buff_size) + (m + 2*buff_size + 1)* &
-                                                  ((k + buff_size) + (n + 2*buff_size + 1)*l))
+                                                 ((k + buff_size) + (n + 2*buff_size + 1)*l))
                                             buff_send(r) = real(mv_in(j, k, l + pack_offset, i - nVar, q), kind=wp)
                                         end do
                                     end do
