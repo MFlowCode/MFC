@@ -611,7 +611,7 @@ contains
 
     end subroutine s_initialize_rhs_module
 
-    subroutine s_compute_rhs(q_cons_vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb, rhs_pb, mv, rhs_mv, t_step, time_avg, stage)
+    subroutine s_compute_rhs(q_cons_vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb, rhs_pb, mv, rhs_mv, t_step, time_avg, stage, is_hat_L)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         type(scalar_field), intent(inout) :: q_T_sf
@@ -623,6 +623,7 @@ contains
         integer, intent(in) :: t_step
         real(wp), intent(inout) :: time_avg
         integer, intent(in) :: stage
+        logical, intent(in), optional :: is_hat_L
 
         real(wp), dimension(0:m, 0:n, 0:p) :: nbub
         real(wp) :: t_start, t_finish
@@ -802,7 +803,7 @@ contains
                                   flux_n(id)%vf, &
                                   flux_src_n(id)%vf, &
                                   flux_gsrc_n(id)%vf, &
-                                  id, irx, iry, irz)
+                                  id, irx, iry, irz, is_hat_L)
             call nvtxEndRange
 
             ! print *, 'DEBUG 1', flux_gsrc_n(1)%vf(1)%sf(5,5,0)
@@ -810,11 +811,16 @@ contains
             ! Additional physics and source terms
             ! RHS addition for advection source
             call nvtxStartRange("RHS-ADVECTION-SRC")
+            ! Despite the name, s_compute_advection_source_term adds not just (alpha div U)
+            ! but also all the fluxes and the (K div U) term
+            ! So although HLLD Hypo skips adding the non-conservative (alpha div U) and (K div U) terms
+            ! we must still call s_compute_advection_source_term for HLLD Hypo
             call s_compute_advection_source_term(id, &
                                                  rhs_vf, &
                                                  q_cons_qp, &
                                                  q_prim_qp, &
-                                                 flux_src_n(id))
+                                                 flux_src_n(id), &
+                                                 is_hat_L)
             call nvtxEndRange
 
             ! ! RHS additions for hypoelasticity
@@ -975,13 +981,14 @@ contains
 
     end subroutine s_compute_rhs
 
-    subroutine s_compute_advection_source_term(idir, rhs_vf, q_cons_vf, q_prim_vf, flux_src_n_vf)
+    subroutine s_compute_advection_source_term(idir, rhs_vf, q_cons_vf, q_prim_vf, flux_src_n_vf, is_hat_L)
 
         integer, intent(in) :: idir
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         type(vector_field), intent(inout) :: q_cons_vf
         type(vector_field), intent(inout) :: q_prim_vf
         type(vector_field), intent(inout) :: flux_src_n_vf
+        logical, intent(in), optional :: is_hat_L
 
         integer :: i, j, k, l, q
 
@@ -1021,18 +1028,44 @@ contains
                            flux_src_n(idir)%vf, idir, 1, irx, iry, irz)
             end if
 
-            !$acc parallel loop collapse(4) gang vector default(present)
-            do j = 1, sys_size
-                do q = 0, p
-                    do l = 0, n
-                        do k = 0, m
-                            rhs_vf(j)%sf(k, l, q) = 1._wp/dx(k)* &
-                                                    (flux_n(1)%vf(j)%sf(k - 1, l, q) &
-                                                     - flux_n(1)%vf(j)%sf(k, l, q))
+            if (.not. HLLD_hypo) then
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do j = 1, sys_size
+                    do q = 0, p
+                        do l = 0, n
+                            do k = 0, m
+                                rhs_vf(j)%sf(k, l, q) = 1._wp/dx(k)* &
+                                                        (flux_n(1)%vf(j)%sf(k - 1, l, q) &
+                                                        - flux_n(1)%vf(j)%sf(k, l, q))
+                            end do
                         end do
                     end do
                 end do
-            end do
+            elseif (is_hat_L) then
+                ! HLLD Hypo uses dual-pass Riemann solver
+                ! Note: hat_L is at i+1/2 and hat_R is at i-1/2
+                ! So U += dt/dx * (F^R_{i-1/2} - F^L_{i+1/2})
+                do j = 1, sys_size
+                    do q = 0, p
+                        do l = 0, n
+                            do k = 0, m
+                                rhs_vf(j)%sf(k, l, q) = - 1._wp/dx(k)*flux_n(1)%vf(j)%sf(k, l, q)
+                            end do
+                        end do
+                    end do
+                end do
+            else ! is_hat_R
+                do j = 1, sys_size
+                    do q = 0, p
+                        do l = 0, n
+                            do k = 0, m
+                                rhs_vf(j)%sf(k, l, q) = 1._wp/dx(k)*flux_n(1)%vf(j)%sf(k - 1, l, q)
+                            end do
+                        end do
+                    end do
+                end do
+            end if
+
 
             if (model_eqns == 3) then
                 !$acc parallel loop collapse(4) gang vector default(present)
@@ -1053,20 +1086,22 @@ contains
             end if
 
             if (riemann_solver == 1 .or. riemann_solver == 4) then
-                !$acc parallel loop collapse(4) gang vector default(present)
-                do j = advxb, advxe
-                    do q = 0, p
-                        do l = 0, n
-                            do k = 0, m
-                                rhs_vf(j)%sf(k, l, q) = &
-                                    rhs_vf(j)%sf(k, l, q) + 1._wp/dx(k)* &
-                                    q_prim_vf%vf(contxe + idir)%sf(k, l, q)* &
-                                    (flux_src_n(1)%vf(j)%sf(k - 1, l, q) &
-                                     - flux_src_n(1)%vf(j)%sf(k, l, q))
+                if (.not. HLLD_hypo) then ! HLLD Hypo does all non-conservative terms inside the Riemann solver
+                    !$acc parallel loop collapse(4) gang vector default(present)
+                    do j = advxb, advxe
+                        do q = 0, p
+                            do l = 0, n
+                                do k = 0, m
+                                    rhs_vf(j)%sf(k, l, q) = &
+                                        rhs_vf(j)%sf(k, l, q) + 1._wp/dx(k)* &
+                                        q_prim_vf%vf(contxe + idir)%sf(k, l, q)* &
+                                        (flux_src_n(1)%vf(j)%sf(k - 1, l, q) &
+                                        - flux_src_n(1)%vf(j)%sf(k, l, q))
+                                end do
                             end do
                         end do
                     end do
-                end do
+                end if
             else
                 if (alt_soundspeed) then
                     do j = advxb, advxe
@@ -1130,19 +1165,44 @@ contains
                            flux_src_n(idir)%vf, idir, 1, irx, iry, irz)
             end if
 
-            !$acc parallel loop collapse(4) gang vector default(present)
-            do j = 1, sys_size
-                do l = 0, p
-                    do k = 0, n
-                        do q = 0, m
-                            rhs_vf(j)%sf(q, k, l) = &
-                                rhs_vf(j)%sf(q, k, l) + 1._wp/dy(k)* &
-                                (flux_n(2)%vf(j)%sf(q, k - 1, l) &
-                                 - flux_n(2)%vf(j)%sf(q, k, l))
+            if (.not. HLLD_hypo) then
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do j = 1, sys_size
+                    do l = 0, p
+                        do k = 0, n
+                            do q = 0, m
+                                rhs_vf(j)%sf(q, k, l) = &
+                                    rhs_vf(j)%sf(q, k, l) + 1._wp/dy(k)* &
+                                    (flux_n(2)%vf(j)%sf(q, k - 1, l) &
+                                     - flux_n(2)%vf(j)%sf(q, k, l))
+                            end do
                         end do
                     end do
                 end do
-            end do
+            elseif (is_hat_L) then
+                ! HLLD Hypo uses dual-pass Riemann solver
+                ! Note: hat_L is at i+1/2 and hat_R is at i-1/2
+                ! So U += dt/dx * (F^R_{i-1/2} - F^L_{i+1/2})
+                do j = 1, sys_size
+                    do l = 0, p
+                        do k = 0, n
+                            do q = 0, m
+                                rhs_vf(j)%sf(q, k, l) = rhs_vf(j)%sf(q, k, l) - 1._wp/dy(k)*flux_n(2)%vf(j)%sf(q, k, l)
+                            end do
+                        end do
+                    end do
+                end do
+            else ! is_hat_R
+                do j = 1, sys_size
+                    do l = 0, p
+                        do k = 0, n
+                            do q = 0, m
+                                rhs_vf(j)%sf(q, k, l) = rhs_vf(j)%sf(q, k, l) + 1._wp/dy(k)*flux_n(2)%vf(j)%sf(q, k - 1, l)
+                            end do
+                        end do
+                    end do
+                end do
+            end if
 
             if (model_eqns == 3) then
                 !$acc parallel loop collapse(4) gang vector default(present)
@@ -1197,20 +1257,22 @@ contains
             end if
 
             if (riemann_solver == 1 .or. riemann_solver == 4) then
-                !$acc parallel loop collapse(4) gang vector default(present)
-                do j = advxb, advxe
-                    do l = 0, p
-                        do k = 0, n
-                            do q = 0, m
-                                rhs_vf(j)%sf(q, k, l) = &
-                                    rhs_vf(j)%sf(q, k, l) + 1._wp/dy(k)* &
-                                    q_prim_vf%vf(contxe + idir)%sf(q, k, l)* &
-                                    (flux_src_n(2)%vf(j)%sf(q, k - 1, l) &
-                                     - flux_src_n(2)%vf(j)%sf(q, k, l))
+                if (.not. HLLD_hypo) then ! HLLD Hypo does all non-conservative terms inside the Riemann solver
+                    !$acc parallel loop collapse(4) gang vector default(present)
+                    do j = advxb, advxe
+                        do l = 0, p
+                            do k = 0, n
+                                do q = 0, m
+                                    rhs_vf(j)%sf(q, k, l) = &
+                                        rhs_vf(j)%sf(q, k, l) + 1._wp/dy(k)* &
+                                        q_prim_vf%vf(contxe + idir)%sf(q, k, l)* &
+                                        (flux_src_n(2)%vf(j)%sf(q, k - 1, l) &
+                                        - flux_src_n(2)%vf(j)%sf(q, k, l))
+                                end do
                             end do
                         end do
                     end do
-                end do
+                end if
             else
 
                 if (alt_soundspeed) then

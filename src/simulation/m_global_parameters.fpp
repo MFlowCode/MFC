@@ -143,6 +143,7 @@ module m_global_parameters
     integer :: riemann_solver !< Riemann solver algorithm
     logical :: riemann_ADC
     real(wp) :: ADC_kappa
+    logical :: HLLD_hypo
     integer :: low_Mach       !< Low Mach number fix to HLLC Riemann solver
     integer :: wave_speeds    !< Wave speeds estimation method
     integer :: avg_state      !< Average state evaluation method
@@ -548,6 +549,7 @@ contains
         riemann_solver = dflt_int
         riemann_ADC = .false.
         ADC_kappa = 1.0
+        HLLD_hypo = .false.
         low_Mach = 0
         wave_speeds = dflt_int
         avg_state = dflt_int
@@ -1178,6 +1180,8 @@ contains
         if (probe_wrt) then
             fd_number = max(1, fd_order/2)
         end if
+
+        HLLD_hypo = hypoelasticity .and. (riemann_solver == 4)
 
         call s_configure_coordinate_bounds(weno_polyn, buff_size, &
                                            idwint, idwbuff, viscous, &

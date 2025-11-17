@@ -54,6 +54,7 @@ module m_riemann_solvers
  s_hll_riemann_solver, &
  s_hllc_riemann_solver, &
  s_hlld_riemann_solver, &
+ s_hypo_hlld_riemann_solver, &
  s_finalize_riemann_solvers_module
 
     !> The cell-boundary values of the fluxes (src - source) that are computed
@@ -157,7 +158,7 @@ contains
                                 q_prim_vf, &
                                 flux_vf, flux_src_vf, &
                                 flux_gsrc_vf, &
-                                norm_dir, ix, iy, iz)
+                                norm_dir, ix, iy, iz, is_hat_L)
 
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(INOUT) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
@@ -176,7 +177,26 @@ contains
 
         integer, intent(IN) :: norm_dir
 
+        logical, intent(in), optional :: is_hat_L
+
         type(int_bounds_info), intent(IN) :: ix, iy, iz
+
+        if (HLLD_hypo) then
+            call s_hypo_hlld_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
+                                            dqL_prim_dy_vf, &
+                                            dqL_prim_dz_vf, &
+                                            qL_prim_vf, &
+                                            qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, &
+                                            dqR_prim_dy_vf, &
+                                            dqR_prim_dz_vf, &
+                                            qR_prim_vf, &
+                                            q_prim_vf, &
+                                            flux_vf, flux_src_vf, &
+                                            flux_gsrc_vf, &
+                                            norm_dir, ix, iy, iz, is_hat_L)
+
+            return
+        end if
 
         #:for NAME, NUM in [('hll', 1), ('hllc', 2), ('hlld', 4)]
             if (riemann_solver == ${NUM}$) then
@@ -2513,9 +2533,6 @@ contains
                                     tau_e_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, strxb - 1 + i)
                                 end do
 
-                                i = 1
-                                ! print *, "qL_prim_rs${XYZ}$_vf(j, k, l, strxb - 1 + i)", qL_prim_rs${XYZ}$_vf(j, k, l, strxb - 1 + i)
-                                ! print *, "tau_e_L(i)", tau_e_L(i)
                                 
                                 if (n == 0) then
                                     ! Normal stress
@@ -3652,6 +3669,508 @@ contains
         call s_finalize_riemann_solver(flux_vf, flux_src_vf, flux_gsrc_vf, &
                                        norm_dir, ix, iy, iz)
     end subroutine s_hlld_riemann_solver
+
+    !> HLLD Riemann solver resolves all 5 waves for the hypoelastic equations:
+        !!      1 entropy wave, 2 shear stress waves, 2 fast waves.
+    subroutine s_hypo_hlld_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, &
+                                          dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, &
+                                          qL_prim_vf, &
+                                          qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, &
+                                          dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, &
+                                          qR_prim_vf, &
+                                          q_prim_vf, &
+                                          flux_vf, flux_src_vf, flux_gsrc_vf, &
+                                          norm_dir, ix, iy, iz, is_hat_L)
+
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, &
+                                                                                                     qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf
+
+        type(scalar_field), allocatable, dimension(:), intent(inout) :: dqL_prim_dx_vf, dqR_prim_dx_vf, &
+                                                                        dqL_prim_dy_vf, dqR_prim_dy_vf, &
+                                                                        dqL_prim_dz_vf, dqR_prim_dz_vf
+
+        type(scalar_field), allocatable, dimension(:), intent(inout) :: qL_prim_vf, qR_prim_vf
+
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: flux_vf, flux_src_vf, flux_gsrc_vf
+
+        integer, intent(in) :: norm_dir
+        type(int_bounds_info), intent(in) :: ix, iy, iz
+
+        logical, intent(in) :: is_hat_L
+
+        ! Local variables:
+
+        ! q_prim_vf with indiced permutated to match qL_prim_rs${XYZ}$_vf
+        ! But note that q_prim_vf and q_hat_prim_x_vf are cell-centered while qL_prim_rs${XYZ}$_vf etc. are cell-boundary values
+        real(wp), dimension(idwbuff(1)%beg:idwbuff(1)%end, &
+                            idwbuff(2)%beg:idwbuff(2)%end, &
+                            idwbuff(3)%beg:idwbuff(3)%end, &
+                            1:sys_size) :: q_hat_prim_x_vf
+
+        real(wp), dimension(idwbuff(2)%beg:idwbuff(2)%end, &
+                            idwbuff(1)%beg:idwbuff(1)%end, &
+                            idwbuff(3)%beg:idwbuff(3)%end, &
+                            1:sys_size) :: q_hat_prim_y_vf
+
+        real(wp), dimension(idwbuff(3)%beg:idwbuff(3)%end, &
+                            idwbuff(2)%beg:idwbuff(2)%end, &
+                            idwbuff(1)%beg:idwbuff(1)%end, &
+                            1:sys_size) :: q_hat_prim_z_vf ! Z is needed even for 2D as ${XYZ}$ is used; TODO order of 3,2,1 need to be checked
+
+        real(wp), dimension(num_fluids) :: alpha_L, alpha_R, alpha_rho_L, alpha_rho_R
+        type(riemann_states_vec3) :: vel
+        type(riemann_states) :: rho, pres, E, H
+        type(riemann_states) :: gamma, pi_inf, qv
+        type(riemann_states) :: vel_rms
+
+        type(riemann_states) :: c
+
+        ! HLLD speeds and intermediate state variables:
+        real(wp) :: S_L, S_R, s_M, S_Lstar, S_Rstar
+        real(wp) :: pTot_L, pTot_R, rhoL_star, rhoR_star
+
+        real(wp), dimension(10) :: U_L, U_R, U_starL, U_starR, U_starstarL, U_starstarR
+        real(wp), dimension(10) :: F_L, F_R, F_starL, F_starR, F_hlld
+
+        ! HLLD Hypo variables
+
+        real(wp) :: C_NC, sqrtC_NC
+        real(wp) :: A_L, A_R, denomA, fac_L, fac_R
+        real(wp) :: u_n_L, u_t_L, u_n_R, u_t_R
+        real(wp) :: tau_nn_L, tau_nt_L, tau_tt_L, tau_nn_R, tau_nt_R, tau_tt_R
+
+        real(wp) :: G_L, G_R
+        real(wp), dimension(strxe-strxb+1) :: tau_e_L, tau_e_R
+
+        real(wp) :: alpha1_L_star, alpha1_R_star, alpha2_L_star, alpha2_R_star
+        real(wp) :: u_t_star, tau_nt_star
+        real(wp) :: tau_nn_L_star, tau_nn_R_star, tau_tt_L_star, tau_tt_R_star
+        real(wp) :: tau_tt_L_starstar, tau_tt_R_starstar
+        real(wp) :: pTot_star
+        real(wp) :: E_L_star, E_R_star
+        real(wp) :: E_L_starstar, E_R_starstar
+
+        real(wp) :: G_hat
+        real(wp) :: rho_hat
+        real(wp) :: u_n_hat, u_t_hat
+        real(wp) :: tau_nn_hat, tau_nt_hat, tau_tt_hat
+        real(wp), dimension(num_fluids) :: alpha_hat, alpha_rho_hat
+        real(wp), dimension(num_vels) :: vel_hat
+        real(wp), dimension(strxe-strxb+1) :: tau_e_hat
+
+        integer :: i, j, k, l
+
+        call s_populate_riemann_states_variables_buffers( &
+            qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
+            dqL_prim_dy_vf, dqL_prim_dz_vf, qL_prim_vf, &
+            qR_prim_rsx_vf, qR_prim_rsy_vf, qR_prim_rsz_vf, dqR_prim_dx_vf, &
+            dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, &
+            norm_dir, ix, iy, iz)
+
+        call s_initialize_riemann_solver( &
+            q_prim_vf, flux_vf, flux_src_vf, flux_gsrc_vf, norm_dir, ix, iy, iz)
+
+        ! Pick the correct index to shift based on norm_dir
+        ! (unlike qL_prim_rs${XYZ}$_vf which has coordinates already permutated, q_prim_vf is always (x,y,z))
+        do i = 1, sys_size
+            do l = is3%beg, is3%end
+                do k = is2%beg, is2%end
+                    do j = is1%beg, is1%end
+                        ! only 2D for now
+                        if (norm_dir == 1) then ! x-normal
+                            ! q_hat_prim_x_vf(x,y,z,i) = q_prim_vf(i)%sf(x_offset,y,z)
+                            if (is_hat_L) then
+                                q_hat_prim_x_vf(j,k,l,i) = q_prim_vf(i)%sf(j-1,k,l)
+                            else
+                                q_hat_prim_x_vf(j,k,l,i) = q_prim_vf(i)%sf(j  ,k,l)
+                            end if
+                        elseif (norm_dir == 2) then ! y-normal
+                            ! q_hat_prim_y_vf(y,x,z,i) = q_prim_vf(i)%sf(x,y_offset,z)
+                            if (is_hat_L) then
+                                q_hat_prim_y_vf(j,k,l,i) = q_prim_vf(i)%sf(k,j-1,l)
+                            else
+                                q_hat_prim_y_vf(j,k,l,i) = q_prim_vf(i)%sf(k,j  ,l)
+                            end if
+                        else ! z-normal not used for now
+                            q_hat_prim_z_vf(j,k,l,i) = 0d0
+                        end if
+                    end do
+                end do
+            end do
+        end do
+
+        #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
+            if (norm_dir == ${NORM_DIR}$) then
+                !$acc parallel loop collapse(3) gang vector default(present) &
+                !$acc private(alpha_rho_L, alpha_rho_R, vel, alpha_L, alpha_R, &
+                !$acc rho, pres, E, H_no_mag, gamma, pi_inf, qv, vel_rms, B, c, c_fast, pres_mag, &
+                !$acc U_L, U_R, U_starL, U_starR, U_doubleL, U_doubleR, F_L, F_R, F_starL, F_starR, F_hlld)
+                
+                ! TODO private list need to be updated
+
+                do l = is3%beg, is3%end
+                    do k = is2%beg, is2%end
+                        do j = is1%beg, is1%end
+
+                            ! ==================== Extract left/right primitive states ====================
+
+                            do i = 1, contxe
+                                alpha_rho_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, i)
+                                alpha_rho_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
+
+                                alpha_rho_hat(i) = q_hat_prim_${XYZ}$_vf(j, k, l, i)
+                            end do
+
+                            ! IMP: vel%L(1:3) has (3) uninitiated for 2D
+                            vel%L = 0._wp
+                            vel%R = 0._wp
+
+                            ! NOTE: unlike HLL & HLLC, vel%L here is permutated by dir_idx for simpler logic
+                            do i = 1, num_vels
+                                vel%L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, contxe + i) ! Don't permutate here; permutate u <-> v later at u_n_L = vel%L(1)
+                                vel%R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, contxe + i)
+
+                                vel_hat(i) = q_hat_prim_${XYZ}$_vf(j, k, l, contxe + i)
+                            end do
+
+                            ! To be extra safe, not using sum() for 2D as vel%L(1:3) has length 3
+                            vel_rms%L = vel%L(1)**2._wp + vel%L(2)**2._wp
+                            vel_rms%R = vel%R(1)**2._wp + vel%R(2)**2._wp
+
+                            do i = 1, num_fluids
+                                alpha_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)
+                                alpha_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)
+
+                                alpha_hat(i) = q_hat_prim_${XYZ}$_vf(j, k, l, E_idx + i)
+                            end do
+
+                            pres%L = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx)
+                            pres%R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx)
+
+                            ! Hypoelasticity (Note: HLLC with Hypo only works for 1D or 2D for now)
+                            !$acc loop seq
+                            do i = 1, strxe - strxb + 1
+                                tau_e_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, strxb - 1 + i)
+                                tau_e_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, strxb - 1 + i)
+
+                                tau_e_hat(i) = q_hat_prim_${XYZ}$_vf(j, k, l, strxb - 1 + i)
+                            end do
+
+                            ! Assume 2D for now
+                            ! TODO this can be combined with q_hat_prim_${XYZ}$_vf -> tau_e_L etc. for conciseness
+                            ! kept this way for now to keep it simple
+                            if (n == 0) then
+                                ! Normal stress
+                                tau_nn_L = tau_e_L(1)
+                                tau_nn_R = tau_e_R(1)
+                                ! Normal velocity
+                                u_n_L = vel%L(1)
+                                u_n_R = vel%R(1)
+
+                                u_n_hat = vel_hat(1)
+                            else
+                                ! Shear stress
+                                tau_nt_L = tau_e_L(2)
+                                tau_nt_R = tau_e_R(2)
+
+                                tau_nt_hat = tau_e_hat(2)
+                                ! Normal stress
+                                if (dir_idx(1) == 1) then
+                                    ! tau_xx is normal
+                                    tau_nn_L = tau_e_L(1)
+                                    tau_nn_R = tau_e_R(1)
+                                    tau_tt_L = tau_e_L(3)
+                                    tau_tt_R = tau_e_R(3)
+                                    u_n_L = vel%L(1)
+                                    u_n_R = vel%R(1)
+                                    u_t_L = vel%L(2)
+                                    u_t_R = vel%R(2)
+
+                                    tau_nn_hat = tau_e_hat(1)
+                                    tau_tt_hat = tau_e_hat(3)
+                                    u_n_hat = vel_hat(1)
+                                    u_t_hat = vel_hat(2)
+                                else
+                                    ! tau_yy is normal
+                                    tau_nn_L = tau_e_L(3)
+                                    tau_nn_R = tau_e_R(3)
+                                    tau_tt_L = tau_e_L(1)
+                                    tau_tt_R = tau_e_R(1)
+                                    u_n_L = vel%L(2)
+                                    u_n_R = vel%R(2)
+                                    u_t_L = vel%L(1)
+                                    u_t_R = vel%R(1)
+
+                                    tau_nn_hat = tau_e_hat(3)
+                                    tau_tt_hat = tau_e_hat(1)
+                                    u_n_hat = vel_hat(2)
+                                    u_t_hat = vel_hat(1)
+                                end if
+                            end if
+                            ! Total pressure (replace the usual pressure to define SM)
+                            pTot_L = pres%L - tau_nn_L
+                            pTot_R = pres%R - tau_nn_R
+
+                            ! Sum properties of all fluid components
+                            rho%L = 0._wp; gamma%L = 0._wp; pi_inf%L = 0._wp; qv%L = 0._wp
+                            rho%R = 0._wp; gamma%R = 0._wp; pi_inf%R = 0._wp; qv%R = 0._wp
+                            rho_hat = 0._wp
+                            !$acc loop seq
+                            do i = 1, num_fluids
+                                rho%L = rho%L + alpha_rho_L(i)
+                                gamma%L = gamma%L + alpha_L(i)*gammas(i)
+                                pi_inf%L = pi_inf%L + alpha_L(i)*pi_infs(i)
+                                qv%L = qv%L + alpha_rho_L(i)*qvs(i)
+
+                                rho%R = rho%R + alpha_rho_R(i)
+                                gamma%R = gamma%R + alpha_R(i)*gammas(i)
+                                pi_inf%R = pi_inf%R + alpha_R(i)*pi_infs(i)
+                                qv%R = qv%R + alpha_rho_R(i)*qvs(i)
+
+                                rho_hat = rho_hat + alpha_rho_hat(i)
+                            end do
+
+
+                            G_L = 0._wp; G_R = 0._wp; G_hat = 0._wp
+                            !$acc loop seq
+                            do i = 1, num_fluids
+                                G_L = G_L + alpha_L(i)*Gs(i)
+                                G_R = G_R + alpha_R(i)*Gs(i)
+
+                                G_hat = G_hat + alpha_hat(i)*Gs(i)
+                            end do
+
+                            E%L = gamma%L*pres%L + pi_inf%L + 5e-1*rho%L*vel_rms%L + qv%L
+                            E%R = gamma%R*pres%R + pi_inf%R + 5e-1*rho%R*vel_rms%R + qv%R
+
+                            !$acc loop seq
+                            do i = 1, strxe - strxb + 1
+                                E%L = E%L + (tau_e_L(i)*tau_e_L(i))/(4_wp*G_L + sgm_eps)
+                                E%R = E%R + (tau_e_R(i)*tau_e_R(i))/(4_wp*G_R + sgm_eps)
+                                ! Shear stress terms in 2D and 3D
+                                if ((i == 2) .or. (i == 4) .or. (i == 5)) then
+                                    E%L = E%L + (tau_e_L(i)*tau_e_L(i))/(4_wp*G_L + sgm_eps)
+                                    E%R = E%R + (tau_e_R(i)*tau_e_R(i))/(4_wp*G_R + sgm_eps)
+                                end if
+                            end do
+
+                            H%L = (E%L + pres%L)/rho%L
+                            H%R = (E%R + pres%R)/rho%R
+
+                            ! ==================== Compute Riemann states ====================
+
+                            call s_compute_speed_of_sound(pres%L, rho%L, gamma%L, pi_inf%L, H%L, alpha_L, vel_rms%L, 0._wp, c%L)
+                            call s_compute_speed_of_sound(pres%R, rho%R, gamma%R, pi_inf%R, H%R, alpha_R, vel_rms%R, 0._wp, c%R)
+
+                            S_L = min(u_n_L - sqrt(c%L*c%L + ((4_wp/3_wp)*G_L + tau_nn_L)/rho%L), u_n_R - sqrt(c%R*c%R + ((4_wp/3_wp)*G_R + tau_nn_R)/rho%R))
+                            S_R = max(u_n_R + sqrt(c%R*c%R + ((4_wp/3_wp)*G_R + tau_nn_R)/rho%R), u_n_L + sqrt(c%L*c%L + ((4_wp/3_wp)*G_L + tau_nn_L)/rho%L))
+
+                            ! IMP Assume two-comp and 2D only for now (not 1D and not single-comp)
+
+                            U_L(1) = alpha_rho_L(1)
+                            U_L(2) = alpha_rho_L(2)
+                            U_L(3) = rho%L*u_n_L
+                            U_L(4) = rho%L*u_t_L
+                            U_L(5) = E%L
+                            U_L(6) = alpha_L(1)
+                            U_L(7) = alpha_L(2)
+                            U_L(8) = rho%L*tau_nn_L
+                            U_L(9) = rho%L*tau_nt_L
+                            U_L(10) = rho%L*tau_tt_L
+
+                            U_R(1) = alpha_rho_R(1)
+                            U_R(2) = alpha_rho_R(2)
+                            U_R(3) = rho%R*u_n_R
+                            U_R(4) = rho%R*u_t_R
+                            U_R(5) = E%R
+                            U_R(6) = alpha_R(1)
+                            U_R(7) = alpha_R(2)
+                            U_R(8) = rho%R*tau_nn_R
+                            U_R(9) = rho%R*tau_nt_R
+                            U_R(10) = rho%R*tau_tt_R
+
+                            F_L(1) = U_L(1)*u_n_L
+                            F_L(2) = U_L(2)*u_n_L
+                            F_L(3) = rho%L*u_n_L*u_n_L + pTot_L
+                            F_L(4) = rho%L*u_n_L*u_t_L - tau_nt_L
+                            F_L(5) = (E%L + pTot_L)*u_n_L - u_t_L*tau_nt_L
+                            F_L(6) = U_L(6)*u_n_L - alpha_hat(1) * u_n_L
+                            F_L(7) = U_L(7)*u_n_L - alpha_hat(2) * u_n_L
+                            F_L(8) = U_L(8)*u_n_L - rho_hat * (4.0/3.0*G_hat + tau_nn_hat) * u_n_L
+                            F_L(9) = U_L(9)*u_n_L - rho_hat * (G_hat + tau_nn_hat) * u_t_L
+                            F_L(10) = U_L(10)*u_n_L + rho_hat * (2.0/3.0*G_hat + tau_tt_hat) * u_n_L - 2.0 * rho_hat * tau_nt_hat * u_t_L
+
+                            F_R(1) = U_R(1)*u_n_R
+                            F_R(2) = U_R(2)*u_n_R
+                            F_R(3) = rho%R*u_n_R*u_n_R + pTot_R
+                            F_R(4) = rho%R*u_n_R*u_t_R - tau_nt_R
+                            F_R(5) = (E%R + pTot_R)*u_n_R - u_t_R*tau_nt_R
+                            F_R(6) = U_R(6)*u_n_R - alpha_hat(1) * u_n_R
+                            F_R(7) = U_R(7)*u_n_R - alpha_hat(2) * u_n_R
+                            F_R(8) = U_R(8)*u_n_R - rho_hat * (4.0/3.0*G_hat + tau_nn_hat) * u_n_R
+                            F_R(9) = U_R(9)*u_n_R - rho_hat * (G_hat + tau_nn_hat) * u_t_R
+                            F_R(10) = U_R(10)*u_n_R + rho_hat * (2.0/3.0*G_hat + tau_tt_hat) * u_n_R - 2.0 * rho_hat * tau_nt_hat * u_t_R
+
+                            ! K div U is not implemented here yet (need to copy K formula from m_rhs's s_compute_advection_source_term)
+
+                            ! The Python code computes F_HLL_hatL/R (for ADC) here but we skip ADC for now
+                            ! Also it might be cleaner to compute F_HLL later at the end
+
+                            A_L = rho%L*(S_L - u_n_L)
+                            A_R = rho%R*(S_R - u_n_R)
+                            denomA = (A_R - A_L)
+                            if (abs(denomA) < sgm_eps) then
+                                print *, "denominator (A_R - A_L) ~ 0"
+                                call exit(4)
+                            end if
+
+                            S_M = ((pTot_R - pTot_L) + A_L*u_n_L - A_R*u_n_R) / (A_L - A_R + sgm_eps)
+                            if (.not. (S_L - sgm_eps <= S_M .and. S_M <= S_R + sgm_eps)) then
+                                print *, "S_M not within [S_L, S_R]"
+                                call exit(5)
+                            end if
+
+                            pTot_star = pTot_L + A_L*(S_M - u_n_L)
+
+                            rhoL_star = rho%L * (S_L - u_n_L) / (S_L - S_M + sgm_eps)
+                            rhoR_star = rho%R * (S_R - u_n_R) / (S_R - S_M + sgm_eps)
+                            fac_L = (S_L - u_n_L) / (S_L - S_M + sgm_eps)
+                            fac_R = (S_R - u_n_R) / (S_R - S_M + sgm_eps)
+
+                            C_NC = rho_hat*(G_hat + tau_nn_hat)
+                            sqrtC_NC = max(sqrt(max(C_NC, 0._wp)), sgm_eps) ! keeps deminator > 0 but tighter than sqrt(max(C_NC, 0))
+
+                            S_Lstar = S_M - sqrtC_NC/rhoL_star
+                            S_Rstar = S_M + sqrtC_NC/rhoR_star
+
+                            !    SL    SL*   SM    SR*   SR
+                            ! utL | utL | ut* | ut* | utR | utR
+                            ! same for tauxy
+                            ! i.e. only jump at SL* and SR*
+                            u_t_star    = 0.5*( (tau_nt_R - tau_nt_L)/sqrtC_NC + (u_t_R + u_t_L) )
+                            tau_nt_star = 0.5*( (u_t_R - u_t_L)*sqrtC_NC + (tau_nt_R + tau_nt_L) )
+                            
+                            tau_tt_L_star = tau_tt_L + ( rho_hat*(G_hat*2.0/3.0 + tau_tt_hat)*(u_n_L-S_M) ) / ( rho%L*(u_n_L-S_L) )
+                            tau_tt_R_star = tau_tt_R + ( rho_hat*(G_hat*2.0/3.0 + tau_tt_hat)*(u_n_R-S_M) ) / ( rho%R*(u_n_R-S_R) )
+                    
+                            tau_tt_L_starstar = tau_tt_L_star + 2*rho_hat*tau_nt_hat/sqrtC_NC * (u_t_star - u_t_L)
+                            tau_tt_R_starstar = tau_tt_R_star - 2*rho_hat*tau_nt_hat/sqrtC_NC * (u_t_star - u_t_R)
+                            
+
+                            E_L_star = ( E%L*(u_n_L-S_L) + u_n_L*pTot_L - S_M*pTot_star ) / (S_M - S_L)
+                            E_R_star = ( E%R*(u_n_R-S_R) + u_n_R*pTot_R - S_M*pTot_star ) / (S_M - S_R)
+                            E_L_starstar = E_L_star + (rhoL_star / sqrtC_NC) * (u_t_star * tau_nt_star - u_t_L * tau_nt_L)
+                            E_R_starstar = E_R_star - (rhoR_star / sqrtC_NC) * (u_t_star * tau_nt_star - u_t_R * tau_nt_R)
+                            
+                            tau_nn_L_star = tau_nn_L - ( rho_hat*(G_hat*4.0/3.0 + tau_nn_hat)*(u_n_L-S_M) ) / ( rho%L*(u_n_L-S_L) )
+                            tau_nn_R_star = tau_nn_R - ( rho_hat*(G_hat*4.0/3.0 + tau_nn_hat)*(u_n_R-S_M) ) / ( rho%R*(u_n_R-S_R) )
+                    
+                            alpha1_L_star = ( alpha_L(1)*(S_L-u_n_L) - alpha_hat(1)*(S_M-u_n_L) ) / (S_L-S_M)
+                            alpha1_R_star = ( alpha_R(1)*(S_R-u_n_R) - alpha_hat(1)*(S_M-u_n_R) ) / (S_R-S_M)
+                    
+                            alpha2_L_star = ( alpha_L(2)*(S_L-u_n_L) - alpha_hat(2)*(S_M-u_n_L) ) / (S_L-S_M)
+                            alpha2_R_star = ( alpha_R(2)*(S_R-u_n_R) - alpha_hat(2)*(S_M-u_n_R) ) / (S_R-S_M)
+
+                            ! ==================== Compute U ====================
+
+                            U_starL(1) = U_L(1) * fac_L
+                            U_starL(2) = U_L(2) * fac_L
+                            U_starL(3) = rhoL_star * S_M
+                            U_starL(4) = rhoL_star * u_t_L
+                            U_starL(5) = E_L_star
+                            U_starL(6) = alpha1_L_star
+                            U_starL(7) = alpha2_L_star
+                            U_starL(8) = rhoL_star * tau_nn_L_star
+                            U_starL(9) = rhoL_star * tau_nt_L
+                            U_starL(10) = rhoL_star * tau_tt_L_star
+
+                            U_starR(1) = U_R(1) * fac_R
+                            U_starR(2) = U_R(2) * fac_R
+                            U_starR(3) = rhoR_star * S_M
+                            U_starR(4) = rhoR_star * u_t_R
+                            U_starR(5) = E_R_star
+                            U_starR(6) = alpha1_R_star
+                            U_starR(7) = alpha2_R_star
+                            U_starR(8) = rhoR_star * tau_nn_R_star
+                            U_starR(9) = rhoR_star * tau_nt_R
+                            U_starR(10) = rhoR_star * tau_tt_R_star
+
+                            U_starstarL(1) = U_L(1) * fac_L
+                            U_starstarL(2) = U_L(2) * fac_L
+                            U_starstarL(3) = rhoL_star * S_M
+                            U_starstarL(4) = rhoL_star * u_t_star
+                            U_starstarL(5) = E_L_starstar
+                            U_starstarL(6) = alpha1_L_star
+                            U_starstarL(7) = alpha2_L_star
+                            U_starstarL(8) = rhoL_star * tau_nn_L_star
+                            U_starstarL(9) = rhoL_star * tau_nt_star
+                            U_starstarL(10) = rhoL_star * tau_tt_L_starstar
+
+                            U_starstarR(1) = U_R(1) * fac_R
+                            U_starstarR(2) = U_R(2) * fac_R
+                            U_starstarR(3) = rhoR_star * S_M
+                            U_starstarR(4) = rhoR_star * u_t_star
+                            U_starstarR(5) = E_R_starstar
+                            U_starstarR(6) = alpha1_R_star
+                            U_starstarR(7) = alpha2_R_star
+                            U_starstarR(8) = rhoR_star * tau_nn_R_star
+                            U_starstarR(9) = rhoR_star * tau_nt_star
+                            U_starstarR(10) = rhoR_star * tau_tt_R_starstar
+
+                            ! ==================== Compute F and select F_HLLD ====================
+
+                            F_starL = F_L + S_L*(U_starL - U_L)
+                            F_starR = F_R + S_R*(U_starR - U_R)
+
+                            if (0.0_wp <= S_L) then
+                                F_hlld = F_L
+                            else if (0.0_wp <= S_Lstar) then
+                                F_hlld = F_starL
+                            else if (0.0_wp <= s_M) then
+                                F_hlld = F_starL + S_Lstar*(U_starstarL - U_starL)
+                            else if (0.0_wp <= S_Rstar) then
+                                F_hlld = F_starR + S_Rstar*(U_starstarR - U_starR)
+                            else if (0.0_wp <= S_R) then
+                                F_hlld = F_starR
+                            else
+                                F_hlld = F_R
+                            end if
+
+                            ! ==================== Reorder F_HLLD (temporary variables) for output ====================
+                            
+                            ! Mass
+                            flux_rs${XYZ}$_vf(j, k, l, 1) = F_hlld(1)
+                            flux_rs${XYZ}$_vf(j, k, l, 2) = F_hlld(2)
+                            ! Momentum
+                            flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(1)) = F_hlld(3)
+                            flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(2)) = F_hlld(4)
+                            ! Energy
+                            flux_rs${XYZ}$_vf(j, k, l, E_idx) = F_hlld(5)
+                            ! Volume Fraction
+                            flux_rs${XYZ}$_vf(j, k, l, E_idx + 1) = F_hlld(6)
+                            flux_rs${XYZ}$_vf(j, k, l, E_idx + 2) = F_hlld(7)
+                            ! Stress
+                            flux_rs${XYZ}$_vf(j, k, l, strxb + 1) = F_hlld(9) ! tau_xy = tau_nt
+                            if (dir_idx(1) == 1) then
+                                flux_rs${XYZ}$_vf(j, k, l, strxb    ) = F_hlld(8 ) ! tau_xx = tau_nn
+                                flux_rs${XYZ}$_vf(j, k, l, strxb + 2) = F_hlld(10) ! tau_yy = tau_tt
+                            else
+                                flux_rs${XYZ}$_vf(j, k, l, strxb    ) = F_hlld(10) ! tau_xx = tau_tt
+                                flux_rs${XYZ}$_vf(j, k, l, strxb + 2) = F_hlld(8 ) ! tau_yy = tau_nn
+                            end if
+
+                            flux_src_rs${XYZ}$_vf(j, k, l, advxb) = 0._wp ! flux_src_rs is used in HLLC Hypo for debug transfer of u and v at interface, but not needed here for HLLD so it is set to 0
+                        end do
+                    end do
+                end do
+                !$acc end parallel loop
+            end if
+        #:endfor
+
+        call s_finalize_riemann_solver(flux_vf, flux_src_vf, flux_gsrc_vf, &
+                                       norm_dir, ix, iy, iz)
+    end subroutine s_hypo_hlld_riemann_solver
 
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any

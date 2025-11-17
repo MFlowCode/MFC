@@ -57,6 +57,9 @@ module m_time_steppers
     type(scalar_field), allocatable, dimension(:) :: rhs_vf !<
     !! Cell-average RHS variables at the current time-stage
 
+    type(scalar_field), allocatable, dimension(:) :: rhs_hatL_vf, rhs_hatR_vf !<
+    !! Cell-average RHS variables at the current time-stage for using left/right-cell hat variables (for Hypo HLLD only)
+
     type(integer_field), allocatable, dimension(:, :) :: bc_type !<
     !! Boundary condition identifiers
 
@@ -75,7 +78,7 @@ module m_time_steppers
     integer, private :: num_ts !<
     !! Number of time stages in the time-stepping scheme
 
-    !$acc declare create(q_cons_ts, q_prim_vf, q_T_sf, rhs_vf, q_prim_ts, rhs_mv, rhs_pb, max_dt)
+    !$acc declare create(q_cons_ts, q_prim_vf, q_T_sf, rhs_vf, rhs_hatL_vf, rhs_hatR_vf, q_prim_ts, rhs_mv, rhs_pb, max_dt)
 
 contains
 
@@ -308,6 +311,18 @@ contains
             @:ACC_SETUP_SFs(rhs_vf(i))
         end do
 
+        if (HLLD_hypo) then
+            @:ALLOCATE(rhs_hatL_vf(1:sys_size))
+            @:ALLOCATE(rhs_hatR_vf(1:sys_size))
+
+            do i = 1, sys_size
+                @:ALLOCATE(rhs_hatL_vf(i)%sf(0:m, 0:n, 0:p))
+                @:ALLOCATE(rhs_hatR_vf(i)%sf(0:m, 0:n, 0:p))
+                @:ACC_SETUP_SFs(rhs_hatL_vf(i))
+                @:ACC_SETUP_SFs(rhs_hatR_vf(i))
+            end do
+        end if
+
         ! Opening and writing the header of the run-time information file
         if (proc_rank == 0 .and. run_time_info) then
             call s_open_run_time_information_file()
@@ -351,7 +366,24 @@ contains
         ! Stage 1 of 1
         call nvtxStartRange("TIMESTEP")
 
-        call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, 1)
+        if (HLLD_hypo) then ! Re-run Riemann solver with right cell-values (_hat_R) to get rhs <- rhs_hat_L + rhs_hat_R
+            call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_hatL_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, 1, .true.)
+            call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_hatR_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, 1, .false.)
+
+            do i = 1, sys_size
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            rhs_vf(i)%sf(j, k, l) = rhs_hatL_vf(i)%sf(j, k, l) + rhs_hatR_vf(i)%sf(j, k, l)
+                        end do
+                    end do
+                end do
+            end do
+
+        else ! not HLLD-hypo
+            call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, 1)
+
+        end if
 
 #ifdef DEBUG
         print *, 'got rhs'
@@ -461,7 +493,24 @@ contains
 
         call nvtxStartRange("TIMESTEP")
 
-        call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, 1)
+        if (HLLD_hypo) then ! Run Riemann solver twice with left/right cell-values (hatL/R) to get: rhs <- rhs_hat_L + rhs_hat_R
+            call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_hatL_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, 1, .true.)
+            call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_hatR_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, 1, .false.)
+
+            do i = 1, sys_size
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            rhs_vf(i)%sf(j, k, l) = rhs_hatL_vf(i)%sf(j, k, l) + rhs_hatR_vf(i)%sf(j, k, l)
+                        end do
+                    end do
+                end do
+            end do
+
+        else ! not HLLD-hypo
+            call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, 1)
+
+        end if
 
         if (run_time_info) then
             call s_write_run_time_information(q_prim_vf, t_step)
@@ -547,7 +596,24 @@ contains
 
         ! Stage 2 of 2
 
-        call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2)
+        if (HLLD_hypo) then ! Run Riemann solver twice with left/right cell-values (hatL/R) to get: rhs <- rhs_hat_L + rhs_hat_R
+            call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_hatL_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2, .true.)
+            call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_hatR_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2, .false.)
+
+            do i = 1, sys_size
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            rhs_vf(i)%sf(j, k, l) = rhs_hatL_vf(i)%sf(j, k, l) + rhs_hatR_vf(i)%sf(j, k, l)
+                        end do
+                    end do
+                end do
+            end do
+
+        else ! not HLLD-hypo
+            call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2)
+
+        end if
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=2)
 
@@ -643,7 +709,24 @@ contains
             call nvtxStartRange("TIMESTEP")
         end if
 
-        call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, 1)
+        if (HLLD_hypo) then ! Run Riemann solver twice with left/right cell-values (hatL/R) to get: rhs <- rhs_hat_L + rhs_hat_R
+            call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_hatL_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, 1, .true.)
+            call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_hatR_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, 1, .false.)
+
+            do i = 1, sys_size
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            rhs_vf(i)%sf(j, k, l) = rhs_hatL_vf(i)%sf(j, k, l) + rhs_hatR_vf(i)%sf(j, k, l)
+                        end do
+                    end do
+                end do
+            end do
+
+        else ! not HLLD-hypo
+            call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, 1)
+
+        end if
 
         if (run_time_info) then
             call s_write_run_time_information(q_prim_vf, t_step)
@@ -729,7 +812,24 @@ contains
 
         ! Stage 2 of 3
 
-        call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2)
+        if (HLLD_hypo) then ! Run Riemann solver twice with left/right cell-values (hatL/R) to get: rhs <- rhs_hat_L + rhs_hat_R
+            call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_hatL_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2, .true.)
+            call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_hatR_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2, .false.)
+
+            do i = 1, sys_size
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            rhs_vf(i)%sf(j, k, l) = rhs_hatL_vf(i)%sf(j, k, l) + rhs_hatR_vf(i)%sf(j, k, l)
+                        end do
+                    end do
+                end do
+            end do
+
+        else ! not HLLD-hypo
+            call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2)
+
+        end if
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=2)
 
@@ -802,7 +902,25 @@ contains
         end if
 
         ! Stage 3 of 3
-        call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 3)
+
+        if (HLLD_hypo) then ! Run Riemann solver twice with left/right cell-values (hatL/R) to get: rhs <- rhs_hat_L + rhs_hat_R
+            call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_hatL_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 3, .true.)
+            call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_hatR_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 3, .false.)
+
+            do i = 1, sys_size
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            rhs_vf(i)%sf(j, k, l) = rhs_hatL_vf(i)%sf(j, k, l) + rhs_hatR_vf(i)%sf(j, k, l)
+                        end do
+                    end do
+                end do
+            end do
+
+        else ! not HLLD-hypo
+            call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 3)
+
+        end if
 
         if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=3)
 
@@ -1156,6 +1274,15 @@ contains
         end do
 
         @:DEALLOCATE(rhs_vf)
+
+        if (HLLD_hypo) then
+            do i = 1, sys_size
+                @:DEALLOCATE(rhs_hatL_vf(i)%sf)
+                @:DEALLOCATE(rhs_hatR_vf(i)%sf)
+            end do
+            @:DEALLOCATE(rhs_hatL_vf)
+            @:DEALLOCATE(rhs_hatR_vf)
+        end if
 
         ! Writing the footer of and closing the run-time information file
         if (proc_rank == 0 .and. run_time_info) then
