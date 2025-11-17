@@ -381,7 +381,7 @@ contains
     !> The purpose of this procedure is to calculate the characteristic cell volume
             !! @param cell Computational coordinates (x, y, z)
             !! @param Charvol Characteristic volume
-    elemental subroutine s_get_char_vol(cellx, celly, cellz, Charvol)
+    subroutine s_get_char_vol(cellx, celly, cellz, Charvol)
         $:GPU_ROUTINE(function_name='s_get_char_vol',parallelism='[seq]', &
             & cray_inline=True)
 
