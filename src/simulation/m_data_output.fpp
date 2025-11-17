@@ -1588,34 +1588,27 @@ contains
                             R(1), &
                             Rdot(1)
                     else if (elasticity) then
-                        FMT = '(6X,F12.6,8'//FMT_glb//')'
+                        FMT = '(6X,F12.6,7'//FMT_glb//')'
                         write (i + 30, FMT) &
                             nondim_time, &
                             rho, &
                             vel(1), &
                             vel(2), &
-                            vel(3), &
                             pres, &
                             tau_e(1), &
                             tau_e(2), &
                             tau_e(3)
                     else
-                        FMT = '(6X,F12.6,11'//FMT_glb//')'
+                        FMT = '(6X,F12.6,4'//FMT_glb//')'
                         write (i + 30, FMT) &
                             nondim_time, &
                             rho, &
                             vel(1), &
                             vel(2), &
-                            vel(3), &
-                            pres, & ! Out of tolerance
-                            gamma, &
-                            pi_inf, &
-                            qv, &
-                            c, &
-                            accel
+                            pres
                     end if
                 else
-                    FMT = '(6X,F12.6,11'//FMT_glb//')'
+                    FMT = '(6X,F12.6,10'//FMT_glb//')'
                     write (i + 30, FMT) &
                         nondim_time, &
                         rho, &
@@ -1625,7 +1618,9 @@ contains
                         pres, &
                         gamma, &
                         pi_inf, &
-                        qv
+                        qv, &
+                        c, &
+                        accel
                 end if
             end if
         end do
