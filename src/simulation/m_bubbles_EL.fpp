@@ -685,7 +685,7 @@ contains
         adap_dt_stop_max = 0
         #:call GPU_PARALLEL_LOOP(private='[k,myalpha_rho,myalpha,Re,cell,myPos,myVel]', &
             & reduction='[[adap_dt_stop_max]]',reductionOp='[MAX]', &
-            & copy='[adap_dt_stop_max]',copyin='[stage]')
+            & copyin='[stage]')
             do k = 1, n_el_bubs_loc
                 ! Keller-Miksis model
 
@@ -737,11 +737,10 @@ contains
                     intfc_vel(k, 1) = myV
                     gas_p(k, 1) = myPb
                     gas_mv(k, 1) = myMass_v
+                    mtn_pos(k, :, 1) = myPos
+                    mtn_vel(k, :, 1) = myVel
 
-                    if (moving_lag_bubbles) then
-                        mtn_pos(k, :, 1) = myPos
-                        mtn_vel(k, :, 1) = myVel
-                    end if
+                    adap_dt_stop_max = max(adap_dt_stop_max, adap_dt_stop)
 
                 else
 
@@ -780,8 +779,6 @@ contains
                         end select
                     end do
                 end if
-
-                adap_dt_stop_max = max(adap_dt_stop_max, adap_dt_stop)
 
             end do
         #:endcall GPU_PARALLEL_LOOP

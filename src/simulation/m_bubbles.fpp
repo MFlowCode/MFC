@@ -630,8 +630,7 @@ contains
     subroutine s_initial_substep_h(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
                                    fntait, fBtait, f_bub_adv_src, f_divu, &
                                    fCson, h)
-        $:GPU_ROUTINE(function_name='s_initial_substep_h',parallelism='[seq]', &
-            & cray_inline=True)
+        $:GPU_ROUTINE(parallelism='[seq]')
 
         real(wp), intent(IN) :: fRho, fP, fR, fV, fR0, fpb, fpbdot, alf
         real(wp), intent(IN) :: fntait, fBtait, f_bub_adv_src, f_divu
@@ -714,8 +713,7 @@ contains
                                  bub_id, fmass_v, fmass_n, fbeta_c, &
                                  fbeta_t, fCson, h, &
                                  myR_tmp, myV_tmp, myPb_tmp, myMv_tmp)
-        $:GPU_ROUTINE(function_name='s_advance_substep',parallelism='[seq]', &
-            & cray_inline=True)
+        $:GPU_ROUTINE(parallelism='[seq]')
 
         real(wp), intent(OUT) :: err
         real(wp), intent(IN) :: fRho, fP, fR, fV, fR0, fpb, fpbdot, alf
