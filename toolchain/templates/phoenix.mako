@@ -35,11 +35,6 @@ cd "${MFC_ROOT_DIR}"
 . ./mfc.sh load -c p -m ${'g' if gpu else 'c'}
 cd - > /dev/null
 echo
-% if gpu != gpuConfigOptions.NONE.value:
-echo "GPU active"
-% else:
-echo "CPU active"
-% endif
 
 % for target in targets:
     ${helpers.run_prologue(target)}
