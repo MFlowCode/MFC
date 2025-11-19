@@ -1,3 +1,5 @@
+#:include 'macros.fpp'
+
 module m_nvtx
 
     use iso_c_binding
