@@ -25,31 +25,31 @@ module m_nvtx
         type(c_ptr) :: message          ! ascii char
     end type nvtxEventAttributes
 
-#:if MFC_GPU and USING_NVHPC
+    #:if MFC_GPU and USING_NVHPC
 
-    interface nvtxRangePush
-        ! push range with custom label and standard color
-        subroutine nvtxRangePushA(name) bind(C, name='nvtxRangePushA')
-            use iso_c_binding
+        interface nvtxRangePush
+            ! push range with custom label and standard color
+            subroutine nvtxRangePushA(name) bind(C, name='nvtxRangePushA')
+                use iso_c_binding
 
-            character(kind=c_char, len=*), intent(IN) :: name
-        end subroutine nvtxRangePushA
+                character(kind=c_char, len=*), intent(IN) :: name
+            end subroutine nvtxRangePushA
 
-        ! push range with custom label and custom color
-        subroutine nvtxRangePushEx(event) bind(C, name='nvtxRangePushEx')
-            use iso_c_binding
+            ! push range with custom label and custom color
+            subroutine nvtxRangePushEx(event) bind(C, name='nvtxRangePushEx')
+                use iso_c_binding
 
-            import :: nvtxEventAttributes
-            type(nvtxEventAttributes), intent(IN) :: event
-        end subroutine nvtxRangePushEx
-    end interface nvtxRangePush
+                import :: nvtxEventAttributes
+                type(nvtxEventAttributes), intent(IN) :: event
+            end subroutine nvtxRangePushEx
+        end interface nvtxRangePush
 
-    interface nvtxRangePop
-        subroutine nvtxRangePop() bind(C, name='nvtxRangePop')
-        end subroutine nvtxRangePop
-    end interface nvtxRangePop
+        interface nvtxRangePop
+            subroutine nvtxRangePop() bind(C, name='nvtxRangePop')
+            end subroutine nvtxRangePop
+        end interface nvtxRangePop
 
-#:endif
+    #:endif
 
 contains
 
@@ -58,25 +58,25 @@ contains
         integer, intent(IN), optional :: id
         type(nvtxEventAttributes) :: event
 
-#:if MFC_GPU and USING_NVHPC
+        #:if MFC_GPU and USING_NVHPC
 
-        tempName = trim(name)//c_null_char
+            tempName = trim(name)//c_null_char
 
-        if (.not. present(id)) then
-            call nvtxRangePush(tempName)
-        else
-            event%color = col(mod(id, 7) + 1)
-            event%message = c_loc(tempName)
-            call nvtxRangePushEx(event)
-        end if
+            if (.not. present(id)) then
+                call nvtxRangePush(tempName)
+            else
+                event%color = col(mod(id, 7) + 1)
+                event%message = c_loc(tempName)
+                call nvtxRangePushEx(event)
+            end if
 
-#:endif
+        #:endif
     end subroutine nvtxStartRange
 
     subroutine nvtxEndRange
-#:if MFC_GPU and USING_NVHPC
-        call nvtxRangePop
-#:endif
+        #:if MFC_GPU and USING_NVHPC
+            call nvtxRangePop
+        #:endif
     end subroutine nvtxEndRange
 
 end module m_nvtx

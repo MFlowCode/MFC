@@ -1064,7 +1064,7 @@ contains
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_species
                                 #:if USING_AMD
-                                h_k(i) = h_k(i)*gas_constant/molecular_weights_nonparameter(i)*T
+                                    h_k(i) = h_k(i)*gas_constant/molecular_weights_nonparameter(i)*T
                                     sum_Enthalpies = sum_Enthalpies + (rho*h_k(i) - pres*Mw/molecular_weights_nonparameter(i)*Cp/R_gas)*dYs_dt(i)
                                 #:else
                                     h_k(i) = h_k(i)*gas_constant/molecular_weights(i)*T
