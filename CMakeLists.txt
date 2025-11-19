@@ -95,6 +95,11 @@ endif()
 
 find_program(FYPP_EXE fypp REQUIRED)
 
+# Python3 is required for chemistry code generation when MFC_CHEMISTRY is ON
+if (MFC_CHEMISTRY)
+    find_package(Python3 REQUIRED COMPONENTS Interpreter)
+endif()
+
 
 # Miscellaneous Configuration:
 # *  Explicitly link to -ldl (or system equivalent)
@@ -361,6 +366,13 @@ macro(HANDLE_SOURCES target useCommon)
         cmake_path(GET fpp FILENAME fpp_filename)
         set(f90 "${CMAKE_BINARY_DIR}/fypp/${target}/${fpp_filename}.f90")
 
+        # Set chemistry flag for Fypp: use 0/1 (not False/True) so Fypp evaluates as boolean
+        if (MFC_CHEMISTRY)
+            set(_chem_flag "1")
+        else()
+            set(_chem_flag "0")
+        endif()
+
         add_custom_command(
             OUTPUT   ${f90}
             COMMAND  ${FYPP_EXE} -m re
@@ -372,7 +384,7 @@ macro(HANDLE_SOURCES target useCommon)
                                  -D MFC_${${target}_UPPER}
                                  -D MFC_COMPILER="${CMAKE_Fortran_COMPILER_ID}"
                                  -D MFC_CASE_OPTIMIZATION=False
-                                 -D chemistry=False
+                                 -D chemistry=${_chem_flag}
                                  --line-numbering
                                  --no-folding
 								 --line-length=999
@@ -385,6 +397,27 @@ macro(HANDLE_SOURCES target useCommon)
 
         list(APPEND ${target}_SRCs ${f90})
     endforeach()
+
+    # Generate m_thermochem.f90 when chemistry is enabled
+    if (MFC_CHEMISTRY)
+        file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/modules/${target}")
+
+        add_custom_command(
+            OUTPUT  "${CMAKE_BINARY_DIR}/modules/${target}/m_thermochem.f90"
+            COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/modules/${target}"
+            COMMAND ${Python3_EXECUTABLE}
+                    "${CMAKE_SOURCE_DIR}/toolchain/scripts/gen_thermochem.py"
+                    --module m_thermochem
+                    --out    "${CMAKE_BINARY_DIR}/modules/${target}/m_thermochem.f90"
+                    --mech   "${MFC_MECH_FILE}"
+            DEPENDS "${CMAKE_SOURCE_DIR}/toolchain/scripts/gen_thermochem.py"
+            COMMENT "Generating m_thermochem.f90 via Pyrometheus/Cantera for ${target}"
+            VERBATIM
+        )
+
+        list(APPEND ${target}_SRCs
+             "${CMAKE_BINARY_DIR}/modules/${target}/m_thermochem.f90")
+    endif()
 endmacro()
 
 
