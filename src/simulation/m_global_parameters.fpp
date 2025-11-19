@@ -21,8 +21,6 @@ module m_global_parameters
 
     use m_helper_basic         !< Functions to compare floating point numbers
 
-    ! $:USE_GPU_MODULE()
-
     implicit none
 
     real(wp) :: wall_time = 0

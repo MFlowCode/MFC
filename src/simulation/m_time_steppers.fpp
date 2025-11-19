@@ -100,9 +100,9 @@ contains
         use hipfort
         use hipfort_hipmalloc
         use hipfort_check
-#if defined(MFC_OpenACC)
-        use openacc
-#endif
+        #:if MFC_OpenACC
+            use openacc
+        #:endif
 #endif
         integer :: i, j !< Generic loop iterators
 
@@ -181,17 +181,17 @@ contains
         ! Doing hipMalloc then mapping should be most performant
         call hipCheck(hipMalloc(q_cons_ts_pool_device, dims8=pool_dims, lbounds8=pool_starts))
         ! Without this map CCE will still create a device copy, because it's silly like that
-#if defined(MFC_OpenACC)
-        call acc_map_data(q_cons_ts_pool_device, c_loc(q_cons_ts_pool_device), c_sizeof(q_cons_ts_pool_device))
-#endif
+        #:if MFC_OpenACC
+            call acc_map_data(q_cons_ts_pool_device, c_loc(q_cons_ts_pool_device), c_sizeof(q_cons_ts_pool_device))
+        #:endif
         ! CCE see it can access this and will leave it on the host. It will stay on the host so long as HSA_XNACK=1
         ! NOTE: WE CANNOT DO ATOMICS INTO THIS MEMORY. We have to change a property to use atomics here
         ! Otherwise leaving this as fine-grained will actually help performance since it can't be cached in GPU L2
         if (num_ts == 2) then
             call hipCheck(hipMallocManaged(q_cons_ts_pool_host, dims8=pool_dims, lbounds8=pool_starts, flags=hipMemAttachGlobal))
-#if defined(MFC_OpenMP)
-            call hipCheck(hipMemAdvise(c_loc(q_cons_ts_pool_host), c_sizeof(q_cons_ts_pool_host), hipMemAdviseSetPreferredLocation, -1))
-#endif
+            #:if MFC_OpenMP
+                call hipCheck(hipMemAdvise(c_loc(q_cons_ts_pool_host), c_sizeof(q_cons_ts_pool_host), hipMemAdviseSetPreferredLocation, -1))
+            #:endif
         end if
 #endif
 

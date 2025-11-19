@@ -60,7 +60,7 @@ module m_igr
 
             integer, parameter :: offxL = 2
             integer, parameter :: offxR = 3
-#if defined(MFC_OpenMP)
+#:if MFC_OpenMP
             real(wp) :: coeff_L(1:5) = [ &
                         -3._wp/60._wp, &  ! Index -1
                         27._wp/60._wp, &  ! Index 0
@@ -76,7 +76,7 @@ module m_igr
                         27._wp/60._wp, &  ! Index 1
                         -3._wp/60._wp &  ! Index 2
                         ]
-#else
+#:else
             real(wp), parameter :: coeff_L(1:5) = [ &
                                    -3._wp/60._wp, &  ! Index -1
                                    27._wp/60._wp, &  ! Index 0
@@ -92,14 +92,14 @@ module m_igr
                                    27._wp/60._wp, &  ! Index 1
                                    -3._wp/60._wp &  ! Index 2
                                    ]
-#endif
+#:endif
         #:elif igr_order == 3
             integer, parameter :: vidxb = -1
             integer, parameter :: vidxe = 2
 
             integer, parameter :: offxL = 1
             integer, parameter :: offxR = 2
-#if defined(MFC_OpenMP)
+#:if MFC_OpenMP
             real(wp) :: coeff_L(1:3) = [ &
                         2._wp/6._wp, & ! Index 0
                         5._wp/6._wp, & ! Index 1
@@ -110,7 +110,7 @@ module m_igr
                         5._wp/6._wp, & ! Index 0
                         2._wp/6._wp & ! Index 1
                         ]
-#else
+#:else
             real(wp), parameter :: coeff_L(1:3) = [ &
                                    2._wp/6._wp, & ! Index 0
                                    5._wp/6._wp, & ! Index 1
@@ -121,12 +121,12 @@ module m_igr
                                    5._wp/6._wp, & ! Index 0
                                    2._wp/6._wp & ! Index 1
                                    ]
-#endif
+#:endif
         #:endif
 
-#if defined(MFC_OpenMP)
+#:if MFC_OpenMP
         $:GPU_DECLARE(create='[coeff_L, coeff_R]')
-#endif
+#:endif
     #:endif
 
     integer(kind=8) :: i, j, k, l, q, r

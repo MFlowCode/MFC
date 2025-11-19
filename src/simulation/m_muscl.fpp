@@ -7,9 +7,7 @@ module m_muscl
 
     use m_variables_conversion !< State variables type conversion procedures
 
-#ifdef MFC_OpenACC
-    use openacc
-#endif
+    $:USE_GPU_MODULE()
 
     use m_mpi_proxy
 

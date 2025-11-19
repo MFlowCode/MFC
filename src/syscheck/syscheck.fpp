@@ -22,21 +22,21 @@
 #:enddef MPIC
 
 #:def ACCC(*args)
-#ifdef MFC_OpenACC
-    @:LOG("[TEST] ACC: ${','.join([ x.replace("'", '') for x in args ])}$")
-    ${','.join([ x.replace("'", '') for x in args ])}$
-#else
-    @:LOG("[SKIP] ACC: ${','.join([ x.replace("'", '') for x in args ])}$")
-#endif
+    #:if MFC_OpenACC
+        @:LOG("[TEST] ACC: ${','.join([ x.replace("'", '') for x in args ])}$")
+        ${','.join([ x.replace("'", '') for x in args ])}$
+    #:else
+        @:LOG("[SKIP] ACC: ${','.join([ x.replace("'", '') for x in args ])}$")
+    #:endif
 #:enddef ACCC
 
 #:def OMPC(*args)
-#ifdef MFC_OpenMP
-    @:LOG("[TEST] OMP: ${','.join([ x.replace("'", '') for x in args ])}$")
-    ${','.join([ x.replace("'", '') for x in args ])}$
-#else
-    @:LOG("[SKIP] OMP: ${','.join([ x.replace("'", '') for x in args ])}$")
-#endif
+    #:if MFC_OpenMP
+        @:LOG("[TEST] OMP: ${','.join([ x.replace("'", '') for x in args ])}$")
+        ${','.join([ x.replace("'", '') for x in args ])}$
+    #:else
+        @:LOG("[SKIP] OMP: ${','.join([ x.replace("'", '') for x in args ])}$")
+    #:endif
 #:enddef OMPC
 
 #:def MPI(*args)
@@ -46,15 +46,15 @@
 #:enddef MPI
 
 #:def ACC(*args)
-#ifdef MFC_OpenACC
-    ${','.join([ x.replace("'", '') for x in args ])}$
-#endif
+    #:if MFC_OpenACC
+        ${','.join([ x.replace("'", '') for x in args ])}$
+    #:endif
 #:enddef ACC
 
 #:def OMP(*args)
-#ifdef MFC_OpenMP
-    ${','.join([ x.replace("'", '') for x in args ])}$
-#endif
+    #:if MFC_OpenMP
+        ${','.join([ x.replace("'", '') for x in args ])}$
+    #:endif
 #:enddef OMP
 
 program syscheck
