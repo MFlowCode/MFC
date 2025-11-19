@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 <%namespace name="helpers" file="helpers.mako"/>
+<%! from mfc.state import gpuConfigOptions %>
 
 % if engine == 'batch':
 #SBATCH --nodes=${nodes}
@@ -9,7 +10,7 @@
 #SBATCH --output="${name}.out"
 #SBATCH --time=${walltime}
 #SBATCH --cpus-per-task=7
-% if gpu:
+% if gpu != gpuConfigOptions.NONE.value:
 #SBATCH --gpus-per-task=1
 #SBATCH --gpu-bind=closest
 % endif

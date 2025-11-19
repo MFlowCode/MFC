@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 <%namespace name="helpers" file="helpers.mako"/>
+<%! from mfc.state import gpuConfigOptions %>
 
 % if engine == 'batch':
 #SBATCH --nodes=${nodes}
@@ -17,7 +18,7 @@
 % if quality_of_service:
 #SBATCH --qos=${quality_of_service}
 % endif
-% if gpu:
+% if gpu != gpuConfigOptions.NONE.value:
 #SBATCH --gres=gpu:V100:${tasks_per_node}
 #SBATCH --mem-per-gpu=16G\
 % endif
@@ -34,6 +35,11 @@ cd "${MFC_ROOT_DIR}"
 . ./mfc.sh load -c p -m ${'g' if gpu else 'c'}
 cd - > /dev/null
 echo
+% if gpu != gpuConfigOptions.NONE.value:
+echo "GPU active"
+% else:
+echo "CPU active"
+% endif
 
 % for target in targets:
     ${helpers.run_prologue(target)}

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 <%namespace name="helpers" file="helpers.mako"/>
+<%! from mfc.state import gpuConfigOptions %>
 
 % if engine == 'batch':
 #SBATCH --uenv=icon/25.2:v1@santis
@@ -74,7 +75,7 @@ echo
                 --ntasks=${nodes*tasks_per_node}                     \
                 --cpus-per-task 72                                   \
                 --cpu-bind=none                                      \
-            % if gpu:
+            % if gpu != gpuConfigOptions.NONE.value:
                 --gpus-per-task 1                                    \
             % endif
                 --wait 200 --bcast=/tmp/${target.name}               \
