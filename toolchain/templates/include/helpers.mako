@@ -1,5 +1,6 @@
-<%! import os 
-    from mfc.state import gpuConfigOptions
+<%!
+import os 
+from mfc.state import gpuConfigOptions
 %>
 
 <% is_gpu_active = (gpu != gpuConfigOptions.NONE.value) %>
