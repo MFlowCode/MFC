@@ -2,7 +2,6 @@
 import os
 from mako.exceptions import RuntimeException
 %>
-<%! from mfc.state import gpuConfigOptions %>
 
 % if os.name == 'nt':
 @echo off

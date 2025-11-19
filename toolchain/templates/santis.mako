@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
 <%namespace name="helpers" file="helpers.mako"/>
-<%! from mfc.state import gpuConfigOptions %>
 
 % if engine == 'batch':
 #SBATCH --uenv=icon/25.2:v1@santis
