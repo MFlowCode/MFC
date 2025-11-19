@@ -1,3 +1,5 @@
+#:include 'macros.fpp'
+
 #:def LOG(*args)
 #ifdef MFC_MPI
     if (rank == 0) then
