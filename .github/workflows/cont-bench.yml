@@ -1,10 +1,19 @@
-name: 'Benchmark'
+name: 'Continuous Benchmarking'
 
 on:
-  pull_request:
   pull_request_review:
     types: [submitted]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'tag to CB'
+        required: true
+
+permissions:
+  contents: write
+  deployments: write
+  pages: write
+  id-token: write
 
 jobs:
   file-changes:
@@ -24,7 +33,6 @@ jobs:
 
   self:
     name: "${{ matrix.name }} (${{ matrix.device }})"
-    if: ${{ github.repository=='MFlowCode/MFC' && needs.file-changes.outputs.checkall=='true' && ((github.event_name=='pull_request_review' && github.event.review.state=='approved') || (github.event_name=='pull_request' && (github.event.pull_request.user.login=='sbryngelson' || github.event.pull_request.user.login=='wilfonba'))) }}
     needs: file-changes
     strategy:
       fail-fast: false
@@ -62,14 +70,6 @@ jobs:
             device: gpu
             interface: acc
             build_script: "bash .github/workflows/frontier/build.sh gpu acc bench"
-          - cluster: frontier
-            name: Oak Ridge | Frontier (CCE)
-            group: phoenix
-            labels: frontier
-            flag: f
-            device: gpu
-            interface: omp
-            build_script: "bash .github/workflows/frontier/build.sh gpu omp bench"
     runs-on:
       group: ${{ matrix.group }}
       labels: ${{ matrix.labels }}
@@ -109,6 +109,45 @@ jobs:
           cp ../www/documentation/data.js ./pr/data.js
           (cd pr && . ./mfc.sh load -c ${{ matrix.flag }} -m g)
           (cd pr && ./mfc.sh bench_diff ../master/bench-${{ matrix.device }}-${{ matrix.interface }}.yaml ../pr/bench-${{ matrix.device }}-${{ matrix.interface }}.yaml -f data.js -n "${{ matrix.name }} (${{ matrix.device }}/${{ matrix.interface }})")
+
+      - name: Prep Benchmark Results
+        run: |
+          # should fill in the template in pr/cont-bench-template.json
+
+      - name: Post Benchmark Results
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          name: "${{ matrix.name }} (${{ matrix.device }}/${{ matrix.interface }})"
+          tool: 'googlecpp'
+          output-file-path: pr/report.json
+          github-token: ${{ secrets.TOKEN }}
+          auto-push: true
+          alert-threshold: '200%'
+          comment-on-alert: true
+          fail-on-alert: true
+          gh-repository: 'github.com/MFlowCode/MFlowCode.github.io'
+          gh-pages-branch: 'main'
+          benchmark-data-dir-path: 'documentation'
+
+      - name: Polishing Results
+        run:  |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "TAG=$TAG" >> $GITHUB_ENV
+
+          set +e
+          git ls-remote "${{ secrets.DOC_PUSH_URL }}" -q
+          if [ "$?" -ne "0" ]; then exit 0; fi
+          set -e
+          git config --global user.name  'MFC Action'
+          git config --global user.email '<>'
+          git clone "${{ secrets.DOC_PUSH_URL }}" ../www
+          sed -i 's/"unit": "s\/iter"/"unit": "s"/g; s/cpu: /runtime: /g; s/iterations: /time steps: /g' ../www/documentation/data.js
+          sed -i "s/${GITHUB_SHA::7}/$TAG/g" ../www/documentation/data.js
+
+          git -C ../www add -A
+          git -C ../www commit -m "Docs @ ${GITHUB_SHA::7}" || true
+          git -C ../www push
 
       - name: Print Logs
         if:   always()
