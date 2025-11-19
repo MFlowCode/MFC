@@ -1,4 +1,9 @@
-<%! import os %>
+<%!
+import os 
+from mfc.state import gpuConfigOptions
+%>
+
+<% is_gpu_active = (gpu != gpuConfigOptions.NONE.value) %>
 
 <%def name="template_prologue()">
 % if os.name != 'nt':
