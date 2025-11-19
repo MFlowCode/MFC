@@ -363,6 +363,7 @@ contains
             write (3, *) ! new line
 
             if (.not. f_approx_equal(icfl_max_glb, icfl_max_glb)) then
+                print *, 'icfl', icfl_max_glb
                 call s_mpi_abort('ICFL is NaN. Exiting.')
             elseif (icfl_max_glb > 1._wp) then
                 print *, 'icfl', icfl_max_glb
@@ -1129,6 +1130,8 @@ contains
         real(wp) :: G_local
         real(wp) :: dyn_p, T
         real(wp) :: damage_state
+        character(LEN=15) :: FMT_glb
+        character(len=30) :: FMT
 
         integer :: i, j, k, l, s, d !< Generic loop iterator
 
@@ -1144,6 +1147,13 @@ contains
         real(wp) :: rhoYks(1:num_species)
 
         T = dflt_T_guess
+
+        ! Set format string based on precision
+        if (precision == 1) then
+            FMT_glb = 'F28.7'
+        else
+            FMT_glb = 'F28.16'
+        end if
 
         ! Non-dimensional time calculation
         if (time_stepper == 23) then
@@ -1578,8 +1588,8 @@ contains
                             R(1), &
                             Rdot(1)
                     else if (elasticity) then
-                        write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
-                               'F24.8,F24.8,F24.8)') &
+                        FMT = '(6X,F12.6,7'//FMT_glb//')'
+                        write (i + 30, FMT) &
                             nondim_time, &
                             rho, &
                             vel(1), &
@@ -1589,17 +1599,17 @@ contains
                             tau_e(2), &
                             tau_e(3)
                     else
-                        write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8)') &
+                        FMT = '(6X,F12.6,4'//FMT_glb//')'
+                        write (i + 30, FMT) &
                             nondim_time, &
                             rho, &
                             vel(1), &
+                            vel(2), &
                             pres
-                        print *, 'time =', nondim_time, 'rho =', rho, 'pres =', pres
                     end if
                 else
-                    write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
-                           'F24.8,F24.8,F24.8,F24.8,F24.8,'// &
-                           'F24.8)') &
+                    FMT = '(6X,F12.6,10'//FMT_glb//')'
+                    write (i + 30, FMT) &
                         nondim_time, &
                         rho, &
                         vel(1), &
