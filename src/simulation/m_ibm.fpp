@@ -1012,8 +1012,8 @@ contains
                                 pressure_divergence(3) = 0._wp
                             end if
 
-                            forces(ib_idx, :) = forces(ib_idx, :) - pressure_divergence * cell_volume
-                            torques(ib_idx, :) = torques(ib_idx, :) + cross_product(radial_vector, pressure_divergence) * cell_volume
+                            forces(ib_idx, :) = forces(ib_idx, :) - (pressure_divergence * cell_volume)
+                            torques(ib_idx, :) = torques(ib_idx, :) + (cross_product(radial_vector, pressure_divergence) * cell_volume)
                         end if
                     end if
                 end do
@@ -1025,6 +1025,7 @@ contains
             patch_ib(i)%force(:) = forces(i, :)
             patch_ib(i)%torque(:) = matmul(patch_ib(i)%rotation_matrix_inverse, torques(i, :)) ! torques must be computed in the local coordinates of the IB
         end do
+
     end subroutine s_compute_ib_forces
 
     !> Subroutine to deallocate memory reserved for the IBM module
