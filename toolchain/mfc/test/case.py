@@ -147,7 +147,16 @@ class TestCase(case.Case):
             *jobs, "-t", *target_names, *gpus_select, *ARG("--")
         ]
 
-        return common.system(command, print_cmd=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        # Enforce per-test timeout only for 2-rank cases (to catch hangs)
+        timeout = ARG("timeout") if self.ppn == 2 else None
+        return common.system(
+            command,
+            print_cmd=False,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            timeout=timeout
+        )
 
     def get_trace(self) -> str:
         return self.trace
