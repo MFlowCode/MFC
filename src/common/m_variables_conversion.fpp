@@ -1634,7 +1634,7 @@ contains
                            pi_infs(2))/gammas(2)
                 c = (1._wp/(rho*(adv(1)/blkmod1 + adv(2)/blkmod2)))
             elseif (model_eqns == 3) then
-                c = sum( adv * gs_min * ( pres + ps_inf ) ) / rho
+                c = sum(adv*gs_min*(pres + ps_inf))/rho
             elseif (((model_eqns == 4) .or. (model_eqns == 2 .and. bubbles_euler))) then
                 ! Sound speed for bubble mmixture to order O(\alpha)
 
