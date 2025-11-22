@@ -1,4 +1,4 @@
-import os, typing, shutil, time, itertools
+import os, typing, shutil, time, itertools, subprocess
 from random import sample, seed
 
 import rich, rich.table
@@ -194,10 +194,31 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
         cons.print(f"  [bold magenta]{case.get_uuid()}[/bold magenta]     SKIP     {case.trace}")
         return
 
-    cmd = case.run([PRE_PROCESS, SIMULATION], gpus=devices)
-
     out_filepath = os.path.join(case.get_dirpath(), "out_pre_sim.txt")
 
+    try:
+        cmd = case.run([PRE_PROCESS, SIMULATION], gpus=devices)
+    except subprocess.TimeoutExpired as exc:
+        # Save any partial stdout we have
+        partial_output = ""
+        if exc.stdout:
+            try:
+                partial_output = exc.stdout.decode() if isinstance(exc.stdout, bytes) else exc.stdout
+            except Exception:
+                partial_output = str(exc.stdout)
+
+        if partial_output:
+            common.file_write(out_filepath, partial_output)
+
+        raise MFCException(
+            f"Test {case} (2-rank case): Timed out after {ARG('timeout')} seconds.\n"
+            f"This suggests the MPI job may have hung or deadlocked.\n"
+            f"Partial output (if any) saved to {out_filepath}.\n"
+            f"Case dictionary: {case.get_filepath()}.\n"
+            f"Command: {' '.join(str(x) for x in exc.cmd)}"
+        ) from exc
+
+    # On normal completion, write full stdout
     common.file_write(out_filepath, cmd.stdout)
 
     if cmd.returncode != 0:
@@ -238,8 +259,30 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
 
     if ARG("test_all"):
         case.delete_output()
-        cmd = case.run([PRE_PROCESS, SIMULATION, POST_PROCESS], gpus=devices)
         out_filepath = os.path.join(case.get_dirpath(), "out_post.txt")
+
+        try:
+            cmd = case.run([PRE_PROCESS, SIMULATION, POST_PROCESS], gpus=devices)
+        except subprocess.TimeoutExpired as exc:
+            # Save any partial stdout we have
+            partial_output = ""
+            if exc.stdout:
+                try:
+                    partial_output = exc.stdout.decode() if isinstance(exc.stdout, bytes) else exc.stdout
+                except Exception:
+                    partial_output = str(exc.stdout)
+
+            if partial_output:
+                common.file_write(out_filepath, partial_output)
+
+            raise MFCException(
+                f"Test {case} (2-rank case, post-process): Timed out after {ARG('timeout')} seconds.\n"
+                f"This suggests the MPI job may have hung or deadlocked.\n"
+                f"Partial output (if any) saved to {out_filepath}.\n"
+                f"Case dictionary: {case.get_filepath()}.\n"
+                f"Command: {' '.join(str(x) for x in exc.cmd)}"
+            ) from exc
+
         common.file_write(out_filepath, cmd.stdout)
 
         for silo_filepath in os.listdir(os.path.join(case.get_dirpath(), 'silo_hdf5', 'p0')):
