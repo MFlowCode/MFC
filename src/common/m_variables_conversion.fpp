@@ -1601,12 +1601,12 @@ contains
     end subroutine s_finalize_variables_conversion_module
 
 #ifndef MFC_PRE_PROCESS
-    subroutine s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_sum, c_c, c)
+    subroutine s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_sum, c_c, c, qv)
         $:GPU_ROUTINE(function_name='s_compute_speed_of_sound', &
             & parallelism='[seq]', cray_inline=True)
 
         real(wp), intent(in) :: pres
-        real(wp), intent(in) :: rho, gamma, pi_inf
+        real(wp), intent(in) :: rho, gamma, pi_inf, qv
         real(wp), intent(in) :: H
         real(wp), dimension(num_fluids), intent(in) :: adv
         real(wp), intent(in) :: vel_sum
@@ -1634,13 +1634,7 @@ contains
                            pi_infs(2))/gammas(2)
                 c = (1._wp/(rho*(adv(1)/blkmod1 + adv(2)/blkmod2)))
             elseif (model_eqns == 3) then
-                c = 0._wp
-                $:GPU_LOOP(parallelism='[seq]')
-                do q = 1, num_fluids
-                    c = c + adv(q)*(1._wp/gammas(q) + 1._wp)* &
-                        (pres + pi_infs(q)/(gammas(q) + 1._wp))
-                end do
-                c = c/rho
+                c = sum( adv * gs_min * ( pres + ps_inf ) ) / rho
             elseif (((model_eqns == 4) .or. (model_eqns == 2 .and. bubbles_euler))) then
                 ! Sound speed for bubble mmixture to order O(\alpha)
 
@@ -1654,7 +1648,7 @@ contains
                         (rho*(1._wp - adv(num_fluids)))
                 end if
             else
-                c = ((H - 5.e-1*vel_sum)/gamma)
+                c = (H - 5.e-1*vel_sum - qv/rho)/gamma
             end if
 
             if (mixture_err .and. c < 0._wp) then
