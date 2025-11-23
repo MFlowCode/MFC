@@ -33,7 +33,7 @@
     vel_avg_rms = (sqrt(rho_L)*vel_L(1) + sqrt(rho_R)*vel_R(1))**2._wp/ &
                   (sqrt(rho_L) + sqrt(rho_R))**2._wp
 
-    qv_avg = (sqrt(qv_L)*H_L + sqrt(qv_R)*H_r)/ &
+    qv_avg = (sqrt(rho_L)*qv_L + sqrt(rho_R)*qv_R)/ &
              (sqrt(rho_L) + sqrt(rho_R))
 
     if (chemistry) then
