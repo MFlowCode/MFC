@@ -1634,9 +1634,15 @@ contains
                            pi_infs(2))/gammas(2)
                 c = (1._wp/(rho*(adv(1)/blkmod1 + adv(2)/blkmod2)))
             elseif (model_eqns == 3) then
-                c = sum(adv*gs_min*(pres + ps_inf))/rho
+                c = 0._wp
+                $:GPU_LOOP(parallelism='[seq]')
+                do q = 1, num_fluids
+                    c = c + adv(q)*(1._wp/gammas(q) + 1._wp)* &
+                        (pres + pi_infs(q)/(gammas(q) + 1._wp))
+                end do
+                c = c/rho
             elseif (((model_eqns == 4) .or. (model_eqns == 2 .and. bubbles_euler))) then
-                ! Sound speed for bubble mmixture to order O(\alpha)
+                ! Sound speed for bubble mixture to order O(\alpha)
 
                 if (mpp_lim .and. (num_fluids > 1)) then
                     c = (1._wp/gamma + 1._wp)* &
