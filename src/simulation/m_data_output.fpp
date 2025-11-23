@@ -273,19 +273,20 @@ contains
         real(wp), dimension(num_fluids) :: alpha      !< Cell-avg. volume fraction
         real(wp) :: gamma      !< Cell-avg. sp. heat ratio
         real(wp) :: pi_inf     !< Cell-avg. liquid stiffness function
+        real(wp) :: qv         !< Cell-avg. internal energy reference value
         real(wp) :: c          !< Cell-avg. sound speed
         real(wp) :: H          !< Cell-avg. enthalpy
         real(wp), dimension(2) :: Re         !< Cell-avg. Reynolds numbers
         integer :: j, k, l
 
         ! Computing Stability Criteria at Current Time-step
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[j,k,l,vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[j,k,l,vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H, qv]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    call s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, j, k, l)
+                    call s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, j, k, l)
 
-                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, 0._wp, c)
+                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, 0._wp, c, qv)
 
                     if (viscous) then
                         call s_compute_stability_from_dt(vel, c, rho, Re, j, k, l, icfl_sf, vcfl_sf, Rc_sf)
@@ -1292,7 +1293,7 @@ contains
 
                     ! Compute mixture sound Speed
                     call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, &
-                                                  ((gamma + 1._wp)*pres + pi_inf)/rho, alpha, 0._wp, 0._wp, c)
+                                                  ((gamma + 1._wp)*pres + pi_inf)/rho, alpha, 0._wp, 0._wp, c, qv)
 
                     accel = accel_mag(j - 2, k, l)
                 end if
@@ -1382,7 +1383,7 @@ contains
                         end if
                         ! Compute mixture sound speed
                         call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, &
-                                                      ((gamma + 1._wp)*pres + pi_inf)/rho, alpha, 0._wp, 0._wp, c)
+                                                      ((gamma + 1._wp)*pres + pi_inf)/rho, alpha, 0._wp, 0._wp, c, qv)
 
                     end if
                 end if
@@ -1447,7 +1448,7 @@ contains
 
                             ! Compute mixture sound speed
                             call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, &
-                                                          ((gamma + 1._wp)*pres + pi_inf)/rho, alpha, 0._wp, 0._wp, c)
+                                                          ((gamma + 1._wp)*pres + pi_inf)/rho, alpha, 0._wp, 0._wp, c, qv)
 
                             accel = accel_mag(j - 2, k - 2, l - 2)
                         end if

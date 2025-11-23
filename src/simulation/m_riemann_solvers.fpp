@@ -317,6 +317,7 @@ contains
 
         real(wp) :: rho_avg
         real(wp) :: H_avg
+        real(wp) :: qv_avg
         real(wp) :: gamma_avg
         real(wp) :: c_avg
 
@@ -629,16 +630,16 @@ contains
                             @:compute_average_state()
 
                             call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
-                                                          vel_L_rms, 0._wp, c_L)
+                                                          vel_L_rms, 0._wp, c_L, qv_L)
 
                             call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
-                                                          vel_R_rms, 0._wp, c_R)
+                                                          vel_R_rms, 0._wp, c_R, qv_R)
 
                             !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
                             ! variables are placeholders to call the subroutine.
 
                             call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
-                                                          vel_avg_rms, c_sum_Yi_Phi, c_avg)
+                                                          vel_avg_rms, c_sum_Yi_Phi, c_avg, qv_avg)
 
                             if (mhd) then
                                 call s_compute_fast_magnetosonic_speed(rho_L, c_L, B%L, norm_dir, c_fast%L, H_L)
@@ -1356,10 +1357,10 @@ contains
                             end if
 
                             call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
-                                                          vel_L_rms, 0._wp, c_L)
+                                                          vel_L_rms, 0._wp, c_L, qv_L)
 
                             call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
-                                                          vel_R_rms, 0._wp, c_R)
+                                                          vel_R_rms, 0._wp, c_R, qv_R)
 
                             if (mhd) then
                                 call s_compute_fast_magnetosonic_speed(rho_L, c_L, B%L, norm_dir, c_fast%L, H_L)
@@ -1937,6 +1938,7 @@ contains
         real(wp) :: rho_avg
         real(wp) :: H_avg
         real(wp) :: gamma_avg
+        real(wp) :: qv_avg
         real(wp) :: c_avg
 
         real(wp) :: s_L, s_R, s_M, s_P, s_S
@@ -2156,15 +2158,15 @@ contains
                                 @:compute_average_state()
 
                                 call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
-                                                              vel_L_rms, 0._wp, c_L)
+                                                              vel_L_rms, 0._wp, c_L, qv_L)
 
                                 call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
-                                                              vel_R_rms, 0._wp, c_R)
+                                                              vel_R_rms, 0._wp, c_R, qv_R)
 
                                 !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
                                 ! variables are placeholders to call the subroutine.
                                 call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
-                                                              vel_avg_rms, 0._wp, c_avg)
+                                                              vel_avg_rms, 0._wp, c_avg, qv_avg)
 
                                 if (viscous) then
                                     $:GPU_LOOP(parallelism='[seq]')
@@ -2472,16 +2474,16 @@ contains
                                 @:compute_average_state()
 
                                 call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
-                                                              vel_L_rms, 0._wp, c_L)
+                                                              vel_L_rms, 0._wp, c_L, qv_L)
 
                                 call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
-                                                              vel_R_rms, 0._wp, c_R)
+                                                              vel_R_rms, 0._wp, c_R, qv_R)
 
                                 !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
                                 ! variables are placeholders to call the subroutine.
 
                                 call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
-                                                              vel_avg_rms, 0._wp, c_avg)
+                                                              vel_avg_rms, 0._wp, c_avg, qv_avg)
 
                                 if (wave_speeds == 1) then
                                     s_L = min(vel_L(dir_idx(1)) - c_L, vel_R(dir_idx(1)) - c_R)
@@ -2858,15 +2860,15 @@ contains
                                 end if
 
                                 call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
-                                                              vel_L_rms, 0._wp, c_L)
+                                                              vel_L_rms, 0._wp, c_L, qv_L)
 
                                 call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
-                                                              vel_R_rms, 0._wp, c_R)
+                                                              vel_R_rms, 0._wp, c_R, qv_R)
 
                                 !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
                                 ! variables are placeholders to call the subroutine.
                                 call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
-                                                              vel_avg_rms, 0._wp, c_avg)
+                                                              vel_avg_rms, 0._wp, c_avg, qv_avg)
 
                                 if (viscous) then
                                     $:GPU_LOOP(parallelism='[seq]')
@@ -3295,15 +3297,15 @@ contains
                                 @:compute_average_state()
 
                                 call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, H_L, alpha_L, &
-                                                              vel_L_rms, 0._wp, c_L)
+                                                              vel_L_rms, 0._wp, c_L, qv_L)
 
                                 call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, H_R, alpha_R, &
-                                                              vel_R_rms, 0._wp, c_R)
+                                                              vel_R_rms, 0._wp, c_R, qv_R)
 
                                 !> The computation of c_avg does not require all the variables, and therefore the non '_avg'
                                 !  variables are placeholders to call the subroutine.
                                 call s_compute_speed_of_sound(pres_R, rho_avg, gamma_avg, pi_inf_R, H_avg, alpha_R, &
-                                                              vel_avg_rms, c_sum_Yi_Phi, c_avg)
+                                                              vel_avg_rms, c_sum_Yi_Phi, c_avg, qv_avg)
 
                                 if (viscous) then
                                     if (chemistry) then
@@ -3750,8 +3752,8 @@ contains
                                 H_no_mag%R = (E%R + pres%R - pres_mag%R)/rho%R ! stagnation enthalpy here excludes magnetic energy (only used to find speed of sound)
 
                                 ! (2) Compute fast wave speeds
-                                call s_compute_speed_of_sound(pres%L, rho%L, gamma%L, pi_inf%L, H_no_mag%L, alpha_L, vel_rms%L, 0._wp, c%L)
-                                call s_compute_speed_of_sound(pres%R, rho%R, gamma%R, pi_inf%R, H_no_mag%R, alpha_R, vel_rms%R, 0._wp, c%R)
+                                call s_compute_speed_of_sound(pres%L, rho%L, gamma%L, pi_inf%L, H_no_mag%L, alpha_L, vel_rms%L, 0._wp, c%L, qv%L)
+                                call s_compute_speed_of_sound(pres%R, rho%R, gamma%R, pi_inf%R, H_no_mag%R, alpha_R, vel_rms%R, 0._wp, c%R, qv%R)
                                 call s_compute_fast_magnetosonic_speed(rho%L, c%L, B%L, norm_dir, c_fast%L, H_no_mag%L)
                                 call s_compute_fast_magnetosonic_speed(rho%R, c%R, B%R, norm_dir, c_fast%R, H_no_mag%R)
 
