@@ -2850,7 +2850,7 @@ contains
                                     rho_avg = 5.e-1_wp*(rho_L + rho_R)
                                     H_avg = 5.e-1_wp*(H_L + H_R)
                                     gamma_avg = 5.e-1_wp*(gamma_L + gamma_R)
-                                    qv_avg    = 5.e-1_wp*(qv_L + qv_R)
+                                    qv_avg = 5.e-1_wp*(qv_L + qv_R)
                                     vel_avg_rms = 0._wp
 
                                     $:GPU_LOOP(parallelism='[seq]')
