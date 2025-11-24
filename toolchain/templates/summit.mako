@@ -2,6 +2,7 @@
 
 <%namespace name="helpers" file="helpers.mako"/>
 
+
 % if engine == 'batch':
 #BSUB -J {{{name}}}
 #BSUB -nnodes {{{nodes}}}
@@ -16,7 +17,7 @@ ${helpers.template_prologue()}
 
 ok ":) Loading modules:\n"
 cd "${MFC_ROOT_DIR}"
-. ./mfc.sh load -c s -m ${'g' if gpu else 'c'}
+. ./mfc.sh load -c s -m ${'g' if is_gpu_active else 'c'}
 cd - > /dev/null
 echo
 

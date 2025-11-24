@@ -2,6 +2,7 @@
 import os
 from mako.exceptions import RuntimeException
 %>
+
 % if os.name == 'nt':
 @echo off
 % else:
@@ -48,7 +49,7 @@ if engine == 'batch':
                 (set -x; ${profiler}   \
                     jsrun --nrs          ${tasks_per_node*nodes} \
                         --cpu_per_rs   1                       \
-                        --gpu_per_rs   ${1 if gpu else 0}      \
+                        --gpu_per_rs   ${1 if is_gpu_active else 0}      \
                         --tasks_per_rs 1                       \
                         "${target.get_install_binpath(case)}")
             elif [ "$binary" == "srun" ]; then

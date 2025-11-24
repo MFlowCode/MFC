@@ -59,7 +59,7 @@ ${helpers.template_prologue()}
 ok ":) Loading modules:\n"
 cd "${MFC_ROOT_DIR}"
 % if engine == 'batch':
-. ./mfc.sh load -c san -m ${'g' if gpu else 'c'}
+. ./mfc.sh load -c san -m ${'g' if is_gpu_active else 'c'}
 % endif
 cd - > /dev/null
 echo
@@ -74,7 +74,7 @@ echo
                 --ntasks=${nodes*tasks_per_node}                     \
                 --cpus-per-task 72                                   \
                 --cpu-bind=none                                      \
-            % if gpu:
+            % if is_gpu_active:
                 --gpus-per-task 1                                    \
             % endif
                 --wait 200 --bcast=/tmp/${target.name}               \
