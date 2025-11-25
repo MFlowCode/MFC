@@ -424,8 +424,8 @@ contains
             do i = 1, num_fluids
 
                 q_sf = q_cons_vf(i + intxb - 1)%sf(-offset_x%beg:m + offset_x%end, &
-                                                -offset_y%beg:n + offset_y%end, &
-                                                -offset_z%beg:p + offset_z%end)
+                                                   -offset_y%beg:n + offset_y%end, &
+                                                   -offset_z%beg:p + offset_z%end)
 
                 write (varname, '(A,I0)') 'alpha_rho_e', i
                 call s_write_variable_to_formatted_database_file(varname, t_step)
@@ -433,7 +433,7 @@ contains
                 varname(:) = ' '
             end do
         end if
-        
+
         !Adding Energy cascade FFT
         if (fft_wrt) then
 
