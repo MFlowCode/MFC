@@ -423,6 +423,7 @@ contains
             fluid_pp(i)%qv = 0._wp
             fluid_pp(i)%qvp = 0._wp
             fluid_pp(i)%G = dflt_real
+            fluid_pp(i)%D_v = dflt_Real
         end do
 
         ! Formatted database file(s) structure parameters
