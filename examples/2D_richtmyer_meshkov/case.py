@@ -92,7 +92,6 @@ print(
             "viscous": "T",
             "fluid_pp(1)%Re(1)": 1 / mu,
             "fluid_pp(2)%Re(1)": 1 / mu,
-
         }
     )
 )
