@@ -1582,7 +1582,7 @@ contains
     impure subroutine s_write_energy_data_file(q_prim_vf, q_cons_vf)
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf, q_cons_vf
         real(wp) :: Elk, Egk, Elp, Egint, Vb, Vl, pres_av, Et
-        real(wp) :: rho, pres, dV, tmp, gamma, pi_inf, MaxMa, MaxMa_glb, maxvel, c, Ma, H
+        real(wp) :: rho, pres, dV, tmp, gamma, pi_inf, MaxMa, MaxMa_glb, maxvel, c, Ma, H, qv
         real(wp), dimension(num_vels) :: vel
         real(wp), dimension(num_fluids) :: adv
         integer :: i, j, k, l, s !looping indices
@@ -1610,6 +1610,7 @@ contains
                     rho = 0._wp
                     gamma = 0._wp
                     pi_inf = 0._wp
+                    qv = 0._wp
                     pres = q_prim_vf(E_idx)%sf(i, j, k)
                     Egint = Egint + q_prim_vf(E_idx + 2)%sf(i, j, k)*(fluid_pp(2)%gamma*pres)*dV
                     do s = 1, num_vels
@@ -1625,13 +1626,14 @@ contains
                         gamma = gamma + adv(l)*fluid_pp(l)%gamma
                         pi_inf = pi_inf + adv(l)*fluid_pp(l)%pi_inf
                         rho = rho + adv(l)*q_prim_vf(l)%sf(i, j, k)
+                        qv = qv + adv(l)*q_prim_vf(l)%sf(i, j, k)*fluid_pp(l)%qv
                     end do
 
-                    H = ((gamma + 1._wp)*pres + pi_inf)/rho
+                    H = ((gamma + 1._wp)*pres + pi_inf + qv)/rho
 
                     call s_compute_speed_of_sound(pres, rho, &
                                                   gamma, pi_inf, &
-                                                  H, adv, 0._wp, 0._wp, c)
+                                                  H, adv, 0._wp, 0._wp, c, qv)
 
                     Ma = maxvel/c
                     if (Ma > MaxMa .and. (adv(1) > (1.0_wp - 1.0e-10_wp))) then

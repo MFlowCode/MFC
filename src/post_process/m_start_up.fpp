@@ -700,7 +700,7 @@ contains
 
                         call s_compute_speed_of_sound(pres, rho_sf(i, j, k), &
                                                       gamma_sf(i, j, k), pi_inf_sf(i, j, k), &
-                                                      H, adv, 0._wp, 0._wp, c)
+                                                      H, adv, 0._wp, 0._wp, c, qv_sf(i, j, k))
 
                         q_sf(i, j, k) = c
                     end do
