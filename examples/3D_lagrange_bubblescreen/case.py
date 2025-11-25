@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3
 import math
 import json
 
@@ -176,7 +176,7 @@ print(
             "fluid_pp(2)%M_v": MW_g,
             "fluid_pp(2)%k_v": k_g,
             "fluid_pp(2)%cp_v": cp_g,
-            "fluid_pp(2)%D_v": diffVapor
+            "fluid_pp(2)%D_v": diffVapor,
         }
     )
 )
