@@ -528,9 +528,9 @@ for cmp_id in range(100):
 POST_PROCESS['chem_wrt_T'] = ParamType.LOG
 
 for fl_id in range(1,10+1):
-    for append, ty in [("schlieren_alpha", ParamType.REAL),
-                       ("alpha_rho_wrt", ParamType.LOG),
-                       ("alpha_wrt", ParamType.LOG), ("kappa_wrt", ParamType.LOG)]:
+    for append, ty in [("schlieren_alpha", ParamType.REAL), ("alpha_rho_wrt", ParamType.LOG),
+                       ("alpha_wrt", ParamType.LOG), ("kappa_wrt", ParamType.LOG),
+                       ("alpha_rho_e_wrt", ParamType.LOG)]:
         POST_PROCESS[f'{append}({fl_id})'] = ty
 
     for real_attr in ["gamma", "pi_inf", "ss", "pv", "gamma_v", "M_v", "mu_v", "k_v", "cp_v",

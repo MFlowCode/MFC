@@ -124,6 +124,7 @@ contains
         call MPI_BCAST(mom_wrt(1), 3, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(vel_wrt(1), 3, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(alpha_rho_wrt(1), num_fluids_max, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(alpha_rho_e_wrt(1), num_fluids_max, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(alpha_wrt(1), num_fluids_max, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
 
         do i = 1, num_fluids_max
