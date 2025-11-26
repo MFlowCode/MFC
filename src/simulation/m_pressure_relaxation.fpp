@@ -177,7 +177,7 @@ contains
                 ! Enforce pressure bounds
                 do i = 1, num_fluids
                     if (pres_relax <= -(1._wp - 1.e-8_wp)*ps_inf(i) + 1.e-8_wp) &
-                        pres_relax = -(1._wp - 1.e-8_wp)*ps_inf(i) + 1._wp
+                        pres_relax = -(1._wp - 1.e-8_wp)*ps_inf(i) + 1.e-8_wp
                 end do
 
                 ! Newton-Raphson step
