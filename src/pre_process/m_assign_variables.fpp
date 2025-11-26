@@ -214,10 +214,7 @@ contains
         pres_mag = 1.e-1_wp
         loc = x_cc(177)
         n_tait = gs_min(1)
-        B_tait = pi_infs(1)
-
-        n_tait = 1._wp/n_tait + 1._wp
-        B_tait = B_tait*(n_tait - 1._wp)/n_tait
+        B_tait = ps_inf(1)
 
         if (j < 177) then
             q_prim_vf(E_idx)%sf(j, k, l) = 0.5_wp*q_prim_vf(E_idx)%sf(j, k, l)
