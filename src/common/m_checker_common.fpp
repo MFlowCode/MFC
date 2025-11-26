@@ -165,13 +165,11 @@ contains
     !> Checks constraints on the phase change parameters.
         !! Called by s_check_inputs_common for pre-processing and simulation
     impure subroutine s_check_inputs_phase_change
-        @:PROHIBIT(relax .and. model_eqns /= 3, "phase change requires model_eqns = 3")
-        @:PROHIBIT(relax .and. relax_model < 0, "relax_model must be in between 0 and 6")
-        @:PROHIBIT(relax .and. relax_model > 6, "relax_model must be in between 0 and 6")
-        @:PROHIBIT(relax .and. palpha_eps <= 0._wp, "palpha_eps must be positive")
-        @:PROHIBIT(relax .and. palpha_eps >= 1._wp, "palpha_eps must be less than 1")
-        @:PROHIBIT(relax .and. ptgalpha_eps <= 0._wp, "ptgalpha_eps must be positive")
-        @:PROHIBIT(relax .and. ptgalpha_eps >= 1._wp, "ptgalpha_eps must be less than 1")
+        @:PROHIBIT(relax .and. ( .not. any((/ 2, 3 /) == model_eqns ) ), "phase change requires model_eqns = 2 or 3")
+        @:PROHIBIT(relax .and. ( .not. any((/ 1, 4, 5, 6/) == relax_model ) ) , "relax_model must be 1, 4, 5, or 6")
+        @:PROHIBIT(relax .and. ( model_eqns == 2 ) .and. ( .not. any((/ 5, 6 /) == relax_model ) ), "relax_model = (5,6) for model_eqns == 2")
+        @:PROHIBIT(relax .and. ( ( palpha_eps <= 0._wp ) .or. ( palpha_eps >= 1._wp ) ), "palpha_eps must be \in (0,1)")
+        @:PROHIBIT(relax .and. ( ( ptgalpha_eps <= 0._wp ) .or. ( ptgalpha_eps >= 1._wp ) ), "ptgalpha_eps must be \in (0,1)")
         @:PROHIBIT((.not. relax) .and. &
             ((relax_model /= dflt_int) .or. (.not. f_is_default(palpha_eps)) .or. (.not. f_is_default(ptgalpha_eps))), &
             "relax is not set as true, but other phase change parameters have been modified. " // &
