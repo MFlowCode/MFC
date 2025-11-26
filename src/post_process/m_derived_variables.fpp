@@ -204,10 +204,10 @@ contains
                                           pi_inf_sf(i, j, k))/(gamma_sf(i, j, k)* &
                                                                rho_sf(i, j, k)))
                     else
-                        blkmod1 = ((fluid_pp(1)%gamma + 1._wp)*q_prim_vf(E_idx)%sf(i, j, k) + &
-                                   fluid_pp(1)%pi_inf)/fluid_pp(1)%gamma
-                        blkmod2 = ((fluid_pp(2)%gamma + 1._wp)*q_prim_vf(E_idx)%sf(i, j, k) + &
-                                   fluid_pp(2)%pi_inf)/fluid_pp(2)%gamma
+                        blkmod1 = ((gammas(1) + 1._wp)*q_prim_vf(E_idx)%sf(i, j, k) + &
+                                   pi_infs(1))/gammas(1)
+                        blkmod2 = ((gammas(2) + 1._wp)*q_prim_vf(E_idx)%sf(i, j, k) + &
+                                   pi_infs(2))/gammas(2)
                         q_sf(i, j, k) = (1._wp/(rho_sf(i, j, k)*(q_prim_vf(adv_idx%beg)%sf(i, j, k)/blkmod1 + &
                                                                  (1._wp - q_prim_vf(adv_idx%beg)%sf(i, j, k))/blkmod2)))
                     end if

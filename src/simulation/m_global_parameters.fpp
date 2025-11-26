@@ -943,8 +943,6 @@ contains
                         end if
                     end if
                     sys_size = bub_idx%end
-                    ! print*, 'alf idx', alf_idx
-                    ! print*, 'bub -idx beg end', bub_idx%beg, bub_idx%end
 
                     if (adv_n) then
                         n_idx = bub_idx%end + 1
