@@ -799,7 +799,7 @@ contains
                             !zero density, reassign according to Tait EOS
                             q_prim_vf(1)%sf(i, j, 0) = &
                                 (((q_prim_vf(E_idx)%sf(i, j, 0) + pi_inf)/(pref + pi_inf))**(1._wp/lit_gamma))* &
-                                (1._wp - q_prim_vf(alf_idx)%sf(i, j, 0))
+                                rhoref*(1._wp - q_prim_vf(alf_idx)%sf(i, j, 0))
                         end if
 
                         ! Updating the patch identities bookkeeping variable
