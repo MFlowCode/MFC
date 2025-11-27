@@ -240,6 +240,7 @@ module m_global_parameters
     integer :: flux_lim
     logical, dimension(3) :: flux_wrt
     logical :: E_wrt
+    logical, dimension(num_fluids_max) :: alpha_rho_e_wrt
     logical :: fft_wrt
     logical :: pres_wrt
     logical, dimension(num_fluids_max) :: alpha_wrt
@@ -432,6 +433,7 @@ contains
         down_sample = .false.
 
         alpha_rho_wrt = .false.
+        alpha_rho_e_wrt = .false.
         rho_wrt = .false.
         mom_wrt = .false.
         vel_wrt = .false.
