@@ -4,6 +4,10 @@
     real(wp) :: r, rmax, gam, umax, p0
     real(wp) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, intL, alph
     real(wp) :: factor
+    ! # 207
+    real(wp) :: sigma, gauss1, gauss2
+    ! # 208
+    real(wp) :: ei, d, fsm, alpha_air, alpha_sf6
 
     eps = 1.e-9_wp
 #:enddef
@@ -127,6 +131,29 @@
             q_prim_vf(E_idx)%sf(i, j, 0) = patch_icpp(1)%pres
             q_prim_vf(advxb)%sf(i, j, 0) = patch_icpp(1)%alpha(1)
             q_prim_vf(advxe)%sf(i, j, 0) = patch_icpp(1)%alpha(2)
+        end if
+
+    case (207) ! Kelvin Helmholtz Instability
+        sigma = 0.05_wp/sqrt(2.0_wp)
+        gauss1 = exp(-(y_cc(j) - 0.75_wp)**2/(2.0_wp*sigma**2))
+        gauss2 = exp(-(y_cc(j) - 0.25_wp)**2/(2.0_wp*sigma**2))
+        q_prim_vf(momxb + 1)%sf(i, j, 0) = &
+            0.1_wp*sin(4.0_wp*pi*x_cc(i))*(gauss1 + gauss2)
+
+    case (208) ! Richtmeyer Meshkov Instability
+        lam = 1.0_wp
+        eps = 1.0e-6_wp
+        ei = 5.0_wp
+        ! Smoothening function to smooth out sharp discontinuity in the interface
+        if (x_cc(i) <= 0.7_wp*lam) then
+            d = x_cc(i) - lam*(0.4_wp - 0.1_wp*sin(2.0_wp*pi*(y_cc(j)/lam + 0.25_wp)))
+            fsm = 0.5_wp*(1.0_wp + erf(d/(ei*sqrt(dx*dy))))
+            alpha_air = eps + (1.0_wp - 2.0_wp*eps)*fsm
+            alpha_sf6 = 1.0_wp - alpha_air
+            q_prim_vf(contxb)%sf(i, j, 0) = alpha_sf6*5.04_wp
+            q_prim_vf(contxe)%sf(i, j, 0) = alpha_air*1.0_wp
+            q_prim_vf(advxb)%sf(i, j, 0) = alpha_sf6
+            q_prim_vf(advxe)%sf(i, j, 0) = alpha_air
         end if
 
     case (250) ! MHD Orszag-Tang vortex
