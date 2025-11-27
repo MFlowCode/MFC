@@ -6,13 +6,6 @@
 # [slug]-cpu [cpu-only modules]  (any number of lines)
 # [slug]-gpu [gpu-only modules]  (any number of lines)
 
-s     OLCF Summit
-s-all python/3.8.10 darshan-runtime/3.3.1-lite hsi/5.0.2.p5 xalt/1.2.1
-s-cpu lsf-tools/2.0 cmake/3.23.2 ninja/1.10.2 spectrum-mpi/10.4.0.3-20210112
-s-cpu gcc/12.1.0
-s-gpu nvhpc/22.11 cuda/nvhpc
-s-gpu CC=nvc CXX=nvc++ FC=nvfortran
-
 b     PSC Bridges2
 b-all python/3.8.6 hdf5 anaconda3
 b-cpu allocations/1.0 gcc/10.2.0 openmpi/4.0.5-gcc10.2.0
