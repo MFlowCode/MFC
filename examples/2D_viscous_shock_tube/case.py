@@ -4,7 +4,7 @@ import math
 
 
 mu = 1.0e-3
-time_end = 1.2
+time_end = 1.0
 time_save = time_end / 100.0
 eps = 1.0e-6
 
@@ -35,18 +35,18 @@ print(
             "mpp_lim": "T",
             "mixture_err": "T",
             "time_stepper": 3,
-            "weno_order": 5,
+            "weno_order": 3,
             "weno_eps": 1.0e-10,
             "null_weights": "F",
             "mapped_weno": "T",
-            "mp_weno": "T",
+            "mp_weno": "F",
             "riemann_solver": 1,
             "wave_speeds": 1,
-            "avg_state": 2,
+            "avg_state": 1,
             "bc_x%beg": -8,
             "bc_x%end": -15,
             "bc_y%beg": -16,
-            "bc_y%end": -15,
+            "bc_y%end": -5,
             # Formatted Database Files Structure Parameters
             "format": 1,
             "precision": 2,
