@@ -31,6 +31,8 @@ module m_icpp_patches
 
     use m_ib_patches
 
+    use m_variables_conversion
+
     implicit none
 
     private; public :: s_apply_icpp_patches
@@ -210,9 +212,9 @@ contains
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded1DVariables()
 
-        pi_inf = fluid_pp(1)%pi_inf
-        gamma = fluid_pp(1)%gamma
-        lit_gamma = (1._wp + gamma)/gamma
+        pi_inf = pi_infs(1)
+        gamma = gammas(1)
+        lit_gamma = gs_min(1)
         j = 0
         k = 0
 
@@ -748,9 +750,9 @@ contains
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded2DVariables()
 
-        pi_inf = fluid_pp(1)%pi_inf
-        gamma = fluid_pp(1)%gamma
-        lit_gamma = (1._wp + gamma)/gamma
+        pi_inf = pi_infs(1)
+        gamma = gammas(1)
+        lit_gamma = gs_min(1)
 
         ! Transferring the rectangle's centroid and length information
         x_centroid = patch_icpp(patch_id)%x_centroid
@@ -911,9 +913,9 @@ contains
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded2DVariables()
 
-        pi_inf = fluid_pp(1)%pi_inf
-        gamma = fluid_pp(1)%gamma
-        lit_gamma = (1._wp + gamma)/gamma
+        pi_inf = pi_infs(1)
+        gamma = gammas(1)
+        lit_gamma = gs_min(1)
 
         ! Transferring the patch's centroid and length information
         x_centroid = patch_icpp(patch_id)%x_centroid
@@ -997,9 +999,9 @@ contains
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded1DVariables()
 
-        pi_inf = fluid_pp(1)%pi_inf
-        gamma = fluid_pp(1)%gamma
-        lit_gamma = (1._wp + gamma)/gamma
+        pi_inf = pi_infs(1)
+        gamma = gammas(1)
+        lit_gamma = gs_min(1)
 
         ! Transferring the patch's centroid and length information
         x_centroid = patch_icpp(patch_id)%x_centroid

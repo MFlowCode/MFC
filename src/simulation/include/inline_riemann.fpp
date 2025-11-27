@@ -8,6 +8,7 @@
 
     H_avg = 5.e-1_wp*(H_L + H_R)
     gamma_avg = 5.e-1_wp*(gamma_L + gamma_R)
+    qv_avg = 5.e-1_wp*(qv_L + qv_R)
 
 #:enddef arithmetic_avg
 
@@ -31,6 +32,9 @@
 
     vel_avg_rms = (sqrt(rho_L)*vel_L(1) + sqrt(rho_R)*vel_R(1))**2._wp/ &
                   (sqrt(rho_L) + sqrt(rho_R))**2._wp
+
+    qv_avg = (sqrt(rho_L)*qv_L + sqrt(rho_R)*qv_R)/ &
+             (sqrt(rho_L) + sqrt(rho_R))
 
     if (chemistry) then
         eps = 0.001_wp

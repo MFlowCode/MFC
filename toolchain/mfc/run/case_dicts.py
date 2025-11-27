@@ -151,7 +151,7 @@ for f_id in range(1, 10+1):
     PRE_PROCESS[f'fluid_rho({f_id})'] = ParamType.REAL
 
     for real_attr in ["gamma", "pi_inf", "mul0", "ss", "pv", "gamma_v", "M_v",
-                      "mu_v", "k_v", "cp_v", "G", "cv", "qv", "qvp" ]:
+                      "mu_v", "k_v", "cp_v", "G", "cv", "qv", "qvp", "D_v" ]:
         PRE_PROCESS[f"fluid_pp({f_id})%{real_attr}"] = ParamType.REAL
 
     PRE_PROCESS[f"simplex_params%perturb_dens({f_id})"] = ParamType.LOG
@@ -349,7 +349,7 @@ for var in [ 'heatTransfer_model', 'massTransfer_model', 'pressure_corrector',
 for var in [ 'solver_approach', 'cluster_type', 'smooth_type', 'nBubs_glb']:
     SIMULATION[f'lag_params%{var}'] = ParamType.INT
 
-for var in [ 'epsilonb', 'valmaxvoid', 'charwidth', 'diffcoefvap',
+for var in [ 'epsilonb', 'valmaxvoid', 'charwidth',
             'c0', 'rho0', 'T0', 'x0', 'Thost' ]:
     SIMULATION[f'lag_params%{var}'] = ParamType.REAL
 
@@ -414,7 +414,7 @@ for probe_id in range(1,10+1):
 
 for f_id in range(1,10+1):
     for real_attr in ["gamma", "pi_inf", "mul0", "ss", "pv", "gamma_v", "M_v",
-                      "mu_v", "k_v", "cp_v", "G", "cv", "qv", "qvp" ]:
+                      "mu_v", "k_v", "cp_v", "G", "cv", "qv", "qvp", 'D_v' ]:
         SIMULATION[f"fluid_pp({f_id})%{real_attr}"] = ParamType.REAL
 
     for re_id in [1, 2]:
@@ -528,13 +528,13 @@ for cmp_id in range(100):
 POST_PROCESS['chem_wrt_T'] = ParamType.LOG
 
 for fl_id in range(1,10+1):
-    for append, ty in [("schlieren_alpha", ParamType.REAL),
-                       ("alpha_rho_wrt", ParamType.LOG),
-                       ("alpha_wrt", ParamType.LOG), ("kappa_wrt", ParamType.LOG)]:
+    for append, ty in [("schlieren_alpha", ParamType.REAL), ("alpha_rho_wrt", ParamType.LOG),
+                       ("alpha_wrt", ParamType.LOG), ("kappa_wrt", ParamType.LOG),
+                       ("alpha_rho_e_wrt", ParamType.LOG)]:
         POST_PROCESS[f'{append}({fl_id})'] = ty
 
     for real_attr in ["gamma", "pi_inf", "ss", "pv", "gamma_v", "M_v", "mu_v", "k_v", "cp_v",
-                      "G", "mul0", "cv", "qv", "qvp" ]:
+                      "G", "mul0", "cv", "qv", "qvp", "D_v" ]:
         POST_PROCESS[f"fluid_pp({fl_id})%{real_attr}"] = ParamType.REAL
 
 IGNORE = ["cantera_file", "chemistry"]

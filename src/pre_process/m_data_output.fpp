@@ -273,10 +273,10 @@ contains
             end do
         end if
 
-        gamma = fluid_pp(1)%gamma
-        lit_gamma = 1._wp/fluid_pp(1)%gamma + 1._wp
-        pi_inf = fluid_pp(1)%pi_inf
-        qv = fluid_pp(1)%qv
+        gamma = gammas(1)
+        lit_gamma = gs_min(1)
+        pi_inf = pi_infs(1)
+        qv = qvs(1)
 
         if (precision == 1) then
             FMT = "(2F30.3)"
