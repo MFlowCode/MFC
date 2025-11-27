@@ -156,6 +156,22 @@
             q_prim_vf(E_idx)%sf(i, j, 0) = 3.e-5_wp
         end if
 
+    case (252) ! MHD Smooth Magnetic Vortex
+        ! Section 5.2 of
+        ! Implicit hybridized discontinuous Galerkin methods for compressible magnetohydrodynamics
+        ! C. Ciuca, P. Fernandez, A. Christophe, N.C. Nguyen, J. Peraire
+
+        ! velocity
+        q_prim_vf(momxb)%sf(i, j, 0) = 1._wp - (y_cc(j)*exp(1 - (x_cc(i)**2 + y_cc(j)**2))/(2.*pi))
+        q_prim_vf(momxb + 1)%sf(i, j, 0) = 1._wp + (x_cc(i)*exp(1 - (x_cc(i)**2 + y_cc(j)**2))/(2.*pi))
+
+        ! magnetic field
+        q_prim_vf(B_idx%beg)%sf(i, j, 0) = -y_cc(j)*exp(1 - (x_cc(i)**2 + y_cc(j)**2))/(2.*pi)
+        q_prim_vf(B_idx%beg + 1)%sf(i, j, 0) = x_cc(i)*exp(1 - (x_cc(i)**2 + y_cc(j)**2))/(2.*pi)
+
+        ! pressure
+        q_prim_vf(E_idx)%sf(i, j, 0) = 1._wp + (1 - 2._wp*(x_cc(i)**2 + y_cc(j)**2))*exp(1 - (x_cc(i)**2 + y_cc(j)**2))/((2._wp*pi)**3)
+
     case (270)
         ! This hardcoded case extrudes a 1D profile to initialize a 2D simulation domain
         @: HardcodedReadValues()

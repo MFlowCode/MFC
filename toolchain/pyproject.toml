@@ -38,8 +38,9 @@ dependencies = [
 
     # Chemistry
     "cantera==3.1.0",
-    "pyrometheus == 1.0.5",
-    
+    #"pyrometheus == 1.0.5",
+    "pyrometheus @ git+https://github.com/wilfonba/pyrometheus-wilfong.git@OpenMPTest",
+
     # Frontier Profiling
     "astunparse==1.6.2",
     "colorlover",

@@ -59,13 +59,12 @@ contains
         type(int_bounds_info), dimension(1:3), intent(in) :: bounds
 
         integer :: x, y, z, eqn
-        real(wp) :: energy
+        real(wp) :: energy, T_in
         real(wp), dimension(num_species) :: Ys
 
         do z = bounds(3)%beg, bounds(3)%end
             do y = bounds(2)%beg, bounds(2)%end
                 do x = bounds(1)%beg, bounds(1)%end
-                    $:GPU_LOOP(parallelism='[seq]')
                     do eqn = chemxb, chemxe
                         Ys(eqn - chemxb + 1) = &
                             q_cons_vf(eqn)%sf(x, y, z)/q_cons_vf(contxb)%sf(x, y, z)
@@ -76,13 +75,15 @@ contains
                     ! cons. contxb    = \rho         (1-fluid model)
                     ! cons. momxb + i = \rho u_i
                     energy = q_cons_vf(E_idx)%sf(x, y, z)/q_cons_vf(contxb)%sf(x, y, z)
-                    $:GPU_LOOP(parallelism='[seq]')
                     do eqn = momxb, momxe
                         energy = energy - &
                                  0.5_wp*(q_cons_vf(eqn)%sf(x, y, z)/q_cons_vf(contxb)%sf(x, y, z))**2._wp
                     end do
 
-                    call get_temperature(energy, dflt_T_guess, Ys, .true., q_T_sf%sf(x, y, z))
+                    T_in = real(q_T_sf%sf(x, y, z), kind=wp)
+                    call get_temperature(energy, dflt_T_guess, Ys, .true., T_in)
+                    q_T_sf%sf(x, y, z) = T_in
+
                 end do
             end do
         end do
@@ -102,7 +103,6 @@ contains
         do z = bounds(3)%beg, bounds(3)%end
             do y = bounds(2)%beg, bounds(2)%end
                 do x = bounds(1)%beg, bounds(1)%end
-                    $:GPU_LOOP(parallelism='[seq]')
                     do i = chemxb, chemxe
                         Ys(i - chemxb + 1) = q_prim_vf(i)%sf(x, y, z)
                     end do
@@ -129,37 +129,37 @@ contains
         real(wp), dimension(num_species) :: Ys
         real(wp), dimension(num_species) :: omega
 
-        #:call GPU_PARALLEL_LOOP(collapse=3, private='[Ys, omega, T]')
-            do z = bounds(3)%beg, bounds(3)%end
-                do y = bounds(2)%beg, bounds(2)%end
-                    do x = bounds(1)%beg, bounds(1)%end
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[Ys, omega, eqn, T, rho, omega, omega_m]', copyin='[bounds]')
+        do z = bounds(3)%beg, bounds(3)%end
+            do y = bounds(2)%beg, bounds(2)%end
+                do x = bounds(1)%beg, bounds(1)%end
 
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do eqn = chemxb, chemxe
-                            Ys(eqn - chemxb + 1) = q_prim_qp(eqn)%sf(x, y, z)
-                        end do
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do eqn = chemxb, chemxe
+                        Ys(eqn - chemxb + 1) = q_prim_qp(eqn)%sf(x, y, z)
+                    end do
 
-                        rho = q_cons_qp(contxe)%sf(x, y, z)
-                        T = q_T_sf%sf(x, y, z)
+                    rho = q_cons_qp(contxe)%sf(x, y, z)
+                    T = q_T_sf%sf(x, y, z)
 
-                        call get_net_production_rates(rho, T, Ys, omega)
+                    call get_net_production_rates(rho, T, Ys, omega)
 
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do eqn = chemxb, chemxe
-                            #:block UNDEF_AMD
-                                omega_m = molecular_weights(eqn - chemxb + 1)*omega(eqn - chemxb + 1)
-                            #:endblock UNDEF_AMD
-                            #:block DEF_AMD
-                                omega_m = molecular_weights_nonparameter(eqn - chemxb + 1)*omega(eqn - chemxb + 1)
-                            #:endblock DEF_AMD
-                            rhs_vf(eqn)%sf(x, y, z) = rhs_vf(eqn)%sf(x, y, z) + omega_m
-
-                        end do
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do eqn = chemxb, chemxe
+                        #:block UNDEF_AMD
+                            omega_m = molecular_weights(eqn - chemxb + 1)*omega(eqn - chemxb + 1)
+                        #:endblock UNDEF_AMD
+                        #:block DEF_AMD
+                            omega_m = molecular_weights_nonparameter(eqn - chemxb + 1)*omega(eqn - chemxb + 1)
+                        #:endblock DEF_AMD
+                        rhs_vf(eqn)%sf(x, y, z) = rhs_vf(eqn)%sf(x, y, z) + omega_m
 
                     end do
+
                 end do
             end do
-        #:endcall GPU_PARALLEL_LOOP
+        end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_compute_chemistry_reaction_flux
 
@@ -190,8 +190,8 @@ contains
             ! Set offsets based on direction using array indexing
             offsets = 0
             offsets(idir) = 1
-
-            #:call GPU_PARALLEL_LOOP(collapse=3,  private='[Ys_L, Ys_R, Ys_cell, Xs_L, Xs_R, mass_diffusivities_mixavg1, mass_diffusivities_mixavg2, mass_diffusivities_mixavg_Cell, h_l, h_r, Xs_cell, h_k, dXk_dxi,Mass_Diffu_Flux]', copyin='[offsets]')
+            #:block UNDEF_AMD
+                $:GPU_PARALLEL_LOOP(collapse=3,  private='[x,y,z,Ys_L, Ys_R, Ys_cell, Xs_L, Xs_R, mass_diffusivities_mixavg1, mass_diffusivities_mixavg2, mass_diffusivities_mixavg_Cell, h_l, h_r, Xs_cell, h_k, dXk_dxi,Mass_Diffu_Flux, Mass_Diffu_Energy, MW_L, MW_R, MW_cell, Rgas_L, Rgas_R, T_L, T_R, P_L, P_R, rho_L, rho_R, rho_cell, rho_Vic, lambda_L, lambda_R, lambda_Cell, dT_dxi, grid_spacing]', copyin='[offsets]')
                 do z = isc3%beg, isc3%end
                     do y = isc2%beg, isc2%end
                         do x = isc1%beg, isc1%end
@@ -298,7 +298,8 @@ contains
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP()
+            #:endblock UNDEF_AMD
         end if
 
     end subroutine s_compute_chemistry_diffusion_flux

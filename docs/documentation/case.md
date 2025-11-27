@@ -745,6 +745,7 @@ Details of the transducer acoustic source model can be found in [Maeda and Colon
 | `mu_v` †	        | Real 		|	Viscosity |
 | `k_v` †	          | Real 		|	Thermal conductivity |
 | `cp_v` †	        | Real 		|	Specific heat capacity |
+| `D_v` †           | Real    | Vapor diffusivity in the gas |
 
 These options work only for gas-liquid two-component flows.
 Component indexes are required to be 1 for liquid and 2 for gas.
@@ -836,7 +837,6 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 | `T0`                  | Real    | Reference temperature                                     |
 | `x0`                  | Real    | Reference length                                          |
 | `Thost`               | Real    | Temperature of the surrounding liquid (host)              |
-| `diffcoefvap`         | Real    | Vapor diffusivity in the gas                              |
 
 - `nBubs_glb` Total number of bubbles. Their initial conditions need to be specified in the ./input/lag_bubbles.dat file. See the example cases for additional information.
 

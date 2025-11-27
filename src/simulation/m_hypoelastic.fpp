@@ -104,272 +104,272 @@ contains
             ! calculate velocity gradients + rho_K and G_K
             ! TODO: re-organize these loops one by one for GPU efficiency if possible?
 
-            #:call GPU_PARALLEL_LOOP(collapse=3)
+            $:GPU_PARALLEL_LOOP(collapse=3)
+            do q = 0, p
+                do l = 0, n
+                    do k = 0, m
+                        du_dx_hypo(k, l, q) = 0._wp
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+
+            $:GPU_PARALLEL_LOOP(collapse=3)
+            do q = 0, p
+                do l = 0, n
+                    do k = 0, m
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do r = -fd_number, fd_number
+                            du_dx_hypo(k, l, q) = du_dx_hypo(k, l, q) &
+                                                  + q_prim_vf(momxb)%sf(k + r, l, q)*fd_coeff_x_hypo(r, k)
+                        end do
+
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+
+            if (ndirs > 1) then
+                $:GPU_PARALLEL_LOOP(collapse=3)
                 do q = 0, p
                     do l = 0, n
                         do k = 0, m
-                            du_dx_hypo(k, l, q) = 0._wp
+                            du_dy_hypo(k, l, q) = 0._wp; dv_dx_hypo(k, l, q) = 0._wp; dv_dy_hypo(k, l, q) = 0._wp
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP()
 
-            #:call GPU_PARALLEL_LOOP(collapse=3)
+                $:GPU_PARALLEL_LOOP(collapse=3)
                 do q = 0, p
                     do l = 0, n
                         do k = 0, m
                             $:GPU_LOOP(parallelism='[seq]')
                             do r = -fd_number, fd_number
-                                du_dx_hypo(k, l, q) = du_dx_hypo(k, l, q) &
-                                                      + q_prim_vf(momxb)%sf(k + r, l, q)*fd_coeff_x_hypo(r, k)
+                                du_dy_hypo(k, l, q) = du_dy_hypo(k, l, q) &
+                                                      + q_prim_vf(momxb)%sf(k, l + r, q)*fd_coeff_y_hypo(r, l)
+                                dv_dx_hypo(k, l, q) = dv_dx_hypo(k, l, q) &
+                                                      + q_prim_vf(momxb + 1)%sf(k + r, l, q)*fd_coeff_x_hypo(r, k)
+                                dv_dy_hypo(k, l, q) = dv_dy_hypo(k, l, q) &
+                                                      + q_prim_vf(momxb + 1)%sf(k, l + r, q)*fd_coeff_y_hypo(r, l)
                             end do
-
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+                $:END_GPU_PARALLEL_LOOP()
 
-            if (ndirs > 1) then
-                #:call GPU_PARALLEL_LOOP(collapse=3)
+                ! 3D
+                if (ndirs == 3) then
+
+                    $:GPU_PARALLEL_LOOP(collapse=3)
                     do q = 0, p
                         do l = 0, n
                             do k = 0, m
-                                du_dy_hypo(k, l, q) = 0._wp; dv_dx_hypo(k, l, q) = 0._wp; dv_dy_hypo(k, l, q) = 0._wp
+                                du_dz_hypo(k, l, q) = 0._wp; dv_dz_hypo(k, l, q) = 0._wp; dw_dx_hypo(k, l, q) = 0._wp; 
+                                dw_dy_hypo(k, l, q) = 0._wp; dw_dz_hypo(k, l, q) = 0._wp; 
                             end do
                         end do
                     end do
-                #:endcall GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP()
 
-                #:call GPU_PARALLEL_LOOP(collapse=3)
+                    $:GPU_PARALLEL_LOOP(collapse=3)
                     do q = 0, p
                         do l = 0, n
                             do k = 0, m
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do r = -fd_number, fd_number
-                                    du_dy_hypo(k, l, q) = du_dy_hypo(k, l, q) &
-                                                          + q_prim_vf(momxb)%sf(k, l + r, q)*fd_coeff_y_hypo(r, l)
-                                    dv_dx_hypo(k, l, q) = dv_dx_hypo(k, l, q) &
-                                                          + q_prim_vf(momxb + 1)%sf(k + r, l, q)*fd_coeff_x_hypo(r, k)
-                                    dv_dy_hypo(k, l, q) = dv_dy_hypo(k, l, q) &
-                                                          + q_prim_vf(momxb + 1)%sf(k, l + r, q)*fd_coeff_y_hypo(r, l)
+                                    du_dz_hypo(k, l, q) = du_dz_hypo(k, l, q) &
+                                                          + q_prim_vf(momxb)%sf(k, l, q + r)*fd_coeff_z_hypo(r, q)
+                                    dv_dz_hypo(k, l, q) = dv_dz_hypo(k, l, q) &
+                                                          + q_prim_vf(momxb + 1)%sf(k, l, q + r)*fd_coeff_z_hypo(r, q)
+                                    dw_dx_hypo(k, l, q) = dw_dx_hypo(k, l, q) &
+                                                          + q_prim_vf(momxe)%sf(k + r, l, q)*fd_coeff_x_hypo(r, k)
+                                    dw_dy_hypo(k, l, q) = dw_dy_hypo(k, l, q) &
+                                                          + q_prim_vf(momxe)%sf(k, l + r, q)*fd_coeff_y_hypo(r, l)
+                                    dw_dz_hypo(k, l, q) = dw_dz_hypo(k, l, q) &
+                                                          + q_prim_vf(momxe)%sf(k, l, q + r)*fd_coeff_z_hypo(r, q)
                                 end do
                             end do
                         end do
                     end do
-                #:endcall GPU_PARALLEL_LOOP
-
-                ! 3D
-                if (ndirs == 3) then
-
-                    #:call GPU_PARALLEL_LOOP(collapse=3)
-                        do q = 0, p
-                            do l = 0, n
-                                do k = 0, m
-                                    du_dz_hypo(k, l, q) = 0._wp; dv_dz_hypo(k, l, q) = 0._wp; dw_dx_hypo(k, l, q) = 0._wp; 
-                                    dw_dy_hypo(k, l, q) = 0._wp; dw_dz_hypo(k, l, q) = 0._wp; 
-                                end do
-                            end do
-                        end do
-                    #:endcall GPU_PARALLEL_LOOP
-
-                    #:call GPU_PARALLEL_LOOP(collapse=3)
-                        do q = 0, p
-                            do l = 0, n
-                                do k = 0, m
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do r = -fd_number, fd_number
-                                        du_dz_hypo(k, l, q) = du_dz_hypo(k, l, q) &
-                                                              + q_prim_vf(momxb)%sf(k, l, q + r)*fd_coeff_z_hypo(r, q)
-                                        dv_dz_hypo(k, l, q) = dv_dz_hypo(k, l, q) &
-                                                              + q_prim_vf(momxb + 1)%sf(k, l, q + r)*fd_coeff_z_hypo(r, q)
-                                        dw_dx_hypo(k, l, q) = dw_dx_hypo(k, l, q) &
-                                                              + q_prim_vf(momxe)%sf(k + r, l, q)*fd_coeff_x_hypo(r, k)
-                                        dw_dy_hypo(k, l, q) = dw_dy_hypo(k, l, q) &
-                                                              + q_prim_vf(momxe)%sf(k, l + r, q)*fd_coeff_y_hypo(r, l)
-                                        dw_dz_hypo(k, l, q) = dw_dz_hypo(k, l, q) &
-                                                              + q_prim_vf(momxe)%sf(k, l, q + r)*fd_coeff_z_hypo(r, q)
-                                    end do
-                                end do
-                            end do
-                        end do
-                    #:endcall GPU_PARALLEL_LOOP
+                    $:END_GPU_PARALLEL_LOOP()
                 end if
             end if
 
-            #:call GPU_PARALLEL_LOOP(collapse=3)
-                do q = 0, p
-                    do l = 0, n
-                        do k = 0, m
-                            rho_K = 0._wp; G_K = 0._wp
-                            do i = 1, num_fluids
-                                rho_K = rho_K + q_prim_vf(i)%sf(k, l, q) !alpha_rho_K(1)
-                                G_K = G_K + q_prim_vf(advxb - 1 + i)%sf(k, l, q)*Gs_hypo(i)  !alpha_K(1) * Gs_hypo(1)
-                            end do
-
-                            if (cont_damage) G_K = G_K*max((1._wp - q_prim_vf(damage_idx)%sf(k, l, q)), 0._wp)
-
-                            rho_K_field(k, l, q) = rho_K
-                            G_K_field(k, l, q) = G_K
-
-                            !TODO: take this out if not needed
-                            if (G_K < verysmall) then
-                                G_K_field(k, l, q) = 0
-                            end if
+            $:GPU_PARALLEL_LOOP(collapse=3,private='[rho_K, G_K]')
+            do q = 0, p
+                do l = 0, n
+                    do k = 0, m
+                        rho_K = 0._wp; G_K = 0._wp
+                        do i = 1, num_fluids
+                            rho_K = rho_K + q_prim_vf(i)%sf(k, l, q) !alpha_rho_K(1)
+                            G_K = G_K + q_prim_vf(advxb - 1 + i)%sf(k, l, q)*Gs_hypo(i)  !alpha_K(1) * Gs_hypo(1)
                         end do
+
+                        if (cont_damage) G_K = G_K*max((1._wp - q_prim_vf(damage_idx)%sf(k, l, q)), 0._wp)
+
+                        rho_K_field(k, l, q) = rho_K
+                        G_K_field(k, l, q) = G_K
+
+                        !TODO: take this out if not needed
+                        if (G_K < verysmall) then
+                            G_K_field(k, l, q) = 0
+                        end if
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            end do
+            $:END_GPU_PARALLEL_LOOP()
 
             ! apply rhs source term to elastic stress equation
-            #:call GPU_PARALLEL_LOOP(collapse=3)
-                do q = 0, p
-                    do l = 0, n
-                        do k = 0, m
-                            rhs_vf(strxb)%sf(k, l, q) = &
-                                rhs_vf(strxb)%sf(k, l, q) + rho_K_field(k, l, q)* &
-                                ((4._wp*G_K_field(k, l, q)/3._wp) + &
-                                 q_prim_vf(strxb)%sf(k, l, q))* &
-                                du_dx_hypo(k, l, q)
-                        end do
+            $:GPU_PARALLEL_LOOP(collapse=3)
+            do q = 0, p
+                do l = 0, n
+                    do k = 0, m
+                        rhs_vf(strxb)%sf(k, l, q) = &
+                            rhs_vf(strxb)%sf(k, l, q) + rho_K_field(k, l, q)* &
+                            ((4._wp*G_K_field(k, l, q)/3._wp) + &
+                             q_prim_vf(strxb)%sf(k, l, q))* &
+                            du_dx_hypo(k, l, q)
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            end do
+            $:END_GPU_PARALLEL_LOOP()
 
         elseif (idir == 2) then
-            #:call GPU_PARALLEL_LOOP(collapse=3)
-                do q = 0, p
-                    do l = 0, n
-                        do k = 0, m
-                            rhs_vf(strxb)%sf(k, l, q) = rhs_vf(strxb)%sf(k, l, q) + rho_K_field(k, l, q)* &
-                                                        (q_prim_vf(strxb + 1)%sf(k, l, q)*du_dy_hypo(k, l, q) + &
-                                                         q_prim_vf(strxb + 1)%sf(k, l, q)*du_dy_hypo(k, l, q) - &
-                                                         q_prim_vf(strxb)%sf(k, l, q)*dv_dy_hypo(k, l, q) - &
-                                                         2._wp*G_K_field(k, l, q)*(1._wp/3._wp)*dv_dy_hypo(k, l, q))
+            $:GPU_PARALLEL_LOOP(collapse=3)
+            do q = 0, p
+                do l = 0, n
+                    do k = 0, m
+                        rhs_vf(strxb)%sf(k, l, q) = rhs_vf(strxb)%sf(k, l, q) + rho_K_field(k, l, q)* &
+                                                    (q_prim_vf(strxb + 1)%sf(k, l, q)*du_dy_hypo(k, l, q) + &
+                                                     q_prim_vf(strxb + 1)%sf(k, l, q)*du_dy_hypo(k, l, q) - &
+                                                     q_prim_vf(strxb)%sf(k, l, q)*dv_dy_hypo(k, l, q) - &
+                                                     2._wp*G_K_field(k, l, q)*(1._wp/3._wp)*dv_dy_hypo(k, l, q))
 
-                            rhs_vf(strxb + 1)%sf(k, l, q) = rhs_vf(strxb + 1)%sf(k, l, q) + rho_K_field(k, l, q)* &
-                                                            (q_prim_vf(strxb + 1)%sf(k, l, q)*du_dx_hypo(k, l, q) + &
-                                                             q_prim_vf(strxb)%sf(k, l, q)*dv_dx_hypo(k, l, q) - &
-                                                             q_prim_vf(strxb + 1)%sf(k, l, q)*du_dx_hypo(k, l, q) + &
-                                                             q_prim_vf(strxb + 2)%sf(k, l, q)*du_dy_hypo(k, l, q) + &
-                                                             q_prim_vf(strxb + 1)%sf(k, l, q)*dv_dy_hypo(k, l, q) - &
-                                                             q_prim_vf(strxb + 1)%sf(k, l, q)*dv_dy_hypo(k, l, q) + &
-                                                             2._wp*G_K_field(k, l, q)*(1._wp/2._wp)*(du_dy_hypo(k, l, q) + &
-                                                                                                     dv_dx_hypo(k, l, q)))
+                        rhs_vf(strxb + 1)%sf(k, l, q) = rhs_vf(strxb + 1)%sf(k, l, q) + rho_K_field(k, l, q)* &
+                                                        (q_prim_vf(strxb + 1)%sf(k, l, q)*du_dx_hypo(k, l, q) + &
+                                                         q_prim_vf(strxb)%sf(k, l, q)*dv_dx_hypo(k, l, q) - &
+                                                         q_prim_vf(strxb + 1)%sf(k, l, q)*du_dx_hypo(k, l, q) + &
+                                                         q_prim_vf(strxb + 2)%sf(k, l, q)*du_dy_hypo(k, l, q) + &
+                                                         q_prim_vf(strxb + 1)%sf(k, l, q)*dv_dy_hypo(k, l, q) - &
+                                                         q_prim_vf(strxb + 1)%sf(k, l, q)*dv_dy_hypo(k, l, q) + &
+                                                         2._wp*G_K_field(k, l, q)*(1._wp/2._wp)*(du_dy_hypo(k, l, q) + &
+                                                                                                 dv_dx_hypo(k, l, q)))
 
-                            rhs_vf(strxb + 2)%sf(k, l, q) = rhs_vf(strxb + 2)%sf(k, l, q) + rho_K_field(k, l, q)* &
-                                                            (q_prim_vf(strxb + 1)%sf(k, l, q)*dv_dx_hypo(k, l, q) + &
-                                                             q_prim_vf(strxb + 1)%sf(k, l, q)*dv_dx_hypo(k, l, q) - &
-                                                             q_prim_vf(strxb + 2)%sf(k, l, q)*du_dx_hypo(k, l, q) + &
-                                                             q_prim_vf(strxb + 2)%sf(k, l, q)*dv_dy_hypo(k, l, q) + &
-                                                             q_prim_vf(strxb + 2)%sf(k, l, q)*dv_dy_hypo(k, l, q) - &
-                                                             q_prim_vf(strxb + 2)%sf(k, l, q)*dv_dy_hypo(k, l, q) + &
-                                                             2._wp*G_K_field(k, l, q)*(dv_dy_hypo(k, l, q) - (1._wp/3._wp)* &
-                                                                                       (du_dx_hypo(k, l, q) + &
-                                                                                        dv_dy_hypo(k, l, q))))
-                        end do
+                        rhs_vf(strxb + 2)%sf(k, l, q) = rhs_vf(strxb + 2)%sf(k, l, q) + rho_K_field(k, l, q)* &
+                                                        (q_prim_vf(strxb + 1)%sf(k, l, q)*dv_dx_hypo(k, l, q) + &
+                                                         q_prim_vf(strxb + 1)%sf(k, l, q)*dv_dx_hypo(k, l, q) - &
+                                                         q_prim_vf(strxb + 2)%sf(k, l, q)*du_dx_hypo(k, l, q) + &
+                                                         q_prim_vf(strxb + 2)%sf(k, l, q)*dv_dy_hypo(k, l, q) + &
+                                                         q_prim_vf(strxb + 2)%sf(k, l, q)*dv_dy_hypo(k, l, q) - &
+                                                         q_prim_vf(strxb + 2)%sf(k, l, q)*dv_dy_hypo(k, l, q) + &
+                                                         2._wp*G_K_field(k, l, q)*(dv_dy_hypo(k, l, q) - (1._wp/3._wp)* &
+                                                                                   (du_dx_hypo(k, l, q) + &
+                                                                                    dv_dy_hypo(k, l, q))))
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            end do
+            $:END_GPU_PARALLEL_LOOP()
 
         elseif (idir == 3) then
-            #:call GPU_PARALLEL_LOOP(collapse=3)
-                do q = 0, p
-                    do l = 0, n
-                        do k = 0, m
-                            rhs_vf(strxb)%sf(k, l, q) = rhs_vf(strxb)%sf(k, l, q) + rho_K_field(k, l, q)* &
-                                                        (q_prim_vf(strxb + 3)%sf(k, l, q)*du_dz_hypo(k, l, q) + &
-                                                         q_prim_vf(strxb + 3)%sf(k, l, q)*du_dz_hypo(k, l, q) - &
-                                                         q_prim_vf(strxb)%sf(k, l, q)*dw_dz_hypo(k, l, q) - &
+            $:GPU_PARALLEL_LOOP(collapse=3)
+            do q = 0, p
+                do l = 0, n
+                    do k = 0, m
+                        rhs_vf(strxb)%sf(k, l, q) = rhs_vf(strxb)%sf(k, l, q) + rho_K_field(k, l, q)* &
+                                                    (q_prim_vf(strxb + 3)%sf(k, l, q)*du_dz_hypo(k, l, q) + &
+                                                     q_prim_vf(strxb + 3)%sf(k, l, q)*du_dz_hypo(k, l, q) - &
+                                                     q_prim_vf(strxb)%sf(k, l, q)*dw_dz_hypo(k, l, q) - &
+                                                     2._wp*G_K_field(k, l, q)*(1._wp/3._wp)*dw_dz_hypo(k, l, q))
+
+                        rhs_vf(strxb + 1)%sf(k, l, q) = rhs_vf(strxb + 1)%sf(k, l, q) + rho_K_field(k, l, q)* &
+                                                        (q_prim_vf(strxb + 4)%sf(k, l, q)*du_dz_hypo(k, l, q) + &
+                                                         q_prim_vf(strxb + 3)%sf(k, l, q)*dv_dz_hypo(k, l, q) - &
+                                                         q_prim_vf(strxb + 1)%sf(k, l, q)*dw_dz_hypo(k, l, q))
+
+                        rhs_vf(strxb + 2)%sf(k, l, q) = rhs_vf(strxb + 2)%sf(k, l, q) + rho_K_field(k, l, q)* &
+                                                        (q_prim_vf(strxb + 4)%sf(k, l, q)*dv_dz_hypo(k, l, q) + &
+                                                         q_prim_vf(strxb + 4)%sf(k, l, q)*dv_dz_hypo(k, l, q) - &
+                                                         q_prim_vf(strxb + 2)%sf(k, l, q)*dw_dz_hypo(k, l, q) - &
                                                          2._wp*G_K_field(k, l, q)*(1._wp/3._wp)*dw_dz_hypo(k, l, q))
 
-                            rhs_vf(strxb + 1)%sf(k, l, q) = rhs_vf(strxb + 1)%sf(k, l, q) + rho_K_field(k, l, q)* &
-                                                            (q_prim_vf(strxb + 4)%sf(k, l, q)*du_dz_hypo(k, l, q) + &
-                                                             q_prim_vf(strxb + 3)%sf(k, l, q)*dv_dz_hypo(k, l, q) - &
-                                                             q_prim_vf(strxb + 1)%sf(k, l, q)*dw_dz_hypo(k, l, q))
+                        rhs_vf(strxb + 3)%sf(k, l, q) = rhs_vf(strxb + 3)%sf(k, l, q) + rho_K_field(k, l, q)* &
+                                                        (q_prim_vf(strxb + 3)%sf(k, l, q)*du_dx_hypo(k, l, q) + &
+                                                         q_prim_vf(strxb)%sf(k, l, q)*dw_dx_hypo(k, l, q) - &
+                                                         q_prim_vf(strxb + 3)%sf(k, l, q)*du_dx_hypo(k, l, q) + &
+                                                         q_prim_vf(strxb + 4)%sf(k, l, q)*du_dy_hypo(k, l, q) + &
+                                                         q_prim_vf(strxb + 1)%sf(k, l, q)*dw_dy_hypo(k, l, q) - &
+                                                         q_prim_vf(strxb + 3)%sf(k, l, q)*dv_dy_hypo(k, l, q) + &
+                                                         q_prim_vf(strxb + 5)%sf(k, l, q)*du_dz_hypo(k, l, q) + &
+                                                         q_prim_vf(strxb + 3)%sf(k, l, q)*dw_dz_hypo(k, l, q) - &
+                                                         q_prim_vf(strxb + 3)%sf(k, l, q)*dw_dz_hypo(k, l, q) + &
+                                                         2._wp*G_K_field(k, l, q)*(1._wp/2._wp)*(du_dz_hypo(k, l, q) + &
+                                                                                                 dw_dx_hypo(k, l, q)))
 
-                            rhs_vf(strxb + 2)%sf(k, l, q) = rhs_vf(strxb + 2)%sf(k, l, q) + rho_K_field(k, l, q)* &
-                                                            (q_prim_vf(strxb + 4)%sf(k, l, q)*dv_dz_hypo(k, l, q) + &
-                                                             q_prim_vf(strxb + 4)%sf(k, l, q)*dv_dz_hypo(k, l, q) - &
-                                                             q_prim_vf(strxb + 2)%sf(k, l, q)*dw_dz_hypo(k, l, q) - &
-                                                             2._wp*G_K_field(k, l, q)*(1._wp/3._wp)*dw_dz_hypo(k, l, q))
+                        rhs_vf(strxb + 4)%sf(k, l, q) = rhs_vf(strxb + 4)%sf(k, l, q) + rho_K_field(k, l, q)* &
+                                                        (q_prim_vf(strxb + 3)%sf(k, l, q)*dv_dx_hypo(k, l, q) + &
+                                                         q_prim_vf(strxb + 1)%sf(k, l, q)*dw_dx_hypo(k, l, q) - &
+                                                         q_prim_vf(strxb + 4)%sf(k, l, q)*du_dx_hypo(k, l, q) + &
+                                                         q_prim_vf(strxb + 4)%sf(k, l, q)*dv_dy_hypo(k, l, q) + &
+                                                         q_prim_vf(strxb + 2)%sf(k, l, q)*dw_dy_hypo(k, l, q) - &
+                                                         q_prim_vf(strxb + 4)%sf(k, l, q)*dv_dy_hypo(k, l, q) + &
+                                                         q_prim_vf(strxb + 5)%sf(k, l, q)*dv_dz_hypo(k, l, q) + &
+                                                         q_prim_vf(strxb + 4)%sf(k, l, q)*dw_dz_hypo(k, l, q) - &
+                                                         q_prim_vf(strxb + 4)%sf(k, l, q)*dw_dz_hypo(k, l, q) + &
+                                                         2._wp*G_K_field(k, l, q)*(1._wp/2._wp)*(dv_dz_hypo(k, l, q) + &
+                                                                                                 dw_dy_hypo(k, l, q)))
 
-                            rhs_vf(strxb + 3)%sf(k, l, q) = rhs_vf(strxb + 3)%sf(k, l, q) + rho_K_field(k, l, q)* &
-                                                            (q_prim_vf(strxb + 3)%sf(k, l, q)*du_dx_hypo(k, l, q) + &
-                                                             q_prim_vf(strxb)%sf(k, l, q)*dw_dx_hypo(k, l, q) - &
-                                                             q_prim_vf(strxb + 3)%sf(k, l, q)*du_dx_hypo(k, l, q) + &
-                                                             q_prim_vf(strxb + 4)%sf(k, l, q)*du_dy_hypo(k, l, q) + &
-                                                             q_prim_vf(strxb + 1)%sf(k, l, q)*dw_dy_hypo(k, l, q) - &
-                                                             q_prim_vf(strxb + 3)%sf(k, l, q)*dv_dy_hypo(k, l, q) + &
-                                                             q_prim_vf(strxb + 5)%sf(k, l, q)*du_dz_hypo(k, l, q) + &
-                                                             q_prim_vf(strxb + 3)%sf(k, l, q)*dw_dz_hypo(k, l, q) - &
-                                                             q_prim_vf(strxb + 3)%sf(k, l, q)*dw_dz_hypo(k, l, q) + &
-                                                             2._wp*G_K_field(k, l, q)*(1._wp/2._wp)*(du_dz_hypo(k, l, q) + &
-                                                                                                     dw_dx_hypo(k, l, q)))
-
-                            rhs_vf(strxb + 4)%sf(k, l, q) = rhs_vf(strxb + 4)%sf(k, l, q) + rho_K_field(k, l, q)* &
-                                                            (q_prim_vf(strxb + 3)%sf(k, l, q)*dv_dx_hypo(k, l, q) + &
-                                                             q_prim_vf(strxb + 1)%sf(k, l, q)*dw_dx_hypo(k, l, q) - &
-                                                             q_prim_vf(strxb + 4)%sf(k, l, q)*du_dx_hypo(k, l, q) + &
-                                                             q_prim_vf(strxb + 4)%sf(k, l, q)*dv_dy_hypo(k, l, q) + &
-                                                             q_prim_vf(strxb + 2)%sf(k, l, q)*dw_dy_hypo(k, l, q) - &
-                                                             q_prim_vf(strxb + 4)%sf(k, l, q)*dv_dy_hypo(k, l, q) + &
-                                                             q_prim_vf(strxb + 5)%sf(k, l, q)*dv_dz_hypo(k, l, q) + &
-                                                             q_prim_vf(strxb + 4)%sf(k, l, q)*dw_dz_hypo(k, l, q) - &
-                                                             q_prim_vf(strxb + 4)%sf(k, l, q)*dw_dz_hypo(k, l, q) + &
-                                                             2._wp*G_K_field(k, l, q)*(1._wp/2._wp)*(dv_dz_hypo(k, l, q) + &
-                                                                                                     dw_dy_hypo(k, l, q)))
-
-                            rhs_vf(strxe)%sf(k, l, q) = rhs_vf(strxe)%sf(k, l, q) + rho_K_field(k, l, q)* &
-                                                        (q_prim_vf(strxe - 2)%sf(k, l, q)*dw_dx_hypo(k, l, q) + &
-                                                         q_prim_vf(strxe - 2)%sf(k, l, q)*dw_dx_hypo(k, l, q) - &
-                                                         q_prim_vf(strxe)%sf(k, l, q)*du_dx_hypo(k, l, q) + &
-                                                         q_prim_vf(strxe - 1)%sf(k, l, q)*dw_dy_hypo(k, l, q) + &
-                                                         q_prim_vf(strxe - 1)%sf(k, l, q)*dw_dy_hypo(k, l, q) - &
-                                                         q_prim_vf(strxe)%sf(k, l, q)*dv_dy_hypo(k, l, q) + &
-                                                         q_prim_vf(strxe)%sf(k, l, q)*dw_dz_hypo(k, l, q) + &
-                                                         q_prim_vf(strxe)%sf(k, l, q)*dw_dz_hypo(k, l, q) - &
-                                                         q_prim_vf(strxe)%sf(k, l, q)*dw_dz_hypo(k, l, q) + &
-                                                         2._wp*G_K_field(k, l, q)*(dw_dz_hypo(k, l, q) - (1._wp/3._wp)* &
-                                                                                   (du_dx_hypo(k, l, q) + &
-                                                                                    dv_dy_hypo(k, l, q) + &
-                                                                                    dw_dz_hypo(k, l, q))))
-                        end do
+                        rhs_vf(strxe)%sf(k, l, q) = rhs_vf(strxe)%sf(k, l, q) + rho_K_field(k, l, q)* &
+                                                    (q_prim_vf(strxe - 2)%sf(k, l, q)*dw_dx_hypo(k, l, q) + &
+                                                     q_prim_vf(strxe - 2)%sf(k, l, q)*dw_dx_hypo(k, l, q) - &
+                                                     q_prim_vf(strxe)%sf(k, l, q)*du_dx_hypo(k, l, q) + &
+                                                     q_prim_vf(strxe - 1)%sf(k, l, q)*dw_dy_hypo(k, l, q) + &
+                                                     q_prim_vf(strxe - 1)%sf(k, l, q)*dw_dy_hypo(k, l, q) - &
+                                                     q_prim_vf(strxe)%sf(k, l, q)*dv_dy_hypo(k, l, q) + &
+                                                     q_prim_vf(strxe)%sf(k, l, q)*dw_dz_hypo(k, l, q) + &
+                                                     q_prim_vf(strxe)%sf(k, l, q)*dw_dz_hypo(k, l, q) - &
+                                                     q_prim_vf(strxe)%sf(k, l, q)*dw_dz_hypo(k, l, q) + &
+                                                     2._wp*G_K_field(k, l, q)*(dw_dz_hypo(k, l, q) - (1._wp/3._wp)* &
+                                                                               (du_dx_hypo(k, l, q) + &
+                                                                                dv_dy_hypo(k, l, q) + &
+                                                                                dw_dz_hypo(k, l, q))))
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            end do
+            $:END_GPU_PARALLEL_LOOP()
         end if
 
         if (cyl_coord .and. idir == 2) then
 
-            #:call GPU_PARALLEL_LOOP(collapse=3)
-                do q = 0, p
-                    do l = 0, n
-                        do k = 0, m
-                            ! S_xx -= rho * v/r * (tau_xx + 2/3*G)
-                            rhs_vf(strxb)%sf(k, l, q) = rhs_vf(strxb)%sf(k, l, q) - &
+            $:GPU_PARALLEL_LOOP(collapse=3)
+            do q = 0, p
+                do l = 0, n
+                    do k = 0, m
+                        ! S_xx -= rho * v/r * (tau_xx + 2/3*G)
+                        rhs_vf(strxb)%sf(k, l, q) = rhs_vf(strxb)%sf(k, l, q) - &
+                                                    rho_K_field(k, l, q)*q_prim_vf(momxb + 1)%sf(k, l, q)/y_cc(l)* &
+                                                    (q_prim_vf(strxb)%sf(k, l, q) + (2._wp/3._wp)*G_K_field(k, l, q)) ! tau_xx + 2/3*G
+
+                        ! S_xr -= rho * v/r * tau_xr
+                        rhs_vf(strxb + 1)%sf(k, l, q) = rhs_vf(strxb + 1)%sf(k, l, q) - &
                                                         rho_K_field(k, l, q)*q_prim_vf(momxb + 1)%sf(k, l, q)/y_cc(l)* &
-                                                        (q_prim_vf(strxb)%sf(k, l, q) + (2._wp/3._wp)*G_K_field(k, l, q)) ! tau_xx + 2/3*G
+                                                        q_prim_vf(strxb + 1)%sf(k, l, q) ! tau_xx
 
-                            ! S_xr -= rho * v/r * tau_xr
-                            rhs_vf(strxb + 1)%sf(k, l, q) = rhs_vf(strxb + 1)%sf(k, l, q) - &
-                                                            rho_K_field(k, l, q)*q_prim_vf(momxb + 1)%sf(k, l, q)/y_cc(l)* &
-                                                            q_prim_vf(strxb + 1)%sf(k, l, q) ! tau_xx
+                        ! S_rr -= rho * v/r * (tau_rr + 2/3*G)
+                        rhs_vf(strxb + 2)%sf(k, l, q) = rhs_vf(strxb + 2)%sf(k, l, q) - &
+                                                        rho_K_field(k, l, q)*q_prim_vf(momxb + 1)%sf(k, l, q)/y_cc(l)* &
+                                                        (q_prim_vf(strxb + 2)%sf(k, l, q) + (2._wp/3._wp)*G_K_field(k, l, q)) ! tau_rr + 2/3*G
 
-                            ! S_rr -= rho * v/r * (tau_rr + 2/3*G)
-                            rhs_vf(strxb + 2)%sf(k, l, q) = rhs_vf(strxb + 2)%sf(k, l, q) - &
-                                                            rho_K_field(k, l, q)*q_prim_vf(momxb + 1)%sf(k, l, q)/y_cc(l)* &
-                                                            (q_prim_vf(strxb + 2)%sf(k, l, q) + (2._wp/3._wp)*G_K_field(k, l, q)) ! tau_rr + 2/3*G
-
-                            ! S_thetatheta += rho * ( -(tau_thetatheta + 2/3*G)*(du/dx + dv/dr + v/r) + 2*(tau_thetatheta + G)*v/r )
-                            rhs_vf(strxb + 3)%sf(k, l, q) = rhs_vf(strxb + 3)%sf(k, l, q) + &
-                                                            rho_K_field(k, l, q)*( &
-                                                            -(q_prim_vf(strxb + 3)%sf(k, l, q) + (2._wp/3._wp)*G_K_field(k, l, q))* &
-                                                            (du_dx_hypo(k, l, q) + dv_dy_hypo(k, l, q) + q_prim_vf(momxb + 1)%sf(k, l, q)/y_cc(l)) &
-                                                            + 2._wp*(q_prim_vf(strxb + 3)%sf(k, l, q) + G_K_field(k, l, q))*q_prim_vf(momxb + 1)%sf(k, l, q)/y_cc(l))
-                        end do
+                        ! S_thetatheta += rho * ( -(tau_thetatheta + 2/3*G)*(du/dx + dv/dr + v/r) + 2*(tau_thetatheta + G)*v/r )
+                        rhs_vf(strxb + 3)%sf(k, l, q) = rhs_vf(strxb + 3)%sf(k, l, q) + &
+                                                        rho_K_field(k, l, q)*( &
+                                                        -(q_prim_vf(strxb + 3)%sf(k, l, q) + (2._wp/3._wp)*G_K_field(k, l, q))* &
+                                                        (du_dx_hypo(k, l, q) + dv_dy_hypo(k, l, q) + q_prim_vf(momxb + 1)%sf(k, l, q)/y_cc(l)) &
+                                                        + 2._wp*(q_prim_vf(strxb + 3)%sf(k, l, q) + G_K_field(k, l, q))*q_prim_vf(momxb + 1)%sf(k, l, q)/y_cc(l))
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            end do
+            $:END_GPU_PARALLEL_LOOP()
 
         end if
 
@@ -404,66 +404,66 @@ contains
 
         if (n == 0) then
             l = 0; q = 0
-            #:call GPU_PARALLEL_LOOP()
-                do k = 0, m
-                    rhs_vf(damage_idx)%sf(k, l, q) = (alpha_bar*max(abs(q_cons_vf(stress_idx%beg)%sf(k, l, q)) - tau_star, 0._wp))**cont_damage_s
-                end do
-            #:endcall GPU_PARALLEL_LOOP
+            $:GPU_PARALLEL_LOOP()
+            do k = 0, m
+                rhs_vf(damage_idx)%sf(k, l, q) = (alpha_bar*max(abs(real(q_cons_vf(stress_idx%beg)%sf(k, l, q), kind=wp)) - tau_star, 0._wp))**cont_damage_s
+            end do
+            $:END_GPU_PARALLEL_LOOP()
         elseif (p == 0) then
             q = 0
-            #:call GPU_PARALLEL_LOOP(collapse=2)
+            $:GPU_PARALLEL_LOOP(collapse=2, private='[tau_p]')
+            do l = 0, n
+                do k = 0, m
+                    ! Maximum principal stress
+                    tau_p = 0.5_wp*(q_cons_vf(stress_idx%beg)%sf(k, l, q) + &
+                                    q_cons_vf(stress_idx%beg + 2)%sf(k, l, q)) + &
+                            sqrt((q_cons_vf(stress_idx%beg)%sf(k, l, q) - &
+                                  q_cons_vf(stress_idx%beg + 2)%sf(k, l, q))**2.0_wp + &
+                                 4._wp*q_cons_vf(stress_idx%beg + 1)%sf(k, l, q)**2.0_wp)/2._wp
+
+                    rhs_vf(damage_idx)%sf(k, l, q) = (alpha_bar*max(tau_p - tau_star, 0._wp))**cont_damage_s
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        else
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[tau_xx, tau_xy, tau_yy, tau_xz, tau_yz, tau_zz, I1, I2, I3, temp, sqrt_term_1, sqrt_term_2, argument, phi, tau_p]')
+            do q = 0, p
                 do l = 0, n
                     do k = 0, m
+                        tau_xx = q_cons_vf(stress_idx%beg)%sf(k, l, q)
+                        tau_xy = q_cons_vf(stress_idx%beg + 1)%sf(k, l, q)
+                        tau_yy = q_cons_vf(stress_idx%beg + 2)%sf(k, l, q)
+                        tau_xz = q_cons_vf(stress_idx%beg + 3)%sf(k, l, q)
+                        tau_yz = q_cons_vf(stress_idx%beg + 4)%sf(k, l, q)
+                        tau_zz = q_cons_vf(stress_idx%beg + 5)%sf(k, l, q)
+
+                        ! Invariants of the stress tensor
+                        I1 = tau_xx + tau_yy + tau_zz
+                        I2 = tau_xx*tau_yy + tau_xx*tau_zz + tau_yy*tau_zz - &
+                             (tau_xy**2.0_wp + tau_xz**2.0_wp + tau_yz**2.0_wp)
+                        I3 = tau_xx*tau_yy*tau_zz + 2.0_wp*tau_xy*tau_xz*tau_yz - &
+                             tau_xx*tau_yz**2.0_wp - tau_yy*tau_xz**2.0_wp - tau_zz*tau_xy**2.0_wp
+
                         ! Maximum principal stress
-                        tau_p = 0.5_wp*(q_cons_vf(stress_idx%beg)%sf(k, l, q) + &
-                                        q_cons_vf(stress_idx%beg + 2)%sf(k, l, q)) + &
-                                sqrt((q_cons_vf(stress_idx%beg)%sf(k, l, q) - &
-                                      q_cons_vf(stress_idx%beg + 2)%sf(k, l, q))**2.0_wp + &
-                                     4._wp*q_cons_vf(stress_idx%beg + 1)%sf(k, l, q)**2.0_wp)/2._wp
+                        temp = I1**2.0_wp - 3.0_wp*I2
+                        sqrt_term_1 = sqrt(max(temp, 0.0_wp))
+                        if (sqrt_term_1 > verysmall) then ! Avoid 0/0
+                            argument = (2.0_wp*I1*I1*I1 - 9.0_wp*I1*I2 + 27.0_wp*I3)/ &
+                                       (2.0_wp*sqrt_term_1*sqrt_term_1*sqrt_term_1)
+                            if (argument > 1.0_wp) argument = 1.0_wp
+                            if (argument < -1.0_wp) argument = -1.0_wp
+                            phi = acos(argument)
+                            sqrt_term_2 = sqrt(max(I1**2.0_wp - 3.0_wp*I2, 0.0_wp))
+                            tau_p = I1/3.0_wp + 2.0_wp/sqrt(3.0_wp)*sqrt_term_2*cos(phi/3.0_wp)
+                        else
+                            tau_p = I1/3.0_wp
+                        end if
 
                         rhs_vf(damage_idx)%sf(k, l, q) = (alpha_bar*max(tau_p - tau_star, 0._wp))**cont_damage_s
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
-        else
-            #:call GPU_PARALLEL_LOOP(collapse=3)
-                do q = 0, p
-                    do l = 0, n
-                        do k = 0, m
-                            tau_xx = q_cons_vf(stress_idx%beg)%sf(k, l, q)
-                            tau_xy = q_cons_vf(stress_idx%beg + 1)%sf(k, l, q)
-                            tau_yy = q_cons_vf(stress_idx%beg + 2)%sf(k, l, q)
-                            tau_xz = q_cons_vf(stress_idx%beg + 3)%sf(k, l, q)
-                            tau_yz = q_cons_vf(stress_idx%beg + 4)%sf(k, l, q)
-                            tau_zz = q_cons_vf(stress_idx%beg + 5)%sf(k, l, q)
-
-                            ! Invariants of the stress tensor
-                            I1 = tau_xx + tau_yy + tau_zz
-                            I2 = tau_xx*tau_yy + tau_xx*tau_zz + tau_yy*tau_zz - &
-                                 (tau_xy**2.0_wp + tau_xz**2.0_wp + tau_yz**2.0_wp)
-                            I3 = tau_xx*tau_yy*tau_zz + 2.0_wp*tau_xy*tau_xz*tau_yz - &
-                                 tau_xx*tau_yz**2.0_wp - tau_yy*tau_xz**2.0_wp - tau_zz*tau_xy**2.0_wp
-
-                            ! Maximum principal stress
-                            temp = I1**2.0_wp - 3.0_wp*I2
-                            sqrt_term_1 = sqrt(max(temp, 0.0_wp))
-                            if (sqrt_term_1 > verysmall) then ! Avoid 0/0
-                                argument = (2.0_wp*I1*I1*I1 - 9.0_wp*I1*I2 + 27.0_wp*I3)/ &
-                                           (2.0_wp*sqrt_term_1*sqrt_term_1*sqrt_term_1)
-                                if (argument > 1.0_wp) argument = 1.0_wp
-                                if (argument < -1.0_wp) argument = -1.0_wp
-                                phi = acos(argument)
-                                sqrt_term_2 = sqrt(max(I1**2.0_wp - 3.0_wp*I2, 0.0_wp))
-                                tau_p = I1/3.0_wp + 2.0_wp/sqrt(3.0_wp)*sqrt_term_2*cos(phi/3.0_wp)
-                            else
-                                tau_p = I1/3.0_wp
-                            end if
-
-                            rhs_vf(damage_idx)%sf(k, l, q) = (alpha_bar*max(tau_p - tau_star, 0._wp))**cont_damage_s
-                        end do
-                    end do
-                end do
-            #:endcall GPU_PARALLEL_LOOP
+            end do
+            $:END_GPU_PARALLEL_LOOP()
         end if
 
     end subroutine s_compute_damage_state
