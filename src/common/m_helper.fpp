@@ -116,9 +116,6 @@ contains
         real(wp), parameter :: k_poly = 1._wp !<
             !! polytropic index used to compute isothermal natural frequency
 
-        real(wp), parameter :: Ru = 8314._wp !<
-            !! universal gas constant
-
         rhol0 = rhoref
         pl0 = pref
 #ifdef MFC_SIMULATION
@@ -154,15 +151,15 @@ contains
         if (thermal == 2) gamma_m = 1._wp
 
         temp = 293.15_wp
-        D_m = 0.242e-4_wp
+        D_m = fluid_pp(2)%D_v
         uu = sqrt(pl0/rhol0)
 
         omega_ref = 3._wp*k_poly*Ca + 2._wp*(3._wp*k_poly - 1._wp)/Web
 
             !!! thermal properties !!!
         ! gas constants
-        R_n = Ru/M_n
-        R_v = Ru/M_v
+        R_n = R_uni/M_n
+        R_v = R_uni/M_v
         ! phi_vn & phi_nv (phi_nn = phi_vv = 1)
         phi_vn = (1._wp + sqrt(mu_v/mu_n)*(M_n/M_v)**(0.25_wp))**2 &
                  /(sqrt(8._wp)*sqrt(1._wp + M_v/M_n))
