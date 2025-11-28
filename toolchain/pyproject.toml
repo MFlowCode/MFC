@@ -37,9 +37,9 @@ dependencies = [
     "matplotlib",
 
     # Chemistry
-    "cantera==3.1.0",
+    "cantera>=3.1.0",
     #"pyrometheus == 1.0.5",
-    "pyrometheus @ git+https://github.com/wilfonba/pyrometheus-wilfong.git@OpenMPTest",
+    "pyrometheus @ git+https://github.com/pyrometheus/pyrometheus.git",
 
     # Frontier Profiling
     "astunparse==1.6.2",
