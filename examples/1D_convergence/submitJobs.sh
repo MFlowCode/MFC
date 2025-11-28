@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 Nx=(32 64 128 256 512 1024)
 Order=(1 3 5)
 
@@ -18,11 +18,11 @@ for i in "${Nx[@]}"; do
     done
 done
 
-cd $MFC_DIR
+cd "$MFC_DIR" || exit 1
 
 for i in "${Nx[@]}"; do
     for j in "${Order[@]}"; do
-        ./mfc.sh run $ROOT_DIR/N${i}_O${j}/case.py --case-optimization --no-debug -- --order $j -N $i --meqns $ME --rs $RS
+        ./mfc.sh run "$ROOT_DIR/N${i}_O${j}/case.py" --case-optimization --no-debug -- --order "$j" -N "$i" --meqns "$ME" --rs "$RS"
     done
 done
 
