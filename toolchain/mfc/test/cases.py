@@ -1024,7 +1024,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                            "3D_IGR_TaylorGreenVortex_nvidia",
                            "2D_backward_facing_step",
                            "2D_forward_facing_step",
-                           "1D_convergence",]
+                           "1D_convergence",
                            "3D_IGR_33jet"]
             if path in casesToSkip:
                 continue
