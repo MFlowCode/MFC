@@ -11,56 +11,57 @@ Based on the constraints enforced in:
 - src/simulation/m_checker.fpp
 - src/post_process/m_checker.fpp
 """
+# pylint: disable=too-many-lines
+# Justification: Comprehensive validator covering all MFC parameter constraints
 
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, List
 from .common import MFCException
 
 
 class CaseConstraintError(MFCException):
     """Exception raised when case parameters violate constraints"""
-    pass
 
 
-class CaseValidator:
+class CaseValidator:  # pylint: disable=too-many-public-methods
     """Validates MFC case parameter constraints"""
-    
+
     def __init__(self, params: Dict[str, Any]):
         self.params = params
         self.errors: List[str] = []
-        
+
     def get(self, key: str, default=None):
         """Get parameter value with default"""
         return self.params.get(key, default)
-    
+
     def is_set(self, key: str) -> bool:
         """Check if parameter is set (not None and present)"""
         return key in self.params and self.params[key] is not None
-    
+
     def prohibit(self, condition: bool, message: str):
         """Assert that condition is False, otherwise add error"""
         if condition:
             self.errors.append(message)
-    
+
     # ===================================================================
     # Common Checks (All Stages)
     # ===================================================================
-    
+
     def check_simulation_domain(self):
         """Checks constraints on dimensionality and number of cells"""
         m = self.get('m')
         n = self.get('n', 0)
         p = self.get('p', 0)
         cyl_coord = self.get('cyl_coord', 'F') == 'T'
-        
+
         self.prohibit(m is None, "m must be set")
         self.prohibit(m is not None and m <= 0, "m must be positive")
         self.prohibit(n is not None and n < 0, "n must be non-negative")
         self.prohibit(p is not None and p < 0, "p must be non-negative")
-        self.prohibit(cyl_coord and p is not None and p > 0 and p % 2 == 0, 
+        self.prohibit(cyl_coord and p is not None and p > 0 and p % 2 == 0,
                      "p must be odd for cylindrical coordinates")
-        self.prohibit(n is not None and p is not None and n == 0 and p > 0, 
+        self.prohibit(n is not None and p is not None and n == 0 and p > 0,
                      "p must be 0 if n = 0")
-    
+
     def check_model_eqns_and_num_fluids(self):
         """Checks constraints on model equations and number of fluids"""
         model_eqns = self.get('model_eqns')
@@ -68,7 +69,7 @@ class CaseValidator:
         mpp_lim = self.get('mpp_lim', 'F') == 'T'
         cyl_coord = self.get('cyl_coord', 'F') == 'T'
         p = self.get('p', 0)
-        
+
         self.prohibit(model_eqns not in [1, 2, 3, 4],
                      "model_eqns must be 1, 2, 3, or 4")
         self.prohibit(num_fluids is not None and num_fluids < 1,
@@ -85,19 +86,19 @@ class CaseValidator:
                      "num_fluids = 1 does not support mpp_lim")
         self.prohibit(model_eqns == 3 and cyl_coord and p != 0,
                      "6-equation model (model_eqns = 3) does not support cylindrical coordinates (cyl_coord = T and p != 0)")
-    
+
     def check_igr(self):
         """Checks constraints regarding IGR order"""
         igr = self.get('igr', 'F') == 'T'
-        
+
         if not igr:
             return
-            
+
         igr_order = self.get('igr_order')
         m = self.get('m', 0)
         n = self.get('n', 0)
         p = self.get('p', 0)
-        
+
         self.prohibit(igr_order not in [None, 3, 5],
                      "igr_order must be 3 or 5")
         if igr_order:
@@ -107,23 +108,23 @@ class CaseValidator:
                          f"n must be at least igr_order - 1 (= {igr_order - 1})")
             self.prohibit(p is not None and p > 0 and p + 1 < igr_order,
                          f"p must be at least igr_order - 1 (= {igr_order - 1})")
-    
+
     def check_weno(self):
         """Checks constraints regarding WENO order"""
         recon_type = self.get('recon_type', 1)
-        
+
         # WENO_TYPE = 1
         if recon_type != 1:
             return
-            
+
         weno_order = self.get('weno_order')
         m = self.get('m', 0)
         n = self.get('n', 0)
         p = self.get('p', 0)
-        
+
         if weno_order is None:
             return
-            
+
         self.prohibit(weno_order not in [1, 3, 5, 7],
                      "weno_order must be 1, 3, 5, or 7")
         self.prohibit(m + 1 < weno_order,
@@ -132,23 +133,23 @@ class CaseValidator:
                      f"For 2D simulation, n must be at least weno_order - 1 (= {weno_order - 1})")
         self.prohibit(p is not None and p > 0 and p + 1 < weno_order,
                      f"For 3D simulation, p must be at least weno_order - 1 (= {weno_order - 1})")
-    
+
     def check_muscl(self):
         """Check constraints regarding MUSCL order"""
         recon_type = self.get('recon_type', 1)
-        
+
         # MUSCL_TYPE = 2
         if recon_type != 2:
             return
-            
+
         muscl_order = self.get('muscl_order')
         m = self.get('m', 0)
         n = self.get('n', 0)
         p = self.get('p', 0)
-        
+
         if muscl_order is None:
             return
-            
+
         self.prohibit(muscl_order not in [1, 2],
                      "muscl_order must be 1 or 2")
         self.prohibit(m + 1 < muscl_order,
@@ -157,52 +158,52 @@ class CaseValidator:
                      f"For 2D simulation, n must be at least muscl_order - 1 (= {muscl_order - 1})")
         self.prohibit(p is not None and p > 0 and p + 1 < muscl_order,
                      f"For 3D simulation, p must be at least muscl_order - 1 (= {muscl_order - 1})")
-    
-    def check_boundary_conditions(self):
+
+    def check_boundary_conditions(self):  # pylint: disable=too-many-locals
         """Checks constraints on boundary conditions"""
         cyl_coord = self.get('cyl_coord', 'F') == 'T'
         m = self.get('m', 0)
         n = self.get('n', 0)
         p = self.get('p', 0)
-        
+
         for dir, var in [('x', 'm'), ('y', 'n'), ('z', 'p')]:
             var_val = {'m': m, 'n': n, 'p': p}[var]
-            
+
             for bound in ['beg', 'end']:
                 bc_key = f'bc_{dir}%{bound}'
                 bc_val = self.get(bc_key)
-                
+
                 self.prohibit(var_val is not None and var_val == 0 and bc_val is not None,
                              f"{bc_key} is not supported for {var} = 0")
                 self.prohibit(var_val is not None and var_val > 0 and bc_val is None,
                              f"{var} != 0 but {bc_key} is not set")
-                
+
             # Check periodicity matches
             beg_bc = self.get(f'bc_{dir}%beg')
             end_bc = self.get(f'bc_{dir}%end')
             if beg_bc is not None and end_bc is not None:
                 self.prohibit((beg_bc == -1 and end_bc != -1) or (end_bc == -1 and beg_bc != -1),
                              f"bc_{dir}%beg and bc_{dir}%end must be both periodic (= -1) or both non-periodic")
-            
+
             # Range check (skip for cylindrical y/z)
             skip_check = cyl_coord and dir in ['y', 'z']
             for bound in ['beg', 'end']:
                 bc_key = f'bc_{dir}%{bound}'
                 bc_val = self.get(bc_key)
-                
+
                 if not skip_check and bc_val is not None:
                     self.prohibit(bc_val > -1 or bc_val < -17,
                                  f"{bc_key} must be between -1 and -17")
                     self.prohibit(bc_val == -14 and not cyl_coord,
                                  f"{bc_key} must not be -14 (BC_AXIS) for non-cylindrical coordinates")
-        
+
         # Check BC_NULL is not used
         for dir in ['x', 'y', 'z']:
             for bound in ['beg', 'end']:
                 bc_val = self.get(f'bc_{dir}%{bound}')
                 self.prohibit(bc_val == -13,
                              "Boundary condition -13 (BC_NULL) is not supported")
-        
+
         # Cylindrical specific checks
         if cyl_coord:
             self.prohibit(n is not None and n == 0, "n must be positive (2D or 3D) for cylindrical coordinates")
@@ -210,32 +211,32 @@ class CaseValidator:
             bc_y_end = self.get('bc_y%end')
             bc_z_beg = self.get('bc_z%beg')
             bc_z_end = self.get('bc_z%end')
-            
+
             self.prohibit(p is not None and p == 0 and bc_y_beg != -2,
                          "bc_y%beg must be -2 (BC_REFLECTIVE) for 2D cylindrical coordinates (p = 0)")
             self.prohibit(p is not None and p > 0 and bc_y_beg != -14,
                          "bc_y%beg must be -14 (BC_AXIS) for 3D cylindrical coordinates (p > 0)")
-            
+
             if bc_y_end is not None:
                 self.prohibit(bc_y_end > -1 or bc_y_end < -17,
                              "bc_y%end must be between -1 and -17")
                 self.prohibit(bc_y_end == -14,
                              "bc_y%end must not be -14 (BC_AXIS)")
-            
+
             # 3D cylindrical
             if p is not None and p > 0:
                 self.prohibit(bc_z_beg is not None and bc_z_beg not in [-1, -2],
                              "bc_z%beg must be -1 (periodic) or -2 (reflective) for 3D cylindrical coordinates")
                 self.prohibit(bc_z_end is not None and bc_z_end not in [-1, -2],
                              "bc_z%end must be -1 (periodic) or -2 (reflective) for 3D cylindrical coordinates")
-    
+
     def check_bubbles_euler(self):
         """Checks constraints on bubble parameters"""
         bubbles_euler = self.get('bubbles_euler', 'F') == 'T'
-        
+
         if not bubbles_euler:
             return
-            
+
         nb = self.get('nb')
         polydisperse = self.get('polydisperse', 'F') == 'T'
         polytropic = self.get('polytropic', 'F') == 'T'
@@ -246,7 +247,7 @@ class CaseValidator:
         rhoref = self.get('rhoref')
         pref = self.get('pref')
         num_fluids = self.get('num_fluids')
-        
+
         self.prohibit(nb is None or nb < 1,
                      "The Ensemble-Averaged Bubble Model requires nb >= 1")
         self.prohibit(polydisperse and nb == 1,
@@ -269,7 +270,7 @@ class CaseValidator:
                      "4-equation model (model_eqns = 4) is single-component and requires num_fluids = 1")
         self.prohibit(cyl_coord,
                      "Bubble models untested in cylindrical coordinates")
-    
+
     def check_qbmm_and_polydisperse(self):
         """Checks constraints on QBMM and polydisperse bubble parameters"""
         polydisperse = self.get('polydisperse', 'F') == 'T'
@@ -277,7 +278,7 @@ class CaseValidator:
         poly_sigma = self.get('poly_sigma')
         qbmm = self.get('qbmm', 'F') == 'T'
         nnode = self.get('nnode')
-        
+
         self.prohibit(polydisperse and not bubbles_euler,
                      "Polydisperse bubble modeling requires the bubbles_euler flag to be set")
         self.prohibit(polydisperse and poly_sigma is None,
@@ -288,35 +289,35 @@ class CaseValidator:
                      "QBMM requires the bubbles_euler flag to be set")
         self.prohibit(qbmm and nnode is not None and nnode != 4,
                      "QBMM requires nnode = 4")
-    
+
     def check_adv_n(self):
         """Checks constraints on adv_n flag"""
         adv_n = self.get('adv_n', 'F') == 'T'
         bubbles_euler = self.get('bubbles_euler', 'F') == 'T'
         num_fluids = self.get('num_fluids')
         qbmm = self.get('qbmm', 'F') == 'T'
-        
+
         if not adv_n:
             return
-            
+
         self.prohibit(not bubbles_euler,
                      "adv_n requires bubbles_euler to be enabled")
         self.prohibit(num_fluids != 1,
                      "adv_n requires num_fluids = 1")
         self.prohibit(qbmm,
                      "adv_n is not compatible with qbmm")
-    
+
     def check_hypoelasticity(self):
         """Checks constraints on hypoelasticity parameters"""
         hypoelasticity = self.get('hypoelasticity', 'F') == 'T'
         model_eqns = self.get('model_eqns')
-        
+
         if not hypoelasticity:
             return
-            
+
         self.prohibit(model_eqns != 2,
                      "hypoelasticity requires model_eqns = 2")
-    
+
     def check_phase_change(self):
         """Checks constraints on phase change parameters"""
         relax = self.get('relax', 'F') == 'T'
@@ -324,10 +325,10 @@ class CaseValidator:
         model_eqns = self.get('model_eqns')
         palpha_eps = self.get('palpha_eps')
         ptgalpha_eps = self.get('ptgalpha_eps')
-        
+
         if not relax:
             return
-            
+
         self.prohibit(model_eqns != 3,
                      "phase change (relax) requires model_eqns = 3")
         self.prohibit(relax_model is not None and (relax_model < 0 or relax_model > 6),
@@ -340,57 +341,54 @@ class CaseValidator:
                      "ptgalpha_eps must be positive")
         self.prohibit(ptgalpha_eps is not None and ptgalpha_eps >= 1,
                      "ptgalpha_eps must be less than 1")
-    
+
     def check_ibm(self):
         """Checks constraints on Immersed Boundaries parameters"""
         ib = self.get('ib', 'F') == 'T'
         n = self.get('n', 0)
         num_ibs = self.get('num_ibs', 0)
-        
+
         self.prohibit(ib and n <= 0,
                      "Immersed Boundaries do not work in 1D (requires n > 0)")
         self.prohibit(ib and (num_ibs <= 0 or num_ibs > 10),
                      "num_ibs must be between 1 and num_patches_max (10)")
         self.prohibit(not ib and num_ibs > 0,
                      "num_ibs is set, but ib is not enabled")
-    
+
     def check_stiffened_eos(self):
         """Checks constraints on stiffened equation of state fluids parameters"""
         num_fluids = self.get('num_fluids')
-        bubbles_euler = self.get('bubbles_euler', 'F') == 'T'
-        
+
         if num_fluids is None:
             return
-            
-        bub_fac = 1 if (bubbles_euler and num_fluids == 1) else 0
-        
+
         for i in range(1, num_fluids + 1):
             gamma = self.get(f'fluid_pp({i})%gamma')
             pi_inf = self.get(f'fluid_pp({i})%pi_inf')
             cv = self.get(f'fluid_pp({i})%cv')
-            
+
             if gamma is not None:
                 self.prohibit(gamma <= 0,
                              f"fluid_pp({i})%gamma must be positive")
-            
+
             if pi_inf is not None:
                 self.prohibit(pi_inf < 0,
                              f"fluid_pp({i})%pi_inf must be non-negative")
-            
+
             if cv is not None:
                 self.prohibit(cv < 0,
                              f"fluid_pp({i})%cv must be positive")
-    
+
     def check_surface_tension(self):
         """Checks constraints on surface tension"""
         surface_tension = self.get('surface_tension', 'F') == 'T'
         sigma = self.get('sigma')
         model_eqns = self.get('model_eqns')
         num_fluids = self.get('num_fluids')
-        
+
         if not surface_tension and sigma is None:
             return
-            
+
         self.prohibit(surface_tension and sigma is None,
                      "sigma must be set if surface_tension is enabled")
         self.prohibit(surface_tension and sigma is not None and sigma < 0,
@@ -401,7 +399,7 @@ class CaseValidator:
                      "The surface tension model requires model_eqns = 2 or model_eqns = 3")
         self.prohibit(surface_tension and num_fluids != 2,
                      "The surface tension model requires num_fluids = 2")
-    
+
     def check_mhd(self):
         """Checks constraints on MHD parameters"""
         mhd = self.get('mhd', 'F') == 'T'
@@ -410,7 +408,7 @@ class CaseValidator:
         relativity = self.get('relativity', 'F') == 'T'
         Bx0 = self.get('Bx0')
         n = self.get('n', 0)
-        
+
         self.prohibit(mhd and num_fluids != 1,
                      "MHD is only available for single-component flows (num_fluids = 1)")
         self.prohibit(mhd and model_eqns != 2,
@@ -423,11 +421,11 @@ class CaseValidator:
                      "Bx0 must be set in 1D MHD simulations")
         self.prohibit(mhd and n is not None and n > 0 and Bx0 is not None,
                      "Bx0 must not be set in 2D/3D MHD simulations")
-    
+
     # ===================================================================
     # Simulation-Specific Checks
     # ===================================================================
-    
+
     def check_riemann_solver(self):
         """Checks constraints on Riemann solver (simulation only)"""
         riemann_solver = self.get('riemann_solver')
@@ -437,10 +435,10 @@ class CaseValidator:
         low_Mach = self.get('low_Mach', 0)
         cyl_coord = self.get('cyl_coord', 'F') == 'T'
         viscous = self.get('viscous', 'F') == 'T'
-        
+
         if riemann_solver is None:
             return
-            
+
         self.prohibit(riemann_solver < 1 or riemann_solver > 5,
                      "riemann_solver must be 1, 2, 3, 4 or 5")
         self.prohibit(riemann_solver != 2 and model_eqns == 3,
@@ -463,22 +461,22 @@ class CaseValidator:
                      "low_Mach = 1 or 2 requires model_eqns = 2 or 3")
         self.prohibit(riemann_solver == 5 and cyl_coord and viscous,
                      "Lax Friedrichs with cylindrical viscous flux not supported")
-    
+
     def check_time_stepping(self):
         """Checks time stepping parameters (simulation/post-process)"""
         cfl_dt = self.get('cfl_dt', 'F') == 'T'
         time_stepper = self.get('time_stepper')
-        
+
         # Check time_stepper bounds
         self.prohibit(time_stepper is not None and (time_stepper < 1 or time_stepper > 3),
                      "time_stepper must be 1, 2, or 3")
-        
+
         if cfl_dt:
             cfl_target = self.get('cfl_target')
             t_stop = self.get('t_stop')
             t_save = self.get('t_save')
             n_start = self.get('n_start')
-            
+
             self.prohibit(cfl_target is not None and (cfl_target < 0 or cfl_target > 1),
                          "cfl_target must be between 0 and 1")
             self.prohibit(t_stop is not None and t_stop <= 0,
@@ -494,27 +492,27 @@ class CaseValidator:
             t_step_stop = self.get('t_step_stop')
             t_step_save = self.get('t_step_save')
             dt = self.get('dt')
-            
+
             self.prohibit(t_step_start is not None and t_step_start < 0,
                          "t_step_start must be non-negative")
             self.prohibit(t_step_stop is not None and t_step_start is not None and t_step_stop <= t_step_start,
                          "t_step_stop must be > t_step_start")
-            self.prohibit(t_step_save is not None and t_step_stop is not None and t_step_start is not None and 
+            self.prohibit(t_step_save is not None and t_step_stop is not None and t_step_start is not None and
                          t_step_save > t_step_stop - t_step_start,
                          "t_step_save must be <= (t_step_stop - t_step_start)")
             self.prohibit(dt is not None and dt <= 0,
                          "dt must be positive")
-    
+
     def check_finite_difference(self):
         """Checks constraints on finite difference parameters"""
         fd_order = self.get('fd_order')
-        
+
         if fd_order is None:
             return
-            
+
         self.prohibit(fd_order not in [1, 2, 4],
                      "fd_order must be 1, 2, or 4")
-    
+
     def check_weno_simulation(self):
         """Checks WENO-specific constraints for simulation"""
         weno_order = self.get('weno_order')
@@ -527,16 +525,16 @@ class CaseValidator:
         mp_weno = self.get('mp_weno', 'F') == 'T'
         weno_avg = self.get('weno_avg', 'F') == 'T'
         model_eqns = self.get('model_eqns')
-        
+
         # Check for multiple WENO schemes (regardless of weno_order being set)
         num_schemes = sum([mapped_weno, wenoz, teno])
         self.prohibit(num_schemes >= 2,
                      "Only one of mapped_weno, wenoz, or teno can be set to true")
-        
+
         # Early return if weno_order not set (other checks need it)
         if weno_order is None:
             return
-            
+
         self.prohibit(weno_order != 1 and weno_eps is None,
                      "weno_order != 1 requires weno_eps to be set. A typical value is 1e-6")
         self.prohibit(weno_eps is not None and weno_eps <= 0,
@@ -549,7 +547,7 @@ class CaseValidator:
                      "teno requires teno_CT to be set. A typical value is 1e-6")
         self.prohibit(teno and teno_CT is not None and teno_CT <= 0,
                      "teno_CT must be positive. A typical value is 1e-6")
-        
+
         self.prohibit(weno_order == 1 and mapped_weno,
                      "mapped_weno is not compatible with weno_order = 1")
         self.prohibit(weno_order == 1 and wenoz,
@@ -560,34 +558,34 @@ class CaseValidator:
                      "mp_weno requires weno_order = 5")
         self.prohibit(model_eqns == 1 and weno_avg,
                      "weno_avg is not compatible with model_eqns = 1")
-    
+
     def check_muscl_simulation(self):
         """Checks MUSCL-specific constraints for simulation"""
         muscl_order = self.get('muscl_order')
         muscl_lim = self.get('muscl_lim')
-        
+
         if muscl_order is None:
             return
-            
+
         self.prohibit(muscl_order == 2 and muscl_lim is None,
                      "muscl_lim must be defined if using muscl_order = 2")
         self.prohibit(muscl_lim is not None and (muscl_lim < 1 or muscl_lim > 5),
                      "muscl_lim must be 1, 2, 3, 4, or 5")
-    
+
     def check_model_eqns_simulation(self):
         """Checks model equation constraints specific to simulation"""
         model_eqns = self.get('model_eqns')
         avg_state = self.get('avg_state')
         wave_speeds = self.get('wave_speeds')
-        
+
         if model_eqns != 3:
             return
-            
+
         self.prohibit(avg_state is not None and avg_state != 2,
                      "6-equation model (model_eqns = 3) requires avg_state = 2")
         self.prohibit(wave_speeds is not None and wave_speeds != 1,
                      "6-equation model (model_eqns = 3) requires wave_speeds = 1")
-    
+
     def check_bubbles_euler_simulation(self):
         """Checks bubble constraints specific to simulation"""
         bubbles_euler = self.get('bubbles_euler', 'F') == 'T'
@@ -596,28 +594,28 @@ class CaseValidator:
         avg_state = self.get('avg_state')
         model_eqns = self.get('model_eqns')
         bubble_model = self.get('bubble_model')
-        
+
         self.prohibit(bubbles_euler and bubbles_lagrange,
                      "Activate only one of the bubble subgrid models (bubbles_euler or bubbles_lagrange)")
-        
+
         if not bubbles_euler:
             return
-            
+
         self.prohibit(riemann_solver is not None and riemann_solver != 2,
                      "Bubble modeling requires HLLC Riemann solver (riemann_solver = 2)")
         self.prohibit(avg_state is not None and avg_state != 2,
                      "Bubble modeling requires arithmetic average (avg_state = 2)")
         self.prohibit(model_eqns == 2 and bubble_model == 1,
                      "The 5-equation bubbly flow model does not support bubble_model = 1 (Gilmore)")
-    
+
     def check_body_forces(self):
         """Checks constraints on body forces parameters"""
         for dir in ['x', 'y', 'z']:
             bf = self.get(f'bf_{dir}', 'F') == 'T'
-            
+
             if not bf:
                 continue
-                
+
             self.prohibit(self.get(f'k_{dir}') is None,
                          f"k_{dir} must be specified if bf_{dir} is true")
             self.prohibit(self.get(f'w_{dir}') is None,
@@ -626,7 +624,7 @@ class CaseValidator:
                          f"p_{dir} must be specified if bf_{dir} is true")
             self.prohibit(self.get(f'g_{dir}') is None,
                          f"g_{dir} must be specified if bf_{dir} is true")
-    
+
     def check_viscosity(self):
         """Checks constraints on viscosity parameters"""
         viscous = self.get('viscous', 'F') == 'T'
@@ -635,15 +633,15 @@ class CaseValidator:
         weno_order = self.get('weno_order')
         weno_avg = self.get('weno_avg', 'F') == 'T'
         igr = self.get('igr', 'F') == 'T'
-        
+
         # If num_fluids is not set, check at least fluid 1 (for model_eqns=1)
         if num_fluids is None:
             num_fluids = 1
-            
+
         for i in range(1, num_fluids + 1):
             Re1 = self.get(f'fluid_pp({i})%Re(1)')
             Re2 = self.get(f'fluid_pp({i})%Re(2)')
-            
+
             for j, Re_val in [(1, Re1), (2, Re2)]:
                 if Re_val is not None:
                     self.prohibit(Re_val <= 0,
@@ -655,11 +653,11 @@ class CaseValidator:
                                      f"weno_order = 1 without weno_avg does not support fluid_pp({i})%Re({j})")
                     self.prohibit(not viscous,
                                  f"Re({j}) is specified, but viscous is not set to true")
-            
+
             # Check Re(1) requirement
             self.prohibit(Re1 is None and viscous,
                          f"viscous is set to true, but fluid_pp({i})%Re(1) is not specified")
-    
+
     def check_mhd_simulation(self):
         """Checks MHD constraints specific to simulation"""
         mhd = self.get('mhd', 'F') == 'T'
@@ -668,7 +666,7 @@ class CaseValidator:
         powell = self.get('powell', 'F') == 'T'
         n = self.get('n', 0)
         fd_order = self.get('fd_order')
-        
+
         self.prohibit(mhd and riemann_solver is not None and riemann_solver not in [1, 4],
                      "MHD simulations require riemann_solver = 1 (HLL) or riemann_solver = 4 (HLLD)")
         self.prohibit(riemann_solver == 4 and not mhd,
@@ -681,14 +679,14 @@ class CaseValidator:
                      "Powell's method is not supported for 1D simulations")
         self.prohibit(powell and fd_order is None,
                      "fd_order must be set if Powell's method is enabled")
-    
-    def check_igr_simulation(self):
+
+    def check_igr_simulation(self):  # pylint: disable=too-many-locals
         """Checks IGR constraints specific to simulation"""
         igr = self.get('igr', 'F') == 'T'
-        
+
         if not igr:
             return
-            
+
         num_igr_iters = self.get('num_igr_iters')
         num_igr_warm_start_iters = self.get('num_igr_warm_start_iters')
         igr_iter_solver = self.get('igr_iter_solver')
@@ -706,7 +704,7 @@ class CaseValidator:
         hyperelasticity = self.get('hyperelasticity', 'F') == 'T'
         cyl_coord = self.get('cyl_coord', 'F') == 'T'
         probe_wrt = self.get('probe_wrt', 'F') == 'T'
-        
+
         self.prohibit(num_igr_iters is not None and num_igr_iters < 0,
                      "num_igr_iters must be greater than or equal to 0")
         self.prohibit(num_igr_warm_start_iters is not None and num_igr_warm_start_iters < 0,
@@ -741,27 +739,27 @@ class CaseValidator:
                      "IGR does not support cylindrical or axisymmetric coordinates")
         self.prohibit(probe_wrt,
                      "IGR does not support probe writes")
-        
+
         # Check BCs
         for dir in ['x', 'y', 'z']:
             for bound in ['beg', 'end']:
                 bc = self.get(f'bc_{dir}%{bound}')
                 if bc is not None:
-                    self.prohibit(bc <= -4 and bc >= -14,
+                    self.prohibit(-14 <= bc <= -4,
                                  f"Characteristic boundary condition bc_{dir}%{bound} is not compatible with IGR")
-    
-    def check_acoustic_source(self):
+
+    def check_acoustic_source(self):  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
         """Checks acoustic source parameters (simulation)"""
         acoustic_source = self.get('acoustic_source', 'F') == 'T'
-        
+
         if not acoustic_source:
             return
-        
+
         num_source = self.get('num_source')
         n = self.get('n', 0)
         p = self.get('p', 0)
         cyl_coord = self.get('cyl_coord', 'F') == 'T'
-        
+
         # Determine dimensionality
         if n is not None and n == 0:
             dim = 1
@@ -769,19 +767,19 @@ class CaseValidator:
             dim = 2
         else:
             dim = 3
-        
+
         self.prohibit(num_source is None,
                      "num_source must be specified for acoustic_source")
         self.prohibit(num_source is not None and num_source < 0,
                      "num_source must be non-negative")
-        
+
         if num_source is None or num_source <= 0:
             return
-        
+
         # Check each acoustic source
         for j in range(1, num_source + 1):
             jstr = str(j)
-            
+
             support = self.get(f'acoustic({j})%support')
             loc = [self.get(f'acoustic({j})%loc({i})') for i in range(1, 4)]
             mag = self.get(f'acoustic({j})%mag')
@@ -805,17 +803,17 @@ class CaseValidator:
             element_on = self.get(f'acoustic({j})%element_on')
             element_spacing_angle = self.get(f'acoustic({j})%element_spacing_angle')
             element_polygon_ratio = self.get(f'acoustic({j})%element_polygon_ratio')
-            
+
             self.prohibit(support is None,
                          f"acoustic({jstr})%support must be specified for acoustic_source")
-            
+
             # Dimension-specific support checks
             if dim == 1:
                 self.prohibit(support != 1,
                              f"Only acoustic({jstr})%support = 1 is allowed for 1D simulations")
                 self.prohibit(support == 1 and loc[0] is None,
                              f"acoustic({jstr})%loc(1) must be specified for support = 1")
-            
+
             elif dim == 2:
                 if cyl_coord:
                     self.prohibit(support not in [2, 6, 10],
@@ -823,24 +821,24 @@ class CaseValidator:
                 else:
                     self.prohibit(support not in [2, 5, 6, 9, 10],
                                  f"Only acoustic({jstr})%support = 2, 5, 6, 9, or 10 is allowed for 2D")
-                
+
                 if support in [2, 5, 6, 9, 10]:
                     self.prohibit(loc[0] is None or loc[1] is None,
                                  f"acoustic({jstr})%loc(1:2) must be specified for support = {support}")
-            
+
             elif dim == 3:
                 self.prohibit(support not in [3, 7, 11],
                              f"Only acoustic({jstr})%support = 3, 7, or 11 is allowed for 3D")
                 self.prohibit(cyl_coord,
                              "Acoustic source is not supported in 3D cylindrical simulations")
-                
+
                 if support == 3:
                     self.prohibit(loc[0] is None or loc[1] is None,
                                  f"acoustic({jstr})%loc(1:2) must be specified for support = 3")
                 elif support in [7, 11]:
                     self.prohibit(loc[0] is None or loc[1] is None or loc[2] is None,
                                  f"acoustic({jstr})%loc(1:3) must be specified for support = {support}")
-            
+
             # Pulse parameters
             self.prohibit(mag is None,
                          f"acoustic({jstr})%mag must be specified")
@@ -848,14 +846,14 @@ class CaseValidator:
                          f"acoustic({jstr})%pulse must be specified")
             self.prohibit(pulse is not None and pulse not in [1, 2, 3, 4],
                          f"Only acoustic({jstr})%pulse = 1, 2, 3, or 4 is allowed")
-            
+
             # Pulse-specific requirements
             if pulse in [1, 3]:
                 freq_set = frequency is not None
                 wave_set = wavelength is not None
                 self.prohibit(freq_set == wave_set,
                              f"One and only one of acoustic({jstr})%frequency or wavelength must be specified for pulse = {pulse}")
-            
+
             if pulse == 2:
                 time_set = gauss_sigma_time is not None
                 dist_set = gauss_sigma_dist is not None
@@ -863,7 +861,7 @@ class CaseValidator:
                              f"One and only one of acoustic({jstr})%gauss_sigma_time or gauss_sigma_dist must be specified for pulse = 2")
                 self.prohibit(delay is None,
                              f"acoustic({jstr})%delay must be specified for pulse = 2 (Gaussian)")
-            
+
             if pulse == 4:
                 self.prohibit(bb_num_freq is None,
                              f"acoustic({jstr})%bb_num_freq must be specified for pulse = 4")
@@ -871,7 +869,7 @@ class CaseValidator:
                              f"acoustic({jstr})%bb_bandwidth must be specified for pulse = 4")
                 self.prohibit(bb_lowest_freq is None,
                              f"acoustic({jstr})%bb_lowest_freq must be specified for pulse = 4")
-            
+
             # npulse checks
             self.prohibit(npulse is None,
                          f"acoustic({jstr})%npulse must be specified")
@@ -885,20 +883,20 @@ class CaseValidator:
                          f"acoustic({jstr})%dir must be non-zero for support = 1")
             self.prohibit(pulse == 3 and support is not None and support >= 5,
                          f"acoustic({jstr})%support >= 5 is not allowed for pulse = 3 (square wave)")
-            
+
             # Geometry checks
             if support in [2, 3]:
                 self.prohibit(length is None,
                              f"acoustic({jstr})%length must be specified for support = {support}")
                 self.prohibit(length is not None and length <= 0,
                              f"acoustic({jstr})%length must be positive for support = {support}")
-            
+
             if support == 3:
                 self.prohibit(height is None,
                              f"acoustic({jstr})%height must be specified for support = 3")
                 self.prohibit(height is not None and height <= 0,
                              f"acoustic({jstr})%height must be positive for support = 3")
-            
+
             if support is not None and support >= 5:
                 self.prohibit(foc_length is None,
                              f"acoustic({jstr})%foc_length must be specified for support >= 5 (non-planar)")
@@ -908,7 +906,7 @@ class CaseValidator:
                              f"acoustic({jstr})%aperture must be specified for support >= 5 (non-planar)")
                 self.prohibit(aperture is not None and aperture <= 0,
                              f"acoustic({jstr})%aperture must be positive for support >= 5")
-            
+
             # Transducer array checks
             if support in [9, 10, 11]:
                 self.prohibit(num_elements is None,
@@ -919,33 +917,33 @@ class CaseValidator:
                              f"acoustic({jstr})%element_on must be non-negative for support = {support}")
                 self.prohibit(element_on is not None and num_elements is not None and element_on > num_elements,
                              f"acoustic({jstr})%element_on must be <= num_elements for support = {support}")
-            
+
             if support in [9, 10]:
                 self.prohibit(element_spacing_angle is None,
                              f"acoustic({jstr})%element_spacing_angle must be specified for support = {support} (2D transducer)")
                 self.prohibit(element_spacing_angle is not None and element_spacing_angle < 0,
                              f"acoustic({jstr})%element_spacing_angle must be non-negative for support = {support}")
-            
+
             if support == 11:
                 self.prohibit(element_polygon_ratio is None,
                              f"acoustic({jstr})%element_polygon_ratio must be specified for support = 11 (3D transducer)")
                 self.prohibit(element_polygon_ratio is not None and element_polygon_ratio <= 0,
                              f"acoustic({jstr})%element_polygon_ratio must be positive for support = 11")
-    
+
     def check_adaptive_time_stepping(self):
         """Checks adaptive time stepping parameters (simulation)"""
         adap_dt = self.get('adap_dt', 'F') == 'T'
-        
+
         if not adap_dt:
             return
-        
+
         time_stepper = self.get('time_stepper')
         model_eqns = self.get('model_eqns')
         polytropic = self.get('polytropic', 'F') == 'T'
         bubbles_lagrange = self.get('bubbles_lagrange', 'F') == 'T'
         qbmm = self.get('qbmm', 'F') == 'T'
         adv_n = self.get('adv_n', 'F') == 'T'
-        
+
         self.prohibit(time_stepper != 3,
                      "adapt_dt requires Runge-Kutta 3 (time_stepper = 3)")
         self.prohibit(model_eqns == 1,
@@ -956,88 +954,88 @@ class CaseValidator:
                      "adapt_dt requires polytropic = T or bubbles_lagrange = T")
         self.prohibit(not adv_n and not bubbles_lagrange,
                      "adapt_dt requires adv_n = T or bubbles_lagrange = T")
-    
+
     def check_alt_soundspeed(self):
         """Checks alternative sound speed parameters (simulation)"""
         alt_soundspeed = self.get('alt_soundspeed', 'F') == 'T'
-        
+
         if not alt_soundspeed:
             return
-        
+
         model_eqns = self.get('model_eqns')
         bubbles_euler = self.get('bubbles_euler', 'F') == 'T'
         avg_state = self.get('avg_state')
-        
+
         self.prohibit(model_eqns != 2,
                      "5-equation model (model_eqns = 2) is required for alt_soundspeed")
         self.prohibit(bubbles_euler,
                      "alt_soundspeed is not compatible with bubbles_euler")
         self.prohibit(avg_state != 2,
                      "alt_soundspeed requires avg_state = 2")
-    
+
     def check_bubbles_lagrange(self):
         """Checks Lagrangian bubble parameters (simulation)"""
         bubbles_lagrange = self.get('bubbles_lagrange', 'F') == 'T'
-        
+
         if not bubbles_lagrange:
             return
-        
+
         file_per_process = self.get('file_per_process', 'F') == 'T'
-        
+
         self.prohibit(file_per_process,
                      "file_per_process must be false for bubbles_lagrange")
-    
+
     def check_continuum_damage(self):
         """Checks continuum damage model parameters (simulation)"""
         cont_damage = self.get('cont_damage', 'F') == 'T'
-        
+
         if not cont_damage:
             return
-        
+
         tau_star = self.get('tau_star')
         model_eqns = self.get('model_eqns')
         hypoelasticity = self.get('hypoelasticity', 'F') == 'T'
-        
+
         self.prohibit(tau_star is None,
                      "tau_star must be specified for cont_damage")
         self.prohibit(model_eqns != 2,
                      "cont_damage requires model_eqns = 2")
         self.prohibit(hypoelasticity,
                      "cont_damage is not compatible with hypoelasticity")
-    
+
     def check_grcbc(self):
         """Checks Generalized Relaxation Characteristics BC (simulation)"""
         for dir in ['x', 'y', 'z']:
             for loc in ['beg', 'end']:
                 grcbc_vel = self.get(f'grcbc_vel_{dir}%{loc}')
                 bc_val = self.get(f'bc_{dir}%{loc}')
-                
+
                 if grcbc_vel is not None:
                     self.prohibit(bc_val != -14,
                                  f"grcbc_vel_{dir}%{loc} requires bc_{dir}%{loc} = -14 (characteristic BC)")
-    
+
     def check_probe_integral_output(self):
         """Checks probe and integral output requirements (simulation)"""
         probe_wrt = self.get('probe_wrt', 'F') == 'T'
         integral_wrt = self.get('integral_wrt', 'F') == 'T'
         fd_order = self.get('fd_order')
-        
+
         self.prohibit(probe_wrt and fd_order is None,
                      "fd_order must be specified for probe_wrt")
         self.prohibit(integral_wrt and fd_order is None,
                      "fd_order must be specified for integral_wrt")
-    
+
     # ===================================================================
     # Pre-Process Specific Checks
     # ===================================================================
-    
+
     def check_restart(self):
         """Checks constraints on restart parameters (pre-process)"""
         old_grid = self.get('old_grid', 'F') == 'T'
         old_ic = self.get('old_ic', 'F') == 'T'
         t_step_old = self.get('t_step_old')
         num_patches = self.get('num_patches', 0)
-        
+
         self.prohibit(not old_grid and old_ic,
                      "old_ic can only be enabled with old_grid enabled")
         self.prohibit(old_grid and t_step_old is None,
@@ -1046,67 +1044,67 @@ class CaseValidator:
                      "num_patches must be non-negative")
         self.prohibit(num_patches == 0 and t_step_old is None,
                      "num_patches must be positive for the non-restart case")
-    
+
     def check_qbmm_pre_process(self):
         """Checks QBMM constraints for pre-process"""
         qbmm = self.get('qbmm', 'F') == 'T'
         dist_type = self.get('dist_type')
         rhoRV = self.get('rhoRV')
-        
+
         if not qbmm:
             return
-            
+
         self.prohibit(dist_type is None,
                      "dist_type must be set if using QBMM")
         self.prohibit(dist_type is not None and dist_type != 1 and rhoRV is not None and rhoRV > 0,
                      "rhoRV cannot be used with dist_type != 1")
-    
+
     # ===================================================================
     # Post-Process Specific Checks
     # ===================================================================
-    
+
     def check_output_format(self):
         """Checks output format parameters (post-process)"""
         format = self.get('format')
         precision = self.get('precision')
-        
+
         if format is not None:
             self.prohibit(format not in [1, 2],
                          "format must be 1 or 2")
-        
+
         if precision is not None:
             self.prohibit(precision not in [1, 2],
                          "precision must be 1 or 2")
-    
+
     def check_vorticity(self):
         """Checks vorticity parameters (post-process)"""
         omega_wrt = [self.get(f'omega_wrt({i})', 'F') == 'T' for i in range(1, 4)]
         n = self.get('n', 0)
         p = self.get('p', 0)
         fd_order = self.get('fd_order')
-        
+
         self.prohibit(n is not None and n == 0 and any(omega_wrt),
                      "omega_wrt requires n > 0 (at least 2D)")
         self.prohibit(p is not None and p == 0 and (omega_wrt[0] or omega_wrt[1]),
                      "omega_wrt(1) and omega_wrt(2) require p > 0 (3D)")
         self.prohibit(any(omega_wrt) and fd_order is None,
                      "fd_order must be set for omega_wrt")
-    
+
     def check_schlieren(self):
         """Checks schlieren parameters (post-process)"""
         schlieren_wrt = self.get('schlieren_wrt', 'F') == 'T'
         n = self.get('n', 0)
         fd_order = self.get('fd_order')
-        
+
         self.prohibit(n is not None and n == 0 and schlieren_wrt,
                      "schlieren_wrt requires n > 0 (at least 2D)")
         self.prohibit(schlieren_wrt and fd_order is None,
                      "fd_order must be set for schlieren_wrt")
-    
+
     # ===================================================================
     # Main Validation Entry Points
     # ===================================================================
-    
+
     def validate_common(self):
         """Validate parameters common to all stages"""
         self.check_simulation_domain()
@@ -1124,7 +1122,7 @@ class CaseValidator:
         self.check_stiffened_eos()
         self.check_surface_tension()
         self.check_mhd()
-    
+
     def validate_simulation(self):
         """Validate simulation-specific parameters"""
         self.validate_common()
@@ -1146,13 +1144,13 @@ class CaseValidator:
         self.check_continuum_damage()
         self.check_grcbc()
         self.check_probe_integral_output()
-    
+
     def validate_pre_process(self):
         """Validate pre-process-specific parameters"""
         self.validate_common()
         self.check_restart()
         self.check_qbmm_pre_process()
-    
+
     def validate_post_process(self):
         """Validate post-process-specific parameters"""
         self.validate_common()
@@ -1161,18 +1159,18 @@ class CaseValidator:
         self.check_output_format()
         self.check_vorticity()
         self.check_schlieren()
-    
+
     def validate(self, stage: str = 'simulation'):
         """Main validation method
-        
+
         Args:
             stage: One of 'simulation', 'pre_process', or 'post_process'
-            
+
         Raises:
             CaseConstraintError: If any constraint violations are found
         """
         self.errors = []
-        
+
         if stage == 'simulation':
             self.validate_simulation()
         elif stage == 'pre_process':
@@ -1181,7 +1179,7 @@ class CaseValidator:
             self.validate_post_process()
         else:
             raise ValueError(f"Unknown stage: {stage}")
-        
+
         if self.errors:
             error_msg = "Case parameter constraint violations:\n" + "\n".join(f"  • {err}" for err in self.errors)
             raise CaseConstraintError(error_msg)
@@ -1189,14 +1187,13 @@ class CaseValidator:
 
 def validate_case_constraints(params: Dict[str, Any], stage: str = 'simulation'):
     """Convenience function to validate case parameters
-    
+
     Args:
         params: Dictionary of case parameters
         stage: One of 'simulation', 'pre_process', or 'post_process'
-        
+
     Raises:
         CaseConstraintError: If any constraint violations are found
     """
     validator = CaseValidator(params)
     validator.validate(stage)
-

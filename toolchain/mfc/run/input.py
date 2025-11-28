@@ -99,12 +99,12 @@ class MFCInputFile(Case):
         """Validate case parameter constraints for a given target stage"""
         target_obj = build.get_target(target)
         stage = target_obj.name
-        
+
         try:
             case_validator.validate_case_constraints(self.params, stage)
         except case_validator.CaseConstraintError as e:
             raise common.MFCException(f"Case validation failed for {stage}:\n{e}")
-    
+
     # Generate case.fpp & [target.name].inp
     def generate(self, target) -> None:
         # Validate constraints before generating input files
