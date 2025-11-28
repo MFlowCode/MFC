@@ -680,6 +680,31 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         self.prohibit(powell and fd_order is None,
                      "fd_order must be set if Powell's method is enabled")
 
+    def check_elasticity_fd_order_simulation(self):
+        """Checks that elasticity uses fd_order = 4 in simulation.
+
+        Mirrors the simulation-only Fortran checks:
+        - elasticity .and. fd_order /= 4
+        where elasticity is implied by hypoelasticity or hyperelasticity.
+        """
+        # elasticity is set in Fortran when either hypoelasticity or
+        # hyperelasticity is enabled; we conservatively treat either flag
+        # (or an explicit elasticity flag) as requiring fd_order = 4.
+        hypoelasticity = self.get('hypoelasticity', 'F') == 'T'
+        hyperelasticity = self.get('hyperelasticity', 'F') == 'T'
+        elasticity_flag = self.get('elasticity', 'F') == 'T'
+        elasticity = elasticity_flag or hypoelasticity or hyperelasticity
+
+        if not elasticity:
+            return
+
+        fd_order = self.get('fd_order')
+        # If elasticity is enabled in simulation, we require fd_order = 4.
+        # If fd_order is unset, other checks will complain; here we only
+        # enforce that, when set, it must be 4.
+        self.prohibit(fd_order is not None and fd_order != 4,
+                     "elasticity (hypoelasticity or hyperelasticity) requires fd_order = 4 in simulation")
+
     def check_igr_simulation(self):  # pylint: disable=too-many-locals
         """Checks IGR constraints specific to simulation"""
         igr = self.get('igr', 'F') == 'T'
@@ -980,8 +1005,11 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         if not bubbles_lagrange:
             return
 
+        n = self.get('n', 0)
         file_per_process = self.get('file_per_process', 'F') == 'T'
 
+        self.prohibit(n is not None and n == 0,
+                     "bubbles_lagrange accepts 2D and 3D simulations only")
         self.prohibit(file_per_process,
                      "file_per_process must be false for bubbles_lagrange")
 
@@ -1025,6 +1053,67 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         self.prohibit(integral_wrt and fd_order is None,
                      "fd_order must be specified for integral_wrt")
 
+    def check_hyperelasticity(self):
+        """Checks hyperelasticity constraints"""
+        hyperelasticity = self.get('hyperelasticity', 'F') == 'T'
+
+        if not hyperelasticity:
+            return
+
+        model_eqns = self.get('model_eqns')
+
+        self.prohibit(model_eqns == 1,
+                     "hyperelasticity is not supported for model_eqns = 1")
+        self.prohibit(model_eqns is not None and model_eqns > 3,
+                     "hyperelasticity is not supported for model_eqns > 3")
+
+    def check_moving_bc(self):  # pylint: disable=too-many-branches
+        """Checks moving boundary constraints"""
+        # Check all directions for moving boundary velocities
+        for direction in ['x', 'y', 'z']:
+            for end in ['beg', 'end']:
+                vb1 = self.get(f'bc_{direction}%vb1', 0.0)
+                vb2 = self.get(f'bc_{direction}%vb2', 0.0)
+                vb3 = self.get(f'bc_{direction}%vb3', 0.0)
+                ve1 = self.get(f'bc_{direction}%ve1', 0.0)
+                ve2 = self.get(f'bc_{direction}%ve2', 0.0)
+                ve3 = self.get(f'bc_{direction}%ve3', 0.0)
+
+                bc_val = self.get(f'bc_{direction}%{end}')
+
+                # Check beg velocities
+                if end == 'beg' and not (vb1 == 0 and vb2 == 0 and vb3 == 0):
+                    # Determine which velocity components should be zero based on direction
+                    if direction == 'x':
+                        non_normal = vb2 != 0 or vb3 != 0
+                    elif direction == 'y':
+                        non_normal = vb3 != 0 or vb1 != 0
+                    else:  # z
+                        non_normal = vb1 != 0 or vb2 != 0
+
+                    if bc_val == -15 and non_normal:  # BC_SLIP_WALL
+                        self.prohibit(True,
+                                     f"bc_{direction}%beg must be -15 if non-normal velocities are set")
+                    elif bc_val not in [-15, -16]:  # Not SLIP or NO_SLIP
+                        self.prohibit(True,
+                                     f"bc_{direction}%beg must be -15 or -16 if velocities are set")
+
+                # Check end velocities
+                if end == 'end' and not (ve1 == 0 and ve2 == 0 and ve3 == 0):
+                    if direction == 'x':
+                        non_normal = ve2 != 0 or ve3 != 0
+                    elif direction == 'y':
+                        non_normal = ve3 != 0 or ve1 != 0
+                    else:  # z
+                        non_normal = ve1 != 0 or ve2 != 0
+
+                    if bc_val == -15 and non_normal:  # BC_SLIP_WALL
+                        self.prohibit(True,
+                                     f"bc_{direction}%end must be -15 if non-normal velocities are set")
+                    elif bc_val not in [-15, -16]:
+                        self.prohibit(True,
+                                     f"bc_{direction}%end must be -15 or -16 if velocities are set")
+
     # ===================================================================
     # Pre-Process Specific Checks
     # ===================================================================
@@ -1058,6 +1147,193 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
                      "dist_type must be set if using QBMM")
         self.prohibit(dist_type is not None and dist_type != 1 and rhoRV is not None and rhoRV > 0,
                      "rhoRV cannot be used with dist_type != 1")
+
+    def check_parallel_io_pre_process(self):
+        """Checks parallel I/O constraints (pre-process)"""
+        parallel_io = self.get('parallel_io', 'F') == 'T'
+        down_sample = self.get('down_sample', 'F') == 'T'
+        igr = self.get('igr', 'F') == 'T'
+        p = self.get('p', 0)
+        file_per_process = self.get('file_per_process', 'F') == 'T'
+        m = self.get('m', 0)
+        n = self.get('n', 0)
+
+        if down_sample:
+            self.prohibit(not parallel_io,
+                         "down sample requires parallel_io = T")
+            self.prohibit(not igr,
+                         "down sample requires igr = T")
+            self.prohibit(p == 0,
+                         "down sample requires 3D (p > 0)")
+            self.prohibit(not file_per_process,
+                         "down sample requires file_per_process = T")
+            if m is not None and m >= 0:
+                self.prohibit((m + 1) % 3 != 0,
+                             "down sample requires m divisible by 3")
+            if n is not None and n >= 0:
+                self.prohibit((n + 1) % 3 != 0,
+                             "down sample requires n divisible by 3")
+            if p is not None and p >= 0:
+                self.prohibit((p + 1) % 3 != 0,
+                             "down sample requires p divisible by 3")
+
+    def check_grid_stretching(self):  # pylint: disable=too-many-branches
+        """Checks grid stretching constraints (pre-process)"""
+        loops_x = self.get('loops_x', 1)
+        loops_y = self.get('loops_y', 1)
+        stretch_y = self.get('stretch_y', 'F') == 'T'
+        stretch_z = self.get('stretch_z', 'F') == 'T'
+        old_grid = self.get('old_grid', 'F') == 'T'
+        n = self.get('n', 0)
+        p = self.get('p', 0)
+        cyl_coord = self.get('cyl_coord', 'F') == 'T'
+
+        self.prohibit(loops_x < 1,
+                     "loops_x must be at least 1")
+        self.prohibit(loops_y < 1,
+                     "loops_y must be at least 1")
+        self.prohibit(stretch_y and n == 0,
+                     "stretch_y requires n > 0")
+        self.prohibit(stretch_z and p == 0,
+                     "stretch_z requires p > 0")
+        self.prohibit(stretch_z and cyl_coord,
+                     "stretch_z is not compatible with cylindrical coordinates")
+
+        for direction in ['x', 'y', 'z']:
+            stretch = self.get(f'stretch_{direction}', 'F') == 'T'
+            if not stretch:
+                continue
+
+            a = self.get(f'a_{direction}')
+            coord_a = self.get(f'{direction}_a')
+            coord_b = self.get(f'{direction}_b')
+
+            self.prohibit(old_grid,
+                         f"old_grid and stretch_{direction} are incompatible")
+            self.prohibit(a is None,
+                         f"a_{direction} must be set with stretch_{direction} enabled")
+            self.prohibit(coord_a is None,
+                         f"{direction}_a must be set with stretch_{direction} enabled")
+            self.prohibit(coord_b is None,
+                         f"{direction}_b must be set with stretch_{direction} enabled")
+            if coord_a is not None and coord_b is not None:
+                self.prohibit(coord_a >= coord_b,
+                             f"{direction}_a must be less than {direction}_b with stretch_{direction} enabled")
+
+    def check_perturb_density(self):
+        """Checks initial partial density perturbation constraints (pre-process)"""
+        perturb_flow = self.get('perturb_flow', 'F') == 'T'
+        perturb_flow_fluid = self.get('perturb_flow_fluid')
+        perturb_flow_mag = self.get('perturb_flow_mag')
+        perturb_sph = self.get('perturb_sph', 'F') == 'T'
+        perturb_sph_fluid = self.get('perturb_sph_fluid')
+        num_fluids = self.get('num_fluids')
+
+        if perturb_flow:
+            self.prohibit(perturb_flow_fluid is None or perturb_flow_mag is None,
+                         "perturb_flow_fluid and perturb_flow_mag must be set with perturb_flow = T")
+        else:
+            self.prohibit(perturb_flow_fluid is not None or perturb_flow_mag is not None,
+                         "perturb_flow_fluid and perturb_flow_mag must not be set with perturb_flow = F")
+
+        if num_fluids is not None and perturb_flow_fluid is not None:
+            self.prohibit(perturb_flow_fluid > num_fluids or perturb_flow_fluid < 0,
+                         "perturb_flow_fluid must be between 0 and num_fluids")
+
+        if perturb_sph:
+            self.prohibit(perturb_sph_fluid is None,
+                         "perturb_sph_fluid must be set with perturb_sph = T")
+        else:
+            self.prohibit(perturb_sph_fluid is not None,
+                         "perturb_sph_fluid must not be set with perturb_sph = F")
+
+        if num_fluids is not None and perturb_sph_fluid is not None:
+            self.prohibit(perturb_sph_fluid > num_fluids or perturb_sph_fluid < 0,
+                         "perturb_sph_fluid must be between 0 and num_fluids")
+
+    def check_chemistry(self):
+        """Checks chemistry constraints (pre-process)"""
+        chemistry = self.get('chemistry', 'F') == 'T'
+        num_species = self.get('num_species', 0)
+
+        if chemistry:
+            self.prohibit(num_species <= 0,
+                         "chemistry requires num_species > 0")
+
+    def check_misc_pre_process(self):
+        """Checks miscellaneous pre-process constraints"""
+        mixlayer_vel_profile = self.get('mixlayer_vel_profile', 'F') == 'T'
+        mixlayer_perturb = self.get('mixlayer_perturb', 'F') == 'T'
+        elliptic_smoothing = self.get('elliptic_smoothing', 'F') == 'T'
+        elliptic_smoothing_iters = self.get('elliptic_smoothing_iters')
+        n = self.get('n', 0)
+        p = self.get('p', 0)
+
+        self.prohibit(mixlayer_vel_profile and n == 0,
+                     "mixlayer_vel_profile requires n > 0")
+        self.prohibit(mixlayer_perturb and p == 0,
+                     "mixlayer_perturb requires p > 0")
+        if elliptic_smoothing and elliptic_smoothing_iters is not None:
+            self.prohibit(elliptic_smoothing_iters < 1,
+                         "elliptic_smoothing_iters must be positive")
+
+    def check_bc_patches(self):  # pylint: disable=too-many-branches,too-many-statements
+        """Checks boundary condition patch geometry (pre-process)"""
+        num_bc_patches = self.get('num_bc_patches', 0)
+        num_bc_patches_max = self.get('num_bc_patches_max', 10)
+
+        if num_bc_patches <= 0:
+            return
+
+        self.prohibit(num_bc_patches > num_bc_patches_max,
+                     f"num_bc_patches must be <= {num_bc_patches_max}")
+
+        for i in range(1, num_bc_patches + 1):
+            geometry = self.get(f'patch_bc({i})%geometry')
+            bc_type = self.get(f'patch_bc({i})%type')
+            direction = self.get(f'patch_bc({i})%dir')
+            radius = self.get(f'patch_bc({i})%radius')
+            centroid = [self.get(f'patch_bc({i})%centroid({j})') for j in range(1, 4)]
+            length = [self.get(f'patch_bc({i})%length({j})') for j in range(1, 4)]
+
+            if geometry is None:
+                continue
+
+            # Line Segment BC (geometry = 1)
+            if geometry == 1:
+                self.prohibit(radius is not None,
+                             f"Line Segment Patch {i} can't have radius defined")
+                if direction in [1, 2]:
+                    self.prohibit(centroid[direction - 1] is not None or centroid[2] is not None,
+                                 f"Line Segment Patch {i} of Dir {direction} can't have centroid in Dir {direction} or 3")
+                    self.prohibit(length[direction - 1] is not None or length[2] is not None,
+                                 f"Line Segment Patch {i} of Dir {direction} can't have length in Dir {direction} or 3")
+
+            # Circle BC (geometry = 2)
+            elif geometry == 2:
+                self.prohibit(radius is None,
+                             f"Circle Patch {i} must have radius defined")
+                self.prohibit(any(l is not None for l in length),
+                             f"Circle Patch {i} can't have lengths defined")
+                if direction in [1, 2, 3]:
+                    self.prohibit(centroid[direction - 1] is not None,
+                                 f"Circle Patch {i} of Dir {direction} can't have centroid in Dir {direction}")
+
+            # Rectangle BC (geometry = 3)
+            elif geometry == 3:
+                self.prohibit(radius is not None,
+                             f"Rectangle Patch {i} can't have radius defined")
+                if direction in [1, 2, 3]:
+                    self.prohibit(centroid[direction - 1] is not None,
+                                 f"Rectangle Patch {i} of Dir {direction} can't have centroid in Dir {direction}")
+                    self.prohibit(length[direction - 1] is not None,
+                                 f"Rectangle Patch {i} of Dir {direction} can't have length in Dir {direction}")
+
+            # Check for incompatible BC types
+            if bc_type is not None:
+                # BC types -14 to -4, -1 (periodic), or < -17 (dirichlet) are incompatible with patches
+                self.prohibit((-14 <= bc_type <= -4) or bc_type == -1 or bc_type < -17,
+                             f"Incompatible BC type for boundary condition patch {i}")
 
     # ===================================================================
     # Post-Process Specific Checks
@@ -1095,11 +1371,232 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         schlieren_wrt = self.get('schlieren_wrt', 'F') == 'T'
         n = self.get('n', 0)
         fd_order = self.get('fd_order')
+        num_fluids = self.get('num_fluids')
 
         self.prohibit(n is not None and n == 0 and schlieren_wrt,
                      "schlieren_wrt requires n > 0 (at least 2D)")
         self.prohibit(schlieren_wrt and fd_order is None,
                      "fd_order must be set for schlieren_wrt")
+
+        if num_fluids is not None:
+            for i in range(1, num_fluids + 1):
+                schlieren_alpha = self.get(f'schlieren_alpha({i})')
+                if schlieren_alpha is not None:
+                    self.prohibit(schlieren_alpha <= 0,
+                                 f"schlieren_alpha({i}) must be greater than zero")
+                    self.prohibit(i > num_fluids,
+                                 f"Index of schlieren_alpha({i}) exceeds the total number of fluids")
+                    self.prohibit(not schlieren_wrt,
+                                 f"schlieren_alpha({i}) should be set only with schlieren_wrt enabled")
+
+    def check_partial_domain(self):  # pylint: disable=too-many-locals
+        """Checks partial domain output constraints (post-process)"""
+        output_partial_domain = self.get('output_partial_domain', 'F') == 'T'
+
+        if not output_partial_domain:
+            return
+
+        format_val = self.get('format')
+        precision = self.get('precision')
+        flux_wrt = self.get('flux_wrt', 'F') == 'T'
+        heat_ratio_wrt = self.get('heat_ratio_wrt', 'F') == 'T'
+        pres_inf_wrt = self.get('pres_inf_wrt', 'F') == 'T'
+        c_wrt = self.get('c_wrt', 'F') == 'T'
+        schlieren_wrt = self.get('schlieren_wrt', 'F') == 'T'
+        qm_wrt = self.get('qm_wrt', 'F') == 'T'
+        liutex_wrt = self.get('liutex_wrt', 'F') == 'T'
+        ib = self.get('ib', 'F') == 'T'
+        omega_wrt = [self.get(f'omega_wrt({i})', 'F') == 'T' for i in range(1, 4)]
+        n = self.get('n', 0)
+        p = self.get('p', 0)
+
+        self.prohibit(format_val == 1,
+                     "output_partial_domain requires format = 2")
+        self.prohibit(precision == 1,
+                     "output_partial_domain requires precision = 2")
+        self.prohibit(flux_wrt or heat_ratio_wrt or pres_inf_wrt or c_wrt or
+                     schlieren_wrt or qm_wrt or liutex_wrt or ib or any(omega_wrt),
+                     "output_partial_domain is incompatible with certain output flags")
+
+        x_output_beg = self.get('x_output%beg')
+        x_output_end = self.get('x_output%end')
+        self.prohibit(x_output_beg is None or x_output_end is None,
+                     "x_output%beg and x_output%end must be set for output_partial_domain")
+
+        if n is not None and n != 0:
+            y_output_beg = self.get('y_output%beg')
+            y_output_end = self.get('y_output%end')
+            self.prohibit(y_output_beg is None or y_output_end is None,
+                         "y_output%beg and y_output%end must be set for output_partial_domain with n > 0")
+
+        if p is not None and p != 0:
+            z_output_beg = self.get('z_output%beg')
+            z_output_end = self.get('z_output%end')
+            self.prohibit(z_output_beg is None or z_output_end is None,
+                         "z_output%beg and z_output%end must be set for output_partial_domain with p > 0")
+
+        for direction in ['x', 'y', 'z']:
+            beg = self.get(f'{direction}_output%beg')
+            end = self.get(f'{direction}_output%end')
+            if beg is not None and end is not None:
+                self.prohibit(beg > end,
+                             f"{direction}_output%beg must be <= {direction}_output%end")
+
+    def check_partial_density(self):
+        """Checks partial density output constraints (post-process)"""
+        num_fluids = self.get('num_fluids')
+        model_eqns = self.get('model_eqns')
+
+        if num_fluids is None:
+            return
+
+        for i in range(1, num_fluids + 1):
+            alpha_rho_wrt = self.get(f'alpha_rho_wrt({i})', 'F') == 'T'
+            if alpha_rho_wrt:
+                self.prohibit(model_eqns == 1,
+                             f"alpha_rho_wrt({i}) is not supported for model_eqns = 1")
+                self.prohibit(i > num_fluids,
+                             f"Index of alpha_rho_wrt({i}) exceeds the total number of fluids")
+
+    def check_momentum_post(self):
+        """Checks momentum output constraints (post-process)"""
+        mom_wrt = [self.get(f'mom_wrt({i})', 'F') == 'T' for i in range(1, 4)]
+        n = self.get('n', 0)
+        p = self.get('p', 0)
+
+        self.prohibit(n == 0 and mom_wrt[1],
+                     "mom_wrt(2) requires n > 0")
+        self.prohibit(p == 0 and mom_wrt[2],
+                     "mom_wrt(3) requires p > 0")
+
+    def check_velocity_post(self):
+        """Checks velocity output constraints (post-process)"""
+        vel_wrt = [self.get(f'vel_wrt({i})', 'F') == 'T' for i in range(1, 4)]
+        n = self.get('n', 0)
+        p = self.get('p', 0)
+
+        self.prohibit(n == 0 and vel_wrt[1],
+                     "vel_wrt(2) requires n > 0")
+        self.prohibit(p == 0 and vel_wrt[2],
+                     "vel_wrt(3) requires p > 0")
+
+    def check_flux_limiter(self):
+        """Checks flux limiter constraints (post-process)"""
+        flux_wrt = [self.get(f'flux_wrt({i})', 'F') == 'T' for i in range(1, 4)]
+        flux_lim = self.get('flux_lim')
+        n = self.get('n', 0)
+        p = self.get('p', 0)
+
+        self.prohibit(n == 0 and flux_wrt[1],
+                     "flux_wrt(2) requires n > 0")
+        self.prohibit(p == 0 and flux_wrt[2],
+                     "flux_wrt(3) requires p > 0")
+
+        if flux_lim is not None:
+            self.prohibit(flux_lim not in [1, 2, 3, 4, 5, 6, 7],
+                         "flux_lim must be between 1 and 7")
+
+    def check_volume_fraction(self):
+        """Checks volume fraction output constraints (post-process)"""
+        num_fluids = self.get('num_fluids')
+        model_eqns = self.get('model_eqns')
+
+        if num_fluids is None:
+            return
+
+        for i in range(1, num_fluids + 1):
+            alpha_wrt = self.get(f'alpha_wrt({i})', 'F') == 'T'
+            if alpha_wrt:
+                self.prohibit(model_eqns == 1,
+                             f"alpha_wrt({i}) is not supported for model_eqns = 1")
+                self.prohibit(i > num_fluids,
+                             f"Index of alpha_wrt({i}) exceeds the total number of fluids")
+
+    def check_fft(self):
+        """Checks FFT output constraints (post-process)"""
+        fft_wrt = self.get('fft_wrt', 'F') == 'T'
+
+        if not fft_wrt:
+            return
+
+        n = self.get('n', 0)
+        p = self.get('p', 0)
+        cyl_coord = self.get('cyl_coord', 'F') == 'T'
+        m_glb = self.get('m_glb')
+        n_glb = self.get('n_glb')
+        p_glb = self.get('p_glb')
+
+        self.prohibit(n == 0 or p == 0,
+                     "FFT WRT only supported in 3D")
+        self.prohibit(cyl_coord,
+                     "FFT WRT incompatible with cylindrical coordinates")
+
+        if m_glb is not None and n_glb is not None and p_glb is not None:
+            self.prohibit((m_glb + 1) % 2 != 0 or (n_glb + 1) % 2 != 0 or (p_glb + 1) % 2 != 0,
+                         "FFT WRT requires global dimensions divisible by 2")
+
+        # BC checks
+        for direction in ['x', 'y', 'z']:
+            for end in ['beg', 'end']:
+                bc_val = self.get(f'bc_{direction}%{end}')
+                if bc_val is not None:
+                    self.prohibit(bc_val < -1,
+                                 "FFT WRT requires periodic BCs (all BCs should be -1)")
+
+    def check_qm(self):
+        """Checks Q-criterion output constraints (post-process)"""
+        qm_wrt = self.get('qm_wrt', 'F') == 'T'
+        n = self.get('n', 0)
+
+        self.prohibit(n == 0 and qm_wrt,
+                     "qm_wrt requires n > 0 (at least 2D)")
+
+    def check_liutex_post(self):
+        """Checks liutex output constraints (post-process)"""
+        liutex_wrt = self.get('liutex_wrt', 'F') == 'T'
+        n = self.get('n', 0)
+
+        self.prohibit(n == 0 and liutex_wrt,
+                     "liutex_wrt requires n > 0 (at least 2D)")
+
+    def check_surface_tension_post(self):
+        """Checks surface tension output constraints (post-process)"""
+        cf_wrt = self.get('cf_wrt', 'F') == 'T'
+        surface_tension = self.get('surface_tension', 'F') == 'T'
+
+        self.prohibit(cf_wrt and not surface_tension,
+                     "cf_wrt can only be enabled if surface_tension is enabled")
+
+    def check_no_flow_variables(self):  # pylint: disable=too-many-locals
+        """Checks that at least one flow variable is selected (post-process)"""
+        rho_wrt = self.get('rho_wrt', 'F') == 'T'
+        E_wrt = self.get('E_wrt', 'F') == 'T'
+        pres_wrt = self.get('pres_wrt', 'F') == 'T'
+        gamma_wrt = self.get('gamma_wrt', 'F') == 'T'
+        heat_ratio_wrt = self.get('heat_ratio_wrt', 'F') == 'T'
+        pi_inf_wrt = self.get('pi_inf_wrt', 'F') == 'T'
+        pres_inf_wrt = self.get('pres_inf_wrt', 'F') == 'T'
+        cons_vars_wrt = self.get('cons_vars_wrt', 'F') == 'T'
+        prim_vars_wrt = self.get('prim_vars_wrt', 'F') == 'T'
+        c_wrt = self.get('c_wrt', 'F') == 'T'
+        schlieren_wrt = self.get('schlieren_wrt', 'F') == 'T'
+
+        # Check array variables
+        num_fluids = self.get('num_fluids', 1)
+        alpha_rho_wrt_any = any(self.get(f'alpha_rho_wrt({i})', 'F') == 'T' for i in range(1, num_fluids + 1))
+        mom_wrt_any = any(self.get(f'mom_wrt({i})', 'F') == 'T' for i in range(1, 4))
+        vel_wrt_any = any(self.get(f'vel_wrt({i})', 'F') == 'T' for i in range(1, 4))
+        flux_wrt_any = any(self.get(f'flux_wrt({i})', 'F') == 'T' for i in range(1, 4))
+        alpha_wrt_any = any(self.get(f'alpha_wrt({i})', 'F') == 'T' for i in range(1, num_fluids + 1))
+        omega_wrt_any = any(self.get(f'omega_wrt({i})', 'F') == 'T' for i in range(1, 4))
+
+        has_output = (rho_wrt or E_wrt or pres_wrt or gamma_wrt or heat_ratio_wrt or
+                     pi_inf_wrt or pres_inf_wrt or cons_vars_wrt or prim_vars_wrt or
+                     c_wrt or schlieren_wrt or alpha_rho_wrt_any or mom_wrt_any or
+                     vel_wrt_any or flux_wrt_any or alpha_wrt_any or omega_wrt_any)
+
+        self.prohibit(not has_output,
+                     "None of the flow variables have been selected for post-process")
 
     # ===================================================================
     # Main Validation Entry Points
@@ -1117,11 +1614,13 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         self.check_qbmm_and_polydisperse()
         self.check_adv_n()
         self.check_hypoelasticity()
+        self.check_hyperelasticity()
         self.check_phase_change()
         self.check_ibm()
         self.check_stiffened_eos()
         self.check_surface_tension()
         self.check_mhd()
+        self.check_moving_bc()
 
     def validate_simulation(self):
         """Validate simulation-specific parameters"""
@@ -1136,6 +1635,7 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         self.check_body_forces()
         self.check_viscosity()
         self.check_mhd_simulation()
+        self.check_elasticity_fd_order_simulation()
         self.check_igr_simulation()
         self.check_acoustic_source()
         self.check_adaptive_time_stepping()
@@ -1150,6 +1650,12 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         self.validate_common()
         self.check_restart()
         self.check_qbmm_pre_process()
+        self.check_parallel_io_pre_process()
+        self.check_grid_stretching()
+        self.check_perturb_density()
+        self.check_chemistry()
+        self.check_misc_pre_process()
+        self.check_bc_patches()
 
     def validate_post_process(self):
         """Validate post-process-specific parameters"""
@@ -1157,8 +1663,19 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         self.check_finite_difference()
         self.check_time_stepping()
         self.check_output_format()
+        self.check_partial_domain()
+        self.check_partial_density()
+        self.check_momentum_post()
+        self.check_velocity_post()
+        self.check_flux_limiter()
+        self.check_volume_fraction()
         self.check_vorticity()
+        self.check_fft()
+        self.check_qm()
+        self.check_liutex_post()
         self.check_schlieren()
+        self.check_surface_tension_post()
+        self.check_no_flow_variables()
 
     def validate(self, stage: str = 'simulation'):
         """Main validation method
