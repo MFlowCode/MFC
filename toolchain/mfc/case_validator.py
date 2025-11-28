@@ -467,6 +467,11 @@ class CaseValidator:
     def check_time_stepping(self):
         """Checks time stepping parameters (simulation/post-process)"""
         cfl_dt = self.get('cfl_dt', 'F') == 'T'
+        time_stepper = self.get('time_stepper')
+        
+        # Check time_stepper bounds
+        self.prohibit(time_stepper is not None and (time_stepper < 1 or time_stepper > 3),
+                     "time_stepper must be 1, 2, or 3")
         
         if cfl_dt:
             cfl_target = self.get('cfl_target')
@@ -626,27 +631,34 @@ class CaseValidator:
         """Checks constraints on viscosity parameters"""
         viscous = self.get('viscous', 'F') == 'T'
         num_fluids = self.get('num_fluids')
+        model_eqns = self.get('model_eqns')
+        weno_order = self.get('weno_order')
+        weno_avg = self.get('weno_avg', 'F') == 'T'
+        igr = self.get('igr', 'F') == 'T'
         
+        # If num_fluids is not set, check at least fluid 1 (for model_eqns=1)
         if num_fluids is None:
-            return
+            num_fluids = 1
             
         for i in range(1, num_fluids + 1):
             Re1 = self.get(f'fluid_pp({i})%Re(1)')
             Re2 = self.get(f'fluid_pp({i})%Re(2)')
             
-            self.prohibit(Re1 is not None and not viscous,
-                         f"fluid_pp({i})%Re(1) is specified, but viscous is not set to true")
-            self.prohibit(Re2 is not None and not viscous,
-                         f"fluid_pp({i})%Re(2) is specified, but viscous is not set to true")
+            for j, Re_val in [(1, Re1), (2, Re2)]:
+                if Re_val is not None:
+                    self.prohibit(Re_val <= 0,
+                                 f"fluid_pp({i})%Re({j}) must be positive")
+                    self.prohibit(model_eqns == 1,
+                                 f"model_eqns = 1 does not support fluid_pp({i})%Re({j})")
+                    if not igr:
+                        self.prohibit(weno_order == 1 and not weno_avg,
+                                     f"weno_order = 1 without weno_avg does not support fluid_pp({i})%Re({j})")
+                    self.prohibit(not viscous,
+                                 f"Re({j}) is specified, but viscous is not set to true")
+            
+            # Check Re(1) requirement
             self.prohibit(Re1 is None and viscous,
                          f"viscous is set to true, but fluid_pp({i})%Re(1) is not specified")
-            
-            if Re1 is not None:
-                self.prohibit(Re1 <= 0,
-                             f"fluid_pp({i})%Re(1) must be positive")
-            if Re2 is not None:
-                self.prohibit(Re2 <= 0,
-                             f"fluid_pp({i})%Re(2) must be positive")
     
     def check_mhd_simulation(self):
         """Checks MHD constraints specific to simulation"""
@@ -737,6 +749,283 @@ class CaseValidator:
                 if bc is not None:
                     self.prohibit(bc <= -4 and bc >= -14,
                                  f"Characteristic boundary condition bc_{dir}%{bound} is not compatible with IGR")
+    
+    def check_acoustic_source(self):
+        """Checks acoustic source parameters (simulation)"""
+        acoustic_source = self.get('acoustic_source', 'F') == 'T'
+        
+        if not acoustic_source:
+            return
+        
+        num_source = self.get('num_source')
+        n = self.get('n', 0)
+        p = self.get('p', 0)
+        cyl_coord = self.get('cyl_coord', 'F') == 'T'
+        
+        # Determine dimensionality
+        if n is not None and n == 0:
+            dim = 1
+        elif p is not None and p == 0:
+            dim = 2
+        else:
+            dim = 3
+        
+        self.prohibit(num_source is None,
+                     "num_source must be specified for acoustic_source")
+        self.prohibit(num_source is not None and num_source < 0,
+                     "num_source must be non-negative")
+        
+        if num_source is None or num_source <= 0:
+            return
+        
+        # Check each acoustic source
+        for j in range(1, num_source + 1):
+            jstr = str(j)
+            
+            support = self.get(f'acoustic({j})%support')
+            loc = [self.get(f'acoustic({j})%loc({i})') for i in range(1, 4)]
+            mag = self.get(f'acoustic({j})%mag')
+            pulse = self.get(f'acoustic({j})%pulse')
+            frequency = self.get(f'acoustic({j})%frequency')
+            wavelength = self.get(f'acoustic({j})%wavelength')
+            gauss_sigma_time = self.get(f'acoustic({j})%gauss_sigma_time')
+            gauss_sigma_dist = self.get(f'acoustic({j})%gauss_sigma_dist')
+            bb_num_freq = self.get(f'acoustic({j})%bb_num_freq')
+            bb_bandwidth = self.get(f'acoustic({j})%bb_bandwidth')
+            bb_lowest_freq = self.get(f'acoustic({j})%bb_lowest_freq')
+            npulse = self.get(f'acoustic({j})%npulse')
+            dipole = self.get(f'acoustic({j})%dipole', 'F') == 'T'
+            dir_val = self.get(f'acoustic({j})%dir')
+            delay = self.get(f'acoustic({j})%delay')
+            length = self.get(f'acoustic({j})%length')
+            height = self.get(f'acoustic({j})%height')
+            foc_length = self.get(f'acoustic({j})%foc_length')
+            aperture = self.get(f'acoustic({j})%aperture')
+            num_elements = self.get(f'acoustic({j})%num_elements')
+            element_on = self.get(f'acoustic({j})%element_on')
+            element_spacing_angle = self.get(f'acoustic({j})%element_spacing_angle')
+            element_polygon_ratio = self.get(f'acoustic({j})%element_polygon_ratio')
+            
+            self.prohibit(support is None,
+                         f"acoustic({jstr})%support must be specified for acoustic_source")
+            
+            # Dimension-specific support checks
+            if dim == 1:
+                self.prohibit(support != 1,
+                             f"Only acoustic({jstr})%support = 1 is allowed for 1D simulations")
+                self.prohibit(support == 1 and loc[0] is None,
+                             f"acoustic({jstr})%loc(1) must be specified for support = 1")
+            
+            elif dim == 2:
+                if cyl_coord:
+                    self.prohibit(support not in [2, 6, 10],
+                                 f"Only acoustic({jstr})%support = 2, 6, or 10 is allowed for 2D axisymmetric")
+                else:
+                    self.prohibit(support not in [2, 5, 6, 9, 10],
+                                 f"Only acoustic({jstr})%support = 2, 5, 6, 9, or 10 is allowed for 2D")
+                
+                if support in [2, 5, 6, 9, 10]:
+                    self.prohibit(loc[0] is None or loc[1] is None,
+                                 f"acoustic({jstr})%loc(1:2) must be specified for support = {support}")
+            
+            elif dim == 3:
+                self.prohibit(support not in [3, 7, 11],
+                             f"Only acoustic({jstr})%support = 3, 7, or 11 is allowed for 3D")
+                self.prohibit(cyl_coord,
+                             "Acoustic source is not supported in 3D cylindrical simulations")
+                
+                if support == 3:
+                    self.prohibit(loc[0] is None or loc[1] is None,
+                                 f"acoustic({jstr})%loc(1:2) must be specified for support = 3")
+                elif support in [7, 11]:
+                    self.prohibit(loc[0] is None or loc[1] is None or loc[2] is None,
+                                 f"acoustic({jstr})%loc(1:3) must be specified for support = {support}")
+            
+            # Pulse parameters
+            self.prohibit(mag is None,
+                         f"acoustic({jstr})%mag must be specified")
+            self.prohibit(pulse is None,
+                         f"acoustic({jstr})%pulse must be specified")
+            self.prohibit(pulse is not None and pulse not in [1, 2, 3, 4],
+                         f"Only acoustic({jstr})%pulse = 1, 2, 3, or 4 is allowed")
+            
+            # Pulse-specific requirements
+            if pulse in [1, 3]:
+                freq_set = frequency is not None
+                wave_set = wavelength is not None
+                self.prohibit(freq_set == wave_set,
+                             f"One and only one of acoustic({jstr})%frequency or wavelength must be specified for pulse = {pulse}")
+            
+            if pulse == 2:
+                time_set = gauss_sigma_time is not None
+                dist_set = gauss_sigma_dist is not None
+                self.prohibit(time_set == dist_set,
+                             f"One and only one of acoustic({jstr})%gauss_sigma_time or gauss_sigma_dist must be specified for pulse = 2")
+                self.prohibit(delay is None,
+                             f"acoustic({jstr})%delay must be specified for pulse = 2 (Gaussian)")
+            
+            if pulse == 4:
+                self.prohibit(bb_num_freq is None,
+                             f"acoustic({jstr})%bb_num_freq must be specified for pulse = 4")
+                self.prohibit(bb_bandwidth is None,
+                             f"acoustic({jstr})%bb_bandwidth must be specified for pulse = 4")
+                self.prohibit(bb_lowest_freq is None,
+                             f"acoustic({jstr})%bb_lowest_freq must be specified for pulse = 4")
+            
+            # npulse checks
+            self.prohibit(npulse is None,
+                         f"acoustic({jstr})%npulse must be specified")
+            self.prohibit(support is not None and support >= 5 and npulse is not None and not isinstance(npulse, int),
+                         f"acoustic({jstr})%npulse must be an integer for support >= 5 (non-planar)")
+            self.prohibit(npulse is not None and npulse >= 5 and dipole,
+                         f"acoustic({jstr})%dipole is not supported for npulse >= 5")
+            self.prohibit(support is not None and support < 5 and dir_val is None,
+                         f"acoustic({jstr})%dir must be specified for support < 5 (planar)")
+            self.prohibit(support == 1 and dir_val is not None and dir_val == 0,
+                         f"acoustic({jstr})%dir must be non-zero for support = 1")
+            self.prohibit(pulse == 3 and support is not None and support >= 5,
+                         f"acoustic({jstr})%support >= 5 is not allowed for pulse = 3 (square wave)")
+            
+            # Geometry checks
+            if support in [2, 3]:
+                self.prohibit(length is None,
+                             f"acoustic({jstr})%length must be specified for support = {support}")
+                self.prohibit(length is not None and length <= 0,
+                             f"acoustic({jstr})%length must be positive for support = {support}")
+            
+            if support == 3:
+                self.prohibit(height is None,
+                             f"acoustic({jstr})%height must be specified for support = 3")
+                self.prohibit(height is not None and height <= 0,
+                             f"acoustic({jstr})%height must be positive for support = 3")
+            
+            if support is not None and support >= 5:
+                self.prohibit(foc_length is None,
+                             f"acoustic({jstr})%foc_length must be specified for support >= 5 (non-planar)")
+                self.prohibit(foc_length is not None and foc_length <= 0,
+                             f"acoustic({jstr})%foc_length must be positive for support >= 5")
+                self.prohibit(aperture is None,
+                             f"acoustic({jstr})%aperture must be specified for support >= 5 (non-planar)")
+                self.prohibit(aperture is not None and aperture <= 0,
+                             f"acoustic({jstr})%aperture must be positive for support >= 5")
+            
+            # Transducer array checks
+            if support in [9, 10, 11]:
+                self.prohibit(num_elements is None,
+                             f"acoustic({jstr})%num_elements must be specified for support = {support} (transducer array)")
+                self.prohibit(num_elements is not None and num_elements <= 0,
+                             f"acoustic({jstr})%num_elements must be positive for support = {support}")
+                self.prohibit(element_on is not None and element_on < 0,
+                             f"acoustic({jstr})%element_on must be non-negative for support = {support}")
+                self.prohibit(element_on is not None and num_elements is not None and element_on > num_elements,
+                             f"acoustic({jstr})%element_on must be <= num_elements for support = {support}")
+            
+            if support in [9, 10]:
+                self.prohibit(element_spacing_angle is None,
+                             f"acoustic({jstr})%element_spacing_angle must be specified for support = {support} (2D transducer)")
+                self.prohibit(element_spacing_angle is not None and element_spacing_angle < 0,
+                             f"acoustic({jstr})%element_spacing_angle must be non-negative for support = {support}")
+            
+            if support == 11:
+                self.prohibit(element_polygon_ratio is None,
+                             f"acoustic({jstr})%element_polygon_ratio must be specified for support = 11 (3D transducer)")
+                self.prohibit(element_polygon_ratio is not None and element_polygon_ratio <= 0,
+                             f"acoustic({jstr})%element_polygon_ratio must be positive for support = 11")
+    
+    def check_adaptive_time_stepping(self):
+        """Checks adaptive time stepping parameters (simulation)"""
+        adap_dt = self.get('adap_dt', 'F') == 'T'
+        
+        if not adap_dt:
+            return
+        
+        time_stepper = self.get('time_stepper')
+        model_eqns = self.get('model_eqns')
+        polytropic = self.get('polytropic', 'F') == 'T'
+        bubbles_lagrange = self.get('bubbles_lagrange', 'F') == 'T'
+        qbmm = self.get('qbmm', 'F') == 'T'
+        adv_n = self.get('adv_n', 'F') == 'T'
+        
+        self.prohibit(time_stepper != 3,
+                     "adapt_dt requires Runge-Kutta 3 (time_stepper = 3)")
+        self.prohibit(model_eqns == 1,
+                     "adapt_dt is not supported for model_eqns = 1")
+        self.prohibit(qbmm,
+                     "adapt_dt is not compatible with qbmm")
+        self.prohibit(not polytropic and not bubbles_lagrange,
+                     "adapt_dt requires polytropic = T or bubbles_lagrange = T")
+        self.prohibit(not adv_n and not bubbles_lagrange,
+                     "adapt_dt requires adv_n = T or bubbles_lagrange = T")
+    
+    def check_alt_soundspeed(self):
+        """Checks alternative sound speed parameters (simulation)"""
+        alt_soundspeed = self.get('alt_soundspeed', 'F') == 'T'
+        
+        if not alt_soundspeed:
+            return
+        
+        model_eqns = self.get('model_eqns')
+        bubbles_euler = self.get('bubbles_euler', 'F') == 'T'
+        avg_state = self.get('avg_state')
+        
+        self.prohibit(model_eqns != 2,
+                     "5-equation model (model_eqns = 2) is required for alt_soundspeed")
+        self.prohibit(bubbles_euler,
+                     "alt_soundspeed is not compatible with bubbles_euler")
+        self.prohibit(avg_state != 2,
+                     "alt_soundspeed requires avg_state = 2")
+    
+    def check_bubbles_lagrange(self):
+        """Checks Lagrangian bubble parameters (simulation)"""
+        bubbles_lagrange = self.get('bubbles_lagrange', 'F') == 'T'
+        
+        if not bubbles_lagrange:
+            return
+        
+        file_per_process = self.get('file_per_process', 'F') == 'T'
+        
+        self.prohibit(file_per_process,
+                     "file_per_process must be false for bubbles_lagrange")
+    
+    def check_continuum_damage(self):
+        """Checks continuum damage model parameters (simulation)"""
+        cont_damage = self.get('cont_damage', 'F') == 'T'
+        
+        if not cont_damage:
+            return
+        
+        tau_star = self.get('tau_star')
+        model_eqns = self.get('model_eqns')
+        hypoelasticity = self.get('hypoelasticity', 'F') == 'T'
+        
+        self.prohibit(tau_star is None,
+                     "tau_star must be specified for cont_damage")
+        self.prohibit(model_eqns != 2,
+                     "cont_damage requires model_eqns = 2")
+        self.prohibit(hypoelasticity,
+                     "cont_damage is not compatible with hypoelasticity")
+    
+    def check_grcbc(self):
+        """Checks Generalized Relaxation Characteristics BC (simulation)"""
+        for dir in ['x', 'y', 'z']:
+            for loc in ['beg', 'end']:
+                grcbc_vel = self.get(f'grcbc_vel_{dir}%{loc}')
+                bc_val = self.get(f'bc_{dir}%{loc}')
+                
+                if grcbc_vel is not None:
+                    self.prohibit(bc_val != -14,
+                                 f"grcbc_vel_{dir}%{loc} requires bc_{dir}%{loc} = -14 (characteristic BC)")
+    
+    def check_probe_integral_output(self):
+        """Checks probe and integral output requirements (simulation)"""
+        probe_wrt = self.get('probe_wrt', 'F') == 'T'
+        integral_wrt = self.get('integral_wrt', 'F') == 'T'
+        fd_order = self.get('fd_order')
+        
+        self.prohibit(probe_wrt and fd_order is None,
+                     "fd_order must be specified for probe_wrt")
+        self.prohibit(integral_wrt and fd_order is None,
+                     "fd_order must be specified for integral_wrt")
     
     # ===================================================================
     # Pre-Process Specific Checks
@@ -850,6 +1139,13 @@ class CaseValidator:
         self.check_viscosity()
         self.check_mhd_simulation()
         self.check_igr_simulation()
+        self.check_acoustic_source()
+        self.check_adaptive_time_stepping()
+        self.check_alt_soundspeed()
+        self.check_bubbles_lagrange()
+        self.check_continuum_damage()
+        self.check_grcbc()
+        self.check_probe_integral_output()
     
     def validate_pre_process(self):
         """Validate pre-process-specific parameters"""
