@@ -21,8 +21,8 @@ class Mfc < Formula
   depends_on "openblas"
   depends_on "python@3.12"
 
-  # Skip relocation for Python C extensions in the venv
-  # The venv is self-contained in libexec and doesn't need Homebrew's relocation
+  # Skip cleanup for Python venv to preserve C extensions as-is
+  # Python wheels manage their own RPATHs and don't need Homebrew's relocation
   skip_clean "libexec/venv"
 
   def install
@@ -94,18 +94,17 @@ class Mfc < Formula
           fi
         done
 
-        SUBCMD="${ARGS[0]-}"
-
         # Friendly help and guardrails
-        if [[ ${#ARGS[@]} -eq 0 ]] || [[ "${SUBCMD}" == "--help" ]] || [[ "${SUBCMD}" == "-h" ]]; then
+        if [[ ${#ARGS[@]} -eq 0 ]] || [[ "${ARGS[0]-}" == "--help" ]] || [[ "${ARGS[0]-}" == "-h" ]]; then
           cat <<'HHELP'
       MFC (Homebrew) #{version}
 
       Usage:
-        mfc run <case.py> [options]
+        mfc <case.py> [options]
 
       Examples:
-        mfc run case.py -j 1
+        mfc case.py -n 2
+        mfc examples/1D_sodshocktube/case.py -n 2 -t pre_process simulation
 
       Notes:
         - This Homebrew wrapper uses prebuilt binaries and a preinstalled venv.
@@ -115,11 +114,47 @@ class Mfc < Formula
           exit 0
         fi
 
-        if [[ "${SUBCMD}" != "run" ]]; then
-          echo "mfc (Homebrew): only 'run' is supported in the Homebrew package."
-          echo "Use 'mfc run <case.py>' or clone the repository for developer commands."
+        # Handle --version flag
+        if [[ "${ARGS[0]-}" == "--version" ]] || [[ "${ARGS[0]-}" == "-v" ]]; then
+          echo "MFC (Homebrew) #{version}"
+          exit 0
+        fi
+
+        # Find first non-flag argument
+        first_nonflag=""
+        for arg in "${ARGS[@]}"; do
+          if [[ "$arg" != -* ]]; then
+            first_nonflag="$arg"
+            break
+          fi
+        done
+
+        # Check if no case file provided
+        if [[ -z "${first_nonflag}" ]]; then
+          echo "mfc (Homebrew): missing case file."
+          echo "Usage: mfc <case.py> [options]"
+          echo "Example: mfc case.py -n 2"
           exit 2
         fi
+
+        # Check if user accidentally used 'mfc run' syntax (even with flags before it)
+        if [[ "${first_nonflag}" == "run" ]]; then
+          echo "mfc (Homebrew): The 'run' command is not needed."
+          echo "Usage: mfc <case.py> [options]"
+          echo "Example: mfc case.py -n 2"
+          exit 2
+        fi
+
+        # Require a readable Python file (not a directory)
+        if [[ ! "${first_nonflag}" =~ .py$ ]] || [[ ! -f "${first_nonflag}" ]]; then
+          echo "mfc (Homebrew): first argument must be a readable Python case file."
+          echo "Given: ${first_nonflag}"
+          echo "Usage: mfc <case.py> [options]"
+          exit 2
+        fi
+
+        # Always prepend "run" since this wrapper only supports running cases
+        ARGS=("run" "${ARGS[@]}")
 
         # Create a temporary working directory (Cellar is read-only)
         TMPDIR="$(mktemp -d)"
@@ -213,12 +248,22 @@ class Mfc < Formula
     (libexec/"mfc").chmod 0755
   end
 
+  # Override to skip relocation checks for Python C extensions in venv
+  # Python wheels (especially orjson, cantera) have Mach-O headers without enough
+  # padding for Homebrew's longer paths. This is safe because:
+  # 1. The venv is self-contained in libexec and uses relative paths
+  # 2. Python manages its own RPATH for C extensions
+  # 3. The venv is never relocated after installation
+  def skip_relocation?(file, _type)
+    file.to_s.include?("/libexec/venv/")
+  end
+
   def caveats
     <<~EOS
       MFC has been installed successfully!
 
       To run a case:
-        mfc run <case.py>
+        mfc <case.py> [options]
 
       Pre-built binaries are also available directly:
         pre_process, simulation, post_process
@@ -226,9 +271,9 @@ class Mfc < Formula
       Examples are available in:
         #{prefix}/examples
 
-      Example:
+      Quick start:
         cp #{prefix}/examples/1D_sodshocktube/case.py .
-        mfc run case.py
+        mfc case.py -n 2
 
       Note: Cantera 3.1.0 is pre-installed in the MFC virtual environment.
     EOS
@@ -254,21 +299,22 @@ class Mfc < Formula
     # Test that mfc wrapper works
     system bin/"mfc", "--help"
 
-    # Test running a simple 1D Sod shock tube case from a separate directory
-    # This ensures the wrapper script correctly handles relative paths
+    # Test running a complete 1D Sod shock tube case from a separate directory
+    # This comprehensive test ensures the entire MFC workflow functions correctly
+    # and that the wrapper script properly handles relative paths
     testpath_case = testpath/"test_run"
     testpath_case.mkpath
 
     # Copy case.py from examples to an independent test directory
     cp prefix/"examples/1D_sodshocktube/case.py", testpath_case/"case.py"
 
-    # Run the case from the test directory (this will execute pre_process and simulation)
-    # Limit to 1 processor and reduce runtime for testing
+    # Run all three stages: pre_process, simulation, and post_process
+    # This runs a full 1D Sod shock tube (1000 timesteps, 399 cells)
     cd testpath_case do
-      system bin/"mfc", "run", "case.py", "-j", "1"
+      system bin/"mfc", "case.py", "-n", "1"
     end
 
-    # Verify output files were created in the test directory
+    # Verify silo_hdf5 output files were created by post_process
     assert_path_exists testpath_case/"silo_hdf5"
     assert_predicate testpath_case/"silo_hdf5", :directory?
   end

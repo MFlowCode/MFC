@@ -1,3 +1,4 @@
+#:include 'case.fpp'
 #:include 'macros.fpp'
 #:include 'inline_capillary.fpp'
 
@@ -88,99 +89,100 @@ contains
         integer :: j, k, l, i
 
         if (id == 1) then
-            #:call GPU_PARALLEL_LOOP(collapse=3, private='[Omega, w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW]')
-                do l = isz%beg, isz%end
-                    do k = isy%beg, isy%end
-                        do j = isx%beg, isx%end
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[Omega, w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW]')
+            do l = isz%beg, isz%end
+                do k = isy%beg, isy%end
+                    do j = isx%beg, isx%end
 
-                            w1L = gL_x(j, k, l, 1)
-                            w2L = gL_x(j, k, l, 2)
-                            w3L = 0._wp
-                            if (p > 0) w3L = gL_x(j, k, l, 3)
+                        w1L = gL_x(j, k, l, 1)
+                        w2L = gL_x(j, k, l, 2)
+                        w3L = 0._wp
+                        if (p > 0) w3L = gL_x(j, k, l, 3)
 
-                            w1R = gR_x(j + 1, k, l, 1)
-                            w2R = gR_x(j + 1, k, l, 2)
-                            w3R = 0._wp
-                            if (p > 0) w3R = gR_x(j + 1, k, l, 3)
+                        w1R = gR_x(j + 1, k, l, 1)
+                        w2R = gR_x(j + 1, k, l, 2)
+                        w3R = 0._wp
+                        if (p > 0) w3R = gR_x(j + 1, k, l, 3)
 
-                            normWL = gL_x(j, k, l, num_dims + 1)
-                            normWR = gR_x(j + 1, k, l, num_dims + 1)
+                        normWL = gL_x(j, k, l, num_dims + 1)
+                        normWR = gR_x(j + 1, k, l, num_dims + 1)
 
-                            w1 = (w1L + w1R)/2._wp
-                            w2 = (w2L + w2R)/2._wp
-                            w3 = (w3L + w3R)/2._wp
-                            normW = (normWL + normWR)/2._wp
+                        w1 = (w1L + w1R)/2._wp
+                        w2 = (w2L + w2R)/2._wp
+                        w3 = (w3L + w3R)/2._wp
+                        normW = (normWL + normWR)/2._wp
 
-                            if (normW > capillary_cutoff) then
-                                @:compute_capillary_stress_tensor()
+                        if (normW > capillary_cutoff) then
+                            @:compute_capillary_stress_tensor()
 
-                                do i = 1, num_dims
+                            do i = 1, num_dims
 
-                                    flux_src_vf(momxb + i - 1)%sf(j, k, l) = &
-                                        flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(1, i)
-
-                                    flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + &
-                                                                     Omega(1, i)*vSrc_rsx_vf(j, k, l, i)
-
-                                end do
+                                flux_src_vf(momxb + i - 1)%sf(j, k, l) = &
+                                    flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(1, i)
 
                                 flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + &
-                                                                 sigma*c_divs(num_dims + 1)%sf(j, k, l)*vSrc_rsx_vf(j, k, l, 1)
-                            end if
-                        end do
+                                                                 Omega(1, i)*vSrc_rsx_vf(j, k, l, i)
+
+                            end do
+
+                            flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + &
+                                                             sigma*c_divs(num_dims + 1)%sf(j, k, l)*vSrc_rsx_vf(j, k, l, 1)
+                        end if
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            end do
+            $:END_GPU_PARALLEL_LOOP()
 
         elseif (id == 2) then
 
-            #:call GPU_PARALLEL_LOOP(collapse=3, private='[Omega, w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW]')
-                do l = isz%beg, isz%end
-                    do k = isy%beg, isy%end
-                        do j = isx%beg, isx%end
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[Omega, w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW]')
+            do l = isz%beg, isz%end
+                do k = isy%beg, isy%end
+                    do j = isx%beg, isx%end
 
-                            w1L = gL_y(k, j, l, 1)
-                            w2L = gL_y(k, j, l, 2)
-                            w3L = 0._wp
-                            if (p > 0) w3L = gL_y(k, j, l, 3)
+                        w1L = gL_y(k, j, l, 1)
+                        w2L = gL_y(k, j, l, 2)
+                        w3L = 0._wp
+                        if (p > 0) w3L = gL_y(k, j, l, 3)
 
-                            w1R = gR_y(k + 1, j, l, 1)
-                            w2R = gR_y(k + 1, j, l, 2)
-                            w3R = 0._wp
-                            if (p > 0) w3R = gR_y(k + 1, j, l, 3)
+                        w1R = gR_y(k + 1, j, l, 1)
+                        w2R = gR_y(k + 1, j, l, 2)
+                        w3R = 0._wp
+                        if (p > 0) w3R = gR_y(k + 1, j, l, 3)
 
-                            normWL = gL_y(k, j, l, num_dims + 1)
-                            normWR = gR_y(k + 1, j, l, num_dims + 1)
+                        normWL = gL_y(k, j, l, num_dims + 1)
+                        normWR = gR_y(k + 1, j, l, num_dims + 1)
 
-                            w1 = (w1L + w1R)/2._wp
-                            w2 = (w2L + w2R)/2._wp
-                            w3 = (w3L + w3R)/2._wp
-                            normW = (normWL + normWR)/2._wp
+                        w1 = (w1L + w1R)/2._wp
+                        w2 = (w2L + w2R)/2._wp
+                        w3 = (w3L + w3R)/2._wp
+                        normW = (normWL + normWR)/2._wp
 
-                            if (normW > capillary_cutoff) then
-                                @:compute_capillary_stress_tensor()
+                        if (normW > capillary_cutoff) then
+                            @:compute_capillary_stress_tensor()
 
-                                do i = 1, num_dims
+                            do i = 1, num_dims
 
-                                    flux_src_vf(momxb + i - 1)%sf(j, k, l) = &
-                                        flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(2, i)
-
-                                    flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + &
-                                                                     Omega(2, i)*vSrc_rsy_vf(k, j, l, i)
-
-                                end do
+                                flux_src_vf(momxb + i - 1)%sf(j, k, l) = &
+                                    flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(2, i)
 
                                 flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + &
-                                                                 sigma*c_divs(num_dims + 1)%sf(j, k, l)*vSrc_rsy_vf(k, j, l, 2)
-                            end if
-                        end do
+                                                                 Omega(2, i)*vSrc_rsy_vf(k, j, l, i)
+
+                            end do
+
+                            flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + &
+                                                             sigma*c_divs(num_dims + 1)%sf(j, k, l)*vSrc_rsy_vf(k, j, l, 2)
+                        end if
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            end do
+            $:END_GPU_PARALLEL_LOOP()
 
         elseif (id == 3) then
+            #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
 
-            #:call GPU_PARALLEL_LOOP(collapse=3, private='[Omega, w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW]')
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[Omega, w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW]')
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
@@ -222,8 +224,8 @@ contains
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
-
+                $:END_GPU_PARALLEL_LOOP()
+            #:endif
         end if
 
     end subroutine s_compute_capillary_source_flux
@@ -231,7 +233,7 @@ contains
     impure subroutine s_get_capillary(q_prim_vf, bc_type)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
-        type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
+        type(integer_field), dimension(1:num_dims, 1:2), intent(in) :: bc_type
 
         type(int_bounds_info) :: isx, isy, isz
         integer :: j, k, l, i
@@ -243,58 +245,60 @@ contains
         isx%end = m; isy%end = n; isz%end = p
 
         ! compute gradient components
-        #:call GPU_PARALLEL_LOOP(collapse=3)
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        c_divs(1)%sf(j, k, l) = 1._wp/(x_cc(j + 1) - x_cc(j - 1))* &
-                                                (q_prim_vf(c_idx)%sf(j + 1, k, l) - q_prim_vf(c_idx)%sf(j - 1, k, l))
-                    end do
+        $:GPU_PARALLEL_LOOP(collapse=3)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    c_divs(1)%sf(j, k, l) = 1._wp/(x_cc(j + 1) - x_cc(j - 1))* &
+                                            (q_prim_vf(c_idx)%sf(j + 1, k, l) - q_prim_vf(c_idx)%sf(j - 1, k, l))
                 end do
             end do
-        #:endcall GPU_PARALLEL_LOOP
+        end do
+        $:END_GPU_PARALLEL_LOOP()
 
-        #:call GPU_PARALLEL_LOOP(collapse=3)
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        c_divs(2)%sf(j, k, l) = 1._wp/(y_cc(k + 1) - y_cc(k - 1))* &
-                                                (q_prim_vf(c_idx)%sf(j, k + 1, l) - q_prim_vf(c_idx)%sf(j, k - 1, l))
-                    end do
+        $:GPU_PARALLEL_LOOP(collapse=3)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    c_divs(2)%sf(j, k, l) = 1._wp/(y_cc(k + 1) - y_cc(k - 1))* &
+                                            (q_prim_vf(c_idx)%sf(j, k + 1, l) - q_prim_vf(c_idx)%sf(j, k - 1, l))
                 end do
             end do
-        #:endcall GPU_PARALLEL_LOOP
+        end do
+        $:END_GPU_PARALLEL_LOOP()
 
         if (p > 0) then
-            #:call GPU_PARALLEL_LOOP(collapse=3)
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            c_divs(3)%sf(j, k, l) = 1._wp/(z_cc(l + 1) - z_cc(l - 1))* &
-                                                    (q_prim_vf(c_idx)%sf(j, k, l + 1) - q_prim_vf(c_idx)%sf(j, k, l - 1))
-                        end do
-                    end do
-                end do
-            #:endcall GPU_PARALLEL_LOOP
-        end if
-
-        #:call GPU_PARALLEL_LOOP(collapse=3)
+            $:GPU_PARALLEL_LOOP(collapse=3)
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        c_divs(num_dims + 1)%sf(j, k, l) = 0._wp
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = 1, num_dims
-                            c_divs(num_dims + 1)%sf(j, k, l) = &
-                                c_divs(num_dims + 1)%sf(j, k, l) + &
-                                c_divs(i)%sf(j, k, l)**2._wp
-                        end do
-                        c_divs(num_dims + 1)%sf(j, k, l) = &
-                            sqrt(c_divs(num_dims + 1)%sf(j, k, l))
+                        c_divs(3)%sf(j, k, l) = 1._wp/(z_cc(l + 1) - z_cc(l - 1))* &
+                                                (q_prim_vf(c_idx)%sf(j, k, l + 1) - q_prim_vf(c_idx)%sf(j, k, l - 1))
                     end do
                 end do
             end do
-        #:endcall GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+
+        $:GPU_PARALLEL_LOOP(collapse=3)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    c_divs(num_dims + 1)%sf(j, k, l) = 0._wp
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do i = 1, num_dims
+                        c_divs(num_dims + 1)%sf(j, k, l) = &
+                            c_divs(num_dims + 1)%sf(j, k, l) + &
+                            c_divs(i)%sf(j, k, l)**2._wp
+                    end do
+                    !c_divs(num_dims + 1)%sf(j, k, l) = &
+                    !sqrt(c_divs(num_dims + 1)%sf(j, k, l))
+                    c_divs(num_dims + 1)%sf(j, k, l) = &
+                        sqrt(real(c_divs(num_dims + 1)%sf(j, k, l), kind=wp))
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
 
         call s_populate_capillary_buffers(c_divs, bc_type)
 
@@ -343,44 +347,44 @@ contains
                 $:GPU_UPDATE(device='[is1,is2,is3,iv]')
 
                 if (recon_dir == 1) then
-                    #:call GPU_PARALLEL_LOOP(collapse=4)
-                        do i = iv%beg, iv%end
-                            do l = is3%beg, is3%end
-                                do k = is2%beg, is2%end
-                                    do j = is1%beg, is1%end
-                                        vL_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
-                                        vR_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
-                                    end do
+                    $:GPU_PARALLEL_LOOP(collapse=4)
+                    do i = iv%beg, iv%end
+                        do l = is3%beg, is3%end
+                            do k = is2%beg, is2%end
+                                do j = is1%beg, is1%end
+                                    vL_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
+                                    vR_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
                                 end do
                             end do
                         end do
-                    #:endcall GPU_PARALLEL_LOOP
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
                 else if (recon_dir == 2) then
-                    #:call GPU_PARALLEL_LOOP(collapse=4)
-                        do i = iv%beg, iv%end
-                            do l = is3%beg, is3%end
-                                do k = is2%beg, is2%end
-                                    do j = is1%beg, is1%end
-                                        vL_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
-                                        vR_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
-                                    end do
+                    $:GPU_PARALLEL_LOOP(collapse=4)
+                    do i = iv%beg, iv%end
+                        do l = is3%beg, is3%end
+                            do k = is2%beg, is2%end
+                                do j = is1%beg, is1%end
+                                    vL_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
+                                    vR_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
                                 end do
                             end do
                         end do
-                    #:endcall GPU_PARALLEL_LOOP
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
                 else if (recon_dir == 3) then
-                    #:call GPU_PARALLEL_LOOP(collapse=4)
-                        do i = iv%beg, iv%end
-                            do l = is3%beg, is3%end
-                                do k = is2%beg, is2%end
-                                    do j = is1%beg, is1%end
-                                        vL_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
-                                        vR_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
-                                    end do
+                    $:GPU_PARALLEL_LOOP(collapse=4)
+                    do i = iv%beg, iv%end
+                        do l = is3%beg, is3%end
+                            do k = is2%beg, is2%end
+                                do j = is1%beg, is1%end
+                                    vL_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
+                                    vR_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
                                 end do
                             end do
                         end do
-                    #:endcall GPU_PARALLEL_LOOP
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
                 end if
             end if
         #:endfor
