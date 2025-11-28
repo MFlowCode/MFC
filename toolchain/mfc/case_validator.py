@@ -54,11 +54,11 @@ class CaseValidator:
         
         self.prohibit(m is None, "m must be set")
         self.prohibit(m is not None and m <= 0, "m must be positive")
-        self.prohibit(n < 0, "n must be non-negative")
-        self.prohibit(p < 0, "p must be non-negative")
-        self.prohibit(cyl_coord and p > 0 and p % 2 == 0, 
+        self.prohibit(n is not None and n < 0, "n must be non-negative")
+        self.prohibit(p is not None and p < 0, "p must be non-negative")
+        self.prohibit(cyl_coord and p is not None and p > 0 and p % 2 == 0, 
                      "p must be odd for cylindrical coordinates")
-        self.prohibit(n == 0 and p > 0, 
+        self.prohibit(n is not None and p is not None and n == 0 and p > 0, 
                      "p must be 0 if n = 0")
     
     def check_model_eqns_and_num_fluids(self):
@@ -103,9 +103,9 @@ class CaseValidator:
         if igr_order:
             self.prohibit(m + 1 < igr_order,
                          f"m must be at least igr_order - 1 (= {igr_order - 1})")
-            self.prohibit(n > 0 and n + 1 < igr_order,
+            self.prohibit(n is not None and n > 0 and n + 1 < igr_order,
                          f"n must be at least igr_order - 1 (= {igr_order - 1})")
-            self.prohibit(p > 0 and p + 1 < igr_order,
+            self.prohibit(p is not None and p > 0 and p + 1 < igr_order,
                          f"p must be at least igr_order - 1 (= {igr_order - 1})")
     
     def check_weno(self):
@@ -128,9 +128,9 @@ class CaseValidator:
                      "weno_order must be 1, 3, 5, or 7")
         self.prohibit(m + 1 < weno_order,
                      f"m must be at least weno_order - 1 (= {weno_order - 1})")
-        self.prohibit(n > 0 and n + 1 < weno_order,
+        self.prohibit(n is not None and n > 0 and n + 1 < weno_order,
                      f"For 2D simulation, n must be at least weno_order - 1 (= {weno_order - 1})")
-        self.prohibit(p > 0 and p + 1 < weno_order,
+        self.prohibit(p is not None and p > 0 and p + 1 < weno_order,
                      f"For 3D simulation, p must be at least weno_order - 1 (= {weno_order - 1})")
     
     def check_muscl(self):
@@ -153,9 +153,9 @@ class CaseValidator:
                      "muscl_order must be 1 or 2")
         self.prohibit(m + 1 < muscl_order,
                      f"m must be at least muscl_order - 1 (= {muscl_order - 1})")
-        self.prohibit(n > 0 and n + 1 < muscl_order,
+        self.prohibit(n is not None and n > 0 and n + 1 < muscl_order,
                      f"For 2D simulation, n must be at least muscl_order - 1 (= {muscl_order - 1})")
-        self.prohibit(p > 0 and p + 1 < muscl_order,
+        self.prohibit(p is not None and p > 0 and p + 1 < muscl_order,
                      f"For 3D simulation, p must be at least muscl_order - 1 (= {muscl_order - 1})")
     
     def check_boundary_conditions(self):
@@ -172,9 +172,9 @@ class CaseValidator:
                 bc_key = f'bc_{dir}%{bound}'
                 bc_val = self.get(bc_key)
                 
-                self.prohibit(var_val == 0 and bc_val is not None,
+                self.prohibit(var_val is not None and var_val == 0 and bc_val is not None,
                              f"{bc_key} is not supported for {var} = 0")
-                self.prohibit(var_val > 0 and bc_val is None,
+                self.prohibit(var_val is not None and var_val > 0 and bc_val is None,
                              f"{var} != 0 but {bc_key} is not set")
                 
             # Check periodicity matches
@@ -205,15 +205,15 @@ class CaseValidator:
         
         # Cylindrical specific checks
         if cyl_coord:
-            self.prohibit(n == 0, "n must be positive (2D or 3D) for cylindrical coordinates")
+            self.prohibit(n is not None and n == 0, "n must be positive (2D or 3D) for cylindrical coordinates")
             bc_y_beg = self.get('bc_y%beg')
             bc_y_end = self.get('bc_y%end')
             bc_z_beg = self.get('bc_z%beg')
             bc_z_end = self.get('bc_z%end')
             
-            self.prohibit(p == 0 and bc_y_beg != -2,
+            self.prohibit(p is not None and p == 0 and bc_y_beg != -2,
                          "bc_y%beg must be -2 (BC_REFLECTIVE) for 2D cylindrical coordinates (p = 0)")
-            self.prohibit(p > 0 and bc_y_beg != -14,
+            self.prohibit(p is not None and p > 0 and bc_y_beg != -14,
                          "bc_y%beg must be -14 (BC_AXIS) for 3D cylindrical coordinates (p > 0)")
             
             if bc_y_end is not None:
@@ -223,7 +223,7 @@ class CaseValidator:
                              "bc_y%end must not be -14 (BC_AXIS)")
             
             # 3D cylindrical
-            if p > 0:
+            if p is not None and p > 0:
                 self.prohibit(bc_z_beg is not None and bc_z_beg not in [-1, -2],
                              "bc_z%beg must be -1 (periodic) or -2 (reflective) for 3D cylindrical coordinates")
                 self.prohibit(bc_z_end is not None and bc_z_end not in [-1, -2],
@@ -251,7 +251,7 @@ class CaseValidator:
                      "The Ensemble-Averaged Bubble Model requires nb >= 1")
         self.prohibit(polydisperse and nb == 1,
                      "Polydisperse bubble dynamics requires nb > 1")
-        self.prohibit(polydisperse and nb % 2 == 0,
+        self.prohibit(polydisperse and nb is not None and nb % 2 == 0,
                      "nb must be odd for polydisperse bubbles")
         self.prohibit(not polytropic and R0ref is None,
                      "R0ref must be set if using bubbles_euler with polytropic = F")
@@ -393,7 +393,7 @@ class CaseValidator:
             
         self.prohibit(surface_tension and sigma is None,
                      "sigma must be set if surface_tension is enabled")
-        self.prohibit(surface_tension and sigma < 0,
+        self.prohibit(surface_tension and sigma is not None and sigma < 0,
                      "sigma must be greater than or equal to zero")
         self.prohibit(sigma is not None and not surface_tension,
                      "sigma is set but surface_tension is not enabled")
@@ -419,9 +419,9 @@ class CaseValidator:
                      "relativity requires mhd to be enabled")
         self.prohibit(Bx0 is not None and not mhd,
                      "Bx0 must not be set if MHD is not enabled")
-        self.prohibit(mhd and n == 0 and Bx0 is None,
+        self.prohibit(mhd and n is not None and n == 0 and Bx0 is None,
                      "Bx0 must be set in 1D MHD simulations")
-        self.prohibit(mhd and n > 0 and Bx0 is not None,
+        self.prohibit(mhd and n is not None and n > 0 and Bx0 is not None,
                      "Bx0 must not be set in 2D/3D MHD simulations")
     
     # ===================================================================
@@ -523,6 +523,12 @@ class CaseValidator:
         weno_avg = self.get('weno_avg', 'F') == 'T'
         model_eqns = self.get('model_eqns')
         
+        # Check for multiple WENO schemes (regardless of weno_order being set)
+        num_schemes = sum([mapped_weno, wenoz, teno])
+        self.prohibit(num_schemes >= 2,
+                     "Only one of mapped_weno, wenoz, or teno can be set to true")
+        
+        # Early return if weno_order not set (other checks need it)
         if weno_order is None:
             return
             
@@ -533,15 +539,12 @@ class CaseValidator:
         self.prohibit(wenoz and weno_order == 7 and wenoz_q is None,
                      "wenoz at 7th order requires wenoz_q to be set (should be 2, 3, or 4)")
         self.prohibit(wenoz and weno_order == 7 and wenoz_q is not None and wenoz_q not in [2, 3, 4],
-                     "wenoz_q must be either 2, 3, or 4")
+                     "wenoz_q must be either 2, 3, or 4)")
         self.prohibit(teno and teno_CT is None,
                      "teno requires teno_CT to be set. A typical value is 1e-6")
         self.prohibit(teno and teno_CT is not None and teno_CT <= 0,
                      "teno_CT must be positive. A typical value is 1e-6")
         
-        num_schemes = sum([mapped_weno, wenoz, teno])
-        self.prohibit(num_schemes >= 2,
-                     "Only one of mapped_weno, wenoz, or teno can be set to true")
         self.prohibit(weno_order == 1 and mapped_weno,
                      "mapped_weno is not compatible with weno_order = 1")
         self.prohibit(weno_order == 1 and wenoz,
@@ -662,7 +665,7 @@ class CaseValidator:
                      "HLLD is not available for RMHD (relativity)")
         self.prohibit(powell and not mhd,
                      "Powell's method requires mhd to be enabled")
-        self.prohibit(powell and n == 0,
+        self.prohibit(powell and n is not None and n == 0,
                      "Powell's method is not supported for 1D simulations")
         self.prohibit(powell and fd_order is None,
                      "fd_order must be set if Powell's method is enabled")
@@ -793,9 +796,9 @@ class CaseValidator:
         p = self.get('p', 0)
         fd_order = self.get('fd_order')
         
-        self.prohibit(n == 0 and any(omega_wrt),
+        self.prohibit(n is not None and n == 0 and any(omega_wrt),
                      "omega_wrt requires n > 0 (at least 2D)")
-        self.prohibit(p == 0 and (omega_wrt[0] or omega_wrt[1]),
+        self.prohibit(p is not None and p == 0 and (omega_wrt[0] or omega_wrt[1]),
                      "omega_wrt(1) and omega_wrt(2) require p > 0 (3D)")
         self.prohibit(any(omega_wrt) and fd_order is None,
                      "fd_order must be set for omega_wrt")
@@ -806,7 +809,7 @@ class CaseValidator:
         n = self.get('n', 0)
         fd_order = self.get('fd_order')
         
-        self.prohibit(n == 0 and schlieren_wrt,
+        self.prohibit(n is not None and n == 0 and schlieren_wrt,
                      "schlieren_wrt requires n > 0 (at least 2D)")
         self.prohibit(schlieren_wrt and fd_order is None,
                      "fd_order must be set for schlieren_wrt")
