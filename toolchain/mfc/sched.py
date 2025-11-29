@@ -95,11 +95,11 @@ def sched(tasks: typing.List[Task], nThreads: int, devices: typing.Set[int] = No
         dim = get_case_dimensionality(case)
         return INTERACTIVE_THRESHOLDS.get(dim, INTERACTIVE_THRESHOLDS[1])
 
-    def notify_long_running_threads(
+    def notify_long_running_threads(  # pylint: disable=too-many-branches
         progress: rich.progress.Progress,
         running_tracker: typing.Optional[rich.progress.TaskID],
         interactive: bool
-    ) -> None:  # pylint: disable=too-many-branches
+    ) -> None:
         """
         Monitor and notify about long-running tests.
 
