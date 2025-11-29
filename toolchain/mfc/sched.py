@@ -39,7 +39,7 @@ class WorkerThread(threading.Thread):
 
 
 @dataclasses.dataclass
-class WorkerThreadHolder:
+class WorkerThreadHolder:  # pylint: disable=too-many-instance-attributes
     thread:  threading.Thread
     ppn:     int
     load:    float
@@ -60,7 +60,7 @@ class Task:
     args: typing.List[typing.Any]
     load: float
 
-def sched(tasks: typing.List[Task], nThreads: int, devices: typing.Set[int] = None) -> None:
+def sched(tasks: typing.List[Task], nThreads: int, devices: typing.Set[int] = None) -> None:  # pylint: disable=too-many-locals,too-many-statements
     nAvailable: int = nThreads
     threads:    typing.List[WorkerThreadHolder] = []
 
@@ -75,17 +75,16 @@ def sched(tasks: typing.List[Task], nThreads: int, devices: typing.Set[int] = No
         """
         if not hasattr(case, 'params'):
             return 1  # Default to 1D if we can't determine
-        
+
         params = case.params
         p = params.get('p', 0)
         n = params.get('n', 0)
-        
+
         if p != 0:
             return 3  # 3D
-        elif n != 0:
+        if n != 0:
             return 2  # 2D
-        else:
-            return 1  # 1D
+        return 1  # 1D
 
     def get_threshold_for_case(case: typing.Any) -> float:
         """
@@ -100,10 +99,10 @@ def sched(tasks: typing.List[Task], nThreads: int, devices: typing.Set[int] = No
         progress: rich.progress.Progress,
         running_tracker: typing.Optional[rich.progress.TaskID],
         interactive: bool
-    ) -> None:
+    ) -> None:  # pylint: disable=too-many-branches
         """
         Monitor and notify about long-running tests.
-        
+
         In interactive mode: prints once when a test crosses its dimension-aware threshold
         and updates the live progress bar. In headless mode: prints milestone notifications
         at 2, 10, and 30 minutes.
@@ -123,10 +122,10 @@ def sched(tasks: typing.List[Task], nThreads: int, devices: typing.Set[int] = No
             # --- interactive: dimension-aware thresholds ---
             if interactive:
                 threshold = get_threshold_for_case(case)
-                
+
                 if elapsed >= threshold:
                     long_running_for_progress.append((case_uuid, case_trace))
-                    
+
                     # Print explicit line once when crossing threshold
                     if not holder.notified_interactive:
                         dim = get_case_dimensionality(case)
