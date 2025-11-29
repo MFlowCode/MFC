@@ -118,8 +118,6 @@ contains
             call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re)
         end if
 
-        if (num_fluids == 1 .and. bubbles_euler) alpha = q_prim_vf(alf_idx)%sf(j, k, l)
-
         if (igr) then
             $:GPU_LOOP(parallelism='[seq]')
             do i = 1, num_vels

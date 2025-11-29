@@ -264,13 +264,20 @@ contains
         ! Calculating the density, the specific heat ratio function, the
         ! liquid stiffness function, and the energy reference function,
         ! respectively, from the species analogs
-        rho = 0._wp; gamma = 0._wp; pi_inf = 0._wp; qv = 0._wp
-        do i = 1, num_fluids
-            rho = rho + alpha_rho_K(i)
-            gamma = gamma + alpha_K(i)*gammas(i)
-            pi_inf = pi_inf + alpha_K(i)*pi_infs(i)
-            qv = qv + alpha_rho_K(i)*qvs(i)
-        end do
+        if (num_fluids == 1 .and. bubbles_euler) then
+            rho = alpha_rho_K(1)
+            gamma = gammas(1)
+            pi_inf = pi_infs(1)
+            qv = qvs(1)
+        else
+            rho = 0._wp; gamma = 0._wp; pi_inf = 0._wp; qv = 0._wp
+            do i = 1, num_fluids
+                rho = rho + alpha_rho_K(i)
+                gamma = gamma + alpha_K(i)*gammas(i)
+                pi_inf = pi_inf + alpha_K(i)*pi_infs(i)
+                qv = qv + alpha_rho_K(i)*qvs(i)
+            end do
+        end if
 
 #ifdef MFC_SIMULATION
         ! Computing the shear and bulk Reynolds numbers from species analogs
@@ -326,13 +333,20 @@ contains
         ! their physical bounds to make sure that any mixture variables that
         ! are derived from them result within the limits that are set by the
         ! fluids physical parameters that make up the mixture
-        rho_K = 0._wp; gamma_K = 0._wp; pi_inf_K = 0._wp; qv_K = 0._wp
-        do i = 1, num_fluids
-            rho_K = rho_K + alpha_rho_K(i)
-            gamma_K = gamma_K + alpha_K(i)*gammas(i)
-            pi_inf_K = pi_inf_K + alpha_K(i)*pi_infs(i)
-            qv_K = qv_K + alpha_rho_K(i)*qvs(i)
-        end do
+        if (num_fluids == 1 .and. bubbles_euler) then
+            rho_K = alpha_rho_K(1)
+            gamma_K = gammas(1)
+            pi_inf_K = pi_infs(1)
+            qv_K = qvs(1)
+        else
+            rho_K = 0._wp; gamma_K = 0._wp; pi_inf_K = 0._wp; qv_K = 0._wp
+            do i = 1, num_fluids
+                rho_K = rho_K + alpha_rho_K(i)
+                gamma_K = gamma_K + alpha_K(i)*gammas(i)
+                pi_inf_K = pi_inf_K + alpha_K(i)*pi_infs(i)
+                qv_K = qv_K + alpha_rho_K(i)*qvs(i)
+            end do
+        end if
 
         if (present(G_K)) then
             G_K = 0._wp
@@ -594,6 +608,8 @@ contains
                     dyn_pres_K = 0._wp
 
                     call s_compute_species_fraction(qK_cons_vf, j, k, l, alpha_rho_K, alpha_K)
+
+                    ! print *, j, k, l, alpha_rho_K, qK_cons_vf(1)%sf(j, k, l), alpha_K, qK_cons_vf(advxb)%sf(j, k, l)
 
                     if (model_eqns /= 4) then
 #ifdef MFC_SIMULATION
@@ -1324,8 +1340,11 @@ contains
                 alpha_rho_K(i) = max(0._wp, alpha_rho_K(i))
                 alpha_K(i) = min(max(0._wp, alpha_K(i)), 1._wp)
             end do
+
             alpha_K = alpha_K/max(sum(alpha_K), 1.e-16_wp)
         end if
+
+        if (num_fluids == 1 .and. bubbles_euler) alpha_K(1) = q_vf(advxb)%sf(k, l, r)
 
     end subroutine s_compute_species_fraction
 
