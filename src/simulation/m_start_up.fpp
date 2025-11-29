@@ -1052,9 +1052,8 @@ contains
                                             dyn_pres, pi_inf, gamma, rho, qv, rhoYks, pres, T, pres_mag=pres_mag)
 
                     do i = 1, num_fluids
-                        v_vf(i + internalEnergies_idx%beg - 1)%sf(j, k, l) = v_vf(i + adv_idx%beg - 1)%sf(j, k, l)* &
-                                                                             (fluid_pp(i)%gamma*pres + fluid_pp(i)%pi_inf) &
-                                                                             + v_vf(i + cont_idx%beg - 1)%sf(j, k, l)*fluid_pp(i)%qv
+                        v_vf(i + intxb - 1)%sf(j, k, l) = v_vf(i + advxb - 1)%sf(j, k, l)*(gammas(i)*pres + pi_infs(i)) &
+                                                          + v_vf(i + contxb - 1)%sf(j, k, l)*qvs(i)
                     end do
 
                 end do
@@ -1220,18 +1219,18 @@ contains
         stor = 1
 
         if (time_stepper /= 1) then
-            #:call GPU_PARALLEL_LOOP(collapse=4, copyin='[idwbuff]')
-                do i = 1, sys_size
-                    do l = idwbuff(3)%beg, idwbuff(3)%end
-                        do k = idwbuff(2)%beg, idwbuff(2)%end
-                            do j = idwbuff(1)%beg, idwbuff(1)%end
-                                q_cons_ts(2)%vf(i)%sf(j, k, l) = &
-                                    q_cons_ts(1)%vf(i)%sf(j, k, l)
-                            end do
+            $:GPU_PARALLEL_LOOP(collapse=4, copyin='[idwbuff]')
+            do i = 1, sys_size
+                do l = idwbuff(3)%beg, idwbuff(3)%end
+                    do k = idwbuff(2)%beg, idwbuff(2)%end
+                        do j = idwbuff(1)%beg, idwbuff(1)%end
+                            q_cons_ts(2)%vf(i)%sf(j, k, l) = &
+                                q_cons_ts(1)%vf(i)%sf(j, k, l)
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            end do
+            $:END_GPU_PARALLEL_LOOP()
             stor = 2
         end if
 

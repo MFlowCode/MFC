@@ -92,7 +92,7 @@ contains
         !! @param j x index
         !! @param k y index
         !! @param l z index
-    subroutine s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, j, k, l)
+    subroutine s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, j, k, l)
         $:GPU_ROUTINE(function_name='s_compute_enthalpy',parallelism='[seq]', &
             & cray_inline=True)
 
@@ -100,11 +100,12 @@ contains
         real(wp), intent(inout), dimension(num_fluids) :: alpha
         real(wp), intent(inout), dimension(num_vels) :: vel
         real(wp), intent(inout) :: rho, gamma, pi_inf, vel_sum, H, pres
+        real(wp), intent(out) :: qv
         integer, intent(in) :: j, k, l
         real(wp), dimension(2), intent(inout) :: Re
 
         real(wp), dimension(num_fluids) :: alpha_rho, Gs
-        real(wp) :: qv, E, G_local
+        real(wp) :: E, G_local
 
         integer :: i
 
@@ -276,17 +277,17 @@ contains
                 if (grid_geometry == 3) then
                     fltr_dtheta = f_compute_filtered_dtheta(k, l)
                     vcfl_dt = cfl_target*(min(dx(j), dy(k), fltr_dtheta)**2._wp) &
-                              /minval(1/(rho*Re_l))
+                              /maxval(1/(rho*Re_l))
                 else
                     vcfl_dt = cfl_target*(min(dx(j), dy(k), dz(l))**2._wp) &
-                              /minval(1/(rho*Re_l))
+                              /maxval(1/(rho*Re_l))
                 end if
             elseif (n > 0) then
                 !2D
                 vcfl_dt = cfl_target*(min(dx(j), dy(k))**2._wp)/maxval((1/Re_l)/rho)
             else
                 !1D
-                vcfl_dt = cfl_target*(dx(j)**2._wp)/minval(1/(rho*Re_l))
+                vcfl_dt = cfl_target*(dx(j)**2._wp)/maxval(1/(rho*Re_l))
             end if
         end if
 
