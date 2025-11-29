@@ -39,6 +39,7 @@ module m_variables_conversion
               s_convert_primitive_to_conservative_variables, &
               s_convert_primitive_to_flux_variables, &
               s_compute_pressure, &
+              s_compute_species_fraction, &
 #ifndef MFC_PRE_PROCESS
               s_compute_speed_of_sound, &
               s_compute_fast_magnetosonic_speed, &
@@ -250,70 +251,31 @@ contains
         real(wp), intent(out), target :: qv
 
         real(wp), optional, dimension(2), intent(out) :: Re_K
-            !! Partial densities and volume fractions
         real(wp), optional, intent(out) :: G_K
         real(wp), optional, dimension(num_fluids), intent(in) :: G
-
         real(wp), dimension(num_fluids) :: alpha_rho_K, alpha_K !<
 
         integer :: i, j !< Generic loop iterator
 
         ! Computing the density, the specific heat ratio function and the
         ! liquid stiffness function, respectively
-
-        if (igr) then
-            if (num_fluids == 1) then
-                alpha_rho_K(1) = q_vf(contxb)%sf(k, l, r)
-                alpha_K(1) = 1._wp
-            else
-                do i = 1, num_fluids - 1
-                    alpha_rho_K(i) = q_vf(i)%sf(k, l, r)
-                    alpha_K(i) = q_vf(advxb + i - 1)%sf(k, l, r)
-                end do
-
-                alpha_rho_K(num_fluids) = q_vf(num_fluids)%sf(k, l, r)
-                alpha_K(num_fluids) = 1._wp - sum(alpha_K(1:num_fluids - 1))
-            end if
-        else
-            do i = 1, num_fluids
-                alpha_rho_K(i) = q_vf(i)%sf(k, l, r)
-                alpha_K(i) = q_vf(advxb + i - 1)%sf(k, l, r)
-            end do
-        end if
-
-        if (mpp_lim) then
-            do i = 1, num_fluids
-                alpha_rho_K(i) = max(0._wp, alpha_rho_K(i))
-                alpha_K(i) = min(max(0._wp, alpha_K(i)), 1._wp)
-            end do
-
-            alpha_K = alpha_K/max(sum(alpha_K), 1.e-16_wp)
-        end if
+        call s_compute_species_fraction(q_vf, k, l, r, alpha_rho_K, alpha_K)
 
         ! Calculating the density, the specific heat ratio function, the
         ! liquid stiffness function, and the energy reference function,
         ! respectively, from the species analogs
         rho = 0._wp; gamma = 0._wp; pi_inf = 0._wp; qv = 0._wp
-
-        if (bubbles_euler) then
-            rho = alpha_rho_K(1)
-            gamma = gammas(1)
-            pi_inf = pi_infs(1)
-            qv = qvs(1)
-        else
-            do i = 1, num_fluids
-                rho = rho + alpha_rho_K(i)
-                gamma = gamma + alpha_K(i)*gammas(i)
-                pi_inf = pi_inf + alpha_K(i)*pi_infs(i)
-                qv = qv + alpha_rho_K(i)*qvs(i)
-            end do
-        end if
+        do i = 1, num_fluids
+            rho = rho + alpha_rho_K(i)
+            gamma = gamma + alpha_K(i)*gammas(i)
+            pi_inf = pi_inf + alpha_K(i)*pi_infs(i)
+            qv = qv + alpha_rho_K(i)*qvs(i)
+        end do
 
 #ifdef MFC_SIMULATION
         ! Computing the shear and bulk Reynolds numbers from species analogs
         if (viscous) then
             do i = 1, 2
-
                 Re_K(i) = dflt_real; if (Re_size(i) > 0) Re_K(i) = 0._wp
 
                 do j = 1, Re_size(i)
@@ -322,7 +284,6 @@ contains
                 end do
 
                 Re_K(i) = 1._wp/max(Re_K(i), sgm_eps)
-
             end do
         end if
 #endif
@@ -353,52 +314,25 @@ contains
             & parallelism='[seq]', cray_inline=True)
 
         real(wp), intent(out) :: rho_K, gamma_K, pi_inf_K, qv_K
-
         real(wp), dimension(num_fluids), intent(inout) :: alpha_rho_K, alpha_K !<
         real(wp), dimension(2), intent(out) :: Re_K
-        !! Partial densities and volume fractions
-
         real(wp), optional, intent(out) :: G_K
         real(wp), optional, dimension(num_fluids), intent(in) :: G
 
         integer :: i, j !< Generic loop iterators
-        real(wp) :: alpha_K_sum
 
 #ifdef MFC_SIMULATION
         ! Constraining the partial densities and the volume fractions within
         ! their physical bounds to make sure that any mixture variables that
         ! are derived from them result within the limits that are set by the
         ! fluids physical parameters that make up the mixture
-        rho_K = 0._wp
-        gamma_K = 0._wp
-        pi_inf_K = 0._wp
-        qv_K = 0._wp
-
-        alpha_K_sum = 0._wp
-
-        if (mpp_lim) then
-            do i = 1, num_fluids
-                alpha_rho_K(i) = max(0._wp, alpha_rho_K(i))
-                alpha_K(i) = min(max(0._wp, alpha_K(i)), 1._wp)
-                alpha_K_sum = alpha_K_sum + alpha_K(i)
-            end do
-
-            alpha_K = alpha_K/max(alpha_K_sum, sgm_eps)
-        end if
-
-        if (bubbles_euler) then
-            rho_K = alpha_rho_K(1)
-            gamma_K = gammas(1)
-            pi_inf_K = pi_infs(1)
-            qv_K = qvs(1)
-        else
-            do i = 1, num_fluids
-                rho_K = rho_K + alpha_rho_K(i)
-                gamma_K = gamma_K + alpha_K(i)*gammas(i)
-                pi_inf_K = pi_inf_K + alpha_K(i)*pi_infs(i)
-                qv_K = qv_K + alpha_rho_K(i)*qvs(i)
-            end do
-        end if
+        rho_K = 0._wp; gamma_K = 0._wp; pi_inf_K = 0._wp; qv_K = 0._wp
+        do i = 1, num_fluids
+            rho_K = rho_K + alpha_rho_K(i)
+            gamma_K = gamma_K + alpha_K(i)*gammas(i)
+            pi_inf_K = pi_inf_K + alpha_K(i)*pi_infs(i)
+            qv_K = qv_K + alpha_rho_K(i)*qvs(i)
+        end do
 
         if (present(G_K)) then
             G_K = 0._wp
@@ -437,7 +371,6 @@ contains
 
         $:GPU_ENTER_DATA(copyin='[is1b,is1e,is2b,is2e,is3b,is3e]')
 
-#ifdef MFC_SIMULATION
         @:ALLOCATE(gammas (1:num_fluids))
         @:ALLOCATE(gs_min (1:num_fluids))
         @:ALLOCATE(pi_infs(1:num_fluids))
@@ -446,16 +379,6 @@ contains
         @:ALLOCATE(qvs    (1:num_fluids))
         @:ALLOCATE(qvps    (1:num_fluids))
         @:ALLOCATE(Gs_vc     (1:num_fluids))
-#else
-        @:ALLOCATE(gammas (1:num_fluids))
-        @:ALLOCATE(gs_min (1:num_fluids))
-        @:ALLOCATE(pi_infs(1:num_fluids))
-        @:ALLOCATE(ps_inf(1:num_fluids))
-        @:ALLOCATE(cvs    (1:num_fluids))
-        @:ALLOCATE(qvs    (1:num_fluids))
-        @:ALLOCATE(qvps    (1:num_fluids))
-        @:ALLOCATE(Gs_vc     (1:num_fluids))
-#endif
 
         do i = 1, num_fluids
             gammas(i) = fluid_pp(i)%gamma
@@ -484,12 +407,7 @@ contains
 #endif
 
         if (bubbles_euler) then
-#ifdef MFC_SIMULATION
             @:ALLOCATE(bubrs_vc(1:nb))
-#else
-            @:ALLOCATE(bubrs_vc(1:nb))
-#endif
-
             do i = 1, nb
                 bubrs_vc(i) = bub_idx%rs(i)
             end do
@@ -675,27 +593,7 @@ contains
                 do j = ibounds(1)%beg, ibounds(1)%end
                     dyn_pres_K = 0._wp
 
-                    if (igr) then
-                        if (num_fluids == 1) then
-                            alpha_rho_K(1) = qK_cons_vf(contxb)%sf(j, k, l)
-                            alpha_K(1) = 1._wp
-                        else
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do i = 1, num_fluids - 1
-                                alpha_rho_K(i) = qK_cons_vf(i)%sf(j, k, l)
-                                alpha_K(i) = qK_cons_vf(advxb + i - 1)%sf(j, k, l)
-                            end do
-
-                            alpha_rho_K(num_fluids) = qK_cons_vf(num_fluids)%sf(j, k, l)
-                            alpha_K(num_fluids) = 1._wp - sum(alpha_K(1:num_fluids - 1))
-                        end if
-                    else
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = 1, num_fluids
-                            alpha_rho_K(i) = qK_cons_vf(i)%sf(j, k, l)
-                            alpha_K(i) = qK_cons_vf(advxb + i - 1)%sf(j, k, l)
-                        end do
-                    end if
+                    call s_compute_species_fraction(qK_cons_vf, j, k, l, alpha_rho_K, alpha_K)
 
                     if (model_eqns /= 4) then
 #ifdef MFC_SIMULATION
@@ -1296,6 +1194,7 @@ contains
                     do i = advxb, advxe
                         alpha_K(i - E_idx) = qK_prim_vf(j, k, l, i)
                     end do
+
                     $:GPU_LOOP(parallelism='[seq]')
                     do i = 1, num_vels
                         vel_K(i) = qK_prim_vf(j, k, l, contxe + i)
@@ -1388,6 +1287,47 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 #endif
     end subroutine s_convert_primitive_to_flux_variables
+
+    subroutine s_compute_species_fraction(q_vf, k, l, r, alpha_rho_K, alpha_K)
+        $:GPU_ROUTINE(function_name='s_compute_species_fraction', &
+            & parallelism='[seq]', cray_inline=True)
+        type(scalar_field), dimension(sys_size), intent(in) :: q_vf
+        integer, intent(in) :: k, l, r
+        real(wp), dimension(num_fluids), intent(out) :: alpha_rho_K, alpha_K
+        integer :: i
+
+        if (num_fluids == 1) then
+            alpha_rho_K(1) = q_vf(contxb)%sf(k, l, r)
+            if (igr .or. bubbles_euler) then
+                alpha_K(1) = 1._wp
+            else
+                alpha_K(1) = q_vf(advxb)%sf(k, l, r)
+            end if
+        else
+            if (igr) then
+                do i = 1, num_fluids - 1
+                    alpha_rho_K(i) = q_vf(i)%sf(k, l, r)
+                    alpha_K(i) = q_vf(advxb + i - 1)%sf(k, l, r)
+                end do
+                alpha_rho_K(num_fluids) = q_vf(num_fluids)%sf(k, l, r)
+                alpha_K(num_fluids) = 1._wp - sum(alpha_K(1:num_fluids - 1))
+            else
+                do i = 1, num_fluids
+                    alpha_rho_K(i) = q_vf(i)%sf(k, l, r)
+                    alpha_K(i) = q_vf(advxb + i - 1)%sf(k, l, r)
+                end do
+            end if
+        end if
+
+        if (mpp_lim) then
+            do i = 1, num_fluids
+                alpha_rho_K(i) = max(0._wp, alpha_rho_K(i))
+                alpha_K(i) = min(max(0._wp, alpha_K(i)), 1._wp)
+            end do
+            alpha_K = alpha_K/max(sum(alpha_K), 1.e-16_wp)
+        end if
+
+    end subroutine s_compute_species_fraction
 
     impure subroutine s_finalize_variables_conversion_module()
 
