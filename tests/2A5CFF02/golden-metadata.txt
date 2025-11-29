@@ -1,10 +1,44 @@
-This file was created on 2025-11-29 10:58:22.072694.
+This file was created on 2025-11-29 11:04:01.386325.
 
 mfc.sh:
 
     Invocation: test -o 1D -j 10 --generate
     Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        f0f9beba3c4f5bcd9964a9f4b05fde5f9fcea316 on probe-testing (dirty)
+    Git:        a0cb393c7fecb6f3a66b3ef72a1d3cb3c3aee0bd on probe-testing (dirty)
+
+pre_process:
+
+    CMake Configuration:
+    
+        CMake v4.1.2 on shb-m1pro-3.local
+    
+        C       : AppleClang v17.0.0.17000404 (/usr/bin/cc)
+        Fortran : GNU v15.2.0 (/opt/homebrew/bin/gfortran)
+    
+        PRE_PROCESS   : ON
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /Users/spencer/Downloads/MFC/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /usr/bin/cc
+        CXX      : /usr/bin/c++
+        FC       : /opt/homebrew/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
 
 syscheck:
 
@@ -51,40 +85,6 @@ simulation:
     
         PRE_PROCESS   : OFF
         SIMULATION    : ON
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-        OpenMP  : OFF
-    
-        Fypp    : /Users/spencer/Downloads/MFC/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /usr/bin/cc
-        CXX      : /usr/bin/c++
-        FC       : /opt/homebrew/bin/gfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
-pre_process:
-
-    CMake Configuration:
-    
-        CMake v4.1.2 on shb-m1pro-3.local
-    
-        C       : AppleClang v17.0.0.17000404 (/usr/bin/cc)
-        Fortran : GNU v15.2.0 (/opt/homebrew/bin/gfortran)
-    
-        PRE_PROCESS   : ON
-        SIMULATION    : OFF
         POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF

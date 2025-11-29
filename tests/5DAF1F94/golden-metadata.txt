@@ -1,10 +1,10 @@
-This file was created on 2025-11-29 00:29:50.967221.
+This file was created on 2025-11-29 11:04:18.525625.
 
 mfc.sh:
 
-    Invocation: test -j 10 --generate
-    Lock:       mpi=No & gpu=No & debug=Yes & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        7889b37e9a5f9e89d46d5e886a1d653de288f8f0 on probe-convergance (dirty)
+    Invocation: test -o 1D -j 10 --generate
+    Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
+    Git:        a0cb393c7fecb6f3a66b3ef72a1d3cb3c3aee0bd on probe-testing (dirty)
 
 pre_process:
 
@@ -22,14 +22,14 @@ pre_process:
         DOCUMENTATION : OFF
         ALL           : OFF
     
-        MPI     : OFF
+        MPI     : ON
         OpenACC : OFF
         OpenMP  : OFF
     
         Fypp    : /Users/spencer/Downloads/MFC/build/venv/bin/fypp
         Doxygen : 
     
-        Build Type : Debug
+        Build Type : Release
     
     Configuration Environment:
     
@@ -56,14 +56,14 @@ syscheck:
         DOCUMENTATION : OFF
         ALL           : OFF
     
-        MPI     : OFF
+        MPI     : ON
         OpenACC : OFF
         OpenMP  : OFF
     
         Fypp    : /Users/spencer/Downloads/MFC/build/venv/bin/fypp
         Doxygen : 
     
-        Build Type : Debug
+        Build Type : Release
     
     Configuration Environment:
     
@@ -90,14 +90,14 @@ simulation:
         DOCUMENTATION : OFF
         ALL           : OFF
     
-        MPI     : OFF
+        MPI     : ON
         OpenACC : OFF
         OpenMP  : OFF
     
         Fypp    : /Users/spencer/Downloads/MFC/build/venv/bin/fypp
         Doxygen : 
     
-        Build Type : Debug
+        Build Type : Release
     
     Configuration Environment:
     
