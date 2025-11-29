@@ -142,7 +142,7 @@ class Case:
                     'r':     f'patch_icpp({pid})%radius',  'eps':   f'patch_icpp({pid})%epsilon', 'beta':  f'patch_icpp({pid})%beta',
                     'tau_e': f'patch_icpp({pid})%tau_e',   'radii': f'patch_icpp({pid})%radii',
 
-                    'e' : f'{math.e}', 'pi': f'{math.pi}',
+                    'e' : f'{math.e}',
                 }.get(match.group(), match.group())
 
             lines = []
