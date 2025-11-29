@@ -72,7 +72,7 @@ def sched(tasks: typing.List[Task], nThreads: int, devices: typing.Optional[typi
                 # (This allows test failures to be handled gracefully by handle_case)
                 if threadHolder.thread.exc is not None and not threadHolder.thread.completed_successfully:
                     # Unhandled exception - propagate with full traceback if available
-                    if hasattr(threadHolder.thread, 'exc_info') and threadHolder.thread.exc_info:
+                    if threadHolder.thread.exc_info:
                         error_msg = f"Worker thread {threadID} failed with unhandled exception:\n{threadHolder.thread.exc_info}"
                         raise RuntimeError(error_msg) from threadHolder.thread.exc
                     raise threadHolder.thread.exc
