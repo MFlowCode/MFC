@@ -68,9 +68,7 @@ def sched(tasks: typing.List[Task], nThreads: int, devices: typing.Optional[typi
                                      f"This may indicate a system threading issue or hung test case.") from join_exc
 
                 # Check for and propagate any exceptions that occurred in the worker thread
-                # But only if the worker function didn't complete successfully
-                # (This allows test failures to be handled gracefully by handle_case)
-                if threadHolder.thread.exc is not None and not threadHolder.thread.completed_successfully:
+                if threadHolder.thread.exc is not None:
                     # Unhandled exception - propagate with full traceback if available
                     if threadHolder.thread.exc_info:
                         error_msg = f"Worker thread {threadID} failed with unhandled exception:\n{threadHolder.thread.exc_info}"
