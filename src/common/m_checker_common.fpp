@@ -312,9 +312,9 @@ contains
         integer :: i
 
         bub_fac = 0
-        if (bubbles_euler .and. (num_fluids == 1)) bub_fac = 1
+        if (bubbles_euler) bub_fac = 1
 
-        do i = 1, num_fluids
+        do i = 1, num_fluids + bub_fac
             call s_int_to_str(i, iStr)
             @:PROHIBIT(.not. f_is_default(fluid_pp(i)%gamma) .and. fluid_pp(i)%gamma <= 0._wp, &
                 "fluid_pp("//trim(iStr)//")%gamma must be positive")
@@ -322,19 +322,11 @@ contains
             @:PROHIBIT(model_eqns == 1 .and. (.not. f_is_default(fluid_pp(i)%gamma)), &
                 "model_eqns = 1 does not support fluid_pp("//trim(iStr)//")%gamma")
 
-            @:PROHIBIT((i <= num_fluids + bub_fac .and. fluid_pp(i)%gamma <= 0._wp) .or. &
-                (i > num_fluids + bub_fac .and. (.not. f_is_default(fluid_pp(i)%gamma))), &
-                "for fluid_pp("//trim(iStr)//")%gamma")
-
             @:PROHIBIT(.not. f_is_default(fluid_pp(i)%pi_inf) .and. fluid_pp(i)%pi_inf < 0._wp, &
                 "fluid_pp("//trim(iStr)//")%pi_inf must be non-negative")
 
             @:PROHIBIT(model_eqns == 1 .and. (.not. f_is_default(fluid_pp(i)%pi_inf)), &
                 "model_eqns = 1 does not support fluid_pp("//trim(iStr)//")%pi_inf")
-
-            @:PROHIBIT((i <= num_fluids + bub_fac .and. fluid_pp(i)%pi_inf < 0._wp) .or. &
-                (i > num_fluids + bub_fac .and. (.not. f_is_default(fluid_pp(i)%pi_inf))), &
-                "for fluid_pp("//trim(iStr)//")%pi_inf")
 
             @:PROHIBIT(fluid_pp(i)%cv < 0._wp, &
                 "fluid_pp("//trim(iStr)//")%cv must be positive")
