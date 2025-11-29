@@ -994,6 +994,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             alter_body_forces(dimInfo)
             alter_mixlayer_perturb(dimInfo)
             alter_bc_patches(dimInfo)
+
+            cases.append(define_case_d(stack, "flux_wrt=T", {'flux_wrt': 'T'}))
+
             stack.pop()
             stack.pop()
 
