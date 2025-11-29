@@ -24,7 +24,7 @@ class WorkerThread(threading.Thread):
 
 
 @dataclasses.dataclass
-class WorkerThreadHolder:
+class WorkerThreadHolder:  # pylint: disable=too-many-instance-attributes
     thread:  threading.Thread
     ppn:     int
     load:    float
@@ -38,7 +38,7 @@ class Task:
     args: typing.List[typing.Any]
     load: float
 
-def sched(tasks: typing.List[Task], nThreads: int, devices: typing.Set[int] = None) -> None:
+def sched(tasks: typing.List[Task], nThreads: int, devices: typing.Set[int] = None) -> None:  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
     nAvailable: int = nThreads
     threads:    typing.List[WorkerThreadHolder] = []
 
@@ -75,12 +75,12 @@ def sched(tasks: typing.List[Task], nThreads: int, devices: typing.Set[int] = No
                         # Test framework handled the exception gracefully (e.g., test failure)
                         # Don't re-raise - this is expected behavior
                         pass
-                    # Unhandled exception - this indicates a real problem
                     elif hasattr(threadHolder.thread, 'exc_info') and threadHolder.thread.exc_info:
+                        # Unhandled exception - this indicates a real problem
                         error_msg = f"Worker thread {threadID} failed with unhandled exception:\n{threadHolder.thread.exc_info}"
                         raise RuntimeError(error_msg) from threadHolder.thread.exc
-                    else:
-                        raise threadHolder.thread.exc
+
+                    raise threadHolder.thread.exc
 
                 nAvailable += threadHolder.ppn
                 for device in threadHolder.devices or set():
