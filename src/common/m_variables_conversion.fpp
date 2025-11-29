@@ -339,6 +339,13 @@ contains
             pi_inf_K = pi_infs(1)
             qv_K = qvs(1)
         else
+            if (mpp_lim) then
+                do i = 1, num_fluids
+                    alpha_rho_K(i) = max(0._wp, alpha_rho_K(i))
+                    alpha_K(i) = min(max(0._wp, alpha_K(i)), 1._wp)
+                end do
+                alpha_K = alpha_K/max(sum(alpha_K), sgm_eps)
+            end if
             rho_K = 0._wp; gamma_K = 0._wp; pi_inf_K = 0._wp; qv_K = 0._wp
             do i = 1, num_fluids
                 rho_K = rho_K + alpha_rho_K(i)
@@ -608,8 +615,6 @@ contains
                     dyn_pres_K = 0._wp
 
                     call s_compute_species_fraction(qK_cons_vf, j, k, l, alpha_rho_K, alpha_K)
-
-                    ! print *, j, k, l, alpha_rho_K, qK_cons_vf(1)%sf(j, k, l), alpha_K, qK_cons_vf(advxb)%sf(j, k, l)
 
                     if (model_eqns /= 4) then
 #ifdef MFC_SIMULATION
@@ -1340,7 +1345,6 @@ contains
                 alpha_rho_K(i) = max(0._wp, alpha_rho_K(i))
                 alpha_K(i) = min(max(0._wp, alpha_K(i)), 1._wp)
             end do
-
             alpha_K = alpha_K/max(sum(alpha_K), 1.e-16_wp)
         end if
 
