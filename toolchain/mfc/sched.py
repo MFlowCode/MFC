@@ -28,7 +28,7 @@ class WorkerThreadHolder:  # pylint: disable=too-many-instance-attributes
     thread:  threading.Thread
     ppn:     int
     load:    float
-    devices: typing.Set[int]
+    devices: typing.Optional[typing.Set[int]]
 
 
 @dataclasses.dataclass
@@ -38,7 +38,7 @@ class Task:
     args: typing.List[typing.Any]
     load: float
 
-def sched(tasks: typing.List[Task], nThreads: int, devices: typing.Set[int] = None) -> None:  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
+def sched(tasks: typing.List[Task], nThreads: int, devices: typing.Optional[typing.Set[int]] = None) -> None:  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
     nAvailable: int = nThreads
     threads:    typing.List[WorkerThreadHolder] = []
 
@@ -70,16 +70,11 @@ def sched(tasks: typing.List[Task], nThreads: int, devices: typing.Set[int] = No
                 # Check for and propagate any exceptions that occurred in the worker thread
                 # But only if the worker function didn't complete successfully
                 # (This allows test failures to be handled gracefully by handle_case)
-                if threadHolder.thread.exc is not None:
-                    if threadHolder.thread.completed_successfully:
-                        # Test framework handled the exception gracefully (e.g., test failure)
-                        # Don't re-raise - this is expected behavior
-                        pass
-                    elif hasattr(threadHolder.thread, 'exc_info') and threadHolder.thread.exc_info:
-                        # Unhandled exception - this indicates a real problem
+                if threadHolder.thread.exc is not None and not threadHolder.thread.completed_successfully:
+                    # Unhandled exception - propagate with full traceback if available
+                    if hasattr(threadHolder.thread, 'exc_info') and threadHolder.thread.exc_info:
                         error_msg = f"Worker thread {threadID} failed with unhandled exception:\n{threadHolder.thread.exc_info}"
                         raise RuntimeError(error_msg) from threadHolder.thread.exc
-
                     raise threadHolder.thread.exc
 
                 nAvailable += threadHolder.ppn
