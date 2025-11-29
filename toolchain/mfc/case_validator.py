@@ -80,6 +80,8 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
                      "5-equation model (model_eqns = 2) requires num_fluids to be set")
         self.prohibit(model_eqns == 3 and num_fluids is None,
                      "6-equation model (model_eqns = 3) requires num_fluids to be set")
+        self.prohibit(model_eqns == 4 and num_fluids is None,
+                     "4-equation model (model_eqns = 4) requires num_fluids to be set")
         self.prohibit(model_eqns == 1 and mpp_lim,
                      "model_eqns = 1 does not support mpp_lim")
         self.prohibit(num_fluids == 1 and mpp_lim,
@@ -1582,7 +1584,9 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         schlieren_wrt = self.get('schlieren_wrt', 'F') == 'T'
 
         # Check array variables
-        num_fluids = self.get('num_fluids', 1)
+        num_fluids = self.get('num_fluids')
+        if num_fluids is None:
+            num_fluids = 1
         alpha_rho_wrt_any = any(self.get(f'alpha_rho_wrt({i})', 'F') == 'T' for i in range(1, num_fluids + 1))
         mom_wrt_any = any(self.get(f'mom_wrt({i})', 'F') == 'T' for i in range(1, 4))
         vel_wrt_any = any(self.get(f'vel_wrt({i})', 'F') == 'T' for i in range(1, 4))
