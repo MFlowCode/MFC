@@ -70,7 +70,7 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         cyl_coord = self.get('cyl_coord', 'F') == 'T'
         p = self.get('p', 0)
 
-        self.prohibit(model_eqns not in [1, 2, 3, 4],
+        self.prohibit(model_eqns is not None and model_eqns not in [1, 2, 3, 4],
                      "model_eqns must be 1, 2, 3, or 4")
         self.prohibit(num_fluids is not None and num_fluids < 1,
                      "num_fluids must be positive")
@@ -363,26 +363,37 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
     def check_stiffened_eos(self):
         """Checks constraints on stiffened equation of state fluids parameters"""
         num_fluids = self.get('num_fluids')
+        model_eqns = self.get('model_eqns')
+        bubbles_euler = self.get('bubbles_euler', 'F') == 'T'
 
         if num_fluids is None:
             return
 
-        for i in range(1, num_fluids + 1):
+        # Allow one extra fluid property slot when using bubbles_euler with single-component flows
+        bub_fac = 1 if (bubbles_euler and num_fluids == 1) else 0
+
+        for i in range(1, num_fluids + 1 + bub_fac):
             gamma = self.get(f'fluid_pp({i})%gamma')
             pi_inf = self.get(f'fluid_pp({i})%pi_inf')
             cv = self.get(f'fluid_pp({i})%cv')
 
+            # Positivity checks
             if gamma is not None:
                 self.prohibit(gamma <= 0,
                              f"fluid_pp({i})%gamma must be positive")
-
             if pi_inf is not None:
                 self.prohibit(pi_inf < 0,
                              f"fluid_pp({i})%pi_inf must be non-negative")
-
             if cv is not None:
                 self.prohibit(cv < 0,
-                             f"fluid_pp({i})%cv must be non-negative")
+                             f"fluid_pp({i})%cv must be positive")
+
+            # Model-specific support
+            if model_eqns == 1:
+                self.prohibit(gamma is not None,
+                             f"model_eqns = 1 does not support fluid_pp({i})%gamma")
+                self.prohibit(pi_inf is not None,
+                             f"model_eqns = 1 does not support fluid_pp({i})%pi_inf")
 
     def check_surface_tension(self):
         """Checks constraints on surface tension"""
@@ -742,7 +753,7 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         self.prohibit(igr_iter_solver is not None and igr_iter_solver not in [1, 2],
                      "igr_iter_solver must be 1 or 2")
         self.prohibit(alf_factor is not None and alf_factor < 0,
-                     "alf_factor must be positive")
+                     "alf_factor must be non-negative")
         self.prohibit(model_eqns != 2,
                      "IGR only supports model_eqns = 2")
         self.prohibit(ib,
@@ -838,37 +849,38 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
             self.prohibit(support is None,
                          f"acoustic({jstr})%support must be specified for acoustic_source")
 
-            # Dimension-specific support checks
-            if dim == 1:
-                self.prohibit(support != 1,
-                             f"Only acoustic({jstr})%support = 1 is allowed for 1D simulations")
-                self.prohibit(support == 1 and loc[0] is None,
-                             f"acoustic({jstr})%loc(1) must be specified for support = 1")
+            # Dimension-specific support checks (only if support was specified)
+            if support is not None:
+                if dim == 1:
+                    self.prohibit(support != 1,
+                                 f"Only acoustic({jstr})%support = 1 is allowed for 1D simulations")
+                    self.prohibit(support == 1 and loc[0] is None,
+                                 f"acoustic({jstr})%loc(1) must be specified for support = 1")
 
-            elif dim == 2:
-                if cyl_coord:
-                    self.prohibit(support not in [2, 6, 10],
-                                 f"Only acoustic({jstr})%support = 2, 6, or 10 is allowed for 2D axisymmetric")
-                else:
-                    self.prohibit(support not in [2, 5, 6, 9, 10],
-                                 f"Only acoustic({jstr})%support = 2, 5, 6, 9, or 10 is allowed for 2D")
+                elif dim == 2:
+                    if cyl_coord:
+                        self.prohibit(support not in [2, 6, 10],
+                                     f"Only acoustic({jstr})%support = 2, 6, or 10 is allowed for 2D axisymmetric")
+                    else:
+                        self.prohibit(support not in [2, 5, 6, 9, 10],
+                                     f"Only acoustic({jstr})%support = 2, 5, 6, 9, or 10 is allowed for 2D")
 
-                if support in [2, 5, 6, 9, 10]:
-                    self.prohibit(loc[0] is None or loc[1] is None,
-                                 f"acoustic({jstr})%loc(1:2) must be specified for support = {support}")
+                    if support in [2, 5, 6, 9, 10]:
+                        self.prohibit(loc[0] is None or loc[1] is None,
+                                     f"acoustic({jstr})%loc(1:2) must be specified for support = {support}")
 
-            elif dim == 3:
-                self.prohibit(support not in [3, 7, 11],
-                             f"Only acoustic({jstr})%support = 3, 7, or 11 is allowed for 3D")
-                self.prohibit(cyl_coord,
-                             "Acoustic source is not supported in 3D cylindrical simulations")
+                elif dim == 3:
+                    self.prohibit(support not in [3, 7, 11],
+                                 f"Only acoustic({jstr})%support = 3, 7, or 11 is allowed for 3D")
+                    self.prohibit(cyl_coord,
+                                 "Acoustic source is not supported in 3D cylindrical simulations")
 
-                if support == 3:
-                    self.prohibit(loc[0] is None or loc[1] is None,
-                                 f"acoustic({jstr})%loc(1:2) must be specified for support = 3")
-                elif support in [7, 11]:
-                    self.prohibit(loc[0] is None or loc[1] is None or loc[2] is None,
-                                 f"acoustic({jstr})%loc(1:3) must be specified for support = {support}")
+                    if support == 3:
+                        self.prohibit(loc[0] is None or loc[1] is None,
+                                     f"acoustic({jstr})%loc(1:2) must be specified for support = 3")
+                    elif support in [7, 11]:
+                        self.prohibit(loc[0] is None or loc[1] is None or loc[2] is None,
+                                     f"acoustic({jstr})%loc(1:3) must be specified for support = {support}")
 
             # Pulse parameters
             self.prohibit(mag is None,
@@ -1107,48 +1119,46 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         """Checks moving boundary constraints"""
         # Check all directions for moving boundary velocities
         for direction in ['x', 'y', 'z']:
-            for end in ['beg', 'end']:
-                vb1 = self.get(f'bc_{direction}%vb1', 0.0)
-                vb2 = self.get(f'bc_{direction}%vb2', 0.0)
-                vb3 = self.get(f'bc_{direction}%vb3', 0.0)
-                ve1 = self.get(f'bc_{direction}%ve1', 0.0)
-                ve2 = self.get(f'bc_{direction}%ve2', 0.0)
-                ve3 = self.get(f'bc_{direction}%ve3', 0.0)
+            # Check beg velocities
+            vb1 = self.get(f'bc_{direction}%vb1', 0.0)
+            vb2 = self.get(f'bc_{direction}%vb2', 0.0)
+            vb3 = self.get(f'bc_{direction}%vb3', 0.0)
+            bc_beg_val = self.get(f'bc_{direction}%beg')
+            if not (vb1 == 0 and vb2 == 0 and vb3 == 0):
+                # Determine which velocity components should be zero based on direction
+                if direction == 'x':
+                    non_normal = vb2 != 0 or vb3 != 0
+                elif direction == 'y':
+                    non_normal = vb3 != 0 or vb1 != 0
+                else:  # z
+                    non_normal = vb1 != 0 or vb2 != 0
 
-                bc_val = self.get(f'bc_{direction}%{end}')
+                if bc_beg_val == -15 and non_normal:  # BC_SLIP_WALL with non-normal velocities
+                    self.prohibit(True,
+                                 f"bc_{direction}%beg must be -16 (no-slip wall) if non-normal velocities are set")
+                elif bc_beg_val not in [-15, -16]:  # Not SLIP or NO_SLIP
+                    self.prohibit(True,
+                                 f"bc_{direction}%beg must be -15 or -16 if velocities are set")
 
-                # Check beg velocities
-                if end == 'beg' and not (vb1 == 0 and vb2 == 0 and vb3 == 0):
-                    # Determine which velocity components should be zero based on direction
-                    if direction == 'x':
-                        non_normal = vb2 != 0 or vb3 != 0
-                    elif direction == 'y':
-                        non_normal = vb3 != 0 or vb1 != 0
-                    else:  # z
-                        non_normal = vb1 != 0 or vb2 != 0
+            # Check end velocities
+            ve1 = self.get(f'bc_{direction}%ve1', 0.0)
+            ve2 = self.get(f'bc_{direction}%ve2', 0.0)
+            ve3 = self.get(f'bc_{direction}%ve3', 0.0)
+            bc_end_val = self.get(f'bc_{direction}%end')
+            if not (ve1 == 0 and ve2 == 0 and ve3 == 0):
+                if direction == 'x':
+                    non_normal = ve2 != 0 or ve3 != 0
+                elif direction == 'y':
+                    non_normal = ve3 != 0 or ve1 != 0
+                else:  # z
+                    non_normal = ve1 != 0 or ve2 != 0
 
-                    if bc_val == -15 and non_normal:  # BC_SLIP_WALL with non-normal velocities
-                        self.prohibit(True,
-                                     f"bc_{direction}%beg must be -16 (no-slip wall) if non-normal velocities are set")
-                    elif bc_val not in [-15, -16]:  # Not SLIP or NO_SLIP
-                        self.prohibit(True,
-                                     f"bc_{direction}%beg must be -15 or -16 if velocities are set")
-
-                # Check end velocities
-                if end == 'end' and not (ve1 == 0 and ve2 == 0 and ve3 == 0):
-                    if direction == 'x':
-                        non_normal = ve2 != 0 or ve3 != 0
-                    elif direction == 'y':
-                        non_normal = ve3 != 0 or ve1 != 0
-                    else:  # z
-                        non_normal = ve1 != 0 or ve2 != 0
-
-                    if bc_val == -15 and non_normal:  # BC_SLIP_WALL with non-normal velocities
-                        self.prohibit(True,
-                                     f"bc_{direction}%end must be -16 (no-slip wall) if non-normal velocities are set")
-                    elif bc_val not in [-15, -16]:
-                        self.prohibit(True,
-                                     f"bc_{direction}%end must be -15 or -16 if velocities are set")
+                if bc_end_val == -15 and non_normal:  # BC_SLIP_WALL with non-normal velocities
+                    self.prohibit(True,
+                                 f"bc_{direction}%end must be -16 (no-slip wall) if non-normal velocities are set")
+                elif bc_end_val not in [-15, -16]:
+                    self.prohibit(True,
+                                 f"bc_{direction}%end must be -15 or -16 if velocities are set")
 
     # ===================================================================
     # Pre-Process Specific Checks
@@ -1349,7 +1359,7 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
             elif geometry == 2:
                 self.prohibit(radius is None,
                              f"Circle Patch {i} must have radius defined")
-                self.prohibit(any(l is not None for l in length),
+                self.prohibit(any(length_val is not None for length_val in length),
                              f"Circle Patch {i} can't have lengths defined")
                 if direction in [1, 2, 3]:
                     self.prohibit(centroid[direction - 1] is not None,
@@ -1565,12 +1575,12 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
             self.prohibit((m_glb + 1) % 2 != 0 or (n_glb + 1) % 2 != 0 or (p_glb + 1) % 2 != 0,
                          "FFT WRT requires global dimensions divisible by 2")
 
-        # BC checks
+        # BC checks: all boundaries must be periodic (-1)
         for direction in ['x', 'y', 'z']:
             for end in ['beg', 'end']:
                 bc_val = self.get(f'bc_{direction}%{end}')
                 if bc_val is not None:
-                    self.prohibit(bc_val < -1,
+                    self.prohibit(bc_val != -1,
                                  "FFT WRT requires periodic BCs (all BCs should be -1)")
 
     def check_qm(self):

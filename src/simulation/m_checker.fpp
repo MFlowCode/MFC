@@ -52,7 +52,7 @@ contains
 
     !> Checks constraints on WENO scheme parameters
     impure subroutine s_check_inputs_weno
-        character(len=5) :: numStr
+        character(len=5) :: numStr !< for int to string conversion
 
         call s_int_to_str(num_stcls_min*weno_order, numStr)
         @:PROHIBIT(m + 1 < num_stcls_min*weno_order, &
@@ -64,7 +64,7 @@ contains
     end subroutine s_check_inputs_weno
 
     impure subroutine s_check_inputs_muscl
-        character(len=5) :: numStr
+        character(len=5) :: numStr !< for int to string conversion
 
         call s_int_to_str(num_stcls_min*muscl_order, numStr)
         @:PROHIBIT(m + 1 < num_stcls_min*muscl_order, &
