@@ -1055,7 +1055,6 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         cont_damage_s = self.get('cont_damage_s')
         alpha_bar = self.get('alpha_bar')
         model_eqns = self.get('model_eqns')
-        hypoelasticity = self.get('hypoelasticity', 'F') == 'T'
 
         self.prohibit(tau_star is None,
                      "tau_star must be specified for cont_damage")
@@ -1065,27 +1064,27 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
                      "alpha_bar must be specified for cont_damage")
         self.prohibit(model_eqns != 2,
                      "cont_damage requires model_eqns = 2")
-        self.prohibit(hypoelasticity,
-                     "cont_damage is not compatible with hypoelasticity")
 
     def check_grcbc(self):
         """Checks Generalized Relaxation Characteristics BC (simulation)"""
         for dir in ['x', 'y', 'z']:
-            grcbc_in_beg = self.get(f'bc_{dir}%grcbc_in')
-            grcbc_out_beg = self.get(f'bc_{dir}%grcbc_out')
-            grcbc_vel_out_beg = self.get(f'bc_{dir}%grcbc_vel_out')
+            grcbc_in = self.get(f'bc_{dir}%grcbc_in', 'F') == 'T'
+            grcbc_out = self.get(f'bc_{dir}%grcbc_out', 'F') == 'T'
+            grcbc_vel_out = self.get(f'bc_{dir}%grcbc_vel_out', 'F') == 'T'
             bc_beg = self.get(f'bc_{dir}%beg')
             bc_end = self.get(f'bc_{dir}%end')
 
-            if grcbc_in_beg:
+            if grcbc_in:
+                # Check if EITHER beg OR end is set to -7
                 self.prohibit(bc_beg != -7 and bc_end != -7,
-                             f"Subsonic Inflow (grcbc_in) requires bc_{dir} = -7")
-            if grcbc_out_beg:
+                             f"Subsonic Inflow (grcbc_in) requires bc_{dir}%beg = -7 or bc_{dir}%end = -7")
+            if grcbc_out:
+                # Check if EITHER beg OR end is set to -8
                 self.prohibit(bc_beg != -8 and bc_end != -8,
-                             f"Subsonic Outflow (grcbc_out) requires bc_{dir} = -8")
-            if grcbc_vel_out_beg:
+                             f"Subsonic Outflow (grcbc_out) requires bc_{dir}%beg = -8 or bc_{dir}%end = -8")
+            if grcbc_vel_out:
                 self.prohibit(bc_beg != -8 and bc_end != -8,
-                             f"Subsonic Outflow (grcbc_vel_out) requires bc_{dir} = -8")
+                             f"Subsonic Outflow Velocity (grcbc_vel_out) requires bc_{dir}%beg = -8 or bc_{dir}%end = -8")
 
     def check_probe_integral_output(self):
         """Checks probe and integral output requirements (simulation)"""
@@ -1298,13 +1297,12 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
                          "perturb_sph_fluid must be between 0 and num_fluids")
 
     def check_chemistry(self):
-        """Checks chemistry constraints (pre-process)"""
-        chemistry = self.get('chemistry', 'F') == 'T'
-        num_species = self.get('num_species', 0)
-
-        if chemistry:
-            self.prohibit(num_species <= 0,
-                         "chemistry requires num_species > 0")
+        """Checks chemistry constraints (pre-process)
+        
+        Note: num_species is set automatically by Cantera at runtime when cantera_file
+        is provided. No static validation is performed here - chemistry will fail at
+        runtime if misconfigured.
+        """
 
     def check_misc_pre_process(self):
         """Checks miscellaneous pre-process constraints"""
