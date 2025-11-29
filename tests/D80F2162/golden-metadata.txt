@@ -1,44 +1,10 @@
-This file was created on 2025-11-21 22:41:36.213300.
+This file was created on 2025-11-29 14:48:47.884435.
 
 mfc.sh:
 
-    Invocation: test -j 4 --generate -f D79C3E6F -t 4D7D85B4
+    Invocation: test -j 10 --generate
     Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        c701821f896929e0b2db24efd4c1ea21fedc8dfa on probe-coverage (dirty)
-
-pre_process:
-
-    CMake Configuration:
-    
-        CMake v4.1.2 on shb-m1pro-3.local
-    
-        C       : AppleClang v17.0.0.17000404 (/usr/bin/cc)
-        Fortran : GNU v15.2.0 (/opt/homebrew/bin/gfortran)
-    
-        PRE_PROCESS   : ON
-        SIMULATION    : OFF
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-        OpenMP  : OFF
-    
-        Fypp    : /Users/spencer/Downloads/MFC/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /usr/bin/cc
-        CXX      : /usr/bin/c++
-        FC       : /opt/homebrew/bin/gfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
+    Git:        bd9b9c6a04a916420687d762e135106d9c59e700 on probe-testing (dirty)
 
 simulation:
 
@@ -74,7 +40,7 @@ simulation:
         OMPI_CXX : 
         OMPI_FC  : 
 
-post_process:
+syscheck:
 
     CMake Configuration:
     
@@ -85,8 +51,8 @@ post_process:
     
         PRE_PROCESS   : OFF
         SIMULATION    : OFF
-        POST_PROCESS  : ON
-        SYSCHECK      : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : ON
         DOCUMENTATION : OFF
         ALL           : OFF
     
@@ -108,7 +74,7 @@ post_process:
         OMPI_CXX : 
         OMPI_FC  : 
 
-syscheck:
+pre_process:
 
     CMake Configuration:
     
@@ -117,10 +83,10 @@ syscheck:
         C       : AppleClang v17.0.0.17000404 (/usr/bin/cc)
         Fortran : GNU v15.2.0 (/opt/homebrew/bin/gfortran)
     
-        PRE_PROCESS   : OFF
+        PRE_PROCESS   : ON
         SIMULATION    : OFF
         POST_PROCESS  : OFF
-        SYSCHECK      : ON
+        SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
     

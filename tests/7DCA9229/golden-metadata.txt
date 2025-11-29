@@ -1,12 +1,12 @@
-This file was created on 2025-11-29 01:00:03.098657.
+This file was created on 2025-11-29 14:51:03.492617.
 
 mfc.sh:
 
     Invocation: test -j 10 --generate
-    Lock:       mpi=No & gpu=No & debug=Yes & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        7889b37e9a5f9e89d46d5e886a1d653de288f8f0 on probe-convergance (dirty)
+    Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
+    Git:        bd9b9c6a04a916420687d762e135106d9c59e700 on probe-testing (dirty)
 
-pre_process:
+simulation:
 
     CMake Configuration:
     
@@ -15,21 +15,21 @@ pre_process:
         C       : AppleClang v17.0.0.17000404 (/usr/bin/cc)
         Fortran : GNU v15.2.0 (/opt/homebrew/bin/gfortran)
     
-        PRE_PROCESS   : ON
-        SIMULATION    : OFF
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
         POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
     
-        MPI     : OFF
+        MPI     : ON
         OpenACC : OFF
         OpenMP  : OFF
     
         Fypp    : /Users/spencer/Downloads/MFC/build/venv/bin/fypp
         Doxygen : 
     
-        Build Type : Debug
+        Build Type : Release
     
     Configuration Environment:
     
@@ -56,14 +56,14 @@ syscheck:
         DOCUMENTATION : OFF
         ALL           : OFF
     
-        MPI     : OFF
+        MPI     : ON
         OpenACC : OFF
         OpenMP  : OFF
     
         Fypp    : /Users/spencer/Downloads/MFC/build/venv/bin/fypp
         Doxygen : 
     
-        Build Type : Debug
+        Build Type : Release
     
     Configuration Environment:
     
@@ -74,7 +74,7 @@ syscheck:
         OMPI_CXX : 
         OMPI_FC  : 
 
-simulation:
+pre_process:
 
     CMake Configuration:
     
@@ -83,21 +83,21 @@ simulation:
         C       : AppleClang v17.0.0.17000404 (/usr/bin/cc)
         Fortran : GNU v15.2.0 (/opt/homebrew/bin/gfortran)
     
-        PRE_PROCESS   : OFF
-        SIMULATION    : ON
+        PRE_PROCESS   : ON
+        SIMULATION    : OFF
         POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
     
-        MPI     : OFF
+        MPI     : ON
         OpenACC : OFF
         OpenMP  : OFF
     
         Fypp    : /Users/spencer/Downloads/MFC/build/venv/bin/fypp
         Doxygen : 
     
-        Build Type : Debug
+        Build Type : Release
     
     Configuration Environment:
     
