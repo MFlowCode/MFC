@@ -313,12 +313,15 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         """Checks constraints on hypoelasticity parameters"""
         hypoelasticity = self.get('hypoelasticity', 'F') == 'T'
         model_eqns = self.get('model_eqns')
+        riemann_solver = self.get('riemann_solver')
 
         if not hypoelasticity:
             return
 
         self.prohibit(model_eqns != 2,
                      "hypoelasticity requires model_eqns = 2")
+        self.prohibit(riemann_solver is not None and riemann_solver != 1,
+                     "hypoelasticity requires HLL Riemann solver (riemann_solver = 1)")
 
     def check_phase_change(self):
         """Checks constraints on phase change parameters"""
@@ -379,7 +382,7 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
 
             if cv is not None:
                 self.prohibit(cv < 0,
-                             f"fluid_pp({i})%cv must be positive")
+                             f"fluid_pp({i})%cv must be non-negative")
 
     def check_surface_tension(self):
         """Checks constraints on surface tension"""
@@ -767,12 +770,13 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         self.prohibit(probe_wrt,
                      "IGR does not support probe writes")
 
-        # Check BCs
+        # Check BCs - IGR does not support characteristic BCs
+        # Characteristic BCs are BC_CHAR_SLIP_WALL (-5) through BC_CHAR_SUP_OUTFLOW (-12)
         for dir in ['x', 'y', 'z']:
             for bound in ['beg', 'end']:
                 bc = self.get(f'bc_{dir}%{bound}')
                 if bc is not None:
-                    self.prohibit(-14 <= bc <= -4,
+                    self.prohibit(-12 <= bc <= -5,
                                  f"Characteristic boundary condition bc_{dir}%{bound} is not compatible with IGR")
 
     def check_acoustic_source(self):  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
@@ -972,15 +976,15 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         adv_n = self.get('adv_n', 'F') == 'T'
 
         self.prohibit(time_stepper != 3,
-                     "adapt_dt requires Runge-Kutta 3 (time_stepper = 3)")
+                     "adap_dt requires Runge-Kutta 3 (time_stepper = 3)")
         self.prohibit(model_eqns == 1,
-                     "adapt_dt is not supported for model_eqns = 1")
+                     "adap_dt is not supported for model_eqns = 1")
         self.prohibit(qbmm,
-                     "adapt_dt is not compatible with qbmm")
+                     "adap_dt is not compatible with qbmm")
         self.prohibit(not polytropic and not bubbles_lagrange,
-                     "adapt_dt requires polytropic = T or bubbles_lagrange = T")
+                     "adap_dt requires polytropic = T or bubbles_lagrange = T")
         self.prohibit(not adv_n and not bubbles_lagrange,
-                     "adapt_dt requires adv_n = T or bubbles_lagrange = T")
+                     "adap_dt requires adv_n = T or bubbles_lagrange = T")
 
     def check_alt_soundspeed(self):
         """Checks alternative sound speed parameters (simulation)"""
@@ -992,6 +996,8 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         model_eqns = self.get('model_eqns')
         bubbles_euler = self.get('bubbles_euler', 'F') == 'T'
         avg_state = self.get('avg_state')
+        riemann_solver = self.get('riemann_solver')
+        num_fluids = self.get('num_fluids')
 
         self.prohibit(model_eqns != 2,
                      "5-equation model (model_eqns = 2) is required for alt_soundspeed")
@@ -999,6 +1005,10 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
                      "alt_soundspeed is not compatible with bubbles_euler")
         self.prohibit(avg_state != 2,
                      "alt_soundspeed requires avg_state = 2")
+        self.prohibit(riemann_solver is not None and riemann_solver != 2,
+                     "alt_soundspeed requires HLLC Riemann solver (riemann_solver = 2)")
+        self.prohibit(num_fluids is not None and num_fluids not in [2, 3],
+                     "alt_soundspeed requires num_fluids = 2 or 3")
 
     def check_bubbles_lagrange(self):
         """Checks Lagrangian bubble parameters (simulation)"""
@@ -1009,11 +1019,18 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
 
         n = self.get('n', 0)
         file_per_process = self.get('file_per_process', 'F') == 'T'
+        model_eqns = self.get('model_eqns')
+        cluster_type = self.get('lag_params%cluster_type')
+        smooth_type = self.get('lag_params%smooth_type')
 
         self.prohibit(n is not None and n == 0,
                      "bubbles_lagrange accepts 2D and 3D simulations only")
         self.prohibit(file_per_process,
                      "file_per_process must be false for bubbles_lagrange")
+        self.prohibit(model_eqns == 3,
+                     "The 6-equation flow model does not support bubbles_lagrange")
+        self.prohibit(cluster_type is not None and cluster_type >= 2 and smooth_type != 1,
+                     "cluster_type >= 2 requires smooth_type = 1")
 
     def check_continuum_damage(self):
         """Checks continuum damage model parameters (simulation)"""
@@ -1023,11 +1040,17 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
             return
 
         tau_star = self.get('tau_star')
+        cont_damage_s = self.get('cont_damage_s')
+        alpha_bar = self.get('alpha_bar')
         model_eqns = self.get('model_eqns')
         hypoelasticity = self.get('hypoelasticity', 'F') == 'T'
 
         self.prohibit(tau_star is None,
                      "tau_star must be specified for cont_damage")
+        self.prohibit(cont_damage_s is None,
+                     "cont_damage_s must be specified for cont_damage")
+        self.prohibit(alpha_bar is None,
+                     "alpha_bar must be specified for cont_damage")
         self.prohibit(model_eqns != 2,
                      "cont_damage requires model_eqns = 2")
         self.prohibit(hypoelasticity,
@@ -1036,24 +1059,35 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
     def check_grcbc(self):
         """Checks Generalized Relaxation Characteristics BC (simulation)"""
         for dir in ['x', 'y', 'z']:
-            for loc in ['beg', 'end']:
-                grcbc_vel = self.get(f'grcbc_vel_{dir}%{loc}')
-                bc_val = self.get(f'bc_{dir}%{loc}')
+            grcbc_in_beg = self.get(f'bc_{dir}%grcbc_in')
+            grcbc_out_beg = self.get(f'bc_{dir}%grcbc_out')
+            grcbc_vel_out_beg = self.get(f'bc_{dir}%grcbc_vel_out')
+            bc_beg = self.get(f'bc_{dir}%beg')
+            bc_end = self.get(f'bc_{dir}%end')
 
-                if grcbc_vel is not None:
-                    self.prohibit(bc_val != -14,
-                                 f"grcbc_vel_{dir}%{loc} requires bc_{dir}%{loc} = -14 (characteristic BC)")
+            if grcbc_in_beg:
+                self.prohibit(bc_beg != -7 and bc_end != -7,
+                             f"Subsonic Inflow (grcbc_in) requires bc_{dir} = -7")
+            if grcbc_out_beg:
+                self.prohibit(bc_beg != -8 and bc_end != -8,
+                             f"Subsonic Outflow (grcbc_out) requires bc_{dir} = -8")
+            if grcbc_vel_out_beg:
+                self.prohibit(bc_beg != -8 and bc_end != -8,
+                             f"Subsonic Outflow (grcbc_vel_out) requires bc_{dir} = -8")
 
     def check_probe_integral_output(self):
         """Checks probe and integral output requirements (simulation)"""
         probe_wrt = self.get('probe_wrt', 'F') == 'T'
         integral_wrt = self.get('integral_wrt', 'F') == 'T'
         fd_order = self.get('fd_order')
+        bubbles_euler = self.get('bubbles_euler', 'F') == 'T'
 
         self.prohibit(probe_wrt and fd_order is None,
                      "fd_order must be specified for probe_wrt")
         self.prohibit(integral_wrt and fd_order is None,
                      "fd_order must be specified for integral_wrt")
+        self.prohibit(integral_wrt and not bubbles_euler,
+                     "integral_wrt requires bubbles_euler to be enabled")
 
     def check_hyperelasticity(self):
         """Checks hyperelasticity constraints"""
@@ -1093,9 +1127,9 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
                     else:  # z
                         non_normal = vb1 != 0 or vb2 != 0
 
-                    if bc_val == -15 and non_normal:  # BC_SLIP_WALL
+                    if bc_val == -15 and non_normal:  # BC_SLIP_WALL with non-normal velocities
                         self.prohibit(True,
-                                     f"bc_{direction}%beg must be -15 if non-normal velocities are set")
+                                     f"bc_{direction}%beg must be -16 (no-slip wall) if non-normal velocities are set")
                     elif bc_val not in [-15, -16]:  # Not SLIP or NO_SLIP
                         self.prohibit(True,
                                      f"bc_{direction}%beg must be -15 or -16 if velocities are set")
@@ -1109,9 +1143,9 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
                     else:  # z
                         non_normal = ve1 != 0 or ve2 != 0
 
-                    if bc_val == -15 and non_normal:  # BC_SLIP_WALL
+                    if bc_val == -15 and non_normal:  # BC_SLIP_WALL with non-normal velocities
                         self.prohibit(True,
-                                     f"bc_{direction}%end must be -15 if non-normal velocities are set")
+                                     f"bc_{direction}%end must be -16 (no-slip wall) if non-normal velocities are set")
                     elif bc_val not in [-15, -16]:
                         self.prohibit(True,
                                      f"bc_{direction}%end must be -15 or -16 if velocities are set")
@@ -1386,8 +1420,6 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
                 if schlieren_alpha is not None:
                     self.prohibit(schlieren_alpha <= 0,
                                  f"schlieren_alpha({i}) must be greater than zero")
-                    self.prohibit(i > num_fluids,
-                                 f"Index of schlieren_alpha({i}) exceeds the total number of fluids")
                     self.prohibit(not schlieren_wrt,
                                  f"schlieren_alpha({i}) should be set only with schlieren_wrt enabled")
 
@@ -1457,8 +1489,6 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
             if alpha_rho_wrt:
                 self.prohibit(model_eqns == 1,
                              f"alpha_rho_wrt({i}) is not supported for model_eqns = 1")
-                self.prohibit(i > num_fluids,
-                             f"Index of alpha_rho_wrt({i}) exceeds the total number of fluids")
 
     def check_momentum_post(self):
         """Checks momentum output constraints (post-process)"""
@@ -1511,8 +1541,6 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
             if alpha_wrt:
                 self.prohibit(model_eqns == 1,
                              f"alpha_wrt({i}) is not supported for model_eqns = 1")
-                self.prohibit(i > num_fluids,
-                             f"Index of alpha_wrt({i}) exceeds the total number of fluids")
 
     def check_fft(self):
         """Checks FFT output constraints (post-process)"""
@@ -1686,6 +1714,7 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
 
         Args:
             stage: One of 'simulation', 'pre_process', or 'post_process'
+                   Other stages (like 'syscheck') have no case constraints and are skipped
 
         Raises:
             CaseConstraintError: If any constraint violations are found
@@ -1699,7 +1728,9 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         elif stage == 'post_process':
             self.validate_post_process()
         else:
-            raise ValueError(f"Unknown stage: {stage}")
+            # No stage-specific constraints for auxiliary targets like 'syscheck'.
+            # Silently skip validation rather than treating this as an error.
+            return
 
         if self.errors:
             error_msg = "Case parameter constraint violations:\n" + "\n".join(f"  • {err}" for err in self.errors)
