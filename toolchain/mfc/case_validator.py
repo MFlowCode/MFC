@@ -1090,51 +1090,6 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         self.prohibit(model_eqns is not None and model_eqns > 3,
                      "hyperelasticity is not supported for model_eqns > 3")
 
-    def check_moving_bc(self):  # pylint: disable=too-many-branches
-        """Checks moving boundary constraints"""
-        # Check all directions for moving boundary velocities
-        for direction in ['x', 'y', 'z']:
-            # Check beg velocities
-            vb1 = self.get(f'bc_{direction}%vb1', 0.0)
-            vb2 = self.get(f'bc_{direction}%vb2', 0.0)
-            vb3 = self.get(f'bc_{direction}%vb3', 0.0)
-            bc_beg_val = self.get(f'bc_{direction}%beg')
-            if not (vb1 == 0 and vb2 == 0 and vb3 == 0):
-                # Determine which velocity components should be zero based on direction
-                if direction == 'x':
-                    non_normal = vb2 != 0 or vb3 != 0
-                elif direction == 'y':
-                    non_normal = vb3 != 0 or vb1 != 0
-                else:  # z
-                    non_normal = vb1 != 0 or vb2 != 0
-
-                if bc_beg_val == -15 and non_normal:  # BC_SLIP_WALL with non-normal velocities
-                    self.prohibit(True,
-                                 f"bc_{direction}%beg must be -16 (no-slip wall) if non-normal velocities are set")
-                elif bc_beg_val not in [-15, -16]:  # Not SLIP or NO_SLIP
-                    self.prohibit(True,
-                                 f"bc_{direction}%beg must be -15 or -16 if velocities are set")
-
-            # Check end velocities
-            ve1 = self.get(f'bc_{direction}%ve1', 0.0)
-            ve2 = self.get(f'bc_{direction}%ve2', 0.0)
-            ve3 = self.get(f'bc_{direction}%ve3', 0.0)
-            bc_end_val = self.get(f'bc_{direction}%end')
-            if not (ve1 == 0 and ve2 == 0 and ve3 == 0):
-                if direction == 'x':
-                    non_normal = ve2 != 0 or ve3 != 0
-                elif direction == 'y':
-                    non_normal = ve3 != 0 or ve1 != 0
-                else:  # z
-                    non_normal = ve1 != 0 or ve2 != 0
-
-                if bc_end_val == -15 and non_normal:  # BC_SLIP_WALL with non-normal velocities
-                    self.prohibit(True,
-                                 f"bc_{direction}%end must be -16 (no-slip wall) if non-normal velocities are set")
-                elif bc_end_val not in [-15, -16]:
-                    self.prohibit(True,
-                                 f"bc_{direction}%end must be -15 or -16 if velocities are set")
-
     # ===================================================================
     # Pre-Process Specific Checks
     # ===================================================================
@@ -1636,7 +1591,6 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         self.check_stiffened_eos()
         self.check_surface_tension()
         self.check_mhd()
-        self.check_moving_bc()
 
     def validate_simulation(self):
         """Validate simulation-specific parameters"""
