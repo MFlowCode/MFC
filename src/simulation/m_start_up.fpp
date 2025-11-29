@@ -1052,8 +1052,9 @@ contains
                                             dyn_pres, pi_inf, gamma, rho, qv, rhoYks, pres, T, pres_mag=pres_mag)
 
                     do i = 1, num_fluids
-                        v_vf(i + intxb - 1)%sf(j, k, l) = v_vf(i + advxb - 1)%sf(j, k, l)*(gammas(i)*pres + pi_infs(i)) &
-                                                          + v_vf(i + contxb - 1)%sf(j, k, l)*qvs(i)
+                        v_vf(i + internalEnergies_idx%beg - 1)%sf(j, k, l) = v_vf(i + adv_idx%beg - 1)%sf(j, k, l)* &
+                                                                             (fluid_pp(i)%gamma*pres + fluid_pp(i)%pi_inf) &
+                                                                             + v_vf(i + cont_idx%beg - 1)%sf(j, k, l)*fluid_pp(i)%qv
                     end do
 
                 end do
@@ -1136,7 +1137,6 @@ contains
         if (relax) call s_infinite_relaxation_k(q_cons_ts(1)%vf)
 
         ! Time-stepping loop controls
-
         t_step = t_step + 1
 
     end subroutine s_perform_time_step

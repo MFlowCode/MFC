@@ -1,52 +1,19 @@
-This file was created on 2025-09-21 23:13:54.182399.
+This file was created on 2025-11-29 00:30:59.616474.
 
 mfc.sh:
 
-    Invocation: test -o riemann_solver=5 --generate -j 8
-    Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No & single=No & fastmath=No
-    Git:        0dba2f28e2808f21ce862a25ba35e8632ea975af on MPI_FFTW (dirty)
-
-simulation:
-
-    CMake Configuration:
-    
-        CMake v3.23.2 on Anands-MacBook-Pro.local
-    
-        C       : AppleClang v16.0.0.16000026 (/Library/Developer/CommandLineTools/usr/bin/cc)
-        Fortran : GNU v15.1.0 (/opt/homebrew/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : ON
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /Users/anand/anandrdbz/MFC/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /Library/Developer/CommandLineTools/usr/bin/cc
-        CXX      : /Library/Developer/CommandLineTools/usr/bin/c++
-        FC       : /opt/homebrew/bin/gfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
+    Invocation: test -j 10 --generate
+    Lock:       mpi=No & gpu=No & debug=Yes & gcov=No & unified=No & single=No & mixed=No & fastmath=No
+    Git:        7889b37e9a5f9e89d46d5e886a1d653de288f8f0 on probe-convergance (dirty)
 
 pre_process:
 
     CMake Configuration:
     
-        CMake v3.23.2 on lawn-128-61-26-75.lawn.gatech.edu
+        CMake v4.1.2 on shb-m1pro-3.local
     
-        C       : AppleClang v16.0.0.16000026 (/Library/Developer/CommandLineTools/usr/bin/cc)
-        Fortran : GNU v15.1.0 (/opt/homebrew/bin/gfortran)
+        C       : AppleClang v17.0.0.17000404 (/usr/bin/cc)
+        Fortran : GNU v15.2.0 (/opt/homebrew/bin/gfortran)
     
         PRE_PROCESS   : ON
         SIMULATION    : OFF
@@ -55,52 +22,20 @@ pre_process:
         DOCUMENTATION : OFF
         ALL           : OFF
     
-        MPI     : ON
+        MPI     : OFF
         OpenACC : OFF
+        OpenMP  : OFF
     
-        Fypp    : /Users/anand/anandrdbz/MFC/build/venv/bin/fypp
+        Fypp    : /Users/spencer/Downloads/MFC/build/venv/bin/fypp
         Doxygen : 
     
-        Build Type : Release
+        Build Type : Debug
     
     Configuration Environment:
     
-        CC       : 
-        CXX      : 
-        FC       : 
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
-post_process:
-
-    CMake Configuration:
-    
-        CMake v3.23.2 on lawn-128-61-26-75.lawn.gatech.edu
-    
-        C       : AppleClang v16.0.0.16000026 (/Library/Developer/CommandLineTools/usr/bin/cc)
-        Fortran : GNU v15.1.0 (/opt/homebrew/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : ON
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /Users/anand/anandrdbz/MFC/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : 
-        CXX      : 
-        FC       : 
+        CC       : /usr/bin/cc
+        CXX      : /usr/bin/c++
+        FC       : /opt/homebrew/bin/gfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -109,10 +44,10 @@ syscheck:
 
     CMake Configuration:
     
-        CMake v3.23.2 on lawn-128-61-26-75.lawn.gatech.edu
+        CMake v4.1.2 on shb-m1pro-3.local
     
-        C       : AppleClang v16.0.0.16000026 (/Library/Developer/CommandLineTools/usr/bin/cc)
-        Fortran : GNU v15.1.0 (/opt/homebrew/bin/gfortran)
+        C       : AppleClang v17.0.0.17000404 (/usr/bin/cc)
+        Fortran : GNU v15.2.0 (/opt/homebrew/bin/gfortran)
     
         PRE_PROCESS   : OFF
         SIMULATION    : OFF
@@ -121,19 +56,54 @@ syscheck:
         DOCUMENTATION : OFF
         ALL           : OFF
     
-        MPI     : ON
+        MPI     : OFF
         OpenACC : OFF
+        OpenMP  : OFF
     
-        Fypp    : /Users/anand/anandrdbz/MFC/build/venv/bin/fypp
+        Fypp    : /Users/spencer/Downloads/MFC/build/venv/bin/fypp
         Doxygen : 
     
-        Build Type : Release
+        Build Type : Debug
     
     Configuration Environment:
     
-        CC       : 
-        CXX      : 
-        FC       : 
+        CC       : /usr/bin/cc
+        CXX      : /usr/bin/c++
+        FC       : /opt/homebrew/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+simulation:
+
+    CMake Configuration:
+    
+        CMake v4.1.2 on shb-m1pro-3.local
+    
+        C       : AppleClang v17.0.0.17000404 (/usr/bin/cc)
+        Fortran : GNU v15.2.0 (/opt/homebrew/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : OFF
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /Users/spencer/Downloads/MFC/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Debug
+    
+    Configuration Environment:
+    
+        CC       : /usr/bin/cc
+        CXX      : /usr/bin/c++
+        FC       : /opt/homebrew/bin/gfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -142,9 +112,9 @@ CPU:
 
     CPU Info:
     From sysctl -a 
-    machdep.cpu.cores_per_package: 8
-    machdep.cpu.core_count: 8
-    machdep.cpu.logical_per_package: 8
-    machdep.cpu.thread_count: 8
-    machdep.cpu.brand_string: Apple M1
+    machdep.cpu.cores_per_package: 10
+    machdep.cpu.core_count: 10
+    machdep.cpu.logical_per_package: 10
+    machdep.cpu.thread_count: 10
+    machdep.cpu.brand_string: Apple M1 Max
 

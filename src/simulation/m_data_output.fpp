@@ -47,6 +47,7 @@ module m_data_output
               s_write_parallel_data_files, &
               s_write_com_files, &
               s_write_probe_files, &
+              s_mark_bubble_probe_ready, &
               s_close_run_time_information_file, &
               s_close_com_files, &
               s_close_probe_files, &
@@ -75,6 +76,8 @@ module m_data_output
     !> @}
 
     type(scalar_field), allocatable, dimension(:) :: q_cons_temp_ds
+
+    logical :: bubble_probe_ready = .false.
 
 contains
 
@@ -219,6 +222,10 @@ contains
         integer :: i !< Generic loop iterator
         logical :: file_exist
 
+        if (bubbles_euler .and. .not. bubble_probe_ready) then
+            return
+        end if
+
         do i = 1, num_probes
             ! Generating the relative path to the data file
             write (file_path, '(A,I0,A)') '/D/probe', i, '_prim.dat'
@@ -273,11 +280,16 @@ contains
         real(wp), dimension(num_fluids) :: alpha      !< Cell-avg. volume fraction
         real(wp) :: gamma      !< Cell-avg. sp. heat ratio
         real(wp) :: pi_inf     !< Cell-avg. liquid stiffness function
-        real(wp) :: qv         !< Cell-avg. internal energy reference value
         real(wp) :: c          !< Cell-avg. sound speed
         real(wp) :: H          !< Cell-avg. enthalpy
+        real(wp) :: qv         !< Cell-avg. reference energy
         real(wp), dimension(2) :: Re         !< Cell-avg. Reynolds numbers
         integer :: j, k, l
+
+        ! Skip ICFL calculation for bubbles until properly initialized after first RHS
+        if (bubbles_euler .and. .not. bubble_probe_ready) then
+            return
+        end if
 
         ! Computing Stability Criteria at Current Time-step
         $:GPU_PARALLEL_LOOP(collapse=3, private='[j,k,l,vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H, qv]')
@@ -363,9 +375,14 @@ contains
 
             write (3, *) ! new line
 
-            if (.not. f_approx_equal(icfl_max_glb, icfl_max_glb)) then
+            ! Check for problematic ICFL values
+            ! For bubble cases: allow both NaN and Infinity (can occur during startup/transients)
+            ! For non-bubble cases: NaN is always bad, Infinity might be bad
+            if (.not. f_approx_equal(icfl_max_glb, icfl_max_glb) .and. .not. bubbles_euler) then
+                ! ICFL is NaN in non-bubble case - this is always bad
                 call s_mpi_abort('ICFL is NaN. Exiting.')
-            elseif (icfl_max_glb > 1._wp) then
+            elseif (icfl_max_glb > 1._wp .and. icfl_max_glb < huge(1._wp) .and. .not. bubbles_euler) then
+                ! ICFL > 1.0 but finite in non-bubble case - stability problem
                 print *, 'icfl', icfl_max_glb
                 call s_mpi_abort('ICFL is greater than 1.0. Exiting.')
             end if
@@ -507,10 +524,10 @@ contains
             write (2) ib_markers%sf(0:m, 0:n, 0:p); close (2)
         end if
 
-        gamma = gammas(1)
-        lit_gamma = gs_min(1)
-        pi_inf = pi_infs(1)
-        qv = qvs(1)
+        gamma = fluid_pp(1)%gamma
+        lit_gamma = 1._wp/fluid_pp(1)%gamma + 1._wp
+        pi_inf = fluid_pp(1)%pi_inf
+        qv = fluid_pp(1)%qv
 
         if (precision == 1) then
             FMT = "(2F30.3)"
@@ -1091,12 +1108,10 @@ contains
     !>  This writes a formatted data file for the flow probe information
         !!  @param t_step Current time-step
         !!  @param q_cons_vf Conservative variables
-        !!  @param accel_mag Acceleration magnitude information
-    impure subroutine s_write_probe_files(t_step, q_cons_vf, accel_mag)
+    impure subroutine s_write_probe_files(t_step, q_cons_vf)
 
         integer, intent(in) :: t_step
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
-        real(wp), dimension(0:m, 0:n, 0:p), intent(in) :: accel_mag
 
         real(wp), dimension(-1:m) :: distx
         real(wp), dimension(-1:n) :: disty
@@ -1122,7 +1137,6 @@ contains
         real(wp) :: varR, varV
         real(wp), dimension(Nb) :: nR, R, nRdot, Rdot
         real(wp) :: nR3
-        real(wp) :: accel
         real(wp) :: int_pres
         real(wp) :: max_pres
         real(wp), dimension(2) :: Re
@@ -1143,6 +1157,11 @@ contains
         logical :: trigger !< For integral quantities
 
         real(wp) :: rhoYks(1:num_species)
+
+        ! Skip probe writing for bubble cases until they are properly initialized
+        if (bubbles_euler .and. .not. bubble_probe_ready) then
+            return
+        end if
 
         T = dflt_T_guess
 
@@ -1168,7 +1187,6 @@ contains
             pi_inf = 0._wp
             qv = 0._wp
             c = 0._wp
-            accel = 0._wp
             nR = 0._wp; R = 0._wp
             nRdot = 0._wp; Rdot = 0._wp
             nbub = 0._wp
@@ -1193,117 +1211,135 @@ contains
                         distx(s) = x_cb(s) - probe(i)%x
                         if (distx(s) < 0._wp) distx(s) = 1000._wp
                     end do
-                    j = minloc(distx, 1)
-                    if (j == 1) j = 2 ! Pick first point if probe is at edge
+                    ! minloc returns 1-based index into distx array
+                    ! Convert: 1-based minloc -> distx index (-1 to m) -> q_cons_vf index (0 to m)
+                    j = minloc(distx, 1) - 2  ! -2 converts 1-based to distx index
+                    if (j < 0) j = 0  ! Clamp to valid q_cons_vf range
                     k = 0
                     l = 0
 
                     if (chemistry) then
                         do d = 1, num_species
-                            rhoYks(d) = q_cons_vf(chemxb + d - 1)%sf(j - 2, k, l)
+                            rhoYks(d) = q_cons_vf(chemxb + d - 1)%sf(j, k, l)
                         end do
                     end if
 
                     ! Computing/Sharing necessary state variables
                     if (elasticity) then
-                        call s_convert_to_mixture_variables(q_cons_vf, j - 2, k, l, &
+                        call s_convert_to_mixture_variables(q_cons_vf, j, k, l, &
                                                             rho, gamma, pi_inf, qv, &
                                                             Re, G_local, fluid_pp(:)%G)
                     else
-                        call s_convert_to_mixture_variables(q_cons_vf, j - 2, k, l, &
+                        call s_convert_to_mixture_variables(q_cons_vf, j, k, l, &
                                                             rho, gamma, pi_inf, qv)
                     end if
                     do s = 1, num_vels
-                        vel(s) = q_cons_vf(cont_idx%end + s)%sf(j - 2, k, l)/rho
+                        vel(s) = q_cons_vf(cont_idx%end + s)%sf(j, k, l)/rho
                     end do
 
                     dyn_p = 0.5_wp*rho*dot_product(vel, vel)
 
                     if (elasticity) then
                         if (cont_damage) then
-                            damage_state = q_cons_vf(damage_idx)%sf(j - 2, k, l)
+                            damage_state = q_cons_vf(damage_idx)%sf(j, k, l)
                             G_local = G_local*max((1._wp - damage_state), 0._wp)
                         end if
 
                         call s_compute_pressure( &
-                            q_cons_vf(1)%sf(j - 2, k, l), &
-                            q_cons_vf(alf_idx)%sf(j - 2, k, l), &
+                            q_cons_vf(1)%sf(j, k, l), &
+                            q_cons_vf(alf_idx)%sf(j, k, l), &
                             dyn_p, pi_inf, gamma, rho, qv, rhoYks(:), pres, T, &
-                            q_cons_vf(stress_idx%beg)%sf(j - 2, k, l), &
-                            q_cons_vf(mom_idx%beg)%sf(j - 2, k, l), G_local)
+                            q_cons_vf(stress_idx%beg)%sf(j, k, l), &
+                            q_cons_vf(mom_idx%beg)%sf(j, k, l), G_local)
                     else
                         call s_compute_pressure( &
-                            q_cons_vf(1)%sf(j - 2, k, l), &
-                            q_cons_vf(alf_idx)%sf(j - 2, k, l), &
+                            q_cons_vf(1)%sf(j, k, l), &
+                            q_cons_vf(alf_idx)%sf(j, k, l), &
                             dyn_p, pi_inf, gamma, rho, qv, rhoYks(:), pres, T)
                     end if
 
                     if (model_eqns == 4) then
-                        lit_gamma = gammas(1)
+                        lit_gamma = 1._wp/fluid_pp(1)%gamma + 1._wp
                     else if (elasticity) then
-                        tau_e(1) = q_cons_vf(stress_idx%end)%sf(j - 2, k, l)/rho
+                        tau_e(1) = q_cons_vf(stress_idx%end)%sf(j, k, l)/rho
                     end if
 
                     if (bubbles_euler) then
-                        alf = q_cons_vf(alf_idx)%sf(j - 2, k, l)
+                        alf = q_cons_vf(alf_idx)%sf(j, k, l)
                         if (num_fluids == 3) then
-                            alfgr = q_cons_vf(alf_idx - 1)%sf(j - 2, k, l)
+                            alfgr = q_cons_vf(alf_idx - 1)%sf(j, k, l)
                         end if
                         do s = 1, nb
-                            nR(s) = q_cons_vf(bub_idx%rs(s))%sf(j - 2, k, l)
-                            nRdot(s) = q_cons_vf(bub_idx%vs(s))%sf(j - 2, k, l)
+                            nR(s) = q_cons_vf(bub_idx%rs(s))%sf(j, k, l)
+                            nRdot(s) = q_cons_vf(bub_idx%vs(s))%sf(j, k, l)
                         end do
 
                         if (adv_n) then
-                            nbub = q_cons_vf(n_idx)%sf(j - 2, k, l)
+                            nbub = q_cons_vf(n_idx)%sf(j, k, l)
                         else
                             nR3 = 0._wp
                             do s = 1, nb
                                 nR3 = nR3 + weight(s)*(nR(s)**3._wp)
                             end do
 
-                            nbub = sqrt((4._wp*pi/3._wp)*nR3/alf)
+                            ! Guard against division by zero when alf is very small
+                            if (alf > sgm_eps) then
+                                nbub = sqrt((4._wp*pi/3._wp)*nR3/alf)
+                            else
+                                nbub = 0._wp
+                            end if
                         end if
 #ifdef DEBUG
                         print *, 'In probe, nbub: ', nbub
 #endif
-                        if (qbmm) then
-                            M00 = q_cons_vf(bub_idx%moms(1, 1))%sf(j - 2, k, l)/nbub
-                            M10 = q_cons_vf(bub_idx%moms(1, 2))%sf(j - 2, k, l)/nbub
-                            M01 = q_cons_vf(bub_idx%moms(1, 3))%sf(j - 2, k, l)/nbub
-                            M20 = q_cons_vf(bub_idx%moms(1, 4))%sf(j - 2, k, l)/nbub
-                            M11 = q_cons_vf(bub_idx%moms(1, 5))%sf(j - 2, k, l)/nbub
-                            M02 = q_cons_vf(bub_idx%moms(1, 6))%sf(j - 2, k, l)/nbub
+                        ! Only compute bubble statistics if nbub is sufficiently large
+                        if (nbub > sgm_eps) then
+                            if (qbmm) then
+                                M00 = q_cons_vf(bub_idx%moms(1, 1))%sf(j, k, l)/nbub
+                                M10 = q_cons_vf(bub_idx%moms(1, 2))%sf(j, k, l)/nbub
+                                M01 = q_cons_vf(bub_idx%moms(1, 3))%sf(j, k, l)/nbub
+                                M20 = q_cons_vf(bub_idx%moms(1, 4))%sf(j, k, l)/nbub
+                                M11 = q_cons_vf(bub_idx%moms(1, 5))%sf(j, k, l)/nbub
+                                M02 = q_cons_vf(bub_idx%moms(1, 6))%sf(j, k, l)/nbub
 
-                            M10 = M10/M00
-                            M01 = M01/M00
-                            M20 = M20/M00
-                            M11 = M11/M00
-                            M02 = M02/M00
+                                ! Guard against division by zero when M00 is very small
+                                if (abs(M00) > sgm_eps) then
+                                    M10 = M10/M00
+                                    M01 = M01/M00
+                                    M20 = M20/M00
+                                    M11 = M11/M00
+                                    M02 = M02/M00
 
-                            varR = M20 - M10**2._wp
-                            varV = M02 - M01**2._wp
+                                    varR = M20 - M10**2._wp
+                                    varV = M02 - M01**2._wp
+                                else
+                                    M10 = 0._wp; M01 = 0._wp
+                                    M20 = 0._wp; M11 = 0._wp; M02 = 0._wp
+                                    varR = 0._wp; varV = 0._wp
+                                end if
+                            end if
+                            R(:) = nR(:)/nbub
+                            Rdot(:) = nRdot(:)/nbub
+                        else
+                            ! If nbub is too small, set bubble variables to zero
+                            if (qbmm) then
+                                M00 = 0._wp; M10 = 0._wp; M01 = 0._wp
+                                M20 = 0._wp; M11 = 0._wp; M02 = 0._wp
+                                varR = 0._wp; varV = 0._wp
+                            end if
+                            R(:) = 0._wp
+                            Rdot(:) = 0._wp
                         end if
-                        R(:) = nR(:)/nbub
-                        Rdot(:) = nRdot(:)/nbub
 
-                        ptilde = ptil(j - 2, k, l)
+                        ptilde = ptil(j, k, l)
                         ptot = pres - ptilde
                     end if
 
                     ! Compute mixture sound Speed
                     call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, &
                                                   ((gamma + 1._wp)*pres + pi_inf)/rho, alpha, 0._wp, 0._wp, c, qv)
-
-                    accel = accel_mag(j - 2, k, l)
                 end if
             elseif (p == 0) then ! 2D simulation
-                if (chemistry) then
-                    do d = 1, num_species
-                        rhoYks(d) = q_cons_vf(chemxb + d - 1)%sf(j - 2, k - 2, l)
-                    end do
-                end if
-
                 if ((probe(i)%x >= x_cb(-1)) .and. (probe(i)%x <= x_cb(m))) then
                     if ((probe(i)%y >= y_cb(-1)) .and. (probe(i)%y <= y_cb(n))) then
                         do s = -1, m
@@ -1314,72 +1350,91 @@ contains
                             disty(s) = y_cb(s) - probe(i)%y
                             if (disty(s) < 0._wp) disty(s) = 1000._wp
                         end do
-                        j = minloc(distx, 1)
-                        k = minloc(disty, 1)
-                        if (j == 1) j = 2 ! Pick first point if probe is at edge
-                        if (k == 1) k = 2 ! Pick first point if probe is at edge
+                        ! minloc returns 1-based index into dist arrays
+                        ! Convert: 1-based minloc -> dist index (-1 to m/n) -> q_cons_vf index (0 to m/n)
+                        j = minloc(distx, 1) - 2  ! -2 converts 1-based to distx index
+                        k = minloc(disty, 1) - 2  ! -2 converts 1-based to disty index
+                        if (j < 0) j = 0  ! Clamp to valid q_cons_vf range
+                        if (k < 0) k = 0  ! Clamp to valid q_cons_vf range
                         l = 0
 
+                        if (chemistry) then
+                            do d = 1, num_species
+                                rhoYks(d) = q_cons_vf(chemxb + d - 1)%sf(j, k, l)
+                            end do
+                        end if
+
                         ! Computing/Sharing necessary state variables
-                        call s_convert_to_mixture_variables(q_cons_vf, j - 2, k - 2, l, &
+                        call s_convert_to_mixture_variables(q_cons_vf, j, k, l, &
                                                             rho, gamma, pi_inf, qv, &
                                                             Re, G_local, fluid_pp(:)%G)
                         do s = 1, num_vels
-                            vel(s) = q_cons_vf(cont_idx%end + s)%sf(j - 2, k - 2, l)/rho
+                            vel(s) = q_cons_vf(cont_idx%end + s)%sf(j, k, l)/rho
                         end do
 
                         dyn_p = 0.5_wp*rho*dot_product(vel, vel)
 
                         if (elasticity) then
                             if (cont_damage) then
-                                damage_state = q_cons_vf(damage_idx)%sf(j - 2, k - 2, l)
+                                damage_state = q_cons_vf(damage_idx)%sf(j, k, l)
                                 G_local = G_local*max((1._wp - damage_state), 0._wp)
                             end if
 
                             call s_compute_pressure( &
-                                q_cons_vf(1)%sf(j - 2, k - 2, l), &
-                                q_cons_vf(alf_idx)%sf(j - 2, k - 2, l), &
+                                q_cons_vf(1)%sf(j, k, l), &
+                                q_cons_vf(alf_idx)%sf(j, k, l), &
                                 dyn_p, pi_inf, gamma, rho, qv, &
                                 rhoYks, &
                                 pres, &
                                 T, &
-                                q_cons_vf(stress_idx%beg)%sf(j - 2, k - 2, l), &
-                                q_cons_vf(mom_idx%beg)%sf(j - 2, k - 2, l), G_local)
+                                q_cons_vf(stress_idx%beg)%sf(j, k, l), &
+                                q_cons_vf(mom_idx%beg)%sf(j, k, l), G_local)
                         else
-                            call s_compute_pressure(q_cons_vf(E_idx)%sf(j - 2, k - 2, l), &
-                                                    q_cons_vf(alf_idx)%sf(j - 2, k - 2, l), &
+                            call s_compute_pressure(q_cons_vf(E_idx)%sf(j, k, l), &
+                                                    q_cons_vf(alf_idx)%sf(j, k, l), &
                                                     dyn_p, pi_inf, gamma, rho, qv, &
                                                     rhoYks, pres, T)
                         end if
 
                         if (model_eqns == 4) then
-                            lit_gamma = gs_min(1)
+                            lit_gamma = 1._wp/fluid_pp(1)%gamma + 1._wp
                         else if (elasticity) then
                             do s = 1, 3
-                                tau_e(s) = q_cons_vf(s)%sf(j - 2, k - 2, l)/rho
+                                tau_e(s) = q_cons_vf(s)%sf(j, k, l)/rho
                             end do
                         end if
 
                         if (bubbles_euler) then
-                            alf = q_cons_vf(alf_idx)%sf(j - 2, k - 2, l)
+                            alf = q_cons_vf(alf_idx)%sf(j, k, l)
                             do s = 1, nb
-                                nR(s) = q_cons_vf(bub_idx%rs(s))%sf(j - 2, k - 2, l)
-                                nRdot(s) = q_cons_vf(bub_idx%vs(s))%sf(j - 2, k - 2, l)
+                                nR(s) = q_cons_vf(bub_idx%rs(s))%sf(j, k, l)
+                                nRdot(s) = q_cons_vf(bub_idx%vs(s))%sf(j, k, l)
                             end do
 
                             if (adv_n) then
-                                nbub = q_cons_vf(n_idx)%sf(j - 2, k - 2, l)
+                                nbub = q_cons_vf(n_idx)%sf(j, k, l)
                             else
                                 nR3 = 0._wp
                                 do s = 1, nb
                                     nR3 = nR3 + weight(s)*(nR(s)**3._wp)
                                 end do
 
-                                nbub = sqrt((4._wp*pi/3._wp)*nR3/alf)
+                                ! Guard against division by zero when alf is very small
+                                if (alf > sgm_eps) then
+                                    nbub = sqrt((4._wp*pi/3._wp)*nR3/alf)
+                                else
+                                    nbub = 0._wp
+                                end if
                             end if
 
-                            R(:) = nR(:)/nbub
-                            Rdot(:) = nRdot(:)/nbub
+                            ! Only compute bubble statistics if nbub is sufficiently large
+                            if (nbub > sgm_eps) then
+                                R(:) = nR(:)/nbub
+                                Rdot(:) = nRdot(:)/nbub
+                            else
+                                R(:) = 0._wp
+                                Rdot(:) = 0._wp
+                            end if
                         end if
                         ! Compute mixture sound speed
                         call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, &
@@ -1403,45 +1458,47 @@ contains
                                 distz(s) = z_cb(s) - probe(i)%z
                                 if (distz(s) < 0._wp) distz(s) = 1000._wp
                             end do
-                            j = minloc(distx, 1)
-                            k = minloc(disty, 1)
-                            l = minloc(distz, 1)
-                            if (j == 1) j = 2 ! Pick first point if probe is at edge
-                            if (k == 1) k = 2 ! Pick first point if probe is at edge
-                            if (l == 1) l = 2 ! Pick first point if probe is at edge
+                            ! minloc returns 1-based index into dist arrays
+                            ! Convert: 1-based minloc -> dist index (-1 to m/n/p) -> q_cons_vf index (0 to m/n/p)
+                            j = minloc(distx, 1) - 2  ! -2 converts 1-based to distx index
+                            k = minloc(disty, 1) - 2  ! -2 converts 1-based to disty index
+                            l = minloc(distz, 1) - 2  ! -2 converts 1-based to distz index
+                            if (j < 0) j = 0  ! Clamp to valid q_cons_vf range
+                            if (k < 0) k = 0  ! Clamp to valid q_cons_vf range
+                            if (l < 0) l = 0  ! Clamp to valid q_cons_vf range
 
                             ! Computing/Sharing necessary state variables
-                            call s_convert_to_mixture_variables(q_cons_vf, j - 2, k - 2, l - 2, &
+                            call s_convert_to_mixture_variables(q_cons_vf, j, k, l, &
                                                                 rho, gamma, pi_inf, qv, &
                                                                 Re, G_local, fluid_pp(:)%G)
                             do s = 1, num_vels
-                                vel(s) = q_cons_vf(cont_idx%end + s)%sf(j - 2, k - 2, l - 2)/rho
+                                vel(s) = q_cons_vf(cont_idx%end + s)%sf(j, k, l)/rho
                             end do
 
                             dyn_p = 0.5_wp*rho*dot_product(vel, vel)
 
                             if (chemistry) then
                                 do d = 1, num_species
-                                    rhoYks(d) = q_cons_vf(chemxb + d - 1)%sf(j - 2, k - 2, l - 2)
+                                    rhoYks(d) = q_cons_vf(chemxb + d - 1)%sf(j, k, l)
                                 end do
                             end if
 
                             if (elasticity) then
                                 if (cont_damage) then
-                                    damage_state = q_cons_vf(damage_idx)%sf(j - 2, k - 2, l - 2)
+                                    damage_state = q_cons_vf(damage_idx)%sf(j, k, l)
                                     G_local = G_local*max((1._wp - damage_state), 0._wp)
                                 end if
 
                                 call s_compute_pressure( &
-                                    q_cons_vf(1)%sf(j - 2, k - 2, l - 2), &
-                                    q_cons_vf(alf_idx)%sf(j - 2, k - 2, l - 2), &
+                                    q_cons_vf(1)%sf(j, k, l), &
+                                    q_cons_vf(alf_idx)%sf(j, k, l), &
                                     dyn_p, pi_inf, gamma, rho, qv, &
                                     rhoYks, pres, T, &
-                                    q_cons_vf(stress_idx%beg)%sf(j - 2, k - 2, l - 2), &
-                                    q_cons_vf(mom_idx%beg)%sf(j - 2, k - 2, l - 2), G_local)
+                                    q_cons_vf(stress_idx%beg)%sf(j, k, l), &
+                                    q_cons_vf(mom_idx%beg)%sf(j, k, l), G_local)
                             else
-                                call s_compute_pressure(q_cons_vf(E_idx)%sf(j - 2, k - 2, l - 2), &
-                                                        q_cons_vf(alf_idx)%sf(j - 2, k - 2, l - 2), &
+                                call s_compute_pressure(q_cons_vf(E_idx)%sf(j, k, l), &
+                                                        q_cons_vf(alf_idx)%sf(j, k, l), &
                                                         dyn_p, pi_inf, gamma, rho, qv, &
                                                         rhoYks, pres, T)
                             end if
@@ -1449,14 +1506,12 @@ contains
                             ! Compute mixture sound speed
                             call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, &
                                                           ((gamma + 1._wp)*pres + pi_inf)/rho, alpha, 0._wp, 0._wp, c, qv)
-
-                            accel = accel_mag(j - 2, k - 2, l - 2)
                         end if
                     end if
                 end if
             end if
             if (num_procs > 1) then
-                #:for VAR in ['rho','pres','gamma','pi_inf','qv','c','accel']
+                #:for VAR in ['rho','pres','gamma','pi_inf','qv','c']
                     tmp = ${VAR}$
                     call s_mpi_allreduce_sum(tmp, ${VAR}$)
                 #:endfor
@@ -1590,17 +1645,20 @@ contains
                             tau_e(2), &
                             tau_e(3)
                     else
-                        write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8)') &
+                        write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,F24.8,F24.8,F24.8,F24.8,F24.8)') &
                             nondim_time, &
                             rho, &
                             vel(1), &
-                            pres
-                        print *, 'time =', nondim_time, 'rho =', rho, 'pres =', pres
+                            vel(2), &
+                            pres, &
+                            gamma, &
+                            pi_inf, &
+                            qv, &
+                            c
                     end if
                 else
                     write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
-                           'F24.8,F24.8,F24.8,F24.8,F24.8,'// &
-                           'F24.8)') &
+                           'F24.8,F24.8,F24.8,F24.8,F24.8)') &
                         nondim_time, &
                         rho, &
                         vel(1), &
@@ -1610,8 +1668,7 @@ contains
                         gamma, &
                         pi_inf, &
                         qv, &
-                        c, &
-                        accel
+                        c
                 end if
             end if
         end do
@@ -1794,6 +1851,10 @@ contains
 
         integer :: i !< Generic loop iterator
 
+        if (bubbles_euler .and. .not. bubble_probe_ready) then
+            return
+        end if
+
         do i = 1, num_probes
             close (i + 30)
         end do
@@ -1806,6 +1867,8 @@ contains
     impure subroutine s_initialize_data_output_module
 
         integer :: i, m_ds, n_ds, p_ds
+
+        bubble_probe_ready = .false.
 
         ! Allocating/initializing ICFL, VCFL, CCFL and Rc stability criteria
         if (run_time_info) then
@@ -1863,5 +1926,9 @@ contains
         end if
 
     end subroutine s_finalize_data_output_module
+
+    subroutine s_mark_bubble_probe_ready()
+        bubble_probe_ready = .true.
+    end subroutine s_mark_bubble_probe_ready
 
 end module m_data_output

@@ -531,6 +531,11 @@ contains
                     end if
                 end if
 
+                ! Mark bubble probes as ready after second ICFL calculation
+                if (t_step == t_step_start + 1 .and. bubbles_euler) then
+                    call s_mark_bubble_probe_ready()
+                end if
+
                 if (probe_wrt) then
                     call s_time_step_cycling(t_step)
                 end if
@@ -709,9 +714,9 @@ contains
         real(wp), dimension(num_fluids) :: alpha      !< Cell-avg. volume fraction
         real(wp) :: gamma      !< Cell-avg. sp. heat ratio
         real(wp) :: pi_inf     !< Cell-avg. liquid stiffness function
-        real(wp) :: qv         !< Cell-avg. fluid reference energy
         real(wp) :: c          !< Cell-avg. sound speed
         real(wp) :: H          !< Cell-avg. enthalpy
+        real(wp) :: qv         !< Cell-avg. reference energy
         real(wp), dimension(2) :: Re         !< Cell-avg. Reynolds numbers
         type(vector_field) :: gm_alpha_qp
 
