@@ -318,7 +318,7 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         if not hypoelasticity:
             return
 
-        self.prohibit(model_eqns != 2,
+        self.prohibit(model_eqns is not None and model_eqns != 2,
                      "hypoelasticity requires model_eqns = 2")
         self.prohibit(riemann_solver is not None and riemann_solver != 1,
                      "hypoelasticity requires HLL Riemann solver (riemann_solver = 1)")
@@ -334,7 +334,7 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         if not relax:
             return
 
-        self.prohibit(model_eqns != 3,
+        self.prohibit(model_eqns is not None and model_eqns != 3,
                      "phase change (relax) requires model_eqns = 3")
         self.prohibit(relax_model is not None and (relax_model < 0 or relax_model > 6),
                      "relax_model must be between 0 and 6")
@@ -754,7 +754,7 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
                      "igr_iter_solver must be 1 or 2")
         self.prohibit(alf_factor is not None and alf_factor < 0,
                      "alf_factor must be non-negative")
-        self.prohibit(model_eqns != 2,
+        self.prohibit(model_eqns is not None and model_eqns != 2,
                      "IGR only supports model_eqns = 2")
         self.prohibit(ib,
                      "IGR does not support the immersed boundary method")
@@ -987,7 +987,7 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         qbmm = self.get('qbmm', 'F') == 'T'
         adv_n = self.get('adv_n', 'F') == 'T'
 
-        self.prohibit(time_stepper != 3,
+        self.prohibit(time_stepper is not None and time_stepper != 3,
                      "adap_dt requires Runge-Kutta 3 (time_stepper = 3)")
         self.prohibit(model_eqns == 1,
                      "adap_dt is not supported for model_eqns = 1")
@@ -1011,11 +1011,11 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         riemann_solver = self.get('riemann_solver')
         num_fluids = self.get('num_fluids')
 
-        self.prohibit(model_eqns != 2,
+        self.prohibit(model_eqns is not None and model_eqns != 2,
                      "5-equation model (model_eqns = 2) is required for alt_soundspeed")
         self.prohibit(bubbles_euler,
                      "alt_soundspeed is not compatible with bubbles_euler")
-        self.prohibit(avg_state != 2,
+        self.prohibit(avg_state is not None and avg_state != 2,
                      "alt_soundspeed requires avg_state = 2")
         self.prohibit(riemann_solver is not None and riemann_solver != 2,
                      "alt_soundspeed requires HLLC Riemann solver (riemann_solver = 2)")
@@ -1062,7 +1062,7 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
                      "cont_damage_s must be specified for cont_damage")
         self.prohibit(alpha_bar is None,
                      "alpha_bar must be specified for cont_damage")
-        self.prohibit(model_eqns != 2,
+        self.prohibit(model_eqns is not None and model_eqns != 2,
                      "cont_damage requires model_eqns = 2")
 
     def check_grcbc(self):
