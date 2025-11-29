@@ -696,30 +696,6 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         self.prohibit(powell and fd_order is None,
                      "fd_order must be set if Powell's method is enabled")
 
-    def check_elasticity_fd_order_simulation(self):
-        """Checks that elasticity uses fd_order = 4 in simulation.
-
-        Mirrors the simulation-only Fortran checks:
-        - elasticity .and. fd_order /= 4
-        where elasticity is implied by hypoelasticity or hyperelasticity.
-        """
-        # elasticity is set in Fortran when either hypoelasticity or
-        # hyperelasticity is enabled; we conservatively treat either flag
-        # (or an explicit elasticity flag) as requiring fd_order = 4.
-        hypoelasticity = self.get('hypoelasticity', 'F') == 'T'
-        hyperelasticity = self.get('hyperelasticity', 'F') == 'T'
-        elasticity_flag = self.get('elasticity', 'F') == 'T'
-        elasticity = elasticity_flag or hypoelasticity or hyperelasticity
-
-        if not elasticity:
-            return
-
-        fd_order = self.get('fd_order')
-        # If elasticity is enabled in simulation, we require fd_order = 4.
-        # If fd_order is unset, other checks will complain; here we only
-        # enforce that, when set, it must be 4.
-        self.prohibit(fd_order is not None and fd_order != 4,
-                     "elasticity (hypoelasticity or hyperelasticity) requires fd_order = 4 in simulation")
 
     def check_igr_simulation(self):  # pylint: disable=too-many-locals
         """Checks IGR constraints specific to simulation"""
@@ -1675,7 +1651,6 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         self.check_body_forces()
         self.check_viscosity()
         self.check_mhd_simulation()
-        self.check_elasticity_fd_order_simulation()
         self.check_igr_simulation()
         self.check_acoustic_source()
         self.check_adaptive_time_stepping()
