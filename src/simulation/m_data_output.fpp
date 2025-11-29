@@ -1144,6 +1144,8 @@ contains
         real(wp) :: G_local
         real(wp) :: dyn_p, T
         real(wp) :: damage_state
+        character(LEN=15) :: FMT_glb
+        character(len=30) :: FMT
 
         integer :: i, j, k, l, s, d !< Generic loop iterator
 
@@ -1164,6 +1166,13 @@ contains
         end if
 
         T = dflt_T_guess
+
+        ! Set format string based on precision
+        if (precision == 1) then
+            FMT_glb = 'F28.7'
+        else
+            FMT_glb = 'F28.16'
+        end if
 
         ! Non-dimensional time calculation
         if (time_stepper == 23) then
