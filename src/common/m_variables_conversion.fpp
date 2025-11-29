@@ -1306,8 +1306,7 @@ contains
                         elseif ((model_eqns /= 4) .and. (bubbles_euler .neqv. .true.)) then
                             ! E = Gamma*P + \rho u u /2 + \pi_inf + (\alpha\rho qv)
                             q_cons_vf(E_idx)%sf(j, k, l) = &
-                                gamma*q_prim_vf(E_idx)%sf(j, k, l) + dyn_pres + pi_inf &
-                                + qv
+                                gamma*q_prim_vf(E_idx)%sf(j, k, l) + dyn_pres + pi_inf + qv
                         else if ((model_eqns /= 4) .and. (bubbles_euler)) then
                             ! \tilde{E} = dyn_pres + (1-\alf)(\Gamma p_l + \Pi_inf)
                             q_cons_vf(E_idx)%sf(j, k, l) = dyn_pres + &
@@ -1323,11 +1322,9 @@ contains
                     if (model_eqns == 3) then
                         do i = 1, num_fluids
                             ! internal energy calculation for each of the fluids
-                            q_cons_vf(i + internalEnergies_idx%beg - 1)%sf(j, k, l) = &
-                                q_cons_vf(i + adv_idx%beg - 1)%sf(j, k, l)* &
-                                (fluid_pp(i)%gamma*q_prim_vf(E_idx)%sf(j, k, l) + &
-                                 fluid_pp(i)%pi_inf) + &
-                                q_cons_vf(i + cont_idx%beg - 1)%sf(j, k, l)*fluid_pp(i)%qv
+                            q_cons_vf(i + intxb - 1)%sf(j, k, l) = q_cons_vf(i + advxb - 1)%sf(j, k, l)* &
+                                                                   (gammas(i)*q_prim_vf(E_idx)%sf(j, k, l) + pi_infs(i)) + &
+                                                                   q_cons_vf(i + contxb - 1)%sf(j, k, l)*qvs(i)
                         end do
                     end if
 
@@ -1637,7 +1634,7 @@ contains
                 c = 0._wp
                 $:GPU_LOOP(parallelism='[seq]')
                 do q = 1, num_fluids
-                    c = c + adv(q)*(1._wp/gammas(q) + 1._wp)* &
+                    c = c + adv(q)*gs_min(q)* &
                         (pres + pi_infs(q)/(gammas(q) + 1._wp))
                 end do
                 c = c/rho

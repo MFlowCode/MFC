@@ -21,6 +21,8 @@ module m_data_output
 
     use m_helper
 
+    use m_variables_conversion
+
     implicit none
 
     private; public :: s_initialize_data_output_module, &
@@ -1612,7 +1614,7 @@ contains
                     pi_inf = 0._wp
                     qv = 0._wp
                     pres = q_prim_vf(E_idx)%sf(i, j, k)
-                    Egint = Egint + q_prim_vf(E_idx + 2)%sf(i, j, k)*(fluid_pp(2)%gamma*pres)*dV
+                    Egint = Egint + q_prim_vf(E_idx + 2)%sf(i, j, k)*(gammas(2)*pres)*dV
                     do s = 1, num_vels
                         vel(s) = q_prim_vf(num_fluids + s)%sf(i, j, k)
                         Egk = Egk + 0.5_wp*q_prim_vf(E_idx + 2)%sf(i, j, k)*q_prim_vf(2)%sf(i, j, k)*vel(s)*vel(s)*dV
@@ -1623,10 +1625,10 @@ contains
                     end do
                     do l = 1, adv_idx%end - E_idx
                         adv(l) = q_prim_vf(E_idx + l)%sf(i, j, k)
-                        gamma = gamma + adv(l)*fluid_pp(l)%gamma
-                        pi_inf = pi_inf + adv(l)*fluid_pp(l)%pi_inf
+                        gamma = gamma + adv(l)*gammas(l)
+                        pi_inf = pi_inf + adv(l)*pi_infs(l)
                         rho = rho + adv(l)*q_prim_vf(l)%sf(i, j, k)
-                        qv = qv + adv(l)*q_prim_vf(l)%sf(i, j, k)*fluid_pp(l)%qv
+                        qv = qv + adv(l)*q_prim_vf(l)%sf(i, j, k)*qvs(l)
                     end do
 
                     H = ((gamma + 1._wp)*pres + pi_inf + qv)/rho
