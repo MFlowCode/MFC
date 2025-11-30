@@ -1610,7 +1610,7 @@ contains
         real(wp), intent(in) :: c_c
         real(wp), intent(out) :: c
 
-        real(wp) :: blkmod1, blkmod2
+        real(wp) :: blkmod1, blkmod2, denom
 
         integer :: q
 
@@ -1643,12 +1643,14 @@ contains
 
                 if (mpp_lim .and. (num_fluids > 1)) then
                     c = (1._wp/gamma + 1._wp)* &
-                        (pres + pi_inf/(gamma + 1._wp))/rho
+                        (pres + pi_inf/(gamma + 1._wp))/max(rho, small_alf)
                 else
-                    c = &
-                        (1._wp/gamma + 1._wp)* &
+                    ! Guard against division by zero when void fraction approaches 1.0
+                    ! Clamp (1 - alpha_gas) to ensure it's representable to working precision
+                    denom = max(1._wp - adv(num_fluids), small_alf)
+                    c = (1._wp/gamma + 1._wp)* &
                         (pres + pi_inf/(gamma + 1._wp))/ &
-                        (rho*(1._wp - adv(num_fluids)))
+                        (max(rho, small_alf)*denom)
                 end if
             else
                 c = (H - 5.e-1*vel_sum - qv/rho)/gamma

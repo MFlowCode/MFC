@@ -1,0 +1,369 @@
+Comparing 546 test(s)...
+--------------------------------------------------------------------------------
+  [DIFF]  0083C150: 1D -> Example -> acoustic_dipole
+          Max difference = 2.0265579224e-06
+  [DIFF]  016C1B8B: 3D -> Lagrange Bubbles -> Two-way Coupling
+          Max difference = 1.2221335055e-12
+  [DIFF]  0288BDAD: 1D -> 2 Fluid(s) -> riemann_solver=2 -> low_Mach=2
+          Max difference = 9.2299501375e-12
+  [DIFF]  02B08B80: 2D -> Example -> acoustic_support9
+          Max difference = 8.4400177002e-05
+  [DIFF]  0387594F: 3D -> 1 Fluid(s) -> Viscous -> IBM -> Cylinder -> slip
+          Max difference = 7.2899908332e-11
+  [DIFF]  03D598D0: 2D -> Bubbles -> QBMM -> bubble_model=3
+          Max difference = 7.2759576142e-12
+  [DIFF]  059D137F: 2D -> Hypoelasticity -> 1 Fluid(s) -> Axisymmetric
+          Max difference = 2.3946995498e-09
+  [DIFF]  07C1FECC: 3D -> 1 Fluid(s) -> riemann_solver=2 -> low_Mach=1
+          Max difference = 4.5474735089e-12
+  [DIFF]  07C33719: 3D -> Cylindrical -> Viscous
+          Max difference = 6.4500000000e-11
+  [DIFF]  0853FBD1: 3D -> 1 Fluid(s) -> riemann_solver=2 -> low_Mach=2
+          Max difference = 4.5474735089e-12
+  [DIFF]  092A339C: 3D -> Bubbles -> QBMM -> bubble_model=3
+          Max difference = 5.4569682106e-12
+  [DIFF]  09623DE3: 3D -> Cylindrical -> Viscous -> weno_Re_flux -> weno_avg
+          Max difference = 1.2362000000e-10
+  [DIFF]  0A362971: 2D -> Example -> ibm_stl_MFCCharacter
+          Max difference = 1.3969838619e-09
+  [DIFF]  0A62F0A6: nD -> Example -> perfect_reactor
+          Max difference = 1.4551915228e-11
+  [DIFF]  0BAA2F42: 2D -> Example -> cont_damage
+          Max difference = 1.4564800000e-09
+  [DIFF]  0BD42F35: 3D -> 2 Fluid(s) -> Viscous -> IBM -> Cylinder
+          Max difference = 2.0698998071e-12
+  [DIFF]  0D1FA5C5: 2D -> Lagrange Bubbles -> One-way Coupling -> adap_dt=T
+          Max difference = 1.4779288904e-12
+  [DIFF]  0D21B728: 2D -> Bubbles -> low_Mach=1
+          Max difference = 5.9117155615e-12
+  [DIFF]  0FF51EDE: 1D -> Acoustic Source -> Square -> Wavelength
+          Max difference = 2.6026003574e-10
+  [DIFF]  105673CA: 1D -> Bubbles -> adv_n=T
+          Max difference = 2.8419933074e-11
+  [DIFF]  10DE58AA: 2D -> Example -> advection_muscl
+          Max difference = 5.9575540945e-08
+  [DIFF]  11DAFD23: 1D -> Bubbles -> nb=1
+          Max difference = 2.5579982577e-11
+  [DIFF]  122713AA: 2D -> Hypoelasticity -> 1 Fluid(s)
+          Max difference = 1.3969838619e-09
+  [DIFF]  126FF74F: 2D -> 1 Fluid(s) -> riemann_solver=2 -> low_Mach=1
+          Max difference = 5.0022208598e-12
+  [DIFF]  1658214E: 2D -> Bubbles -> Polytropic -> bubble_model=3
+          Max difference = 3.6379788071e-12
+  [DIFF]  18431ACB: 3D -> Phase Change model 5 -> 3 Fluid(s)
+          Max difference = 1.8626451492e-09
+  [DIFF]  18B832DD: 3D -> 2 Fluid(s) -> Viscous -> IBM -> Cuboid
+          Max difference = 4.1699976805e-12
+  [DIFF]  1929BEC7: 2D -> 2 Fluid(s) -> riemann_solver=2 -> low_Mach=1
+          Max difference = 3.6379788071e-12
+  [DIFF]  1A78D4CC: 2D -> 1 Fluid(s) -> riemann_solver=1 -> low_Mach=1
+          Max difference = 3.6379788071e-12
+  [DIFF]  1B0A7157: 1D -> Acoustic Source -> Sine -> Frequency
+          Max difference = 2.2399859745e-12
+  [DIFF]  1BA21D14: 2D -> Example -> lungwave_horizontal
+          Max difference = 7.2759576142e-12
+  [DIFF]  1D88CFE0: 2D -> Example -> shearlayer
+          Max difference = 4.4107437134e-06
+  [DIFF]  1E288DE4: 1D -> Bubbles -> QBMM -> bubble_model=3
+          Max difference = 2.2740032080e-11
+  [DIFF]  203572A8: 2D -> Example -> whale_bubble_annulus
+          Max difference = 4.0927261580e-12
+  [DIFF]  2122A4F6: 2D -> Lagrange Bubbles -> Two-way Coupling -> adap_dt=T
+          Max difference = 1.4779288904e-12
+  [DIFF]  221C9980: 3D -> 1 Fluid(s) -> Viscous -> IBM -> Cylinder
+          Max difference = 1.3510081942e-11
+  [DIFF]  23573861: 3D -> Example -> shockdroplet_muscl
+          Max difference = 1.4784745872e-08
+  [DIFF]  24FD489A: 2D -> Example -> shockbubble
+          Max difference = 1.8626451492e-09
+  [DIFF]  265366F3: 2D -> Example -> lid_driven_cavity
+          Max difference = 4.5792088970e-05
+  [DIFF]  290C3BA8: 2D -> 1 Fluid(s) -> riemann_solver=2 -> low_Mach=2
+          Max difference = 3.6379788071e-12
+  [DIFF]  2BA0324F: 2D -> Example -> rayleigh_taylor
+          Max difference = 4.4017069740e-05
+  [DIFF]  2BDE2018: 1D -> Chemistry -> Inert Shocktube -> Riemann Solver 1 -> Gamma Method 2
+          Max difference = 1.8917489797e-10
+  [DIFF]  2F58A83F: 1D -> Acoustic Source -> Square -> Frequency
+          Max difference = 2.1700419239e-12
+  [DIFF]  304DAF95: 2D -> Example -> TaylorGreenVortex
+          Max difference = 6.9849193096e-10
+  [DIFF]  3053B44F: 1D -> Acoustic Source -> Gaussian -> Sigma Dist
+          Max difference = 1.8399995069e-12
+  [DIFF]  32A3A936: 1D -> Hypoelasticity -> 1 Fluid(s) -> cont_damage
+          Max difference = 5.3551048040e-09
+  [DIFF]  32DD0363: 3D -> 1 Fluid(s) -> Viscous -> IBM -> Cuboid -> slip
+          Max difference = 4.1660008776e-11
+  [DIFF]  33FA33BE: 2D -> RMHD
+          Max difference = 2.3305801733e-12
+  [DIFF]  35635326: 3D -> Example -> rayleigh_taylor_muscl
+          Max difference = 2.3283064365e-10
+  [DIFF]  356A5C50: 1D -> Bubbles -> QBMM -> Non-polytropic
+          Max difference = 2.5579982577e-11
+  [DIFF]  3643454B: 1D -> Bubbles -> Polytropic -> bubble_model=3
+          Max difference = 2.5579982577e-11
+  [DIFF]  3B3F8C68: 1D -> Bubbles -> adv_n=T -> adap_dt=T
+          Max difference = 3.9789949113e-11
+  [DIFF]  3D320EA4: 2D -> Bubbles -> QBMM -> Non-polytropic
+          Max difference = 6.8212102633e-12
+  [DIFF]  3E400FBF: 2D -> Example -> axisym_shockwatercavity
+          Max difference = 4.7683715820e-07
+  [DIFF]  408BF558: 3D -> 2 Fluid(s) -> Viscous -> IBM -> Cuboid -> slip
+          Max difference = 4.1699976805e-12
+  [DIFF]  41AD0140: 1D -> Chemistry -> MultiComponent Diffusion
+          Max difference = 1.3411045074e-07
+  [DIFF]  41C830CC: 3D -> Bubbles -> QBMM -> bubble_model=3 -> Non-polytropic
+          Max difference = 5.9117155615e-12
+  [DIFF]  431554F7: 3D -> 2 Fluid(s) -> Viscous -> IBM -> Sphere
+          Max difference = 1.8740120566e-11
+  [DIFF]  4927BF4B: 1D -> Bubbles -> low_Mach=2
+          Max difference = 2.2730040072e-11
+  [DIFF]  4A1BD9B8: 2D -> Lagrange Bubbles -> Two-way Coupling
+          Max difference = 1.4779288904e-12
+  [DIFF]  4C64244B: 3D -> 1 Fluid(s) -> Viscous -> IBM -> Cuboid
+          Max difference = 5.2019943908e-11
+  [DIFF]  4D7D85B4: 1D -> Chemistry -> Inert Shocktube -> Riemann Solver 1 -> Gamma Method 1
+          Max difference = 1.7462298274e-10
+  [DIFF]  4D88A48D: 3D -> 1 Fluid(s) -> riemann_solver=1 -> low_Mach=1
+          Max difference = 3.6379788071e-12
+  [DIFF]  4D95A70E: 1D -> Example -> hypo_2materials
+          Max difference = 5.4951290932e+05
+  [DIFF]  4EAA3C32: 3D -> Bubbles -> low_Mach=2
+          Max difference = 5.4569682106e-12
+  [DIFF]  5281BD7B: 2D -> Hypoelasticity -> 2 Fluid(s)
+          Max difference = 1.1641532183e-09
+  [DIFF]  53E13D19: 1D -> Viscosity -> Bubbles -> QBMM -> bubble_model=3
+          Max difference = 2.8401725416e-12
+  [DIFF]  5505A65C: 2D -> Example -> 5wave_quasi1D
+          Max difference = 5.4719663603e-04
+  [DIFF]  5576FEEA: 1D -> Bubbles -> QBMM -> bubble_model=3 -> Non-polytropic
+          Max difference = 2.5579982577e-11
+  [DIFF]  55A51767: 2D -> 2 Fluid(s) -> riemann_solver=2 -> low_Mach=2
+          Max difference = 3.6379788071e-12
+  [DIFF]  574636EE: 2D -> Hypoelasticity -> 1 Fluid(s) -> cont_damage
+          Max difference = 1.1259544408e-09
+  [DIFF]  57FE221F: 2D -> Example -> lungwave
+          Max difference = 7.2759576142e-12
+  [DIFF]  595705C7: 2D -> Hypoelasticity -> 1 Fluid(s) -> bc=-2
+          Max difference = 6.1576720327e-06
+  [DIFF]  5B7A746F: 3D -> Bubbles -> Polytropic -> bubble_model=3
+          Max difference = 5.9117155615e-12
+  [DIFF]  5CAA4E68: 1D -> Example -> exp_bubscreen
+          Shape mismatch. Repo: (12074,), Local: (12024,)
+  [DIFF]  5DAF1F94: 1D -> Acoustic Source -> Square -> Delay
+          Max difference = 6.1399774154e-12
+  [DIFF]  6076815B: 3D -> Example -> rotating_sphere
+          Max difference = 7.4316250931e-08
+  [DIFF]  610959C9: 3D -> Example -> phasechange_bubble
+          Max difference = 1.0430812836e-06
+  [DIFF]  6247B427: 1D -> Example -> shuosher_teno7
+          Max difference = 6.7466032760e-11
+  [DIFF]  63F2D0C0: 1D -> Bubbles -> Polytropic -> bubble_model=2
+          Max difference = 2.5579982577e-11
+  [DIFF]  66CB22E3: 1D -> 1 Fluid(s) -> riemann_solver=1 -> low_Mach=1
+          Max difference = 2.2740032080e-11
+  [DIFF]  67A5ECF8: 3D -> Hypoelasticity -> 1 Fluid(s) -> bc=-2
+          Max difference = 8.2817859948e-07
+  [DIFF]  6B3AE48F: 1D -> Chemistry -> Inert Shocktube -> Riemann Solver 2 -> Gamma Method 1
+          Max difference = 1.4551915228e-10
+  [DIFF]  6F296065: 2D -> Phase Change model 5 -> 3 Fluid(s)
+          Max difference = 3.2596290112e-09
+  [DIFF]  6F35CD77: 3D -> Bubbles -> bubble_model=2
+          Max difference = 5.9117155615e-12
+  [DIFF]  70832086: 1D -> Example -> brio_wu
+          Max difference = 1.7901236049e-12
+  [DIFF]  70EC99CE: 2D -> Example -> viscous_shock_tube
+          Max difference = 7.2276407082e-11
+  [DIFF]  72A40EA6: 3D -> Example -> acoustic_support7
+          Max difference = 1.7535686493e-04
+  [DIFF]  72FD6FF5: 3D -> Phase Change model 5 -> 2 Fluid(s)
+          Max difference = 2.3283064365e-08
+  [DIFF]  749F3DD3: 1D -> Bubbles -> bubble_model=2
+          Max difference = 2.5579982577e-11
+  [DIFF]  786DE444: 1D -> Phase Change model 6 -> 3 Fluid(s)
+          Max difference = 2.3283064365e-09
+  [DIFF]  78A3B0C4: 1D -> Example -> acoustic_sine_wavelength
+          Max difference = 2.8371869121e-06
+  [DIFF]  7912AB81: 3D -> Bubbles -> adv_n=T -> adap_dt=T
+          Max difference = 9.5496943686e-12
+  [DIFF]  7A9F4EF4: 2D -> Example -> axisym_shockbubble
+          Max difference = 1.2805685401e-09
+  [DIFF]  7B21681C: 1D -> 1 Fluid(s) -> riemann_solver=2 -> low_Mach=1
+          Max difference = 2.2730040072e-11
+  [DIFF]  7B67FDE5: 2D -> Bubbles -> QBMM -> bubble_model=3 -> Non-polytropic
+          Max difference = 6.8212102633e-12
+  [DIFF]  7C2FF26F: 2D -> Acoustic Source -> Transducer -> support=6 -> Gaussian
+          Max difference = 2.0601298445e-12
+  [DIFF]  7DCE34B4: 2D -> 2 Fluid(s) -> Viscous -> IBM -> model_eqns=3
+          Max difference = 5.3299586966e-12
+  [DIFF]  7EFBCDAE: 3D -> Hypoelasticity -> 1 Fluid(s)
+          Max difference = 1.1641532183e-09
+  [DIFF]  82152069: 2D -> Example -> shockdroplet
+          Max difference = 4.1723251343e-07
+  [DIFF]  82A64F89: 2D -> Example -> shocktube_phasechange
+          Max difference = 1.1641532183e-08
+  [DIFF]  8370A3D9: 2D -> Example -> acoustic_pulse
+          Max difference = 2.8230715543e-09
+  [DIFF]  842C6FFC: 1D -> Phase Change model 6 -> 2 Fluid(s)
+          Max difference = 1.2107193470e-08
+  [DIFF]  84FC700A: 2D -> Bubbles -> low_Mach=2
+          Max difference = 4.5474735089e-12
+  [DIFF]  8F78E60C: 1D -> MHD -> HLLD
+          Max difference = 7.2563000053e-10
+  [DIFF]  8FD91C41: 2D -> Example -> zero_circ_vortex
+          Max difference = 1.1350493878e-09
+  [DIFF]  91938DCD: 1D -> Example -> impact
+          Max difference = 7.4768066406e-04
+  [DIFF]  939D6718: 3D -> Cylindrical -> Viscous -> weno_Re_flux
+          Max difference = 7.5630000000e-11
+  [DIFF]  986BC1A2: 2D -> Example -> richtmyer_meshkov
+          Max difference = 9.8698826889e-12
+  [DIFF]  999812A9: 2D -> Bubbles -> Polytropic -> bubble_model=2
+          Max difference = 3.6379788071e-12
+  [DIFF]  9A00542C: 2D -> Example -> isentropicvortex
+          Max difference = 5.2361549985e-08
+  [DIFF]  9C3B986E: 3D -> Bubbles -> low_Mach=1
+          Max difference = 5.4569682106e-12
+  [DIFF]  9C9B2CBC: 2D -> Example -> axisym_hypoelasticity
+          Max difference = 1.1920928955e-06
+  [DIFF]  9E2CA336: 3D -> Example -> recovering_sphere
+          Max difference = 2.5611370802e-09
+  [DIFF]  9EB947DB: 1D -> Hypoelasticity -> 1 Fluid(s)
+          Max difference = 3.1432136893e-09
+  [DIFF]  9EF19F0A: 1D -> Phase Change model 5 -> 3 Fluid(s)
+          Max difference = 3.0267983675e-09
+  [DIFF]  A0E9B272: 2D -> Bubbles -> QBMM
+          Max difference = 7.2759576142e-12
+  [DIFF]  A83CADB5: 1D -> Phase Change model 5 -> 2 Fluid(s)
+          Max difference = 2.1420419216e-08
+  [DIFF]  AB5A57AE: 2D -> Example -> shock_cloud_rmhd
+          Max difference = 4.3200998334e-12
+  [DIFF]  AE9A7D73: 1D -> Example -> poly_bubscreen
+          Shape mismatch. Repo: (505,), Local: (504,)
+  [DIFF]  AF0BCEE4: 1D -> Hypoelasticity -> 2 Fluid(s)
+          Max difference = 5.2386894822e-09
+  [DIFF]  B0CE19C5: 2D -> 1 Fluid(s) -> Viscous -> IBM -> model_eqns=3
+          Max difference = 7.9980022605e-11
+  [DIFF]  B2310476: 3D -> Bubbles -> adv_n=T
+          Max difference = 5.4569682106e-12
+  [DIFF]  B2AEF240: 2D -> 2 Fluid(s) -> riemann_solver=1 -> low_Mach=1
+          Max difference = 3.6379788071e-12
+  [DIFF]  B5F0C655: 3D -> Example -> shockdroplet
+          Max difference = 7.8929588199e-08
+  [DIFF]  B73DC79F: 1D -> Example -> cont_damage
+          Max difference = 4.0531449486e-07
+  [DIFF]  B85C5AB6: 2D -> Example -> acoustic_support10_axisym
+          Max difference = 1.1920928955e-06
+  [DIFF]  B89113D9: 2D -> Acoustic Source -> Transducer -> support=5 -> Gaussian
+          Max difference = 1.2900791546e-12
+  [DIFF]  B9553426: 2D -> Lagrange Bubbles -> One-way Coupling
+          Max difference = 1.4779288904e-12
+  [DIFF]  B97D4966: 2D -> Example -> phasechange_bubble
+          Max difference = 8.9406967163e-07
+  [DIFF]  BA473AFF: 1D -> Example -> vacuum_restart
+          Max difference = 1.1101448536e-01
+  [DIFF]  BDD3411B: 3D -> Hypoelasticity -> 2 Fluid(s)
+          Max difference = 1.1641532183e-09
+  [DIFF]  BE0B2040: 1D -> Bubbles -> artificial_Ma
+          Max difference = 4.2599257455e-12
+  [DIFF]  BE3CF022: 1D -> Example -> acoustic_gauss_sigmadist
+          Max difference = 3.6478013499e-06
+  [DIFF]  BE796E10: 2D -> Example -> shockdroplet_muscl
+          Max difference = 2.3841857910e-07
+  [DIFF]  BFAA7587: 3D -> 2 Fluid(s) -> Viscous -> IBM -> Cylinder -> slip
+          Max difference = 8.3300033538e-12
+  [DIFF]  C0127FD0: 2D -> Example -> acoustic_support6_axisym
+          Max difference = 2.3841857910e-06
+  [DIFF]  C071BA12: 3D -> Example -> TaylorGreenVortex
+          Max difference = 1.5925406478e-04
+  [DIFF]  C2D278B4: 2D -> Example -> acoustic_support5
+          Max difference = 2.3007392883e-05
+  [DIFF]  C462AA3E: 3D -> 2 Fluid(s) -> riemann_solver=2 -> low_Mach=2
+          Max difference = 2.2737367544e-12
+  [DIFF]  C4B81FF0: 2D -> Bubbles -> nb=1
+          Max difference = 5.4569682106e-12
+  [DIFF]  C5205982: 3D -> Bubbles -> QBMM
+          Max difference = 5.9117155615e-12
+  [DIFF]  C7598989: 1D -> Example -> acoustic_sine_frequency
+          Max difference = 9.7274751170e-06
+  [DIFF]  C7927D03: 2D -> Example -> jet
+          Max difference = 2.2703898139e-07
+  [DIFF]  C93CB5DF: 1D -> Example -> exp_tube_phasechange
+          Max difference = 3.0603408813e-03
+  [DIFF]  C9E0B721: 2D -> Example -> GreshoVortex
+          Max difference = 8.4052159899e-08
+  [DIFF]  CB76A5E1: 1D -> 1 Fluid(s) -> riemann_solver=2 -> low_Mach=2
+          Max difference = 3.1270042111e-11
+  [DIFF]  CE9DBA3F: 1D -> Bubbles -> QBMM
+          Max difference = 2.2740032080e-11
+  [DIFF]  D33BD146: 3D -> Bubbles -> QBMM -> Non-polytropic
+          Max difference = 5.9117155615e-12
+  [DIFF]  D3C860B9: 2D -> Phase Change model 6 -> 3 Fluid(s)
+          Max difference = 6.1118043959e-09
+  [DIFF]  D644524E: 3D -> Example -> rayleigh_taylor
+          Max difference = 2.0580337150e-05
+  [DIFF]  D827EA4B: 3D -> Example -> acoustic_support11
+          Max difference = 2.9122829437e-04
+  [DIFF]  DA54B209: 3D -> Bubbles -> Polytropic -> bubble_model=2
+          Max difference = 5.9117155615e-12
+  [DIFF]  DA8AF07E: 2D -> Phase Change model 5 -> 2 Fluid(s)
+          Max difference = 2.8870999813e-08
+  [DIFF]  DC391F9B: 2D -> Example -> acoustic_support2
+          Max difference = 2.3841857910e-06
+  [DIFF]  DFF6E349: 3D -> Lagrange Bubbles -> Two-way Coupling -> adap_dt=T
+          Max difference = 1.1084466678e-12
+  [DIFF]  E0015186: 1D -> RMHD
+          Max difference = 2.0360001879e-11
+  [DIFF]  E47F81A2: 1D -> Example -> kapilashocktube
+          Max difference = 6.0796737671e-06
+  [DIFF]  E49EF7B6: 3D -> Example -> IGR_TaylorGreenVortex
+          Max difference = 1.3898249017e-04
+  [DIFF]  E7732AC5: 1D -> Example -> brio_wu_hlld
+          Max difference = 1.8319998296e-11
+  [DIFF]  E8C7E354: 1D -> Example -> vacuum
+          Max difference = 1.1101448536e-01
+  [DIFF]  EE34D7DC: 1D -> Acoustic Source -> Gaussian -> Sigma Time
+          Max difference = 1.2601031329e-12
+  [DIFF]  EE58C595: 1D -> Example -> acoustic_gauss_sigmatime
+          Max difference = 1.1348733096e-05
+  [DIFF]  EF3E3FF1: 1D -> Example -> titarevtorro
+          Max difference = 8.4253277000e-07
+  [DIFF]  EF3E7C79: 3D -> Hypoelasticity -> 1 Fluid(s) -> cont_damage
+          Max difference = 4.2891770136e-09
+  [DIFF]  F28381D9: 1D -> 2 Fluid(s) -> riemann_solver=2 -> low_Mach=1
+          Max difference = 9.2400531670e-12
+  [DIFF]  F3E2DAC6: 1D -> Bubbles -> low_Mach=1
+          Max difference = 1.7050139078e-11
+  [DIFF]  F4883338: 2D -> Bubbles -> adv_n=T
+          Max difference = 4.5474735089e-12
+  [DIFF]  F5493DA5: 2D -> Bubbles -> adv_n=T -> adap_dt=T
+          Max difference = 1.8189894035e-11
+  [DIFF]  F5512823: 1D -> 2 Fluid(s) -> riemann_solver=1 -> low_Mach=1
+          Max difference = 1.7310153311e-11
+  [DIFF]  F5F06EA3: 3D -> 2 Fluid(s) -> riemann_solver=2 -> low_Mach=1
+          Max difference = 2.2737367544e-12
+  [DIFF]  F8ADA51B: 1D -> Chemistry -> Inert Shocktube -> Riemann Solver 2 -> Gamma Method 2
+          Max difference = 1.4551915228e-10
+  [DIFF]  F9E0BE95: 3D -> 2 Fluid(s) -> riemann_solver=1 -> low_Mach=1
+          Max difference = 3.1832314562e-12
+  [DIFF]  F9EB7B49: 2D -> Bubbles -> bubble_model=2
+          Max difference = 5.4569682106e-12
+  [DIFF]  FA695993: 1D -> Example -> qbmm
+          Shape mismatch. Repo: (54586,), Local: (54536,)
+  [DIFF]  FBB296DA: 1D -> Example -> bubblescreen
+          Shape mismatch. Repo: (2474,), Local: (2424,)
+  [DIFF]  FC3FE863: 3D -> Bubbles -> nb=1
+          Max difference = 5.9117155615e-12
+--------------------------------------------------------------------------------
+
+Summary:
+  OK:     369
+  DIFF:   177
+  SKIP:   0
+  ERROR:  0
+
+Maximum difference: 5.4951290932e+05
+  Test: 4D95A70E
+  Case: 1D -> Example -> hypo_2materials
+
+✗ Differences found in 177 golden files
