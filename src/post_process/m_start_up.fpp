@@ -118,7 +118,8 @@ contains
             lag_id_wrt, lag_pos_wrt, lag_pos_prev_wrt, lag_vel_wrt, &
             lag_rad_wrt, lag_rvel_wrt, lag_r0_wrt, lag_rmax_wrt, &
             lag_rmin_wrt, lag_dphidt_wrt, lag_pres_wrt, lag_mv_wrt, &
-            lag_mg_wrt, lag_betaT_wrt, lag_betaC_wrt
+            lag_mg_wrt, lag_betaT_wrt, lag_betaC_wrt, &
+            alpha_rho_e_wrt
 
         ! Inquiring the status of the post_process.inp file
         file_loc = 'post_process.inp'
@@ -419,6 +420,19 @@ contains
 
         end if
 
+        ! Adding the individual energies to the formatted database file
+        if (model_eqns == 3) then
+            do i = 1, num_fluids
+                if (alpha_rho_e_wrt(i) .or. cons_vars_wrt) then
+                    q_sf = q_cons_vf(i + intxb - 1)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
+                    write (varname, '(A,I0)') 'alpha_rho_e', i
+                    call s_write_variable_to_formatted_database_file(varname, t_step)
+
+                    varname(:) = ' '
+                end if
+            end do
+        end if
+
         !Adding Energy cascade FFT
         if (fft_wrt) then
 
@@ -700,7 +714,7 @@ contains
 
                         call s_compute_speed_of_sound(pres, rho_sf(i, j, k), &
                                                       gamma_sf(i, j, k), pi_inf_sf(i, j, k), &
-                                                      H, adv, 0._wp, 0._wp, c)
+                                                      H, adv, 0._wp, 0._wp, c, qv_sf(i, j, k))
 
                         q_sf(i, j, k) = c
                     end do

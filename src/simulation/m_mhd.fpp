@@ -76,60 +76,60 @@ contains
         real(wp), dimension(3) :: v, B
         real(wp) :: divB, vdotB
 
-        #:call GPU_PARALLEL_LOOP(collapse=3, private='[v, B]')
-            do q = 0, p
-                do l = 0, n
-                    do k = 0, m
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[k,l,q,v,B,r,divB,vdotB]')
+        do q = 0, p
+            do l = 0, n
+                do k = 0, m
 
-                        divB = 0._wp
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do r = -fd_number, fd_number
-                            divB = divB + q_prim_vf(B_idx%beg)%sf(k + r, l, q)*fd_coeff_x_h(r, k)
-                        end do
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do r = -fd_number, fd_number
-                            divB = divB + q_prim_vf(B_idx%beg + 1)%sf(k, l + r, q)*fd_coeff_y_h(r, l)
-                        end do
-                        if (p > 0) then
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do r = -fd_number, fd_number
-                                divB = divB + q_prim_vf(B_idx%beg + 2)%sf(k, l, q + r)*fd_coeff_z_h(r, q)
-                            end do
-                        end if
-
-                        v(1) = q_prim_vf(momxb)%sf(k, l, q)
-                        v(2) = q_prim_vf(momxb + 1)%sf(k, l, q)
-                        v(3) = q_prim_vf(momxb + 2)%sf(k, l, q)
-
-                        B(1) = q_prim_vf(B_idx%beg)%sf(k, l, q)
-                        B(2) = q_prim_vf(B_idx%beg + 1)%sf(k, l, q)
-                        B(3) = q_prim_vf(B_idx%beg + 2)%sf(k, l, q)
-
-                        vdotB = sum(v*B)
-
-                        ! 1: rho -> unchanged
-                        ! 2: vx  -> - (divB) * Bx
-                        ! 3: vy  -> - (divB) * By
-                        ! 4: vz  -> - (divB) * Bz
-                        ! 5: E   -> - (divB) * (vdotB)
-                        ! 6: Bx  -> - (divB) * vx
-                        ! 7: By  -> - (divB) * vy
-                        ! 8: Bz  -> - (divB) * vz
-
-                        rhs_vf(momxb)%sf(k, l, q) = rhs_vf(momxb)%sf(k, l, q) - divB*B(1)
-                        rhs_vf(momxb + 1)%sf(k, l, q) = rhs_vf(momxb + 1)%sf(k, l, q) - divB*B(2)
-                        rhs_vf(momxb + 2)%sf(k, l, q) = rhs_vf(momxb + 2)%sf(k, l, q) - divB*B(3)
-
-                        rhs_vf(E_idx)%sf(k, l, q) = rhs_vf(E_idx)%sf(k, l, q) - divB*vdotB
-
-                        rhs_vf(B_idx%beg)%sf(k, l, q) = rhs_vf(B_idx%beg)%sf(k, l, q) - divB*v(1)
-                        rhs_vf(B_idx%beg + 1)%sf(k, l, q) = rhs_vf(B_idx%beg + 1)%sf(k, l, q) - divB*v(2)
-                        rhs_vf(B_idx%beg + 2)%sf(k, l, q) = rhs_vf(B_idx%beg + 2)%sf(k, l, q) - divB*v(3)
-
+                    divB = 0._wp
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do r = -fd_number, fd_number
+                        divB = divB + q_prim_vf(B_idx%beg)%sf(k + r, l, q)*fd_coeff_x_h(r, k)
                     end do
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do r = -fd_number, fd_number
+                        divB = divB + q_prim_vf(B_idx%beg + 1)%sf(k, l + r, q)*fd_coeff_y_h(r, l)
+                    end do
+                    if (p > 0) then
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do r = -fd_number, fd_number
+                            divB = divB + q_prim_vf(B_idx%beg + 2)%sf(k, l, q + r)*fd_coeff_z_h(r, q)
+                        end do
+                    end if
+
+                    v(1) = q_prim_vf(momxb)%sf(k, l, q)
+                    v(2) = q_prim_vf(momxb + 1)%sf(k, l, q)
+                    v(3) = q_prim_vf(momxb + 2)%sf(k, l, q)
+
+                    B(1) = q_prim_vf(B_idx%beg)%sf(k, l, q)
+                    B(2) = q_prim_vf(B_idx%beg + 1)%sf(k, l, q)
+                    B(3) = q_prim_vf(B_idx%beg + 2)%sf(k, l, q)
+
+                    vdotB = sum(v*B)
+
+                    ! 1: rho -> unchanged
+                    ! 2: vx  -> - (divB) * Bx
+                    ! 3: vy  -> - (divB) * By
+                    ! 4: vz  -> - (divB) * Bz
+                    ! 5: E   -> - (divB) * (vdotB)
+                    ! 6: Bx  -> - (divB) * vx
+                    ! 7: By  -> - (divB) * vy
+                    ! 8: Bz  -> - (divB) * vz
+
+                    rhs_vf(momxb)%sf(k, l, q) = rhs_vf(momxb)%sf(k, l, q) - divB*B(1)
+                    rhs_vf(momxb + 1)%sf(k, l, q) = rhs_vf(momxb + 1)%sf(k, l, q) - divB*B(2)
+                    rhs_vf(momxb + 2)%sf(k, l, q) = rhs_vf(momxb + 2)%sf(k, l, q) - divB*B(3)
+
+                    rhs_vf(E_idx)%sf(k, l, q) = rhs_vf(E_idx)%sf(k, l, q) - divB*vdotB
+
+                    rhs_vf(B_idx%beg)%sf(k, l, q) = rhs_vf(B_idx%beg)%sf(k, l, q) - divB*v(1)
+                    rhs_vf(B_idx%beg + 1)%sf(k, l, q) = rhs_vf(B_idx%beg + 1)%sf(k, l, q) - divB*v(2)
+                    rhs_vf(B_idx%beg + 2)%sf(k, l, q) = rhs_vf(B_idx%beg + 2)%sf(k, l, q) - divB*v(3)
+
                 end do
             end do
-        #:endcall GPU_PARALLEL_LOOP
+        end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_compute_mhd_powell_rhs
 

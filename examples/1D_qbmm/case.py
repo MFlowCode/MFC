@@ -25,6 +25,7 @@ gamma_n = 1.4
 M_n = 28.97
 mu_n = 1.8e-05
 k_n = 0.02556
+D = 0.242e-4
 
 # air props
 # gamma_gas = gamma_n
@@ -163,6 +164,7 @@ print(
             "fluid_pp(2)%M_v": M_n,
             "fluid_pp(2)%mu_v": mu_n,
             "fluid_pp(2)%k_v": k_n,
+            "fluid_pp(2)%D_v": D,
             # Non-polytropic gas compression model AND/OR Tait EOS
             "pref": p0,
             "rhoref": rho0,
