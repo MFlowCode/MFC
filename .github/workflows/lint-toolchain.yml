@@ -11,6 +11,11 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: MFC Python setup
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.14'
+    
+    - name: Initialize MFC
       run: ./mfc.sh init
 
     - name: Lint the toolchain
