@@ -144,7 +144,7 @@ contains
 
         integer, intent(in) :: t_step
 
-        real(wp) :: myalpha(num_fluids), myalpha_rho(num_fluids)
+        real(wp), dimension(num_fluids) :: myalpha, myalpha_rho
         real(wp) :: myRho, B_tait
         real(wp) :: sim_time, c, small_gamma
         real(wp) :: frequency_local, gauss_sigma_time_local
@@ -166,19 +166,19 @@ contains
 
         sim_time = t_step*dt
 
-        #:call GPU_PARALLEL_LOOP(collapse=3)
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        mass_src(j, k, l) = 0._wp
-                        mom_src(1, j, k, l) = 0._wp
-                        e_src(j, k, l) = 0._wp
-                        if (n > 0) mom_src(2, j, k, l) = 0._wp
-                        if (p > 0) mom_src(3, j, k, l) = 0._wp
-                    end do
+        $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    mass_src(j, k, l) = 0._wp
+                    mom_src(1, j, k, l) = 0._wp
+                    e_src(j, k, l) = 0._wp
+                    if (n > 0) mom_src(2, j, k, l) = 0._wp
+                    if (p > 0) mom_src(3, j, k, l) = 0._wp
                 end do
             end do
-        #:endcall GPU_PARALLEL_LOOP
+        end do
+        $:END_GPU_PARALLEL_LOOP()
 
         ! Keep outer loop sequel because different sources can have very different number of points
         do ai = 1, num_source
@@ -199,6 +199,7 @@ contains
 
                 ! Allocate buffers for random phase shift
                 allocate (phi_rn(1:bb_num_freq(ai)))
+                phi_rn(1:bb_num_freq(ai)) = 0._wp
 
                 if (pulse(ai) == 4) then
                     call random_number(phi_rn(1:bb_num_freq(ai)))
@@ -206,7 +207,6 @@ contains
                     call s_mpi_send_random_number(phi_rn, bb_num_freq(ai))
                 end if
 
-                $:GPU_LOOP(reduction='[[sum_BB]]', reductionOp='[+]')
                 do k = 1, bb_num_freq(ai)
                     ! Acoustic period of the wave at each discrete frequency
                     period_BB = 1._wp/(bb_lowest_freq(ai) + k*bb_bandwidth(ai))
@@ -220,125 +220,125 @@ contains
 
                 deallocate (phi_rn)
 
-                #:call GPU_PARALLEL_LOOP(private='[myalpha,myalpha_rho]')
-                    do i = 1, num_points
-                        j = source_spatials(ai)%coord(1, i)
-                        k = source_spatials(ai)%coord(2, i)
-                        l = source_spatials(ai)%coord(3, i)
+                $:GPU_PARALLEL_LOOP(private='[myalpha,myalpha_rho, myRho, B_tait,c,  small_gamma, frequency_local, gauss_sigma_time_local, mass_src_diff, mom_src_diff, source_temporal, j, k, l, q ]', copyin = '[sum_BB, freq_conv_flag, gauss_conv_flag, sim_time]')
+                do i = 1, num_points
+                    j = source_spatials(ai)%coord(1, i)
+                    k = source_spatials(ai)%coord(2, i)
+                    l = source_spatials(ai)%coord(3, i)
 
-                        ! Compute speed of sound
-                        myRho = 0._wp
-                        B_tait = 0._wp
-                        small_gamma = 0._wp
+                    ! Compute speed of sound
+                    myRho = 0._wp
+                    B_tait = 0._wp
+                    small_gamma = 0._wp
 
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do q = 1, num_fluids
-                            myalpha_rho(q) = q_cons_vf(q)%sf(j, k, l)
-                            myalpha(q) = q_cons_vf(advxb + q - 1)%sf(j, k, l)
-                        end do
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do q = 1, num_fluids
+                        myalpha_rho(q) = q_cons_vf(q)%sf(j, k, l)
+                        myalpha(q) = q_cons_vf(advxb + q - 1)%sf(j, k, l)
+                    end do
 
-                        if (bubbles_euler) then
-                            if (num_fluids > 2) then
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do q = 1, num_fluids - 1
-                                    myRho = myRho + myalpha_rho(q)
-                                    B_tait = B_tait + myalpha(q)*pi_infs(q)
-                                    small_gamma = small_gamma + myalpha(q)*gammas(q)
-                                end do
-                            else
-                                myRho = myalpha_rho(1)
-                                B_tait = pi_infs(1)
-                                small_gamma = gammas(1)
-                            end if
-                        end if
-
-                        if ((.not. bubbles_euler) .or. (mpp_lim .and. (num_fluids > 2))) then
+                    if (bubbles_euler) then
+                        if (num_fluids > 2) then
                             $:GPU_LOOP(parallelism='[seq]')
-                            do q = 1, num_fluids
+                            do q = 1, num_fluids - 1
                                 myRho = myRho + myalpha_rho(q)
                                 B_tait = B_tait + myalpha(q)*pi_infs(q)
                                 small_gamma = small_gamma + myalpha(q)*gammas(q)
                             end do
+                        else
+                            myRho = myalpha_rho(1)
+                            B_tait = pi_infs(1)
+                            small_gamma = gammas(1)
                         end if
+                    end if
 
-                        small_gamma = 1._wp/small_gamma + 1._wp
-                        c = sqrt(small_gamma*(q_prim_vf(E_idx)%sf(j, k, l) + ((small_gamma - 1._wp)/small_gamma)*B_tait)/myRho)
+                    if ((.not. bubbles_euler) .or. (mpp_lim .and. (num_fluids > 2))) then
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do q = 1, num_fluids
+                            myRho = myRho + myalpha_rho(q)
+                            B_tait = B_tait + myalpha(q)*pi_infs(q)
+                            small_gamma = small_gamma + myalpha(q)*gammas(q)
+                        end do
+                    end if
 
-                        ! Wavelength to frequency conversion
-                        if (pulse(ai) == 1 .or. pulse(ai) == 3) frequency_local = f_frequency_local(freq_conv_flag, ai, c)
-                        if (pulse(ai) == 2) gauss_sigma_time_local = f_gauss_sigma_time_local(gauss_conv_flag, ai, c)
+                    small_gamma = 1._wp/small_gamma + 1._wp
+                    c = sqrt(small_gamma*(q_prim_vf(E_idx)%sf(j, k, l) + ((small_gamma - 1._wp)/small_gamma)*B_tait)/myRho)
 
-                        ! Update momentum source term
-                        call s_source_temporal(sim_time, c, ai, mom_label, frequency_local, gauss_sigma_time_local, source_temporal, sum_BB)
-                        mom_src_diff = source_temporal*source_spatials(ai)%val(i)
+                    ! Wavelength to frequency conversion
+                    if (pulse(ai) == 1 .or. pulse(ai) == 3) frequency_local = f_frequency_local(freq_conv_flag, ai, c)
+                    if (pulse(ai) == 2) gauss_sigma_time_local = f_gauss_sigma_time_local(gauss_conv_flag, ai, c)
 
-                        if (dipole(ai)) then ! Double amplitude & No momentum source term (only works for Planar)
-                            mass_src(j, k, l) = mass_src(j, k, l) + 2._wp*mom_src_diff/c
-                            if (model_eqns /= 4) E_src(j, k, l) = E_src(j, k, l) + 2._wp*mom_src_diff*c/(small_gamma - 1._wp)
-                            cycle
-                        end if
+                    ! Update momentum source term
+                    call s_source_temporal(sim_time, c, ai, mom_label, frequency_local, gauss_sigma_time_local, source_temporal, sum_BB)
+                    mom_src_diff = source_temporal*source_spatials(ai)%val(i)
 
-                        if (n == 0) then ! 1D
-                            mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*sign(1._wp, dir(ai)) ! Left or right-going wave
+                    if (dipole(ai)) then ! Double amplitude & No momentum source term (only works for Planar)
+                        mass_src(j, k, l) = mass_src(j, k, l) + 2._wp*mom_src_diff/c
+                        if (model_eqns /= 4) E_src(j, k, l) = E_src(j, k, l) + 2._wp*mom_src_diff*c/(small_gamma - 1._wp)
+                        cycle
+                    end if
 
-                        elseif (p == 0) then ! 2D
-                            if (support(ai) < 5) then ! Planar
-                                mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*cos(dir(ai))
-                                mom_src(2, j, k, l) = mom_src(2, j, k, l) + mom_src_diff*sin(dir(ai))
-                            else
-                                mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*cos(source_spatials(ai)%angle(i))
-                                mom_src(2, j, k, l) = mom_src(2, j, k, l) + mom_src_diff*sin(source_spatials(ai)%angle(i))
-                            end if
+                    if (n == 0) then ! 1D
+                        mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*sign(1._wp, dir(ai)) ! Left or right-going wave
 
-                        else ! 3D
-                            if (support(ai) < 5) then ! Planar
-                                mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*cos(dir(ai))
-                                mom_src(2, j, k, l) = mom_src(2, j, k, l) + mom_src_diff*sin(dir(ai))
-                            else
-                                mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*source_spatials(ai)%xyz_to_r_ratios(1, i)
-                                mom_src(2, j, k, l) = mom_src(2, j, k, l) + mom_src_diff*source_spatials(ai)%xyz_to_r_ratios(2, i)
-                                mom_src(3, j, k, l) = mom_src(3, j, k, l) + mom_src_diff*source_spatials(ai)%xyz_to_r_ratios(3, i)
-                            end if
-                        end if
-
-                        ! Update mass source term
+                    elseif (p == 0) then ! 2D
                         if (support(ai) < 5) then ! Planar
-                            mass_src_diff = mom_src_diff/c
-                        else ! Spherical or cylindrical support
-                            ! Mass source term must be calculated differently using a correction term for spherical and cylindrical support
-                            call s_source_temporal(sim_time, c, ai, mass_label, frequency_local, gauss_sigma_time_local, source_temporal, sum_BB)
-                            mass_src_diff = source_temporal*source_spatials(ai)%val(i)
-                        end if
-                        mass_src(j, k, l) = mass_src(j, k, l) + mass_src_diff
-
-                        ! Update energy source term
-                        if (model_eqns /= 4) then
-                            E_src(j, k, l) = E_src(j, k, l) + mass_src_diff*c**2._wp/(small_gamma - 1._wp)
+                            mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*cos(dir(ai))
+                            mom_src(2, j, k, l) = mom_src(2, j, k, l) + mom_src_diff*sin(dir(ai))
+                        else
+                            mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*cos(source_spatials(ai)%angle(i))
+                            mom_src(2, j, k, l) = mom_src(2, j, k, l) + mom_src_diff*sin(source_spatials(ai)%angle(i))
                         end if
 
-                    end do
-                #:endcall GPU_PARALLEL_LOOP
+                    else ! 3D
+                        if (support(ai) < 5) then ! Planar
+                            mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*cos(dir(ai))
+                            mom_src(2, j, k, l) = mom_src(2, j, k, l) + mom_src_diff*sin(dir(ai))
+                        else
+                            mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*source_spatials(ai)%xyz_to_r_ratios(1, i)
+                            mom_src(2, j, k, l) = mom_src(2, j, k, l) + mom_src_diff*source_spatials(ai)%xyz_to_r_ratios(2, i)
+                            mom_src(3, j, k, l) = mom_src(3, j, k, l) + mom_src_diff*source_spatials(ai)%xyz_to_r_ratios(3, i)
+                        end if
+                    end if
+
+                    ! Update mass source term
+                    if (support(ai) < 5) then ! Planar
+                        mass_src_diff = mom_src_diff/c
+                    else ! Spherical or cylindrical support
+                        ! Mass source term must be calculated differently using a correction term for spherical and cylindrical support
+                        call s_source_temporal(sim_time, c, ai, mass_label, frequency_local, gauss_sigma_time_local, source_temporal, sum_BB)
+                        mass_src_diff = source_temporal*source_spatials(ai)%val(i)
+                    end if
+                    mass_src(j, k, l) = mass_src(j, k, l) + mass_src_diff
+
+                    ! Update energy source term
+                    if (model_eqns /= 4) then
+                        E_src(j, k, l) = E_src(j, k, l) + mass_src_diff*c**2._wp/(small_gamma - 1._wp)
+                    end if
+
+                end do
+                $:END_GPU_PARALLEL_LOOP()
             end if
         end do
 
         ! Update the rhs variables
-        #:call GPU_PARALLEL_LOOP(collapse=3)
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do q = contxb, contxe
-                            rhs_vf(q)%sf(j, k, l) = rhs_vf(q)%sf(j, k, l) + mass_src(j, k, l)
-                        end do
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do q = momxb, momxe
-                            rhs_vf(q)%sf(j, k, l) = rhs_vf(q)%sf(j, k, l) + mom_src(q - contxe, j, k, l)
-                        end do
-                        rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + e_src(j, k, l)
+        $:GPU_PARALLEL_LOOP(private='[j,k,l]',collapse=3)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do q = contxb, contxe
+                        rhs_vf(q)%sf(j, k, l) = rhs_vf(q)%sf(j, k, l) + mass_src(j, k, l)
                     end do
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do q = momxb, momxe
+                        rhs_vf(q)%sf(j, k, l) = rhs_vf(q)%sf(j, k, l) + mom_src(q - contxe, j, k, l)
+                    end do
+                    rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + e_src(j, k, l)
                 end do
             end do
-        #:endcall GPU_PARALLEL_LOOP
+        end do
+        $:END_GPU_PARALLEL_LOOP()
     end subroutine s_acoustic_src_calculations
 
     !> This subroutine gives the temporally varying amplitude of the pulse
@@ -442,15 +442,12 @@ contains
             source_spatials_num_points(ai) = count
 
             ! Allocate arrays with the correct size
+
             @:ALLOCATE(source_spatials(ai)%coord(1:3, 1:count))
             @:ALLOCATE(source_spatials(ai)%val(1:count))
-            if (support(ai) >= 5) then ! Planar supports don't need angle or xyz_to_r_ratios
-                if (dim == 2) then
-                    @:ALLOCATE(source_spatials(ai)%angle(1:count))
-                elseif (dim == 3) then
-                    @:ALLOCATE(source_spatials(ai)%xyz_to_r_ratios(1:3, 1:count))
-                end if
-            end if
+            @:ALLOCATE(source_spatials(ai)%angle(1:count))
+            @:ALLOCATE(source_spatials(ai)%xyz_to_r_ratios(1:3, 1:count))
+
             @:ACC_SETUP_source_spatials(source_spatials(ai))
 
             ! Second pass: Store the values
@@ -467,7 +464,7 @@ contains
                         source_spatials(ai)%val(count) = source_spatial
                         if (support(ai) >= 5) then
                             if (dim == 2) source_spatials(ai)%angle(count) = angle
-                            if (dim == 3) source_spatials(ai)%xyz_to_r_ratios(:, count) = xyz_to_r_ratios
+                            if (dim == 3) source_spatials(ai)%xyz_to_r_ratios(1:3, count) = xyz_to_r_ratios
                         end if
                     end do
                 end do

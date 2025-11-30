@@ -20,9 +20,6 @@ module m_pressure_relaxation
  s_initialize_pressure_relaxation_module, &
  s_finalize_pressure_relaxation_module
 
-    real(wp), allocatable, dimension(:) :: gamma_min, pres_inf
-    $:GPU_DECLARE(create='[gamma_min, pres_inf]')
-
     real(wp), allocatable, dimension(:, :) :: Res_pr
     $:GPU_DECLARE(create='[Res_pr]')
 
@@ -32,14 +29,6 @@ contains
     impure subroutine s_initialize_pressure_relaxation_module
 
         integer :: i, j
-
-        @:ALLOCATE(gamma_min(1:num_fluids), pres_inf(1:num_fluids))
-
-        do i = 1, num_fluids
-            gamma_min(i) = 1._wp/fluid_pp(i)%gamma + 1._wp
-            pres_inf(i) = fluid_pp(i)%pi_inf/(1._wp + fluid_pp(i)%gamma)
-        end do
-        $:GPU_UPDATE(device='[gamma_min, pres_inf]')
 
         if (viscous) then
             @:ALLOCATE(Res_pr(1:2, 1:Re_size_max))
@@ -56,7 +45,6 @@ contains
     !> Finalize the pressure relaxation module
     impure subroutine s_finalize_pressure_relaxation_module
 
-        @:DEALLOCATE(gamma_min, pres_inf)
         if (viscous) then
             @:DEALLOCATE(Res_pr)
         end if
@@ -70,15 +58,15 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         integer :: j, k, l
 
-        #:call GPU_PARALLEL_LOOP(collapse=3)
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        call s_relax_cell_pressure(q_cons_vf, j, k, l)
-                    end do
+        $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    call s_relax_cell_pressure(q_cons_vf, j, k, l)
                 end do
             end do
-        #:endcall GPU_PARALLEL_LOOP
+        end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_pressure_relaxation_procedure
 
@@ -170,8 +158,8 @@ contains
             if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > sgm_eps) then
                 pres_K_init(i) = (q_cons_vf(i + intxb - 1)%sf(j, k, l)/ &
                                   q_cons_vf(i + advxb - 1)%sf(j, k, l) - pi_infs(i))/gammas(i)
-                if (pres_K_init(i) <= -(1._wp - 1.e-8_wp)*pres_inf(i) + 1.e-8_wp) &
-                    pres_K_init(i) = -(1._wp - 1.e-8_wp)*pres_inf(i) + 1.e-8_wp
+                if (pres_K_init(i) <= -(1._wp - 1.e-8_wp)*ps_inf(i) + 1.e-8_wp) &
+                    pres_K_init(i) = -(1._wp - 1.e-8_wp)*ps_inf(i) + 1.e-8_wp
             else
                 pres_K_init(i) = 0._wp
             end if
@@ -188,8 +176,8 @@ contains
 
                 ! Enforce pressure bounds
                 do i = 1, num_fluids
-                    if (pres_relax <= -(1._wp - 1.e-8_wp)*pres_inf(i) + 1.e-8_wp) &
-                        pres_relax = -(1._wp - 1.e-8_wp)*pres_inf(i) + 1._wp
+                    if (pres_relax <= -(1._wp - 1.e-8_wp)*ps_inf(i) + 1.e-8_wp) &
+                        pres_relax = -(1._wp - 1.e-8_wp)*ps_inf(i) + 1.e-8_wp
                 end do
 
                 ! Newton-Raphson step
@@ -200,11 +188,11 @@ contains
                     if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > sgm_eps) then
                         rho_K_s(i) = q_cons_vf(i + contxb - 1)%sf(j, k, l)/ &
                                      max(q_cons_vf(i + advxb - 1)%sf(j, k, l), sgm_eps) &
-                                     *((pres_relax + pres_inf(i))/(pres_K_init(i) + &
-                                                                   pres_inf(i)))**(1._wp/gamma_min(i))
+                                     *((pres_relax + ps_inf(i))/(pres_K_init(i) + &
+                                                                 ps_inf(i)))**(1._wp/gs_min(i))
                         f_pres = f_pres + q_cons_vf(i + contxb - 1)%sf(j, k, l)/rho_K_s(i)
                         df_pres = df_pres - q_cons_vf(i + contxb - 1)%sf(j, k, l) &
-                                  /(gamma_min(i)*rho_K_s(i)*(pres_relax + pres_inf(i)))
+                                  /(gs_min(i)*rho_K_s(i)*(pres_relax + ps_inf(i)))
                     end if
                 end do
             end if

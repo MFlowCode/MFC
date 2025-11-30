@@ -60,7 +60,7 @@ module m_time_steppers
     type(integer_field), allocatable, dimension(:, :) :: bc_type !<
     !! Boundary condition identifiers
 
-    type(vector_field), allocatable, dimension(:) :: q_prim_ts !<
+    type(vector_field), allocatable, dimension(:) :: q_prim_ts1, q_prim_ts2 !<
     !! Cell-average primitive variables at consecutive TIMESTEPS
 
     real(wp), allocatable, dimension(:, :, :, :, :) :: rhs_pb
@@ -75,14 +75,17 @@ module m_time_steppers
 
     integer :: stor !< storage index
     real(wp), allocatable, dimension(:, :) :: rk_coef
+    integer, private :: num_probe_ts
 
-    $:GPU_DECLARE(create='[q_cons_ts,q_prim_vf,q_T_sf,rhs_vf,q_prim_ts,rhs_mv,rhs_pb,rk_coef]')
+    $:GPU_DECLARE(create='[q_cons_ts,q_prim_vf,q_T_sf,rhs_vf,q_prim_ts1,q_prim_ts2,rhs_mv,rhs_pb,max_dt,rk_coef,stor,bc_type]')
 
 #if defined(__NVCOMPILER_GPU_UNIFIED_MEM)
-    real(wp), allocatable, dimension(:, :, :, :), pinned, target :: q_cons_ts_pool_host
+    real(stp), allocatable, dimension(:, :, :, :), pinned, target :: q_cons_ts_pool_host
 #elif defined(FRONTIER_UNIFIED)
-    real(wp), pointer, contiguous, dimension(:, :, :, :) :: q_cons_ts_pool_host, q_cons_ts_pool_device
+    real(stp), pointer, contiguous, dimension(:, :, :, :) :: q_cons_ts_pool_host, q_cons_ts_pool_device
     integer(kind=8) :: pool_dims(4), pool_starts(4)
+    integer(kind=8) :: pool_size
+    type(c_ptr) :: cptr_host, cptr_device
 #endif
 
 contains
@@ -95,7 +98,9 @@ contains
         use hipfort
         use hipfort_hipmalloc
         use hipfort_check
+#if defined(MFC_OpenACC)
         use openacc
+#endif
 #endif
         integer :: i, j !< Generic loop iterators
 
@@ -104,6 +109,10 @@ contains
             num_ts = 1
         elseif (any(time_stepper == (/2, 3/))) then
             num_ts = 2
+        end if
+
+        if (probe_wrt) then
+            num_probe_ts = 2
         end if
 
         ! Allocating the cell-average conservative variables
@@ -157,18 +166,32 @@ contains
         end do
         pool_dims(4) = sys_size
         pool_starts(4) = 1
+#ifdef MFC_MIXED_PRECISION
+        pool_size = 1_8*(idwbuff(1)%end - idwbuff(1)%beg + 1)*(idwbuff(2)%end - idwbuff(2)%beg + 1)*(idwbuff(3)%end - idwbuff(3)%beg + 1)*sys_size
+        call hipCheck(hipMalloc_(cptr_device, pool_size*2_8))
+        call c_f_pointer(cptr_device, q_cons_ts_pool_device, shape=pool_dims)
+        q_cons_ts_pool_device(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:) => q_cons_ts_pool_device
 
+        call hipCheck(hipMallocManaged_(cptr_host, pool_size*2_8, hipMemAttachGlobal))
+        call c_f_pointer(cptr_host, q_cons_ts_pool_host, shape=pool_dims)
+        q_cons_ts_pool_host(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:) => q_cons_ts_pool_host
+#else
         ! Doing hipMalloc then mapping should be most performant
         call hipCheck(hipMalloc(q_cons_ts_pool_device, dims8=pool_dims, lbounds8=pool_starts))
         ! Without this map CCE will still create a device copy, because it's silly like that
+#if defined(MFC_OpenACC)
         call acc_map_data(q_cons_ts_pool_device, c_loc(q_cons_ts_pool_device), c_sizeof(q_cons_ts_pool_device))
-
+#endif
         ! CCE see it can access this and will leave it on the host. It will stay on the host so long as HSA_XNACK=1
         ! NOTE: WE CANNOT DO ATOMICS INTO THIS MEMORY. We have to change a property to use atomics here
         ! Otherwise leaving this as fine-grained will actually help performance since it can't be cached in GPU L2
         if (num_ts == 2) then
             call hipCheck(hipMallocManaged(q_cons_ts_pool_host, dims8=pool_dims, lbounds8=pool_starts, flags=hipMemAttachGlobal))
+#if defined(MFC_OpenMP)
+            call hipCheck(hipMemAdvise(c_loc(q_cons_ts_pool_host), c_sizeof(q_cons_ts_pool_host), hipMemAdviseSetPreferredLocation, -1))
+#endif
         end if
+#endif
 
         do j = 1, sys_size
             ! q_cons_ts(1) lives on the device
@@ -202,22 +225,34 @@ contains
 
         ! Allocating the cell-average primitive ts variables
         if (probe_wrt) then
-            @:ALLOCATE(q_prim_ts(0:3))
+            @:ALLOCATE(q_prim_ts1(1:num_probe_ts))
 
-            do i = 0, 3
-                @:ALLOCATE(q_prim_ts(i)%vf(1:sys_size))
+            do i = 1, num_probe_ts
+                @:ALLOCATE(q_prim_ts1(i)%vf(1:sys_size))
             end do
 
-            do i = 0, 3
+            do i = 1, num_probe_ts
                 do j = 1, sys_size
-                    @:ALLOCATE(q_prim_ts(i)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                    @:ALLOCATE(q_prim_ts1(i)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                         idwbuff(2)%beg:idwbuff(2)%end, &
                         idwbuff(3)%beg:idwbuff(3)%end))
                 end do
+                @:ACC_SETUP_VFs(q_prim_ts1(i))
             end do
 
-            do i = 0, 3
-                @:ACC_SETUP_VFs(q_prim_ts(i))
+            @:ALLOCATE(q_prim_ts2(1:num_probe_ts))
+
+            do i = 1, num_probe_ts
+                @:ALLOCATE(q_prim_ts2(i)%vf(1:sys_size))
+            end do
+
+            do i = 1, num_probe_ts
+                do j = 1, sys_size
+                    @:ALLOCATE(q_prim_ts2(i)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                        idwbuff(2)%beg:idwbuff(2)%end, &
+                        idwbuff(3)%beg:idwbuff(3)%end))
+                end do
+                @:ACC_SETUP_VFs(q_prim_ts2(i))
             end do
         end if
 
@@ -416,21 +451,21 @@ contains
         end if
 
         ! Allocating arrays to store the bc types
-        @:ALLOCATE(bc_type(1:num_dims,-1:1))
+        @:ALLOCATE(bc_type(1:num_dims,1:2))
 
-        @:ALLOCATE(bc_type(1,-1)%sf(0:0,0:n,0:p))
         @:ALLOCATE(bc_type(1,1)%sf(0:0,0:n,0:p))
+        @:ALLOCATE(bc_type(1,2)%sf(0:0,0:n,0:p))
         if (n > 0) then
-            @:ALLOCATE(bc_type(2,-1)%sf(-buff_size:m+buff_size,0:0,0:p))
             @:ALLOCATE(bc_type(2,1)%sf(-buff_size:m+buff_size,0:0,0:p))
+            @:ALLOCATE(bc_type(2,2)%sf(-buff_size:m+buff_size,0:0,0:p))
             if (p > 0) then
-                @:ALLOCATE(bc_type(3,-1)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,0:0))
                 @:ALLOCATE(bc_type(3,1)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,0:0))
+                @:ALLOCATE(bc_type(3,2)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,0:0))
             end if
         end if
 
         do i = 1, num_dims
-            do j = -1, 1, 2
+            do j = 1, 2
                 @:ACC_SETUP_SFs(bc_type(i,j))
             end do
         end do
@@ -455,7 +490,7 @@ contains
                 rk_coef(2, :) = (/1._wp, 3._wp, 1._wp, 4._wp/)
                 rk_coef(3, :) = (/2._wp, 1._wp, 2._wp, 3._wp/)
             end if
-            $:GPU_UPDATE(device='[rk_coef]')
+            $:GPU_UPDATE(device='[rk_coef, stor]')
         end if
 
     end subroutine s_initialize_time_steppers_module
@@ -470,6 +505,7 @@ contains
 
         integer :: i, j, k, l, q, s !< Generic loop iterator
         real(wp) :: start, finish
+        integer :: dest
 
         call cpu_time(start)
         call nvtxStartRange("TIMESTEP")
@@ -500,55 +536,61 @@ contains
                 end if
             end if
 
-            if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(q_prim_vf, stage=s)
+            if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=s)
 
-            #:call GPU_PARALLEL_LOOP(collapse=4)
-                do i = 1, sys_size
-                    do l = 0, p
-                        do k = 0, n
-                            do j = 0, m
-                                if (s == 1 .and. nstage > 1) then
-                                    q_cons_ts(stor)%vf(i)%sf(j, k, l) = &
-                                        q_cons_ts(1)%vf(i)%sf(j, k, l)
-                                end if
+            $:GPU_PARALLEL_LOOP(collapse=4)
+            do i = 1, sys_size
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            if (s == 1 .and. nstage > 1) then
+                                q_cons_ts(stor)%vf(i)%sf(j, k, l) = &
+                                    q_cons_ts(1)%vf(i)%sf(j, k, l)
+                            end if
+                            if (igr) then
+                                q_cons_ts(1)%vf(i)%sf(j, k, l) = &
+                                    (rk_coef(s, 1)*q_cons_ts(1)%vf(i)%sf(j, k, l) &
+                                     + rk_coef(s, 2)*q_cons_ts(stor)%vf(i)%sf(j, k, l) &
+                                     + rk_coef(s, 3)*rhs_vf(i)%sf(j, k, l))/rk_coef(s, 4)
+                            else
                                 q_cons_ts(1)%vf(i)%sf(j, k, l) = &
                                     (rk_coef(s, 1)*q_cons_ts(1)%vf(i)%sf(j, k, l) &
                                      + rk_coef(s, 2)*q_cons_ts(stor)%vf(i)%sf(j, k, l) &
                                      + rk_coef(s, 3)*dt*rhs_vf(i)%sf(j, k, l))/rk_coef(s, 4)
-                            end do
+                            end if
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
 
             !Evolve pb and mv for non-polytropic qbmm
             if (qbmm .and. (.not. polytropic)) then
-                #:call GPU_PARALLEL_LOOP(collapse=5)
-                    do i = 1, nb
-                        do l = 0, p
-                            do k = 0, n
-                                do j = 0, m
-                                    do q = 1, nnode
-                                        if (s == 1 .and. nstage > 1) then
-                                            pb_ts(stor)%sf(j, k, l, q, i) = &
-                                                pb_ts(1)%sf(j, k, l, q, i)
-                                            mv_ts(stor)%sf(j, k, l, q, i) = &
-                                                mv_ts(1)%sf(j, k, l, q, i)
-                                        end if
-                                        pb_ts(1)%sf(j, k, l, q, i) = &
-                                            (rk_coef(s, 1)*pb_ts(1)%sf(j, k, l, q, i) &
-                                             + rk_coef(s, 2)*pb_ts(stor)%sf(j, k, l, q, i) &
-                                             + rk_coef(s, 3)*dt*rhs_pb(j, k, l, q, i))/rk_coef(s, 4)
-                                        mv_ts(1)%sf(j, k, l, q, i) = &
-                                            (rk_coef(s, 1)*mv_ts(1)%sf(j, k, l, q, i) &
-                                             + rk_coef(s, 2)*mv_ts(stor)%sf(j, k, l, q, i) &
-                                             + rk_coef(s, 3)*dt*rhs_mv(j, k, l, q, i))/rk_coef(s, 4)
-                                    end do
+                $:GPU_PARALLEL_LOOP(collapse=5)
+                do i = 1, nb
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                do q = 1, nnode
+                                    if (s == 1 .and. nstage > 1) then
+                                        pb_ts(stor)%sf(j, k, l, q, i) = &
+                                            pb_ts(1)%sf(j, k, l, q, i)
+                                        mv_ts(stor)%sf(j, k, l, q, i) = &
+                                            mv_ts(1)%sf(j, k, l, q, i)
+                                    end if
+                                    pb_ts(1)%sf(j, k, l, q, i) = &
+                                        (rk_coef(s, 1)*pb_ts(1)%sf(j, k, l, q, i) &
+                                         + rk_coef(s, 2)*pb_ts(stor)%sf(j, k, l, q, i) &
+                                         + rk_coef(s, 3)*dt*rhs_pb(j, k, l, q, i))/rk_coef(s, 4)
+                                    mv_ts(1)%sf(j, k, l, q, i) = &
+                                        (rk_coef(s, 1)*mv_ts(1)%sf(j, k, l, q, i) &
+                                         + rk_coef(s, 2)*mv_ts(stor)%sf(j, k, l, q, i) &
+                                         + rk_coef(s, 3)*dt*rhs_mv(j, k, l, q, i))/rk_coef(s, 4)
                                 end do
                             end do
                         end do
                     end do
-                #:endcall GPU_PARALLEL_LOOP
+                end do
+                $:END_GPU_PARALLEL_LOOP()
             end if
 
             if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, rk_coef(s, 3)*dt/rk_coef(s, 4))
@@ -662,6 +704,7 @@ contains
         real(wp), dimension(num_fluids) :: alpha      !< Cell-avg. volume fraction
         real(wp) :: gamma      !< Cell-avg. sp. heat ratio
         real(wp) :: pi_inf     !< Cell-avg. liquid stiffness function
+        real(wp) :: qv         !< Cell-avg. fluid reference energy
         real(wp) :: c          !< Cell-avg. sound speed
         real(wp) :: H          !< Cell-avg. enthalpy
         real(wp), dimension(2) :: Re         !< Cell-avg. Reynolds numbers
@@ -678,27 +721,26 @@ contains
                 idwint)
         end if
 
-        dt_local = huge(1.0_wp)
-        #:call GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re]', &
-            & reduction='[[dt_local]]', reductionOp='[min]')
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        if (igr) then
-                            call s_compute_enthalpy(q_cons_ts(1)%vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, j, k, l)
-                        else
-                            call s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, j, k, l)
-                        end if
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H, qv]', &
+            & recution='[[dt_local]]', reductionOp='[min]')
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    if (igr) then
+                        call s_compute_enthalpy(q_cons_ts(1)%vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, j, k, l)
+                    else
+                        call s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, j, k, l)
+                    end if
 
-                        ! Compute mixture sound speed
-                        call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, 0._wp, c)
+                    ! Compute mixture sound speed
+                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, 0._wp, c, qv)
 
-                        call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, j, k, l)
-                        dt_local = min(dt_local, max_dt)
-                    end do
+                    call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, j, k, l)
+                    dt_local = min(dt_local, max_dt)
                 end do
             end do
-        #:endcall GPU_PARALLEL_LOOP
+        end do
+        $:END_GPU_PARALLEL_LOOP()
 
         if (num_procs == 1) then
             dt = dt_local
@@ -725,18 +767,18 @@ contains
         call nvtxStartRange("RHS-BODYFORCES")
         call s_compute_body_forces_rhs(q_prim_vf_in, q_cons_vf, rhs_vf_in)
 
-        #:call GPU_PARALLEL_LOOP(collapse=4)
-            do i = momxb, E_idx
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) + &
-                                                       ldt*rhs_vf_in(i)%sf(j, k, l)
-                        end do
+        $:GPU_PARALLEL_LOOP(collapse=4)
+        do i = momxb, E_idx
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) + &
+                                                   ldt*rhs_vf_in(i)%sf(j, k, l)
                     end do
                 end do
             end do
-        #:endcall GPU_PARALLEL_LOOP
+        end do
+        $:END_GPU_PARALLEL_LOOP()
 
         call nvtxEndRange
 
@@ -752,68 +794,68 @@ contains
         integer :: i, j, k, l !< Generic loop iterator
 
         if (t_step == t_step_start) then
-            #:call GPU_PARALLEL_LOOP(collapse=4)
-                do i = 1, sys_size
-                    do l = 0, p
-                        do k = 0, n
-                            do j = 0, m
-                                q_prim_ts(3)%vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
-                            end do
+            $:GPU_PARALLEL_LOOP(collapse=4)
+            do i = 1, sys_size
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            q_prim_ts2(2)%vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            end do
+            $:END_GPU_PARALLEL_LOOP()
         elseif (t_step == t_step_start + 1) then
-            #:call GPU_PARALLEL_LOOP(collapse=4)
-                do i = 1, sys_size
-                    do l = 0, p
-                        do k = 0, n
-                            do j = 0, m
-                                q_prim_ts(2)%vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
-                            end do
+            $:GPU_PARALLEL_LOOP(collapse=4)
+            do i = 1, sys_size
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            q_prim_ts2(1)%vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            end do
+            $:END_GPU_PARALLEL_LOOP()
         elseif (t_step == t_step_start + 2) then
-            #:call GPU_PARALLEL_LOOP(collapse=4)
-                do i = 1, sys_size
-                    do l = 0, p
-                        do k = 0, n
-                            do j = 0, m
-                                q_prim_ts(1)%vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
-                            end do
+            $:GPU_PARALLEL_LOOP(collapse=4)
+            do i = 1, sys_size
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            q_prim_ts1(2)%vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            end do
+            $:END_GPU_PARALLEL_LOOP()
         elseif (t_step == t_step_start + 3) then
-            #:call GPU_PARALLEL_LOOP(collapse=4)
-                do i = 1, sys_size
-                    do l = 0, p
-                        do k = 0, n
-                            do j = 0, m
-                                q_prim_ts(0)%vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
-                            end do
+            $:GPU_PARALLEL_LOOP(collapse=4)
+            do i = 1, sys_size
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            q_prim_ts1(1)%vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            end do
+            $:END_GPU_PARALLEL_LOOP()
         else ! All other timesteps
-            #:call GPU_PARALLEL_LOOP(collapse=4)
-                do i = 1, sys_size
-                    do l = 0, p
-                        do k = 0, n
-                            do j = 0, m
-                                q_prim_ts(3)%vf(i)%sf(j, k, l) = q_prim_ts(2)%vf(i)%sf(j, k, l)
-                                q_prim_ts(2)%vf(i)%sf(j, k, l) = q_prim_ts(1)%vf(i)%sf(j, k, l)
-                                q_prim_ts(1)%vf(i)%sf(j, k, l) = q_prim_ts(0)%vf(i)%sf(j, k, l)
-                                q_prim_ts(0)%vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
-                            end do
+            $:GPU_PARALLEL_LOOP(collapse=4)
+            do i = 1, sys_size
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            q_prim_ts2(2)%vf(i)%sf(j, k, l) = q_prim_ts2(1)%vf(i)%sf(j, k, l)
+                            q_prim_ts2(1)%vf(i)%sf(j, k, l) = q_prim_ts1(2)%vf(i)%sf(j, k, l)
+                            q_prim_ts1(2)%vf(i)%sf(j, k, l) = q_prim_ts1(1)%vf(i)%sf(j, k, l)
+                            q_prim_ts1(1)%vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)
                         end do
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            end do
+            $:END_GPU_PARALLEL_LOOP()
         end if
 
     end subroutine s_time_step_cycling
@@ -848,9 +890,15 @@ contains
                 nullify (q_cons_ts(i)%vf(j)%sf)
             end do
         end do
-
+#ifdef MFC_MIXED_PRECISION
+        call hipCheck(hipHostFree_(c_loc(q_cons_ts_pool_host)))
+        nullify (q_cons_ts_pool_host)
+        call hipCheck(hipFree_(c_loc(q_cons_ts_pool_device)))
+        nullify (q_cons_ts_pool_device)
+#else
         call hipCheck(hipHostFree(q_cons_ts_pool_host))
         call hipCheck(hipFree(q_cons_ts_pool_device))
+#endif
 #else
         do i = 1, num_ts
             do j = 1, sys_size
@@ -866,13 +914,13 @@ contains
 
         ! Deallocating the cell-average primitive ts variables
         if (probe_wrt) then
-            do i = 0, 3
+            do i = 1, num_probe_ts
                 do j = 1, sys_size
-                    @:DEALLOCATE(q_prim_ts(i)%vf(j)%sf)
+                    @:DEALLOCATE(q_prim_ts1(i)%vf(j)%sf,q_prim_ts2(i)%vf(j)%sf )
                 end do
-                @:DEALLOCATE(q_prim_ts(i)%vf)
+                @:DEALLOCATE(q_prim_ts1(i)%vf, q_prim_ts2(i)%vf)
             end do
-            @:DEALLOCATE(q_prim_ts)
+            @:DEALLOCATE(q_prim_ts1, q_prim_ts2)
         end if
 
         if (.not. igr) then

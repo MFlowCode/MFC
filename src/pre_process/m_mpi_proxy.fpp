@@ -34,7 +34,7 @@ contains
 #ifdef MFC_MPI
 
         ! Generic loop iterator
-        integer :: i
+        integer :: i, j
         ! Generic flag used to identify and report MPI errors
         integer :: ierr
 
@@ -59,7 +59,7 @@ contains
             & 'cfl_const_dt', 'cfl_dt', 'surface_tension',                     &
             & 'hyperelasticity', 'pre_stress', 'elliptic_smoothing', 'viscous',&
             & 'bubbles_lagrange', 'bc_io', 'mhd', 'relativity', 'cont_damage', &
-            & 'igr', 'down_sample','fft_wrt' ]
+            & 'igr', 'down_sample', 'simplex_perturb','fft_wrt' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
         call MPI_BCAST(fluid_rho(1), num_fluids_max, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
@@ -144,7 +144,7 @@ contains
         ! Fluids physical parameters
         do i = 1, num_fluids_max
             #:for VAR in [ 'gamma','pi_inf','mul0','ss','pv','gamma_v','M_v',  &
-                & 'mu_v','k_v', 'G', 'cv', 'qv', 'qvp' ]
+                & 'mu_v','k_v', 'G', 'cv', 'qv', 'qvp', 'D_v' ]
                 call MPI_BCAST(fluid_pp(i)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
         end do
@@ -155,6 +155,32 @@ contains
         call MPI_BCAST(normMag, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(g0_ic, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(p0_ic, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+
+        ! Simplex noise  and fluid physical parameters
+        do i = 1, num_fluids_max
+            #:for VAR in [ 'gamma','pi_inf','mul0','ss','pv','gamma_v','M_v',  &
+                & 'mu_v','k_v', 'G', 'cv', 'qv', 'qvp', 'D_v' ]
+                call MPI_BCAST(fluid_pp(i)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
+
+            call MPI_BCAST(simplex_params%perturb_dens(i), 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(simplex_params%perturb_dens_freq(i), 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(simplex_params%perturb_dens_scale(i), 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+
+            do j = 1, 3
+                call MPI_BCAST(simplex_params%perturb_dens_offset(i, j), 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            end do
+        end do
+
+        do i = 1, 3
+            call MPI_BCAST(simplex_params%perturb_vel(i), 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(simplex_params%perturb_vel_freq(i), 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(simplex_params%perturb_vel_scale(i), 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+
+            do j = 1, 3
+                call MPI_BCAST(simplex_params%perturb_vel_offset(i, j), 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            end do
+        end do
 #endif
 
     end subroutine s_mpi_bcast_user_inputs

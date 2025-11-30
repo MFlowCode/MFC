@@ -189,7 +189,7 @@ contains
                 call MPI_BCAST(lag_params%${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 
-            #:for VAR in [ 'c0', 'rho0', 'T0', 'x0', 'diffcoefvap', 'epsilonb','charwidth', &
+            #:for VAR in [ 'c0', 'rho0', 'T0', 'x0', 'epsilonb','charwidth', &
                 & 'valmaxvoid', 'Thost']
                 call MPI_BCAST(lag_params%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
@@ -238,7 +238,7 @@ contains
 
         do i = 1, num_fluids_max
             #:for VAR in [ 'gamma','pi_inf','mul0','ss','pv','gamma_v','M_v',  &
-                & 'mu_v','k_v', 'cp_v','G', 'cv', 'qv', 'qvp' ]
+                & 'mu_v','k_v', 'cp_v','G', 'cv', 'qv', 'qvp', 'D_v' ]
                 call MPI_BCAST(fluid_pp(i)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
             call MPI_BCAST(fluid_pp(i)%Re(1), 2, mpi_p, 0, MPI_COMM_WORLD, ierr)
@@ -251,8 +251,8 @@ contains
         end do
 
         do i = 1, num_ibs
-            #:for VAR in [ 'radius', 'length_x', 'length_y', &
-                & 'x_centroid', 'y_centroid', 'c', 'm', 'p', 't', 'theta', 'slip']
+            #:for VAR in [ 'radius', 'length_x', 'length_y', 'length_z', &
+                & 'x_centroid', 'y_centroid', 'z_centroid', 'c', 'm', 'p', 't', 'theta', 'slip']
                 call MPI_BCAST(patch_ib(i)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
             #:for VAR in ['vel', 'angular_vel', 'angles']
@@ -365,40 +365,40 @@ contains
         #:for mpi_dir in [1, 2, 3]
             if (mpi_dir == ${mpi_dir}$) then
                 #:if mpi_dir == 1
-                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[r]')
-                        do l = 0, p
-                            do k = 0, n
-                                do j = 0, buff_size - 1
-                                    r = (j + buff_size*(k + (n + 1)*l))
-                                    ib_buff_send(r) = ib_markers%sf(j + pack_offset, k, l)
-                                end do
+                    $:GPU_PARALLEL_LOOP(collapse=3,private='[j,k,l,r]')
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, buff_size - 1
+                                r = (j + buff_size*(k + (n + 1)*l))
+                                ib_buff_send(r) = ib_markers%sf(j + pack_offset, k, l)
                             end do
                         end do
-                    #:endcall GPU_PARALLEL_LOOP
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
                 #:elif mpi_dir == 2
-                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[r]')
-                        do l = 0, p
-                            do k = 0, buff_size - 1
-                                do j = -buff_size, m + buff_size
-                                    r = ((j + buff_size) + (m + 2*buff_size + 1)* &
-                                         (k + buff_size*l))
-                                    ib_buff_send(r) = ib_markers%sf(j, k + pack_offset, l)
-                                end do
+                    $:GPU_PARALLEL_LOOP(collapse=3,private='[j,k,l,r]')
+                    do l = 0, p
+                        do k = 0, buff_size - 1
+                            do j = -buff_size, m + buff_size
+                                r = ((j + buff_size) + (m + 2*buff_size + 1)* &
+                                     (k + buff_size*l))
+                                ib_buff_send(r) = ib_markers%sf(j, k + pack_offset, l)
                             end do
                         end do
-                    #:endcall GPU_PARALLEL_LOOP
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
                 #:else
-                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[r]')
-                        do l = 0, buff_size - 1
-                            do k = -buff_size, n + buff_size
-                                do j = -buff_size, m + buff_size
-                                    r = ((j + buff_size) + (m + 2*buff_size + 1)* &
-                                         ((k + buff_size) + (n + 2*buff_size + 1)*l))
-                                    ib_buff_send(r) = ib_markers%sf(j, k, l + pack_offset)
-                                end do
+                    $:GPU_PARALLEL_LOOP(collapse=3,private='[j,k,l,r]')
+                    do l = 0, buff_size - 1
+                        do k = -buff_size, n + buff_size
+                            do j = -buff_size, m + buff_size
+                                r = ((j + buff_size) + (m + 2*buff_size + 1)* &
+                                     ((k + buff_size) + (n + 2*buff_size + 1)*l))
+                                ib_buff_send(r) = ib_markers%sf(j, k, l + pack_offset)
                             end do
                         end do
-                    #:endcall GPU_PARALLEL_LOOP
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
                 #:endif
             end if
         #:endfor
@@ -442,42 +442,42 @@ contains
         #:for mpi_dir in [1, 2, 3]
             if (mpi_dir == ${mpi_dir}$) then
                 #:if mpi_dir == 1
-                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[r]')
-                        do l = 0, p
-                            do k = 0, n
-                                do j = -buff_size, -1
-                                    r = (j + buff_size*((k + 1) + (n + 1)*l))
-                                    ib_markers%sf(j + unpack_offset, k, l) = ib_buff_recv(r)
-                                end do
+                    $:GPU_PARALLEL_LOOP(collapse=3,private='[j,k,l,r]')
+                    do l = 0, p
+                        do k = 0, n
+                            do j = -buff_size, -1
+                                r = (j + buff_size*((k + 1) + (n + 1)*l))
+                                ib_markers%sf(j + unpack_offset, k, l) = ib_buff_recv(r)
                             end do
                         end do
-                    #:endcall GPU_PARALLEL_LOOP
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
                 #:elif mpi_dir == 2
-                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[r]')
-                        do l = 0, p
-                            do k = -buff_size, -1
-                                do j = -buff_size, m + buff_size
-                                    r = ((j + buff_size) + (m + 2*buff_size + 1)* &
-                                         ((k + buff_size) + buff_size*l))
-                                    ib_markers%sf(j, k + unpack_offset, l) = ib_buff_recv(r)
-                                end do
+                    $:GPU_PARALLEL_LOOP(collapse=3,private='[j,k,l,r]')
+                    do l = 0, p
+                        do k = -buff_size, -1
+                            do j = -buff_size, m + buff_size
+                                r = ((j + buff_size) + (m + 2*buff_size + 1)* &
+                                     ((k + buff_size) + buff_size*l))
+                                ib_markers%sf(j, k + unpack_offset, l) = ib_buff_recv(r)
                             end do
                         end do
-                    #:endcall GPU_PARALLEL_LOOP
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
                 #:else
                     ! Unpacking buffer from bc_z%beg
-                    #:call GPU_PARALLEL_LOOP(collapse=3,private='[r]')
-                        do l = -buff_size, -1
-                            do k = -buff_size, n + buff_size
-                                do j = -buff_size, m + buff_size
-                                    r = ((j + buff_size) + (m + 2*buff_size + 1)* &
-                                         ((k + buff_size) + (n + 2*buff_size + 1)* &
-                                          (l + buff_size)))
-                                    ib_markers%sf(j, k, l + unpack_offset) = ib_buff_recv(r)
-                                end do
+                    $:GPU_PARALLEL_LOOP(collapse=3,private='[j,k,l,r]')
+                    do l = -buff_size, -1
+                        do k = -buff_size, n + buff_size
+                            do j = -buff_size, m + buff_size
+                                r = ((j + buff_size) + (m + 2*buff_size + 1)* &
+                                     ((k + buff_size) + (n + 2*buff_size + 1)* &
+                                      (l + buff_size)))
+                                ib_markers%sf(j, k, l + unpack_offset) = ib_buff_recv(r)
                             end do
                         end do
-                    #:endcall GPU_PARALLEL_LOOP
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
                 #:endif
             end if
         #:endfor

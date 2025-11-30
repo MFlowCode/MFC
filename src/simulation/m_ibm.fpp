@@ -121,9 +121,10 @@ contains
         call s_mpi_allreduce_integer_sum(num_gps, max_num_gps)
         call s_mpi_allreduce_integer_sum(num_inner_gps, max_num_inner_gps)
 
+        ! set the size of the ghost point arrays to be the amount of points total, plus a factor of 2 buffer
         $:GPU_UPDATE(device='[num_gps, num_inner_gps]')
-        @:ALLOCATE(ghost_points(1:int(max_num_gps * 2.0)))
-        @:ALLOCATE(inner_points(1:int(max_num_inner_gps * 2.0)))
+        @:ALLOCATE(ghost_points(1:int((max_num_gps + max_num_inner_gps) * 2.0)))
+        @:ALLOCATE(inner_points(1:int((max_num_gps + max_num_inner_gps) * 2.0)))
 
         $:GPU_ENTER_DATA(copyin='[ghost_points,inner_points]')
 
@@ -165,7 +166,7 @@ contains
             dimension(sys_size), &
             intent(INOUT) :: q_prim_vf !< Primitive Variables
 
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), optional, intent(INOUT) :: pb_in, mv_in
+        real(stp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), optional, intent(INOUT) :: pb_in, mv_in
 
         integer :: i, j, k, l, q, r!< Iterator variables
         integer :: patch_id !< Patch ID of ghost point
@@ -195,185 +196,196 @@ contains
         real(wp) :: buf
         type(ghost_point) :: gp
         type(ghost_point) :: innerp
+
         if (num_gps > 0) then
-            #:call GPU_PARALLEL_LOOP(private='[physical_loc,dyn_pres,alpha_rho_IP, alpha_IP,pres_IP,vel_IP,vel_g,vel_norm_IP,r_IP, v_IP,pb_IP,mv_IP,nmom_IP,presb_IP,massv_IP,rho, gamma,pi_inf,Re_K,G_K,Gs,gp,innerp,norm,buf, radial_vector, rotation_velocity, j,k,l,q]')
-                do i = 1, num_gps
+            $:GPU_PARALLEL_LOOP(private='[i,physical_loc,dyn_pres,alpha_rho_IP, alpha_IP,pres_IP,vel_IP,vel_g,vel_norm_IP,r_IP, v_IP,pb_IP,mv_IP,nmom_IP,presb_IP,massv_IP,rho, gamma,pi_inf,Re_K,G_K,Gs,gp,innerp,norm,buf, radial_vector, rotation_velocity, j,k,l,q,qv_K,c_IP,nbub,patch_id]')
+            do i = 1, num_gps
 
-                    gp = ghost_points(i)
-                    j = gp%loc(1)
-                    k = gp%loc(2)
-                    l = gp%loc(3)
-                    patch_id = ghost_points(i)%ib_patch_id
+                gp = ghost_points(i)
+                j = gp%loc(1)
+                k = gp%loc(2)
+                l = gp%loc(3)
+                patch_id = ghost_points(i)%ib_patch_id
 
-                    ! Calculate physical location of GP
-                    if (p > 0) then
-                        physical_loc = [x_cc(j), y_cc(k), z_cc(l)]
-                    else
-                        physical_loc = [x_cc(j), y_cc(k), 0._wp]
-                    end if
+                ! Calculate physical location of GP
+                if (p > 0) then
+                    physical_loc = [x_cc(j), y_cc(k), z_cc(l)]
+                else
+                    physical_loc = [x_cc(j), y_cc(k), 0._wp]
+                end if
 
-                    !Interpolate primitive variables at image point associated w/ GP
-                    if (bubbles_euler .and. .not. qbmm) then
-                        call s_interpolate_image_point(q_prim_vf, gp, &
-                                                       alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, &
-                                                       r_IP, v_IP, pb_IP, mv_IP)
-                    else if (qbmm .and. polytropic) then
-                        call s_interpolate_image_point(q_prim_vf, gp, &
-                                                       alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, &
-                                                       r_IP, v_IP, pb_IP, mv_IP, nmom_IP)
-                    else if (qbmm .and. .not. polytropic) then
-                        call s_interpolate_image_point(q_prim_vf, gp, &
-                                                       alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, &
-                                                       r_IP, v_IP, pb_IP, mv_IP, nmom_IP, pb_in, mv_in, presb_IP, massv_IP)
-                    else
-                        call s_interpolate_image_point(q_prim_vf, gp, &
-                                                       alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP)
-                    end if
-                    dyn_pres = 0._wp
+                !Interpolate primitive variables at image point associated w/ GP
+                if (bubbles_euler .and. .not. qbmm) then
+                    call s_interpolate_image_point(q_prim_vf, gp, &
+                                                   alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, &
+                                                   r_IP, v_IP, pb_IP, mv_IP)
+                else if (qbmm .and. polytropic) then
+                    call s_interpolate_image_point(q_prim_vf, gp, &
+                                                   alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, &
+                                                   r_IP, v_IP, pb_IP, mv_IP, nmom_IP)
+                else if (qbmm .and. .not. polytropic) then
+                    call s_interpolate_image_point(q_prim_vf, gp, &
+                                                   alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, &
+                                                   r_IP, v_IP, pb_IP, mv_IP, nmom_IP, pb_in, mv_in, presb_IP, massv_IP)
+                else
+                    call s_interpolate_image_point(q_prim_vf, gp, &
+                                                   alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP)
+                end if
 
-                    ! Set q_prim_vf params at GP so that mixture vars calculated properly
-                    $:GPU_LOOP(parallelism='[seq]')
-                    do q = 1, num_fluids
-                        q_prim_vf(q)%sf(j, k, l) = alpha_rho_IP(q)
-                        q_prim_vf(advxb + q - 1)%sf(j, k, l) = alpha_IP(q)
-                    end do
+                dyn_pres = 0._wp
 
-                    if (surface_tension) then
-                        q_prim_vf(c_idx)%sf(j, k, l) = c_IP
-                    end if
-                    if (model_eqns /= 4) then
-                        ! If in simulation, use acc mixture subroutines
-                        if (elasticity) then
-                            call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv_K, alpha_IP, &
-                                                                            alpha_rho_IP, Re_K, G_K, Gs)
-                        else if (bubbles_euler) then
-                            call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, qv_K, alpha_IP, &
-                                                                                    alpha_rho_IP, Re_K)
-                        else
-                            call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv_K, alpha_IP, &
-                                                                            alpha_rho_IP, Re_K)
-                        end if
-                    end if
-
-                    ! Calculate velocity of ghost cell
-                    if (gp%slip) then
-                        norm(1:3) = levelset_norm%sf(gp%loc(1), gp%loc(2), gp%loc(3), gp%ib_patch_id, 1:3)
-                        buf = sqrt(sum(norm**2))
-                        norm = norm/buf
-                        vel_norm_IP = sum(vel_IP*norm)*norm
-                        vel_g = vel_IP - vel_norm_IP
-                    else
-                        if (patch_ib(patch_id)%moving_ibm == 0) then
-                            ! we know the object is not moving if moving_ibm is 0 (false)
-                            vel_g = 0._wp
-                        else
-                            ! get the vector that points from the centroid to the ghost
-                            radial_vector = physical_loc - [patch_ib(patch_id)%x_centroid, &
-                                                            patch_ib(patch_id)%y_centroid, patch_ib(patch_id)%z_centroid]
-                            ! convert the angular velocity from the inertial reference frame to the fluids frame, then convert to linear velocity
-                            rotation_velocity = cross_product(matmul(patch_ib(patch_id)%rotation_matrix, patch_ib(patch_id)%angular_vel), radial_vector)
-                            do q = 1, 3
-                                ! if mibm is 1 or 2, then the boundary may be moving
-                                vel_g(q) = patch_ib(patch_id)%vel(q) ! add the linear velocity
-                                vel_g(q) = vel_g(q) + rotation_velocity(q) ! add the rotational velocity
-                            end do
-                        end if
-                    end if
-
-                    ! Set momentum
-                    $:GPU_LOOP(parallelism='[seq]')
-                    do q = momxb, momxe
-                        q_cons_vf(q)%sf(j, k, l) = rho*vel_g(q - momxb + 1)
-                        dyn_pres = dyn_pres + q_cons_vf(q)%sf(j, k, l)* &
-                                   vel_g(q - momxb + 1)/2._wp
-                    end do
-
-                    ! Set continuity and adv vars
-                    $:GPU_LOOP(parallelism='[seq]')
-                    do q = 1, num_fluids
-                        q_cons_vf(q)%sf(j, k, l) = alpha_rho_IP(q)
-                        q_cons_vf(advxb + q - 1)%sf(j, k, l) = alpha_IP(q)
-                    end do
-
-                    ! Set color function
-                    if (surface_tension) then
-                        q_cons_vf(c_idx)%sf(j, k, l) = c_IP
-                    end if
-
-                    ! Set Energy
-                    if (bubbles_euler) then
-                        q_cons_vf(E_idx)%sf(j, k, l) = (1 - alpha_IP(1))*(gamma*pres_IP + pi_inf + dyn_pres)
-                    else
-                        q_cons_vf(E_idx)%sf(j, k, l) = gamma*pres_IP + pi_inf + dyn_pres
-                    end if
-                    ! Set bubble vars
-                    if (bubbles_euler .and. .not. qbmm) then
-                        call s_comp_n_from_prim(alpha_IP(1), r_IP, nbub, weight)
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do q = 1, nb
-                            q_cons_vf(bubxb + (q - 1)*2)%sf(j, k, l) = nbub*r_IP(q)
-                            q_cons_vf(bubxb + (q - 1)*2 + 1)%sf(j, k, l) = nbub*v_IP(q)
-                            if (.not. polytropic) then
-                                q_cons_vf(bubxb + (q - 1)*4)%sf(j, k, l) = nbub*r_IP(q)
-                                q_cons_vf(bubxb + (q - 1)*4 + 1)%sf(j, k, l) = nbub*v_IP(q)
-                                q_cons_vf(bubxb + (q - 1)*4 + 2)%sf(j, k, l) = nbub*pb_IP(q)
-                                q_cons_vf(bubxb + (q - 1)*4 + 3)%sf(j, k, l) = nbub*mv_IP(q)
-                            end if
-                        end do
-                    end if
-
-                    if (qbmm) then
-
-                        nbub = nmom_IP(1)
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do q = 1, nb*nmom
-                            q_cons_vf(bubxb + q - 1)%sf(j, k, l) = nbub*nmom_IP(q)
-                        end do
-
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do q = 1, nb
-                            q_cons_vf(bubxb + (q - 1)*nmom)%sf(j, k, l) = nbub
-                        end do
-
-                        if (.not. polytropic) then
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do q = 1, nb
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do r = 1, nnode
-                                    pb_in(j, k, l, r, q) = presb_IP((q - 1)*nnode + r)
-                                    mv_in(j, k, l, r, q) = massv_IP((q - 1)*nnode + r)
-                                end do
-                            end do
-                        end if
-                    end if
-
-                    if (model_eqns == 3) then
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do q = intxb, intxe
-                            q_cons_vf(q)%sf(j, k, l) = alpha_IP(q - intxb + 1)*(gammas(q - intxb + 1)*pres_IP &
-                                                                                + pi_infs(q - intxb + 1))
-                        end do
-                    end if
+                ! Set q_prim_vf params at GP so that mixture vars calculated properly
+                $:GPU_LOOP(parallelism='[seq]')
+                do q = 1, num_fluids
+                    q_prim_vf(q)%sf(j, k, l) = alpha_rho_IP(q)
+                    q_prim_vf(advxb + q - 1)%sf(j, k, l) = alpha_IP(q)
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+
+                if (surface_tension) then
+                    q_prim_vf(c_idx)%sf(j, k, l) = c_IP
+                end if
+                if (model_eqns /= 4) then
+                    ! If in simulation, use acc mixture subroutines
+                    if (elasticity) then
+                        call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv_K, alpha_IP, &
+                                                                        alpha_rho_IP, Re_K, G_K, Gs)
+                    else if (bubbles_euler) then
+                        call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, qv_K, alpha_IP, &
+                                                                                alpha_rho_IP, Re_K)
+                    else
+                        call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv_K, alpha_IP, &
+                                                                        alpha_rho_IP, Re_K)
+                    end if
+                end if
+
+                ! Calculate velocity of ghost cell
+                if (gp%slip) then
+                    norm(1:3) = levelset_norm%sf(gp%loc(1), gp%loc(2), gp%loc(3), gp%ib_patch_id, 1:3)
+                    buf = sqrt(sum(norm**2))
+                    norm = norm/buf
+                    vel_norm_IP = sum(vel_IP*norm)*norm
+                    vel_g = vel_IP - vel_norm_IP
+                    if (patch_ib(patch_id)%moving_ibm /= 0) then
+                        ! compute the linear velocity of the ghost point due to rotation
+                        radial_vector = physical_loc - [patch_ib(patch_id)%x_centroid, &
+                                                        patch_ib(patch_id)%y_centroid, patch_ib(patch_id)%z_centroid]
+                        rotation_velocity = cross_product(matmul(patch_ib(patch_id)%rotation_matrix, patch_ib(patch_id)%angular_vel), radial_vector)
+
+                        ! add only the component of the IB's motion that is normal to the surface
+                        vel_g = vel_g + sum((patch_ib(patch_id)%vel + rotation_velocity)*norm)*norm
+                    end if
+                else
+                    if (patch_ib(patch_id)%moving_ibm == 0) then
+                        ! we know the object is not moving if moving_ibm is 0 (false)
+                        vel_g = 0._wp
+                    else
+                        ! get the vector that points from the centroid to the ghost
+                        radial_vector = physical_loc - [patch_ib(patch_id)%x_centroid, &
+                                                        patch_ib(patch_id)%y_centroid, patch_ib(patch_id)%z_centroid]
+                        ! convert the angular velocity from the inertial reference frame to the fluids frame, then convert to linear velocity
+                        rotation_velocity = cross_product(matmul(patch_ib(patch_id)%rotation_matrix, patch_ib(patch_id)%angular_vel), radial_vector)
+                        do q = 1, 3
+                            ! if mibm is 1 or 2, then the boundary may be moving
+                            vel_g(q) = patch_ib(patch_id)%vel(q) ! add the linear velocity
+                            vel_g(q) = vel_g(q) + rotation_velocity(q) ! add the rotational velocity
+                        end do
+                    end if
+                end if
+
+                ! Set momentum
+                $:GPU_LOOP(parallelism='[seq]')
+                do q = momxb, momxe
+                    q_cons_vf(q)%sf(j, k, l) = rho*vel_g(q - momxb + 1)
+                    dyn_pres = dyn_pres + q_cons_vf(q)%sf(j, k, l)* &
+                               vel_g(q - momxb + 1)/2._wp
+                end do
+
+                ! Set continuity and adv vars
+                $:GPU_LOOP(parallelism='[seq]')
+                do q = 1, num_fluids
+                    q_cons_vf(q)%sf(j, k, l) = alpha_rho_IP(q)
+                    q_cons_vf(advxb + q - 1)%sf(j, k, l) = alpha_IP(q)
+                end do
+
+                ! Set color function
+                if (surface_tension) then
+                    q_cons_vf(c_idx)%sf(j, k, l) = c_IP
+                end if
+
+                ! Set Energy
+                if (bubbles_euler) then
+                    q_cons_vf(E_idx)%sf(j, k, l) = (1 - alpha_IP(1))*(gamma*pres_IP + pi_inf + dyn_pres)
+                else
+                    q_cons_vf(E_idx)%sf(j, k, l) = gamma*pres_IP + pi_inf + dyn_pres
+                end if
+                ! Set bubble vars
+                if (bubbles_euler .and. .not. qbmm) then
+                    call s_comp_n_from_prim(alpha_IP(1), r_IP, nbub, weight)
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do q = 1, nb
+                        q_cons_vf(bubxb + (q - 1)*2)%sf(j, k, l) = nbub*r_IP(q)
+                        q_cons_vf(bubxb + (q - 1)*2 + 1)%sf(j, k, l) = nbub*v_IP(q)
+                        if (.not. polytropic) then
+                            q_cons_vf(bubxb + (q - 1)*4)%sf(j, k, l) = nbub*r_IP(q)
+                            q_cons_vf(bubxb + (q - 1)*4 + 1)%sf(j, k, l) = nbub*v_IP(q)
+                            q_cons_vf(bubxb + (q - 1)*4 + 2)%sf(j, k, l) = nbub*pb_IP(q)
+                            q_cons_vf(bubxb + (q - 1)*4 + 3)%sf(j, k, l) = nbub*mv_IP(q)
+                        end if
+                    end do
+                end if
+
+                if (qbmm) then
+
+                    nbub = nmom_IP(1)
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do q = 1, nb*nmom
+                        q_cons_vf(bubxb + q - 1)%sf(j, k, l) = nbub*nmom_IP(q)
+                    end do
+
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do q = 1, nb
+                        q_cons_vf(bubxb + (q - 1)*nmom)%sf(j, k, l) = nbub
+                    end do
+
+                    if (.not. polytropic) then
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do q = 1, nb
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do r = 1, nnode
+                                pb_in(j, k, l, r, q) = presb_IP((q - 1)*nnode + r)
+                                mv_in(j, k, l, r, q) = massv_IP((q - 1)*nnode + r)
+                            end do
+                        end do
+                    end if
+                end if
+
+                if (model_eqns == 3) then
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do q = intxb, intxe
+                        q_cons_vf(q)%sf(j, k, l) = alpha_IP(q - intxb + 1)*(gammas(q - intxb + 1)*pres_IP &
+                                                                            + pi_infs(q - intxb + 1))
+                    end do
+                end if
+            end do
+            $:END_GPU_PARALLEL_LOOP()
         end if
 
         !Correct the state of the inner points in IBs
         if (num_inner_gps > 0) then
-            #:call GPU_PARALLEL_LOOP(private='[physical_loc,dyn_pres,alpha_rho_IP, alpha_IP,vel_g,rho,gamma,pi_inf,Re_K,innerp,j,k,l,q]')
-                do i = 1, num_inner_gps
+            $:GPU_PARALLEL_LOOP(private='[i,physical_loc,dyn_pres,alpha_rho_IP, alpha_IP,vel_g,rho,gamma,pi_inf,Re_K,innerp,j,k,l,q]')
+            do i = 1, num_inner_gps
 
-                    innerp = inner_points(i)
-                    j = innerp%loc(1)
-                    k = innerp%loc(2)
-                    l = innerp%loc(3)
+                innerp = inner_points(i)
+                j = innerp%loc(1)
+                k = innerp%loc(2)
+                l = innerp%loc(3)
 
-                    $:GPU_LOOP(parallelism='[seq]')
-                    do q = momxb, momxe
-                        q_cons_vf(q)%sf(j, k, l) = 0._wp
-                    end do
+                $:GPU_LOOP(parallelism='[seq]')
+                do q = momxb, momxe
+                    q_cons_vf(q)%sf(j, k, l) = 0._wp
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            end do
+            $:END_GPU_PARALLEL_LOOP()
         end if
 
     end subroutine s_ibm_correct_state
@@ -417,7 +429,7 @@ contains
 
             ! Calculate and store the precise location of the image point
             patch_id = gp%ib_patch_id
-            dist = abs(levelset_in%sf(i, j, k, patch_id))
+            dist = abs(real(levelset_in%sf(i, j, k, patch_id), kind=wp))
             norm(:) = levelset_norm_in%sf(i, j, k, patch_id, :)
             ghost_points_in(q)%ip_loc(:) = physical_loc(:) + 2*dist*norm(:)
 
@@ -791,13 +803,15 @@ contains
 
     !> Function that uses the interpolation coefficients and the current state
     !! at the cell centers in order to estimate the state at the image point
-    subroutine s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, pb_in, mv_in, presb_IP, massv_IP)
+    subroutine s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, &
+                                         pres_IP, vel_IP, c_IP, r_IP, v_IP, pb_IP, &
+                                         mv_IP, nmom_IP, pb_in, mv_in, presb_IP, massv_IP)
         $:GPU_ROUTINE(parallelism='[seq]')
         type(scalar_field), &
             dimension(sys_size), &
             intent(IN) :: q_prim_vf !< Primitive Variables
 
-        real(wp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(INOUT) :: pb_in, mv_in
+        real(stp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(IN) :: pb_in, mv_in
 
         type(ghost_point), intent(IN) :: gp
         real(wp), intent(INOUT) :: pres_IP
@@ -897,8 +911,10 @@ contains
                         if (.not. polytropic) then
                             do q = 1, nb
                                 do l = 1, nnode
-                                    presb_IP((q - 1)*nnode + l) = presb_IP((q - 1)*nnode + l) + coeff*pb_in(i, j, k, l, q)
-                                    massv_IP((q - 1)*nnode + l) = massv_IP((q - 1)*nnode + l) + coeff*mv_in(i, j, k, l, q)
+                                    presb_IP((q - 1)*nnode + l) = presb_IP((q - 1)*nnode + l) + &
+                                                                  coeff*real(pb_in(i, j, k, l, q), kind=wp)
+                                    massv_IP((q - 1)*nnode + l) = massv_IP((q - 1)*nnode + l) + &
+                                                                  coeff*real(mv_in(i, j, k, l, q), kind=wp)
                                 end do
                             end do
                         end if
@@ -922,7 +938,9 @@ contains
         integer :: i, ierr
 
         ! Clears the existing immersed boundary indices
-        ib_markers%sf = 0
+        ib_markers%sf = 0._wp
+        levelset%sf = 0._wp
+        levelset_norm%sf = 0._wp
 
         ! recalulcate the rotation matrix based upon the new angles
         do i = 1, num_ibs
@@ -936,7 +954,8 @@ contains
         ! recompute the new ib_patch locations and broadcast them.
         call s_apply_ib_patches(ib_markers%sf(0:m, 0:n, 0:p), levelset, levelset_norm)
         call s_populate_ib_buffers() ! transmits the new IB markers via MPI
-        $:GPU_UPDATE(device='[ib_markers%sf, levelset%sf, levelset_norm%sf]')
+        $:GPU_UPDATE(device='[ib_markers%sf]')
+        $:GPU_UPDATE(host='[levelset%sf, levelset_norm%sf]')
 
         ! recalculate the ghost point locations and coefficients
         call s_find_num_ghost_points(num_gps, num_inner_gps)

@@ -25,6 +25,49 @@
   </a>
 </p>
 
+<p align="center">
+  <a href="https://mflowcode.github.io/">
+    <img src="https://img.shields.io/badge/docs-mflowcode.github.io-blue" />
+  </a>
+  <a href="https://github.com/MFlowCode/MFC/discussions">
+    <img src="https://img.shields.io/badge/discussions-join-brightgreen" />
+  </a>
+  <a href="https://github.com/codespaces/new?hide_repo_select=true&ref=master&repo=MFlowCode%2FMFC">
+    <img src="https://img.shields.io/badge/Codespaces-Open-2ea44f?logo=github" />
+  </a>
+  <a href="https://hub.docker.com/r/sbryngelson/mfc">
+    <img src="https://img.shields.io/badge/dockerhub-images-important.svg?logo=Docker&style=flat" />
+  </a>	
+	
+  <a href="https://github.com/MFlowCode/homebrew-mfc">
+    <img src="https://img.shields.io/badge/homebrew-mflowcode%2Fmfc%2Fmfc-brown?logo=homebrew&style=flat" />
+  </a>	
+</p>
+
+<p align="center">
+  <a href="https://star-history.com/#MFlowCode/MFC&Date">
+    <img src="https://api.star-history.com/svg?repos=MFlowCode/MFC&type=Date&theme=dark" alt="Star History Chart" width="600"/>
+  </a>
+</p>
+
+> **If MFC helps your work, please ⭐ the repo and cite it!**
+
+### Who uses MFC
+
+MFC runs at exascale on the world's fastest supercomputers:
+- **OLCF Frontier** (>33K AMD MI250X GPUs)
+- **LLNL El Capitan** (>43K AMD MI300A APUs)
+- **LLNL Tuolumne**, **CSCS Alps**, and many others
+
+### Try MFC
+
+| Path | Command |
+| --- | --- |
+| **Codespaces** (fastest) 💨 | Click the "Codespaces" badge above to launch in 1 click |
+| **Docker** 🐳 | `docker run -it --rm --entrypoint bash sbryngelson/mfc:latest-cpu` |
+| **Homebrew** (macOS) 🍺 | `brew install mflowcode/mfc/mfc && mfc $(brew --prefix mfc)/examples/1D_sodshocktube/case.py -n 2` |
+| **Local build** 💻 | `./mfc.sh build -j $(nproc) && ./mfc.sh test -j $(nproc)` |
+
 **Welcome!**
 MFC simulates compressible multi-phase flows, [among other things](#what-else-can-this-thing-do). 
 It uses metaprogramming and is short (20K lines) and portable.
@@ -34,6 +77,9 @@ MFC is a 2025 Gordon Bell Prize Finalist.
 <p align="center">
 <a href="https://doi.org/10.48550/arXiv.2503.07953" target="_blank">
     <img src="https://img.shields.io/badge/DOI-10.48550/arXiv.2503.07953-thistle.svg"/>
+</a>
+<a href="https://doi.org/10.5281/zenodo.17049757" target="_blank">
+    <img src="https://zenodo.org/badge/DOI/10.5281/zenodo.17049757.svg"/>
 </a>
 <a href="https://github.com/MFlowCode/MFC/stargazers" target="_blank">
     <img src="https://img.shields.io/github/stars/MFlowCode/MFC?style=flat&color=maroon"/>
@@ -86,17 +132,50 @@ And here is a high-amplitude acoustic wave reflecting and emerging through a cir
 
 ## Getting started
 
+You can navigate [to this webpage](https://mflowcode.github.io/documentation/md_getting-started.html) to get you get started using MFC on your local machine, cluster, or supercomputer!
+It's rather straightforward.
+Some examples are below.
+
+### Codespaces and Containers
+
+  <a href="https://github.com/codespaces/new?hide_repo_select=true&ref=master&repo=MFlowCode%2FMFC">
+    <img src="https://img.shields.io/badge/Codespaces-Open%20in%201%20click-2ea44f?logo=github" />
+  </a>
+  
 For a _very_ quick start, open a GitHub Codespace to load a pre-configured Docker container and familiarize yourself with MFC commands.
 Click <kbd> <> Code</kbd> (green button at top right) → <kbd>Codespaces</kbd> (right tab) → <kbd>+</kbd> (create a codespace).
+
+Alternatively, run MFC directly with Docker on your local machine:
+```bash
+docker run -it --rm --entrypoint bash sbryngelson/mfc:latest-cpu
+```
+Once inside the container, navigate to `/opt/MFC` to access MFC and run examples.
 
 > ****Note:**** Codespaces is a free service with a monthly quota of compute time and storage usage.
 > It is recommended for testing commands, troubleshooting, and running simple case files without installing dependencies or building MFC on your device.
 > Don't conduct any critical work here!
-> To learn more, please see [how Docker & Containers work](https://mflowcode.github.io/documentation/docker.html).
+> To learn more, please see [how Docker & Containers work](https://mflowcode.github.io/documentation/md_docker.html).
 
-You can navigate [to this webpage](https://mflowcode.github.io/documentation/md_getting-started.html) to get you get started using MFC on your local machine, cluster, or supercomputer!
-It's rather straightforward.
-We'll give a brief introdocution for MacOS below.
+### macOS quick start (Homebrew)
+
+<a href="https://github.com/MFlowCode/homebrew-mfc">
+<img src="https://img.shields.io/badge/homebrew-mflowcode%2Fmfc%2Fmfc-brown?logo=homebrew&style=flat" />
+</a>
+
+Install the prebuilt package and run an example:
+
+```bash
+brew install mflowcode/mfc/mfc
+mkdir -p ~/mfc_quickstart && cd ~/mfc_quickstart
+cp $(brew --prefix mfc)/examples/1D_sodshocktube/case.py .
+mfc case.py -n 2
+```
+
+Use `-n X` to select the number of MPI processes. For developer commands (`build`, `test`, etc.), clone the repo and use `./mfc.sh`.
+
+### macOS from source
+
+We'll give a brief introduction for building from source on MacOS below.
 Using [brew](https://brew.sh), install MFC's dependencies:
 ```shell
 brew install coreutils python cmake fftw hdf5 gcc boost open-mpi lapack

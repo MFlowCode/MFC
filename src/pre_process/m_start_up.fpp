@@ -153,7 +153,8 @@ contains
             viscous, bubbles_lagrange, bc_x, bc_y, bc_z, num_bc_patches, &
             patch_bc, Bx0, relativity, cont_damage, igr, igr_order, &
             down_sample, recon_type, muscl_order, fft_wrt, &
-            fd_order, lag_params, interface_file, normFac, normMag, &
+            fd_order, lag_params, simplex_perturb, simplex_params, &
+            interface_file, normFac, normMag, &
             g0_ic, p0_ic
 
         ! Inquiring the status of the pre_process.inp file
@@ -949,7 +950,7 @@ contains
         call s_finalize_perturbation_module()
         call s_finalize_boundary_common_module()
         if (relax) call s_finalize_relaxation_solver_module()
-
+        call s_finalize_initial_condition_module()
         ! Finalization of the MPI environment
         call s_mpi_finalize()
     end subroutine s_finalize_modules

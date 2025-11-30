@@ -20,6 +20,7 @@ Strang = "Strang"
 TKE = "TKE"
 HSA = "HSA"
 infp = "infp"
+Sur = "Sur"
 
 [files]
 extend-exclude = ["docs/documentation/references*", "tests/", "toolchain/cce_simulation_workgroup_256.sh"]

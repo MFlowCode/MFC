@@ -1,3 +1,4 @@
+#:include 'case.fpp'
 #:include 'macros.fpp'
 
 module m_sim_helpers
@@ -59,15 +60,17 @@ contains
 
         if (p > 0) then
             !3D
-            if (grid_geometry == 3) then
-                cfl_terms = min(dx(j)/(abs(vel(1)) + c), &
-                                dy(k)/(abs(vel(2)) + c), &
-                                fltr_dtheta/(abs(vel(3)) + c))
-            else
-                cfl_terms = min(dx(j)/(abs(vel(1)) + c), &
-                                dy(k)/(abs(vel(2)) + c), &
-                                dz(l)/(abs(vel(3)) + c))
-            end if
+            #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                if (grid_geometry == 3) then
+                    cfl_terms = min(dx(j)/(abs(vel(1)) + c), &
+                                    dy(k)/(abs(vel(2)) + c), &
+                                    fltr_dtheta/(abs(vel(3)) + c))
+                else
+                    cfl_terms = min(dx(j)/(abs(vel(1)) + c), &
+                                    dy(k)/(abs(vel(2)) + c), &
+                                    dz(l)/(abs(vel(3)) + c))
+                end if
+            #:endif
         else
             !2D
             cfl_terms = min(dx(j)/(abs(vel(1)) + c), &
@@ -89,7 +92,7 @@ contains
         !! @param j x index
         !! @param k y index
         !! @param l z index
-    subroutine s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, j, k, l)
+    subroutine s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, j, k, l)
         $:GPU_ROUTINE(function_name='s_compute_enthalpy',parallelism='[seq]', &
             & cray_inline=True)
 
@@ -97,11 +100,12 @@ contains
         real(wp), intent(inout), dimension(num_fluids) :: alpha
         real(wp), intent(inout), dimension(num_vels) :: vel
         real(wp), intent(inout) :: rho, gamma, pi_inf, vel_sum, H, pres
+        real(wp), intent(out) :: qv
         integer, intent(in) :: j, k, l
         real(wp), dimension(2), intent(inout) :: Re
 
         real(wp), dimension(num_fluids) :: alpha_rho, Gs
-        real(wp) :: qv, E, G_local
+        real(wp) :: E, G_local
 
         integer :: i
 
@@ -203,31 +207,36 @@ contains
 
         ! Viscous calculations
         if (viscous) then
-            if (p > 0) then !3D
-                if (grid_geometry == 3) then
-                    fltr_dtheta = f_compute_filtered_dtheta(k, l)
-                    vcfl = maxval(dt/Re_l/rho) &
-                           /min(dx(j), dy(k), fltr_dtheta)**2._wp
-                    Rc = min(dx(j)*(abs(vel(1)) + c), &
-                             dy(k)*(abs(vel(2)) + c), &
-                             fltr_dtheta*(abs(vel(3)) + c)) &
-                         /maxval(1._wp/Re_l)
-                else
-                    vcfl = maxval(dt/Re_l/rho) &
-                           /min(dx(j), dy(k), dz(l))**2._wp
-                    Rc = min(dx(j)*(abs(vel(1)) + c), &
-                             dy(k)*(abs(vel(2)) + c), &
-                             dz(l)*(abs(vel(3)) + c)) &
-                         /maxval(1._wp/Re_l)
-                end if
-            elseif (n > 0) then !2D
-                vcfl = maxval(dt/Re_l/rho)/min(dx(j), dy(k))**2._wp
-                Rc = min(dx(j)*(abs(vel(1)) + c), &
-                         dy(k)*(abs(vel(2)) + c)) &
-                     /maxval(1._wp/Re_l)
-            else !1D
-                vcfl = maxval(dt/Re_l/rho)/dx(j)**2._wp
-                Rc = dx(j)*(abs(vel(1)) + c)/maxval(1._wp/Re_l)
+            if (p > 0) then
+                #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                    !3D
+                    if (grid_geometry == 3) then
+                        fltr_dtheta = f_compute_filtered_dtheta(k, l)
+                        vcfl_sf(j, k, l) = maxval(dt/Re_l/rho) &
+                                           /min(dx(j), dy(k), fltr_dtheta)**2._wp
+                        Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), &
+                                             dy(k)*(abs(vel(2)) + c), &
+                                             fltr_dtheta*(abs(vel(3)) + c)) &
+                                         /maxval(1._wp/Re_l)
+                    else
+                        vcfl_sf(j, k, l) = maxval(dt/Re_l/rho) &
+                                           /min(dx(j), dy(k), dz(l))**2._wp
+                        Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), &
+                                             dy(k)*(abs(vel(2)) + c), &
+                                             dz(l)*(abs(vel(3)) + c)) &
+                                         /maxval(1._wp/Re_l)
+                    end if
+                #:endif
+            elseif (n > 0) then
+                !2D
+                vcfl_sf(j, k, l) = maxval(dt/Re_l/rho)/min(dx(j), dy(k))**2._wp
+                Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), &
+                                     dy(k)*(abs(vel(2)) + c)) &
+                                 /maxval(1._wp/Re_l)
+            else
+                !1D
+                vcfl_sf(j, k, l) = maxval(dt/Re_l/rho)/dx(j)**2._wp
+                Rc_sf(j, k, l) = dx(j)*(abs(vel(1)) + c)/maxval(1._wp/Re_l)
             end if
         end if
 

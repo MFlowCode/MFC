@@ -73,19 +73,19 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         integer :: i, j, k, l !< standard iterators
 
-        #:call GPU_PARALLEL_LOOP(collapse=3)
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        rhoM(j, k, l) = 0._wp
-                        do i = 1, num_fluids
-                            rhoM(j, k, l) = rhoM(j, k, l) + &
-                                            q_cons_vf(contxb + i - 1)%sf(j, k, l)
-                        end do
+        $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    rhoM(j, k, l) = 0._wp
+                    do i = 1, num_fluids
+                        rhoM(j, k, l) = rhoM(j, k, l) + &
+                                        q_cons_vf(contxb + i - 1)%sf(j, k, l)
                     end do
                 end do
             end do
-        #:endcall GPU_PARALLEL_LOOP
+        end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_compute_mixture_density
 
@@ -104,64 +104,64 @@ contains
         call s_compute_acceleration(mytime)
         call s_compute_mixture_density(q_cons_vf)
 
-        #:call GPU_PARALLEL_LOOP(collapse=4)
-            do i = momxb, E_idx
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            rhs_vf(i)%sf(j, k, l) = 0._wp
-                        end do
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
+        do i = momxb, E_idx
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        rhs_vf(i)%sf(j, k, l) = 0._wp
                     end do
                 end do
             end do
-        #:endcall GPU_PARALLEL_LOOP
+        end do
+        $:END_GPU_PARALLEL_LOOP()
 
         if (bf_x) then ! x-direction body forces
 
-            #:call GPU_PARALLEL_LOOP(collapse=3)
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            rhs_vf(momxb)%sf(j, k, l) = rhs_vf(momxb)%sf(j, k, l) + &
-                                                        rhoM(j, k, l)*accel_bf(1)
-                            rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + &
-                                                        q_cons_vf(momxb)%sf(j, k, l)*accel_bf(1)
-                        end do
+            $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        rhs_vf(momxb)%sf(j, k, l) = rhs_vf(momxb)%sf(j, k, l) + &
+                                                    rhoM(j, k, l)*accel_bf(1)
+                        rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + &
+                                                    q_cons_vf(momxb)%sf(j, k, l)*accel_bf(1)
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            end do
+            $:END_GPU_PARALLEL_LOOP()
         end if
 
         if (bf_y) then ! y-direction body forces
 
-            #:call GPU_PARALLEL_LOOP(collapse=3)
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            rhs_vf(momxb + 1)%sf(j, k, l) = rhs_vf(momxb + 1)%sf(j, k, l) + &
-                                                            rhoM(j, k, l)*accel_bf(2)
-                            rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + &
-                                                        q_cons_vf(momxb + 1)%sf(j, k, l)*accel_bf(2)
-                        end do
+            $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        rhs_vf(momxb + 1)%sf(j, k, l) = rhs_vf(momxb + 1)%sf(j, k, l) + &
+                                                        rhoM(j, k, l)*accel_bf(2)
+                        rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + &
+                                                    q_cons_vf(momxb + 1)%sf(j, k, l)*accel_bf(2)
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            end do
+            $:END_GPU_PARALLEL_LOOP()
         end if
 
         if (bf_z) then ! z-direction body forces
 
-            #:call GPU_PARALLEL_LOOP(collapse=3)
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            rhs_vf(momxe)%sf(j, k, l) = rhs_vf(momxe)%sf(j, k, l) + &
-                                                        (rhoM(j, k, l))*accel_bf(3)
-                            rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + &
-                                                        q_cons_vf(momxe)%sf(j, k, l)*accel_bf(3)
-                        end do
+            $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        rhs_vf(momxe)%sf(j, k, l) = rhs_vf(momxe)%sf(j, k, l) + &
+                                                    rhoM(j, k, l)*accel_bf(3)
+                        rhs_vf(E_idx)%sf(j, k, l) = rhs_vf(E_idx)%sf(j, k, l) + &
+                                                    q_cons_vf(momxe)%sf(j, k, l)*accel_bf(3)
                     end do
                 end do
-            #:endcall GPU_PARALLEL_LOOP
+            end do
+            $:END_GPU_PARALLEL_LOOP()
 
         end if
 

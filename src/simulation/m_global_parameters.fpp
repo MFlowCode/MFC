@@ -694,6 +694,7 @@ contains
             fluid_pp(i)%k_v = dflt_real
             fluid_pp(i)%cp_v = dflt_real
             fluid_pp(i)%G = 0._wp
+            fluid_pp(i)%D_v = dflt_real
         end do
 
         ! Tait EOS
@@ -836,7 +837,6 @@ contains
         lag_params%T0 = dflt_real
         lag_params%Thost = dflt_real
         lag_params%x0 = dflt_real
-        lag_params%diffcoefvap = dflt_real
         lag_params%input_path = 'input/lag_bubbles.dat'
         moving_lag_bubbles = .false.
         lag_vel_model = dflt_int
@@ -963,8 +963,6 @@ contains
                         end if
                     end if
                     sys_size = bub_idx%end
-                    ! print*, 'alf idx', alf_idx
-                    ! print*, 'bub -idx beg end', bub_idx%beg, bub_idx%end
 
                     if (adv_n) then
                         n_idx = bub_idx%end + 1
@@ -1127,7 +1125,7 @@ contains
 
             Re_size_max = maxval(Re_size)
 
-            $:GPU_UPDATE(device='[Re_size,Re_size_max,viscous,shear_stress,bulk_stress]')
+            $:GPU_UPDATE(device='[Re_size,Re_size_max,shear_stress,bulk_stress]')
 
             ! Bookkeeping the indexes of any viscous fluids and any pairs of
             ! fluids whose interface will support effects of surface tension
@@ -1324,7 +1322,7 @@ contains
         $:GPU_UPDATE(device='[dt,sys_size,buff_size,pref,rhoref, &
             & gamma_idx,pi_inf_idx,E_idx,alf_idx,stress_idx, &
             & mpp_lim,bubbles_euler,hypoelasticity,alt_soundspeed, &
-            & avg_state,num_fluids,model_eqns,num_dims,num_vels, &
+            & avg_state,model_eqns, &
             & mixture_err,grid_geometry,cyl_coord,mp_weno,weno_eps, &
             & teno_CT,hyperelasticity,hyper_model,elasticity,xi_idx, &
             & B_idx,low_Mach]')
@@ -1340,18 +1338,13 @@ contains
             $:GPU_UPDATE(device='[wenoz_q]')
             $:GPU_UPDATE(device='[mhd, relativity]')
             $:GPU_UPDATE(device='[muscl_order, muscl_lim]')
+            $:GPU_UPDATE(device='[igr, igr_order]')
+            $:GPU_UPDATE(device='[num_fluids,num_dims,viscous,num_vels,nb,muscl_lim]')
         #:endif
 
-        $:GPU_ENTER_DATA(copyin='[nb,R0ref,Ca,Web,Re_inv,weight,R0, &
-            & bubbles_euler,polytropic,polydisperse,qbmm, &
-            & ptil,bubble_model,thermal,poly_sigma]')
-        $:GPU_ENTER_DATA(copyin='[R_n,R_v,phi_vn,phi_nv,Pe_c,Tw,pv, &
-            & M_n,M_v,k_n,k_v,pb0,mass_n0,mass_v0,Pe_T, &
-            & Re_trans_T,Re_trans_c,Im_trans_T,Im_trans_c,omegaN, &
-            & mul0,ss,gamma_v,mu_v,gamma_m,gamma_n,mu_n,gam]')
-        $:GPU_ENTER_DATA(copyin='[dir_idx,dir_flg,dir_idx_tau]')
+        $:GPU_UPDATE(device='[dir_idx,dir_flg,dir_idx_tau]')
 
-        $:GPU_ENTER_DATA(copyin='[relax,relax_model,palpha_eps,ptgalpha_eps]')
+        $:GPU_UPDATE(device='[relax,relax_model,palpha_eps,ptgalpha_eps]')
 
         ! Allocating grid variables for the x-, y- and z-directions
         @:ALLOCATE(x_cb(-1 - buff_size:m + buff_size))

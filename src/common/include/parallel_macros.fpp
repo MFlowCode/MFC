@@ -19,13 +19,13 @@
 
 #:enddef
 
-#:def GPU_PARALLEL_LOOP(code, collapse=None, private=None, parallelism='[gang, vector]', &
+#:def GPU_PARALLEL_LOOP_OLD(code, collapse=None, private=None, parallelism='[gang, vector]', &
     & default='present', firstprivate=None, reduction=None, reductionOp=None, &
     & copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, &
     & no_create=None, present=None, deviceptr=None, attach=None, extraAccArgs=None, extraOmpArgs=None)
 
-    #:set acc_code = ACC_PARALLEL_LOOP(code, collapse, private, parallelism, default, firstprivate, reduction, reductionOp, copy, copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, extraAccArgs)
-    #:set omp_code = OMP_PARALLEL_LOOP(code, collapse, private, parallelism, default, firstprivate, reduction, reductionOp, copy, copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, extraOmpArgs)
+    #:set acc_code = ACC_PARALLEL_LOOP_OLD(code, collapse, private, parallelism, default, firstprivate, reduction, reductionOp, copy, copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, extraAccArgs)
+    #:set omp_code = OMP_PARALLEL_LOOP_OLD(code, collapse, private, parallelism, default, firstprivate, reduction, reductionOp, copy, copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, extraOmpArgs)
 
 #if defined(MFC_OpenACC)
     $:acc_code
@@ -34,6 +34,35 @@
 #else
     $:code
 #endif
+#:enddef
+
+#:def GPU_PARALLEL_LOOP(collapse=None, private=None, parallelism='[gang, vector]', &
+    & default='present', firstprivate=None, reduction=None, reductionOp=None, &
+    & copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, &
+    & no_create=None, present=None, deviceptr=None, attach=None, extraAccArgs=None, extraOmpArgs=None)
+
+    #:set acc_directive = ACC_PARALLEL_LOOP(collapse, private, parallelism, default, firstprivate, reduction, reductionOp, copy, copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, extraAccArgs)
+    #:set omp_directive = OMP_PARALLEL_LOOP(collapse, private, parallelism, default, firstprivate, reduction, reductionOp, copy, copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, extraOmpArgs)
+
+#if defined(MFC_OpenACC)
+    $:acc_directive
+#elif defined(MFC_OpenMP)
+    $:omp_directive
+#endif
+
+#:enddef
+
+#:def END_GPU_PARALLEL_LOOP()
+
+    #:set acc_end_directive = '!$acc end parallel loop'
+    #:set omp_end_directive = END_OMP_PARALLEL_LOOP()
+
+#if defined(MFC_OpenACC)
+    $:acc_end_directive
+#elif defined(MFC_OpenMP)
+    $:omp_end_directive
+#endif
+
 #:enddef
 
 #:def GPU_ROUTINE(function_name=None, parallelism=None, nohost=False, cray_inline=False, extraAccArgs=None, extraOmpArgs=None)

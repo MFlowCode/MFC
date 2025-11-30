@@ -4,7 +4,7 @@
 
 #:include 'macros.fpp'
 
-!> @brief This module contains the procedures shared by the ensemble-averaged and volume-averaged bubble models.
+!> @brief This module contains procedures shared by the ensemble-averaged and volume-averaged bubble models.
 module m_bubbles
 
     use m_derived_types        !< Definitions of the derived types
