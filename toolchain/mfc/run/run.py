@@ -117,9 +117,7 @@ def __generate_input_files(targets, case: input.MFCInputFile):
     for target in targets:
         cons.print(f"Generating input files for [magenta]{target.name}[/magenta]...")
         cons.indent()
-        cons.print()
-        case.generate_inp(target)
-        cons.print()
+        case.generate(target)
         cons.unindent()
 
 
