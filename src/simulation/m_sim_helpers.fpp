@@ -109,33 +109,11 @@ contains
 
         integer :: i
 
-        if (igr) then
-            if (num_fluids == 1) then
-                alpha_rho(1) = q_prim_vf(contxb)%sf(j, k, l)
-                alpha(1) = 1._wp
-            else
-                $:GPU_LOOP(parallelism='[seq]')
-                do i = 1, num_fluids - 1
-                    alpha_rho(i) = q_prim_vf(i)%sf(j, k, l)
-                    alpha(i) = q_prim_vf(advxb + i - 1)%sf(j, k, l)
-                end do
-
-                alpha_rho(num_fluids) = q_prim_vf(num_fluids)%sf(j, k, l)
-                alpha(num_fluids) = 1._wp - sum(alpha(1:num_fluids - 1))
-            end if
-        else
-            $:GPU_LOOP(parallelism='[seq]')
-            do i = 1, num_fluids
-                alpha_rho(i) = q_prim_vf(i)%sf(j, k, l)
-                alpha(i) = q_prim_vf(advxb + i - 1)%sf(j, k, l)
-            end do
-        end if
+        call s_compute_species_fraction(q_prim_vf, j, k, l, alpha_rho, alpha)
 
         if (elasticity) then
             call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha, &
                                                             alpha_rho, Re, G_local, Gs)
-        elseif (bubbles_euler) then
-            call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re)
         else
             call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re)
         end if

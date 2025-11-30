@@ -369,8 +369,8 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         if num_fluids is None:
             return
 
-        # Allow one extra fluid property slot when using bubbles_euler with single-component flows
-        bub_fac = 1 if (bubbles_euler and num_fluids == 1) else 0
+        # Allow one extra fluid property slot when using bubbles_euler
+        bub_fac = 1 if (bubbles_euler) else 0
 
         for i in range(1, num_fluids + 1 + bub_fac):
             gamma = self.get(f'fluid_pp({i})%gamma')
