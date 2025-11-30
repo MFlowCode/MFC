@@ -1309,6 +1309,7 @@ contains
 #endif
     end subroutine s_convert_primitive_to_flux_variables
 
+    !>  This subroutine computes partial densities and volume fractions
     subroutine s_compute_species_fraction(q_vf, k, l, r, alpha_rho_K, alpha_K)
         $:GPU_ROUTINE(function_name='s_compute_species_fraction', &
             & parallelism='[seq]', cray_inline=True)
