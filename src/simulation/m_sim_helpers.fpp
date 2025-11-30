@@ -182,9 +182,9 @@ contains
         !! @param j x index
         !! @param k y index
         !! @param l z index
-        !! @param icfl_sf cell-centered inviscid cfl number
-        !! @param vcfl_sf (optional) cell-centered viscous CFL number
-        !! @param Rc_sf (optional) cell centered Rc
+        !! @param icfl cell-centered inviscid cfl number
+        !! @param vcfl (optional) cell-centered viscous CFL number
+        !! @param Rc (optional) cell centered Rc
     subroutine s_compute_stability_from_dt(vel, c, rho, Re_l, j, k, l, icfl, vcfl, Rc)
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in), dimension(num_vels) :: vel
@@ -212,16 +212,16 @@ contains
                     !3D
                     if (grid_geometry == 3) then
                         fltr_dtheta = f_compute_filtered_dtheta(k, l)
-                        vcfl_sf(j, k, l) = maxval(dt/Re_l/rho) &
+                        vcfl = maxval(dt/Re_l/rho) &
                                            /min(dx(j), dy(k), fltr_dtheta)**2._wp
-                        Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), &
+                        Rc = min(dx(j)*(abs(vel(1)) + c), &
                                              dy(k)*(abs(vel(2)) + c), &
                                              fltr_dtheta*(abs(vel(3)) + c)) &
                                          /maxval(1._wp/Re_l)
                     else
-                        vcfl_sf(j, k, l) = maxval(dt/Re_l/rho) &
+                        vcfl = maxval(dt/Re_l/rho) &
                                            /min(dx(j), dy(k), dz(l))**2._wp
-                        Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), &
+                        Rc = min(dx(j)*(abs(vel(1)) + c), &
                                              dy(k)*(abs(vel(2)) + c), &
                                              dz(l)*(abs(vel(3)) + c)) &
                                          /maxval(1._wp/Re_l)
@@ -229,14 +229,14 @@ contains
                 #:endif
             elseif (n > 0) then
                 !2D
-                vcfl_sf(j, k, l) = maxval(dt/Re_l/rho)/min(dx(j), dy(k))**2._wp
-                Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), &
+                vcfl = maxval(dt/Re_l/rho)/min(dx(j), dy(k))**2._wp
+                Rc = min(dx(j)*(abs(vel(1)) + c), &
                                      dy(k)*(abs(vel(2)) + c)) &
                                  /maxval(1._wp/Re_l)
             else
                 !1D
-                vcfl_sf(j, k, l) = maxval(dt/Re_l/rho)/dx(j)**2._wp
-                Rc_sf(j, k, l) = dx(j)*(abs(vel(1)) + c)/maxval(1._wp/Re_l)
+                vcfl = maxval(dt/Re_l/rho)/dx(j)**2._wp
+                Rc = dx(j)*(abs(vel(1)) + c)/maxval(1._wp/Re_l)
             end if
         end if
 

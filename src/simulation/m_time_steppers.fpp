@@ -536,7 +536,7 @@ contains
                 end if
             end if
 
-            if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=s)
+            if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(q_prim_vf, stage=s)
 
             $:GPU_PARALLEL_LOOP(collapse=4)
             do i = 1, sys_size
@@ -561,6 +561,7 @@ contains
                         end do
                     end do
                 end do
+            end do
             $:END_GPU_PARALLEL_LOOP()
 
             !Evolve pb and mv for non-polytropic qbmm
@@ -721,8 +722,9 @@ contains
                 idwint)
         end if
 
+        dt_local = huge(1.0_wp)
         $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H, qv]', &
-            & recution='[[dt_local]]', reductionOp='[min]')
+            & reduction='[[dt_local]]', reductionOp='[min]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m

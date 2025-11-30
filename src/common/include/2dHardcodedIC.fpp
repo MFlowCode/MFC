@@ -9,34 +9,6 @@
     ! # 208
     real(wp) :: ei, d, fsm, alpha_air, alpha_sf6
 
-    real(wp), allocatable, dimension(:, :) :: ih
-    integer :: pos, start, end
-    logical :: file_exist
-    character(len=10000) :: line
-    character(len=25) :: value
-
-    if (patch_icpp(patch_id)%hcid == 207) then
-        allocate (ih(0:n_glb, 0:0))
-        if (interface_file == '.') then
-            call s_mpi_abort("Error: interface_file must be specified for hcid=304")
-        else
-            inquire (file=trim(interface_file), exist=file_exist)
-            if (file_exist) then
-                open (unit=10, file=trim(interface_file), status="old", action="read")
-                do i = 0, n_glb
-                    read (10, '(A)') line  ! Read a full line as a string
-                    value = trim(line)
-                    read (value, *) ih(i, 0)  ! Convert string to numeric value
-                    if (.not. f_is_default(normMag)) ih(i, 0) = ih(i, 0)*normMag
-                    if (.not. f_is_default(normFac)) ih(i, 0) = ih(i, 0) + normFac
-                end do
-                close (10)
-            else
-                call s_mpi_abort("Error: interface_file specified for hcid=207 does not exist")
-            end if
-        end if
-    end if
-
     eps = 1.e-9_wp
 #:enddef
 

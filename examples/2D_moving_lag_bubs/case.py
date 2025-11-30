@@ -134,6 +134,7 @@ data = {
     "fluid_pp(2)%M_v": MW_g,
     "fluid_pp(2)%k_v": k_g,
     "fluid_pp(2)%cp_v": cp_g,
+    "fluid_pp(2)%D_v": diffVapor,
     # Viscosity
     "viscous": "T",
     "fluid_pp(1)%Re(1)": 1.0 / (mu_host / (rho0 * c0 * L0)),
@@ -186,7 +187,6 @@ data = {
     "lag_params%rho0": rho0,
     "lag_params%T0": T0,
     "lag_params%x0": L0,
-    "lag_params%diffcoefvap": diffVapor,
     "lag_params%Thost": T_host,
     "lag_params%charwidth": cw,
 }

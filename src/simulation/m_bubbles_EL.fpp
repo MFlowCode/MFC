@@ -1450,107 +1450,107 @@ contains
         real(wp) :: offset
         integer, dimension(3) :: cell
 
-        #:call GPU_PARALLEL_LOOP(private='[cell]')
-            do k = 1, n_el_bubs_loc
-                keep_bubble(k) = 1
-                wrap_bubble_loc(k, :) = 0
-                wrap_bubble_dir(k, :) = 0
+        $:GPU_PARALLEL_LOOP(private='[k]')
+        do k = 1, n_el_bubs_loc
+            keep_bubble(k) = 1
+            wrap_bubble_loc(k, :) = 0
+            wrap_bubble_dir(k, :) = 0
 
-                ! Relocate bubbles at solid boundaries and delete bubbles that leave
-                ! buffer regions
-                if (any(bc_x%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
-                    .and. mtn_pos(k, 1, dest) < x_cb(-1) + intfc_rad(k, dest)) then
-                    mtn_pos(k, 1, dest) = x_cb(-1) + intfc_rad(k, dest)
-                elseif (any(bc_x%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
-                        .and. mtn_pos(k, 1, dest) > x_cb(m) - intfc_rad(k, dest)) then
-                    mtn_pos(k, 1, dest) = x_cb(m) - intfc_rad(k, dest)
-                elseif (bc_x%beg == BC_PERIODIC .and. mtn_pos(k, 1, dest) < pcomm_coords(1)%beg .and. &
-                        mtn_posPrev(k, 1, dest) > pcomm_coords(1)%beg) then
-                    wrap_bubble_dir(k, 1) = 1
-                    wrap_bubble_loc(k, 1) = -1
-                elseif (bc_x%end == BC_PERIODIC .and. mtn_pos(k, 1, dest) > pcomm_coords(1)%end .and. &
-                        mtn_posPrev(k, 1, dest) < pcomm_coords(1)%end) then
-                    wrap_bubble_dir(k, 1) = 1
-                    wrap_bubble_loc(k, 1) = 1
-                elseif (mtn_pos(k, 1, dest) >= x_cb(m + buff_size - fd_number)) then
+            ! Relocate bubbles at solid boundaries and delete bubbles that leave
+            ! buffer regions
+            if (any(bc_x%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
+                .and. mtn_pos(k, 1, dest) < x_cb(-1) + intfc_rad(k, dest)) then
+                mtn_pos(k, 1, dest) = x_cb(-1) + intfc_rad(k, dest)
+            elseif (any(bc_x%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
+                    .and. mtn_pos(k, 1, dest) > x_cb(m) - intfc_rad(k, dest)) then
+                mtn_pos(k, 1, dest) = x_cb(m) - intfc_rad(k, dest)
+            elseif (bc_x%beg == BC_PERIODIC .and. mtn_pos(k, 1, dest) < pcomm_coords(1)%beg .and. &
+                    mtn_posPrev(k, 1, dest) > pcomm_coords(1)%beg) then
+                wrap_bubble_dir(k, 1) = 1
+                wrap_bubble_loc(k, 1) = -1
+            elseif (bc_x%end == BC_PERIODIC .and. mtn_pos(k, 1, dest) > pcomm_coords(1)%end .and. &
+                    mtn_posPrev(k, 1, dest) < pcomm_coords(1)%end) then
+                wrap_bubble_dir(k, 1) = 1
+                wrap_bubble_loc(k, 1) = 1
+            elseif (mtn_pos(k, 1, dest) >= x_cb(m + buff_size - fd_number)) then
+                keep_bubble(k) = 0
+            elseif (mtn_pos(k, 1, dest) < x_cb(fd_number - buff_size - 1)) then
+                keep_bubble(k) = 0
+            end if
+
+            if (any(bc_y%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
+                .and. mtn_pos(k, 2, dest) < y_cb(-1) + intfc_rad(k, dest)) then
+                mtn_pos(k, 2, dest) = y_cb(-1) + intfc_rad(k, dest)
+            else if (any(bc_y%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
+                     .and. mtn_pos(k, 2, dest) > y_cb(n) - intfc_rad(k, dest)) then
+                mtn_pos(k, 2, dest) = y_cb(n) - intfc_rad(k, dest)
+            elseif (bc_y%beg == BC_PERIODIC .and. mtn_pos(k, 2, dest) < pcomm_coords(2)%beg .and. &
+                    mtn_posPrev(k, 2, dest) > pcomm_coords(2)%beg) then
+                wrap_bubble_dir(k, 2) = 1
+                wrap_bubble_loc(k, 2) = -1
+            elseif (bc_y%end == BC_PERIODIC .and. mtn_pos(k, 2, dest) > pcomm_coords(2)%end .and. &
+                    mtn_posPrev(k, 2, dest) < pcomm_coords(2)%end) then
+                wrap_bubble_dir(k, 2) = 1
+                wrap_bubble_loc(k, 2) = 1
+            elseif (mtn_pos(k, 2, dest) >= y_cb(n + buff_size - fd_number)) then
+                keep_bubble(k) = 0
+            elseif (mtn_pos(k, 2, dest) < y_cb(fd_number - buff_size - 1)) then
+                keep_bubble(k) = 0
+            end if
+
+            if (p > 0) then
+                if (any(bc_z%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
+                    .and. mtn_pos(k, 3, dest) < z_cb(-1) + intfc_rad(k, dest)) then
+                    mtn_pos(k, 3, dest) = z_cb(-1) + intfc_rad(k, dest)
+                else if (any(bc_z%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
+                         .and. mtn_pos(k, 3, dest) > z_cb(p) - intfc_rad(k, dest)) then
+                    mtn_pos(k, 3, dest) = z_cb(p) - intfc_rad(k, dest)
+                elseif (bc_z%beg == BC_PERIODIC .and. mtn_pos(k, 3, dest) < pcomm_coords(3)%beg .and. &
+                        mtn_posPrev(k, 3, dest) > pcomm_coords(3)%beg) then
+                    wrap_bubble_dir(k, 3) = 1
+                    wrap_bubble_loc(k, 3) = -1
+                elseif (bc_z%end == BC_PERIODIC .and. mtn_pos(k, 3, dest) > pcomm_coords(3)%end .and. &
+                        mtn_posPrev(k, 3, dest) < pcomm_coords(3)%end) then
+                    wrap_bubble_dir(k, 3) = 1
+                    wrap_bubble_loc(k, 3) = 1
+                elseif (mtn_pos(k, 3, dest) >= z_cb(p + buff_size - fd_number)) then
                     keep_bubble(k) = 0
-                elseif (mtn_pos(k, 1, dest) < x_cb(fd_number - buff_size - 1)) then
+                elseif (mtn_pos(k, 3, dest) < z_cb(fd_number - buff_size - 1)) then
+                    keep_bubble(k) = 0
+                end if
+            end if
+
+            if (keep_bubble(k) == 1) then
+                ! Remove bubbles that are no longer in a liquid
+                cell = fd_number - buff_size
+                call s_locate_cell(mtn_pos(k, 1:3, dest), cell, mtn_s(k, 1:3, dest))
+
+                if (q_prim_vf(advxb)%sf(cell(1), cell(2), cell(3)) < (1._wp - lag_params%valmaxvoid)) then
                     keep_bubble(k) = 0
                 end if
 
-                if (any(bc_y%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
-                    .and. mtn_pos(k, 2, dest) < y_cb(-1) + intfc_rad(k, dest)) then
-                    mtn_pos(k, 2, dest) = y_cb(-1) + intfc_rad(k, dest)
-                else if (any(bc_y%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
-                         .and. mtn_pos(k, 2, dest) > y_cb(n) - intfc_rad(k, dest)) then
-                    mtn_pos(k, 2, dest) = y_cb(n) - intfc_rad(k, dest)
-                elseif (bc_y%beg == BC_PERIODIC .and. mtn_pos(k, 2, dest) < pcomm_coords(2)%beg .and. &
-                        mtn_posPrev(k, 2, dest) > pcomm_coords(2)%beg) then
-                    wrap_bubble_dir(k, 2) = 1
-                    wrap_bubble_loc(k, 2) = -1
-                elseif (bc_y%end == BC_PERIODIC .and. mtn_pos(k, 2, dest) > pcomm_coords(2)%end .and. &
-                        mtn_posPrev(k, 2, dest) < pcomm_coords(2)%end) then
-                    wrap_bubble_dir(k, 2) = 1
-                    wrap_bubble_loc(k, 2) = 1
-                elseif (mtn_pos(k, 2, dest) >= y_cb(n + buff_size - fd_number)) then
-                    keep_bubble(k) = 0
-                elseif (mtn_pos(k, 2, dest) < y_cb(fd_number - buff_size - 1)) then
-                    keep_bubble(k) = 0
-                end if
-
-                if (p > 0) then
-                    if (any(bc_z%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
-                        .and. mtn_pos(k, 3, dest) < z_cb(-1) + intfc_rad(k, dest)) then
-                        mtn_pos(k, 3, dest) = z_cb(-1) + intfc_rad(k, dest)
-                    else if (any(bc_z%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
-                             .and. mtn_pos(k, 3, dest) > z_cb(p) - intfc_rad(k, dest)) then
-                        mtn_pos(k, 3, dest) = z_cb(p) - intfc_rad(k, dest)
-                    elseif (bc_z%beg == BC_PERIODIC .and. mtn_pos(k, 3, dest) < pcomm_coords(3)%beg .and. &
-                            mtn_posPrev(k, 3, dest) > pcomm_coords(3)%beg) then
-                        wrap_bubble_dir(k, 3) = 1
-                        wrap_bubble_loc(k, 3) = -1
-                    elseif (bc_z%end == BC_PERIODIC .and. mtn_pos(k, 3, dest) > pcomm_coords(3)%end .and. &
-                            mtn_posPrev(k, 3, dest) < pcomm_coords(3)%end) then
-                        wrap_bubble_dir(k, 3) = 1
-                        wrap_bubble_loc(k, 3) = 1
-                    elseif (mtn_pos(k, 3, dest) >= z_cb(p + buff_size - fd_number)) then
-                        keep_bubble(k) = 0
-                    elseif (mtn_pos(k, 3, dest) < z_cb(fd_number - buff_size - 1)) then
-                        keep_bubble(k) = 0
-                    end if
-                end if
-
-                if (keep_bubble(k) == 1) then
-                    ! Remove bubbles that are no longer in a liquid
+                ! Move bubbles back to surface of IB
+                if (ib) then
                     cell = fd_number - buff_size
                     call s_locate_cell(mtn_pos(k, 1:3, dest), cell, mtn_s(k, 1:3, dest))
 
-                    if (q_prim_vf(advxb)%sf(cell(1), cell(2), cell(3)) < (1._wp - lag_params%valmaxvoid)) then
-                        keep_bubble(k) = 0
-                    end if
+                    if (ib_markers%sf(cell(1), cell(2), cell(3)) /= 0) then
+                        patch_id = ib_markers%sf(cell(1), cell(2), cell(3))
 
-                    ! Move bubbles back to surface of IB
-                    if (ib) then
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = 1, num_dims
+                            mtn_pos(k, i, dest) = mtn_pos(k, i, dest) - &
+                                                  levelset_norm%sf(cell(1), cell(2), cell(3), patch_id, i) &
+                                                  *levelset%sf(cell(1), cell(2), cell(3), patch_id)
+                        end do
+
                         cell = fd_number - buff_size
                         call s_locate_cell(mtn_pos(k, 1:3, dest), cell, mtn_s(k, 1:3, dest))
-
-                        if (ib_markers%sf(cell(1), cell(2), cell(3)) /= 0) then
-                            patch_id = ib_markers%sf(cell(1), cell(2), cell(3))
-
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do i = 1, num_dims
-                                mtn_pos(k, i, dest) = mtn_pos(k, i, dest) - &
-                                                      levelset_norm%sf(cell(1), cell(2), cell(3), patch_id, i) &
-                                                      *levelset%sf(cell(1), cell(2), cell(3), patch_id)
-                            end do
-
-                            cell = fd_number - buff_size
-                            call s_locate_cell(mtn_pos(k, 1:3, dest), cell, mtn_s(k, 1:3, dest))
-                        end if
                     end if
                 end if
-            end do
-        #:endcall GPU_PARALLEL_LOOP
+            end if
+        end do
+        $:END_GPU_PARALLEL_LOOP()
 
         call nvtxStartRange("LAG-BC")
         call nvtxStartRange("LAG-BC-DEV2HOST")
@@ -2163,7 +2163,7 @@ contains
 
         $:GPU_PARALLEL_LOOP(private='[k]', reduction='[[Rmax_glb], [Rmin_glb]]', &
             & reductionOp='[MAX, MIN]', copy='[Rmax_glb,Rmin_glb]')
-        do k = 1, nBubs
+        do k = 1, n_el_bubs_loc
             Rmax_glb = max(Rmax_glb, intfc_rad(k, 1)/bub_R0(k))
             Rmin_glb = min(Rmin_glb, intfc_rad(k, 1)/bub_R0(k))
             Rmax_stats(k) = max(Rmax_stats(k), intfc_rad(k, 1)/bub_R0(k))

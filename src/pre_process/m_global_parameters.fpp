@@ -457,7 +457,6 @@ contains
         lag_params%T0 = dflt_real
         lag_params%Thost = dflt_real
         lag_params%x0 = dflt_real
-        lag_params%diffcoefvap = dflt_real
 
         do i = 1, num_patches_max
             patch_icpp(i)%geometry = dflt_int
