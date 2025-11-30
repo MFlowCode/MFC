@@ -218,13 +218,24 @@ contains
 
         character(LEN=path_len + 3*name_len) :: file_path !<
             !! Relative path to the probe data file in the case directory
+        
+        character(LEN=path_len) :: dir_path !<
+            !! Path to the D directory
 
         integer :: i !< Generic loop iterator
         logical :: file_exist
+        logical :: dir_exist
 
+        ! For bubble cases, wait until probe is ready (after initialization)
+        ! For non-bubble cases, proceed immediately
         if (bubbles_euler .and. .not. bubble_probe_ready) then
             return
         end if
+
+        ! Create the D directory if it doesn't exist
+        write (dir_path, '(A)') trim(case_dir)//'/D'
+        call my_inquire(trim(dir_path)//'/.', dir_exist)
+        if (.not. dir_exist) call s_create_directory(trim(dir_path))
 
         do i = 1, num_probes
             ! Generating the relative path to the data file
@@ -286,7 +297,8 @@ contains
         real(wp), dimension(2) :: Re         !< Cell-avg. Reynolds numbers
         integer :: j, k, l
 
-        ! Skip ICFL calculation for bubbles until properly initialized after first RHS
+        ! For bubble cases, wait until probe is ready (after initialization)
+        ! For non-bubble cases, proceed immediately  
         if (bubbles_euler .and. .not. bubble_probe_ready) then
             return
         end if
@@ -376,13 +388,13 @@ contains
             write (3, *) ! new line
 
             ! Check for problematic ICFL values
-            ! For bubble cases: allow both NaN and Infinity (can occur during startup/transients)
-            ! For non-bubble cases: NaN is always bad, Infinity might be bad
-            if (.not. f_approx_equal(icfl_max_glb, icfl_max_glb) .and. .not. bubbles_euler) then
-                ! ICFL is NaN in non-bubble case - this is always bad
+            ! Note: If bubbles not initialized, this function returns early (line 290-292)
+            ! so these checks only run after proper initialization
+            if (.not. f_approx_equal(icfl_max_glb, icfl_max_glb)) then
+                ! ICFL is NaN - this should never happen after proper initialization
                 call s_mpi_abort('ICFL is NaN. Exiting.')
-            elseif (icfl_max_glb > 1._wp .and. icfl_max_glb < huge(1._wp) .and. .not. bubbles_euler) then
-                ! ICFL > 1.0 but finite in non-bubble case - stability problem
+            elseif (icfl_max_glb > 1._wp .and. icfl_max_glb < huge(1._wp)) then
+                ! ICFL > 1.0 but finite - stability problem
                 print *, 'icfl', icfl_max_glb
                 call s_mpi_abort('ICFL is greater than 1.0. Exiting.')
             end if
@@ -1160,7 +1172,8 @@ contains
 
         real(wp) :: rhoYks(1:num_species)
 
-        ! Skip probe writing for bubble cases until they are properly initialized
+        ! For bubble cases, wait until probe is ready (after initialization)
+        ! For non-bubble cases, proceed immediately
         if (bubbles_euler .and. .not. bubble_probe_ready) then
             return
         end if
@@ -1609,16 +1622,16 @@ contains
                         write (i + 30, '(6x,f12.6,f24.8,f24.8,f24.8,f24.8,'// &
                                'f24.8,f24.8,f24.8,f24.8,f24.8,f24.8,f24.8,f24.8,f24.8)') &
                             nondim_time, &
-                            q_cons_vf(1)%sf(j - 2, 0, 0), &
-                            q_cons_vf(2)%sf(j - 2, 0, 0), &
-                            q_cons_vf(3)%sf(j - 2, 0, 0), &
-                            q_cons_vf(4)%sf(j - 2, 0, 0), &
-                            q_cons_vf(5)%sf(j - 2, 0, 0), &
-                            q_cons_vf(6)%sf(j - 2, 0, 0), &
-                            q_cons_vf(7)%sf(j - 2, 0, 0), &
-                            q_cons_vf(8)%sf(j - 2, 0, 0), &
-                            q_cons_vf(9)%sf(j - 2, 0, 0), &
-                            q_cons_vf(10)%sf(j - 2, 0, 0), &
+                            q_cons_vf(1)%sf(j, 0, 0), &
+                            q_cons_vf(2)%sf(j, 0, 0), &
+                            q_cons_vf(3)%sf(j, 0, 0), &
+                            q_cons_vf(4)%sf(j, 0, 0), &
+                            q_cons_vf(5)%sf(j, 0, 0), &
+                            q_cons_vf(6)%sf(j, 0, 0), &
+                            q_cons_vf(7)%sf(j, 0, 0), &
+                            q_cons_vf(8)%sf(j, 0, 0), &
+                            q_cons_vf(9)%sf(j, 0, 0), &
+                            q_cons_vf(10)%sf(j, 0, 0), &
                             nbub, &
                             R(1), &
                             Rdot(1)
@@ -1877,7 +1890,13 @@ contains
 
         integer :: i, m_ds, n_ds, p_ds
 
-        bubble_probe_ready = .false.
+        ! For non-bubble cases, probes are ready immediately
+        ! For bubble cases, we wait until after first RHS (FD arrays must be allocated first)
+        if (bubbles_euler) then
+            bubble_probe_ready = .false.
+        else
+            bubble_probe_ready = .true.
+        end if
 
         ! Allocating/initializing ICFL, VCFL, CCFL and Rc stability criteria
         if (run_time_info) then
@@ -1938,6 +1957,8 @@ contains
 
     subroutine s_mark_bubble_probe_ready()
         bubble_probe_ready = .true.
+        ! Now that FD arrays are allocated, we can safely open probe files
+        if (proc_rank == 0) call s_open_probe_files()
     end subroutine s_mark_bubble_probe_ready
 
 end module m_data_output

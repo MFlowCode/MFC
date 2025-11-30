@@ -136,6 +136,15 @@ def compile(casepath: str) -> typing.Tuple[Pack, str]:
                 lines = content.splitlines()
                 content = "\n".join(lines[1:])  # Skip the first line
                 doubles = _extract_doubles(content)
+            elif "probe" in short_filepath or "integral" in short_filepath:
+                # Probe and integral files have format: time value1 value2 ... valueN
+                # We want to extract all values except the time column
+                lines = content.splitlines()
+                doubles = []
+                for line in lines:
+                    line_doubles = _extract_doubles(line)
+                    if line_doubles:
+                        doubles.extend(line_doubles[1:])  # Skip time (first column)
             else:
                 # Every line is <x> <y> <z> <value> (<y> and <z> are optional). So the
                 # number of dimensions is the number of doubles in the first line minus 1.

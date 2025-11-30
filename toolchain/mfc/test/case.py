@@ -38,6 +38,7 @@ BASE_CFG = {
     'avg_state'                    : 2,
     'format'                       : 1,
     'precision'                    : 2,
+    'probe_wrt'                    : 'F',
 
     'patch_icpp(1)%pres'           : 1.0,
     'patch_icpp(1)%alpha_rho(1)'   : 1.E+00,
