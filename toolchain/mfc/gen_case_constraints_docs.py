@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import ast
 import json
+import sys
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -391,6 +392,26 @@ PLAYBOOK_EXAMPLES = [
 ]
 
 
+def validate_playbook_examples():
+    """Check that all curated examples exist and error if any are missing"""
+    missing = []
+    for entry in PLAYBOOK_EXAMPLES:
+        case_path = EXAMPLES_DIR / entry.case_dir / "case.py"
+        if not case_path.exists():
+            missing.append(entry.case_dir)
+
+    if missing:
+        print("=" * 70, file=sys.stderr)
+        print("ERROR: Missing playbook examples:", file=sys.stderr)
+        for example in missing:
+            print(f"  - {example}", file=sys.stderr)
+        print("\nPlease update PLAYBOOK_EXAMPLES in:", file=sys.stderr)
+        print(f"  {Path(__file__).relative_to(REPO_ROOT)}", file=sys.stderr)
+        print("\nRemove the missing examples from the list or restore them.", file=sys.stderr)
+        print("=" * 70, file=sys.stderr)
+        sys.exit(1)
+
+
 def load_case_params(case_dir: str) -> Dict[str, Any]:
     """Load parameters from a case.py file"""
     case_path = EXAMPLES_DIR / case_dir / "case.py"
@@ -571,6 +592,9 @@ def render_playbook_card(entry: PlaybookEntry, summary: Dict[str, Any]) -> str: 
 def generate_playbook() -> str:
     """Generate complete playbook from curated examples"""
     lines = []
+
+    # Validate examples - will exit(1) if any are missing
+    validate_playbook_examples()
 
     lines.append("## 🧩 Case Design Playbook\n")
     lines.append(
