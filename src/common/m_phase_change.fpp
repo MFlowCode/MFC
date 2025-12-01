@@ -261,7 +261,7 @@ contains
 
                         ! alpha*rho*e
                         if (model_eqns == 3) then
-                          q_cons_vf(i + intxb - 1)%sf(j, k, l) = q_cons_vf(i + contxb - 1)%sf(j, k, l)*ek(i)
+                            q_cons_vf(i + intxb - 1)%sf(j, k, l) = q_cons_vf(i + contxb - 1)%sf(j, k, l)*ek(i)
                         end if
 
                         ! Total entropy
