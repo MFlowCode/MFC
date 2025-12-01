@@ -277,8 +277,11 @@ contains
         real(wp) :: Rc_min_loc, Rc_min_glb !< Rc   stability extrema on local and global grids
         real(wp) :: icfl, vcfl, Rc
 
+        icfl_max_loc = 0._wp
+        vcfl_max_loc = 0._wp
+        Rc_min_loc = huge(1.0_wp)
         ! Computing Stability Criteria at Current Time-step
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[j,k,l,vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H, qv]', &
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[j,k,l,vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H, qv, icfl, vcfl, Rc]', &
             & reduction='[[icfl_max_loc,vcfl_max_loc],[Rc_min_loc]]', reductionOp='[max,min]')
         do l = 0, p
             do k = 0, n
