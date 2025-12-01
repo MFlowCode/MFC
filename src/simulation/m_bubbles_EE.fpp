@@ -242,34 +242,26 @@ contains
                             myalpha(ii) = q_cons_vf(advxb + ii - 1)%sf(j, k, l)
                         end do
 
-                        myRho = 0._wp
-                        n_tait = 0._wp
-                        B_tait = 0._wp
+                        if (num_fluids == 1) then
+                            myRho = myalpha_rho(1)
+                            n_tait = gammas(1)
+                            B_tait = pi_infs(1)/pi_fac
+                        else
+                            myRho = 0._wp
+                            n_tait = 0._wp
+                            B_tait = 0._wp
 
-                        if (mpp_lim .and. (num_fluids > 2)) then
                             $:GPU_LOOP(parallelism='[seq]')
                             do ii = 1, num_fluids
                                 myRho = myRho + myalpha_rho(ii)
                                 n_tait = n_tait + myalpha(ii)*gammas(ii)
-                                B_tait = B_tait + myalpha(ii)*pi_infs(ii)
+                                B_tait = B_tait + myalpha(ii)*pi_infs(ii)/pi_fac
                             end do
-                        else if (num_fluids > 2) then
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do ii = 1, num_fluids - 1
-                                myRho = myRho + myalpha_rho(ii)
-                                n_tait = n_tait + myalpha(ii)*gammas(ii)
-                                B_tait = B_tait + myalpha(ii)*pi_infs(ii)
-                            end do
-                        else
-                            myRho = myalpha_rho(1)
-                            n_tait = gammas(1)
-                            B_tait = pi_infs(1)/pi_fac
                         end if
 
                         n_tait = 1._wp/n_tait + 1._wp !make this the usual little 'gamma'
                         B_tait = B_tait*(n_tait - 1)/n_tait ! make this the usual pi_inf
 
-                        myRho = q_prim_vf(1)%sf(j, k, l)
                         myP = q_prim_vf(E_idx)%sf(j, k, l)
                         alf = q_prim_vf(alf_idx)%sf(j, k, l)
                         myR = q_prim_vf(rs(q))%sf(j, k, l)

@@ -357,6 +357,8 @@ module m_derived_types
         real(wp) :: k_v     !< Bubble constants (see Preston (2007), Ando (2010))
         real(wp) :: cp_v
         real(wp) :: G
+        real(wp) :: D_v     !< Vapor diffusivity in the gas
+
     end type physical_parameters
 
     type mpi_io_airfoil_ib_var
@@ -459,7 +461,6 @@ module m_derived_types
         real(wp) :: rho0             !< Reference density
         real(wp) :: T0, Thost        !< Reference temperature and host temperature
         real(wp) :: x0               !< Reference length
-        real(wp) :: diffcoefvap      !< Vapor diffusivity in the gas
 
     end type bubbles_lagrange_parameters
 

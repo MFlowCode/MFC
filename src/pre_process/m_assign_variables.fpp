@@ -213,11 +213,8 @@ contains
         p0 = 101325._wp
         pres_mag = 1.e-1_wp
         loc = x_cc(177)
-        n_tait = fluid_pp(1)%gamma
-        B_tait = fluid_pp(1)%pi_inf
-
-        n_tait = 1._wp/n_tait + 1._wp
-        B_tait = B_tait*(n_tait - 1._wp)/n_tait
+        n_tait = gs_min(1)
+        B_tait = ps_inf(1)
 
         if (j < 177) then
             q_prim_vf(E_idx)%sf(j, k, l) = 0.5_wp*q_prim_vf(E_idx)%sf(j, k, l)
@@ -563,9 +560,9 @@ contains
             end do
         else
             !get mixture density from pressure via Tait EOS
-            pi_inf = fluid_pp(1)%pi_inf
-            gamma = fluid_pp(1)%gamma
-            lit_gamma = (1._wp + gamma)/gamma
+            pi_inf = pi_infs(1)
+            gamma = gammas(1)
+            lit_gamma = gs_min(1)
 
             ! \rho = (( p_l + pi_inf)/( p_ref + pi_inf))**(1/little_gam) * rhoref(1-alf)
             q_prim_vf(1)%sf(j, k, l) = &

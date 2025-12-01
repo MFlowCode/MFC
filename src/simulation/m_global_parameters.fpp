@@ -680,6 +680,7 @@ contains
             fluid_pp(i)%k_v = dflt_real
             fluid_pp(i)%cp_v = dflt_real
             fluid_pp(i)%G = 0._wp
+            fluid_pp(i)%D_v = dflt_real
         end do
 
         ! Tait EOS
@@ -817,7 +818,6 @@ contains
         lag_params%T0 = dflt_real
         lag_params%Thost = dflt_real
         lag_params%x0 = dflt_real
-        lag_params%diffcoefvap = dflt_real
 
         ! Continuum damage model
         tau_star = dflt_real
@@ -941,8 +941,6 @@ contains
                         end if
                     end if
                     sys_size = bub_idx%end
-                    ! print*, 'alf idx', alf_idx
-                    ! print*, 'bub -idx beg end', bub_idx%beg, bub_idx%end
 
                     if (adv_n) then
                         n_idx = bub_idx%end + 1

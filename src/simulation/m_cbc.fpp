@@ -813,11 +813,7 @@ contains
                             adv_local(i) = q_prim_rs${XYZ}$_vf(0, k, r, E_idx + i)
                         end do
 
-                        if (bubbles_euler) then
-                            call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, qv, adv_local, alpha_rho, Re_cbc)
-                        else
-                            call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, adv_local, alpha_rho, Re_cbc)
-                        end if
+                        call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, adv_local, alpha_rho, Re_cbc)
 
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, contxe
@@ -854,7 +850,7 @@ contains
                         H = (E + pres)/rho
 
                         ! Compute mixture sound speed
-                        call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv_local, vel_K_sum, 0._wp, c)
+                        call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv_local, vel_K_sum, 0._wp, c, qv)
 
                         ! First-Order Spatial Derivatives of Primitive Variables
 
