@@ -428,7 +428,8 @@ def load_case_params(case_dir: str) -> Dict[str, Any]:
         )
         params = json.loads(result.stdout)
         return params
-    except (subprocess.CalledProcessError, json.JSONDecodeError, subprocess.TimeoutExpired):
+    except (subprocess.CalledProcessError, json.JSONDecodeError, subprocess.TimeoutExpired) as e:
+        print(f"WARNING: Failed to load params from {case_path}: {e}", file=sys.stderr)
         return {}
 
 
@@ -620,7 +621,8 @@ def generate_playbook() -> str:
                 summary = summarize_case_params(params)
                 card = render_playbook_card(entry, summary)
                 lines.append(card)
-            except Exception:  # pylint: disable=broad-except
+            except Exception as e:  # pylint: disable=broad-except
+                print(f"WARNING: Failed to process playbook entry '{entry.case_dir}': {e}", file=sys.stderr)
                 continue
 
     return "\n".join(lines)
