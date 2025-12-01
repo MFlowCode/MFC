@@ -689,39 +689,34 @@ contains
         $:GPU_PARALLEL_LOOP(private='[k,i,myalpha_rho,myalpha,Re,cell,myPos,myVel]', &
             & reduction='[[adap_dt_stop_max]]',reductionOp='[MAX]', &
             & copy='[adap_dt_stop_max]',copyin='[stage]')
+        do k = 1, n_el_bubs_loc
+            ! Keller-Miksis model
 
-            do k = 1, n_el_bubs_loc
-                ! Keller-Miksis model
+            ! Current bubble state
+            myPb = gas_p(k, 2)
+            myMass_n = gas_mg(k)
+            myMass_v = gas_mv(k, 2)
+            myR = intfc_rad(k, 2)
+            myV = intfc_vel(k, 2)
+            myBeta_c = gas_betaC(k)
+            myBeta_t = gas_betaT(k)
+            myR0 = bub_R0(k)
+            myPos = mtn_pos(k, :, 2)
+            myVel = mtn_vel(k, :, 2)
 
-                ! Current bubble state
-                myPb = gas_p(k, 2)
-                myMass_n = gas_mg(k)
-                myMass_v = gas_mv(k, 2)
-                myR = intfc_rad(k, 2)
-                myV = intfc_vel(k, 2)
-                myBeta_c = gas_betaC(k)
-                myBeta_t = gas_betaT(k)
-                myR0 = bub_R0(k)
-                myPos = mtn_pos(k, :, 2)
-                myVel = mtn_vel(k, :, 2)
+            ! Vapor and heat fluxes
+            call s_vflux(myR, myV, myPb, myMass_v, k, myVapFlux, myMass_n, myBeta_c, myR_m, mygamma_m)
+            myPbdot = f_bpres_dot(myVapFlux, myR, myV, myPb, myMass_v, k, myBeta_t, myR_m, mygamma_m)
+            myMvdot = 4._wp*pi*myR**2._wp*myVapFlux
 
-                ! Vapor and heat fluxes
-                call s_vflux(myR, myV, myPb, myMass_v, k, myVapFlux, myMass_n, myBeta_c, myR_m, mygamma_m)
-                myPbdot = f_bpres_dot(myVapFlux, myR, myV, myPb, myMass_v, k, myBeta_t, myR_m, mygamma_m)
-                myMvdot = 4._wp*pi*myR**2._wp*myVapFlux
+            ! Obtaining driving pressure
+            call s_get_pinf(k, q_prim_vf, 1, myPinf, cell, aux1, aux2)
 
-                ! Obtaining driving pressure
-                call s_get_pinf(k, q_prim_vf, 1, myPinf, cell, aux1, aux2)
-
-                ! Obtain liquid density and computing speed of sound from pinf
-                $:GPU_LOOP(parallelism='[seq]')
-                do i = 1, num_fluids
-                    myalpha_rho(i) = q_prim_vf(i)%sf(cell(1), cell(2), cell(3))
-                    myalpha(i) = q_prim_vf(E_idx + i)%sf(cell(1), cell(2), cell(3))
-                end do
-                call s_convert_species_to_mixture_variables_acc(myRho, gamma, pi_inf, qv, myalpha, &
-                                                                myalpha_rho, Re)
-                call s_compute_cson_from_pinf(q_prim_vf, myPinf, cell, myRho, gamma, pi_inf, myCson)
+            ! Obtain liquid density and computing speed of sound from pinf
+            call s_compute_species_fraction(q_prim_vf, cell(1), cell(2), cell(3), myalpha_rho, myalpha)
+            call s_convert_species_to_mixture_variables_acc(myRho, gamma, pi_inf, qv, myalpha, &
+                                                            myalpha_rho, Re)
+            call s_compute_cson_from_pinf(q_prim_vf, myPinf, cell, myRho, gamma, pi_inf, myCson)
 
             ! Adaptive time stepping
             adap_dt_stop = 0
