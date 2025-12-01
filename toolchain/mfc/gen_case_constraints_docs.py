@@ -83,7 +83,7 @@ class CaseValidatorAnalyzer(ast.NodeVisitor):
         self.local_param_stack.pop()
         self.current_method = None
 
-    def _build_local_param_map(self, func: ast.FunctionDef) -> Dict[str, str]:
+    def _build_local_param_map(self, func: ast.FunctionDef) -> Dict[str, str]:  # pylint: disable=too-many-nested-blocks
         """
         Look for assignments like:
             igr = self.get('igr', 'F') == 'T'
@@ -91,17 +91,17 @@ class CaseValidatorAnalyzer(ast.NodeVisitor):
         and record local_name -> 'param_name'.
         """
         m: Dict[str, str] = {}
-        for stmt in func.body:
+        for stmt in func.body:  # pylint: disable=too-many-nested-blocks
             if isinstance(stmt, ast.Assign):
                 # Handle both direct calls and comparisons
                 value = stmt.value
                 # Unwrap comparisons like "self.get('igr', 'F') == 'T'"
                 if isinstance(value, ast.Compare):
                     value = value.left
-                
+
                 if isinstance(value, ast.Call):
                     call = value
-                    if (
+                    if (  # pylint: disable=too-many-boolean-expressions
                         isinstance(call.func, ast.Attribute)
                         and isinstance(call.func.value, ast.Name)
                         and call.func.value.id == "self"
@@ -168,7 +168,7 @@ class CaseValidatorAnalyzer(ast.NodeVisitor):
 
             # direct self.get('param_name')
             if isinstance(node, ast.Call):
-                if (
+                if (  # pylint: disable=too-many-boolean-expressions
                     isinstance(node.func, ast.Attribute)
                     and isinstance(node.func.value, ast.Name)
                     and node.func.value.id == "self"
@@ -233,7 +233,7 @@ def classify_message(msg: str) -> str:
     """
     text = msg.lower()
 
-    if (
+    if (  # pylint: disable=too-many-boolean-expressions
         "not compatible" in text
         or "does not support" in text
         or "cannot be used" in text
@@ -244,7 +244,7 @@ def classify_message(msg: str) -> str:
     ):
         return "incompatibility"
 
-    if (
+    if (  # pylint: disable=too-many-boolean-expressions
         "requires" in text
         or "must be set if" in text
         or "must be specified" in text
@@ -254,7 +254,7 @@ def classify_message(msg: str) -> str:
     ):
         return "requirement"
 
-    if (
+    if (  # pylint: disable=too-many-boolean-expressions
         "must be between" in text
         or "must be positive" in text
         or "must be non-negative" in text
@@ -307,7 +307,7 @@ def feature_title(param: str) -> str:
 # Markdown rendering
 # ---------------------------------------------------------------------------
 
-def render_markdown(rules: Iterable[Rule]) -> str:
+def render_markdown(rules: Iterable[Rule]) -> str:  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
     """
     Render user-friendly compatibility tables and summaries.
     """
@@ -352,7 +352,7 @@ def render_markdown(rules: Iterable[Rule]) -> str:
     lines.append("'avg_state': 2,               # Arithmetic average")
     lines.append("```")
     lines.append("</details>\n")
-    
+
     lines.append("<details>")
     lines.append("<summary><b>⚡ Magnetohydrodynamics (MHD)</b></summary>\n")
     lines.append("```python")
@@ -362,7 +362,7 @@ def render_markdown(rules: Iterable[Rule]) -> str:
     lines.append("'riemann_solver': 1,          # HLL (or 4 for HLLD)")
     lines.append("```")
     lines.append("</details>\n")
-    
+
     lines.append("<details>")
     lines.append("<summary><b>🌡️ Phase Change</b></summary>\n")
     lines.append("```python")
@@ -372,7 +372,7 @@ def render_markdown(rules: Iterable[Rule]) -> str:
     lines.append("'riemann_solver': 2,          # HLLC")
     lines.append("```")
     lines.append("</details>\n")
-    
+
     lines.append("<details>")
     lines.append("<summary><b>💎 Elastic Materials</b></summary>\n")
     lines.append("```python")
@@ -385,26 +385,26 @@ def render_markdown(rules: Iterable[Rule]) -> str:
     # 2. Feature Compatibility Matrix (simplified, no IGR column)
     lines.append("## 📊 Feature Compatibility\n")
     lines.append("What works together:\n")
-    
-    for category, features in major_features.items():
+
+    for category, features in major_features.items():  # pylint: disable=too-many-nested-blocks
         lines.append(f"\n### {category}\n")
-        
+
         # Build compatibility info (exclude IGR from incompatibilities)
         compat_info = {}
         for feat in features:
             if feat not in by_param:
                 continue
-            
+
             incomp = []
             req = []
             for rule in by_param[feat]:
                 kind = classify_message(rule.message)
                 msg = rule.message
-                
+
                 # Skip IGR-related incompatibilities
                 if "IGR" in msg:
                     continue
-                    
+
                 if kind == "incompatibility":
                     for other_feat in features:
                         if other_feat != feat and other_feat in rule.params:
@@ -413,19 +413,19 @@ def render_markdown(rules: Iterable[Rule]) -> str:
                     for other_feat in features:
                         if other_feat != feat and other_feat in rule.params:
                             req.append(feature_title(other_feat))
-            
+
             compat_info[feat] = {"incomp": list(set(incomp)), "req": list(set(req))}
-        
+
         # Render as compact table
         lines.append("| Feature | Requirements | Notes |")
         lines.append("|---------|-------------|-------|")
-        
+
         for feat in features:
             if feat not in by_param:
                 continue
             title = feature_title(feat)
             info = compat_info.get(feat, {"incomp": [], "req": []})
-            
+
             # Get key requirement
             reqs = []
             for rule in by_param[feat]:
@@ -434,32 +434,32 @@ def render_markdown(rules: Iterable[Rule]) -> str:
                     if "model_eqns" in msg:
                         reqs.append("Specific model")
                         break
-            
+
             req_str = reqs[0] if reqs else "—"
-            
+
             # Get short note
             incomp_with = [i for i in info["incomp"] if i not in ["IGR"]][:2]
             if incomp_with:
                 note = f"⚠️ Not with: {', '.join(incomp_with)}"
             else:
                 note = "✓ General use"
-            
+
             lines.append(f"| {title} | {req_str} | {note} |")
-        
+
         lines.append("")
 
-    # 3. Model Equations 
+    # 3. Model Equations
     lines.append("## 🔢 Model Equations\n")
     lines.append("Choose your governing equations:\n")
     lines.append("")
-    
+
     lines.append("<details>")
     lines.append("<summary><b>Model 1: π-γ (Compressible Euler)</b></summary>\n")
     lines.append("- **Use for:** Single-fluid compressible flow")
     lines.append("- **Value:** `model_eqns = 1`")
     lines.append("- **Note:** Cannot use `num_fluids`, bubbles, or certain WENO variants")
     lines.append("</details>\n")
-    
+
     lines.append("<details>")
     lines.append("<summary><b>Model 2: 5-Equation (Most versatile)</b></summary>\n")
     lines.append("- **Use for:** Multiphase, bubbles, elastic materials, MHD")
@@ -467,7 +467,7 @@ def render_markdown(rules: Iterable[Rule]) -> str:
     lines.append("- **Requirements:** Set `num_fluids`")
     lines.append("- **Compatible with:** Most physics models")
     lines.append("</details>\n")
-    
+
     lines.append("<details>")
     lines.append("<summary><b>Model 3: 6-Equation (Phase change)</b></summary>\n")
     lines.append("- **Use for:** Phase change, cavitation")
@@ -475,7 +475,7 @@ def render_markdown(rules: Iterable[Rule]) -> str:
     lines.append("- **Requirements:** `riemann_solver = 2` (HLLC), `avg_state = 2`, `wave_speeds = 1`")
     lines.append("- **Note:** Not compatible with bubbles or 3D cylindrical")
     lines.append("</details>\n")
-    
+
     lines.append("<details>")
     lines.append("<summary><b>Model 4: 4-Equation (Single component)</b></summary>\n")
     lines.append("- **Use for:** Single-component flows with bubbles")
@@ -498,7 +498,7 @@ def render_markdown(rules: Iterable[Rule]) -> str:
     if "bubbles_euler" in by_param or "bubbles_lagrange" in by_param:
         lines.append("## 💧 Bubble Models\n")
         lines.append("")
-        
+
         lines.append("<details>")
         lines.append("<summary><b>Euler-Euler (`bubbles_euler`)</b></summary>\n")
         lines.append("**Requirements:**")
@@ -511,7 +511,7 @@ def render_markdown(rules: Iterable[Rule]) -> str:
         lines.append("- `qbmm = T`: Quadrature method (requires `nnode = 4`)")
         lines.append("- `adv_n = T`: Number density advection (requires `num_fluids = 1`)")
         lines.append("</details>\n")
-        
+
         lines.append("<details>")
         lines.append("<summary><b>Euler-Lagrange (`bubbles_lagrange`)</b></summary>\n")
         lines.append("**Requirements:**")
@@ -524,34 +524,34 @@ def render_markdown(rules: Iterable[Rule]) -> str:
     # 6. Condensed Parameter Reference
     lines.append("## 📖 Quick Parameter Reference\n")
     lines.append("Key parameters and their constraints:\n")
-    
+
     # Highlight only the most important parameters in collapsible sections
     important_params = {
         "MHD": "mhd",
-        "Surface Tension": "surface_tension", 
+        "Surface Tension": "surface_tension",
         "Viscosity": "viscous",
         "Number of Fluids": "num_fluids",
         "Cylindrical Coordinates": "cyl_coord",
         "Immersed Boundaries": "ib",
     }
-    
+
     for title, param in important_params.items():
         if param not in by_param:
             continue
-            
+
         rules_for_param = by_param[param]
-        
+
         # Get key info
         requirements = []
         incompatibilities = []
         ranges = []
-        
+
         for rule in rules_for_param:
             msg = rule.message
             # Skip IGR-related messages
             if "IGR" in msg:
                 continue
-                
+
             kind = classify_message(msg)
             if kind == "requirement":
                 requirements.append(msg)
@@ -559,31 +559,31 @@ def render_markdown(rules: Iterable[Rule]) -> str:
                 incompatibilities.append(msg)
             elif kind == "range":
                 ranges.append(msg)
-        
+
         if not (requirements or incompatibilities or ranges):
             continue
-            
+
         lines.append(f"\n<details>")
         lines.append(f"<summary><b>{title}</b> (`{param}`)</summary>\n")
-        
+
         if requirements:
             lines.append("**Requirements:**")
             for req in requirements[:3]:
                 lines.append(f"- {req}")
             lines.append("")
-        
+
         if incompatibilities:
             lines.append("**Incompatibilities:**")
             for inc in incompatibilities[:3]:
                 lines.append(f"- {inc}")
             lines.append("")
-        
+
         if ranges:
             lines.append("**Valid values:**")
             for rng in ranges[:2]:
                 lines.append(f"- {rng}")
             lines.append("")
-        
+
         lines.append("</details>\n")
 
     # Add a footer with link to full validator
@@ -618,6 +618,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-
-
