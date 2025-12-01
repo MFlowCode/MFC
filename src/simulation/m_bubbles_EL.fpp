@@ -1450,7 +1450,7 @@ contains
         real(wp) :: offset
         integer, dimension(3) :: cell
 
-        $:GPU_PARALLEL_LOOP(private='[k]')
+        $:GPU_PARALLEL_LOOP(private='[k, cell]')
         do k = 1, n_el_bubs_loc
             keep_bubble(k) = 1
             wrap_bubble_loc(k, :) = 0
