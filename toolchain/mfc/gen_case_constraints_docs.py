@@ -4,18 +4,24 @@ Generate human-readable documentation for MFC case parameter constraints.
 
 Parses toolchain/mfc/case_validator.py, extracts all `self.prohibit(...)` rules,
 maps them to parameters and stages, and emits Markdown to stdout.
+
+Also generates case design playbook from curated working examples.
 """
 
 from __future__ import annotations
 
 import ast
+import json
+import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Set, Iterable
+from typing import Dict, List, Set, Iterable, Any
 from collections import defaultdict
 
 HERE = Path(__file__).resolve().parent
 CASE_VALIDATOR_PATH = HERE / "case_validator.py"
+REPO_ROOT = HERE.parent.parent
+EXAMPLES_DIR = REPO_ROOT / "examples"
 
 
 # ---------------------------------------------------------------------------
@@ -304,6 +310,299 @@ def feature_title(param: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Case Playbook Generation (from working examples)
+# ---------------------------------------------------------------------------
+
+@dataclass
+class PlaybookEntry:
+    """A curated example case for the playbook"""
+    case_dir: str
+    title: str
+    description: str
+    level: str  # "Beginner", "Intermediate", "Advanced"
+    tags: List[str]
+
+
+# Curated list of hero examples
+PLAYBOOK_EXAMPLES = [
+    PlaybookEntry(
+        "2D_shockbubble",
+        "2D Shock-Bubble Interaction",
+        "Two-fluid shock-interface benchmark. Classic validation case for compressible multiphase flows.",
+        "Beginner",
+        ["2D", "Multiphase", "Shock"]
+    ),
+    PlaybookEntry(
+        "1D_bubblescreen",
+        "1D Bubble Screen",
+        "Euler-Euler ensemble-averaged bubble dynamics through shock wave.",
+        "Intermediate",
+        ["1D", "Bubbles", "Euler-Euler"]
+    ),
+    PlaybookEntry(
+        "2D_lagrange_bubblescreen",
+        "2D Lagrangian Bubble Screen",
+        "Individual bubble tracking with Euler-Lagrange method.",
+        "Intermediate",
+        ["2D", "Bubbles", "Euler-Lagrange"]
+    ),
+    PlaybookEntry(
+        "2D_phasechange_bubble",
+        "2D Phase Change Bubble",
+        "Phase change and cavitation modeling with 6-equation model.",
+        "Advanced",
+        ["2D", "Phase-change", "Cavitation"]
+    ),
+    PlaybookEntry(
+        "2D_orszag_tang",
+        "2D Orszag-Tang MHD Vortex",
+        "Magnetohydrodynamics test problem with complex vortex structures.",
+        "Intermediate",
+        ["2D", "MHD"]
+    ),
+    PlaybookEntry(
+        "2D_ibm_airfoil",
+        "2D IBM Airfoil",
+        "Immersed boundary method around a NACA airfoil geometry.",
+        "Intermediate",
+        ["2D", "IBM", "Geometry"]
+    ),
+    PlaybookEntry(
+        "2D_viscous_shock_tube",
+        "2D Viscous Shock Tube",
+        "Shock tube with viscous effects and heat transfer.",
+        "Intermediate",
+        ["2D", "Viscous", "Shock"]
+    ),
+    PlaybookEntry(
+        "3D_TaylorGreenVortex",
+        "3D Taylor-Green Vortex",
+        "Classic 3D turbulence benchmark with viscous dissipation.",
+        "Advanced",
+        ["3D", "Viscous", "Turbulence"]
+    ),
+    PlaybookEntry(
+        "2D_IGR_triple_point",
+        "2D IGR Triple Point",
+        "Triple point problem using Iterative Generalized Riemann solver.",
+        "Advanced",
+        ["2D", "IGR", "Multiphase"]
+    ),
+]
+
+
+def load_case_params(case_dir: str) -> Dict[str, Any]:
+    """Load parameters from a case.py file"""
+    case_path = EXAMPLES_DIR / case_dir / "case.py"
+    if not case_path.exists():
+        return {}
+
+    try:
+        result = subprocess.run(
+            ["python3", str(case_path)],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=True
+        )
+        params = json.loads(result.stdout)
+        return params
+    except (subprocess.CalledProcessError, json.JSONDecodeError, subprocess.TimeoutExpired):
+        return {}
+
+
+def summarize_case_params(params: Dict[str, Any]) -> Dict[str, Any]:
+    """Extract key features from case parameters"""
+    return {
+        "model_eqns": params.get("model_eqns"),
+        "num_fluids": params.get("num_fluids"),
+        "surface_tension": params.get("surface_tension") == "T",
+        "bubbles_euler": params.get("bubbles_euler") == "T",
+        "bubbles_lagrange": params.get("bubbles_lagrange") == "T",
+        "qbmm": params.get("qbmm") == "T",
+        "polydisperse": params.get("polydisperse") == "T",
+        "mhd": params.get("mhd") == "T",
+        "relax": params.get("relax") == "T",
+        "hypoelasticity": params.get("hypoelasticity") == "T",
+        "viscous": params.get("viscous") == "T",
+        "ib": params.get("ib") == "T",
+        "igr": params.get("igr") == "T",
+        "acoustic_source": params.get("acoustic_source") == "T",
+        "cyl_coord": params.get("cyl_coord") == "T",
+        "m": params.get("m"),
+        "n": params.get("n", 0),
+        "p": params.get("p", 0),
+        "recon_type": params.get("recon_type", 1),
+        "weno_order": params.get("weno_order"),
+        "muscl_order": params.get("muscl_order"),
+        "riemann_solver": params.get("riemann_solver"),
+        "time_stepper": params.get("time_stepper"),
+    }
+
+
+def get_model_name(model_eqns: int | None) -> str:
+    """Get human-friendly model name"""
+    models = {
+        1: "π-γ (Compressible Euler)",
+        2: "5-Equation (Multiphase)",
+        3: "6-Equation (Phase Change)",
+        4: "4-Equation (Single Component)"
+    }
+    return models.get(model_eqns, "Not specified")
+
+
+def get_riemann_solver_name(solver: int | None) -> str:
+    """Get Riemann solver name"""
+    solvers = {
+        1: "HLL",
+        2: "HLLC",
+        3: "Exact",
+        4: "HLLD",
+        5: "Lax-Friedrichs"
+    }
+    return solvers.get(solver, "Not specified")
+
+
+def get_time_stepper_name(stepper: int | None) -> str:
+    """Get time stepper name"""
+    steppers = {
+        1: "RK1 (Forward Euler)",
+        2: "RK2",
+        3: "RK3 (SSP)"
+    }
+    return steppers.get(stepper, "Not specified")
+
+
+def render_playbook_card(entry: PlaybookEntry, summary: Dict[str, Any]) -> str:  # pylint: disable=too-many-branches,too-many-statements
+    """Render a single playbook entry as Markdown"""
+    lines = []
+
+    tags_str = " · ".join(entry.tags)
+    level_emoji = {"Beginner": "🟢", "Intermediate": "🟡", "Advanced": "🔴"}.get(entry.level, "")
+
+    lines.append("<details>")
+    lines.append(f'<summary><b>{entry.title}</b> {level_emoji} <i>{entry.level}</i> · <code>{entry.case_dir}</code></summary>\n')
+    lines.append(f"**{entry.description}**\n")
+    lines.append(f"**Tags:** {tags_str}\n")
+
+    lines.append("**Physics Configuration:**\n")
+    lines.append(f"- **Model:** {get_model_name(summary['model_eqns'])} (`model_eqns = {summary['model_eqns']}`)")
+
+    if summary['num_fluids'] is not None:
+        lines.append(f"- **Number of fluids:** {summary['num_fluids']}")
+
+    # Dimensionality
+    n, p = summary['n'], summary['p']
+    dim_str = "3D" if p > 0 else ("2D" if n > 0 else "1D")
+    lines.append(f"- **Dimensionality:** {dim_str}")
+
+    if summary['cyl_coord']:
+        lines.append("- **Coordinates:** Cylindrical/Axisymmetric")
+
+    # Active features
+    active_features = []
+    if summary['bubbles_euler']:
+        active_features.append("Euler-Euler bubbles")
+    if summary['bubbles_lagrange']:
+        active_features.append("Euler-Lagrange bubbles")
+    if summary['qbmm']:
+        active_features.append("QBMM")
+    if summary['polydisperse']:
+        active_features.append("Polydisperse")
+    if summary['surface_tension']:
+        active_features.append("Surface tension")
+    if summary['mhd']:
+        active_features.append("MHD")
+    if summary['relax']:
+        active_features.append("Phase change")
+    if summary['hypoelasticity']:
+        active_features.append("Hypoelasticity")
+    if summary['viscous']:
+        active_features.append("Viscous")
+    if summary['ib']:
+        active_features.append("Immersed boundaries")
+    if summary['igr']:
+        active_features.append("IGR solver")
+    if summary['acoustic_source']:
+        active_features.append("Acoustic sources")
+
+    if active_features:
+        lines.append(f"- **Active features:** {', '.join(active_features)}")
+
+    # Numerics
+    lines.append("\n**Numerical Methods:**\n")
+
+    if summary['recon_type'] == 1 and summary['weno_order']:
+        lines.append(f"- **Reconstruction:** WENO-{summary['weno_order']}")
+    elif summary['recon_type'] == 2 and summary['muscl_order']:
+        lines.append(f"- **Reconstruction:** MUSCL (order {summary['muscl_order']})")
+
+    if summary['riemann_solver']:
+        solver_name = get_riemann_solver_name(summary['riemann_solver'])
+        lines.append(f"- **Riemann solver:** {solver_name} (`riemann_solver = {summary['riemann_solver']}`)")
+
+    if summary['time_stepper']:
+        stepper_name = get_time_stepper_name(summary['time_stepper'])
+        lines.append(f"- **Time stepping:** {stepper_name}")
+
+    # Links
+    lines.append("\n**Related Documentation:**")
+    lines.append(f"- [Model Equations (model_eqns = {summary['model_eqns']})](#-model-equations)")
+
+    if summary['riemann_solver']:
+        lines.append("- [Riemann Solvers](#️-riemann-solvers)")
+
+    if summary['bubbles_euler'] or summary['bubbles_lagrange']:
+        lines.append("- [Bubble Models](#-bubble-models)")
+
+    if summary['mhd']:
+        lines.append("- [MHD](#magnetohydrodynamics-mhd-mhd)")
+
+    if summary['ib']:
+        lines.append("- [Immersed Boundaries](#immersed-boundaries-ib)")
+
+    if summary['viscous']:
+        lines.append("- [Viscosity](#viscosity-viscous)")
+
+    lines.append("\n</details>\n")
+    return "\n".join(lines)
+
+
+def generate_playbook() -> str:
+    """Generate complete playbook from curated examples"""
+    lines = []
+
+    lines.append("## 🧩 Case Design Playbook\n")
+    lines.append(
+        "> **Learn by example:** The cases below are curated from MFC's `examples/` "
+        "directory and are validated, working configurations. "
+        "Use them as blueprints for building your own simulations.\n"
+    )
+
+    # Group by level
+    for level in ["Beginner", "Intermediate", "Advanced"]:
+        level_entries = [e for e in PLAYBOOK_EXAMPLES if e.level == level]
+        if not level_entries:
+            continue
+
+        level_emoji = {"Beginner": "🟢", "Intermediate": "🟡", "Advanced": "🔴"}.get(level, "")
+        lines.append(f"\n### {level_emoji} {level} Examples\n")
+
+        for entry in level_entries:
+            try:
+                params = load_case_params(entry.case_dir)
+                if not params:
+                    continue
+                summary = summarize_case_params(params)
+                card = render_playbook_card(entry, summary)
+                lines.append(card)
+            except Exception:  # pylint: disable=broad-except
+                continue
+
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
 # Markdown rendering
 # ---------------------------------------------------------------------------
 
@@ -321,14 +620,18 @@ def render_markdown(rules: Iterable[Rule]) -> str:  # pylint: disable=too-many-l
 
     lines: List[str] = []
 
-    lines.append("# MFC Feature Compatibility Guide\n")
+    lines.append("# Case Creator Guide\n")
     lines.append(
-        "> **Quick reference** for understanding which MFC features work together "
+        "> **Quick reference** for building MFC cases: working examples, compatibility rules, "
         "and configuration requirements.\n"
     )
     lines.append(
-        "> Auto-generated from validation rules in `case_validator.py`.\n"
+        "> Auto-generated from `case_validator.py` and `examples/`.\n"
     )
+
+    # Add playbook at the top
+    playbook = generate_playbook()
+    lines.append(playbook)
 
     # Define major feature groups (excluding IGR)
     major_features = {
