@@ -246,153 +246,6 @@ contains
                                                    alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP)
                 end if
 
-<<<<<<< HEAD
-                    ! Set q_prim_vf params at GP so that mixture vars calculated properly
-                    $:GPU_LOOP(parallelism='[seq]')
-                    do q = 1, num_fluids
-                        q_prim_vf(q)%sf(j, k, l) = alpha_rho_IP(q)
-                        q_prim_vf(advxb + q - 1)%sf(j, k, l) = alpha_IP(q)
-                    end do
-                    
-                    if (surface_tension) then
-                        q_prim_vf(c_idx)%sf(j, k, l) = c_IP
-                    end if
-
-                    ! set the pressure
-                    do q = 1, num_fluids
-                        if (patch_ib(patch_id)%moving_ibm == 0) then
-                            q_prim_vf(E_idx)%sf(j, k, l) = pres_IP
-                        else
-                          ! TODO :: imporve for two fluid
-                          q_prim_vf(E_idx)%sf(j, k, l) = pres_IP / (1._wp - 2._wp*abs(levelset%sf(j,k,l,patch_id)*alpha_rho_IP(q)/pres_IP) * dot_product(patch_ib(patch_id)%force/patch_ib(patch_id)%mass, levelset_norm%sf(j,k,l,patch_id,:)))
-                        end if
-                    end do
-
-                    if (model_eqns /= 4) then
-                        ! If in simulation, use acc mixture subroutines
-                        if (elasticity) then
-                            call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv_K, alpha_IP, &
-                                                                            alpha_rho_IP, Re_K, G_K, Gs)
-                        else if (bubbles_euler) then
-                            call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, qv_K, alpha_IP, &
-                                                                                    alpha_rho_IP, Re_K)
-                        else
-                            call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv_K, alpha_IP, &
-                                                                            alpha_rho_IP, Re_K)
-                        end if
-                    end if
-
-                    ! Calculate velocity of ghost cell
-                    if (gp%slip) then
-                        norm(1:3) = levelset_norm%sf(gp%loc(1), gp%loc(2), gp%loc(3), gp%ib_patch_id, 1:3)
-                        buf = sqrt(sum(norm**2))
-                        norm = norm/buf
-                        vel_norm_IP = sum(vel_IP*norm)*norm
-                        vel_g = vel_IP - vel_norm_IP
-                        if (patch_ib(patch_id)%moving_ibm /= 0) then
-                            ! compute the linear velocity of the ghost point due to rotation
-                            radial_vector = physical_loc - [patch_ib(patch_id)%x_centroid, &
-                                                            patch_ib(patch_id)%y_centroid, patch_ib(patch_id)%z_centroid]
-                            rotation_velocity = cross_product(matmul(patch_ib(patch_id)%rotation_matrix, patch_ib(patch_id)%angular_vel), radial_vector)
-
-                            ! add only the component of the IB's motion that is normal to the surface
-                            vel_g = vel_g + sum((patch_ib(patch_id)%vel + rotation_velocity)*norm)*norm
-                        end if
-                    else
-                        if (patch_ib(patch_id)%moving_ibm == 0) then
-                            ! we know the object is not moving if moving_ibm is 0 (false)
-                            vel_g = 0._wp
-                        else
-                            ! get the vector that points from the centroid to the ghost
-                            radial_vector = physical_loc - [patch_ib(patch_id)%x_centroid, &
-                                                            patch_ib(patch_id)%y_centroid, patch_ib(patch_id)%z_centroid]
-                            ! convert the angular velocity from the inertial reference frame to the fluids frame, then convert to linear velocity
-                            rotation_velocity = cross_product(matmul(patch_ib(patch_id)%rotation_matrix, patch_ib(patch_id)%angular_vel), radial_vector)
-                            do q = 1, 3
-                                ! if mibm is 1 or 2, then the boundary may be moving
-                                vel_g(q) = patch_ib(patch_id)%vel(q) ! add the linear velocity
-                                vel_g(q) = vel_g(q) + rotation_velocity(q) ! add the rotational velocity
-                            end do
-                        end if
-                    end if
-
-                    ! Set momentum
-                    $:GPU_LOOP(parallelism='[seq]')
-                    do q = momxb, momxe
-                        q_cons_vf(q)%sf(j, k, l) = rho*vel_g(q - momxb + 1)
-                        dyn_pres = dyn_pres + q_cons_vf(q)%sf(j, k, l)* &
-                                   vel_g(q - momxb + 1)/2._wp
-                    end do
-
-                    ! Set continuity and adv vars
-                    $:GPU_LOOP(parallelism='[seq]')
-                    do q = 1, num_fluids
-                        q_cons_vf(q)%sf(j, k, l) = alpha_rho_IP(q)
-                        q_cons_vf(advxb + q - 1)%sf(j, k, l) = alpha_IP(q)
-                    end do
-
-                    ! Set color function
-                    if (surface_tension) then
-                        q_cons_vf(c_idx)%sf(j, k, l) = c_IP
-                    end if
-
-                    ! Set Energy
-                    if (bubbles_euler) then
-                        q_cons_vf(E_idx)%sf(j, k, l) = (1 - alpha_IP(1))*(gamma*pres_IP + pi_inf + dyn_pres)
-                    else
-                        q_cons_vf(E_idx)%sf(j, k, l) = gamma*pres_IP + pi_inf + dyn_pres
-                    end if
-                    ! Set bubble vars
-                    if (bubbles_euler .and. .not. qbmm) then
-                        call s_comp_n_from_prim(alpha_IP(1), r_IP, nbub, weight)
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do q = 1, nb
-                            q_cons_vf(bubxb + (q - 1)*2)%sf(j, k, l) = nbub*r_IP(q)
-                            q_cons_vf(bubxb + (q - 1)*2 + 1)%sf(j, k, l) = nbub*v_IP(q)
-                            if (.not. polytropic) then
-                                q_cons_vf(bubxb + (q - 1)*4)%sf(j, k, l) = nbub*r_IP(q)
-                                q_cons_vf(bubxb + (q - 1)*4 + 1)%sf(j, k, l) = nbub*v_IP(q)
-                                q_cons_vf(bubxb + (q - 1)*4 + 2)%sf(j, k, l) = nbub*pb_IP(q)
-                                q_cons_vf(bubxb + (q - 1)*4 + 3)%sf(j, k, l) = nbub*mv_IP(q)
-                            end if
-                        end do
-                    end if
-
-                    if (qbmm) then
-
-                        nbub = nmom_IP(1)
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do q = 1, nb*nmom
-                            q_cons_vf(bubxb + q - 1)%sf(j, k, l) = nbub*nmom_IP(q)
-                        end do
-
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do q = 1, nb
-                            q_cons_vf(bubxb + (q - 1)*nmom)%sf(j, k, l) = nbub
-                        end do
-
-                        if (.not. polytropic) then
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do q = 1, nb
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do r = 1, nnode
-                                    pb_in(j, k, l, r, q) = presb_IP((q - 1)*nnode + r)
-                                    mv_in(j, k, l, r, q) = massv_IP((q - 1)*nnode + r)
-                                end do
-                            end do
-                        end if
-                    end if
-
-                    if (model_eqns == 3) then
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do q = intxb, intxe
-                            q_cons_vf(q)%sf(j, k, l) = alpha_IP(q - intxb + 1)*(gammas(q - intxb + 1)*pres_IP &
-                                                                                + pi_infs(q - intxb + 1))
-                        end do
-                    end if
-                end do
-            $:END_GPU_PARALLEL_LOOP()
-=======
                 dyn_pres = 0._wp
 
                 ! Set q_prim_vf params at GP so that mixture vars calculated properly
@@ -405,6 +258,17 @@ contains
                 if (surface_tension) then
                     q_prim_vf(c_idx)%sf(j, k, l) = c_IP
                 end if
+
+                ! set the pressure
+                do q = 1, num_fluids
+                    if (patch_ib(patch_id)%moving_ibm == 0) then
+                        q_prim_vf(E_idx)%sf(j, k, l) = pres_IP
+                    else
+                      ! TODO :: improve for two fluid
+                      q_prim_vf(E_idx)%sf(j, k, l) = pres_IP / (1._wp - 2._wp*abs(levelset%sf(j,k,l,patch_id)*alpha_rho_IP(q)/pres_IP) * dot_product(patch_ib(patch_id)%force/patch_ib(patch_id)%mass, levelset_norm%sf(j,k,l,patch_id,:)))
+                    end if
+                end do
+
                 if (model_eqns /= 4) then
                     ! If in simulation, use acc mixture subroutines
                     if (elasticity) then
@@ -526,7 +390,6 @@ contains
                 end if
             end do
             $:END_GPU_PARALLEL_LOOP()
->>>>>>> master
         end if
 
         !Correct the state of the inner points in IBs
@@ -1222,7 +1085,7 @@ contains
         elseif (patch_ib(ib_marker)%geometry == 8) then ! sphere
             patch_ib(ib_marker)%moment = 0.4 * patch_ib(ib_marker)%mass * (patch_ib(ib_marker)%radius)**2
           
-        else ! we do not have an analytic moment of intertia calculation and need to approximate it directly
+        else ! we do not have an analytic moment of inertia calculation and need to approximate it directly
             count = 0
             moment = 0._wp
             cell_volume = (x_cc(1) - x_cc(0))*(y_cc(1) - y_cc(0)) ! computed without grid stretching. Update in the loop to perform with stretching
@@ -1237,7 +1100,7 @@ contains
                     do k = 0, p
                         if (ib_markers%sf(i, j, k) == ib_marker) then
                             $:GPU_ATOMIC(atomic='update')
-                            count = count + 1 ! incriment the count of total cells in the boundary
+                            count = count + 1 ! increment the count of total cells in the boundary
 
                             ! get the position in local coordinates so that the axis passes through 0, 0, 0
                             if (p == 0) then
