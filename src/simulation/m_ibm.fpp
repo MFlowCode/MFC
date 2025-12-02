@@ -1094,7 +1094,7 @@ contains
             end if
 
             
-            #:call GPU_PARALLEL_LOOP(private='[position,closest_point_along_axis,vector_to_axis,distance_to_axis]', copy='[moment,count]', copyin='[ib_marker,cell_volume,axis]', collapse=3)
+            $:GPU_PARALLEL_LOOP(private='[position,closest_point_along_axis,vector_to_axis,distance_to_axis]', copy='[moment,count]', copyin='[ib_marker,cell_volume,axis]', collapse=3)
             do i = 0, m
                 do j = 0, j
                     do k = 0, p
@@ -1121,7 +1121,7 @@ contains
                     end do
                 end do
             end do
-            #:endcall GPU_PARALLEL_LOOP
+            $:END_GPU_PARALLEL_LOOP()
 
             ! write the final moment assuming the points are all uniform density
             patch_ib(ib_marker)%moment = moment * patch_ib(ib_marker)%mass / (count * cell_volume)
