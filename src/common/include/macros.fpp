@@ -133,19 +133,20 @@
 
         #:for arg in args
             $:GPU_ENTER_DATA(copyin=('[' + arg + ']'))
-            if (allocated(${arg}$%coord)) then
+            if (associated(${arg}$%coord)) then
                 $:GPU_ENTER_DATA(copyin=('[' + arg + '%coord]'))
             end if
-            if (allocated(${arg}$%val)) then
+            if (associated(${arg}$%val)) then
                 $:GPU_ENTER_DATA(copyin=('[' + arg + '%val]'))
             end if
-            if (allocated(${arg}$%angle)) then
+            if (associated(${arg}$%angle)) then
                 $:GPU_ENTER_DATA(copyin=('[' + arg + '%angle]'))
             end if
-            if (allocated(${arg}$%xyz_to_r_ratios)) then
+            if (associated(${arg}$%xyz_to_r_ratios)) then
                 $:GPU_ENTER_DATA(copyin=('[' + arg + '%xyz_to_r_ratios]'))
             end if
         #:endfor
+
     end block
 #endif
 #:enddef

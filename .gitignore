@@ -19,6 +19,9 @@ __pycache__
 
 *.egg-info
 
+# Auto-generated version file
+toolchain/mfc/_version.py
+
 .DS_Store
 
 /tests/*/**
@@ -86,3 +89,6 @@ benchmarks/*.png
 *.mov
 *.mkv
 *.avi
+
+packaging/spack/spack-test
+.spack 
