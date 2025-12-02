@@ -195,6 +195,22 @@ contains
         real(wp) :: buf
         type(ghost_point) :: gp
         type(ghost_point) :: innerp
+
+        ! set the Moving IBM Pressure Values
+        do patch_id = 1, num_ibs
+            if (patch_ib(patch_id)%moving_ibm == 2) then
+                do j = 0, m
+                    do k = 0, n
+                        do l = 0, p
+                            if (ib_markers%sf(j,k,l) == patch_id) then
+                                q_prim_vf(E_idx)%sf(j, k, l) = 1._wp
+                            end if
+                        end do
+                    end do
+                end do
+            end if
+        end do
+
         if (num_gps > 0) then
             ! #:call GPU_PARALLEL_LOOP(private='[physical_loc,dyn_pres,alpha_rho_IP, alpha_IP,pres_IP,vel_IP,vel_g,vel_norm_IP,r_IP, v_IP,pb_IP,mv_IP,nmom_IP,presb_IP,massv_IP,rho, gamma,pi_inf,Re_K,G_K,Gs,gp,innerp,norm,buf, radial_vector, rotation_velocity, j,k,l,q]')
                 do i = 1, num_gps
@@ -1025,6 +1041,8 @@ contains
             patch_ib(i)%force(:) = forces(i, :)
             patch_ib(i)%torque(:) = matmul(patch_ib(i)%rotation_matrix_inverse, torques(i, :)) ! torques must be computed in the local coordinates of the IB
         end do
+
+        print *, patch_ib(1)%force(1:2)
 
     end subroutine s_compute_ib_forces
 
