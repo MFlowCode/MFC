@@ -1010,6 +1010,7 @@ contains
         torques = 0._wp
 
         ! TODO :: This is currently only valid inviscid, and needs to be extended to add viscocity
+        $:GPU_PARALLEL_LOOP(private='[ib_idx,radial_vector,pressure_divergence,cell_volume]', copy='[forces,torques]', copyin='[ib_markers]', collapse=3)
         do i = 0, m
             do j = 0, n
                 do k = 0, p
@@ -1038,6 +1039,11 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        ! reduce the forces across all MPI ranks
+        call s_mpi_allreduce_sum(forces, forces)
+        call s_mpi_allreduce_sum(torques, torques)
 
         ! apply the summed forces
         do i = 1, num_ibs
