@@ -918,7 +918,7 @@ def render_markdown(rules: Iterable[Rule]) -> str:  # pylint: disable=too-many-l
     # Add a footer with link to full validator
     lines.append("\n---\n")
     lines.append("💡 **Tip:** If you encounter a validation error, check the relevant section above or ")
-    lines.append("review [`case_validator.py`](../../toolchain/mfc/case_validator.py) for complete validation logic.\n")
+    lines.append("review [`case_validator.py`](https://github.com/MFlowCode/MFC/blob/master/toolchain/mfc/case_validator.py) for complete validation logic.\n")
 
     return "\n".join(lines)
 
