@@ -1042,8 +1042,8 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
         ! reduce the forces across all MPI ranks
-        call s_mpi_allreduce_sum(forces, forces)
-        call s_mpi_allreduce_sum(torques, torques)
+        call s_mpi_allreduce_vectors_sum(forces, forces, num_ibs, 3)
+        call s_mpi_allreduce_vectors_sum(torques, torques, num_ibs, 3)
 
         ! apply the summed forces
         do i = 1, num_ibs
