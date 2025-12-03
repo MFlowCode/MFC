@@ -486,10 +486,10 @@ contains
         ! Performing the reduction procedure
         if (loc(var_loc) == loc(var_glb)) then
             call MPI_Allreduce(MPI_IN_PLACE, var_glb, num_vectors*vector_length, &
-                              mpi_p, MPI_SUM, MPI_COMM_WORLD, ierr)
+                               mpi_p, MPI_SUM, MPI_COMM_WORLD, ierr)
         else
             call MPI_Allreduce(var_loc, var_glb, num_vectors*vector_length, &
-                              mpi_p, MPI_SUM, MPI_COMM_WORLD, ierr)
+                               mpi_p, MPI_SUM, MPI_COMM_WORLD, ierr)
         end if
 
 #endif

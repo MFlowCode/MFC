@@ -309,7 +309,7 @@ This is enabled by adding `'elliptic_smoothing': "T",` and `'elliptic_smoothing_
 | `model_threshold`    | Real    | Ray fraction inside the model patch above which the fraction is set to one.|
 | `moving_ibm`         | Integer | Sets the method used for IB movement. |
 | `vel(i)`             | Real    | Initial velocity of the moving IB in the i-th direction. |
-| `angular_vel(i)`     | Real    | Initial angular velcoity of the moving IB in the i-th direction. |
+| `angular_vel(i)`     | Real    | Initial angular velocity of the moving IB in the i-th direction. |
 
 These parameters should be prepended with `patch_ib(j)%` where $j$ is the patch index.
 
@@ -336,9 +336,9 @@ Additional details on this specification can be found in [The Naca Airfoil Serie
 
 - `moving_ibm` sets the method by which movement will be applied to the immersed boundary. Using 0 will result in no movement. Using 1 will result 1-way coupling where the boundary moves at a constant rate and applied forces to the fluid based upon it's own motion. In 1-way coupling, the fluid does not apply forces back onto the IB.
 
-- `vel(i)` is the initial linear velocity of the IB in the x, y, z direction for i=1, 2, 3. When `moving_ibm` equals 1, this velcoity is constant.
+- `vel(i)` is the initial linear velocity of the IB in the x, y, z direction for i=1, 2, 3. When `moving_ibm` equals 1, this velocity is constant.
 
-- `angular_vel(i)` is the initial angular velocity of the IB about the x, y, z axes for i=1, 2, 3 in radians per second. When `moving_ibm` equals 1, this angular velcoity is constant.
+- `angular_vel(i)` is the initial angular velocity of the IB about the x, y, z axes for i=1, 2, 3 in radians per second. When `moving_ibm` equals 1, this angular velocity is constant.
 
 ### 5. Fluid Material’s
 

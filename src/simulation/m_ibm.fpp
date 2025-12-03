@@ -202,7 +202,7 @@ contains
                 do j = 0, m
                     do k = 0, n
                         do l = 0, p
-                            if (ib_markers%sf(j,k,l) == patch_id) then
+                            if (ib_markers%sf(j, k, l) == patch_id) then
                                 q_prim_vf(E_idx)%sf(j, k, l) = 1._wp
                             end if
                         end do
@@ -264,8 +264,8 @@ contains
                     if (patch_ib(patch_id)%moving_ibm == 0) then
                         q_prim_vf(E_idx)%sf(j, k, l) = pres_IP
                     else
-                      ! TODO :: improve for two fluid
-                      q_prim_vf(E_idx)%sf(j, k, l) = pres_IP / (1._wp - 2._wp*abs(levelset%sf(j,k,l,patch_id)*alpha_rho_IP(q)/pres_IP) * dot_product(patch_ib(patch_id)%force/patch_ib(patch_id)%mass, levelset_norm%sf(j,k,l,patch_id,:)))
+                        ! TODO :: improve for two fluid
+                        q_prim_vf(E_idx)%sf(j, k, l) = pres_IP/(1._wp - 2._wp*abs(levelset%sf(j, k, l, patch_id)*alpha_rho_IP(q)/pres_IP)*dot_product(patch_ib(patch_id)%force/patch_ib(patch_id)%mass, levelset_norm%sf(j, k, l, patch_id, :)))
                     end if
                 end do
 
@@ -1019,21 +1019,21 @@ contains
                         if (patch_ib(ib_idx)%moving_ibm == 2) then
                             if (num_dims == 3) then
                                 radial_vector = [x_cc(i), y_cc(j), z_cc(k)] - [patch_ib(ib_idx)%x_centroid, patch_ib(ib_idx)%y_centroid, patch_ib(ib_idx)%z_centroid] ! get the vector pointing to the grid cell
-                            else 
+                            else
                                 radial_vector = [x_cc(i), y_cc(j), 0._wp] - [patch_ib(ib_idx)%x_centroid, patch_ib(ib_idx)%y_centroid, 0._wp] ! get the vector pointing to the grid cell
                             end if
-                            pressure_divergence(1) = (pressure(i+1, j, k) - pressure(i-1, j, k)) / (2._wp * x_cc(i))
-                            pressure_divergence(2) = (pressure(i, j+1, k) - pressure(i, j-1, k)) / (2._wp * y_cc(j))
-                            cell_volume = x_cc(i) * y_cc(j)
+                            pressure_divergence(1) = (pressure(i + 1, j, k) - pressure(i - 1, j, k))/(2._wp*x_cc(i))
+                            pressure_divergence(2) = (pressure(i, j + 1, k) - pressure(i, j - 1, k))/(2._wp*y_cc(j))
+                            cell_volume = x_cc(i)*y_cc(j)
                             if (num_dims == 3) then
-                                pressure_divergence(3) = (pressure(i, j, k+1) - pressure(i, j, k-1)) / (2._wp * z_cc(k))
-                                cell_volume = cell_volume * z_cc(k)
+                                pressure_divergence(3) = (pressure(i, j, k + 1) - pressure(i, j, k - 1))/(2._wp*z_cc(k))
+                                cell_volume = cell_volume*z_cc(k)
                             else
                                 pressure_divergence(3) = 0._wp
                             end if
 
-                            forces(ib_idx, :) = forces(ib_idx, :) - (pressure_divergence * cell_volume)
-                            torques(ib_idx, :) = torques(ib_idx, :) + (cross_product(radial_vector, pressure_divergence) * cell_volume)
+                            forces(ib_idx, :) = forces(ib_idx, :) - (pressure_divergence*cell_volume)
+                            torques(ib_idx, :) = torques(ib_idx, :) + (cross_product(radial_vector, pressure_divergence)*cell_volume)
                         end if
                     end if
                 end do
@@ -1068,9 +1068,9 @@ contains
 
         real(wp), dimension(3), optional :: axis !< the axis about which we compute the moment. Only required in 3D.
         integer, intent(in) :: ib_marker
-        
-        real (wp) :: moment, distance_to_axis, cell_volume
-        real (wp), dimension(3) :: position, closest_point_along_axis, vector_to_axis
+
+        real(wp) :: moment, distance_to_axis, cell_volume
+        real(wp), dimension(3) :: position, closest_point_along_axis, vector_to_axis
         integer :: i, j, k, count
 
         if (p == 0) then
@@ -1080,26 +1080,25 @@ contains
             patch_ib(ib_marker)%moment = 1._wp
             return
         else
-            axis = axis / sqrt(sum(axis))
+            axis = axis/sqrt(sum(axis))
         end if
-        
+
         ! if the IB is in 2D or a 3D sphere, we can compute this exactly
         if (patch_ib(ib_marker)%geometry == 2) then ! circle
-            patch_ib(ib_marker)%moment = 0.5 * patch_ib(ib_marker)%mass * (patch_ib(ib_marker)%radius)**2
+            patch_ib(ib_marker)%moment = 0.5*patch_ib(ib_marker)%mass*(patch_ib(ib_marker)%radius)**2
         elseif (patch_ib(ib_marker)%geometry == 3) then ! rectangle
-            patch_ib(ib_marker)%moment = patch_ib(i)%mass * (patch_ib(ib_marker)%length_x**2 + patch_ib(ib_marker)%length_y**2) / 6._wp                
+            patch_ib(ib_marker)%moment = patch_ib(i)%mass*(patch_ib(ib_marker)%length_x**2 + patch_ib(ib_marker)%length_y**2)/6._wp
         elseif (patch_ib(ib_marker)%geometry == 8) then ! sphere
-            patch_ib(ib_marker)%moment = 0.4 * patch_ib(ib_marker)%mass * (patch_ib(ib_marker)%radius)**2
-          
+            patch_ib(ib_marker)%moment = 0.4*patch_ib(ib_marker)%mass*(patch_ib(ib_marker)%radius)**2
+
         else ! we do not have an analytic moment of inertia calculation and need to approximate it directly
             count = 0
             moment = 0._wp
             cell_volume = (x_cc(1) - x_cc(0))*(y_cc(1) - y_cc(0)) ! computed without grid stretching. Update in the loop to perform with stretching
             if (p /= 0) then
-              cell_volume = cell_volume * (z_cc(1) - z_cc(0))
+                cell_volume = cell_volume*(z_cc(1) - z_cc(0))
             end if
 
-            
             $:GPU_PARALLEL_LOOP(private='[position,closest_point_along_axis,vector_to_axis,distance_to_axis]', copy='[moment,count]', copyin='[ib_marker,cell_volume,axis]', collapse=3)
             do i = 0, m
                 do j = 0, j
@@ -1130,7 +1129,7 @@ contains
             $:END_GPU_PARALLEL_LOOP()
 
             ! write the final moment assuming the points are all uniform density
-            patch_ib(ib_marker)%moment = moment * patch_ib(ib_marker)%mass / (count * cell_volume)
+            patch_ib(ib_marker)%moment = moment*patch_ib(ib_marker)%mass/(count*cell_volume)
             $:GPU_UPDATE(device='[patch_ib(ib_marker)%moment]')
         end if
 
