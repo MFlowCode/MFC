@@ -492,6 +492,8 @@ contains
                                mpi_p, MPI_SUM, MPI_COMM_WORLD, ierr)
         end if
 
+#else
+        var_glb = var_loc
 #endif
 
     end subroutine s_mpi_allreduce_vectors_sum
