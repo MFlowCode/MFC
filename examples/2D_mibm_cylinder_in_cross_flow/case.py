@@ -95,7 +95,7 @@ print(
             "patch_ib(1)%angular_vel(1)": 0.0,  # x-axis rotational velocity in radians per second
             "patch_ib(1)%angular_vel(2)": 0.0,  # y-axis rotation
             "patch_ib(1)%angular_vel(3)": 0.0,  # z-axis rotation
-            "patch_ib(1)%mass": 0.0001,  # z-axis rotation
+            "patch_ib(1)%mass": 1.0e-6,  # z-axis rotation
             # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (gam_a - 1.0e00),  # 2.50(Not 1.40)
             "fluid_pp(1)%pi_inf": 0,

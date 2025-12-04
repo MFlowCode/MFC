@@ -493,7 +493,7 @@ contains
         end if
 
 #else
-        var_glb = var_loc
+        var_glb(1:num_vectors, 1:vector_length) = var_loc(1:num_vectors, 1:vector_length)
 #endif
 
     end subroutine s_mpi_allreduce_vectors_sum

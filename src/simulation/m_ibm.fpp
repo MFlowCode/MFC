@@ -197,19 +197,17 @@ contains
         type(ghost_point) :: innerp
 
         ! set the Moving IBM interior Pressure Values
-        do patch_id = 1, num_ibs
-            if (patch_ib(patch_id)%moving_ibm == 2) then
-                do j = 0, m
-                    do k = 0, n
-                        do l = 0, p
-                            if (ib_markers%sf(j, k, l) == patch_id) then
-                                q_prim_vf(E_idx)%sf(j, k, l) = 1._wp
-                            end if
-                        end do
+        $:GPU_PARALLEL_LOOP(private='[i,j,k]', copyin='[E_idx]', collapse=3)
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        if (ib_markers%sf(j, k, l) /= 0) then
+                            q_prim_vf(E_idx)%sf(j, k, l) = 1._wp
+                        end if
                     end do
                 end do
-            end if
-        end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
 
         if (num_gps > 0) then
             $:GPU_PARALLEL_LOOP(private='[i,physical_loc,dyn_pres,alpha_rho_IP, alpha_IP,pres_IP,vel_IP,vel_g,vel_norm_IP,r_IP, v_IP,pb_IP,mv_IP,nmom_IP,presb_IP,massv_IP,rho, gamma,pi_inf,Re_K,G_K,Gs,gp,innerp,norm,buf, radial_vector, rotation_velocity, j,k,l,q,qv_K,c_IP,nbub,patch_id]')
@@ -260,14 +258,15 @@ contains
                 end if
 
                 ! set the pressure
-                do q = 1, num_fluids
-                    if (patch_ib(patch_id)%moving_ibm == 0) then
-                        q_prim_vf(E_idx)%sf(j, k, l) = pres_IP
-                    else
-                        ! TODO :: improve for two fluid
-                        q_prim_vf(E_idx)%sf(j, k, l) = pres_IP/(1._wp - 2._wp*abs(levelset%sf(j, k, l, patch_id)*alpha_rho_IP(q)/pres_IP)*dot_product(patch_ib(patch_id)%force/patch_ib(patch_id)%mass, levelset_norm%sf(j, k, l, patch_id, :)))
-                    end if
-                end do
+                if (patch_ib(patch_id)%moving_ibm == 0) then
+                    q_prim_vf(E_idx)%sf(j, k, l) = pres_IP
+                else
+                    q_prim_vf(E_idx)%sf(j, k, l) = 0._wp
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do q = 1, num_fluids
+                        q_prim_vf(E_idx)%sf(j, k, l) = q_prim_vf(E_idx)%sf(j, k, l) + pres_IP/(1._wp - 2._wp*abs(levelset%sf(j, k, l, patch_id)*alpha_rho_IP(q)/pres_IP)*dot_product(patch_ib(patch_id)%force/patch_ib(patch_id)%mass, levelset_norm%sf(j, k, l, patch_id, :)))
+                    end do
+                end if
 
                 if (model_eqns /= 4) then
                     ! If in simulation, use acc mixture subroutines
@@ -1023,8 +1022,8 @@ contains
                             else
                                 radial_vector = [x_cc(i), y_cc(j), 0._wp] - [patch_ib(ib_idx)%x_centroid, patch_ib(ib_idx)%y_centroid, 0._wp]
                             end if
-                            dx = x_cc(i+1)-x_cc(i)
-                            dy = y_cc(j+1)-y_cc(j)
+                            dx = x_cc(i + 1) - x_cc(i)
+                            dy = y_cc(j + 1) - y_cc(j)
 
                             ! use a finite difference to compute the 2D components of the gradient of the pressure and cell volume
                             pressure_divergence(1) = (pressure(i + 1, j, k) - pressure(i - 1, j, k))/(2._wp*dx)
@@ -1033,7 +1032,7 @@ contains
 
                             ! add the 3D component, if we are working in 3 dimensions
                             if (num_dims == 3) then
-                                dz = z_cc(k+1)-z_cc(k)
+                                dz = z_cc(k + 1) - z_cc(k)
                                 pressure_divergence(3) = (pressure(i, j, k + 1) - pressure(i, j, k - 1))/(2._wp*dz)
                                 cell_volume = cell_volume*dz
                             else
@@ -1061,6 +1060,8 @@ contains
             patch_ib(i)%force(:) = forces(i, :)
             patch_ib(i)%torque(:) = matmul(patch_ib(i)%rotation_matrix_inverse, torques(i, :)) ! torques must be computed in the local coordinates of the IB
         end do
+
+        print *, forces(1, 1:2)
 
     end subroutine s_compute_ib_forces
 
@@ -1096,7 +1097,7 @@ contains
         if (patch_ib(ib_marker)%geometry == 2) then ! circle
             patch_ib(ib_marker)%moment = 0.5*patch_ib(ib_marker)%mass*(patch_ib(ib_marker)%radius)**2
         elseif (patch_ib(ib_marker)%geometry == 3) then ! rectangle
-            patch_ib(ib_marker)%moment = patch_ib(i)%mass*(patch_ib(ib_marker)%length_x**2 + patch_ib(ib_marker)%length_y**2)/6._wp
+            patch_ib(ib_marker)%moment = patch_ib(ib_marker)%mass*(patch_ib(ib_marker)%length_x**2 + patch_ib(ib_marker)%length_y**2)/6._wp
         elseif (patch_ib(ib_marker)%geometry == 8) then ! sphere
             patch_ib(ib_marker)%moment = 0.4*patch_ib(ib_marker)%mass*(patch_ib(ib_marker)%radius)**2
 
@@ -1126,7 +1127,7 @@ contains
                             ! project the position along the axis to find the closest distance to the rotation axis
                             closest_point_along_axis = axis*dot_product(axis, position)
                             vector_to_axis = position - closest_point_along_axis
-                            distance_to_axis = sum(vector_to_axis) ! saves the distance to the axis squared
+                            distance_to_axis = dot_product(vector_to_axis, vector_to_axis) ! saves the distance to the axis squared
 
                             ! compute the position component of the moment
                             $:GPU_ATOMIC(atomic='update')
