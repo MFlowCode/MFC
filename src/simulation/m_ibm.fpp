@@ -1036,7 +1036,7 @@ contains
                                 pressure_divergence(3) = 0._wp
                             end if
 
-                            ! Update the force values atmoically to prevent race conditions
+                            ! Update the force values atomically to prevent race conditions
                             $:GPU_ATOMIC(atomic='update')
                             forces(ib_idx, :) = forces(ib_idx, :) - (pressure_divergence*cell_volume)
                             $:GPU_ATOMIC(atomic='update')
