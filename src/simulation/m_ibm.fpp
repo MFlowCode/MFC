@@ -1004,13 +1004,13 @@ contains
         integer :: i, j, k, ib_idx
         real(wp), dimension(num_ibs, 3) :: forces, torques
         real(wp), dimension(1:3) :: pressure_divergence, radial_vector
-        real(wp) :: cell_volume
+        real(wp) :: cell_volume, dx, dy, dz
 
         forces = 0._wp
         torques = 0._wp
 
         ! TODO :: This is currently only valid inviscid, and needs to be extended to add viscocity
-        $:GPU_PARALLEL_LOOP(private='[ib_idx,radial_vector,pressure_divergence,cell_volume]', copy='[forces,torques]', copyin='[ib_markers]', collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[ib_idx,radial_vector,pressure_divergence,cell_volume, dx, dy, dz]', copy='[forces,torques]', copyin='[ib_markers]', collapse=3)
         do i = 0, m
             do j = 0, n
                 do k = 0, p
@@ -1023,16 +1023,19 @@ contains
                             else
                                 radial_vector = [x_cc(i), y_cc(j), 0._wp] - [patch_ib(ib_idx)%x_centroid, patch_ib(ib_idx)%y_centroid, 0._wp]
                             end if
+                            dx = x_cc(i+1)-x_cc(i)
+                            dy = y_cc(j+1)-y_cc(j)
 
                             ! use a finite difference to compute the 2D components of the gradient of the pressure and cell volume
-                            pressure_divergence(1) = (pressure(i + 1, j, k) - pressure(i - 1, j, k))/(2._wp*x_cc(i))
-                            pressure_divergence(2) = (pressure(i, j + 1, k) - pressure(i, j - 1, k))/(2._wp*y_cc(j))
-                            cell_volume = x_cc(i)*y_cc(j)
+                            pressure_divergence(1) = (pressure(i + 1, j, k) - pressure(i - 1, j, k))/(2._wp*dx)
+                            pressure_divergence(2) = (pressure(i, j + 1, k) - pressure(i, j - 1, k))/(2._wp*dy)
+                            cell_volume = dx*dy
 
                             ! add the 3D component, if we are working in 3 dimensions
                             if (num_dims == 3) then
-                                pressure_divergence(3) = (pressure(i, j, k + 1) - pressure(i, j, k - 1))/(2._wp*z_cc(k))
-                                cell_volume = cell_volume*z_cc(k)
+                                dz = z_cc(k+1)-z_cc(k)
+                                pressure_divergence(3) = (pressure(i, j, k + 1) - pressure(i, j, k - 1))/(2._wp*dz)
+                                cell_volume = cell_volume*dz
                             else
                                 pressure_divergence(3) = 0._wp
                             end if
