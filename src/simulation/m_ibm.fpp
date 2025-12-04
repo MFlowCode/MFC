@@ -1016,15 +1016,19 @@ contains
                 do k = 0, p
                     ib_idx = ib_markers%sf(i, j, k)
                     if (ib_idx /= 0) then ! only need to compute the gradient for cells inside a IB
-                        if (patch_ib(ib_idx)%moving_ibm == 2) then
+                        if (patch_ib(ib_idx)%moving_ibm == 2) then ! make sure that this IB has 2-way coupling enabled
                             if (num_dims == 3) then
                                 radial_vector = [x_cc(i), y_cc(j), z_cc(k)] - [patch_ib(ib_idx)%x_centroid, patch_ib(ib_idx)%y_centroid, patch_ib(ib_idx)%z_centroid] ! get the vector pointing to the grid cell
                             else
                                 radial_vector = [x_cc(i), y_cc(j), 0._wp] - [patch_ib(ib_idx)%x_centroid, patch_ib(ib_idx)%y_centroid, 0._wp] ! get the vector pointing to the grid cell
                             end if
+
+                            ! use a finite difference to compute the 2D components of the gradient of the pressure and cell volume
                             pressure_divergence(1) = (pressure(i + 1, j, k) - pressure(i - 1, j, k))/(2._wp*x_cc(i))
                             pressure_divergence(2) = (pressure(i, j + 1, k) - pressure(i, j - 1, k))/(2._wp*y_cc(j))
                             cell_volume = x_cc(i)*y_cc(j)
+
+                            ! add the 3D component, if we are working in 3 dimensions
                             if (num_dims == 3) then
                                 pressure_divergence(3) = (pressure(i, j, k + 1) - pressure(i, j, k - 1))/(2._wp*z_cc(k))
                                 cell_volume = cell_volume*z_cc(k)
@@ -1032,7 +1036,10 @@ contains
                                 pressure_divergence(3) = 0._wp
                             end if
 
+                            ! Update the force values atmoically to prevent race conditions
+                            $:GPU_ATOMIC(atomic='update')
                             forces(ib_idx, :) = forces(ib_idx, :) - (pressure_divergence*cell_volume)
+                            $:GPU_ATOMIC(atomic='update')
                             torques(ib_idx, :) = torques(ib_idx, :) + (cross_product(radial_vector, pressure_divergence)*cell_volume)
                         end if
                     end if
@@ -1050,8 +1057,6 @@ contains
             patch_ib(i)%force(:) = forces(i, :)
             patch_ib(i)%torque(:) = matmul(patch_ib(i)%rotation_matrix_inverse, torques(i, :)) ! torques must be computed in the local coordinates of the IB
         end do
-
-        print *, patch_ib(1)%force(1:2)
 
     end subroutine s_compute_ib_forces
 
