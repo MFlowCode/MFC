@@ -1106,7 +1106,7 @@ contains
 
             $:GPU_PARALLEL_LOOP(private='[position,closest_point_along_axis,vector_to_axis,distance_to_axis]', copy='[moment,count]', copyin='[ib_marker,cell_volume,axis]', collapse=3)
             do i = 0, m
-                do j = 0, j
+                do j = 0, n
                     do k = 0, p
                         if (ib_markers%sf(i, j, k) == ib_marker) then
                             $:GPU_ATOMIC(atomic='update')
