@@ -472,6 +472,32 @@ contains
 
     end subroutine s_mpi_allreduce_sum
 
+    !>  This subroutine follows the behavior of the s_mpi_allreduce_sum subroutine
+    !>  with the additional feature that it reduces an array of vectors.
+    impure subroutine s_mpi_allreduce_vectors_sum(var_loc, var_glb, num_vectors, vector_length)
+
+        integer, intent(in) :: num_vectors, vector_length
+        real(wp), dimension(:, :), intent(in) :: var_loc
+        real(wp), dimension(:, :), intent(out) :: var_glb
+
+#ifdef MFC_MPI
+        integer :: ierr !< Generic flag used to identify and report MPI errors
+
+        ! Performing the reduction procedure
+        if (loc(var_loc) == loc(var_glb)) then
+            call MPI_Allreduce(MPI_IN_PLACE, var_glb, num_vectors*vector_length, &
+                               mpi_p, MPI_SUM, MPI_COMM_WORLD, ierr)
+        else
+            call MPI_Allreduce(var_loc, var_glb, num_vectors*vector_length, &
+                               mpi_p, MPI_SUM, MPI_COMM_WORLD, ierr)
+        end if
+
+#else
+        var_glb(1:num_vectors, 1:vector_length) = var_loc(1:num_vectors, 1:vector_length)
+#endif
+
+    end subroutine s_mpi_allreduce_vectors_sum
+
     !>  The following subroutine takes the input local variable
         !!      from all processors and reduces to the sum of all
         !!      values. The reduced variable is recorded back onto the
