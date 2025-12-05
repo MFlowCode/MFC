@@ -322,17 +322,73 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
                     raise MFCException(f"Test {case}: {msg}")
 
         if ARG("test_all"):
-            case.delete_output()
+            # Don't delete output here - we need restart_data from the simulation above
             # Check timeout before launching the (potentially long) post-process run
             if timeout_flag.is_set():
                 raise TestTimeoutError("Test case exceeded 1 hour timeout")
-            cmd = case.run([PRE_PROCESS, SIMULATION, POST_PROCESS], gpus=devices)
+            # Run only POST_PROCESS since PRE_PROCESS and SIMULATION already ran successfully above
+            cmd = case.run([POST_PROCESS], gpus=devices)
             out_filepath = os.path.join(case.get_dirpath(), "out_post.txt")
             common.file_write(out_filepath, cmd.stdout)
 
             # Check return code from post-process run
             if cmd.returncode != 0:
                 cons.print(cmd.stdout)
+
+                # Extra debug for multi-rank restart/post-process issues
+                if getattr(case, "ppn", 1) >= 2:
+                    case_dir = case.get_dirpath()
+                    restart_dir = os.path.join(case_dir, "restart_data")
+
+                    cons.print("[bold yellow]Multi-rank debug (ppn >= 2): inspecting restart_data and post_process.inp[/bold yellow]")
+                    cons.print(f"[bold yellow]  Case directory:[/bold yellow] {case_dir}")
+                    cons.print(f"[bold yellow]  restart_data directory:[/bold yellow] {restart_dir}")
+
+                    # List restart_data contents
+                    if os.path.isdir(restart_dir):
+                        try:
+                            entries = sorted(os.listdir(restart_dir))
+                        except OSError as exc:
+                            cons.print(f"[bold yellow]  Could not list restart_data contents: {exc}[/bold yellow]")
+                        else:
+                            cons.print(f"[bold yellow]  restart_data entries ({len(entries)} total, showing up to 20):[/bold yellow]")
+                            for name in entries[:20]:
+                                cons.print(f"    - {name}")
+                    else:
+                        cons.print("[bold yellow]  restart_data directory does not exist[/bold yellow]")
+
+                    # Dump key case parameters relevant to restart/post-process
+                    params = getattr(case, "params", {})
+                    def _param(name: str):
+                        return params.get(name, "<unset>")
+
+                    cons.print("[bold yellow]  Selected case parameters relevant to restart:[/bold yellow]")
+                    for key in (
+                        "t_step_start",
+                        "t_step_stop",
+                        "t_step_save",
+                        "n_start",
+                        "t_save",
+                        "parallel_io",
+                        "file_per_process",
+                    ):
+                        cons.print(f"    {key} = {_param(key)}")
+
+                    # Show the beginning of post_process.inp if present
+                    ppi_path = os.path.join(case_dir, "post_process.inp")
+                    if os.path.exists(ppi_path):
+                        cons.print(f"[bold yellow]  First lines of post_process.inp ({ppi_path}):[/bold yellow]")
+                        try:
+                            with open(ppi_path, "r", encoding="utf-8", errors="replace") as f:
+                                for i, line in enumerate(f):
+                                    if i >= 40:
+                                        break
+                                    cons.print("    " + line.rstrip())
+                        except OSError as exc:
+                            cons.print(f"[bold yellow]  Could not read post_process.inp: {exc}[/bold yellow]")
+                    else:
+                        cons.print("[bold yellow]  post_process.inp not found in case directory[/bold yellow]")
+
                 raise MFCException(
                     f"Test {case}: Failed to execute MFC (post-process). "
                     f"See log at: {out_filepath}"
