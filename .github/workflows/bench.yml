@@ -114,7 +114,7 @@ jobs:
             submit_output=$(bash .github/workflows/$cluster/submit-bench.sh \
               .github/workflows/$cluster/bench.sh $device $interface 2>&1)
             
-            job_id=$(echo "$submit_output" | grep -oP 'Submitted batch job \K[0-9]+' || echo "")
+            job_id=$(echo "$submit_output" | sed -n 's/.*Submitted batch job \([0-9][0-9]*\).*/\1/p')
             job_slug="bench-$device-$interface"
             output_file="${job_slug}.out"
             
@@ -135,10 +135,20 @@ jobs:
           (submit_and_monitor master ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }}) &
           master_pid=$!
           
-          wait $pr_pid && pr_exit=$? || pr_exit=$?
-          wait $master_pid && master_exit=$? || master_exit=$?
-          
-          if [ $pr_exit -ne 0 ] || [ $master_exit -ne 0 ]; then
+          # Wait and capture exit codes reliably
+          pr_exit=0
+          master_exit=0
+
+          if ! wait "$pr_pid"; then
+            pr_exit=$?
+          fi
+          if ! wait "$master_pid"; then
+            master_exit=$?
+          fi
+
+          # Explicitly check and quote to avoid test errors
+          if [ "${pr_exit}" -ne 0 ] || [ "${master_exit}" -ne 0 ]; then
+            echo "One or both benchmark jobs failed: pr_exit=${pr_exit}, master_exit=${master_exit}"
             exit 1
           fi
 

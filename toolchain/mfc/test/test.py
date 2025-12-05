@@ -107,7 +107,7 @@ def __filter(cases_) -> typing.List[TestCase]:
     return selected_cases, skipped_cases
 
 def test():
-    # pylint: disable=global-statement, global-variable-not-assigned
+    # pylint: disable=global-statement, global-variable-not-assigned, too-many-statements
     global nFAIL, nPASS, nSKIP, total_test_count
     global errors
 
@@ -181,8 +181,13 @@ def test():
         total_completed = nFAIL + nPASS
         cons.print()
         cons.unindent()
+        if total_completed > 0:
+            raise MFCException(
+                f"Excessive test failures: {nFAIL}/{total_completed} "
+                f"failed ({nFAIL/total_completed*100:.1f}%)"
+            )
         raise MFCException(
-            f"Excessive test failures: {nFAIL}/{total_completed} failed ({nFAIL/total_completed*100:.1f}%)"
+            f"Excessive test failures: {nFAIL} failed, but no tests were completed."
         )
 
     nSKIP = len(skipped_cases)
@@ -242,8 +247,9 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
     start_time = time.time()
 
     # Set timeout using threading.Timer (works in worker threads)
-    # Note: signal.alarm() only works in the main thread, so we use
-    # threading.Timer which works correctly in worker threads spawned by sched.sched
+    # Note: we intentionally do not use signal.alarm() here because signals
+    # only work in the main thread; sched.sched runs tests in worker threads.
+    # threading.Timer works correctly in this threaded context.
     timeout_flag = threading.Event()
     timeout_timer = threading.Timer(TEST_TIMEOUT_SECONDS, timeout_flag.set)
     timeout_timer.start()
@@ -309,6 +315,9 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
 
         if ARG("test_all"):
             case.delete_output()
+            # Check timeout before launching the (potentially long) post-process run
+            if timeout_flag.is_set():
+                raise TestTimeoutError("Test case exceeded 1 hour timeout")
             cmd = case.run([PRE_PROCESS, SIMULATION, POST_PROCESS], gpus=devices)
             out_filepath = os.path.join(case.get_dirpath(), "out_post.txt")
             common.file_write(out_filepath, cmd.stdout)
@@ -329,10 +338,17 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
         cons.print(f"  {progress_str}    [bold magenta]{case.get_uuid()}[/bold magenta]    {duration:6.2f}    {case.trace}")
 
     except TestTimeoutError as exc:
+        log_path = os.path.join(case.get_dirpath(), 'out_pre_sim.txt')
+        if os.path.exists(log_path):
+            log_msg = f"Check the log at: {log_path}"
+        else:
+            log_msg = (
+                f"Log file ({log_path}) may not exist if the timeout occurred early."
+            )
         raise MFCException(
             f"Test {case} exceeded 1 hour timeout. "
             f"This may indicate a hung simulation or misconfigured case. "
-            f"Check the log at: {os.path.join(case.get_dirpath(), 'out_pre_sim.txt')}"
+            f"{log_msg}"
         ) from exc
     finally:
         timeout_timer.cancel()  # Cancel timeout timer
