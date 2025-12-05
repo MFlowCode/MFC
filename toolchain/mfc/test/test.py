@@ -213,6 +213,13 @@ def test():
 # pylint: disable=too-many-locals, too-many-branches, too-many-statements, trailing-whitespace
 def _process_silo_file(silo_filepath: str, case: TestCase, out_filepath: str):
     """Process a single silo file with h5dump and check for NaNs/Infinities."""
+    # Check that silo file exists before attempting to process it
+    if not os.path.exists(silo_filepath):
+        raise MFCException(
+            f"Test {case}: Expected silo file missing: {silo_filepath}. "
+            f"Check the post-process log at: {out_filepath}"
+        )
+
     h5dump = f"{HDF5.get_install_dirpath(case.to_input_file())}/bin/h5dump"
 
     if not os.path.exists(h5dump or ""):
@@ -224,7 +231,8 @@ def _process_silo_file(silo_filepath: str, case: TestCase, out_filepath: str):
 
     if err != 0:
         raise MFCException(
-            f"Test {case}: Failed to run h5dump. You can find the run's output in {out_filepath}, "
+            f"Test {case}: Failed to run h5dump on {silo_filepath}. "
+            f"You can find the run's output in {out_filepath}, "
             f"and the case dictionary in {case.get_filepath()}."
         )
 
@@ -321,6 +329,14 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
             cmd = case.run([PRE_PROCESS, SIMULATION, POST_PROCESS], gpus=devices)
             out_filepath = os.path.join(case.get_dirpath(), "out_post.txt")
             common.file_write(out_filepath, cmd.stdout)
+
+            # Check return code from post-process run
+            if cmd.returncode != 0:
+                cons.print(cmd.stdout)
+                raise MFCException(
+                    f"Test {case}: Failed to execute MFC (post-process). "
+                    f"See log at: {out_filepath}"
+                )
 
             silo_dir = os.path.join(case.get_dirpath(), 'silo_hdf5', 'p0')
             if os.path.isdir(silo_dir):
