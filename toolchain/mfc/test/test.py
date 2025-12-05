@@ -291,12 +291,12 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
         progress_str = f"({current_test_number:3d}/{total_test_count:3d})"
         cons.print(f"  {progress_str}    [bold magenta]{case.get_uuid()}[/bold magenta]    {duration:6.2f}    {case.trace}")
 
-    except TestTimeoutError:
+    except TestTimeoutError as exc:
         raise MFCException(
             f"Test {case} exceeded 1 hour timeout. "
             f"This may indicate a hung simulation or misconfigured case. "
             f"Check the log at: {os.path.join(case.get_dirpath(), 'out_pre_sim.txt')}"
-        )
+        ) from exc
     finally:
         signal.alarm(0)  # Cancel alarm
 
