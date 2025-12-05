@@ -16,7 +16,7 @@ ${helpers.template_prologue()}
 
 ok ":) Loading modules:\n"
 cd "${MFC_ROOT_DIR}"
-. ./mfc.sh load -c s -m ${'g' if gpu else 'c'}
+. ./mfc.sh load -c s -m ${'g' if gpu_enabled else 'c'}
 cd - > /dev/null
 echo
 
@@ -27,12 +27,12 @@ echo
         (set -x; ${rofiler} "${target.get_install_binpath(case)}")
     % else:
         (set -x; ${profiler} \
-            jsrun                                      \
-                ${'--smpiargs="-gpu"' if gpu else ''}  \
-                --nrs          ${tasks_per_node*nodes} \
-                --cpu_per_rs   1                       \
-                --gpu_per_rs   ${1 if gpu else 0}      \
-                --tasks_per_rs 1                       \
+            jsrun                                              \
+                ${'--smpiargs="-gpu"' if gpu_enabled else ''}  \
+                --nrs          ${tasks_per_node*nodes}         \
+                --cpu_per_rs   1                               \
+                --gpu_per_rs   ${1 if gpu_enabled else 0}      \
+                --tasks_per_rs 1                               \
                 "${target.get_install_binpath(case)}")
     % endif
 
