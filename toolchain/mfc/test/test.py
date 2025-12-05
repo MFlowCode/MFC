@@ -206,6 +206,36 @@ def test():
 
 
 # pylint: disable=too-many-locals, too-many-branches, too-many-statements, trailing-whitespace
+def _process_silo_file(silo_filepath: str, case: TestCase, out_filepath: str):
+    """Process a single silo file with h5dump and check for NaNs/Infinities."""
+    h5dump = f"{HDF5.get_install_dirpath(case.to_input_file())}/bin/h5dump"
+
+    if not os.path.exists(h5dump or ""):
+        if not does_command_exist("h5dump"):
+            raise MFCException("h5dump couldn't be found.")
+        h5dump = shutil.which("h5dump")
+
+    output, err = get_program_output([h5dump, silo_filepath])
+
+    if err != 0:
+        raise MFCException(
+            f"Test {case}: Failed to run h5dump. You can find the run's output in {out_filepath}, "
+            f"and the case dictionary in {case.get_filepath()}."
+        )
+
+    if "nan," in output:
+        raise MFCException(
+            f"Test {case}: Post Process has detected a NaN. You can find the run's output in {out_filepath}, "
+            f"and the case dictionary in {case.get_filepath()}."
+        )
+
+    if "inf," in output:
+        raise MFCException(
+            f"Test {case}: Post Process has detected an Infinity. You can find the run's output in {out_filepath}, "
+            f"and the case dictionary in {case.get_filepath()}."
+        )
+
+
 def _handle_case(case: TestCase, devices: typing.Set[int]):
     # pylint: disable=global-statement, global-variable-not-assigned
     global current_test_number
@@ -287,24 +317,7 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
             if os.path.isdir(silo_dir):
                 for silo_filename in os.listdir(silo_dir):
                     silo_filepath = os.path.join(silo_dir, silo_filename)
-                    h5dump        = f"{HDF5.get_install_dirpath(case.to_input_file())}/bin/h5dump"
-
-                    if not os.path.exists(h5dump or ""):
-                        if not does_command_exist("h5dump"):
-                            raise MFCException("h5dump couldn't be found.")
-
-                        h5dump = shutil.which("h5dump")
-
-                    output, err = get_program_output([h5dump, silo_filepath])
-
-                    if err != 0:
-                        raise MFCException(f"Test {case}: Failed to run h5dump. You can find the run's output in {out_filepath}, and the case dictionary in {case.get_filepath()}.")
-
-                    if "nan," in output:
-                        raise MFCException(f"Test {case}: Post Process has detected a NaN. You can find the run's output in {out_filepath}, and the case dictionary in {case.get_filepath()}.")
-
-                    if "inf," in output:
-                        raise MFCException(f"Test {case}: Post Process has detected an Infinity. You can find the run's output in {out_filepath}, and the case dictionary in {case.get_filepath()}.")
+                    _process_silo_file(silo_filepath, case, out_filepath)
 
         case.delete_output()
 

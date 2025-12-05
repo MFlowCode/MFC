@@ -1,4 +1,4 @@
-import os, sys, uuid, subprocess, dataclasses, typing, math
+import os, sys, uuid, subprocess, dataclasses, typing, math, traceback
 
 import rich.table
 
@@ -209,7 +209,6 @@ def diff():
                         cons.print(f"[bold red]Error[/bold red]: Benchmarking failed since grind time speedup for {target.name} below acceptable threshold (<0.95) - Case: {slug}")
                         err = 1
             except Exception as e:
-                import traceback
                 cons.print(
                     f"[bold red]ERROR[/bold red]: Failed to compute speedup for {target.name} in {slug}: {e}\n"
                     f"{traceback.format_exc()}"
