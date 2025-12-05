@@ -23,7 +23,7 @@ jobs:
           filters: ".github/file-filter.yml"
 
   self:
-    name: "${{ matrix.name }} (${{ matrix.device }})"
+    name: "${{ matrix.name }} (${{ matrix.device }}${{ matrix.interface != 'none' && format('-{0}', matrix.interface) || '' }})"
     if: ${{ github.repository=='MFlowCode/MFC' && needs.file-changes.outputs.checkall=='true' && ((github.event_name=='pull_request_review' && github.event.review.state=='approved') || (github.event_name=='pull_request' && (github.event.pull_request.user.login=='sbryngelson' || github.event.pull_request.user.login=='wilfonba'))) }}
     needs: file-changes
     strategy:
@@ -73,7 +73,7 @@ jobs:
     runs-on:
       group: ${{ matrix.group }}
       labels: ${{ matrix.labels }}
-    timeout-minutes: 1400
+    timeout-minutes: 480
     env:
       ACTIONS_RUNNER_FORCE_ACTIONS_NODE_VERSION: node16
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
@@ -99,9 +99,83 @@ jobs:
 
       - name: Bench (Master v. PR)
         run: |
-          (cd pr     && bash .github/workflows/${{ matrix.cluster }}/submit-bench.sh .github/workflows/${{ matrix.cluster }}/bench.sh ${{ matrix.device }} ${{ matrix.interface }}) &
-          (cd master && bash .github/workflows/${{ matrix.cluster }}/submit-bench.sh .github/workflows/${{ matrix.cluster }}/bench.sh ${{ matrix.device }} ${{ matrix.interface }}) &
-          wait %1 && wait %2
+          set -e
+          
+          # Function to submit and monitor
+          submit_and_monitor() {
+            local dir=$1
+            local device=$2
+            local interface=$3
+            local cluster=$4
+            
+            cd "$dir"
+            
+            # Submit job
+            submit_output=$(bash .github/workflows/$cluster/submit-bench.sh \
+              .github/workflows/$cluster/bench.sh $device $interface 2>&1)
+            
+            job_id=$(echo "$submit_output" | grep -oP 'Submitted batch job \K[0-9]+' || echo "")
+            job_slug="bench-$device-$interface"
+            output_file="${job_slug}.out"
+            
+            if [ -z "$job_id" ]; then
+              echo "ERROR: Failed to submit job"
+              echo "$submit_output"
+              return 1
+            fi
+            
+            echo "Submitted batch job $job_id"
+            echo "Monitoring output file: $output_file"
+            
+            # Wait for file to appear (check job status if it takes a while)
+            echo "Waiting for job to start..."
+            while [ ! -f "$output_file" ]; do
+              # Check if job failed to start
+              if ! squeue -j "$job_id" &>/dev/null && [ ! -f "$output_file" ]; then
+                echo "ERROR: Job $job_id finished without creating output file"
+                return 1
+              fi
+              sleep 5
+            done
+            
+            echo "=== Streaming output for job $job_id ==="
+            # Stream output while job runs
+            tail -f "$output_file" &
+            tail_pid=$!
+            
+            # Wait for job to complete (will wait up to GitHub Actions timeout)
+            while squeue -j "$job_id" &>/dev/null; do
+              sleep 5
+            done
+            
+            # Stop tailing
+            kill $tail_pid 2>/dev/null || true
+            
+            echo ""
+            echo "=== Final output ==="
+            cat "$output_file"
+            
+            # Check exit status
+            exit_code=$(scontrol show job "$job_id" 2>/dev/null | grep -oP 'ExitCode=\K[0-9]+' || echo "0:0")
+            if [ "$exit_code" != "0" ] && [ "$exit_code" != "0:0" ]; then
+              echo "ERROR: Job $job_id failed with exit code $exit_code"
+              return 1
+            fi
+          }
+          
+          # Run both jobs with monitoring
+          (submit_and_monitor pr ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }}) &
+          pr_pid=$!
+          
+          (submit_and_monitor master ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }}) &
+          master_pid=$!
+          
+          wait $pr_pid && pr_exit=$? || pr_exit=$?
+          wait $master_pid && master_exit=$? || master_exit=$?
+          
+          if [ $pr_exit -ne 0 ] || [ $master_exit -ne 0 ]; then
+            exit 1
+          fi
 
       - name: Generate & Post Comment
         run: |

@@ -93,11 +93,11 @@ jobs:
           OPT2: ${{ matrix.debug == 'debug' && '-% 20' || '' }}
 
   self:
-    name: Self Hosted
+    name: "${{ matrix.lbl == 'gt' && 'Georgia Tech | Phoenix' || 'Oak Ridge | Frontier' }} (${{ matrix.device }}${{ matrix.interface != 'none' && format('-{0}', matrix.interface) || '' }})"
     if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true'
     needs: file-changes
     continue-on-error: false
-    timeout-minutes: 1400
+    timeout-minutes: 480
     strategy:
       matrix:
         device: ['gpu']

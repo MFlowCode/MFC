@@ -1,4 +1,4 @@
-import os, typing, shutil, time, itertools
+import os, typing, shutil, time, itertools, signal
 from random import sample, seed
 
 import rich, rich.table
@@ -22,6 +22,19 @@ nSKIP = 0
 current_test_number = 0
 total_test_count = 0
 errors = []
+
+# Early abort thresholds
+MIN_CASES_BEFORE_ABORT = 20
+FAILURE_RATE_THRESHOLD = 0.3
+
+# Per-test timeout (1 hour)
+TEST_TIMEOUT_SECONDS = 3600
+
+class TestTimeoutError(MFCException):
+    pass
+
+def timeout_handler(signum, frame):
+    raise TestTimeoutError("Test case exceeded 1 hour timeout")
 
 # pylint: disable=too-many-branches, trailing-whitespace
 def __filter(cases_) -> typing.List[TestCase]:
@@ -186,91 +199,106 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
     global current_test_number
     start_time = time.time()
 
+    # Set timeout alarm
+    signal.signal(signal.SIGALRM, timeout_handler)
+    signal.alarm(TEST_TIMEOUT_SECONDS)
+
     tol = case.compute_tolerance()
     case.delete_output()
     case.create_directory()
 
     if ARG("dry_run"):
         cons.print(f"  [bold magenta]{case.get_uuid()}[/bold magenta]     SKIP     {case.trace}")
+        signal.alarm(0)  # Cancel alarm
         return
 
-    cmd = case.run([PRE_PROCESS, SIMULATION], gpus=devices)
+    try:
+        cmd = case.run([PRE_PROCESS, SIMULATION], gpus=devices)
 
-    out_filepath = os.path.join(case.get_dirpath(), "out_pre_sim.txt")
+        out_filepath = os.path.join(case.get_dirpath(), "out_pre_sim.txt")
 
-    common.file_write(out_filepath, cmd.stdout)
-
-    if cmd.returncode != 0:
-        cons.print(cmd.stdout)
-        raise MFCException(f"Test {case}: Failed to execute MFC.")
-
-    pack, err = packer.pack(case.get_dirpath())
-    if err is not None:
-        raise MFCException(f"Test {case}: {err}")
-
-    if pack.has_NaNs():
-        raise MFCException(f"Test {case}: NaNs detected in the case.")
-
-    golden_filepath = os.path.join(case.get_dirpath(), "golden.txt")
-    if ARG("generate"):
-        common.delete_file(golden_filepath)
-        pack.save(golden_filepath)
-    else:
-        if not os.path.isfile(golden_filepath):
-            raise MFCException(f"Test {case}: The golden file does not exist! To generate golden files, use the '--generate' flag.")
-
-        golden = packer.load(golden_filepath)
-
-        if ARG("add_new_variables"):
-            for pfilepath, pentry in list(pack.entries.items()):
-                if golden.find(pfilepath) is None:
-                    golden.set(pentry)
-
-            for gfilepath, gentry in list(golden.entries.items()):
-                if pack.find(gfilepath) is None:
-                    golden.remove(gentry)
-
-            golden.save(golden_filepath)
-        else:
-            err, msg = packtol.compare(pack, packer.load(golden_filepath), packtol.Tolerance(tol, tol))
-            if msg is not None:
-                raise MFCException(f"Test {case}: {msg}")
-
-    if ARG("test_all"):
-        case.delete_output()
-        cmd = case.run([PRE_PROCESS, SIMULATION, POST_PROCESS], gpus=devices)
-        out_filepath = os.path.join(case.get_dirpath(), "out_post.txt")
         common.file_write(out_filepath, cmd.stdout)
 
-        for silo_filepath in os.listdir(os.path.join(case.get_dirpath(), 'silo_hdf5', 'p0')):
-            silo_filepath = os.path.join(case.get_dirpath(), 'silo_hdf5', 'p0', silo_filepath)
-            h5dump        = f"{HDF5.get_install_dirpath(case.to_input_file())}/bin/h5dump"
+        if cmd.returncode != 0:
+            cons.print(cmd.stdout)
+            raise MFCException(f"Test {case}: Failed to execute MFC.")
 
-            if not os.path.exists(h5dump or ""):
-                if not does_command_exist("h5dump"):
-                    raise MFCException("h5dump couldn't be found.")
+        pack, err = packer.pack(case.get_dirpath())
+        if err is not None:
+            raise MFCException(f"Test {case}: {err}")
 
-                h5dump = shutil.which("h5dump")
+        if pack.has_NaNs():
+            raise MFCException(f"Test {case}: NaNs detected in the case.")
 
-            output, err = get_program_output([h5dump, silo_filepath])
+        golden_filepath = os.path.join(case.get_dirpath(), "golden.txt")
+        if ARG("generate"):
+            common.delete_file(golden_filepath)
+            pack.save(golden_filepath)
+        else:
+            if not os.path.isfile(golden_filepath):
+                raise MFCException(f"Test {case}: The golden file does not exist! To generate golden files, use the '--generate' flag.")
 
-            if err != 0:
-                raise MFCException(f"Test {case}: Failed to run h5dump. You can find the run's output in {out_filepath}, and the case dictionary in {case.get_filepath()}.")
+            golden = packer.load(golden_filepath)
 
-            if "nan," in output:
-                raise MFCException(f"Test {case}: Post Process has detected a NaN. You can find the run's output in {out_filepath}, and the case dictionary in {case.get_filepath()}.")
+            if ARG("add_new_variables"):
+                for pfilepath, pentry in list(pack.entries.items()):
+                    if golden.find(pfilepath) is None:
+                        golden.set(pentry)
 
-            if "inf," in output:
-                raise MFCException(f"Test {case}: Post Process has detected an Infinity. You can find the run's output in {out_filepath}, and the case dictionary in {case.get_filepath()}.")
+                for gfilepath, gentry in list(golden.entries.items()):
+                    if pack.find(gfilepath) is None:
+                        golden.remove(gentry)
 
-    case.delete_output()
+                golden.save(golden_filepath)
+            else:
+                err, msg = packtol.compare(pack, packer.load(golden_filepath), packtol.Tolerance(tol, tol))
+                if msg is not None:
+                    raise MFCException(f"Test {case}: {msg}")
 
-    end_time = time.time()
-    duration = end_time - start_time
+        if ARG("test_all"):
+            case.delete_output()
+            cmd = case.run([PRE_PROCESS, SIMULATION, POST_PROCESS], gpus=devices)
+            out_filepath = os.path.join(case.get_dirpath(), "out_post.txt")
+            common.file_write(out_filepath, cmd.stdout)
 
-    current_test_number += 1
-    progress_str = f"({current_test_number:3d}/{total_test_count:3d})"
-    cons.print(f"  {progress_str}    [bold magenta]{case.get_uuid()}[/bold magenta]    {duration:6.2f}    {case.trace}")
+            for silo_filepath in os.listdir(os.path.join(case.get_dirpath(), 'silo_hdf5', 'p0')):
+                silo_filepath = os.path.join(case.get_dirpath(), 'silo_hdf5', 'p0', silo_filepath)
+                h5dump        = f"{HDF5.get_install_dirpath(case.to_input_file())}/bin/h5dump"
+
+                if not os.path.exists(h5dump or ""):
+                    if not does_command_exist("h5dump"):
+                        raise MFCException("h5dump couldn't be found.")
+
+                    h5dump = shutil.which("h5dump")
+
+                output, err = get_program_output([h5dump, silo_filepath])
+
+                if err != 0:
+                    raise MFCException(f"Test {case}: Failed to run h5dump. You can find the run's output in {out_filepath}, and the case dictionary in {case.get_filepath()}.")
+
+                if "nan," in output:
+                    raise MFCException(f"Test {case}: Post Process has detected a NaN. You can find the run's output in {out_filepath}, and the case dictionary in {case.get_filepath()}.")
+
+                if "inf," in output:
+                    raise MFCException(f"Test {case}: Post Process has detected an Infinity. You can find the run's output in {out_filepath}, and the case dictionary in {case.get_filepath()}.")
+
+        case.delete_output()
+
+        end_time = time.time()
+        duration = end_time - start_time
+
+        current_test_number += 1
+        progress_str = f"({current_test_number:3d}/{total_test_count:3d})"
+        cons.print(f"  {progress_str}    [bold magenta]{case.get_uuid()}[/bold magenta]    {duration:6.2f}    {case.trace}")
+
+    except TestTimeoutError:
+        raise MFCException(
+            f"Test {case} exceeded 1 hour timeout. "
+            f"This may indicate a hung simulation or misconfigured case. "
+            f"Check the log at: {os.path.join(case.get_dirpath(), 'out_pre_sim.txt')}"
+        )
+    finally:
+        signal.alarm(0)  # Cancel alarm
 
 
 def handle_case(case: TestCase, devices: typing.Set[int]):
@@ -300,5 +328,17 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
             cons.print(f"[bold red]Failed test {case} after {nAttempts} attempt(s).[/bold red]")
             errors.append(f"[bold red]Failed test {case} after {nAttempts} attempt(s).[/bold red]")
             errors.append(f"{exc}")
+
+        # Check if we should abort early due to high failure rate
+        total_completed = nFAIL + nPASS
+        if total_completed >= MIN_CASES_BEFORE_ABORT:
+            failure_rate = nFAIL / total_completed
+            if failure_rate >= FAILURE_RATE_THRESHOLD:
+                cons.print(f"\n[bold red]CRITICAL: {failure_rate*100:.1f}% failure rate detected after {total_completed} tests.[/bold red]")
+                cons.print(f"[bold red]This suggests a systemic issue (bad build, broken environment, etc.)[/bold red]")
+                cons.print(f"[bold red]Aborting remaining tests to fail fast.[/bold red]\n")
+                raise MFCException(
+                    f"Excessive test failures: {nFAIL}/{total_completed} failed ({failure_rate*100:.1f}%)"
+                )
 
         return
