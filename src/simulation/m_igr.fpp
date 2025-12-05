@@ -27,6 +27,7 @@ module m_igr
 #ifdef __NVCOMPILER_GPU_UNIFIED_MEM
     integer, dimension(3) :: nv_uvm_temp_on_gpu
     real(wp), pointer, contiguous, dimension(:, :, :) :: jac, jac_rhs, jac_old
+    $:GPU_DECLARE(create='[jac, jac_rhs, jac_old]')
     real(wp), allocatable, dimension(:, :, :), pinned, target :: jac_host
     real(wp), allocatable, dimension(:, :, :), pinned, target :: jac_rhs_host
     real(wp), allocatable, dimension(:, :, :), pinned, target :: jac_old_host
