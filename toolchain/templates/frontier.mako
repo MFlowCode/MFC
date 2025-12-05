@@ -45,7 +45,7 @@ echo
     export MPICH_GPU_SUPPORT_ENABLED=0
 % endif
 
-%if unified:
+% if unified:
     export CRAY_ACC_USE_UNIFIED_MEM=1
 % endif
 

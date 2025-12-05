@@ -101,9 +101,17 @@ def __generate_job_script(targets, case: input.MFCInputFile):
 
     # Compute GPU mode booleans for templates
     gpu_mode = ARG('gpu')
-    gpu_enabled = (gpu_mode != gpuConfigOptions.NONE.value)
-    gpu_acc = (gpu_mode == gpuConfigOptions.ACC.value)
-    gpu_mp = (gpu_mode == gpuConfigOptions.MP.value)
+
+    # Validate gpu_mode is one of the expected values
+    valid_gpu_modes = {e.value for e in gpuConfigOptions}
+    if gpu_mode not in valid_gpu_modes:
+        raise MFCException(
+            f"Invalid GPU mode '{gpu_mode}'. Must be one of: {', '.join(sorted(valid_gpu_modes))}"
+        )
+
+    gpu_enabled = gpu_mode != gpuConfigOptions.NONE.value
+    gpu_acc = gpu_mode == gpuConfigOptions.ACC.value
+    gpu_mp = gpu_mode == gpuConfigOptions.MP.value
 
     content = __get_template().render(
         **{**ARGS(), 'targets': targets},

@@ -19,7 +19,7 @@
 % endif
 % if gpu_enabled:
 #SBATCH --gres=gpu:V100:${tasks_per_node}
-#SBATCH --mem-per-gpu=16G\
+#SBATCH --mem-per-gpu=16G
 % endif
 % if email:
 #SBATCH --mail-user=${email}
