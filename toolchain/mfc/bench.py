@@ -68,13 +68,14 @@ def bench(targets = None):
                     ["--targets"] + [t.name for t in targets] +
                     ["--output-summary", summary_filepath] +
                     case.args +
-                    ["--", "--gbpp", ARG('mem')],
+                    ["--", "--gbpp", str(ARG('mem'))],
                     stdout=log_file,
                     stderr=subprocess.STDOUT)
 
-            # Check return code
-            if result.returncode != 0:
-                cons.print(f"[bold red]ERROR[/bold red]: Case {case.slug} failed with exit code {result.returncode}")
+            # Check return code (handle CompletedProcess or int defensively)
+            rc = result.returncode if hasattr(result, "returncode") else result
+            if rc != 0:
+                cons.print(f"[bold red]ERROR[/bold red]: Case {case.slug} failed with exit code {rc}")
                 cons.print(f"[bold red]      Check log at: {log_filepath}[/bold red]")
                 failed_cases.append(case.slug)
                 cons.unindent()
@@ -111,7 +112,6 @@ def bench(targets = None):
 
             if validation_failed:
                 failed_cases.append(case.slug)
-                cons.unindent()
                 continue
 
             # Add to results
@@ -124,8 +124,8 @@ def bench(targets = None):
         except Exception as e:
             cons.print(f"[bold red]ERROR[/bold red]: Unexpected error running {case.slug}: {e}")
             failed_cases.append(case.slug)
-
-        cons.unindent()
+        finally:
+            cons.unindent()
 
     # Report results
     if failed_cases:
@@ -209,7 +209,11 @@ def diff():
                         cons.print(f"[bold red]Error[/bold red]: Benchmarking failed since grind time speedup for {target.name} below acceptable threshold (<0.95) - Case: {slug}")
                         err = 1
             except Exception as e:
-                cons.print(f"[bold red]ERROR[/bold red]: Failed to compute speedup for {target.name} in {slug}: {e}")
+                import traceback
+                cons.print(
+                    f"[bold red]ERROR[/bold red]: Failed to compute speedup for {target.name} in {slug}: {e}\n"
+                    f"{traceback.format_exc()}"
+                )
                 err = 1
 
         table.add_row(f"[magenta]{slug}[/magenta]", *speedups)

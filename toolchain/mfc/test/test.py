@@ -1,4 +1,4 @@
-import os, typing, shutil, time, itertools, signal
+import os, typing, shutil, time, itertools, threading
 from random import sample, seed
 
 import rich, rich.table
@@ -30,11 +30,14 @@ FAILURE_RATE_THRESHOLD = 0.3
 # Per-test timeout (1 hour)
 TEST_TIMEOUT_SECONDS = 3600
 
+# Global abort flag for thread-safe early termination
+# This flag is set when the failure rate exceeds the threshold, signaling
+# all worker threads to exit gracefully. This avoids raising exceptions
+# from worker threads which could leave the scheduler in an undefined state.
+abort_tests = threading.Event()
+
 class TestTimeoutError(MFCException):
     pass
-
-def timeout_handler(signum, frame):
-    raise TestTimeoutError("Test case exceeded 1 hour timeout")
 
 # pylint: disable=too-many-branches, trailing-whitespace
 def __filter(cases_) -> typing.List[TestCase]:
@@ -173,6 +176,15 @@ def test():
         [ sched.Task(ppn=case.ppn, func=handle_case, args=[case], load=case.get_cell_count()) for case in cases ],
         ARG("jobs"), ARG("gpus"))
 
+    # Check if we aborted due to high failure rate
+    if abort_tests.is_set():
+        total_completed = nFAIL + nPASS
+        cons.print()
+        cons.unindent()
+        raise MFCException(
+            f"Excessive test failures: {nFAIL}/{total_completed} failed ({nFAIL/total_completed*100:.1f}%)"
+        )
+
     nSKIP = len(skipped_cases)
     cons.print()
     cons.unindent()
@@ -199,9 +211,12 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
     global current_test_number
     start_time = time.time()
 
-    # Set timeout alarm
-    signal.signal(signal.SIGALRM, timeout_handler)
-    signal.alarm(TEST_TIMEOUT_SECONDS)
+    # Set timeout using threading.Timer (works in worker threads)
+    # Note: signal.alarm() only works in the main thread, so we use
+    # threading.Timer which works correctly in worker threads spawned by sched.sched
+    timeout_flag = threading.Event()
+    timeout_timer = threading.Timer(TEST_TIMEOUT_SECONDS, timeout_flag.set)
+    timeout_timer.start()
 
     tol = case.compute_tolerance()
     case.delete_output()
@@ -209,11 +224,18 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
 
     if ARG("dry_run"):
         cons.print(f"  [bold magenta]{case.get_uuid()}[/bold magenta]     SKIP     {case.trace}")
-        signal.alarm(0)  # Cancel alarm
+        timeout_timer.cancel()
         return
 
     try:
+        # Check timeout before starting
+        if timeout_flag.is_set():
+            raise TestTimeoutError("Test case exceeded 1 hour timeout")
         cmd = case.run([PRE_PROCESS, SIMULATION], gpus=devices)
+
+        # Check timeout after simulation
+        if timeout_flag.is_set():
+            raise TestTimeoutError("Test case exceeded 1 hour timeout")
 
         out_filepath = os.path.join(case.get_dirpath(), "out_pre_sim.txt")
 
@@ -261,26 +283,28 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
             out_filepath = os.path.join(case.get_dirpath(), "out_post.txt")
             common.file_write(out_filepath, cmd.stdout)
 
-            for silo_filepath in os.listdir(os.path.join(case.get_dirpath(), 'silo_hdf5', 'p0')):
-                silo_filepath = os.path.join(case.get_dirpath(), 'silo_hdf5', 'p0', silo_filepath)
-                h5dump        = f"{HDF5.get_install_dirpath(case.to_input_file())}/bin/h5dump"
+            silo_dir = os.path.join(case.get_dirpath(), 'silo_hdf5', 'p0')
+            if os.path.isdir(silo_dir):
+                for silo_filename in os.listdir(silo_dir):
+                    silo_filepath = os.path.join(silo_dir, silo_filename)
+                    h5dump        = f"{HDF5.get_install_dirpath(case.to_input_file())}/bin/h5dump"
 
-                if not os.path.exists(h5dump or ""):
-                    if not does_command_exist("h5dump"):
-                        raise MFCException("h5dump couldn't be found.")
+                    if not os.path.exists(h5dump or ""):
+                        if not does_command_exist("h5dump"):
+                            raise MFCException("h5dump couldn't be found.")
 
-                    h5dump = shutil.which("h5dump")
+                        h5dump = shutil.which("h5dump")
 
-                output, err = get_program_output([h5dump, silo_filepath])
+                    output, err = get_program_output([h5dump, silo_filepath])
 
-                if err != 0:
-                    raise MFCException(f"Test {case}: Failed to run h5dump. You can find the run's output in {out_filepath}, and the case dictionary in {case.get_filepath()}.")
+                    if err != 0:
+                        raise MFCException(f"Test {case}: Failed to run h5dump. You can find the run's output in {out_filepath}, and the case dictionary in {case.get_filepath()}.")
 
-                if "nan," in output:
-                    raise MFCException(f"Test {case}: Post Process has detected a NaN. You can find the run's output in {out_filepath}, and the case dictionary in {case.get_filepath()}.")
+                    if "nan," in output:
+                        raise MFCException(f"Test {case}: Post Process has detected a NaN. You can find the run's output in {out_filepath}, and the case dictionary in {case.get_filepath()}.")
 
-                if "inf," in output:
-                    raise MFCException(f"Test {case}: Post Process has detected an Infinity. You can find the run's output in {out_filepath}, and the case dictionary in {case.get_filepath()}.")
+                    if "inf," in output:
+                        raise MFCException(f"Test {case}: Post Process has detected an Infinity. You can find the run's output in {out_filepath}, and the case dictionary in {case.get_filepath()}.")
 
         case.delete_output()
 
@@ -298,13 +322,17 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
             f"Check the log at: {os.path.join(case.get_dirpath(), 'out_pre_sim.txt')}"
         ) from exc
     finally:
-        signal.alarm(0)  # Cancel alarm
+        timeout_timer.cancel()  # Cancel timeout timer
 
 
 def handle_case(case: TestCase, devices: typing.Set[int]):
     # pylint: disable=global-statement, global-variable-not-assigned
     global nFAIL, nPASS, nSKIP
     global errors
+
+    # Check if we should abort before processing this case
+    if abort_tests.is_set():
+        return  # Exit gracefully if abort was requested
 
     nAttempts = 0
     if ARG('single'):
@@ -337,10 +365,10 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
                 failure_rate = nFAIL / total_completed
                 if failure_rate >= FAILURE_RATE_THRESHOLD:
                     cons.print(f"\n[bold red]CRITICAL: {failure_rate*100:.1f}% failure rate detected after {total_completed} tests.[/bold red]")
-                    cons.print(f"[bold red]This suggests a systemic issue (bad build, broken environment, etc.)[/bold red]")
-                    cons.print(f"[bold red]Aborting remaining tests to fail fast.[/bold red]\n")
-                    raise MFCException(
-                        f"Excessive test failures: {nFAIL}/{total_completed} failed ({failure_rate*100:.1f}%)"
-                    )
+                    cons.print("[bold red]This suggests a systemic issue (bad build, broken environment, etc.)[/bold red]")
+                    cons.print("[bold red]Aborting remaining tests to fail fast.[/bold red]\n")
+                    # Set abort flag instead of raising exception from worker thread
+                    abort_tests.set()
+                    return  # Exit gracefully
 
         return

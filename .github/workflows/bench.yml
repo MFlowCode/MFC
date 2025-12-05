@@ -101,7 +101,7 @@ jobs:
         run: |
           set -e
           
-          # Function to submit and monitor
+          # Function to submit and monitor using extracted script
           submit_and_monitor() {
             local dir=$1
             local device=$2
@@ -124,43 +124,8 @@ jobs:
               return 1
             fi
             
-            echo "Submitted batch job $job_id"
-            echo "Monitoring output file: $output_file"
-            
-            # Wait for file to appear (check job status if it takes a while)
-            echo "Waiting for job to start..."
-            while [ ! -f "$output_file" ]; do
-              # Check if job failed to start
-              if ! squeue -j "$job_id" &>/dev/null && [ ! -f "$output_file" ]; then
-                echo "ERROR: Job $job_id finished without creating output file"
-                return 1
-              fi
-              sleep 5
-            done
-            
-            echo "=== Streaming output for job $job_id ==="
-            # Stream output while job runs
-            tail -f "$output_file" &
-            tail_pid=$!
-            
-            # Wait for job to complete (will wait up to GitHub Actions timeout)
-            while squeue -j "$job_id" &>/dev/null; do
-              sleep 5
-            done
-            
-            # Stop tailing
-            kill $tail_pid 2>/dev/null || true
-            
-            echo ""
-            echo "=== Final output ==="
-            cat "$output_file"
-            
-            # Check exit status
-            exit_code=$(scontrol show job "$job_id" 2>/dev/null | grep -oP 'ExitCode=\K[0-9]+' || echo "0:0")
-            if [ "$exit_code" != "0" ] && [ "$exit_code" != "0:0" ]; then
-              echo "ERROR: Job $job_id failed with exit code $exit_code"
-              return 1
-            fi
+            # Use the monitoring script
+            bash .github/scripts/monitor_slurm_job.sh "$job_id" "$output_file"
           }
           
           # Run both jobs with monitoring
