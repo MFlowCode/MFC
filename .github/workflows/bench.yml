@@ -139,12 +139,8 @@ jobs:
           pr_exit=0
           master_exit=0
 
-          if ! wait "$pr_pid"; then
-            pr_exit=$?
-          fi
-          if ! wait "$master_pid"; then
-            master_exit=$?
-          fi
+          wait "$pr_pid"   || pr_exit=$?
+          wait "$master_pid" || master_exit=$?
 
           # Explicitly check and quote to avoid test errors
           if [ "${pr_exit}" -ne 0 ] || [ "${master_exit}" -ne 0 ]; then
