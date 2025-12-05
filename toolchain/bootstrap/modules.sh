@@ -39,12 +39,13 @@ done
 if [ -v $u_c ]; then
     log   "Select a system:"
     log   "$G""ORNL$W:    Ascent     (a) | Frontier (f) | Summit (s) | Wombat (w)"
+    log   "$B""LLNL $W:   Tuolumne   (t)"
     log   "$C""ACCESS$W:  Bridges2   (b) | Expanse (e) | Delta  (d) | DeltaAI (dai)"
     log   "$Y""Gatech$W:  Phoenix    (p)"
     log   "$R""Caltech$W: Richardson (r)"
-    log   "$BR""Brown$W: Oscar (o)"
+    log   "$BR""Brown$W:   Oscar (o)"
     log   "$B""DoD$W:     Carpenter Cray (cc) | Carpenter GNU (c) |  Nautilus (n)"
-    log_n "($G""a$W/$G""f$W/$G""s$W/$G""w$W/$C""b$W/$C""e$CR/$C""d/$C""dai$CR/$Y""p$CR/$R""r$CR/$B""cc$CR/$B""c$CR/$B""n$CR/$BR""o"$CR"): "
+    log_n "($G""a$W/$G""f$W/$G""s$W/$G""w$W/$B""t$W/$C""b$W/$C""e$CR/$C""d/$C""dai$CR/$Y""p$CR/$R""r$CR/$B""cc$CR/$B""c$CR/$B""n$CR/$BR""o"$CR"): "
     read u_c
     log
 fi
