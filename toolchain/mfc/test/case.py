@@ -105,7 +105,6 @@ BASE_CFG = {
     'lag_params%rho0'                  : 1000.,
     'lag_params%T0'                    : 298.,
     'lag_params%x0'                    : 1.,
-    'lag_params%diffcoefvap'           : 2.5e-5,
     'lag_params%Thost'                 : 298.,
 }
 

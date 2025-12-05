@@ -178,7 +178,7 @@ contains
         cp_n = fluid_pp(id_host)%cp_v*(T0/(c0*c0))
         R_v = (R_uni/fluid_pp(id_bubbles)%M_v)*(T0/(c0*c0))
         R_n = (R_uni/fluid_pp(id_host)%M_v)*(T0/(c0*c0))
-        lag_params%diffcoefvap = lag_params%diffcoefvap/(x0*c0)
+        fluid_pp(id_bubbles)%D_v = fluid_pp(id_bubbles)%D_v/(x0*c0)
         ss = fluid_pp(id_host)%ss/(rho0*x0*c0*c0)
         mul0 = fluid_pp(id_host)%mul0/(rho0*x0*c0)
 
@@ -386,9 +386,9 @@ contains
         call s_transcoeff(1._wp, PeT, Re_trans, Im_trans)
         gas_betaT(bub_id) = Re_trans*(heatflag)*kparticle
 
-        PeG = bub_R0(bub_id)**2._wp*omegaN_local/lag_params%diffcoefvap
+        PeG = bub_R0(bub_id)**2._wp*omegaN_local/fluid_pp(num_fluids)%D_v
         call s_transcoeff(1._wp, PeG, Re_trans, Im_trans)
-        gas_betaC(bub_id) = Re_trans*(massflag)*lag_params%diffcoefvap
+        gas_betaC(bub_id) = Re_trans*(massflag)*fluid_pp(num_fluids)%D_v
 
         if (gas_mg(bub_id) <= 0._wp) then
             call s_mpi_abort("Negative gas mass in the bubble, check if the bubble is in the domain.")
@@ -642,11 +642,7 @@ contains
             call s_get_pinf(k, q_prim_vf, 1, myPinf, cell, aux1, aux2)
 
             ! Obtain liquid density and computing speed of sound from pinf
-            $:GPU_LOOP(parallelism='[seq]')
-            do i = 1, num_fluids
-                myalpha_rho(i) = q_prim_vf(i)%sf(cell(1), cell(2), cell(3))
-                myalpha(i) = q_prim_vf(E_idx + i)%sf(cell(1), cell(2), cell(3))
-            end do
+            call s_compute_species_fraction(q_prim_vf, cell(1), cell(2), cell(3), myalpha_rho, myalpha)
             call s_convert_species_to_mixture_variables_acc(myRho, gamma, pi_inf, qv, myalpha, &
                                                             myalpha_rho, Re)
             call s_compute_cson_from_pinf(q_prim_vf, myPinf, cell, myRho, gamma, pi_inf, myCson)

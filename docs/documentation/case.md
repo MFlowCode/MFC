@@ -68,6 +68,15 @@ For example, to run the `scaling` case in "weak-scaling" mode:
 
 ## Parameters
 
+## Feature Compatibility
+
+Before diving into parameter details, check the **[Feature Compatibility Guide](case_constraints.md)** to understand:
+- Which features work together (MHD, bubbles, phase change, etc.)
+- Common configuration patterns with copy-paste examples
+- Requirements for each model equation and Riemann solver
+
+💡 **Tip:** If you get a validation error, the compatibility guide explains what each parameter requires.
+
 There are multiple sets of parameters that must be specified in the python input file:
 1. [Runtime Parameters](#1-runtime)
 2. [Computational Domain Parameters](#2-computational-domain)
@@ -745,6 +754,7 @@ Details of the transducer acoustic source model can be found in [Maeda and Colon
 | `mu_v` †	        | Real 		|	Viscosity |
 | `k_v` †	          | Real 		|	Thermal conductivity |
 | `cp_v` †	        | Real 		|	Specific heat capacity |
+| `D_v` †           | Real    | Vapor diffusivity in the gas |
 
 These options work only for gas-liquid two-component flows.
 Component indexes are required to be 1 for liquid and 2 for gas.
@@ -836,7 +846,6 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 | `T0`                  | Real    | Reference temperature                                     |
 | `x0`                  | Real    | Reference length                                          |
 | `Thost`               | Real    | Temperature of the surrounding liquid (host)              |
-| `diffcoefvap`         | Real    | Vapor diffusivity in the gas                              |
 
 - `nBubs_glb` Total number of bubbles. Their initial conditions need to be specified in the ./input/lag_bubbles.dat file. See the example cases for additional information.
 

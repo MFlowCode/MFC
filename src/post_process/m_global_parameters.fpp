@@ -240,6 +240,7 @@ module m_global_parameters
     integer :: flux_lim
     logical, dimension(3) :: flux_wrt
     logical :: E_wrt
+    logical, dimension(num_fluids_max) :: alpha_rho_e_wrt
     logical :: fft_wrt
     logical :: pres_wrt
     logical, dimension(num_fluids_max) :: alpha_wrt
@@ -423,6 +424,7 @@ contains
             fluid_pp(i)%qv = 0._wp
             fluid_pp(i)%qvp = 0._wp
             fluid_pp(i)%G = dflt_real
+            fluid_pp(i)%D_v = dflt_real
         end do
 
         ! Formatted database file(s) structure parameters
@@ -432,6 +434,7 @@ contains
         down_sample = .false.
 
         alpha_rho_wrt = .false.
+        alpha_rho_e_wrt = .false.
         rho_wrt = .false.
         mom_wrt = .false.
         vel_wrt = .false.
