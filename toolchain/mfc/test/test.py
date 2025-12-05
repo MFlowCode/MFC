@@ -330,15 +330,17 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
             errors.append(f"{exc}")
 
         # Check if we should abort early due to high failure rate
-        total_completed = nFAIL + nPASS
-        if total_completed >= MIN_CASES_BEFORE_ABORT:
-            failure_rate = nFAIL / total_completed
-            if failure_rate >= FAILURE_RATE_THRESHOLD:
-                cons.print(f"\n[bold red]CRITICAL: {failure_rate*100:.1f}% failure rate detected after {total_completed} tests.[/bold red]")
-                cons.print(f"[bold red]This suggests a systemic issue (bad build, broken environment, etc.)[/bold red]")
-                cons.print(f"[bold red]Aborting remaining tests to fail fast.[/bold red]\n")
-                raise MFCException(
-                    f"Excessive test failures: {nFAIL}/{total_completed} failed ({failure_rate*100:.1f}%)"
-                )
+        # Skip this check during dry-run (only builds, doesn't run tests)
+        if not ARG("dry_run"):
+            total_completed = nFAIL + nPASS
+            if total_completed >= MIN_CASES_BEFORE_ABORT:
+                failure_rate = nFAIL / total_completed
+                if failure_rate >= FAILURE_RATE_THRESHOLD:
+                    cons.print(f"\n[bold red]CRITICAL: {failure_rate*100:.1f}% failure rate detected after {total_completed} tests.[/bold red]")
+                    cons.print(f"[bold red]This suggests a systemic issue (bad build, broken environment, etc.)[/bold red]")
+                    cons.print(f"[bold red]Aborting remaining tests to fail fast.[/bold red]\n")
+                    raise MFCException(
+                        f"Excessive test failures: {nFAIL}/{total_completed} failed ({failure_rate*100:.1f}%)"
+                    )
 
         return
