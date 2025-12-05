@@ -78,7 +78,6 @@ def bench(targets = None):
                 cons.print(f"[bold red]ERROR[/bold red]: Case {case.slug} failed with exit code {rc}")
                 cons.print(f"[bold red]      Check log at: {log_filepath}[/bold red]")
                 failed_cases.append(case.slug)
-                cons.unindent()
                 continue
 
             # Validate summary file exists
@@ -86,7 +85,6 @@ def bench(targets = None):
                 cons.print(f"[bold red]ERROR[/bold red]: Summary file not created for {case.slug}")
                 cons.print(f"[bold red]      Expected: {summary_filepath}[/bold red]")
                 failed_cases.append(case.slug)
-                cons.unindent()
                 continue
 
             # Load summary
