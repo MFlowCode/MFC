@@ -327,10 +327,19 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
         return
 
     try:
+        # Decide which targets to run in a single pipeline.
+        # - Default: PRE_PROCESS + SIMULATION (used for golden comparison)
+        # - With --test-all (-a): also include POST_PROCESS so that the configuration
+        #   used by simulation and post_process is consistent (e.g. parallel_io,
+        #   file_per_process, *_wrt flags). This ensures simulation writes the
+        #   Lustre-style restart/grid files (e.g. restart_data/lustre_x_cb.dat)
+        #   that post_process expects.
+        targets = [PRE_PROCESS, SIMULATION, POST_PROCESS] if ARG("test_all") else [PRE_PROCESS, SIMULATION]
+
         # Check timeout before starting
         if timeout_flag.is_set():
             raise TestTimeoutError("Test case exceeded 1 hour timeout")
-        cmd = case.run([PRE_PROCESS, SIMULATION], gpus=devices)
+        cmd = case.run(targets, gpus=devices)
 
         # Check timeout after simulation
         if timeout_flag.is_set():
@@ -342,6 +351,9 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
 
         if cmd.returncode != 0:
             cons.print(cmd.stdout)
+            # If test_all is enabled and the pipeline failed, provide extra debug info
+            if ARG("test_all") and getattr(case, "ppn", 1) >= 2:
+                _print_multirank_debug_info(case)
             raise MFCException(f"Test {case}: Failed to execute MFC.")
 
         pack, err = packer.pack(case.get_dirpath())
@@ -377,16 +389,20 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
                     raise MFCException(f"Test {case}: {msg}")
 
         if ARG("test_all"):
-            # Don't delete output here - we need restart_data from the simulation above
-            # Check timeout before launching the (potentially long) post-process run
-            if timeout_flag.is_set():
-                raise TestTimeoutError("Test case exceeded 1 hour timeout")
-            # Run only POST_PROCESS since PRE_PROCESS and SIMULATION already ran successfully above
-            cmd = case.run([POST_PROCESS], gpus=devices)
-            out_filepath = os.path.join(case.get_dirpath(), "out_post.txt")
-            common.file_write(out_filepath, cmd.stdout)
+            # We already ran PRE_PROCESS, SIMULATION, and POST_PROCESS together
+            # in the single pipeline above. At this point:
+            #   - If cmd.returncode != 0, post_process (or an earlier stage)
+            #     failed and we want to surface that with verbose diagnostics.
+            #   - If cmd.returncode == 0, post_process completed and should
+            #     have written its outputs (e.g., silo_hdf5) based on a
+            #     configuration that had "post_process" in ARGS["mfc"]["targets"],
+            #     so parallel_io and restart_data layout are consistent.
 
-            # Check return code from post-process run
+            out_post_filepath = os.path.join(case.get_dirpath(), "out_post.txt")
+            # Write the full pipeline output to an explicit post-process log too,
+            # even though it includes pre/sim messages. This is helpful for CI.
+            common.file_write(out_post_filepath, cmd.stdout)
+
             if cmd.returncode != 0:
                 cons.print(cmd.stdout)
 
@@ -396,14 +412,15 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
 
                 raise MFCException(
                     f"Test {case}: Failed to execute MFC (post-process). "
-                    f"See log at: {out_filepath}"
+                    f"See log at: {out_post_filepath}"
                 )
 
+            # After a successful post_process run, inspect Silo/HDF5 outputs
             silo_dir = os.path.join(case.get_dirpath(), 'silo_hdf5', 'p0')
             if os.path.isdir(silo_dir):
                 for silo_filename in os.listdir(silo_dir):
                     silo_filepath = os.path.join(silo_dir, silo_filename)
-                    _process_silo_file(silo_filepath, case, out_filepath)
+                    _process_silo_file(silo_filepath, case, out_post_filepath)
 
         case.delete_output()
 
