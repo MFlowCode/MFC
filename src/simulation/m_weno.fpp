@@ -25,8 +25,6 @@ module m_weno
 
     use m_variables_conversion !< State variables type conversion procedures
 
-    ! $:USE_GPU_MODULE()
-
     use m_mpi_proxy
 
     use m_muscl !< For Interface Compression

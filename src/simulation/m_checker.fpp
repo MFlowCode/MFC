@@ -45,9 +45,9 @@ contains
 
     !> Checks constraints on compiler options
     impure subroutine s_check_inputs_compilers
-#if !defined(MFC_OpenACC) && !(defined(__PGI) || defined(_CRAYFTN))
-        @:PROHIBIT(rdma_mpi, "Unsupported value of rdma_mpi for the current compiler")
-#endif
+        #:if not MFC_OpenACC and (not (USING_NVHPC or USING_CCE))
+            @:PROHIBIT(rdma_mpi, "Unsupported value of rdma_mpi for the current compiler")
+        #:endif
     end subroutine s_check_inputs_compilers
 
     !> Checks constraints on WENO scheme parameters

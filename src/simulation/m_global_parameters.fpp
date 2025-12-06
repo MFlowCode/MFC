@@ -21,8 +21,6 @@ module m_global_parameters
 
     use m_helper_basic         !< Functions to compare floating point numbers
 
-    ! $:USE_GPU_MODULE()
-
     implicit none
 
     real(wp) :: wall_time = 0
@@ -232,13 +230,13 @@ module m_global_parameters
     !> @{
     type(int_bounds_info) :: bc_x, bc_y, bc_z
     !> @}
-#if defined(MFC_OpenACC)
-    $:GPU_DECLARE(create='[bc_x%vb1, bc_x%vb2, bc_x%vb3, bc_x%ve1, bc_x%ve2, bc_x%ve3]')
-    $:GPU_DECLARE(create='[bc_y%vb1, bc_y%vb2, bc_y%vb3, bc_y%ve1, bc_y%ve2, bc_y%ve3]')
-    $:GPU_DECLARE(create='[bc_z%vb1, bc_z%vb2, bc_z%vb3, bc_z%ve1, bc_z%ve2, bc_z%ve3]')
-#elif defined(MFC_OpenMP)
-    $:GPU_DECLARE(create='[bc_x, bc_y, bc_z]')
-#endif
+    #:if MFC_OpenACC
+        $:GPU_DECLARE(create='[bc_x%vb1, bc_x%vb2, bc_x%vb3, bc_x%ve1, bc_x%ve2, bc_x%ve3]')
+        $:GPU_DECLARE(create='[bc_y%vb1, bc_y%vb2, bc_y%vb3, bc_y%ve1, bc_y%ve2, bc_y%ve3]')
+        $:GPU_DECLARE(create='[bc_z%vb1, bc_z%vb2, bc_z%vb3, bc_z%ve1, bc_z%ve2, bc_z%ve3]')
+    #:elif MFC_OpenMP
+        $:GPU_DECLARE(create='[bc_x, bc_y, bc_z]')
+    #:endif
     type(bounds_info) :: x_domain, y_domain, z_domain
     real(wp) :: x_a, y_a, z_a
     real(wp) :: x_b, y_b, z_b
