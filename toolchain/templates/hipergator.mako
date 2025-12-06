@@ -9,7 +9,7 @@
 #SBATCH --output="${name}.out"
 #SBATCH --time=${walltime}
 #SBATCH --cpus-per-task=7
-% if gpu:
+% if gpu_enabled:
 #SBATCH --gpus-per-task=1
 #SBATCH --gpu-bind=closest
 % endif
@@ -35,7 +35,7 @@ ${helpers.template_prologue()}
 ok ":) Loading modules:\n"
 cd "${MFC_ROOT_DIR}"
 % if engine == 'batch':
-. ./mfc.sh load -c h -m ${'g' if gpu else 'c'}
+. ./mfc.sh load -c h -m ${'g' if gpu_enabled else 'c'}
 % endif
 cd - > /dev/null
 echo
