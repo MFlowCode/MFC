@@ -173,7 +173,7 @@ contains
 
         integer :: i, j, k, l, q, ii !< Loop variables
 
-        integer :: adap_dt_stop_max, adap_dt_stop !< Fail-safe exit if max iteration count reached
+        integer :: adap_dt_stop_sum, adap_dt_stop !< Fail-safe exit if max iteration count reached
         integer :: dmBub_id !< Dummy variables for unified subgrid bubble subroutines
         real(wp) :: dmMass_v, dmMass_n, dmBeta_c, dmBeta_t, dmCson
 
@@ -195,10 +195,9 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        adap_dt_stop_max = 0
+        adap_dt_stop_sum = 0
         $:GPU_PARALLEL_LOOP(private='[j,k,l,Rtmp, Vtmp, myalpha_rho, myalpha, myR, myV, alf, myP, myRho, R2Vav, R3, nbub, pb_local, mv_local, vflux, pbdot, rddot, n_tait, B_tait, my_divu]', collapse=3, &
-            & reduction='[[adap_dt_stop_max]]', reductionOp='[MAX]', &
-            & copy='[adap_dt_stop_max]')
+            & copy='[adap_dt_stop_sum]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -286,11 +285,11 @@ contains
                         if (adap_dt) then
 
                             my_divu = real(divu_in%sf(j, k, l), kind=wp)
-                            call s_advance_step(myRho, myP, myR, myV, R0(q), &
-                                                pb_local, pbdot, alf, n_tait, B_tait, &
-                                                bub_adv_src(j, k, l), my_divu, &
-                                                dmBub_id, dmMass_v, dmMass_n, dmBeta_c, &
-                                                dmBeta_t, dmCson, adap_dt_stop)
+                            adap_dt_stop = f_advance_step(myRho, myP, myR, myV, R0(q), &
+                                                          pb_local, pbdot, alf, n_tait, B_tait, &
+                                                          bub_adv_src(j, k, l), my_divu, &
+                                                          dmBub_id, dmMass_v, dmMass_n, dmBeta_c, &
+                                                          dmBeta_t, dmCson)
 
                             q_cons_vf(rs(q))%sf(j, k, l) = nbub*myR
                             q_cons_vf(vs(q))%sf(j, k, l) = nbub*myV
@@ -305,7 +304,8 @@ contains
                             bub_r_src(j, k, l, q) = q_cons_vf(vs(q))%sf(j, k, l)
                         end if
 
-                        adap_dt_stop_max = max(adap_dt_stop_max, adap_dt_stop)
+                        $:GPU_ATOMIC(atomic='update')
+                        adap_dt_stop_sum = adap_dt_stop_sum + adap_dt_stop
 
                         if (alf < 1.e-11_wp) then
                             bub_adv_src(j, k, l) = 0._wp
@@ -322,7 +322,7 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        if (adap_dt .and. adap_dt_stop_max > 0) call s_mpi_abort("Adaptive time stepping failed to converge.")
+        if (adap_dt .and. adap_dt_stop_sum > 0) call s_mpi_abort("Adaptive time stepping failed to converge.")
 
         if (.not. adap_dt) then
             $:GPU_PARALLEL_LOOP(private='[i,k,l,q]', collapse=3)

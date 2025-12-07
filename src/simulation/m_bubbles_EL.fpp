@@ -649,22 +649,22 @@ contains
         real(wp) :: myR, myV, myBeta_c, myBeta_t, myR0, myPbdot, myMvdot
         real(wp) :: myPinf, aux1, aux2, myCson, myRho
         real(wp), dimension(3) :: myPos, myVel
-        real(wp) :: gamma, pi_inf, qv, f_b
+        real(wp) :: gamma, pi_inf, qv, f_b, myRe
         real(wp), dimension(contxe) :: myalpha_rho, myalpha
         real(wp), dimension(2) :: Re
         integer, dimension(3) :: cell
 
-        integer :: adap_dt_stop_max, adap_dt_stop !< Fail-safe exit if max iteration count reached
+        integer :: adap_dt_stop_sum, adap_dt_stop !< Fail-safe exit if max iteration count reached
         real(wp) :: dmalf, dmntait, dmBtait, dm_bub_adv_src, dm_divu !< Dummy variables for unified subgrid bubble subroutines
 
-        integer :: i, j, k, l
+        integer :: k, l
 
         call nvtxStartRange("LAGRANGE-BUBBLE-DYNAMICS")
 
         ! Subgrid p_inf model based on Maeda and Colonius (2018).
         if (lag_params%pressure_corrector) then
             ! Calculate velocity potentials (valid for one bubble per cell)
-            $:GPU_PARALLEL_LOOP(private='[k,cell]')
+            $:GPU_PARALLEL_LOOP(private='[k,cell,myR0,myR,myV,myPb,pint,term1_fac]')
             do k = 1, n_el_bubs_loc
                 call s_get_pinf(k, q_prim_vf, 2, paux, cell, preterm1, term2, Romega)
                 myR0 = bub_R0(k)
@@ -685,10 +685,9 @@ contains
         end if
 
         ! Radial motion model
-        adap_dt_stop_max = 0
-        $:GPU_PARALLEL_LOOP(private='[k,i,myalpha_rho,myalpha,Re,cell,myPos,myVel]', &
-            & reduction='[[adap_dt_stop_max]]',reductionOp='[MAX]', &
-            & copy='[adap_dt_stop_max]',copyin='[stage]')
+        adap_dt_stop_sum = 0
+        $:GPU_PARALLEL_LOOP(private='[k,l,cell,myPb,myMass_n,myMass_v,myR,myV,myBeta_c,myBeta_t,myR0,myPos,myVel,myPbdot,myMvdot,myRe,adap_dt_stop,myalpha,myalpha_rho,Re]', &
+            copy='[adap_dt_stop_sum]', copyin='[stage]')
         do k = 1, n_el_bubs_loc
             ! Keller-Miksis model
 
@@ -725,11 +724,12 @@ contains
 
                 mtn_posPrev(k, :, 1) = myPos
 
-                call s_advance_step(myRho, myPinf, myR, myV, myR0, myPb, myPbdot, dmalf, &
-                                    dmntait, dmBtait, dm_bub_adv_src, dm_divu, &
-                                    k, myMass_v, myMass_n, myBeta_c, &
-                                    myBeta_t, myCson, adap_dt_stop, Re(1), &
-                                    myPos, myVel, cell, q_prim_vf)
+                myRe = Re(1)
+                adap_dt_stop = f_advance_step(myRho, myPinf, myR, myV, myR0, myPb, myPbdot, dmalf, &
+                                              dmntait, dmBtait, dm_bub_adv_src, dm_divu, &
+                                              k, myMass_v, myMass_n, myBeta_c, &
+                                              myBeta_t, myCson, myRe, &
+                                              myPos, myVel, cell, q_prim_vf)
 
                 ! Update bubble state
                 intfc_rad(k, 1) = myR
@@ -738,8 +738,6 @@ contains
                 gas_mv(k, 1) = myMass_v
                 mtn_pos(k, :, 1) = myPos
                 mtn_vel(k, :, 1) = myVel
-
-                adap_dt_stop_max = max(adap_dt_stop_max, adap_dt_stop)
 
             else
 
@@ -779,10 +777,13 @@ contains
                 end do
             end if
 
+            $:GPU_ATOMIC(atomic='update')
+            adap_dt_stop_sum = adap_dt_stop_sum + adap_dt_stop
+
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        if (adap_dt .and. adap_dt_stop_max > 0) call s_mpi_abort("Adaptive time stepping failed to converge.")
+        if (adap_dt .and. adap_dt_stop_sum > 0) call s_mpi_abort("Adaptive time stepping failed to converge.")
 
         if (adap_dt .and. moving_lag_bubbles) then
             call s_enforce_EL_bubbles_boundary_conditions(q_prim_vf, dest=1)
