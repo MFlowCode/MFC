@@ -2,7 +2,15 @@
 # Monitor a SLURM job and stream its output in real-time
 # Usage: monitor_slurm_job.sh <job_id> <output_file>
 
-set -e
+set -euo pipefail
+
+# Cleanup handler to prevent orphaned tail processes
+cleanup() {
+  if [ -n "${tail_pid:-}" ]; then
+    kill "${tail_pid}" 2>/dev/null || true
+  fi
+}
+trap cleanup EXIT
 
 if [ $# -ne 2 ]; then
     echo "Usage: $0 <job_id> <output_file>"
@@ -96,8 +104,8 @@ if [ -f "$output_file" ]; then
   done
 fi
 
-# Stop tailing
-kill $tail_pid 2>/dev/null || true
+# Stop tailing (trap will also handle this on exit)
+kill "${tail_pid}" 2>/dev/null || true
 
 echo ""
 echo "=== Final output ==="
