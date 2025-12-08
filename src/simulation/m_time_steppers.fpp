@@ -611,7 +611,7 @@ contains
             if (ib) then
                 ! check if any IBMS are moving, and if so, update the markers, ghost points, levelsets, and levelset norms
                 if (moving_immersed_boundary_flag) then
-                    call s_compute_ib_forces(q_prim_vf(E_idx)%sf(0:m, 0:n, 0:p)) ! compute the force and torque on the IB from the fluid
+                    call s_compute_ib_forces(q_prim_vf(E_idx)%sf) ! compute the force and torque on the IB from the fluid
 
                     do i = 1, num_ibs
                         if (s == 1) then

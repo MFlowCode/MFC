@@ -998,7 +998,9 @@ contains
     ! by Archana Sridhar and Jesse Capecelatro
     subroutine s_compute_ib_forces(pressure)
 
-        real(wp), dimension(0:m, 0:n, 0:p), intent(in) :: pressure
+        real(wp), dimension(idwbuff(1)%beg:idwbuff(1)%end, &
+                    idwbuff(2)%beg:idwbuff(2)%end, &
+                    idwbuff(3)%beg:idwbuff(3)%end), intent(in) :: pressure
 
         integer :: i, j, k, ib_idx
         real(wp), dimension(num_ibs, 3) :: forces, torques
@@ -1060,8 +1062,6 @@ contains
             patch_ib(i)%force(:) = forces(i, :)
             patch_ib(i)%torque(:) = matmul(patch_ib(i)%rotation_matrix_inverse, torques(i, :)) ! torques must be computed in the local coordinates of the IB
         end do
-
-        print *, forces(1, 1:2)
 
     end subroutine s_compute_ib_forces
 
