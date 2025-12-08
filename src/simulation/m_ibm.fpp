@@ -198,16 +198,16 @@ contains
 
         ! set the Moving IBM interior Pressure Values
         $:GPU_PARALLEL_LOOP(private='[i,j,k]', copyin='[E_idx]', collapse=3)
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        if (ib_markers%sf(j, k, l) /= 0) then
-                            q_prim_vf(E_idx)%sf(j, k, l) = 1._wp
-                        end if
-                    end do
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    if (ib_markers%sf(j, k, l) /= 0) then
+                        q_prim_vf(E_idx)%sf(j, k, l) = 1._wp
+                    end if
                 end do
             end do
-            $:END_GPU_PARALLEL_LOOP()
+        end do
+        $:END_GPU_PARALLEL_LOOP()
 
         if (num_gps > 0) then
             $:GPU_PARALLEL_LOOP(private='[i,physical_loc,dyn_pres,alpha_rho_IP, alpha_IP,pres_IP,vel_IP,vel_g,vel_norm_IP,r_IP, v_IP,pb_IP,mv_IP,nmom_IP,presb_IP,massv_IP,rho, gamma,pi_inf,Re_K,G_K,Gs,gp,innerp,norm,buf, radial_vector, rotation_velocity, j,k,l,q,qv_K,c_IP,nbub,patch_id]')
@@ -258,12 +258,13 @@ contains
                 end if
 
                 ! set the pressure
-                if (patch_ib(patch_id)%moving_ibm == 0) then
+                if (patch_ib(patch_id)%moving_ibm <= 1) then
                     q_prim_vf(E_idx)%sf(j, k, l) = pres_IP
                 else
                     q_prim_vf(E_idx)%sf(j, k, l) = 0._wp
                     $:GPU_LOOP(parallelism='[seq]')
                     do q = 1, num_fluids
+                        ! Se the pressure inside a moving immersed boundary based upon the pressure of the image point. acceleration, and normal vector direction
                         q_prim_vf(E_idx)%sf(j, k, l) = q_prim_vf(E_idx)%sf(j, k, l) + pres_IP/(1._wp - 2._wp*abs(levelset%sf(j, k, l, patch_id)*alpha_rho_IP(q)/pres_IP)*dot_product(patch_ib(patch_id)%force/patch_ib(patch_id)%mass, levelset_norm%sf(j, k, l, patch_id, :)))
                     end do
                 end if
@@ -1002,16 +1003,16 @@ contains
                     idwbuff(2)%beg:idwbuff(2)%end, &
                     idwbuff(3)%beg:idwbuff(3)%end), intent(in) :: pressure
 
-        integer :: i, j, k, ib_idx
+        integer :: i, j, k, l, ib_idx
         real(wp), dimension(num_ibs, 3) :: forces, torques
-        real(wp), dimension(1:3) :: pressure_divergence, radial_vector
+        real(wp), dimension(1:3) :: pressure_divergence, radial_vector, temp_torque_vector
         real(wp) :: cell_volume, dx, dy, dz
 
         forces = 0._wp
         torques = 0._wp
 
         ! TODO :: This is currently only valid inviscid, and needs to be extended to add viscocity
-        $:GPU_PARALLEL_LOOP(private='[ib_idx,radial_vector,pressure_divergence,cell_volume, dx, dy, dz]', copy='[forces,torques]', copyin='[ib_markers]', collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[ib_idx,radial_vector,pressure_divergence,cell_volume,temp_torque_vector, dx, dy, dz]', copy='[forces,torques]', copyin='[ib_markers]', collapse=3)
         do i = 0, m
             do j = 0, n
                 do k = 0, p
@@ -1042,10 +1043,13 @@ contains
                             end if
 
                             ! Update the force values atomically to prevent race conditions
-                            $:GPU_ATOMIC(atomic='update')
-                            forces(ib_idx, :) = forces(ib_idx, :) - (pressure_divergence*cell_volume)
-                            $:GPU_ATOMIC(atomic='update')
-                            torques(ib_idx, :) = torques(ib_idx, :) - (cross_product(radial_vector, pressure_divergence)*cell_volume)
+                            temp_torque_vector = cross_product(radial_vector, pressure_divergence)*cell_volume ! separate out to make atomics safe
+                            do l = 1, 3
+                                $:GPU_ATOMIC(atomic='update')
+                                forces(ib_idx, l) = forces(ib_idx, l) - (pressure_divergence(l)*cell_volume)
+                                $:GPU_ATOMIC(atomic='update')
+                                torques(ib_idx, l) = torques(ib_idx, l) - temp_torque_vector(l)
+                            end do
                         end if
                     end if
                 end do
