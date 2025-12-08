@@ -1001,16 +1001,16 @@ contains
 
         real(wp), dimension(0:m, 0:n, 0:p), intent(in) :: pressure
 
-        integer :: i, j, k, ib_idx
+        integer :: i, j, k, l, ib_idx
         real(wp), dimension(num_ibs, 3) :: forces, torques
-        real(wp), dimension(1:3) :: pressure_divergence, radial_vector
+        real(wp), dimension(1:3) :: pressure_divergence, radial_vector, temp_torque_vector
         real(wp) :: cell_volume, dx, dy, dz
 
         forces = 0._wp
         torques = 0._wp
 
         ! TODO :: This is currently only valid inviscid, and needs to be extended to add viscocity
-        $:GPU_PARALLEL_LOOP(private='[ib_idx,radial_vector,pressure_divergence,cell_volume, dx, dy, dz]', copy='[forces,torques]', copyin='[ib_markers]', collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[ib_idx,radial_vector,pressure_divergence,cell_volume,temp_torque_vector, dx, dy, dz]', copy='[forces,torques]', copyin='[ib_markers]', collapse=3)
         do i = 0, m
             do j = 0, n
                 do k = 0, p
@@ -1041,10 +1041,13 @@ contains
                             end if
 
                             ! Update the force values atomically to prevent race conditions
-                            $:GPU_ATOMIC(atomic='update')
-                            forces(ib_idx, :) = forces(ib_idx, :) - (pressure_divergence*cell_volume)
-                            $:GPU_ATOMIC(atomic='update')
-                            torques(ib_idx, :) = torques(ib_idx, :) - (cross_product(radial_vector, pressure_divergence)*cell_volume)
+                            temp_torque_vector = cross_product(radial_vector, pressure_divergence)*cell_volume ! separate out to make atomics safe
+                            do l = 1, 3
+                                $:GPU_ATOMIC(atomic='update')
+                                forces(ib_idx, l) = forces(ib_idx, l) - (pressure_divergence(l)*cell_volume)
+                                $:GPU_ATOMIC(atomic='update')
+                                torques(ib_idx, l) = torques(ib_idx, l) - temp_torque_vector(l)
+                            end do
                         end if
                     end if
                 end do
