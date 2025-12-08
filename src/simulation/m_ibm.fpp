@@ -999,9 +999,10 @@ contains
     ! by Archana Sridhar and Jesse Capecelatro
     subroutine s_compute_ib_forces(pressure)
 
-        real(wp), dimension(idwbuff(1)%beg:idwbuff(1)%end, &
-                    idwbuff(2)%beg:idwbuff(2)%end, &
-                    idwbuff(3)%beg:idwbuff(3)%end), intent(in) :: pressure
+        ! real(wp), dimension(idwbuff(1)%beg:idwbuff(1)%end, &
+        !             idwbuff(2)%beg:idwbuff(2)%end, &
+        !             idwbuff(3)%beg:idwbuff(3)%end), intent(in) :: pressure
+        type(scalar_field), intent(in) :: pressure
 
         integer :: i, j, k, l, ib_idx
         real(wp), dimension(num_ibs, 3) :: forces, torques
@@ -1029,14 +1030,14 @@ contains
                             dy = y_cc(j + 1) - y_cc(j)
 
                             ! use a finite difference to compute the 2D components of the gradient of the pressure and cell volume
-                            pressure_divergence(1) = (pressure(i + 1, j, k) - pressure(i - 1, j, k))/(2._wp*dx)
-                            pressure_divergence(2) = (pressure(i, j + 1, k) - pressure(i, j - 1, k))/(2._wp*dy)
+                            pressure_divergence(1) = (pressure%sf(i + 1, j, k) - pressure%sf(i - 1, j, k))/(2._wp*dx)
+                            pressure_divergence(2) = (pressure%sf(i, j + 1, k) - pressure%sf(i, j - 1, k))/(2._wp*dy)
                             cell_volume = dx*dy
 
                             ! add the 3D component, if we are working in 3 dimensions
                             if (num_dims == 3) then
                                 dz = z_cc(k + 1) - z_cc(k)
-                                pressure_divergence(3) = (pressure(i, j, k + 1) - pressure(i, j, k - 1))/(2._wp*dz)
+                                pressure_divergence(3) = (pressure%sf(i, j, k + 1) - pressure%sf(i, j, k - 1))/(2._wp*dz)
                                 cell_volume = cell_volume*dz
                             else
                                 pressure_divergence(3) = 0._wp
