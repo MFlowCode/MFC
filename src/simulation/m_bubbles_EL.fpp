@@ -639,7 +639,9 @@ contains
         !! @param t_step Current time step
         !! @param stage Current stage in the time-stepper algorithm
     subroutine s_compute_bubble_EL_dynamics(q_prim_vf, stage)
-
+#ifdef MFC_OpenMP
+        !DIR$ OPTIMIZE (-O1)
+#endif
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer, intent(in) :: stage
 
