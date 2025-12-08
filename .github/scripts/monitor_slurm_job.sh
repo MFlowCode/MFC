@@ -50,15 +50,24 @@ while [ ! -f "$output_file" ]; do
 done
 
 echo "=== Streaming output for job $job_id ==="
-# Stream output while job runs
-tail -f "$output_file" &
+# Stream output while job runs (explicitly redirect to ensure output visibility)
+tail -f "$output_file" 2>&1 &
 tail_pid=$!
+
+# Give tail a moment to start and show initial output
+sleep 2
 
 # Wait for job to complete with retry logic for transient squeue failures
 squeue_failures=0
+heartbeat_counter=0
 while true; do
   if squeue -j "$job_id" &>/dev/null; then
     squeue_failures=0
+    # Print heartbeat every 60 seconds (12 iterations * 5 sec)
+    heartbeat_counter=$((heartbeat_counter + 1))
+    if [ $((heartbeat_counter % 12)) -eq 0 ]; then
+      echo "[$(date +%H:%M:%S)] Job $job_id still running..."
+    fi
   else
     squeue_failures=$((squeue_failures + 1))
     # Check if job actually completed using sacct (if available)
@@ -68,6 +77,7 @@ while true; do
         # Consider job done only if it reached a terminal state
         case "$state" in
           COMPLETED|FAILED|CANCELLED|TIMEOUT|OUT_OF_MEMORY)
+            echo "[$(date +%H:%M:%S)] Job $job_id reached terminal state: $state"
             break
             ;;
           *)

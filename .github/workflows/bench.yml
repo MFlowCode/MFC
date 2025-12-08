@@ -108,6 +108,7 @@ jobs:
             local interface=$3
             local cluster=$4
             
+            echo "[$dir] Submitting benchmark for $device-$interface on $cluster..."
             cd "$dir"
             
             # Submit job
@@ -119,21 +120,33 @@ jobs:
             output_file="${job_slug}.out"
             
             if [ -z "$job_id" ]; then
-              echo "ERROR: Failed to submit job"
+              echo "[$dir] ERROR: Failed to submit job"
               echo "$submit_output"
               return 1
             fi
             
+            echo "[$dir] Job ID: $job_id, monitoring output file: $output_file"
+            
             # Use the monitoring script
             bash .github/scripts/monitor_slurm_job.sh "$job_id" "$output_file"
+            
+            echo "[$dir] Monitoring complete for job $job_id"
           }
           
           # Run both jobs with monitoring
+          echo "=========================================="
+          echo "Starting parallel benchmark jobs..."
+          echo "=========================================="
+          
           (submit_and_monitor pr ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }}) &
           pr_pid=$!
+          echo "PR job started in background (PID: $pr_pid)"
           
           (submit_and_monitor master ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }}) &
           master_pid=$!
+          echo "Master job started in background (PID: $master_pid)"
+          
+          echo "Waiting for both jobs to complete..."
           
           # Wait and capture exit codes reliably
           pr_exit=0
@@ -141,16 +154,27 @@ jobs:
 
           if ! wait "$pr_pid"; then
             pr_exit=$?
+            echo "PR job exited with code: $pr_exit"
+          else
+            echo "PR job completed successfully"
           fi
+          
           if ! wait "$master_pid"; then
             master_exit=$?
+            echo "Master job exited with code: $master_exit"
+          else
+            echo "Master job completed successfully"
           fi
 
           # Explicitly check and quote to avoid test errors
           if [ "${pr_exit}" -ne 0 ] || [ "${master_exit}" -ne 0 ]; then
-            echo "One or both benchmark jobs failed: pr_exit=${pr_exit}, master_exit=${master_exit}"
+            echo "ERROR: One or both benchmark jobs failed: pr_exit=${pr_exit}, master_exit=${master_exit}"
             exit 1
           fi
+          
+          echo "=========================================="
+          echo "Both benchmark jobs completed successfully!"
+          echo "=========================================="
 
       - name: Generate & Post Comment
         run: |
