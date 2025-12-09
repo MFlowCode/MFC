@@ -1065,8 +1065,6 @@ contains
             patch_ib(i)%torque(:) = matmul(patch_ib(i)%rotation_matrix_inverse, torques(i, :)) ! torques must be computed in the local coordinates of the IB
         end do
 
-        print *, forces(1, 1:2)
-
     end subroutine s_compute_ib_forces
 
     !> Subroutine to deallocate memory reserved for the IBM module
@@ -1150,7 +1148,6 @@ contains
     end subroutine s_compute_moment_of_inertia
 
     function cross_product(a, b) result(c)
-        implicit none
         real(wp), intent(in) :: a(3), b(3)
         real(wp) :: c(3)
 
