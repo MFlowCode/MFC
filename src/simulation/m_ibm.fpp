@@ -291,7 +291,7 @@ contains
                         ! compute the linear velocity of the ghost point due to rotation
                         radial_vector = physical_loc - [patch_ib(patch_id)%x_centroid, &
                                                         patch_ib(patch_id)%y_centroid, patch_ib(patch_id)%z_centroid]
-                        rotation_velocity = cross_product(matmul(patch_ib(patch_id)%rotation_matrix, patch_ib(patch_id)%angular_vel), radial_vector)
+                        call s_cross_product(matmul(patch_ib(patch_id)%rotation_matrix, patch_ib(patch_id)%angular_vel), radial_vector, rotation_velocity)
 
                         ! add only the component of the IB's motion that is normal to the surface
                         vel_g = vel_g + sum((patch_ib(patch_id)%vel + rotation_velocity)*norm)*norm
@@ -305,7 +305,7 @@ contains
                         radial_vector = physical_loc - [patch_ib(patch_id)%x_centroid, &
                                                         patch_ib(patch_id)%y_centroid, patch_ib(patch_id)%z_centroid]
                         ! convert the angular velocity from the inertial reference frame to the fluids frame, then convert to linear velocity
-                        rotation_velocity = cross_product(matmul(patch_ib(patch_id)%rotation_matrix, patch_ib(patch_id)%angular_vel), radial_vector)
+                        call s_cross_product(matmul(patch_ib(patch_id)%rotation_matrix, patch_ib(patch_id)%angular_vel), radial_vector, rotation_velocity)
                         do q = 1, 3
                             ! if mibm is 1 or 2, then the boundary may be moving
                             vel_g(q) = patch_ib(patch_id)%vel(q) ! add the linear velocity
@@ -1006,14 +1006,14 @@ contains
 
         integer :: i, j, k, l, ib_idx
         real(wp), dimension(num_ibs, 3) :: forces, torques
-        real(wp), dimension(1:3) :: pressure_divergence, radial_vector, temp_torque_vector
+        real(wp), dimension(1:3) :: pressure_divergence, radial_vector, local_torque_contribution
         real(wp) :: cell_volume, dx, dy, dz
 
         forces = 0._wp
         torques = 0._wp
 
         ! TODO :: This is currently only valid inviscid, and needs to be extended to add viscocity
-        $:GPU_PARALLEL_LOOP(private='[ib_idx,radial_vector,pressure_divergence,cell_volume,temp_torque_vector, dx, dy, dz]', copy='[forces,torques]', copyin='[ib_markers]', collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[ib_idx,radial_vector,pressure_divergence,cell_volume,local_torque_contribution, dx, dy, dz]', copy='[forces,torques]', copyin='[ib_markers,patch_ib]', collapse=3)
         do i = 0, m
             do j = 0, n
                 do k = 0, p
@@ -1044,12 +1044,13 @@ contains
                             end if
 
                             ! Update the force values atomically to prevent race conditions
-                            temp_torque_vector = cross_product(radial_vector, pressure_divergence)*cell_volume ! separate out to make atomics safe
+                            call s_cross_product(radial_vector, pressure_divergence, local_torque_contribution) ! separate out to make atomics safe
+                            local_torque_contribution = local_torque_contribution * cell_volume
                             do l = 1, 3
                                 $:GPU_ATOMIC(atomic='update')
                                 forces(ib_idx, l) = forces(ib_idx, l) - (pressure_divergence(l)*cell_volume)
                                 $:GPU_ATOMIC(atomic='update')
-                                torques(ib_idx, l) = torques(ib_idx, l) - temp_torque_vector(l)
+                                torques(ib_idx, l) = torques(ib_idx, l) - local_torque_contribution(l)
                             end do
                         end if
                     end if
@@ -1150,14 +1151,15 @@ contains
 
     end subroutine s_compute_moment_of_inertia
 
-    function cross_product(a, b) result(c)
+    subroutine s_cross_product(a, b, c)
+        $:GPU_ROUTINE(parallelism='[seq]')
         implicit none
         real(wp), intent(in) :: a(3), b(3)
-        real(wp) :: c(3)
+        real(wp), intent(out) :: c(3)
 
         c(1) = a(2)*b(3) - a(3)*b(2)
         c(2) = a(3)*b(1) - a(1)*b(3)
         c(3) = a(1)*b(2) - a(2)*b(1)
-    end function cross_product
+    end subroutine s_cross_product
 
 end module m_ibm
