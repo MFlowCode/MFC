@@ -47,6 +47,11 @@ if [ ! -f "$yaml_file" ]; then
   echo "[$dir] ERROR: Expected output file not found: $yaml_file"
   echo "[$dir] Directory contents:"
   ls -la *.yaml 2>/dev/null || echo "  No YAML files found"
+  echo ""
+  echo "[$dir] Last 100 lines of job output ($output_file):"
+  echo "----------------------------------------"
+  tail -n 100 "$output_file" 2>/dev/null || echo "  Could not read output file"
+  echo "----------------------------------------"
   exit 1
 fi
 
