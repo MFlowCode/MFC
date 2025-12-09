@@ -611,7 +611,6 @@ contains
             if (ib) then
                 ! check if any IBMS are moving, and if so, update the markers, ghost points, levelsets, and levelset norms
                 if (moving_immersed_boundary_flag) then
-
                     do i = 1, num_ibs
                         if (s == 1) then
                             patch_ib(i)%step_vel = patch_ib(i)%vel
@@ -628,7 +627,7 @@ contains
 
                             if (patch_ib(i)%moving_ibm == 2) then ! if we are using two-way coupling, apply force and torque
                                 ! compute the force and torque on the IB from the fluid
-                                call s_compute_ib_forces(q_prim_vf(E_idx)%sf(0:m, 0:n, 0:p))
+                                call s_compute_ib_forces(q_prim_vf(E_idx))
 
                                 ! update the velocity from the force value
                                 patch_ib(i)%vel = patch_ib(i)%vel + rk_coef(s, 3)*dt*(patch_ib(i)%force/patch_ib(i)%mass)/rk_coef(s, 4)
