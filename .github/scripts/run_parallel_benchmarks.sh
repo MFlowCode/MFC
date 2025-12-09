@@ -13,16 +13,19 @@ device="$1"
 interface="$2"
 cluster="$3"
 
+# Get the directory where this script lives (pr/.github/scripts/)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 echo "=========================================="
 echo "Starting parallel benchmark jobs..."
 echo "=========================================="
 
-# Run both jobs with monitoring using dedicated script
-(bash .github/scripts/submit_and_monitor_bench.sh pr "$device" "$interface" "$cluster") &
+# Run both jobs with monitoring using dedicated script from PR
+(bash "${SCRIPT_DIR}/submit_and_monitor_bench.sh" pr "$device" "$interface" "$cluster") &
 pr_pid=$!
 echo "PR job started in background (PID: $pr_pid)"
 
-(bash .github/scripts/submit_and_monitor_bench.sh master "$device" "$interface" "$cluster") &
+(bash "${SCRIPT_DIR}/submit_and_monitor_bench.sh" master "$device" "$interface" "$cluster") &
 master_pid=$!
 echo "Master job started in background (PID: $master_pid)"
 

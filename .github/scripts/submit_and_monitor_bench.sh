@@ -14,6 +14,9 @@ device="$2"
 interface="$3"
 cluster="$4"
 
+# Get the directory where this script lives
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 echo "[$dir] Submitting benchmark for $device-$interface on $cluster..."
 cd "$dir"
 
@@ -33,8 +36,8 @@ fi
 
 echo "[$dir] Job ID: $job_id, monitoring output file: $output_file"
 
-# Use the monitoring script
-bash .github/scripts/monitor_slurm_job.sh "$job_id" "$output_file"
+# Use the monitoring script from PR (where this script lives)
+bash "${SCRIPT_DIR}/monitor_slurm_job.sh" "$job_id" "$output_file"
 
 echo "[$dir] Monitoring complete for job $job_id"
 

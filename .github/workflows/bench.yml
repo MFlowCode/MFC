@@ -98,7 +98,7 @@ jobs:
           wait %1 && wait %2
 
       - name: Bench (Master v. PR)
-        run: bash .github/scripts/run_parallel_benchmarks.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }}
+        run: bash pr/.github/scripts/run_parallel_benchmarks.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }}
 
       - name: Generate & Post Comment
         run: |
