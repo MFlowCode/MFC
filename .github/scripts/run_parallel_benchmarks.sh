@@ -21,11 +21,12 @@ echo "Starting parallel benchmark jobs..."
 echo "=========================================="
 
 # Run both jobs with monitoring using dedicated script from PR
-(bash "${SCRIPT_DIR}/submit_and_monitor_bench.sh" pr "$device" "$interface" "$cluster") &
+# Use stdbuf for line-buffered output and prefix each line for clarity
+(stdbuf -oL -eL bash "${SCRIPT_DIR}/submit_and_monitor_bench.sh" pr "$device" "$interface" "$cluster" 2>&1 | while IFS= read -r line; do echo "[PR] $line"; done) &
 pr_pid=$!
 echo "PR job started in background (PID: $pr_pid)"
 
-(bash "${SCRIPT_DIR}/submit_and_monitor_bench.sh" master "$device" "$interface" "$cluster") &
+(stdbuf -oL -eL bash "${SCRIPT_DIR}/submit_and_monitor_bench.sh" master "$device" "$interface" "$cluster" 2>&1 | while IFS= read -r line; do echo "[MASTER] $line"; done) &
 master_pid=$!
 echo "Master job started in background (PID: $master_pid)"
 

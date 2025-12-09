@@ -51,7 +51,8 @@ done
 
 echo "=== Streaming output for job $job_id ==="
 # Stream output while job runs (explicitly redirect to ensure output visibility)
-tail -f "$output_file" 2>&1 &
+# Use stdbuf for unbuffered output to ensure immediate display in CI logs
+stdbuf -oL -eL tail -f "$output_file" 2>&1 &
 tail_pid=$!
 
 # Give tail a moment to start and show initial output
