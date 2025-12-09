@@ -50,26 +50,33 @@ while [ ! -f "$output_file" ]; do
 done
 
 echo "=== Streaming output for job $job_id ==="
-# Stream output while job runs (explicitly redirect to ensure output visibility)
-# Use stdbuf for unbuffered output to ensure immediate display in CI logs
-stdbuf -oL -eL tail -f "$output_file" 2>&1 &
+
+# Start tail and redirect its output to file descriptor 3 for multiplexing
+# This allows us to stream tail output while also printing heartbeat messages
+exec 3< <(stdbuf -oL -eL tail -f "$output_file" 2>&1)
 tail_pid=$!
 
-# Give tail a moment to start and show initial output
-sleep 2
-
-# Wait for job to complete with retry logic for transient squeue failures
+# Monitor job status and stream output simultaneously
 squeue_failures=0
-heartbeat_counter=0
+last_heartbeat=$(date +%s)
+
 while true; do
-  if squeue -j "$job_id" &>/dev/null; then
-    squeue_failures=0
-    # Print heartbeat every 60 seconds (12 iterations * 5 sec)
-    heartbeat_counter=$((heartbeat_counter + 1))
-    if [ $((heartbeat_counter % 12)) -eq 0 ]; then
-      echo "[$(date +%H:%M:%S)] Job $job_id still running..."
+  # Try to read from tail output (non-blocking via timeout)
+  # Read multiple lines if available to avoid falling behind
+  lines_read=0
+  while IFS= read -r -t 0.1 line <&3 2>/dev/null; do
+    echo "$line"
+    lines_read=$((lines_read + 1))
+    last_heartbeat=$(date +%s)
+    # Limit burst reads to avoid starving the status check
+    if [ $lines_read -ge 100 ]; then
+      break
     fi
-  else
+  done
+  
+  # Check job status
+  current_time=$(date +%s)
+  if ! squeue -j "$job_id" &>/dev/null; then
     squeue_failures=$((squeue_failures + 1))
     # Check if job actually completed using sacct (if available)
     if [ $squeue_failures -ge 3 ]; then
@@ -87,13 +94,40 @@ while true; do
             ;;
         esac
       else
-        # No sacct: avoid false positive by doing an extra check cycle
-        squeue_failures=2
+        # No sacct: assume job completed after 3 failures
+        echo "[$(date +%H:%M:%S)] Job $job_id no longer in queue"
+        break
       fi
     fi
+  else
+    squeue_failures=0
+    # Print heartbeat if no output for 60 seconds
+    if [ $((current_time - last_heartbeat)) -ge 60 ]; then
+      echo "[$(date +%H:%M:%S)] Job $job_id still running (no new output for 60s)..."
+      last_heartbeat=$current_time
+    fi
   fi
-  sleep 5
+  
+  # Sleep briefly between status checks
+  sleep 1
 done
+
+# Drain any remaining output from tail after job completes
+echo "Draining remaining output..."
+drain_count=0
+while IFS= read -r -t 0.5 line <&3 2>/dev/null; do
+  echo "$line"
+  drain_count=$((drain_count + 1))
+  # Safety limit to avoid infinite loop
+  if [ $drain_count -ge 10000 ]; then
+    echo "Warning: Truncating remaining output after 10000 lines"
+    break
+  fi
+done
+
+# Close the file descriptor and kill tail
+exec 3<&-
+kill "${tail_pid}" 2>/dev/null || true
 
 # Wait for output file to finish growing (stabilize) before stopping tail
 if [ -f "$output_file" ]; then
