@@ -1045,7 +1045,7 @@ contains
 
                             ! Update the force values atomically to prevent race conditions
                             call s_cross_product(radial_vector, pressure_divergence, local_torque_contribution) ! separate out to make atomics safe
-                            local_torque_contribution = local_torque_contribution * cell_volume
+                            local_torque_contribution = local_torque_contribution*cell_volume
                             do l = 1, 3
                                 $:GPU_ATOMIC(atomic='update')
                                 forces(ib_idx, l) = forces(ib_idx, l) - (pressure_divergence(l)*cell_volume)
