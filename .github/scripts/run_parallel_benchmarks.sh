@@ -36,15 +36,17 @@ echo "Waiting for both jobs to complete..."
 pr_exit=0
 master_exit=0
 
-if ! wait "$pr_pid"; then
-  pr_exit=$?
+wait "$pr_pid"
+pr_exit=$?
+if [ "$pr_exit" -ne 0 ]; then
   echo "PR job exited with code: $pr_exit"
 else
   echo "PR job completed successfully"
 fi
 
-if ! wait "$master_pid"; then
-  master_exit=$?
+wait "$master_pid"
+master_exit=$?
+if [ "$master_exit" -ne 0 ]; then
   echo "Master job exited with code: $master_exit"
 else
   echo "Master job completed successfully"
