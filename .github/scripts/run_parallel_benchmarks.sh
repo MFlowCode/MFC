@@ -73,6 +73,9 @@ fi
 if [ ! -f "$master_yaml" ]; then
   echo "ERROR: Master benchmark output not found: $master_yaml"
   ls -la master/ || true
+  echo ""
+  echo "Last 100 lines of master log:"
+  tail -n 100 "master/bench-${device}-${interface}.out" 2>/dev/null || echo "  Could not read master log"
   exit 1
 fi
 
