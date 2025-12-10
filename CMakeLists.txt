@@ -652,6 +652,18 @@ if (MFC_DOCUMENTATION)
         VERBATIM
     )
 
+    # Generate case_constraints.md from case_validator.py and examples/
+    add_custom_command(
+        OUTPUT  "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/case_constraints.md"
+        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/mfc/gen_case_constraints_docs.py"
+                "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/mfc/case_validator.py"
+                "${examples_DOCs}"
+        COMMAND "bash" "${CMAKE_CURRENT_SOURCE_DIR}/docs/gen_constraints.sh"
+                       "${CMAKE_CURRENT_SOURCE_DIR}"
+        COMMENT "Generating case_constraints.md"
+        VERBATIM
+    )
+
     file(GLOB common_DOCs CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/docs/*")
 
     # GEN_DOCS: Given a target name (herein <target>), this macro sets up a
@@ -685,8 +697,10 @@ if (MFC_DOCUMENTATION)
             "${CMAKE_CURRENT_BINARY_DIR}/${target}-Doxyfile" @ONLY)
 
         set(opt_example_dependency "")
+        set(opt_constraints_dependency "")
         if (${target} STREQUAL documentation)
             set(opt_example_dependency "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/examples.md")
+            set(opt_constraints_dependency "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/case_constraints.md")
         endif()
 
         file(GLOB_RECURSE ${target}_DOCs CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/docs/${target}/*")
@@ -696,6 +710,7 @@ if (MFC_DOCUMENTATION)
             OUTPUT  "${CMAKE_CURRENT_BINARY_DIR}/${target}/html/index.html"
             DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/${target}-Doxyfile"
                     "${opt_example_dependency}"
+                    "${opt_constraints_dependency}"
                     "${${target}_SRCs}" "${${target}_DOCs}"
             COMMAND "${DOXYGEN_EXECUTABLE}" "${target}-Doxyfile"
             WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
