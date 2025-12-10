@@ -67,6 +67,9 @@ master_yaml="master/bench-${device}-${interface}.yaml"
 if [ ! -f "$pr_yaml" ]; then
   echo "ERROR: PR benchmark output not found: $pr_yaml"
   ls -la pr/ || true
+  echo ""
+  echo "Last 100 lines of PR log:"
+  tail -n 100 "pr/bench-${device}-${interface}.out" 2>/dev/null || echo "  Could not read PR log"
   exit 1
 fi
 
