@@ -570,6 +570,7 @@ contains
             patch_ib(i)%rotation_matrix_inverse = patch_ib(i)%rotation_matrix
         end do
         
+                chem_params%gamma_method = 1
         chem_params%transport_model = 1
         
         ! Fluids physical parameters
