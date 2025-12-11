@@ -301,8 +301,9 @@ contains
                                 do eqn = chemxb, chemxe
                                     flux_src_vf(eqn)%sf(x, y, z) = flux_src_vf(eqn)%sf(x, y, z) - Mass_Diffu_Flux(eqn - chemxb + 1)
                                 end do
-                                                  end do
+                           end do
                     end do
+                end do
                     $:END_GPU_PARALLEL_LOOP()
                 #:endblock UNDEF_AMD
 
@@ -396,14 +397,11 @@ contains
                                 do eqn = chemxb, chemxe
                                     flux_src_vf(eqn)%sf(x, y, z) = flux_src_vf(eqn)%sf(x, y, z) - Mass_Diffu_Flux(eqn - chemxb + 1)
                                 end do
-                            end do
                         end do
                     end do
                 end do
                 $:END_GPU_PARALLEL_LOOP()
             #:endblock UNDEF_AMD
-                    $:END_GPU_PARALLEL_LOOP()
-                #:endblock UNDEF_AMD
             end if
         end if
 
