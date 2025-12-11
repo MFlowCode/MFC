@@ -93,23 +93,40 @@ jobs:
           OPT2: ${{ matrix.debug == 'debug' && '-% 20' || '' }}
 
   self:
-    name: Self Hosted
+    name: "${{ matrix.cluster_name }} (${{ matrix.device }}${{ matrix.interface != 'none' && format('-{0}', matrix.interface) || '' }})"
     if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true'
     needs: file-changes
     continue-on-error: false
-    timeout-minutes: 1400
+    timeout-minutes: 480
     strategy:
       matrix:
-        device: ['gpu']
-        interface: ['acc', 'omp']
-        lbl: ['gt', 'frontier']
         include:
-          - device: 'cpu'
+          # Phoenix (GT)
+          - lbl: 'gt'
+            cluster_name: 'Georgia Tech | Phoenix'
+            device: 'gpu'
+            interface: 'acc'
+          - lbl: 'gt'
+            cluster_name: 'Georgia Tech | Phoenix'
+            device: 'gpu'
+            interface: 'omp'
+          - lbl: 'gt'
+            cluster_name: 'Georgia Tech | Phoenix'
+            device: 'cpu'
             interface: 'none'
-            lbl: 'gt'
-          - device: 'cpu'
+          # Frontier (ORNL)
+          - lbl: 'frontier'
+            cluster_name: 'Oak Ridge | Frontier'
+            device: 'gpu'
+            interface: 'acc'
+          - lbl: 'frontier'
+            cluster_name: 'Oak Ridge | Frontier'
+            device: 'gpu'
+            interface: 'omp'
+          - lbl: 'frontier'
+            cluster_name: 'Oak Ridge | Frontier'
+            device: 'cpu'
             interface: 'none'
-            lbl: 'frontier'
     runs-on:
       group:  phoenix
       labels: ${{ matrix.lbl }}
