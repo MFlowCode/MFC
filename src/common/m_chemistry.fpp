@@ -190,8 +190,10 @@ contains
         $:GPU_UPDATE(device='[isc1,isc2,isc3]')
 
         if (chemistry) then
+            offsets = 0
+            offsets(idir) = 1
             ! Set offsets based on direction using array indexing
-          ! ==========================================
+            ! ==========================================
             ! Model 1: Mixture-Average Transport
             ! ==========================================
             if (chem_params%transport_model == 1) then
@@ -301,9 +303,9 @@ contains
                                 do eqn = chemxb, chemxe
                                     flux_src_vf(eqn)%sf(x, y, z) = flux_src_vf(eqn)%sf(x, y, z) - Mass_Diffu_Flux(eqn - chemxb + 1)
                                 end do
-                           end do
+                            end do
+                        end do
                     end do
-                end do
                     $:END_GPU_PARALLEL_LOOP()
                 #:endblock UNDEF_AMD
 
@@ -317,6 +319,7 @@ contains
                     do z = isc3%beg, isc3%end
                         do y = isc2%beg, isc2%end
                             do x = isc1%beg, isc1%end
+                                print *, 'h3h3'
                                 ! Calculate grid spacing using direction-based indexing
                                 select case (idir)
                                 case (1)
@@ -397,11 +400,11 @@ contains
                                 do eqn = chemxb, chemxe
                                     flux_src_vf(eqn)%sf(x, y, z) = flux_src_vf(eqn)%sf(x, y, z) - Mass_Diffu_Flux(eqn - chemxb + 1)
                                 end do
+                            end do
                         end do
                     end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            #:endblock UNDEF_AMD
+                    $:END_GPU_PARALLEL_LOOP()
+                #:endblock UNDEF_AMD
             end if
         end if
 

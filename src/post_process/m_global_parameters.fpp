@@ -300,7 +300,7 @@ module m_global_parameters
     real(wp) :: rhoref, pref
     !> @}
 
-type(chemistry_parameters) :: chem_params
+    type(chemistry_parameters) :: chem_params
     !> @name Bubble modeling variables and parameters
     !> @{
     integer :: nb
