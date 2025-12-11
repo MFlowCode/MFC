@@ -190,12 +190,11 @@ contains
         $:GPU_UPDATE(device='[isc1,isc2,isc3]')
 
         if (chemistry) then
+
+            ! Set offsets based on direction using array indexing
             offsets = 0
             offsets(idir) = 1
-            ! Set offsets based on direction using array indexing
-            ! ==========================================
             ! Model 1: Mixture-Average Transport
-            ! ==========================================
             if (chem_params%transport_model == 1) then
                 #:block UNDEF_AMD
                     ! Note: Added 'i' and 'eqn' to private list.
@@ -309,9 +308,7 @@ contains
                     $:END_GPU_PARALLEL_LOOP()
                 #:endblock UNDEF_AMD
 
-                ! ==========================================
-                ! Model 2: Unity Lewis Number / Constant
-                ! ==========================================
+                ! Model 2: Unity Lewis Number
             else if (chem_params%transport_model == 2) then
                 #:block UNDEF_AMD
                     ! Note: Added ALL scalars and 'i'/'eqn' to private list to prevent race conditions.
@@ -319,7 +316,6 @@ contains
                     do z = isc3%beg, isc3%end
                         do y = isc2%beg, isc2%end
                             do x = isc1%beg, isc1%end
-                                print *, 'h3h3'
                                 ! Calculate grid spacing using direction-based indexing
                                 select case (idir)
                                 case (1)
