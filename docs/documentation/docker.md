@@ -38,8 +38,8 @@ docker run -it --rm --entrypoint bash --platform linux/amd64 sbryngelson/mfc:lat
 **What's Next?** 
 
 Once a container has started, the primary working directory is `/opt/MFC`, and all necessary files are located there.
-You can check out the usual MFC documentation, such as the [Example Cases](https://mflowcode.github.io/documentation/md_examples.html), to get familiar with running cases.
-Then, review the [Case Files](https://mflowcode.github.io/documentation/md_case.html) to write a custom case file.
+You can check out the usual MFC documentation, such as the [Example Cases](examples.md), to get familiar with running cases.
+Then, review the [Case Files](case.md) to write a custom case file.
 
 ## Details on Running Containers
 

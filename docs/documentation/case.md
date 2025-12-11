@@ -68,6 +68,15 @@ For example, to run the `scaling` case in "weak-scaling" mode:
 
 ## Parameters
 
+## Feature Compatibility
+
+Before diving into parameter details, check the **[Feature Compatibility Guide](case_constraints.md)** to understand:
+- Which features work together (MHD, bubbles, phase change, etc.)
+- Common configuration patterns with copy-paste examples
+- Requirements for each model equation and Riemann solver
+
+💡 **Tip:** If you get a validation error, the compatibility guide explains what each parameter requires.
+
 There are multiple sets of parameters that must be specified in the python input file:
 1. [Runtime Parameters](#1-runtime)
 2. [Computational Domain Parameters](#2-computational-domain)
