@@ -3021,6 +3021,21 @@ contains
                                         *(vel_R(dir_idx(1)) + s_P*(xi_R - 1._wp))
                                 end if
 
+                                do i = bubxb, bubxe
+                                    if (flux_rs${XYZ}$_vf(j, k, l, i) /= flux_rs${XYZ}$_vf(j, k, l, i)) then
+                                        print *, "riemann solver", j, i
+                                        print *, (q_prim_vf(q)%sf(j, k, l), q=1, sys_size)
+                                        print *, (qL_prim_rs${XYZ}$_vf(j, k, l, q), q=1, sys_size)
+                                        print *, (qR_prim_rs${XYZ}$_vf(j + 1, k, l, q), q=1, sys_size)
+                                        print *, xi_M, nbub_L, qL_prim_rs${XYZ}$_vf(j, k, l, i)
+                                        print *, vel_L(dir_idx(1)), s_M, xi_L
+                                        print *, xi_P, nbub_R, qR_prim_rs${XYZ}$_vf(j, k, l, i)
+                                        print *, vel_R(dir_idx(1)), s_P, xi_R
+                                        print *, s_L, s_R, s_S
+                                        call s_mpi_abort()
+                                    end if
+                                end do
+
                                 if (adv_n) then
                                     flux_rs${XYZ}$_vf(j, k, l, n_idx) = &
                                         xi_M*nbub_L &

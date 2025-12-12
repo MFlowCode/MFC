@@ -1,19 +1,19 @@
-This file was created on 2024-11-22 03:00:48.177697.
+This file was created on 2025-12-11 21:43:51.948473.
 
 mfc.sh:
 
-    Invocation: test -j 8 --generate -o Example
-    Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No
-    Git:        eb1524b7e9585bed8b4fff63f7a65061881ab20d on exampleCI2 (dirty)
+    Invocation: test -o 5CAA4E68 --generate
+    Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
+    Git:        9d283e5f56ba0e7f16f569c116b2716b1b571b01 on bubnorm (dirty)
 
 syscheck:
 
     CMake Configuration:
     
-        CMake v3.31.0 on bok
+        CMake v4.1.2 on M4Pro.local
     
-        C       : GNU v14.2.1 (/usr/bin/cc)
-        Fortran : GNU v14.2.1 (/usr/bin/gfortran)
+        C       : AppleClang v17.0.0.17000404 (/usr/bin/cc)
+        Fortran : GNU v15.2.0 (/opt/homebrew/bin/gfortran)
     
         PRE_PROCESS   : OFF
         SIMULATION    : OFF
@@ -24,8 +24,9 @@ syscheck:
     
         MPI     : ON
         OpenACC : OFF
+        OpenMP  : OFF
     
-        Fypp    : /home/bok/dev/MFC/build/venv/bin/fypp
+        Fypp    : /Users/hyeoksu/MyWork/MFC-local/MFC/bubnorm/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
@@ -34,7 +35,7 @@ syscheck:
     
         CC       : /usr/bin/cc
         CXX      : /usr/bin/c++
-        FC       : /usr/bin/gfortran
+        FC       : /opt/homebrew/bin/gfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -43,10 +44,10 @@ pre_process:
 
     CMake Configuration:
     
-        CMake v3.31.0 on bok
+        CMake v4.1.2 on M4Pro.local
     
-        C       : GNU v14.2.1 (/usr/bin/cc)
-        Fortran : GNU v14.2.1 (/usr/bin/gfortran)
+        C       : AppleClang v17.0.0.17000404 (/usr/bin/cc)
+        Fortran : GNU v15.2.0 (/opt/homebrew/bin/gfortran)
     
         PRE_PROCESS   : ON
         SIMULATION    : OFF
@@ -57,8 +58,9 @@ pre_process:
     
         MPI     : ON
         OpenACC : OFF
+        OpenMP  : OFF
     
-        Fypp    : /home/bok/dev/MFC/build/venv/bin/fypp
+        Fypp    : /Users/hyeoksu/MyWork/MFC-local/MFC/bubnorm/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
@@ -67,40 +69,7 @@ pre_process:
     
         CC       : /usr/bin/cc
         CXX      : /usr/bin/c++
-        FC       : /usr/bin/gfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
-simulation:
-
-    CMake Configuration:
-    
-        CMake v3.31.0 on bok
-    
-        C       : GNU v14.2.1 (/usr/bin/cc)
-        Fortran : GNU v14.2.1 (/usr/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : ON
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /home/bok/dev/MFC/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /usr/bin/cc
-        CXX      : /usr/bin/c++
-        FC       : /usr/bin/gfortran
+        FC       : /opt/homebrew/bin/gfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -109,10 +78,10 @@ post_process:
 
     CMake Configuration:
     
-        CMake v3.31.0 on bok
+        CMake v4.1.2 on M4Pro.local
     
-        C       : GNU v14.2.1 (/usr/bin/cc)
-        Fortran : GNU v14.2.1 (/usr/bin/gfortran)
+        C       : AppleClang v17.0.0.17000404 (/usr/bin/cc)
+        Fortran : GNU v15.2.0 (/opt/homebrew/bin/gfortran)
     
         PRE_PROCESS   : OFF
         SIMULATION    : OFF
@@ -123,8 +92,9 @@ post_process:
     
         MPI     : ON
         OpenACC : OFF
+        OpenMP  : OFF
     
-        Fypp    : /home/bok/dev/MFC/build/venv/bin/fypp
+        Fypp    : /Users/hyeoksu/MyWork/MFC-local/MFC/bubnorm/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
@@ -133,7 +103,41 @@ post_process:
     
         CC       : /usr/bin/cc
         CXX      : /usr/bin/c++
-        FC       : /usr/bin/gfortran
+        FC       : /opt/homebrew/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+simulation:
+
+    CMake Configuration:
+    
+        CMake v4.1.2 on M4Pro.local
+    
+        C       : AppleClang v17.0.0.17000404 (/usr/bin/cc)
+        Fortran : GNU v15.2.0 (/opt/homebrew/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /Users/hyeoksu/MyWork/MFC-local/MFC/bubnorm/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /usr/bin/cc
+        CXX      : /usr/bin/c++
+        FC       : /opt/homebrew/bin/gfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -141,45 +145,10 @@ post_process:
 CPU:
 
     CPU Info:
-    From lscpu
-    Architecture:                         x86_64
-    CPU op-mode(s):                       32-bit, 64-bit
-    Address sizes:                        39 bits physical, 48 bits virtual
-    Byte Order:                           Little Endian
-    CPU(s):                               8
-    On-line CPU(s) list:                  0-7
-    Vendor ID:                            GenuineIntel
-    Model name:                           11th Gen Intel(R) Core(TM) i7-1165G7 @ 2.80GHz
-    CPU family:                           6
-    Model:                                140
-    Thread(s) per core:                   2
-    Core(s) per socket:                   4
-    Socket(s):                            1
-    Stepping:                             1
-    CPU(s) scaling MHz:                   49%
-    CPU max MHz:                          4700.0000
-    CPU min MHz:                          400.0000
-    BogoMIPS:                             5608.00
-    Flags:                                fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc art arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc cpuid aperfmperf tsc_known_freq pni pclmulqdq dtes64 monitor ds_cpl vmx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch cpuid_fault epb cat_l2 cdp_l2 ssbd ibrs ibpb stibp ibrs_enhanced tpr_shadow flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid rdt_a avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb intel_pt avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves split_lock_detect user_shstk dtherm ida arat pln pts hwp hwp_notify hwp_act_window hwp_epp hwp_pkg_req vnmi avx512vbmi umip pku ospke avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid movdiri movdir64b fsrm avx512_vp2intersect md_clear ibt flush_l1d arch_capabilities
-    Virtualization:                       VT-x
-    L1d cache:                            192 KiB (4 instances)
-    L1i cache:                            128 KiB (4 instances)
-    L2 cache:                             5 MiB (4 instances)
-    L3 cache:                             12 MiB (1 instance)
-    NUMA node(s):                         1
-    NUMA node0 CPU(s):                    0-7
-    Vulnerability Gather data sampling:   Vulnerable: No microcode
-    Vulnerability Itlb multihit:          Not affected
-    Vulnerability L1tf:                   Not affected
-    Vulnerability Mds:                    Not affected
-    Vulnerability Meltdown:               Not affected
-    Vulnerability Mmio stale data:        Not affected
-    Vulnerability Reg file data sampling: Not affected
-    Vulnerability Retbleed:               Not affected
-    Vulnerability Spec rstack overflow:   Not affected
-    Vulnerability Spec store bypass:      Mitigation; Speculative Store Bypass disabled via prctl
-    Vulnerability Spectre v1:             Mitigation; usercopy/swapgs barriers and __user pointer sanitization
-    Vulnerability Spectre v2:             Mitigation; Enhanced / Automatic IBRS; IBPB conditional; RSB filling; PBRSB-eIBRS SW sequence; BHI SW loop, KVM SW loop
-    Vulnerability Srbds:                  Not affected
-    Vulnerability Tsx async abort:        Not affected
+    From sysctl -a 
+    machdep.cpu.cores_per_package: 14
+    machdep.cpu.core_count: 14
+    machdep.cpu.logical_per_package: 14
+    machdep.cpu.thread_count: 14
+    machdep.cpu.brand_string: Apple M4 Pro
 

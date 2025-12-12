@@ -655,6 +655,8 @@ contains
         integer :: id
         integer(kind=8) :: i, j, k, l, q !< Generic loop iterators
 
+        real(wp) :: denom, nbubble
+
         call nvtxStartRange("COMPUTE-RHS")
 
         call cpu_time(t_start)
@@ -966,7 +968,6 @@ contains
                 end if
 
                 ! RHS additions for qbmm bubbles
-
                 if (qbmm) then
                     call nvtxStartRange("RHS-QBMM")
                     call s_compute_qbmm_rhs(id, &
