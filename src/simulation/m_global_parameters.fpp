@@ -472,7 +472,7 @@ module m_global_parameters
     !> @name Physical bubble parameters (see Ando 2010, Preston 2007)
     !> @{
     real(wp) :: phi_vg, phi_gv, Pe_c, Tw, k_vl, k_gl
-    $:GPU_DECLARE(create='[phi_vg,phi_gv,Pe_c,Tw,M_g, M_v,k_vl,k_gl]')
+    $:GPU_DECLARE(create='[phi_vg,phi_gv,Pe_c,Tw,k_vl,k_gl]')
 
     real(wp), dimension(:), allocatable :: pb0, mass_g0, mass_v0, Pe_T, k_v, k_g
     real(wp), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN
