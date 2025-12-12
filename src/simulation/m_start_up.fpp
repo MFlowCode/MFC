@@ -1500,10 +1500,10 @@ contains
             & bubbles_euler,polytropic,polydisperse,qbmm, &
             & ptil,bubble_model,thermal,poly_sigma,adv_n,adap_dt, &
             & adap_dt_tol,adap_dt_max_iters,n_idx,pi_fac,low_Mach]')
-        $:GPU_UPDATE(device='[R_n,R_v,phi_vn,phi_nv,Pe_c,Tw,M_n, &
-            & M_v,k_n,k_v,pb0,mass_n0,mass_v0,Pe_T,Re_trans_T, &
-            & Re_trans_c,Im_trans_T,Im_trans_c,omegaN,mul0, &
-            & gamma_v,mu_v,gamma_m,gamma_n,mu_n,gam]')
+        $:GPU_UPDATE(device='[R_g,R_v,phi_vg,phi_gv,Pe_c,Tw,M_g, &
+            & M_v,k_g,k_v,pb0,mass_g0,mass_v0,Pe_T,Re_trans_T, &
+            & Re_trans_c,Im_trans_T,Im_trans_c,omegaN,mu_l, &
+            & gam_v,mu_v,gam_m,gam_g,mu_g,gam]')
 
         $:GPU_UPDATE(device='[adv_n,adap_dt,adap_dt_tol,adap_dt_max_iters,n_idx,pi_fac,low_Mach]')
 
