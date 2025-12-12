@@ -19,12 +19,12 @@ module m_chemistry
 
     implicit none
 
-    #:block DEF_AMD
+    #:if USING_AMD
         real(wp) :: molecular_weights_nonparameter(10) = &
                     (/2.016, 1.008, 15.999, 31.998, 17.007, 18.015, 33.006, &
                       34.014, 39.95, 28.014/)
         $:GPU_DECLARE(create='[molecular_weights_nonparameter]')
-    #:endblock DEF_AMD
+    #:endif
 
     type(int_bounds_info) :: isc1, isc2, isc3
     $:GPU_DECLARE(create='[isc1, isc2, isc3]')
@@ -129,7 +129,7 @@ contains
         real(wp), dimension(num_species) :: Ys
         real(wp), dimension(num_species) :: omega
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[Ys, omega, eqn, T, rho, omega, omega_m]', copyin='[bounds]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[Ys, omega, eqn, T, rho, omega_m]', copyin='[bounds]')
         do z = bounds(3)%beg, bounds(3)%end
             do y = bounds(2)%beg, bounds(2)%end
                 do x = bounds(1)%beg, bounds(1)%end
@@ -146,12 +146,11 @@ contains
 
                     $:GPU_LOOP(parallelism='[seq]')
                     do eqn = chemxb, chemxe
-                        #:block UNDEF_AMD
-                            omega_m = molecular_weights(eqn - chemxb + 1)*omega(eqn - chemxb + 1)
-                        #:endblock UNDEF_AMD
-                        #:block DEF_AMD
+                        #:if USING_AMD
                             omega_m = molecular_weights_nonparameter(eqn - chemxb + 1)*omega(eqn - chemxb + 1)
-                        #:endblock DEF_AMD
+                        #:else
+                            omega_m = molecular_weights(eqn - chemxb + 1)*omega(eqn - chemxb + 1)
+                        #:endif
                         rhs_vf(eqn)%sf(x, y, z) = rhs_vf(eqn)%sf(x, y, z) + omega_m
 
                     end do
@@ -190,7 +189,7 @@ contains
             ! Set offsets based on direction using array indexing
             offsets = 0
             offsets(idir) = 1
-            #:block UNDEF_AMD
+            #:if not USING_AMD
                 $:GPU_PARALLEL_LOOP(collapse=3,  private='[x,y,z,Ys_L, Ys_R, Ys_cell, Xs_L, Xs_R, mass_diffusivities_mixavg1, mass_diffusivities_mixavg2, mass_diffusivities_mixavg_Cell, h_l, h_r, Xs_cell, h_k, dXk_dxi,Mass_Diffu_Flux, Mass_Diffu_Energy, MW_L, MW_R, MW_cell, Rgas_L, Rgas_R, T_L, T_R, P_L, P_R, rho_L, rho_R, rho_cell, rho_Vic, lambda_L, lambda_R, lambda_Cell, dT_dxi, grid_spacing]', copyin='[offsets]')
                 do z = isc3%beg, isc3%end
                     do y = isc2%beg, isc2%end
@@ -299,7 +298,7 @@ contains
                     end do
                 end do
                 $:END_GPU_PARALLEL_LOOP()
-            #:endblock UNDEF_AMD
+            #:endif
         end if
 
     end subroutine s_compute_chemistry_diffusion_flux

@@ -320,10 +320,10 @@ contains
         $:GPU_ROUTINE(function_name='s_convert_species_to_mixture_variables_acc', &
             & parallelism='[seq]', cray_inline=True)
 
-        real(wp), intent(out) :: rho_K, gamma_K, pi_inf_K, qv_K
+        real(wp), intent(inout) :: rho_K, gamma_K, pi_inf_K, qv_K
         real(wp), dimension(num_fluids), intent(inout) :: alpha_rho_K, alpha_K !<
-        real(wp), dimension(2), intent(out) :: Re_K
-        real(wp), optional, intent(out) :: G_K
+        real(wp), dimension(2), intent(inout) :: Re_K
+        real(wp), optional, intent(inout) :: G_K
         real(wp), optional, dimension(num_fluids), intent(in) :: G
 
         integer :: i, j !< Generic loop iterators
@@ -360,7 +360,7 @@ contains
             do i = 1, num_fluids
                 !TODO: change to use Gs_vc directly here?
                 !TODO: Make this changes as well for GPUs
-                G_K = G_K + alpha_K(i)*G(i)
+                G_K = G_K + alpha_K(i)*Gs_vc(i)
             end do
             G_K = max(0._wp, G_K)
         end if
@@ -1166,9 +1166,9 @@ contains
                                                      is1, is2, is3, s2b, s3b)
 
         integer, intent(in) :: s2b, s3b
-        real(wp), dimension(0:, s2b:, s3b:, 1:), intent(in) :: qK_prim_vf
-        real(wp), dimension(0:, s2b:, s3b:, 1:), intent(inout) :: FK_vf
-        real(wp), dimension(0:, s2b:, s3b:, advxb:), intent(inout) :: FK_src_vf
+        real(wp), dimension(0:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(in) :: qK_prim_vf
+        real(wp), dimension(0:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: FK_vf
+        real(wp), dimension(0:, idwbuff(2)%beg:, idwbuff(3)%beg:, advxb:), intent(inout) :: FK_src_vf
 
         type(int_bounds_info), intent(in) :: is1, is2, is3
 
@@ -1332,7 +1332,11 @@ contains
                     alpha_K(i) = q_vf(advxb + i - 1)%sf(k, l, r)
                 end do
                 alpha_rho_K(num_fluids) = q_vf(num_fluids)%sf(k, l, r)
-                alpha_K(num_fluids) = 1._wp - sum(alpha_K(1:num_fluids - 1))
+                alpha_K(num_fluids) = 1._wp 
+                do i = 1, num_fluids - 1 
+                    alpha_K(num_fluids) = alpha_K(num_fluids) - alpha_K(i)
+                end do
+                
             else
                 do i = 1, num_fluids
                     alpha_rho_K(i) = q_vf(i)%sf(k, l, r)

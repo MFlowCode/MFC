@@ -1,11 +1,5 @@
 #:include 'shared_parallel_macros.fpp'
 
-#:set NVIDIA_COMPILER_ID="NVHPC"
-#:set PGI_COMPILER_ID="PGI"
-#:set INTEL_COMPILER_ID="Intel"
-#:set CCE_COMPILER_ID="Cray"
-#:set AMD_COMPILER_ID="LLVMFlang"
-
 #:def OMP_MAP_STR(map_type, var_list)
     #:assert map_type is not None
     #:assert isinstance(map_type, str) 
@@ -23,11 +17,11 @@
         #:assert isinstance(default, str)
         #:assert (default == 'present' or default == 'none')
         #:if default == 'present'
-            #:if MFC_COMPILER == NVIDIA_COMPILER_ID or MFC_COMPILER == PGI_COMPILER_ID
+            #:if USING_NVHPC
                 #:set default_val = 'defaultmap(tofrom:aggregate) defaultmap(tofrom:allocatable) defaultmap(tofrom:pointer) '
-            #:elif MFC_COMPILER == CCE_COMPILER_ID
+            #:elif USING_CCE
                 #:set default_val = 'defaultmap(tofrom:aggregate) defaultmap(present:allocatable) defaultmap(present:pointer) '
-            #:elif MFC_COMPILER == AMD_COMPILER_ID
+            #:elif USING_AMD
                 #:set default_val = ''
             #:else
                 #:set default_val = 'defaultmap(tofrom:aggregate) defaultmap(tofrom:allocatable) defaultmap(tofrom:pointer) '
@@ -176,13 +170,13 @@
         & deviceptr_val.strip('\n') + attach_val.strip('\n')
     #! Hardcoding the parallelism for now
 
-    #:if MFC_COMPILER == NVIDIA_COMPILER_ID or MFC_COMPILER == PGI_COMPILER_ID
+    #:if USING_NVHPC
         #:set omp_start_directive = '!$omp target teams loop defaultmap(firstprivate:scalar) bind(teams,parallel) '
         #:set omp_end_directive = '!$omp end target teams loop'
-    #:elif MFC_COMPILER == CCE_COMPILER_ID
+    #:elif USING_CCE
         #:set omp_start_directive = '!$omp target teams distribute parallel do simd defaultmap(firstprivate:scalar) '
         #:set omp_end_directive = '!$omp end target teams distribute parallel do simd'
-    #:elif MFC_COMPILER == AMD_COMPILER_ID
+    #:elif USING_AMD
         #:set omp_start_directive = '!$omp target teams distribute parallel do '
         #:set omp_end_directive = '!$omp end target teams distribute parallel do'
     #:else
@@ -223,11 +217,11 @@
         & deviceptr_val.strip('\n') + attach_val.strip('\n')
     #! Hardcoding the parallelism for now
 
-    #:if MFC_COMPILER == NVIDIA_COMPILER_ID or MFC_COMPILER == PGI_COMPILER_ID
+    #:if USING_NVHPC
         #:set omp_start_directive = '!$omp target teams loop defaultmap(firstprivate:scalar) bind(teams,parallel) '
-    #:elif MFC_COMPILER == CCE_COMPILER_ID
+    #:elif USING_CCE
         #:set omp_start_directive = '!$omp target teams distribute parallel do simd defaultmap(firstprivate:scalar) '
-    #:elif MFC_COMPILER == AMD_COMPILER_ID
+    #:elif USING_AMD
         #:set omp_start_directive = '!$omp target teams distribute parallel do '
     #:else
         #:set omp_start_directive = '!$omp target teams loop defaultmap(firstprivate:scalar) bind(teams,parallel) '
@@ -239,11 +233,11 @@
 
 #:def END_OMP_PARALLEL_LOOP()
     
-    #:if MFC_COMPILER == NVIDIA_COMPILER_ID or MFC_COMPILER == PGI_COMPILER_ID
+    #:if USING_NVHPC
         #:set omp_end_directive = '!$omp end target teams loop'
-    #:elif MFC_COMPILER == CCE_COMPILER_ID
+    #:elif USING_CCE
         #:set omp_end_directive = '!$omp end target teams distribute parallel do simd'
-    #:elif MFC_COMPILER == AMD_COMPILER_ID
+    #:elif USING_AMD
         #:set omp_end_directive = '!$omp end target teams distribute parallel do'
     #:else
         #:set omp_end_directive = '!$omp end target teams loop'
@@ -266,7 +260,7 @@
         #:set function_name_val = ''
     #:endif
     
-    #:if MFC_COMPILER == AMD_COMPILER_ID
+    #:if USING_AMD
         #:set clause_val = ''
     #:else
         #:set clause_val = nohost_val.strip('\n')
@@ -290,9 +284,9 @@
 
 #! Not fully implemented yet (ignores most args right now)
 #:def OMP_LOOP(collapse=None, parallelism=None, data_dependency=None, reduction=None, reductionOp=None, private=None, extraOmpArgs=None)
-    #:if MFC_COMPILER == NVIDIA_COMPILER_ID or MFC_COMPILER == PGI_COMPILER_ID
+    #:if USING_NVHPC
         #:set omp_directive = '!$omp loop bind(thread)'
-    #:elif MFC_COMPILER == CCE_COMPILER_ID or MFC_COMPILER == AMD_COMPILER_ID
+    #:elif USING_CCE or USING_AMD
         #:set omp_directive = ''
     #:else
         #:set omp_directive = ''
@@ -389,35 +383,5 @@
     #:set clause_val = ''
     #:set omp_directive = '!$omp barrier ' + clause_val + extraOmpArgs_val.strip('\n')
     $:omp_directive
-#:enddef
-
-#:def UNDEF_AMD(code)
-    #:if MFC_COMPILER != AMD_COMPILER_ID
-        $:code
-    #:endif
-#:enddef
-
-#:def DEF_AMD(code)
-    #:if MFC_COMPILER == AMD_COMPILER_ID
-        $:code
-    #:endif
-#:enddef
-
-#:def UNDEF_CCE(code)
-    #:if MFC_COMPILER != CCE_COMPILER_ID
-        $:code
-    #:endif
-#:enddef
-
-#:def DEF_CCE(code)
-    #:if MFC_COMPILER == CCE_COMPILER_ID
-        $:code
-    #:endif
-#:enddef
-
-#:def UNDEF_NVIDIA(code)
-    #:if MFC_COMPILER != NVIDIA_COMPILER_ID and MFC_COMPILER != PGI_COMPILER_ID
-        $:code
-    #:endif
 #:enddef
 ! New line at end of file is required for FYPP

@@ -92,15 +92,15 @@ contains
         !! @param j x index
         !! @param k y index
         !! @param l z index
-    subroutine s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, j, k, l)
+    subroutine s_compute_enthalpy(pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, E_hyp, j, k, l)
         $:GPU_ROUTINE(function_name='s_compute_enthalpy',parallelism='[seq]', &
             & cray_inline=True)
 
-        type(scalar_field), intent(in), dimension(sys_size) :: q_prim_vf
         real(wp), intent(inout), dimension(num_fluids) :: alpha
-        real(wp), intent(inout), dimension(num_vels) :: vel
+        real(wp), intent(inout), dimension(num_vels)  :: vel
         real(wp), intent(inout) :: rho, gamma, pi_inf, vel_sum, H, pres
-        real(wp), intent(out) :: qv
+        real(wp), intent(inout) :: qv
+        real(wp), intent(inout) :: E_hyp
         integer, intent(in) :: j, k, l
         real(wp), dimension(2), intent(inout) :: Re
 
@@ -109,8 +109,6 @@ contains
 
         integer :: i
 
-        call s_compute_species_fraction(q_prim_vf, j, k, l, alpha_rho, alpha)
-
         if (elasticity) then
             call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha, &
                                                             alpha_rho, Re, G_local, Gs)
@@ -118,35 +116,25 @@ contains
             call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re)
         end if
 
-        if (igr) then
-            $:GPU_LOOP(parallelism='[seq]')
-            do i = 1, num_vels
-                vel(i) = q_prim_vf(contxe + i)%sf(j, k, l)/rho
-            end do
-        else
-            $:GPU_LOOP(parallelism='[seq]')
-            do i = 1, num_vels
-                vel(i) = q_prim_vf(contxe + i)%sf(j, k, l)
-            end do
+        if(igr) then 
+            vel(i) = vel(i) / rho 
         end if
 
         vel_sum = 0._wp
-        $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_vels
             vel_sum = vel_sum + vel(i)**2._wp
         end do
 
         if (igr) then
-            E = q_prim_vf(E_idx)%sf(j, k, l)
+            E = pres
             pres = (E - pi_inf - qv - 5.e-1_wp*rho*vel_sum)/gamma
         else
-            pres = q_prim_vf(E_idx)%sf(j, k, l)
             E = gamma*pres + pi_inf + 5.e-1_wp*rho*vel_sum + qv
         end if
 
         ! Adjust energy for hyperelasticity
         if (hyperelasticity) then
-            E = E + G_local*q_prim_vf(xiend + 1)%sf(j, k, l)
+            E = E + G_local*E_hyp
         end if
 
         H = (E + pres)/rho

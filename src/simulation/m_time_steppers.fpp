@@ -100,9 +100,9 @@ contains
         use hipfort
         use hipfort_hipmalloc
         use hipfort_check
-#if defined(MFC_OpenACC)
-        use openacc
-#endif
+        #:if MFC_OpenACC
+            use openacc
+        #:endif
 #endif
         integer :: i, j !< Generic loop iterators
 
@@ -181,17 +181,17 @@ contains
         ! Doing hipMalloc then mapping should be most performant
         call hipCheck(hipMalloc(q_cons_ts_pool_device, dims8=pool_dims, lbounds8=pool_starts))
         ! Without this map CCE will still create a device copy, because it's silly like that
-#if defined(MFC_OpenACC)
-        call acc_map_data(q_cons_ts_pool_device, c_loc(q_cons_ts_pool_device), c_sizeof(q_cons_ts_pool_device))
-#endif
+        #:if MFC_OpenACC
+            call acc_map_data(q_cons_ts_pool_device, c_loc(q_cons_ts_pool_device), c_sizeof(q_cons_ts_pool_device))
+        #:endif
         ! CCE see it can access this and will leave it on the host. It will stay on the host so long as HSA_XNACK=1
         ! NOTE: WE CANNOT DO ATOMICS INTO THIS MEMORY. We have to change a property to use atomics here
         ! Otherwise leaving this as fine-grained will actually help performance since it can't be cached in GPU L2
         if (num_ts == 2) then
             call hipCheck(hipMallocManaged(q_cons_ts_pool_host, dims8=pool_dims, lbounds8=pool_starts, flags=hipMemAttachGlobal))
-#if defined(MFC_OpenMP)
-            call hipCheck(hipMemAdvise(c_loc(q_cons_ts_pool_host), c_sizeof(q_cons_ts_pool_host), hipMemAdviseSetPreferredLocation, -1))
-#endif
+            #:if MFC_OpenMP
+                call hipCheck(hipMemAdvise(c_loc(q_cons_ts_pool_host), c_sizeof(q_cons_ts_pool_host), hipMemAdviseSetPreferredLocation, -1))
+            #:endif
         end if
 #endif
 
@@ -717,17 +717,18 @@ contains
         real(wp), dimension(num_vels) :: vel        !< Cell-avg. velocity
         real(wp) :: vel_sum    !< Cell-avg. velocity sum
         real(wp) :: pres       !< Cell-avg. pressure
-        real(wp), dimension(num_fluids) :: alpha      !< Cell-avg. volume fraction
+        real(wp), dimension(num_fluids) :: alpha, alpha_rho      !< Cell-avg. volume fraction
         real(wp) :: gamma      !< Cell-avg. sp. heat ratio
         real(wp) :: pi_inf     !< Cell-avg. liquid stiffness function
         real(wp) :: qv         !< Cell-avg. fluid reference energy
         real(wp) :: c          !< Cell-avg. sound speed
         real(wp) :: H          !< Cell-avg. enthalpy
+        real(wp) :: E_hyp
         real(wp), dimension(2) :: Re         !< Cell-avg. Reynolds numbers
         type(vector_field) :: gm_alpha_qp
 
         real(wp) :: dt_local
-        integer :: j, k, l !< Generic loop iterators
+        integer :: i, j, k, l !< Generic loop iterators
 
         if (.not. igr) then
             call s_convert_conservative_to_primitive_variables( &
@@ -741,10 +742,22 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
+
+                    call s_compute_species_fraction(q_prim_vf, j, k, l, alpha_rho, alpha)
+
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do i = 1, num_vels 
+                        vel(i) = q_prim_vf(momxb + i - 1)%sf(j, k, l)
+                    end do
+
+                    pres = q_prim_vf(E_idx)%sf(j, k, l)
+
+                    E_hyp = q_prim_vf(xiend + 1)%sf(j, k, l)
+
                     if (igr) then
-                        call s_compute_enthalpy(q_cons_ts(1)%vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, j, k, l)
+                        call s_compute_enthalpy(pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, E_hyp, j, k, l)
                     else
-                        call s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, j, k, l)
+                        call s_compute_enthalpy(pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, E_hyp, j, k, l)
                     end if
 
                     ! Compute mixture sound speed

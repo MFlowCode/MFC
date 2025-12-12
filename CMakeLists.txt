@@ -310,7 +310,18 @@ endif()
 # and generate documentation. Instead, we can simply include the list of .f90
 # files that will eventually be used to compile <target>.
 
-macro(HANDLE_SOURCES target useCommon)
+macro(HANDLE_SOURCES target useCommon useOpenACC useOpenMP)
+
+    if (${useOpenACC} AND ${useOpenMP})
+      message(FATAL_ERROR "OpenACC and OpenMP at same time is unsupported.")
+    elseif (${useOpenACC})
+      set(MFC_GPU_MODE "OpenACC")
+    elseif (${useOpenMP})
+      set(MFC_GPU_MODE "OpenMP")
+    else()
+      set(MFC_GPU_MODE "")
+    endif()
+    
     set(${target}_DIR "${CMAKE_SOURCE_DIR}/src/${target}")
     set(common_DIR    "${CMAKE_SOURCE_DIR}/src/common")
 
@@ -372,6 +383,7 @@ macro(HANDLE_SOURCES target useCommon)
                                  -D MFC_${${target}_UPPER}
                                  -D MFC_COMPILER="${CMAKE_Fortran_COMPILER_ID}"
                                  -D MFC_CASE_OPTIMIZATION=False
+                                 -D MFC_GPU_MODE="${MFC_GPU_MODE}"
                                  -D chemistry=False
                                  --line-numbering
                                  --no-folding
@@ -388,10 +400,10 @@ macro(HANDLE_SOURCES target useCommon)
 endmacro()
 
 
-HANDLE_SOURCES(pre_process ON)
-HANDLE_SOURCES(simulation ON)
-HANDLE_SOURCES(post_process ON)
-HANDLE_SOURCES(syscheck OFF)
+HANDLE_SOURCES(pre_process ON OFF OFF)
+HANDLE_SOURCES(simulation ON ${MFC_OpenACC} ${MFC_OpenMP})
+HANDLE_SOURCES(post_process ON OFF OFF)
+HANDLE_SOURCES(syscheck OFF ${MFC_OpenACC} ${MFC_OpenMP})
 
 
 # MFC_SETUP_TARGET: Given a target (herein <target>), this macro creates a new
@@ -430,6 +442,7 @@ function(MFC_SETUP_TARGET)
 
     foreach (a_target ${IPO_TARGETS})
         set_target_properties(${a_target} PROPERTIES Fortran_PREPROCESS ON)
+        message(STATUS ${CMAKE_Fortran_COMPILER_ID})
 
         target_include_directories(${a_target} PRIVATE
             "${CMAKE_SOURCE_DIR}/src/common"
@@ -450,8 +463,8 @@ function(MFC_SETUP_TARGET)
         if (MFC_MPI AND ARGS_MPI)
             find_package(MPI COMPONENTS Fortran REQUIRED)
 
-            target_compile_definitions(${a_target} PRIVATE MFC_MPI)
-            target_link_libraries     (${a_target} PRIVATE MPI::MPI_Fortran)
+            target_compile_definitions(${a_target} PRIVATE $ENV{CRAY_MPICH_INC})
+            target_link_libraries     (${a_target} PRIVATE $ENV{CRAY_MPICH_LIB})
         endif()
 
         if (ARGS_SILO)
@@ -470,8 +483,8 @@ function(MFC_SETUP_TARGET)
                     find_package(CUDAToolkit REQUIRED)
                     target_link_libraries(${a_target} PRIVATE CUDA::cudart CUDA::cufft)
                 else()
-                    find_package(hipfort COMPONENTS hipfft CONFIG REQUIRED)
-                    target_link_libraries(${a_target} PRIVATE hipfort::hipfft)
+                    # find_package(hipfort COMPONENTS hipfft CONFIG REQUIRED)
+                    target_link_libraries(${a_target} PRIVATE $ENV{CRAY_HIPFORT_INC})
                 endif()
             else()
                 find_package(FFTW REQUIRED)
@@ -517,8 +530,8 @@ function(MFC_SETUP_TARGET)
                     target_compile_options(${a_target} PRIVATE -fopenmp)
                     target_link_options(${a_target} PRIVATE -fopenmp)
                 elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
-                    target_compile_options(${a_target} PRIVATE -fopenmp --offload-arch=gfx90a)
-                    target_link_options(${a_target} PRIVATE -fopenmp --offload-arch=gfx90a)
+                    target_compile_options(${a_target} PRIVATE -fopenmp --offload-arch=gfx90a $ENV{CRAY_MPICH_INC})
+                    target_link_options(${a_target} PRIVATE -fopenmp --offload-arch=gfx90a $ENV{CRAY_MPICH_LIB})          
                 endif()
             endif()
 
@@ -584,7 +597,7 @@ function(MFC_SETUP_TARGET)
                         PRIVATE -DFRONTIER_UNIFIED)
                 endif()
 
-    		find_package(hipfort COMPONENTS hip CONFIG REQUIRED)
+    		        find_package(hipfort COMPONENTS hip CONFIG REQUIRED)
                 target_link_libraries(${a_target} PRIVATE hipfort::hip hipfort::hipfort-amdgcn flang_rt.hostdevice)
             endif()
         elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")

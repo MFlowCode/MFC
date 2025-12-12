@@ -60,73 +60,73 @@ module m_igr
 
             integer, parameter :: offxL = 2
             integer, parameter :: offxR = 3
-#if defined(MFC_OpenMP)
-            real(wp) :: coeff_L(1:5) = [ &
-                        -3._wp/60._wp, &  ! Index -1
-                        27._wp/60._wp, &  ! Index 0
-                        47._wp/60._wp, &  ! Index 1
-                        -13._wp/60._wp, &  ! Index 2
-                        2._wp/60._wp &  ! Index 3
-                        ]
+            #:if MFC_OpenMP
+                real(wp) :: coeff_L(1:5) = [ &
+                            -3._wp/60._wp, &  ! Index -1
+                            27._wp/60._wp, &  ! Index 0
+                            47._wp/60._wp, &  ! Index 1
+                            -13._wp/60._wp, &  ! Index 2
+                            2._wp/60._wp &  ! Index 3
+                            ]
 
-            real(wp) :: coeff_R(1:5) = [ &
-                        2._wp/60._wp, &  ! Index -2
-                        -13._wp/60._wp, &  ! Index -1
-                        47._wp/60._wp, &  ! Index 0
-                        27._wp/60._wp, &  ! Index 1
-                        -3._wp/60._wp &  ! Index 2
-                        ]
-#else
-            real(wp), parameter :: coeff_L(1:5) = [ &
-                                   -3._wp/60._wp, &  ! Index -1
-                                   27._wp/60._wp, &  ! Index 0
-                                   47._wp/60._wp, &  ! Index 1
-                                   -13._wp/60._wp, &  ! Index 2
-                                   2._wp/60._wp &  ! Index 3
-                                   ]
+                real(wp) :: coeff_R(1:5) = [ &
+                            2._wp/60._wp, &  ! Index -2
+                            -13._wp/60._wp, &  ! Index -1
+                            47._wp/60._wp, &  ! Index 0
+                            27._wp/60._wp, &  ! Index 1
+                            -3._wp/60._wp &  ! Index 2
+                            ]
+            #:else
+                real(wp), parameter :: coeff_L(1:5) = [ &
+                                       -3._wp/60._wp, &  ! Index -1
+                                       27._wp/60._wp, &  ! Index 0
+                                       47._wp/60._wp, &  ! Index 1
+                                       -13._wp/60._wp, &  ! Index 2
+                                       2._wp/60._wp &  ! Index 3
+                                       ]
 
-            real(wp), parameter :: coeff_R(1:5) = [ &
-                                   2._wp/60._wp, &  ! Index -2
-                                   -13._wp/60._wp, &  ! Index -1
-                                   47._wp/60._wp, &  ! Index 0
-                                   27._wp/60._wp, &  ! Index 1
-                                   -3._wp/60._wp &  ! Index 2
-                                   ]
-#endif
+                real(wp), parameter :: coeff_R(1:5) = [ &
+                                       2._wp/60._wp, &  ! Index -2
+                                       -13._wp/60._wp, &  ! Index -1
+                                       47._wp/60._wp, &  ! Index 0
+                                       27._wp/60._wp, &  ! Index 1
+                                       -3._wp/60._wp &  ! Index 2
+                                       ]
+            #:endif
         #:elif igr_order == 3
             integer, parameter :: vidxb = -1
             integer, parameter :: vidxe = 2
 
             integer, parameter :: offxL = 1
             integer, parameter :: offxR = 2
-#if defined(MFC_OpenMP)
-            real(wp) :: coeff_L(1:3) = [ &
-                        2._wp/6._wp, & ! Index 0
-                        5._wp/6._wp, & ! Index 1
-                        -1._wp/6._wp & ! Index 2
-                        ]
-            real(wp) :: coeff_R(1:3) = [ &
-                        -1._wp/6._wp, & ! Index -1
-                        5._wp/6._wp, & ! Index 0
-                        2._wp/6._wp & ! Index 1
-                        ]
-#else
-            real(wp), parameter :: coeff_L(1:3) = [ &
-                                   2._wp/6._wp, & ! Index 0
-                                   5._wp/6._wp, & ! Index 1
-                                   -1._wp/6._wp & ! Index 2
-                                   ]
-            real(wp), parameter :: coeff_R(1:3) = [ &
-                                   -1._wp/6._wp, & ! Index -1
-                                   5._wp/6._wp, & ! Index 0
-                                   2._wp/6._wp & ! Index 1
-                                   ]
-#endif
+            #:if MFC_OpenMP
+                real(wp) :: coeff_L(1:3) = [ &
+                            2._wp/6._wp, & ! Index 0
+                            5._wp/6._wp, & ! Index 1
+                            -1._wp/6._wp & ! Index 2
+                            ]
+                real(wp) :: coeff_R(1:3) = [ &
+                            -1._wp/6._wp, & ! Index -1
+                            5._wp/6._wp, & ! Index 0
+                            2._wp/6._wp & ! Index 1
+                            ]
+            #:else
+                real(wp), parameter :: coeff_L(1:3) = [ &
+                                       2._wp/6._wp, & ! Index 0
+                                       5._wp/6._wp, & ! Index 1
+                                       -1._wp/6._wp & ! Index 2
+                                       ]
+                real(wp), parameter :: coeff_R(1:3) = [ &
+                                       -1._wp/6._wp, & ! Index -1
+                                       5._wp/6._wp, & ! Index 0
+                                       2._wp/6._wp & ! Index 1
+                                       ]
+            #:endif
         #:endif
 
-#if defined(MFC_OpenMP)
-        $:GPU_DECLARE(create='[coeff_L, coeff_R]')
-#endif
+        #:if MFC_OpenMP
+            $:GPU_DECLARE(create='[coeff_L, coeff_R]')
+        #:endif
     #:endif
 
     integer(kind=8) :: i, j, k, l, q, r
