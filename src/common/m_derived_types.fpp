@@ -353,10 +353,10 @@ module m_derived_types
 
     !> Derived type annexing the physical parameters required for sub-grid bubble models
     type subgrid_bubble_physical_parameters
-        real(wp) :: R0ref !<
-        real(wp) :: p0ref !<
-        real(wp) :: rho0ref !<
-        real(wp) :: T0ref !<
+        real(wp) :: R0ref !< reference bubble radius
+        real(wp) :: p0ref !< reference pressure
+        real(wp) :: rho0ref !< reference density
+        real(wp) :: T0ref !< reference temperature
         real(wp) :: ss    !< surface tension between host and gas (bubble)
         real(wp) :: pv    !< vapor pressure of host
         real(wp) :: vd    !< vapor diffusivity in gas (bubble)
