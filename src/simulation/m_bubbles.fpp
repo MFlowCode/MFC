@@ -781,7 +781,7 @@ contains
         err_V = (-5._wp*h/24._wp)*(myA_tmp(2) + myA_tmp(3) - 2._wp*myA_tmp(4)) &
                 /max(abs(myV_tmp(1)), abs(myV_tmp(4)))
         ! Error correction for non-oscillating bubbles
-        if (f_approx_equal(myV_tmp(1), 0._wp) .and. f_approx_equal(myV_tmp(4), 0._wp)) then
+        if (max(abs(myV_tmp(1)), abs(myV_tmp(4))) < 1.e-12_wp) then
             err_V = 0._wp
         end if
         if (bubbles_lagrange .and. f_approx_equal(myA_tmp(1), 0._wp) .and. f_approx_equal(myA_tmp(2), 0._wp) .and. &
