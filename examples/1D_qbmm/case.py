@@ -3,7 +3,7 @@ import math
 import json
 
 # FLUID PROPERTIES
-R_uni = 8314.0  # [J/mol/K]
+R_uni = 8314.0  # [J/kmol/K]
 # Water
 gam_l = 7.1  # [1]
 pi_inf_l = 306.0e06  # [N/m2]
@@ -11,23 +11,23 @@ rho_l = 1.0e03  # [kg/m3]
 mu_l = 1.002e-03  # [kg/m/s]
 ss = 0.07275  # [kg/s2]
 pv = 2.3388e03  # [N/m2]
-vd = 0.242e-4  # []
+vd = 0.242e-4  # [m2/s]
 
 # Vapor
 gam_v = 1.33  # [1]
 M_v = 18.02  # [g/mol]
 mu_v = 0.8816e-05  # [kg/m/s]
-k_v = 0.019426  # []
+k_v = 0.019426  # [W/m/K]
 cp_v = 2.1e3  # [J/kg/K]
-R_v = R_uni / M_v  # []
+R_v = R_uni / M_v  # [J/kg/K]
 
 # Air
 gam_g = 1.4  # [1]
 M_g = 28.97  # [g/mol]
 mu_g = 1.8e-05  # [kg/m/s]
-k_g = 0.02556  # []
+k_g = 0.02556  # [W/m/K]
 cp_g = 1.0e3  # [J/kg/K]
-R_g = R_uni / M_g  # []
+R_g = R_uni / M_g  # [J/kg/K]
 
 # Bubble
 R0ref = 10.0e-06  # [m]

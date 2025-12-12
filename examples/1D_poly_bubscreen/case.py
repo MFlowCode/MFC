@@ -34,7 +34,6 @@ p0ref = 112.9e03  # [N/m2]
 rho0ref = rho_l  # [kg/m3]
 T0ref = 293.15  # [K]
 vf0 = 1e-4  # [1]
-nb = 3
 
 # External condition
 p0ext = 112.9e03  # [N/m2]
