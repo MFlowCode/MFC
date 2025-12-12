@@ -191,11 +191,6 @@ contains
             end if
         end if
 
-        print *, Tw, pv, gam_v, gam_g
-        print *, k_vl, k_gl
-        print *, cp_v, cp_g
-        print *, R_v, R_g, vd, Web, Re_inv
-
     end subroutine s_initialize_bubble_vars
 
     !> Initializes non-polydisperse bubble modeling
