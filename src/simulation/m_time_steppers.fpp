@@ -521,10 +521,7 @@ contains
         if (adap_dt) call s_adaptive_dt_bubble(1)
 
         do s = 1, nstage
-
             call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, s)
-
-            ! print *, s, q_cons_ts(1)%vf(alf_idx)%sf(50, 0, 0), pb_ts(1)%sf(50, 0, 0, 1, 1), rhs_pb(50, 0, 0, 1, 1)
 
             if (s == 1) then
                 if (run_time_info) then
