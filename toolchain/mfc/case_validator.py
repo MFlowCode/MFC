@@ -241,8 +241,6 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
 
         nb = self.get('nb')
         polydisperse = self.get('polydisperse', 'F') == 'T'
-        polytropic = self.get('polytropic', 'F') == 'T'
-        R0ref = self.get('R0ref')
         thermal = self.get('thermal')
         model_eqns = self.get('model_eqns')
         cyl_coord = self.get('cyl_coord', 'F') == 'T'
@@ -256,8 +254,6 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
                      "Polydisperse bubble dynamics requires nb > 1")
         self.prohibit(polydisperse and nb is not None and nb % 2 == 0,
                      "nb must be odd for polydisperse bubbles")
-        # self.prohibit(not polytropic and R0ref is None,
-        #              "R0ref must be set if using bubbles_euler with polytropic = F")
         self.prohibit(thermal is not None and thermal > 3,
                      "thermal must be <= 3")
         self.prohibit(model_eqns == 3,

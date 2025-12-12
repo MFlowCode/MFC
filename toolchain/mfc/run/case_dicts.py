@@ -107,7 +107,7 @@ PRE_PROCESS.update({
     'fft_wrt': ParamType.LOG,
 })
 
-for var in ["R0ref", "p0ref", "rho0ref", "T0ref", "ss", "pv", "vd", 
+for var in ["R0ref", "p0ref", "rho0ref", "T0ref", "ss", "pv", "vd",
             "mu_l", "mu_v", "mu_g", "gam_v", "gam_g",
             "M_v", "M_g", "k_v", "k_g", "cp_v", "cp_g", "R_v", "R_g" ]:
     PRE_PROCESS[f"bub_pp%{var}"] = ParamType.REAL
@@ -359,7 +359,7 @@ for var in [ 'diffusion', 'reactions' ]:
 for var in [ 'gamma_method' ]:
     SIMULATION[f'chem_params%{var}'] = ParamType.INT
 
-for var in ["R0ref", "p0ref", "rho0ref", "T0ref", "ss", "pv", "vd", 
+for var in ["R0ref", "p0ref", "rho0ref", "T0ref", "ss", "pv", "vd",
             "mu_l", "mu_v", "mu_g", "gam_v", "gam_g",
             "M_v", "M_g", "k_v", "k_g", "cp_v", "cp_g", "R_v", "R_g" ]:
     SIMULATION[f"bub_pp%{var}"] = ParamType.REAL
@@ -511,7 +511,7 @@ POST_PROCESS.update({
     'lag_betaC_wrt': ParamType.LOG,
 })
 
-for var in ["R0ref", "p0ref", "rho0ref", "T0ref", "ss", "pv", "vd", 
+for var in ["R0ref", "p0ref", "rho0ref", "T0ref", "ss", "pv", "vd",
             "mu_l", "mu_v", "mu_g", "gam_v", "gam_g",
             "M_v", "M_g", "k_v", "k_g", "cp_v", "cp_g", "R_v", "R_g" ]:
     POST_PROCESS[f"bub_pp%{var}"] = ParamType.REAL
