@@ -664,9 +664,9 @@ contains
             #:endfor
         #:endfor
 
-        x_domain%beg = dflt_int; x_domain%end = dflt_int
-        y_domain%beg = dflt_int; y_domain%end = dflt_int
-        z_domain%beg = dflt_int; z_domain%end = dflt_int
+        x_domain%beg = dflt_real; x_domain%end = dflt_real
+        y_domain%beg = dflt_real; y_domain%end = dflt_real
+        z_domain%beg = dflt_real; z_domain%end = dflt_real
 
         ! Fluids physical parameters
         do i = 1, num_fluids_max
