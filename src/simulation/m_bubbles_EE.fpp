@@ -267,10 +267,6 @@ contains
                         myR = q_prim_vf(rs(q))%sf(j, k, l)
                         myV = q_prim_vf(vs(q))%sf(j, k, l)
 
-                        if (myR < 0._wp) then
-                            call s_mpi_abort("R < 0")
-                        end if
-
                         if (alf < small_alf) then
                             bub_adv_src(j, k, l) = 0._wp
                             bub_r_src(j, k, l, q) = 0._wp
