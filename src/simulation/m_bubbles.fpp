@@ -586,10 +586,7 @@ contains
 
         end do
 
-        if (iter_count >= adap_dt_max_iters) then
-            print *, err, myR_tmp1(4), myV_tmp1(4), h, h0
-            adap_dt_stop = 1
-        end if
+        if (iter_count >= adap_dt_max_iters) adap_dt_stop = 1
 
     end subroutine s_advance_step
 
