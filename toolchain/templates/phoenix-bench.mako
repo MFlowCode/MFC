@@ -17,7 +17,7 @@
 % if quality_of_service:
 #SBATCH --qos=${quality_of_service}
 % endif
-% if gpu:
+% if gpu_enabled:
 #SBATCH --gres=gpu:V100:${tasks_per_node}
 #SBATCH --mem-per-gpu=16G\
 % endif
@@ -31,7 +31,7 @@ ${helpers.template_prologue()}
 
 ok ":) Loading modules:\n"
 cd "${MFC_ROOT_DIR}"
-. ./mfc.sh load -c p -m ${'g' if gpu else 'c'}
+. ./mfc.sh load -c p -m ${'g' if gpu_enabled else 'c'}
 cd - > /dev/null
 echo
 

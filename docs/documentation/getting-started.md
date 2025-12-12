@@ -173,7 +173,7 @@ In brief, you can run the latest MFC container:
 ```bash
 docker run -it --rm --entrypoint bash sbryngelson/mfc:latest-cpu
 ```
-Please refer to the [Docker](https://mflowcode.github.io/documentation/docker.html) document for more information.
+Please refer to the [Docker](docker.md) document for more information.
 
 ## Running the Test Suite
 
