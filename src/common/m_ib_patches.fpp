@@ -773,14 +773,15 @@ contains
 
         integer :: i, j, k !< generic loop iterators
         real(wp), dimension(1:3) :: xy_local !< x and y coordinates in local IB frame
-        real(wp), dimension(1:2) :: length, center !< x and y coordinates in local IB frame
+        real(wp), dimension(1:2) :: ellipse_coeffs !< a and b in the ellipse coefficients
+        real(wp), dimension(1:2) :: center !< x and y coordinates in local IB frame
         real(wp), dimension(1:3, 1:3) :: inverse_rotation
 
         ! Transferring the rectangle's centroid and length information
         center(1) = patch_ib(patch_id)%x_centroid
         center(2) = patch_ib(patch_id)%y_centroid
-        length(1) = patch_ib(patch_id)%length_x
-        length(2) = patch_ib(patch_id)%length_y
+        ellipse_coeffs(1) = 0.5_wp * patch_ib(patch_id)%length_x
+        ellipse_coeffs(2) = 0.5_wp * patch_ib(patch_id)%length_y
         inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
 
         ! Checking whether the rectangle covers a particular cell in the
@@ -788,7 +789,7 @@ contains
         ! to write to that cell. If both queries check out, the primitive
         ! variables of the current patch are assigned to this cell.
         $:GPU_PARALLEL_LOOP(private='[i,j, xy_local]', copy='[ib_markers_sf]',&
-                  & copyin='[patch_id,center,length,inverse_rotation,x_cc,y_cc]', collapse=2)
+                  & copyin='[patch_id,center,ellipse_coeffs,inverse_rotation,x_cc,y_cc]', collapse=2)
         do j = 0, n
             do i = 0, m
                 ! get the x and y coordinates in the local IB frame
@@ -796,7 +797,7 @@ contains
                 xy_local = matmul(inverse_rotation, xy_local)
 
                 ! Ellipse condition (x/a)^2 + (y/b)^2 <= 1
-                if ((xy_local(1)/length(1))**2 + (xy_local(1)/length(1))**2) then
+                if ((xy_local(1)/ellipse_coeffs(1))**2 + (xy_local(2)/ellipse_coeffs(2))**2 <= 1._wp) then
                     ! Updating the patch identities bookkeeping variable
                     ib_markers_sf(i, j, 0) = patch_id
                 end if

@@ -62,6 +62,8 @@ contains
                 else if (patch_ib(i)%geometry == 5 .or. &
                          patch_ib(i)%geometry == 12) then
                     call s_check_model_ib_patch_geometry(i)
+                else if (patch_ib(i)%geometry == 6) then
+                    print *, "Ellipse Patch"
                 else
                     call s_prohibit_abort("Invalid IB patch", &
                                           "patch_ib("//trim(iStr)//")%geometry must be "// &
