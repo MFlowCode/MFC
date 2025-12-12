@@ -795,19 +795,19 @@ Implementation of the parameters into the model follow [Ando (2010)](references.
 
 #### 9.1 Ensemble-Averaged Bubble Model
 
-| Parameter      .  | Type    | Description                                    |
-| ---:           .  | :----:  |          :---                                  |
-| `bubbles_euler`.  | Logical	| Ensemble-averaged bubble modeling	|
-| `polytropic`      | Logical	| Polytropic gas compression |
-| `thermal` 		    | Integer	| Thermal model: [1] Adiabatic; [2] Isothermal; [3] Transfer |
-| `polydisperse`   | Logical	| Polydispersity in equilibrium bubble radius R0 |
-| `nb` 			       | Integer	| Number of bins: [1] Monodisperse; [$>1$] Polydisperse |
-| `poly_sigma` 	   | Real 		|	Standard deviation for probability density function of polydisperse bubble populations |
-| `qbmm` 	         | Logical 	|	Quadrature by  method of moments |
-| `dist_type`      | Integer  |	Joint probability density function for bubble radius and velocity (only for ``qbmm = 'T'``) |
-| `sigR` 	         | Real 		|	Standard deviation for the probability density function of bubble radius (only for ``qbmm = 'T'``) (EE)|
-| `sigV` 	         | Real 		|	Standard deviation for the probability density function of bubble velocity (only for ``qbmm = 'T'``) (EE)|
-| `rhoRV`	         | Real 		|	Correlation coefficient for the joint probability density function of bubble radius and velocity (only for ``qbmm = 'T'``) |
+| Parameter         | Type    | Description                                    |
+| ---:              | :----:  |          :---                                  |
+| `bubbles_euler`   | Logical | Ensemble-averaged bubble modeling	|
+| `polytropic`      | Logical | Polytropic gas compression |
+| `thermal` 		    | Integer | Thermal model: [1] Adiabatic; [2] Isothermal; [3] Transfer |
+| `polydisperse`    | Logical | Polydispersity in equilibrium bubble radius R0 |
+| `nb`              | Integer | Number of bins: [1] Monodisperse; [$>1$] Polydisperse |
+| `poly_sigma`      | Real 	  |	Standard deviation for probability density function of polydisperse bubble populations |
+| `qbmm`            | Logical |	Quadrature by  method of moments |
+| `dist_type`       | Integer |	Joint probability density function for bubble radius and velocity (only for ``qbmm = 'T'``) |
+| `sigR`            | Real    |	Standard deviation for the probability density function of bubble radius (only for ``qbmm = 'T'``) (EE)|
+| `sigV`            | Real    |	Standard deviation for the probability density function of bubble velocity (only for ``qbmm = 'T'``) (EE)|
+| `rhoRV`           | Real    |	Correlation coefficient for the joint probability density function of bubble radius and velocity (only for ``qbmm = 'T'``) |
 
 This table lists the ensemble-averaged bubble model parameters.
 
