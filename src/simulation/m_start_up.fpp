@@ -1496,14 +1496,14 @@ contains
 
         $:GPU_UPDATE(device='[chem_params]')
 
-        $:GPU_UPDATE(device='[R0ref,Ca,Web,Re_inv,weight,R0, &
+        $:GPU_UPDATE(device='[R0ref,p0ref,rho0ref,ss,pv,vd,mu_l,mu_v,mu_g, &
+            & gam_v,gam_g,M_v,M_g,k_v,k_g,R_v,R_g,Tw,cp_v,cp_g,k_vl,k_gl, &
+            & gam, gam_m,Eu,Ca,Web,Re_inv,Pe_c,Pe_T,weight,R0, &
+            & phi_vg,phi_gv,pb0,mass_g0,mass_v0,Re_trans_T, &
+            & Re_trans_c,Im_trans_T,Im_trans_c,omegaN, &
             & bubbles_euler,polytropic,polydisperse,qbmm, &
             & ptil,bubble_model,thermal,poly_sigma,adv_n,adap_dt, &
             & adap_dt_tol,adap_dt_max_iters,n_idx,pi_fac,low_Mach]')
-        $:GPU_UPDATE(device='[R_g,R_v,phi_vg,phi_gv,Pe_c,Tw,M_g, &
-            & M_v,k_g,k_v,pb0,mass_g0,mass_v0,Pe_T,Re_trans_T, &
-            & Re_trans_c,Im_trans_T,Im_trans_c,omegaN,mu_l, &
-            & gam_v,mu_v,gam_m,gam_g,mu_g,gam]')
 
         $:GPU_UPDATE(device='[adv_n,adap_dt,adap_dt_tol,adap_dt_max_iters,n_idx,pi_fac,low_Mach]')
 

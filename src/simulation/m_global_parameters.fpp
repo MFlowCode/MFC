@@ -736,6 +736,7 @@ contains
         ! User inputs for qbmm for simulation code
         qbmm = .false.
 
+        Eu = dflt_real
         Ca = dflt_real
         Re_inv = dflt_real
         Web = dflt_real
