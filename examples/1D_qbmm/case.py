@@ -147,7 +147,7 @@ print(
             "polydisperse": "T",
             "poly_sigma": 0.3,
             "thermal": 3,
-            "nb": 3,
+            "nb": nb,
             "qbmm": "T",
             "dist_type": 2,
             "sigR": 0.1,

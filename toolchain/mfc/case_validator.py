@@ -1017,7 +1017,7 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
                      "The 6-equation flow model does not support bubbles_lagrange")
         self.prohibit(polytropic,
                      "bubbles_lagrange requires polytropic = F")
-        self.prohibit(thermal != 3,
+        self.prohibit(thermal is not None and thermal != 3,
                      "bubbles_lagrange requires thermal = 3")
         self.prohibit(cluster_type is not None and cluster_type >= 2 and smooth_type != 1,
                      "cluster_type >= 2 requires smooth_type = 1")
