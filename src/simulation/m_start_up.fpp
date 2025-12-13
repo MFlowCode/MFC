@@ -1502,12 +1502,12 @@ contains
             & bubbles_euler,polytropic,polydisperse,qbmm, &
             & ptil,bubble_model,thermal,poly_sigma,adv_n,adap_dt, &
             & adap_dt_tol,adap_dt_max_iters,n_idx,pi_fac,low_Mach]')
-        
+
         if (bubbles_euler) then
             $:GPU_UPDATE(device='[weight,R0]')
             if (.not. polytropic) then
                 $:GPU_UPDATE(device='[pb0,Pe_T,k_g,k_v,mass_g0,mass_v0 &
-                  & Re_trans_T,Re_trans_c,Im_trans_T,Im_trans_c]')  
+                  & Re_trans_T,Re_trans_c,Im_trans_T,Im_trans_c]')
             else if (qbmm) then
                 $:GPU_UPDATE(device='[pb0]')
             end if
