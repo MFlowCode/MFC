@@ -241,8 +241,6 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
 
         nb = self.get('nb')
         polydisperse = self.get('polydisperse', 'F') == 'T'
-        polytropic = self.get('polytropic', 'F') == 'T'
-        R0ref = self.get('R0ref')
         thermal = self.get('thermal')
         model_eqns = self.get('model_eqns')
         cyl_coord = self.get('cyl_coord', 'F') == 'T'
@@ -256,8 +254,6 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
                      "Polydisperse bubble dynamics requires nb > 1")
         self.prohibit(polydisperse and nb is not None and nb % 2 == 0,
                      "nb must be odd for polydisperse bubbles")
-        self.prohibit(not polytropic and R0ref is None,
-                     "R0ref must be set if using bubbles_euler with polytropic = F")
         self.prohibit(thermal is not None and thermal > 3,
                      "thermal must be <= 3")
         self.prohibit(model_eqns == 3,
@@ -1010,6 +1006,8 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         model_eqns = self.get('model_eqns')
         cluster_type = self.get('lag_params%cluster_type')
         smooth_type = self.get('lag_params%smooth_type')
+        polytropic = self.get('polytropic', 'F') == 'T'
+        thermal = self.get('thermal')
 
         self.prohibit(n is not None and n == 0,
                      "bubbles_lagrange accepts 2D and 3D simulations only")
@@ -1017,6 +1015,10 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
                      "file_per_process must be false for bubbles_lagrange")
         self.prohibit(model_eqns == 3,
                      "The 6-equation flow model does not support bubbles_lagrange")
+        self.prohibit(polytropic,
+                     "bubbles_lagrange requires polytropic = F")
+        self.prohibit(thermal is not None and thermal != 3,
+                     "bubbles_lagrange requires thermal = 3")
         self.prohibit(cluster_type is not None and cluster_type >= 2 and smooth_type != 1,
                      "cluster_type >= 2 requires smooth_type = 1")
 

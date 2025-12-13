@@ -365,7 +365,10 @@ module m_global_parameters
     type(physical_parameters), dimension(num_fluids_max) :: fluid_pp !<
     !! Database of the physical parameters of each of the fluids that is present
     !! in the flow. These include the stiffened gas equation of state parameters,
-    !! the Reynolds numbers and the Weber numbers.
+    !! and the Reynolds numbers.
+
+    ! Subgrid Bubble Parameters
+    type(subgrid_bubble_physical_parameters) :: bub_pp
 
     integer :: fd_order !<
     !! The order of the finite-difference (fd) approximations of the first-order
@@ -415,11 +418,11 @@ module m_global_parameters
         integer :: nb       !< Number of eq. bubble sizes
     #:endif
 
-    real(wp) :: R0ref    !< Reference bubble size
+    real(wp) :: Eu       !< Euler number
     real(wp) :: Ca       !< Cavitation number
     real(wp) :: Web      !< Weber number
     real(wp) :: Re_inv   !< Inverse Reynolds number
-    $:GPU_DECLARE(create='[R0ref,Ca,Web,Re_inv]')
+    $:GPU_DECLARE(create='[Eu,Ca,Web,Re_inv]')
 
     real(wp), dimension(:), allocatable :: weight !< Simpson quadrature weights
     real(wp), dimension(:), allocatable :: R0     !< Bubble sizes
@@ -468,22 +471,22 @@ module m_global_parameters
 
     !> @name Physical bubble parameters (see Ando 2010, Preston 2007)
     !> @{
+    real(wp) :: phi_vg, phi_gv, Pe_c, Tw, k_vl, k_gl
+    $:GPU_DECLARE(create='[phi_vg,phi_gv,Pe_c,Tw,k_vl,k_gl]')
 
-    real(wp) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, pv, M_n, M_v, k_vl, k_nl, cp_n, cp_v
-    $:GPU_DECLARE(create='[R_n,R_v,phi_vn,phi_nv,Pe_c,Tw]')
-    $:GPU_DECLARE(create='[pv,M_n, M_v,k_vl,k_nl,cp_n,cp_v]')
-
-    real(wp), dimension(:), allocatable :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T
+    real(wp), dimension(:), allocatable :: pb0, mass_g0, mass_v0, Pe_T, k_v, k_g
     real(wp), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN
-    $:GPU_DECLARE(create='[k_n,k_v,pb0,mass_n0,mass_v0,Pe_T]')
+    $:GPU_DECLARE(create='[pb0,mass_g0,mass_v0,Pe_T,k_v,k_g]')
     $:GPU_DECLARE(create='[Re_trans_T,Re_trans_c,Im_trans_T,Im_trans_c,omegaN]')
 
-    real(wp) :: mul0, ss, gamma_v, mu_v
-    real(wp) :: gamma_m, gamma_n, mu_n
-    real(wp) :: gam
-    !> @}
+    real(wp) :: gam, gam_m
+    $:GPU_DECLARE(create='[gam,gam_m]')
 
-    $:GPU_DECLARE(create='[mul0,ss,gamma_v,mu_v,gamma_m,gamma_n,mu_n,gam]')
+    real(wp) :: R0ref, p0ref, rho0ref, T0ref, ss, pv, vd, mu_l, mu_v, mu_g, &
+                gam_v, gam_g, M_v, M_g, cp_v, cp_g, R_v, R_g
+    $:GPU_DECLARE(create='[R0ref, p0ref, rho0ref, T0ref, ss, pv, vd, mu_l, mu_v, mu_g, &
+        gam_v, gam_g, M_v, M_g, cp_v, cp_g, R_v, R_g]')
+    !> @}
 
     !> @name Acoustic acoustic_source parameters
     !> @{
@@ -661,9 +664,9 @@ contains
             #:endfor
         #:endfor
 
-        x_domain%beg = dflt_int; x_domain%end = dflt_int
-        y_domain%beg = dflt_int; y_domain%end = dflt_int
-        z_domain%beg = dflt_int; z_domain%end = dflt_int
+        x_domain%beg = dflt_real; x_domain%end = dflt_real
+        y_domain%beg = dflt_real; y_domain%end = dflt_real
+        z_domain%beg = dflt_real; z_domain%end = dflt_real
 
         ! Fluids physical parameters
         do i = 1, num_fluids_max
@@ -673,17 +676,30 @@ contains
             fluid_pp(i)%qv = 0._wp
             fluid_pp(i)%qvp = 0._wp
             fluid_pp(i)%Re(:) = dflt_real
-            fluid_pp(i)%mul0 = dflt_real
-            fluid_pp(i)%ss = dflt_real
-            fluid_pp(i)%pv = dflt_real
-            fluid_pp(i)%gamma_v = dflt_real
-            fluid_pp(i)%M_v = dflt_real
-            fluid_pp(i)%mu_v = dflt_real
-            fluid_pp(i)%k_v = dflt_real
-            fluid_pp(i)%cp_v = dflt_real
             fluid_pp(i)%G = 0._wp
-            fluid_pp(i)%D_v = dflt_real
         end do
+
+        ! Subgrid bubble parameters
+        bub_pp%R0ref = dflt_real; R0ref = dflt_real
+        bub_pp%p0ref = dflt_real; p0ref = dflt_real
+        bub_pp%rho0ref = dflt_real; rho0ref = dflt_real
+        bub_pp%T0ref = dflt_real; T0ref = dflt_real
+        bub_pp%ss = dflt_real; ss = dflt_real
+        bub_pp%pv = dflt_real; pv = dflt_real
+        bub_pp%vd = dflt_real; vd = dflt_real
+        bub_pp%mu_l = dflt_real; mu_l = dflt_real
+        bub_pp%mu_v = dflt_real; mu_v = dflt_real
+        bub_pp%mu_g = dflt_real; mu_g = dflt_real
+        bub_pp%gam_v = dflt_real; gam_v = dflt_real
+        bub_pp%gam_g = dflt_real; gam_g = dflt_real
+        bub_pp%M_v = dflt_real; M_v = dflt_real
+        bub_pp%M_g = dflt_real; M_g = dflt_real
+        bub_pp%k_v = dflt_real; 
+        bub_pp%k_g = dflt_real; 
+        bub_pp%cp_v = dflt_real; cp_v = dflt_real
+        bub_pp%cp_g = dflt_real; cp_g = dflt_real
+        bub_pp%R_v = dflt_real; R_v = dflt_real
+        bub_pp%R_g = dflt_real; R_g = dflt_real
 
         ! Tait EOS
         rhoref = dflt_real
@@ -712,7 +728,7 @@ contains
 
         adv_n = .false.
         adap_dt = .false.
-        adap_dt_tol = dflt_real
+        adap_dt_tol = dflt_adap_dt_tol
         adap_dt_max_iters = dflt_adap_dt_max_iters
 
         pi_fac = 1._wp
@@ -720,6 +736,7 @@ contains
         ! User inputs for qbmm for simulation code
         qbmm = .false.
 
+        Eu = dflt_real
         Ca = dflt_real
         Re_inv = dflt_real
         Web = dflt_real
@@ -949,15 +966,10 @@ contains
                         sys_size = n_idx
                     end if
 
-                    @:ALLOCATE(weight(nb), R0(nb))
                     @:ALLOCATE(bub_idx%rs(nb), bub_idx%vs(nb))
                     @:ALLOCATE(bub_idx%ps(nb), bub_idx%ms(nb))
 
-                    if (num_fluids == 1) then
-                        gam = 1._wp/fluid_pp(num_fluids + 1)%gamma + 1._wp
-                    else
-                        gam = 1._wp/fluid_pp(num_fluids)%gamma + 1._wp
-                    end if
+                    gam = bub_pp%gam_g
 
                     if (qbmm) then
                         @:ALLOCATE(bub_idx%moms(nb, nmom))
@@ -985,36 +997,6 @@ contains
                                 bub_idx%ms(i) = bub_idx%ps(i) + 1
                             end if
                         end do
-                    end if
-
-                    if (nb == 1) then
-                        weight(:) = 1._wp
-                        R0(:) = 1._wp
-                    else if (nb < 1) then
-                        stop 'Invalid value of nb'
-                    end if
-
-                    !Initialize pref,rhoref for polytropic qbmm (done in s_initialize_nonpoly for non-polytropic)
-                    if (.not. qbmm) then
-                        if (polytropic) then
-                            rhoref = 1._wp
-                            pref = 1._wp
-                        end if
-                    end if
-
-                    !Initialize pb0, pv, pref, rhoref for polytropic qbmm (done in s_initialize_nonpoly for non-polytropic)
-                    if (qbmm) then
-                        if (polytropic) then
-                            pv = fluid_pp(1)%pv
-                            pv = pv/pref
-                            @:ALLOCATE(pb0(nb))
-                            if ((f_is_default(Web))) then
-                                pb0 = pref
-                                pb0 = pb0/pref
-                                pref = 1._wp
-                            end if
-                            rhoref = 1._wp
-                        end if
                     end if
                 end if
 
@@ -1062,7 +1044,6 @@ contains
 
                     @:ALLOCATE(bub_idx%rs(nb), bub_idx%vs(nb))
                     @:ALLOCATE(bub_idx%ps(nb), bub_idx%ms(nb))
-                    @:ALLOCATE(weight(nb), R0(nb))
 
                     do i = 1, nb
                         if (polytropic) then
@@ -1079,17 +1060,6 @@ contains
                             bub_idx%ms(i) = bub_idx%ps(i) + 1
                         end if
                     end do
-                    if (nb == 1) then
-                        weight(:) = 1._wp
-                        R0(:) = 1._wp
-                    else if (nb < 1) then
-                        stop 'Invalid value of nb'
-                    end if
-
-                    if (polytropic) then
-                        rhoref = 1._wp
-                        pref = 1._wp
-                    end if
                 end if
             end if
 

@@ -512,6 +512,7 @@ contains
         integer :: i, j, k, l, q, s !< Generic loop iterator
         real(wp) :: start, finish
         integer :: dest
+        real(wp) :: denom, nbubble
 
         call cpu_time(start)
         call nvtxStartRange("TIMESTEP")

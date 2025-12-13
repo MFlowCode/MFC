@@ -267,53 +267,49 @@ contains
                         myR = q_prim_vf(rs(q))%sf(j, k, l)
                         myV = q_prim_vf(vs(q))%sf(j, k, l)
 
-                        if (.not. polytropic) then
-                            pb_local = q_prim_vf(ps(q))%sf(j, k, l)
-                            mv_local = q_prim_vf(ms(q))%sf(j, k, l)
-                            call s_bwproperty(pb_local, q, chi_vw, k_mw, rho_mw)
-                            call s_vflux(myR, myV, pb_local, mv_local, q, vflux)
-                            pbdot = f_bpres_dot(vflux, myR, myV, pb_local, mv_local, q)
-
-                            bub_p_src(j, k, l, q) = nbub*pbdot
-                            bub_m_src(j, k, l, q) = nbub*vflux*4._wp*pi*(myR**2._wp)
-                        else
-                            pb_local = 0._wp; mv_local = 0._wp; vflux = 0._wp; pbdot = 0._wp
-                        end if
-
-                        ! Adaptive time stepping
-                        adap_dt_stop = 0
-
-                        if (adap_dt) then
-
-                            my_divu = real(divu_in%sf(j, k, l), kind=wp)
-                            call s_advance_step(myRho, myP, myR, myV, R0(q), &
-                                                pb_local, pbdot, alf, n_tait, B_tait, &
-                                                bub_adv_src(j, k, l), my_divu, &
-                                                dmBub_id, dmMass_v, dmMass_n, dmBeta_c, &
-                                                dmBeta_t, dmCson, adap_dt_stop)
-
-                            q_cons_vf(rs(q))%sf(j, k, l) = nbub*myR
-                            q_cons_vf(vs(q))%sf(j, k, l) = nbub*myV
-
-                        else
-                            my_divu = real(divu_in%sf(j, k, l), kind=wp)
-                            rddot = f_rddot(myRho, myP, myR, myV, R0(q), &
-                                            pb_local, pbdot, alf, n_tait, B_tait, &
-                                            bub_adv_src(j, k, l), my_divu, &
-                                            dmCson)
-                            bub_v_src(j, k, l, q) = nbub*rddot
-                            bub_r_src(j, k, l, q) = q_cons_vf(vs(q))%sf(j, k, l)
-                        end if
-
-                        adap_dt_stop_max = max(adap_dt_stop_max, adap_dt_stop)
-
-                        if (alf < 1.e-11_wp) then
+                        if (alf < small_alf) then
                             bub_adv_src(j, k, l) = 0._wp
                             bub_r_src(j, k, l, q) = 0._wp
                             bub_v_src(j, k, l, q) = 0._wp
                             if (.not. polytropic) then
                                 bub_p_src(j, k, l, q) = 0._wp
                                 bub_m_src(j, k, l, q) = 0._wp
+                            end if
+                        else
+                            if (.not. polytropic) then
+                                pb_local = q_prim_vf(ps(q))%sf(j, k, l)
+                                mv_local = q_prim_vf(ms(q))%sf(j, k, l)
+                                call s_bwproperty(pb_local, q, chi_vw, k_mw, rho_mw)
+                                call s_vflux(myR, myV, pb_local, mv_local, q, vflux)
+                                pbdot = f_bpres_dot(vflux, myR, myV, pb_local, mv_local, q)
+                                bub_p_src(j, k, l, q) = nbub*pbdot
+                                bub_m_src(j, k, l, q) = nbub*vflux*4._wp*pi*(myR**2._wp)
+                            else
+                                pb_local = 0._wp; mv_local = 0._wp; vflux = 0._wp; pbdot = 0._wp
+                            end if
+
+                            ! Adaptive time stepping
+                            if (adap_dt) then
+                                adap_dt_stop = 0
+
+                                call s_advance_step(myRho, myP, myR, myV, R0(q), &
+                                                    pb_local, pbdot, alf, n_tait, B_tait, &
+                                                    bub_adv_src(j, k, l), divu_in%sf(j, k, l), &
+                                                    dmBub_id, dmMass_v, dmMass_n, dmBeta_c, &
+                                                    dmBeta_t, dmCson, adap_dt_stop)
+
+                                q_cons_vf(rs(q))%sf(j, k, l) = nbub*myR
+                                q_cons_vf(vs(q))%sf(j, k, l) = nbub*myV
+
+                                adap_dt_stop_max = max(adap_dt_stop_max, adap_dt_stop)
+
+                            else
+                                rddot = f_rddot(myRho, myP, myR, myV, R0(q), &
+                                                pb_local, pbdot, alf, n_tait, B_tait, &
+                                                bub_adv_src(j, k, l), divu_in%sf(j, k, l), &
+                                                dmCson)
+                                bub_v_src(j, k, l, q) = nbub*rddot
+                                bub_r_src(j, k, l, q) = q_cons_vf(vs(q))%sf(j, k, l)
                             end if
                         end if
                     end do

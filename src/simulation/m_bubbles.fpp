@@ -51,7 +51,7 @@ contains
 
         if (bubble_model == 1) then
             ! Gilmore bubbles
-            fCpinf = fP - pref
+            fCpinf = fP - Eu
             fCpbw = f_cpbw(fR0, fR, fV, fpb)
             fH = f_H(fCpbw, fCpinf, fntait, fBtait)
             c_gas = f_cgas(fCpinf, fntait, fBtait, fH)
@@ -264,7 +264,7 @@ contains
         real(wp) :: f_cpbw_KM
 
         if (polytropic) then
-            f_cpbw_KM = Ca*((fR0/fR)**(3._wp*gam)) - Ca + 1._wp
+            f_cpbw_KM = Ca*((fR0/fR)**(3._wp*gam)) - Ca + Eu
             if (.not. f_is_default(Web)) f_cpbw_KM = f_cpbw_KM + &
                                                      (2._wp/(Web*fR0))*((fR0/fR)**(3._wp*gam))
         else
@@ -329,11 +329,11 @@ contains
         real(wp) :: x_vw
 
         ! mass fraction of vapor
-        chi_vw_out = 1._wp/(1._wp + R_v/R_n*(pb_in/pv - 1._wp))
+        chi_vw_out = 1._wp/(1._wp + R_v/R_g*(pb_in/pv - 1._wp))
         ! mole fraction of vapor & thermal conductivity of gas mixture
-        x_vw = M_n*chi_vw_out/(M_v + (M_n - M_v)*chi_vw_out)
-        k_mw_out = x_vw*k_v(iR0)/(x_vw + (1._wp - x_vw)*phi_vn) &
-                   + (1._wp - x_vw)*k_n(iR0)/(x_vw*phi_nv + 1._wp - x_vw)
+        x_vw = M_g*chi_vw_out/(M_v + (M_g - M_v)*chi_vw_out)
+        k_mw_out = x_vw*k_v(iR0)/(x_vw + (1._wp - x_vw)*phi_vg) &
+                   + (1._wp - x_vw)*k_g(iR0)/(x_vw*phi_gv + 1._wp - x_vw)
         ! gas mixture density
         rho_mw_out = pv/(chi_vw_out*R_v*Tw)
 
@@ -345,11 +345,11 @@ contains
         !!  @param fpb
         !!  @param fmass_v Current mass of vapour
         !!  @param iR0 Bubble size index (EE) or bubble identifier (EL)
-        !!  @param fmass_n Current gas mass (EL)
+        !!  @param fmass_g Current gas mass (EL)
         !!  @param fbeta_c Mass transfer coefficient (EL)
         !!  @param fR_m Mixture gas constant (EL)
         !!  @param fgamma_m Mixture gamma (EL)
-    elemental subroutine s_vflux(fR, fV, fpb, fmass_v, iR0, vflux, fmass_n, fbeta_c, fR_m, fgamma_m)
+    elemental subroutine s_vflux(fR, fV, fpb, fmass_v, iR0, vflux, fmass_g, fbeta_c, fR_m, fgamma_m)
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: fR
         real(wp), intent(in) :: fV
@@ -357,7 +357,7 @@ contains
         real(wp), intent(in) :: fmass_v
         integer, intent(in) :: iR0
         real(wp), intent(out) :: vflux
-        real(wp), intent(in), optional :: fmass_n, fbeta_c
+        real(wp), intent(in), optional :: fmass_g, fbeta_c
         real(wp), intent(out), optional :: fR_m, fgamma_m
 
         real(wp) :: chi_bar
@@ -369,23 +369,23 @@ contains
             ! constant transfer model
             if (bubbles_lagrange) then
                 ! Mixture properties (gas+vapor) in the bubble
-                conc_v = fmass_v/(fmass_v + fmass_n)
+                conc_v = fmass_v/(fmass_v + fmass_g)
                 if (lag_params%massTransfer_model) then
-                    conc_v = 1._wp/(1._wp + (R_v/R_n)*(fpb/pv - 1._wp))
+                    conc_v = 1._wp/(1._wp + (R_v/R_g)*(fpb/pv - 1._wp))
                 end if
-                fR_m = (fmass_n*R_n + fmass_v*R_v)
-                fgamma_m = conc_v*gamma_v + (1._wp - conc_v)*gamma_n
+                fR_m = (fmass_g*R_g + fmass_v*R_v)
+                fgamma_m = conc_v*gam_v + (1._wp - conc_v)*gam_g
 
                 ! Vapor flux
-                chi_bar = fmass_v/(fmass_v + fmass_n)
+                chi_bar = fmass_v/(fmass_v + fmass_g)
                 grad_chi = (chi_bar - conc_v)
-                rho_mw_lag = (fmass_n + fmass_v)/(4._wp/3._wp*pi*fR**3._wp)
+                rho_mw_lag = (fmass_g + fmass_v)/(4._wp/3._wp*pi*fR**3._wp)
                 vflux = 0._wp
                 if (lag_params%massTransfer_model) then
                     vflux = -fbeta_c*rho_mw_lag*grad_chi/(1._wp - conc_v)/fR
                 end if
             else
-                chi_bar = fmass_v/(fmass_v + mass_n0(iR0))
+                chi_bar = fmass_v/(fmass_v + mass_g0(iR0))
                 grad_chi = -Re_trans_c(iR0)*(chi_bar - chi_vw)
                 vflux = rho_mw*grad_chi/Pe_c/(1._wp - chi_vw)/fR
             end if
@@ -431,13 +431,12 @@ contains
                                               + heatflux)/fR
                 return
             end if
-            T_bar = Tw*(fpb/pb0(iR0))*(fR/R0(iR0))**3 &
-                    *(mass_n0(iR0) + mass_v0(iR0))/(mass_n0(iR0) + fmass_v)
-            grad_T = -Re_trans_T(iR0)*(T_bar - Tw)
-            f_bpres_dot = 3._wp*gamma_m*(-fV*fpb + fvflux*R_v*Tw &
-                                         + pb0(iR0)*k_mw*grad_T/Pe_T(iR0)/fR)/fR
+            grad_T = -Re_trans_T(iR0)*((fpb/pb0(iR0))*(fR/R0(iR0))**3 &
+                                       *(mass_g0(iR0) + mass_v0(iR0))/(mass_g0(iR0) + fmass_v) - 1._wp)
+            f_bpres_dot = 3._wp*gam_m*(-fV*fpb + fvflux*R_v*Tw &
+                                       + pb0(iR0)*k_mw*grad_T/Pe_T(iR0)/fR)/fR
         else
-            f_bpres_dot = -3._wp*gamma_m*fV/fR*(fpb - pv)
+            f_bpres_dot = -3._wp*gam_m*fV/fR*(fpb - pv)
         end if
 
     end function f_bpres_dot
@@ -459,14 +458,14 @@ contains
         !!  @param f_divu Divergence of velocity
         !!  @param bub_id Bubble identifier (EL)
         !!  @param fmass_v Current mass of vapour (EL)
-        !!  @param fmass_n Current mass of gas (EL)
+        !!  @param fmass_g Current mass of gas (EL)
         !!  @param fbeta_c Mass transfer coefficient (EL)
         !!  @param fbeta_t Heat transfer coefficient (EL)
         !!  @param fCson Speed of sound (EL)
         !!  @param adap_dt_stop Fail-safe exit if max iteration count reached
     subroutine s_advance_step(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
                               fntait, fBtait, f_bub_adv_src, f_divu, &
-                              bub_id, fmass_v, fmass_n, fbeta_c, &
+                              bub_id, fmass_v, fmass_g, fbeta_c, &
                               fbeta_t, fCson, adap_dt_stop)
         $:GPU_ROUTINE(function_name='s_advance_step',parallelism='[seq]', &
             & cray_inline=True)
@@ -475,27 +474,26 @@ contains
         real(wp), intent(in) :: fRho, fP, fR0, fpbdot, alf
         real(wp), intent(in) :: fntait, fBtait, f_bub_adv_src, f_divu
         integer, intent(in) :: bub_id
-        real(wp), intent(in) :: fmass_n, fbeta_c, fbeta_t, fCson
+        real(wp), intent(in) :: fmass_g, fbeta_c, fbeta_t, fCson
         integer, intent(inout) :: adap_dt_stop
 
         real(wp), dimension(5) :: err !< Error estimates for adaptive time stepping
         real(wp) :: t_new !< Updated time step size
-        real(wp) :: h !< Time step size
+        real(wp) :: h0, h !< Time step size
         real(wp), dimension(4) :: myR_tmp1, myV_tmp1, myR_tmp2, myV_tmp2 !< Bubble radius, radial velocity, and radial acceleration for the inner loop
         real(wp), dimension(4) :: myPb_tmp1, myMv_tmp1, myPb_tmp2, myMv_tmp2 !< Gas pressure and vapor mass for the inner loop (EL)
         real(wp) :: fR2, fV2, fpb2, fmass_v2
         integer :: iter_count
 
         call s_initial_substep_h(fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
-                                 fntait, fBtait, f_bub_adv_src, f_divu, fCson, h)
-
+                                 fntait, fBtait, f_bub_adv_src, f_divu, fCson, h0)
+        h = h0
         ! Advancing one step
         t_new = 0._wp
         iter_count = 0
         adap_dt_stop = 0
 
         do
-
             if (t_new + h > 0.5_wp*dt) then
                 h = 0.5_wp*dt - t_new
             end if
@@ -509,17 +507,25 @@ contains
                 call s_advance_substep(err(1), &
                                        fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
                                        fntait, fBtait, f_bub_adv_src, f_divu, &
-                                       bub_id, fmass_v, fmass_n, fbeta_c, &
+                                       bub_id, fmass_v, fmass_g, fbeta_c, &
                                        fbeta_t, fCson, h, &
                                        myR_tmp1, myV_tmp1, myPb_tmp1, myMv_tmp1)
+                if (err(1) > adap_dt_tol) then
+                    h = 0.25_wp*h
+                    cycle
+                end if
 
                 ! Advance one sub-step by advancing two half steps
                 call s_advance_substep(err(2), &
                                        fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
                                        fntait, fBtait, f_bub_adv_src, f_divu, &
-                                       bub_id, fmass_v, fmass_n, fbeta_c, &
+                                       bub_id, fmass_v, fmass_g, fbeta_c, &
                                        fbeta_t, fCson, 0.5_wp*h, &
                                        myR_tmp2, myV_tmp2, myPb_tmp2, myMv_tmp2)
+                if (err(2) > adap_dt_tol) then
+                    h = 0.25_wp*h
+                    cycle
+                end if
 
                 fR2 = myR_tmp2(4); fV2 = myV_tmp2(4)
                 fpb2 = myPb_tmp2(4); fmass_v2 = myMv_tmp2(4)
@@ -527,9 +533,13 @@ contains
                 call s_advance_substep(err(3), &
                                        fRho, fP, fR2, fV2, fR0, fpb2, fpbdot, alf, &
                                        fntait, fBtait, f_bub_adv_src, f_divu, &
-                                       bub_id, fmass_v2, fmass_n, fbeta_c, &
+                                       bub_id, fmass_v2, fmass_g, fbeta_c, &
                                        fbeta_t, fCson, 0.5_wp*h, &
                                        myR_tmp2, myV_tmp2, myPb_tmp2, myMv_tmp2)
+                if (err(3) > adap_dt_tol) then
+                    h = 0.5_wp*h
+                    cycle
+                end if
 
                 err(4) = abs((myR_tmp1(4) - myR_tmp2(4))/myR_tmp1(4))
                 err(5) = abs((myV_tmp1(4) - myV_tmp2(4))/myV_tmp1(4))
@@ -541,8 +551,8 @@ contains
                 !   Rule 3: abs((myR_tmp1(4) - myR_tmp2(4))/fR) < tol
                 !   Rule 4: abs((myV_tmp1(4) - myV_tmp2(4))/fV) < tol
                 if ((err(1) <= adap_dt_tol) .and. (err(2) <= adap_dt_tol) .and. &
-                    (err(3) <= adap_dt_tol) .and. (err(4) < adap_dt_tol) .and. &
-                    (err(5) < adap_dt_tol) .and. myR_tmp1(4) > 0._wp) then
+                    (err(3) <= adap_dt_tol) .and. (err(4) <= adap_dt_tol) .and. &
+                    (err(5) <= adap_dt_tol) .and. myR_tmp1(4) > 0._wp) then
 
                     ! Accepted. Finalize the sub-step
                     t_new = t_new + h
@@ -670,7 +680,7 @@ contains
         !!  @param f_divu Divergence of velocity
         !!  @param bub_id Bubble identifier (EL)
         !!  @param fmass_v Current mass of vapour (EL)
-        !!  @param fmass_n Current mass of gas (EL)
+        !!  @param fmass_g Current mass of gas (EL)
         !!  @param fbeta_c Mass transfer coefficient (EL)
         !!  @param fbeta_t Heat transfer coefficient (EL)
         !!  @param fCson Speed of sound (EL)
@@ -681,7 +691,7 @@ contains
         !!  @param myMv_tmp Mass of vapor in the bubble at each stage (EL)
     subroutine s_advance_substep(err, fRho, fP, fR, fV, fR0, fpb, fpbdot, alf, &
                                  fntait, fBtait, f_bub_adv_src, f_divu, &
-                                 bub_id, fmass_v, fmass_n, fbeta_c, &
+                                 bub_id, fmass_v, fmass_g, fbeta_c, &
                                  fbeta_t, fCson, h, &
                                  myR_tmp, myV_tmp, myPb_tmp, myMv_tmp)
         $:GPU_ROUTINE(function_name='s_advance_substep',parallelism='[seq]', &
@@ -691,7 +701,7 @@ contains
         real(wp), intent(IN) :: fRho, fP, fR, fV, fR0, fpb, fpbdot, alf
         real(wp), intent(IN) :: fntait, fBtait, f_bub_adv_src, f_divu, h
         integer, intent(IN) :: bub_id
-        real(wp), intent(IN) :: fmass_v, fmass_n, fbeta_c, fbeta_t, fCson
+        real(wp), intent(IN) :: fmass_v, fmass_g, fbeta_c, fbeta_t, fCson
         real(wp), dimension(4), intent(OUT) :: myR_tmp, myV_tmp, myPb_tmp, myMv_tmp
 
         real(wp), dimension(4) :: myA_tmp, mydPbdt_tmp, mydMvdt_tmp
@@ -707,7 +717,7 @@ contains
             myPb_tmp(1) = fpb
             myMv_tmp(1) = fmass_v
             call s_advance_EL(myR_tmp(1), myV_tmp(1), myPb_tmp(1), myMv_tmp(1), bub_id, &
-                              fmass_n, fbeta_c, fbeta_t, mydPbdt_tmp(1), mydMvdt_tmp(1))
+                              fmass_g, fbeta_c, fbeta_t, mydPbdt_tmp(1), mydMvdt_tmp(1))
         end if
         myA_tmp(1) = f_rddot(fRho, fP, myR_tmp(1), myV_tmp(1), fR0, &
                              myPb_tmp(1), mydPbdt_tmp(1), alf, fntait, fBtait, &
@@ -716,12 +726,15 @@ contains
 
         ! Stage 1
         myR_tmp(2) = myR_tmp(1) + h*myV_tmp(1)
+        if (myR_tmp(2) < 0._wp) then
+            err = adap_dt_tol + 1._wp; return
+        end if
         myV_tmp(2) = myV_tmp(1) + h*myA_tmp(1)
         if (bubbles_lagrange) then
             myPb_tmp(2) = myPb_tmp(1) + h*mydPbdt_tmp(1)
             myMv_tmp(2) = myMv_tmp(1) + h*mydMvdt_tmp(1)
             call s_advance_EL(myR_tmp(2), myV_tmp(2), myPb_tmp(2), myMv_tmp(2), &
-                              bub_id, fmass_n, fbeta_c, fbeta_t, mydPbdt_tmp(2), mydMvdt_tmp(2))
+                              bub_id, fmass_g, fbeta_c, fbeta_t, mydPbdt_tmp(2), mydMvdt_tmp(2))
         end if
         myA_tmp(2) = f_rddot(fRho, fP, myR_tmp(2), myV_tmp(2), fR0, &
                              myPb_tmp(2), mydPbdt_tmp(2), alf, fntait, fBtait, &
@@ -730,12 +743,15 @@ contains
 
         ! Stage 2
         myR_tmp(3) = myR_tmp(1) + (h/4._wp)*(myV_tmp(1) + myV_tmp(2))
+        if (myR_tmp(3) < 0._wp) then
+            err = adap_dt_tol + 1._wp; return
+        end if
         myV_tmp(3) = myV_tmp(1) + (h/4._wp)*(myA_tmp(1) + myA_tmp(2))
         if (bubbles_lagrange) then
             myPb_tmp(3) = myPb_tmp(1) + (h/4._wp)*(mydPbdt_tmp(1) + mydPbdt_tmp(2))
             myMv_tmp(3) = myMv_tmp(1) + (h/4._wp)*(mydMvdt_tmp(1) + mydMvdt_tmp(2))
             call s_advance_EL(myR_tmp(3), myV_tmp(3), myPb_tmp(3), myMv_tmp(3), &
-                              bub_id, fmass_n, fbeta_c, fbeta_t, mydPbdt_tmp(3), mydMvdt_tmp(3))
+                              bub_id, fmass_g, fbeta_c, fbeta_t, mydPbdt_tmp(3), mydMvdt_tmp(3))
         end if
         myA_tmp(3) = f_rddot(fRho, fP, myR_tmp(3), myV_tmp(3), fR0, &
                              myPb_tmp(3), mydPbdt_tmp(3), alf, fntait, fBtait, &
@@ -744,12 +760,15 @@ contains
 
         ! Stage 3
         myR_tmp(4) = myR_tmp(1) + (h/6._wp)*(myV_tmp(1) + myV_tmp(2) + 4._wp*myV_tmp(3))
+        if (myR_tmp(4) < 0._wp) then
+            err = adap_dt_tol + 1._wp; return
+        end if
         myV_tmp(4) = myV_tmp(1) + (h/6._wp)*(myA_tmp(1) + myA_tmp(2) + 4._wp*myA_tmp(3))
         if (bubbles_lagrange) then
             myPb_tmp(4) = myPb_tmp(1) + (h/6._wp)*(mydPbdt_tmp(1) + mydPbdt_tmp(2) + 4._wp*mydPbdt_tmp(3))
             myMv_tmp(4) = myMv_tmp(1) + (h/6._wp)*(mydMvdt_tmp(1) + mydMvdt_tmp(2) + 4._wp*mydMvdt_tmp(3))
             call s_advance_EL(myR_tmp(4), myV_tmp(4), myPb_tmp(4), myMv_tmp(4), &
-                              bub_id, fmass_n, fbeta_c, fbeta_t, mydPbdt_tmp(4), mydMvdt_tmp(4))
+                              bub_id, fmass_g, fbeta_c, fbeta_t, mydPbdt_tmp(4), mydMvdt_tmp(4))
         end if
         myA_tmp(4) = f_rddot(fRho, fP, myR_tmp(4), myV_tmp(4), fR0, &
                              myPb_tmp(4), mydPbdt_tmp(4), alf, fntait, fBtait, &
@@ -762,6 +781,9 @@ contains
         err_V = (-5._wp*h/24._wp)*(myA_tmp(2) + myA_tmp(3) - 2._wp*myA_tmp(4)) &
                 /max(abs(myV_tmp(1)), abs(myV_tmp(4)))
         ! Error correction for non-oscillating bubbles
+        if (max(abs(myV_tmp(1)), abs(myV_tmp(4))) < 1.e-12_wp) then
+            err_V = 0._wp
+        end if
         if (bubbles_lagrange .and. f_approx_equal(myA_tmp(1), 0._wp) .and. f_approx_equal(myA_tmp(2), 0._wp) .and. &
             f_approx_equal(myA_tmp(3), 0._wp) .and. f_approx_equal(myA_tmp(4), 0._wp)) then
             err_V = 0._wp
@@ -772,7 +794,7 @@ contains
 
     !>  Changes of pressure and vapor mass in the lagrange bubbles.
         !!  @param bub_id Bubble identifier
-        !!  @param fmass_n Current mass of gas
+        !!  @param fmass_g Current mass of gas
         !!  @param fbeta_c Mass transfer coefficient
         !!  @param fbeta_t Heat transfer coefficient
         !!  @param fR_tmp Bubble radius
@@ -782,16 +804,16 @@ contains
         !!  @param fdPbdt_tmp Rate of change of the internal bubble pressure
         !!  @param fdMvdt_tmp Rate of change of the mass of vapor in the bubble
     elemental subroutine s_advance_EL(fR_tmp, fV_tmp, fPb_tmp, fMv_tmp, bub_id, &
-                                      fmass_n, fbeta_c, fbeta_t, fdPbdt_tmp, advance_EL)
+                                      fmass_g, fbeta_c, fbeta_t, fdPbdt_tmp, advance_EL)
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(IN) :: fR_tmp, fV_tmp, fPb_tmp, fMv_tmp
-        real(wp), intent(IN) :: fmass_n, fbeta_c, fbeta_t
+        real(wp), intent(IN) :: fmass_g, fbeta_c, fbeta_t
         integer, intent(IN) :: bub_id
         real(wp), intent(INOUT) :: fdPbdt_tmp
         real(wp), intent(out) :: advance_EL
         real(wp) :: fVapFlux, myR_m, mygamma_m
 
-        call s_vflux(fR_tmp, fV_tmp, fPb_tmp, fMv_tmp, bub_id, fVapFlux, fmass_n, fbeta_c, myR_m, mygamma_m)
+        call s_vflux(fR_tmp, fV_tmp, fPb_tmp, fMv_tmp, bub_id, fVapFlux, fmass_g, fbeta_c, myR_m, mygamma_m)
         fdPbdt_tmp = f_bpres_dot(fVapFlux, fR_tmp, fV_tmp, fPb_tmp, fMv_tmp, bub_id, fbeta_t, myR_m, mygamma_m)
         advance_EL = 4._wp*pi*fR_tmp**2._wp*fVapFlux
 

@@ -445,12 +445,13 @@ contains
                                 nR2 = q_cons_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
                                 R = q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
                                 R2 = q_prim_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
-                                var = max(R2 - R**2._wp, verysmall)
+                                var = max(R2 - R**2._wp, sgm_eps)
                                 if (q <= 2) then
                                     AX = R - sqrt(var)
                                 else
                                     AX = R + sqrt(var)
                                 end if
+
                                 select case (idir)
                                 case (1)
                                     nb_dot = flux_n_vf(bubxb + (i - 1)*nmom)%sf(j - 1, k, l) - flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
@@ -718,14 +719,14 @@ contains
         real(wp), dimension(nmom) :: moms, msum
         real(wp), dimension(nnode, nb) :: wght, abscX, abscY, wght_pb, wght_mv, wght_ht, ht
         real(wp), dimension(nterms, 0:2, 0:2) :: coeff
-        real(wp) :: pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T
+        real(wp) :: pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, grad_T
         real(wp) :: n_tait, B_tait
         integer :: id1, id2, id3, i1, i2, j, q, r
 
         is1_qbmm = ix; is2_qbmm = iy; is3_qbmm = iz
         $:GPU_UPDATE(device='[is1_qbmm,is2_qbmm,is3_qbmm]')
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[id1,id2,id3,moms, msum, wght, abscX, abscY, wght_pb, wght_mv, wght_ht, coeff, ht, r, q, n_tait, B_tait, pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T, i1, i2, j]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[id1,id2,id3,moms, msum, wght, abscX, abscY, wght_pb, wght_mv, wght_ht, coeff, ht, r, q, n_tait, B_tait, pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, grad_T, i1, i2, j]')
         do id3 = is3_qbmm%beg, is3_qbmm%end
             do id2 = is2_qbmm%beg, is2_qbmm%end
                 do id1 = is1_qbmm%beg, is1_qbmm%end
@@ -763,14 +764,13 @@ contains
                             else
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do j = 1, nnode
-                                    chi_vw = 1._wp/(1._wp + R_v/R_n*(pb(id1, id2, id3, j, q)/pv - 1._wp))
-                                    x_vw = M_n*chi_vw/(M_v + (M_n - M_v)*chi_vw)
-                                    k_mw = x_vw*k_v(q)/(x_vw + (1._wp - x_vw)*phi_vn) + (1._wp - x_vw)*k_n(q)/(x_vw*phi_nv + 1._wp - x_vw)
+                                    chi_vw = 1._wp/(1._wp + R_v/R_g*(pb(id1, id2, id3, j, q)/pv - 1._wp))
+                                    x_vw = M_g*chi_vw/(M_v + (M_g - M_v)*chi_vw)
+                                    k_mw = x_vw*k_v(q)/(x_vw + (1._wp - x_vw)*phi_vg) + (1._wp - x_vw)*k_g(q)/(x_vw*phi_gv + 1._wp - x_vw)
                                     rho_mw = pv/(chi_vw*R_v*Tw)
-                                    rhs_mv(id1, id2, id3, j, q) = -Re_trans_c(q)*((mv(id1, id2, id3, j, q)/(mv(id1, id2, id3, j, q) + mass_n0(q))) - chi_vw)
+                                    rhs_mv(id1, id2, id3, j, q) = -Re_trans_c(q)*((mv(id1, id2, id3, j, q)/(mv(id1, id2, id3, j, q) + mass_g0(q))) - chi_vw)
                                     rhs_mv(id1, id2, id3, j, q) = rho_mw*rhs_mv(id1, id2, id3, j, q)/Pe_c/(1._wp - chi_vw)/abscX(j, q)
-                                    T_bar = Tw*(pb(id1, id2, id3, j, q)/pb0(q))*(abscX(j, q)/R0(q))**3*(mass_n0(q) + mass_v0(q))/(mass_n0(q) + mv(id1, id2, id3, j, q))
-                                    grad_T = -Re_trans_T(q)*(T_bar - Tw)
+                                    grad_T = -Re_trans_T(q)*((pb(id1, id2, id3, j, q)/pb0(q))*(abscX(j, q)/R0(q))**3*(mass_g0(q) + mass_v0(q))/(mass_g0(q) + mv(id1, id2, id3, j, q)) - 1._wp)
                                     ht(j, q) = pb0(q)*k_mw*grad_T/Pe_T(q)/abscX(j, q)
                                     wght_pb(j, q) = wght(j, q)*(pb(id1, id2, id3, j, q))
                                     wght_mv(j, q) = wght(j, q)*(rhs_mv(id1, id2, id3, j, q))
@@ -819,13 +819,14 @@ contains
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do j = 1, nnode
                                     drdt = msum(2)
-                                    drdt2 = merge(-1._wp, 1._wp, j == 1 .or. j == 2)/(2._wp*sqrt(merge(moms(4) - moms(2)**2._wp, verysmall, moms(4) - moms(2)**2._wp > 0._wp)))
+                                    drdt2 = merge(-1._wp, 1._wp, j == 1 .or. j == 2)/(2._wp*sqrt(merge(moms(4) - moms(2)**2._wp, sgm_eps, moms(4) - moms(2)**2._wp > 0._wp)))
                                     drdt2 = drdt2*(msum(3) - 2._wp*moms(2)*msum(2))
                                     drdt = drdt + drdt2
                                     rhs_pb(id1, id2, id3, j, q) = (-3._wp*gam*drdt/abscX(j, q))*(pb(id1, id2, id3, j, q))
                                     rhs_pb(id1, id2, id3, j, q) = rhs_pb(id1, id2, id3, j, q) + (3._wp*gam/abscX(j, q))*rhs_mv(id1, id2, id3, j, q)*R_v*Tw
                                     rhs_pb(id1, id2, id3, j, q) = rhs_pb(id1, id2, id3, j, q) + (3._wp*gam/abscX(j, q))*ht(j, q)
                                     rhs_mv(id1, id2, id3, j, q) = rhs_mv(id1, id2, id3, j, q)*(4._wp*pi*abscX(j, q)**2._wp)
+
                                 end do
                             end if
                         end do
@@ -951,7 +952,7 @@ contains
             c2 = d2 - bu**2._wp
             frho(1) = fmom(1)/2._wp; 
             frho(2) = fmom(1)/2._wp; 
-            c2 = maxval((/c2, verysmall/))
+            c2 = maxval((/c2, sgm_eps/))
             fup(1) = bu - sqrt(c2)
             fup(2) = bu + sqrt(c2)
 

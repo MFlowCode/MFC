@@ -9,11 +9,11 @@ l = 0.375
 
 # Numerical setup
 r0 = 0.15
-x0 = 0
+x0 = 0.0
 x1 = l
-y0 = 0
+y0 = 0.0
 y1 = l
-z0 = 0
+z0 = 0.0
 z1 = l
 
 

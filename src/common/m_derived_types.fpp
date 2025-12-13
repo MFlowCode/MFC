@@ -346,22 +346,36 @@ module m_derived_types
     type physical_parameters
         real(wp) :: gamma   !< Sp. heat ratio
         real(wp) :: pi_inf  !< Liquid stiffness
-        real(wp), dimension(2) :: Re      !< Reynolds number
+        real(wp), dimension(2) :: Re  !< Reynolds number
         real(wp) :: cv      !< heat capacity
         real(wp) :: qv      !< reference energy per unit mass for SGEOS, q (see Le Metayer (2004))
         real(wp) :: qvp     !< reference entropy per unit mass for SGEOS, q' (see Le Metayer (2004))
-        real(wp) :: mul0    !< Bubble viscosity
-        real(wp) :: ss      !< Bubble surface tension
-        real(wp) :: pv      !< Bubble vapour pressure
-        real(wp) :: gamma_v !< Bubble constants (see Preston (2007), Ando (2010))
-        real(wp) :: M_v     !< Bubble constants (see Preston (2007), Ando (2010))
-        real(wp) :: mu_v    !< Bubble constants (see Preston (2007), Ando (2010))
-        real(wp) :: k_v     !< Bubble constants (see Preston (2007), Ando (2010))
-        real(wp) :: cp_v
         real(wp) :: G
-        real(wp) :: D_v     !< Vapor diffusivity in the gas
-
     end type physical_parameters
+
+    !> Derived type annexing the physical parameters required for sub-grid bubble models
+    type subgrid_bubble_physical_parameters
+        real(wp) :: R0ref !< reference bubble radius
+        real(wp) :: p0ref !< reference pressure
+        real(wp) :: rho0ref !< reference density
+        real(wp) :: T0ref !< reference temperature
+        real(wp) :: ss    !< surface tension between host and gas (bubble)
+        real(wp) :: pv    !< vapor pressure of host
+        real(wp) :: vd    !< vapor diffusivity in gas (bubble)
+        real(wp) :: mu_l  !< viscosity of host in liquid state
+        real(wp) :: mu_v  !< viscosity of host in vapor state
+        real(wp) :: mu_g  !< viscosity of gas (bubble)
+        real(wp) :: gam_v !< specific heat ratio of host in vapor state
+        real(wp) :: gam_g !< specific heat ratio of gas (bubble)
+        real(wp) :: M_v   !< Molecular weight of host
+        real(wp) :: M_g   !< Molecular weight of gas (bubble)
+        real(wp) :: k_v   !< thermal conductivity of host in vapor state
+        real(wp) :: k_g   !< thermal conductivity of gas (bubble)
+        real(wp) :: cp_v  !< specific heat capacity in constant pressure of host in vapor state
+        real(wp) :: cp_g  !< specific heat capacity in constant pressure of gas (bubble)
+        real(wp) :: R_v   !< gas constant of host in vapor state
+        real(wp) :: R_g   !< gas constant of gas (bubble)
+    end type subgrid_bubble_physical_parameters
 
     type mpi_io_airfoil_ib_var
         integer, dimension(2) :: view
