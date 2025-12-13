@@ -82,7 +82,7 @@ if (MFC_SILO)
 
         ExternalProject_Add(silo
             GIT_REPOSITORY "https://github.com/LLNL/Silo"
-            GIT_TAG        9af504ef4fb79153e1fbf3bdb75421b6b65f6dc4
+            GIT_TAG        main
             GIT_PROGRESS   ON
             PATCH_COMMAND  "${GIT_EXECUTABLE}" stash
                         && "${GIT_EXECUTABLE}" apply "${CMAKE_SOURCE_DIR}/Silo.patch"
