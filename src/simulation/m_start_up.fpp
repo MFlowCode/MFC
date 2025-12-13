@@ -1497,13 +1497,21 @@ contains
         $:GPU_UPDATE(device='[chem_params]')
 
         $:GPU_UPDATE(device='[R0ref,p0ref,rho0ref,ss,pv,vd,mu_l,mu_v,mu_g, &
-            & gam_v,gam_g,M_v,M_g,k_v,k_g,R_v,R_g,Tw,cp_v,cp_g,k_vl,k_gl, &
-            & gam, gam_m,Eu,Ca,Web,Re_inv,Pe_c,Pe_T,weight,R0, &
-            & phi_vg,phi_gv,pb0,mass_g0,mass_v0,Re_trans_T, &
-            & Re_trans_c,Im_trans_T,Im_trans_c,omegaN, &
+            & gam_v,gam_g,M_v,M_g,R_v,R_g,Tw,cp_v,cp_g,k_vl,k_gl, &
+            & gam, gam_m,Eu,Ca,Web,Re_inv,Pe_c,phi_vg,phi_gv,omegaN, &
             & bubbles_euler,polytropic,polydisperse,qbmm, &
             & ptil,bubble_model,thermal,poly_sigma,adv_n,adap_dt, &
             & adap_dt_tol,adap_dt_max_iters,n_idx,pi_fac,low_Mach]')
+        
+        if (bubbles_euler) then
+            $:GPU_UPDATE(device='[weight,R0]')
+            if (.not. polytropic) then
+                $:GPU_UPDATE(device='[pb0,Pe_T,k_g,k_v,mass_g0,mass_v0 &
+                  & Re_trans_T,Re_trans_c,Im_trans_T,Im_trans_c]')  
+            else if (qbmm) then
+                $:GPU_UPDATE(device='[pb0]')
+            end if
+        end if
 
         $:GPU_UPDATE(device='[adv_n,adap_dt,adap_dt_tol,adap_dt_max_iters,n_idx,pi_fac,low_Mach]')
 
