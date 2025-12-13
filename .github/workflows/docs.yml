@@ -77,6 +77,7 @@ jobs:
         rm -rf ../www/*
         mv build/install/docs/mfc/* ../www/
         git -C ../www add -A
+        git -C ../www restore documentation/data.js
         git -C ../www commit -m "Docs @ ${GITHUB_SHA::7}" || true
         git -C ../www push
 
