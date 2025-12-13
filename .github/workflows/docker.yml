@@ -9,6 +9,10 @@ on:
         description: 'tag to containerize'
         required: true
 
+permissions:
+  contents: read
+  packages: write
+
 concurrency:
   group: Containerization
   cancel-in-progress: false
@@ -24,6 +28,7 @@ jobs:
     runs-on: ${{ matrix.config.runner }}
     outputs:
       tag: ${{ steps.clone.outputs.tag }}
+
     steps:
       - name: Free Disk Space
         uses: jlumbroso/free-disk-space@main
@@ -36,11 +41,19 @@ jobs:
           docker-images: true
           swap-storage: true
 
-      - name: Login
+      # ----- Logins -----
+      - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Buildx
         uses: docker/setup-buildx-action@v3
@@ -89,12 +102,16 @@ jobs:
             FC_COMPILER=${{ 'gfortran' }}
             COMPILER_PATH=${{ '/usr/bin' }}
             COMPILER_LD_LIBRARY_PATH=${{ '/usr/lib' }}
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/mfc:${{ env.TAG }}-${{ matrix.config.name }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/mfc:${{ env.TAG }}-${{ matrix.config.name }}
+            ghcr.io/${{ github.repository_owner }}/mfc:${{ env.TAG }}-${{ matrix.config.name }}
           push: true
 
       - name: Build and push image (gpu)
         if: ${{ matrix.config.name == 'gpu' }}
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           builder: default
           context: /mnt/share
@@ -107,26 +124,61 @@ jobs:
             FC_COMPILER=${{ 'nvfortran' }}
             COMPILER_PATH=${{ '/opt/nvidia/hpc_sdk/Linux_x86_64/compilers/bin' }}
             COMPILER_LD_LIBRARY_PATH=${{ '/opt/nvidia/hpc_sdk/Linux_x86_64/compilers/lib' }}
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/mfc:${{ env.TAG }}-${{ matrix.config.name }}-${{ matrix.config.runner}}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/mfc:${{ env.TAG }}-${{ matrix.config.name }}-${{ matrix.config.runner}}
+            ghcr.io/${{ github.repository_owner }}/mfc:${{ env.TAG }}-${{ matrix.config.name }}-${{ matrix.config.runner}}
           push: true
 
   manifests:
     runs-on: ubuntu-latest
     needs: Container
     steps:
-      - name: Login
+      - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
-      - name: Create and Push Manifest Lists
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create and Push Manifest Lists (Docker Hub + GHCR)
         env:
           TAG: ${{ needs.Container.outputs.tag }}
-          REGISTRY: ${{ secrets.DOCKERHUB_USERNAME }}/mfc
+          DH_REGISTRY: ${{ secrets.DOCKERHUB_USERNAME }}/mfc
+          GH_REGISTRY: ghcr.io/${{ github.repository_owner }}/mfc
         run: |
-          docker buildx imagetools create -t $REGISTRY:latest-cpu $REGISTRY:$TAG-cpu
-          docker manifest create $REGISTRY:$TAG-gpu $REGISTRY:$TAG-gpu-ubuntu-22.04 $REGISTRY:$TAG-gpu-ubuntu-22.04-arm
-          docker manifest create $REGISTRY:latest-gpu $REGISTRY:$TAG-gpu-ubuntu-22.04 $REGISTRY:$TAG-gpu-ubuntu-22.04-arm
-          docker manifest push $REGISTRY:$TAG-gpu
-          docker manifest push $REGISTRY:latest-gpu
+          # ---- CPU multi-arch "latest-cpu" from the already pushed $TAG-cpu ----
+          docker buildx imagetools create -t $DH_REGISTRY:latest-cpu $DH_REGISTRY:$TAG-cpu
+          docker buildx imagetools create -t $GH_REGISTRY:latest-cpu $GH_REGISTRY:$TAG-cpu
+
+          # ---- GPU manifests across the two runners ----
+          # Tag these for versioned + latest GPU
+          docker manifest create $DH_REGISTRY:$TAG-gpu \
+            $DH_REGISTRY:$TAG-gpu-ubuntu-22.04 \
+            $DH_REGISTRY:$TAG-gpu-ubuntu-22.04-arm
+
+          docker manifest create $DH_REGISTRY:latest-gpu \
+            $DH_REGISTRY:$TAG-gpu-ubuntu-22.04 \
+            $DH_REGISTRY:$TAG-gpu-ubuntu-22.04-arm
+
+          docker manifest push $DH_REGISTRY:$TAG-gpu
+          docker manifest push $DH_REGISTRY:latest-gpu
+
+          # GHCR equivalent
+          docker manifest create $GH_REGISTRY:$TAG-gpu \
+            $GH_REGISTRY:$TAG-gpu-ubuntu-22.04 \
+            $GH_REGISTRY:$TAG-gpu-ubuntu-22.04-arm
+
+          docker manifest create $GH_REGISTRY:latest-gpu \
+            $GH_REGISTRY:$TAG-gpu-ubuntu-22.04 \
+            $GH_REGISTRY:$TAG-gpu-ubuntu-22.04-arm
+
+          docker manifest push $GH_REGISTRY:$TAG-gpu
+          docker manifest push $GH_REGISTRY:latest-gpu
