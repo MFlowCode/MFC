@@ -71,6 +71,8 @@ module m_start_up
 
     use m_helper_basic          !< Functions to compare floating point numbers
 
+    use m_helper
+
     $:USE_GPU_MODULE()
 
     use m_nvtx
