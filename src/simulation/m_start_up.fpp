@@ -1508,7 +1508,7 @@ contains
         if (bubbles_euler) then
             $:GPU_UPDATE(device='[weight,R0]')
             if (.not. polytropic) then
-                $:GPU_UPDATE(device='[pb0,Pe_T,k_g,k_v,mass_g0,mass_v0 &
+                $:GPU_UPDATE(device='[pb0,Pe_T,k_g,k_v,mass_g0,mass_v0, &
                   & Re_trans_T,Re_trans_c,Im_trans_T,Im_trans_c]')
             else if (qbmm) then
                 $:GPU_UPDATE(device='[pb0]')
