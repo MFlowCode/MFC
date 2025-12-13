@@ -356,7 +356,7 @@ for var in [ 'epsilonb', 'valmaxvoid', 'charwidth',
 for var in [ 'diffusion', 'reactions' ]:
     SIMULATION[f'chem_params%{var}'] = ParamType.LOG
 
-for var in [ 'gamma_method' ]:
+for var in [ 'gamma_method', 'transport_model']:
     SIMULATION[f'chem_params%{var}'] = ParamType.INT
 
 for ib_id in range(1, 10+1):

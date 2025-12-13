@@ -175,7 +175,7 @@
     case (1)
         idx = i + 1 + global_offset_x
         do f = 1, sys_size
-            q_prim_vf(f)%sf(i, 0, 0) = stored_values(idx, 1, f)
+            q_prim_vf(f)%sf(i, 0, 0) = stored_values(i + 1, 1, f)
         end do
 
     case (2)
