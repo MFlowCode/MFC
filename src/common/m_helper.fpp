@@ -130,7 +130,7 @@ contains
                 R0 = 1._wp
                 weight = 1._wp
             else
-                call s_mpi_abort('Invalid value of nb')
+                stop 'Invalid value of nb'
             end if
             R0 = R0*bub_pp%R0ref
         end if
