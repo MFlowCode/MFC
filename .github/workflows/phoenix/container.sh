@@ -2,9 +2,8 @@
 
 if [ "$job_interface" = "omp" ]; then
     apptainer build mfc:latest-\$job_device.sif docker://sbryngelson/mfc:latest-mp-\$job_device
-elif [ "$job_interface" = "acc" ]; then
+else
     apptainer build mfc:latest-\$job_device.sif docker://sbryngelson/mfc:latest-\$job_device
-fi
 
 CONTAINER="mfc:latest-\$job_device.sif"
 
