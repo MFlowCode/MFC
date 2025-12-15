@@ -56,7 +56,7 @@ contains
             & 'perturb_flow', 'perturb_sph', 'mixlayer_vel_profile',           &
             & 'mixlayer_perturb', 'bubbles_euler', 'polytropic', 'polydisperse',&
             & 'qbmm', 'file_per_process', 'adv_n', 'ib' , 'cfl_adap_dt',       &
-            & 'cfl_const_dt', 'cfl_dt', 'surface_tension',                     &
+            & 'cfl_const_dt', 'cfl_dt', 'surface_tension',  'extrusion_ic'     &
             & 'hyperelasticity', 'pre_stress', 'elliptic_smoothing', 'viscous',&
             & 'bubbles_lagrange', 'bc_io', 'mhd', 'relativity', 'cont_damage', &
             & 'igr', 'down_sample', 'simplex_perturb','fft_wrt' ]
