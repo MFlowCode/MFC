@@ -1,59 +1,19 @@
-name: 'Benchmark'
+name: 'Benchmark Frontier Releases'
 
 on:
-  pull_request:
-  pull_request_review:
-    types: [submitted]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'tag to Benchmark'
+        required: true
 
 jobs:
-  file-changes:
-    name: Detect File Changes
-    runs-on: 'ubuntu-latest'
-    outputs: 
-      checkall: ${{ steps.changes.outputs.checkall }}
-    steps:
-      - name: Clone
-        uses: actions/checkout@v4
-
-      - name: Detect Changes
-        uses: dorny/paths-filter@v3
-        id: changes
-        with: 
-          filters: ".github/file-filter.yml"
-
   self:
     name: "${{ matrix.name }} (${{ matrix.device }}${{ matrix.interface != 'none' && format('-{0}', matrix.interface) || '' }})"
-    if: ${{ github.repository=='MFlowCode/MFC' && needs.file-changes.outputs.checkall=='true' && ((github.event_name=='pull_request_review' && github.event.review.state=='approved') || (github.event_name=='pull_request' && (github.event.pull_request.user.login=='sbryngelson' || github.event.pull_request.user.login=='wilfonba'))) }}
-    needs: file-changes
     strategy:
       fail-fast: false
       matrix:
         include:
-          - cluster: phoenix
-            name: Georgia Tech | Phoenix (NVHPC)
-            group: phoenix
-            labels: gt
-            flag: p
-            device: cpu
-            interface: none
-            build_script: ""
-          - cluster: phoenix
-            name: Georgia Tech | Phoenix (NVHPC)
-            group: phoenix
-            labels: gt
-            flag: p
-            device: gpu
-            interface: acc
-            build_script: ""
-          - cluster: phoenix
-            name: Georgia Tech | Phoenix (NVHPC)
-            group: phoenix
-            labels: gt
-            flag: p
-            device: gpu
-            interface: omp
-            build_script: ""
           - cluster: frontier
             name: Oak Ridge | Frontier (CCE)
             group: phoenix
@@ -62,14 +22,14 @@ jobs:
             device: gpu
             interface: acc
             build_script: "bash .github/workflows/frontier/build.sh gpu acc bench"
-          - cluster: frontier
-            name: Oak Ridge | Frontier (CCE)
-            group: phoenix
-            labels: frontier
-            flag: f
-            device: gpu
-            interface: omp
-            build_script: "bash .github/workflows/frontier/build.sh gpu omp bench"
+          # - cluster: frontier
+          #   name: Oak Ridge | Frontier (CCE)
+          #   group: phoenix
+          #   labels: frontier
+          #   flag: f
+          #   device: gpu
+          #   interface: omp
+          #   build_script: "bash .github/workflows/frontier/build.sh gpu omp bench"
     runs-on:
       group: ${{ matrix.group }}
       labels: ${{ matrix.labels }}
@@ -81,44 +41,98 @@ jobs:
       - name: Clone - PR
         uses: actions/checkout@v4
         with:
-          path: pr
+          path: pr          
 
       - name: Clone - Master
         uses: actions/checkout@v4
         with:
           repository: MFlowCode/MFC
-          ref: master
+          ref: ${{ github.event.inputs.tag }}
           path: master
+
+      - name: Checkout PR repo
+        uses: actions/checkout@v3
+        with:
+          path: pr
+
+      - name: Prepare Docker context
+        run: |
+          sudo fallocate -l 8G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          sudo mkdir -p /home/runner/tmp
+          export TMPDIR=/home/runner/tmp
+          free -h
+          
+          sudo mkdir -p master
+          sudo chmod 777 master
+          rm -rf master/*
+          cp -r mfc/* master/
+          cp -r mfc/.git master/.git
+          cp pr/.github/Dockerfile master/
+          cp pr/.github/.dockerignore master/
+          cp pr/toolchain/dependencies/Silo.patch master/toolchain/dependencies/Silo.patch
+          cp pr/.github/scripts/run_parallel_benchmarks.sh master/.github/scripts/run_parallel_benchmarks.sh
+
+      - name: Replace old SILO block in CMakeLists.txt
+        run: |
+          if [ -f master/toolchain/pyproject.toml ]; then
+              sed -i 's/"cantera",/"cantera==3.0.1",/g' master/toolchain/pyproject.toml
+          fi
+
+          sed -i '/# SILO/,/^endif()/{
+              r /dev/stdin
+              d
+          }' master/toolchain/dependencies/CMakeLists.txt <<'EOF'
+          # SILO
+          if (MFC_SILO)
+              find_package(SILO)
+              if (SILO_FOUND)
+                  message(STATUS "SILO found.")
+                  add_custom_target(silo)
+              else()
+                  find_package(Git REQUIRED)
+
+                  ExternalProject_Add(silo
+                      GIT_REPOSITORY "https://github.com/LLNL/Silo"
+                      GIT_TAG        9af504ef4fb79153e1fbf3bdb75421b6b65f6dc4
+                      GIT_PROGRESS   ON
+                      PATCH_COMMAND  "${GIT_EXECUTABLE}" stash
+                                  && "${GIT_EXECUTABLE}" apply "${CMAKE_SOURCE_DIR}/Silo.patch"
+                      CMAKE_ARGS     -DSILO_ENABLE_SHARED=OFF
+                                    -DSILO_ENABLE_SILOCK=OFF
+                                    -DSILO_ENABLE_BROWSER=OFF
+                                    -DFIND_LIBRARY_USE_LIB64_PATHS=ON
+                                    "-DCMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}"
+                                    "-DCMAKE_FIND_ROOT_PATH=${CMAKE_FIND_ROOT_PATH}"
+                                    "-DCMAKE_FIND_PACKAGE_REDIRECTS_DIR=${CMAKE_FIND_PACKAGE_REDIRECTS_DIR}"
+                                    "-DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}"
+                                    "$<$<STREQUAL:${CMAKE_Fortran_COMPILER_ID},Cray>:-DCMAKE_MODULE_PATH=${CMAKE_SOURCE_DIR}/../cmake/cce>"
+                  )
+                endif()
+          endif()
+          EOF
+          docker buildx create --name mfcbuilder --driver docker-container --use
 
       - name: Setup & Build
         if: matrix.build_script != ''
         run: | 
-          (cd pr     && ${{ matrix.build_script }}) &
-          (cd master && ${{ matrix.build_script }}) &
-          wait %1 && wait %2
+          (cd master && ${{ matrix.build_script }}) & 
+          wait %1
 
       - name: Bench (Master v. PR)
-        run: bash pr/.github/scripts/run_parallel_benchmarks.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }}
-
-      - name: Generate & Post Comment
-        run: |
-          (cd pr && . ./mfc.sh load -c ${{ matrix.flag }} -m g)
-          (cd pr && ./mfc.sh bench_diff ../master/bench-${{ matrix.device }}-${{ matrix.interface }}.yaml ../pr/bench-${{ matrix.device }}-${{ matrix.interface }}.yaml)
+        run: bash master/.github/scripts/run_parallel_benchmarks.sh ${{ matrix.device }} ${{ matrix.cluster }}
 
       - name: Print Logs
         if:   always()
         run: |
-          cat pr/bench-${{ matrix.device }}-${{ matrix.interface }}.* 2>/dev/null || true
-          cat master/bench-${{ matrix.device }}-${{ matrix.interface }}.* 2>/dev/null || true
+          cat master/bench-${{ matrix.device }}.* 2>/dev/null || true
 
-      # All other runners (non-Phoenix) just run without special env
       - name: Archive Logs (Frontier)
-        if: always() && matrix.cluster != 'phoenix'
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.cluster }}-${{ matrix.device }}-${{ matrix.interface }}
+          name: ${{ matrix.cluster }}-${{ matrix.device }}
           path: |
-            pr/bench-${{ matrix.device }}-${{ matrix.interface }}.*
-            pr/build/benchmarks/*
-            master/bench-${{ matrix.device }}-${{ matrix.interface }}.*
+            master/bench-${{ matrix.device }}.*
             master/build/benchmarks/*
