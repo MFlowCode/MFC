@@ -4,6 +4,8 @@ on:
   schedule:
     - cron: '0 0 * * 5'  # This runs every Friday at midnight UTC
   workflow_dispatch:
+  push:
+  pull_request:
     
 jobs:
   self:
