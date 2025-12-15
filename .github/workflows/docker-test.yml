@@ -15,10 +15,10 @@ jobs:
     strategy:
       matrix:
         include:
-          # - lbl: 'gt'
-          #   cluster_name: 'Georgia Tech | Phoenix'
-          #   device: 'gpu'
-          #   interface: 'acc'
+          - lbl: 'gt'
+            cluster_name: 'Georgia Tech | Phoenix'
+            device: 'gpu'
+            interface: 'acc'
           # - lbl: 'gt'
           #   cluster_name: 'Georgia Tech | Phoenix'
           #   device: 'gpu'
