@@ -63,7 +63,7 @@ print(
             "m": Nx,
             "n": 0,
             "p": 0,
-            "dt": 0.0001,
+            "dt": dt,
             "t_step_start": 0,
             "t_step_stop": Nt,
             "t_step_save": t_save,
