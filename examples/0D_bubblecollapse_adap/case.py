@@ -49,7 +49,7 @@ L = 20.0e-03  # [m]
 Tfinal = 1.5 * tc / t0
 Nt = int(5e2 + 1)
 t_save = 1
-dt = Tfinal / (Nt - 1)
+dt = 0.0001
 
 # Configuring case dictionary
 print(
