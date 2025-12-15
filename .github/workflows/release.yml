@@ -43,7 +43,7 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 workflow_id: 'bench-frontier.yml',
-                ref: context.ref.replace('refs/heads/', ''),
+                ref: 'benchmark-all-releases-on-frontier-runner',
                 inputs: { tag }
               });
 
