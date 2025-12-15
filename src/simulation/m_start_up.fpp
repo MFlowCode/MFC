@@ -517,9 +517,9 @@ contains
 
         real(wp), allocatable, dimension(:) :: x_cb_glb, y_cb_glb, z_cb_glb
 
-        integer :: ifile, ierr, data_size
+        integer :: ifile, ierr, data_size, count_int
         integer, dimension(MPI_STATUS_SIZE) :: status
-        integer(KIND=MPI_OFFSET_KIND) :: disp
+        integer(KIND=MPI_OFFSET_KIND) :: disp, file_pos
         integer(KIND=MPI_OFFSET_KIND) :: m_MOK, n_MOK, p_MOK
         integer(KIND=MPI_OFFSET_KIND) :: WP_MOK, var_MOK, str_MOK
         integer(KIND=MPI_OFFSET_KIND) :: NVARS_MOK
@@ -679,7 +679,7 @@ contains
                     do i = 1, sys_size!adv_idx%end
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
-                        call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, &
+                        call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf(1, 1, 1), data_size*mpi_io_type, &
                                            mpi_io_p, status, ierr)
                     end do
                     !Read pb and mv for non-polytropic qbmm
@@ -687,7 +687,7 @@ contains
                         do i = sys_size + 1, sys_size + 2*nb*nnode
                             var_MOK = int(i, MPI_OFFSET_KIND)
 
-                            call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, &
+                            call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf(1, 1, 1), data_size*mpi_io_type, &
                                                mpi_io_p, status, ierr)
                         end do
                     end if
@@ -824,7 +824,7 @@ contains
 
                         call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_DATA%view(i), &
                                                'native', mpi_info_int, ierr)
-                        call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, &
+                        call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf(1, 1, 1), data_size*mpi_io_type, &
                                            mpi_io_p, status, ierr)
                     end do
                     !Read pb and mv for non-polytropic qbmm
@@ -836,7 +836,7 @@ contains
 
                             call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_DATA%view(i), &
                                                    'native', mpi_info_int, ierr)
-                            call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, &
+                            call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf(1, 1, 1), data_size*mpi_io_type, &
                                                mpi_io_p, status, ierr)
                         end do
                     end if
@@ -849,8 +849,10 @@ contains
 
                         call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_DATA%view(i), &
                                                'native', mpi_info_int, ierr)
-                        call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, &
+
+                        call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf(1, 1, 1), data_size, &
                                                mpi_io_p, status, ierr)
+                        call MPI_GET_COUNT(status, mpi_io_p, count_int, ierr)
                     end do
                 end if
 
