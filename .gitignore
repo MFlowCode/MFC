@@ -91,5 +91,5 @@ benchmarks/*.png
 *.mkv
 *.avi
 
-packaging/spack/spack-test
-.spack 
+**isolation_rules/
+**.supercode/
