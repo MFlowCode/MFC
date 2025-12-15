@@ -23,7 +23,7 @@ jobs:
           #   cluster_name: 'Georgia Tech | Phoenix'
           #   device: 'gpu'
           #   interface: 'omp'
-          # - lbl: 'gt'
+          - lbl: 'gt'
             cluster_name: 'Georgia Tech | Phoenix'
             device: 'cpu'
             interface: 'none'
