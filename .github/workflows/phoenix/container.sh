@@ -11,6 +11,8 @@ CONTAINER="mfc:latest-$job_device.sif"
 NV_FLAG=""
 [ "$job_device" = "gpu" ] && NV_FLAG="--nv"
 
+unset LD_PRELOAD
+
 apptainer exec $NV_FLAG --fakeroot --writable-tmpfs \
   --bind "$SCRATCH_DIR":/scratch \
   --env job_slug="$job_slug" \

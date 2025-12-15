@@ -23,10 +23,10 @@ jobs:
           #   cluster_name: 'Georgia Tech | Phoenix'
           #   device: 'gpu'
           #   interface: 'omp'
-          - lbl: 'gt'
-            cluster_name: 'Georgia Tech | Phoenix'
-            device: 'cpu'
-            interface: 'none'
+          # - lbl: 'gt'
+          #   cluster_name: 'Georgia Tech | Phoenix'
+          #   device: 'cpu'
+          #   interface: 'none'
     runs-on:
       group:  phoenix
       labels: ${{ matrix.lbl }}
@@ -44,4 +44,4 @@ jobs:
 
       - name: Print Logs
         if:   always()
-        run:  cat test-${{ matrix.device }}-${{ matrix.interface }}.out
+        run:  cat container-${{ matrix.device }}-${{ matrix.interface }}.out
