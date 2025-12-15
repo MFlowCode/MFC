@@ -786,7 +786,7 @@ This table lists the sub-grid bubble model parameters, which can be utilized in 
 
 - `bubbles_lagrange` activates the volume-averaged bubble model.
 
-- `bubble_model` specified a model for spherical bubble dynamics by an integer of 1 and 2.
+- `bubble_model` specifies a model for spherical bubble dynamics by an integer of `1`, `2`, or `3`.
 `bubble_model = 1`, `2`, and `3` correspond to the Gilmore, Keller-Miksis, and Rayleigh-Plesset models.
 
 - `bub_pp` specifies simulation parameters for the EE and/or EL bubble model. 
