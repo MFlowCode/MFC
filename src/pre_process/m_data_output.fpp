@@ -587,9 +587,9 @@ contains
 
 #ifdef MFC_MPI
 
-        integer :: ifile, ierr, data_size, count_int
+        integer :: ifile, ierr, data_size
         integer, dimension(MPI_STATUS_SIZE) :: status
-        integer(KIND=MPI_OFFSET_KIND) :: disp, file_pos
+        integer(KIND=MPI_OFFSET_KIND) :: disp
         integer(KIND=MPI_OFFSET_KIND) :: m_MOK, n_MOK, p_MOK
         integer(KIND=MPI_OFFSET_KIND) :: WP_MOK, var_MOK, str_MOK
         integer(KIND=MPI_OFFSET_KIND) :: NVARS_MOK
@@ -765,7 +765,7 @@ contains
 
                     call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_DATA%view(i), &
                                            'native', mpi_info_int, ierr)
-                    call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, &
+                    call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf(1, 1, 1), data_size*mpi_io_type, &
                                             mpi_io_p, status, ierr)
                 end do
                 !Additional variables pb and mv for non-polytropic qbmm
@@ -778,7 +778,7 @@ contains
 
                         call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_DATA%view(i), &
                                                'native', mpi_info_int, ierr)
-                        call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, &
+                        call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf(1, 1, 1), data_size*mpi_io_type, &
                                                 mpi_io_p, status, ierr)
                     end do
                 end if
@@ -795,14 +795,11 @@ contains
 
                     call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf(1, 1, 1), data_size, &
                                             mpi_io_p, status, ierr)
-                    call MPI_GET_COUNT(status, mpi_io_p, count_int, ierr)
                 end do
 
             end if
 
             call MPI_FILE_CLOSE(ifile, ierr)
-
-            inquire(FILE=trim(file_loc), SIZE=file_pos)
         end if
 
         ! IB Markers
