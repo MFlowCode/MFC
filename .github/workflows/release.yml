@@ -33,7 +33,7 @@ jobs:
           TAGS_IN_RANGE=$(awk "/^${{ env.FROM_TAG }}$/,/^${{ env.TO_TAG }}$/" <<< "$TAGS" | grep -v '^$')
           echo "tags=$(echo $TAGS_IN_RANGE | tr '\n' ' ')" >> $GITHUB_OUTPUT
 
-      - name: Dispatch bench.yml for each tag
+      - name: Dispatch bench-frontier.yml for each tag
         uses: actions/github-script@v7
         with:
           script: |
@@ -42,7 +42,7 @@ jobs:
               await github.rest.actions.createWorkflowDispatch({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                workflow_id: 'bench.yml',
+                workflow_id: 'bench-frontier.yml',
                 ref: context.ref.replace('refs/heads/', ''),
                 inputs: { tag }
               });
@@ -52,7 +52,7 @@ jobs:
                 const runs = await github.rest.actions.listWorkflowRuns({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  workflow_id: 'bench.yml',
+                  workflow_id: 'bench-frontier.yml',
                   event: 'workflow_dispatch',
                   per_page: 5
                 });
