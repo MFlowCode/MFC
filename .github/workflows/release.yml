@@ -40,8 +40,8 @@ jobs:
             const tags = '${{ steps.tags.outputs.tags }}'.split(' ').filter(Boolean);
             for (const tag of tags) {
               await github.rest.actions.createWorkflowDispatch({
-                owner: Malmahrouqi3,
-                repo: MFC-mo2,
+                owner: 'Malmahrouqi3',
+                repo: 'MFC-mo2',
                 workflow_id: 'bench-frontier.yml',
                 ref: 'benchmark-all-releases-on-frontier-runner',
                 inputs: { tag }
@@ -50,8 +50,8 @@ jobs:
               let runId = null;
               for (let i = 0; i < 60; i++) { // Try for up to 300 seconds
                 const runs = await github.rest.actions.listWorkflowRuns({
-                  owner: Malmahrouqi3,
-                  repo: MFC-mo2,
+                  owner: 'Malmahrouqi3',
+                  repo: 'MFC-mo2',
                   workflow_id: 'bench-frontier.yml',
                   event: 'workflow_dispatch',
                   per_page: 5
@@ -74,8 +74,8 @@ jobs:
               let completed = false;
               while (!completed) {
                 const run = await github.rest.actions.getWorkflowRun({
-                  owner: Malmahrouqi3,
-                  repo: MFC-mo2,
+                  owner: 'Malmahrouqi3',
+                  repo: 'MFC-mo2',
                   run_id: runId
                 });
                 if (run.data.status === 'completed') {
