@@ -1,11 +1,12 @@
 #!/bin/bash
 
 if [ "$job_interface" = "omp" ]; then
-    apptainer build mfc:latest-\$job_device.sif docker://sbryngelson/mfc:latest-mp-\$job_device
+    apptainer build mfc:latest-$job_device.sif docker://sbryngelson/mfc:latest-mp-$job_device
 else
-    apptainer build mfc:latest-\$job_device.sif docker://sbryngelson/mfc:latest-\$job_device
+    apptainer build mfc:latest-$job_device.sif docker://sbryngelson/mfc:latest-$job_device
+fi
 
-CONTAINER="mfc:latest-\$job_device.sif"
+CONTAINER="mfc:latest-$job_device.sif"
 
 NV_FLAG=""
 [ "\$job_device" = "gpu" ] && NV_FLAG="--nv"
