@@ -9,13 +9,13 @@ fi
 CONTAINER="mfc:latest-$job_device.sif"
 
 NV_FLAG=""
-[ "\$job_device" = "gpu" ] && NV_FLAG="--nv"
+[ "$job_device" = "gpu" ] && NV_FLAG="--nv"
 
-apptainer exec \$NV_FLAG --fakeroot --writable-tmpfs \
-  --bind "\$SCRATCH_DIR":/scratch \
-  --env job_slug="\$job_slug" \
-  --env job_device="\$job_device" \
-  "\$CONTAINER" \
+apptainer exec $NV_FLAG --fakeroot --writable-tmpfs \
+  --bind "$SCRATCH_DIR":/scratch \
+  --env job_slug="$job_slug" \
+  --env job_device="$job_device" \
+  "$CONTAINER" \
   bash -c 'cd /opt/MFC &&
 
 build_opts=""
