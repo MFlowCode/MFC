@@ -148,8 +148,10 @@ In the above,
 ## Tag Details
 
 ### Base Images
-- CPU images (v4.3.0-latest releases) are built on **Ubuntu 22.04**.
-- GPU images (v4.3.0-latest releases) are built on **NVHPC SDK 23.11 (CUDA 12.3) & Ubuntu 22.04**.
+- CPU images (v4.3.0-latest release) are built on **Ubuntu 22.04**.
+- GPU images (v4.3.0-latest release) are built on **NVHPC SDK 23.11 (CUDA 12.3) & Ubuntu 22.04**.
+  - OpenACC images (v4.3.0-latest release).
+  - OpenMP images (v5.1.0-latest release).
 
 ### Tag Structure
 - **`vx.x.x`** - Official MFC release versions (recommended: use `latest` release)
