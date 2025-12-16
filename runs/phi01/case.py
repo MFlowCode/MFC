@@ -9,7 +9,7 @@ D = 0.1
 L = 10 * D
 
 M = 0.8
-Re = 1500.0
+Re = 1000.0
 
 P = 101325
 rho = 1.225
@@ -22,9 +22,9 @@ mu = rho * v1 * D / Re
 #print('rho: ', rho)
 #print('Kn = ' + str( np.sqrt(np.pi*gam_a/2)*(M/Re) )) # Kn < 0.01 = continuum flow
 
-dt = 5.0E-06
-Nt = 200 #int(1 * L / v1 / dt)
-t_save = Nt//5
+dt = 1.0E-06
+Nt = 20 #int(1 * L / v1 / dt)
+t_save = Nt//10
 t_step_start_stats = Nt//2
 
 Nx = 199
@@ -105,7 +105,6 @@ case_dict = {
     "null_weights": "F",
     "mp_weno": "T",
     "riemann_solver": 2,
-    "low_Mach": 1,
     "wave_speeds": 1,
     # periodic bc
     "bc_x%beg": -1,
@@ -150,14 +149,18 @@ case_dict = {
 
     # new case additions
     "periodic_forcing": "T",
+    "u_inf_ref": v1,
+    "rho_inf_ref": rho,
+    "P_inf_ref": P,
+    "mom_f_idx": 1,
+    "forcing_window": 1,
+    "forcing_dt": 1.0/(0.5*dt),
+    "particle_vf": 0.1,
+
     "periodic_ibs": "T",
     "volume_filtering_momentum_eqn": "T",
     "filter_width": 3.0*D/2 * np.sqrt(2/(9*np.pi)),
     "compute_particle_drag": "T",
-
-    "u_inf_ref": v1,
-    "rho_inf_ref": rho,
-    "P_inf_ref": P,
 
     "store_levelset": "F",
     "slab_domain_decomposition": "T", 

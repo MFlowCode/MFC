@@ -452,7 +452,6 @@ contains
         real(wp) :: x_centroid, y_centroid, z_centroid
         real(wp), dimension(3) :: dist_vec
 
-        real(wp) :: x_domain_beg, x_domain_end, y_domain_beg, y_domain_end, z_domain_beg, z_domain_end
         real(wp) :: x_pcen, y_pcen, z_pcen !< periodically projected centroids of sphere
         real(wp), dimension(7, 3) :: dist_vec_per
         real(wp), dimension(7) :: dist_per
@@ -465,32 +464,25 @@ contains
         y_centroid = patch_ib(ib_patch_id)%y_centroid
         z_centroid = patch_ib(ib_patch_id)%z_centroid
 
-        call s_mpi_allreduce_min(x_domain%beg, x_domain_beg)
-        call s_mpi_allreduce_max(x_domain%end, x_domain_end)
-        call s_mpi_allreduce_min(y_domain%beg, y_domain_beg)
-        call s_mpi_allreduce_max(y_domain%end, y_domain_end)
-        call s_mpi_allreduce_min(z_domain%beg, z_domain_beg)
-        call s_mpi_allreduce_max(z_domain%end, z_domain_end)
-
         if (periodic_ibs) then
-            if ((x_centroid - x_domain_beg) <= radius) then
-                x_pcen = x_domain_end + (x_centroid - x_domain_beg)
-            else if ((x_domain_end - x_centroid) <= radius) then
-                x_pcen = x_domain_beg - (x_domain_end - x_centroid)
+            if ((x_centroid - domain_glb(1, 1)) <= radius) then
+                x_pcen = domain_glb(1, 2) + (x_centroid - domain_glb(1, 1))
+            else if ((domain_glb(1, 2) - x_centroid) <= radius) then
+                x_pcen = domain_glb(1, 1) - (domain_glb(1, 2) - x_centroid)
             else
                 x_pcen = x_centroid
             end if
-            if ((y_centroid - y_domain_beg) <= radius) then
-                y_pcen = y_domain_end + (y_centroid - y_domain_beg)
-            else if ((y_domain_end - y_centroid) <= radius) then
-                y_pcen = y_domain_beg - (y_domain_end - y_centroid)
+            if ((y_centroid - domain_glb(2, 1)) <= radius) then
+                y_pcen = domain_glb(2, 2) + (y_centroid - domain_glb(2, 1))
+            else if ((domain_glb(2, 2) - y_centroid) <= radius) then
+                y_pcen = domain_glb(2, 1) - (domain_glb(2, 2) - y_centroid)
             else
                 y_pcen = y_centroid
             end if
-            if ((z_centroid - z_domain_beg) <= radius) then
-                z_pcen = z_domain_end + (z_centroid - z_domain_beg)
-            else if ((z_domain_end - z_centroid) <= radius) then
-                z_pcen = z_domain_beg - (z_domain_end - z_centroid)
+            if ((z_centroid - domain_glb(3, 1)) <= radius) then
+                z_pcen = domain_glb(3, 2) + (z_centroid - domain_glb(3, 1))
+            else if ((domain_glb(3, 2) - z_centroid) <= radius) then
+                z_pcen = domain_glb(3, 1) - (domain_glb(3, 2) - z_centroid)
             else
                 z_pcen = z_centroid
             end if

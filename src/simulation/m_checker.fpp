@@ -55,6 +55,7 @@ contains
         call s_check_inputs_stiffened_eos_viscosity
         call s_check_inputs_body_forces
         call s_check_inputs_misc
+        call s_check_inputs_periodic_forcing
 
     end subroutine s_check_inputs
 
@@ -401,15 +402,32 @@ contains
     impure subroutine s_check_inputs_misc
         @:PROHIBIT(probe_wrt .and. fd_order == dflt_int, "fd_order must be specified for probe_wrt")
         @:PROHIBIT(integral_wrt .and. (.not. bubbles_euler))
-        #:for X in ['x', 'y', 'z']
-            #:for BOUND in ['beg', 'end']
-                @:PROHIBIT(periodic_forcing .and. bc_${X}$%${BOUND}$ /= BC_PERIODIC, &
-                    "Periodic forcing requires all BCs to be periodic")
-                @:PROHIBIT(volume_filtering_momentum_eqn .and. bc_${X}$%${BOUND}$ /= BC_PERIODIC, &
-                    "Explicit filtering of flow data requires all BCs to be periodic due to fourier transform")
-            #:endfor
-        #:endfor
     end subroutine s_check_inputs_misc
+
+    impure subroutine s_check_inputs_periodic_forcing
+        @:PROHIBIT(periodic_forcing .and. mom_f_idx == dflt_int, &
+            "a direction must be specified for the periodic forcing")
+        if (mom_f_idx == 1) then
+            #:for BOUND in ['beg', 'end']
+                @:PROHIBIT(periodic_forcing .and. bc_x%${BOUND}$ /= BC_PERIODIC, &
+                    "Periodic forcing requires x BCs to be periodic")
+            #:endfor
+        else if (mom_f_idx == 2) then
+            #:for BOUND in ['beg', 'end']
+                @:PROHIBIT(periodic_forcing .and. bc_y%${BOUND}$ /= BC_PERIODIC, &
+                    "Periodic forcing requires y BCs to be periodic")
+            #:endfor
+        else if (mom_f_idx == 3) then
+            #:for BOUND in ['beg', 'end']
+                @:PROHIBIT(periodic_forcing .and. bc_z%${BOUND}$ /= BC_PERIODIC, &
+                    "Periodic forcing requires z BCs to be periodic")
+            #:endfor
+        end if
+        @:PROHIBIT(periodic_forcing .and. (f_is_default(rho_inf_ref) .or. f_is_default(u_inf_ref) .or. f_is_default(P_inf_ref)), &
+            "reference density, velocity, and pressure values must be specified to force the simulation towards")
+        @:PROHIBIT(periodic_forcing .and. forcing_window == dflt_int, "time window used for forcing averages must be specified")
+        @:PROHIBIT(periodic_forcing .and. f_is_default(forcing_dt), "forcing timestep size must be specified")
+    end subroutine s_check_inputs_periodic_forcing
 
     impure subroutine s_check_inputs_mhd
         @:PROHIBIT(mhd .and. (riemann_solver /= 1 .and. riemann_solver /= 4), &

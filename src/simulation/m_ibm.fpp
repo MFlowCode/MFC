@@ -54,9 +54,6 @@ module m_ibm
 
     logical :: moving_immersed_boundary_flag
 
-    real(wp) :: x_domain_beg_glb, x_domain_end_glb, y_domain_beg_glb, y_domain_end_glb, z_domain_beg_glb, z_domain_end_glb !< global domain beginning/end
-    $:GPU_DECLARE(create='[x_domain_beg_glb, x_domain_end_glb, y_domain_beg_glb, y_domain_end_glb, z_domain_beg_glb, z_domain_end_glb]')
-
 contains
 
     !>  Allocates memory for the variables in the IBM module
@@ -92,14 +89,6 @@ contains
 
         integer :: i, j, k
         integer :: max_num_gps, max_num_inner_gps
-
-        call s_mpi_allreduce_min(x_domain%beg, x_domain_beg_glb)
-        call s_mpi_allreduce_max(x_domain%end, x_domain_end_glb)
-        call s_mpi_allreduce_min(y_domain%beg, y_domain_beg_glb)
-        call s_mpi_allreduce_max(y_domain%end, y_domain_end_glb)
-        call s_mpi_allreduce_min(z_domain%beg, z_domain_beg_glb)
-        call s_mpi_allreduce_max(z_domain%end, z_domain_end_glb)
-        $:GPU_UPDATE(device='[x_domain_beg_glb, x_domain_end_glb, y_domain_beg_glb, y_domain_end_glb, z_domain_beg_glb, z_domain_end_glb]')
 
         moving_immersed_boundary_flag = .false.
         do i = 1, num_ibs
@@ -522,24 +511,24 @@ contains
                 dist_calc = sqrt(sum(dist_vec**2))
                 ! all permutations of periodically projected ib
                 if (periodic_ibs) then
-                    if ((x_centroid - x_domain_beg_glb) <= radius) then
-                        x_pcen = x_domain_end_glb + (x_centroid - x_domain_beg_glb)
-                    else if ((x_domain_end_glb - x_centroid) <= radius) then
-                        x_pcen = x_domain_beg_glb - (x_domain_end_glb - x_centroid)
+                    if ((x_centroid - domain_glb(1, 1)) <= radius) then
+                        x_pcen = domain_glb(1, 2) + (x_centroid - domain_glb(1, 1))
+                    else if ((domain_glb(1, 2) - x_centroid) <= radius) then
+                        x_pcen = domain_glb(1, 1) - (domain_glb(1, 2) - x_centroid)
                     else
                         x_pcen = x_centroid
                     end if
-                    if ((y_centroid - y_domain_beg_glb) <= radius) then
-                        y_pcen = y_domain_end_glb + (y_centroid - y_domain_beg_glb)
-                    else if ((y_domain_end_glb - y_centroid) <= radius) then
-                        y_pcen = y_domain_beg_glb - (y_domain_end_glb - y_centroid)
+                    if ((y_centroid - domain_glb(2, 1)) <= radius) then
+                        y_pcen = domain_glb(2, 2) + (y_centroid - domain_glb(2, 1))
+                    else if ((domain_glb(2, 2) - y_centroid) <= radius) then
+                        y_pcen = domain_glb(2, 1) - (domain_glb(2, 2) - y_centroid)
                     else
                         y_pcen = y_centroid
                     end if
-                    if ((z_centroid - z_domain_beg_glb) <= radius) then
-                        z_pcen = z_domain_end_glb + (z_centroid - z_domain_beg_glb)
-                    else if ((z_domain_end_glb - z_centroid) <= radius) then
-                        z_pcen = z_domain_beg_glb - (z_domain_end_glb - z_centroid)
+                    if ((z_centroid - domain_glb(3, 1)) <= radius) then
+                        z_pcen = domain_glb(3, 2) + (z_centroid - domain_glb(3, 1))
+                    else if ((domain_glb(3, 2) - z_centroid) <= radius) then
+                        z_pcen = domain_glb(3, 1) - (domain_glb(3, 2) - z_centroid)
                     else
                         z_pcen = z_centroid
                     end if

@@ -29,10 +29,7 @@ module m_volume_filtering
     private; public :: s_initialize_fftw_explicit_filter_module, &
  s_initialize_filtering_kernel, s_initialize_fluid_indicator_function, &
  s_initialize_filtered_fluid_indicator_function, s_initialize_fluid_indicator_gradient, &
- s_finalize_fftw_explicit_filter_module, s_volume_filter_momentum_eqn, s_apply_fftw_filter_scalarfield, s_filter_batch, &
- s_compute_viscous_stress_tensor, s_compute_stress_tensor, s_compute_divergence_stress_tensor, s_compute_particle_forces, &
- s_mpi_transpose_slabZ2Y, s_mpi_transpose_slabY2Z, s_mpi_transpose_slabZ2Y_batch, s_mpi_transpose_slabY2Z_batch, &
- s_mpi_FFT_fwd, s_mpi_FFT_bwd, s_setup_terms_filtering, s_compute_pseudo_turbulent_reynolds_stress, s_compute_effective_viscosity
+ s_finalize_fftw_explicit_filter_module, s_volume_filter_momentum_eqn, s_compute_particle_forces
 
 #if !defined(MFC_OpenACC)
     include 'fftw3.f03'
@@ -357,9 +354,9 @@ contains
         ! gaussian filter
         sigma_stddev = filter_width
 
-        Lx = x_domain_end_glb - x_domain_beg_glb
-        Ly = y_domain_end_glb - y_domain_beg_glb
-        Lz = z_domain_end_glb - z_domain_beg_glb
+        Lx = domain_glb(1, 2) - domain_glb(1, 1)
+        Ly = domain_glb(2, 2) - domain_glb(2, 1)
+        Lz = domain_glb(3, 2) - domain_glb(3, 1)
 
         G_norm_int = 0.0_wp
 
@@ -367,9 +364,9 @@ contains
         do i = 0, m
             do j = 0, n
                 do k = 0, p
-                    x_r = min(abs(x_cc(i) - x_domain_beg_glb), Lx - abs(x_cc(i) - x_domain_beg_glb))
-                    y_r = min(abs(y_cc(j) - y_domain_beg_glb), Ly - abs(y_cc(j) - y_domain_beg_glb))
-                    z_r = min(abs(z_cc(k) - z_domain_beg_glb), Lz - abs(z_cc(k) - z_domain_beg_glb))
+                    x_r = min(abs(x_cc(i) - domain_glb(1, 1)), Lx - abs(x_cc(i) - domain_glb(1, 1)))
+                    y_r = min(abs(y_cc(j) - domain_glb(2, 1)), Ly - abs(y_cc(j) - domain_glb(2, 1)))
+                    z_r = min(abs(z_cc(k) - domain_glb(3, 1)), Lz - abs(z_cc(k) - domain_glb(3, 1)))
 
                     r2 = x_r**2 + y_r**2 + z_r**2
 
@@ -481,18 +478,29 @@ contains
         @:ACC_SETUP_SFs(fluid_indicator_function)
 
         ! define fluid indicator function
-        $:GPU_PARALLEL_LOOP(collapse=3)
-        do i = 0, m
-            do j = 0, n
-                do k = 0, p
-                    if (ib_markers%sf(i, j, k) == 0) then
-                        fluid_indicator_function%sf(i, j, k) = 1.0_wp
-                    else
-                        fluid_indicator_function%sf(i, j, k) = 0.0_wp
-                    end if
+        if (ib) then
+            $:GPU_PARALLEL_LOOP(collapse=3)
+            do i = 0, m
+                do j = 0, n
+                    do k = 0, p
+                        if (ib_markers%sf(i, j, k) == 0) then
+                            fluid_indicator_function%sf(i, j, k) = 1.0_wp
+                        else
+                            fluid_indicator_function%sf(i, j, k) = 0.0_wp
+                        end if
+                    end do
                 end do
             end do
-        end do
+        else
+            $:GPU_PARALLEL_LOOP(collapse=3)
+            do i = 0, m
+                do j = 0, n
+                    do k = 0, p
+                        fluid_indicator_function%sf(i, j, k) = 1.0_wp
+                    end do
+                end do
+            end do
+        end if
 
         call s_populate_scalarfield_buffers(bc_type, fluid_indicator_function)
 
@@ -984,6 +992,7 @@ contains
         if (proc_rank == 0) then
             write (100) force_glb
             flush (100)
+            !print *, force_glb(1, 1) / (0.5_wp * rho_inf_ref * u_inf_ref**2 * pi * patch_ib(1)%radius**2)
         end if
 
     end subroutine s_compute_particle_forces

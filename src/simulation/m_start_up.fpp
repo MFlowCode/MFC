@@ -197,7 +197,8 @@ contains
             int_comp, ic_eps, ic_beta, nv_uvm_out_of_core, &
             nv_uvm_igr_temps_on_gpu, nv_uvm_pref_gpu, down_sample, fft_wrt, & 
             periodic_ibs, compute_particle_drag, u_inf_ref, rho_inf_ref, P_inf_ref, & 
-            periodic_forcing, volume_filtering_momentum_eqn, store_levelset, & 
+            periodic_forcing, mom_f_idx, forcing_window, forcing_dt, forcing_wrt, & 
+            particle_vf, volume_filtering_momentum_eqn, store_levelset, & 
             slab_domain_decomposition, t_step_stat_start, & 
             filter_width, q_filtered_wrt
 
@@ -588,6 +589,9 @@ contains
         ! Computing the cell center locations
         x_cc(0:m) = x_cb(-1:m - 1) + dx(0:m)/2._wp
 
+        x_domain%beg = x_cb(-1)
+        x_domain%end = x_cb(m)
+
         if (ib) then
             do i = 1, num_ibs
                 if (patch_ib(i)%c > 0) then
@@ -618,6 +622,9 @@ contains
             ! Computing the cell center locations
             y_cc(0:n) = y_cb(-1:n - 1) + dy(0:n)/2._wp
 
+            y_domain%beg = y_cb(-1)
+            y_domain%end = y_cb(n)
+
             if (p > 0) then
                 ! Read in cell boundary locations in z-direction
                 file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//'z_cb.dat'
@@ -638,6 +645,9 @@ contains
                 dz(0:p) = z_cb(0:p) - z_cb(-1:p - 1)
                 ! Computing the cell center locations
                 z_cc(0:p) = z_cb(-1:p - 1) + dz(0:p)/2._wp
+
+                z_domain%beg = z_cb(-1)
+                z_domain%end = z_cb(p)
 
             end if
         end if
@@ -1421,6 +1431,8 @@ contains
             call s_read_data_files(q_cons_ts(1)%vf)
         end if
 
+        call s_mpi_global_domain_bounds()
+
         ! Populating the buffers of the grid variables using the boundary conditions
         call s_populate_grid_variables_buffers()
 
@@ -1585,7 +1597,7 @@ contains
         end if
 
         $:GPU_UPDATE(device='[igr, igr_order]')
-        $:GPU_UPDATE(device='[u_inf_ref, rho_inf_ref, P_inf_ref, filter_width]')
+        $:GPU_UPDATE(device='[u_inf_ref, rho_inf_ref, P_inf_ref, mom_f_idx, forcing_window, forcing_dt, particle_vf, filter_width]')
 
     end subroutine s_initialize_gpu_vars
 
