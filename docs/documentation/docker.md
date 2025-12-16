@@ -154,6 +154,7 @@ In the above,
 ### Tag Structure
 - **`vx.x.x`** - Official MFC release versions (recommended: use `latest` release)
 - **`cpu/gpu`** - Build configurations for CPU or GPU acceleration.
+- **`acc/mp`** - Build configurations for OpenACC or OpenMP parallelization.
 - **`ubuntu-xx.xx`** - Base Ubuntu version (standard = `amd64`, `-arm` = `arm64`)
 
 ### Example Tags
@@ -161,7 +162,8 @@ In the above,
 ```shell
 mfc:latest-xxx                   # Latest version (amd64 & arm64)
 mfc:vx.x.x-cpu                   # CPU version    (amd64 & arm64)
-mfc:vx.x.x-gpu                   # GPU version    (amd64 & arm64)
+mfc:vx.x.x-gpu                   # OpenACC-supported GPU version  (amd64 & arm64)
+mfc:vx.x.x-mp-gpu                # OpenMP-supported  GPU version  (amd64 & arm64)
 mfc:vx.x.x-xxx-ubuntu-xx.xx      # amd64 natively-supported version
 mfc:vx.x.x-xxx-ubuntu-xx.xx-arm  # arm64 natively-supported version
 ```
