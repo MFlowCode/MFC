@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if [ "$job_interface" = "omp" ]; then
+if [ "$job_interface" = "mp" ]; then
     apptainer build mfc:latest-$job_device.sif docker://sbryngelson/mfc:latest-mp-$job_device
 else
     apptainer build mfc:latest-$job_device.sif docker://sbryngelson/mfc:latest-$job_device
@@ -23,7 +23,7 @@ apptainer exec $NV_FLAG --fakeroot --writable-tmpfs \
 build_opts=""
 if [ "$job_device" = "gpu" ]; then
     build_opts="--gpu"
-    if [ "$job_interface" = "omp" ]; then
+    if [ "$job_interface" = "mp" ]; then
       build_opts+=" mp"
     elif [ "$job_interface" = "acc" ]; then
       build_opts+=" acc"

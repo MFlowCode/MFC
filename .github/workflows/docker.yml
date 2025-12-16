@@ -142,5 +142,5 @@ jobs:
           # GPU Manifest (OMP)
           docker manifest create $REGISTRY:$TAG-mp-gpu $REGISTRY:$TAG-gpu-mp-ubuntu-22.04 $REGISTRY:$TAG-gpu-mp-ubuntu-22.04-arm
           docker manifest create $REGISTRY:latest-mp-gpu $REGISTRY:$TAG-gpu-mp-ubuntu-22.04 $REGISTRY:$TAG-gpu-mp-ubuntu-22.04-arm
-          docker manifest push $REGISTRY:$TAG--mp-gpu
+          docker manifest push $REGISTRY:$TAG-mp-gpu
           docker manifest push $REGISTRY:latest-mp-gpu
