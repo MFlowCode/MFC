@@ -4,6 +4,7 @@ concurrency:
   group: bench-frontier
   cancel-in-progress: false
 
+
 on:
   push:
   pull_request:
