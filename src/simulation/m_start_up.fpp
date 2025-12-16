@@ -71,6 +71,8 @@ module m_start_up
 
     use m_helper_basic          !< Functions to compare floating point numbers
 
+    use m_helper
+
     $:USE_GPU_MODULE()
 
     use m_nvtx
@@ -155,7 +157,7 @@ contains
             x_domain, y_domain, z_domain, &
             hypoelasticity, &
             ib, num_ibs, patch_ib, &
-            fluid_pp, probe_wrt, prim_vars_wrt, &
+            fluid_pp, bub_pp, probe_wrt, prim_vars_wrt, &
             fd_order, probe, num_probes, t_step_old, &
             alt_soundspeed, mixture_err, weno_Re_flux, &
             null_weights, precision, parallel_io, cyl_coord, &
@@ -1305,21 +1307,9 @@ contains
         real(wp) :: temp1, temp2, temp3, temp4
 
         call s_initialize_global_parameters_module()
-        !Quadrature weights and nodes for polydisperse simulations
-        if (bubbles_euler .and. nb > 1) then
-            call s_simpson(weight, R0)
+        if (bubbles_euler .or. bubbles_lagrange) then
+            call s_initialize_bubbles_model()
         end if
-        !Initialize variables for non-polytropic (Preston) model
-        if (bubbles_euler .and. .not. polytropic) then
-            call s_initialize_nonpoly()
-        end if
-        !Initialize pb based on surface tension for qbmm (polytropic)
-        if (qbmm .and. polytropic .and. (.not. f_is_default(Web))) then
-            pb0(:) = pref + 2._wp*fluid_pp(1)%ss/(R0(:)*R0ref)
-            pb0 = pb0/pref
-            pref = 1._wp
-        end if
-
         call s_initialize_mpi_common_module()
         call s_initialize_mpi_proxy_module()
         call s_initialize_variables_conversion_module()
@@ -1508,25 +1498,24 @@ contains
 
         $:GPU_UPDATE(device='[chem_params]')
 
-        $:GPU_UPDATE(device='[R0ref,Ca,Web,Re_inv,weight,R0, &
+        $:GPU_UPDATE(device='[R0ref,p0ref,rho0ref,ss,pv,vd,mu_l,mu_v,mu_g, &
+            & gam_v,gam_g,M_v,M_g,R_v,R_g,Tw,cp_v,cp_g,k_vl,k_gl, &
+            & gam, gam_m,Eu,Ca,Web,Re_inv,Pe_c,phi_vg,phi_gv,omegaN, &
             & bubbles_euler,polytropic,polydisperse,qbmm, &
             & ptil,bubble_model,thermal,poly_sigma,adv_n,adap_dt, &
             & adap_dt_tol,adap_dt_max_iters,n_idx,pi_fac,low_Mach]')
-        $:GPU_UPDATE(device='[R_n,R_v,phi_vn,phi_nv,Pe_c,Tw,pv,M_n, &
-            & M_v,k_n,k_v,pb0,mass_n0,mass_v0,Pe_T,Re_trans_T, &
-            & Re_trans_c,Im_trans_T,Im_trans_c,omegaN,mul0,ss, &
-            & gamma_v,mu_v,gamma_m,gamma_n,mu_n,gam]')
+
+        if (bubbles_euler) then
+            $:GPU_UPDATE(device='[weight,R0]')
+            if (.not. polytropic) then
+                $:GPU_UPDATE(device='[pb0,Pe_T,k_g,k_v,mass_g0,mass_v0, &
+                  & Re_trans_T,Re_trans_c,Im_trans_T,Im_trans_c]')
+            else if (qbmm) then
+                $:GPU_UPDATE(device='[pb0]')
+            end if
+        end if
 
         $:GPU_UPDATE(device='[adv_n,adap_dt,adap_dt_tol,adap_dt_max_iters,n_idx,pi_fac,low_Mach]')
-
-        $:GPU_UPDATE(device='[R0ref,Ca,Web,Re_inv,weight,R0, &
-            & bubbles_euler,polytropic,polydisperse,qbmm, &
-            & ptil,bubble_model,thermal,poly_sigma,adv_n,adap_dt, &
-            & adap_dt_tol,adap_dt_max_iters,n_idx,pi_fac,low_Mach]')
-        $:GPU_UPDATE(device='[R_n,R_v,phi_vn,phi_nv,Pe_c,Tw,pv,M_n, &
-            & M_v,k_n,k_v,pb0,mass_n0,mass_v0,Pe_T,Re_trans_T, &
-            & Re_trans_c,Im_trans_T,Im_trans_c,omegaN,mul0,ss, &
-            & gamma_v,mu_v,gamma_m,gamma_n,mu_n,gam]')
 
         $:GPU_UPDATE(device='[acoustic_source, num_source]')
         $:GPU_UPDATE(device='[sigma, surface_tension]')

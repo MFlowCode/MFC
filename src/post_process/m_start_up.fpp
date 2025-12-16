@@ -95,7 +95,7 @@ contains
             t_step_stop, t_step_save, model_eqns, &
             num_fluids, mpp_lim, &
             weno_order, bc_x, &
-            bc_y, bc_z, fluid_pp, format, precision, &
+            bc_y, bc_z, fluid_pp, bub_pp, format, precision, &
             output_partial_domain, x_output, y_output, z_output, &
             hypoelasticity, G, mhd, &
             chem_wrt_Y, chem_wrt_T, avg_state, &
@@ -971,11 +971,8 @@ contains
         integer :: size_n(1), inembed(1), onembed(1)
 
         call s_initialize_global_parameters_module()
-        if (bubbles_euler .and. nb > 1) then
-            call s_simpson(weight, R0)
-        end if
-        if (bubbles_euler .and. .not. polytropic) then
-            call s_initialize_nonpoly()
+        if (bubbles_euler .or. bubbles_lagrange) then
+            call s_initialize_bubbles_model()
         end if
         if (num_procs > 1) then
             call s_initialize_mpi_proxy_module()
