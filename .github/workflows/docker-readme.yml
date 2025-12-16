@@ -1,0 +1,24 @@
+name: Docker Readme Update
+
+on:
+  pull_request:
+    types: [closed]
+    paths:
+      - '.github/docker_readme.md'
+
+jobs:
+  Container:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          path: pr
+
+      - name: Docker Hub Description
+        uses: peter-evans/dockerhub-description@v5
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+          repository: ${{ secrets.DOCKERHUB_USERNAME }}/mfc
+          readme-filepath: pr/.github/docker_readme.md

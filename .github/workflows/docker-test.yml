@@ -1,0 +1,44 @@
+name: 'Test Docker Containers'
+
+on:
+  schedule:
+    - cron: '0 0 * * 5'  # This runs every Friday at midnight UTC
+
+jobs:
+  self:
+    name: "${{ matrix.cluster_name }} (${{ matrix.device }}${{ matrix.interface != 'none' && format('-{0}', matrix.interface) || '' }})"
+    continue-on-error: false
+    timeout-minutes: 480
+    strategy:
+      matrix:
+        include:
+          - lbl: 'gt'
+            cluster_name: 'Georgia Tech | Phoenix'
+            device: 'gpu'
+            interface: 'acc'
+          - lbl: 'gt'
+            cluster_name: 'Georgia Tech | Phoenix'
+            device: 'gpu'
+            interface: 'mp'
+          - lbl: 'gt'
+            cluster_name: 'Georgia Tech | Phoenix'
+            device: 'cpu'
+            interface: 'none'
+    runs-on:
+      group:  phoenix
+      labels: ${{ matrix.lbl }}
+    env:
+      NODE_OPTIONS: ${{ matrix.lbl == 'gt' && '--max-old-space-size=2048' || '' }}
+      ACTIONS_RUNNER_FORCE_ACTIONS_NODE_VERSION: node16
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
+
+      - name: Pull & Test
+        if:   matrix.lbl == 'gt'
+        run:  bash .github/workflows/phoenix/submit.sh .github/workflows/phoenix/container.sh ${{ matrix.device }} ${{ matrix.interface }}
+
+      - name: Print Logs
+        if:   always()
+        run:  cat container-${{ matrix.device }}-${{ matrix.interface }}.out
