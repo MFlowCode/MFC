@@ -19,14 +19,14 @@ jobs:
             cluster_name: 'Georgia Tech | Phoenix'
             device: 'gpu'
             interface: 'acc'
-          # - lbl: 'gt'
-          #   cluster_name: 'Georgia Tech | Phoenix'
-          #   device: 'gpu'
-          #   interface: 'omp'
-          # - lbl: 'gt'
-          #   cluster_name: 'Georgia Tech | Phoenix'
-          #   device: 'cpu'
-          #   interface: 'none'
+          - lbl: 'gt'
+            cluster_name: 'Georgia Tech | Phoenix'
+            device: 'gpu'
+            interface: 'mp'
+          - lbl: 'gt'
+            cluster_name: 'Georgia Tech | Phoenix'
+            device: 'cpu'
+            interface: 'none'
     runs-on:
       group:  phoenix
       labels: ${{ matrix.lbl }}
