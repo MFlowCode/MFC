@@ -63,23 +63,8 @@ jobs:
         with:
           path: pr
 
-      - name: Prepare Docker context
+      - name: Prepare context
         run: |
-          sudo fallocate -l 8G /swapfile
-          sudo chmod 600 /swapfile
-          sudo mkswap /swapfile
-          sudo swapon /swapfile
-          sudo mkdir -p /home/runner/tmp
-          export TMPDIR=/home/runner/tmp
-          free -h
-          
-          sudo mkdir -p master
-          sudo chmod 777 master
-          rm -rf master/*
-          cp -r mfc/* master/
-          cp -r mfc/.git master/.git
-          cp pr/.github/Dockerfile master/
-          cp pr/.github/.dockerignore master/
           cp pr/toolchain/dependencies/Silo.patch master/toolchain/dependencies/Silo.patch
           cp pr/.github/scripts/run_parallel_benchmarks.sh master/.github/scripts/run_parallel_benchmarks.sh
 
