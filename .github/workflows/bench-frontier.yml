@@ -29,14 +29,14 @@ jobs:
             device: gpu
             interface: acc
             build_script: "bash .github/workflows/frontier/build.sh gpu acc bench"
-          # - cluster: frontier
-          #   name: Oak Ridge | Frontier (CCE)
-          #   group: phoenix
-          #   labels: frontier
-          #   flag: f
-          #   device: gpu
-          #   interface: omp
-          #   build_script: "bash .github/workflows/frontier/build.sh gpu omp bench"
+          - cluster: frontier
+            name: Oak Ridge | Frontier (CCE)
+            group: phoenix
+            labels: frontier
+            flag: f
+            device: gpu
+            interface: omp
+            build_script: "bash .github/workflows/frontier/build.sh gpu omp bench"
     runs-on:
       group: ${{ matrix.group }}
       labels: ${{ matrix.labels }}
@@ -69,7 +69,7 @@ jobs:
           wait %1
 
       - name: Bench (Master)
-        run: bash master/.github/scripts/run_parallel_benchmarks.sh ${{ matrix.device }} ${{ matrix.cluster }}
+        run: bash master/.github/scripts/run_parallel_benchmarks.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }}
 
       - name: Print Logs
         if:   always()
