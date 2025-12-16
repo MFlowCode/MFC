@@ -42,16 +42,16 @@ contains
 
         ! particle volume fraction
         if (ib) then
-            volfrac_phi = particle_vf 
+            volfrac_phi = particle_vf
         else
             volfrac_phi = 0._wp
         end if
 
         ! total cartesian domain volume
-        domain_vol = (domain_glb(1,2)-domain_glb(1,1)) * (domain_glb(2,2)-domain_glb(2,1)) * (domain_glb(3,2)-domain_glb(3,1))
+        domain_vol = (domain_glb(1, 2) - domain_glb(1, 1))*(domain_glb(2, 2) - domain_glb(2, 1))*(domain_glb(3, 2) - domain_glb(3, 1))
 
         ! coefficient used for phase averages
-        avg_coeff = 1._wp / (domain_vol * (1._wp - volfrac_phi))
+        avg_coeff = 1._wp/(domain_vol*(1._wp - volfrac_phi))
         $:GPU_UPDATE(device='[avg_coeff]')
 
         ! initialization of parameters
@@ -102,14 +102,14 @@ contains
         do i = 0, m
             do j = 0, n
                 do k = 0, p
-                    dVol = dx(i) * dy(j) * dz(k) * fluid_indicator_function%sf(i, j, k)
-                    spatial_rho = spatial_rho + (q_cons_vf(1)%sf(i, j, k) * dVol) ! rho
-                    spatial_u = spatial_u + (q_cons_vf(contxe+mom_f_idx)%sf(i, j, k) * dVol) ! rho*u
+                    dVol = dx(i)*dy(j)*dz(k)*fluid_indicator_function%sf(i, j, k)
+                    spatial_rho = spatial_rho + (q_cons_vf(1)%sf(i, j, k)*dVol) ! rho
+                    spatial_u = spatial_u + (q_cons_vf(contxe + mom_f_idx)%sf(i, j, k)*dVol) ! rho*u
                     spatial_eps = spatial_eps + ((q_cons_vf(5)%sf(i, j, k) - 0.5_wp*( &
                                                   q_cons_vf(2)%sf(i, j, k)**2 + &
                                                   q_cons_vf(3)%sf(i, j, k)**2 + &
-                                                  q_cons_vf(4)%sf(i, j, k)**2)/ & 
-                                                  q_cons_vf(1)%sf(i, j, k)) * dVol) ! rho*e
+                                                  q_cons_vf(4)%sf(i, j, k)**2)/ &
+                                                  q_cons_vf(1)%sf(i, j, k))*dVol) ! rho*e
                 end do
             end do
         end do
@@ -160,7 +160,7 @@ contains
 
                     ! f_E
                     q_periodic_force(3)%sf(i, j, k) = (P_inf_ref*gammas(1) - phase_eps)*forcing_dt &
-                                                      + q_cons_vf(contxe+mom_f_idx)%sf(i, j, k)*q_periodic_force(2)%sf(i, j, k)/q_cons_vf(1)%sf(i, j, k)
+                                                      + q_cons_vf(contxe + mom_f_idx)%sf(i, j, k)*q_periodic_force(2)%sf(i, j, k)/q_cons_vf(1)%sf(i, j, k)
                 end do
             end do
         end do
@@ -171,7 +171,7 @@ contains
             do j = 0, n
                 do k = 0, p
                     rhs_vf(1)%sf(i, j, k) = rhs_vf(1)%sf(i, j, k) + q_periodic_force(1)%sf(i, j, k)*fluid_indicator_function%sf(i, j, k) ! continuity
-                    rhs_vf(contxe+mom_f_idx)%sf(i, j, k) = rhs_vf(contxe+mom_f_idx)%sf(i, j, k) + q_periodic_force(2)%sf(i, j, k)*fluid_indicator_function%sf(i, j, k) ! momentum
+                    rhs_vf(contxe + mom_f_idx)%sf(i, j, k) = rhs_vf(contxe + mom_f_idx)%sf(i, j, k) + q_periodic_force(2)%sf(i, j, k)*fluid_indicator_function%sf(i, j, k) ! momentum
                     rhs_vf(5)%sf(i, j, k) = rhs_vf(5)%sf(i, j, k) + q_periodic_force(3)%sf(i, j, k)*fluid_indicator_function%sf(i, j, k) ! energy
                 end do
             end do

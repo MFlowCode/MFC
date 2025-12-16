@@ -55,9 +55,9 @@ module m_mpi_common
     $:GPU_DECLARE(create='[buff_send_scalarfield, buff_recv_scalarfield]')
 #endif
 
-    real(wp), allocatable, dimension(:,:), public :: domain_glb
+    real(wp), allocatable, dimension(:, :), public :: domain_glb
     $:GPU_DECLARE(create='[domain_glb]')
-    !! This variables holds the physical locations of the global domain bounds 
+    !! This variables holds the physical locations of the global domain bounds
 
 contains
 

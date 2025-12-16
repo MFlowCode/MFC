@@ -557,7 +557,7 @@ module m_global_parameters
     logical :: periodic_forcing
     integer :: mom_f_idx
     integer :: forcing_window
-    real(wp) :: forcing_dt 
+    real(wp) :: forcing_dt
     logical :: forcing_wrt
     real(wp) :: particle_vf
     logical :: volume_filtering_momentum_eqn

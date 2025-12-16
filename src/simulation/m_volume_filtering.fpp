@@ -1014,10 +1014,10 @@ contains
         end do
 
         $:GPU_UPDATE(host='[sendbuf_sf]')
-
+#ifdef MFC_MPI
         call MPI_Alltoall(sendbuf_sf, NxC*Nyloc*Nzloc, MPI_COMPLEX, &
                           recvbuf_sf, NxC*Nyloc*Nzloc, MPI_COMPLEX, MPI_COMM_WORLD, ierr)
-
+#endif
         $:GPU_UPDATE(device='[recvbuf_sf]')
 
         $:GPU_PARALLEL_LOOP(collapse=4)
@@ -1050,10 +1050,10 @@ contains
         end do
 
         $:GPU_UPDATE(host='[sendbuf_sf]')
-
+#ifdef MFC_MPI
         call MPI_Alltoall(sendbuf_sf, NxC*Nyloc*Nzloc, MPI_COMPLEX, &
                           recvbuf_sf, NxC*Nyloc*Nzloc, MPI_COMPLEX, MPI_COMM_WORLD, ierr)
-
+#endif
         $:GPU_UPDATE(device='[recvbuf_sf]')
 
         $:GPU_PARALLEL_LOOP(collapse=4)
@@ -1088,10 +1088,10 @@ contains
         end do
 
         $:GPU_UPDATE(host='[sendbuf_batch]')
-
+#ifdef MFC_MPI
         call MPI_Alltoall(sendbuf_batch, 24*NxC*Nyloc*Nzloc, MPI_COMPLEX, &
                           recvbuf_batch, 24*NxC*Nyloc*Nzloc, MPI_COMPLEX, MPI_COMM_WORLD, ierr)
-
+#endif
         $:GPU_UPDATE(device='[recvbuf_batch]')
 
         $:GPU_PARALLEL_LOOP(collapse=5)
@@ -1128,10 +1128,10 @@ contains
         end do
 
         $:GPU_UPDATE(host='[sendbuf_batch]')
-
+#ifdef MFC_MPI
         call MPI_Alltoall(sendbuf_batch, 24*NxC*Nyloc*Nzloc, MPI_COMPLEX, &
                           recvbuf_batch, 24*NxC*Nyloc*Nzloc, MPI_COMPLEX, MPI_COMM_WORLD, ierr)
-
+#endif
         $:GPU_UPDATE(device='[recvbuf_batch]')
 
         $:GPU_PARALLEL_LOOP(collapse=5)

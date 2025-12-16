@@ -610,67 +610,55 @@ contains
         end if
 
         xc = [x_centroid, x_pcen]
-        yc = [y_centroid, y_pcen] 
+        yc = [y_centroid, y_pcen]
         zc = [z_centroid, z_pcen]
 
-        do k = 0, p
-            do j = 0, n
-                do i = 0, m
-                    if (grid_geometry == 3) then
-                        call s_convert_cylindrical_to_cartesian_coord(y_cc(j), z_cc(k))
-                    else
-                        cart_y = y_cc(j)
-                        cart_z = z_cc(k)
-                    end if
-                    ! Updating the patch identities bookkeeping variable
-                    if (((x_cc(i) - x_centroid)**2 &
-                         + (cart_y - y_centroid)**2 &
-                         + (cart_z - z_centroid)**2 <= r2)) then
-                        ib_markers_sf(i, j, k) = patch_id
-                    end if
-
-                    if (periodic_ibs) then ! check every permutation of the projected cell location
-                        do ix = 1, 2 
+        if (periodic_ibs) then
+            do k = 0, p
+                do j = 0, n
+                    do i = 0, m
+                        if (grid_geometry == 3) then
+                            call s_convert_cylindrical_to_cartesian_coord(y_cc(j), z_cc(k))
+                        else
+                            cart_y = y_cc(j)
+                            cart_z = z_cc(k)
+                        end if
+                        ! Updating the patch identities bookkeeping variable
+                        do ix = 1, 2
                             dxr2 = (x_cc(i) - xc(ix))**2
-                            do iy = 1, 2 
+                            do iy = 1, 2
                                 dyr2 = (cart_y - yc(iy))**2
                                 do iz = 1, 2
                                     dzr2 = (cart_z - zc(iz))**2
-                                    if ((dxr2 + dyr2 + dzr2) <= r2) then 
+                                    if ((dxr2 + dyr2 + dzr2) <= r2) then
                                         ib_markers_sf(i, j, k) = patch_id
                                     end if
-                                end do 
-                            end do 
+                                end do
+                            end do
                         end do
-                        ! if (((x_cc(i) - x_pcen)**2 &
-                        !      + (cart_y - y_pcen)**2 &
-                        !      + (cart_z - z_pcen)**2 <= radius**2) &
-                        !     .or. ((x_cc(i) - x_pcen)**2 &
-                        !           + (cart_y - y_centroid)**2 &
-                        !           + (cart_z - z_centroid)**2 <= radius**2) &
-                        !     .or. ((x_cc(i) - x_pcen)**2 &
-                        !           + (cart_y - y_pcen)**2 &
-                        !           + (cart_z - z_centroid)**2 <= radius**2) &
-                        !     .or. ((x_cc(i) - x_pcen)**2 &
-                        !           + (cart_y - y_centroid)**2 &
-                        !           + (cart_z - z_pcen)**2 <= radius**2) &
-                        !     .or. ((x_cc(i) - x_centroid)**2 &
-                        !           + (cart_y - y_pcen)**2 &
-                        !           + (cart_z - z_centroid)**2 <= radius**2) &
-                        !     .or. ((x_cc(i) - x_centroid)**2 &
-                        !           + (cart_y - y_pcen)**2 &
-                        !           + (cart_z - z_pcen)**2 <= radius**2) &
-                        !     .or. ((x_cc(i) - x_centroid)**2 &
-                        !           + (cart_y - y_centroid)**2 &
-                        !           + (cart_z - z_pcen)**2 <= radius**2)) &
-                        !     then
-                        !     ! Updating the patch identities bookkeeping variable
-                        !     ib_markers_sf(i, j, k) = patch_id
-                        ! end if
-                    end if
+                    end do
                 end do
             end do
-        end do
+        else
+            do k = 0, p
+                do j = 0, n
+                    do i = 0, m
+                        if (grid_geometry == 3) then
+                            call s_convert_cylindrical_to_cartesian_coord(y_cc(j), z_cc(k))
+                        else
+                            cart_y = y_cc(j)
+                            cart_z = z_cc(k)
+                        end if
+                        ! Updating the patch identities bookkeeping variable
+                        if (((x_cc(i) - x_centroid)**2 &
+                             + (cart_y - y_centroid)**2 &
+                             + (cart_z - z_centroid)**2 <= r2)) then
+                            ib_markers_sf(i, j, k) = patch_id
+                        end if
+                    end do
+                end do
+            end do
+        end if
 
     end subroutine s_ib_sphere
 
