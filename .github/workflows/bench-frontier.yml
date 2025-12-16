@@ -62,12 +62,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           path: pr
-
-      - name: Prepare context
-        run: |
-          cp pr/toolchain/dependencies/Silo.patch master/toolchain/dependencies/Silo.patch
-          cp pr/.github/scripts/run_parallel_benchmarks.sh master/.github/scripts/run_parallel_benchmarks.sh
-
+          
       - name: Replace old SILO block in CMakeLists.txt
         run: |
           if [ -f master/toolchain/pyproject.toml ]; then
