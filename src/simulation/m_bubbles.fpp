@@ -541,8 +541,8 @@ contains
                     cycle
                 end if
 
-                err(4) = abs((myR_tmp1(4) - myR_tmp2(4))/max(abs(myR_tmp1(4)), sgm_eps))
-                err(5) = abs((myV_tmp1(4) - myV_tmp2(4))/max(abs(myV_tmp1(4)), sgm_eps))
+                err(4) = abs((myR_tmp1(4) - myR_tmp2(4))/myR_tmp1(4))
+                err(5) = abs((myV_tmp1(4) - myV_tmp2(4))/myV_tmp1(4))
                 if (abs(myV_tmp1(4)) < verysmall) err(5) = 0._wp
 
                 ! Determine acceptance/rejection and update step size
