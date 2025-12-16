@@ -29,14 +29,14 @@ jobs:
             device: gpu
             interface: acc
             build_script: "bash .github/workflows/frontier/build.sh gpu acc bench"
-          - cluster: frontier
-            name: Oak Ridge | Frontier (CCE)
-            group: phoenix
-            labels: frontier
-            flag: f
-            device: gpu
-            interface: omp
-            build_script: "bash .github/workflows/frontier/build.sh gpu omp bench"
+          # - cluster: frontier
+          #   name: Oak Ridge | Frontier (CCE)
+          #   group: phoenix
+          #   labels: frontier
+          #   flag: f
+          #   device: gpu
+          #   interface: omp
+          #   build_script: "bash .github/workflows/frontier/build.sh gpu omp bench"
     runs-on:
       group: ${{ matrix.group }}
       labels: ${{ matrix.labels }}
@@ -55,7 +55,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: MFlowCode/MFC
-          ref: ${{ env.BENCH_TAG }}
+          ref: master
           path: master
 
       - name: Checkout PR repo
