@@ -752,8 +752,8 @@ Details of the transducer acoustic source model can be found in [Maeda and Colon
 
 | Parameter          | Type    | Description                                    |
 | ---:               | :----:  |          :---                                  |
-| `bubbles_euler`    | Logical | Ensemble-averaged bubble modeling	|
-| `bubbles_lagrange` | Logical | Volume-averaged bubble modeling	|
+| `bubbles_euler`    | Logical | Ensemble-averaged bubble modeling |
+| `bubbles_lagrange` | Logical | Volume-averaged bubble modeling |
 | `bubble_model`     | Integer | [1] Gilmore; [2] Keller--Miksis; [3] Rayleigh-Plesset |
 | `bub_pp%%R0ref`*†‡  | Real    | Reference bubble radius |
 | `bub_pp%%p0ref`*†‡  | Real    | Reference pressure |
