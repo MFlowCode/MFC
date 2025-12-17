@@ -201,7 +201,10 @@ module m_global_parameters
     type(physical_parameters), dimension(num_fluids_max) :: fluid_pp !<
     !! Database of the physical parameters of each of the fluids that is present
     !! in the flow. These include the stiffened gas equation of state parameters,
-    !! the Reynolds numbers and the Weber numbers.
+    !! and the Reynolds numbers.
+
+    ! Subgrid Bubble Parameters
+    type(subgrid_bubble_physical_parameters) :: bub_pp
 
     real(wp), allocatable, dimension(:) :: adv !< Advection variables
 
@@ -303,8 +306,7 @@ module m_global_parameters
     !> @name Bubble modeling variables and parameters
     !> @{
     integer :: nb
-    real(wp) :: R0ref
-    real(wp) :: Ca, Web, Re_inv
+    real(wp) :: Eu, Ca, Web, Re_inv
     real(wp), dimension(:), allocatable :: weight, R0
     logical :: bubbles_euler
     logical :: qbmm
@@ -312,11 +314,13 @@ module m_global_parameters
     logical :: polydisperse
     logical :: adv_n
     integer :: thermal  !< 1 = adiabatic, 2 = isotherm, 3 = transfer
-    real(wp) :: R_n, R_v, phi_vn, phi_nv, Pe_c, Tw, G, pv, M_n, M_v
-    real(wp), dimension(:), allocatable :: k_n, k_v, pb0, mass_n0, mass_v0, Pe_T
+    real(wp) :: phi_vg, phi_gv, Pe_c, Tw, k_vl, k_gl
+    real(wp) :: gam_m
+    real(wp), dimension(:), allocatable :: pb0, mass_g0, mass_v0, Pe_T, k_v, k_g
     real(wp), dimension(:), allocatable :: Re_trans_T, Re_trans_c, Im_trans_T, Im_trans_c, omegaN
-    real(wp) :: mul0, ss, gamma_v, mu_v
-    real(wp) :: gamma_m, gamma_n, mu_n
+    real(wp) :: R0ref, p0ref, rho0ref, T0ref, ss, pv, vd, mu_l, mu_v, mu_g, &
+                gam_v, gam_g, M_v, M_g, cp_v, cp_g, R_v, R_g
+    real(wp) :: G
     real(wp) :: poly_sigma
     real(wp) :: sigR
     integer :: nmom
@@ -424,8 +428,29 @@ contains
             fluid_pp(i)%qv = 0._wp
             fluid_pp(i)%qvp = 0._wp
             fluid_pp(i)%G = dflt_real
-            fluid_pp(i)%D_v = dflt_real
         end do
+
+        ! Subgrid bubble parameters
+        bub_pp%R0ref = dflt_real; R0ref = dflt_real
+        bub_pp%p0ref = dflt_real; p0ref = dflt_real
+        bub_pp%rho0ref = dflt_real; rho0ref = dflt_real
+        bub_pp%T0ref = dflt_real; T0ref = dflt_real
+        bub_pp%ss = dflt_real; ss = dflt_real
+        bub_pp%pv = dflt_real; pv = dflt_real
+        bub_pp%vd = dflt_real; vd = dflt_real
+        bub_pp%mu_l = dflt_real; mu_l = dflt_real
+        bub_pp%mu_v = dflt_real; mu_v = dflt_real
+        bub_pp%mu_g = dflt_real; mu_g = dflt_real
+        bub_pp%gam_v = dflt_real; gam_v = dflt_real
+        bub_pp%gam_g = dflt_real; gam_g = dflt_real
+        bub_pp%M_v = dflt_real; M_v = dflt_real
+        bub_pp%M_g = dflt_real; M_g = dflt_real
+        bub_pp%k_v = dflt_real; 
+        bub_pp%k_g = dflt_real; 
+        bub_pp%cp_v = dflt_real; cp_v = dflt_real
+        bub_pp%cp_g = dflt_real; cp_g = dflt_real
+        bub_pp%R_v = dflt_real; R_v = dflt_real
+        bub_pp%R_g = dflt_real; R_g = dflt_real
 
         ! Formatted database file(s) structure parameters
         format = dflt_int
@@ -612,7 +637,6 @@ contains
 
                 allocate (bub_idx%rs(nb), bub_idx%vs(nb))
                 allocate (bub_idx%ps(nb), bub_idx%ms(nb))
-                allocate (weight(nb), R0(nb))
 
                 if (qbmm) then
                     allocate (bub_idx%moms(nb, nmom))
@@ -640,21 +664,6 @@ contains
                         end if
                     end do
                 end if
-
-                if (nb == 1) then
-                    weight(:) = 1._wp
-                    R0(:) = 1._wp
-                else if (nb < 1) then
-                    stop 'Invalid value of nb'
-                end if
-
-                if (polytropic .neqv. .true.) then
-                    !call s_initialize_nonpoly
-                else
-                    rhoref = 1._wp
-                    pref = 1._wp
-                end if
-
             end if
 
             if (bubbles_lagrange) then

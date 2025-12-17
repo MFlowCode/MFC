@@ -750,26 +750,35 @@ Details of the transducer acoustic source model can be found in [Maeda and Colon
 
 ### 9. Sub-grid Bubble Models
 
-| Parameter         | Type    | Description                                    |
-| ---:              | :----:  |          :---                                  |
-| `bubbles_euler`   | Logical	| Ensemble-averaged bubble modeling	|
-| `bubbles_lagrange`| Logical	| Volume-averaged bubble modeling	|
-| `bubble_model`    | Integer	| [1] Gilmore; [2] Keller--Miksis |
-| `mu_l0` *	        | Real 		|	Liquid viscosity (only specify in liquid phase)  |
-| `ss` *		        | Real 		|	Surface tension (only specify in liquid phase) |
-| `pv` *		        | Real 		|	Vapor pressure (only specify in liquid phase) |
-| `gamma_v` † 	    | Real 	  |	Specific heat ratio |
-| `M_v` †     	    | Real 		| Molecular weight |
-| `mu_v` †	        | Real 		|	Viscosity |
-| `k_v` †	          | Real 		|	Thermal conductivity |
-| `cp_v` †	        | Real 		|	Specific heat capacity |
-| `D_v` †           | Real    | Vapor diffusivity in the gas |
+| Parameter          | Type    | Description                                    |
+| ---:               | :----:  |          :---                                  |
+| `bubbles_euler`    | Logical	| Ensemble-averaged bubble modeling	|
+| `bubbles_lagrange` | Logical	| Volume-averaged bubble modeling	|
+| `bubble_model`     | Integer	| [1] Gilmore; [2] Keller--Miksis; [3] Rayleigh-Plesset |
+| `bub_pp%R0ref`*†‡  | Real    | Reference bubble radius |
+| `bub_pp%p0ref`*†‡  | Real    | Reference pressure |
+| `bub_pp%rho0ref`*†‡| Real    | Reference density |
+| `bub_pp%T0ref`†‡   | Real    | Reference temperature |
+| `bub_pp%ss`*†‡     | Real    | Surface tension between host and gas (bubble) |
+| `bub_pp%pv`*†‡     | Real    | Vapor pressure of host |
+| `bub_pp%vd`† ‡     | Real    | Vapor diffusivity in gas (bubble) |
+| `bub_pp%mu_l`*†‡   | Real    | Viscosity of host in liquid state |
+| `bub_pp%mu_v`†     | Real    | Viscosity of host in vapor state |
+| `bub_pp%mu_g`†     | Real    | Viscosity of gas (bubble) |
+| `bub_pp%gam_v`†‡   | Real    | Specific heat ratio of host in vapor state |
+| `bub_pp%gam_g`*†‡  | Real    | Specific heat ratio of gas (bubble) |
+| `bub_pp%M_v`†‡     | Real    | Molecular weight of host |
+| `bub_pp%M_g`†‡     | Real    | Molecular weight of gas (bubble) |
+| `bub_pp%k_v`†‡     | Real    | Thermal conductivity of host in vapor state |
+| `bub_pp%k_g`†‡     | Real    | Thermal conductivity of gas (bubble) |
+| `bub_pp%cp_v`‡     | Real    | Specific heat capacity in constant pressure of host in vapor state |
+| `bub_pp%cp_g`‡     | Real    | Specific heat capacity in constant pressure of gas (bubble) |
+| `bub_pp%R_v`†‡     | Real    | Gas constant of host in vapor state |
+| `bub_pp%R_g`†‡     | Real    | Gas constant of gas (bubble) |
 
-These options work only for gas-liquid two-component flows.
-Component indexes are required to be 1 for liquid and 2 for gas.
-
-- \* These parameters should be prepended with patch index $1$ that is filled with liquid: `fluid_pp(1)%`.
-- †  These parameters should be prepended with patch indexes filled with liquid and gas: `fluid_pp(1)%` and `fluid_pp(2)%`.
+- \* These parameters are required for ensemble-averaged bubble model.
+- †  These parameters are required for ensemble-averaged bubble model with `polytropic = F`.
+- ‡  These parameters are required for volume-averaged bubble model with `polytropic = F`.
 
 This table lists the sub-grid bubble model parameters, which can be utilized in both the ensemble-averaged and volume-averaged bubble models.
 
@@ -777,33 +786,28 @@ This table lists the sub-grid bubble model parameters, which can be utilized in 
 
 - `bubbles_lagrange` activates the volume-averaged bubble model.
 
-- `bubble_model` specified a model for spherical bubble dynamics by an integer of 1 and 2.
+- `bubble_model` specifies a model for spherical bubble dynamics by an integer of `1`, `2`, or `3`.
 `bubble_model = 1`, `2`, and `3` correspond to the Gilmore, Keller-Miksis, and Rayleigh-Plesset models.
 
-- `mu_l0`, `ss`, and `pv`, `gamma_v`, `M_v`, `mu_v`, `k_v`, and `cp_v` specify simulation parameters for the non-polytropic gas compression model.
-`mu_l0`, `ss`, and `pv` correspond to the liquid viscosity, surface tension, and vapor pressure, respectively.
-`gamma_v`, `M_v`, `mu_v`, `k_v`, and `cp_v` specify the specific heat ratio, molecular weight, viscosity, thermal conductivity and specific heat capacity of a chosen component (`cp_v` only for ``bubbles_lagrange = 'T'``).
+- `bub_pp` specifies simulation parameters for the EE and/or EL bubble model. 
+
 Implementation of the parameters into the model follow [Ando (2010)](references.md).
 
 #### 9.1 Ensemble-Averaged Bubble Model
 
-| Parameter      .  | Type    | Description                                    |
-| ---:           .  | :----:  |          :---                                  |
-| `bubbles_euler`.  | Logical	| Ensemble-averaged bubble modeling	|
-| `polytropic`      | Logical	| Polytropic gas compression |
-| `thermal` 		    | Integer	| Thermal model: [1] Adiabatic; [2] Isothermal; [3] Transfer |
-| `R0ref` 			    | Real		| Reference bubble radius |
-| `polydisperse`    | Logical	| Polydispersity in equilibrium bubble radius R0 |
-| `nb` 			        | Integer	| Number of bins: [1] Monodisperse; [$>1$] Polydisperse |
-| `poly_sigma` 	    | Real 		|	Standard deviation for probability density function of polydisperse bubble populations |
-| `Ca` 			        | Real		| Cavitation number |
-| `Web` 			      | Real		| Weber number |
-| `Re_inv` 		      | Real		| Inverse Reynolds number |
-| `qbmm` 	          | Logical	|	Quadrature by  method of moments |
-| `dist_type` 	    | Integer	|	Joint probability density function for bubble radius and velocity (only for ``qbmm = 'T'``) |
-| `sigR` 	          | Real 		|	Standard deviation for the probability density function of bubble radius (only for ``qbmm = 'T'``) (EE)|
-| `sigV` 	          | Real 		|	Standard deviation for the probability density function of bubble velocity (only for ``qbmm = 'T'``) (EE)|
-| `rhoRV`	          | Real 		|	Correlation coefficient for the joint probability density function of bubble radius and velocity (only for ``qbmm = 'T'``) |
+| Parameter         | Type    | Description                                    |
+| ---:              | :----:  |          :---                                  |
+| `bubbles_euler`   | Logical | Ensemble-averaged bubble modeling	|
+| `polytropic`      | Logical | Polytropic gas compression |
+| `thermal` 		    | Integer | Thermal model: [1] Adiabatic; [2] Isothermal; [3] Transfer |
+| `polydisperse`    | Logical | Polydispersity in equilibrium bubble radius R0 |
+| `nb`              | Integer | Number of bins: [1] Monodisperse; [$>1$] Polydisperse |
+| `poly_sigma`      | Real 	  |	Standard deviation for probability density function of polydisperse bubble populations |
+| `qbmm`            | Logical |	Quadrature by  method of moments |
+| `dist_type`       | Integer |	Joint probability density function for bubble radius and velocity (only for ``qbmm = 'T'``) |
+| `sigR`            | Real    |	Standard deviation for the probability density function of bubble radius (only for ``qbmm = 'T'``) (EE)|
+| `sigV`            | Real    |	Standard deviation for the probability density function of bubble velocity (only for ``qbmm = 'T'``) (EE)|
+| `rhoRV`           | Real    |	Correlation coefficient for the joint probability density function of bubble radius and velocity (only for ``qbmm = 'T'``) |
 
 This table lists the ensemble-averaged bubble model parameters.
 
@@ -815,13 +819,9 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 
 - `polydisperse` activates polydispersity in the bubble model through a probability density function (PDF) of the equilibrium bubble radius. Simpson's rule is used for integrating the log-normal PDF of equilibrium bubble radius for polydisperse populations.
 
-- `R0ref` specifies the reference bubble radius.
-
 - `nb` specifies the number of discrete bins that define the probability density function (PDF) of the equilibrium bubble radius.
 
 - `poly_sigma` specifies the standard deviation of the log-normal PDF of equilibrium bubble radius for polydisperse populations.
-
-- `Ca`, `Web`, and `Re_inv` respectively specify the Cavitation number, Weber number, and the inverse Reynolds number that characterize the offset of the gas pressure from the vapor pressure, surface tension, and liquid viscosity when the polytropic gas compression model is used.
 
 - `qbmm` activates quadrature by method of moments, which assumes a PDF for bubble radius and velocity.
 
@@ -850,11 +850,6 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 | `epsilonb`            | Real    | Standard deviation scaling for the gaussian function      |
 | `charwidth`           | Real    | Domain virtual depth (z direction, for 2D simulations)    |
 | `valmaxvoid`          | Real    | Maximum void fraction permitted                           |
-| `c0`                  | Real    | Reference speed                                           |
-| `rho0`                | Real    | Reference density                                         |
-| `T0`                  | Real    | Reference temperature                                     |
-| `x0`                  | Real    | Reference length                                          |
-| `Thost`               | Real    | Temperature of the surrounding liquid (host)              |
 
 - `nBubs_glb` Total number of bubbles. Their initial conditions need to be specified in the ./input/lag_bubbles.dat file. See the example cases for additional information.
 
