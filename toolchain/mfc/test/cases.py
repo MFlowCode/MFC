@@ -862,10 +862,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         'lag_params%write_bubbles_stats': "T", "polytropic": "F",
                         'bub_pp%R0ref': 1.0, 'bub_pp%p0ref': 1.0, 'bub_pp%rho0ref': 1.0, 'bub_pp%T0ref': 1.0,
                         'bub_pp%ss': 7.131653759435349e-07, 'bub_pp%pv': 0.02292716400352907, 'bub_pp%vd': 2.4752475247524753e-06, 
-                        'bub_pp%mu_l': 9.920792079207921e-08, 'bub_pp%gam_g': 1.33, 'bub_pp%gam_v': 1.4,
-                        'bub_pp%M_g': 18.02, 'bub_pp%M_v': 28.97, 'bub_pp%k_g': 5.618695895665441e-06,
-                        'bub_pp%k_v': 7.392868685947116e-06, 'bub_pp%R_g': 1347.810235139403, 'bub_pp%R_v': 838.3686723235085,
-                        'bub_pp%cp_v': 2921.2822272326243, 'bub_pp%cp_g': 6134.692677188511
+                        'bub_pp%mu_l': 9.920792079207921e-08, 'bub_pp%gam_v': 1.33, 'bub_pp%gam_g': 1.4,
+                        'bub_pp%M_v': 18.02, 'bub_pp%M_g': 28.97, 'bub_pp%k_v': 5.618695895665441e-06,
+                        'bub_pp%k_g': 7.392868685947116e-06, 'bub_pp%R_v': 1347.810235139403, 'bub_pp%R_g': 838.3686723235085,
+                        'bub_pp%cp_g': 2921.2822272326243, 'bub_pp%cp_v': 6134.692677188511
                     })
 
                     if len(dimInfo[0]) == 2:
