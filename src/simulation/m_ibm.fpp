@@ -1003,17 +1003,19 @@ contains
         !             idwbuff(2)%beg:idwbuff(2)%end, &
         !             idwbuff(3)%beg:idwbuff(3)%end), intent(in) :: pressure
         type(scalar_field), intent(in) :: pressure
+        type(scalar_field), dimension(1:3), intent(in) :: velocities
+        real(wp), intent(in) :: dynamic_viscosity, bulk_viscosity
 
-        integer :: i, j, k, l, ib_idx
+        integer :: i, j, k, l, q, ib_idx
         real(wp), dimension(num_ibs, 3) :: forces, torques
-        real(wp), dimension(1:3, 1:3) :: viscous_stress_tensor
-        real(wp), dimension(1:3) :: pressure_divergence, radial_vector, local_torque_contribution
+        real(wp), dimension(1:3, 1:3) :: viscous_stress_div, viscous_stress_div_1, viscous_stress_div_2 ! viscous stress tensor with temp vectors to hold divergence calculations 
+        real(wp), dimension(1:3) :: local_force_contribution, radial_vector, local_torque_contribution
         real(wp) :: cell_volume, dx, dy, dz
 
         forces = 0._wp
         torques = 0._wp
 
-        $:GPU_PARALLEL_LOOP(private='[ib_idx,radial_vector,pressure_divergence,cell_volume,local_torque_contribution, viscous_stress_tensor, dx, dy, dz]', copy='[forces,torques]', copyin='[ib_markers,patch_ib]', collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[ib_idx,radial_vector,local_force_contribution,cell_volume,local_torque_contribution, viscous_stress_div, viscous_stress_div_1, viscous_stress_div_2, dx, dy, dz]', copy='[forces,torques]', copyin='[ib_markers,patch_ib,velocities,dynamic_viscosity,bulk_viscosity]', collapse=3)
         do i = 0, m
             do j = 0, n
                 do k = 0, p
@@ -1029,34 +1031,68 @@ contains
                             dx = x_cc(i + 1) - x_cc(i)
                             dy = y_cc(j + 1) - y_cc(j)
 
-                            ! use a finite difference to compute the 2D components of the gradient of the pressure and cell volume
-                            pressure_divergence(1) = (pressure%sf(i + 1, j, k) - pressure%sf(i - 1, j, k))/(2._wp*dx)
-                            pressure_divergence(2) = (pressure%sf(i, j + 1, k) - pressure%sf(i, j - 1, k))/(2._wp*dy)
+                            ! Get the pressure contribution to force via a finite difference to compute the 2D components of the gradient of the pressure and cell volume
+                            local_force_contribution(1) = (pressure%sf(i + 1, j, k) - pressure%sf(i - 1, j, k))/(2._wp*dx)
+                            local_force_contribution(2) = (pressure%sf(i, j + 1, k) - pressure%sf(i, j - 1, k))/(2._wp*dy)
                             cell_volume = dx*dy
-
-                            ! add the 3D component, if we are working in 3 dimensions
+                            ! add the 3D component of the pressure gradient, if we are working in 3 dimensions
                             if (num_dims == 3) then
                                 dz = z_cc(k + 1) - z_cc(k)
-                                pressure_divergence(3) = (pressure%sf(i, j, k + 1) - pressure%sf(i, j, k - 1))/(2._wp*dz)
+                                local_force_contribution(3) = (pressure%sf(i, j, k + 1) - pressure%sf(i, j, k - 1))/(2._wp*dz)
                                 cell_volume = cell_volume*dz
                             else
-                                pressure_divergence(3) = 0._wp
+                              local_force_contribution(3) = 0._wp
                             end if
 
                             ! Update the force values atomically to prevent race conditions
-                            call s_cross_product(radial_vector, pressure_divergence, local_torque_contribution) ! separate out to make atomics safe
-                            local_torque_contribution = local_torque_contribution*cell_volume
+                            call s_cross_product(radial_vector, local_force_contribution, local_torque_contribution)
 
-                            ! get the viscous stress and add its contribution
+                            ! get the viscous stress and add its contribution if that is considered
+                            ! TODO :: This is really bad code
                             if (viscous) then
-                                s_compute_viscous_stress_tensor(viscous_stress_tensor, velocities, dynamic_viscosity, bulk_viscosity, i, j, k)
+                                ! get the linear force component first
+                                call s_compute_viscous_stress_tensor(viscous_stress_div_1, velocities, dynamic_viscosity, bulk_viscosity, i-1, j, k)
+                                call s_compute_viscous_stress_tensor(viscous_stress_div_2, velocities, dynamic_viscosity, bulk_viscosity, i+1, j, k)
+                                viscous_stress_div = (viscous_stress_div_2 - viscous_stress_div_1) / (2._wp * dx) ! get the x derivative of the viscous stress tensor
+                                local_force_contribution(1:3) = local_force_contribution(1:3) + viscous_stress_div(1, 1:3) ! add te x componenets of the derivative to the force
+                                do l = 1, 3
+                                    ! take the cross products for the torque componenet
+                                    call s_cross_product(radial_vector, viscous_stress_div_1(l, 1:3), viscous_stress_div_1(l, 1:3))
+                                    call s_cross_product(radial_vector, viscous_stress_div_2(l, 1:3), viscous_stress_div_2(l, 1:3))
+                                end do
+                                viscous_stress_div = (viscous_stress_div_2 - viscous_stress_div_1) / (2._wp * dx) ! get the x derivative of the cross products
+                                local_torque_contribution(1:3) = local_torque_contribution(1:3) + viscous_stress_div(1, 1:3) ! apply the cross product derivative to the torque
+                                
+                                call s_compute_viscous_stress_tensor(viscous_stress_div_1, velocities, dynamic_viscosity, bulk_viscosity, i, j-1, k)
+                                call s_compute_viscous_stress_tensor(viscous_stress_div_2, velocities, dynamic_viscosity, bulk_viscosity, i, j+1, k)
+                                viscous_stress_div = (viscous_stress_div_2 - viscous_stress_div) / (2._wp * dy)
+                                local_force_contribution(1:3) = local_force_contribution(1:3) + viscous_stress_div(2, 1:3)
+                                do l = 1, 3
+                                    call s_cross_product(radial_vector, viscous_stress_div_1(l, 1:3), viscous_stress_div_1(l, 1:3))
+                                    call s_cross_product(radial_vector, viscous_stress_div_2(l, 1:3), viscous_stress_div_2(l, 1:3))
+                                end do
+                                viscous_stress_div = (viscous_stress_div_2 - viscous_stress_div_1) / (2._wp * dy) 
+                                local_torque_contribution(1:3) = local_torque_contribution(1:3) + viscous_stress_div(1, 1:3)
+
+                                if (dum_dims == 3) then
+                                    call s_compute_viscous_stress_tensor(viscous_stress_div_1, velocities, dynamic_viscosity, bulk_viscosity, i, j, k-1)
+                                    call s_compute_viscous_stress_tensor(viscous_stress_div_2, velocities, dynamic_viscosity, bulk_viscosity, i, j, k+1)
+                                    viscous_stress_div = (viscous_stress_div_2 - viscous_stress_div_1) / (2._wp * dz)
+                                    local_force_contribution(1:3) = local_force_contribution(1:3) + viscous_stress_div(3, 1:3)
+                                    do l = 1, 3
+                                        call s_cross_product(radial_vector, viscous_stress_div_1(l, 1:3), viscous_stress_div_1(l, 1:3))
+                                        call s_cross_product(radial_vector, viscous_stress_div_2(l, 1:3), viscous_stress_div_2(l, 1:3))
+                                    end do
+                                    viscous_stress_div = (viscous_stress_div_2 - viscous_stress_div_1) / (2._wp * dz) 
+                                    local_torque_contribution(1:3) = local_torque_contribution(1:3) + viscous_stress_div(1, 1:3)
+                                end if
                             end if
 
                             do l = 1, 3
                                 $:GPU_ATOMIC(atomic='update')
-                                forces(ib_idx, l) = forces(ib_idx, l) - (pressure_divergence(l)*cell_volume)
+                                forces(ib_idx, l) = forces(ib_idx, l) - (local_force_contribution(l)*cell_volume)
                                 $:GPU_ATOMIC(atomic='update')
-                                torques(ib_idx, l) = torques(ib_idx, l) - local_torque_contribution(l)
+                                torques(ib_idx, l) = torques(ib_idx, l) - local_torque_contribution(l)*cell_volume
                             end do
                         end if
                     end if
@@ -1068,6 +1104,13 @@ contains
         ! reduce the forces across all MPI ranks
         call s_mpi_allreduce_vectors_sum(forces, forces, num_ibs, 3)
         call s_mpi_allreduce_vectors_sum(torques, torques, num_ibs, 3)
+
+        ! consider gravity after reducing to avoid double counting
+        if (body_forces) then
+            do i = 1, num_ibs
+                forces(i, 2) = forces(i, 2) - 9.8*patch_ib(ib_idx)%mass ! -9.8 m/s/s acceleration in the y direction
+            end do
+        end if
 
         ! apply the summed forces
         do i = 1, num_ibs
