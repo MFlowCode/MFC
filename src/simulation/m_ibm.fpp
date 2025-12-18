@@ -1016,6 +1016,7 @@ contains
         forces = 0._wp
         torques = 0._wp
 
+        ! TODO :: Change this to a loop over ghost points
         $:GPU_PARALLEL_LOOP(private='[ib_idx,radial_vector,local_force_contribution,cell_volume,local_torque_contribution, viscous_stress_div, viscous_stress_div_1, viscous_stress_div_2, dx, dy, dz]', copy='[forces,torques]', copyin='[ib_markers,patch_ib,dynamic_viscosity,bulk_viscosity]', collapse=3)
         do i = 0, m
             do j = 0, n
@@ -1050,7 +1051,8 @@ contains
 
                             ! get the viscous stress and add its contribution if that is considered
                             ! TODO :: This is really bad code
-                            if (viscous) then
+                            ! if (viscous) then
+                            if (.false.) then
                                 ! get the linear force component first
                                 call s_compute_viscous_stress_tensor(viscous_stress_div_1, q_prim_vf, dynamic_viscosity, bulk_viscosity, i-1, j, k)
                                 call s_compute_viscous_stress_tensor(viscous_stress_div_2, q_prim_vf, dynamic_viscosity, bulk_viscosity, i+1, j, k)
@@ -1061,7 +1063,7 @@ contains
                                     call s_cross_product(radial_vector, viscous_stress_div_1(l, 1:3), viscous_stress_div_1(l, 1:3))
                                     call s_cross_product(radial_vector, viscous_stress_div_2(l, 1:3), viscous_stress_div_2(l, 1:3))
                                 end do
-                                viscous_stress_div = (viscous_stress_div_2 - viscous_stress_div_1) / (2._wp * dx) ! get the x derivative of the cross products
+                                viscous_stress_div = (viscous_stress_div_2 - viscous_stress_div_1) / (2._wp * dx) ! get the x derivative of the cross product
                                 local_torque_contribution(1:3) = local_torque_contribution(1:3) + viscous_stress_div(1, 1:3) ! apply the cross product derivative to the torque
                                 
                                 call s_compute_viscous_stress_tensor(viscous_stress_div_1, q_prim_vf, dynamic_viscosity, bulk_viscosity, i, j-1, k)

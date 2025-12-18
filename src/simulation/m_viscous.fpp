@@ -1541,10 +1541,10 @@ contains
 
       ! compute the velocity gradient tensor
       do l = 1, num_dims
-          velocity_gradient_tensor(l,1) = (q_prim_vf(momxb+l)%sf(i+1, j, k) - q_prim_vf(momxb+l)%sf(i-1, j, k)) / (2._wp * dx(1)) 
-          velocity_gradient_tensor(l,2) = (q_prim_vf(momxb+l)%sf(i, j+1, k) - q_prim_vf(momxb+l)%sf(i, j-1, k)) / (2._wp * dx(2))
+          velocity_gradient_tensor(l,1) = (q_prim_vf(momxb+l-1)%sf(i+1, j, k) - q_prim_vf(momxb+l-1)%sf(i-1, j, k)) / (2._wp * dx(1)) 
+          velocity_gradient_tensor(l,2) = (q_prim_vf(momxb+l-1)%sf(i, j+1, k) - q_prim_vf(momxb+l-1)%sf(i, j-1, k)) / (2._wp * dx(2))
           if (num_dims == 3) then
-              velocity_gradient_tensor(l,3) = (q_prim_vf(momxb+l)%sf(i, j, k+1) - q_prim_vf(momxb+l)%sf(i, j, k-1)) / (2._wp * dx(3)) 
+              velocity_gradient_tensor(l,3) = (q_prim_vf(momxb+l-1)%sf(i, j, k+1) - q_prim_vf(momxb+l-1)%sf(i, j, k-1)) / (2._wp * dx(3)) 
           end if
       end do
 
