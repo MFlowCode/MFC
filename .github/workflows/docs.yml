@@ -34,6 +34,14 @@ jobs:
         cmake -S . -B build -G Ninja --install-prefix=$(pwd)/build/install -D MFC_DOCUMENTATION=ON
         ninja -C build install
 
+    - name: Upload Built Documentation Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: mfc-docs
+        path: build/install/docs/mfc
+        if-no-files-found: error
+        retention-days: 7
+
     # From here https://github.com/cicirello/generate-sitemap
     - name: Generate the sitemap
       id: sitemap

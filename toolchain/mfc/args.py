@@ -59,7 +59,7 @@ started, run ./mfc.sh build -h.""",
         if "m" not in mask:
             for f in dataclasses.fields(config):
                 if f.name == 'gpu':
-                    p.add_argument(f"--{f.name}", action="store", nargs='?', const= gpuConfigOptions.ACC.value,default=gpuConfigOptions.ACC.value, dest=f.name, choices=[e.value for e in gpuConfigOptions], help=f"Turn the {f.name} option to OpenACC or OpenMP.")
+                    p.add_argument(f"--{f.name}", action="store", nargs='?', const= gpuConfigOptions.ACC.value,default=gpuConfigOptions.NONE.value, dest=f.name, choices=[e.value for e in gpuConfigOptions], help=f"Turn the {f.name} option to OpenACC or OpenMP.")
                     p.add_argument(f"--no-{f.name}", action="store_const", const = gpuConfigOptions.NONE.value, dest=f.name, help=f"Turn the {f.name} option OFF.")
                     continue
                 p.add_argument(   f"--{f.name}", action="store_true",               help=f"Turn the {f.name} option ON.")

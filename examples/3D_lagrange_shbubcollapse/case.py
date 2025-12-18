@@ -26,8 +26,8 @@ T_host = T0  # temperature K
 R_uni = 8314  # Universal gas constant - J/kmol/K
 MW_g = 28.0  # Molar weight of the gas - kg/kmol
 MW_v = 18.0  # Molar weight of the vapor - kg/kmol
-gamma_g = 1.33  # Specific heat ratio of the gas
-gamma_v = 1.33  # Specific heat ratio of the vapor
+gam_g = 1.33  # Specific heat ratio of the gas
+gam_v = 1.33  # Specific heat ratio of the vapor
 pv = 2500  # Vapor pressure of the host - Pa
 cp_g = 1.0e3  # Specific heat of the gas - J/kg/K
 cp_v = 2.1e3  # Specific heat of the vapor - J/kg/K
@@ -35,7 +35,7 @@ k_g = 0.025  # Thermal conductivity of the gas - W/m/K
 k_v = 0.02  # Thermal conductivity of the vapor - W/m/K
 diffVapor = 2.5e-5  # Diffusivity coefficient of the vapor - m2/s
 sigBubble = 0.07  # Surface tension of the bubble - N/m
-mu_gas = 1.48e-5
+mu_g = 1.48e-5
 
 # Acoustic source properties
 patm = 1.0e05  # Atmospheric pressure - Pa
@@ -142,8 +142,10 @@ print(
             # Lagrangian Bubbles
             "bubbles_lagrange": "T",
             "bubble_model": 2,  # Keller-Miksis model
+            "thermal": 3,
+            "polytropic": "F",
             "lag_params%nBubs_glb": 1,
-            "lag_params%solver_approach": 2,  # Two-way coupled
+            "lag_params%solver_approach": 2,
             "lag_params%cluster_type": 2,
             "lag_params%pressure_corrector": "T",
             "lag_params%smooth_type": 1,
@@ -153,32 +155,34 @@ print(
             "lag_params%valmaxvoid": 0.9,
             "lag_params%write_bubbles": "F",
             "lag_params%write_bubbles_stats": "F",
-            "lag_params%c0": c0,
-            "lag_params%rho0": rho0,
-            "lag_params%T0": T0,
-            "lag_params%x0": x0,
-            "lag_params%Thost": T_host,
+            # Bubble parameters
+            "bub_pp%R0ref": 1.0,
+            "bub_pp%p0ref": 1.0,
+            "bub_pp%rho0ref": 1.0,
+            "bub_pp%T0ref": 1.0,
+            "bub_pp%ss": sigBubble / (rho0 * x0 * c0 * c0),
+            "bub_pp%pv": pv / p0,
+            "bub_pp%vd": diffVapor / (x0 * c0),
+            "bub_pp%mu_l": mu_host / (rho0 * x0 * c0),
+            "bub_pp%gam_v": gam_g,
+            "bub_pp%gam_g": gam_v,
+            "bub_pp%M_v": MW_g,
+            "bub_pp%M_g": MW_v,
+            "bub_pp%k_v": k_g * (T0 / (x0 * rho0 * c0 * c0 * c0)),
+            "bub_pp%k_g": k_v * (T0 / (x0 * rho0 * c0 * c0 * c0)),
+            "bub_pp%cp_v": cp_g * (T0 / (c0 * c0)),
+            "bub_pp%cp_g": cp_v * (T0 / (c0 * c0)),
+            "bub_pp%R_v": (R_uni / MW_g) * (T0 / (c0 * c0)),
+            "bub_pp%R_g": (R_uni / MW_v) * (T0 / (c0 * c0)),
             # Fluids Physical Parameters
             # Host medium
             "fluid_pp(1)%gamma": 1.0 / (gamma_host - 1.0),
             "fluid_pp(1)%pi_inf": gamma_host * (pi_inf_host / p0) / (gamma_host - 1.0),
             "fluid_pp(1)%Re(1)": 1.0 / (mu_host / (rho0 * c0 * x0)),
-            "fluid_pp(1)%mul0": mu_host,
-            "fluid_pp(1)%ss": sigBubble,
-            "fluid_pp(1)%pv": pv,
-            "fluid_pp(1)%gamma_v": gamma_v,
-            "fluid_pp(1)%M_v": MW_v,
-            "fluid_pp(1)%k_v": k_v,
-            "fluid_pp(1)%cp_v": cp_v,
             # Bubble gas state
-            "fluid_pp(2)%gamma": 1.0 / (gamma_g - 1.0),
+            "fluid_pp(2)%gamma": 1.0 / (gam_g - 1.0),
             "fluid_pp(2)%pi_inf": 0.0e00,
-            "fluid_pp(2)%Re(1)": 1.0 / (mu_gas / (rho0 * c0 * x0)),
-            "fluid_pp(2)%gamma_v": gamma_g,
-            "fluid_pp(2)%M_v": MW_g,
-            "fluid_pp(2)%k_v": k_g,
-            "fluid_pp(2)%cp_v": cp_g,
-            "fluid_pp(2)%D_v": diffVapor,
+            "fluid_pp(2)%Re(1)": 1.0 / (mu_g / (rho0 * c0 * x0)),
         }
     )
 )
