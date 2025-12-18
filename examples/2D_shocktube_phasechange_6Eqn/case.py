@@ -142,12 +142,8 @@ SF = 40
 tendA = (xe - xb) / ss * 5 / 24
 
 # 1 - ensure NtA is sufficient to go a little beyond tendA
-NtA = int(tendA // dt + 1)
-
-# Array of saves. it is the same as Nt/Sf = t_step_save
-AS = int(NtA // SF + 1)
-
-# Nt = total number of steps. Ensure Nt > NtA (so the total tendA is covered)
+NtA = int(math.ceil(tendA / dt))
+AS = int(math.ceil(NtA / SF))
 Nt = AS * SF
 
 # Total physical time
