@@ -24,7 +24,8 @@ module m_viscous
     s_compute_viscous_stress_cylindrical_boundary, &
  s_initialize_viscous_module, &
  s_reconstruct_cell_boundary_values_visc_deriv, &
- s_finalize_viscous_module
+ s_finalize_viscous_module, &
+ s_compute_viscous_stress_tensor
 
     type(int_bounds_info) :: iv
     type(int_bounds_info) :: is1_viscous, is2_viscous, is3_viscous
@@ -1512,11 +1513,11 @@ contains
     end subroutine s_compute_fd_gradient
 
     ! computes the viscous stress tensor at a particule i, j, k element
-    subroutine s_compute_viscous_stress_tensor(viscous_stress_tensor, velocities, dynamic_viscosity, bulk_viscosity, i, j, k)
+    subroutine s_compute_viscous_stress_tensor(viscous_stress_tensor, q_prim_vf, dynamic_viscosity, bulk_viscosity, i, j, k)
       $:GPU_ROUTINE(parallelism='[seq]')
 
       real(wp), dimension(1:3, 1:3), intent(inout) :: viscous_stress_tensor
-      type(scalar_field), dimension(1:3), intent(in) :: velocities
+      type(scalar_field), dimension(1:sys_size), intent(in) :: q_prim_vf
       real(wp), intent(in) :: dynamic_viscosity, bulk_viscosity
       integer, intent(in) :: i, j, k
 
@@ -1539,11 +1540,11 @@ contains
       end if
 
       ! compute the velocity gradient tensor
-      do l = 1:num_dims
-          velocity_gradient_tensor(l,1) = (velocities(l)%sf(i+1, j, k) - velocities(l)%sf(i-1, j, k)) / (2._wp * dx(1)) 
-          velocity_gradient_tensor(l,2) = (velocities(l)%sf(i, j+1, k) - velocities(l)%sf(i, j-1, k)) / (2._wp * dx(2))
+      do l = 1, num_dims
+          velocity_gradient_tensor(l,1) = (q_prim_vf(momxb+l)%sf(i+1, j, k) - q_prim_vf(momxb+l)%sf(i-1, j, k)) / (2._wp * dx(1)) 
+          velocity_gradient_tensor(l,2) = (q_prim_vf(momxb+l)%sf(i, j+1, k) - q_prim_vf(momxb+l)%sf(i, j-1, k)) / (2._wp * dx(2))
           if (num_dims == 3) then
-              velocity_gradient_tensor(l,3) = (velocities(l)%sf(i, j, k+1) - velocities(l)%sf(i, j, k-1)) / (2._wp * dx(3)) 
+              velocity_gradient_tensor(l,3) = (q_prim_vf(momxb+l)%sf(i, j, k+1) - q_prim_vf(momxb+l)%sf(i, j, k-1)) / (2._wp * dx(3)) 
           end if
       end do
 
@@ -1551,20 +1552,20 @@ contains
       divergence = velocity_gradient_tensor(1, 1) + velocity_gradient_tensor(2, 2) + velocity_gradient_tensor(3, 3)
 
       ! set up the shear stress tensor
-      do l = 1:num_dims
-          do q = 1:num_dims
+      do l = 1, num_dims
+          do q = 1, num_dims
               shear_strain_tensor(l, q) = 0.5_wp * (velocity_gradient_tensor(l,q) + velocity_gradient_tensor(q,l))
           end do
       end do
 
       ! populate the viscous_stress_tensor
-      do l = 1num_dims
-        do q = 1:num_dims
-          viscous_stress_tensor(l, q) = shear_strain_tensor(l, q)*dynamic_viscosity*2._wp
-          if (l == q) then
-              viscous_stress_tensor(l, q) = viscous_stress_tensor(l, q) + divergence * bulk_viscosity
-          end if
-        end do
+      do l = 1, num_dims
+          do q = 1, num_dims
+              viscous_stress_tensor(l, q) = shear_strain_tensor(l, q)*dynamic_viscosity*2._wp
+              if (l == q) then
+                  viscous_stress_tensor(l, q) = viscous_stress_tensor(l, q) + divergence * bulk_viscosity
+              end if
+          end do
       end do
 
     end subroutine s_compute_viscous_stress_tensor
