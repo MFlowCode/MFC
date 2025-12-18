@@ -162,7 +162,7 @@ tend = 1.2 * tc
 
 # Nt = total number of steps. Ensure Nt > NtA (so the total tendA is covered)
 # Nt = AS * SF
-Nt = int(18e3 * tend // tc * Nx / Nx0 + 1)
+Nt = int(math.ceil(18e3 * tend / tc * Nx / Nx0) + 1)
 
 dt = tend / Nt
 
