@@ -732,8 +732,8 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
                      "alf_factor must be non-negative")
         self.prohibit(model_eqns is not None and model_eqns != 2,
                      "IGR only supports model_eqns = 2")
-        self.prohibit(ib,
-                     "IGR does not support the immersed boundary method")
+#        self.prohibit(ib,
+#                     "IGR does not support the immersed boundary method")
         self.prohibit(bubbles_euler,
                      "IGR does not support Euler-Euler bubble models")
         self.prohibit(bubbles_lagrange,
