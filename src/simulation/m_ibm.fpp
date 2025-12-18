@@ -1105,12 +1105,19 @@ contains
         call s_mpi_allreduce_vectors_sum(forces, forces, num_ibs, 3)
         call s_mpi_allreduce_vectors_sum(torques, torques, num_ibs, 3)
 
-        ! consider gravity after reducing to avoid double counting
-        if (body_forces) then
-            do i = 1, num_ibs
-                forces(i, 2) = forces(i, 2) - 9.8*patch_ib(ib_idx)%mass ! -9.8 m/s/s acceleration in the y direction
-            end do
-        end if
+        ! consider body forces after reducing to avoid double counting
+        
+        do i = 1, num_ibs
+          if (bf_x) then
+              forces(i, 1) = forces(i, 1) + accel_bf(1)*patch_ib(ib_idx)%mass
+          end if
+          if (bf_y) then
+              forces(i, 2) = forces(i, 3) + accel_bf(2)*patch_ib(ib_idx)%mass
+          end if
+          if (bf_z) then
+              forces(i, 3) = forces(i, 3) + accel_bf(3)*patch_ib(ib_idx)%mass
+          end if
+        end do
 
         ! apply the summed forces
         do i = 1, num_ibs
