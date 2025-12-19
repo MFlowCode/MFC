@@ -51,7 +51,7 @@ class Mfc < Formula
     }
     saved_env = {}
     pretend_env.each do |k, v|
-      saved_env[k] = ENV[k]
+      saved_env[k] = ENV.fetch(k, nil)
       ENV[k] = v
     end
 
