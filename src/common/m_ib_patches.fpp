@@ -557,19 +557,17 @@ contains
         ! Generic loop iterators
         integer :: i, j, k, ix, iy, iz
         real(wp) :: radius
-        real(wp) :: x_pcen, y_pcen, z_pcen ! periodic centers
-        real(wp), dimension(2) :: xc, yc, zc ! array of potential centers
         real(wp) :: r2 ! radius squared
-        real(wp) :: dxr2, dyr2, dzr2 ! squared distance between point and center
+        real(wp), dimension(3, 2) :: center
 
         !! Variables to initialize the pressure field that corresponds to the
             !! bubble-collapse test case found in Tiwari et al. (2013)
 
         ! Transferring spherical patch's radius, centroid, smoothing patch
         ! identity and smoothing coefficient information
-        x_centroid = patch_ib(patch_id)%x_centroid
-        y_centroid = patch_ib(patch_id)%y_centroid
-        z_centroid = patch_ib(patch_id)%z_centroid
+        center(1, 1) = patch_ib(patch_id)%x_centroid
+        center(2, 1) = patch_ib(patch_id)%y_centroid
+        center(3, 1) = patch_ib(patch_id)%z_centroid
         radius = patch_ib(patch_id)%radius
 
         r2 = radius**2
@@ -584,36 +582,33 @@ contains
         ! that cell. If both queries check out, the primitive variables of
         ! the current patch are assigned to this cell.
 
-        ! periodically projected sphere centroid
+        ! periodically wrap centroids around domain
         if (periodic_ibs) then
-            if ((x_centroid - domain_glb(1, 1)) <= radius) then
-                x_pcen = domain_glb(1, 2) + (x_centroid - domain_glb(1, 1))
-            else if ((domain_glb(1, 2) - x_centroid) <= radius) then
-                x_pcen = domain_glb(1, 1) - (domain_glb(1, 2) - x_centroid)
+            if ((center(1, 1) - domain_glb(1, 1)) <= radius) then
+                center(1, 2) = domain_glb(1, 2) + (center(1, 1) - domain_glb(1, 1))
+            else if ((domain_glb(1, 2) - center(1, 1)) <= radius) then
+                center(1, 2) = domain_glb(1, 1) - (domain_glb(1, 2) - center(1, 1))
             else
-                x_pcen = x_centroid
+                center(1, 2) = center(1, 1)
             end if
-            if ((y_centroid - domain_glb(2, 1)) <= radius) then
-                y_pcen = domain_glb(2, 2) + (y_centroid - domain_glb(2, 1))
-            else if ((domain_glb(2, 2) - y_centroid) <= radius) then
-                y_pcen = domain_glb(2, 1) - (domain_glb(2, 2) - y_centroid)
+            if ((center(2, 1) - domain_glb(2, 1)) <= radius) then
+                center(2, 2) = domain_glb(2, 2) + (center(2, 1) - domain_glb(2, 1))
+            else if ((domain_glb(2, 2) - center(2, 1)) <= radius) then
+                center(2, 2) = domain_glb(2, 1) - (domain_glb(2, 2) - center(2, 1))
             else
-                y_pcen = y_centroid
+                center(2, 2) = center(2, 1)
             end if
-            if ((z_centroid - domain_glb(3, 1)) <= radius) then
-                z_pcen = domain_glb(3, 2) + (z_centroid - domain_glb(3, 1))
-            else if ((domain_glb(3, 2) - z_centroid) <= radius) then
-                z_pcen = domain_glb(3, 1) - (domain_glb(3, 2) - z_centroid)
+            if ((center(3, 1) - domain_glb(3, 1)) <= radius) then
+                center(3, 2) = domain_glb(3, 2) + (center(3, 1) - domain_glb(3, 1))
+            else if ((domain_glb(3, 2) - center(3, 1)) <= radius) then
+                center(3, 2) = domain_glb(3, 1) - (domain_glb(3, 2) - center(3, 1))
             else
-                z_pcen = z_centroid
+                center(3, 2) = center(3, 1)
             end if
         end if
 
-        xc = [x_centroid, x_pcen]
-        yc = [y_centroid, y_pcen]
-        zc = [z_centroid, z_pcen]
-
         if (periodic_ibs) then
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[cart_y, cart_z]', copy='[ib_markers_sf]', copyin='[patch_id, center, r2]')
             do k = 0, p
                 do j = 0, n
                     do i = 0, m
@@ -623,14 +618,10 @@ contains
                             cart_y = y_cc(j)
                             cart_z = z_cc(k)
                         end if
-                        ! Updating the patch identities bookkeeping variable
                         do ix = 1, 2
-                            dxr2 = (x_cc(i) - xc(ix))**2
                             do iy = 1, 2
-                                dyr2 = (cart_y - yc(iy))**2
                                 do iz = 1, 2
-                                    dzr2 = (cart_z - zc(iz))**2
-                                    if ((dxr2 + dyr2 + dzr2) <= r2) then
+                                    if (((x_cc(i) - center(1, ix))**2 + (cart_y - center(2, iy))**2 + (cart_z - center(3, iz))**2) <= r2) then
                                         ib_markers_sf(i, j, k) = patch_id
                                     end if
                                 end do
@@ -640,6 +631,8 @@ contains
                 end do
             end do
         else
+            $:GPU_PARALLEL_LOOP(private='[i,j,k,cart_y,cart_z]', copy='[ib_markers_sf]',&
+                      & copyin='[patch_id,center,r2]', collapse=3)
             do k = 0, p
                 do j = 0, n
                     do i = 0, m
@@ -650,9 +643,9 @@ contains
                             cart_z = z_cc(k)
                         end if
                         ! Updating the patch identities bookkeeping variable
-                        if (((x_cc(i) - x_centroid)**2 &
-                             + (cart_y - y_centroid)**2 &
-                             + (cart_z - z_centroid)**2 <= r2)) then
+                        if (((x_cc(i) - center(1, 1))**2 &
+                            + (cart_y - center(2, 1))**2 &
+                            + (cart_z - center(3, 1))**2 <= r2)) then
                             ib_markers_sf(i, j, k) = patch_id
                         end if
                     end do
