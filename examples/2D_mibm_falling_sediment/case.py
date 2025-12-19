@@ -4,6 +4,11 @@ import math
 Mu = 1.84e-05
 gam_a = 1.4
 
+total_time = 2.0
+num_time_steps = 500000
+num_saves = 200
+
+
 # Configuring case dictionary
 print(
     json.dumps(
@@ -20,13 +25,13 @@ print(
             "y_domain%beg": 0.0e00,
             "y_domain%end": 6.0e-03,
             "cyl_coord": "F",
-            "m": 250,
-            "n": 250,
+            "m": 200,
+            "n": 800,
             "p": 0,
-            "dt": 0.5e-5,
+            "dt": float(total_time / num_time_steps),
             "t_step_start": 0,
-            "t_step_stop": 5000,  # 3000
-            "t_step_save": 50,  # 10
+            "t_step_stop": int(num_time_steps),  # 3000
+            "t_step_save": int(num_time_steps / 200),  # 10
             # Simulation Algorithm Parameters
             # Only one patches are necessary, the air tube
             "num_patches": 1,
@@ -70,11 +75,11 @@ print(
             # Patch: Constant Tube filled with air
             # Specify the cylindrical air tube grid geometry
             "patch_icpp(1)%geometry": 3,
-            "patch_icpp(1)%x_centroid": 3.0e-03,
+            "patch_icpp(1)%x_centroid": 0.2,
             # Uniform medium density, centroid is at the center of the domain
-            "patch_icpp(1)%y_centroid": 3.0e-03,
-            "patch_icpp(1)%length_x": 6.0e-03,
-            "patch_icpp(1)%length_y": 6.0e-03,
+            "patch_icpp(1)%y_centroid": 1.4,
+            "patch_icpp(1)%length_x": 0.4,
+            "patch_icpp(1)%length_y": 2.8,
             # Specify the patch primitive variables
             "patch_icpp(1)%vel(1)": 0.00e00,
             "patch_icpp(1)%vel(2)": 0.0e00,
@@ -84,18 +89,24 @@ print(
             # Patch: Cylinder Immersed Boundary
             "patch_ib(1)%geometry": 6,
             "patch_ib(1)%moving_ibm": 2,
-            "patch_ib(1)%x_centroid": 1.5e-03,
-            "patch_ib(1)%y_centroid": 3.0e-03,
-            "patch_ib(1)%length_x": 0.4e-03,
-            "patch_ib(1)%length_y": 0.2e-03,
-            "patch_ib(1)%vel(2)": -0.05e00,
-            "patch_ib(1)%angles(3)": -math.pi / 4.,
-            "patch_ib(1)%mass": 1.0e-6, 
+            "patch_ib(1)%x_centroid": 0.2,
+            "patch_ib(1)%y_centroid": 2.4,
+            "patch_ib(1)%length_x": 0.1,
+            "patch_ib(1)%length_y": 0.05,
+            "patch_ib(1)%vel(2)": 0.00e00,
+            "patch_ib(1)%angles(3)": math.pi / 4.,
+            "patch_ib(1)%mass": 1.1e-6, 
             "patch_ib(1)%slip": "F",
             # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (gam_a - 1.0e00),  # 2.50(Not 1.40)
             "fluid_pp(1)%pi_inf": 0,
-            "fluid_pp(1)%Re(1)": 2500000,
+            "fluid_pp(1)%Re(1)": 1000000,
+            # Body Forces
+            "bf_y": "T",
+            "k_y": 0.0,
+            "w_y": 0.0,
+            "p_y": 0.0,
+            "g_y": -9.81,  # gravity
         }
     )
 )
