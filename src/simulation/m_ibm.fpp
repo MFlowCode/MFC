@@ -979,7 +979,7 @@ contains
     end subroutine s_finalize_ibm_module
 
     function cross_product(a, b) result(c)
-        implicit none
+        $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: a(3), b(3)
         real(wp) :: c(3)
 

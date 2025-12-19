@@ -18,10 +18,6 @@
 % if partition:
 # flux: --queue=${partition}
 % endif
-% if unified:
-# flux:--setattr=thp=always
-# flux: --coral2-hugepages=512GB
-% endif
 % endif
 
 ${helpers.template_prologue()}
@@ -40,6 +36,8 @@ echo
     export MPICH_GPU_SUPPORT_ENABLED=0
 % endif
 
+export HSA_XNACK=0
+
 % for target in targets:
     ${helpers.run_prologue(target)}
 
@@ -48,7 +46,7 @@ echo
     % else:
         (set -x; flux run \
             --nodes=${nodes} --ntasks=${tasks_per_node * nodes} \
-            --exclusive \
+            -o spindle.level=off --exclusive \
             % if gpu:
                 --gpus-per-task 1 \
             % endif

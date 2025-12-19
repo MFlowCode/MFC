@@ -46,6 +46,8 @@ module m_time_steppers
 
     use m_body_forces
 
+    use m_derived_variables
+
     implicit none
 
     type(vector_field), allocatable, dimension(:) :: q_cons_ts !<
@@ -533,6 +535,7 @@ contains
 
                 if (probe_wrt) then
                     call s_time_step_cycling(t_step)
+                    call s_compute_derived_variables(t_step, q_cons_ts(1)%vf, q_prim_ts1, q_prim_ts2)
                 end if
 
                 if (cfl_dt) then
