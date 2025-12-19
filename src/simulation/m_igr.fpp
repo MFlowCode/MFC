@@ -383,6 +383,7 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
             call s_update_igr(jac_sf)
+            ! If using Jacobi Iter, we need to update jac_old again
             if (igr_iter_solver == 1) then
                 $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
                 do l = idwbuff(3)%beg, idwbuff(3)%end

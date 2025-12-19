@@ -709,7 +709,6 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         igr_iter_solver = self.get('igr_iter_solver')
         alf_factor = self.get('alf_factor')
         model_eqns = self.get('model_eqns')
-        ib = self.get('ib', 'F') == 'T'
         bubbles_euler = self.get('bubbles_euler', 'F') == 'T'
         bubbles_lagrange = self.get('bubbles_lagrange', 'F') == 'T'
         alt_soundspeed = self.get('alt_soundspeed', 'F') == 'T'
@@ -732,8 +731,6 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
                      "alf_factor must be non-negative")
         self.prohibit(model_eqns is not None and model_eqns != 2,
                      "IGR only supports model_eqns = 2")
-#        self.prohibit(ib,
-#                     "IGR does not support the immersed boundary method")
         self.prohibit(bubbles_euler,
                      "IGR does not support Euler-Euler bubble models")
         self.prohibit(bubbles_lagrange,

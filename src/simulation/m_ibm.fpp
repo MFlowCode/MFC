@@ -156,6 +156,8 @@ contains
         integer :: j1, j2, k1, k2, l1, l2
         real(wp) :: coeff, jac_IP
         type(ghost_point) :: gp
+
+        ! At all ghost points, use its image point to interpolate sigma
         if (num_gps > 0) then
             $:GPU_PARALLEL_LOOP(private='[i, j, k, l, j1, j2, k1, k2, l1, l2, r, s, t, gp, coeff, jac_IP]')
             do i = 1, num_gps
@@ -195,7 +197,7 @@ contains
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(INOUT) :: q_cons_vf !< Primitive Variables
+            intent(INOUT) :: q_cons_vf !< Conservative Variables
 
         type(scalar_field), &
             dimension(sys_size), &
@@ -311,7 +313,7 @@ contains
                 end if
 
                 ! set the pressure
-                ! !TEMPORARY, NEED TO FIX FOR IGR
+                ! !TEMPORARY, NEED TO FIX FOR MOVING IGR
                 if (.not. igr) then
                     if (patch_ib(patch_id)%moving_ibm <= 1) then
                         q_prim_vf(E_idx)%sf(j, k, l) = pres_IP
@@ -959,6 +961,8 @@ contains
                     coeff = gp%interp_coeffs(i - i1 + 1, j - j1 + 1, k - k1 + 1)
 
                     if (igr) then
+                        ! For IGR, we will need to perform operations on
+                        ! the conservative variables instead
                         alphaSum = 0._wp
                         dyn_pres = 0._wp
                         if (num_fluids == 1) then
