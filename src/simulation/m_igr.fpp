@@ -15,7 +15,7 @@ module m_igr
 
     use m_boundary_common
 
-    use m_ibm
+    use m_ibm, only: ib, ib_markers, s_update_igr
 
     implicit none
 

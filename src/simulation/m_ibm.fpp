@@ -150,6 +150,8 @@ contains
 
     end subroutine s_populate_ib_buffers
 
+    !>  Interpolates sigma from the m_igr module at all ghost points
+        !!  @param jac_sf Sigma, Entropic pressure
     subroutine s_update_igr(jac_sf)
         type(scalar_field), dimension(1), intent(inout) :: jac_sf
         integer :: j, k, l, r, s, t, i
@@ -170,6 +172,11 @@ contains
                 j1 = gp%ip_grid(1); j2 = j1 + 1
                 k1 = gp%ip_grid(2); k2 = k1 + 1
                 l1 = gp%ip_grid(3); l2 = l1 + 1
+
+                if (p == 0) then
+                    l1 = 0
+                    l2 = 0
+                end if
 
                 $:GPU_LOOP(parallelism='[seq]')
                 do l = l1, l2
@@ -236,7 +243,7 @@ contains
 
         if (.not. igr) then
             ! set the Moving IBM interior Pressure Values
-            $:GPU_PARALLEL_LOOP(private='[i,j,k]', copyin='[E_idx]', collapse=3)
+            $:GPU_PARALLEL_LOOP(private='[j,k,l]', copyin='[E_idx]', collapse=3)
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -911,7 +918,7 @@ contains
         integer :: i, j, k, l, q !< Iterator variables
         integer :: i1, i2, j1, j2, k1, k2 !< Iterator variables
         real(wp) :: coeff
-        real(wp) :: alphaSum
+        real(wp) :: alpha_sum
         real(wp) :: pres, dyn_pres, pres_mag, T
         real(wp) :: rhoYks(1:num_species)
         real(wp) :: rho_K, gamma_K, pi_inf_K, qv_K
@@ -963,7 +970,7 @@ contains
                     if (igr) then
                         ! For IGR, we will need to perform operations on
                         ! the conservative variables instead
-                        alphaSum = 0._wp
+                        alpha_sum = 0._wp
                         dyn_pres = 0._wp
                         if (num_fluids == 1) then
                             alpha_rho_K(1) = q_cons_vf(1)%sf(i, j, k)
@@ -1015,14 +1022,15 @@ contains
                             alpha_rho_IP(1) = alpha_rho_IP(1) + coeff*q_cons_vf(contxb)%sf(i, j, k)
                             alpha_IP(1) = alpha_IP(1) + coeff*1._wp
                         else
+                            alpha_sum = 0._wp
                             $:GPU_LOOP(parallelism='[seq]')
                             do l = 1, num_fluids - 1
                                 alpha_rho_IP(l) = alpha_rho_IP(l) + coeff*q_cons_vf(l)%sf(i, j, k)
                                 alpha_IP(l) = alpha_IP(l) + coeff*q_cons_vf(E_idx + l)%sf(i, j, k)
-                                alphaSum = alphaSum + q_cons_vf(E_idx + l)%sf(i, j, k)
+                                alpha_sum = alpha_sum + q_cons_vf(E_idx + l)%sf(i, j, k)
                             end do
                             alpha_rho_IP(num_fluids) = alpha_rho_IP(num_fluids) + coeff*q_cons_vf(num_fluids)%sf(i, j, k)
-                            alpha_IP(num_fluids) = alpha_IP(num_fluids) + coeff*(1._wp - alphaSum)
+                            alpha_IP(num_fluids) = alpha_IP(num_fluids) + coeff*(1._wp - alpha_sum)
                         end if
                     else
                         pres_IP = pres_IP + coeff* &
