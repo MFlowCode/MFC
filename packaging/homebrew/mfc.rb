@@ -36,6 +36,13 @@ class Mfc < Formula
     # Match the version constraint from toolchain/pyproject.toml
     system venv/"bin/pip", "install", "--only-binary=:all:", "cantera>=3.1.0"
 
+    # MFC's toolchain uses VCS-derived versioning (via Hatch/hatch-vcs) and Homebrew builds from
+    # GitHub release tarballs without a .git directory. Provide a fallback/pretend version so
+    # metadata generation succeeds during pip install.
+    ENV["SETUPTOOLS_SCM_PRETEND_VERSION"] = version.to_s
+    ENV["SETUPTOOLS_SCM_PRETEND_VERSION_FOR_MFC"] = version.to_s
+    ENV["SETUPTOOLS_SCM_PRETEND_VERSION_FOR_mfc"] = version.to_s
+
     # Install MFC Python package and dependencies into venv
     # Use editable install (-e) to avoid RECORD file issues when venv is symlinked at runtime
     # Dependencies will use pre-built wheels from PyPI
