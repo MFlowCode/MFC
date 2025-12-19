@@ -151,9 +151,9 @@ contains
     end subroutine s_populate_ib_buffers
 
     !>  Interpolates sigma from the m_igr module at all ghost points
-        !!  @param jac_sf Sigma, Entropic pressure
-    subroutine s_update_igr(jac_sf)
-        type(scalar_field), dimension(1), intent(inout) :: jac_sf
+        !!  @param jac: Sigma, Entropic pressure
+    subroutine s_interpolate_sigma_igr(jac)
+        real(wp), dimension(:, :, :), intent(inout) :: jac
         integer :: j, k, l, r, s, t, i
         integer :: j1, j2, k1, k2, l1, l2
         real(wp) :: coeff, jac_IP
@@ -185,15 +185,15 @@ contains
                         $:GPU_LOOP(parallelism='[seq]')
                         do j = j1, j2
                             coeff = gp%interp_coeffs(j - j1 + 1, k - k1 + 1, l - l1 + 1)
-                            jac_IP = jac_IP + coeff*jac_sf(1)%sf(j, k, l)
+                            jac_IP = jac_IP + coeff*jac(j, k, l)
                         end do
                     end do
                 end do
-                jac_sf(1)%sf(r, s, t) = jac_IP
+                jac(r, s, t) = jac_IP
             end do
             $:END_GPU_PARALLEL_LOOP()
         end if
-    end subroutine s_update_igr
+    end subroutine s_interpolate_sigma_igr
 
     !>  Subroutine that updates the conservative variables at the ghost points
         !!  @param q_cons_vf Conservative Variables
