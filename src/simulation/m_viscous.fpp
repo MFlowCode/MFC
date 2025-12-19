@@ -1513,22 +1513,21 @@ contains
     end subroutine s_compute_fd_gradient
 
     ! computes the viscous stress tensor at a particule i, j, k element
-    subroutine s_compute_viscous_stress_tensor(viscous_stress_tensor, q_prim_vf, dynamic_viscosity, bulk_viscosity, i, j, k)
+    subroutine s_compute_viscous_stress_tensor(viscous_stress_tensor, q_prim_vf, dynamic_viscosity, i, j, k)
       $:GPU_ROUTINE(parallelism='[seq]')
 
       real(wp), dimension(1:3, 1:3), intent(inout) :: viscous_stress_tensor
       type(scalar_field), dimension(1:sys_size), intent(in) :: q_prim_vf
-      real(wp), intent(in) :: dynamic_viscosity, bulk_viscosity
+      real(wp), intent(in) :: dynamic_viscosity
       integer, intent(in) :: i, j, k
 
-      real(wp), dimension(1:3, 1:3) :: velocity_gradient_tensor, shear_strain_tensor
+      real(wp), dimension(1:3, 1:3) :: velocity_gradient_tensor
       real(wp), dimension(1:3) :: dx
       real(wp) :: divergence
       integer :: l, q ! iterators
 
       ! zero the viscous stress, collection of velocity diriviatives, and spacial finite differences
       viscous_stress_tensor = 0._wp
-      shear_strain_tensor = 0._wp
       velocity_gradient_tensor = 0._wp
       dx = 0._wp
 
@@ -1549,24 +1548,29 @@ contains
       end do
 
       ! compute divergence
-      divergence = velocity_gradient_tensor(1, 1) + velocity_gradient_tensor(2, 2) + velocity_gradient_tensor(3, 3)
+      divergence = 0._wp
+      do l = 1, num_dims
+          divergence = divergence + velocity_gradient_tensor(l, l)
+      end do
 
       ! set up the shear stress tensor
       do l = 1, num_dims
           do q = 1, num_dims
-              shear_strain_tensor(l, q) = 0.5_wp * (velocity_gradient_tensor(l,q) + velocity_gradient_tensor(q,l))
+              viscous_stress_tensor(l, q) = dynamic_viscosity * (velocity_gradient_tensor(l,q) + velocity_gradient_tensor(q,l))
           end do
       end do
 
       ! populate the viscous_stress_tensor
       do l = 1, num_dims
-          do q = 1, num_dims
-              viscous_stress_tensor(l, q) = shear_strain_tensor(l, q)*dynamic_viscosity*2._wp
-              if (l == q) then
-                  viscous_stress_tensor(l, q) = viscous_stress_tensor(l, q) + divergence * bulk_viscosity
-              end if
-          end do
+          viscous_stress_tensor(l, l) = viscous_stress_tensor(l, l) - 2._wp * divergence * dynamic_viscosity / 3._wp
       end do
+
+      if (num_dims == 2) then
+          do l = 1, 3
+              viscous_stress_tensor(3, l) = 0._wp
+              viscous_stress_tensor(l, 3) = 0._wp
+          end do
+      end if
 
     end subroutine s_compute_viscous_stress_tensor
 
