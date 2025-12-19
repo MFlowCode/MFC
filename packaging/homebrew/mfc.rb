@@ -29,11 +29,18 @@ class Mfc < Formula
     # Create Python virtual environment inside libexec (inside Cellar for proper bottling)
     venv = libexec/"venv"
     system Formula["python@3.12"].opt_bin/"python3.12", "-m", "venv", venv
-    system venv/"bin/pip", "install", "--upgrade", "pip", "setuptools", "wheel"
+    system venv/"bin/pip", "install", "--upgrade", "pip", "setuptools", "wheel", "setuptools-scm"
 
     # Install Cantera from PyPI using pre-built wheel (complex package, doesn't need custom flags)
     # Cantera has CMake compatibility issues when building from source with newer CMake versions
     system venv/"bin/pip", "install", "cantera==3.1.0"
+
+    # MFC's toolchain uses VCS-derived versioning (via Hatch/hatch-vcs) and Homebrew builds from
+    # GitHub release tarballs without a .git directory. Provide a fallback/pretend version so
+    # metadata generation succeeds during pip install.
+    ENV["SETUPTOOLS_SCM_PRETEND_VERSION"] = version.to_s
+    ENV["SETUPTOOLS_SCM_PRETEND_VERSION_FOR_MFC"] = version.to_s
+    ENV["SETUPTOOLS_SCM_PRETEND_VERSION_FOR_mfc"] = version.to_s
 
     # Install MFC Python package and dependencies into venv
     # Use editable install (-e) to avoid RECORD file issues when venv is symlinked at runtime
