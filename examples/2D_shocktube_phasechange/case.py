@@ -1,5 +1,16 @@
 #!/usr/bin/env python3
-import math, json
+import math, json, argparse
+
+parser = argparse.ArgumentParser(
+    prog="phasechange",
+    description="phase change considering both 5 and 6 equation models.",
+    formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+ 
+parser.add_argument("--mfc", type=json.loads, default='{}', metavar="DICT",
+                    help="MFC's toolchain's internal state.")
+parser.add_argument("-me", "--model_eqns", type=int, metavar="MODEL EQN", choices=[2, 3],
+                    help="Whether 5 or 6 equation models are chosen.")
+args = parser.parse_args()
 
 ## 1 FOR BACKGROUND, 2 FOR SHOKED STATE, 3 FOR WATER REGION (WHEN NEEDED)
 # Pressure
@@ -173,7 +184,7 @@ print(
             "t_step_save": AS,
             # Simulation Algorithm Parameters
             "num_patches": 3,
-            "model_eqns": 3,
+            "model_eqns": args.model_eqns,
             "num_fluids": 3,
             "mpp_lim": "T",
             "mixture_err": "T",

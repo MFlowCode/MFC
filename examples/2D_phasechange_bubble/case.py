@@ -1,5 +1,16 @@
 #!/usr/bin/env python3
-import math, json
+import math, json, argparse
+
+parser = argparse.ArgumentParser(
+    prog="phasechange",
+    description="phase change considering both 5 and 6 equation models.",
+    formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+ 
+parser.add_argument("--mfc", type=json.loads, default='{}', metavar="DICT",
+                    help="MFC's toolchain's internal state.")
+parser.add_argument("-me", "--model_eqns", type=int, metavar="MODEL EQN", choices=[2, 3],
+                    help="Whether 5 or 6 equation models are chosen.")
+args = parser.parse_args()
 
 ## 1 FOR BACKGROUND, 2 FOR BUBBLE
 # Pressure [Pa]
@@ -123,9 +134,9 @@ R0 = 30e-06
 
 # number of elements
 Nx0 = 400
-Nx = 100
-Ny = 100
-Nz = 100
+Nx = 1600
+Ny = 1600
+Nz = 1600
 
 # domain boundaries
 xb = 0.00
@@ -182,8 +193,6 @@ print(
             "x_domain%end": xe,
             "y_domain%beg": yb,
             "y_domain%end": ye,
-            "z_domain%beg": zb,
-            "z_domain%end": ze,
             "stretch_x": "T",
             "loops_x": 3,
             "a_x": 4.0e0,
@@ -194,32 +203,27 @@ print(
             "a_y": 4.0e0,
             "y_a": -2.0 * R0,
             "y_b": 2.0 * R0,
-            "stretch_z": "T",
-            "loops_z": 3,
-            "a_z": 4.0e0,
-            "z_a": -2.0 * R0,
-            "z_b": 2.0 * R0,
-            "cyl_coord": "F",
+            "cyl_coord": "T",
             "m": Nx,
             "n": Ny,
-            "p": Nz,
+            "p": 0,
             "dt": dt,
             "t_step_start": 0,
             "t_step_stop": Nt,
             "t_step_save": AS,
             # Simulation Algorithm Parameters
             "num_patches": 2,
-            "model_eqns": 3,
+            "model_eqns": args.model_eqns,
             "num_fluids": 3,
             "mpp_lim": "T",
             "mixture_err": "T",
             "relax": "T",
             "relax_model": 6,
-            "palpha_eps": 1.0e-6,
+            "palpha_eps": 1.0e-8,
             "ptgalpha_eps": 1.0e-2,
             "time_stepper": 3,
             "weno_order": 3,
-            "weno_eps": 1.0e-32,
+            "weno_eps": 1.0e-16,
             "weno_Re_flux": "F",
             "weno_avg": "F",
             "mapped_weno": "T",
@@ -232,8 +236,6 @@ print(
             "bc_x%end": -6,
             "bc_y%beg": -2,
             "bc_y%end": -6,
-            "bc_z%beg": -2,
-            "bc_z%end": -6,
             # Formatted Database Files Structure Parameters
             "format": 1,
             "precision": 2,
@@ -241,16 +243,13 @@ print(
             "parallel_io": "T",
             # Patch 1: High pressured water
             # Specify the cubic water background grid geometry
-            "patch_icpp(1)%geometry": 9,
+            "patch_icpp(1)%geometry": 3,
             "patch_icpp(1)%x_centroid": (xe + xb) * 500000 / 100,
             "patch_icpp(1)%y_centroid": (ye + yb) * 500000 / 100,
-            "patch_icpp(1)%z_centroid": (ze + zb) * 500000 / 100,
             "patch_icpp(1)%length_x": (xe - xb) * 1000000 / 100,
             "patch_icpp(1)%length_y": (ye - yb) * 1000000 / 100,
-            "patch_icpp(1)%length_z": (ze - zb) * 1000000 / 100,
             "patch_icpp(1)%vel(1)": 0.0e00,
             "patch_icpp(1)%vel(2)": 0.0e00,
-            "patch_icpp(1)%vel(3)": 0.0e00,
             "patch_icpp(1)%pres": p01,
             "patch_icpp(1)%alpha_rho(1)": awl1 * rho0wl1,
             "patch_icpp(1)%alpha_rho(2)": awv1 * rho0wv1,
@@ -259,14 +258,12 @@ print(
             "patch_icpp(1)%alpha(2)": awv1,
             "patch_icpp(1)%alpha(3)": aa1,
             # Patch 2: (Vapor) Bubble
-            "patch_icpp(2)%geometry": 8,
+            "patch_icpp(2)%geometry": 2,
             "patch_icpp(2)%x_centroid": xb,
             "patch_icpp(2)%y_centroid": yb,
-            "patch_icpp(2)%z_centroid": zb,
             "patch_icpp(2)%radius": R0,
             "patch_icpp(2)%vel(1)": 0.0e00,
             "patch_icpp(2)%vel(2)": 0.0e00,
-            "patch_icpp(2)%vel(3)": 0.0e00,
             "patch_icpp(2)%pres": p02,
             "patch_icpp(2)%alpha_rho(1)": awl2 * rho0wl2,
             "patch_icpp(2)%alpha_rho(2)": awv2 * rho0wv2,
