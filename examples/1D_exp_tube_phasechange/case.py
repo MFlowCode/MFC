@@ -8,8 +8,8 @@ parser = argparse.ArgumentParser(
  
 parser.add_argument("--mfc", type=json.loads, default='{}', metavar="DICT",
                     help="MFC's toolchain's internal state.")
-parser.add_argument("-me", "--model_eqns", type=int, metavar="MODEL EQN", choices=[2, 3],
-                    help="Whether 5 or 6 equation models are chosen.")
+parser.add_argument("-me", "--model_eqns", type=int, metavar="MODEL EQN", choices=[2, 3], default=3,
+                    help="choose `2' for 5-equation model or `3' for 6-equation model.")
 args = parser.parse_args()
 
 # Pressure
