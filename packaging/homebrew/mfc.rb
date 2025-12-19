@@ -47,7 +47,7 @@ class Mfc < Formula
     pretend_env = {
       "SETUPTOOLS_SCM_PRETEND_VERSION_FOR_MFC" => version.to_s,
       "SETUPTOOLS_SCM_PRETEND_VERSION_FOR_mfc" => version.to_s,
-      "SETUPTOOLS_SCM_PRETEND_VERSION" => version.to_s, # Fallback for hatch-vcs/setuptools-scm
+      "SETUPTOOLS_SCM_PRETEND_VERSION"         => version.to_s, # Fallback for hatch-vcs/setuptools-scm
     }
     saved_env = {}
     pretend_env.each do |k, v|
