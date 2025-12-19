@@ -20,11 +20,8 @@ module m_pressure_relaxation
  s_initialize_pressure_relaxation_module, &
  s_finalize_pressure_relaxation_module
 
-    real(wp), allocatable, dimension(:) :: gamma_min, pres_inf
-    $:GPU_DECLARE(create='[gamma_min, pres_inf]')
-
-    real(wp), allocatable, dimension(:, :) :: Res
-    $:GPU_DECLARE(create='[Res]')
+    real(wp), allocatable, dimension(:, :) :: Res_pr
+    $:GPU_DECLARE(create='[Res_pr]')
 
 contains
 
@@ -33,22 +30,14 @@ contains
 
         integer :: i, j
 
-        @:ALLOCATE(gamma_min(1:num_fluids), pres_inf(1:num_fluids))
-
-        do i = 1, num_fluids
-            gamma_min(i) = 1._wp/fluid_pp(i)%gamma + 1._wp
-            pres_inf(i) = fluid_pp(i)%pi_inf/(1._wp + fluid_pp(i)%gamma)
-        end do
-        $:GPU_UPDATE(device='[gamma_min, pres_inf]')
-
         if (viscous) then
-            @:ALLOCATE(Res(1:2, 1:Re_size_max))
+            @:ALLOCATE(Res_pr(1:2, 1:Re_size_max))
             do i = 1, 2
                 do j = 1, Re_size(i)
-                    Res(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
+                    Res_pr(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
                 end do
             end do
-            $:GPU_UPDATE(device='[Res, Re_idx, Re_size]')
+            $:GPU_UPDATE(device='[Res_pr, Re_idx, Re_size]')
         end if
 
     end subroutine s_initialize_pressure_relaxation_module
@@ -56,21 +45,20 @@ contains
     !> Finalize the pressure relaxation module
     impure subroutine s_finalize_pressure_relaxation_module
 
-        @:DEALLOCATE(gamma_min, pres_inf)
         if (viscous) then
-            @:DEALLOCATE(Res)
+            @:DEALLOCATE(Res_pr)
         end if
 
     end subroutine s_finalize_pressure_relaxation_module
 
     !> The main pressure relaxation procedure
     !! @param q_cons_vf Cell-average conservative variables
-    pure subroutine s_pressure_relaxation_procedure(q_cons_vf)
+    subroutine s_pressure_relaxation_procedure(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         integer :: j, k, l
 
-        $:GPU_PARALLEL_LOOP(collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -78,11 +66,12 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_pressure_relaxation_procedure
 
     !> Process pressure relaxation for a single cell
-    pure subroutine s_relax_cell_pressure(q_cons_vf, j, k, l)
+    subroutine s_relax_cell_pressure(q_cons_vf, j, k, l)
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
@@ -102,7 +91,7 @@ contains
     end subroutine s_relax_cell_pressure
 
     !> Check if pressure relaxation is needed for this cell
-    pure logical function s_needs_pressure_relaxation(q_cons_vf, j, k, l)
+    logical function s_needs_pressure_relaxation(q_cons_vf, j, k, l)
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
@@ -120,7 +109,7 @@ contains
     end function s_needs_pressure_relaxation
 
     !> Correct volume fractions to physical bounds
-    pure subroutine s_correct_volume_fractions(q_cons_vf, j, k, l)
+    subroutine s_correct_volume_fractions(q_cons_vf, j, k, l)
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
@@ -150,7 +139,7 @@ contains
     end subroutine s_correct_volume_fractions
 
     !> Main pressure equilibration using Newton-Raphson
-    pure subroutine s_equilibrate_pressure(q_cons_vf, j, k, l)
+    subroutine s_equilibrate_pressure(q_cons_vf, j, k, l)
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
@@ -169,8 +158,8 @@ contains
             if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > sgm_eps) then
                 pres_K_init(i) = (q_cons_vf(i + intxb - 1)%sf(j, k, l)/ &
                                   q_cons_vf(i + advxb - 1)%sf(j, k, l) - pi_infs(i))/gammas(i)
-                if (pres_K_init(i) <= -(1._wp - 1.e-8_wp)*pres_inf(i) + 1.e-8_wp) &
-                    pres_K_init(i) = -(1._wp - 1.e-8_wp)*pres_inf(i) + 1.e-8_wp
+                if (pres_K_init(i) <= -(1._wp - 1.e-8_wp)*ps_inf(i) + 1.e-8_wp) &
+                    pres_K_init(i) = -(1._wp - 1.e-8_wp)*ps_inf(i) + 1.e-8_wp
             else
                 pres_K_init(i) = 0._wp
             end if
@@ -187,8 +176,8 @@ contains
 
                 ! Enforce pressure bounds
                 do i = 1, num_fluids
-                    if (pres_relax <= -(1._wp - 1.e-8_wp)*pres_inf(i) + 1.e-8_wp) &
-                        pres_relax = -(1._wp - 1.e-8_wp)*pres_inf(i) + 1._wp
+                    if (pres_relax <= -(1._wp - 1.e-8_wp)*ps_inf(i) + 1.e-8_wp) &
+                        pres_relax = -(1._wp - 1.e-8_wp)*ps_inf(i) + 1.e-8_wp
                 end do
 
                 ! Newton-Raphson step
@@ -199,11 +188,11 @@ contains
                     if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > sgm_eps) then
                         rho_K_s(i) = q_cons_vf(i + contxb - 1)%sf(j, k, l)/ &
                                      max(q_cons_vf(i + advxb - 1)%sf(j, k, l), sgm_eps) &
-                                     *((pres_relax + pres_inf(i))/(pres_K_init(i) + &
-                                                                   pres_inf(i)))**(1._wp/gamma_min(i))
+                                     *((pres_relax + ps_inf(i))/(pres_K_init(i) + &
+                                                                 ps_inf(i)))**(1._wp/gs_min(i))
                         f_pres = f_pres + q_cons_vf(i + contxb - 1)%sf(j, k, l)/rho_K_s(i)
                         df_pres = df_pres - q_cons_vf(i + contxb - 1)%sf(j, k, l) &
-                                  /(gamma_min(i)*rho_K_s(i)*(pres_relax + pres_inf(i)))
+                                  /(gs_min(i)*rho_K_s(i)*(pres_relax + ps_inf(i)))
                     end if
                 end do
             end if
@@ -219,7 +208,7 @@ contains
     end subroutine s_equilibrate_pressure
 
     !> Correct internal energies using equilibrated pressure
-    pure subroutine s_correct_internal_energies(q_cons_vf, j, k, l)
+    subroutine s_correct_internal_energies(q_cons_vf, j, k, l)
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
@@ -287,7 +276,7 @@ contains
                     if (Re_size(i) > 0) Re(i) = 0._wp
                     $:GPU_LOOP(parallelism='[seq]')
                     do q = 1, Re_size(i)
-                        Re(i) = alpha(Re_idx(i, q))/Res(i, q) + Re(i)
+                        Re(i) = alpha(Re_idx(i, q))/Res_pr(i, q) + Re(i)
                     end do
                     Re(i) = 1._wp/max(Re(i), sgm_eps)
                 end do

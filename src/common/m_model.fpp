@@ -424,7 +424,7 @@ contains
     end subroutine s_model_write
 
     !> This procedure frees the memory allocated for an STL mesh.
-    pure subroutine s_model_free(model)
+    subroutine s_model_free(model)
 
         type(t_model), intent(inout) :: model
 
@@ -532,7 +532,7 @@ contains
     !! @param ray      Ray.
     !! @param triangle Triangle.
     !! @return         True if the ray intersects the triangle, false otherwise.
-    pure elemental function f_intersects_triangle(ray, triangle) result(intersects)
+    elemental function f_intersects_triangle(ray, triangle) result(intersects)
 
         type(t_ray), intent(in) :: ray
         type(t_triangle), intent(in) :: triangle
@@ -592,7 +592,8 @@ contains
     !! @param boundary_v                 Output boundary vertices/normals.
     !! @param boundary_vertex_count      Output total boundary vertex count
     !! @param boundary_edge_count        Output total boundary edge counts
-    pure subroutine f_check_boundary(model, boundary_v, boundary_vertex_count, boundary_edge_count)
+    subroutine f_check_boundary(model, boundary_v, boundary_vertex_count, boundary_edge_count)
+
         type(t_model), intent(in) :: model
         real(wp), allocatable, intent(out), dimension(:, :, :) :: boundary_v !< Output boundary vertices/normals
         integer, intent(out) :: boundary_vertex_count, boundary_edge_count !< Output boundary vertex/edge count
@@ -705,7 +706,8 @@ contains
     !! @param edge                 Edges end points to be registered
     !! @param edge_index           Edge index iterator
     !! @param edge_count           Total number of edges
-    pure subroutine f_register_edge(temp_boundary_v, edge, edge_index, edge_count)
+    subroutine f_register_edge(temp_boundary_v, edge, edge_index, edge_count)
+
         integer, intent(inout) :: edge_index !< Edge index iterator
         integer, intent(inout) :: edge_count !< Total number of edges
         real(wp), intent(in), dimension(1:2, 1:2) :: edge !< Edges end points to be registered
@@ -723,7 +725,8 @@ contains
     !! @param boundary_edge_count       Output total number of boundary edges
     !! @param spacing                   Dimensions of the current levelset cell
     !! @param interpolate               Logical output
-    pure subroutine f_check_interpolation_2D(boundary_v, boundary_edge_count, spacing, interpolate)
+    subroutine f_check_interpolation_2D(boundary_v, boundary_edge_count, spacing, interpolate)
+
         logical, intent(inout) :: interpolate !< Logical indicator of interpolation
         integer, intent(in) :: boundary_edge_count !< Number of boundary edges
         real(wp), intent(in), dimension(1:boundary_edge_count, 1:3, 1:2) :: boundary_v
@@ -753,7 +756,8 @@ contains
     !! @param model              Model to search in.
     !! @param spacing            Dimensions of the current levelset cell
     !! @param interpolate        Logical output
-    pure subroutine f_check_interpolation_3D(model, spacing, interpolate)
+    subroutine f_check_interpolation_3D(model, spacing, interpolate)
+
         logical, intent(inout) :: interpolate
         type(t_model), intent(in) :: model
         real(wp), dimension(1:3), intent(in) :: spacing
@@ -799,7 +803,8 @@ contains
     !! @param spacing                      Dimensions of the current levelset cell
     !! @param interpolated_boundary_v      Output all the boundary vertices of the interpolated 2D model
     !! @param total_vertices               Total number of vertices after interpolation
-    pure subroutine f_interpolate_2D(boundary_v, boundary_edge_count, spacing, interpolated_boundary_v, total_vertices)
+    subroutine f_interpolate_2D(boundary_v, boundary_edge_count, spacing, interpolated_boundary_v, total_vertices)
+
         real(wp), intent(in), dimension(:, :, :) :: boundary_v
         real(wp), dimension(1:3), intent(in) :: spacing
         real(wp), allocatable, intent(inout), dimension(:, :) :: interpolated_boundary_v
@@ -1042,7 +1047,8 @@ contains
     !! @param point        The cell centers of the current level cell
     !! @param normals      The output levelset normals
     !! @param distance     The output levelset distance
-    pure subroutine f_distance_normals_3D(model, point, normals, distance)
+    subroutine f_distance_normals_3D(model, point, normals, distance)
+
         type(t_model), intent(IN) :: model
         real(wp), dimension(1:3), intent(in) :: point
         real(wp), dimension(1:3), intent(out) :: normals
@@ -1104,7 +1110,8 @@ contains
     !! @param point                        The cell centers of the current levelset cell
     !! @param spacing                      Dimensions of the current levelset cell
     !! @return                             Distance which the levelset distance without interpolation
-    pure function f_distance(boundary_v, boundary_edge_count, point) result(distance)
+    function f_distance(boundary_v, boundary_edge_count, point) result(distance)
+
         integer, intent(in) :: boundary_edge_count
         real(wp), intent(in), dimension(1:boundary_edge_count, 1:3, 1:2) :: boundary_v
         real(wp), dimension(1:3), intent(in) :: point
@@ -1134,7 +1141,8 @@ contains
     !! @param boundary_edge_count          Output the total number of boundary edges
     !! @param point                        The cell centers of the current levelset cell
     !! @param normals                      Output levelset normals without interpolation
-    pure subroutine f_normals(boundary_v, boundary_edge_count, point, normals)
+    subroutine f_normals(boundary_v, boundary_edge_count, point, normals)
+
         integer, intent(in) :: boundary_edge_count
         real(wp), intent(in), dimension(1:boundary_edge_count, 1:3, 1:2) :: boundary_v
         real(wp), dimension(1:3), intent(in) :: point
@@ -1169,7 +1177,8 @@ contains
     end subroutine f_normals
 
     !> This procedure calculates the barycentric facet area
-    pure subroutine f_tri_area(tri, tri_area)
+    subroutine f_tri_area(tri, tri_area)
+
         real(wp), dimension(1:3, 1:3), intent(in) :: tri
         real(wp), intent(out) :: tri_area
         real(wp), dimension(1:3) :: AB, AC, cross
@@ -1192,7 +1201,8 @@ contains
     !! @param total_vertices               Total number of vertices after interpolation
     !! @param point                        The cell centers of the current levelset cell
     !! @return                             Distance which the levelset distance without interpolation
-    pure function f_interpolated_distance(interpolated_boundary_v, total_vertices, point) result(distance)
+    function f_interpolated_distance(interpolated_boundary_v, total_vertices, point) result(distance)
+
         integer, intent(in) :: total_vertices
         real(wp), intent(in), dimension(1:total_vertices, 1:3) :: interpolated_boundary_v
         real(wp), dimension(1:3), intent(in) :: point

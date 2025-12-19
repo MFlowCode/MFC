@@ -4,9 +4,9 @@ import json
 
 # Domain parameters
 
-D = 2  # Jet diameter
+D = 2.0  # Jet diameter
 Nd = 100  # Cells per jet diameter
-x0 = 0  # x_beg coordinate
+x0 = 0.0  # x_beg coordinate
 x1 = 3 * D  # x_end coordinate
 y0 = -3 * D / 2  # y_beg coordinate
 y1 = 3 * D / 2  # y_end coordinate

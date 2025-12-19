@@ -113,6 +113,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
         $:GPU_UPDATE(host='[spatial_rho, spatial_u, spatial_eps]')
 
@@ -164,6 +165,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
         ! add the forcing terms to the RHS
         $:GPU_PARALLEL_LOOP(collapse=3)
@@ -176,6 +178,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
         ! compare L2 norms of energy forcing due to linear and nonlinear terms
         if (forcing_wrt .and. proc_rank == 0) then

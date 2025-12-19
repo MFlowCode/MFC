@@ -1,0 +1,120 @@
+name: Deploy Homebrew Tap
+
+on:
+  # Test formula on PRs (audit only, don't deploy)
+  pull_request:
+    branches: [ master ]
+    paths:
+      - 'packaging/homebrew/mfc.rb'
+      - 'packaging/homebrew/README.md'
+  # Deploy to tap on push to master
+  push:
+    branches: [ master, homebrew-new ]
+    paths:
+      - 'packaging/homebrew/mfc.rb'
+      - 'packaging/homebrew/README.md'
+    tags:
+      - 'v*.*.*'
+  # Allow manual trigger for testing
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-tap:
+    name: Audit and deploy formula
+    runs-on: macos-14
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout MFC repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine event metadata
+        id: meta
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+            URL="https://github.com/${{ github.repository }}/archive/refs/tags/v${VERSION}.tar.gz"
+          else
+            # Extract URL from current formula to re-audit and sync
+            URL="$(grep -Eo 'https://github.com/.*/archive/refs/tags/v[0-9]+\.[0-9]+\.[0-9]+\.tar\.gz' packaging/homebrew/mfc.rb | head -n1)"
+            VERSION="$(echo "${URL}" | sed -E 's/.*v([0-9]+\.[0-9]+\.[0-9]+)\.tar\.gz/\1/')"
+          fi
+          SHASUM="$(curl -sL "${URL}" | shasum -a 256 | awk '{print $1}')"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "url=${URL}" >> $GITHUB_OUTPUT
+          echo "sha256=${SHASUM}" >> $GITHUB_OUTPUT
+          echo "Event: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "Version: ${VERSION}" >> $GITHUB_STEP_SUMMARY
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "Mode: Audit only (PR)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Mode: Audit and deploy" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Update formula (for tag events)
+        if: github.ref_type == 'tag'
+        run: |
+          /usr/bin/sed -i '' "s@^  url \".*\"@  url \"${{ steps.meta.outputs.url }}\"@" packaging/homebrew/mfc.rb
+          /usr/bin/sed -i '' "s@^  sha256 \".*\"@  sha256 \"${{ steps.meta.outputs.sha256 }}\"@" packaging/homebrew/mfc.rb
+
+      - name: Setup Homebrew
+        uses: Homebrew/actions/setup-homebrew@master
+
+      - name: Audit/style formula before pushing
+        run: |
+          brew style packaging/homebrew/mfc.rb
+          # Create temporary tap to audit the formula
+          brew tap-new mfc/local
+          cp packaging/homebrew/mfc.rb "$(brew --repository)/Library/Taps/mfc/homebrew-local/Formula/mfc.rb"
+          brew audit --online --strict --new --except=homepage mfc/local/mfc || brew audit --online mfc/local/mfc
+          brew untap mfc/local
+
+      - name: Clone or bootstrap tap repository
+        if: github.event_name != 'pull_request'
+        env:
+          TAP_TOKEN: ${{ secrets.TAP_REPO_TOKEN }}
+        run: |
+          set -euo pipefail
+          REPO="https://x-access-token:${TAP_TOKEN}@github.com/MFlowCode/homebrew-mfc.git"
+          if git ls-remote "${REPO}" HEAD >/dev/null 2>&1; then
+            git clone "${REPO}" tap-repo
+          else
+            # Repo exists but might be empty; fall back to bootstrap
+            mkdir -p tap-repo
+            cd tap-repo
+            git init -b main
+            git remote add origin "${REPO}"
+            touch .keep
+            git add .keep
+            git -c user.name="github-actions[bot]" -c user.email="github-actions[bot]@users.noreply.github.com" commit -m "Initialize tap"
+            git push -u origin main
+          fi
+
+      - name: Copy formula and README into tap
+        if: github.event_name != 'pull_request'
+        run: |
+          mkdir -p tap-repo/Formula
+          cp packaging/homebrew/mfc.rb tap-repo/Formula/mfc.rb
+          cp packaging/homebrew/README.md tap-repo/README.md
+
+      - name: Commit & push if changed
+        if: github.event_name != 'pull_request'
+        env:
+          TAP_TOKEN: ${{ secrets.TAP_REPO_TOKEN }}
+        run: |
+          cd tap-repo
+          git add Formula/mfc.rb README.md
+          if git diff --cached --quiet; then
+            echo "No changes in Formula/mfc.rb or README.md; skipping push."
+            exit 0
+          fi
+          git -c user.name="github-actions[bot]" -c user.email="github-actions[bot]@users.noreply.github.com" \
+            commit -m "mfc: v${{ steps.meta.outputs.version }}"
+          git push origin HEAD:main
+

@@ -135,8 +135,8 @@ contains
             a_z, x_a, y_a, z_a, x_b, y_b, z_b, &
             model_eqns, num_fluids, mpp_lim, &
             weno_order, bc_x, bc_y, bc_z, num_patches, &
-            hypoelasticity, mhd, patch_icpp, fluid_pp, precision, parallel_io, &
-            mixlayer_vel_profile, mixlayer_vel_coef, &
+            hypoelasticity, mhd, patch_icpp, fluid_pp, bub_pp, &
+            precision, parallel_io, mixlayer_vel_profile, mixlayer_vel_coef, &
             mixlayer_perturb, mixlayer_perturb_nk, mixlayer_perturb_k0, &
             pi_fac, perturb_flow, perturb_flow_fluid, perturb_flow_mag, &
             perturb_sph, perturb_sph_fluid, fluid_rho, &
@@ -153,7 +153,8 @@ contains
             viscous, bubbles_lagrange, bc_x, bc_y, bc_z, num_bc_patches, &
             patch_bc, Bx0, relativity, cont_damage, igr, igr_order, &
             down_sample, recon_type, muscl_order, fft_wrt, &
-            periodic_ibs, store_levelset, slab_domain_decomposition
+            periodic_ibs, store_levelset, slab_domain_decomposition, & 
+            simplex_perturb, simplex_params
 
         ! Inquiring the status of the pre_process.inp file
         file_loc = 'pre_process.inp'
@@ -772,19 +773,8 @@ contains
         ! Computation of parameters, allocation procedures, and/or any other tasks
         ! needed to properly setup the modules
         call s_initialize_global_parameters_module()
-        !Quadrature weights and nodes for polydisperse simulations
-        if (bubbles_euler .and. nb > 1) then
-            call s_simpson(weight, R0)
-        end if
-        !Initialize variables for non-polytropic (Preston) model
-        if (bubbles_euler .and. .not. polytropic) then
-            call s_initialize_nonpoly()
-        end if
-        !Initialize pb based on surface tension for qbmm (polytropic)
-        if (qbmm .and. polytropic .and. (.not. f_is_default(Web))) then
-            pb0(:) = pref + 2._wp*fluid_pp(1)%ss/(R0(:)*R0ref)
-            pb0(:) = pb0(:)/pref
-            pref = 1._wp
+        if (bubbles_euler .or. bubbles_lagrange) then
+            call s_initialize_bubbles_model()
         end if
         call s_initialize_mpi_common_module()
         call s_initialize_data_output_module()
@@ -950,7 +940,7 @@ contains
         call s_finalize_perturbation_module()
         call s_finalize_boundary_common_module()
         if (relax) call s_finalize_relaxation_solver_module()
-
+        call s_finalize_initial_condition_module()
         ! Finalization of the MPI environment
         call s_mpi_finalize()
     end subroutine s_finalize_modules

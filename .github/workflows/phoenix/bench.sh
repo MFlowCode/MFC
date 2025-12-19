@@ -2,10 +2,18 @@
 
 n_ranks=12
 
+echo "My interface is:" $job_interface
+device_opts=""
 if [ "$job_device" = "gpu" ]; then
     n_ranks=$(nvidia-smi -L | wc -l)        # number of GPUs on node
     gpu_ids=$(seq -s ' ' 0 $(($n_ranks-1))) # 0,1,2,...,gpu_count-1
-    device_opts="--gpu -g $gpu_ids"
+    device_opts+="--gpu"
+    if [ "$job_interface" = "acc" ]; then
+        device_opts+=" acc"
+    elif [ "$job_interface" = "omp" ]; then
+        device_opts+=" mp"
+    fi
+    device_opts+=" -g $gpu_ids"
 fi
 
 tmpbuild=/storage/scratch1/6/sbryngelson3/mytmp_build

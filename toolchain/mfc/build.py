@@ -6,6 +6,7 @@ from .common  import MFCException, system, delete_directory, create_directory, \
                      format_list_to_string
 from .state   import ARG, CFG
 from .run     import input
+from .state   import gpuConfigOptions
 
 @dataclasses.dataclass
 class MFCTarget:
@@ -17,7 +18,7 @@ class MFCTarget:
 
         def compute(self) -> typing.Set:
             r  = self.all[:]
-            r += self.gpu[:] if ARG("gpu") else self.cpu[:]
+            r += self.gpu[:] if (ARG("gpu") != gpuConfigOptions.NONE.value) else self.cpu[:]
 
             return r
 
@@ -136,7 +137,8 @@ class MFCTarget:
             # Location prefix to install bin/, lib/, include/, etc.
             # See: https://cmake.org/cmake/help/latest/command/install.html.
             f"-DCMAKE_INSTALL_PREFIX={install_dirpath}",
-            f"-DMFC_SINGLE_PRECISION={'ON' if ARG('single') else 'OFF'}"
+            f"-DMFC_SINGLE_PRECISION={'ON' if (ARG('single') or ARG('mixed')) else 'OFF'}",
+            f"-DMFC_MIXED_PRECISION={'ON' if ARG('mixed') else 'OFF'}"
         ]
 
         if ARG("verbose"):
@@ -144,7 +146,10 @@ class MFCTarget:
 
         if not self.isDependency:
             flags.append(f"-DMFC_MPI={    'ON' if ARG('mpi') else 'OFF'}")
-            flags.append(f"-DMFC_OpenACC={'ON' if ARG('gpu') else 'OFF'}")
+            # flags.append(f"-DMFC_OpenACC={'ON' if ARG('acc') else 'OFF'}")
+            # flags.append(f"-DMFC_OpenMP={'ON' if ARG('mp') else 'OFF'}")
+            flags.append(f"-DMFC_OpenACC={'ON' if (ARG('gpu') == gpuConfigOptions.ACC.value) else 'OFF'}")
+            flags.append(f"-DMFC_OpenMP={'ON' if (ARG('gpu') == gpuConfigOptions.MP.value) else 'OFF'}")
             flags.append(f"-DMFC_GCov={   'ON' if ARG('gcov') else 'OFF'}")
             flags.append(f"-DMFC_Unified={'ON' if ARG('unified') else 'OFF'}")
             flags.append(f"-DMFC_Fastmath={'ON' if ARG('fastmath') else 'OFF'}")

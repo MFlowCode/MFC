@@ -95,7 +95,7 @@ contains
             t_step_stop, t_step_save, model_eqns, &
             num_fluids, mpp_lim, &
             weno_order, bc_x, &
-            bc_y, bc_z, fluid_pp, format, precision, &
+            bc_y, bc_z, fluid_pp, bub_pp, format, precision, &
             output_partial_domain, x_output, y_output, z_output, &
             hypoelasticity, G, mhd, &
             chem_wrt_Y, chem_wrt_T, avg_state, &
@@ -120,7 +120,7 @@ contains
             lag_rmin_wrt, lag_dphidt_wrt, lag_pres_wrt, lag_mv_wrt, &
             lag_mg_wrt, lag_betaT_wrt, lag_betaC_wrt, &
             periodic_ibs, store_levelset, slab_domain_decomposition, &
-            q_filtered_wrt
+            q_filtered_wrt, alpha_rho_e_wrt
 
         ! Inquiring the status of the post_process.inp file
         file_loc = 'post_process.inp'
@@ -476,6 +476,19 @@ contains
 
         end if
 
+        ! Adding the individual energies to the formatted database file
+        if (model_eqns == 3) then
+            do i = 1, num_fluids
+                if (alpha_rho_e_wrt(i) .or. cons_vars_wrt) then
+                    q_sf = q_cons_vf(i + intxb - 1)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
+                    write (varname, '(A,I0)') 'alpha_rho_e', i
+                    call s_write_variable_to_formatted_database_file(varname, t_step)
+
+                    varname(:) = ' '
+                end if
+            end do
+        end if
+
         !Adding Energy cascade FFT
         if (fft_wrt) then
 
@@ -553,7 +566,9 @@ contains
                 end do
             end do
 
+#ifdef MFC_MPI
             call MPI_ALLREDUCE(MPI_IN_PLACE, En, Nf, mpi_p, MPI_SUM, MPI_COMM_WORLD, ierr)
+#endif
 
             if (proc_rank == 0) then
                 call s_create_directory('En_FFT_DATA')
@@ -757,7 +772,7 @@ contains
 
                         call s_compute_speed_of_sound(pres, rho_sf(i, j, k), &
                                                       gamma_sf(i, j, k), pi_inf_sf(i, j, k), &
-                                                      H, adv, 0._wp, 0._wp, c)
+                                                      H, adv, 0._wp, 0._wp, c, qv_sf(i, j, k))
 
                         q_sf(i, j, k) = c
                     end do
@@ -931,6 +946,8 @@ contains
         integer :: dest_rank, src_rank
         integer :: i, j, k, l
 
+#ifdef MFC_MPI
+
         allocate (sendbuf(Nx*Nyloc*Nzloc))
         allocate (recvbuf(Nx*Nyloc*Nzloc))
 
@@ -960,12 +977,16 @@ contains
         deallocate (sendbuf)
         deallocate (recvbuf)
 
+#endif
+
     end subroutine s_mpi_transpose_x2y
 
     subroutine s_mpi_transpose_y2z
         complex(c_double_complex), allocatable :: sendbuf(:), recvbuf(:)
         integer :: dest_rank, src_rank
         integer :: j, k, l
+
+#ifdef MFC_MPI
 
         allocate (sendbuf(Ny*Nxloc*Nzloc))
         allocate (recvbuf(Ny*Nxloc*Nzloc))
@@ -996,6 +1017,8 @@ contains
         deallocate (sendbuf)
         deallocate (recvbuf)
 
+#endif
+
     end subroutine s_mpi_transpose_y2z
 
     impure subroutine s_initialize_modules
@@ -1004,11 +1027,8 @@ contains
         integer :: size_n(1), inembed(1), onembed(1)
 
         call s_initialize_global_parameters_module()
-        if (bubbles_euler .and. nb > 1) then
-            call s_simpson(weight, R0)
-        end if
-        if (bubbles_euler .and. .not. polytropic) then
-            call s_initialize_nonpoly()
+        if (bubbles_euler .or. bubbles_lagrange) then
+            call s_initialize_bubbles_model()
         end if
         if (num_procs > 1) then
             call s_initialize_mpi_proxy_module()
@@ -1027,6 +1047,7 @@ contains
             s_read_data_files => s_read_parallel_data_files
         end if
 
+#ifdef MFC_MPI
         if (fft_wrt) then
 
             num_procs_x = (m_glb + 1)/(m + 1)
@@ -1097,11 +1118,14 @@ contains
             call MPI_CART_COORDS(MPI_COMM_CART13, proc_rank13, 2, cart2d13_coords, ierr)
 
         end if
+#endif
     end subroutine s_initialize_modules
 
     subroutine s_mpi_FFT_fwd
 
         integer :: j, k, l
+
+#ifdef MFC_MPI
 
         do l = 1, Nzloc
             do k = 1, Nyloc
@@ -1161,9 +1185,15 @@ contains
             end do
         end do
 
+#endif
+
     end subroutine s_mpi_FFT_fwd
 
     impure subroutine s_initialize_mpi_domain
+
+        num_dims = 1 + min(1, n) + min(1, p)
+
+#ifdef MFC_MPI
         ! Initialization of the MPI environment
         call s_mpi_initialize()
 
@@ -1186,6 +1216,8 @@ contains
         call s_initialize_parallel_io()
         call s_mpi_decompose_computational_domain()
         call s_check_inputs_fft()
+
+#endif
 
     end subroutine s_initialize_mpi_domain
 
@@ -1212,11 +1244,13 @@ contains
             call fftw_cleanup()
         end if
 
+#ifdef MFC_MPI
         if (fft_wrt) then
             if (MPI_COMM_CART12 /= MPI_COMM_NULL) call MPI_Comm_free(MPI_COMM_CART12, ierr)
             if (MPI_COMM_CART13 /= MPI_COMM_NULL) call MPI_Comm_free(MPI_COMM_CART13, ierr)
             if (MPI_COMM_CART /= MPI_COMM_NULL) call MPI_Comm_free(MPI_COMM_CART, ierr)
         end if
+#endif
 
         ! Deallocation procedures for the modules
         call s_finalize_data_output_module()

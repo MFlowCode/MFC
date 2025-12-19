@@ -376,6 +376,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
         call s_mpi_allreduce_sum(G_norm_int, G_norm_int_glb)
 
@@ -389,6 +390,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
         ! 3D z-slab -> 1D x, y, z
         $:GPU_PARALLEL_LOOP(collapse=3)
@@ -399,6 +401,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
         ! X FFT
 #if defined(MFC_OpenACC)
@@ -416,6 +419,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
         ! Y FFT
 #if defined(MFC_OpenACC)
@@ -433,6 +437,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
         ! transpose z-slab to y-slab
         call s_mpi_transpose_slabZ2Y
@@ -446,6 +451,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
         ! Z FFT
 #if defined(MFC_OpenACC)
@@ -463,13 +469,14 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
         ! return cmplx_kernelG1d: 1D z, x, y
     end subroutine s_initialize_filtering_kernel
 
     !< initialize fluid indicator function and filtered fluid indicator function
     subroutine s_initialize_fluid_indicator_function(bc_type)
-        type(integer_field), dimension(1:num_dims, -1:1), intent(in) :: bc_type
+        type(integer_field), dimension(1:num_dims, 1:2), intent(in) :: bc_type
         integer :: i, j, k
 
         @:ALLOCATE(fluid_indicator_function%sf(idwbuff(1)%beg:idwbuff(1)%end, &
@@ -491,6 +498,7 @@ contains
                     end do
                 end do
             end do
+            $:END_GPU_PARALLEL_LOOP()
         else
             $:GPU_PARALLEL_LOOP(collapse=3)
             do i = 0, m
@@ -500,6 +508,7 @@ contains
                     end do
                 end do
             end do
+            $:END_GPU_PARALLEL_LOOP()
         end if
 
         call s_populate_scalarfield_buffers(bc_type, fluid_indicator_function)
@@ -521,6 +530,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
         call s_mpi_FFT_fwd
 
@@ -532,6 +542,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
         call s_mpi_FFT_bwd
 
@@ -543,6 +554,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_initialize_filtered_fluid_indicator_function
 
@@ -579,6 +591,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_initialize_fluid_indicator_gradient
 
@@ -619,6 +632,7 @@ contains
                     end do
                 end do
             end do
+            $:END_GPU_PARALLEL_LOOP()
         else
             $:GPU_PARALLEL_LOOP(collapse=3)
             do i = 0, m
@@ -628,6 +642,7 @@ contains
                     end do
                 end do
             end do
+            $:END_GPU_PARALLEL_LOOP()
         end if
 
         call nvtxStartRange("FORWARD-3D-FFT")
@@ -642,6 +657,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
         call nvtxStartRange("BACKWARD-3D-FFT")
         call s_mpi_FFT_bwd
@@ -656,6 +672,7 @@ contains
                     end do
                 end do
             end do
+            $:END_GPU_PARALLEL_LOOP()
         else
             $:GPU_PARALLEL_LOOP(collapse=3)
             do i = 0, m
@@ -665,6 +682,7 @@ contains
                     end do
                 end do
             end do
+            $:END_GPU_PARALLEL_LOOP()
         end if
 
     end subroutine s_apply_fftw_filter_scalarfield
@@ -708,6 +726,7 @@ contains
                     end do
                 end do
             end do
+            $:END_GPU_PARALLEL_LOOP()
         else if (present(q_cons_filtered)) then
             $:GPU_PARALLEL_LOOP(collapse=3, private='[dudx, dudy, dudz, dvdx, dvdy, dvdz, dwdx, dwdy, dwdz]')
             do i = 0, m
@@ -739,6 +758,7 @@ contains
                     end do
                 end do
             end do
+            $:END_GPU_PARALLEL_LOOP()
         end if
 
     end subroutine s_compute_viscous_stress_tensor
@@ -765,6 +785,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_compute_stress_tensor
 
@@ -792,6 +813,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_compute_divergence_stress_tensor
 
@@ -822,6 +844,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
         ! set density and momentum buffers
         do i = contxb, momxe
@@ -865,6 +888,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_compute_pseudo_turbulent_reynolds_stress
 
@@ -899,6 +923,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_compute_effective_viscosity
 
@@ -923,6 +948,7 @@ contains
                     end do
                 end do
             end do
+            $:END_GPU_PARALLEL_LOOP()
 
             call nvtxStartRange("FORWARD-3D-FFT")
             call s_mpi_FFT_fwd
@@ -937,6 +963,7 @@ contains
                     end do
                 end do
             end do
+            $:END_GPU_PARALLEL_LOOP()
 
             call nvtxStartRange("BACKWARD-3D-FFT")
             call s_mpi_FFT_bwd
@@ -950,6 +977,7 @@ contains
                     end do
                 end do
             end do
+            $:END_GPU_PARALLEL_LOOP()
         end do ! end component loop
 
     end subroutine s_compute_interphase_momentum_exchange
@@ -978,6 +1006,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
         $:GPU_UPDATE(host='[particle_forces]')
 
@@ -1012,6 +1041,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
         $:GPU_UPDATE(host='[sendbuf_sf]')
 #ifdef MFC_MPI
@@ -1030,6 +1060,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_mpi_transpose_slabZ2Y
 
@@ -1048,6 +1079,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
         $:GPU_UPDATE(host='[sendbuf_sf]')
 #ifdef MFC_MPI
@@ -1066,6 +1098,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_mpi_transpose_slabY2Z
 
@@ -1086,6 +1119,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
         $:GPU_UPDATE(host='[sendbuf_batch]')
 #ifdef MFC_MPI
@@ -1106,6 +1140,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_mpi_transpose_slabZ2Y_batch
 
@@ -1126,6 +1161,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
         $:GPU_UPDATE(host='[sendbuf_batch]')
 #ifdef MFC_MPI
@@ -1146,6 +1182,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_mpi_transpose_slabY2Z_batch
 
@@ -1170,6 +1207,7 @@ contains
                     end do
                 end do
             end do
+            $:END_GPU_PARALLEL_LOOP()
             $:GPU_PARALLEL_LOOP(collapse=3)
             do i = 1, Nx
                 do j = 1, Ny
@@ -1178,6 +1216,7 @@ contains
                     end do
                 end do
             end do
+            $:END_GPU_PARALLEL_LOOP()
 #if defined(MFC_OpenACC)
             ierr = cufftExecD2Z(plan_x_fwd_gpu, data_real_in1d, data_cmplx_out1d)
 #else
@@ -1191,6 +1230,7 @@ contains
                     end do
                 end do
             end do
+            $:END_GPU_PARALLEL_LOOP()
 #if defined(MFC_OpenACC)
             ierr = cufftExecZ2Z(plan_y_gpu, data_cmplx_out1dy, data_cmplx_out1dy, CUFFT_FORWARD)
 #else
@@ -1204,6 +1244,7 @@ contains
                     end do
                 end do
             end do
+            $:END_GPU_PARALLEL_LOOP()
         end do
 
         ! pressure
@@ -1215,6 +1256,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
         $:GPU_PARALLEL_LOOP(collapse=3)
         do i = 1, Nx
             do j = 1, Ny
@@ -1223,6 +1265,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 #if defined(MFC_OpenACC)
         ierr = cufftExecD2Z(plan_x_fwd_gpu, data_real_in1d, data_cmplx_out1d)
 #else
@@ -1236,6 +1279,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 #if defined(MFC_OpenACC)
         ierr = cufftExecZ2Z(plan_y_gpu, data_cmplx_out1dy, data_cmplx_out1dy, CUFFT_FORWARD)
 #else
@@ -1249,6 +1293,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
         ! reynolds stress
         do l = 1, 3
@@ -1261,6 +1306,7 @@ contains
                         end do
                     end do
                 end do
+                $:END_GPU_PARALLEL_LOOP()
                 $:GPU_PARALLEL_LOOP(collapse=3)
                 do i = 1, Nx
                     do j = 1, Ny
@@ -1269,6 +1315,7 @@ contains
                         end do
                     end do
                 end do
+                $:END_GPU_PARALLEL_LOOP()
 #if defined(MFC_OpenACC)
                 ierr = cufftExecD2Z(plan_x_fwd_gpu, data_real_in1d, data_cmplx_out1d)
 #else
@@ -1282,6 +1329,7 @@ contains
                         end do
                     end do
                 end do
+                $:END_GPU_PARALLEL_LOOP()
 #if defined(MFC_OpenACC)
                 ierr = cufftExecZ2Z(plan_y_gpu, data_cmplx_out1dy, data_cmplx_out1dy, CUFFT_FORWARD)
 #else
@@ -1295,6 +1343,7 @@ contains
                         end do
                     end do
                 end do
+                $:END_GPU_PARALLEL_LOOP()
             end do
         end do
 
@@ -1309,6 +1358,7 @@ contains
                         end do
                     end do
                 end do
+                $:END_GPU_PARALLEL_LOOP()
                 $:GPU_PARALLEL_LOOP(collapse=3)
                 do i = 1, Nx
                     do j = 1, Ny
@@ -1317,6 +1367,7 @@ contains
                         end do
                     end do
                 end do
+                $:END_GPU_PARALLEL_LOOP()
 #if defined(MFC_OpenACC)
                 ierr = cufftExecD2Z(plan_x_fwd_gpu, data_real_in1d, data_cmplx_out1d)
 #else
@@ -1330,6 +1381,7 @@ contains
                         end do
                     end do
                 end do
+                $:END_GPU_PARALLEL_LOOP()
 #if defined(MFC_OpenACC)
                 ierr = cufftExecZ2Z(plan_y_gpu, data_cmplx_out1dy, data_cmplx_out1dy, CUFFT_FORWARD)
 #else
@@ -1343,6 +1395,7 @@ contains
                         end do
                     end do
                 end do
+                $:END_GPU_PARALLEL_LOOP()
             end do
         end do
 
@@ -1358,6 +1411,7 @@ contains
                     end do
                 end do
             end do
+            $:END_GPU_PARALLEL_LOOP()
 #if defined(MFC_OpenACC)
             ierr = cufftExecZ2Z(plan_z_gpu, data_cmplx_out1d, data_cmplx_out1d, CUFFT_FORWARD)
 #else
@@ -1371,6 +1425,7 @@ contains
                     end do
                 end do
             end do
+            $:END_GPU_PARALLEL_LOOP()
 #if defined(MFC_OpenACC)
             ierr = cufftExecZ2Z(plan_z_gpu, data_cmplx_out1d, data_cmplx_out1d, CUFFT_INVERSE)
 #else
@@ -1384,6 +1439,7 @@ contains
                     end do
                 end do
             end do
+            $:END_GPU_PARALLEL_LOOP()
         end do
 
         ! pressure
@@ -1395,6 +1451,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 #if defined(MFC_OpenACC)
         ierr = cufftExecZ2Z(plan_z_gpu, data_cmplx_out1d, data_cmplx_out1d, CUFFT_FORWARD)
 #else
@@ -1408,6 +1465,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 #if defined(MFC_OpenACC)
         ierr = cufftExecZ2Z(plan_z_gpu, data_cmplx_out1d, data_cmplx_out1d, CUFFT_INVERSE)
 #else
@@ -1421,6 +1479,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
         ! reynolds stress
         do l = 1, 3
@@ -1433,6 +1492,7 @@ contains
                         end do
                     end do
                 end do
+                $:END_GPU_PARALLEL_LOOP()
 #if defined(MFC_OpenACC)
                 ierr = cufftExecZ2Z(plan_z_gpu, data_cmplx_out1d, data_cmplx_out1d, CUFFT_FORWARD)
 #else
@@ -1446,6 +1506,7 @@ contains
                         end do
                     end do
                 end do
+                $:END_GPU_PARALLEL_LOOP()
 #if defined(MFC_OpenACC)
                 ierr = cufftExecZ2Z(plan_z_gpu, data_cmplx_out1d, data_cmplx_out1d, CUFFT_INVERSE)
 #else
@@ -1459,6 +1520,7 @@ contains
                         end do
                     end do
                 end do
+                $:END_GPU_PARALLEL_LOOP()
             end do
         end do
 
@@ -1473,6 +1535,7 @@ contains
                         end do
                     end do
                 end do
+                $:END_GPU_PARALLEL_LOOP()
 #if defined(MFC_OpenACC)
                 ierr = cufftExecZ2Z(plan_z_gpu, data_cmplx_out1d, data_cmplx_out1d, CUFFT_FORWARD)
 #else
@@ -1486,6 +1549,7 @@ contains
                         end do
                     end do
                 end do
+                $:END_GPU_PARALLEL_LOOP()
 #if defined(MFC_OpenACC)
                 ierr = cufftExecZ2Z(plan_z_gpu, data_cmplx_out1d, data_cmplx_out1d, CUFFT_INVERSE)
 #else
@@ -1499,6 +1563,7 @@ contains
                         end do
                     end do
                 end do
+                $:END_GPU_PARALLEL_LOOP()
             end do
         end do
 
@@ -1514,6 +1579,7 @@ contains
                     end do
                 end do
             end do
+            $:END_GPU_PARALLEL_LOOP()
 #if defined(MFC_OpenACC)
             ierr = cufftExecZ2Z(plan_y_gpu, data_cmplx_out1dy, data_cmplx_out1dy, CUFFT_INVERSE)
 #else
@@ -1527,6 +1593,7 @@ contains
                     end do
                 end do
             end do
+            $:END_GPU_PARALLEL_LOOP()
 #if defined(MFC_OpenACC)
             ierr = cufftExecZ2D(plan_x_bwd_gpu, data_cmplx_out1d, data_real_in1d)
 #else
@@ -1540,6 +1607,7 @@ contains
                     end do
                 end do
             end do
+            $:END_GPU_PARALLEL_LOOP()
             $:GPU_PARALLEL_LOOP(collapse=3)
             do i = 0, m
                 do j = 0, n
@@ -1548,6 +1616,7 @@ contains
                     end do
                 end do
             end do
+            $:END_GPU_PARALLEL_LOOP()
         end do
 
         ! pressure
@@ -1559,6 +1628,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 #if defined(MFC_OpenACC)
         ierr = cufftExecZ2Z(plan_y_gpu, data_cmplx_out1dy, data_cmplx_out1dy, CUFFT_INVERSE)
 #else
@@ -1572,6 +1642,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 #if defined(MFC_OpenACC)
         ierr = cufftExecZ2D(plan_x_bwd_gpu, data_cmplx_out1d, data_real_in1d)
 #else
@@ -1585,6 +1656,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
         $:GPU_PARALLEL_LOOP(collapse=3)
         do i = 0, m
             do j = 0, n
@@ -1593,6 +1665,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
         ! reynolds stress
         do l = 1, 3
@@ -1605,6 +1678,7 @@ contains
                         end do
                     end do
                 end do
+                $:END_GPU_PARALLEL_LOOP()
 #if defined(MFC_OpenACC)
                 ierr = cufftExecZ2Z(plan_y_gpu, data_cmplx_out1dy, data_cmplx_out1dy, CUFFT_INVERSE)
 #else
@@ -1618,6 +1692,7 @@ contains
                         end do
                     end do
                 end do
+                $:END_GPU_PARALLEL_LOOP()
 #if defined(MFC_OpenACC)
                 ierr = cufftExecZ2D(plan_x_bwd_gpu, data_cmplx_out1d, data_real_in1d)
 #else
@@ -1631,6 +1706,7 @@ contains
                         end do
                     end do
                 end do
+                $:END_GPU_PARALLEL_LOOP()
                 $:GPU_PARALLEL_LOOP(collapse=3)
                 do i = 0, m
                     do j = 0, n
@@ -1639,6 +1715,7 @@ contains
                         end do
                     end do
                 end do
+                $:END_GPU_PARALLEL_LOOP()
             end do
         end do
 
@@ -1653,6 +1730,7 @@ contains
                         end do
                     end do
                 end do
+                $:END_GPU_PARALLEL_LOOP()
 #if defined(MFC_OpenACC)
                 ierr = cufftExecZ2Z(plan_y_gpu, data_cmplx_out1dy, data_cmplx_out1dy, CUFFT_INVERSE)
 #else
@@ -1666,6 +1744,7 @@ contains
                         end do
                     end do
                 end do
+                $:END_GPU_PARALLEL_LOOP()
 #if defined(MFC_OpenACC)
                 ierr = cufftExecZ2D(plan_x_bwd_gpu, data_cmplx_out1d, data_real_in1d)
 #else
@@ -1679,6 +1758,7 @@ contains
                         end do
                     end do
                 end do
+                $:END_GPU_PARALLEL_LOOP()
                 $:GPU_PARALLEL_LOOP(collapse=3)
                 do i = 0, m
                     do j = 0, n
@@ -1687,6 +1767,7 @@ contains
                         end do
                     end do
                 end do
+                $:END_GPU_PARALLEL_LOOP()
             end do
         end do
 
@@ -1705,6 +1786,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
         ! X FFT
 #if defined(MFC_OpenACC)
@@ -1722,6 +1804,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
         ! Y FFT
 #if defined(MFC_OpenACC)
@@ -1739,6 +1822,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
         ! transpose z-slab to y-slab
         call nvtxStartRange("SLAB-MPI-TRANSPOSE-Z2Y")
@@ -1754,6 +1838,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
         ! Z FFT
 #if defined(MFC_OpenACC)
@@ -1785,6 +1870,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
         ! transpose y-slab to z-slab
         call nvtxStartRange("SLAB-MPI-TRANSPOSE-Y2Z")
@@ -1800,6 +1886,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
         ! Y inv FFT
 #if defined(MFC_OpenACC)
@@ -1817,6 +1904,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
         ! X inv FFT
 #if defined(MFC_OpenACC)
@@ -1834,6 +1922,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_mpi_FFT_bwd
 

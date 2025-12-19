@@ -21,10 +21,10 @@ module m_mhd
  s_finalize_mhd_powell_module, &
  s_compute_mhd_powell_rhs
 
-    real(wp), allocatable, dimension(:, :, :) :: du_dx, du_dy, du_dz
-    real(wp), allocatable, dimension(:, :, :) :: dv_dx, dv_dy, dv_dz
-    real(wp), allocatable, dimension(:, :, :) :: dw_dx, dw_dy, dw_dz
-    $:GPU_DECLARE(create='[du_dx,du_dy,du_dz,dv_dx,dv_dy,dv_dz,dw_dx,dw_dy,dw_dz]')
+    real(wp), allocatable, dimension(:, :, :) :: du_dx_mhd, du_dy_mhd, du_dz_mhd
+    real(wp), allocatable, dimension(:, :, :) :: dv_dx_mhd, dv_dy_mhd, dv_dz_mhd
+    real(wp), allocatable, dimension(:, :, :) :: dw_dx_mhd, dw_dy_mhd, dw_dz_mhd
+    $:GPU_DECLARE(create='[du_dx_mhd,du_dy_mhd,du_dz_mhd,dv_dx_mhd,dv_dy_mhd,dv_dz_mhd,dw_dx_mhd,dw_dy_mhd,dw_dz_mhd]')
 
     real(wp), allocatable, dimension(:, :) :: fd_coeff_x_h
     real(wp), allocatable, dimension(:, :) :: fd_coeff_y_h
@@ -38,10 +38,10 @@ contains
         ! Additional safety check beyond m_checker
         if (n == 0) call s_mpi_abort('Fatal Error: Powell correction is not applicable for 1D')
 
-        @:ALLOCATE(du_dx(0:m,0:n,0:p), dv_dx(0:m,0:n,0:p), dw_dx(0:m,0:n,0:p))
-        @:ALLOCATE(du_dy(0:m,0:n,0:p), dv_dy(0:m,0:n,0:p), dw_dy(0:m,0:n,0:p))
+        @:ALLOCATE(du_dx_mhd(0:m,0:n,0:p), dv_dx_mhd(0:m,0:n,0:p), dw_dx_mhd(0:m,0:n,0:p))
+        @:ALLOCATE(du_dy_mhd(0:m,0:n,0:p), dv_dy_mhd(0:m,0:n,0:p), dw_dy_mhd(0:m,0:n,0:p))
         if (p > 0) then
-            @:ALLOCATE(dw_dx(0:m,0:n,0:p), dw_dy(0:m,0:n,0:p), dw_dz(0:m,0:n,0:p))
+            @:ALLOCATE(dw_dx_mhd(0:m,0:n,0:p), dw_dy_mhd(0:m,0:n,0:p), dw_dz_mhd(0:m,0:n,0:p))
         end if
 
         @:ALLOCATE(fd_coeff_x_h(-fd_number:fd_number, 0:m))
@@ -67,7 +67,7 @@ contains
         !!      S = - (divB) [ 0, Bx, By, Bz, vdotB, vx, vy, vz ]^T
         !!  @param q_prim_vf  Primitive variables
         !!  @param rhs_vf     rhs variables
-    pure subroutine s_compute_mhd_powell_rhs(q_prim_vf, rhs_vf)
+    subroutine s_compute_mhd_powell_rhs(q_prim_vf, rhs_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
@@ -76,7 +76,7 @@ contains
         real(wp), dimension(3) :: v, B
         real(wp) :: divB, vdotB
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[v, B]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[k,l,q,v,B,r,divB,vdotB]')
         do q = 0, p
             do l = 0, n
                 do k = 0, m
@@ -129,17 +129,18 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_compute_mhd_powell_rhs
 
     impure subroutine s_finalize_mhd_powell_module
 
-        @:DEALLOCATE(du_dx, dv_dx, dw_dx)
+        @:DEALLOCATE(du_dx_mhd, dv_dx_mhd, dw_dx_mhd)
         @:DEALLOCATE(fd_coeff_x_h)
-        @:DEALLOCATE(du_dy, dv_dy, dw_dy)
+        @:DEALLOCATE(du_dy_mhd, dv_dy_mhd, dw_dy_mhd)
         @:DEALLOCATE(fd_coeff_y_h)
         if (p > 0) then
-            @:DEALLOCATE(dw_dx, dw_dy, dw_dz)
+            @:DEALLOCATE(dw_dx_mhd, dw_dy_mhd, dw_dz_mhd)
             @:DEALLOCATE(fd_coeff_z_h)
         end if
 

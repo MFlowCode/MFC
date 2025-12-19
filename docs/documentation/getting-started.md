@@ -9,6 +9,29 @@ git clone https://github.com/MFlowCode/MFC.git
 cd MFC
 ```
 
+## Install via Homebrew (macOS)
+
+On macOS, install prebuilt MFC via Homebrew:
+
+```bash
+brew install mflowcode/mfc/mfc
+```
+
+Run a quick example:
+
+```bash
+mkdir -p ~/mfc_quickstart && cd ~/mfc_quickstart
+cp $(brew --prefix mfc)/examples/1D_sodshocktube/case.py .
+# Use -n X to choose the number of MPI processes
+mfc case.py -n 2
+```
+
+Notes:
+- The Homebrew package uses a simplified syntax: just `mfc <case.py>` to run cases.
+- Developer commands like `build`, `test`, `clean` are available when you clone the repo and use `./mfc.sh`.
+- The package bundles a Python venv and prebuilt binaries; no additional setup is required.
+- Examples are installed at `$(brew --prefix mfc)/examples/`.
+
 ## Build Environment
 
 MFC can be built in multiple ways on various operating systems.
@@ -150,7 +173,7 @@ In brief, you can run the latest MFC container:
 ```bash
 docker run -it --rm --entrypoint bash sbryngelson/mfc:latest-cpu
 ```
-Please refer to the [Docker](https://mflowcode.github.io/documentation/docker.html) document for more information.
+Please refer to the [Docker](docker.md) document for more information.
 
 ## Running the Test Suite
 

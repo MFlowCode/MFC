@@ -24,7 +24,7 @@ else
 fi
 
 
-job_slug="`basename "$1" | sed 's/\.sh$//' | sed 's/[^a-zA-Z0-9]/-/g'`-$2"
+job_slug="`basename "$1" | sed 's/\.sh$//' | sed 's/[^a-zA-Z0-9]/-/g'`-$2-$3"
 
 sbatch <<EOT
 #!/bin/bash
@@ -35,7 +35,6 @@ $sbatch_device_opts
 #SBATCH -t 02:59:00                # Duration of the job (Ex: 15 mins)
 #SBATCH -o$job_slug.out            # Combined output and error messages file
 #SBATCH -p extended                # Extended partition for shorter queues
-#SBATCH -W                         # Do not exit until the submitted job terminates.
 
 set -e
 set -x
@@ -45,6 +44,7 @@ echo "Running in $(pwd):"
 
 job_slug="$job_slug"
 job_device="$2"
+job_interface="$3"
 
 . ./mfc.sh load -c f -m g
 

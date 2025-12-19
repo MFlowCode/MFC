@@ -23,7 +23,7 @@ jobs:
           filters: ".github/file-filter.yml"
 
   self:
-    name: "${{ matrix.name }} (${{ matrix.device }})"
+    name: "${{ matrix.name }} (${{ matrix.device }}${{ matrix.interface != 'none' && format('-{0}', matrix.interface) || '' }})"
     if: ${{ github.repository=='MFlowCode/MFC' && needs.file-changes.outputs.checkall=='true' && ((github.event_name=='pull_request_review' && github.event.review.state=='approved') || (github.event_name=='pull_request' && (github.event.pull_request.user.login=='sbryngelson' || github.event.pull_request.user.login=='wilfonba'))) }}
     needs: file-changes
     strategy:
@@ -36,6 +36,7 @@ jobs:
             labels: gt
             flag: p
             device: cpu
+            interface: none
             build_script: ""
           - cluster: phoenix
             name: Georgia Tech | Phoenix (NVHPC)
@@ -43,6 +44,15 @@ jobs:
             labels: gt
             flag: p
             device: gpu
+            interface: acc
+            build_script: ""
+          - cluster: phoenix
+            name: Georgia Tech | Phoenix (NVHPC)
+            group: phoenix
+            labels: gt
+            flag: p
+            device: gpu
+            interface: omp
             build_script: ""
           - cluster: frontier
             name: Oak Ridge | Frontier (CCE)
@@ -50,11 +60,20 @@ jobs:
             labels: frontier
             flag: f
             device: gpu
-            build_script: "bash .github/workflows/frontier/build.sh gpu bench"
+            interface: acc
+            build_script: "bash .github/workflows/frontier/build.sh gpu acc bench"
+          - cluster: frontier
+            name: Oak Ridge | Frontier (CCE)
+            group: phoenix
+            labels: frontier
+            flag: f
+            device: gpu
+            interface: omp
+            build_script: "bash .github/workflows/frontier/build.sh gpu omp bench"
     runs-on:
       group: ${{ matrix.group }}
       labels: ${{ matrix.labels }}
-    timeout-minutes: 1400
+    timeout-minutes: 480
     env:
       ACTIONS_RUNNER_FORCE_ACTIONS_NODE_VERSION: node16
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
@@ -79,30 +98,27 @@ jobs:
           wait %1 && wait %2
 
       - name: Bench (Master v. PR)
-        run: |
-          (cd pr     && bash .github/workflows/${{ matrix.cluster }}/submit-bench.sh .github/workflows/${{ matrix.cluster }}/bench.sh ${{ matrix.device }}) &
-          (cd master && bash .github/workflows/${{ matrix.cluster }}/submit-bench.sh .github/workflows/${{ matrix.cluster }}/bench.sh ${{ matrix.device }}) &
-          wait %1 && wait %2
+        run: bash pr/.github/scripts/run_parallel_benchmarks.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }}
 
       - name: Generate & Post Comment
         run: |
           (cd pr && . ./mfc.sh load -c ${{ matrix.flag }} -m g)
-          (cd pr && ./mfc.sh bench_diff ../master/bench-${{ matrix.device }}.yaml ../pr/bench-${{ matrix.device }}.yaml)
+          (cd pr && ./mfc.sh bench_diff ../master/bench-${{ matrix.device }}-${{ matrix.interface }}.yaml ../pr/bench-${{ matrix.device }}-${{ matrix.interface }}.yaml)
 
       - name: Print Logs
         if:   always()
         run: |
-          cat pr/bench-${{ matrix.device }}.* 2>/dev/null || true
-          cat master/bench-${{ matrix.device }}.* 2>/dev/null || true
+          cat pr/bench-${{ matrix.device }}-${{ matrix.interface }}.* 2>/dev/null || true
+          cat master/bench-${{ matrix.device }}-${{ matrix.interface }}.* 2>/dev/null || true
 
       # All other runners (non-Phoenix) just run without special env
       - name: Archive Logs (Frontier)
         if: always() && matrix.cluster != 'phoenix'
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.cluster }}-${{ matrix.device }}
+          name: ${{ matrix.cluster }}-${{ matrix.device }}-${{ matrix.interface }}
           path: |
-            pr/bench-${{ matrix.device }}.*
+            pr/bench-${{ matrix.device }}-${{ matrix.interface }}.*
             pr/build/benchmarks/*
-            master/bench-${{ matrix.device }}.*
+            master/bench-${{ matrix.device }}-${{ matrix.interface }}.*
             master/build/benchmarks/*

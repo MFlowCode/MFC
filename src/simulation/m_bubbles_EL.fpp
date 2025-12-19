@@ -69,7 +69,8 @@ module m_bubbles_EL
 
     integer :: nBubs                            !< Number of bubbles in the local domain
     real(wp) :: Rmax_glb, Rmin_glb       !< Maximum and minimum bubbe size in the local domain
-    type(vector_field) :: q_beta                !< Projection of the lagrangian particles in the Eulerian framework
+    !< Projection of the lagrangian particles in the Eulerian framework
+    type(scalar_field), dimension(:), allocatable :: q_beta
     integer :: q_beta_idx                       !< Size of the q_beta vector field
 
     $:GPU_DECLARE(create='[nBubs,Rmax_glb,Rmin_glb,q_beta,q_beta_idx]')
@@ -104,15 +105,17 @@ contains
 
         $:GPU_UPDATE(device='[lag_num_ts, q_beta_idx]')
 
-        @:ALLOCATE(q_beta%vf(1:q_beta_idx))
+        @:ALLOCATE(q_beta(1:q_beta_idx))
 
         do i = 1, q_beta_idx
-            @:ALLOCATE(q_beta%vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+            @:ALLOCATE(q_beta(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                 idwbuff(2)%beg:idwbuff(2)%end, &
                 idwbuff(3)%beg:idwbuff(3)%end))
         end do
 
-        @:ACC_SETUP_VFs(q_beta)
+        do i = 1, q_beta_idx
+            @:ACC_SETUP_SFs(q_beta(i))
+        end do
 
         ! Allocating space for lagrangian variables
         nBubs_glb = lag_params%nBubs_glb
@@ -143,53 +146,9 @@ contains
         if (adap_dt .and. f_is_default(adap_dt_tol)) adap_dt_tol = dflt_adap_dt_tol
 
         ! Starting bubbles
-        call s_start_lagrange_inputs()
         call s_read_input_bubbles(q_cons_vf)
 
     end subroutine s_initialize_bubbles_EL_module
-
-    !> The purpose of this procedure is to start lagrange bubble parameters applying nondimensionalization if needed
-    impure subroutine s_start_lagrange_inputs()
-
-        integer :: id_bubbles, id_host
-        real(wp) :: rho0, c0, T0, x0, p0
-
-        id_bubbles = num_fluids
-        id_host = num_fluids - 1
-
-        !Reference values
-        rho0 = lag_params%rho0
-        c0 = lag_params%c0
-        T0 = lag_params%T0
-        x0 = lag_params%x0
-        p0 = rho0*c0*c0
-
-        !Update inputs
-        Tw = lag_params%Thost/T0
-        pv = fluid_pp(id_host)%pv/p0
-        gamma_v = fluid_pp(id_bubbles)%gamma_v
-        gamma_n = fluid_pp(id_host)%gamma_v
-        k_vl = fluid_pp(id_bubbles)%k_v*(T0/(x0*rho0*c0*c0*c0))
-        k_nl = fluid_pp(id_host)%k_v*(T0/(x0*rho0*c0*c0*c0))
-        cp_v = fluid_pp(id_bubbles)%cp_v*(T0/(c0*c0))
-        cp_n = fluid_pp(id_host)%cp_v*(T0/(c0*c0))
-        R_v = (R_uni/fluid_pp(id_bubbles)%M_v)*(T0/(c0*c0))
-        R_n = (R_uni/fluid_pp(id_host)%M_v)*(T0/(c0*c0))
-        lag_params%diffcoefvap = lag_params%diffcoefvap/(x0*c0)
-        ss = fluid_pp(id_host)%ss/(rho0*x0*c0*c0)
-        mul0 = fluid_pp(id_host)%mul0/(rho0*x0*c0)
-
-        ! Parameters used in bubble_model
-        Web = 1._wp/ss
-        Re_inv = mul0
-
-        ! Need improvements to accept polytropic gas compression, isothermal and adiabatic thermal models, and
-        ! the Gilmore and RP bubble models.
-        polytropic = .false.    ! Forcing no polytropic model
-        thermal = 3             ! Forcing constant transfer coefficient model based on Preston et al., 2007
-        ! If Keller-Miksis model is not selected, then no radial motion
-
-    end subroutine s_start_lagrange_inputs
 
     !> The purpose of this procedure is to obtain the initial bubbles' information
         !! @param q_cons_vf Conservative variables
@@ -361,7 +320,7 @@ contains
         ! Initial particle mass
         volparticle = 4._wp/3._wp*pi*bub_R0(bub_id)**3._wp ! volume
         gas_mv(bub_id, 1) = pv*volparticle*(1._wp/(R_v*Tw))*(massflag) ! vapermass
-        gas_mg(bub_id) = (gas_p(bub_id, 1) - pv*(massflag))*volparticle*(1._wp/(R_n*Tw)) ! gasmass
+        gas_mg(bub_id) = (gas_p(bub_id, 1) - pv*(massflag))*volparticle*(1._wp/(R_g*Tw)) ! gasmass
         if (gas_mg(bub_id) <= 0._wp) then
             call s_mpi_abort("The initial mass of gas inside the bubble is negative. Check the initial conditions.")
         end if
@@ -375,17 +334,17 @@ contains
         end if
         omegaN_local = sqrt(omegaN_local/bub_R0(bub_id)**2._wp)
 
-        cpparticle = concvap*cp_v + (1._wp - concvap)*cp_n
-        kparticle = concvap*k_vl + (1._wp - concvap)*k_nl
+        cpparticle = concvap*cp_v + (1._wp - concvap)*cp_g
+        kparticle = concvap*k_vl + (1._wp - concvap)*k_gl
 
         ! Mass and heat transfer coefficients (based on Preston 2007)
         PeT = totalmass/volparticle*cpparticle*bub_R0(bub_id)**2._wp*omegaN_local/kparticle
         call s_transcoeff(1._wp, PeT, Re_trans, Im_trans)
         gas_betaT(bub_id) = Re_trans*(heatflag)*kparticle
 
-        PeG = bub_R0(bub_id)**2._wp*omegaN_local/lag_params%diffcoefvap
+        PeG = bub_R0(bub_id)**2._wp*omegaN_local/vd
         call s_transcoeff(1._wp, PeG, Re_trans, Im_trans)
-        gas_betaC(bub_id) = Re_trans*(massflag)*lag_params%diffcoefvap
+        gas_betaC(bub_id) = Re_trans*(massflag)*vd
 
         if (gas_mg(bub_id) <= 0._wp) then
             call s_mpi_abort("Negative gas mass in the bubble, check if the bubble is in the domain.")
@@ -609,11 +568,12 @@ contains
                     bub_dphidt(k) = bub_dphidt(k)/(1._wp - term1_fac)
                 end if
             end do
+            $:END_GPU_PARALLEL_LOOP()
         end if
 
         ! Radial motion model
         adap_dt_stop_max = 0
-        $:GPU_PARALLEL_LOOP(private='[k,myalpha_rho,myalpha,Re,cell]', &
+        $:GPU_PARALLEL_LOOP(private='[k,i,myalpha_rho,myalpha,Re,cell]', &
             & reduction='[[adap_dt_stop_max]]',reductionOp='[MAX]', &
             & copy='[adap_dt_stop_max]',copyin='[stage]')
         do k = 1, nBubs
@@ -638,11 +598,7 @@ contains
             call s_get_pinf(k, q_prim_vf, 1, myPinf, cell, aux1, aux2)
 
             ! Obtain liquid density and computing speed of sound from pinf
-            $:GPU_LOOP(parallelism='[seq]')
-            do i = 1, num_fluids
-                myalpha_rho(i) = q_prim_vf(i)%sf(cell(1), cell(2), cell(3))
-                myalpha(i) = q_prim_vf(E_idx + i)%sf(cell(1), cell(2), cell(3))
-            end do
+            call s_compute_species_fraction(q_prim_vf, cell(1), cell(2), cell(3), myalpha_rho, myalpha)
             call s_convert_species_to_mixture_variables_acc(myRho, gamma, pi_inf, qv, myalpha, &
                                                             myalpha_rho, Re)
             call s_compute_cson_from_pinf(q_prim_vf, myPinf, cell, myRho, gamma, pi_inf, myCson)
@@ -679,17 +635,19 @@ contains
             adap_dt_stop_max = max(adap_dt_stop_max, adap_dt_stop)
 
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
         if (adap_dt .and. adap_dt_stop_max > 0) call s_mpi_abort("Adaptive time stepping failed to converge.")
 
         ! Bubbles remain in a fixed position
-        $:GPU_PARALLEL_LOOP(collapse=2, private='[k]', copyin='[stage]')
+        $:GPU_PARALLEL_LOOP(collapse=2, private='[k,l]', copyin='[stage]')
         do k = 1, nBubs
             do l = 1, 3
                 mtn_dposdt(k, l, stage) = 0._wp
                 mtn_dveldt(k, l, stage) = 0._wp
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
         call nvtxEndRange
 
@@ -714,82 +672,87 @@ contains
 
             ! (q / (1 - beta)) * d(beta)/dt source
             if (p == 0) then
-                $:GPU_PARALLEL_LOOP(collapse=4)
+                $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
                 do k = 0, p
                     do j = 0, n
                         do i = 0, m
                             do l = 1, E_idx
-                                if (q_beta%vf(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
+                                if (q_beta(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
                                     rhs_vf(l)%sf(i, j, k) = rhs_vf(l)%sf(i, j, k) + &
-                                                            q_cons_vf(l)%sf(i, j, k)*(q_beta%vf(2)%sf(i, j, k) + &
-                                                                                      q_beta%vf(5)%sf(i, j, k))
+                                                            q_cons_vf(l)%sf(i, j, k)*(q_beta(2)%sf(i, j, k) + &
+                                                                                      q_beta(5)%sf(i, j, k))
 
                                 end if
                             end do
                         end do
                     end do
                 end do
+                $:END_GPU_PARALLEL_LOOP()
             else
-                $:GPU_PARALLEL_LOOP(collapse=4)
+                $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
                 do k = 0, p
                     do j = 0, n
                         do i = 0, m
                             do l = 1, E_idx
-                                if (q_beta%vf(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
+                                if (q_beta(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
                                     rhs_vf(l)%sf(i, j, k) = rhs_vf(l)%sf(i, j, k) + &
-                                                            q_cons_vf(l)%sf(i, j, k)/q_beta%vf(1)%sf(i, j, k)* &
-                                                            q_beta%vf(2)%sf(i, j, k)
+                                                            q_cons_vf(l)%sf(i, j, k)/q_beta(1)%sf(i, j, k)* &
+                                                            q_beta(2)%sf(i, j, k)
                                 end if
                             end do
                         end do
                     end do
                 end do
+                $:END_GPU_PARALLEL_LOOP()
             end if
 
             do l = 1, num_dims
 
-                call s_gradient_dir(q_prim_vf(E_idx), q_beta%vf(3), l)
+                call s_gradient_dir(q_prim_vf(E_idx)%sf, q_beta(3)%sf, l)
 
                 ! (q / (1 - beta)) * d(beta)/dt source
-                $:GPU_PARALLEL_LOOP(collapse=3)
+                $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3)
                 do k = 0, p
                     do j = 0, n
                         do i = 0, m
-                            if (q_beta%vf(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
+                            if (q_beta(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
                                 rhs_vf(contxe + l)%sf(i, j, k) = rhs_vf(contxe + l)%sf(i, j, k) - &
-                                                                 (1._wp - q_beta%vf(1)%sf(i, j, k))/ &
-                                                                 q_beta%vf(1)%sf(i, j, k)* &
-                                                                 q_beta%vf(3)%sf(i, j, k)
+                                                                 (1._wp - q_beta(1)%sf(i, j, k))/ &
+                                                                 q_beta(1)%sf(i, j, k)* &
+                                                                 q_beta(3)%sf(i, j, k)
                             end if
                         end do
                     end do
                 end do
+                $:END_GPU_PARALLEL_LOOP()
 
                 !source in energy
-                $:GPU_PARALLEL_LOOP(collapse=3)
+                $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3)
                 do k = idwbuff(3)%beg, idwbuff(3)%end
                     do j = idwbuff(2)%beg, idwbuff(2)%end
                         do i = idwbuff(1)%beg, idwbuff(1)%end
-                            q_beta%vf(3)%sf(i, j, k) = q_prim_vf(E_idx)%sf(i, j, k)*q_prim_vf(contxe + l)%sf(i, j, k)
+                            q_beta(3)%sf(i, j, k) = q_prim_vf(E_idx)%sf(i, j, k)*q_prim_vf(contxe + l)%sf(i, j, k)
                         end do
                     end do
                 end do
+                $:END_GPU_PARALLEL_LOOP()
 
-                call s_gradient_dir(q_beta%vf(3), q_beta%vf(4), l)
+                call s_gradient_dir(q_beta(3)%sf, q_beta(4)%sf, l)
 
                 ! (beta / (1 - beta)) * d(Pu)/dl source
-                $:GPU_PARALLEL_LOOP(collapse=3)
+                $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3)
                 do k = 0, p
                     do j = 0, n
                         do i = 0, m
-                            if (q_beta%vf(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
+                            if (q_beta(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
                                 rhs_vf(E_idx)%sf(i, j, k) = rhs_vf(E_idx)%sf(i, j, k) - &
-                                                            q_beta%vf(4)%sf(i, j, k)*(1._wp - q_beta%vf(1)%sf(i, j, k))/ &
-                                                            q_beta%vf(1)%sf(i, j, k)
+                                                            q_beta(4)%sf(i, j, k)*(1._wp - q_beta(1)%sf(i, j, k))/ &
+                                                            q_beta(1)%sf(i, j, k)
                             end if
                         end do
                     end do
                 end do
+                $:END_GPU_PARALLEL_LOOP()
             end do
 
         end if
@@ -805,7 +768,7 @@ contains
         !! @param gamma Liquid specific heat ratio
         !! @param pi_inf Liquid stiffness
         !! @param cson Calculated speed of sound
-    pure subroutine s_compute_cson_from_pinf(q_prim_vf, pinf, cell, rhol, gamma, pi_inf, cson)
+    subroutine s_compute_cson_from_pinf(q_prim_vf, pinf, cell, rhol, gamma, pi_inf, cson)
         $:GPU_ROUTINE(function_name='s_compute_cson_from_pinf', &
             & parallelism='[seq]', cray_inline=True)
 
@@ -835,32 +798,34 @@ contains
 
         call nvtxStartRange("BUBBLES-LAGRANGE-KERNELS")
 
-        $:GPU_PARALLEL_LOOP(collapse=4)
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
         do i = 1, q_beta_idx
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
-                        q_beta%vf(i)%sf(j, k, l) = 0._wp
+                        q_beta(i)%sf(j, k, l) = 0._wp
                     end do
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
         call s_smoothfunction(nBubs, intfc_rad, intfc_vel, &
                               mtn_s, mtn_pos, q_beta)
 
         !Store 1-beta
-        $:GPU_PARALLEL_LOOP(collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
         do l = idwbuff(3)%beg, idwbuff(3)%end
             do k = idwbuff(2)%beg, idwbuff(2)%end
                 do j = idwbuff(1)%beg, idwbuff(1)%end
-                    q_beta%vf(1)%sf(j, k, l) = 1._wp - q_beta%vf(1)%sf(j, k, l)
+                    q_beta(1)%sf(j, k, l) = 1._wp - q_beta(1)%sf(j, k, l)
                     ! Limiting void fraction given max value
-                    q_beta%vf(1)%sf(j, k, l) = max(q_beta%vf(1)%sf(j, k, l), &
-                                                   1._wp - lag_params%valmaxvoid)
+                    q_beta(1)%sf(j, k, l) = max(q_beta(1)%sf(j, k, l), &
+                                                1._wp - lag_params%valmaxvoid)
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
         call nvtxEndRange
 
@@ -873,7 +838,7 @@ contains
         !! @param f_pinfl Driving pressure
         !! @param cell Bubble cell
         !! @param Romega Control volume radius
-    pure subroutine s_get_pinf(bub_id, q_prim_vf, ptype, f_pinfl, cell, preterm1, term2, Romega)
+    subroutine s_get_pinf(bub_id, q_prim_vf, ptype, f_pinfl, cell, preterm1, term2, Romega)
         $:GPU_ROUTINE(function_name='s_get_pinf',parallelism='[seq]', &
             & cray_inline=True)
 
@@ -1040,9 +1005,9 @@ contains
                             !< Update values
                             charvol = charvol + vol
                             charpres = charpres + q_prim_vf(E_idx)%sf(cellaux(1), cellaux(2), cellaux(3))*vol
-                            charvol2 = charvol2 + vol*q_beta%vf(1)%sf(cellaux(1), cellaux(2), cellaux(3))
+                            charvol2 = charvol2 + vol*q_beta(1)%sf(cellaux(1), cellaux(2), cellaux(3))
                             charpres2 = charpres2 + q_prim_vf(E_idx)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                        *vol*q_beta%vf(1)%sf(cellaux(1), cellaux(2), cellaux(3))
+                                        *vol*q_beta(1)%sf(cellaux(1), cellaux(2), cellaux(3))
                         end if
 
                     end do
@@ -1101,6 +1066,7 @@ contains
                 gas_p(k, 1) = gas_p(k, 1) + dt*gas_dpdt(k, 1)
                 gas_mv(k, 1) = gas_mv(k, 1) + dt*gas_dmvdt(k, 1)
             end do
+            $:END_GPU_PARALLEL_LOOP()
 
             call s_transfer_data_to_tmp()
             call s_write_void_evol(mytime)
@@ -1123,6 +1089,7 @@ contains
                     gas_p(k, 2) = gas_p(k, 1) + dt*gas_dpdt(k, 1)
                     gas_mv(k, 2) = gas_mv(k, 1) + dt*gas_dmvdt(k, 1)
                 end do
+                $:END_GPU_PARALLEL_LOOP()
 
             elseif (stage == 2) then
                 $:GPU_PARALLEL_LOOP(private='[k]')
@@ -1135,6 +1102,7 @@ contains
                     gas_p(k, 1) = gas_p(k, 1) + dt*(gas_dpdt(k, 1) + gas_dpdt(k, 2))/2._wp
                     gas_mv(k, 1) = gas_mv(k, 1) + dt*(gas_dmvdt(k, 1) + gas_dmvdt(k, 2))/2._wp
                 end do
+                $:END_GPU_PARALLEL_LOOP()
 
                 call s_transfer_data_to_tmp()
                 call s_write_void_evol(mytime)
@@ -1159,6 +1127,7 @@ contains
                     gas_p(k, 2) = gas_p(k, 1) + dt*gas_dpdt(k, 1)
                     gas_mv(k, 2) = gas_mv(k, 1) + dt*gas_dmvdt(k, 1)
                 end do
+                $:END_GPU_PARALLEL_LOOP()
 
             elseif (stage == 2) then
                 $:GPU_PARALLEL_LOOP(private='[k]')
@@ -1171,6 +1140,7 @@ contains
                     gas_p(k, 2) = gas_p(k, 1) + dt*(gas_dpdt(k, 1) + gas_dpdt(k, 2))/4._wp
                     gas_mv(k, 2) = gas_mv(k, 1) + dt*(gas_dmvdt(k, 1) + gas_dmvdt(k, 2))/4._wp
                 end do
+                $:END_GPU_PARALLEL_LOOP()
             elseif (stage == 3) then
                 $:GPU_PARALLEL_LOOP(private='[k]')
                 do k = 1, nBubs
@@ -1182,6 +1152,7 @@ contains
                     gas_p(k, 1) = gas_p(k, 1) + (2._wp/3._wp)*dt*(gas_dpdt(k, 1)/4._wp + gas_dpdt(k, 2)/4._wp + gas_dpdt(k, 3))
                     gas_mv(k, 1) = gas_mv(k, 1) + (2._wp/3._wp)*dt*(gas_dmvdt(k, 1)/4._wp + gas_dmvdt(k, 2)/4._wp + gas_dmvdt(k, 3))
                 end do
+                $:END_GPU_PARALLEL_LOOP()
 
                 call s_transfer_data_to_tmp()
                 call s_write_void_evol(mytime)
@@ -1202,7 +1173,7 @@ contains
           !! @param pos Input coordinates
           !! @param cell Computational coordinate of the cell
           !! @param scoord Calculated particle coordinates
-    pure subroutine s_locate_cell(pos, cell, scoord)
+    subroutine s_locate_cell(pos, cell, scoord)
 
         real(wp), dimension(3), intent(in) :: pos
         real(wp), dimension(3), intent(out) :: scoord
@@ -1269,13 +1240,14 @@ contains
             mtn_vel(k, 1:3, 2) = mtn_vel(k, 1:3, 1)
             mtn_s(k, 1:3, 2) = mtn_s(k, 1:3, 1)
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_transfer_data_to_tmp
 
     !> The purpose of this procedure is to determine if the global coordinates of the bubbles
         !!      are present in the current MPI processor (including ghost cells).
         !! @param pos_part Spatial coordinates of the bubble
-    pure function particle_in_domain(pos_part)
+    function particle_in_domain(pos_part)
 
         logical :: particle_in_domain
         real(wp), dimension(3), intent(in) :: pos_part
@@ -1327,7 +1299,7 @@ contains
     !> The purpose of this procedure is to determine if the lagrangian bubble is located in the
         !!       physical domain. The ghost cells are not part of the physical domain.
         !! @param pos_part Spatial coordinates of the bubble
-    pure function particle_in_domain_physical(pos_part)
+    function particle_in_domain_physical(pos_part)
 
         logical :: particle_in_domain_physical
         real(wp), dimension(3), intent(in) :: pos_part
@@ -1346,56 +1318,58 @@ contains
         !! @param q Input scalar field
         !! @param dq Output gradient of q
         !! @param dir Gradient spatial direction
-    pure subroutine s_gradient_dir(q, dq, dir)
+    subroutine s_gradient_dir(q, dq, dir)
 
-        type(scalar_field), intent(inout) :: q
-        type(scalar_field), intent(inout) :: dq
+        real(stp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:), intent(inout) :: q, dq
         integer, intent(in) :: dir
 
         integer :: i, j, k
 
         if (dir == 1) then
             ! Gradient in x dir.
-            $:GPU_PARALLEL_LOOP(collapse=3)
+            $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3)
             do k = 0, p
                 do j = 0, n
                     do i = 0, m
-                        dq%sf(i, j, k) = q%sf(i, j, k)*(dx(i + 1) - dx(i - 1)) &
-                                         + q%sf(i + 1, j, k)*(dx(i) + dx(i - 1)) &
-                                         - q%sf(i - 1, j, k)*(dx(i) + dx(i + 1))
-                        dq%sf(i, j, k) = dq%sf(i, j, k)/ &
-                                         ((dx(i) + dx(i - 1))*(dx(i) + dx(i + 1)))
+                        dq(i, j, k) = q(i, j, k)*(dx(i + 1) - dx(i - 1)) &
+                                      + q(i + 1, j, k)*(dx(i) + dx(i - 1)) &
+                                      - q(i - 1, j, k)*(dx(i) + dx(i + 1))
+                        dq(i, j, k) = dq(i, j, k)/ &
+                                      ((dx(i) + dx(i - 1))*(dx(i) + dx(i + 1)))
                     end do
                 end do
             end do
+            $:END_GPU_PARALLEL_LOOP()
         elseif (dir == 2) then
             ! Gradient in y dir.
-            $:GPU_PARALLEL_LOOP(collapse=3)
+            $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3)
             do k = 0, p
                 do j = 0, n
                     do i = 0, m
-                        dq%sf(i, j, k) = q%sf(i, j, k)*(dy(j + 1) - dy(j - 1)) &
-                                         + q%sf(i, j + 1, k)*(dy(j) + dy(j - 1)) &
-                                         - q%sf(i, j - 1, k)*(dy(j) + dy(j + 1))
-                        dq%sf(i, j, k) = dq%sf(i, j, k)/ &
-                                         ((dy(j) + dy(j - 1))*(dy(j) + dy(j + 1)))
+                        dq(i, j, k) = q(i, j, k)*(dy(j + 1) - dy(j - 1)) &
+                                      + q(i, j + 1, k)*(dy(j) + dy(j - 1)) &
+                                      - q(i, j - 1, k)*(dy(j) + dy(j + 1))
+                        dq(i, j, k) = dq(i, j, k)/ &
+                                      ((dy(j) + dy(j - 1))*(dy(j) + dy(j + 1)))
                     end do
                 end do
             end do
+            $:END_GPU_PARALLEL_LOOP()
         elseif (dir == 3) then
             ! Gradient in z dir.
-            $:GPU_PARALLEL_LOOP(collapse=3)
+            $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3)
             do k = 0, p
                 do j = 0, n
                     do i = 0, m
-                        dq%sf(i, j, k) = q%sf(i, j, k)*(dz(k + 1) - dz(k - 1)) &
-                                         + q%sf(i, j, k + 1)*(dz(k) + dz(k - 1)) &
-                                         - q%sf(i, j, k - 1)*(dz(k) + dz(k + 1))
-                        dq%sf(i, j, k) = dq%sf(i, j, k)/ &
-                                         ((dz(k) + dz(k - 1))*(dz(k) + dz(k + 1)))
+                        dq(i, j, k) = q(i, j, k)*(dz(k + 1) - dz(k - 1)) &
+                                      + q(i, j, k + 1)*(dz(k) + dz(k - 1)) &
+                                      - q(i, j, k - 1)*(dz(k) + dz(k + 1))
+                        dq(i, j, k) = dq(i, j, k)/ &
+                                      ((dz(k) + dz(k - 1))*(dz(k) + dz(k + 1)))
                     end do
                 end do
             end do
+            $:END_GPU_PARALLEL_LOOP()
         end if
 
     end subroutine s_gradient_dir
@@ -1491,21 +1465,20 @@ contains
         lag_void_max = 0._wp
         lag_void_avg = 0._wp
         lag_vol = 0._wp
-        $:GPU_PARALLEL_LOOP(collapse=3, reduction='[[lag_vol, lag_void_avg], &
-            & [lag_void_max]]', reductionOp='[+, MAX]', &
-            & copy='[lag_vol, lag_void_avg, lag_void_max]')
+        $:GPU_PARALLEL_LOOP(private='[volcell]', collapse=3, reduction='[[lag_vol, lag_void_avg], [lag_void_max]]', reductionOp='[+, MAX]', copy='[lag_vol, lag_void_avg, lag_void_max]')
         do k = 0, p
             do j = 0, n
                 do i = 0, m
-                    lag_void_max = max(lag_void_max, 1._wp - q_beta%vf(1)%sf(i, j, k))
+                    lag_void_max = max(lag_void_max, 1._wp - q_beta(1)%sf(i, j, k))
                     call s_get_char_vol(i, j, k, volcell)
-                    if ((1._wp - q_beta%vf(1)%sf(i, j, k)) > 5.0d-11) then
-                        lag_void_avg = lag_void_avg + (1._wp - q_beta%vf(1)%sf(i, j, k))*volcell
+                    if ((1._wp - q_beta(1)%sf(i, j, k)) > 5.0d-11) then
+                        lag_void_avg = lag_void_avg + (1._wp - q_beta(1)%sf(i, j, k))*volcell
                         lag_vol = lag_vol + volcell
                     end if
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
 #ifdef MFC_MPI
         if (num_procs > 1) then
@@ -1688,7 +1661,7 @@ contains
 
         integer :: k
 
-        $:GPU_PARALLEL_LOOP(reduction='[[Rmax_glb], [Rmin_glb]]', &
+        $:GPU_PARALLEL_LOOP(private='[k]', reduction='[[Rmax_glb], [Rmin_glb]]', &
             & reductionOp='[MAX, MIN]', copy='[Rmax_glb,Rmin_glb]')
         do k = 1, nBubs
             Rmax_glb = max(Rmax_glb, intfc_rad(k, 1)/bub_R0(k))
@@ -1696,6 +1669,7 @@ contains
             Rmax_stats(k) = max(Rmax_stats(k), intfc_rad(k, 1)/bub_R0(k))
             Rmin_stats(k) = min(Rmin_stats(k), intfc_rad(k, 1)/bub_R0(k))
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_calculate_lag_bubble_stats
 
@@ -1785,9 +1759,9 @@ contains
         integer :: i
 
         do i = 1, q_beta_idx
-            @:DEALLOCATE(q_beta%vf(i)%sf)
+            @:DEALLOCATE(q_beta(i)%sf)
         end do
-        @:DEALLOCATE(q_beta%vf)
+        @:DEALLOCATE(q_beta)
 
         !Deallocating space
         @:DEALLOCATE(lag_id)

@@ -1,15 +1,23 @@
 import typing, dataclasses
+from enum import Enum, unique
 
+@unique
+class gpuConfigOptions(Enum):
+    NONE = 'no'
+    ACC = 'acc'
+    MP = 'mp'
 
 @dataclasses.dataclass
 class MFCConfig:
+    # pylint: disable=too-many-instance-attributes
     mpi:       bool = True
-    gpu:       bool = False
+    gpu:     str = gpuConfigOptions.NONE.value
     debug:     bool = False
     gcov:      bool = False
     unified:   bool = False
     single:    bool = False
-    fastmath : bool = False
+    mixed:   bool = False
+    fastmath: bool = False
 
     @staticmethod
     def from_dict(d: dict):
@@ -22,18 +30,30 @@ class MFCConfig:
 
         return r
 
-    def items(self) -> typing.List[typing.Tuple[str, bool]]:
+    def items(self) -> typing.Iterable[typing.Tuple[str, typing.Any]]:
         return dataclasses.asdict(self).items()
 
     def make_options(self) -> typing.List[str]:
         """ Returns a list of options that could be passed to mfc.sh again.
             Example: --no-debug --mpi --no-gpu --no-gcov --no-unified"""
-        return [ f"--{'no-' if not v else ''}{k}" for k, v in self.items() ]
+        options = []
+        for k, v in self.items():
+            if k == 'gpu':
+                options.append(f"--{v}-{k}")
+            else:
+                options.append(f"--{'no-' if not v else ''}{k}")
+        return options
 
     def make_slug(self) -> str:
         """ Sort the items by key, then join them with underscores. This uniquely 
             identifies the configuration. Example: no-debug_no-gpu_no_mpi_no-gcov """
-        return '_'.join([ f"{'no-' if not v else ''}{k}" for k, v in sorted(self.items(), key=lambda x: x[0]) ])
+        options = []
+        for k, v in sorted(self.items(), key=lambda x: x[0]):
+            if k == 'gpu':
+                options.append(f"--{v}-{k}")
+            else:
+                options.append(f"--{'no-' if not v else ''}{k}")
+        return '_'.join(options)
 
     def __eq__(self, other) -> bool:
         """ Check if two MFCConfig objects are equal, field by field. """
@@ -45,8 +65,18 @@ class MFCConfig:
 
     def __str__(self) -> str:
         """ Returns a string like "mpi=No & gpu=No & debug=No & gcov=No & unified=No" """
+        strings = []
+        for k,v in self.items():
+            if isinstance(v, bool):
+                strings.append(f"{k}={'Yes' if v else 'No'}")
+            elif isinstance(v, str):
+                strings.append(f"{k}={v.capitalize()}")
+            elif isinstance(v, int):
+                strings.append(f"{k}={v}")
+            else:
+                strings.append(f"{k}={v.__str__()}")
 
-        return ' & '.join([ f"{k}={'Yes' if v else 'No'}" for k, v in self.items() ])
+        return ' & '.join(strings)
 
 
 gCFG: MFCConfig = MFCConfig()

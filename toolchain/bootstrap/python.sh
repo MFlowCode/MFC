@@ -1,7 +1,7 @@
 #!/bin/bash
 
 MFC_PYTHON_MIN_MAJOR=3
-MFC_PYTHON_MIN_MINOR=9
+MFC_PYTHON_MIN_MINOR=11
 MFC_PYTHON_MIN_STR="$MFC_PYTHON_MIN_MAJOR.$MFC_PYTHON_MIN_MINOR"
 
 is_python_compatible() {
@@ -29,7 +29,8 @@ if [ -f "$(pwd)/build/venv/bin/activate" ]; then
     fi
 fi
 
-if ! command -v pip3 > /dev/null 2>&1 && [ ! -f "$(pwd)/build/venv/bin/activate" ]; then
+# Only bootstrap pip if we don't already have a venv
+if [ ! -f "$(pwd)/build/venv/bin/activate" ]; then
     # Check whether python3 is in the $PATH / is accessible.
     if ! command -v python3 > /dev/null 2>&1; then
         error "Couldn't find$MAGENTA Python$COLOR_RESET. Please ensure it is discoverable."
@@ -39,26 +40,41 @@ if ! command -v pip3 > /dev/null 2>&1 && [ ! -f "$(pwd)/build/venv/bin/activate"
 
     assert_python_compatible
 
-    get_pip_url="https://bootstrap.pypa.io/pip/get-pip.py"
+    # Check if pip is already available as a Python module
+    # This works on both laptops and HPC systems with module-loaded Python
+    if ! python3 -c "import pip" > /dev/null 2>&1; then
+        warn "$MAGENTA""Python$COLOR_RESET's$MAGENTA PIP$COLOR_RESET is not installed."
+        
+        # Try ensurepip first (standard library, safe)
+        log "Attempting to install pip via ensurepip..."
+        if python3 -m ensurepip --upgrade 2>/dev/null; then
+            ok "Installed pip via ensurepip."
+        else
+            # Fall back to get-pip.py only if ensurepip fails
+            get_pip_url="https://bootstrap.pypa.io/pip/get-pip.py"
+            log "Downloading$MAGENTA Python$COLOR_RESET's$MAGENTA PIP$COLOR_RESET from $get_pip_url..."
 
-    warn "$MAGENTA""Python$COLOR_RESET's$MAGENTA PIP$COLOR_RESET is not installed."
-    log  "Downloading$MAGENTA Python$COLOR_RESET's$MAGENTA PIP$COLOR_RESET from $get_pip_url..."
+            if ! wget -O "$(pwd)/build/get-pip.py" "$get_pip_url"; then
+                error "Couldn't download get-pip.py."
+                exit 1
+            fi
 
-    if ! wget -O "$(pwd)/build/get-pip.py" "$get_pip_url"; then
-        error "Couldn't download get-pip.py."
+            # Suppress PIP version warning (out of date)
+            export PIP_DISABLE_PIP_VERSION_CHECK=1
+            if ! python3 "$(pwd)/build/get-pip.py" --user; then
+                error "Couldn't install$MAGENTA pip$COLOR_RESET with get-pip.py"
+                exit 1
+            fi
 
-        exit 1
+            ok "Installed pip via get-pip.py."
+            
+            # Ensure user-site bin directory is on PATH for this session
+            user_base_bin="$(python3 -m site --user-base)/bin"
+            if [ -d "$user_base_bin" ]; then
+                export PATH="$user_base_bin:$PATH"
+            fi
+        fi
     fi
-
-    # Suppress PIP version warning (out of date)
-    export PIP_DISABLE_PIP_VERSION_CHECK=1
-    if ! python3 "$(pwd)/build/get-pip.py" --user; then
-        error "Couldn't install$MAGENTA pip$COLOR_RESET with get-pip.py"
-
-        exit 1
-    fi
-
-    ok "Installed pip."
 fi
 
 

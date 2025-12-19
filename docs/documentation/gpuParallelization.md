@@ -44,14 +44,21 @@ Note: Ordering is not guaranteed or stable, so use key-value pairing when using 
 
 **Macro Invocation**
 
-Uses FYPP eval directive using `$:`
+In order to parallelize a loop, simply place two macro calls on either end of the loop:
 
-`$:GPU_PARALLEL_LOOP(...)`
+```C
+$:$GPU_PARALLEL_LOOP(...)
+   {code}
+$:END_GPU_PARALLEL_LOOP()
+```
+
+This wraps the lines in `code` with parallelization calls to openACC or openMP, depending on environment and compiler settings.
 
 **Parameters**
 
 | name             | data type           | Default Value     | description                                                                               |
 |------------------|---------------------|-------------------|-------------------------------------------------------------------------------------------|
+| `code`           | code                | Required          | Region of code where the GPU parallelizes loops                                           |
 | `collapse`       | integer             | None              | Number of loops to combine into 1 loop                                                    |
 | `parallelism`    | string list         | '\[gang,vector\]' | Parallelism granularity to use for this loop                                              |
 | `default`        | string              | 'present'         | Implicit assumptions compiler should make                                                 |
@@ -69,6 +76,7 @@ Uses FYPP eval directive using `$:`
 | `deviceptr`      | string list         | None              | Pointer variables that are already allocated on GPU memory                                |
 | `attach`         | string list         | None              | Attaches device pointer to device targets on entrance, then detach on exit                |
 | `extraAccArgs`   | string              | None              | String of any extra arguments added to the OpenACC directive                              |
+| `extraOmpArgs`   | string              | None              | String of any extra arguments added to the OpenMP directive                               |
 
 **Parameter Restrictions**
 
@@ -88,9 +96,15 @@ Uses FYPP eval directive using `$:`
 
 **Example**
 
-```python
- $:GPU_PARALLEL_LOOP(collapse=3, private='[tmp, r]', reduction='[[vol, avg], [max_val]]', reductionOp='[+, MAX]')
- $:GPU_PARALLEL_LOOP(collapse=2, private='[sum_holder]', copyin='[starting_sum]', copyout='[eigenval,C]')
+```C
+  #:call GPU_PARALLEL_LOOP(collapse=3, private='[tmp, r]', reduction='[[vol, avg], [max_val]]', reductionOp='[+, MAX]')
+    {code}
+    ...
+  #:endcall GPU_PARALLEL_LOOP
+  #:call GPU_PARALLEL_LOOP(collapse=2, private='[sum_holder]', copyin='[starting_sum]', copyout='[eigenval,C]')
+     {code}
+    ...
+  #:endcall GPU_PARALLEL_LOOP
 ```
 
 </details>
@@ -115,6 +129,7 @@ Uses FYPP eval directive using `$:`
 | `reduction`       | 2-level string list | None          | Variables unique to each iteration and reduced at the end                                        |
 | `reductionOp`     | string list         | None          | Operator that each list of reduction will reduce with                                            |
 | `extraAccArgs`    | string              | None          | String of any extra arguments added to the OpenACC directive                                     |
+| `extraOmpArgs`    | string              | None          | String of any extra arguments added to the OpenMP directive                                      |
 
 **Parameter Restrictions**
 
@@ -154,23 +169,25 @@ Uses FYPP call directive using `#:call`
 
 **Parameters**
 
-| name             | data type           | Default Value     | description                                                                               |
-|------------------|---------------------|-------------------|-------------------------------------------------------------------------------------------|
-| `default`        | string              | 'present'         | Implicit assumptions compiler should make                                                 |
-| `private`        | string list         | None              | Variables that are private to each iteration/thread                                       |
-| `firstprivate`   | string list         | None              | Initialized variables that are private to each iteration/thread                           |
-| `reduction`      | 2-level string list | None              | Variables unique to each iteration and reduced at the end                                 |
-| `reductionOp`    | string list         | None              | Operator that each list of reduction will reduce with                                     |
-| `copy`           | string list         | None              | Allocates and copies data to GPU on entrance, then deallocated and copies to CPU on exit  |
-| `copyin`         | string list         | None              | Allocates and copies data to GPU on entrance and then deallocated on exit                 |
-| `copyinReadOnly` | string list         | None              | Allocates and copies readonly data to GPU and then deallocated on exit                    |
-| `copyout`        | string list         | None              | Allocates data on GPU on entrance and then deallocates and copies to CPU on exit          |
-| `create`         | string list         | None              | Allocates data on GPU on entrance and then deallocates on exit                            |
-| `no_create`      | string list         | None              | Use data in CPU memory unless data is already in GPU memory                               |
-| `present`        | string list         | None              | Data that must be present in GPU memory. Increment counter on entrance, decrement on exit |
-| `deviceptr`      | string list         | None              | Pointer variables that are already allocated on GPU memory                                |
-| `attach`         | string list         | None              | Attaches device pointer to device targets on entrance, then detach on exit                |
-| `extraAccArgs`   | string              | None              | String of any extra arguments added to the OpenACC directive                              |
+| name             | data type           | Default Value | description                                                                               |
+|------------------|---------------------|---------------|-------------------------------------------------------------------------------------------|
+| `code`           | code                | Required      | Region of code where a kernel is launched on the GPU                                      |
+| `default`        | string              | 'present'     | Implicit assumptions compiler should make                                                 |
+| `private`        | string list         | None          | Variables that are private to each iteration/thread                                       |
+| `firstprivate`   | string list         | None          | Initialized variables that are private to each iteration/thread                           |
+| `reduction`      | 2-level string list | None          | Variables unique to each iteration and reduced at the end                                 |
+| `reductionOp`    | string list         | None          | Operator that each list of reduction will reduce with                                     |
+| `copy`           | string list         | None          | Allocates and copies data to GPU on entrance, then deallocated and copies to CPU on exit  |
+| `copyin`         | string list         | None          | Allocates and copies data to GPU on entrance and then deallocated on exit                 |
+| `copyinReadOnly` | string list         | None          | Allocates and copies readonly data to GPU and then deallocated on exit                    |
+| `copyout`        | string list         | None          | Allocates data on GPU on entrance and then deallocates and copies to CPU on exit          |
+| `create`         | string list         | None          | Allocates data on GPU on entrance and then deallocates on exit                            |
+| `no_create`      | string list         | None          | Use data in CPU memory unless data is already in GPU memory                               |
+| `present`        | string list         | None          | Data that must be present in GPU memory. Increment counter on entrance, decrement on exit |
+| `deviceptr`      | string list         | None          | Pointer variables that are already allocated on GPU memory                                |
+| `attach`         | string list         | None          | Attaches device pointer to device targets on entrance, then detach on exit                |
+| `extraAccArgs`   | string              | None          | String of any extra arguments added to the OpenACC directive                              |
+| `extraOmpArgs`   | string              | None          | String of any extra arguments added to the OpenMP directive                               |
 
 **Parameter Restrictions**
 
@@ -234,6 +251,8 @@ Uses FYPP call directive using `#:call`
 | `attach`         | string list | None          | Attaches device pointer to device targets on entrance, then detach on exit                   |
 | `default`        | string      | None          | Implicit assumptions compiler should make                                                    |
 | `extraAccArgs`   | string      | None          | String of any extra arguments added to the OpenACC directive                                 |
+| `extraOmpArgs`   | string      | None          | String of any extra arguments added to the OpenMP directive                                  |
+
 
 **Parameter Restrictions**
 
@@ -274,6 +293,8 @@ Uses FYPP eval directive using `$:`
 | `create`         | string list | None          | Allocates data on GPU on entrance                            |
 | `attach`         | string list | None          | Attaches device pointer to device targets on entrance        |
 | `extraAccArgs`   | string      | None          | String of any extra arguments added to the OpenACC directive |
+| `extraOmpArgs`   | string      | None          | String of any extra arguments added to the OpenMP directive  |
+
 
 **Example**
 
@@ -301,6 +322,8 @@ Uses FYPP eval directive using `$:`
 | `delete`       | string list | None          | Deallocates data on GPU on exit                              |
 | `detach`       | string list | None          | Detach device pointer from device targets on exit            |
 | `extraAccArgs` | string      | None          | String of any extra arguments added to the OpenACC directive |
+| `extraOmpArgs` | string      | None          | String of any extra arguments added to the OpenMP directive  |
+
 
 **Example**
 
@@ -333,6 +356,8 @@ Uses FYPP eval directive using `$:`
 | `deviceptr`      | string list | None          | Pointer variables that are already allocated on GPU memory                                |
 | `link`           | string list | None          | Declare global link, and only allocate when variable used in data clause.                 |
 | `extraAccArgs`   | string      | None          | String of any extra arguments added to the OpenACC directive                              |
+| `extraOmpArgs`   | string      | None          | String of any extra arguments added to the OpenMP directive                               |
+
 
 **Additional information**
 
@@ -366,6 +391,8 @@ Uses FYPP eval directive using `$:`
 | `host`         | string list | None          | Updates data from GPU to CPU                                 |
 | `device`       | string list | None          | Updates data from CPU to GPU                                 |
 | `extraAccArgs` | string      | None          | String of any extra arguments added to the OpenACC directive |
+| `extraOmpArgs` | string      | None          | String of any extra arguments added to the OpenMP directive  |
+
 
 **Example**
 
@@ -391,11 +418,14 @@ Uses FYPP call directive using `#:call`
 
 **Parameters**
 
-| name           | data type   | Default Value | description                                                      |
-|----------------|-------------|---------------|------------------------------------------------------------------|
-| `code`         | code        | Required      | Region of code where GPU memory addresses is accessible          |
-| `use_device`   | string list | None          | Use GPU memory address of variable instead of CPU memory address |
-| `extraAccArgs` | string      | None          | String of any extra arguments added to the OpenACC directive     |
+| name              | data type   | Default Value | description                                                      |
+|-------------------|-------------|---------------|------------------------------------------------------------------|
+| `code`            | code        | Required      | Region of code where GPU memory addresses is accessible          |
+| `use_device_addr` | string list | None          | Use GPU memory address of variable instead of CPU memory address |
+| `use_device_ptr`  | string list | None          | Use GPU pointer of pointers instead of CPU pointer               |
+| `extraAccArgs`    | string      | None          | String of any extra arguments added to the OpenACC directive     |
+| `extraOmpArgs`    | string      | None          | String of any extra arguments added to the OpenMP directive      |
+
 
 **Parameter Restrictions**
 
@@ -436,6 +466,8 @@ Uses FYPP eval directive using `$:`
 | name           | data type | Default Value | description                                                  |
 |----------------|-----------|---------------|--------------------------------------------------------------|
 | `extraAccArgs` | string    | None          | String of any extra arguments added to the OpenACC directive |
+| `extraOmpArgs` | string    | None          | String of any extra arguments added to the OpenMP directive  |
+
 
 **Example**
 
@@ -460,6 +492,8 @@ Uses FYPP eval directive using `$:`
 |----------------|-----------|---------------|--------------------------------------------------------------|
 | `atomic`       | string    | Required      | Which atomic operation is performed                          |
 | `extraAccArgs` | string    | None          | String of any extra arguments added to the OpenACC directive |
+| `extraOmpArgs` | string    | None          | String of any extra arguments added to the OpenMP directive  |
+
 
 **Parameter Restrictions**
 
@@ -517,6 +551,9 @@ Uses FYPP eval directive using `$:`
 | `nohost`        | boolean     | False         | Do not compile procedure code for CPU                        |
 | `cray_inline`   | boolean     | False         | Inline procedure on cray compiler                            |
 | `extraAccArgs`  | string      | None          | String of any extra arguments added to the OpenACC directive |
+| `extraOmpArgs`  | string      | None          | String of any extra arguments added to the OpenMP directive  |
+
+
 
 **Parameter Restrictions**
 
@@ -555,6 +592,9 @@ Uses FYPP eval directive using `$:`
 | `cache`          | string list | Required      | Data that should to stored in cache                          |
 | `extraAccArgs`   | string      | None          | String of any extra arguments added to the OpenACC directive |
 
+**NOTE**
+Does not do anything for OpenMP currently
+
 **Example**
 
 ```python
@@ -570,27 +610,32 @@ Uses FYPP eval directive using `$:`
 ## Compiler agnostic tools
 
 ## OpenMP tools
+
 ```bash
 OMP_DISPLAY_ENV=true | false | verbose
 ```
+
 - Prints out the internal control values and environment variables at the beginning of the program if `true` or `verbose`
 - `verbose` will also print out vendor-specific internal control values and environment variables
 
 ```bash
 OMP_TARGET_OFFLOAD = MANDATORY | DISABLED | DEFAULT
 ```
+
 - Quick way to turn off off-load (`DISABLED`) or make it abort if a GPU isn't found (`MANDATORY`)
-- Great first test: does the problem disappear when you drop back to the CPU? 
+- Great first test: does the problem disappear when you drop back to the CPU?
 
 ```bash
 OMP_THREAD_LIMIT=<positive_integer>
 ```
+
 - Sets the maximum number of OpenMP threads to use in a contention group
 - Might be useful in checking for issues with contention or race conditions
 
 ```bash
 OMP_DISPLAY_AFFINITY=TRUE
 ```
+
 - Will display affinity bindings for each OpenMP thread, containing hostname, process identifier, OS thread identifier, OpenMP thread identifier, and affinity binding.
 
 ## Cray Compiler Tools
@@ -620,6 +665,7 @@ CRAY_ACC_FORCE_EARLY_INIT=1
 ```bash
 CRAY_ACC_PRESENT_DUMP_SAVE_NAMES=1
 ```
+
 - Will cause `acc_present_dump()` to output variable names and file locations in addition to variable mappings
 - Add `acc_present_dump()` around hotspots to help find problems with data movements
   - Helps more if adding `CRAY_ACC_DEBUG` environment variable
@@ -631,12 +677,14 @@ CRAY_ACC_PRESENT_DUMP_SAVE_NAMES=1
 ```bash
 STATIC_RANDOM_SEED=1
 ```
-- Forces the seed returned by `RANDOM_SEED` to be constant, so it generates the same sequence of random numbers 
+
+- Forces the seed returned by `RANDOM_SEED` to be constant, so it generates the same sequence of random numbers
 - Useful for testing issues with randomized data
 
 ```bash
 NVCOMPILER_TERM=option[,option]
 ```
+
 - `[no]debug`: Enables/disables just-in-time debugging (debugging invoked on error)
 - `[no]trace`: Enables/disables stack traceback on error
 
@@ -645,17 +693,19 @@ NVCOMPILER_TERM=option[,option]
 ```bash
 NVCOMPILER_ACC_NOTIFY= <bitmask>
 ```
+
 - Assign the environment variable to a bitmask to print out information to stderr for the following
   - kernel launches: 1
   - data transfers: 2
   - region entry/exit: 4
   - wait operation of synchronizations with the device: 8
   - device memory allocations and deallocations: 16
-- 1 (kernels only) is the usual first step.3 (kernels + copies) is great for "why is it so slow?" 
+- 1 (kernels only) is the usual first step.3 (kernels + copies) is great for "why is it so slow?"
 
 ```bash
 NVCOMPILER_ACC_TIME=1
 ```
+
 - Lightweight profiler
 - prints a tidy end-of-run table with per-region and per-kernel times and bytes moved
 - Do not use with CUDA profiler at the same time
@@ -663,8 +713,9 @@ NVCOMPILER_ACC_TIME=1
 ```bash
 NVCOMPILER_ACC_DEBUG=1
 ```
+
 - Spews everything the runtime sees: host/device addresses, mapping events, present-table look-ups, etc.
-- Great for "partially present" or "pointer went missing" errors. 
+- Great for "partially present" or "pointer went missing" errors.
 - [Doc for NVCOMPILER_ACC_DEBUG](https://docs.nvidia.com/hpc-sdk/archive/20.9/pdf/hpc209openacc_gs.pdf)
   - Ctrl+F for `NVCOMPILER_ACC_DEBUG`
 
@@ -673,6 +724,7 @@ NVCOMPILER_ACC_DEBUG=1
 ```bash
 LIBOMPTARGET_PROFILE=run.json
 ```
+
 - Emits a Chrome-trace (JSON) timeline you can open in chrome://tracing or Speedscope
 - Great lightweight profiler when Nsight is overkill.
 - Granularity in µs via `LIBOMPTARGET_PROFILE_GRANULARITY` (default 500).
@@ -680,9 +732,10 @@ LIBOMPTARGET_PROFILE=run.json
 ```bash
 LIBOMPTARGET_INFO=<bitmask>
 ```
+
 - Prints out different types of runtime information
 - Human-readable log of data-mapping inserts/updates, kernel launches, copies, waits.
-- Perfect first stop for "why is nothing copied?" 
+- Perfect first stop for "why is nothing copied?"
 - Flags
   - Print all data arguments upon entering an OpenMP device kernel: 0x01
   - Indicate when a mapped address already exists in the device mapping table: 0x02
@@ -694,6 +747,7 @@ LIBOMPTARGET_INFO=<bitmask>
 ```bash
 LIBOMPTARGET_DEBUG=1
 ```
+
 - Developer-level trace (host-side)
 - Much noisier than `INFO`
 - Only works if the runtime was built with `-DOMPTARGET_DEBUG`.
@@ -701,12 +755,14 @@ LIBOMPTARGET_DEBUG=1
 ```bash
 LIBOMPTARGET_JIT_OPT_LEVEL=-O{0,1,2,3}
 ```
-- This environment variable can be used to change the optimization pipeline used to optimize the embedded device code as part of the device JIT. 
+
+- This environment variable can be used to change the optimization pipeline used to optimize the embedded device code as part of the device JIT.
 - The value corresponds to the `-O{0,1,2,3}` command line argument passed to clang.
 
 ```bash
 LIBOMPTARGET_JIT_SKIP_OPT=1
 ```
+
 - This environment variable can be used to skip the optimization pipeline during JIT compilation.
 - If set, the image will only be passed through the backend.
 - The backend is invoked with the `LIBOMPTARGET_JIT_OPT_LEVEL` flag.
@@ -718,6 +774,6 @@ LIBOMPTARGET_JIT_SKIP_OPT=1
 - [NVHPC & OpenACC Docs](https://docs.nvidia.com/hpc-sdk/compilers/hpc-compilers-user-guide/index.html?highlight=NVCOMPILER_#environment-variables)
 - [NVHPC & OpenMP Docs](https://docs.nvidia.com/hpc-sdk/compilers/hpc-compilers-user-guide/index.html?highlight=NVCOMPILER_#id2)
 - [LLVM & OpenMP Docs](https://openmp.llvm.org/design/Runtimes.html)
-    - NVHPC is built on top of LLVM
+  - NVHPC is built on top of LLVM
 - [OpenMP Docs](https://www.openmp.org/spec-html/5.1/openmp.html)
 - [OpenACC Docs](https://www.openacc.org/sites/default/files/inline-files/OpenACC.2.7.pdf)

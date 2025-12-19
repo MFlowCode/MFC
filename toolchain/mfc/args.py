@@ -4,9 +4,10 @@ from .run.run      import get_baked_templates
 from .build        import TARGETS, DEFAULT_TARGETS
 from .common       import MFCException, format_list_to_string
 from .test.cases   import list_cases
+from .state        import gpuConfigOptions, MFCConfig
 
 # pylint: disable=too-many-locals, too-many-branches, too-many-statements
-def parse(config):
+def parse(config: MFCConfig):
     parser = argparse.ArgumentParser(
         prog="./mfc.sh",
         description="""\
@@ -46,7 +47,7 @@ started, run ./mfc.sh build -h.""",
     compare.add_argument("-rel", "--reltol", metavar="RELTOL", type=float, default=1e-12, help="Relative tolerance.")
     compare.add_argument("-abs", "--abstol", metavar="ABSTOL", type=float, default=1e-12, help="Absolute tolerance.")
 
-    def add_common_arguments(p, mask = None):
+    def add_common_arguments(p: argparse.ArgumentParser, mask = None):
         if mask is None:
             mask = ""
 
@@ -57,6 +58,10 @@ started, run ./mfc.sh build -h.""",
 
         if "m" not in mask:
             for f in dataclasses.fields(config):
+                if f.name == 'gpu':
+                    p.add_argument(f"--{f.name}", action="store", nargs='?', const= gpuConfigOptions.ACC.value,default=gpuConfigOptions.NONE.value, dest=f.name, choices=[e.value for e in gpuConfigOptions], help=f"Turn the {f.name} option to OpenACC or OpenMP.")
+                    p.add_argument(f"--no-{f.name}", action="store_const", const = gpuConfigOptions.NONE.value, dest=f.name, help=f"Turn the {f.name} option OFF.")
+                    continue
                 p.add_argument(   f"--{f.name}", action="store_true",               help=f"Turn the {f.name} option ON.")
                 p.add_argument(f"--no-{f.name}", action="store_false", dest=f.name, help=f"Turn the {f.name} option OFF.")
 

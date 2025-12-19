@@ -52,7 +52,11 @@ module m_assign_variables
             integer, intent(in) :: j, k, l
             real(wp), intent(in) :: eta
             type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+#ifdef MFC_MIXED_PRECISION
+            integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+#else
             integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+#endif
 
         end subroutine s_assign_patch_xxxxx_primitive_variables
 
@@ -69,7 +73,9 @@ contains
 
     impure subroutine s_initialize_assign_variables_module
 
-        allocate (alf_sum%sf(0:m, 0:n, 0:p))
+        if (.not. igr) then
+            allocate (alf_sum%sf(0:m, 0:n, 0:p))
+        end if
 
         ! Depending on multicomponent flow model, the appropriate procedure
         ! for assignment of the patch mixture or species primitive variables
@@ -102,15 +108,19 @@ contains
         !! @param eta pseudo volume fraction
         !! @param q_prim_vf Primitive variables
         !! @param patch_id_fp Array to track patch ids
-    pure subroutine s_assign_patch_mixture_primitive_variables(patch_id, j, k, l, &
-                                                               eta, q_prim_vf, patch_id_fp)
+    subroutine s_assign_patch_mixture_primitive_variables(patch_id, j, k, l, &
+                                                          eta, q_prim_vf, patch_id_fp)
         $:GPU_ROUTINE(parallelism='[seq]')
 
         integer, intent(in) :: patch_id
         integer, intent(in) :: j, k, l
         real(wp), intent(in) :: eta
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+#ifdef MFC_MIXED_PRECISION
+        integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+#else
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+#endif
 
         real(wp) :: Ys(1:num_species)
 
@@ -191,7 +201,7 @@ contains
     !! @param k the y-dir node index
     !! @param l the z-dir node index
     !! @param q_prim_vf Primitive variables
-    pure subroutine s_perturb_primitive(j, k, l, q_prim_vf)
+    subroutine s_perturb_primitive(j, k, l, q_prim_vf)
 
         integer, intent(in) :: j, k, l
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
@@ -203,11 +213,8 @@ contains
         p0 = 101325._wp
         pres_mag = 1.e-1_wp
         loc = x_cc(177)
-        n_tait = fluid_pp(1)%gamma
-        B_tait = fluid_pp(1)%pi_inf
-
-        n_tait = 1._wp/n_tait + 1._wp
-        B_tait = B_tait*(n_tait - 1._wp)/n_tait
+        n_tait = gs_min(1)
+        B_tait = ps_inf(1)
 
         if (j < 177) then
             q_prim_vf(E_idx)%sf(j, k, l) = 0.5_wp*q_prim_vf(E_idx)%sf(j, k, l)
@@ -215,7 +222,7 @@ contains
 
         if (qbmm) then
             do i = 1, nb
-                q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l) = q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)*((p0 - fluid_pp(1)%pv)/(q_prim_vf(E_idx)%sf(j, k, l)*p0 - fluid_pp(1)%pv))**(1._wp/3._wp)
+                q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l) = q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)*((p0 - bub_pp%pv)/(q_prim_vf(E_idx)%sf(j, k, l)*p0 - bub_pp%pv))**(1._wp/3._wp)
             end do
         end if
 
@@ -282,7 +289,11 @@ contains
         integer, intent(in) :: patch_id
         integer, intent(in) :: j, k, l
         real(wp), intent(in) :: eta
+#ifdef MFC_MIXED_PRECISION
+        integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+#else
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+#endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         ! Density, the specific heat ratio function and the liquid stiffness
@@ -304,7 +315,7 @@ contains
 
         real(wp) :: Ys(1:num_species)
 
-        real(wp), dimension(sys_size) :: orig_prim_vf !<
+        real(stp), dimension(sys_size) :: orig_prim_vf !<
             !! Vector to hold original values of cell for smoothing purposes
 
         integer :: i  !< Generic loop iterator
@@ -409,7 +420,7 @@ contains
         ! Bubbles euler variables
         if (bubbles_euler) then
             do i = 1, nb
-                muR = R0(i)*patch_icpp(smooth_patch_id)%r0
+                muR = R0(i)*patch_icpp(smooth_patch_id)%r0/R0ref
                 muV = patch_icpp(smooth_patch_id)%v0
                 if (qbmm) then
                     ! Initialize the moment set
@@ -417,16 +428,16 @@ contains
                         q_prim_vf(bub_idx%fullmom(i, 0, 0))%sf(j, k, l) = 1._wp
                         q_prim_vf(bub_idx%fullmom(i, 1, 0))%sf(j, k, l) = muR
                         q_prim_vf(bub_idx%fullmom(i, 0, 1))%sf(j, k, l) = muV
-                        q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = muR**2 + sigR**2
-                        q_prim_vf(bub_idx%fullmom(i, 1, 1))%sf(j, k, l) = muR*muV + rhoRV*sigR*sigV
-                        q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + sigV**2
+                        q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = muR**2 + (sigR*R0ref)**2
+                        q_prim_vf(bub_idx%fullmom(i, 1, 1))%sf(j, k, l) = muR*muV + rhoRV*(sigR*R0ref)*(sigV*sqrt(p0ref/rho0ref))
+                        q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + (sigV*sqrt(p0ref/rho0ref))**2
                     else if (dist_type == 2) then
                         q_prim_vf(bub_idx%fullmom(i, 0, 0))%sf(j, k, l) = 1._wp
                         q_prim_vf(bub_idx%fullmom(i, 1, 0))%sf(j, k, l) = exp((sigR**2)/2._wp)*muR
                         q_prim_vf(bub_idx%fullmom(i, 0, 1))%sf(j, k, l) = muV
                         q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = exp((sigR**2)*2._wp)*(muR**2)
                         q_prim_vf(bub_idx%fullmom(i, 1, 1))%sf(j, k, l) = exp((sigR**2)/2._wp)*muR*muV
-                        q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + sigV**2
+                        q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + (sigV*sqrt(p0ref/rho0ref))**2
                     end if
                 else
                     q_prim_vf(bub_idx%rs(i))%sf(j, k, l) = muR
@@ -549,9 +560,9 @@ contains
             end do
         else
             !get mixture density from pressure via Tait EOS
-            pi_inf = fluid_pp(1)%pi_inf
-            gamma = fluid_pp(1)%gamma
-            lit_gamma = (1._wp + gamma)/gamma
+            pi_inf = pi_infs(1)
+            gamma = gammas(1)
+            lit_gamma = gs_min(1)
 
             ! \rho = (( p_l + pi_inf)/( p_ref + pi_inf))**(1/little_gam) * rhoref(1-alf)
             q_prim_vf(1)%sf(j, k, l) = &
@@ -616,7 +627,7 @@ contains
         ! Smoothed bubble variables
         if (bubbles_euler) then
             do i = 1, nb
-                muR = R0(i)*patch_icpp(patch_id)%r0
+                muR = R0(i)*patch_icpp(patch_id)%r0/R0ref
                 muV = patch_icpp(patch_id)%v0
                 if (qbmm) then
                     ! Initialize the moment set
@@ -624,16 +635,16 @@ contains
                         q_prim_vf(bub_idx%fullmom(i, 0, 0))%sf(j, k, l) = 1._wp
                         q_prim_vf(bub_idx%fullmom(i, 1, 0))%sf(j, k, l) = muR
                         q_prim_vf(bub_idx%fullmom(i, 0, 1))%sf(j, k, l) = muV
-                        q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = muR**2 + sigR**2
-                        q_prim_vf(bub_idx%fullmom(i, 1, 1))%sf(j, k, l) = muR*muV + rhoRV*sigR*sigV
-                        q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + sigV**2
+                        q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = muR**2 + (sigR*R0ref)**2
+                        q_prim_vf(bub_idx%fullmom(i, 1, 1))%sf(j, k, l) = muR*muV + rhoRV*(sigR*R0ref)*(sigV*sqrt(p0ref/rho0ref))
+                        q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + (sigV*sqrt(p0ref/rho0ref))**2
                     else if (dist_type == 2) then
                         q_prim_vf(bub_idx%fullmom(i, 0, 0))%sf(j, k, l) = 1._wp
                         q_prim_vf(bub_idx%fullmom(i, 1, 0))%sf(j, k, l) = exp((sigR**2)/2._wp)*muR
                         q_prim_vf(bub_idx%fullmom(i, 0, 1))%sf(j, k, l) = muV
                         q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = exp((sigR**2)*2._wp)*(muR**2)
                         q_prim_vf(bub_idx%fullmom(i, 1, 1))%sf(j, k, l) = exp((sigR**2)/2._wp)*muR*muV
-                        q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + sigV**2
+                        q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + (sigV*sqrt(p0ref/rho0ref))**2
                     end if
                 else
                     q_prim_vf(bub_idx%rs(i))%sf(j, k, l) = muR
@@ -672,11 +683,11 @@ contains
 
         if (bubbles_euler .and. (.not. polytropic) .and. (.not. qbmm)) then
             do i = 1, nb
-                if (f_is_default(q_prim_vf(bub_idx%ps(i))%sf(j, k, l))) then
+                if (f_is_default(real(q_prim_vf(bub_idx%ps(i))%sf(j, k, l), kind=wp))) then
                     q_prim_vf(bub_idx%ps(i))%sf(j, k, l) = pb0(i)
                     ! print *, 'setting to pb0'
                 end if
-                if (f_is_default(q_prim_vf(bub_idx%ms(i))%sf(j, k, l))) then
+                if (f_is_default(real(q_prim_vf(bub_idx%ms(i))%sf(j, k, l), kind=wp))) then
                     q_prim_vf(bub_idx%ms(i))%sf(j, k, l) = mass_v0(i)
                 end if
             end do
@@ -689,6 +700,15 @@ contains
 
         ! Updating the patch identities bookkeeping variable
         if (1._wp - eta < 1.e-16_wp) patch_id_fp(j, k, l) = patch_id
+
+        ! if (j == 1) then
+        !     print *, (q_prim_vf(bub_idx%rs(i))%sf(j, k, l), i = 1, nb)
+        !     print *, (q_prim_vf(bub_idx%fullmom(i, 1, 0))%sf(j, k, l), i = 1, nb)
+        !     print *, (R0(i), i = 1, nb)
+        !     print *, patch_icpp(patch_id)%r0
+        !     print *, (bub_idx%rs(i), i = 1, nb)
+        !     print *, (bub_idx%fullmom(i, 1, 0), i = 1, nb)
+        ! end if
 
     end subroutine s_assign_patch_species_primitive_variables
 

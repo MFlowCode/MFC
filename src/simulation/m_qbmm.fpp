@@ -37,9 +37,9 @@ module m_qbmm
     type(int_bounds_info) :: is1_qbmm, is2_qbmm, is3_qbmm
     $:GPU_DECLARE(create='[is1_qbmm,is2_qbmm,is3_qbmm]')
 
-    integer, allocatable, dimension(:) :: bubrs
+    integer, allocatable, dimension(:) :: bubrs_qbmm
     integer, allocatable, dimension(:, :) :: bubmoms
-    $:GPU_DECLARE(create='[bubrs,bubmoms]')
+    $:GPU_DECLARE(create='[bubrs_qbmm,bubmoms]')
 
 contains
 
@@ -394,13 +394,13 @@ contains
 
         $:GPU_UPDATE(device='[momrhs]')
 
-        @:ALLOCATE(bubrs(1:nb))
+        @:ALLOCATE(bubrs_qbmm(1:nb))
         @:ALLOCATE(bubmoms(1:nb, 1:nmom))
 
         do i = 1, nb
-            bubrs(i) = bub_idx%rs(i)
+            bubrs_qbmm(i) = bub_idx%rs(i)
         end do
-        $:GPU_UPDATE(device='[bubrs]')
+        $:GPU_UPDATE(device='[bubrs_qbmm]')
 
         do j = 1, nmom
             do i = 1, nb
@@ -411,13 +411,14 @@ contains
 
     end subroutine s_initialize_qbmm_module
 
-    pure subroutine s_compute_qbmm_rhs(idir, q_cons_vf, q_prim_vf, rhs_vf, flux_n_vf, pb, rhs_pb)
+    subroutine s_compute_qbmm_rhs(idir, q_cons_vf, q_prim_vf, rhs_vf, flux_n_vf, pb, rhs_pb)
 
         integer, intent(in) :: idir
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf, q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         type(scalar_field), dimension(sys_size), intent(in) :: flux_n_vf
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, rhs_pb
+        real(stp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: rhs_pb  ! TODO :: I think that this should be stp as well.
 
         integer :: i, j, k, l, q
         real(wp) :: nb_q, nb_dot, R, R2, nR, nR2, nR_dot, nR2_dot, var, AX
@@ -433,7 +434,7 @@ contains
         end select
 
         if (.not. polytropic) then
-            $:GPU_PARALLEL_LOOP(collapse=5,private='[nb_q,nR,nR2,R,R2,nb_dot,nR_dot,nR2_dot,var,AX]')
+            $:GPU_PARALLEL_LOOP(collapse=5,private='[i,j,k,l,q,nb_q,nR,nR2,R,R2,nb_dot,nR_dot,nR2_dot,var,AX]')
             do i = 1, nb
                 do q = 1, nnode
                     do l = 0, p
@@ -444,12 +445,13 @@ contains
                                 nR2 = q_cons_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
                                 R = q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
                                 R2 = q_prim_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
-                                var = max(R2 - R**2._wp, verysmall)
+                                var = max(R2 - R**2._wp, sgm_eps)
                                 if (q <= 2) then
                                     AX = R - sqrt(var)
                                 else
                                     AX = R + sqrt(var)
                                 end if
+
                                 select case (idir)
                                 case (1)
                                     nb_dot = flux_n_vf(bubxb + (i - 1)*nmom)%sf(j - 1, k, l) - flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
@@ -534,11 +536,12 @@ contains
                     end do
                 end do
             end do
+            $:END_GPU_PARALLEL_LOOP()
         end if
 
         ! The following block is not repeated and is left as is
         if (idir == 1) then
-            $:GPU_PARALLEL_LOOP(collapse=3)
+            $:GPU_PARALLEL_LOOP(private='[i,l,q]', collapse=3)
             do l = 0, p
                 do q = 0, n
                     do i = 0, m
@@ -557,12 +560,13 @@ contains
                     end do
                 end do
             end do
+            $:END_GPU_PARALLEL_LOOP()
         end if
 
     end subroutine s_compute_qbmm_rhs
 
     !Coefficient array for non-polytropic model (pb and mv values are accounted in wght_pb and wght_mv)
-    pure subroutine s_coeff_nonpoly(pres, rho, c, coeffs)
+    subroutine s_coeff_nonpoly(pres, rho, c, coeffs)
         $:GPU_ROUTINE(function_name='s_coeff_nonpoly',parallelism='[seq]', &
             & cray_inline=True)
 
@@ -576,56 +580,60 @@ contains
         do i2 = 0, 2; do i1 = 0, 2
                 if ((i1 + i2) <= 2) then
                     if (bubble_model == 3) then
-                        ! RPE
-                        coeffs(1, i1, i2) = -1._wp*i2*pres/rho
-                        coeffs(2, i1, i2) = -3._wp*i2/2._wp
-                        coeffs(3, i1, i2) = i2/rho
-                        coeffs(4, i1, i2) = i1
-                        if (.not. f_is_default(Re_inv)) coeffs(5, i1, i2) = -4._wp*i2*Re_inv/rho
-                        if (.not. f_is_default(Web)) coeffs(6, i1, i2) = -2._wp*i2/Web/rho
-                        coeffs(7, i1, i2) = 0._wp
+                        #:if not MFC_CASE_OPTIMIZATION or nterms > 1
+                            ! RPE
+                            coeffs(1, i1, i2) = -1._wp*i2*pres/rho
+                            coeffs(2, i1, i2) = -3._wp*i2/2._wp
+                            coeffs(3, i1, i2) = i2/rho
+                            coeffs(4, i1, i2) = i1
+                            if (.not. f_is_default(Re_inv)) coeffs(5, i1, i2) = -4._wp*i2*Re_inv/rho
+                            if (.not. f_is_default(Web)) coeffs(6, i1, i2) = -2._wp*i2/Web/rho
+                            coeffs(7, i1, i2) = 0._wp
+                        #:endif
                     else if (bubble_model == 2) then
                         ! KM with approximation of 1/(1-V/C) = 1+V/C
-                        coeffs(1, i1, i2) = -3._wp*i2/2._wp
-                        coeffs(2, i1, i2) = -i2/c
-                        coeffs(3, i1, i2) = i2/(2._wp*c*c)
-                        coeffs(4, i1, i2) = -i2*pres/rho
-                        coeffs(5, i1, i2) = -2._wp*i2*pres/(c*rho)
-                        coeffs(6, i1, i2) = -i2*pres/(c*c*rho)
-                        coeffs(7, i1, i2) = i2/rho
-                        coeffs(8, i1, i2) = 2._wp*i2/(c*rho)
-                        coeffs(9, i1, i2) = i2/(c*c*rho)
-                        coeffs(10, i1, i2) = -3._wp*i2*gam/(c*rho)
-                        coeffs(11, i1, i2) = -3._wp*i2*gam/(c*c*rho)
-                        coeffs(12, i1, i2) = i1
-                        coeffs(13, i1, i2) = 0._wp
-                        coeffs(14, i1, i2) = 0._wp
-                        coeffs(15, i1, i2) = 0._wp
-                        if (.not. f_is_default(Re_inv)) coeffs(16, i1, i2) = -i2*4._wp*Re_inv/rho
-                        if (.not. f_is_default(Web)) coeffs(17, i1, i2) = -i2*2._wp/Web/rho
-                        if (.not. f_is_default(Re_inv)) then
-                            coeffs(18, i1, i2) = i2*6._wp*Re_inv/(rho*c)
-                            coeffs(19, i1, i2) = -i2*2._wp*Re_inv/(rho*c*c)
-                            coeffs(20, i1, i2) = i2*4._wp*pres*Re_inv/(rho*rho*c)
-                            coeffs(21, i1, i2) = i2*4._wp*pres*Re_inv/(rho*rho*c*c)
-                            coeffs(22, i1, i2) = -i2*4._wp*Re_inv/(rho*rho*c)
-                            coeffs(23, i1, i2) = -i2*4._wp*Re_inv/(rho*rho*c*c)
-                            coeffs(24, i1, i2) = i2*16._wp*Re_inv*Re_inv/(rho*rho*c)
-                            if (.not. f_is_default(Web)) then
-                                coeffs(25, i1, i2) = i2*8._wp*Re_inv/Web/(rho*rho*c)
+                        #:if not MFC_CASE_OPTIMIZATION or nterms > 7
+                            coeffs(1, i1, i2) = -3._wp*i2/2._wp
+                            coeffs(2, i1, i2) = -i2/c
+                            coeffs(3, i1, i2) = i2/(2._wp*c*c)
+                            coeffs(4, i1, i2) = -i2*pres/rho
+                            coeffs(5, i1, i2) = -2._wp*i2*pres/(c*rho)
+                            coeffs(6, i1, i2) = -i2*pres/(c*c*rho)
+                            coeffs(7, i1, i2) = i2/rho
+                            coeffs(8, i1, i2) = 2._wp*i2/(c*rho)
+                            coeffs(9, i1, i2) = i2/(c*c*rho)
+                            coeffs(10, i1, i2) = -3._wp*i2*gam/(c*rho)
+                            coeffs(11, i1, i2) = -3._wp*i2*gam/(c*c*rho)
+                            coeffs(12, i1, i2) = i1
+                            coeffs(13, i1, i2) = 0._wp
+                            coeffs(14, i1, i2) = 0._wp
+                            coeffs(15, i1, i2) = 0._wp
+                            if (.not. f_is_default(Re_inv)) coeffs(16, i1, i2) = -i2*4._wp*Re_inv/rho
+                            if (.not. f_is_default(Web)) coeffs(17, i1, i2) = -i2*2._wp/Web/rho
+                            if (.not. f_is_default(Re_inv)) then
+                                coeffs(18, i1, i2) = i2*6._wp*Re_inv/(rho*c)
+                                coeffs(19, i1, i2) = -i2*2._wp*Re_inv/(rho*c*c)
+                                coeffs(20, i1, i2) = i2*4._wp*pres*Re_inv/(rho*rho*c)
+                                coeffs(21, i1, i2) = i2*4._wp*pres*Re_inv/(rho*rho*c*c)
+                                coeffs(22, i1, i2) = -i2*4._wp*Re_inv/(rho*rho*c)
+                                coeffs(23, i1, i2) = -i2*4._wp*Re_inv/(rho*rho*c*c)
+                                coeffs(24, i1, i2) = i2*16._wp*Re_inv*Re_inv/(rho*rho*c)
+                                if (.not. f_is_default(Web)) then
+                                    coeffs(25, i1, i2) = i2*8._wp*Re_inv/Web/(rho*rho*c)
+                                end if
+                                coeffs(26, i1, i2) = -12._wp*i2*gam*Re_inv/(rho*rho*c*c)
                             end if
-                            coeffs(26, i1, i2) = -12._wp*i2*gam*Re_inv/(rho*rho*c*c)
-                        end if
-                        coeffs(27, i1, i2) = 3._wp*i2*gam*R_v*Tw/(c*rho)
-                        coeffs(28, i1, i2) = 3._wp*i2*gam*R_v*Tw/(c*c*rho)
-                        if (.not. f_is_default(Re_inv)) then
-                            coeffs(29, i1, i2) = 12._wp*i2*gam*R_v*Tw*Re_inv/(rho*rho*c*c)
-                        end if
-                        coeffs(30, i1, i2) = 3._wp*i2*gam/(c*rho)
-                        coeffs(31, i1, i2) = 3._wp*i2*gam/(c*c*rho)
-                        if (.not. f_is_default(Re_inv)) then
-                            coeffs(32, i1, i2) = 12._wp*i2*gam*Re_inv/(rho*rho*c*c)
-                        end if
+                            coeffs(27, i1, i2) = 3._wp*i2*gam*R_v*Tw/(c*rho)
+                            coeffs(28, i1, i2) = 3._wp*i2*gam*R_v*Tw/(c*c*rho)
+                            if (.not. f_is_default(Re_inv)) then
+                                coeffs(29, i1, i2) = 12._wp*i2*gam*R_v*Tw*Re_inv/(rho*rho*c*c)
+                            end if
+                            coeffs(30, i1, i2) = 3._wp*i2*gam/(c*rho)
+                            coeffs(31, i1, i2) = 3._wp*i2*gam/(c*c*rho)
+                            if (.not. f_is_default(Re_inv)) then
+                                coeffs(32, i1, i2) = 12._wp*i2*gam*Re_inv/(rho*rho*c*c)
+                            end if
+                        #:endif
                     end if
                 end if
             end do; end do
@@ -633,7 +641,7 @@ contains
     end subroutine s_coeff_nonpoly
 
 !Coefficient array for polytropic model (pb for each R0 bin accounted for in wght_pb)
-    pure subroutine s_coeff(pres, rho, c, coeffs)
+    subroutine s_coeff(pres, rho, c, coeffs)
         $:GPU_ROUTINE(function_name='s_coeff',parallelism='[seq]', &
             & cray_inline=True)
 
@@ -648,45 +656,49 @@ contains
                 if ((i1 + i2) <= 2) then
                     if (bubble_model == 3) then
                         ! RPE
-                        coeffs(1, i1, i2) = -1._wp*i2*pres/rho
-                        coeffs(2, i1, i2) = -3._wp*i2/2._wp
-                        coeffs(3, i1, i2) = i2/rho
-                        coeffs(4, i1, i2) = i1
-                        if (.not. f_is_default(Re_inv)) coeffs(5, i1, i2) = -4._wp*i2*Re_inv/rho
-                        if (.not. f_is_default(Web)) coeffs(6, i1, i2) = -2._wp*i2/Web/rho
-                        coeffs(7, i1, i2) = i2*pv/rho
+                        #:if not MFC_CASE_OPTIMIZATION or nterms > 7
+                            coeffs(1, i1, i2) = -1._wp*i2*pres/rho
+                            coeffs(2, i1, i2) = -3._wp*i2/2._wp
+                            coeffs(3, i1, i2) = i2/rho
+                            coeffs(4, i1, i2) = i1
+                            if (.not. f_is_default(Re_inv)) coeffs(5, i1, i2) = -4._wp*i2*Re_inv/rho
+                            if (.not. f_is_default(Web)) coeffs(6, i1, i2) = -2._wp*i2/Web/rho
+                            coeffs(7, i1, i2) = i2*pv/rho
+                        #:endif
                     else if (bubble_model == 2) then
                         ! KM with approximation of 1/(1-V/C) = 1+V/C
-                        coeffs(1, i1, i2) = -3._wp*i2/2._wp
-                        coeffs(2, i1, i2) = -i2/c
-                        coeffs(3, i1, i2) = i2/(2._wp*c*c)
-                        coeffs(4, i1, i2) = -i2*pres/rho
-                        coeffs(5, i1, i2) = -2._wp*i2*pres/(c*rho)
-                        coeffs(6, i1, i2) = -i2*pres/(c*c*rho)
-                        coeffs(7, i1, i2) = i2/rho
-                        coeffs(8, i1, i2) = 2._wp*i2/(c*rho)
-                        coeffs(9, i1, i2) = i2/(c*c*rho)
-                        coeffs(10, i1, i2) = -3._wp*i2*gam/(c*rho)
-                        coeffs(11, i1, i2) = -3._wp*i2*gam/(c*c*rho)
-                        coeffs(12, i1, i2) = i1
-                        coeffs(13, i1, i2) = i2*(pv)/rho
-                        coeffs(14, i1, i2) = 2._wp*i2*(pv)/(c*rho)
-                        coeffs(15, i1, i2) = i2*(pv)/(c*c*rho)
-                        if (.not. f_is_default(Re_inv)) coeffs(16, i1, i2) = -i2*4._wp*Re_inv/rho
-                        if (.not. f_is_default(Web)) coeffs(17, i1, i2) = -i2*2._wp/Web/rho
-                        if (.not. f_is_default(Re_inv)) then
-                            coeffs(18, i1, i2) = i2*6._wp*Re_inv/(rho*c)
-                            coeffs(19, i1, i2) = -i2*2._wp*Re_inv/(rho*c*c)
-                            coeffs(20, i1, i2) = i2*4._wp*pres*Re_inv/(rho*rho*c)
-                            coeffs(21, i1, i2) = i2*4._wp*pres*Re_inv/(rho*rho*c*c)
-                            coeffs(22, i1, i2) = -i2*4._wp*Re_inv/(rho*rho*c)
-                            coeffs(23, i1, i2) = -i2*4._wp*Re_inv/(rho*rho*c*c)
-                            coeffs(24, i1, i2) = i2*16._wp*Re_inv*Re_inv/(rho*rho*c)
-                            if (.not. f_is_default(Web)) then
-                                coeffs(25, i1, i2) = i2*8._wp*Re_inv/Web/(rho*rho*c)
+                        #:if not MFC_CASE_OPTIMIZATION or nterms > 7
+                            coeffs(1, i1, i2) = -3._wp*i2/2._wp
+                            coeffs(2, i1, i2) = -i2/c
+                            coeffs(3, i1, i2) = i2/(2._wp*c*c)
+                            coeffs(4, i1, i2) = -i2*pres/rho
+                            coeffs(5, i1, i2) = -2._wp*i2*pres/(c*rho)
+                            coeffs(6, i1, i2) = -i2*pres/(c*c*rho)
+                            coeffs(7, i1, i2) = i2/rho
+                            coeffs(8, i1, i2) = 2._wp*i2/(c*rho)
+                            coeffs(9, i1, i2) = i2/(c*c*rho)
+                            coeffs(10, i1, i2) = -3._wp*i2*gam/(c*rho)
+                            coeffs(11, i1, i2) = -3._wp*i2*gam/(c*c*rho)
+                            coeffs(12, i1, i2) = i1
+                            coeffs(13, i1, i2) = i2*(pv)/rho
+                            coeffs(14, i1, i2) = 2._wp*i2*(pv)/(c*rho)
+                            coeffs(15, i1, i2) = i2*(pv)/(c*c*rho)
+                            if (.not. f_is_default(Re_inv)) coeffs(16, i1, i2) = -i2*4._wp*Re_inv/rho
+                            if (.not. f_is_default(Web)) coeffs(17, i1, i2) = -i2*2._wp/Web/rho
+                            if (.not. f_is_default(Re_inv)) then
+                                coeffs(18, i1, i2) = i2*6._wp*Re_inv/(rho*c)
+                                coeffs(19, i1, i2) = -i2*2._wp*Re_inv/(rho*c*c)
+                                coeffs(20, i1, i2) = i2*4._wp*pres*Re_inv/(rho*rho*c)
+                                coeffs(21, i1, i2) = i2*4._wp*pres*Re_inv/(rho*rho*c*c)
+                                coeffs(22, i1, i2) = -i2*4._wp*Re_inv/(rho*rho*c)
+                                coeffs(23, i1, i2) = -i2*4._wp*Re_inv/(rho*rho*c*c)
+                                coeffs(24, i1, i2) = i2*16._wp*Re_inv*Re_inv/(rho*rho*c)
+                                if (.not. f_is_default(Web)) then
+                                    coeffs(25, i1, i2) = i2*8._wp*Re_inv/Web/(rho*rho*c)
+                                end if
+                                coeffs(26, i1, i2) = -12._wp*i2*gam*Re_inv/(rho*rho*c*c)
                             end if
-                            coeffs(26, i1, i2) = -12._wp*i2*gam*Re_inv/(rho*rho*c*c)
-                        end if
+                        #:endif
                     end if
                 end if
             end do; end do
@@ -698,24 +710,23 @@ contains
         type(scalar_field), dimension(:), intent(inout) :: q_cons_vf, q_prim_vf
         type(scalar_field), dimension(:), intent(inout) :: momsp
         type(scalar_field), dimension(0:, 0:, :), intent(inout) :: moms3d
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb, rhs_pb
-        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: mv, rhs_mv
+        real(stp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: pb
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: rhs_pb
+        real(stp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: mv
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: rhs_mv
         type(int_bounds_info), intent(in) :: ix, iy, iz
 
         real(wp), dimension(nmom) :: moms, msum
         real(wp), dimension(nnode, nb) :: wght, abscX, abscY, wght_pb, wght_mv, wght_ht, ht
         real(wp), dimension(nterms, 0:2, 0:2) :: coeff
-        real(wp) :: pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T
+        real(wp) :: pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, grad_T
         real(wp) :: n_tait, B_tait
         integer :: id1, id2, id3, i1, i2, j, q, r
 
         is1_qbmm = ix; is2_qbmm = iy; is3_qbmm = iz
         $:GPU_UPDATE(device='[is1_qbmm,is2_qbmm,is3_qbmm]')
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[moms, msum, wght, abscX, &
-            & abscY, wght_pb, wght_mv, wght_ht, coeff, ht, r, q, &
-            & n_tait, B_tait, pres, rho, nbub, c, alf, momsum, &
-            & drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[id1,id2,id3,moms, msum, wght, abscX, abscY, wght_pb, wght_mv, wght_ht, coeff, ht, r, q, n_tait, B_tait, pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, grad_T, i1, i2, j]')
         do id3 = is3_qbmm%beg, is3_qbmm%end
             do id2 = is2_qbmm%beg, is2_qbmm%end
                 do id1 = is1_qbmm%beg, is1_qbmm%end
@@ -753,14 +764,13 @@ contains
                             else
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do j = 1, nnode
-                                    chi_vw = 1._wp/(1._wp + R_v/R_n*(pb(id1, id2, id3, j, q)/pv - 1._wp))
-                                    x_vw = M_n*chi_vw/(M_v + (M_n - M_v)*chi_vw)
-                                    k_mw = x_vw*k_v(q)/(x_vw + (1._wp - x_vw)*phi_vn) + (1._wp - x_vw)*k_n(q)/(x_vw*phi_nv + 1._wp - x_vw)
+                                    chi_vw = 1._wp/(1._wp + R_v/R_g*(pb(id1, id2, id3, j, q)/pv - 1._wp))
+                                    x_vw = M_g*chi_vw/(M_v + (M_g - M_v)*chi_vw)
+                                    k_mw = x_vw*k_v(q)/(x_vw + (1._wp - x_vw)*phi_vg) + (1._wp - x_vw)*k_g(q)/(x_vw*phi_gv + 1._wp - x_vw)
                                     rho_mw = pv/(chi_vw*R_v*Tw)
-                                    rhs_mv(id1, id2, id3, j, q) = -Re_trans_c(q)*((mv(id1, id2, id3, j, q)/(mv(id1, id2, id3, j, q) + mass_n0(q))) - chi_vw)
+                                    rhs_mv(id1, id2, id3, j, q) = -Re_trans_c(q)*((mv(id1, id2, id3, j, q)/(mv(id1, id2, id3, j, q) + mass_g0(q))) - chi_vw)
                                     rhs_mv(id1, id2, id3, j, q) = rho_mw*rhs_mv(id1, id2, id3, j, q)/Pe_c/(1._wp - chi_vw)/abscX(j, q)
-                                    T_bar = Tw*(pb(id1, id2, id3, j, q)/pb0(q))*(abscX(j, q)/R0(q))**3*(mass_n0(q) + mass_v0(q))/(mass_n0(q) + mv(id1, id2, id3, j, q))
-                                    grad_T = -Re_trans_T(q)*(T_bar - Tw)
+                                    grad_T = -Re_trans_T(q)*((pb(id1, id2, id3, j, q)/pb0(q))*(abscX(j, q)/R0(q))**3*(mass_g0(q) + mass_v0(q))/(mass_g0(q) + mv(id1, id2, id3, j, q)) - 1._wp)
                                     ht(j, q) = pb0(q)*k_mw*grad_T/Pe_T(q)/abscX(j, q)
                                     wght_pb(j, q) = wght(j, q)*(pb(id1, id2, id3, j, q))
                                     wght_mv(j, q) = wght(j, q)*(rhs_mv(id1, id2, id3, j, q))
@@ -809,13 +819,14 @@ contains
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do j = 1, nnode
                                     drdt = msum(2)
-                                    drdt2 = merge(-1._wp, 1._wp, j == 1 .or. j == 2)/(2._wp*sqrt(merge(moms(4) - moms(2)**2._wp, verysmall, moms(4) - moms(2)**2._wp > 0._wp)))
+                                    drdt2 = merge(-1._wp, 1._wp, j == 1 .or. j == 2)/(2._wp*sqrt(merge(moms(4) - moms(2)**2._wp, sgm_eps, moms(4) - moms(2)**2._wp > 0._wp)))
                                     drdt2 = drdt2*(msum(3) - 2._wp*moms(2)*msum(2))
                                     drdt = drdt + drdt2
                                     rhs_pb(id1, id2, id3, j, q) = (-3._wp*gam*drdt/abscX(j, q))*(pb(id1, id2, id3, j, q))
                                     rhs_pb(id1, id2, id3, j, q) = rhs_pb(id1, id2, id3, j, q) + (3._wp*gam/abscX(j, q))*rhs_mv(id1, id2, id3, j, q)*R_v*Tw
                                     rhs_pb(id1, id2, id3, j, q) = rhs_pb(id1, id2, id3, j, q) + (3._wp*gam/abscX(j, q))*ht(j, q)
                                     rhs_mv(id1, id2, id3, j, q) = rhs_mv(id1, id2, id3, j, q)*(4._wp*pi*abscX(j, q)**2._wp)
+
                                 end do
                             end if
                         end do
@@ -852,6 +863,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
     contains
         ! Helper to select the correct coefficient routine
@@ -868,7 +880,7 @@ contains
             end if
         end subroutine s_coeff_selector
 
-        pure subroutine s_chyqmom(momin, wght, abscX, abscY)
+        subroutine s_chyqmom(momin, wght, abscX, abscY)
             $:GPU_ROUTINE(function_name='s_chyqmom',parallelism='[seq]', &
                 & cray_inline=True)
 
@@ -926,7 +938,7 @@ contains
 
         end subroutine s_chyqmom
 
-        pure subroutine s_hyqmom(frho, fup, fmom)
+        subroutine s_hyqmom(frho, fup, fmom)
             $:GPU_ROUTINE(function_name='s_hyqmom',parallelism='[seq]', &
                 & cray_inline=True)
 
@@ -940,13 +952,13 @@ contains
             c2 = d2 - bu**2._wp
             frho(1) = fmom(1)/2._wp; 
             frho(2) = fmom(1)/2._wp; 
-            c2 = maxval((/c2, verysmall/))
+            c2 = maxval((/c2, sgm_eps/))
             fup(1) = bu - sqrt(c2)
             fup(2) = bu + sqrt(c2)
 
         end subroutine s_hyqmom
 
-        pure function f_quad(abscX, abscY, wght_in, q, r, s)
+        function f_quad(abscX, abscY, wght_in, q, r, s)
             $:GPU_ROUTINE(parallelism='[seq]')
             real(wp), dimension(nnode, nb), intent(in) :: abscX, abscY, wght_in
             real(wp), intent(in) :: q, r, s
@@ -962,7 +974,7 @@ contains
 
         end function f_quad
 
-        pure function f_quad2D(abscX, abscY, wght_in, pow)
+        function f_quad2D(abscX, abscY, wght_in, pow)
             $:GPU_ROUTINE(parallelism='[seq]')
             real(wp), dimension(nnode), intent(in) :: abscX, abscY, wght_in
             real(wp), dimension(3), intent(in) :: pow

@@ -5,8 +5,9 @@ import cantera     as ct
 
 from ..printer import cons
 from ..        import common, build
-from ..state   import ARGS, ARG
+from ..state   import ARGS, ARG, gpuConfigOptions
 from ..case    import Case
+from ..        import case_validator
 
 @dataclasses.dataclass(init=False)
 class MFCInputFile(Case):
@@ -71,7 +72,14 @@ class MFCInputFile(Case):
         common.create_directory(modules_dir)
 
         # Determine the real type based on the single precision flag
-        real_type = 'real(sp)' if ARG('single') else 'real(dp)'
+        real_type = 'real(sp)' if (ARG('single') or ARG('mixed')) else 'real(dp)'
+
+        if ARG("gpu") == gpuConfigOptions.MP.value:
+            directive_str = 'mp'
+        elif ARG("gpu") == gpuConfigOptions.ACC.value:
+            directive_str = 'acc'
+        else:
+            directive_str = None
 
         # Write the generated Fortran code to the m_thermochem.f90 file with the chosen precision
         common.file_write(
@@ -79,7 +87,7 @@ class MFCInputFile(Case):
             pyro.FortranCodeGenerator().generate(
                 "m_thermochem",
                 self.get_cantera_solution(),
-                pyro.CodeGenerationOptions(scalar_type = real_type, directive_offload="acc")
+                pyro.CodeGenerationOptions(scalar_type = real_type, directive_offload = directive_str)
             ),
             True
         )
@@ -87,8 +95,20 @@ class MFCInputFile(Case):
         cons.unindent()
 
 
+    def validate_constraints(self, target) -> None:
+        """Validate case parameter constraints for a given target stage"""
+        target_obj = build.get_target(target)
+        stage = target_obj.name
+
+        try:
+            case_validator.validate_case_constraints(self.params, stage)
+        except case_validator.CaseConstraintError as e:
+            raise common.MFCException(f"Case validation failed for {stage}:\n{e}") from e
+
     # Generate case.fpp & [target.name].inp
     def generate(self, target) -> None:
+        # Validate constraints before generating input files
+        self.validate_constraints(target)
         self.generate_inp(target)
         cons.print()
         self.generate_fpp(target)

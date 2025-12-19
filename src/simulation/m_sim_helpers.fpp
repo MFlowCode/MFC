@@ -1,3 +1,4 @@
+#:include 'case.fpp'
 #:include 'macros.fpp'
 
 module m_sim_helpers
@@ -20,7 +21,7 @@ contains
         !! @param k y coordinate index
         !! @param l z coordinate index
         !! @return fltr_dtheta Modified dtheta value for cylindrical coordinates
-    pure function f_compute_filtered_dtheta(k, l) result(fltr_dtheta)
+    function f_compute_filtered_dtheta(k, l) result(fltr_dtheta)
         $:GPU_ROUTINE(parallelism='[seq]')
         integer, intent(in) :: k, l
         real(wp) :: fltr_dtheta
@@ -47,7 +48,7 @@ contains
         !! @param k y coordinate index
         !! @param l z coordinate index
         !! @return cfl_terms computed CFL terms for 2D/3D cases
-    pure function f_compute_multidim_cfl_terms(vel, c, j, k, l) result(cfl_terms)
+    function f_compute_multidim_cfl_terms(vel, c, j, k, l) result(cfl_terms)
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), dimension(num_vels), intent(in) :: vel
         real(wp), intent(in) :: c
@@ -59,15 +60,17 @@ contains
 
         if (p > 0) then
             !3D
-            if (grid_geometry == 3) then
-                cfl_terms = min(dx(j)/(abs(vel(1)) + c), &
-                                dy(k)/(abs(vel(2)) + c), &
-                                fltr_dtheta/(abs(vel(3)) + c))
-            else
-                cfl_terms = min(dx(j)/(abs(vel(1)) + c), &
-                                dy(k)/(abs(vel(2)) + c), &
-                                dz(l)/(abs(vel(3)) + c))
-            end if
+            #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                if (grid_geometry == 3) then
+                    cfl_terms = min(dx(j)/(abs(vel(1)) + c), &
+                                    dy(k)/(abs(vel(2)) + c), &
+                                    fltr_dtheta/(abs(vel(3)) + c))
+                else
+                    cfl_terms = min(dx(j)/(abs(vel(1)) + c), &
+                                    dy(k)/(abs(vel(2)) + c), &
+                                    dz(l)/(abs(vel(3)) + c))
+                end if
+            #:endif
         else
             !2D
             cfl_terms = min(dx(j)/(abs(vel(1)) + c), &
@@ -89,7 +92,7 @@ contains
         !! @param j x index
         !! @param k y index
         !! @param l z index
-    pure subroutine s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, j, k, l)
+    subroutine s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, j, k, l)
         $:GPU_ROUTINE(function_name='s_compute_enthalpy',parallelism='[seq]', &
             & cray_inline=True)
 
@@ -97,41 +100,20 @@ contains
         real(wp), intent(inout), dimension(num_fluids) :: alpha
         real(wp), intent(inout), dimension(num_vels) :: vel
         real(wp), intent(inout) :: rho, gamma, pi_inf, vel_sum, H, pres
+        real(wp), intent(out) :: qv
         integer, intent(in) :: j, k, l
         real(wp), dimension(2), intent(inout) :: Re
 
         real(wp), dimension(num_fluids) :: alpha_rho, Gs
-        real(wp) :: qv, E, G_local
+        real(wp) :: E, G_local
 
         integer :: i
 
-        if (igr) then
-            if (num_fluids == 1) then
-                alpha_rho(1) = q_prim_vf(contxb)%sf(j, k, l)
-                alpha(1) = 1._wp
-            else
-                $:GPU_LOOP(parallelism='[seq]')
-                do i = 1, num_fluids - 1
-                    alpha_rho(i) = q_prim_vf(i)%sf(j, k, l)
-                    alpha(i) = q_prim_vf(advxb + i - 1)%sf(j, k, l)
-                end do
-
-                alpha_rho(num_fluids) = q_prim_vf(num_fluids)%sf(j, k, l)
-                alpha(num_fluids) = 1._wp - sum(alpha(1:num_fluids - 1))
-            end if
-        else
-            $:GPU_LOOP(parallelism='[seq]')
-            do i = 1, num_fluids
-                alpha_rho(i) = q_prim_vf(i)%sf(j, k, l)
-                alpha(i) = q_prim_vf(advxb + i - 1)%sf(j, k, l)
-            end do
-        end if
+        call s_compute_species_fraction(q_prim_vf, j, k, l, alpha_rho, alpha)
 
         if (elasticity) then
             call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha, &
                                                             alpha_rho, Re, G_local, Gs)
-        elseif (bubbles_euler) then
-            call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re)
         else
             call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re)
         end if
@@ -181,7 +163,7 @@ contains
         !! @param icfl_sf cell-centered inviscid cfl number
         !! @param vcfl_sf (optional) cell-centered viscous CFL number
         !! @param Rc_sf (optional) cell centered Rc
-    pure subroutine s_compute_stability_from_dt(vel, c, rho, Re_l, j, k, l, icfl_sf, vcfl_sf, Rc_sf)
+    subroutine s_compute_stability_from_dt(vel, c, rho, Re_l, j, k, l, icfl_sf, vcfl_sf, Rc_sf)
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in), dimension(num_vels) :: vel
         real(wp), intent(in) :: c, rho
@@ -204,23 +186,25 @@ contains
         ! Viscous calculations
         if (viscous) then
             if (p > 0) then
-                !3D
-                if (grid_geometry == 3) then
-                    fltr_dtheta = f_compute_filtered_dtheta(k, l)
-                    vcfl_sf(j, k, l) = maxval(dt/Re_l/rho) &
-                                       /min(dx(j), dy(k), fltr_dtheta)**2._wp
-                    Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), &
-                                         dy(k)*(abs(vel(2)) + c), &
-                                         fltr_dtheta*(abs(vel(3)) + c)) &
-                                     /maxval(1._wp/Re_l)
-                else
-                    vcfl_sf(j, k, l) = maxval(dt/Re_l/rho) &
-                                       /min(dx(j), dy(k), dz(l))**2._wp
-                    Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), &
-                                         dy(k)*(abs(vel(2)) + c), &
-                                         dz(l)*(abs(vel(3)) + c)) &
-                                     /maxval(1._wp/Re_l)
-                end if
+                #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                    !3D
+                    if (grid_geometry == 3) then
+                        fltr_dtheta = f_compute_filtered_dtheta(k, l)
+                        vcfl_sf(j, k, l) = maxval(dt/Re_l/rho) &
+                                           /min(dx(j), dy(k), fltr_dtheta)**2._wp
+                        Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), &
+                                             dy(k)*(abs(vel(2)) + c), &
+                                             fltr_dtheta*(abs(vel(3)) + c)) &
+                                         /maxval(1._wp/Re_l)
+                    else
+                        vcfl_sf(j, k, l) = maxval(dt/Re_l/rho) &
+                                           /min(dx(j), dy(k), dz(l))**2._wp
+                        Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), &
+                                             dy(k)*(abs(vel(2)) + c), &
+                                             dz(l)*(abs(vel(3)) + c)) &
+                                         /maxval(1._wp/Re_l)
+                    end if
+                #:endif
             elseif (n > 0) then
                 !2D
                 vcfl_sf(j, k, l) = maxval(dt/Re_l/rho)/min(dx(j), dy(k))**2._wp
@@ -244,7 +228,7 @@ contains
         !! @param j x coordinate
         !! @param k y coordinate
         !! @param l z coordinate
-    pure subroutine s_compute_dt_from_cfl(vel, c, max_dt, rho, Re_l, j, k, l)
+    subroutine s_compute_dt_from_cfl(vel, c, max_dt, rho, Re_l, j, k, l)
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), dimension(num_vels), intent(in) :: vel
         real(wp), intent(in) :: c, rho
@@ -271,17 +255,17 @@ contains
                 if (grid_geometry == 3) then
                     fltr_dtheta = f_compute_filtered_dtheta(k, l)
                     vcfl_dt = cfl_target*(min(dx(j), dy(k), fltr_dtheta)**2._wp) &
-                              /minval(1/(rho*Re_l))
+                              /maxval(1/(rho*Re_l))
                 else
                     vcfl_dt = cfl_target*(min(dx(j), dy(k), dz(l))**2._wp) &
-                              /minval(1/(rho*Re_l))
+                              /maxval(1/(rho*Re_l))
                 end if
             elseif (n > 0) then
                 !2D
                 vcfl_dt = cfl_target*(min(dx(j), dy(k))**2._wp)/maxval((1/Re_l)/rho)
             else
                 !1D
-                vcfl_dt = cfl_target*(dx(j)**2._wp)/minval(1/(rho*Re_l))
+                vcfl_dt = cfl_target*(dx(j)**2._wp)/maxval(1/(rho*Re_l))
             end if
         end if
 

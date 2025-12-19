@@ -10,6 +10,7 @@ module m_constants
 
     real(wp), parameter :: dflt_real = -1.e6_wp                !< Default real value
     real(wp), parameter :: sgm_eps = 1.e-16_wp               !< Segmentation tolerance
+    real(wp), parameter :: Chem_Tolerance = 1.e-16_wp               !< Speed of Sound Tolerance in Chemistry
     real(wp), parameter :: small_alf = 1.e-11_wp                !< Small alf tolerance
     real(wp), parameter :: pi = 3.141592653589793_wp !< Pi
     real(wp), parameter :: verysmall = 1.e-12_wp              !< Very small number

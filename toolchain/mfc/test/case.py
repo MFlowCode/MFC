@@ -57,16 +57,13 @@ BASE_CFG = {
     'fluid_pp(1)%qv'               : 0.0,
     'fluid_pp(1)%qvp'              : 0.0,   
     'bubbles_euler'                 : 'F',
-    'Ca'                            : 0.9769178386380458,
-    'Web'                           : 13.927835051546392,
-    'Re_inv'                        : 0.009954269975623245,
     'pref'                          : 101325.0,
     'rhoref'                        : 1000.0,
     'bubble_model'                  :  3,
     'polytropic'                    : 'T',
     'polydisperse'                  : 'F',
     'thermal'                       :  3,
-    'R0ref'                         : 1e-05,
+
     'patch_icpp(1)%r0'              :  1,
     'patch_icpp(1)%v0'              :  0,
     'patch_icpp(2)%r0'              :  1,
@@ -101,12 +98,6 @@ BASE_CFG = {
     'lag_params%heatTransfer_model'    : 'F',
     'lag_params%massTransfer_model'    : 'F',
     'lag_params%valmaxvoid'            : 0.9,
-    'lag_params%c0'                    : 10.1,
-    'lag_params%rho0'                  : 1000.,
-    'lag_params%T0'                    : 298.,
-    'lag_params%x0'                    : 1.,
-    'lag_params%diffcoefvap'           : 2.5e-5,
-    'lag_params%Thost'                 : 298.,
 }
 
 def trace_to_uuid(trace: str) -> str:

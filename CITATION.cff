@@ -4,27 +4,92 @@
 
 cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
-title: "Multicomponent Flow Code"
+title: "Multicomponent Flow Code (MFC)"
 url: "https://github.com/MFlowCode/MFC"
 preferred-citation:
   type: article
-  title: "MFC: An open-source high-order multi-component, multi-phase, and multi-scale compressible flow solver"
-  journal: "Computer Physics Communications"
-  doi: "10.1016/j.cpc.2020.107396"
-  volume: 266
-  start: 107396
-  month: 5
-  year: 2021
+  title: "MFC 5.0: An exascale many-physics flow solver"
+  journal: "arXiv preprint arXiv.2503.07953"
+  doi: "10.48550/arXiv.2503.07953"
+  year: 2025
   authors:
-  - given-names:  Spencer H.
-    family-names: Bryngelson
-  - given-names:  Kevin
-    family-names: Schmidmayer
-  - given-names:  Vedran
-    family-names: Coralic
-  - given-names:  Jomela C.
-    family-names: Meng
-  - given-names:  Kazuki
-    family-names: Maeda
-  - given-names:  Tim
-    family-names: Colonius
+    - given-names: Benjamin
+      family-names: Wilfong
+    - given-names: Henry
+      family-names: Le Berre
+    - given-names: Anand
+      family-names: Radhakrishnan
+    - given-names: Ansh
+      family-names: Gupta
+    - given-names: Diego
+      family-names: Vaca-Revelo
+    - given-names: Dimitrios
+      family-names: Adam
+    - given-names: Haocheng
+      family-names: Yu
+    - given-names: Hyeoksu
+      family-names: Lee
+    - given-names: Jose Rodolfo
+      family-names: Chreim
+    - given-names: Mirelys
+      family-names: Carcana Barbosa
+    - given-names: Yanjun
+      family-names: Zhang
+    - given-names: Esteban
+      family-names: Cisneros-Garibay
+    - given-names: Aswin
+      family-names: Gnanaskandan
+    - given-names: Mauro
+      family-names: Rodriguez Jr.
+    - given-names: Reuben D.
+      family-names: Budiardja
+    - given-names: Stephen
+      family-names: Abbott
+    - given-names: Tim
+      family-names: Colonius
+    - given-names: Spencer H.
+      family-names: Bryngelson
+references:
+  - type: article
+    title: "Method for portable, scalable, and performant GPU-accelerated simulation of multiphase compressible flow"
+    doi: "10.1016/j.cpc.2024.109238"
+    journal: "Computer Physics Communications"
+    volume: 302
+    start: 109238
+    year: 2024
+    authors:
+      - given-names: A.
+        family-names: Radhakrishnan
+      - given-names: H.
+        family-names: Le Berre
+      - given-names: B.
+        family-names: Wilfong
+      - given-names: J.-S.
+        family-names: Spratt
+      - given-names: M.
+        family-names: Rodriguez Jr.
+      - given-names: T.
+        family-names: Colonius
+      - given-names: S. H.
+        family-names: Bryngelson
+  - type: article
+    title: "MFC: An open-source high-order multi-component, multi-phase, and multi-scale compressible flow solver"
+    doi: "10.1016/j.cpc.2020.107396"
+    journal: "Computer Physics Communications"
+    volume: 266
+    start: 107396
+    month: 5
+    year: 2021
+    authors:
+      - given-names: Spencer H.
+        family-names: Bryngelson
+      - given-names: Kevin
+        family-names: Schmidmayer
+      - given-names: Vedran
+        family-names: Coralic
+      - given-names: Jomela C.
+        family-names: Meng
+      - given-names: Kazuki
+        family-names: Maeda
+      - given-names: Tim
+        family-names: Colonius

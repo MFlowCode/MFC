@@ -48,11 +48,6 @@ jobs:
       - name: Clone
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.13
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-
       - name: Setup MacOS
         if:   matrix.os == 'macos'
         run:  |
@@ -81,6 +76,10 @@ jobs:
           source /opt/intel/oneapi/setvars.sh
           printenv >> $GITHUB_ENV
 
+      - name: Set up Python 3.14
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
 
       - name: Build
         run:  |
@@ -94,15 +93,40 @@ jobs:
           OPT2: ${{ matrix.debug == 'debug' && '-% 20' || '' }}
 
   self:
-    name: Self Hosted
+    name: "${{ matrix.cluster_name }} (${{ matrix.device }}${{ matrix.interface != 'none' && format('-{0}', matrix.interface) || '' }})"
     if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true'
     needs: file-changes
     continue-on-error: false
-    timeout-minutes: 1400
+    timeout-minutes: 480
     strategy:
       matrix:
-        device: ['cpu', 'gpu']
-        lbl: ['gt', 'frontier']
+        include:
+          # Phoenix (GT)
+          - lbl: 'gt'
+            cluster_name: 'Georgia Tech | Phoenix'
+            device: 'gpu'
+            interface: 'acc'
+          - lbl: 'gt'
+            cluster_name: 'Georgia Tech | Phoenix'
+            device: 'gpu'
+            interface: 'omp'
+          - lbl: 'gt'
+            cluster_name: 'Georgia Tech | Phoenix'
+            device: 'cpu'
+            interface: 'none'
+          # Frontier (ORNL)
+          - lbl: 'frontier'
+            cluster_name: 'Oak Ridge | Frontier'
+            device: 'gpu'
+            interface: 'acc'
+          - lbl: 'frontier'
+            cluster_name: 'Oak Ridge | Frontier'
+            device: 'gpu'
+            interface: 'omp'
+          - lbl: 'frontier'
+            cluster_name: 'Oak Ridge | Frontier'
+            device: 'cpu'
+            interface: 'none'
     runs-on:
       group:  phoenix
       labels: ${{ matrix.lbl }}
@@ -116,23 +140,23 @@ jobs:
 
       - name: Build & Test
         if:   matrix.lbl == 'gt'
-        run:  bash .github/workflows/phoenix/submit.sh .github/workflows/phoenix/test.sh ${{ matrix.device }}
+        run:  bash .github/workflows/phoenix/submit.sh .github/workflows/phoenix/test.sh ${{ matrix.device }} ${{ matrix.interface }}
 
       - name: Build
         if:   matrix.lbl == 'frontier'
-        run:  bash .github/workflows/frontier/build.sh ${{ matrix.device }}
+        run:  bash .github/workflows/frontier/build.sh ${{ matrix.device }} ${{ matrix.interface }}
 
       - name: Test
         if:   matrix.lbl == 'frontier'
-        run:  bash .github/workflows/frontier/submit.sh .github/workflows/frontier/test.sh ${{matrix.device}}
+        run:  bash .github/workflows/frontier/submit.sh .github/workflows/frontier/test.sh ${{matrix.device}} ${{ matrix.interface }}
 
       - name: Print Logs
         if:   always()
-        run:  cat test-${{ matrix.device }}.out
+        run:  cat test-${{ matrix.device }}-${{ matrix.interface }}.out
 
       - name: Archive Logs
         uses: actions/upload-artifact@v4
         if:   matrix.lbl == 'frontier'
         with:
-          name: logs-${{ strategy.job-index }}-${{ matrix.device }}
-          path: test-${{ matrix.device }}.out
+          name: logs-${{ strategy.job-index }}-${{ matrix.device }}-${{ matrix.interface }}
+          path: test-${{ matrix.device }}-${{ matrix.interface }}.out

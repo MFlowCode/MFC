@@ -65,7 +65,18 @@
     @:LOG({'@:ALLOCATE(${re.sub(' +', ' ', ', '.join(args))}$)'})
     #:set allocated_variables = ', '.join(args)
     allocate (${allocated_variables}$)
-    $:GPU_ENTER_DATA(create=('[' + allocated_variables + ']'))
+    #:set cleaned = []
+    #:for a in args
+        #:set s = a.rstrip()
+        #:if s.endswith(')')
+            #:set rev = s[::-1]
+            #:set pos = next(i for i, ch, d in ( (j, c, sum(1 if t==')' else -1 if t=='(' else 0 for t in rev[:j+1])) for j, c in enumerate(rev) ) if ch == '(' and d == 0 )
+            #:set s = s[:len(s)-1-pos]
+        #:endif
+        $:cleaned.append(s)
+    #:endfor
+    #:set joined = ', '.join(cleaned)
+    $:GPU_ENTER_DATA(create='[' + joined + ']')
 #:enddef ALLOCATE
 
 #:def DEALLOCATE(*args)
@@ -122,19 +133,20 @@
 
         #:for arg in args
             $:GPU_ENTER_DATA(copyin=('[' + arg + ']'))
-            if (allocated(${arg}$%coord)) then
+            if (associated(${arg}$%coord)) then
                 $:GPU_ENTER_DATA(copyin=('[' + arg + '%coord]'))
             end if
-            if (allocated(${arg}$%val)) then
+            if (associated(${arg}$%val)) then
                 $:GPU_ENTER_DATA(copyin=('[' + arg + '%val]'))
             end if
-            if (allocated(${arg}$%angle)) then
+            if (associated(${arg}$%angle)) then
                 $:GPU_ENTER_DATA(copyin=('[' + arg + '%angle]'))
             end if
-            if (allocated(${arg}$%xyz_to_r_ratios)) then
+            if (associated(${arg}$%xyz_to_r_ratios)) then
                 $:GPU_ENTER_DATA(copyin=('[' + arg + '%xyz_to_r_ratios]'))
             end if
         #:endfor
+
     end block
 #endif
 #:enddef
