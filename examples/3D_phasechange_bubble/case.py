@@ -7,7 +7,7 @@ parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter) 
 parser.add_argument("--mfc", type=json.loads, default='{}', metavar="DICT",
                     help="MFC's toolchain's internal state.")
-parser.add_argument("-me", "--model_eqns", type=int, default=3, metavar="MODEL EQN", choices=[2, 3],
+parser.add_argument("-me", "--model_eqns", type=int, metavar="MODEL EQN", choices=[2, 3], default=3,
                     help="choose `2' for 5-equation model or `3' for 6-equation model.")
 args = parser.parse_args()
 
@@ -303,4 +303,5 @@ print(
         }
     )
 )
+
 
