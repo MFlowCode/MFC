@@ -5,9 +5,10 @@ Mu = 1.84e-05
 gam_a = 1.4
 
 total_time = 2.0
-num_time_steps = 500000
+num_time_steps = 100000
+dt = float(total_time / num_time_steps)
 num_saves = 200
-
+steps_per_save = int(num_time_steps / num_saves)
 
 # Configuring case dictionary
 print(
@@ -18,20 +19,18 @@ print(
             # Computational Domain Parameters
             # For these computations, the cylinder is placed at the (0,0,0)
             # domain origin.
-            # axial direction
-            "x_domain%beg": 0.0e00,
-            "x_domain%end": 6.0e-03,
-            # r direction
-            "y_domain%beg": 0.0e00,
-            "y_domain%end": 6.0e-03,
+            "x_domain%beg": 0.0,
+            "x_domain%end": 0.4,
+            "y_domain%beg": 0.0,
+            "y_domain%end": 2.8,
             "cyl_coord": "F",
-            "m": 200,
-            "n": 800,
+            "m": 100,
+            "n": 700,
             "p": 0,
-            "dt": float(total_time / num_time_steps),
+            "dt": dt,
             "t_step_start": 0,
-            "t_step_stop": int(num_time_steps),  # 3000
-            "t_step_save": int(num_time_steps / 200),  # 10
+            "t_step_stop": num_time_steps,  # 3000
+            "t_step_save": steps_per_save,  # 10
             # Simulation Algorithm Parameters
             # Only one patches are necessary, the air tube
             "num_patches": 1,
@@ -100,7 +99,7 @@ print(
             # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (gam_a - 1.0e00),  # 2.50(Not 1.40)
             "fluid_pp(1)%pi_inf": 0,
-            "fluid_pp(1)%Re(1)": 1000000,
+            "fluid_pp(1)%Re(1)": 100000,
             # Body Forces
             "bf_y": "T",
             "k_y": 0.0,
