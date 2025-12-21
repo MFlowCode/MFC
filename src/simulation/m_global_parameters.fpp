@@ -832,11 +832,6 @@ contains
         lag_params%epsilonb = 1._wp
         lag_params%charwidth = dflt_real
         lag_params%valmaxvoid = dflt_real
-        lag_params%c0 = dflt_real
-        lag_params%rho0 = dflt_real
-        lag_params%T0 = dflt_real
-        lag_params%Thost = dflt_real
-        lag_params%x0 = dflt_real
 
         ! Continuum damage model
         tau_star = dflt_real
