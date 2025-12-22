@@ -752,29 +752,29 @@ Details of the transducer acoustic source model can be found in [Maeda and Colon
 
 | Parameter          | Type    | Description                                    |
 | ---:               | :----:  |          :---                                  |
-| `bubbles_euler`    | Logical	| Ensemble-averaged bubble modeling	|
-| `bubbles_lagrange` | Logical	| Volume-averaged bubble modeling	|
-| `bubble_model`     | Integer	| [1] Gilmore; [2] Keller--Miksis; [3] Rayleigh-Plesset |
-| `bub_pp%R0ref`*†‡  | Real    | Reference bubble radius |
-| `bub_pp%p0ref`*†‡  | Real    | Reference pressure |
-| `bub_pp%rho0ref`*†‡| Real    | Reference density |
-| `bub_pp%T0ref`†‡   | Real    | Reference temperature |
-| `bub_pp%ss`*†‡     | Real    | Surface tension between host and gas (bubble) |
-| `bub_pp%pv`*†‡     | Real    | Vapor pressure of host |
-| `bub_pp%vd`† ‡     | Real    | Vapor diffusivity in gas (bubble) |
-| `bub_pp%mu_l`*†‡   | Real    | Viscosity of host in liquid state |
-| `bub_pp%mu_v`†     | Real    | Viscosity of host in vapor state |
-| `bub_pp%mu_g`†     | Real    | Viscosity of gas (bubble) |
-| `bub_pp%gam_v`†‡   | Real    | Specific heat ratio of host in vapor state |
-| `bub_pp%gam_g`*†‡  | Real    | Specific heat ratio of gas (bubble) |
-| `bub_pp%M_v`†‡     | Real    | Molecular weight of host |
-| `bub_pp%M_g`†‡     | Real    | Molecular weight of gas (bubble) |
-| `bub_pp%k_v`†‡     | Real    | Thermal conductivity of host in vapor state |
-| `bub_pp%k_g`†‡     | Real    | Thermal conductivity of gas (bubble) |
-| `bub_pp%cp_v`‡     | Real    | Specific heat capacity in constant pressure of host in vapor state |
-| `bub_pp%cp_g`‡     | Real    | Specific heat capacity in constant pressure of gas (bubble) |
-| `bub_pp%R_v`†‡     | Real    | Gas constant of host in vapor state |
-| `bub_pp%R_g`†‡     | Real    | Gas constant of gas (bubble) |
+| `bubbles_euler`    | Logical | Ensemble-averaged bubble modeling |
+| `bubbles_lagrange` | Logical | Volume-averaged bubble modeling |
+| `bubble_model`     | Integer | [1] Gilmore; [2] Keller--Miksis; [3] Rayleigh-Plesset |
+| `bub_pp%%R0ref`*†‡  | Real    | Reference bubble radius |
+| `bub_pp%%p0ref`*†‡  | Real    | Reference pressure |
+| `bub_pp%%rho0ref`*†‡| Real    | Reference density |
+| `bub_pp%%T0ref`†‡   | Real    | Reference temperature |
+| `bub_pp%%ss`*†‡     | Real    | Surface tension between host and gas (bubble) |
+| `bub_pp%%pv`*†‡     | Real    | Vapor pressure of host |
+| `bub_pp%%vd`† ‡     | Real    | Vapor diffusivity in gas (bubble) |
+| `bub_pp%%mu_l`*†‡   | Real    | Viscosity of host in liquid state |
+| `bub_pp%%mu_v`†     | Real    | Viscosity of host in vapor state |
+| `bub_pp%%mu_g`†     | Real    | Viscosity of gas (bubble) |
+| `bub_pp%%gam_v`†‡   | Real    | Specific heat ratio of host in vapor state |
+| `bub_pp%%gam_g`*†‡  | Real    | Specific heat ratio of gas (bubble) |
+| `bub_pp%%M_v`†‡     | Real    | Molecular weight of host |
+| `bub_pp%%M_g`†‡     | Real    | Molecular weight of gas (bubble) |
+| `bub_pp%%k_v`†‡     | Real    | Thermal conductivity of host in vapor state |
+| `bub_pp%%k_g`†‡     | Real    | Thermal conductivity of gas (bubble) |
+| `bub_pp%%cp_v`‡     | Real    | Specific heat capacity in constant pressure of host in vapor state |
+| `bub_pp%%cp_g`‡     | Real    | Specific heat capacity in constant pressure of gas (bubble) |
+| `bub_pp%%R_v`†‡     | Real    | Gas constant of host in vapor state |
+| `bub_pp%%R_g`†‡     | Real    | Gas constant of gas (bubble) |
 
 - \* These parameters are required for ensemble-averaged bubble model.
 - †  These parameters are required for ensemble-averaged bubble model with `polytropic = F`.

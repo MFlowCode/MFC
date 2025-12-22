@@ -473,10 +473,6 @@ module m_derived_types
         real(wp) :: epsilonb         !< Standard deviation scaling for the gaussian function
         real(wp) :: charwidth        !< Domain virtual depth (z direction, for 2D simulations)
         real(wp) :: valmaxvoid       !< Maximum void fraction permitted
-        real(wp) :: c0               !< Reference speed
-        real(wp) :: rho0             !< Reference density
-        real(wp) :: T0, Thost        !< Reference temperature and host temperature
-        real(wp) :: x0               !< Reference length
 
     end type bubbles_lagrange_parameters
 
