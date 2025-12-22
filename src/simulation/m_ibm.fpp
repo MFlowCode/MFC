@@ -98,8 +98,8 @@ contains
         moving_immersed_boundary_flag = .false.
         do i = 1, num_ibs
             if (patch_ib(i)%moving_ibm /= 0) then
+              call s_compute_moment_of_inertia(i, patch_ib(i)%angular_vel)
                 moving_immersed_boundary_flag = .true.
-
             end if
             call s_update_ib_rotation_matrix(i)
         end do
@@ -1139,9 +1139,9 @@ contains
             patch_ib(i)%torque(:) = matmul(patch_ib(i)%rotation_matrix_inverse, torques(i, :)) ! torques must be computed in the local coordinates of the IB
         end do
 
-        ! print *, "drag force: ", forces(1, 1:2), " || torque: ", torques(1, 3)
-        vel = [0.05_wp, 0._wp, 0._wp] - patch_ib(1)%vel
-        print *, "drag coef: ", 2._wp * sqrt(dot_product(forces(1, :), forces(1, :))) / ((sqrt(dot_product(vel,vel))**2) * 2._wp * 0.3e-03)
+        ! print *, "Acceleration: ", forces(1, 1:2) / patch_ib(1)%mass, " || torque: ", torques(1, 3)
+        ! vel = [0.05_wp, 0._wp, 0._wp] - patch_ib(1)%vel
+        ! print *, "drag coef: ", 2._wp * sqrt(dot_product(forces(1, :), forces(1, :))) / (dot_product(vel,vel) * 2._wp * 0.3e-03)
 
     end subroutine s_compute_ib_forces
 
@@ -1156,21 +1156,21 @@ contains
 
     subroutine s_compute_moment_of_inertia(ib_marker, axis)
 
-        real(wp), dimension(3), optional :: axis !< the axis about which we compute the moment. Only required in 3D.
+        real(wp), dimension(3), intent(in) :: axis !< the axis about which we compute the moment. Only required in 3D.
         integer, intent(in) :: ib_marker
 
         real(wp) :: moment, distance_to_axis, cell_volume
-        real(wp), dimension(3) :: position, closest_point_along_axis, vector_to_axis
+        real(wp), dimension(3) :: position, closest_point_along_axis, vector_to_axis, normal_axis
         integer :: i, j, k, count
 
         if (p == 0) then
-            axis = [0, 1, 0]
+            normal_axis = [0, 1, 0]
         else if (sqrt(sum(axis**2)) == 0) then
             ! if the object is not actually rotating at this time, return a dummy value and exit
             patch_ib(ib_marker)%moment = 1._wp
             return
         else
-            axis = axis/sqrt(sum(axis))
+            normal_axis = axis/sqrt(sum(axis))
         end if
 
         ! if the IB is in 2D or a 3D sphere, we can compute this exactly
@@ -1191,7 +1191,7 @@ contains
                 cell_volume = cell_volume*(z_cc(1) - z_cc(0))
             end if
 
-            $:GPU_PARALLEL_LOOP(private='[position,closest_point_along_axis,vector_to_axis,distance_to_axis]', copy='[moment,count]', copyin='[ib_marker,cell_volume,axis]', collapse=3)
+            $:GPU_PARALLEL_LOOP(private='[position,closest_point_along_axis,vector_to_axis,distance_to_axis]', copy='[moment,count]', copyin='[ib_marker,cell_volume,normal_axis]', collapse=3)
             do i = 0, m
                 do j = 0, n
                     do k = 0, p
@@ -1207,7 +1207,7 @@ contains
                             end if
 
                             ! project the position along the axis to find the closest distance to the rotation axis
-                            closest_point_along_axis = axis*dot_product(axis, position)
+                            closest_point_along_axis = normal_axis*dot_product(axis, position)
                             vector_to_axis = position - closest_point_along_axis
                             distance_to_axis = dot_product(vector_to_axis, vector_to_axis) ! saves the distance to the axis squared
 
