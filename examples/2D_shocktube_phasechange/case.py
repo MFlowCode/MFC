@@ -1,14 +1,9 @@
 #!/usr/bin/env python3
 import math, json, argparse
 
-parser = argparse.ArgumentParser(
-    prog="phasechange",
-    description="phase change considering both 5 and 6 equation models.",
-    formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument("--mfc", type=json.loads, default='{}', metavar="DICT",
-                    help="MFC's toolchain's internal state.")
-parser.add_argument("-me", "--model_eqns", type=int, metavar="MODEL EQN", choices=[2, 3], default=3,
-                    help="choose `2' for 5-equation model or `3' for 6-equation model.")
+parser = argparse.ArgumentParser(prog="phasechange", description="phase change considering both 5 and 6 equation models.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+parser.add_argument("--mfc", type=json.loads, default="{}", metavar="DICT", help="MFC's toolchain's internal state.")
+parser.add_argument("-me", "--model_eqns", type=int, metavar="MODEL EQN", choices=[2, 3], default=3, help="choose `2' for 5-equation model or `3' for 6-equation model.")
 args = parser.parse_args()
 
 ## 1 FOR BACKGROUND, 2 FOR SHOKED STATE, 3 FOR WATER REGION (WHEN NEEDED)
