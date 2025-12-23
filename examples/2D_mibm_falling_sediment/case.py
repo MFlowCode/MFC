@@ -7,8 +7,10 @@ gam_a = 1.4
 total_time = 2.0
 num_time_steps = 100000
 dt = float(total_time / num_time_steps)
-num_saves = 200
+num_saves = 1000
 steps_per_save = int(num_time_steps / num_saves)
+
+length = 0.4e-2
 
 # Configuring case dictionary
 print(
@@ -19,10 +21,10 @@ print(
             # Computational Domain Parameters
             # For these computations, the cylinder is placed at the (0,0,0)
             # domain origin.
-            "x_domain%beg": 0.0,
-            "x_domain%end": 0.4,
-            "y_domain%beg": 0.0,
-            "y_domain%end": 2.8,
+            "x_domain%beg": 0.0e-2,
+            "x_domain%end": length,
+            "y_domain%beg": 0.0e-2,
+            "y_domain%end": 7.*length,
             "cyl_coord": "F",
             "m": 100,
             "n": 700,
@@ -57,10 +59,10 @@ print(
             "riemann_solver": 2,
             "wave_speeds": 1,
             # We use ghost-cell
-            "bc_x%beg": -3,
-            "bc_x%end": -3,
-            "bc_y%beg": -3,
-            "bc_y%end": -3,
+            "bc_x%beg": -15,
+            "bc_x%end": -15,
+            "bc_y%beg": -15,
+            "bc_y%end": -15,
             # Set IB to True and add 1 patch
             "ib": "T",
             "num_ibs": 1,
@@ -74,32 +76,32 @@ print(
             # Patch: Constant Tube filled with air
             # Specify the cylindrical air tube grid geometry
             "patch_icpp(1)%geometry": 3,
-            "patch_icpp(1)%x_centroid": 0.2,
+            "patch_icpp(1)%x_centroid": length/2.,
             # Uniform medium density, centroid is at the center of the domain
-            "patch_icpp(1)%y_centroid": 1.4,
-            "patch_icpp(1)%length_x": 0.4,
-            "patch_icpp(1)%length_y": 2.8,
+            "patch_icpp(1)%y_centroid": 7.*length/2.,
+            "patch_icpp(1)%length_x": length,
+            "patch_icpp(1)%length_y": 7. * length,
             # Specify the patch primitive variables
             "patch_icpp(1)%vel(1)": 0.00e00,
             "patch_icpp(1)%vel(2)": 0.0e00,
-            "patch_icpp(1)%pres": 1.0e00,
+            "patch_icpp(1)%pres": f"1.0 + 9.81*{7. * length} - 9.81*y", # Set up a linear pressure gradient to start with # 1.0e00 at the top,
             "patch_icpp(1)%alpha_rho(1)": 1.0e00,
             "patch_icpp(1)%alpha(1)": 1.0e00,
             # Patch: Cylinder Immersed Boundary
             "patch_ib(1)%geometry": 6,
             "patch_ib(1)%moving_ibm": 2,
-            "patch_ib(1)%x_centroid": 0.2,
-            "patch_ib(1)%y_centroid": 2.4,
-            "patch_ib(1)%length_x": 0.1,
-            "patch_ib(1)%length_y": 0.05,
-            "patch_ib(1)%vel(2)": 0.00e00,
+            "patch_ib(1)%x_centroid": length/2.,
+            "patch_ib(1)%y_centroid": 6. * length,
+            "patch_ib(1)%length_x": length / 4.,
+            "patch_ib(1)%length_y": length / 8,
+            "patch_ib(1)%vel(2)": 0.0e00,
             "patch_ib(1)%angles(3)": math.pi / 4.,
-            "patch_ib(1)%mass": 1.1e-6, 
+            "patch_ib(1)%mass": 1.1 * math.pi * length * length / 32., # density of 1.1e-6 times the volume of the ellipse
             "patch_ib(1)%slip": "F",
             # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (gam_a - 1.0e00),  # 2.50(Not 1.40)
             "fluid_pp(1)%pi_inf": 0,
-            "fluid_pp(1)%Re(1)": 100000,
+            "fluid_pp(1)%Re(1)": 100000, # kenimatic viscosity of 0.01 cm^2/s
             # Body Forces
             "bf_y": "T",
             "k_y": 0.0,
