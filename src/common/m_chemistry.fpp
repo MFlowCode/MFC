@@ -376,7 +376,7 @@ contains
                                 diffusivity_R = lambda_R/rho_R/Cp_R
 
                                 lambda_Cell = 0.5_wp*(lambda_R + lambda_L)
-                                diffusivity_Cell = 0.5_wp*(diffusivity_R + diffusivity_L)
+                                diffusivity_cell = 0.5_wp*(diffusivity_R + diffusivity_L)
 
                                 ! Calculate mass diffusion fluxes
                                 Mass_Diffu_Energy = 0.0_wp
