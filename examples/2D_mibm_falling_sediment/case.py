@@ -1,16 +1,18 @@
 import json
 import math
 
-Mu = 1.84e-05
+Mu = 0.1 * 1e-4 # kenimatic viscosity of 0.01 cm^2/s
 gam_a = 1.4
 
-total_time = 2.0
+total_time = 0.35
+# total_time = 2.0
 num_time_steps = 100000
 dt = float(total_time / num_time_steps)
 num_saves = 1000
 steps_per_save = int(num_time_steps / num_saves)
 
 length = 0.4e-2
+avg_speed = 5.5*length / total_time
 
 # Configuring case dictionary
 print(
@@ -101,7 +103,7 @@ print(
             # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (gam_a - 1.0e00),  # 2.50(Not 1.40)
             "fluid_pp(1)%pi_inf": 0,
-            "fluid_pp(1)%Re(1)": 100000, # kenimatic viscosity of 0.01 cm^2/s
+            "fluid_pp(1)%Re(1)": 1. / Mu,
             # Body Forces
             "bf_y": "T",
             "k_y": 0.0,
