@@ -53,7 +53,7 @@ case = {
     "chemistry": "T",
     "chem_params%diffusion": "T",
     "chem_params%reactions": "F",
-    "chem_params%transport_model": 1,  # Mixture-Average
+    "chem_params%transport_model": 2,  # Unity-Lewis
     "format": 1,
     "precision": 2,
     "prim_vars_wrt": "T",
