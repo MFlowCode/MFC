@@ -127,6 +127,10 @@ jobs:
             cluster_name: 'Oak Ridge | Frontier'
             device: 'cpu'
             interface: 'none'
+          - lbl: 'delta'
+            cluster_name: 'NCSA | Delta'
+            device: 'cpu'
+            interface: 'none'
     runs-on:
       group:  phoenix
       labels: ${{ matrix.lbl }}
@@ -140,6 +144,10 @@ jobs:
 
       - name: Build & Test
         if:   matrix.lbl == 'gt'
+        run:  bash .github/workflows/phoenix/submit.sh .github/workflows/phoenix/test.sh ${{ matrix.device }} ${{ matrix.interface }}
+
+      - name: Build & Test
+        if:   matrix.lbl == 'delta'
         run:  bash .github/workflows/phoenix/submit.sh .github/workflows/phoenix/test.sh ${{ matrix.device }} ${{ matrix.interface }}
 
       - name: Build
