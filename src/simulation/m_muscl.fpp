@@ -348,7 +348,7 @@ contains
             $:END_GPU_PARALLEL_LOOP()
         end if
 
-        ! Reshaping/Projecting onto Characteristic Fields in z-direction
+        ! Reshaping onto Characteristic Fields in z-direction 
         if (p == 0) return
         if (muscl_dir == 3) then
             $:GPU_PARALLEL_LOOP(private='[j,k,l,q]', collapse=4)
