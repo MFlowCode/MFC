@@ -63,6 +63,9 @@ COMMON = {
     'down_sample': ParamType.LOG,
     'recon_type': ParamType.INT,
     'muscl_order': ParamType.INT,
+    'periodic_ibs': ParamType.LOG,
+    'store_levelset': ParamType.LOG,
+    'slab_domain_decomposition': ParamType.LOG,
 }
 
 PRE_PROCESS = COMMON.copy()
@@ -112,7 +115,7 @@ for var in ["R0ref", "p0ref", "rho0ref", "T0ref", "ss", "pv", "vd",
             "M_v", "M_g", "k_v", "k_g", "cp_v", "cp_g", "R_v", "R_g" ]:
     PRE_PROCESS[f"bub_pp%{var}"] = ParamType.REAL
 
-for ib_id in range(1, 10+1):
+for ib_id in range(1, 1000+1):
     for real_attr, ty in [("geometry", ParamType.INT), ("radius", ParamType.REAL),
                           ("theta", ParamType.REAL), ("slip", ParamType.LOG),
                           ("c", ParamType.REAL), ("p", ParamType.REAL),
@@ -340,6 +343,20 @@ SIMULATION.update({
     'nv_uvm_igr_temps_on_gpu': ParamType.INT,
     'nv_uvm_pref_gpu': ParamType.LOG,
     'fft_wrt': ParamType.LOG,
+    'compute_particle_drag': ParamType.LOG,
+    'u_inf_ref': ParamType.REAL,
+    'rho_inf_ref': ParamType.REAL,
+    'P_inf_ref': ParamType.REAL,
+    'periodic_forcing': ParamType.LOG,
+    'mom_f_idx': ParamType.INT,
+    'forcing_window': ParamType.INT, 
+    'forcing_dt': ParamType.REAL, 
+    'forcing_wrt': ParamType.LOG, 
+    'particle_vf': ParamType.REAL,
+    'volume_filtering_momentum_eqn': ParamType.LOG,
+    't_step_stat_start': ParamType.INT,
+    'filter_width': ParamType.REAL,
+    'q_filtered_wrt': ParamType.LOG,
 })
 
 for var in [ 'heatTransfer_model', 'massTransfer_model', 'pressure_corrector',
@@ -363,7 +380,7 @@ for var in ["R0ref", "p0ref", "rho0ref", "T0ref", "ss", "pv", "vd",
             "M_v", "M_g", "k_v", "k_g", "cp_v", "cp_g", "R_v", "R_g" ]:
     SIMULATION[f"bub_pp%{var}"] = ParamType.REAL
 
-for ib_id in range(1, 10+1):
+for ib_id in range(1, 1000+1):
     for real_attr, ty in [("geometry", ParamType.INT), ("radius", ParamType.REAL),
                           ("theta", ParamType.REAL), ("slip", ParamType.LOG),
                           ("c", ParamType.REAL), ("p", ParamType.REAL),
@@ -508,6 +525,7 @@ POST_PROCESS.update({
     'lag_mg_wrt': ParamType.LOG,
     'lag_betaT_wrt': ParamType.LOG,
     'lag_betaC_wrt': ParamType.LOG,
+    'q_filtered_wrt': ParamType.LOG,
 })
 
 for var in ["R0ref", "p0ref", "rho0ref", "T0ref", "ss", "pv", "vd",
