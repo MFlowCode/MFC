@@ -303,6 +303,7 @@ module m_global_parameters
     real(wp) :: rhoref, pref
     !> @}
 
+    type(chemistry_parameters) :: chem_params
     !> @name Bubble modeling variables and parameters
     !> @{
     integer :: nb
@@ -419,6 +420,9 @@ contains
                 bc_${DIM}$%ve${DIR}$ = 0._wp
             #:endfor
         #:endfor
+
+        chem_params%gamma_method = 1
+        chem_params%transport_model = 1
 
         ! Fluids physical parameters
         do i = 1, num_fluids_max
