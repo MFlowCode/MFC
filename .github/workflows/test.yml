@@ -122,7 +122,7 @@ jobs:
 
       - name: Build & Test
         if:   matrix.lbl == 'delta'
-        run:  bash .github/workflows/phoenix/submit.sh .github/workflows/phoenix/test.sh ${{ matrix.device }} ${{ matrix.interface }}
+        run:  bash .github/workflows/delta/submit.sh .github/workflows/delta/test.sh ${{ matrix.device }} ${{ matrix.interface }}
 
       - name: Build
         if:   matrix.lbl == 'frontier'
