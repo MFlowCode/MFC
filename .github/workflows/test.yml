@@ -101,32 +101,6 @@ jobs:
     strategy:
       matrix:
         include:
-          # Phoenix (GT)
-          - lbl: 'gt'
-            cluster_name: 'Georgia Tech | Phoenix'
-            device: 'gpu'
-            interface: 'acc'
-          - lbl: 'gt'
-            cluster_name: 'Georgia Tech | Phoenix'
-            device: 'gpu'
-            interface: 'omp'
-          - lbl: 'gt'
-            cluster_name: 'Georgia Tech | Phoenix'
-            device: 'cpu'
-            interface: 'none'
-          # Frontier (ORNL)
-          - lbl: 'frontier'
-            cluster_name: 'Oak Ridge | Frontier'
-            device: 'gpu'
-            interface: 'acc'
-          - lbl: 'frontier'
-            cluster_name: 'Oak Ridge | Frontier'
-            device: 'gpu'
-            interface: 'omp'
-          - lbl: 'frontier'
-            cluster_name: 'Oak Ridge | Frontier'
-            device: 'cpu'
-            interface: 'none'
           - lbl: 'delta'
             cluster_name: 'NCSA | Delta'
             device: 'cpu'
