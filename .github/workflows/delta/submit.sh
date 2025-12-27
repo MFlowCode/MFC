@@ -56,7 +56,7 @@ job_slug="$job_slug"
 job_device="$2"
 job_interface="$3"
 
-. ./mfc.sh load -c delta -m $2
+. ./mfc.sh load -c d -m $2
 
 $sbatch_script_contents
 
