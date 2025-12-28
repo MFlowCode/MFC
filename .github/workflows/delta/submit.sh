@@ -42,15 +42,22 @@ sbatch <<EOT
 #SBATCH -Jshb-$job_slug            # Job name
 #SBATCH -N1                        # Number of nodes required
 $sbatch_device_opts
-#SBATCH -t 03:00:00                # Duration of the job (Ex: 15 mins)
+#SBATCH -t 01:00:00                # Duration of the job (Ex: 15 mins)
 #SBATCH -o$job_slug.out            # Combined output and error messages file
 #SBATCH -W                         # Do not exit until the submitted job terminates.
+#SBATCH --exclusive                         # Do not exit until the submitted job terminates.
 
 set -e
 set -x
 
 cd "\$SLURM_SUBMIT_DIR"
 echo "Running in $(pwd):"
+
+echo "Job started on nodes: $SLURM_JOB_NODELIST"
+echo "Number of tasks requested: $SLURM_NTASKS"
+echo "CPUs per task requested: $SLURM_CPUS_PER_TASK"
+echo "Total allocated CPU cores: $(($SLURM_NTASKS * $SLURM_CPUS_PER_TASK))"
+echo "Cores available on this specific node: $SLURM_CPUS_ON_NODE"
 
 job_slug="$job_slug"
 job_device="$2"
