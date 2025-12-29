@@ -1322,8 +1322,8 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         precision = self.get('precision')
 
         if format is not None:
-            self.prohibit(format not in [1, 2],
-                         "format must be 1 or 2")
+            self.prohibit(format not in [1, 2, 3],
+                         "format must be 1 (Silo-HDF5), 2 (Binary), or 3 (HDF5+XDMF)")
 
         if precision is not None:
             self.prohibit(precision not in [1, 2],

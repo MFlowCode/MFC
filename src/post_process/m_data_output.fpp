@@ -4,9 +4,10 @@
 
 !> @brief This module enables the restructuring of the raw simulation data
 !!              file(s) into formatted database file(s). The formats that may be
-!!              chosen from include Silo-HDF5 and Binary. Each of these database
-!!              structures contains information about the grid as well as each of
-!!              the flow variable(s) that were chosen by the user to be included.
+!!              chosen from include Silo-HDF5, Binary, and HDF5+XDMF. Each of
+!!              these database structures contains information about the grid as
+!!              well as each of the flow variable(s) that were chosen by the user
+!!              to be included.
 module m_data_output
 
     use m_derived_types         ! Definitions of the derived types
@@ -23,6 +24,8 @@ module m_data_output
 
     use m_variables_conversion
 
+    use m_hdf5_xdmf_output      ! Native HDF5+XDMF output support
+
     implicit none
 
     private; public :: s_initialize_data_output_module, &
@@ -37,6 +40,7 @@ module m_data_output
  s_write_intf_data_file, &
  s_write_energy_data_file, &
  s_close_formatted_database_file, &
+ s_write_xdmf_metadata_file, &
  s_close_intf_data_file, &
  s_close_energy_data_file, &
  s_finalize_data_output_module
@@ -253,7 +257,7 @@ contains
 
             ! Generating Binary Directory Tree
 
-        else
+        elseif (format == 2) then
 
             ! Creating the directory associated with the local process
             dbdir = trim(case_dir)//'/binary'
@@ -284,6 +288,13 @@ contains
                 end if
 
             end if
+
+            ! Generating HDF5+XDMF Directory Tree
+
+        elseif (format == 3) then
+
+            ! Initialize the HDF5+XDMF module (creates directory structure)
+            call s_initialize_hdf5_xdmf_module()
 
         end if
 
@@ -539,7 +550,7 @@ contains
 
             ! Binary Database Format
 
-        else
+        elseif (format == 2) then
 
             ! Generating the relative path to the formatted database slave
             ! file, that is to be opened for the current time-step, t_step
@@ -596,6 +607,13 @@ contains
                 end if
 
             end if
+
+            ! HDF5+XDMF Database Format
+
+        elseif (format == 3) then
+
+            ! Open new HDF5 file for this time-step
+            call s_open_hdf5_file(t_step)
 
         end if
 
@@ -836,6 +854,13 @@ contains
 
             end if
 
+            ! HDF5+XDMF Database Format
+
+        elseif (format == 3) then
+
+            ! Write grid coordinates to HDF5 file
+            call s_write_grid_to_hdf5()
+
         end if
 
     end subroutine s_write_grid_to_formatted_database_file
@@ -1003,7 +1028,7 @@ contains
 
             ! Binary Database Format
 
-        else
+        elseif (format == 2) then
 
             ! Writing the name of the flow variable and its data, associated
             ! with the local processor, to the formatted database slave file
@@ -1033,6 +1058,13 @@ contains
                 end if
 
             end if
+
+            ! HDF5+XDMF Database Format
+
+        elseif (format == 3) then
+
+            ! Write the flow variable to HDF5 file
+            call s_write_variable_to_hdf5(varname, q_sf)
 
         end if
 
@@ -1702,9 +1734,13 @@ contains
             if (proc_rank == 0) ierr = DBCLOSE(dbroot)
 
             ! Binary database format
-        else
+        elseif (format == 2) then
             close (dbfile)
             if (n == 0 .and. proc_rank == 0) close (dbroot)
+
+            ! HDF5+XDMF database format
+        elseif (format == 3) then
+            call s_close_hdf5_file()
 
         end if
 
@@ -1721,6 +1757,21 @@ contains
         close (251)
 
     end subroutine s_close_energy_data_file
+
+    !>  Subroutine to write XDMF metadata file for HDF5+XDMF format
+    !!  @param t_step Current time step
+    !!  @param time Physical time value
+    impure subroutine s_write_xdmf_metadata_file(t_step, time)
+
+        integer, intent(in) :: t_step
+        real(wp), intent(in) :: time
+
+        ! Only write XDMF for format=3
+        if (format == 3) then
+            call s_write_xdmf_file(t_step, time)
+        end if
+
+    end subroutine s_write_xdmf_metadata_file
 
     impure subroutine s_finalize_data_output_module()
         ! Description: Deallocation procedures for the module
@@ -1744,6 +1795,11 @@ contains
             deallocate (lo_offset)
             deallocate (hi_offset)
             deallocate (dims)
+        end if
+
+        ! Finalize HDF5+XDMF module if used
+        if (format == 3) then
+            call s_finalize_hdf5_xdmf_module()
         end if
 
     end subroutine s_finalize_data_output_module

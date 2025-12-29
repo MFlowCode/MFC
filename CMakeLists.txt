@@ -460,8 +460,10 @@ function(MFC_SETUP_TARGET)
         endif()
 
         if (ARGS_HDF5)
-            find_package(HDF5 REQUIRED)
+            find_package(HDF5 REQUIRED COMPONENTS Fortran)
             target_link_libraries(${a_target} PRIVATE HDF5::HDF5)
+            target_include_directories(${a_target} PRIVATE ${HDF5_Fortran_INCLUDE_DIRS})
+            target_link_libraries(${a_target} PRIVATE ${HDF5_Fortran_LIBRARIES})
         endif()
 
         if (ARGS_FFTW)
