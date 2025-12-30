@@ -638,7 +638,10 @@ To restart the simulation from $k$-th time step, see [Restarting Cases](running.
 
 The table lists formatted database output parameters. The parameters define variables that are outputted from simulation and file types and formats of data as well as options for post-processing.
 
-- `format` specifies the choice of the file format of data file outputted by MFC by an integer of 1 and 2. `format = 1` and `2` correspond to Silo-HDF5 format and binary format, respectively.
+- `format` specifies the choice of the file format of data file outputted by MFC by an integer of 1, 2, or 3:
+  - `format = 1`: Silo-HDF5 format (default). Works with VisIt and ParaView 5.11 and earlier.
+  - `format = 2`: Binary format. Lightweight output for custom analysis pipelines.
+  - `format = 3`: Native HDF5 + XDMF format. Recommended for ParaView 5.12 and later compatibility. Produces portable, self-describing output without external library dependencies beyond HDF5.
 
 - `precision` specifies the choice of the floating-point format of the data file outputted by MFC by an integer of 1 and 2. `precision = 1` and `2` correspond to single-precision and double-precision formats, respectively.
 

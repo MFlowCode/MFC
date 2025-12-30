@@ -4,9 +4,10 @@
 
 !> @brief This module enables the restructuring of the raw simulation data
 !!              file(s) into formatted database file(s). The formats that may be
-!!              chosen from include Silo-HDF5 and Binary. Each of these database
-!!              structures contains information about the grid as well as each of
-!!              the flow variable(s) that were chosen by the user to be included.
+!!              chosen from include Silo-HDF5, Binary, and HDF5+XDMF. Each of
+!!              these database structures contains information about the grid as
+!!              well as each of the flow variable(s) that were chosen by the user
+!!              to be included.
 module m_data_output
 
     use m_derived_types         ! Definitions of the derived types
@@ -23,6 +24,8 @@ module m_data_output
 
     use m_variables_conversion
 
+    use m_hdf5_xdmf_output      ! Native HDF5+XDMF output support
+
     implicit none
 
     private; public :: s_initialize_data_output_module, &
@@ -37,6 +40,7 @@ module m_data_output
  s_write_intf_data_file, &
  s_write_energy_data_file, &
  s_close_formatted_database_file, &
+ s_write_xdmf_metadata_file, &
  s_close_intf_data_file, &
  s_close_energy_data_file, &
  s_finalize_data_output_module
@@ -253,7 +257,7 @@ contains
 
             ! Generating Binary Directory Tree
 
-        else
+        elseif (format == 2) then
 
             ! Creating the directory associated with the local process
             dbdir = trim(case_dir)//'/binary'
@@ -284,6 +288,13 @@ contains
                 end if
 
             end if
+
+            ! Generating HDF5+XDMF Directory Tree
+
+        elseif (format == 3) then
+
+            ! Initialize the HDF5+XDMF module (creates directory structure)
+            call s_initialize_hdf5_xdmf_module()
 
         end if
 
@@ -539,7 +550,7 @@ contains
 
             ! Binary Database Format
 
-        else
+        elseif (format == 2) then
 
             ! Generating the relative path to the formatted database slave
             ! file, that is to be opened for the current time-step, t_step
@@ -596,6 +607,13 @@ contains
                 end if
 
             end if
+
+            ! HDF5+XDMF Database Format
+
+        elseif (format == 3) then
+
+            ! Open new HDF5 file for this time-step
+            call s_open_hdf5_file(t_step)
 
         end if
 
@@ -836,6 +854,13 @@ contains
 
             end if
 
+            ! HDF5+XDMF Database Format
+
+        elseif (format == 3) then
+
+            ! Write grid coordinates to HDF5 file
+            call s_write_grid_to_hdf5()
+
         end if
 
     end subroutine s_write_grid_to_formatted_database_file
@@ -1003,7 +1028,7 @@ contains
 
             ! Binary Database Format
 
-        else
+        elseif (format == 2) then
 
             ! Writing the name of the flow variable and its data, associated
             ! with the local processor, to the formatted database slave file
@@ -1033,6 +1058,13 @@ contains
                 end if
 
             end if
+
+            ! HDF5+XDMF Database Format
+
+        elseif (format == 3) then
+
+            ! Write the flow variable to HDF5 file
+            call s_write_variable_to_hdf5(varname, q_sf)
 
         end if
 
@@ -1338,23 +1370,31 @@ contains
             ! extents in the formatted database master file. In addition, it
             ! also records a sub-domain connectivity map so that the entire
             ! grid may be reassembled by looking at the master file.
-            if (proc_rank == 0) then
 
-                do i = 1, num_procs
-                    write (meshnames(i), '(A,I0,A,I0,A)') '../p', i - 1, &
-                        '/', t_step, '.silo:lag_bubbles'
-                    meshtypes(i) = DB_POINTMESH
-                end do
-                err = DBSET2DSTRLEN(len(meshnames(1)))
-                err = DBPUTMMESH(dbroot, 'lag_bubbles', 16, &
-                                 num_procs, meshnames, &
-                                 len_trim(meshnames), &
-                                 meshtypes, DB_F77NULL, ierr)
+            ! Format-specific particle mesh output
+            if (format == 1) then
+                ! Silo-HDF5 format
+                if (proc_rank == 0) then
+                    do i = 1, num_procs
+                        write (meshnames(i), '(A,I0,A,I0,A)') '../p', i - 1, &
+                            '/', t_step, '.silo:lag_bubbles'
+                        meshtypes(i) = DB_POINTMESH
+                    end do
+                    err = DBSET2DSTRLEN(len(meshnames(1)))
+                    err = DBPUTMMESH(dbroot, 'lag_bubbles', 16, &
+                                     num_procs, meshnames, &
+                                     len_trim(meshnames), &
+                                     meshtypes, DB_F77NULL, ierr)
+                end if
+
+                err = DBPUTPM(dbfile, 'lag_bubbles', 11, 3, &
+                              px, py, pz, nBub, &
+                              DB_DOUBLE, DB_F77NULL, ierr)
+
+            elseif (format == 3) then
+                ! HDF5+XDMF format - write particle mesh to HDF5
+                call s_write_particle_mesh_to_hdf5(px, py, pz, nBub)
             end if
-
-            err = DBPUTPM(dbfile, 'lag_bubbles', 11, 3, &
-                          px, py, pz, nBub, &
-                          DB_DOUBLE, DB_F77NULL, ierr)
 
             if (lag_id_wrt) call s_write_lag_variable_to_formatted_database_file('part_id', t_step, bub_id, nBub)
             if (lag_vel_wrt) then
@@ -1395,24 +1435,28 @@ contains
             call MPI_FILE_CLOSE(ifile, ierr)
             call MPI_TYPE_FREE(view, ierr)
 
-            if (proc_rank == 0) then
+            ! Format-specific empty particle mesh handling
+            if (format == 1) then
+                ! Silo-HDF5 format
+                if (proc_rank == 0) then
+                    do i = 1, num_procs
+                        write (meshnames(i), '(A,I0,A,I0,A)') '../p', i - 1, &
+                            '/', t_step, '.silo:lag_bubbles'
+                        meshtypes(i) = DB_POINTMESH
+                    end do
+                    err = DBSET2DSTRLEN(len(meshnames(1)))
+                    err = DBPUTMMESH(dbroot, 'lag_bubbles', 16, &
+                                     num_procs, meshnames, &
+                                     len_trim(meshnames), &
+                                     meshtypes, DB_F77NULL, ierr)
+                end if
 
-                do i = 1, num_procs
-                    write (meshnames(i), '(A,I0,A,I0,A)') '../p', i - 1, &
-                        '/', t_step, '.silo:lag_bubbles'
-                    meshtypes(i) = DB_POINTMESH
-                end do
-                err = DBSET2DSTRLEN(len(meshnames(1)))
-                err = DBPUTMMESH(dbroot, 'lag_bubbles', 16, &
-                                 num_procs, meshnames, &
-                                 len_trim(meshnames), &
-                                 meshtypes, DB_F77NULL, ierr)
+                err = DBSETEMPTYOK(1)
+                err = DBPUTPM(dbfile, 'lag_bubbles', 11, 3, &
+                              dummy_data, dummy_data, dummy_data, 0, &
+                              DB_DOUBLE, DB_F77NULL, ierr)
             end if
-
-            err = DBSETEMPTYOK(1)
-            err = DBPUTPM(dbfile, 'lag_bubbles', 11, 3, &
-                          dummy_data, dummy_data, dummy_data, 0, &
-                          DB_DOUBLE, DB_F77NULL, ierr)
+            ! Note: For format=3 with no particles, we don't write particle data
 
             if (lag_id_wrt) call s_write_lag_variable_to_formatted_database_file('part_id', t_step)
             if (lag_vel_wrt) then
@@ -1454,39 +1498,55 @@ contains
         dummy_data = 0._wp
 
         if (present(nBubs) .and. present(data)) then
-            if (proc_rank == 0) then
-                do i = 1, num_procs
-                    write (var_names(i), '(A,I0,A,I0,A)') '../p', i - 1, &
-                        '/', t_step, '.silo:'//trim(varname)
-                    var_types(i) = DB_POINTVAR
-                end do
-                err = DBSET2DSTRLEN(len(var_names(1)))
-                err = DBPUTMVAR(dbroot, trim(varname), len_trim(varname), &
-                                num_procs, var_names, &
-                                len_trim(var_names), &
-                                var_types, DB_F77NULL, ierr)
+            ! Has particle data
+
+            if (format == 1) then
+                ! Silo-HDF5 format
+                if (proc_rank == 0) then
+                    do i = 1, num_procs
+                        write (var_names(i), '(A,I0,A,I0,A)') '../p', i - 1, &
+                            '/', t_step, '.silo:'//trim(varname)
+                        var_types(i) = DB_POINTVAR
+                    end do
+                    err = DBSET2DSTRLEN(len(var_names(1)))
+                    err = DBPUTMVAR(dbroot, trim(varname), len_trim(varname), &
+                                    num_procs, var_names, &
+                                    len_trim(var_names), &
+                                    var_types, DB_F77NULL, ierr)
+                end if
+
+                err = DBPUTPV1(dbfile, trim(varname), len_trim(varname), &
+                               'lag_bubbles', 11, data, nBubs, DB_DOUBLE, DB_F77NULL, ierr)
+
+            elseif (format == 3) then
+                ! HDF5+XDMF format
+                call s_write_particle_variable_to_hdf5(varname, data, nBubs)
             end if
 
-            err = DBPUTPV1(dbfile, trim(varname), len_trim(varname), &
-                           'lag_bubbles', 11, data, nBubs, DB_DOUBLE, DB_F77NULL, ierr)
         else
-            if (proc_rank == 0) then
-                do i = 1, num_procs
-                    write (var_names(i), '(A,I0,A,I0,A)') '../p', i - 1, &
-                        '/', t_step, '.silo:'//trim(varname)
-                    var_types(i) = DB_POINTVAR
-                end do
-                err = DBSET2DSTRLEN(len(var_names(1)))
-                err = DBSETEMPTYOK(1)
-                err = DBPUTMVAR(dbroot, trim(varname), len_trim(varname), &
-                                num_procs, var_names, &
-                                len_trim(var_names), &
-                                var_types, DB_F77NULL, ierr)
-            end if
+            ! No particle data (empty case)
 
-            err = DBSETEMPTYOK(1)
-            err = DBPUTPV1(dbfile, trim(varname), len_trim(varname), &
-                           'lag_bubbles', 11, dummy_data, 0, DB_DOUBLE, DB_F77NULL, ierr)
+            if (format == 1) then
+                ! Silo-HDF5 format
+                if (proc_rank == 0) then
+                    do i = 1, num_procs
+                        write (var_names(i), '(A,I0,A,I0,A)') '../p', i - 1, &
+                            '/', t_step, '.silo:'//trim(varname)
+                        var_types(i) = DB_POINTVAR
+                    end do
+                    err = DBSET2DSTRLEN(len(var_names(1)))
+                    err = DBSETEMPTYOK(1)
+                    err = DBPUTMVAR(dbroot, trim(varname), len_trim(varname), &
+                                    num_procs, var_names, &
+                                    len_trim(var_names), &
+                                    var_types, DB_F77NULL, ierr)
+                end if
+
+                err = DBSETEMPTYOK(1)
+                err = DBPUTPV1(dbfile, trim(varname), len_trim(varname), &
+                               'lag_bubbles', 11, dummy_data, 0, DB_DOUBLE, DB_F77NULL, ierr)
+            end if
+            ! Note: For format=3 with no particles, no data written
         end if
 
     end subroutine s_write_lag_variable_to_formatted_database_file
@@ -1702,9 +1762,13 @@ contains
             if (proc_rank == 0) ierr = DBCLOSE(dbroot)
 
             ! Binary database format
-        else
+        elseif (format == 2) then
             close (dbfile)
             if (n == 0 .and. proc_rank == 0) close (dbroot)
+
+            ! HDF5+XDMF database format
+        elseif (format == 3) then
+            call s_close_hdf5_file()
 
         end if
 
@@ -1721,6 +1785,21 @@ contains
         close (251)
 
     end subroutine s_close_energy_data_file
+
+    !>  Subroutine to write XDMF metadata file for HDF5+XDMF format
+    !!  @param t_step Current time step
+    !!  @param time Physical time value
+    impure subroutine s_write_xdmf_metadata_file(t_step, time)
+
+        integer, intent(in) :: t_step
+        real(wp), intent(in) :: time
+
+        ! Only write XDMF for format=3
+        if (format == 3) then
+            call s_write_xdmf_file(t_step, time)
+        end if
+
+    end subroutine s_write_xdmf_metadata_file
 
     impure subroutine s_finalize_data_output_module()
         ! Description: Deallocation procedures for the module
@@ -1744,6 +1823,13 @@ contains
             deallocate (lo_offset)
             deallocate (hi_offset)
             deallocate (dims)
+        end if
+
+        ! Finalize HDF5+XDMF module if used
+        if (format == 3) then
+            ! Write master time series XDMF file that references all timesteps
+            call s_write_xdmf_time_series(t_step_start, t_step_stop, t_step_save)
+            call s_finalize_hdf5_xdmf_module()
         end if
 
     end subroutine s_finalize_data_output_module

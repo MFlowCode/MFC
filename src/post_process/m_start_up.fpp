@@ -880,6 +880,9 @@ contains
             call s_close_energy_data_file()
         end if
 
+        ! Write XDMF metadata file for HDF5+XDMF format (before closing HDF5 file)
+        call s_write_xdmf_metadata_file(t_step, real(t_step, wp))
+
         ! Closing the formatted database file
         call s_close_formatted_database_file()
 

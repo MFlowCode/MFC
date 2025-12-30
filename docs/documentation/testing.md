@@ -97,8 +97,21 @@ To test the post-processing code, append the `-a` or `--test-all` option:
 ./mfc.sh test -a -j 8
 ```
 
-This argument will re-run the test stack with `parallel_io='T'`, which generates silo_hdf5 files.
+This argument will re-run the test stack with `parallel_io='T'`, which generates output files depending on the `format` parameter.
 It will also turn most write parameters (`*_wrt`) on.
-Then, it searches through the silo files using `h5dump` to ensure that there are no `NaN`s or `Infinity`s.
-Although adding this option does not guarantee that accurate `.silo` files are generated, it does ensure that the post-process code does not fail or produce malformed data.
+
+The test framework validates post-process output for the following formats:
+
+| Format | Output Directory | Validation |
+|--------|------------------|------------|
+| `format=1` | `silo_hdf5/` | Checks HDF5 files for NaN/Infinity values |
+| `format=3` | `hdf5_xdmf/` | Checks HDF5 files for NaN/Infinity, then validates XDMF metadata structure |
+
+For Silo-HDF5 output (`format=1`), the test searches through the `.silo` files using `h5dump` to ensure that there are no `NaN`s or `Infinity`s.
+
+For native HDF5+XDMF output (`format=3`), the test:
+1. Validates all `.h5` files contain no `NaN` or `Infinity` values
+2. Validates `.xdmf` metadata files have correct XML structure with required elements (`Domain`, `Grid`, `Topology`, `Geometry`, `Attribute`)
+
+Although adding this option does not guarantee that fully accurate output files are generated, it does ensure that the post-process code does not fail or produce malformed data.
 
