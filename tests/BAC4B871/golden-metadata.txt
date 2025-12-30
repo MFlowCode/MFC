@@ -1,0 +1,154 @@
+This file was created on 2025-12-30 10:13:30.305064.
+
+mfc.sh:
+
+    Invocation: test -j 4 -f BAC4B871 -t B30CF683 --generate
+    Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
+    Git:        5d7ebef838d93082006694a5c7155b8264990b0c on feature/native-hdf5 (dirty)
+
+syscheck:
+
+    CMake Configuration:
+    
+        CMake v4.2.1 on BGC-MBP14.local
+    
+        C       : GNU v15.2.0 (/opt/homebrew/opt/gcc/bin/gcc-15)
+        Fortran : GNU v15.2.0 (/opt/homebrew/opt/gcc/bin/gfortran-15)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : ON
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /Users/speedyturtle/Developer/mfc/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /opt/homebrew/opt/gcc/bin/gcc-15
+        CXX      : /opt/homebrew/opt/gcc/bin/g++-15
+        FC       : /opt/homebrew/opt/gcc/bin/gfortran-15
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+simulation:
+
+    CMake Configuration:
+    
+        CMake v4.2.1 on BGC-MBP14.local
+    
+        C       : GNU v15.2.0 (/opt/homebrew/opt/gcc/bin/gcc-15)
+        Fortran : GNU v15.2.0 (/opt/homebrew/opt/gcc/bin/gfortran-15)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /Users/speedyturtle/Developer/mfc/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /opt/homebrew/opt/gcc/bin/gcc-15
+        CXX      : /opt/homebrew/opt/gcc/bin/g++-15
+        FC       : /opt/homebrew/opt/gcc/bin/gfortran-15
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+pre_process:
+
+    CMake Configuration:
+    
+        CMake v4.2.1 on BGC-MBP14.local
+    
+        C       : GNU v15.2.0 (/opt/homebrew/opt/gcc/bin/gcc-15)
+        Fortran : GNU v15.2.0 (/opt/homebrew/opt/gcc/bin/gfortran-15)
+    
+        PRE_PROCESS   : ON
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /Users/speedyturtle/Developer/mfc/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /opt/homebrew/opt/gcc/bin/gcc-15
+        CXX      : /opt/homebrew/opt/gcc/bin/g++-15
+        FC       : /opt/homebrew/opt/gcc/bin/gfortran-15
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+post_process:
+
+    CMake Configuration:
+    
+        CMake v4.2.1 on BGC-MBP14.local
+    
+        C       : GNU v15.2.0 (/opt/homebrew/opt/gcc/bin/gcc-15)
+        Fortran : GNU v15.2.0 (/opt/homebrew/opt/gcc/bin/gfortran-15)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : ON
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /Users/speedyturtle/Developer/mfc/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /opt/homebrew/opt/gcc/bin/gcc-15
+        CXX      : /opt/homebrew/opt/gcc/bin/g++-15
+        FC       : /opt/homebrew/opt/gcc/bin/gfortran-15
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+CPU:
+
+    CPU Info:
+    From sysctl -a 
+    machdep.cpu.cores_per_package: 14
+    machdep.cpu.core_count: 14
+    machdep.cpu.logical_per_package: 14
+    machdep.cpu.thread_count: 14
+    machdep.cpu.brand_string: Apple M3 Max
+

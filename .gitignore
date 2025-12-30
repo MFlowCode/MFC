@@ -93,6 +93,3 @@ benchmarks/*.png
 
 **isolation_rules/
 **.supercode/
-
-# User-generated sim files
-sims/

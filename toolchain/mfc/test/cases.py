@@ -1100,6 +1100,47 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
     mhd_cases()
 
+    # HDF5+XDMF output format tests (format=3)
+    def hdf5_xdmf_format_cases():
+        """Test cases for HDF5+XDMF output format (format=3).
+
+        These tests verify that the native HDF5+XDMF output works correctly
+        by using existing examples with format=3 post-processing.
+        """
+        common_mods = {
+            't_step_stop': Nt, 't_step_save': Nt, 'format': 3
+        }
+
+        # Use existing examples with format=3 output
+        case_specs = [
+            # 1D examples
+            ("1D -> HDF5+XDMF Output -> Sod Shock Tube",
+             "examples/1D_sodshocktube/case.py",
+             {'m': 99}),
+            ("1D -> HDF5+XDMF Output -> Sod Shock Tube -> prim_vars_wrt",
+             "examples/1D_sodshocktube/case.py",
+             {'m': 99, 'prim_vars_wrt': 'T'}),
+            ("1D -> HDF5+XDMF Output -> MHD Brio-Wu",
+             "examples/1D_brio_wu/case.py",
+             {'m': 99}),
+            # 2D examples
+            ("2D -> HDF5+XDMF Output -> Shock-Bubble",
+             "examples/2D_shockbubble/case.py",
+             {'m': 49, 'n': 49}),
+            ("2D -> HDF5+XDMF Output -> Kelvin-Helmholtz",
+             "examples/2D_kelvin_helmholtz/case.py",
+             {'m': 49, 'n': 49}),
+            # 3D example
+            ("3D -> HDF5+XDMF Output -> MHD Brio-Wu",
+             "examples/3D_brio_wu/case.py",
+             {'m': 24, 'n': 24, 'p': 24}),
+        ]
+
+        for name, path, extra_mods in case_specs:
+            cases.append(define_case_f(name, path, mods={**common_mods, **extra_mods}))
+
+    hdf5_xdmf_format_cases()
+
     foreach_example()
 
     chemistry_cases()
