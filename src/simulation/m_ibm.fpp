@@ -153,7 +153,7 @@ contains
     !>  Interpolates sigma from the m_igr module at all ghost points
         !!  @param jac: Sigma, Entropic pressure
     subroutine s_interpolate_sigma_igr(jac)
-        real(wp), dimension(:, :, :), intent(inout) :: jac
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:), intent(inout) :: jac
         integer :: j, k, l, r, s, t, i
         integer :: j1, j2, k1, k2, l1, l2
         real(wp) :: coeff, jac_IP
@@ -986,8 +986,8 @@ contains
                         end if
                         if (model_eqns /= 4) then
                             if (elasticity) then
-!                            call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
-!                                                                            alpha_rho_K, Re_K, G_K, Gs_vc)
+                                ! call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
+                                ! alpha_rho_K, Re_K, G_K, Gs_vc)
                             else
                                 call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, &
                                                                                 alpha_K, alpha_rho_K, Re_K)
@@ -1027,7 +1027,7 @@ contains
                             do l = 1, num_fluids - 1
                                 alpha_rho_IP(l) = alpha_rho_IP(l) + coeff*q_cons_vf(l)%sf(i, j, k)
                                 alpha_IP(l) = alpha_IP(l) + coeff*q_cons_vf(E_idx + l)%sf(i, j, k)
-                                alpha_sum = alpha_sum + q_cons_vf(E_idx + l)%sf(i, j, k)
+                                alpha_sum = alpha_sum + coeff*q_cons_vf(E_idx + l)%sf(i, j, k)
                             end do
                             alpha_rho_IP(num_fluids) = alpha_rho_IP(num_fluids) + coeff*q_cons_vf(num_fluids)%sf(i, j, k)
                             alpha_IP(num_fluids) = alpha_IP(num_fluids) + coeff*(1._wp - alpha_sum)
