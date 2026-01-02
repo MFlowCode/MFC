@@ -15,7 +15,7 @@ module m_igr
 
     use m_boundary_common
 
-    use m_ibm, only: ib, ib_markers, s_interpolate_sigma_igr
+    use m_ibm, only: ib_markers, s_interpolate_sigma_igr
 
     implicit none
 
