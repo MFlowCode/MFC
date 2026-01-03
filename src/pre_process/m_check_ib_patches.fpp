@@ -44,6 +44,9 @@ contains
                 @:PROHIBIT(patch_ib(i)%geometry == dflt_int, "IB patch undefined. &
                     patch_ib("//trim(iStr)//")%geometry must be set.")
 
+                @:PROHIBIT(igr .and. any(patch_ib(:)%moving_ibm > 0), "Cannot use &
+                    moving immersed boundary with IGR. patch_ib("//trim(iStr)//")%moving_ibm must be 0.")
+
                 ! Constraints on the geometric initial condition patch parameters
                 if (patch_ib(i)%geometry == 2) then
                     call s_check_circle_ib_patch_geometry(i)
