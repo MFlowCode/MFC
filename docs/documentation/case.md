@@ -384,12 +384,12 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 - `fluid_pp(i)%%G` is required for `hypoelasticity`.
 
 ### 6. Simulation Algorithm
-.  
-| Parameter               .  | Type    | Description                                    |
-| ---:                    .  | :----:  |          :---                                  |
-| `bc_[x,y,z]%%beg[end]`  .  | Integer | Beginning [ending] boundary condition in the $[x,y,z]$-direction (negative integer, see table [Boundary Conditions](#boundary-conditions)) |
-| `bc_[x,y,z]%%vb[1,2,3]`‡.  | Real    | Velocity in the (x,1), (y, 2), (z,3) direction applied to `bc_[x,y,z]%%beg` |
-| `bc_[x,y,z]%%ve[1,2,3]`‡.  | Real    | Velocity in the (x,1), (y, 2), (z,3) direction applied to `bc_[x,y,z]%%end` |
+  
+| Parameter                  | Type    | Description                                    |
+| ---:                       | :----:  |          :---                                  |
+| `bc_[x,y,z]%%beg[end]`     | Integer | Beginning [ending] boundary condition in the $[x,y,z]$-direction (negative integer, see table [Boundary Conditions](#boundary-conditions)) |
+| `bc_[x,y,z]%%vb[1,2,3]`‡   | Real    | Velocity in the (x,1), (y, 2), (z,3) direction applied to `bc_[x,y,z]%%beg` |
+| `bc_[x,y,z]%%ve[1,2,3]`‡   | Real    | Velocity in the (x,1), (y, 2), (z,3) direction applied to `bc_[x,y,z]%%end` |
 | `model_eqns`               | Integer | Multicomponent model: [1] $\Gamma/\Pi_\infty$; [2] 5-equation; [3] 6-equation; [4] 4-equation |
 | `alt_soundspeed` *         | Logical | Alternate sound speed and $K \nabla \cdot u$ for 5-equation model |
 | `adv_n`   	               | Logical | Solving directly for the number density (in the method of classes) and compute void fraction from the number density |
