@@ -908,7 +908,7 @@ contains
 
         type(ghost_point), intent(IN) :: gp
         real(wp), optional, intent(INOUT) :: G_K
-        real(wp), optional, dimension(num_fluids), intent(IN):: Gs
+        real(wp), optional, dimension(num_fluids), intent(IN) :: Gs
 
         real(wp), intent(INOUT) :: pres_IP
         real(wp), dimension(3), intent(INOUT) :: vel_IP
