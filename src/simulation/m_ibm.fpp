@@ -970,9 +970,8 @@ contains
                     if (igr) then
                         ! For IGR, we will need to perform operations on
                         ! the conservative variables instead
-                        if (.not. present(q_cons_vf)) then
-                            stop 'q_cons_vf is required inside s_interpolate_image_point when running with IGR'
-                        end if
+                        if (.not. present(q_cons_vf) .and. proc_rank == 0)
+                        call s_mpi_abort("q_cons_vf is required inside s_interpolate_image_point when running with IGR")
                         alpha_sum = 0._wp
                         dyn_pres = 0._wp
                         if (num_fluids == 1) then
