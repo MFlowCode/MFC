@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3
 import math, json, argparse
 
 parser = argparse.ArgumentParser(prog="phasechange", description="phase change considering both 5 and 6 equation models.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
