@@ -36,6 +36,7 @@ module m_ibm
     ; public :: s_initialize_ibm_module, &
  s_ibm_setup, &
  s_ibm_correct_state, &
+ s_interpolate_sigma_igr, &
  s_finalize_ibm_module
 
     integer, allocatable, dimension(:, :, :) :: patch_id_fp
