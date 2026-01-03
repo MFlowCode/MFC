@@ -288,7 +288,7 @@ contains
                                                    r_IP, v_IP, pb_IP, mv_IP, nmom_IP, pb_in, mv_in, presb_IP, massv_IP)
                 else if (igr) then
                     call s_interpolate_image_point(q_prim_vf, gp, &
-                                                   alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, q_cons_vf=q_cons_vf)
+                                                   alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, q_cons_vf=q_cons_vf, G_K=G_K, Gs=Gs)
                 else
                     call s_interpolate_image_point(q_prim_vf, gp, &
                                                    alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP)
@@ -895,7 +895,7 @@ contains
     !! at the cell centers in order to estimate the state at the image point
     subroutine s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, &
                                          pres_IP, vel_IP, c_IP, r_IP, v_IP, pb_IP, &
-                                         mv_IP, nmom_IP, pb_in, mv_in, presb_IP, massv_IP, q_cons_vf)
+                                         mv_IP, nmom_IP, pb_in, mv_in, presb_IP, massv_IP, q_cons_vf, G_K, Gs)
         $:GPU_ROUTINE(parallelism='[seq]')
         type(scalar_field), &
             dimension(sys_size), &
@@ -907,6 +907,9 @@ contains
         real(stp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(IN) :: pb_in, mv_in
 
         type(ghost_point), intent(IN) :: gp
+        real(wp), optional, intent(INOUT) :: G_K
+        real(wp), optional, dimension(num_fluids), intent(IN):: Gs
+
         real(wp), intent(INOUT) :: pres_IP
         real(wp), dimension(3), intent(INOUT) :: vel_IP
         real(wp), intent(INOUT) :: c_IP
@@ -986,8 +989,9 @@ contains
                         end if
                         if (model_eqns /= 4) then
                             if (elasticity) then
-                                ! call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
-                                ! alpha_rho_K, Re_K, G_K, Gs_vc)
+                                ! NOTE: NEED TO VERIFY ELASTICITY W/ IGR
+                                call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
+                                                                                alpha_rho_K, Re_K, G_K, Gs)
                             else
                                 call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, &
                                                                                 alpha_K, alpha_rho_K, Re_K)
