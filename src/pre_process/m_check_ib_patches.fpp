@@ -37,15 +37,15 @@ contains
 
         integer :: i
 
+        @:PROHIBIT(igr .and. any(patch_ib(:)%moving_ibm > 0), "Cannot use &
+            moving immersed boundary with IGR. All patch_ib(:)%moving_ibm must be 0.")
+
         do i = 1, num_patches_max
             if (i <= num_ibs) then
                 ! call s_check_patch_geometry(i)
                 call s_int_to_str(i, iStr)
                 @:PROHIBIT(patch_ib(i)%geometry == dflt_int, "IB patch undefined. &
                     patch_ib("//trim(iStr)//")%geometry must be set.")
-
-                @:PROHIBIT(igr .and. any(patch_ib(:)%moving_ibm > 0), "Cannot use &
-                    moving immersed boundary with IGR. patch_ib("//trim(iStr)//")%moving_ibm must be 0.")
 
                 ! Constraints on the geometric initial condition patch parameters
                 if (patch_ib(i)%geometry == 2) then

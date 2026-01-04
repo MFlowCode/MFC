@@ -1035,7 +1035,7 @@ contains
                                 alpha_sum = alpha_sum + coeff*q_cons_vf(E_idx + l)%sf(i, j, k)
                             end do
                             alpha_rho_IP(num_fluids) = alpha_rho_IP(num_fluids) + coeff*q_cons_vf(num_fluids)%sf(i, j, k)
-                            alpha_IP(num_fluids) = alpha_IP(num_fluids) + (1._wp - alpha_sum)
+                            alpha_IP(num_fluids) = alpha_IP(num_fluids) + (coeff*1._wp - alpha_sum)
                         end if
                     else
                         pres_IP = pres_IP + coeff* &
