@@ -29,15 +29,17 @@ Nx, Ny, Nz = 2 * s, s, s
 x0 = 10.0e-04
 y0 = 10.0e-04
 z0 = 10.0e-04
-p0 = 1.0
+p0 = 101325.0
+p0ref = p0
 rho0 = 1.0e03
-c0 = math.sqrt(p0 / rho0)
-patm = 1.0
+rho0ref = rho0
+u0 = math.sqrt(p0 / rho0)
+p0ext = 101325.0
 
 # water props
-n_tait = 7.1
-B_tait = 306.0e06 / p0
-mul0 = 1.002e-03  # viscosity
+gam_l = 7.1
+pi_inf_l = 306.0e06
+mu_l = 1.002e-03  # viscosity
 ss = 0.07275  # surface tension
 pv = 2.3388e03  # vapor pressure
 
@@ -47,43 +49,25 @@ mu_v = 0.8816e-05
 k_v = 0.019426
 
 # air props
-gamma_n = 1.4
-M_n = 28.97
-mu_n = 1.8e-05
-k_n = 0.02556
-
-# air props
-gamma_gas = gamma_n
+gam_g = 1.4
 
 # reference bubble size
 R0ref = 10.0e-06
 
-pa = 0.1 * 1.0e06 / 101325.0
-
-# Characteristic velocity
-uu = math.sqrt(p0 / rho0)
-# Cavitation number
-Ca = (p0 - pv) / (rho0 * (uu**2.0))
-# Weber number
-We = rho0 * (uu**2.0) * R0ref / ss
-# Inv. bubble Reynolds number
-Re_inv = mul0 / (rho0 * uu * R0ref)
+pa = 0.1 * 1.0e06
 
 # IC setup
 vf0 = 0.00004
 n0 = vf0 / (math.pi * 4.0e00 / 3.0e00)
 
 cact = 1475.0
-t0 = x0 / c0
-
-nbubbles = 1
-myr0 = R0ref
+t0 = x0 / u0
 
 cfl = 0.01
 Ldomain = 20.0e-03
 L = Ldomain / x0
 dx = L / float(Nx)
-dt = cfl * dx * c0 / cact
+dt = cfl * dx * u0 / cact
 Lpulse = 0.3 * Ldomain
 Tpulse = Lpulse / cact
 
@@ -150,10 +134,10 @@ print(
             "patch_icpp(1)%vel(1)": 0.0,
             "patch_icpp(1)%vel(2)": 0.0,
             "patch_icpp(1)%vel(3)": 0.0,
-            "patch_icpp(1)%pres": patm,
+            "patch_icpp(1)%pres": p0ext / p0,
             "patch_icpp(1)%alpha_rho(1)": (1.0 - 1.0e-12) * 1.0e03 / rho0,
             "patch_icpp(1)%alpha(1)": 1.0e-12,
-            "patch_icpp(1)%r0": 1.0,
+            "patch_icpp(1)%r0": R0ref / x0,
             "patch_icpp(1)%v0": 0.0e00,
             # Patch 2 Screen
             "patch_icpp(2)%geometry": 9,
@@ -167,46 +151,30 @@ print(
             "patch_icpp(2)%vel(1)": 0.0,
             "patch_icpp(2)%vel(2)": 0.0,
             "patch_icpp(2)%vel(3)": 0.0,
-            "patch_icpp(2)%pres": patm,
+            "patch_icpp(2)%pres": p0ext / p0,
             "patch_icpp(2)%alpha_rho(1)": (1.0 - vf0) * 1.0e03 / rho0,
             "patch_icpp(2)%alpha(1)": vf0,
-            "patch_icpp(2)%r0": 1.0,
+            "patch_icpp(2)%r0": R0ref / x0,
             "patch_icpp(2)%v0": 0.0e00,
             # Fluids Physical Parameters
             # Surrounding liquid
-            "fluid_pp(1)%gamma": 1.0e00 / (n_tait - 1.0e00),
-            "fluid_pp(1)%pi_inf": n_tait * B_tait / (n_tait - 1.0),
-            "fluid_pp(1)%mul0": mul0,
-            "fluid_pp(1)%ss": ss,
-            "fluid_pp(1)%pv": pv,
-            "fluid_pp(1)%gamma_v": gamma_v,
-            "fluid_pp(1)%M_v": M_v,
-            "fluid_pp(1)%mu_v": mu_v,
-            "fluid_pp(1)%k_v": k_v,
+            "fluid_pp(1)%gamma": 1.0e00 / (gam_l - 1.0e00),
+            "fluid_pp(1)%pi_inf": gam_l * (pi_inf_l / p0) / (gam_l - 1.0),
             "fluid_pp(1)%Re(1)": 1e3,
-            # Last fluid_pp is always reserved for bubble gas state
-            # if applicable
-            "fluid_pp(2)%gamma": 1.0 / (gamma_gas - 1.0),
-            "fluid_pp(2)%pi_inf": 0.0e00,
-            "fluid_pp(2)%gamma_v": gamma_n,
-            "fluid_pp(2)%M_v": M_n,
-            "fluid_pp(2)%mu_v": mu_n,
-            "fluid_pp(2)%k_v": k_n,
-            # Non-polytropic gas compression model AND/OR Tait EOS
-            "pref": p0,
-            "rhoref": rho0,
             # Bubbles
             "bubbles_euler": "T",
             "bubble_model": 3,
             "polytropic": "T",
             "polydisperse": "F",
-            # 'poly_sigma'                   : 0.3,
             "thermal": 3,
-            "R0ref": myr0,
             "nb": 1,
-            "Ca": Ca,
-            "Web": We,
-            "Re_inv": Re_inv,
+            "bub_pp%R0ref": R0ref / x0,
+            "bub_pp%p0ref": p0ref / p0,
+            "bub_pp%rho0ref": rho0ref / rho0,
+            "bub_pp%ss": ss / (rho0 * x0 * u0 * u0),
+            "bub_pp%pv": pv / p0,
+            "bub_pp%mu_l": mu_l / (rho0 * x0 * u0),
+            "bub_pp%gam_g": gam_g,
             # Acoustic source
             "acoustic_source": "T",
             "num_source": 1,
@@ -218,7 +186,7 @@ print(
             "acoustic(1)%npulse": 1,
             "acoustic(1)%dir": 1.0,
             "acoustic(1)%pulse": 1,
-            "acoustic(1)%mag": pa,
+            "acoustic(1)%mag": pa / p0,
             "acoustic(1)%wavelength": (1.0 / (300000.0)) * cact / x0,
         }
     )
