@@ -1,7 +1,7 @@
 import json
 import math
 
-Mu = 0.1 * 1e-4 # kenimatic viscosity of 0.01 cm^2/s
+Mu = 0.01 * 1e-4 # kenimatic viscosity of 0.01 cm^2/s
 gam_a = 1.4
 
 total_time = 0.35
@@ -75,8 +75,7 @@ print(
             "prim_vars_wrt": "T",
             "E_wrt": "T",
             "parallel_io": "T",
-            # Patch: Constant Tube filled with air
-            # Specify the cylindrical air tube grid geometry
+            # Specify the rectangle patch geometry
             "patch_icpp(1)%geometry": 3,
             "patch_icpp(1)%x_centroid": length/2.,
             # Uniform medium density, centroid is at the center of the domain
@@ -98,7 +97,7 @@ print(
             "patch_ib(1)%length_y": length / 8,
             "patch_ib(1)%vel(2)": 0.0e00,
             "patch_ib(1)%angles(3)": math.pi / 4.,
-            "patch_ib(1)%mass": 1.1 * math.pi * length * length / 32., # density of 1.1e-6 times the volume of the ellipse
+            "patch_ib(1)%mass": 1.1 * math.pi * length * length / 128., # density of 1.1 times the volume of the ellipse to give density ratio of 1.1
             "patch_ib(1)%slip": "F",
             # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (gam_a - 1.0e00),  # 2.50(Not 1.40)
