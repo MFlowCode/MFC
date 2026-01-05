@@ -716,6 +716,7 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         hyperelasticity = self.get('hyperelasticity', 'F') == 'T'
         cyl_coord = self.get('cyl_coord', 'F') == 'T'
         probe_wrt = self.get('probe_wrt', 'F') == 'T'
+        chemistry = self.get('chemistry', 'F') == 'T'
 
         self.prohibit(num_igr_iters is not None and num_igr_iters < 0,
                      "num_igr_iters must be greater than or equal to 0")
@@ -749,6 +750,9 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
                      "IGR does not support cylindrical or axisymmetric coordinates")
         self.prohibit(probe_wrt,
                      "IGR does not support probe writes")
+        self.prohibit(chemistry,
+                     "IGR does not support chemistry")
+
 
         # Check BCs - IGR does not support characteristic BCs
         # Characteristic BCs are BC_CHAR_SLIP_WALL (-5) through BC_CHAR_SUP_OUTFLOW (-12)

@@ -1009,6 +1009,8 @@ contains
                             end if
                         end do
                         pres_mag = 0._wp
+                        T = 0._wp
+                        rhoYks = 0._wp
 
                         call s_compute_pressure(q_cons_vf(E_idx)%sf(i, j, k), &
                                                 q_cons_vf(alf_idx)%sf(i, j, k), &
