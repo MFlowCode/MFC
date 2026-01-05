@@ -384,12 +384,12 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 - `fluid_pp(i)%%G` is required for `hypoelasticity`.
 
 ### 6. Simulation Algorithm
-.  
-| Parameter               .  | Type    | Description                                    |
-| ---:                    .  | :----:  |          :---                                  |
-| `bc_[x,y,z]%%beg[end]`  .  | Integer | Beginning [ending] boundary condition in the $[x,y,z]$-direction (negative integer, see table [Boundary Conditions](#boundary-conditions)) |
-| `bc_[x,y,z]%%vb[1,2,3]`‡.  | Real    | Velocity in the (x,1), (y, 2), (z,3) direction applied to `bc_[x,y,z]%%beg` |
-| `bc_[x,y,z]%%ve[1,2,3]`‡.  | Real    | Velocity in the (x,1), (y, 2), (z,3) direction applied to `bc_[x,y,z]%%end` |
+  
+| Parameter                  | Type    | Description                                    |
+| ---:                       | :----:  |          :---                                  |
+| `bc_[x,y,z]%%beg[end]`     | Integer | Beginning [ending] boundary condition in the $[x,y,z]$-direction (negative integer, see table [Boundary Conditions](#boundary-conditions)) |
+| `bc_[x,y,z]%%vb[1,2,3]`‡   | Real    | Velocity in the (x,1), (y, 2), (z,3) direction applied to `bc_[x,y,z]%%beg` |
+| `bc_[x,y,z]%%ve[1,2,3]`‡   | Real    | Velocity in the (x,1), (y, 2), (z,3) direction applied to `bc_[x,y,z]%%end` |
 | `model_eqns`               | Integer | Multicomponent model: [1] $\Gamma/\Pi_\infty$; [2] 5-equation; [3] 6-equation; [4] 4-equation |
 | `alt_soundspeed` *         | Logical | Alternate sound speed and $K \nabla \cdot u$ for 5-equation model |
 | `adv_n`   	               | Logical | Solving directly for the number density (in the method of classes) and compute void fraction from the number density |
@@ -752,29 +752,29 @@ Details of the transducer acoustic source model can be found in [Maeda and Colon
 
 | Parameter          | Type    | Description                                    |
 | ---:               | :----:  |          :---                                  |
-| `bubbles_euler`    | Logical	| Ensemble-averaged bubble modeling	|
-| `bubbles_lagrange` | Logical	| Volume-averaged bubble modeling	|
-| `bubble_model`     | Integer	| [1] Gilmore; [2] Keller--Miksis; [3] Rayleigh-Plesset |
-| `bub_pp%R0ref`*†‡  | Real    | Reference bubble radius |
-| `bub_pp%p0ref`*†‡  | Real    | Reference pressure |
-| `bub_pp%rho0ref`*†‡| Real    | Reference density |
-| `bub_pp%T0ref`†‡   | Real    | Reference temperature |
-| `bub_pp%ss`*†‡     | Real    | Surface tension between host and gas (bubble) |
-| `bub_pp%pv`*†‡     | Real    | Vapor pressure of host |
-| `bub_pp%vd`† ‡     | Real    | Vapor diffusivity in gas (bubble) |
-| `bub_pp%mu_l`*†‡   | Real    | Viscosity of host in liquid state |
-| `bub_pp%mu_v`†     | Real    | Viscosity of host in vapor state |
-| `bub_pp%mu_g`†     | Real    | Viscosity of gas (bubble) |
-| `bub_pp%gam_v`†‡   | Real    | Specific heat ratio of host in vapor state |
-| `bub_pp%gam_g`*†‡  | Real    | Specific heat ratio of gas (bubble) |
-| `bub_pp%M_v`†‡     | Real    | Molecular weight of host |
-| `bub_pp%M_g`†‡     | Real    | Molecular weight of gas (bubble) |
-| `bub_pp%k_v`†‡     | Real    | Thermal conductivity of host in vapor state |
-| `bub_pp%k_g`†‡     | Real    | Thermal conductivity of gas (bubble) |
-| `bub_pp%cp_v`‡     | Real    | Specific heat capacity in constant pressure of host in vapor state |
-| `bub_pp%cp_g`‡     | Real    | Specific heat capacity in constant pressure of gas (bubble) |
-| `bub_pp%R_v`†‡     | Real    | Gas constant of host in vapor state |
-| `bub_pp%R_g`†‡     | Real    | Gas constant of gas (bubble) |
+| `bubbles_euler`    | Logical | Ensemble-averaged bubble modeling |
+| `bubbles_lagrange` | Logical | Volume-averaged bubble modeling |
+| `bubble_model`     | Integer | [1] Gilmore; [2] Keller--Miksis; [3] Rayleigh-Plesset |
+| `bub_pp%%R0ref`*†‡  | Real    | Reference bubble radius |
+| `bub_pp%%p0ref`*†‡  | Real    | Reference pressure |
+| `bub_pp%%rho0ref`*†‡| Real    | Reference density |
+| `bub_pp%%T0ref`†‡   | Real    | Reference temperature |
+| `bub_pp%%ss`*†‡     | Real    | Surface tension between host and gas (bubble) |
+| `bub_pp%%pv`*†‡     | Real    | Vapor pressure of host |
+| `bub_pp%%vd`† ‡     | Real    | Vapor diffusivity in gas (bubble) |
+| `bub_pp%%mu_l`*†‡   | Real    | Viscosity of host in liquid state |
+| `bub_pp%%mu_v`†     | Real    | Viscosity of host in vapor state |
+| `bub_pp%%mu_g`†     | Real    | Viscosity of gas (bubble) |
+| `bub_pp%%gam_v`†‡   | Real    | Specific heat ratio of host in vapor state |
+| `bub_pp%%gam_g`*†‡  | Real    | Specific heat ratio of gas (bubble) |
+| `bub_pp%%M_v`†‡     | Real    | Molecular weight of host |
+| `bub_pp%%M_g`†‡     | Real    | Molecular weight of gas (bubble) |
+| `bub_pp%%k_v`†‡     | Real    | Thermal conductivity of host in vapor state |
+| `bub_pp%%k_g`†‡     | Real    | Thermal conductivity of gas (bubble) |
+| `bub_pp%%cp_v`‡     | Real    | Specific heat capacity in constant pressure of host in vapor state |
+| `bub_pp%%cp_g`‡     | Real    | Specific heat capacity in constant pressure of gas (bubble) |
+| `bub_pp%%R_v`†‡     | Real    | Gas constant of host in vapor state |
+| `bub_pp%%R_g`†‡     | Real    | Gas constant of gas (bubble) |
 
 - \* These parameters are required for ensemble-averaged bubble model.
 - †  These parameters are required for ensemble-averaged bubble model with `polytropic = F`.

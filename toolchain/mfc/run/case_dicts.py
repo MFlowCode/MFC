@@ -349,8 +349,7 @@ for var in [ 'heatTransfer_model', 'massTransfer_model', 'pressure_corrector',
 for var in [ 'solver_approach', 'cluster_type', 'smooth_type', 'nBubs_glb']:
     SIMULATION[f'lag_params%{var}'] = ParamType.INT
 
-for var in [ 'epsilonb', 'valmaxvoid', 'charwidth',
-            'c0', 'rho0', 'T0', 'x0', 'Thost' ]:
+for var in [ 'epsilonb', 'valmaxvoid', 'charwidth']:
     SIMULATION[f'lag_params%{var}'] = ParamType.REAL
 
 for var in [ 'diffusion', 'reactions' ]:
