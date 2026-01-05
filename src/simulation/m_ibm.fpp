@@ -1136,12 +1136,8 @@ contains
         ! apply the summed forces
         do i = 1, num_ibs
             patch_ib(i)%force(:) = forces(i, :)
-            patch_ib(i)%torque(:) = matmul(patch_ib(i)%rotation_matrix_inverse, torques(i, :)) ! torques must be computed in the local coordinates of the IB
+            patch_ib(i)%torque(:) = matmul(patch_ib(i)%rotation_matrix_inverse, torques(i, :)) ! torques must be converted to the local coordinates of the IB
         end do
-
-        ! print *, "Acceleration: ", forces(1, 1:2) / patch_ib(1)%mass, " || torque: ", torques(1, 3)
-        ! vel = [0.05_wp, 0._wp, 0._wp] - patch_ib(1)%vel
-        ! print *, "drag coef: ", 2._wp * sqrt(dot_product(forces(1, :), forces(1, :))) / (dot_product(vel,vel) * 2._wp * 0.3e-03)
 
     end subroutine s_compute_ib_forces
 
@@ -1179,7 +1175,7 @@ contains
         elseif (patch_ib(ib_marker)%geometry == 3) then ! rectangle
             patch_ib(ib_marker)%moment = patch_ib(ib_marker)%mass*(patch_ib(ib_marker)%length_x**2 + patch_ib(ib_marker)%length_y**2)/6._wp
         elseif (patch_ib(ib_marker)%geometry == 6) then ! ellipse
-            patch_ib(ib_marker)%moment = 0.25_wp*patch_ib(ib_marker)%mass*(patch_ib(ib_marker)%length_x**2 + patch_ib(ib_marker)%length_y**2)
+            patch_ib(ib_marker)%moment = 0.0625_wp*patch_ib(ib_marker)%mass*(patch_ib(ib_marker)%length_x**2 + patch_ib(ib_marker)%length_y**2)
         elseif (patch_ib(ib_marker)%geometry == 8) then ! sphere
             patch_ib(ib_marker)%moment = 0.4*patch_ib(ib_marker)%mass*(patch_ib(ib_marker)%radius)**2
 
