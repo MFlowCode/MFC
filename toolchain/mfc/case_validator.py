@@ -330,11 +330,10 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         if not relax:
             return
 
-        self.prohibit(
-            model_eqns is not None and (
-                (model_eqns == 2 and relax_model not in (5, 6)) or
-                (model_eqns == 3 and relax_model not in (1, 4, 5, 6))),
-            "phase change requires model_eqns==2 with relax_model in [5,6] or model_eqns==3 with relax_model in [1,4,5,6]")
+        self.prohibit((
+                     (model_eqns == 2 and relax_model not in (5, 6)) or
+                     (model_eqns == 3 and relax_model not in (1, 4, 5, 6))),
+                     "phase change requires model_eqns==2 with relax_model in [5,6] or model_eqns==3 with relax_model in [1,4,5,6]")
         self.prohibit(palpha_eps is not None and palpha_eps <= 0,
                      "palpha_eps must be positive")
         self.prohibit(palpha_eps is not None and palpha_eps >= 1,
