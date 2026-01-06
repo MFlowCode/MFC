@@ -331,6 +331,7 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
             return
 
         self.prohibit((
+                     model_eqns not in (2, 3) or
                      (model_eqns == 2 and relax_model not in (5, 6)) or
                      (model_eqns == 3 and relax_model not in (1, 4, 5, 6))),
                      "phase change requires model_eqns==2 with relax_model in [5,6] or model_eqns==3 with relax_model in [1,4,5,6]")
