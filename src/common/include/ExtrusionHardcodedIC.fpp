@@ -48,10 +48,10 @@
     real(wp), allocatable :: x_coords(:), y_coords(:)
     logical :: files_loaded = .false.
     real(wp) :: domain_xstart, domain_xend, domain_ystart, domain_yend
-    character(len=*), parameter :: init_dir = "/home/MFC/FilesDirectory" ! For example /home/MFC/examples/1D_Shock/D/
+   ! character(len=*), parameter :: init_dir = "/home/MFC/FilesDirectory" ! For example /home/MFC/examples/1D_Shock/D/
     character(len=20) :: file_num_str     ! For storing the file number as a string
     character(len=20) :: zeros_part       ! For the trailing zeros part
-    character(len=6), parameter :: zeros_default = "000000"  ! Default zeros (can be changed)
+   ! character(len=6), parameter :: zeros_default = "000000"  ! Default zeros (can be changed)
 #:enddef
 
 #:def HardcodedReadValues()
@@ -60,9 +60,18 @@
         max_files = merge(sys_size, sys_size - 1, num_dims == 1)
         do f = 1, max_files
             write (file_num_str, '(I0)') f
-            fileNames(f) = trim(init_dir)//"prim."//trim(file_num_str)//".00."//zeros_default//".dat"
-        end do
+            ! 1. Trim the directory
+            ! 2. Check if it already ends in / (optional, but trim is mandatory)
+            ! 3. Trim the extension
+fileNames(f) = trim(files_dir)//"/"// "prim." // trim(file_num_str) // ".00." // trim(file_extention) // ".dat" 
+ end do
 
+        ! Add this PRINT line for debugging! 
+        ! It will show you exactly what the code is seeing in the terminal.
+        print *, "RANK", proc_rank, " is opening: |" // trim(fileNames(1)) // "|"
+
+        ! Common file reading setup
+        open (newunit=unit2, file=trim(fileNames(1)), status='old', action='read', iostat=ios2)
         ! Common file reading setup
         open (newunit=unit2, file=trim(fileNames(1)), status='old', action='read', iostat=ios2)
         if (ios2 /= 0) call s_mpi_abort("Error opening file: "//trim(fileNames(1)))
@@ -99,7 +108,7 @@
             ! Calculate offsets
             domain_xstart = x_coords(1)
             x_step = x_cc(1) - x_cc(0)
-            delta_x = merge(x_cc(0) - domain_xstart + x_step/2.0, &
+            delta_x = merge(x_cc(0) - domain_xstart, &
                             x_cc(index_x) - domain_xstart + x_step/2.0, num_dims == 1)
             global_offset_x = nint(abs(delta_x)/x_step)
 

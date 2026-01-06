@@ -1007,7 +1007,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                            "2D_laplace_pressure_jump", "2D_bubbly_steady_shock",
                            "2D_advection", "2D_hardcoded_ic",
                            "2D_ibm_multiphase", "2D_acoustic_broadband",
-                           "1D_inert_shocktube", "1D_reactive_shocktube",
+                           "1D_inert_shocktube", "1D_reactive_shocktube","1D_Flamelet"
                            "2D_ibm_steady_shock", "3D_performance_test",
                            "3D_ibm_stl_ellipsoid", "3D_sphbubcollapse",
                            "2D_ibm_stl_wedge", "3D_ibm_stl_pyramid",
@@ -1077,6 +1077,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 },
                 override_tol=10**(-10)
             ))
+
+            cases.append(define_case_f(
+                f'1D -> Chemistry -> Flamelet','examples/1D_Flamelet/case.py',
+                mods={
+                    **common_mods,
+                },
+                override_tol= 10**(-10)
+          ))
 
         stack.push(f'1D -> Chemistry -> MultiComponent Diffusion', {'m': 200,
                     'dt': 0.1e-06, 'num_patches': 1, 'num_fluids': 1, 'x_domain%beg': 0.0, 'x_domain%end': 0.05,

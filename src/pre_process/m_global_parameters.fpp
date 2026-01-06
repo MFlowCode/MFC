@@ -24,6 +24,9 @@ module m_global_parameters
     ! Logistics
     integer :: num_procs            !< Number of processors
     character(LEN=path_len) :: case_dir             !< Case folder location
+    character(len=255) :: files_dir  !< Location of IC extrusion files
+    character(len=6) :: file_extention !< The last 6 digits on the files which are used
+                                       !! for the IC extrustion (prim.XX.YY.123456.dat)
     logical :: old_grid             !< Use existing grid data
     logical :: old_ic, non_axis_sym               !< Use existing IC data
     integer :: t_step_old, t_step_start           !< Existing IC/grid folder
@@ -149,6 +152,7 @@ module m_global_parameters
     logical :: down_sample !< Down-sample the output data
 
     logical :: extrusion_ic !< Extrusion of initial conditions to a higher dimension
+
 
     logical :: mixlayer_vel_profile !< Set hyperbolic tangent streamwise velocity profile
     real(wp) :: mixlayer_vel_coef !< Coefficient for the hyperbolic tangent streamwise velocity profile
@@ -305,6 +309,10 @@ contains
 
         ! Logistics
         case_dir = '.'
+
+
+       file_extention = '000000'
+           files_dir = './'
         old_grid = .false.
         old_ic = .false.
         t_step_old = dflt_int
