@@ -8,11 +8,11 @@ k = 2 * math.pi / lam
 amp = 0.05 / k
 
 # Numerical setup
-x0 = 0
+x0 = 0.0
 x1 = lam / 2
 y0 = 0.0
 y1 = h
-z0 = 0
+z0 = 0.0
 z1 = lam / 2
 
 Nx = 99

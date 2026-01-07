@@ -54,7 +54,7 @@ d-gpu MFC_CUDA_CC=80,86
 
 o     Brown Oscar
 o-all python
-o-cpu hpcx-mpi
+o-cpu hpcx-mpi python/3.13.10s
 o-gpu nvhpc cuda/12.3.0 cmake/3.26.3
 o-gpu CC=nvc CXX=nvc++ FC=nvfortran
 

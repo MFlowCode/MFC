@@ -50,7 +50,7 @@ case = {
     # Logistics
     "run_time_info": "T",
     # Computational Domain Parameters
-    "x_domain%beg": 0,
+    "x_domain%beg": 0.0,
     "x_domain%end": L,
     "m": Nx,
     "n": 0,

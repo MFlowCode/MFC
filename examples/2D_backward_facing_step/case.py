@@ -17,9 +17,9 @@ print(
         {
             # Logistics
             "run_time_info": "T",
-            "x_domain%beg": 0,
+            "x_domain%beg": 0.0,
             "x_domain%end": 30 * h,
-            "y_domain%beg": 0,
+            "y_domain%beg": 0.0,
             "y_domain%end": 6 * h,
             "cyl_coord": "F",
             "m": 1999,

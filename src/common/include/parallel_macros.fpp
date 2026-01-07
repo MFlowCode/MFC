@@ -19,23 +19,6 @@
 
 #:enddef
 
-#:def GPU_PARALLEL_LOOP_OLD(code, collapse=None, private=None, parallelism='[gang, vector]', &
-    & default='present', firstprivate=None, reduction=None, reductionOp=None, &
-    & copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, &
-    & no_create=None, present=None, deviceptr=None, attach=None, extraAccArgs=None, extraOmpArgs=None)
-
-    #:set acc_code = ACC_PARALLEL_LOOP_OLD(code, collapse, private, parallelism, default, firstprivate, reduction, reductionOp, copy, copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, extraAccArgs)
-    #:set omp_code = OMP_PARALLEL_LOOP_OLD(code, collapse, private, parallelism, default, firstprivate, reduction, reductionOp, copy, copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, extraOmpArgs)
-
-#if defined(MFC_OpenACC)
-    $:acc_code
-#elif defined(MFC_OpenMP)
-    $:omp_code
-#else
-    $:code
-#endif
-#:enddef
-
 #:def GPU_PARALLEL_LOOP(collapse=None, private=None, parallelism='[gang, vector]', &
     & default='present', firstprivate=None, reduction=None, reductionOp=None, &
     & copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, &

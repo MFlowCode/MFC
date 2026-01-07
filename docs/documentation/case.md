@@ -300,22 +300,25 @@ This is enabled by adding `'elliptic_smoothing': "T",` and `'elliptic_smoothing_
 
 | Parameter            | Type    | Description |
 | ---:                 | :----:  | :---                |
-| `geometry`             | Integer | Geometry configuration of the patch.|
-| `x[y,z]_centroid`      | Real    | Centroid of the applied geometry in the [x,y,z]-direction. |
-| `length_x[y,z]`        | Real    | Length, if applicable, in the [x,y,z]-direction. |
-| `radius`               | Real    | Radius, if applicable, of the applied geometry. |
-| `theta`                | Real    | Angle of attach applied to airfoil IB patches |
-| `c`                    | Real    | NACA airfoil parameters (see below) |
-| `t`                    | Real    | NACA airfoil parameters (see below) |
-| `m`                    | Real    | NACA airfoil parameters (see below) |
-| `p`                    | Real    | NACA airfoil parameters (see below) |
-| `slip`                 | Logical | Apply a slip boundary |
-| `model_filepath`      | String  | Path to an STL or OBJ file (not all OBJs are supported).     |
-| `model_scale(i)`      | Real    | Model's (applied) scaling factor for component $i$.          |
-| `model_rotate(i)`     | Real    | Model's (applied) angle of rotation about axis $i$.          |
-| `model_translate(i)`  | Real    | Model's $i$-th component of (applied) translation.           |
-| `model_spc`           | Integer | Number of samples per cell when discretizing the model into the grid. |
-| `model_threshold`     | Real    | Ray fraction inside the model patch above which the fraction is set to one.|
+| `geometry`           | Integer | Geometry configuration of the patch.|
+| `x[y,z]_centroid`    | Real    | Centroid of the applied geometry in the [x,y,z]-direction. |
+| `length_x[y,z]`      | Real    | Length, if applicable, in the [x,y,z]-direction. |
+| `radius`             | Real    | Radius, if applicable, of the applied geometry. |
+| `theta`              | Real    | Angle of attach applied to airfoil IB patches |
+| `c`                  | Real    | NACA airfoil parameters (see below) |
+| `t`                  | Real    | NACA airfoil parameters (see below) |
+| `m`                  | Real    | NACA airfoil parameters (see below) |
+| `p`                  | Real    | NACA airfoil parameters (see below) |
+| `slip`               | Logical | Apply a slip boundary |
+| `model_filepath`     | String  | Path to an STL or OBJ file (not all OBJs are supported).     |
+| `model_scale(i)`     | Real    | Model's (applied) scaling factor for component $i$.          |
+| `model_rotate(i)`    | Real    | Model's (applied) angle of rotation about axis $i$.          |
+| `model_translate(i)` | Real    | Model's $i$-th component of (applied) translation.           |
+| `model_spc`          | Integer | Number of samples per cell when discretizing the model into the grid. |
+| `model_threshold`    | Real    | Ray fraction inside the model patch above which the fraction is set to one.|
+| `moving_ibm`         | Integer | Sets the method used for IB movement. |
+| `vel(i)`             | Real    | Initial velocity of the moving IB in the i-th direction. |
+| `angular_vel(i)`     | Real    | Initial angular velocity of the moving IB in the i-th direction. |
 
 These parameters should be prepended with `patch_ib(j)%` where $j$ is the patch index.
 
@@ -339,6 +342,12 @@ Additional details on this specification can be found in [The Naca Airfoil Serie
 - `slip` applies a slip boundary to the surface of the patch if true and a no-slip boundary condition to the surface if false.
 
 - Please see [Patch Parameters](#3-patches) for the descriptions of `model_filepath`, `model_scale`, `model_rotate`, `model_translate`, `model_spc`, and `model_threshold`.
+
+- `moving_ibm` sets the method by which movement will be applied to the immersed boundary. Using 0 will result in no movement. Using 1 will result 1-way coupling where the boundary moves at a constant rate and applied forces to the fluid based upon it's own motion. In 1-way coupling, the fluid does not apply forces back onto the IB.
+
+- `vel(i)` is the initial linear velocity of the IB in the x, y, z direction for i=1, 2, 3. When `moving_ibm` equals 1, this velocity is constant.
+
+- `angular_vel(i)` is the initial angular velocity of the IB about the x, y, z axes for i=1, 2, 3 in radians per second. When `moving_ibm` equals 1, this angular velocity is constant.
 
 ### 5. Fluid Material’s
 
@@ -375,62 +384,62 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 - `fluid_pp(i)%%G` is required for `hypoelasticity`.
 
 ### 6. Simulation Algorithm
-
-| Parameter              | Type    | Description                                    |
-| ---:                   | :----:  |          :---                                  |
-| `bc_[x,y,z]%%beg[end]` | Integer | Beginning [ending] boundary condition in the $[x,y,z]$-direction (negative integer, see table [Boundary Conditions](#boundary-conditions)) |
-| `bc_[x,y,z]%%vb[1,2,3]`‡| Real   | Velocity in the (x,1), (y, 2), (z,3) direction applied to `bc_[x,y,z]%%beg` |
-| `bc_[x,y,z]%%ve[1,2,3]`‡| Real   | Velocity in the (x,1), (y, 2), (z,3) direction applied to `bc_[x,y,z]%%end` |
-| `model_eqns`           | Integer | Multicomponent model: [1] $\Gamma/\Pi_\infty$; [2] 5-equation; [3] 6-equation; [4] 4-equation |
-| `alt_soundspeed` *     | Logical | Alternate sound speed and $K \nabla \cdot u$ for 5-equation model |
-| `adv_n`   	         | Logical | Solving directly for the number density (in the method of classes) and compute void fraction from the number density |
-| `mpp_lim`	             | Logical | Mixture physical parameters limits |
-| `mixture_err`          | Logical | Mixture properties correction |
-| `time_stepper`         | Integer | Runge--Kutta order [1-3] |
-| `adap_dt`              | Logical | Strang splitting scheme with adaptive time stepping |
-| `recon_type`           | Integer | Reconstruction Type: [1] WENO; [2] MUSCL |
-| `adap_dt_tol`          | Real    | Tolerance for adaptive time stepping in Strang splitting scheme|
-| `adap_dt_max_iters`    | Integer | Max iteration for adaptive time stepping in Strang splitting scheme |
-| `weno_order`	         | Integer | WENO order [1,3,5] |
-| `weno_eps`	         | Real    | WENO perturbation (avoid division by zero) |
-| `mapped_weno`	         | Logical | WENO-M (WENO with mapping of nonlinear weights) |
-| `wenoz`	             | Logical | WENO-Z |
-| `wenoz_q`              | Real    | WENO-Z power parameter q (only for WENO7) |
-| `teno`                 | Logical | TENO (Targeted ENO) |
-| `teno_CT`              | Real    | TENO threshold for smoothness detection |
-| `null_weights`         | Logical | Null WENO weights at boundaries |
-| `mp_weno`              | Logical | Monotonicity preserving WENO |
-| `muscl_order`          | Integer | MUSCL order [1,2] |
-| `muscl_lim`            | Integer | MUSCL Slope Limiter: [1] minmod; [2] monotonized central; [3] Van Albada; [4] Van Leer; [5] SUPERBEE |
-| `int_comp`             | Logical | THINC Interface Compression |
-| `ic_eps`               | Real | Interface compression threshold (default: 1e-4) |
-| `ic_beta`              | Real | Interface compression sharpness parameter (default: 1.6) |
-| `riemann_solver`       | Integer | Riemann solver algorithm: [1] HLL*; [2] HLLC; [3] Exact*; [4] HLLD	(only for MHD) |
-| `low_Mach`             | Integer | Low Mach number correction for HLLC Riemann solver: [0] None; [1] Pressure (Chen et al. 2022); [2] Velocity (Thornber et al. 2008)	 |
-| `avg_state`	         | Integer | Averaged state evaluation method: [1] Roe average*; [2] Arithmetic mean  |
-| `wave_speeds`          | Integer | Wave-speed estimation: [1] Direct (Batten et al. 1997); [2] Pressure-velocity* (Toro 1999)	 |
-| `weno_Re_flux`         | Logical | Compute velocity gradient using scalar divergence theorem	 |
-| `weno_avg`          	 | Logical | Arithmetic mean of left and right, WENO-reconstructed, cell-boundary values |
-| `dt`                   | Real    | Time step size |
-| `t_step_start`         | Integer | Simulation starting time step |
-| `t_step_stop`          | Integer | Simulation stopping time step |
-| `t_step_save`          | Integer | Frequency to output data |
-| `t_step_print`         | Integer | Frequency to print the current step number to standard output (default 1) |
-| `cfl_adap_dt`          | Logical | CFL based adaptive time-stepping |
-| `cfl_const_dt`         | Logical | CFL based non-adaptive time-stepping |
-| `cfl_target`           | Real    | Specified CFL value |
-| `n_start`              | Integer | Save file from which to start simulation |
-| `t_save`               | Real    | Time duration between data output |
-| `t_stop`               | Real    | Simulation stop time |
-| `surface_tension`      | Logical | Activate surface tension |
-| `viscous`              | Logical | Activate viscosity |
-| `hypoelasticity`       | Logical | Activate hypoelasticity* |
-| `igr`                  | Logical | Enable solution via information geometric regularization (IGR) [Cao (2024)](references.md) |
-| `igr_order`            | Integer | Order of reconstruction for IGR [3,5] |
-| `alf_factor`           | Real    | Alpha factor for IGR entropic pressure (default 10) |
-| `igr_pres_lim`         | Logical | Limit IGR pressure to avoid negative values (default F) |
-| `igr_iter_solver`      | Integer | Solution method for IGR elliptic solve [1] Jacobi [2] Gauss-Seidel |
-| `num_igr_iters`        | Integer | Number of iterations for for the IGR elliptic solve (default 2) |
+.  
+| Parameter               .  | Type    | Description                                    |
+| ---:                    .  | :----:  |          :---                                  |
+| `bc_[x,y,z]%%beg[end]`  .  | Integer | Beginning [ending] boundary condition in the $[x,y,z]$-direction (negative integer, see table [Boundary Conditions](#boundary-conditions)) |
+| `bc_[x,y,z]%%vb[1,2,3]`‡.  | Real    | Velocity in the (x,1), (y, 2), (z,3) direction applied to `bc_[x,y,z]%%beg` |
+| `bc_[x,y,z]%%ve[1,2,3]`‡.  | Real    | Velocity in the (x,1), (y, 2), (z,3) direction applied to `bc_[x,y,z]%%end` |
+| `model_eqns`               | Integer | Multicomponent model: [1] $\Gamma/\Pi_\infty$; [2] 5-equation; [3] 6-equation; [4] 4-equation |
+| `alt_soundspeed` *         | Logical | Alternate sound speed and $K \nabla \cdot u$ for 5-equation model |
+| `adv_n`   	               | Logical | Solving directly for the number density (in the method of classes) and compute void fraction from the number density |
+| `mpp_lim`	                 | Logical | Mixture physical parameters limits |
+| `mixture_err`              | Logical | Mixture properties correction |
+| `time_stepper`             | Integer | Runge--Kutta order [1-3] |
+| `adap_dt`                  | Logical | Strang splitting scheme with adaptive time stepping |
+| `recon_type`               | Integer | Reconstruction Type: [1] WENO; [2] MUSCL |
+| `adap_dt_tol`              | Real    | Tolerance for adaptive time stepping in Strang splitting scheme|
+| `adap_dt_max_iters`        | Integer | Max iteration for adaptive time stepping in Strang splitting scheme |
+| `weno_order`	             | Integer | WENO order [1,3,5] |
+| `weno_eps`	               | Real    | WENO perturbation (avoid division by zero) |
+| `mapped_weno`	             | Logical | WENO-M (WENO with mapping of nonlinear weights) |
+| `wenoz`	                   | Logical | WENO-Z |
+| `wenoz_q`                  | Real    | WENO-Z power parameter q (only for WENO7) |
+| `teno`                     | Logical | TENO (Targeted ENO) |
+| `teno_CT`                  | Real    | TENO threshold for smoothness detection |
+| `null_weights`             | Logical | Null WENO weights at boundaries |
+| `mp_weno`                  | Logical | Monotonicity preserving WENO |
+| `muscl_order`              | Integer | MUSCL order [1,2] |
+| `muscl_lim`                | Integer | MUSCL Slope Limiter: [1] minmod; [2] monotonized central; [3] Van Albada; [4] Van Leer; [5] SUPERBEE |
+| `int_comp`                 | Logical | THINC Interface Compression |
+| `ic_eps`                   | Real    | Interface compression threshold (default: 1e-4) |
+| `ic_beta`                  | Real    | Interface compression sharpness parameter (default: 1.6) |
+| `riemann_solver`           | Integer | Riemann solver algorithm: [1] HLL*; [2] HLLC; [3] Exact*; [4] HLLD	(only for MHD) |
+| `low_Mach`                 | Integer | Low Mach number correction for HLLC Riemann solver: [0] None; [1] Pressure (Chen et al. 2022); [2] Velocity (Thornber et al. 2008)	 |
+| `avg_state`	               | Integer | Averaged state evaluation method: [1] Roe average*; [2] Arithmetic mean  |
+| `wave_speeds`              | Integer | Wave-speed estimation: [1] Direct (Batten et al. 1997); [2] Pressure-velocity* (Toro 1999)	 |
+| `weno_Re_flux`             | Logical | Compute velocity gradient using scalar divergence theorem	 |
+| `weno_avg`          	     | Logical | Arithmetic mean of left and right, WENO-reconstructed, cell-boundary values |
+| `dt`                       | Real    | Time step size |
+| `t_step_start`             | Integer | Simulation starting time step |
+| `t_step_stop`              | Integer | Simulation stopping time step |
+| `t_step_save`              | Integer | Frequency to output data |
+| `t_step_print`             | Integer | Frequency to print the current step number to standard output (default 1) |
+| `cfl_adap_dt`              | Logical | CFL based adaptive time-stepping |
+| `cfl_const_dt`             | Logical | CFL based non-adaptive time-stepping |
+| `cfl_target`               | Real    | Specified CFL value |
+| `n_start`                  | Integer | Save file from which to start simulation |
+| `t_save`                   | Real    | Time duration between data output |
+| `t_stop`                   | Real    | Simulation stop time |
+| `surface_tension`          | Logical | Activate surface tension |
+| `viscous`                  | Logical | Activate viscosity |
+| `hypoelasticity`           | Logical | Activate hypoelasticity* |
+| `igr`                      | Logical | Enable solution via information geometric regularization (IGR) [Cao (2024)](references.md) |
+| `igr_order`                | Integer | Order of reconstruction for IGR [3,5] |
+| `alf_factor`               | Real    | Alpha factor for IGR entropic pressure (default 10) |
+| `igr_pres_lim`             | Logical | Limit IGR pressure to avoid negative values (default F) |
+| `igr_iter_solver`          | Integer | Solution method for IGR elliptic solve [1] Jacobi [2] Gauss-Seidel |
+| `num_igr_iters`            | Integer | Number of iterations for for the IGR elliptic solve (default 2) |
 | `num_igr_warm_start_iters` | Integer | Number of iterations for the IGR elliptic solve at the first time step (default 50) |
 
 - \* Options that work only with `model_eqns = 2`.
@@ -575,57 +584,57 @@ To restart the simulation from $k$-th time step, see [Restarting Cases](running.
 
 ### 7. Formatted Output
 
-| Parameter            | Type    | Description                                    |
-| ---:                 | :----:  |          :---                                  |
-| `format`             | Integer | Output format. [1]: Silo-HDF5; [2] Binary	|
-| `precision`          | Integer | [1] Single; [2] Double	 |
-| `parallel_io`        | Logical | Parallel I/O	|
-| `file_per_process`   | Logical | Whether or not to write one IO file per process |
-| `cons_vars_wrt`      | Logical | Write conservative variables |
-| `prim_vars_wrt`      | Logical | Write primitive variables	|
-| `alpha_rho_wrt(i)`   | Logical | Add the partial density of the fluid $i$ to the database \|
-| `rho_wrt`            | Logical | Add the mixture density to the database	 |
-| `mom_wrt(i)`         | Logical | Add the $i$-direction momentum to the database	 |
-| `vel_wrt(i)`         | Logical | Add the $i$-direction velocity to the database	  |
-| `E_wrt`              | Logical | Add the total energy to the database	 |
-| `pres_wrt`           | Logical | Add the pressure to the database	|
-| `alpha_wrt(i)`       | Logical | Add the volume fraction of fluid $i$ to the database	|
-| `gamma_wrt`          | Logical | Add the specific heat ratio function to the database	|
-| `heat_ratio_wrt`     | Logical | Add the specific heat ratio to the database	|
-| `pi_inf_wrt`         | Logical | Add the liquid stiffness function to the database |
-| `pres_inf_wrt`       | Logical | Add the liquid stiffness to the formatted database	 |
-| `c_wrt`              | Logical | Add the sound speed to the database	 |
-| `omega_wrt(i)`       | Logical | Add the $i$-direction vorticity to the database	 |
-| `schlieren_wrt`      | Logical | Add the numerical schlieren to the database|
-| `qm_wrt`             | Logical | Add the Q-criterion to the database|
-| `liutex_wrt`         | Logical | Add the Liutex to the database|
-| `tau_wrt`            | Logical | Add the elastic stress components to the database|
-| `fd_order`           | Integer | Order of finite differences for computing the vorticity and the numerical Schlieren function [1,2,4] |
-| `schlieren_alpha(i)` | Real    | Intensity of the numerical Schlieren computed via `alpha(i)` |
-| `probe_wrt`          | Logical | Write the flow chosen probes data files for each time step	|
-| `num_probes`         | Integer | Number of probes	|
-| `probe(i)%[x,y,z]`   | Real	 | Coordinates of probe $i$	|
+| Parameter               | Type    | Description                                    |
+| ---:                    | :----:  |          :---                                  |
+| `format`                | Integer | Output format. [1]: Silo-HDF5; [2] Binary	|
+| `precision`             | Integer | [1] Single; [2] Double	 |
+| `parallel_io`           | Logical | Parallel I/O	|
+| `file_per_process`      | Logical | Whether or not to write one IO file per process |
+| `cons_vars_wrt`         | Logical | Write conservative variables |
+| `prim_vars_wrt`         | Logical | Write primitive variables	|
+| `alpha_rho_wrt(i)`      | Logical | Add the partial density of the fluid $i$ to the database \|
+| `rho_wrt`               | Logical | Add the mixture density to the database	 |
+| `mom_wrt(i)`            | Logical | Add the $i$-direction momentum to the database	 |
+| `vel_wrt(i)`            | Logical | Add the $i$-direction velocity to the database	  |
+| `E_wrt`                 | Logical | Add the total energy to the database	 |
+| `pres_wrt`              | Logical | Add the pressure to the database	|
+| `alpha_wrt(i)`          | Logical | Add the volume fraction of fluid $i$ to the database	|
+| `gamma_wrt`             | Logical | Add the specific heat ratio function to the database	|
+| `heat_ratio_wrt`        | Logical | Add the specific heat ratio to the database	|
+| `pi_inf_wrt`            | Logical | Add the liquid stiffness function to the database |
+| `pres_inf_wrt`          | Logical | Add the liquid stiffness to the formatted database	 |
+| `c_wrt`                 | Logical | Add the sound speed to the database	 |
+| `omega_wrt(i)`          | Logical | Add the $i$-direction vorticity to the database	 |
+| `schlieren_wrt`         | Logical | Add the numerical schlieren to the database|
+| `qm_wrt`                | Logical | Add the Q-criterion to the database|
+| `liutex_wrt`            | Logical | Add the Liutex to the database|
+| `tau_wrt`               | Logical | Add the elastic stress components to the database|
+| `fd_order`              | Integer | Order of finite differences for computing the vorticity and the numerical Schlieren function [1,2,4] |
+| `schlieren_alpha(i)`    | Real    | Intensity of the numerical Schlieren computed via `alpha(i)` |
+| `probe_wrt`             | Logical | Write the flow chosen probes data files for each time step	|
+| `num_probes`            | Integer | Number of probes	|
+| `probe(i)%[x,y,z]`      | Real	  | Coordinates of probe $i$	|
 | `output_partial_domain` | Logical | Output part of the domain |
-| `[x,y,z]_output%beg` | Real    | Beginning of the output domain in the [x,y,z]-direction |
-| `[x,y,z]_output%end` | Real    | End of the output domain in the [x,y,z]-direction |
-| `lag_txt_wrt`        | Logical | Write Lagrangian bubble data to `.dat` files |
-| `lag_header`         | Logical | Write header to Lagrangian bubble `.dat` files |
-| `lag_db_wrt`         | Logical | Write Lagrangian bubble data to silo/hdf5 database files |
-| `lag_id_wrt`         | Logical | Add the global bubble idea to the database file |
-| `lag_pos_wrt`        | Logical | Add the bubble position to the database file |
-| `lag_pos_prev_wrt`   | Logical | Add the previous bubble position to the database file |
-| `lag_vel_wrt`        | Logical | Add the bubble translational velocity to the database file |
-| `lag_rad_wrt`        | Logical | Add the bubble radius to the database file |
-| `lag_rvel_wrt`       | Logical | Add the bubble radial velocity to the database file |
-| `lag_r0_wrt`         | Logical | Add the bubble initial radius to the database file |
-| `lag_rmax_wrt`       | Logical | Add the bubble maximum radius to the database file |
-| `lag_rmin_wrt`       | Logical | Add the bubble minimum radius to the database file |
-| `lag_dphidt_wrt`     | Logical | Add the bubble subgrid velocity potential to the database file |
-| `lag_pres_wrt`       | Logical | Add the bubble pressure to the database file |
-| `lag_mv_wrt`         | Logical | Add the bubble vapor mass to the database file |
-| `lag_mg_wrt`         | Logical | Add the bubble gas mass to the database file |
-| `lag_betaT_wrt`      | Logical | Add the bubble heat flux model coefficient to the database file |
-| `lag_betaC_wrt`      | Logical | Add the bubble mass flux model coefficient to the database file |
+| `[x,y,z]_output%beg`    | Real    | Beginning of the output domain in the [x,y,z]-direction |
+| `[x,y,z]_output%end`    | Real    | End of the output domain in the [x,y,z]-direction |
+| `lag_txt_wrt`           | Logical | Write Lagrangian bubble data to `.dat` files |
+| `lag_header`            | Logical | Write header to Lagrangian bubble `.dat` files |
+| `lag_db_wrt`            | Logical | Write Lagrangian bubble data to silo/hdf5 database files |
+| `lag_id_wrt`            | Logical | Add the global bubble idea to the database file |
+| `lag_pos_wrt`           | Logical | Add the bubble position to the database file |
+| `lag_pos_prev_wrt`      | Logical | Add the previous bubble position to the database file |
+| `lag_vel_wrt`           | Logical | Add the bubble translational velocity to the database file |
+| `lag_rad_wrt`           | Logical | Add the bubble radius to the database file |
+| `lag_rvel_wrt`          | Logical | Add the bubble radial velocity to the database file |
+| `lag_r0_wrt`            | Logical | Add the bubble initial radius to the database file |
+| `lag_rmax_wrt`          | Logical | Add the bubble maximum radius to the database file |
+| `lag_rmin_wrt`          | Logical | Add the bubble minimum radius to the database file |
+| `lag_dphidt_wrt`        | Logical | Add the bubble subgrid velocity potential to the database file |
+| `lag_pres_wrt`          | Logical | Add the bubble pressure to the database file |
+| `lag_mv_wrt`            | Logical | Add the bubble vapor mass to the database file |
+| `lag_mg_wrt`            | Logical | Add the bubble gas mass to the database file |
+| `lag_betaT_wrt`         | Logical | Add the bubble heat flux model coefficient to the database file |
+| `lag_betaC_wrt`         | Logical | Add the bubble mass flux model coefficient to the database file |
 
 The table lists formatted database output parameters. The parameters define variables that are outputted from simulation and file types and formats of data as well as options for post-processing.
 
@@ -741,26 +750,35 @@ Details of the transducer acoustic source model can be found in [Maeda and Colon
 
 ### 9. Sub-grid Bubble Models
 
-| Parameter         | Type    | Description                                    |
-| ---:              | :----:  |          :---                                  |
-| `bubbles_euler`   | Logical	| Ensemble-averaged bubble modeling	|
-| `bubbles_lagrange`| Logical	| Volume-averaged bubble modeling	|
-| `bubble_model`    | Integer	| [1] Gilmore; [2] Keller--Miksis |
-| `mu_l0` *	        | Real 		|	Liquid viscosity (only specify in liquid phase)  |
-| `ss` *		        | Real 		|	Surface tension (only specify in liquid phase) |
-| `pv` *		        | Real 		|	Vapor pressure (only specify in liquid phase) |
-| `gamma_v` † 	    | Real 	  |	Specific heat ratio |
-| `M_v` †     	    | Real 		| Molecular weight |
-| `mu_v` †	        | Real 		|	Viscosity |
-| `k_v` †	          | Real 		|	Thermal conductivity |
-| `cp_v` †	        | Real 		|	Specific heat capacity |
-| `D_v` †           | Real    | Vapor diffusivity in the gas |
+| Parameter          | Type    | Description                                    |
+| ---:               | :----:  |          :---                                  |
+| `bubbles_euler`    | Logical	| Ensemble-averaged bubble modeling	|
+| `bubbles_lagrange` | Logical	| Volume-averaged bubble modeling	|
+| `bubble_model`     | Integer	| [1] Gilmore; [2] Keller--Miksis; [3] Rayleigh-Plesset |
+| `bub_pp%R0ref`*†‡  | Real    | Reference bubble radius |
+| `bub_pp%p0ref`*†‡  | Real    | Reference pressure |
+| `bub_pp%rho0ref`*†‡| Real    | Reference density |
+| `bub_pp%T0ref`†‡   | Real    | Reference temperature |
+| `bub_pp%ss`*†‡     | Real    | Surface tension between host and gas (bubble) |
+| `bub_pp%pv`*†‡     | Real    | Vapor pressure of host |
+| `bub_pp%vd`† ‡     | Real    | Vapor diffusivity in gas (bubble) |
+| `bub_pp%mu_l`*†‡   | Real    | Viscosity of host in liquid state |
+| `bub_pp%mu_v`†     | Real    | Viscosity of host in vapor state |
+| `bub_pp%mu_g`†     | Real    | Viscosity of gas (bubble) |
+| `bub_pp%gam_v`†‡   | Real    | Specific heat ratio of host in vapor state |
+| `bub_pp%gam_g`*†‡  | Real    | Specific heat ratio of gas (bubble) |
+| `bub_pp%M_v`†‡     | Real    | Molecular weight of host |
+| `bub_pp%M_g`†‡     | Real    | Molecular weight of gas (bubble) |
+| `bub_pp%k_v`†‡     | Real    | Thermal conductivity of host in vapor state |
+| `bub_pp%k_g`†‡     | Real    | Thermal conductivity of gas (bubble) |
+| `bub_pp%cp_v`‡     | Real    | Specific heat capacity in constant pressure of host in vapor state |
+| `bub_pp%cp_g`‡     | Real    | Specific heat capacity in constant pressure of gas (bubble) |
+| `bub_pp%R_v`†‡     | Real    | Gas constant of host in vapor state |
+| `bub_pp%R_g`†‡     | Real    | Gas constant of gas (bubble) |
 
-These options work only for gas-liquid two-component flows.
-Component indexes are required to be 1 for liquid and 2 for gas.
-
-- \* These parameters should be prepended with patch index $1$ that is filled with liquid: `fluid_pp(1)%`.
-- †  These parameters should be prepended with patch indexes filled with liquid and gas: `fluid_pp(1)%` and `fluid_pp(2)%`.
+- \* These parameters are required for ensemble-averaged bubble model.
+- †  These parameters are required for ensemble-averaged bubble model with `polytropic = F`.
+- ‡  These parameters are required for volume-averaged bubble model with `polytropic = F`.
 
 This table lists the sub-grid bubble model parameters, which can be utilized in both the ensemble-averaged and volume-averaged bubble models.
 
@@ -768,33 +786,28 @@ This table lists the sub-grid bubble model parameters, which can be utilized in 
 
 - `bubbles_lagrange` activates the volume-averaged bubble model.
 
-- `bubble_model` specified a model for spherical bubble dynamics by an integer of 1 and 2.
+- `bubble_model` specifies a model for spherical bubble dynamics by an integer of `1`, `2`, or `3`.
 `bubble_model = 1`, `2`, and `3` correspond to the Gilmore, Keller-Miksis, and Rayleigh-Plesset models.
 
-- `mu_l0`, `ss`, and `pv`, `gamma_v`, `M_v`, `mu_v`, `k_v`, and `cp_v` specify simulation parameters for the non-polytropic gas compression model.
-`mu_l0`, `ss`, and `pv` correspond to the liquid viscosity, surface tension, and vapor pressure, respectively.
-`gamma_v`, `M_v`, `mu_v`, `k_v`, and `cp_v` specify the specific heat ratio, molecular weight, viscosity, thermal conductivity and specific heat capacity of a chosen component (`cp_v` only for ``bubbles_lagrange = 'T'``).
+- `bub_pp` specifies simulation parameters for the EE and/or EL bubble model. 
+
 Implementation of the parameters into the model follow [Ando (2010)](references.md).
 
 #### 9.1 Ensemble-Averaged Bubble Model
 
-| Parameter      | Type    | Description                                    |
-| ---:           | :----:  |          :---                                  |
-| `bubbles_euler`| Logical	| Ensemble-averaged bubble modeling	|
-| `polytropic`      | Logical	| Polytropic gas compression |
-| `thermal` 		    | Integer	| Thermal model: [1] Adiabatic; [2] Isothermal; [3] Transfer |
-| `R0ref` 			 | Real		  | Reference bubble radius |
-| `polydisperse`   | Logical	| Polydispersity in equilibrium bubble radius R0 |
-| `nb` 			     | Integer	| Number of bins: [1] Monodisperse; [$>1$] Polydisperse |
-| `poly_sigma` 	       | Real 		|	Standard deviation for probability density function of polydisperse bubble populations |
-| `Ca` 			     | Real		  | Cavitation number |
-| `Web` 			   | Real		  | Weber number |
-| `Re_inv` 		   | Real		  | Inverse Reynolds number |
-| `qbmm` 	       | Logical 		|	Quadrature by  method of moments |
-| `dist_type` 	       | Integer 		|	Joint probability density function for bubble radius and velocity (only for ``qbmm = 'T'``) |
-| `sigR` 	       | Real 		|	Standard deviation for the probability density function of bubble radius (only for ``qbmm = 'T'``) (EE)|
-| `sigV` 	       | Real 		|	Standard deviation for the probability density function of bubble velocity (only for ``qbmm = 'T'``) (EE)|
-| `rhoRV`	       | Real 		|	Correlation coefficient for the joint probability density function of bubble radius and velocity (only for ``qbmm = 'T'``) |
+| Parameter         | Type    | Description                                    |
+| ---:              | :----:  |          :---                                  |
+| `bubbles_euler`   | Logical | Ensemble-averaged bubble modeling	|
+| `polytropic`      | Logical | Polytropic gas compression |
+| `thermal` 		    | Integer | Thermal model: [1] Adiabatic; [2] Isothermal; [3] Transfer |
+| `polydisperse`    | Logical | Polydispersity in equilibrium bubble radius R0 |
+| `nb`              | Integer | Number of bins: [1] Monodisperse; [$>1$] Polydisperse |
+| `poly_sigma`      | Real 	  |	Standard deviation for probability density function of polydisperse bubble populations |
+| `qbmm`            | Logical |	Quadrature by  method of moments |
+| `dist_type`       | Integer |	Joint probability density function for bubble radius and velocity (only for ``qbmm = 'T'``) |
+| `sigR`            | Real    |	Standard deviation for the probability density function of bubble radius (only for ``qbmm = 'T'``) (EE)|
+| `sigV`            | Real    |	Standard deviation for the probability density function of bubble velocity (only for ``qbmm = 'T'``) (EE)|
+| `rhoRV`           | Real    |	Correlation coefficient for the joint probability density function of bubble radius and velocity (only for ``qbmm = 'T'``) |
 
 This table lists the ensemble-averaged bubble model parameters.
 
@@ -806,13 +819,9 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 
 - `polydisperse` activates polydispersity in the bubble model through a probability density function (PDF) of the equilibrium bubble radius. Simpson's rule is used for integrating the log-normal PDF of equilibrium bubble radius for polydisperse populations.
 
-- `R0ref` specifies the reference bubble radius.
-
 - `nb` specifies the number of discrete bins that define the probability density function (PDF) of the equilibrium bubble radius.
 
 - `poly_sigma` specifies the standard deviation of the log-normal PDF of equilibrium bubble radius for polydisperse populations.
-
-- `Ca`, `Web`, and `Re_inv` respectively specify the Cavitation number, Weber number, and the inverse Reynolds number that characterize the offset of the gas pressure from the vapor pressure, surface tension, and liquid viscosity when the polytropic gas compression model is used.
 
 - `qbmm` activates quadrature by method of moments, which assumes a PDF for bubble radius and velocity.
 
@@ -841,11 +850,6 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 | `epsilonb`            | Real    | Standard deviation scaling for the gaussian function      |
 | `charwidth`           | Real    | Domain virtual depth (z direction, for 2D simulations)    |
 | `valmaxvoid`          | Real    | Maximum void fraction permitted                           |
-| `c0`                  | Real    | Reference speed                                           |
-| `rho0`                | Real    | Reference density                                         |
-| `T0`                  | Real    | Reference temperature                                     |
-| `x0`                  | Real    | Reference length                                          |
-| `Thost`               | Real    | Temperature of the surrounding liquid (host)              |
 
 - `nBubs_glb` Total number of bubbles. Their initial conditions need to be specified in the ./input/lag_bubbles.dat file. See the example cases for additional information.
 
@@ -899,7 +903,7 @@ $$ u = \mbox{patch\_icpp(1)\%vel(1)} * \tanh( y_{cc} * \mbox{mixlayer\_vel\_coef
 | `relax`                | Logical | Activates Phase Change model |
 | `relax_model`          | Integer | Phase change model: [5] pT-equilibrium; [6] pTg-equilibrium |
 | `palpha_eps`           | Real    | tolerance of the Newton Solver to activate pT-equilibrium  |
-| `ptgalpha_eps`	     | Real    | tolerance of the Newton Solver to activate pTg-equilibrium |
+| `ptgalpha_eps`         | Real    | tolerance of the Newton Solver to activate pTg-equilibrium |
 
 - `relax` Activates the Phase Change model.
 
@@ -1035,29 +1039,29 @@ This boundary condition can be used for subsonic inflow (`bc_[x,y,z]%[beg,end]` 
 
 ### Patch types
 
-| #    | Name               | Dim.  | Smooth | Description |
-| ---: | :----:             | :---: |  :---: | :--- |
-| 1    | Line segment 	    | 1     | N      | Requires `x_centroid` and `length_x`. |
-| 2    | Circle 		    | 2     | Y      | Requires `[x,y]_centroid` and `radius`. |
-| 3    | Rectangle 	        | 2     | N      | Coordinate-aligned. Requires `[x,y]_centroid` and `length_[x,y]`. |
-| 4    | Sweep line 		| 2     | Y      | Not coordinate aligned. Requires `[x,y]_centroid` and `normal(i)`. |
-| 5    | Ellipse 		    | 2     | Y      | Requires `[x,y]_centroid` and `radii(i)`. |
-| 6    | N/A 		        | N/A   | N/A    | No longer exists. Empty. |
-| 7    | N/A        	    | N/A   | N/A    | No longer exists. Empty. |
-| 8    | Sphere 		    | 3     | Y      | Requires `[x,y,z]_centroid` and `radius` |
-| 9    | Cuboid 		    | 3     | N      | Coordinate-aligned. Requires `[x,y,z]_centroid` and `length_[x,y,z]`. |
-| 10   | Cylinder 		    | 3     | Y      | Requires `[x,y,z]_centroid`, `radius`, and `length_[x,y,z]`. |
-| 11   | Sweep plane 	    | 3     | Y      | Not coordinate-aligned. Requires `x[y,z]_centroid` and `normal(i)`. |
-| 12   | Ellipsoid 		    | 3     | Y      | Requires `[x,y,z]_centroid` and `radii(i)`. |
-| 13   | N/A        	    | N/A   | N/A    | No longer exists. Empty. |
-| 14   | Spherical Harmonic | 3     | N      | Requires `[x,y,z]_centroid`, `radius`, `epsilon`, `beta` |
-| 15   | N/A                | N/A   | N/A    | No longer exists. Empty.  |
-| 16   | 1D bubble pulse    | 1     | N      | Requires `x_centroid`, `length_x` |
-| 17   | Spiral             | 2     | N      | Requires `[x,y]_centroid` |
-| 18   | 2D Varcircle       | 2     | Y      | Requires `[x,y]_centroid`, `radius`, and `thickness` |
-| 19   | 3D Varcircle       | 3     | Y      | Requires `[x,y,z]_centroid`, `length_z`, `radius`, and `thickness` |
-| 20   | 2D Taylor-Green Vortex  | 2  | N     | Requires `[x,y]_centroid`, `length_x`, `length_y`, `vel(1)`, and `vel(2)` |
-| 21   | Model              | 2 & 3 | Y      | Imports a Model (STL/OBJ). Requires `model%%filepath`. |
+| #    | Name                    | Dim.  | Smooth | Description |
+| ---: | :----:                  | :---: |  :---: | :--- |
+| 1    | Line segment 	         | 1     | N      | Requires `x_centroid` and `length_x`. |
+| 2    | Circle 		             | 2     | Y      | Requires `[x,y]_centroid` and `radius`. |
+| 3    | Rectangle 	             | 2     | N      | Coordinate-aligned. Requires `[x,y]_centroid` and `length_[x,y]`. |
+| 4    | Sweep line 	           | 2     | Y      | Not coordinate aligned. Requires `[x,y]_centroid` and `normal(i)`. |
+| 5    | Ellipse 		             | 2     | Y      | Requires `[x,y]_centroid` and `radii(i)`. |
+| 6    | N/A 		                 | N/A   | N/A    | No longer exists. Empty. |
+| 7    | N/A        	           | N/A   | N/A    | No longer exists. Empty. |
+| 8    | Sphere 		             | 3     | Y      | Requires `[x,y,z]_centroid` and `radius` |
+| 9    | Cuboid 		             | 3     | N      | Coordinate-aligned. Requires `[x,y,z]_centroid` and `length_[x,y,z]`. |
+| 10   | Cylinder 		           | 3     | Y      | Requires `[x,y,z]_centroid`, `radius`, and `length_[x,y,z]`. |
+| 11   | Sweep plane 	           | 3     | Y      | Not coordinate-aligned. Requires `x[y,z]_centroid` and `normal(i)`. |
+| 12   | Ellipsoid 		           | 3     | Y      | Requires `[x,y,z]_centroid` and `radii(i)`. |
+| 13   | N/A        	           | N/A   | N/A    | No longer exists. Empty. |
+| 14   | Spherical Harmonic      | 3     | N      | Requires `[x,y,z]_centroid`, `radius`, `epsilon`, `beta` |
+| 15   | N/A                     | N/A   | N/A    | No longer exists. Empty.  |
+| 16   | 1D bubble pulse         | 1     | N      | Requires `x_centroid`, `length_x` |
+| 17   | Spiral                  | 2     | N      | Requires `[x,y]_centroid` |
+| 18   | 2D Varcircle            | 2     | Y      | Requires `[x,y]_centroid`, `radius`, and `thickness` |
+| 19   | 3D Varcircle            | 3     | Y      | Requires `[x,y,z]_centroid`, `length_z`, `radius`, and `thickness` |
+| 20   | 2D Taylor-Green Vortex  | 2     | N      | Requires `[x,y]_centroid`, `length_x`, `length_y`, `vel(1)`, and `vel(2)` |
+| 21   | Model                   | 2 & 3 | Y      | Imports a Model (STL/OBJ). Requires `model%%filepath`. |
 
 The patch types supported by the MFC are listed in table [Patch Types](#patch-types).
 This includes types exclusive to one-, two-, and three-dimensional problems.

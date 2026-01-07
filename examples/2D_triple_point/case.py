@@ -12,10 +12,10 @@ print(
             # Logistics
             "run_time_info": "F",
             # Computational Domain Parameters
-            "x_domain%beg": 0,
-            "x_domain%end": 7,
-            "y_domain%beg": 0,
-            "y_domain%end": 3,
+            "x_domain%beg": 0.0,
+            "x_domain%end": 7.0,
+            "y_domain%beg": 0.0,
+            "y_domain%end": 3.0,
             "m": int(Nx),
             "n": int(Ny),
             "p": 0,

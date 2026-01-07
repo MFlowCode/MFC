@@ -34,7 +34,7 @@ print(
             # Computational Domain Parameters
             "x_domain%beg": -4 * D,
             "x_domain%end": 20 * D,
-            "y_domain%beg": 0,
+            "y_domain%beg": 0.0,
             "y_domain%end": 6 * D,
             "stretch_y": "T",
             "a_y": 3.67,

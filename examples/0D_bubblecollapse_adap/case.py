@@ -4,53 +4,52 @@ import json
 
 # FLUID PROPERTIES
 # Water
-n_tait = 7.1
-B_tait = 306.0e06
-rho0 = 1.0e03
-mul0 = 1.002e-03
-ss = 0.07275
-pv = 2.3388e03
+gam_l = 7.1  # [1]
+pi_inf_l = 306.0e06  # [N/m2]
+rho_l = 1.0e03  # [kg/m3]
+mu_l = 1.002e-03  # [kg/m/s]
+ss = 0.07275  # [kg/s2]
+pv = 2.3388e03  # [N/m2]
 
 # Vapor
-gamma_v = 1.33
-M_v = 18.02
-mu_v = 0.8816e-05
-k_v = 0.019426
+gam_v = 1.33  # [1]
+M_v = 18.02  # [g/mol]
+mu_v = 0.8816e-05  # [kg/m/s]
+k_v = 0.019426  # [W/m/K]
 
 # Air
-gamma_n = 1.4
-M_n = 28.97
-mu_n = 1.8e-05
-k_n = 0.02556
-
-# REFERENCE VALUES
-R0ref = 50.0e-06
-x0 = R0ref
-p0 = 8236.0  # for Ca = 1 in mixing layer scale
-u0 = math.sqrt(p0 / rho0)
-patm = 1.0
-cact = math.sqrt(n_tait * (p0 + B_tait) / rho0)
-
-# NONDIMENSIONAL NUMBERS
-Ca = (p0 - pv) / (rho0 * (u0**2.0))  # Cavitation number
-We = rho0 * (u0**2.0) * R0ref / ss  # Weber number
-Re_inv = mul0 / (rho0 * u0 * R0ref)  # Inv. bubble Reynolds number
+gam_g = 1.4  # [1]
+M_g = 28.97  # [g/mol]
+mu_g = 1.8e-05  # [kg/m/s]
+k_g = 0.02556  # [W/m/K]
 
 # BUBBLES
-vf0 = 1e-5
+R0ref = 50.0e-06  # [m]
+p0ref = 8236.0  # [N/m2]
+rho0ref = rho_l  # [kg/m3]
+vf0 = 1e-5  # [1]
 nb = 1
+
+# External pressure
+p0ext = 1000 * p0ref  # [N/m2]
+
+# REFERENCE VALUES
+x0 = R0ref  # [m]
+p0 = p0ref  # [N/m2]
+rho0 = rho0ref  # [kg/m3]
+u0 = math.sqrt(p0 / rho0)  # [m/s]
+t0 = x0 / u0  # [s]
+tc = 0.915 * math.sqrt(rho_l * R0ref**2 / (p0ext - pv))  # [s]
 
 # DOMAIN
 Nx = 30
-Ldomain = 20.0e-03
-L = Ldomain / x0
-dx = L / float(Nx + 1)
+L = 20.0e-03  # [m]
 
 # TIME STEPS
-Tfinal = 0.05
+Tfinal = 1.5 * tc / t0
 Nt = int(5e2 + 1)
 t_save = 1
-dt = Tfinal / (Nt - 1)
+dt = 0.0001
 
 # Configuring case dictionary
 print(
@@ -59,10 +58,8 @@ print(
             # Logistics
             "run_time_info": "T",
             # Computational Domain Parameters
-            "x_domain%beg": -0.5 * L,
-            "x_domain%end": 0.5 * L,
-            "stretch_x": "F",
-            "cyl_coord": "F",
+            "x_domain%beg": -0.5 * L / x0,
+            "x_domain%end": 0.5 * L / x0,
             "m": Nx,
             "n": 0,
             "p": 0,
@@ -97,46 +94,35 @@ print(
             # Patch 1 _ Background
             "patch_icpp(1)%geometry": 1,
             "patch_icpp(1)%x_centroid": 0.0,
-            "patch_icpp(1)%length_x": L,
+            "patch_icpp(1)%length_x": L / x0,
             "patch_icpp(1)%vel(1)": 0.0,
-            "patch_icpp(1)%pres": 1000.0,
+            "patch_icpp(1)%pres": p0ext / p0,
             "patch_icpp(1)%alpha_rho(1)": (1.0 - vf0),
             "patch_icpp(1)%alpha(1)": vf0,
-            "patch_icpp(1)%r0": 1.0,
+            "patch_icpp(1)%r0": R0ref / x0,
             "patch_icpp(1)%v0": 0.0,
-            # Non-polytropic gas compression model AND/OR Tait EOS
-            "pref": p0,
-            "rhoref": rho0,
             # Bubbles
             "bubbles_euler": "T",
             "bubble_model": 2,
             # Nondimensional numbers
-            "Ca": Ca,
-            "Web": We,
-            "Re_inv": Re_inv,
-            # adv_n
+            "bub_pp%R0ref": R0ref / x0,
+            "bub_pp%p0ref": p0ref / p0,
+            "bub_pp%rho0ref": rho0ref / rho0,
+            "bub_pp%ss": ss / (rho0 * x0 * u0 * u0),
+            "bub_pp%pv": pv / p0,
+            "bub_pp%mu_l": mu_l / (rho0 * x0 * u0),
+            "bub_pp%gam_g": gam_g,
             "adv_n": "T",
-            # adap_dt
             "adap_dt": "T",
-            "adap_dt_max_iters": 200,
-            # Gas compression model
+            "adap_dt_tol": 1e-4,
+            "adap_dt_max_iters": 10000,
             "polytropic": "T",
             "thermal": 1,
-            # Polydispersity
             "polydisperse": "F",
             "nb": nb,
-            # QBMM
-            "qbmm": "F",
             # Fluids Physical Parameters
-            # Surrounding liquid
-            "fluid_pp(1)%gamma": 1.0e00 / (n_tait - 1.0e00),
-            "fluid_pp(1)%pi_inf": n_tait * (B_tait / p0) / (n_tait - 1.0),
-            "fluid_pp(1)%ss": ss,
-            "fluid_pp(1)%pv": pv,
-            # Last fluid_pp is always reserved for bubble gas state
-            # if applicable
-            "fluid_pp(2)%gamma": 1.0 / (gamma_n - 1.0),
-            "fluid_pp(2)%pi_inf": 0.0e00,
+            "fluid_pp(1)%gamma": 1.0e00 / (gam_l - 1.0e00),
+            "fluid_pp(1)%pi_inf": gam_l * (pi_inf_l / p0) / (gam_l - 1.0),
         }
     )
 )

@@ -29,17 +29,43 @@ class Mfc < Formula
     # Create Python virtual environment inside libexec (inside Cellar for proper bottling)
     venv = libexec/"venv"
     system Formula["python@3.12"].opt_bin/"python3.12", "-m", "venv", venv
-    system venv/"bin/pip", "install", "--upgrade", "pip", "setuptools", "wheel"
+    system venv/"bin/pip", "install", "--upgrade", "pip", "setuptools", "wheel", "setuptools-scm"
 
     # Install Cantera from PyPI using pre-built wheel (complex package, doesn't need custom flags)
     # Cantera has CMake compatibility issues when building from source with newer CMake versions
-    system venv/"bin/pip", "install", "cantera==3.1.0"
+    # Match the version constraint from toolchain/pyproject.toml
+    system venv/"bin/pip", "install", "--only-binary=:all:", "cantera>=3.1.0"
 
     # Install MFC Python package and dependencies into venv
     # Use editable install (-e) to avoid RECORD file issues when venv is symlinked at runtime
     # Dependencies will use pre-built wheels from PyPI
     # Keep toolchain in buildpath for now - mfc.sh needs it there
-    system venv/"bin/pip", "install", "-e", buildpath/"toolchain"
+    #
+    # MFC's toolchain uses VCS-derived versioning (via Hatch/hatch-vcs) and Homebrew builds from
+    # GitHub release tarballs without a .git directory. Scope pretend-version env vars tightly
+    # to avoid polluting subsequent pip installs.
+    pretend_env = {
+      "SETUPTOOLS_SCM_PRETEND_VERSION_FOR_MFC" => version.to_s,
+      "SETUPTOOLS_SCM_PRETEND_VERSION_FOR_mfc" => version.to_s,
+      "SETUPTOOLS_SCM_PRETEND_VERSION"         => version.to_s, # Fallback for hatch-vcs/setuptools-scm
+    }
+    saved_env = {}
+    pretend_env.each do |k, v|
+      saved_env[k] = ENV.fetch(k, nil)
+      ENV[k] = v
+    end
+
+    begin
+      system venv/"bin/pip", "install", "-e", buildpath/"toolchain"
+    ensure
+      pretend_env.each_key do |k|
+        if saved_env[k].nil?
+          ENV.delete(k)
+        else
+          ENV[k] = saved_env[k]
+        end
+      end
+    end
 
     # Create symlink so mfc.sh uses our pre-installed venv
     mkdir_p "build"
