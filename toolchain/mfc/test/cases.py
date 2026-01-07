@@ -1078,14 +1078,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 override_tol=10**(-10)
             ))
 
-            cases.append(define_case_f(
-                f'1D -> Chemistry -> Flamelet','examples/1D_Flamelet/case.py',
-                mods={
-                    **common_mods,
-                },
-                override_tol= 10**(-10)
-          ))
-
+        cases.append(define_case_f( 
+           f'1D -> Chemistry -> Flamelet','examples/1D_Flamelet/case.py',
+           mods={
+               **common_mods
+           }, 
+           override_tol= 10**(-10)
+        ))
+       
         stack.push(f'1D -> Chemistry -> MultiComponent Diffusion', {'m': 200,
                     'dt': 0.1e-06, 'num_patches': 1, 'num_fluids': 1, 'x_domain%beg': 0.0, 'x_domain%end': 0.05,
                     'bc_x%beg': -1, 'bc_x%end': -1, 'weno_order': 5,'weno_eps': 1e-16, 'weno_avg': 'F',
