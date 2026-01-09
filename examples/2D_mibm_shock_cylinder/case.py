@@ -2,7 +2,7 @@ import json
 import math
 
 # This case is a recreation of the case from "Moving overlapping grids with adaptive mesh refinement for high-speed reactive and non-reactive flow"
-# by William D. Henshaw and Donald W. Schwendeman 
+# by William D. Henshaw and Donald W. Schwendeman
 
 # fluid parameters
 gam_a = 1.4
@@ -16,7 +16,7 @@ post_shock_pressure = 2.4583
 post_shock_density = 2.6069
 post_shock_speed = 0.6944
 
-domain_size = 4.
+domain_size = 4.0
 wave_front = -1.5
 
 total_time = 1.5
@@ -90,32 +90,32 @@ print(
             "parallel_io": "T",
             # Patch: Constant Tube filled with air
             # Specify the cylindrical air tube grid geometry
-            "patch_icpp(1)%geometry": 3,            
+            "patch_icpp(1)%geometry": 3,
             "patch_icpp(2)%geometry": 3,
-            # patch locations      
+            # patch locations
             "patch_icpp(1)%x_centroid": 0.5 * wave_front + 0.25 * domain_size,
-            "patch_icpp(1)%y_centroid": 0.,
+            "patch_icpp(1)%y_centroid": 0.0,
             "patch_icpp(1)%length_x": 0.5 * domain_size - wave_front,
             "patch_icpp(1)%length_y": domain_size,
             "patch_icpp(2)%x_centroid": 0.5 * wave_front - 0.25 * domain_size,
-            "patch_icpp(2)%y_centroid": 0.,
+            "patch_icpp(2)%y_centroid": 0.0,
             "patch_icpp(2)%length_x": 0.5 * domain_size + wave_front,
             "patch_icpp(2)%length_y": domain_size,
             # Specify the patch primitive variables
             "patch_icpp(1)%vel(1)": pre_shock_speed,
             "patch_icpp(1)%vel(2)": 0.0,
             "patch_icpp(1)%pres": pre_shock_pressure,
-            "patch_icpp(1)%alpha_rho(1)":  pre_shock_density,
+            "patch_icpp(1)%alpha_rho(1)": pre_shock_density,
             "patch_icpp(1)%alpha(1)": 1.0e00,
             "patch_icpp(2)%vel(1)": post_shock_speed,
             "patch_icpp(2)%vel(2)": 0.0,
             "patch_icpp(2)%pres": post_shock_pressure,
-            "patch_icpp(2)%alpha_rho(1)":  post_shock_density,
+            "patch_icpp(2)%alpha_rho(1)": post_shock_density,
             "patch_icpp(2)%alpha(1)": 1.0e00,
             # Patch: Cylinder Immersed Boundary
             "patch_ib(1)%geometry": 2,
             "patch_ib(1)%x_centroid": -0.5,
-            "patch_ib(1)%y_centroid": 0.,
+            "patch_ib(1)%y_centroid": 0.0,
             "patch_ib(1)%radius": 0.5,
             "patch_ib(1)%slip": "T",
             "patch_ib(1)%moving_ibm": 2,
