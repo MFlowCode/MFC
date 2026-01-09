@@ -1203,7 +1203,7 @@ contains
                             end if
 
                             ! project the position along the axis to find the closest distance to the rotation axis
-                            closest_point_along_axis = normal_axis*dot_product(axis, position)
+                            closest_point_along_axis = normal_axis*dot_product(normal_axis, position)
                             vector_to_axis = position - closest_point_along_axis
                             distance_to_axis = dot_product(vector_to_axis, vector_to_axis) ! saves the distance to the axis squared
 
