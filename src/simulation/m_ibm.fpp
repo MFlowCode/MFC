@@ -1160,7 +1160,7 @@ contains
         integer :: i, j, k, count
 
         if (p == 0) then
-            normal_axis = [0, 1, 0]
+            normal_axis = [0, 0, 1]
         else if (sqrt(sum(axis**2)) == 0) then
             ! if the object is not actually rotating at this time, return a dummy value and exit
             patch_ib(ib_marker)%moment = 1._wp
