@@ -211,8 +211,9 @@ def test():
 
 
 # pylint: disable=too-many-locals, too-many-branches, too-many-statements, trailing-whitespace
-def _process_silo_file(silo_filepath: str, case: TestCase, out_filepath: str):
-    """Process a single silo file with h5dump and check for NaNs/Infinities."""
+def _process_hdf5_file(silo_filepath: str, case: TestCase, out_filepath: str):
+    """Process a single Silo/HDF5 file with h5dump and check for NaNs/Infinities.
+    Works for both Silo-HDF5 and HDF5+XDMF files."""
     h5dump = f"{HDF5.get_install_dirpath(case.to_input_file())}/bin/h5dump"
 
     if not os.path.exists(h5dump or ""):
@@ -238,6 +239,34 @@ def _process_silo_file(silo_filepath: str, case: TestCase, out_filepath: str):
         raise MFCException(
             f"Test {case}: Post Process has detected an Infinity. You can find the run's output in {out_filepath}, "
             f"and the case dictionary in {case.get_filepath()}."
+        )
+
+
+def _process_xdmf_file(xdmf_filepath: str, case: TestCase, out_filepath: str):
+    """Validate XDMF file structure and check for valid HDF5 references."""
+    try:
+        content = common.file_read(xdmf_filepath)
+
+        # Check for basic XDMF structure
+        if '<?xml' not in content or '<Xdmf' not in content:
+            raise MFCException(
+                f"Test {case}: XDMF file {xdmf_filepath} is malformed (missing XML/Xdmf tags). "
+                f"You can find the run's output in {out_filepath}."
+            )
+
+        # Check for required XDMF elements
+        required_elements = ['<Domain>', '<Grid', '<Topology', '<Geometry', '<Attribute']
+        for element in required_elements:
+            if element not in content:
+                raise MFCException(
+                    f"Test {case}: XDMF file {xdmf_filepath} is missing required element '{element}'. "
+                    f"You can find the run's output in {out_filepath}."
+                )
+
+    except FileNotFoundError:
+        raise MFCException(
+            f"Test {case}: XDMF file {xdmf_filepath} not found. "
+            f"You can find the run's output in {out_filepath}."
         )
 
 
@@ -322,11 +351,31 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
             out_filepath = os.path.join(case.get_dirpath(), "out_post.txt")
             common.file_write(out_filepath, cmd.stdout)
 
+            # Check Silo-HDF5 output (format=1)
             silo_dir = os.path.join(case.get_dirpath(), 'silo_hdf5', 'p0')
             if os.path.isdir(silo_dir):
                 for silo_filename in os.listdir(silo_dir):
                     silo_filepath = os.path.join(silo_dir, silo_filename)
-                    _process_silo_file(silo_filepath, case, out_filepath)
+                    _process_hdf5_file(silo_filepath, case, out_filepath)
+
+            # Check HDF5+XDMF output (format=3)
+            hdf5_xdmf_dir = os.path.join(case.get_dirpath(), 'hdf5_xdmf')
+            if os.path.isdir(hdf5_xdmf_dir):
+                # Process HDF5 files in processor directories (p0/, p1/, etc.)
+                for subdir in os.listdir(hdf5_xdmf_dir):
+                    subdir_path = os.path.join(hdf5_xdmf_dir, subdir)
+                    if os.path.isdir(subdir_path) and subdir.startswith('p'):
+                        for hdf5_filename in os.listdir(subdir_path):
+                            if hdf5_filename.endswith('.h5'):
+                                hdf5_filepath = os.path.join(subdir_path, hdf5_filename)
+                                _process_hdf5_file(hdf5_filepath, case, out_filepath)
+                # Process XDMF files in root directory (skip time_series.xdmf as it only contains includes)
+                root_dir = os.path.join(hdf5_xdmf_dir, 'root')
+                if os.path.isdir(root_dir):
+                    for xdmf_filename in os.listdir(root_dir):
+                        if xdmf_filename.endswith('.xdmf') and xdmf_filename.startswith('timestep_'):
+                            xdmf_filepath = os.path.join(root_dir, xdmf_filename)
+                            _process_xdmf_file(xdmf_filepath, case, out_filepath)
 
         case.delete_output()
 
