@@ -649,6 +649,7 @@ contains
         chem_params%diffusion = .false.
         chem_params%reactions = .false.
         chem_params%gamma_method = 1
+        chem_params%transport_model = 1
 
         num_bc_patches = 0
         bc_io = .false.
