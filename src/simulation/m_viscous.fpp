@@ -21,7 +21,7 @@ module m_viscous
     use m_finite_differences
 
     private; public s_get_viscous, &
-    s_compute_viscous_stress_cylindrical_boundary, &
+ s_compute_viscous_stress_cylindrical_boundary, &
  s_initialize_viscous_module, &
  s_reconstruct_cell_boundary_values_visc_deriv, &
  s_finalize_viscous_module, &
@@ -62,8 +62,8 @@ contains
     !  @param grad_y_vf Cell-average primitive variable derivatives, y-dir
     !  @param grad_z_vf Cell-average primitive variable derivatives, z-dir
     subroutine s_compute_viscous_stress_cylindrical_boundary(q_prim_vf, grad_x_vf, grad_y_vf, grad_z_vf, &
-                                               tau_Re_vf, &
-                                               ix, iy, iz)
+                                                             tau_Re_vf, &
+                                                             ix, iy, iz)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         type(scalar_field), dimension(num_dims), intent(in) :: grad_x_vf, grad_y_vf, grad_z_vf
@@ -1514,63 +1514,63 @@ contains
 
     ! computes the viscous stress tensor at a particule i, j, k element
     subroutine s_compute_viscous_stress_tensor(viscous_stress_tensor, q_prim_vf, dynamic_viscosity, i, j, k)
-      $:GPU_ROUTINE(parallelism='[seq]')
+        $:GPU_ROUTINE(parallelism='[seq]')
 
-      real(wp), dimension(1:3, 1:3), intent(inout) :: viscous_stress_tensor
-      type(scalar_field), dimension(1:sys_size), intent(in) :: q_prim_vf
-      real(wp), intent(in) :: dynamic_viscosity
-      integer, intent(in) :: i, j, k
+        real(wp), dimension(1:3, 1:3), intent(inout) :: viscous_stress_tensor
+        type(scalar_field), dimension(1:sys_size), intent(in) :: q_prim_vf
+        real(wp), intent(in) :: dynamic_viscosity
+        integer, intent(in) :: i, j, k
 
-      real(wp), dimension(1:3, 1:3) :: velocity_gradient_tensor
-      real(wp), dimension(1:3) :: dx
-      real(wp) :: divergence
-      integer :: l, q ! iterators
+        real(wp), dimension(1:3, 1:3) :: velocity_gradient_tensor
+        real(wp), dimension(1:3) :: dx
+        real(wp) :: divergence
+        integer :: l, q ! iterators
 
-      ! zero the viscous stress, collection of velocity diriviatives, and spacial finite differences
-      viscous_stress_tensor = 0._wp
-      velocity_gradient_tensor = 0._wp
-      dx = 0._wp
+        ! zero the viscous stress, collection of velocity diriviatives, and spacial finite differences
+        viscous_stress_tensor = 0._wp
+        velocity_gradient_tensor = 0._wp
+        dx = 0._wp
 
-      ! get the change in x used in the finite difference equaiont
-      dx(1) = 0.5_wp * (x_cc(i+1) - x_cc(i-1))
-      dx(2) = 0.5_wp * (y_cc(j+1) - y_cc(j-1))
-      if (num_dims == 3) then
-          dx(3) = 0.5_wp * (z_cc(k+1) - z_cc(k-1))
-      end if
+        ! get the change in x used in the finite difference equaiont
+        dx(1) = 0.5_wp*(x_cc(i + 1) - x_cc(i - 1))
+        dx(2) = 0.5_wp*(y_cc(j + 1) - y_cc(j - 1))
+        if (num_dims == 3) then
+            dx(3) = 0.5_wp*(z_cc(k + 1) - z_cc(k - 1))
+        end if
 
-      ! compute the velocity gradient tensor
-      do l = 1, num_dims
-          velocity_gradient_tensor(l,1) = (q_prim_vf(momxb+l-1)%sf(i+1, j, k) - q_prim_vf(momxb+l-1)%sf(i-1, j, k)) / (2._wp * dx(1)) 
-          velocity_gradient_tensor(l,2) = (q_prim_vf(momxb+l-1)%sf(i, j+1, k) - q_prim_vf(momxb+l-1)%sf(i, j-1, k)) / (2._wp * dx(2))
-          if (num_dims == 3) then
-              velocity_gradient_tensor(l,3) = (q_prim_vf(momxb+l-1)%sf(i, j, k+1) - q_prim_vf(momxb+l-1)%sf(i, j, k-1)) / (2._wp * dx(3)) 
-          end if
-      end do
+        ! compute the velocity gradient tensor
+        do l = 1, num_dims
+            velocity_gradient_tensor(l, 1) = (q_prim_vf(momxb + l - 1)%sf(i + 1, j, k) - q_prim_vf(momxb + l - 1)%sf(i - 1, j, k))/(2._wp*dx(1))
+            velocity_gradient_tensor(l, 2) = (q_prim_vf(momxb + l - 1)%sf(i, j + 1, k) - q_prim_vf(momxb + l - 1)%sf(i, j - 1, k))/(2._wp*dx(2))
+            if (num_dims == 3) then
+                velocity_gradient_tensor(l, 3) = (q_prim_vf(momxb + l - 1)%sf(i, j, k + 1) - q_prim_vf(momxb + l - 1)%sf(i, j, k - 1))/(2._wp*dx(3))
+            end if
+        end do
 
-      ! compute divergence
-      divergence = 0._wp
-      do l = 1, num_dims
-          divergence = divergence + velocity_gradient_tensor(l, l)
-      end do
+        ! compute divergence
+        divergence = 0._wp
+        do l = 1, num_dims
+            divergence = divergence + velocity_gradient_tensor(l, l)
+        end do
 
-      ! set up the shear stress tensor
-      do l = 1, num_dims
-          do q = 1, num_dims
-              viscous_stress_tensor(l, q) = dynamic_viscosity * (velocity_gradient_tensor(l,q) + velocity_gradient_tensor(q,l))
-          end do
-      end do
+        ! set up the shear stress tensor
+        do l = 1, num_dims
+            do q = 1, num_dims
+                viscous_stress_tensor(l, q) = dynamic_viscosity*(velocity_gradient_tensor(l, q) + velocity_gradient_tensor(q, l))
+            end do
+        end do
 
-      ! populate the viscous_stress_tensor
-      do l = 1, num_dims
-          viscous_stress_tensor(l, l) = viscous_stress_tensor(l, l) - 2._wp * divergence * dynamic_viscosity / 3._wp
-      end do
+        ! populate the viscous_stress_tensor
+        do l = 1, num_dims
+            viscous_stress_tensor(l, l) = viscous_stress_tensor(l, l) - 2._wp*divergence*dynamic_viscosity/3._wp
+        end do
 
-      if (num_dims == 2) then
-          do l = 1, 3
-              viscous_stress_tensor(3, l) = 0._wp
-              viscous_stress_tensor(l, 3) = 0._wp
-          end do
-      end if
+        if (num_dims == 2) then
+            do l = 1, 3
+                viscous_stress_tensor(3, l) = 0._wp
+                viscous_stress_tensor(l, 3) = 0._wp
+            end do
+        end if
 
     end subroutine s_compute_viscous_stress_tensor
 

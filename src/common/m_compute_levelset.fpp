@@ -361,8 +361,8 @@ contains
         inverse_rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:, :)
         rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix(:, :)
 
-        ellipse_coeffs(1) = 0.5_wp * length_x
-        ellipse_coeffs(2) = 0.5_wp * length_y
+        ellipse_coeffs(1) = 0.5_wp*length_x
+        ellipse_coeffs(2) = 0.5_wp*length_y
 
         $:GPU_PARALLEL_LOOP(private='[i,j,k,idx,quadratic_coeffs,xy_local,normal_vector]', &
                   & copyin='[ib_patch_id,center,ellipse_coeffs,inverse_rotation,rotation]', collapse=2)
@@ -375,17 +375,17 @@ contains
                 if ((xy_local(1)/ellipse_coeffs(1))**2 + (xy_local(2)/ellipse_coeffs(2))**2 <= 1._wp) then
 
                     normal_vector = xy_local
-                    normal_vector(2) = normal_vector(2) * (ellipse_coeffs(1)/ellipse_coeffs(2))**2._wp ! get the normal direction via the coordinate transofmration method
-                    normal_vector = normal_vector / sqrt(dot_product(normal_vector, normal_vector)) ! normalize the vector
+                    normal_vector(2) = normal_vector(2)*(ellipse_coeffs(1)/ellipse_coeffs(2))**2._wp ! get the normal direction via the coordinate transformation method
+                    normal_vector = normal_vector/sqrt(dot_product(normal_vector, normal_vector)) ! normalize the vector
                     levelset_norm%sf(i, j, 0, ib_patch_id, :) = matmul(rotation, normal_vector) ! save after rotating the vector to the global frame
 
                     ! use the normal vector to set up the quadratic equation for the levelset, using A, B, and C in indices 1, 2, and 3
                     quadratic_coeffs(1) = (normal_vector(1)/ellipse_coeffs(1))**2 + (normal_vector(2)/ellipse_coeffs(2))**2
-                    quadratic_coeffs(2) = 2._wp * ((xy_local(1)*normal_vector(1)/(ellipse_coeffs(1)**2)) + (xy_local(2)*normal_vector(2)/(ellipse_coeffs(2)**2)))
+                    quadratic_coeffs(2) = 2._wp*((xy_local(1)*normal_vector(1)/(ellipse_coeffs(1)**2)) + (xy_local(2)*normal_vector(2)/(ellipse_coeffs(2)**2)))
                     quadratic_coeffs(3) = (xy_local(1)/ellipse_coeffs(1))**2._wp + (xy_local(2)/ellipse_coeffs(2))**2._wp - 1._wp
 
                     ! compute the levelset with the quadratic equation [ -B + sqrt(B^2 - 4AC) ] / 2A
-                    levelset%sf(i, j, 0, ib_patch_id) = -0.5_wp * (-quadratic_coeffs(2) + sqrt(quadratic_coeffs(2)**2._wp - 4._wp * quadratic_coeffs(1)*quadratic_coeffs(3))) / quadratic_coeffs(1)
+                    levelset%sf(i, j, 0, ib_patch_id) = -0.5_wp*(-quadratic_coeffs(2) + sqrt(quadratic_coeffs(2)**2._wp - 4._wp*quadratic_coeffs(1)*quadratic_coeffs(3)))/quadratic_coeffs(1)
                 end if
             end do
         end do
