@@ -712,7 +712,7 @@ contains
                         pres = q_prim_vf(E_idx)%sf(i, j, k)
 
                         H = ((gamma_sf(i, j, k) + 1._wp)*pres + &
-                             pi_inf_sf(i, j, k))/rho_sf(i, j, k)
+                             pi_inf_sf(i, j, k) + qv_sf(i, j, k))/rho_sf(i, j, k)
 
                         call s_compute_speed_of_sound(pres, rho_sf(i, j, k), &
                                                       gamma_sf(i, j, k), pi_inf_sf(i, j, k), &
