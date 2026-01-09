@@ -1,8 +1,10 @@
 import json
 import math
 
+# This case is a recreation of the case from "Moving overlapping grids with adaptive mesh refinement for high-speed reactive and non-reactive flow"
+# by William D. Henshaw and Donald W. Schwendeman 
+
 # fluid parameters
-Mu = 1.84e-05
 gam_a = 1.4
 
 # domain size and speed
