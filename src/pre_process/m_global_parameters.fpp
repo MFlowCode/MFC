@@ -300,6 +300,9 @@ module m_global_parameters
     !! to the next time-step.
 
     logical :: fft_wrt
+    logical :: periodic_ibs
+    logical :: store_levelset
+    logical :: slab_domain_decomposition
 
 contains
 
@@ -596,6 +599,10 @@ contains
 
         Bx0 = dflt_real
 
+        periodic_ibs = .false.
+        store_levelset = .true.
+        slab_domain_decomposition = .false.
+        
         ! Subgrid bubble parameters
         bub_pp%R0ref = dflt_real; R0ref = dflt_real
         bub_pp%p0ref = dflt_real; p0ref = dflt_real
