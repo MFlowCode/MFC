@@ -1029,7 +1029,7 @@ contains
         forces = 0._wp
         torques = 0._wp
 
-        $:GPU_PARALLEL_LOOP(private='[ib_idx,radial_vector,local_force_contribution,cell_volume,local_torque_contribution, viscous_stress_div, viscous_stress_div_1, viscous_stress_div_2, dx, dy, dz]', copy='[forces,torques]', copyin='[ib_markers,patch_ib,dynamic_viscosity,bulk_viscosity]', collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[ib_idx,radial_vector,local_force_contribution,cell_volume,local_torque_contribution, viscous_stress_div, viscous_stress_div_1, viscous_stress_div_2, dx, dy, dz]', copy='[forces,torques]', copyin='[ib_markers,patch_ib,dynamic_viscosity]', collapse=3)
         do i = 0, m
             do j = 0, n
                 do k = 0, p
