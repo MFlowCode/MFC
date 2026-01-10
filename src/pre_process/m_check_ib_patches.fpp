@@ -96,8 +96,8 @@ contains
 
     end subroutine s_check_circle_ib_patch_geometry
 
-        !>  This subroutine verifies that the geometric parameters of
-        !!      the circle patch have consistently been inputted by the
+    !>  This subroutine verifies that the geometric parameters of
+        !!      the ellipse patch have consistently been inputted by the
         !!      user.
         !!  @param patch_id Patch identifier
     impure subroutine s_check_ellipse_ib_patch_geometry(patch_id)
