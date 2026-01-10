@@ -113,7 +113,7 @@ contains
             .or. f_is_default(patch_ib(patch_id)%y_centroid), &
             'in ellipse IB patch '//trim(iStr))
 
-    end subroutine s_check_circle_ib_patch_geometry
+    end subroutine s_check_ellipse_ib_patch_geometry
 
     !>  This subroutine verifies that the geometric parameters of
         !!      the airfoil patch have consistently been inputted by the
