@@ -1,78 +1,10 @@
-This file was created on 2026-01-09 16:23:05.537791.
+This file was created on 2026-01-10 09:29:50.350999.
 
 mfc.sh:
 
     Invocation: test --generate -o 5600D63B
     Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        18b7dcc7ad3a66260613dd23a226cb2e258257d4 on viscous-stress-and-ellipse-ib (clean)
-
-post_process:
-
-    CMake Configuration:
-    
-        CMake v3.28.3 on schwarzschild
-    
-        C       : GNU v13.3.0 (/usr/bin/cc)
-        Fortran : GNU v13.3.0 (/usr/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : ON
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-        OpenMP  : OFF
-    
-        Fypp    : /home/dan/Documents/repos/MFC/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /usr/bin/cc
-        CXX      : /usr/bin/c++
-        FC       : /usr/bin/gfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
-simulation:
-
-    CMake Configuration:
-    
-        CMake v3.28.3 on schwarzschild
-    
-        C       : GNU v13.3.0 (/usr/bin/cc)
-        Fortran : GNU v13.3.0 (/usr/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : ON
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-        OpenMP  : OFF
-    
-        Fypp    : /home/dan/Documents/repos/MFC/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /usr/bin/cc
-        CXX      : /usr/bin/c++
-        FC       : /usr/bin/gfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
+    Git:        e262ef9387a432cc58ead795fa521c27e17e29be on viscous-stress-and-ellipse-ib (dirty)
 
 pre_process:
 
@@ -142,6 +74,74 @@ syscheck:
         OMPI_CXX : 
         OMPI_FC  : 
 
+simulation:
+
+    CMake Configuration:
+    
+        CMake v3.28.3 on schwarzschild
+    
+        C       : GNU v13.3.0 (/usr/bin/cc)
+        Fortran : GNU v13.3.0 (/usr/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /home/dan/Documents/repos/MFC/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /usr/bin/cc
+        CXX      : /usr/bin/c++
+        FC       : /usr/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+post_process:
+
+    CMake Configuration:
+    
+        CMake v3.28.3 on schwarzschild
+    
+        C       : GNU v13.3.0 (/usr/bin/cc)
+        Fortran : GNU v13.3.0 (/usr/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : ON
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /home/dan/Documents/repos/MFC/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /usr/bin/cc
+        CXX      : /usr/bin/c++
+        FC       : /usr/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
 CPU:
 
     CPU Info:
@@ -160,7 +160,7 @@ CPU:
     Core(s) per socket:                      12
     Socket(s):                               1
     Stepping:                                2
-    CPU(s) scaling MHz:                      23%
+    CPU(s) scaling MHz:                      32%
     CPU max MHz:                             5100.0000
     CPU min MHz:                             800.0000
     BogoMIPS:                                7219.20

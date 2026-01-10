@@ -1022,8 +1022,8 @@ contains
 
         integer :: gp_id, i, j, k, l, q, ib_idx
         real(wp), dimension(num_ibs, 3) :: forces, torques
-        real(wp), dimension(1:3, 1:3) :: viscous_stress_div, viscous_stress_div_1, viscous_stress_div_2 ! viscous stress tensor with temp vectors to hold divergence calculations
-        real(wp), dimension(1:3) :: local_force_contribution, radial_vector, local_torque_contribution, vel, viscous_cross_1, viscous_cross_2
+        real(wp), dimension(1:3, 1:3) :: viscous_stress_div, viscous_stress_div_1, viscous_stress_div_2, viscous_cross_1, viscous_cross_2 ! viscous stress tensor with temp vectors to hold divergence calculations
+        real(wp), dimension(1:3) :: local_force_contribution, radial_vector, local_torque_contribution, vel
         real(wp) :: cell_volume, dx, dy, dz
 
         forces = 0._wp
