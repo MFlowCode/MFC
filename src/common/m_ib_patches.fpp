@@ -119,6 +119,9 @@ contains
                     ! STL+IBM patch
                 elseif (patch_ib(i)%geometry == 5) then
                     call s_ib_model(i, ib_markers_sf, levelset, levelset_norm)
+                elseif (patch_ib(i)%geometry == 6) then
+                    call s_ib_ellipse(i, ib_markers_sf)
+                    call s_ellipse_levelset(i, levelset, levelset_norm)
                 end if
             end do
             !> @}
@@ -761,6 +764,45 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_ib_cylinder
+
+    subroutine s_ib_ellipse(patch_id, ib_markers_sf)
+
+        integer, intent(in) :: patch_id
+        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: ib_markers_sf
+
+        integer :: i, j, k !< generic loop iterators
+        real(wp), dimension(1:3) :: xy_local !< x and y coordinates in local IB frame
+        real(wp), dimension(1:2) :: ellipse_coeffs !< a and b in the ellipse coefficients
+        real(wp), dimension(1:2) :: center !< x and y coordinates in local IB frame
+        real(wp), dimension(1:3, 1:3) :: inverse_rotation
+
+        ! Transferring the ellipse's centroid and length information
+        center(1) = patch_ib(patch_id)%x_centroid
+        center(2) = patch_ib(patch_id)%y_centroid
+        ellipse_coeffs(1) = 0.5_wp*patch_ib(patch_id)%length_x
+        ellipse_coeffs(2) = 0.5_wp*patch_ib(patch_id)%length_y
+        inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
+
+        ! Checking whether the ellipse covers a particular cell in the
+        ! domain
+        $:GPU_PARALLEL_LOOP(private='[i,j, xy_local]', copy='[ib_markers_sf]',&
+                  & copyin='[patch_id,center,ellipse_coeffs,inverse_rotation,x_cc,y_cc]', collapse=2)
+        do j = 0, n
+            do i = 0, m
+                ! get the x and y coordinates in the local IB frame
+                xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]
+                xy_local = matmul(inverse_rotation, xy_local)
+
+                ! Ellipse condition (x/a)^2 + (y/b)^2 <= 1
+                if ((xy_local(1)/ellipse_coeffs(1))**2 + (xy_local(2)/ellipse_coeffs(2))**2 <= 1._wp) then
+                    ! Updating the patch identities bookkeeping variable
+                    ib_markers_sf(i, j, 0) = patch_id
+                end if
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_ib_ellipse
 
     !> The STL patch is a 2/3D geometry that is imported from an STL file.
     !! @param patch_id is the patch identifier

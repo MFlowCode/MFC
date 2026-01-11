@@ -627,7 +627,7 @@ contains
 
                             if (patch_ib(i)%moving_ibm == 2) then ! if we are using two-way coupling, apply force and torque
                                 ! compute the force and torque on the IB from the fluid
-                                call s_compute_ib_forces(q_prim_vf(E_idx))
+                                call s_compute_ib_forces(q_prim_vf, 1._wp/fluid_pp(1)%Re(1))
 
                                 ! update the velocity from the force value
                                 patch_ib(i)%vel = patch_ib(i)%vel + rk_coef(s, 3)*dt*(patch_ib(i)%force/patch_ib(i)%mass)/rk_coef(s, 4)
