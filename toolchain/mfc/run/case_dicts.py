@@ -105,7 +105,7 @@ PRE_PROCESS.update({
     'bubbles_lagrange': ParamType.LOG,
     'simplex_perturb': ParamType.LOG,
     'fft_wrt': ParamType.LOG,
-        'files_dir': ParamType.STR,       
+    'files_dir': ParamType.STR,       
     'file_extention': ParamType.STR,
 })
 
