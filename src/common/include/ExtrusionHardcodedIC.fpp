@@ -37,12 +37,12 @@
 
 #:def HardcodedDimensionsExtrusion()
     integer :: xRows, yRows, nRows, iix, iiy, max_files
-    integer :: f, iter, ios, ios2, unit, unit2, idx, idy, index_x, index_y, jump, line_count, ycount
+    integer :: f, iter, ios, ios2, unit, unit2, idx, idy, index_x, index_y, jump, line_count, ycount,ierr
     real(wp) :: x_len, x_step, y_len, y_step
     real(wp) :: dummy_x, dummy_y, dummy_z, x0, y0
     integer :: global_offset_x, global_offset_y           ! MPI subdomain offset
     real(wp) :: delta_x, delta_y
-    character(len=100), dimension(sys_size) :: fileNames ! Arrays to store all data from files
+    character(len=150), dimension(sys_size) :: fileNames ! Arrays to store all data from files
     character(len=200) :: errmsg
     real(wp), allocatable :: stored_values(:, :, :)
     real(wp), allocatable :: x_coords(:), y_coords(:)
@@ -51,31 +51,34 @@
    ! character(len=*), parameter :: init_dir = "/home/MFC/FilesDirectory" ! For example /home/MFC/examples/1D_Shock/D/
     character(len=20) :: file_num_str     ! For storing the file number as a string
     character(len=20) :: zeros_part       ! For the trailing zeros part
-   ! character(len=6), parameter :: zeros_default = "000000"  ! Default zeros (can be changed)
+integer :: ierr = 0
+integer :: ios = 0
+integer :: ios2 = 0
+! character(len=6), parameter :: zeros_default = "000000"  ! Default zeros (can be changed)
 #:enddef
 
 #:def HardcodedReadValues()
 
     if (.not. files_loaded) then
         max_files = merge(sys_size, sys_size - 1, num_dims == 1)
-        do f = 1, max_files
-            write (file_num_str, '(I0)') f
-            ! 1. Trim the directory
-            ! 2. Check if it already ends in / (optional, but trim is mandatory)
-            ! 3. Trim the extension
-fileNames(f) = trim(files_dir)//"/"// "prim." // trim(file_num_str) // ".00." // trim(file_extention) // ".dat" 
- end do
-
-        ! Add this PRINT line for debugging! 
-        ! It will show you exactly what the code is seeing in the terminal.
-        print *, "RANK", proc_rank, " is opening: |" // trim(fileNames(1)) // "|"
-
-        ! Common file reading setup
-        open (newunit=unit2, file=trim(fileNames(1)), status='old', action='read', iostat=ios2)
-        ! Common file reading setup
-        open (newunit=unit2, file=trim(fileNames(1)), status='old', action='read', iostat=ios2)
-        if (ios2 /= 0) call s_mpi_abort("Error opening file: "//trim(fileNames(1)))
-
+     
+            do f = 1, max_files
+              write (file_num_str, '(I0)') f
+              ! 1. Trim the directory
+              ! 2. Check if it already ends in / (optional, but trim is mandatory)
+              ! 3. Trim the extension
+  fileNames(f) = trim(files_dir)//"/"// "prim." // trim(file_num_str) //".00."//trim(file_extention)//".dat"
+   end do
+ !call mpi_barrier(MPI_COMM_WORLD, ierr)  
+          ! Add this PRINT line for debugging! 
+          ! It will show you exactly what the code is seeing in the terminal.
+  
+          ! Common file reading setup
+          open (newunit=unit2, file=trim(fileNames(1)), status='old', action='read', iostat=ios2)
+          ! Common file reading setup
+          ! open (newunit=unit2, file=trim(fileNames(1)), status='old', action='read', iostat=ios2)
+           if (ios2 /= 0) call s_mpi_abort("Error opening file: "//trim(fileNames(1)))
+   
         select case (num_dims)
         case (1, 2)  ! 1D and 2D cases are similar
             ! Count lines

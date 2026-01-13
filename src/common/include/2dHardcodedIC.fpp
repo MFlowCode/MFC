@@ -3,12 +3,18 @@
     real(wp) :: eps
     real(wp) :: r, rmax, gam, umax, p0
     real(wp) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, intL, alph
-    real(wp) :: factor
+    real(wp) :: factor, x1c,y1c,x2c,y2c,Rvortex,r1c,r2c,cvortex,u1c,u2c,v1c,v2c, rvortex
     ! # 207
     real(wp) :: sigma, gauss1, gauss2
+    real(wp) :: yy0, yrel, theta, dx_front, sss, aaa
+    integer :: v, klo, khi, kmid,ll
     ! # 208
     real(wp) :: ei, d, fsm, alpha_air, alpha_sf6
-
+        real(wp), parameter :: Ly_param = 0.00775735_wp                       
+        real(wp), parameter :: A_param  = 0.1_wp*96.9880867_wp*10.0_wp**(-6.0_wp)
+        integer,  parameter :: Nwaves   = 6
+        real(wp), parameter :: pi_wp  = acos(-1.0_wp)
+        real(wp), parameter :: y0_ref = 0.0_wp
     eps = 1.e-9_wp
 #:enddef
 
@@ -202,7 +208,68 @@
     case (270)
         ! This hardcoded case extrudes a 1D profile to initialize a 2D simulation domain
         @: HardcodedReadValues()
+         x1c=0.0027_wp                                                                                                                                   
+         y1c=0.005_wp
+         x2c=0.0027_wp
+         y2c=0.003_wp
+         r1c=(x_cc(i)-x1c)**(2.0_wp)+(y_cc(j)-y1c)**(2.0_wp)
+         r2c=(x_cc(i)-x2c)**(2.0_wp)+(y_cc(j)-y2c)**(2.0_wp)
+         rvortex=0.0005_wp 
+         cvortex=6000.0_wp
+   
+        u1c=-cvortex*((y_cc(j)-y1c))*exp(-r1c/(2.0_wp*rvortex**2.0_wp)) 
+        v1c=cvortex*((x_cc(i)-x1c))*exp(-r1c/(2.0_wp*rvortex**2.0_wp))
+  
+        u2c=cvortex*((y_cc(j)-y2c))*exp(-r2c/(2.0_wp*rvortex**2.0_wp))
+        v2c=-cvortex*((x_cc(i)-x2c))*exp(-r2c/(2.0_wp*rvortex**2.0_wp))
+        q_prim_vf(2)%sf(i,j,0)=q_prim_vf(2)%sf(i,j,0)+u1c+u2c
+        q_prim_vf(3)%sf(i,j,0)=v1c+v2c
 
+        case (272)
+                 @: HardcodedReadValues()
+
+              yy0  = y0_ref
+    yrel = y_cc(j) - yy0
+    theta    = 2.0_wp*pi_wp*Nwaves * (yrel / Ly_param)
+    dx_front = A_param * sin(theta)
+ 
+    ! sample the global 1D profile at shifted coordinate s = x - dx_front
+           sss = x_cc(i) - dx_front
+ 
+    ! ---- clamp or interpolate from GLOBAL arrays: x_coords / stored_values ----
+     if (sss <= x_coords(1)) then
+       do v = 1, sys_size - 1
+         q_prim_vf(v + merge(1,0, v>=momxe))%sf(i,j,0) = stored_values(1, 1, v)
+       end do
+       q_prim_vf(momxe)%sf(i,j,0) = 0.0_wp
+  
+     else if (sss >= x_coords(xRows)) then
+       do v = 1, sys_size - 1
+         q_prim_vf(v + merge(1,0, v>=momxe))%sf(i,j,0) = stored_values(xRows, 1, v)
+     end do
+       q_prim_vf(momxe)%sf(i,j,0) = 0.0_wp
+
+       else
+      ! Bisection ONLY on GLOBAL x_coords: find klo,khi with x_coords(klo) <= sss < x_coords(khi)
+       klo = 1;  khi = xRows
+       do while (khi - klo > 1)
+         kmid = (klo + khi) / 2
+         if (x_coords(kmid) <= sss) then
+           klo = kmid
+         else
+           khi = kmid
+         end if
+       end do
+
+      aaa = (sss - x_coords(klo)) / (x_coords(khi) - x_coords(klo))   ! weight in [0,1)
+  
+       ! interpolate ALL variables except momxe (2D out-of-plane momentum)
+       do v = 1, sys_size - 1
+         q_prim_vf(v + merge(1,0, v>=momxe))%sf(i,j,0) = (1.0_wp - aaa)*stored_values(klo, 1, v) &
+                                                       +            aaa *stored_values(khi, 1, v)
+       end do
+     q_prim_vf(momxe)%sf(i,j,0) = 0.0_wp
+      end if
     case (280)
         ! This is patch is hard-coded for test suite optimization used in the
         ! 2D_isentropicvortex case:

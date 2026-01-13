@@ -979,6 +979,8 @@ contains
     end subroutine s_finalize_ibm_module
 
     function cross_product(a, b) result(c)
+  $:GPU_ROUTINE(function_name='cross_product',parallelism='[seq]', &
+              & cray_inline=True)
         implicit none
         real(wp), intent(in) :: a(3), b(3)
         real(wp) :: c(3)

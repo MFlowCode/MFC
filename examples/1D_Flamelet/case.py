@@ -18,7 +18,7 @@ parser.add_argument("--no-chem", dest='chemistry', default=True, action="store_f
                     help="Disable chemistry.")
 args = parser.parse_args()
 
-current_dir = os.path.dirname(os.path.realpath(__file__))
+current_dir = os.path.dirname(os.path.abspath(__file__))
 ctfile    = 'sandiego.yaml'
 sol_L     = ct.Solution(ctfile)
 sol_L.TPX =  300,  8000, 'O2:2,N2:2,H2O:5'
@@ -65,7 +65,7 @@ case = {
     'bc_x%beg'                     :-8,
     'bc_x%end'                     :-8,
     'viscous'                      : 'F',
-'files_dir': os.path.join(current_dir, 'IC'),
+    'files_dir': os.path.join(current_dir, 'IC'),
     'file_extention'                : '000000',
     # ==========================================================================
     # Chemistry ================================================================
