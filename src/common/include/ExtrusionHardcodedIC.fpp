@@ -61,7 +61,7 @@
 
         do f = 1, max_files
             write (file_num_str, '(I0)') f
-            fileNames(f) = trim(files_dir)//"/"//"prim."//trim(file_num_str)//".00."//trim(file_extention)//".dat"
+            fileNames(f) = trim(files_dir)//"/"//"prim."//trim(file_num_str)//".00."//trim(file_extension)//".dat"
         end do
 
         ! Common file reading setup

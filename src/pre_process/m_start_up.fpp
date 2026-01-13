@@ -154,7 +154,7 @@ contains
             patch_bc, Bx0, relativity, cont_damage, igr, igr_order, &
             down_sample, recon_type, muscl_order, &
             simplex_perturb, simplex_params, fft_wrt, &
-            files_dir, file_extention
+            files_dir, file_extension
 
         ! Inquiring the status of the pre_process.inp file
         file_loc = 'pre_process.inp'

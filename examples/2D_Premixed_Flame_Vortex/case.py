@@ -65,7 +65,7 @@ data = {
     "chem_params%diffusion": "T",
     "chem_params%reactions": "T",
     "files_dir": os.path.join(current_dir, "IC"),
-    "file_extention": "000000",
+    "file_extension": "000000",
     "format": 1,
     "precision": 2,
     "prim_vars_wrt": "T",
