@@ -49,7 +49,7 @@ case = {
     "viscous": "F",
     "files_dir": os.path.join(current_dir, "IC"),
     "file_extension": "000000",
-    "chemistry": "T" if not args.chemistry else "T",
+    "chemistry": "T",
     "chem_params%diffusion": "T",
     "chem_params%reactions": "T",
     "chem_params%transport_model": 2,

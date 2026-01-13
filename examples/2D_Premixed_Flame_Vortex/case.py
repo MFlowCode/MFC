@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-
-#Reference: An improved high-order scheme for DNS of low Mach number turbulent reacting flows based on stiff chemistry solver, 4.3
+# Reference: An improved high-order scheme for DNS of low Mach number turbulent reacting flows based on stiff chemistry solver, 4.3
 import json
 import argparse
 import math
@@ -61,7 +60,7 @@ data = {
     "num_patches": 1,
     "num_fluids": 1,
     "viscous": "T",
-    "chemistry": "T" if not args.chemistry else "T",
+    "chemistry": "T",
     "chem_params%diffusion": "T",
     "chem_params%reactions": "T",
     "files_dir": os.path.join(current_dir, "IC"),

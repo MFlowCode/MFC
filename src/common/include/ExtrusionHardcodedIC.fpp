@@ -37,7 +37,7 @@
 
 #:def HardcodedDimensionsExtrusion()
     integer :: xRows, yRows, nRows, iix, iiy, max_files
-    integer :: f, iter, ios, ios2, unit, unit2, idx, idy, index_x, index_y, jump, line_count, ycount
+    integer :: f, iter, unit, unit2, idx, idy, index_x, index_y, jump, line_count, ycount
     real(wp) :: x_len, x_step, y_len, y_step
     real(wp) :: dummy_x, dummy_y, dummy_z, x0, y0
     integer :: global_offset_x, global_offset_y           ! MPI subdomain offset
@@ -50,8 +50,8 @@
     real(wp) :: domain_xstart, domain_xend, domain_ystart, domain_yend
     character(len=20) :: file_num_str     ! For storing the file number as a string
     character(len=20) :: zeros_part       ! For the trailing zeros part
-    ios = 0
-    ios2 = 0
+    integer :: ios = 0
+    integer :: ios2 = 0
 #:enddef
 
 #:def HardcodedReadValues()

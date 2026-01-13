@@ -6,14 +6,13 @@
     real(wp) :: factor, x1c, y1c, x2c, y2c, r1c, r2c, cvortex, u1c, u2c, v1c, v2c, rvortex
     ! # 207
     real(wp) :: sigma, gauss1, gauss2
-    real(wp) :: y_center, y_dist, wave_phase, front_shift, x_mapped, alpha
+    real(wp) :: y_center, y_dist, wave_phase, front_shift, x_mapped, interp_wt
     integer :: v, idx_lo, idx_hi, idx_mid, ll
     ! # 208
     real(wp) :: ei, d, fsm, alpha_air, alpha_sf6
     real(wp), parameter :: Ly_param = 0.00775735_wp
     real(wp), parameter :: A_param = 0.1_wp*96.9880867_wp*10.0_wp**(-6.0_wp)
     integer, parameter :: Nwaves = 6
-    real(wp), parameter :: pi_wp = acos(-1.0_wp)
     real(wp), parameter :: y0_ref = 0.0_wp
     eps = 1.e-9_wp
 #:enddef
@@ -230,13 +229,11 @@
 
         y_center = y0_ref
         y_dist = y_cc(j) - y_center
-        wave_phase = 2.0_wp*pi_wp*Nwaves*(y_dist/Ly_param)
+        wave_phase = 2.0_wp*pi*Nwaves*(y_dist/Ly_param)
         front_shift = A_param*sin(wave_phase)
 
-        ! sample the global 1D profile at shifted coordinate s = x - front_shift
         x_mapped = x_cc(i) - front_shift
 
-        ! ---- clamp or interpolate from GLOBAL arrays: x_coords / stored_values ----
         if (x_mapped <= x_coords(1)) then
             do v = 1, sys_size - 1
                 q_prim_vf(v + merge(1, 0, v >= momxe))%sf(i, j, 0) = stored_values(1, 1, v)
@@ -261,12 +258,11 @@
                 end if
             end do
 
-            alpha = (x_mapped - x_coords(idx_lo))/(x_coords(idx_hi) - x_coords(idx_lo))   ! weight in [0,1)
+            interp_wt = (x_mapped - x_coords(idx_lo))/(x_coords(idx_hi) - x_coords(idx_lo))   ! weight in [0,1)
 
-            ! interpolate ALL variables except momxe (2D out-of-plane momentum)
             do v = 1, sys_size - 1
-                q_prim_vf(v + merge(1, 0, v >= momxe))%sf(i, j, 0) = (1.0_wp - alpha)*stored_values(idx_lo, 1, v) &
-                                                                     + alpha*stored_values(idx_hi, 1, v)
+                q_prim_vf(v + merge(1, 0, v >= momxe))%sf(i, j, 0) = (1.0_wp - interp_wt)*stored_values(idx_lo, 1, v) &
+                                                                     + interp_wt*stored_values(idx_hi, 1, v)
             end do
             q_prim_vf(momxe)%sf(i, j, 0) = 0.0_wp
         end if
