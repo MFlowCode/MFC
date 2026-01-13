@@ -1,0 +1,18 @@
+This file was created on 2026-01-13 14:04:47.198929.
+
+mfc.sh:
+
+    Invocation: test --generate -o 0D1E22F3 --no-gpu -j1
+    Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
+    Git:        f233473d9a6250965ae45690ef667b3f52c3f42c on ExtrusionV2 (dirty)
+
+CPU:
+
+    CPU Info:
+    From sysctl -a 
+    machdep.cpu.cores_per_package: 8
+    machdep.cpu.core_count: 8
+    machdep.cpu.logical_per_package: 8
+    machdep.cpu.thread_count: 8
+    machdep.cpu.brand_string: Apple M3
+

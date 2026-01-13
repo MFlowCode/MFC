@@ -58,7 +58,7 @@ contains
             & 'perturb_flow', 'perturb_sph', 'mixlayer_vel_profile',           &
             & 'mixlayer_perturb', 'bubbles_euler', 'polytropic', 'polydisperse',&
             & 'qbmm', 'file_per_process', 'adv_n', 'ib' , 'cfl_adap_dt',       &
-            & 'cfl_const_dt', 'cfl_dt', 'surface_tension',  'extrusion_ic',     &
+            & 'cfl_const_dt', 'cfl_dt', 'surface_tension',                     &
             & 'hyperelasticity', 'pre_stress', 'elliptic_smoothing', 'viscous',&
             & 'bubbles_lagrange', 'bc_io', 'mhd', 'relativity', 'cont_damage', &
             & 'igr', 'down_sample', 'simplex_perturb','fft_wrt' ]
@@ -143,18 +143,9 @@ contains
             #:endfor
         end do
 
-        ! Fluids physical parameters
-        do i = 1, num_fluids_max
-            #:for VAR in [ 'gamma','pi_inf','mul0','ss','pv','gamma_v','M_v',  &
-                & 'mu_v','k_v', 'G', 'cv', 'qv', 'qvp', 'D_v' ]
-                call MPI_BCAST(fluid_pp(i)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-            #:endfor
-        end do
-
         ! Simplex noise  and fluid physical parameters
         do i = 1, num_fluids_max
-            #:for VAR in [ 'gamma','pi_inf','mul0','ss','pv','gamma_v','M_v',  &
-                & 'mu_v','k_v', 'G', 'cv', 'qv', 'qvp', 'D_v' ]
+            #:for VAR in [ 'gamma','pi_inf', 'G', 'cv', 'qv', 'qvp' ]
                 call MPI_BCAST(fluid_pp(i)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 
@@ -166,6 +157,15 @@ contains
                 call MPI_BCAST(simplex_params%perturb_dens_offset(i, j), 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             end do
         end do
+
+        ! Subgrid bubble parameters
+        if (bubbles_euler .or. bubbles_lagrange) then
+            #:for VAR in [ 'R0ref','p0ref','rho0ref','T0ref', &
+                'ss','pv','vd','mu_l','mu_v','mu_g','gam_v','gam_g', &
+                'M_v','M_g','k_v','k_g','cp_v','cp_g','R_v','R_g']
+                call MPI_BCAST(bub_pp%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
+        end if
 
         do i = 1, 3
             call MPI_BCAST(simplex_params%perturb_vel(i), 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
