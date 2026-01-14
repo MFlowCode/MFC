@@ -7,6 +7,8 @@ from .printer import cons
 from .state import ARG
 from .run   import case_dicts
 
+from pprint import pprint
+
 
 QPVF_IDX_VARS = {
     'alpha_rho': 'contxb', 'vel'  : 'momxb',         'pres': 'E_idx', 
@@ -52,7 +54,7 @@ class Case:
         dict_str = ""
         for key, val in self.params.items():
             if key in MASTER_KEYS and key not in case_dicts.IGNORE:
-                if self.__is_ic_analytical(key, val):
+                if self.__is_ic_analytical(key, val) or self.__is_mib_analytical(key, val):
                     dict_str += f"{key} = 0d0\n"
                     ignored.append(key)
                     continue
@@ -106,7 +108,7 @@ class Case:
             return False
 
         for variable in MIBM_ANALYTIC_VARS:
-            if re.match(fr'^patch_ib\([0-9]+\)%{variable}', key):
+            if re.match(fr'^patch_ib\([0-9]+\)%{re.escape(variable)}', key):
                 return True
 
         return False
@@ -348,13 +350,14 @@ class Case:
         else:
             out = ""
 
+        out = out + self.__get_analytic_mib_fpp(print)
+
         # We need to also include the pre_processing includes so that common subroutines have access to the @:analytical function
         return out + f"\n{self.__get_pre_fpp(print)}"
 
 
     def __get_pre_fpp(self, print: bool) -> str:
         out = self.__get_analytic_ic_fpp(print)
-        out += self.__get_analytical_mib_fpp(print)
         return out
 
     def get_fpp(self, target, print = True) -> str:

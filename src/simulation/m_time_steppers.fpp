@@ -3,6 +3,7 @@
 !! @brief Contains module m_time_steppers
 
 #:include 'macros.fpp'
+#:include 'case.fpp'
 
 !> @brief The following module features a variety of time-stepping schemes.
 !!              Currently, it includes the following Runge-Kutta (RK) algorithms:
@@ -626,6 +627,7 @@ contains
                             patch_ib(i)%angular_vel = (rk_coef(s, 1)*patch_ib(i)%step_angular_vel + rk_coef(s, 2)*patch_ib(i)%angular_vel)/rk_coef(s, 4)
 
                             if (patch_ib(i)%moving_ibm == 1) then
+                                ! plug in analytic velocities for 1-way coupling, if it exists
                                 @:mib_analytical()
                             else if (patch_ib(i)%moving_ibm == 2) then ! if we are using two-way coupling, apply force and torque
                                 ! compute the force and torque on the IB from the fluid
