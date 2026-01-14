@@ -625,7 +625,9 @@ contains
                             patch_ib(i)%vel = (rk_coef(s, 1)*patch_ib(i)%step_vel + rk_coef(s, 2)*patch_ib(i)%vel)/rk_coef(s, 4)
                             patch_ib(i)%angular_vel = (rk_coef(s, 1)*patch_ib(i)%step_angular_vel + rk_coef(s, 2)*patch_ib(i)%angular_vel)/rk_coef(s, 4)
 
-                            if (patch_ib(i)%moving_ibm == 2) then ! if we are using two-way coupling, apply force and torque
+                            if (patch_ib(i)%moving_ibm == 1) then
+                                @:mib_analytical()
+                            else if (patch_ib(i)%moving_ibm == 2) then ! if we are using two-way coupling, apply force and torque
                                 ! compute the force and torque on the IB from the fluid
                                 call s_compute_ib_forces(q_prim_vf(E_idx))
 
