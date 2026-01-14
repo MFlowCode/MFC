@@ -10,7 +10,7 @@
 # flux: --error="${name}.err"
 # flux: --time=${walltime}
 # flux: --exclusive
-# flux:--setattr=thp=always
+# flux: --setattr=thp=always
 # flux: --coral2-hugepages=512GB
 % if account:
 # flux: --bank=${account}
@@ -25,7 +25,7 @@ ${helpers.template_prologue()}
 ok ":) Loading modules:\n"
 cd "${MFC_ROOT_DIR}"
 % if engine == 'batch':
-. ./mfc.sh load -c t -m ${'g' if gpu else 'c'}
+. ./mfc.sh load -c tuo -m ${'g' if gpu else 'c'}
 % endif
 cd - > /dev/null
 echo
