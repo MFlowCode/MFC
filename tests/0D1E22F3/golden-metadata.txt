@@ -1,10 +1,10 @@
-This file was created on 2026-01-13 14:04:47.198929.
+This file was created on 2026-01-13 22:51:24.002067.
 
 mfc.sh:
 
-    Invocation: test --generate -o 0D1E22F3 --no-gpu -j1
+    Invocation: test --generate -o 0D1E22F3 --no-gpu -j1 --no-debug
     Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        f233473d9a6250965ae45690ef667b3f52c3f42c on ExtrusionV2 (dirty)
+    Git:        7194c0bf06c4719fe2220cacf0fc42ef5465d073 on ExtrusionV2 (clean)
 
 CPU:
 
