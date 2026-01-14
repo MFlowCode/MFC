@@ -1085,7 +1085,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             ))
 
         cases.append(define_case_f(
-           f'1D -> Chemistry -> Flamelet','examples/1D_Flamelet/case.py',
+           f'1D -> Chemistry -> Flamelet','examples/1D_flamelet/case.py',
            mods={
                **common_mods
            },
