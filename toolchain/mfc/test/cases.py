@@ -1011,14 +1011,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             # # List of all example cases that will be skipped during testing
             casesToSkip = ["2D_ibm_cfl_dt", "1D_sodHypo", "2D_viscous",
                            "2D_laplace_pressure_jump", "2D_bubbly_steady_shock",
-                           "2D_advection", "2D_hardcoded_ic","2D_Premixed_Landau_Insta",
+                           "2D_advection", "2D_hardcoded_ic","2D_premixed_landau_insta",
                            "2D_ibm_multiphase", "2D_acoustic_broadband",
-                           "1D_inert_shocktube", "1D_reactive_shocktube","1D_Flamelet"
+                           "1D_inert_shocktube", "1D_reactive_shocktube","1D_flamelet"
                            "2D_ibm_steady_shock", "3D_performance_test",
                            "3D_ibm_stl_ellipsoid", "3D_sphbubcollapse",
                            "2D_ibm_stl_wedge", "3D_ibm_stl_pyramid",
                            "3D_ibm_bowshock", "3D_turb_mixing",
-                           "2D_mixing_artificial_Ma", "2D_Premixed_Flame_Vortex",
+                           "2D_mixing_artificial_Ma", "2D_premixed_flame_vortex",
                            "2D_lagrange_bubblescreen",
                            "3D_lagrange_bubblescreen", "2D_triple_point",
                            "1D_shuosher_analytical",
