@@ -1118,7 +1118,7 @@ contains
             call s_mpi_allreduce_sum(center_of_mass(2), center_of_mass(2))
             call s_mpi_allreduce_sum(center_of_mass(3), center_of_mass(3))
             call s_mpi_allreduce_integer_sum(num_cells_local, num_cells)
-            center_of_mass = center_of_mass/real(num_cells_local, wp)
+            center_of_mass = center_of_mass/real(num_cells, wp)
 
             ! assign the centroid offset as a vector pointing from the true COM to the "centroid" in the input file and replace the current centroid
             patch_ib(ib_marker)%centroid_offset = [patch_ib(ib_marker)%x_centroid, patch_ib(ib_marker)%y_centroid, patch_ib(ib_marker)%z_centroid] &
