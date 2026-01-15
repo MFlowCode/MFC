@@ -1098,13 +1098,13 @@ contains
 
             center_of_mass = [0._wp, 0._wp, 0._wp]
             num_cells_local = 0
-            
+
             ! get the summed mass distribution and number of cells to divide by
             do i = 0, m
                 do j = 0, n
                     do k = 0, p
                         if (ib_markers%sf(i, j, k) == ib_marker) then
-                          num_cells_local = num_cells_local + 1
+                            num_cells_local = num_cells_local + 1
                             center_of_mass = center_of_mass + [x_cc(i), y_cc(j), 0._wp]
                             if (num_dims == 3) center_of_mass(3) = center_of_mass(3) + z_cc(k)
                         end if
@@ -1118,11 +1118,11 @@ contains
             call s_mpi_allreduce_sum(center_of_mass(2), center_of_mass(2))
             call s_mpi_allreduce_sum(center_of_mass(3), center_of_mass(3))
             call s_mpi_allreduce_integer_sum(num_cells_local, num_cells)
-            center_of_mass =  center_of_mass / real(num_cells_local, wp)
+            center_of_mass = center_of_mass/real(num_cells_local, wp)
 
             ! assign the centroid offset as a vector pointing from the true COM to the "centroid" in the input file and replace the current centroid
             patch_ib(ib_marker)%centroid_offset = [patch_ib(ib_marker)%x_centroid, patch_ib(ib_marker)%y_centroid, patch_ib(ib_marker)%z_centroid] &
-                - center_of_mass
+                                                  - center_of_mass
             patch_ib(ib_marker)%x_centroid = center_of_mass(1)
             patch_ib(ib_marker)%y_centroid = center_of_mass(2)
             patch_ib(ib_marker)%z_centroid = center_of_mass(3)

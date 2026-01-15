@@ -767,7 +767,6 @@ contains
 
     end subroutine s_ib_cylinder
 
-
     subroutine s_ib_ellipse(patch_id, ib_markers_sf)
 
         integer, intent(in) :: patch_id
@@ -782,8 +781,8 @@ contains
         ! Transferring the rectangle's centroid and length information
         center(1) = patch_ib(patch_id)%x_centroid
         center(2) = patch_ib(patch_id)%y_centroid
-        ellipse_coeffs(1) = 0.5_wp * patch_ib(patch_id)%length_x
-        ellipse_coeffs(2) = 0.5_wp * patch_ib(patch_id)%length_y
+        ellipse_coeffs(1) = 0.5_wp*patch_ib(patch_id)%length_x
+        ellipse_coeffs(2) = 0.5_wp*patch_ib(patch_id)%length_y
         inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
 
         ! Checking whether the rectangle covers a particular cell in the
