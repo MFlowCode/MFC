@@ -94,6 +94,7 @@ contains
             do j = 0, n
                 xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp] ! get coordinate frame centered on IB
                 xy_local = matmul(inverse_rotation, xy_local) ! rotate the frame into the IB's coordinate
+                xy_local = xy_local - patch_ib(ib_patch_id)%centroid_offset ! airfoils are a patch that require a centroid offset
 
                 if (xy_local(2) >= 0._wp) then
                     ! finds the location on the airfoil grid with the minimum distance (closest)
@@ -189,6 +190,7 @@ contains
 
                     xyz_local = [x_cc(i) - center(1), y_cc(j) - center(2), z_cc(l) - center(3)] ! get coordinate frame centered on IB
                     xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordinates
+                    xyz_local = xyz_local - patch_ib(ib_patch_id)%centroid_offset ! airfoils are a patch that require a centroid offset
 
                     if (xyz_local(2) >= center(2)) then
                         do k = 1, Np

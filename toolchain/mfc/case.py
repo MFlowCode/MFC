@@ -7,9 +7,6 @@ from .printer import cons
 from .state import ARG
 from .run   import case_dicts
 
-from pprint import pprint
-
-
 QPVF_IDX_VARS = {
     'alpha_rho': 'contxb', 'vel'  : 'momxb',         'pres': 'E_idx', 
     'alpha':     'advxb',  'tau_e': 'stress_idx%beg', 'Y':   'chemxb',
@@ -17,7 +14,7 @@ QPVF_IDX_VARS = {
 }
 
 MIBM_ANALYTIC_VARS = [
-    'vel(1)', 'vel(2)', 'vel(3)', 'angluar_vel(1)', 'angluar_vel(2)', 'angluar_vel(3)'
+    'vel(1)', 'vel(2)', 'vel(3)', 'angular_vel(1)', 'angular_vel(2)', 'angular_vel(3)'
 ]
 # "B_idx%end - 1" not "B_idx%beg + 1" must be used because 1D does not have Bx
 
