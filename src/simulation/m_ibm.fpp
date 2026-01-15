@@ -93,13 +93,14 @@ contains
         integer :: i, j, k
         integer :: max_num_gps, max_num_inner_gps
 
+        ! do all set up for moving immersed boundaries
         moving_immersed_boundary_flag = .false.
         do i = 1, num_ibs
             if (patch_ib(i)%moving_ibm /= 0) then
                 moving_immersed_boundary_flag = .true.
-
             end if
             call s_update_ib_rotation_matrix(i)
+            call s_compute_centroid_offset(i)
         end do
         $:GPU_ENTER_DATA(copyin='[patch_ib]')
 
@@ -1079,6 +1080,56 @@ contains
         @:DEALLOCATE(levelset_norm%sf)
 
     end subroutine s_finalize_ibm_module
+
+    !> Computes the center of mass for IB patch types where we are unable to determine their center of mass analytically.
+    !> These patches include things like NACA airfoils and STL models
+    subroutine s_compute_centroid_offset(ib_marker)
+
+        integer, intent(in) :: ib_marker
+
+        integer :: i, j, k, num_cells
+        real(wp), dimension(1:3) :: center_of_mass
+
+        ! Offset only needs to be computes for specific geometries
+        if (patch_ib(ib_marker)%geometry == 4 .or. &
+            patch_ib(ib_marker)%geometry == 5 .or. &
+            patch_ib(ib_marker)%geometry == 11 .or. &
+            patch_ib(ib_marker)%geometry == 12 .or. ) then
+
+            center_of_mass = [0._wp, 0._wp, 0._wp]
+            num_cells = 0
+            
+            ! get the summed mass distribution and number of cells to divide by
+            do i = 0, m
+                do j = 0, n
+                    do k = 0, p
+                        if (ib_markers%sf(i, j, k) == ib_marker) then
+                            center_of_mass = center_of_mass + [x_cc(i), y_cc(j), z_cc(k)]
+                            num_cells = num_cells + 1
+                        end if
+                    end do
+                end do
+            end do
+
+            ! reduce the mass contribution over all MPI ranks and compute COM
+            call s_mpi_allreduce_vectors_sum(center_of_mass, center_of_mass, 1, 3)
+            call s_mpi_allreduce_integer_sum(num_cells, num_cells)
+            center_of_mass = center_of_mass / real(num_cells, wp) ! compute the actual center of mass
+
+            ! assign the centroid offset as a vector pointing from the true COM to the "centroid" in the input file and replace the current centroid
+            patch_ib(ib_marker)%centroid_offset = [patch_ib(ib_marker)%x_centroid, patch_ib(ib_marker)%y_centroid, patch_ib(ib_marker)%_centroid] &
+                - center_of_mass
+            patch_ib(ib_marker)%x_centroid = center_of_mass(1)
+            patch_ib(ib_marker)%y_centroid = center_of_mass(2)
+            patch_ib(ib_marker)%z_centroid = center_of_mass(3)
+
+            ! rotate the centroid offset back into the local coords of the IB
+            patch_ib(ib_marker)%centroid_offset = matmul(patch_ib(ib_marker)%rotation_matrix_inverse, patch_ib(ib_marker)%centroid_offset)
+        else
+            patch_ib(ib_marker)%centroid_offset(:) = [0._wp, 0._wp, 0._wp]
+        end if
+
+    end subroutine s_compute_center_of_mass_offset
 
     subroutine s_compute_moment_of_inertia(ib_marker, axis)
 
