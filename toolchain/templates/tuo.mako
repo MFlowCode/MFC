@@ -11,7 +11,6 @@
 # flux: --time=${walltime}
 # flux: --exclusive
 # flux: --setattr=thp=always
-# flux: --coral2-hugepages=512GB
 % if account:
 # flux: --bank=${account}
 % endif
