@@ -76,7 +76,7 @@ data = {
     "fluid_pp(1)%pi_inf": 0.0e00,
     "fluid_pp(1)%Re(1)": 100000,
     "patch_icpp(1)%geometry": 3,
-    "patch_icpp(1)%hcid": 270,
+    "patch_icpp(1)%hcid": 271,
     "patch_icpp(1)%x_centroid": L / 2,
     "patch_icpp(1)%y_centroid": L / 4,
     "patch_icpp(1)%length_x": L,

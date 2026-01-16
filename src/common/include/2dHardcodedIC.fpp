@@ -206,6 +206,11 @@
 
     case (270)
         ! This hardcoded case extrudes a 1D profile to initialize a 2D simulation domain
+        @: HardcodedReadValues()   
+
+
+    case (271) ! Premixed Flame Vortices interctiom
+       
         @: HardcodedReadValues()
         x1c = 0.0027_wp
         y1c = 0.005_wp
@@ -225,6 +230,7 @@
         q_prim_vf(3)%sf(i, j, 0) = v1c + v2c
 
     case (272)
+        
         @: HardcodedReadValues()
 
         y_center = y0_ref
@@ -247,7 +253,6 @@
             q_prim_vf(momxe)%sf(i, j, 0) = 0.0_wp
 
         else
-            ! Bisection ONLY on GLOBAL x_coords: find idx_lo,idx_hi with x_coords(idx_lo) <= x_mapped < x_coords(idx_hi)
             idx_lo = 1; idx_hi = xRows
             do while (idx_hi - idx_lo > 1)
                 idx_mid = (idx_lo + idx_hi)/2

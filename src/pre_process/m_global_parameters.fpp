@@ -151,8 +151,6 @@ module m_global_parameters
     integer :: precision !< Precision of output files
     logical :: down_sample !< Down-sample the output data
 
-    logical :: extrusion_ic !< Extrusion of initial conditions to a higher dimension
-
     logical :: mixlayer_vel_profile !< Set hyperbolic tangent streamwise velocity profile
     real(wp) :: mixlayer_vel_coef !< Coefficient for the hyperbolic tangent streamwise velocity profile
     logical :: mixlayer_perturb !< Superimpose instability waves to surrounding fluid flow
@@ -400,7 +398,6 @@ contains
         file_per_process = .false.
         precision = 2
         down_sample = .false.
-        extrusion_ic = .false.
         viscous = .false.
         bubbles_lagrange = .false.
         mixlayer_vel_profile = .false.
