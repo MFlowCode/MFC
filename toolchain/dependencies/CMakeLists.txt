@@ -130,7 +130,7 @@ if (MFC_HIPFORT)
     if (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
         ExternalProject_Add(hipfort
             GIT_REPOSITORY "https://github.com/ROCmSoftwarePlatform/hipfort"
-            GIT_TAG        rocm-6.0.2
+            GIT_TAG        rocm-6.3.1
             GIT_SHALLOW    ON
             GIT_PROGRESS   ON
             CMAKE_ARGS     "-DHIPFORT_COMPILER=${CMAKE_Fortran_COMPILER}"
