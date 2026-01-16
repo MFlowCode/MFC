@@ -1159,7 +1159,7 @@ contains
         integer, intent(in) :: ib_marker
 
         integer :: i, j, k, num_cells, num_cells_local
-        real(wp), dimension(1:3) :: center_of_mass
+        real(wp), dimension(1:3) :: center_of_mass, center_of_mass_local
 
         ! Offset only needs to be computes for specific geometries
         if (patch_ib(ib_marker)%geometry == 4 .or. &
@@ -1167,7 +1167,7 @@ contains
             patch_ib(ib_marker)%geometry == 11 .or. &
             patch_ib(ib_marker)%geometry == 12) then
 
-            center_of_mass = [0._wp, 0._wp, 0._wp]
+                center_of_mass_local = [0._wp, 0._wp, 0._wp]
             num_cells_local = 0
 
             ! get the summed mass distribution and number of cells to divide by
@@ -1176,8 +1176,8 @@ contains
                     do k = 0, p
                         if (ib_markers%sf(i, j, k) == ib_marker) then
                             num_cells_local = num_cells_local + 1
-                            center_of_mass = center_of_mass + [x_cc(i), y_cc(j), 0._wp]
-                            if (num_dims == 3) center_of_mass(3) = center_of_mass(3) + z_cc(k)
+                            center_of_mass_local = center_of_mass_local + [x_cc(i), y_cc(j), 0._wp]
+                            if (num_dims == 3) center_of_mass_local(3) = center_of_mass_local(3) + z_cc(k)
                         end if
                     end do
                 end do
@@ -1185,9 +1185,9 @@ contains
 
             ! reduce the mass contribution over all MPI ranks and compute COM
             ! print *, "Before reduction ", center_of_mass, num_cells_local
-            call s_mpi_allreduce_sum(center_of_mass(1), center_of_mass(1))
-            call s_mpi_allreduce_sum(center_of_mass(2), center_of_mass(2))
-            call s_mpi_allreduce_sum(center_of_mass(3), center_of_mass(3))
+            call s_mpi_allreduce_sum(center_of_mass_local(1), center_of_mass(1))
+            call s_mpi_allreduce_sum(center_of_mass_local(2), center_of_mass(2))
+            call s_mpi_allreduce_sum(center_of_mass_local(3), center_of_mass(3))
             call s_mpi_allreduce_integer_sum(num_cells_local, num_cells)
             center_of_mass = center_of_mass/real(num_cells, wp)
 
