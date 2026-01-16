@@ -609,9 +609,8 @@ contains
                         end if
                     else
                         levelset%sf(i, j, k, ib_patch_id) = dist_surface
-
                         xyz_local = xyz_local*dist_surface_vec
-                        xyz_local = xyz_local/norm2(xyz_local)
+                        xyz_local = xyz_local/max(norm2(xyz_local), sgm_eps)
                         levelset_norm%sf(i, j, k, ib_patch_id, :) = matmul(rotation, xyz_local)
                     end if
                 end do

@@ -1123,11 +1123,6 @@ contains
             end do
         end if
 
-        call s_compute_derived_variables(t_step)
-
-#ifdef DEBUG
-        print *, 'Computed derived vars'
-#endif
         mytime = mytime + dt
 
         ! Total-variation-diminishing (TVD) Runge-Kutta (RK) time-steppers
@@ -1138,7 +1133,6 @@ contains
         if (relax) call s_infinite_relaxation_k(q_cons_ts(1)%vf)
 
         ! Time-stepping loop controls
-
         t_step = t_step + 1
 
     end subroutine s_perform_time_step
