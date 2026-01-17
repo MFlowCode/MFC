@@ -1167,7 +1167,7 @@ contains
             patch_ib(ib_marker)%geometry == 11 .or. &
             patch_ib(ib_marker)%geometry == 12) then
 
-                center_of_mass_local = [0._wp, 0._wp, 0._wp]
+            center_of_mass_local = [0._wp, 0._wp, 0._wp]
             num_cells_local = 0
 
             ! get the summed mass distribution and number of cells to divide by
