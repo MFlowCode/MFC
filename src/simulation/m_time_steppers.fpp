@@ -773,6 +773,9 @@ contains
 
         integer, intent(in) :: s
         integer :: i
+        logical :: forces_computed
+
+        forces_computed = .false.
 
         do i = 1, num_ibs
             if (s == 1) then
@@ -793,7 +796,10 @@ contains
                     @:mib_analytical()
                 else if (patch_ib(i)%moving_ibm == 2) then ! if we are using two-way coupling, apply force and torque
                     ! compute the force and torque on the IB from the fluid
-                    call s_compute_ib_forces(q_prim_vf, fluid_pp)
+                    if (.not. forces_computed) then
+                        call s_compute_ib_forces(q_prim_vf, fluid_pp)
+                        forces_computed = .true.
+                    end if
 
                     ! update the velocity from the force value
                     patch_ib(i)%vel = patch_ib(i)%vel + rk_coef(s, 3)*dt*(patch_ib(i)%force/patch_ib(i)%mass)/rk_coef(s, 4)

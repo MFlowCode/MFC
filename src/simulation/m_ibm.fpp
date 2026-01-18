@@ -1050,12 +1050,12 @@ contains
                         do fluid_idx = 0, num_fluids - 1
                             ! Get the pressure contribution to force via a finite difference to compute the 2D components of the gradient of the pressure and cell volume
                             local_force_contribution(1) = local_force_contribution(1) - (q_prim_vf(E_idx + fluid_idx)%sf(i + 1, j, k) - q_prim_vf(E_idx + fluid_idx)%sf(i - 1, j, k))/(2._wp*dx) ! force is the negative pressure gradient
-                            local_force_contribution(2) = local_force_contribution(1) - (q_prim_vf(E_idx + fluid_idx)%sf(i, j + 1, k) - q_prim_vf(E_idx + fluid_idx)%sf(i, j - 1, k))/(2._wp*dy)
+                            local_force_contribution(2) = local_force_contribution(2) - (q_prim_vf(E_idx + fluid_idx)%sf(i, j + 1, k) - q_prim_vf(E_idx + fluid_idx)%sf(i, j - 1, k))/(2._wp*dy)
                             cell_volume = abs(dx*dy)
                             ! add the 3D component of the pressure gradient, if we are working in 3 dimensions
                             if (num_dims == 3) then
                                 dz = z_cc(k + 1) - z_cc(k)
-                                local_force_contribution(3) = local_force_contribution(1) - (q_prim_vf(E_idx + fluid_idx)%sf(i, j, k + 1) - q_prim_vf(E_idx + fluid_idx)%sf(i, j, k - 1))/(2._wp*dz)
+                                local_force_contribution(3) = local_force_contribution(3) - (q_prim_vf(E_idx + fluid_idx)%sf(i, j, k + 1) - q_prim_vf(E_idx + fluid_idx)%sf(i, j, k - 1))/(2._wp*dz)
                                 cell_volume = abs(cell_volume*dz)
                             end if
                         end do
@@ -1070,7 +1070,7 @@ contains
                             dynamic_viscosity = 0._wp
                             do fluid_idx = 1, num_fluids
                                 ! local dynamic viscosity is the dynamic viscosity of the fluid times alpha of the fluid
-                                if (fluid_pp(fluid_idx)%Re(1) /= 0._wp) dynamic_viscosity = dynamic_viscosity + q_prim_vf(fluid_idx + advxb - 1)%sf(j, k, l)*(1._wp/fluid_pp(fluid_idx)%Re(1))
+                                if (fluid_pp(fluid_idx)%Re(1) /= 0._wp) dynamic_viscosity = dynamic_viscosity + q_prim_vf(fluid_idx + advxb - 1)%sf(i, j, k)*(1._wp/fluid_pp(fluid_idx)%Re(1))
                             end do
 
                             ! get the linear force component first
@@ -1191,12 +1191,16 @@ contains
             end do
 
             ! reduce the mass contribution over all MPI ranks and compute COM
-            ! print *, "Before reduction ", center_of_mass, num_cells_local
-            call s_mpi_allreduce_sum(center_of_mass_local(1), center_of_mass(1))
-            call s_mpi_allreduce_sum(center_of_mass_local(2), center_of_mass(2))
-            call s_mpi_allreduce_sum(center_of_mass_local(3), center_of_mass(3))
             call s_mpi_allreduce_integer_sum(num_cells_local, num_cells)
-            center_of_mass = center_of_mass/real(num_cells, wp)
+            if (num_cells /= 0) then
+                call s_mpi_allreduce_sum(center_of_mass_local(1), center_of_mass(1))
+                call s_mpi_allreduce_sum(center_of_mass_local(2), center_of_mass(2))
+                call s_mpi_allreduce_sum(center_of_mass_local(3), center_of_mass(3))
+                center_of_mass = center_of_mass/real(num_cells, wp)
+            else
+                patch_ib(ib_marker)%centroid_offset = [0._wp, 0._wp, 0._wp]
+                return
+            end if
 
             ! assign the centroid offset as a vector pointing from the true COM to the "centroid" in the input file and replace the current centroid
             patch_ib(ib_marker)%centroid_offset = [patch_ib(ib_marker)%x_centroid, patch_ib(ib_marker)%y_centroid, patch_ib(ib_marker)%z_centroid] &
