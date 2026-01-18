@@ -678,7 +678,7 @@ contains
         do i = 1, boundary_edge_count
             boundary_edge(1) = boundary_v(i, 2, 1) - boundary_v(i, 1, 1)
             boundary_edge(2) = boundary_v(i, 2, 2) - boundary_v(i, 1, 2)
-            edgetan = boundary_edge(1)/boundary_edge(2)
+            edgetan = boundary_edge(1)/sign(max(sgm_eps, abs(boundary_edge(2))), boundary_edge(2))
 
             if (abs(boundary_edge(2)) < threshold_vector_zero) then
                 if (edgetan > 0._wp) then

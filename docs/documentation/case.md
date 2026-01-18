@@ -993,6 +993,22 @@ When ``cyl_coord = 'T'`` is set in 2D the following constraints must be met:
 
 - `bc_y%beg = -2` to enable reflective boundary conditions
 
+### 17. Chemistry
+
+| Parameter                     | Type    | Description                                              |
+| ---:                          | :---:   | :---                                                     |
+| `chemistry`                   | Logical | Enable chemistry simulation                              |
+| `chem_params%diffusion`       | Logical | Enable multispecies diffusion                            |
+| `chem_params%reactions`       | Logical | Enable chemical reactions                                |
+| `chem_params%gamma_method`    | Integer | Methodology for calculating the heat capacity ratio      |
+| `chem_params%transport_model` | Integer | Methodology for calculating the diffusion coefficients   |
+| `cantera_file`                | String  | Cantera-format mechanism file (e.g., .yaml)              |
+
+- `chem_params%transport_model` specifies the methodology for calculating diffusion coefficients and other transport properties, `1` for mixture-average, `2` for Unity-Lewis
+
+- `cantera_file` specifies the chemical mechanism file. If the file is part of the standard Cantera library, only the filename is required. Otherwise, the file must be located in the same directory as your `case.py` file
+
+
 ## Enumerations
 
 ### Boundary conditions
