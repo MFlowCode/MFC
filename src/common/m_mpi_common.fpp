@@ -324,10 +324,10 @@ contains
 
         type(scalar_field), intent(in) :: filtered_fluid_indicator_function
         type(vector_field), dimension(5), intent(in) :: stat_q_cons_filtered
-        type(scalar_field), dimension(1:4), intent(in) :: stat_filtered_pressure
-        type(vector_field), dimension(1:9), intent(in) :: stat_reynolds_stress
-        type(vector_field), dimension(1:9), intent(in) :: stat_eff_visc
-        type(vector_field), dimension(1:3), intent(in) :: stat_int_mom_exch
+        type(scalar_field), dimension(4), intent(in) :: stat_filtered_pressure
+        type(vector_field), dimension(9), intent(in) :: stat_reynolds_stress
+        type(vector_field), dimension(9), intent(in) :: stat_eff_visc
+        type(vector_field), dimension(3), intent(in) :: stat_int_mom_exch
 
         integer, dimension(num_dims) :: sizes_glb, sizes_loc
 

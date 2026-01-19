@@ -250,10 +250,10 @@ contains
 
         allocate (filtered_fluid_indicator_function%sf(local_start_idx:end_x, local_start_idx:end_y, local_start_idx:end_z))
 
-        do i = 1, sys_size - 1
+        do i = 1, 5
             allocate (stat_q_cons_filtered(i)%vf(1:4))
         end do
-        do i = 1, sys_size - 1
+        do i = 1, 5
             do j = 1, 4
                 allocate (stat_q_cons_filtered(i)%vf(j)%sf(local_start_idx:end_x, local_start_idx:end_y, local_start_idx:end_z))
             end do
@@ -728,7 +728,7 @@ contains
         allocate (q_cons_temp(1:sys_size))
 
         if (q_filtered_wrt) then
-            allocate (stat_q_cons_filtered(1:sys_size - 1))
+            allocate (stat_q_cons_filtered(1:5))
             allocate (stat_filtered_pressure(1:4))
             allocate (stat_reynolds_stress(1:9))
             allocate (stat_eff_visc(1:9))

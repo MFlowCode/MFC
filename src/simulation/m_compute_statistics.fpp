@@ -146,7 +146,7 @@ contains
         type(vector_field), dimension(1:3), intent(in) :: reynolds_stress
         type(vector_field), dimension(1:3), intent(in) :: eff_visc
         type(scalar_field), dimension(1:3), intent(in) :: int_mom_exch
-        type(scalar_field), dimension(sys_size - 1), intent(in) :: q_cons_filtered
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_filtered
         type(scalar_field), intent(in) :: filtered_pressure
         integer, intent(in) :: t_step
         integer, intent(in) :: t_step_stat_start
