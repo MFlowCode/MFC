@@ -19,8 +19,6 @@ module m_derived_variables
 
     use m_data_output           !< Data output module
 
-    use m_time_steppers         !< Time-stepping algorithms
-
     use m_compile_specific
 
     use m_helper
@@ -120,9 +118,11 @@ contains
 
     !> Writes coherent body information, communication files, and probes.
         !!  @param t_step Current time-step
-    subroutine s_compute_derived_variables(t_step)
+    subroutine s_compute_derived_variables(t_step, q_cons_vf, q_prim_ts1, q_prim_ts2)
 
         integer, intent(in) :: t_step
+        type(scalar_field), dimension(:), intent(inout) :: q_cons_vf
+        type(vector_field), dimension(:), intent(inout) :: q_prim_ts1, q_prim_ts2
         integer :: i, j, k !< Generic loop iterators
 
         if (probe_wrt) then
@@ -169,7 +169,7 @@ contains
 
             call s_derive_center_of_mass(q_prim_ts2(2)%vf, c_mass)
 
-            call s_write_probe_files(t_step, q_cons_ts(1)%vf, accel_mag)
+            call s_write_probe_files(t_step, q_cons_vf, accel_mag)
 
             call s_write_com_files(t_step, c_mass)
         end if
