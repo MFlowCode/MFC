@@ -2,7 +2,6 @@
 import json
 import math
 
-
 mu = 1.0e-3
 time_end = 1.0
 time_save = time_end / 100.0
