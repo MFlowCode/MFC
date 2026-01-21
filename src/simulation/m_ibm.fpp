@@ -1027,11 +1027,18 @@ contains
         real(wp), dimension(1:3, 1:3) :: viscous_stress_div, viscous_stress_div_1, viscous_stress_div_2, viscous_cross_1, viscous_cross_2 ! viscous stress tensor with temp vectors to hold divergence calculations
         real(wp), dimension(1:3) :: local_force_contribution, radial_vector, local_torque_contribution, vel
         real(wp) :: cell_volume, dx, dy, dz, dynamic_viscosity
+        real(wp), dimension(1:num_fluids) :: dynamic_viscosities
 
         forces = 0._wp
         torques = 0._wp
 
-        $:GPU_PARALLEL_LOOP(private='[ib_idx,fluid_idx, radial_vector,local_force_contribution,cell_volume,local_torque_contribution, dynamic_viscosity, viscous_stress_div, viscous_stress_div_1, viscous_stress_div_2, viscous_cross_1, viscous_cross_2, dx, dy, dz]', copy='[forces,torques]', copyin='[ib_markers,patch_ib,fluid_pp]', collapse=3)
+        if (viscous) then
+            do fluid_idx = 1, num_fluids
+                if (fluid_pp(fluid_idx)%Re(1) /= 0._wp) dynamic_viscosities(fluid_idx) = 1._wp / fluid_pp(fluid_idx)%Re(1)
+            end do
+        end if
+
+        $:GPU_PARALLEL_LOOP(private='[ib_idx,fluid_idx, radial_vector,local_force_contribution,cell_volume,local_torque_contribution, dynamic_viscosity, viscous_stress_div, viscous_stress_div_1, viscous_stress_div_2, viscous_cross_1, viscous_cross_2, dx, dy, dz]', copy='[forces,torques]', copyin='[ib_markers,patch_ib,dynamic_viscosities]', collapse=3)
         do i = 0, m
             do j = 0, n
                 do k = 0, p
@@ -1070,7 +1077,7 @@ contains
                             dynamic_viscosity = 0._wp
                             do fluid_idx = 1, num_fluids
                                 ! local dynamic viscosity is the dynamic viscosity of the fluid times alpha of the fluid
-                                if (fluid_pp(fluid_idx)%Re(1) /= 0._wp) dynamic_viscosity = dynamic_viscosity + (q_prim_vf(fluid_idx + advxb - 1)%sf(i, j, k)/fluid_pp(fluid_idx)%Re(1))
+                                dynamic_viscosity = dynamic_viscosity + (q_prim_vf(fluid_idx + advxb - 1)%sf(i, j, k) * dynamic_viscosities(fluid_idx))
                             end do
 
                             ! get the linear force component first
