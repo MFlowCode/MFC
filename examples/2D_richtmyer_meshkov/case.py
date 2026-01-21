@@ -2,7 +2,6 @@
 import json
 import math
 
-
 mu = 1.0e-4
 lambd = 1.0
 time_end = 15.0
