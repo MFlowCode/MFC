@@ -1179,7 +1179,7 @@ contains
         elseif (patch_ib(ib_marker)%geometry == 8) then ! sphere
             patch_ib(ib_marker)%moment = 0.4*patch_ib(ib_marker)%mass*(patch_ib(ib_marker)%radius)**2
 
-        else ! we do not have an analytic moment of inertia calculation and need to approximate it directly
+        else ! we do not have an analytic moment of inertia calculation and need to approximate it directly via a sum
             count = 0
             moment = 0._wp
             cell_volume = (x_cc(1) - x_cc(0))*(y_cc(1) - y_cc(0)) ! computed without grid stretching. Update in the loop to perform with stretching
