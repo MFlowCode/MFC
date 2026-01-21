@@ -1034,7 +1034,7 @@ contains
 
         if (viscous) then
             do fluid_idx = 1, num_fluids
-                if (fluid_pp(fluid_idx)%Re(1) /= 0._wp) dynamic_viscosities(fluid_idx) = 1._wp / fluid_pp(fluid_idx)%Re(1)
+                if (fluid_pp(fluid_idx)%Re(1) /= 0._wp) dynamic_viscosities(fluid_idx) = 1._wp/fluid_pp(fluid_idx)%Re(1)
             end do
         end if
 
@@ -1077,7 +1077,7 @@ contains
                             dynamic_viscosity = 0._wp
                             do fluid_idx = 1, num_fluids
                                 ! local dynamic viscosity is the dynamic viscosity of the fluid times alpha of the fluid
-                                dynamic_viscosity = dynamic_viscosity + (q_prim_vf(fluid_idx + advxb - 1)%sf(i, j, k) * dynamic_viscosities(fluid_idx))
+                                dynamic_viscosity = dynamic_viscosity + (q_prim_vf(fluid_idx + advxb - 1)%sf(i, j, k)*dynamic_viscosities(fluid_idx))
                             end do
 
                             ! get the linear force component first
