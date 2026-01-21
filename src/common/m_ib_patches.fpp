@@ -652,8 +652,8 @@ contains
                         end if
                         ! Updating the patch identities bookkeeping variable
                         if (((x_cc(i) - center(1, 1))**2 &
-                            + (cart_y - center(2, 1))**2 &
-                            + (cart_z - center(3, 1))**2 <= r2)) then
+                             + (cart_y - center(2, 1))**2 &
+                             + (cart_z - center(3, 1))**2 <= r2)) then
                             ib_markers_sf(i, j, k) = patch_id
                         end if
                     end do

@@ -100,7 +100,7 @@ contains
             & 'num_probes', 'num_integrals', 'bubble_model', 'thermal',        &
             & 'num_source', 'relax_model', 'num_ibs', 'n_start',    &
             & 'num_bc_patches', 'num_igr_iters', 'num_igr_warm_start_iters', &
-            & 'adap_dt_max_iters', 't_step_stat_start', 'mom_f_idx', 'forcing_window' ]
+            & 'adap_dt_max_iters', 't_step_start_stats', 'mom_f_idx', 'forcing_window' ]
             call MPI_BCAST(${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -159,7 +159,7 @@ contains
             & 'z_b', 't_stop', 't_save', 'cfl_target', 'Bx0', 'alf_factor',  &
             & 'tau_star', 'cont_damage_s', 'alpha_bar', 'adap_dt_tol', &
             & 'ic_eps', 'ic_beta', 'u_inf_ref', 'rho_inf_ref', 'P_inf_ref',      &
-            & 'filter_width', 'forcing_dt', 'particle_vf' ]
+            & 'filter_width', 'forcing_dt', 'fluid_volume_fraction' ]
             call MPI_BCAST(${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 

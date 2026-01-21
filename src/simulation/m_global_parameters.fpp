@@ -562,15 +562,15 @@ module m_global_parameters
     integer :: forcing_window
     real(wp) :: forcing_dt
     logical :: forcing_wrt
-    real(wp) :: particle_vf
+    real(wp) :: fluid_volume_fraction
     logical :: volume_filtering_momentum_eqn
     logical :: store_levelset
     logical :: slab_domain_decomposition
-    integer :: t_step_stat_start
+    integer :: t_step_start_stats
     real(wp) :: filter_width
     logical :: q_filtered_wrt
 
-    $:GPU_DECLARE(create='[u_inf_ref, rho_inf_ref, P_inf_ref, mom_f_idx, forcing_window, forcing_dt, particle_vf, filter_width]')
+    $:GPU_DECLARE(create='[u_inf_ref, rho_inf_ref, P_inf_ref, mom_f_idx, forcing_window, forcing_dt, fluid_volume_fraction, filter_width]')
 
 contains
 
@@ -878,11 +878,11 @@ contains
         forcing_window = dflt_int
         forcing_dt = dflt_real
         forcing_wrt = .false.
-        particle_vf = dflt_real
+        fluid_volume_fraction = dflt_real
         volume_filtering_momentum_eqn = .false.
         store_levelset = .true.
         slab_domain_decomposition = .false.
-        t_step_stat_start = dflt_int
+        t_step_start_stats = dflt_int
         filter_width = dflt_real
         q_filtered_wrt = .false.
 

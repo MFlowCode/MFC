@@ -108,11 +108,11 @@ contains
             intent(in) :: bc_type
 
         type(scalar_field), intent(inout), optional :: filtered_fluid_indicator_function
-        type(vector_field), dimension(1:9), intent(inout), optional :: stat_reynolds_stress
-        type(vector_field), dimension(1:9), intent(inout), optional :: stat_eff_visc
-        type(vector_field), dimension(1:3), intent(inout), optional :: stat_int_mom_exch
-        type(vector_field), dimension(1:5), intent(inout), optional :: stat_q_cons_filtered
-        type(scalar_field), dimension(1:4), intent(inout), optional :: stat_filtered_pressure
+        type(vector_field), dimension(num_dims, num_dims), intent(inout), optional :: stat_reynolds_stress
+        type(vector_field), dimension(num_dims, num_dims), intent(inout), optional :: stat_eff_visc
+        type(vector_field), dimension(num_dims), intent(inout), optional :: stat_int_mom_exch
+        type(vector_field), dimension(sys_size - 1), intent(inout), optional :: stat_q_cons_filtered
+        type(scalar_field), dimension(4), intent(inout), optional :: stat_filtered_pressure
 
         if (.not. parallel_io) then
             call s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, bc_type, beta)
@@ -807,11 +807,11 @@ contains
         integer, intent(in) :: t_step
         type(scalar_field), intent(inout), optional :: beta
         type(scalar_field), intent(inout), optional :: filtered_fluid_indicator_function
-        type(vector_field), dimension(1:sys_size - 1), intent(inout), optional :: stat_q_cons_filtered
-        type(scalar_field), dimension(1:4), intent(inout), optional :: stat_filtered_pressure
-        type(vector_field), dimension(1:9), intent(inout), optional :: stat_reynolds_stress
-        type(vector_field), dimension(1:9), intent(inout), optional :: stat_eff_visc
-        type(vector_field), dimension(1:3), intent(inout), optional :: stat_int_mom_exch
+        type(vector_field), dimension(sys_size - 1), intent(inout), optional :: stat_q_cons_filtered
+        type(scalar_field), dimension(4), intent(inout), optional :: stat_filtered_pressure
+        type(vector_field), dimension(num_dims, num_dims), intent(inout), optional :: stat_reynolds_stress
+        type(vector_field), dimension(num_dims, num_dims), intent(inout), optional :: stat_eff_visc
+        type(vector_field), dimension(num_dims), intent(inout), optional :: stat_int_mom_exch
 
         type(integer_field), &
             dimension(1:num_dims, -1:1), &

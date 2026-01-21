@@ -386,25 +386,29 @@ contains
             varname(:) = ' '
 
             ! filtered vars stats
-            do i = 1, 9
-                do j = 1, 4
-                    q_sf = stat_reynolds_stress(i)%vf(j)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
-                    write (varname, '(A,I0,A,I0)') 'stat_reynolds_stress', i, '_m', j
-                    call s_write_variable_to_formatted_database_file(varname, t_step)
+            do i = 1, num_dims
+                do j = 1, num_dims
+                    do k = 1, 4
+                        q_sf = stat_reynolds_stress(i, j)%vf(k)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
+                        write (varname, '(A,I0,A,I0,A,I0)') 'stat_reynolds_stress', i, '_', j, '_m', k
+                        call s_write_variable_to_formatted_database_file(varname, t_step)
 
-                    varname(:) = ' '
+                        varname(:) = ' '
+                    end do
                 end do
             end do
-            do i = 1, 9
-                do j = 1, 4
-                    q_sf = stat_eff_visc(i)%vf(j)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
-                    write (varname, '(A,I0,A,I0)') 'stat_eff_visc', i, '_m', j
-                    call s_write_variable_to_formatted_database_file(varname, t_step)
+            do i = 1, num_dims
+                do j = 1, num_dims
+                    do k = 1, 4
+                        q_sf = stat_eff_visc(i, j)%vf(k)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
+                        write (varname, '(A,I0,A,I0,A,I0)') 'stat_eff_visc', i, '_', j, '_m', k
+                        call s_write_variable_to_formatted_database_file(varname, t_step)
 
-                    varname(:) = ' '
+                        varname(:) = ' '
+                    end do
                 end do
             end do
-            do i = 1, 3
+            do i = 1, num_dims
                 do j = 1, 4
                     q_sf = stat_int_mom_exch(i)%vf(j)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
                     write (varname, '(A,I0,A,I0)') 'stat_int_mom_exch', i, '_m', j

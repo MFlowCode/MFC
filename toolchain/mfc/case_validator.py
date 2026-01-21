@@ -349,6 +349,7 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         ib = self.get('ib', 'F') == 'T'
         n = self.get('n', 0)
         num_ibs = self.get('num_ibs', 0)
+        periodic_ibs = self.get('periodic_ibs', 'F') == 'T'
 
         self.prohibit(ib and n <= 0,
                      "Immersed Boundaries do not work in 1D (requires n > 0)")
@@ -356,6 +357,13 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
                      "num_ibs must be between 1 and num_patches_max (10)")
         self.prohibit(not ib and num_ibs > 0,
                      "num_ibs is set, but ib is not enabled")
+        if (periodic_ibs):
+            for direction in ['x', 'y', 'z']:
+                for end in ['beg', 'end']:
+                    bc_val = self.get(f'bc_{direction}%{end}')
+                    if bc_val is not None:
+                        self.prohibit(bc_val != -1,
+                                    "Periodic immersed boundaries requires periodicity in all directions (all BCs should be -1)")
 
     def check_stiffened_eos(self):
         """Checks constraints on stiffened equation of state fluids parameters"""
@@ -1093,6 +1101,72 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         self.prohibit(model_eqns is not None and model_eqns > 3,
                      "hyperelasticity is not supported for model_eqns > 3")
 
+    def check_periodic_forcing(self):
+        """Checks requirements for periodic forcing based on bulk quantities"""
+        periodic_forcing = self.get('periodic_forcing', 'F') == 'T'
+
+        if not periodic_forcing:
+            return
+        
+        for direction in ['x', 'y', 'z']:
+            for end in ['beg', 'end']:
+                bc_val = self.get(f'bc_{direction}%{end}')
+                if bc_val is not None:
+                    self.prohibit(bc_val != -1,
+                                 "Periodic forcing requires periodicity in all directions (all BCs should be -1)")
+        
+        u_inf_ref = self.get('u_inf_ref')
+        rho_inf_ref = self.get('rho_inf_ref')
+        P_inf_ref = self.get('P_inf_ref')
+        mom_f_idx = self.get('mom_f_idx')
+        forcing_window = self.get('forcing_window')
+        forcing_dt = self.get('forcing_dt')
+        ib = self.get('ib', 'F') == 'T'
+        fluid_volume_fraction = self.get('fluid_volume_fraction')
+
+        self.prohibit(periodic_forcing and u_inf_ref is None, 
+                      "u_inf_ref (desired bulk velocity) must be specified for periodic_forcing")
+        self.prohibit(periodic_forcing and rho_inf_ref is None, 
+                      "rho_inf_ref (desired bulk density) must be specified for periodic_forcing")
+        self.prohibit(periodic_forcing and P_inf_ref is None, 
+                      "P_inf_ref (desired pressure based on bulk internal energy) must be specified for periodic_forcing")
+        self.prohibit(periodic_forcing and mom_f_idx is None, 
+                      "mom_f_idx (direction to apply momentum forcing) must be specified for periodic_forcing")
+        self.prohibit(periodic_forcing and forcing_window is None, 
+                      "forcing_window must be specified for periodic_forcing")
+        self.prohibit(periodic_forcing and forcing_dt is None, 
+                      "forcing_dt must be specified for periodic_forcing")
+        self.prohibit((periodic_forcing and ib) and fluid_volume_fraction is None,
+                      "periodic_forcing with ib requires specification of fluid_volume_fraction")
+        
+    def check_volume_filtering(self):
+        """Checks requirements for computing unclosed terms in the volume filtered momentum equation"""
+        volume_filtering = self.get('volume_filtering_momentum_eqn', 'F') == 'T'
+
+        if not volume_filtering:
+            return
+        
+        filter_width = self.get('filter_width')
+        slab_domain_decomposition = self.get('slab_domain_decomposition', 'F') == 'T'
+        n = self.get('n', 0)
+        p = self.get('p', 0)
+        cyl_coord = self.get('cyl_coord', 'F') == 'T'
+        m_glb = self.get('m_glb')
+        n_glb = self.get('n_glb')
+        p_glb = self.get('p_glb')
+
+        self.prohibit(volume_filtering and filter_width is None, 
+                      "volume_filtering requires specifying filter_width (Gaussian kernel width)")
+        self.prohibit(volume_filtering and not slab_domain_decomposition, 
+                      "volume_filtering requires slab_domain_decomposition to be set to true")
+        self.prohibit(n == 0 or p == 0,
+                     "volume_filtering only supported in 3D")
+        self.prohibit(cyl_coord,
+                     "volume_filtering incompatible with cylindrical coordinates")
+        if m_glb is not None and n_glb is not None and p_glb is not None:
+            self.prohibit((m_glb + 1) % 2 != 0 or (n_glb + 1) % 2 != 0 or (p_glb + 1) % 2 != 0,
+                         "volume_filtering requires global dimensions divisible by 2 in every direction")
+        
     # ===================================================================
     # Pre-Process Specific Checks
     # ===================================================================
@@ -1594,6 +1668,8 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         self.check_stiffened_eos()
         self.check_surface_tension()
         self.check_mhd()
+        self.check_periodic_forcing()
+        self.check_volume_filtering()
 
     def validate_simulation(self):
         """Validate simulation-specific parameters"""

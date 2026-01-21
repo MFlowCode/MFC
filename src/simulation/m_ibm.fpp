@@ -609,7 +609,6 @@ contains
                 end if
             end if ! end store_levelset if statement
 
-            
             ghost_points_in(q)%ip_loc(:) = physical_loc(:) + 2*dist*norm(:)
 
             ! Find the closest grid point to the image point

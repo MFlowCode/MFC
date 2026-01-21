@@ -49,7 +49,7 @@ module m_time_steppers
     use m_volume_filtering
 
     use m_compute_statistics
-    
+
     use m_derived_variables
 
     implicit none
@@ -63,7 +63,7 @@ module m_time_steppers
     type(scalar_field), allocatable, dimension(:) :: rhs_vf !<
     !! Cell-average RHS variables at the current time-stage
 
-    type(integer_field), allocatable, dimension(:, :), public :: bc_type !<
+    type(integer_field), allocatable, dimension(:, :) :: bc_type !<
     !! Boundary condition identifiers
 
     type(vector_field), allocatable, dimension(:) :: q_prim_ts1, q_prim_ts2 !<

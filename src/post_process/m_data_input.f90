@@ -65,8 +65,8 @@ module m_data_input
     type(integer_field), public :: ib_markers
 
     type(scalar_field), public :: filtered_fluid_indicator_function
-    type(vector_field), allocatable, dimension(:), public :: stat_reynolds_stress
-    type(vector_field), allocatable, dimension(:), public :: stat_eff_visc
+    type(vector_field), allocatable, dimension(:, :), public :: stat_reynolds_stress
+    type(vector_field), allocatable, dimension(:, :), public :: stat_eff_visc
     type(vector_field), allocatable, dimension(:), public :: stat_int_mom_exch
     type(vector_field), allocatable, dimension(:), public :: stat_q_cons_filtered
     type(scalar_field), allocatable, dimension(:), public :: stat_filtered_pressure
@@ -246,14 +246,14 @@ contains
     impure subroutine s_allocate_filtered_arrays(local_start_idx, end_x, end_y, end_z)
 
         integer, intent(in) :: local_start_idx, end_x, end_y, end_z
-        integer :: i, j
+        integer :: i, j, k
 
         allocate (filtered_fluid_indicator_function%sf(local_start_idx:end_x, local_start_idx:end_y, local_start_idx:end_z))
 
-        do i = 1, 5
+        do i = 1, sys_size - 1
             allocate (stat_q_cons_filtered(i)%vf(1:4))
         end do
-        do i = 1, 5
+        do i = 1, sys_size - 1
             do j = 1, 4
                 allocate (stat_q_cons_filtered(i)%vf(j)%sf(local_start_idx:end_x, local_start_idx:end_y, local_start_idx:end_z))
             end do
@@ -263,28 +263,36 @@ contains
             allocate (stat_filtered_pressure(i)%sf(local_start_idx:end_x, local_start_idx:end_y, local_start_idx:end_z))
         end do
 
-        do i = 1, 9
-            allocate (stat_reynolds_stress(i)%vf(1:4))
+        do i = 1, num_dims
+            do j = 1, num_dims
+                allocate (stat_reynolds_stress(i, j)%vf(1:4))
+            end do
         end do
-        do i = 1, 9
-            do j = 1, 4
-                allocate (stat_reynolds_stress(i)%vf(j)%sf(local_start_idx:end_x, local_start_idx:end_y, local_start_idx:end_z))
+        do i = 1, num_dims
+            do j = 1, num_dims
+                do k = 1, 4
+                    allocate (stat_reynolds_stress(i, j)%vf(k)%sf(local_start_idx:end_x, local_start_idx:end_y, local_start_idx:end_z))
+                end do
             end do
         end do
 
-        do i = 1, 9
-            allocate (stat_eff_visc(i)%vf(1:4))
+        do i = 1, num_dims
+            do j = 1, num_dims
+                allocate (stat_eff_visc(i, j)%vf(1:4))
+            end do
         end do
-        do i = 1, 9
-            do j = 1, 4
-                allocate (stat_eff_visc(i)%vf(j)%sf(local_start_idx:end_x, local_start_idx:end_y, local_start_idx:end_z))
+        do i = 1, num_dims
+            do j = 1, num_dims
+                do k = 1, 4
+                    allocate (stat_eff_visc(i, j)%vf(k)%sf(local_start_idx:end_x, local_start_idx:end_y, local_start_idx:end_z))
+                end do
             end do
         end do
 
-        do i = 1, 3
+        do i = 1, num_dims
             allocate (stat_int_mom_exch(i)%vf(1:4))
         end do
-        do i = 1, 3
+        do i = 1, num_dims
             do j = 1, 4
                 allocate (stat_int_mom_exch(i)%vf(j)%sf(local_start_idx:end_x, local_start_idx:end_y, local_start_idx:end_z))
             end do
@@ -693,16 +701,16 @@ contains
             NVARS_MOK = int(alt_sys, MPI_OFFSET_KIND)
 
             ! Read the data for each variable
-            do i = sys_size+1, alt_sys
+            do i = sys_size + 1, alt_sys
                 var_MOK = int(i, MPI_OFFSET_KIND)
 
                 ! Initial displacement to skip at beginning of file
                 disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
                 call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), &
-                                        'native', mpi_info_int, ierr)
+                                       'native', mpi_info_int, ierr)
                 call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, &
-                                        mpi_io_p, status, ierr)
+                                       mpi_io_p, status, ierr)
             end do
 
             call s_mpi_barrier()
@@ -728,11 +736,11 @@ contains
         allocate (q_cons_temp(1:sys_size))
 
         if (q_filtered_wrt) then
-            allocate (stat_q_cons_filtered(1:5))
+            allocate (stat_q_cons_filtered(1:sys_size - 1))
             allocate (stat_filtered_pressure(1:4))
-            allocate (stat_reynolds_stress(1:9))
-            allocate (stat_eff_visc(1:9))
-            allocate (stat_int_mom_exch(1:3))
+            allocate (stat_reynolds_stress(1:num_dims, 1:num_dims))
+            allocate (stat_eff_visc(1:num_dims, 1:num_dims))
+            allocate (stat_int_mom_exch(1:num_dims))
         end if
 
         ! Allocating the parts of the conservative and primitive variables
@@ -785,7 +793,7 @@ contains
     !> Deallocation procedures for the module
     impure subroutine s_finalize_data_input_module
 
-        integer :: i, j !< Generic loop iterator
+        integer :: i, j, k !< Generic loop iterator
 
         ! Deallocating the conservative and primitive variables
         do i = 1, sys_size
@@ -836,23 +844,27 @@ contains
             end do
             deallocate (stat_filtered_pressure)
 
-            do i = 1, 9
-                do j = 1, 4
-                    deallocate (stat_reynolds_stress(i)%vf(j)%sf)
+            do i = 1, num_dims
+                do j = 1, num_dims
+                    do k = 1, 4
+                        deallocate (stat_reynolds_stress(i, j)%vf(k)%sf)
+                    end do
+                    deallocate (stat_reynolds_stress(i, j)%vf)
                 end do
-                deallocate (stat_reynolds_stress(i)%vf)
             end do
             deallocate (stat_reynolds_stress)
 
-            do i = 1, 9
-                do j = 1, 4
-                    deallocate (stat_eff_visc(i)%vf(j)%sf)
+            do i = 1, num_dims
+                do j = 1, num_dims
+                    do k = 1, 4
+                        deallocate (stat_eff_visc(i, j)%vf(k)%sf)
+                    end do
+                    deallocate (stat_eff_visc(i, j)%vf)
                 end do
-                deallocate (stat_eff_visc(i)%vf)
             end do
             deallocate (stat_eff_visc)
 
-            do i = 1, 3
+            do i = 1, num_dims
                 do j = 1, 4
                     deallocate (stat_int_mom_exch(i)%vf(j)%sf)
                 end do

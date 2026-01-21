@@ -602,7 +602,7 @@ contains
         periodic_ibs = .false.
         store_levelset = .true.
         slab_domain_decomposition = .false.
-        
+
         ! Subgrid bubble parameters
         bub_pp%R0ref = dflt_real; R0ref = dflt_real
         bub_pp%p0ref = dflt_real; p0ref = dflt_real

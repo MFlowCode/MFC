@@ -323,18 +323,18 @@ contains
                                                      stat_reynolds_stress, stat_eff_visc, stat_int_mom_exch)
 
         type(scalar_field), intent(in) :: filtered_fluid_indicator_function
-        type(vector_field), dimension(5), intent(in) :: stat_q_cons_filtered
+        type(vector_field), dimension(sys_size - 1), intent(in) :: stat_q_cons_filtered
         type(scalar_field), dimension(4), intent(in) :: stat_filtered_pressure
-        type(vector_field), dimension(9), intent(in) :: stat_reynolds_stress
-        type(vector_field), dimension(9), intent(in) :: stat_eff_visc
-        type(vector_field), dimension(3), intent(in) :: stat_int_mom_exch
+        type(vector_field), dimension(num_dims, num_dims), intent(in) :: stat_reynolds_stress
+        type(vector_field), dimension(num_dims, num_dims), intent(in) :: stat_eff_visc
+        type(vector_field), dimension(num_dims), intent(in) :: stat_int_mom_exch
 
         integer, dimension(num_dims) :: sizes_glb, sizes_loc
 
 #ifdef MFC_MPI
 
         ! Generic loop iterator
-        integer :: i, j
+        integer :: i, j, k
         integer :: ierr !< Generic flag used to identify and report MPI errors
 
         !total system size
@@ -343,17 +343,21 @@ contains
         alt_sys = sys_size + 1 + 9*4 + 9*4 + 3*4 + 6*4 ! 109
 
         MPI_IO_DATA%var(sys_size + 1)%sf => filtered_fluid_indicator_function%sf(0:m, 0:n, 0:p)
-        do i = 1, 9
-            do j = 1, 4
-                MPI_IO_DATA%var(sys_size + 1 + (i - 1)*4 + j)%sf => stat_reynolds_stress(i)%vf(j)%sf(0:m, 0:n, 0:p)
+        do i = 1, num_dims
+            do j = 1, num_dims
+                do k = 1, 4
+                    MPI_IO_DATA%var(sys_size + 1 + (i - 1)*4*num_dims + (j - 1)*4 + k)%sf => stat_reynolds_stress(i, j)%vf(k)%sf(0:m, 0:n, 0:p)
+                end do
             end do
         end do
-        do i = 1, 9
-            do j = 1, 4
-                MPI_IO_DATA%var(sys_size + 37 + (i - 1)*4 + j)%sf => stat_eff_visc(i)%vf(j)%sf(0:m, 0:n, 0:p)
+        do i = 1, num_dims
+            do j = 1, num_dims
+                do k = 1, 4
+                    MPI_IO_DATA%var(sys_size + 37 + (i - 1)*4*num_dims + (j - 1)*4 + k)%sf => stat_eff_visc(i, j)%vf(k)%sf(0:m, 0:n, 0:p)
+                end do
             end do
         end do
-        do i = 1, 3
+        do i = 1, num_dims
             do j = 1, 4
                 MPI_IO_DATA%var(sys_size + 73 + (i - 1)*4 + j)%sf => stat_int_mom_exch(i)%vf(j)%sf(0:m, 0:n, 0:p)
             end do

@@ -95,7 +95,7 @@ module m_start_up
 
     use m_igr
 
-    use m_additional_forcing 
+    use m_additional_forcing
 
     use m_volume_filtering
 
@@ -193,11 +193,11 @@ contains
             cont_damage, tau_star, cont_damage_s, alpha_bar, &
             alf_factor, num_igr_iters, num_igr_warm_start_iters, &
             int_comp, ic_eps, ic_beta, nv_uvm_out_of_core, &
-            nv_uvm_igr_temps_on_gpu, nv_uvm_pref_gpu, down_sample, fft_wrt, & 
-            periodic_ibs, compute_particle_drag, u_inf_ref, rho_inf_ref, P_inf_ref, & 
-            periodic_forcing, mom_f_idx, forcing_window, forcing_dt, forcing_wrt, & 
-            particle_vf, volume_filtering_momentum_eqn, store_levelset, & 
-            slab_domain_decomposition, t_step_stat_start, & 
+            nv_uvm_igr_temps_on_gpu, nv_uvm_pref_gpu, down_sample, fft_wrt, &
+            periodic_ibs, compute_particle_drag, u_inf_ref, rho_inf_ref, P_inf_ref, &
+            periodic_forcing, mom_f_idx, forcing_window, forcing_dt, forcing_wrt, &
+            fluid_volume_fraction, volume_filtering_momentum_eqn, store_levelset, &
+            slab_domain_decomposition, t_step_start_stats, &
             filter_width, q_filtered_wrt
 
         ! Checking that an input file has been provided by the user. If it
@@ -460,9 +460,9 @@ contains
                 inquire (FILE=trim(file_path), EXIST=file_exist)
                 if (file_exist) then
                     open (2, FILE=trim(file_path), &
-                            FORM='unformatted', &
-                            ACTION='read', &
-                            STATUS='old')
+                          FORM='unformatted', &
+                          ACTION='read', &
+                          STATUS='old')
                     read (2) levelset%sf(0:m, 0:n, 0:p, 1:num_ibs); close (2)
                     ! print*, 'check', STL_levelset(106, 50, 0, 1)
                 else
@@ -475,9 +475,9 @@ contains
                 inquire (FILE=trim(file_path), EXIST=file_exist)
                 if (file_exist) then
                     open (2, FILE=trim(file_path), &
-                            FORM='unformatted', &
-                            ACTION='read', &
-                            STATUS='old')
+                          FORM='unformatted', &
+                          ACTION='read', &
+                          STATUS='old')
                     read (2) levelset_norm%sf(0:m, 0:n, 0:p, 1:num_ibs, 1:3); close (2)
                 else
                     call s_mpi_abort(trim(file_path)//' is missing. Exiting.')
@@ -771,9 +771,9 @@ contains
                             disp = 0
 
                             call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_levelset_DATA%view, &
-                                                'native', mpi_info_int, ierr)
-                            call MPI_FILE_READ(ifile, MPI_IO_levelset_DATA%var%sf, data_size * num_ibs, &
-                                            mpi_p, status, ierr)
+                                                   'native', mpi_info_int, ierr)
+                            call MPI_FILE_READ(ifile, MPI_IO_levelset_DATA%var%sf, data_size*num_ibs, &
+                                               mpi_p, status, ierr)
 
                         else
                             call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
@@ -791,9 +791,9 @@ contains
                             disp = 0
 
                             call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_levelsetnorm_DATA%view, &
-                                                'native', mpi_info_int, ierr)
-                            call MPI_FILE_READ(ifile, MPI_IO_levelsetnorm_DATA%var%sf, data_size * num_ibs * 3, &
-                                            mpi_p, status, ierr)
+                                                   'native', mpi_info_int, ierr)
+                            call MPI_FILE_READ(ifile, MPI_IO_levelsetnorm_DATA%var%sf, data_size*num_ibs*3, &
+                                               mpi_p, status, ierr)
 
                         else
                             call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
@@ -919,9 +919,9 @@ contains
                             disp = 0
 
                             call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_levelset_DATA%view, &
-                                                'native', mpi_info_int, ierr)
-                            call MPI_FILE_READ(ifile, MPI_IO_levelset_DATA%var%sf, data_size * num_ibs, &
-                                            mpi_p, status, ierr)
+                                                   'native', mpi_info_int, ierr)
+                            call MPI_FILE_READ(ifile, MPI_IO_levelset_DATA%var%sf, data_size*num_ibs, &
+                                               mpi_p, status, ierr)
 
                         else
                             call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
@@ -939,9 +939,9 @@ contains
                             disp = 0
 
                             call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_levelsetnorm_DATA%view, &
-                                                'native', mpi_info_int, ierr)
-                            call MPI_FILE_READ(ifile, MPI_IO_levelsetnorm_DATA%var%sf, data_size * num_ibs * 3, &
-                                            mpi_p, status, ierr)
+                                                   'native', mpi_info_int, ierr)
+                            call MPI_FILE_READ(ifile, MPI_IO_levelsetnorm_DATA%var%sf, data_size*num_ibs*3, &
+                                               mpi_p, status, ierr)
 
                         else
                             call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
@@ -1150,14 +1150,14 @@ contains
         end if
 
         ! Volume filter flow variables, compute unclosed terms and their statistics
-        if (volume_filtering_momentum_eqn) then 
-            if (t_step > t_step_stat_start) then  
-                call nvtxStartRange("VOLUME-FILTER-MOMENTUM-EQUATION")  
-                call s_volume_filter_momentum_eqn(q_cons_ts(1)%vf, q_prim_vf, bc_type)
+        if (volume_filtering_momentum_eqn) then
+            if (t_step > t_step_start_stats) then
+                call nvtxStartRange("VOLUME-FILTER-MOMENTUM-EQUATION")
+                call s_volume_filter_momentum_eqn(q_cons_ts(1)%vf, q_prim_vf, q_T_sf, 1._wp/fluid_pp(1)%Re(1), bc_type)
                 call nvtxEndRange
 
                 call nvtxStartRange("COMPUTE-STATISTICS")
-                call s_compute_statistics_momentum_unclosed_terms(t_step, t_step_stat_start, reynolds_stress, eff_visc, int_mom_exch, q_cons_filtered, filtered_pressure)
+                call s_compute_statistics_momentum_unclosed_terms(t_step, t_step_start_stats, reynolds_stress, eff_visc, int_mom_exch, q_cons_filtered, filtered_pressure)
                 call nvtxEndRange
 
                 ! Compute explicit x-, y-, z- forces on each particle
@@ -1280,21 +1280,23 @@ contains
         call nvtxStartRange("SAVE-DATA")
         if (q_filtered_wrt .and. (t_step == 0 .or. t_step == t_step_stop)) then
             $:GPU_UPDATE(host='[filtered_fluid_indicator_function%sf]')
-            do i = 1, 9 
-                do j = 1, 4 
-                    $:GPU_UPDATE(host='[stat_reynolds_stress(i)%vf(j)%sf]')
-                    $:GPU_UPDATE(host='[stat_eff_visc(i)%vf(j)%sf]')
-                end do 
-            end do 
-            do i = 1, 3 
-                do j = 1, 4 
-                    $:GPU_UPDATE(host='[stat_int_mom_exch(i)%vf(j)%sf]')
-                end do 
+            do i = 1, num_dims
+                do j = 1, num_dims
+                    do k = 1, 4
+                        $:GPU_UPDATE(host='[stat_reynolds_stress(i, j)%vf(k)%sf]')
+                        $:GPU_UPDATE(host='[stat_eff_visc(i, j)%vf(k)%sf]')
+                    end do
+                end do
             end do
-            do i = 1, sys_size-1
-                do j = 1, 4 
+            do i = 1, num_dims
+                do j = 1, 4
+                    $:GPU_UPDATE(host='[stat_int_mom_exch(i)%vf(j)%sf]')
+                end do
+            end do
+            do i = 1, sys_size - 1
+                do j = 1, 4
                     $:GPU_UPDATE(host='[stat_q_cons_filtered(i)%vf(j)%sf]')
-                end do 
+                end do
             end do
             do i = 1, 4
                 $:GPU_UPDATE(host='[stat_filtered_pressure(i)%sf]')
@@ -1343,9 +1345,9 @@ contains
             call s_write_restart_lag_bubbles(save_count) !parallel
             if (lag_params%write_bubbles_stats) call s_write_lag_bubble_stats()
         else if (volume_filtering_momentum_eqn .and. (t_step == 0 .or. t_step == t_step_stop)) then
-            call s_write_data_files(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, save_count, bc_type, & 
+            call s_write_data_files(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, save_count, bc_type, &
                                     filtered_fluid_indicator_function=filtered_fluid_indicator_function, &
-                                    stat_q_cons_filtered=stat_q_cons_filtered, stat_filtered_pressure=stat_filtered_pressure, & 
+                                    stat_q_cons_filtered=stat_q_cons_filtered, stat_filtered_pressure=stat_filtered_pressure, &
                                     stat_reynolds_stress=stat_reynolds_stress, stat_eff_visc=stat_eff_visc, stat_int_mom_exch=stat_int_mom_exch)
         else
             call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count, bc_type)
@@ -1469,7 +1471,7 @@ contains
         if (mhd .and. powell) call s_initialize_mhd_powell_module
 
         if (periodic_forcing) call s_initialize_additional_forcing_module()
-        if (volume_filtering_momentum_eqn) then 
+        if (volume_filtering_momentum_eqn) then
             call s_initialize_fftw_explicit_filter_module()
             call s_initialize_statistics_module()
         end if
@@ -1613,8 +1615,8 @@ contains
             $:GPU_UPDATE(device='[ib_markers%sf]')
         end if
 
-        $:GPU_UPDATE(device='[u_inf_ref, rho_inf_ref, P_inf_ref, mom_f_idx, forcing_window, forcing_dt, particle_vf, filter_width]')
-        
+        $:GPU_UPDATE(device='[u_inf_ref, rho_inf_ref, P_inf_ref, mom_f_idx, forcing_window, forcing_dt, fluid_volume_fraction, filter_width]')
+
         #:if not MFC_CASE_OPTIMIZATION
             $:GPU_UPDATE(device='[igr,nb,igr_order]')
         #:endif

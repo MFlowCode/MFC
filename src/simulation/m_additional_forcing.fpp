@@ -42,7 +42,7 @@ contains
 
         ! particle volume fraction
         if (ib) then
-            volfrac_phi = particle_vf
+            volfrac_phi = 1._wp - fluid_volume_fraction
         else
             volfrac_phi = 0._wp
         end if
