@@ -78,13 +78,13 @@ if (__name__ == '__main__'):
 
     np.savetxt(output_dir+'/sphere_array_locations.txt', relaxed_points)
 
-    # check no spheres are overlaping
+    # check no spheres are overlapping
     for i in range(N_sphere):
         for j in range(N_sphere):
             if (i != j):
                 dist = np.sqrt((relaxed_points[i, 0] - relaxed_points[j, 0])**2 + (relaxed_points[i, 1] - relaxed_points[j, 1])**2 + (relaxed_points[i, 2] - relaxed_points[j, 2])**2)
                 if (dist <= 1.05*D):
-                    print(f'spheres overlaping, dist={dist}, spheres #: {i}, {j}')
+                    print(f'spheres overlapping, dist={dist}, spheres #: {i}, {j}')
                     print(f'locations: ({relaxed_points[i, :]}), ({relaxed_points[j, :]})')
 
     fig = plt.figure(figsize=(10,5))
