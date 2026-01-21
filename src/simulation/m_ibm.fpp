@@ -1034,7 +1034,11 @@ contains
 
         if (viscous) then
             do fluid_idx = 1, num_fluids
-                if (fluid_pp(fluid_idx)%Re(1) /= 0._wp) dynamic_viscosities(fluid_idx) = 1._wp/fluid_pp(fluid_idx)%Re(1)
+                if (fluid_pp(fluid_idx)%Re(1) /= 0._wp) then
+                    dynamic_viscosities(fluid_idx) = 1._wp/fluid_pp(fluid_idx)%Re(1)
+                else
+                    dynamic_viscosities(fluid_idx) = 0._wp
+                end if
             end do
         end if
 
