@@ -105,13 +105,13 @@ contains
                         do l = 1, num_fluids
                             rho = rho + q_cons_vf(contxb + l - 1)%sf(i, j, k)
                         end do
-                        dVol = dx(i) * dy(j) * dz(k)
+                        dVol = dx(i)*dy(j)*dz(k)
                         spatial_rho = spatial_rho + (rho*dVol) ! rho
                         spatial_u = spatial_u + (q_cons_vf(contxe + mom_f_idx)%sf(i, j, k)*dVol) ! rho*u
-                        spatial_eps = spatial_eps + ((q_cons_vf(E_idx  )%sf(i, j, k) - 0.5_wp*( &
-                                                      q_cons_vf(momxb  )%sf(i, j, k)**2 + &
-                                                      q_cons_vf(momxb+1)%sf(i, j, k)**2 + &
-                                                      q_cons_vf(momxb+2)%sf(i, j, k)**2)/ &
+                        spatial_eps = spatial_eps + ((q_cons_vf(E_idx)%sf(i, j, k) - 0.5_wp*( &
+                                                      q_cons_vf(momxb)%sf(i, j, k)**2 + &
+                                                      q_cons_vf(momxb + 1)%sf(i, j, k)**2 + &
+                                                      q_cons_vf(momxb + 2)%sf(i, j, k)**2)/ &
                                                       rho)*dVol) ! rho*e
                     end if
                 end do

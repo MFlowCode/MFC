@@ -1667,7 +1667,7 @@ contains
         if (mhd .and. powell) call s_finalize_mhd_powell_module
 
         if (periodic_forcing) call s_finalize_additional_forcing_module()
-        if (volume_filter_momentum_eqn) then 
+        if (volume_filter_momentum_eqn) then
             call s_finalize_fftw_explicit_filter_module()
             call s_finalize_statistics_module()
         end if

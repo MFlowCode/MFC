@@ -120,7 +120,7 @@ module m_global_parameters
     logical :: igr             !< enable IGR
     integer :: igr_order       !< IGR reconstruction order
     logical, parameter :: chemistry = .${chemistry}$. !< Chemistry modeling
-    integer :: volume_filter_size !< Number of total elements in volume filtering 
+    integer :: volume_filter_size !< Number of total elements in volume filtering
     !> @}
 
     integer :: avg_state       !< Average state evaluation method
@@ -696,7 +696,7 @@ contains
             end if
 
             if (q_filtered_wrt) then
-                volume_filter_size = sys_size + 1 + 4*(2*num_dims**2 + num_dims + E_idx + 1)  
+                volume_filter_size = sys_size + 1 + 4*(2*num_dims**2 + num_dims + E_idx + 1)
             end if
 
             ! Volume Fraction Model (6-equation model)

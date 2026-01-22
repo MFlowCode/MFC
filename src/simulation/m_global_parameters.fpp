@@ -290,7 +290,7 @@ module m_global_parameters
     type(int_bounds_info) :: species_idx               !< Indexes of first & last concentration eqns.
     integer :: c_idx                                   !< Index of color function
     integer :: damage_idx                              !< Index of damage state variable (D) for continuum damage model
-    integer :: volume_filter_size                      !< Number of total elements in volume filtering 
+    integer :: volume_filter_size                      !< Number of total elements in volume filtering
     !> @}
     $:GPU_DECLARE(create='[sys_size,E_idx,n_idx,bub_idx,alf_idx,gamma_idx]')
     $:GPU_DECLARE(create='[pi_inf_idx,B_idx,stress_idx,xi_idx,b_size]')
@@ -1046,7 +1046,7 @@ contains
                 end if
 
                 if (q_filtered_wrt) then
-                    volume_filter_size = sys_size + 1 + 4*(2*num_dims**2 + num_dims + E_idx + 1)  
+                    volume_filter_size = sys_size + 1 + 4*(2*num_dims**2 + num_dims + E_idx + 1)
                 end if
 
             else if (model_eqns == 3) then

@@ -81,7 +81,7 @@ module m_volume_filtering
 
     ! domain size information (global, complex, local)
     integer :: Nx, Ny, Nz, NxC, Nyloc, Nzloc
-    real(wp) ::  fft_norm
+    real(wp) :: fft_norm
 
     ! 1D real and complex vectors for FFT routines
     real(c_double), allocatable :: data_real_in1d(:)
@@ -209,7 +209,7 @@ contains
         Nx = m_glb + 1
         Ny = n_glb + 1
         Nz = p_glb + 1
-        fft_norm = 1._wp / real(Nx*Ny*Nz, wp)
+        fft_norm = 1._wp/real(Nx*Ny*Nz, wp)
 
         if (mod(Ny, num_procs) /= 0) then
             call s_mpi_abort('Volume filtering requires p to be divisible by the number of ranks')
