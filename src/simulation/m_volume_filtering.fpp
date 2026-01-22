@@ -81,6 +81,7 @@ module m_volume_filtering
 
     ! domain size information (global, complex, local)
     integer :: Nx, Ny, Nz, NxC, Nyloc, Nzloc
+    real(wp) ::  fft_norm
 
     ! 1D real and complex vectors for FFT routines
     real(c_double), allocatable :: data_real_in1d(:)
@@ -101,7 +102,7 @@ module m_volume_filtering
     ! FFT of filtering kernel
     complex(c_double_complex), allocatable :: cmplx_kernelG1d(:)
 
-    $:GPU_DECLARE(create='[Nx, Ny, Nz, NxC, Nyloc, Nzloc]')
+    $:GPU_DECLARE(create='[Nx, Ny, Nz, NxC, Nyloc, Nzloc, fft_norm]')
     $:GPU_DECLARE(create='[data_real_in1d, data_cmplx_out1d, data_cmplx_out1dy, data_cmplx_slabz, data_cmplx_slaby, data_cmplx_slabz_batch, data_cmplx_slaby_batch]')
     $:GPU_DECLARE(create='[data_real_3D_slabz, real_kernelG_in, cmplx_kernelG1d]')
 
@@ -208,6 +209,11 @@ contains
         Nx = m_glb + 1
         Ny = n_glb + 1
         Nz = p_glb + 1
+        fft_norm = 1._wp / real(Nx*Ny*Nz, wp)
+
+        if (mod(Ny, num_procs) /= 0) then
+            call s_mpi_abort('Volume filtering requires p to be divisible by the number of ranks')
+        end if
 
         !< complex size
         NxC = Nx/2 + 1
@@ -222,7 +228,7 @@ contains
         eff_visc_idx = reynolds_stress_idx + 9
         int_mom_exch_idx = eff_visc_idx + 9
 
-        $:GPU_UPDATE(device='[Nx, Ny, Nz, NxC, Nyloc, Nzloc, fft_batch_size, reynolds_stress_idx, eff_visc_idx, int_mom_exch_idx]')
+        $:GPU_UPDATE(device='[Nx, Ny, Nz, fft_norm, NxC, Nyloc, Nzloc, fft_batch_size, reynolds_stress_idx, eff_visc_idx, int_mom_exch_idx]')
 
         @:ALLOCATE(data_real_in1d(Nx*Ny*Nzloc))
         @:ALLOCATE(data_cmplx_out1d(NxC*Ny*Nz/num_procs))
@@ -461,7 +467,7 @@ contains
         do i = 1, NxC
             do j = 1, Nyloc
                 do k = 1, Nz
-                    cmplx_kernelG1d(k + (i - 1)*Nz + (j - 1)*Nz*NxC) = cmplx_kernelG1d(k + (i - 1)*Nz + (j - 1)*Nz*NxC)/(real(Nx*Ny*Nz, wp))
+                    cmplx_kernelG1d(k + (i - 1)*Nz + (j - 1)*Nz*NxC) = cmplx_kernelG1d(k + (i - 1)*Nz + (j - 1)*Nz*NxC)*fft_norm
                 end do
             end do
         end do
@@ -546,7 +552,7 @@ contains
         do i = 1, Nx
             do j = 1, Ny
                 do k = 1, Nzloc
-                    filtered_fluid_indicator_function%sf(i - 1, j - 1, k - 1) = data_real_3D_slabz(i, j, k)/(real(Nx*Ny*Nz, wp))
+                    filtered_fluid_indicator_function%sf(i - 1, j - 1, k - 1) = data_real_3D_slabz(i, j, k)*fft_norm
                 end do
             end do
         end do
@@ -572,6 +578,8 @@ contains
         do i = 1, num_dims
             @:ALLOCATE(grad_fluid_indicator(i)%sf(0:m, 0:n, 0:p))
             @:ACC_SETUP_SFs(grad_fluid_indicator(i))
+            grad_fluid_indicator(i)%sf = 0._wp
+            $:GPU_UPDATE(device='[grad_fluid_indicator(i)%sf]')
         end do
 
         $:GPU_PARALLEL_LOOP(collapse=3, copyin='[fd_coeffs]')
@@ -1545,7 +1553,7 @@ contains
             do i = 0, m
                 do j = 0, n
                     do k = 0, p
-                        q_cons_filtered(l)%sf(i, j, k) = data_real_3D_slabz(i + 1, j + 1, k + 1)/(real(Nx*Ny*Nz, wp)*filtered_fluid_indicator_function%sf(i, j, k))
+                        q_cons_filtered(l)%sf(i, j, k) = data_real_3D_slabz(i + 1, j + 1, k + 1)*fft_norm/filtered_fluid_indicator_function%sf(i, j, k)
                     end do
                 end do
             end do
@@ -1594,7 +1602,7 @@ contains
         do i = 0, m
             do j = 0, n
                 do k = 0, p
-                    filtered_pressure%sf(i, j, k) = data_real_3D_slabz(i + 1, j + 1, k + 1)/(real(Nx*Ny*Nz, wp)*filtered_fluid_indicator_function%sf(i, j, k))
+                    filtered_pressure%sf(i, j, k) = data_real_3D_slabz(i + 1, j + 1, k + 1)*fft_norm/filtered_fluid_indicator_function%sf(i, j, k)
                 end do
             end do
         end do
@@ -1644,7 +1652,7 @@ contains
                 do i = 0, m
                     do j = 0, n
                         do k = 0, p
-                            reynolds_stress(l, q)%sf(i, j, k) = data_real_3D_slabz(i + 1, j + 1, k + 1)/(real(Nx*Ny*Nz, wp)*filtered_fluid_indicator_function%sf(i, j, k))
+                            reynolds_stress(l, q)%sf(i, j, k) = data_real_3D_slabz(i + 1, j + 1, k + 1)*fft_norm/filtered_fluid_indicator_function%sf(i, j, k)
                         end do
                     end do
                 end do
@@ -1696,7 +1704,7 @@ contains
                 do i = 0, m
                     do j = 0, n
                         do k = 0, p
-                            eff_visc(l, q)%sf(i, j, k) = data_real_3D_slabz(i + 1, j + 1, k + 1)/(real(Nx*Ny*Nz, wp)*filtered_fluid_indicator_function%sf(i, j, k))
+                            eff_visc(l, q)%sf(i, j, k) = data_real_3D_slabz(i + 1, j + 1, k + 1)*fft_norm/filtered_fluid_indicator_function%sf(i, j, k)
                         end do
                     end do
                 end do
@@ -1747,7 +1755,7 @@ contains
             do i = 0, m
                 do j = 0, n
                     do k = 0, p
-                        int_mom_exch(l)%sf(i, j, k) = data_real_3D_slabz(i + 1, j + 1, k + 1)/(real(Nx*Ny*Nz, wp))
+                        int_mom_exch(l)%sf(i, j, k) = data_real_3D_slabz(i + 1, j + 1, k + 1)*fft_norm
                     end do
                 end do
             end do

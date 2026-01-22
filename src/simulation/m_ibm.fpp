@@ -555,6 +555,9 @@ contains
                 dist = abs(real(levelset_in%sf(i, j, k, patch_id), kind=wp))
                 norm(:) = levelset_norm_in%sf(i, j, k, patch_id, :)
             else ! compute levelset and levelset_norm on the fly (SPHERE ONLY)
+                if (patch_ib(patch_id)%geometry /= 8) then
+                    call s_mpi_abort('store_levelset=F requires all ib geometries to be spherical (geometry=8)')
+                end if
                 radius = patch_ib(patch_id)%radius
                 center(1, 1) = patch_ib(patch_id)%x_centroid
                 center(2, 1) = patch_ib(patch_id)%y_centroid

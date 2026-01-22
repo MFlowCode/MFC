@@ -196,7 +196,7 @@ contains
             nv_uvm_igr_temps_on_gpu, nv_uvm_pref_gpu, down_sample, fft_wrt, &
             periodic_ibs, compute_particle_drag, u_inf_ref, rho_inf_ref, P_inf_ref, &
             periodic_forcing, mom_f_idx, forcing_window, forcing_dt, forcing_wrt, &
-            fluid_volume_fraction, volume_filtering_momentum_eqn, store_levelset, &
+            fluid_volume_fraction, volume_filter_momentum_eqn, store_levelset, &
             slab_domain_decomposition, t_step_start_stats, &
             filter_width, q_filtered_wrt
 
@@ -1150,7 +1150,7 @@ contains
         end if
 
         ! Volume filter flow variables, compute unclosed terms and their statistics
-        if (volume_filtering_momentum_eqn) then
+        if (volume_filter_momentum_eqn) then
             if (t_step > t_step_start_stats) then
                 call nvtxStartRange("VOLUME-FILTER-MOMENTUM-EQUATION")
                 call s_volume_filter_momentum_eqn(q_cons_ts(1)%vf, q_prim_vf, q_T_sf, 1._wp/fluid_pp(1)%Re(1), bc_type)
@@ -1293,7 +1293,7 @@ contains
                     $:GPU_UPDATE(host='[stat_int_mom_exch(i)%vf(j)%sf]')
                 end do
             end do
-            do i = 1, sys_size - 1
+            do i = 1, E_idx
                 do j = 1, 4
                     $:GPU_UPDATE(host='[stat_q_cons_filtered(i)%vf(j)%sf]')
                 end do
@@ -1344,7 +1344,7 @@ contains
             $:GPU_UPDATE(host='[Rmax_stats,Rmin_stats,gas_p,gas_mv,intfc_vel]')
             call s_write_restart_lag_bubbles(save_count) !parallel
             if (lag_params%write_bubbles_stats) call s_write_lag_bubble_stats()
-        else if (volume_filtering_momentum_eqn .and. (t_step == 0 .or. t_step == t_step_stop)) then
+        else if (q_filtered_wrt .and. (t_step == 0 .or. t_step == t_step_stop)) then
             call s_write_data_files(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, save_count, bc_type, &
                                     filtered_fluid_indicator_function=filtered_fluid_indicator_function, &
                                     stat_q_cons_filtered=stat_q_cons_filtered, stat_filtered_pressure=stat_filtered_pressure, &
@@ -1471,7 +1471,7 @@ contains
         if (mhd .and. powell) call s_initialize_mhd_powell_module
 
         if (periodic_forcing) call s_initialize_additional_forcing_module()
-        if (volume_filtering_momentum_eqn) then
+        if (volume_filter_momentum_eqn) then
             call s_initialize_fftw_explicit_filter_module()
             call s_initialize_statistics_module()
         end if
@@ -1667,7 +1667,10 @@ contains
         if (mhd .and. powell) call s_finalize_mhd_powell_module
 
         if (periodic_forcing) call s_finalize_additional_forcing_module()
-        if (volume_filtering_momentum_eqn) call s_finalize_fftw_explicit_filter_module
+        if (volume_filter_momentum_eqn) then 
+            call s_finalize_fftw_explicit_filter_module()
+            call s_finalize_statistics_module()
+        end if
 
         ! Terminating MPI execution environment
         call s_mpi_finalize()

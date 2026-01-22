@@ -111,7 +111,7 @@ contains
         type(vector_field), dimension(num_dims, num_dims), intent(inout), optional :: stat_reynolds_stress
         type(vector_field), dimension(num_dims, num_dims), intent(inout), optional :: stat_eff_visc
         type(vector_field), dimension(num_dims), intent(inout), optional :: stat_int_mom_exch
-        type(vector_field), dimension(sys_size - 1), intent(inout), optional :: stat_q_cons_filtered
+        type(vector_field), dimension(E_idx), intent(inout), optional :: stat_q_cons_filtered
         type(scalar_field), dimension(4), intent(inout), optional :: stat_filtered_pressure
 
         if (.not. parallel_io) then
@@ -807,7 +807,7 @@ contains
         integer, intent(in) :: t_step
         type(scalar_field), intent(inout), optional :: beta
         type(scalar_field), intent(inout), optional :: filtered_fluid_indicator_function
-        type(vector_field), dimension(sys_size - 1), intent(inout), optional :: stat_q_cons_filtered
+        type(vector_field), dimension(E_idx), intent(inout), optional :: stat_q_cons_filtered
         type(scalar_field), dimension(4), intent(inout), optional :: stat_filtered_pressure
         type(vector_field), dimension(num_dims, num_dims), intent(inout), optional :: stat_reynolds_stress
         type(vector_field), dimension(num_dims, num_dims), intent(inout), optional :: stat_eff_visc
@@ -848,7 +848,7 @@ contains
         if (present(beta)) then
             alt_sys = sys_size + 1
         else if (q_filtered_wrt .and. (t_step == 0 .or. t_step == t_step_stop)) then
-            alt_sys = sys_size + 1 + 9*4 + 9*4 + 3*4 + 6*4
+            alt_sys = volume_filter_size
         else
             alt_sys = sys_size
         end if
@@ -1015,7 +1015,7 @@ contains
                                                 mpi_io_p, status, ierr)
                     end do
                 end if
-            else if (volume_filtering_momentum_eqn) then
+            else if (q_filtered_wrt .and. (t_step == 0 .or. t_step == t_step_stop)) then
                 do i = 1, alt_sys
                     var_MOK = int(i, MPI_OFFSET_KIND)
 

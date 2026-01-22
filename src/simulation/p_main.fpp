@@ -56,8 +56,8 @@ program p_main
     call s_initialize_gpu_vars()
     call nvtxEndRange
 
-    if (volume_filtering_momentum_eqn .or. periodic_forcing) call s_initialize_fluid_indicator_function(bc_type)
-    if (volume_filtering_momentum_eqn) then
+    if (volume_filter_momentum_eqn) call s_initialize_fluid_indicator_function(bc_type)
+    if (volume_filter_momentum_eqn) then
         call s_initialize_filtering_kernel()
         call s_initialize_filtered_fluid_indicator_function()
         call s_initialize_fluid_indicator_gradient()

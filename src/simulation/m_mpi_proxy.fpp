@@ -118,7 +118,7 @@ contains
             & 'shear_stress', 'bulk_stress', 'bubbles_lagrange',                &
             & 'hyperelasticity', 'down_sample', 'int_comp','fft_wrt',           &
             & 'periodic_ibs', 'compute_particle_drag', 'periodic_forcing',      &
-            & 'forcing_wrt', 'volume_filtering_momentum_eqn', 'store_levelset', &
+            & 'forcing_wrt', 'volume_filter_momentum_eqn', 'store_levelset', &
             & 'slab_domain_decomposition', 'q_filtered_wrt' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor

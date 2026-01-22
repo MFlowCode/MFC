@@ -354,10 +354,10 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         self.prohibit(ib and n <= 0,
                      "Immersed Boundaries do not work in 1D (requires n > 0)")
         self.prohibit(ib and (num_ibs <= 0 or num_ibs > 1000),
-                     "num_ibs must be between 1 and num_patches_max (10)")
+                     "num_ibs must be between 1 and num_patches_max (1000)")
         self.prohibit(not ib and num_ibs > 0,
                      "num_ibs is set, but ib is not enabled")
-        if (periodic_ibs):
+        if periodic_ibs:
             for direction in ['x', 'y', 'z']:
                 for end in ['beg', 'end']:
                     bc_val = self.get(f'bc_{direction}%{end}')
@@ -1123,29 +1123,44 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         forcing_dt = self.get('forcing_dt')
         ib = self.get('ib', 'F') == 'T'
         fluid_volume_fraction = self.get('fluid_volume_fraction')
+        cyl_coord = self.get('cyl_coord', 'F') == 'T'
+        n = self.get('n', 0)
+        p = self.get('p', 0)
+        num_fluids = self.get('num_fluids')
+        model_eqns = self.get('model_eqns')
 
-        self.prohibit(periodic_forcing and u_inf_ref is None, 
+        self.prohibit(u_inf_ref is None, 
                       "u_inf_ref (desired bulk velocity) must be specified for periodic_forcing")
-        self.prohibit(periodic_forcing and rho_inf_ref is None, 
+        self.prohibit(rho_inf_ref is None, 
                       "rho_inf_ref (desired bulk density) must be specified for periodic_forcing")
-        self.prohibit(periodic_forcing and P_inf_ref is None, 
+        self.prohibit(P_inf_ref is None, 
                       "P_inf_ref (desired pressure based on bulk internal energy) must be specified for periodic_forcing")
-        self.prohibit(periodic_forcing and mom_f_idx is None, 
-                      "mom_f_idx (direction to apply momentum forcing) must be specified for periodic_forcing")
-        self.prohibit(periodic_forcing and forcing_window is None, 
+        self.prohibit(mom_f_idx not in [1, 2, 3], 
+                      "mom_f_idx (direction to apply momentum forcing) must be set to [1, 2, 3]")
+        self.prohibit(forcing_window is None, 
                       "forcing_window must be specified for periodic_forcing")
-        self.prohibit(periodic_forcing and forcing_dt is None, 
+        self.prohibit(forcing_dt is None, 
                       "forcing_dt must be specified for periodic_forcing")
-        self.prohibit((periodic_forcing and ib) and fluid_volume_fraction is None,
+        self.prohibit(ib and fluid_volume_fraction is None,
                       "periodic_forcing with ib requires specification of fluid_volume_fraction")
+        self.prohibit(cyl_coord,
+                     "periodic_forcing incompatible with cylindrical coordinates")
+        self.prohibit(n == 0 or p == 0,
+                     "periodic_forcing only supported in 3D")
+        if num_fluids is not None:
+            self.prohibit(num_fluids > 1, 
+                          "periodic_forcing currently only supported with num_fluids=1")
+        self.prohibit(model_eqns != 2,
+                      "periodic_forcing requires model_eqns=2")
         
     def check_volume_filtering(self):
         """Checks requirements for computing unclosed terms in the volume filtered momentum equation"""
-        volume_filtering = self.get('volume_filtering_momentum_eqn', 'F') == 'T'
+        volume_filtering = self.get('volume_filter_momentum_eqn', 'F') == 'T'
 
         if not volume_filtering:
             return
         
+        q_filtered_wrt = self.get('q_filtered_wrt', 'F') == 'T'
         filter_width = self.get('filter_width')
         slab_domain_decomposition = self.get('slab_domain_decomposition', 'F') == 'T'
         n = self.get('n', 0)
@@ -1154,18 +1169,26 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         m_glb = self.get('m_glb')
         n_glb = self.get('n_glb')
         p_glb = self.get('p_glb')
+        file_per_process = self.get('file_per_process', 'F') == 'T'
+        parallel_io = self.get('parallel_io', 'F') == 'T'
 
-        self.prohibit(volume_filtering and filter_width is None, 
-                      "volume_filtering requires specifying filter_width (Gaussian kernel width)")
-        self.prohibit(volume_filtering and not slab_domain_decomposition, 
-                      "volume_filtering requires slab_domain_decomposition to be set to true")
+        self.prohibit(not q_filtered_wrt, 
+                      "volume_filter_momentum_eqn requires q_filtered_wrt to be set to true")
+        self.prohibit(filter_width is None, 
+                      "volume_filter_momentum_eqn requires specifying filter_width (Gaussian kernel width)")
+        self.prohibit(not slab_domain_decomposition, 
+                      "volume_filter_momentum_eqn requires slab_domain_decomposition to be set to true")
         self.prohibit(n == 0 or p == 0,
-                     "volume_filtering only supported in 3D")
+                     "volume_filter_momentum_eqn only supported in 3D")
         self.prohibit(cyl_coord,
-                     "volume_filtering incompatible with cylindrical coordinates")
+                     "volume_filter_momentum_eqn incompatible with cylindrical coordinates")
         if m_glb is not None and n_glb is not None and p_glb is not None:
             self.prohibit((m_glb + 1) % 2 != 0 or (n_glb + 1) % 2 != 0 or (p_glb + 1) % 2 != 0,
-                         "volume_filtering requires global dimensions divisible by 2 in every direction")
+                         "volume_filter_momentum_eqn requires global dimensions divisible by 2 in every direction")
+        self.prohibit(file_per_process,
+                     "file_per_process must be false for q_filtered_wrt")
+        self.prohibit(not parallel_io, 
+                      "q_filtered_wrt requires parallel_io to be set to true")
         
     # ===================================================================
     # Pre-Process Specific Checks

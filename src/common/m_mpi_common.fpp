@@ -103,7 +103,7 @@ contains
 #endif
 
 #ifdef MFC_SIMULATION
-        if (periodic_forcing .or. volume_filtering_momentum_eqn) then
+        if (volume_filter_momentum_eqn) then
             halo_size_sf = nint(-1._wp + 1._wp*buff_size* &
                                            & (m + 2*buff_size + 1)* &
                                            & (n + 2*buff_size + 1)* &
@@ -323,7 +323,7 @@ contains
                                                      stat_reynolds_stress, stat_eff_visc, stat_int_mom_exch)
 
         type(scalar_field), intent(in) :: filtered_fluid_indicator_function
-        type(vector_field), dimension(sys_size - 1), intent(in) :: stat_q_cons_filtered
+        type(vector_field), dimension(E_idx), intent(in) :: stat_q_cons_filtered
         type(scalar_field), dimension(4), intent(in) :: stat_filtered_pressure
         type(vector_field), dimension(num_dims, num_dims), intent(in) :: stat_reynolds_stress
         type(vector_field), dimension(num_dims, num_dims), intent(in) :: stat_eff_visc
@@ -332,6 +332,7 @@ contains
         integer, dimension(num_dims) :: sizes_glb, sizes_loc
 
 #ifdef MFC_MPI
+#ifndef MFC_PRE_PROCESS
 
         ! Generic loop iterator
         integer :: i, j, k
@@ -340,7 +341,7 @@ contains
         !total system size
         integer :: alt_sys
 
-        alt_sys = sys_size + 1 + 9*4 + 9*4 + 3*4 + 6*4 ! 109
+        alt_sys = volume_filter_size
 
         MPI_IO_DATA%var(sys_size + 1)%sf => filtered_fluid_indicator_function%sf(0:m, 0:n, 0:p)
         do i = 1, num_dims
@@ -362,7 +363,7 @@ contains
                 MPI_IO_DATA%var(sys_size + 73 + (i - 1)*4 + j)%sf => stat_int_mom_exch(i)%vf(j)%sf(0:m, 0:n, 0:p)
             end do
         end do
-        do i = 1, sys_size - 1
+        do i = 1, E_idx
             do j = 1, 4
                 MPI_IO_DATA%var(sys_size + 85 + (i - 1)*4 + j)%sf => stat_q_cons_filtered(i)%vf(j)%sf(0:m, 0:n, 0:p)
             end do
@@ -387,6 +388,7 @@ contains
             call MPI_TYPE_COMMIT(MPI_IO_DATA%view(i), ierr)
         end do
 
+#endif
 #endif
 
     end subroutine s_initialize_mpi_data_filtered
@@ -2273,7 +2275,7 @@ contains
 #ifdef MFC_MPI
         deallocate (buff_send, buff_recv)
 #ifdef MFC_SIMULATION
-        if (volume_filtering_momentum_eqn) then
+        if (volume_filter_momentum_eqn) then
             @:DEALLOCATE(buff_send_scalarfield)
             @:DEALLOCATE(buff_recv_scalarfield)
         end if

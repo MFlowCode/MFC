@@ -48,8 +48,6 @@ module m_time_steppers
 
     use m_volume_filtering
 
-    use m_compute_statistics
-
     use m_derived_variables
 
     implicit none

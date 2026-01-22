@@ -9,8 +9,6 @@ module m_additional_forcing
 
     use m_mpi_proxy
 
-    use m_volume_filtering
-
     implicit none
 
     private; public :: s_initialize_additional_forcing_module, &
@@ -82,13 +80,13 @@ contains
 
     !< compute the space and time average of quantities, compute the periodic forcing terms described in Khalloufi and Capecelatro
     subroutine s_compute_periodic_forcing(rhs_vf, q_cons_vf, q_prim_vf, t_step)
-        type(scalar_field), dimension(sys_size), intent(in) :: rhs_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         integer, intent(in) :: t_step
         real(wp) :: spatial_rho_glb, spatial_u_glb, spatial_eps_glb
-        real(wp) :: dVol
-        integer :: i, j, k
+        real(wp) :: dVol, rho
+        integer :: i, j, k, l
 
         ! zero spatial averages
         spatial_rho = 0._wp
@@ -98,18 +96,24 @@ contains
         $:GPU_UPDATE(device='[spatial_rho, spatial_u, spatial_eps]')
 
         ! compute spatial averages
-        $:GPU_PARALLEL_LOOP(collapse=3, reduction='[[spatial_rho, spatial_u, spatial_eps]]', reductionOp='[+]', private='[dVol]')
+        $:GPU_PARALLEL_LOOP(collapse=3, reduction='[[spatial_rho, spatial_u, spatial_eps]]', reductionOp='[+]', private='[rho, dVol]')
         do i = 0, m
             do j = 0, n
                 do k = 0, p
-                    dVol = dx(i)*dy(j)*dz(k)*fluid_indicator_function%sf(i, j, k)
-                    spatial_rho = spatial_rho + (q_cons_vf(1)%sf(i, j, k)*dVol) ! rho
-                    spatial_u = spatial_u + (q_cons_vf(contxe + mom_f_idx)%sf(i, j, k)*dVol) ! rho*u
-                    spatial_eps = spatial_eps + ((q_cons_vf(5)%sf(i, j, k) - 0.5_wp*( &
-                                                  q_cons_vf(2)%sf(i, j, k)**2 + &
-                                                  q_cons_vf(3)%sf(i, j, k)**2 + &
-                                                  q_cons_vf(4)%sf(i, j, k)**2)/ &
-                                                  q_cons_vf(1)%sf(i, j, k))*dVol) ! rho*e
+                    if (ib_markers%sf(i, j, k) == 0) then
+                        rho = 0._wp
+                        do l = 1, num_fluids
+                            rho = rho + q_cons_vf(contxb + l - 1)%sf(i, j, k)
+                        end do
+                        dVol = dx(i) * dy(j) * dz(k)
+                        spatial_rho = spatial_rho + (rho*dVol) ! rho
+                        spatial_u = spatial_u + (q_cons_vf(contxe + mom_f_idx)%sf(i, j, k)*dVol) ! rho*u
+                        spatial_eps = spatial_eps + ((q_cons_vf(E_idx  )%sf(i, j, k) - 0.5_wp*( &
+                                                      q_cons_vf(momxb  )%sf(i, j, k)**2 + &
+                                                      q_cons_vf(momxb+1)%sf(i, j, k)**2 + &
+                                                      q_cons_vf(momxb+2)%sf(i, j, k)**2)/ &
+                                                      rho)*dVol) ! rho*e
+                    end if
                 end do
             end do
         end do
@@ -161,7 +165,7 @@ contains
 
                     ! f_E
                     q_periodic_force(3)%sf(i, j, k) = (P_inf_ref*gammas(1) - phase_eps)*forcing_dt &
-                                                      + q_cons_vf(contxe + mom_f_idx)%sf(i, j, k)*q_periodic_force(2)%sf(i, j, k)/q_cons_vf(1)%sf(i, j, k)
+                                                      + q_cons_vf(contxe + mom_f_idx)%sf(i, j, k)*q_periodic_force(2)%sf(i, j, k)/q_cons_vf(contxb)%sf(i, j, k)
                 end do
             end do
         end do
@@ -172,15 +176,18 @@ contains
         do i = 0, m
             do j = 0, n
                 do k = 0, p
-                    rhs_vf(1)%sf(i, j, k) = rhs_vf(1)%sf(i, j, k) + q_periodic_force(1)%sf(i, j, k)*fluid_indicator_function%sf(i, j, k) ! continuity
-                    rhs_vf(contxe + mom_f_idx)%sf(i, j, k) = rhs_vf(contxe + mom_f_idx)%sf(i, j, k) + q_periodic_force(2)%sf(i, j, k)*fluid_indicator_function%sf(i, j, k) ! momentum
-                    rhs_vf(5)%sf(i, j, k) = rhs_vf(5)%sf(i, j, k) + q_periodic_force(3)%sf(i, j, k)*fluid_indicator_function%sf(i, j, k) ! energy
+                    if (ib_markers%sf(i, j, k) == 0) then
+                        do l = 1, num_fluids
+                            rhs_vf(contxb + l - 1)%sf(i, j, k) = rhs_vf(contxb + l - 1)%sf(i, j, k) + q_periodic_force(1)%sf(i, j, k) ! continuity
+                        end do
+                        rhs_vf(contxe + mom_f_idx)%sf(i, j, k) = rhs_vf(contxe + mom_f_idx)%sf(i, j, k) + q_periodic_force(2)%sf(i, j, k) ! momentum
+                        rhs_vf(E_idx)%sf(i, j, k) = rhs_vf(E_idx)%sf(i, j, k) + q_periodic_force(3)%sf(i, j, k) ! energy
+                    end if
                 end do
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        ! compare L2 norms of energy forcing due to linear and nonlinear terms
         if (forcing_wrt .and. proc_rank == 0) then
             print *, spatial_rho_glb, spatial_u_glb, spatial_eps_glb
             write (102) spatial_rho_glb, spatial_u_glb, spatial_eps_glb
@@ -195,6 +202,10 @@ contains
             @:DEALLOCATE(q_periodic_force(i)%sf)
         end do
         @:DEALLOCATE(q_periodic_force)
+
+        @:DEALLOCATE(rho_window)
+        @:DEALLOCATE(u_window)
+        @:DEALLOCATE(eps_window)
 
         if (forcing_wrt .and. proc_rank == 0) then
             close (102)

@@ -516,7 +516,6 @@ contains
         real(wp), dimension(3) :: dist_vec_temp ! temporary distance vector used for periodicity
 
         integer :: i, j, k, ix, iy, iz !< Loop index variables
-        integer :: ierr
 
         radius = patch_ib(ib_patch_id)%radius
         center(1, 1) = patch_ib(ib_patch_id)%x_centroid
@@ -548,7 +547,7 @@ contains
         end if
 
         if (periodic_ibs) then
-            $:GPU_PARALLEL_LOOP(private='[i,j,k,dist_vec,dist,dist_vec_temp,dist_temp]', &
+            $:GPU_PARALLEL_LOOP(private='[i,j,k,dist_vec,dist,dist_vec_temp,dist_temp,ix,iy,iz]', &
                       & copyin='[ib_patch_id,center,radius]', collapse=3)
             do i = 0, m
                 do j = 0, n

@@ -152,7 +152,7 @@ case_dict = {
     # ibs wrap around domain
     "periodic_ibs": "T",
     # compute unclosed terms in volume filtered momentum equation
-    "volume_filtering_momentum_eqn": "T",
+    "volume_filter_momentum_eqn": "T",
     "filter_width": 3.0 * D / 2 * np.sqrt(2 / (9 * np.pi)),
     "compute_particle_drag": "T",
     # do not store a levelset field for every ib

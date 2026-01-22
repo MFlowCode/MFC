@@ -615,7 +615,7 @@ contains
         end if
 
         if (periodic_ibs) then
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[cart_y, cart_z]', copy='[ib_markers_sf]', copyin='[patch_id, center, r2]')
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[cart_y, cart_z, ix, iy, iz]', copy='[ib_markers_sf]', copyin='[patch_id, center, r2]')
             do k = 0, p
                 do j = 0, n
                     do i = 0, m

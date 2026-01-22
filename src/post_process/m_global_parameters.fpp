@@ -120,6 +120,7 @@ module m_global_parameters
     logical :: igr             !< enable IGR
     integer :: igr_order       !< IGR reconstruction order
     logical, parameter :: chemistry = .${chemistry}$. !< Chemistry modeling
+    integer :: volume_filter_size !< Number of total elements in volume filtering 
     !> @}
 
     integer :: avg_state       !< Average state evaluation method
@@ -694,6 +695,10 @@ contains
                 sys_size = B_idx%end
             end if
 
+            if (q_filtered_wrt) then
+                volume_filter_size = sys_size + 1 + 4*(2*num_dims**2 + num_dims + E_idx + 1)  
+            end if
+
             ! Volume Fraction Model (6-equation model)
         else if (model_eqns == 3) then
 
@@ -858,9 +863,9 @@ contains
 
 #ifdef MFC_MPI
         if (q_filtered_wrt) then
-            allocate (MPI_IO_DATA%view(1:sys_size + 1 + 4*9 + 4*9 + 3*4 + 6*4))
-            allocate (MPI_IO_DATA%var(1:sys_size + 1 + 4*9 + 4*9 + 3*4 + 6*4))
-            do i = 1, sys_size + 1 + 4*9 + 4*9 + 3*4 + 6*4
+            allocate (MPI_IO_DATA%view(1:volume_filter_size))
+            allocate (MPI_IO_DATA%var(1:volume_filter_size))
+            do i = 1, volume_filter_size
                 allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
                 MPI_IO_DATA%var(i)%sf => null()
             end do
@@ -1051,7 +1056,7 @@ contains
             end do
 
             if (q_filtered_wrt) then
-                do i = sys_size + 1, sys_size + 1 + 4*9 + 4*9 + 3*4 + 6*4
+                do i = sys_size + 1, volume_filter_size
                     MPI_IO_DATA%var(i)%sf => null()
                 end do
             end if

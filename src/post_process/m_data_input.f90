@@ -250,10 +250,10 @@ contains
 
         allocate (filtered_fluid_indicator_function%sf(local_start_idx:end_x, local_start_idx:end_y, local_start_idx:end_z))
 
-        do i = 1, sys_size - 1
+        do i = 1, E_idx
             allocate (stat_q_cons_filtered(i)%vf(1:4))
         end do
-        do i = 1, sys_size - 1
+        do i = 1, E_idx
             do j = 1, 4
                 allocate (stat_q_cons_filtered(i)%vf(j)%sf(local_start_idx:end_x, local_start_idx:end_y, local_start_idx:end_z))
             end do
@@ -676,7 +676,7 @@ contains
         integer :: alt_sys
         integer :: i
 
-        alt_sys = sys_size + 1 + 9*4 + 9*4 + 3*4 + 6*4 ! 109, filtered indicator, stats of: R_u, R_mu, F_imet, q_cons_filtered
+        alt_sys = volume_filter_size ! filtered indicator, stats of: R_u, R_mu, F_imet, q_cons_filtered, pressure
 
         ! Open the file to read volume filtered variables
         write (file_loc, '(I0,A)') t_step, '.dat'
@@ -736,7 +736,7 @@ contains
         allocate (q_cons_temp(1:sys_size))
 
         if (q_filtered_wrt) then
-            allocate (stat_q_cons_filtered(1:sys_size - 1))
+            allocate (stat_q_cons_filtered(1:E_idx))
             allocate (stat_filtered_pressure(1:4))
             allocate (stat_reynolds_stress(1:num_dims, 1:num_dims))
             allocate (stat_eff_visc(1:num_dims, 1:num_dims))
@@ -831,7 +831,7 @@ contains
         if (q_filtered_wrt) then
             deallocate (filtered_fluid_indicator_function%sf)
 
-            do i = 1, sys_size - 1
+            do i = 1, E_idx
                 do j = 1, 4
                     deallocate (stat_q_cons_filtered(i)%vf(j)%sf)
                 end do

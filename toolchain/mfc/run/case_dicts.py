@@ -353,7 +353,7 @@ SIMULATION.update({
     'forcing_dt': ParamType.REAL, 
     'forcing_wrt': ParamType.LOG, 
     'fluid_volume_fraction': ParamType.REAL,
-    'volume_filtering_momentum_eqn': ParamType.LOG,
+    'volume_filter_momentum_eqn': ParamType.LOG,
     't_step_start_stats': ParamType.INT,
     'filter_width': ParamType.REAL,
     'q_filtered_wrt': ParamType.LOG,
