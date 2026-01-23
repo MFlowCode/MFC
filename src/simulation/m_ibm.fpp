@@ -67,10 +67,12 @@ contains
         if (p > 0) then
             @:ALLOCATE(ib_markers%sf(-buff_size:m+buff_size, &
                 -buff_size:n+buff_size, -buff_size:p+buff_size))
-            @:ALLOCATE(levelset%sf(-buff_size:m+buff_size, &
-                -buff_size:n+buff_size, -buff_size:p+buff_size, 1:num_ibs))
-            @:ALLOCATE(levelset_norm%sf(-buff_size:m+buff_size, &
-                -buff_size:n+buff_size, -buff_size:p+buff_size, 1:num_ibs, 1:3))
+            if (store_levelset) then
+                @:ALLOCATE(levelset%sf(-buff_size:m+buff_size, &
+                    -buff_size:n+buff_size, -buff_size:p+buff_size, 1:num_ibs))
+                @:ALLOCATE(levelset_norm%sf(-buff_size:m+buff_size, &
+                    -buff_size:n+buff_size, -buff_size:p+buff_size, 1:num_ibs, 1:3))
+            end if
         else
             @:ALLOCATE(ib_markers%sf(-buff_size:m+buff_size, &
                 -buff_size:n+buff_size, 0:0))
@@ -81,8 +83,10 @@ contains
         end if
 
         @:ACC_SETUP_SFs(ib_markers)
-        @:ACC_SETUP_SFs(levelset)
-        @:ACC_SETUP_SFs(levelset_norm)
+        if (store_levelset) then
+            @:ACC_SETUP_SFs(levelset)
+            @:ACC_SETUP_SFs(levelset_norm)
+        end if
 
         $:GPU_ENTER_DATA(copyin='[num_gps,num_inner_gps]')
 
@@ -697,26 +701,26 @@ contains
                 else
                     do k = 0, p
                         if (ib_markers%sf(i, j, k) /= 0) then
-                            ! subsection_3D = ib_markers%sf( &
-                            !                 i - gp_layers:i + gp_layers, &
-                            !                 j - gp_layers:j + gp_layers, &
-                            !                 k - gp_layers:k + gp_layers)
-                            ! if (any(subsection_3D == 0)) then
-                            !     num_gps_out = num_gps_out + 1
-                            ! else
-                            !     num_inner_gps_out = num_inner_gps_out + 1
-                            ! end if
-
-                            subsection_x = ib_markers%sf(i - gp_layers:i + gp_layers, j, k)
-                            subsection_y = ib_markers%sf(i, j - gp_layers:j + gp_layers, k)
-                            subsection_z = ib_markers%sf(i, j, k - gp_layers:k + gp_layers)
-                            if (any(subsection_x == 0) .or. &
-                                any(subsection_y == 0) .or. &
-                                any(subsection_z == 0)) then
+                            subsection_3D = ib_markers%sf( &
+                                            i - gp_layers:i + gp_layers, &
+                                            j - gp_layers:j + gp_layers, &
+                                            k - gp_layers:k + gp_layers)
+                            if (any(subsection_3D == 0)) then
                                 num_gps_out = num_gps_out + 1
                             else
                                 num_inner_gps_out = num_inner_gps_out + 1
                             end if
+
+                            ! subsection_x = ib_markers%sf(i - gp_layers:i + gp_layers, j, k)
+                            ! subsection_y = ib_markers%sf(i, j - gp_layers:j + gp_layers, k)
+                            ! subsection_z = ib_markers%sf(i, j, k - gp_layers:k + gp_layers)
+                            ! if (any(subsection_x == 0) .or. &
+                            !     any(subsection_y == 0) .or. &
+                            !     any(subsection_z == 0)) then
+                            !     num_gps_out = num_gps_out + 1
+                            ! else
+                            !     num_inner_gps_out = num_inner_gps_out + 1
+                            ! end if
                         end if
                     end do
                 end if
@@ -793,18 +797,18 @@ contains
                     ! 3D
                     do k = 0, p
                         if (ib_markers%sf(i, j, k) /= 0) then
-                            ! subsection_3D = ib_markers%sf( &
-                            !                 i - gp_layers:i + gp_layers, &
-                            !                 j - gp_layers:j + gp_layers, &
-                            !                 k - gp_layers:k + gp_layers)
-                            ! if (any(subsection_3D == 0)) then
+                            subsection_3D = ib_markers%sf( &
+                                            i - gp_layers:i + gp_layers, &
+                                            j - gp_layers:j + gp_layers, &
+                                            k - gp_layers:k + gp_layers)
+                            if (any(subsection_3D == 0)) then
 
-                            subsection_x = ib_markers%sf(i - gp_layers:i + gp_layers, j, k)
-                            subsection_y = ib_markers%sf(i, j - gp_layers:j + gp_layers, k)
-                            subsection_z = ib_markers%sf(i, j, k - gp_layers:k + gp_layers)
-                            if (any(subsection_x == 0) .or. &
-                                any(subsection_y == 0) .or. &
-                                any(subsection_z == 0)) then
+                                ! subsection_x = ib_markers%sf(i - gp_layers:i + gp_layers, j, k)
+                                ! subsection_y = ib_markers%sf(i, j - gp_layers:j + gp_layers, k)
+                                ! subsection_z = ib_markers%sf(i, j, k - gp_layers:k + gp_layers)
+                                ! if (any(subsection_x == 0) .or. &
+                                !     any(subsection_y == 0) .or. &
+                                !     any(subsection_z == 0)) then
 
                                 ghost_points_in(count)%loc = [i, j, k]
                                 patch_id = ib_markers%sf(i, j, k)

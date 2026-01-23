@@ -223,10 +223,10 @@ contains
         Nzloc = p + 1
 
         !< batch size used in MPI_Alltoall
-        fft_batch_size = sys_size + 1 + 9 + 9 + 3 ! conservative vars, pressure, reynolds stress, viscous stress, interphase momentum exchange
+        fft_batch_size = sys_size + 1 + num_dims**2 + num_dims**2 + num_dims ! conservative vars, pressure, reynolds stress, viscous stress, interphase momentum exchange
         reynolds_stress_idx = sys_size + 1
-        eff_visc_idx = reynolds_stress_idx + 9
-        int_mom_exch_idx = eff_visc_idx + 9
+        eff_visc_idx = reynolds_stress_idx + num_dims**2
+        int_mom_exch_idx = eff_visc_idx + num_dims**2
 
         $:GPU_UPDATE(device='[Nx, Ny, Nz, fft_norm, NxC, Nyloc, Nzloc, fft_batch_size, reynolds_stress_idx, eff_visc_idx, int_mom_exch_idx]')
 

@@ -364,6 +364,13 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
                     if bc_val is not None:
                         self.prohibit(bc_val != -1,
                                     "Periodic immersed boundaries requires periodicity in all directions (all BCs should be -1)")
+        store_levelset = self.get('store_levelset', 'T') == 'T'
+        for i in range(1, num_ibs+1):
+            ib_geometry = self.get(f'patch_ib({i})%geometry')
+            self.prohibit(not store_levelset and ib_geometry != 8,
+                          "store_levelset set to false requires all immersed boundaries to be spherical (geometry=8)")
+            self.prohibit(periodic_ibs and ib_geometry != 8,
+                          "periodic_ibs requires all immersed boundaries to be spherical (geometry=8)")
 
     def check_stiffened_eos(self):
         """Checks constraints on stiffened equation of state fluids parameters"""
@@ -1101,7 +1108,7 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         self.prohibit(model_eqns is not None and model_eqns > 3,
                      "hyperelasticity is not supported for model_eqns > 3")
 
-    def check_periodic_forcing(self):
+    def check_periodic_forcing(self): # pylint: disable=too-many-locals
         """Checks requirements for periodic forcing based on bulk quantities"""
         periodic_forcing = self.get('periodic_forcing', 'F') == 'T'
 
@@ -1129,17 +1136,17 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         num_fluids = self.get('num_fluids')
         model_eqns = self.get('model_eqns')
 
-        self.prohibit(u_inf_ref is None, 
+        self.prohibit(u_inf_ref is None,
                       "u_inf_ref (desired bulk velocity) must be specified for periodic_forcing")
-        self.prohibit(rho_inf_ref is None, 
+        self.prohibit(rho_inf_ref is None,
                       "rho_inf_ref (desired bulk density) must be specified for periodic_forcing")
-        self.prohibit(P_inf_ref is None, 
+        self.prohibit(P_inf_ref is None,
                       "P_inf_ref (desired pressure based on bulk internal energy) must be specified for periodic_forcing")
-        self.prohibit(mom_f_idx not in [1, 2, 3], 
+        self.prohibit(mom_f_idx not in [1, 2, 3],
                       "mom_f_idx (direction to apply momentum forcing) must be set to [1, 2, 3]")
-        self.prohibit(forcing_window is None, 
+        self.prohibit(forcing_window is None,
                       "forcing_window must be specified for periodic_forcing")
-        self.prohibit(forcing_dt is None, 
+        self.prohibit(forcing_dt is None,
                       "forcing_dt must be specified for periodic_forcing")
         self.prohibit(ib and fluid_volume_fraction is None,
                       "periodic_forcing with ib requires specification of fluid_volume_fraction")
@@ -1148,19 +1155,22 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         self.prohibit(n == 0 or p == 0,
                      "periodic_forcing only supported in 3D")
         if num_fluids is not None:
-            self.prohibit(num_fluids > 1, 
+            self.prohibit(num_fluids > 1,
                           "periodic_forcing currently only supported with num_fluids=1")
         self.prohibit(model_eqns != 2,
                       "periodic_forcing requires model_eqns=2")
         
-    def check_volume_filtering(self):
+    def check_volume_filtering(self): # pylint: disable=too-many-locals
         """Checks requirements for computing unclosed terms in the volume filtered momentum equation"""
         volume_filtering = self.get('volume_filter_momentum_eqn', 'F') == 'T'
+        q_filtered_wrt = self.get('q_filtered_wrt', 'F') == 'T'
+
+        self.prohibit(q_filtered_wrt and not volume_filtering,
+                      "q_filtered_wrt requires volume_filter_momentum_eqn to be set to true")
 
         if not volume_filtering:
             return
-        
-        q_filtered_wrt = self.get('q_filtered_wrt', 'F') == 'T'
+
         filter_width = self.get('filter_width')
         slab_domain_decomposition = self.get('slab_domain_decomposition', 'F') == 'T'
         n = self.get('n', 0)
@@ -1172,11 +1182,9 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         file_per_process = self.get('file_per_process', 'F') == 'T'
         parallel_io = self.get('parallel_io', 'F') == 'T'
 
-        self.prohibit(not q_filtered_wrt, 
-                      "volume_filter_momentum_eqn requires q_filtered_wrt to be set to true")
-        self.prohibit(filter_width is None, 
+        self.prohibit(filter_width is None,
                       "volume_filter_momentum_eqn requires specifying filter_width (Gaussian kernel width)")
-        self.prohibit(not slab_domain_decomposition, 
+        self.prohibit(not slab_domain_decomposition,
                       "volume_filter_momentum_eqn requires slab_domain_decomposition to be set to true")
         self.prohibit(n == 0 or p == 0,
                      "volume_filter_momentum_eqn only supported in 3D")
@@ -1185,9 +1193,9 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         if m_glb is not None and n_glb is not None and p_glb is not None:
             self.prohibit((m_glb + 1) % 2 != 0 or (n_glb + 1) % 2 != 0 or (p_glb + 1) % 2 != 0,
                          "volume_filter_momentum_eqn requires global dimensions divisible by 2 in every direction")
-        self.prohibit(file_per_process,
+        self.prohibit(q_filtered_wrt and file_per_process,
                      "file_per_process must be false for q_filtered_wrt")
-        self.prohibit(not parallel_io, 
+        self.prohibit(q_filtered_wrt and not parallel_io,
                       "q_filtered_wrt requires parallel_io to be set to true")
         
     # ===================================================================

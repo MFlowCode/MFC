@@ -248,19 +248,25 @@ contains
         integer, intent(in) :: local_start_idx, end_x, end_y, end_z
         integer :: i, j, k
 
-        allocate (filtered_fluid_indicator_function%sf(local_start_idx:end_x, local_start_idx:end_y, local_start_idx:end_z))
+        allocate (filtered_fluid_indicator_function%sf(local_start_idx:end_x, &
+                                                       local_start_idx:end_y, &
+                                                       local_start_idx:end_z))
 
         do i = 1, E_idx
             allocate (stat_q_cons_filtered(i)%vf(1:4))
         end do
         do i = 1, E_idx
             do j = 1, 4
-                allocate (stat_q_cons_filtered(i)%vf(j)%sf(local_start_idx:end_x, local_start_idx:end_y, local_start_idx:end_z))
+                allocate (stat_q_cons_filtered(i)%vf(j)%sf(local_start_idx:end_x, &
+                                                           local_start_idx:end_y, &
+                                                           local_start_idx:end_z))
             end do
         end do
 
         do i = 1, 4
-            allocate (stat_filtered_pressure(i)%sf(local_start_idx:end_x, local_start_idx:end_y, local_start_idx:end_z))
+            allocate (stat_filtered_pressure(i)%sf(local_start_idx:end_x, &
+                                                   local_start_idx:end_y, &
+                                                   local_start_idx:end_z))
         end do
 
         do i = 1, num_dims
@@ -271,7 +277,9 @@ contains
         do i = 1, num_dims
             do j = 1, num_dims
                 do k = 1, 4
-                    allocate (stat_reynolds_stress(i, j)%vf(k)%sf(local_start_idx:end_x, local_start_idx:end_y, local_start_idx:end_z))
+                    allocate (stat_reynolds_stress(i, j)%vf(k)%sf(local_start_idx:end_x, &
+                                                                  local_start_idx:end_y, &
+                                                                  local_start_idx:end_z))
                 end do
             end do
         end do
@@ -284,7 +292,9 @@ contains
         do i = 1, num_dims
             do j = 1, num_dims
                 do k = 1, 4
-                    allocate (stat_eff_visc(i, j)%vf(k)%sf(local_start_idx:end_x, local_start_idx:end_y, local_start_idx:end_z))
+                    allocate (stat_eff_visc(i, j)%vf(k)%sf(local_start_idx:end_x, &
+                                                           local_start_idx:end_y, &
+                                                           local_start_idx:end_z))
                 end do
             end do
         end do
@@ -294,7 +304,9 @@ contains
         end do
         do i = 1, num_dims
             do j = 1, 4
-                allocate (stat_int_mom_exch(i)%vf(j)%sf(local_start_idx:end_x, local_start_idx:end_y, local_start_idx:end_z))
+                allocate (stat_int_mom_exch(i)%vf(j)%sf(local_start_idx:end_x, &
+                                                        local_start_idx:end_y, &
+                                                        local_start_idx:end_z))
             end do
         end do
 
@@ -676,7 +688,7 @@ contains
         integer :: alt_sys
         integer :: i
 
-        alt_sys = volume_filter_size ! filtered indicator, stats of: R_u, R_mu, F_imet, q_cons_filtered, pressure
+        alt_sys = sys_size + volume_filter_dt%stat_size ! filtered indicator, stats of: R_u, R_mu, F_imet, q_cons_filtered, pressure
 
         ! Open the file to read volume filtered variables
         write (file_loc, '(I0,A)') t_step, '.dat'

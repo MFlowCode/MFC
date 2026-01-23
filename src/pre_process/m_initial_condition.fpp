@@ -101,8 +101,10 @@ contains
 
         if (ib) then
             allocate (ib_markers%sf(0:m, 0:n, 0:p))
-            allocate (levelset%sf(0:m, 0:n, 0:p, 1:num_ibs))
-            allocate (levelset_norm%sf(0:m, 0:n, 0:p, 1:num_ibs, 1:3))
+            if (store_levelset) then
+                allocate (levelset%sf(0:m, 0:n, 0:p, 1:num_ibs))
+                allocate (levelset_norm%sf(0:m, 0:n, 0:p, 1:num_ibs, 1:3))
+            end if
             ib_markers%sf = 0
         end if
 
@@ -247,7 +249,10 @@ contains
         deallocate (patch_id_fp)
 
         if (ib) then
-            deallocate (ib_markers%sf, levelset%sf, levelset_norm%sf)
+            deallocate (ib_markers%sf)
+            if (store_levelset) then
+                deallocate (levelset%sf, levelset_norm%sf)
+            end if
         end if
 
         deallocate (bc_type(1, 1)%sf)

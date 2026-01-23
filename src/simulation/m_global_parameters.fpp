@@ -290,7 +290,7 @@ module m_global_parameters
     type(int_bounds_info) :: species_idx               !< Indexes of first & last concentration eqns.
     integer :: c_idx                                   !< Index of color function
     integer :: damage_idx                              !< Index of damage state variable (D) for continuum damage model
-    integer :: volume_filter_size                      !< Number of total elements in volume filtering
+    type(volume_filter_params) :: volume_filter_dt     !< Size and starting indices of volume filtered quantities
     !> @}
     $:GPU_DECLARE(create='[sys_size,E_idx,n_idx,bub_idx,alf_idx,gamma_idx]')
     $:GPU_DECLARE(create='[pi_inf_idx,B_idx,stress_idx,xi_idx,b_size]')
@@ -1045,10 +1045,6 @@ contains
                     sys_size = B_idx%end
                 end if
 
-                if (q_filtered_wrt) then
-                    volume_filter_size = sys_size + 1 + 4*(2*num_dims**2 + num_dims + E_idx + 1)
-                end if
-
             else if (model_eqns == 3) then
                 cont_idx%beg = 1
                 cont_idx%end = num_fluids
@@ -1204,6 +1200,18 @@ contains
             sys_size = species_idx%end
         end if
 
+        if (q_filtered_wrt) then
+            ! statistics of unclosed terms size for data output
+            volume_filter_dt%stat_size = 1 + 4*(2*num_dims**2 + num_dims + E_idx + 1)
+            ! starting indices for statistics
+            volume_filter_dt%stat_fluid_idx = 1
+            volume_filter_dt%stat_re_idx = 2
+            volume_filter_dt%stat_visc_idx = 2 + 4*num_dims**2
+            volume_filter_dt%stat_mom_exch_idx = 2 + 4*(2*num_dims**2)
+            volume_filter_dt%stat_cons_idx = 2 + 4*(2*num_dims**2 + num_dims)
+            volume_filter_dt%stat_pres_idx = 2 + 4*(2*num_dims**2 + num_dims + E_idx)
+        end if
+
         if (bubbles_euler .and. qbmm .and. .not. polytropic) then
             allocate (MPI_IO_DATA%view(1:sys_size + 2*nb*4))
             allocate (MPI_IO_DATA%var(1:sys_size + 2*nb*4))
@@ -1211,8 +1219,8 @@ contains
             allocate (MPI_IO_DATA%view(1:sys_size + 1))
             allocate (MPI_IO_DATA%var(1:sys_size + 1))
         else if (q_filtered_wrt) then
-            allocate (MPI_IO_DATA%view(1:volume_filter_size))
-            allocate (MPI_IO_DATA%var(1:volume_filter_size))
+            allocate (MPI_IO_DATA%view(1:sys_size + volume_filter_dt%stat_size))
+            allocate (MPI_IO_DATA%var(1:sys_size + volume_filter_dt%stat_size))
         else
             allocate (MPI_IO_DATA%view(1:sys_size))
             allocate (MPI_IO_DATA%var(1:sys_size))
@@ -1235,7 +1243,7 @@ contains
                 MPI_IO_DATA%var(i)%sf => null()
             end do
         else if (q_filtered_wrt) then
-            do i = sys_size + 1, volume_filter_size
+            do i = sys_size + 1, sys_size + volume_filter_dt%stat_size
                 allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
                 MPI_IO_DATA%var(i)%sf => null()
             end do
@@ -1436,7 +1444,7 @@ contains
                     MPI_IO_DATA%var(i)%sf => null()
                 end do
             else if (q_filtered_wrt) then
-                do i = 1, volume_filter_size
+                do i = 1, sys_size + volume_filter_dt%stat_size
                     MPI_IO_DATA%var(i)%sf => null()
                 end do
             else

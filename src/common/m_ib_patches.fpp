@@ -84,7 +84,9 @@ contains
 
                 if (patch_ib(i)%geometry == 8) then
                     call s_ib_sphere(i, ib_markers_sf)
-                    call s_sphere_levelset(i, levelset, levelset_norm)
+                    if (store_levelset) then
+                        call s_sphere_levelset(i, levelset, levelset_norm)
+                    end if
                 elseif (patch_ib(i)%geometry == 9) then
                     call s_ib_cuboid(i, ib_markers_sf)
                     call s_cuboid_levelset(i, levelset, levelset_norm)

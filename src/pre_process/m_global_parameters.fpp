@@ -948,8 +948,10 @@ contains
 
         if (ib) then
             allocate (MPI_IO_IB_DATA%var%sf(0:m, 0:n, 0:p))
-            allocate (MPI_IO_levelset_DATA%var%sf(0:m, 0:n, 0:p, 1:num_ibs))
-            allocate (MPI_IO_levelsetnorm_DATA%var%sf(0:m, 0:n, 0:p, 1:num_ibs, 1:3))
+            if (store_levelset) then
+                allocate (MPI_IO_levelset_DATA%var%sf(0:m, 0:n, 0:p, 1:num_ibs))
+                allocate (MPI_IO_levelsetnorm_DATA%var%sf(0:m, 0:n, 0:p, 1:num_ibs, 1:3))
+            end if
         end if
 #endif
 

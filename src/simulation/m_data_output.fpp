@@ -848,7 +848,7 @@ contains
         if (present(beta)) then
             alt_sys = sys_size + 1
         else if (q_filtered_wrt .and. (t_step == 0 .or. t_step == t_step_stop)) then
-            alt_sys = volume_filter_size
+            alt_sys = sys_size + volume_filter_dt%stat_size
         else
             alt_sys = sys_size
         end if

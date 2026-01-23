@@ -258,13 +258,15 @@ contains
             call MPI_TYPE_COMMIT(MPI_IO_IB_DATA%view, ierr)
 
 #ifndef MFC_POST_PROCESS
-            call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, &
-                                          MPI_ORDER_FORTRAN, mpi_p, MPI_IO_levelset_DATA%view, ierr)
-            call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, &
-                                          MPI_ORDER_FORTRAN, mpi_p, MPI_IO_levelsetnorm_DATA%view, ierr)
+            if (store_levelset) then
+                call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, &
+                                              MPI_ORDER_FORTRAN, mpi_p, MPI_IO_levelset_DATA%view, ierr)
+                call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, &
+                                              MPI_ORDER_FORTRAN, mpi_p, MPI_IO_levelsetnorm_DATA%view, ierr)
 
-            call MPI_TYPE_COMMIT(MPI_IO_levelset_DATA%view, ierr)
-            call MPI_TYPE_COMMIT(MPI_IO_levelsetnorm_DATA%view, ierr)
+                call MPI_TYPE_COMMIT(MPI_IO_levelset_DATA%view, ierr)
+                call MPI_TYPE_COMMIT(MPI_IO_levelsetnorm_DATA%view, ierr)
+            end if
 #endif
         end if
 
@@ -341,35 +343,35 @@ contains
         !total system size
         integer :: alt_sys
 
-        alt_sys = volume_filter_size
+        alt_sys = sys_size + volume_filter_dt%stat_size
 
-        MPI_IO_DATA%var(sys_size + 1)%sf => filtered_fluid_indicator_function%sf(0:m, 0:n, 0:p)
+        MPI_IO_DATA%var(sys_size + volume_filter_dt%stat_fluid_idx)%sf => filtered_fluid_indicator_function%sf(0:m, 0:n, 0:p)
         do i = 1, num_dims
             do j = 1, num_dims
                 do k = 1, 4
-                    MPI_IO_DATA%var(sys_size + 1 + (i - 1)*4*num_dims + (j - 1)*4 + k)%sf => stat_reynolds_stress(i, j)%vf(k)%sf(0:m, 0:n, 0:p)
+                    MPI_IO_DATA%var(sys_size + volume_filter_dt%stat_re_idx + (i - 1)*4*num_dims + (j - 1)*4 + (k - 1))%sf => stat_reynolds_stress(i, j)%vf(k)%sf(0:m, 0:n, 0:p)
                 end do
             end do
         end do
         do i = 1, num_dims
             do j = 1, num_dims
                 do k = 1, 4
-                    MPI_IO_DATA%var(sys_size + 37 + (i - 1)*4*num_dims + (j - 1)*4 + k)%sf => stat_eff_visc(i, j)%vf(k)%sf(0:m, 0:n, 0:p)
+                    MPI_IO_DATA%var(sys_size + volume_filter_dt%stat_visc_idx + (i - 1)*4*num_dims + (j - 1)*4 + (k - 1))%sf => stat_eff_visc(i, j)%vf(k)%sf(0:m, 0:n, 0:p)
                 end do
             end do
         end do
         do i = 1, num_dims
             do j = 1, 4
-                MPI_IO_DATA%var(sys_size + 73 + (i - 1)*4 + j)%sf => stat_int_mom_exch(i)%vf(j)%sf(0:m, 0:n, 0:p)
+                MPI_IO_DATA%var(sys_size + volume_filter_dt%stat_mom_exch_idx + (i - 1)*4 + (j - 1))%sf => stat_int_mom_exch(i)%vf(j)%sf(0:m, 0:n, 0:p)
             end do
         end do
         do i = 1, E_idx
             do j = 1, 4
-                MPI_IO_DATA%var(sys_size + 85 + (i - 1)*4 + j)%sf => stat_q_cons_filtered(i)%vf(j)%sf(0:m, 0:n, 0:p)
+                MPI_IO_DATA%var(sys_size + volume_filter_dt%stat_cons_idx + (i - 1)*4 + (j - 1))%sf => stat_q_cons_filtered(i)%vf(j)%sf(0:m, 0:n, 0:p)
             end do
         end do
         do i = 1, 4
-            MPI_IO_DATA%var(sys_size + 105 + i)%sf => stat_filtered_pressure(i)%sf(0:m, 0:n, 0:p)
+            MPI_IO_DATA%var(sys_size + volume_filter_dt%stat_pres_idx + (i - 1))%sf => stat_filtered_pressure(i)%sf(0:m, 0:n, 0:p)
         end do
 
         ! Define global(g) and local(l) sizes for flow variables

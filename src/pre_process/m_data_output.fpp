@@ -221,18 +221,20 @@ contains
                 end if
             end do
 
-            ! Outtputting Levelset Info
-            file_loc = trim(t_step_dir)//'/levelset.dat'
+            if (store_levelset) then
+                ! Outtputting Levelset Info
+                file_loc = trim(t_step_dir)//'/levelset.dat'
 
-            open (1, FILE=trim(file_loc), FORM='unformatted', STATUS=status)
-            write (1) levelset%sf
-            close (1)
+                open (1, FILE=trim(file_loc), FORM='unformatted', STATUS=status)
+                write (1) levelset%sf
+                close (1)
 
-            file_loc = trim(t_step_dir)//'/levelset_norm.dat'
+                file_loc = trim(t_step_dir)//'/levelset_norm.dat'
 
-            open (1, FILE=trim(file_loc), FORM='unformatted', STATUS=status)
-            write (1) levelset_norm%sf
-            close (1)
+                open (1, FILE=trim(file_loc), FORM='unformatted', STATUS=status)
+                write (1) levelset_norm%sf
+                close (1)
+            end if
         end if
 
         ! Outputting Conservative Variables

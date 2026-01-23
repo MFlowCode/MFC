@@ -157,6 +157,10 @@ contains
         do i = 0, m
             do j = 0, n
                 do k = 0, p
+                    rho = 0._wp
+                    do l = 1, num_fluids
+                        rho = rho + q_cons_vf(contxb + l - 1)%sf(i, j, k)
+                    end do
                     ! f_rho
                     q_periodic_force(1)%sf(i, j, k) = (rho_inf_ref - phase_rho)*forcing_dt
 
@@ -165,7 +169,7 @@ contains
 
                     ! f_E
                     q_periodic_force(3)%sf(i, j, k) = (P_inf_ref*gammas(1) - phase_eps)*forcing_dt &
-                                                      + q_cons_vf(contxe + mom_f_idx)%sf(i, j, k)*q_periodic_force(2)%sf(i, j, k)/q_cons_vf(contxb)%sf(i, j, k)
+                                                      + q_cons_vf(contxe + mom_f_idx)%sf(i, j, k)*q_periodic_force(2)%sf(i, j, k)/rho
                 end do
             end do
         end do
