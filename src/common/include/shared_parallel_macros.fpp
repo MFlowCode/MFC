@@ -1,3 +1,13 @@
+#:set NVIDIA_COMPILER_ID="NVHPC"
+#:set PGI_COMPILER_ID="PGI"
+#:set INTEL_COMPILER_ID="Intel"
+#:set CCE_COMPILER_ID="Cray"
+#:set AMD_COMPILER_ID="LLVMFlang"
+
+#:set USING_NVHPC = (MFC_COMPILER == NVIDIA_COMPILER_ID or MFC_COMPILER == PGI_COMPILER_ID)
+#:set USING_CCE = (MFC_COMPILER == CCE_COMPILER_ID)
+#:set USING_AMD = (MFC_COMPILER == AMD_COMPILER_ID)
+
 #:def ASSERT_LIST(data, datatype)
     #:assert data is not None
     #:assert isinstance(data, list)

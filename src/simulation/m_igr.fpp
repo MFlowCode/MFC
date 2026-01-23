@@ -356,7 +356,7 @@ contains
 
             call s_populate_F_igr_buffers(bc_type, jac_sf)
 
-            if (igr_iter_solver == 1) then ! Jacobi iteration
+            if (igr_iter_solver == 1 .or. dummy) then ! Jacobi iteration
                 $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
                 do l = idwbuff(3)%beg, idwbuff(3)%end
                     do k = idwbuff(2)%beg, idwbuff(2)%end
@@ -487,6 +487,7 @@ contains
 
         if (idir == 1) then
             if (p == 0) then
+                #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[j,k,l,rho_L, rho_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, mu_L, mu_R, vel_L, vel_R, pres_L, pres_R, alpha_L, alpha_R, alpha_rho_L, alpha_rho_R, F_L, F_R, E_L, E_R, cfl, dvel, dvel_small, rho_sf_small, vflux_L_arr, vflux_R_arr]')
                 do l = 0, p
                     do k = 0, n
@@ -901,6 +902,7 @@ contains
                     end do
                 end do
                 $:END_GPU_PARALLEL_LOOP()
+                #:endif
             else
                 #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                     $:GPU_PARALLEL_LOOP(collapse=3, private='[j,k,l,rho_L, rho_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, mu_L, mu_R, vel_L, vel_R, pres_L, pres_R, alpha_L, alpha_R, alpha_rho_L, alpha_rho_R, F_L, F_R, E_L, E_R, cfl, dvel, dvel_small, rho_sf_small, vflux_L_arr, vflux_R_arr]')
@@ -1418,6 +1420,7 @@ contains
             end if
         else if (idir == 2) then
             if (p == 0) then
+                #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[j,k,l,rho_L, rho_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, mu_L, mu_R, vel_L, vel_R, pres_L, pres_R, alpha_L, alpha_R, alpha_rho_L, alpha_rho_R, F_L, F_R, E_L, E_R, cfl, dvel_small, rho_sf_small, vflux_L_arr, vflux_R_arr]')
                 do l = 0, p
                     do k = -1, n
@@ -1812,6 +1815,7 @@ contains
                     end do
                 end do
                 $:END_GPU_PARALLEL_LOOP()
+                #:endif
             else
                 #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                     $:GPU_PARALLEL_LOOP(collapse=3, private='[j,k,l,rho_L, rho_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, mu_L, mu_R, vel_L, vel_R, pres_L, pres_R, alpha_L, alpha_R, alpha_rho_L, alpha_rho_R, F_L, F_R, E_L, E_R, cfl, dvel_small, rho_sf_small, vflux_L_arr, vflux_R_arr]')

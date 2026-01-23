@@ -647,12 +647,21 @@ contains
         integer, intent(in) :: weno_dir
         type(int_bounds_info), intent(in) :: is1_weno_d, is2_weno_d, is3_weno_d
 
+#:if USING_AMD and not MFC_CASE_OPTIMIZATION
+        real(wp), dimension(-3:2) :: dvd
+        real(wp), dimension(0:4) :: poly
+        real(wp), dimension(0:4) :: alpha
+        real(wp), dimension(0:4) :: omega
+        real(wp), dimension(0:4) :: beta
+        real(wp), dimension(0:4) :: delta
+#:else
         real(wp), dimension(-weno_polyn:weno_polyn - 1) :: dvd
         real(wp), dimension(0:weno_num_stencils) :: poly
         real(wp), dimension(0:weno_num_stencils) :: alpha
         real(wp), dimension(0:weno_num_stencils) :: omega
         real(wp), dimension(0:weno_num_stencils) :: beta
         real(wp), dimension(0:weno_num_stencils) :: delta
+#:endif
         real(wp), dimension(-3:3) :: v ! temporary field value array for clarity (WENO7 only)
         real(wp) :: tau
 
@@ -664,12 +673,12 @@ contains
 
         $:GPU_UPDATE(device='[is1_weno,is2_weno,is3_weno]')
 
-        if (weno_order /= 1) then
+        if (weno_order /= 1 .or. dummy) then
             call s_initialize_weno(v_vf, &
                                    weno_dir)
         end if
 
-        if (weno_order == 1) then
+        if (weno_order == 1 .or. dummy) then
             if (weno_dir == 1) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
                 do i = 1, ubound(v_vf, 1)
@@ -710,7 +719,8 @@ contains
                 end do
                 $:END_GPU_PARALLEL_LOOP()
             end if
-        elseif (weno_order == 3) then
+        end if
+        if (weno_order == 3 .or. dummy) then
             #:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
                 if (weno_dir == ${WENO_DIR}$) then
                     $:GPU_PARALLEL_LOOP(collapse=4,private='[beta,dvd,poly,omega,alpha,tau]')
@@ -719,6 +729,10 @@ contains
                             do j = is1_weno%beg, is1_weno%end
                                 do i = 1, v_size
                                     ! reconstruct from left side
+
+                                    alpha(:) = 0._wp 
+                                    omega(:) = 0._wp 
+                                    beta(:) = weno_eps
 
                                     dvd(0) = v_rs_ws_${XYZ}$ (j + 1, k, l, i) &
                                              - v_rs_ws_${XYZ}$ (j, k, l, i)
@@ -736,19 +750,19 @@ contains
                                               + weno_eps
 
                                     if (wenojs) then
-                                        alpha = d_cbL_${XYZ}$ (:, j)/(beta*beta)
+                                        alpha(0:weno_num_stencils) = d_cbL_${XYZ}$ (0:weno_num_stencils, j)/(beta(0:weno_num_stencils)**2._wp)
 
                                     elseif (mapped_weno) then
-                                        alpha = d_cbL_${XYZ}$ (:, j)/(beta*beta)
+                                        alpha(0:weno_num_stencils) = d_cbL_${XYZ}$ (0:weno_num_stencils, j)/(beta(0:weno_num_stencils)**2._wp)
                                         omega = alpha/sum(alpha)
-                                        alpha = (d_cbL_${XYZ}$ (:, j)*(1._wp + d_cbL_${XYZ}$ (:, j) - 3._wp*omega) + omega**2._wp) &
-                                                *(omega/(d_cbL_${XYZ}$ (:, j)**2._wp + omega*(1._wp - 2._wp*d_cbL_${XYZ}$ (:, j))))
+                                        alpha(0:weno_num_stencils) = (d_cbL_${XYZ}$ (0:weno_num_stencils, j)*(1._wp + d_cbL_${XYZ}$ (0:weno_num_stencils, j) - 3._wp*omega(0:weno_num_stencils)) + omega(0:weno_num_stencils)**2._wp) &
+                                                *(omega(0:weno_num_stencils)/(d_cbL_${XYZ}$ (0:weno_num_stencils, j)**2._wp + omega(0:weno_num_stencils)*(1._wp - 2._wp*d_cbL_${XYZ}$ (0:weno_num_stencils, j))))
 
                                     elseif (wenoz) then
                                         ! Borges, et al. (2008)
 
                                         tau = abs(beta(1) - beta(0))
-                                        alpha = d_cbL_${XYZ}$ (:, j)*(1._wp + tau/beta)
+                                        alpha(0:weno_num_stencils) = d_cbL_${XYZ}$ (0:weno_num_stencils, j)*(1._wp + tau/beta(0:weno_num_stencils))
 
                                     end if
 
@@ -764,17 +778,17 @@ contains
                                               + poly_coef_cbR_${XYZ}$ (j, 1, 0)*dvd(-1)
 
                                     if (wenojs) then
-                                        alpha = d_cbR_${XYZ}$ (:, j)/(beta*beta)
+                                        alpha(0:weno_num_stencils) = d_cbR_${XYZ}$ (0:weno_num_stencils, j)/(beta(0:weno_num_stencils)**2._wp)
 
                                     elseif (mapped_weno) then
-                                        alpha = d_cbR_${XYZ}$ (:, j)/(beta*beta)
+                                        alpha(0:weno_num_stencils) = d_cbR_${XYZ}$ (0:weno_num_stencils, j)/(beta(0:weno_num_stencils)**2._wp)
                                         omega = alpha/sum(alpha)
-                                        alpha = (d_cbR_${XYZ}$ (:, j)*(1._wp + d_cbR_${XYZ}$ (:, j) - 3._wp*omega) + omega**2._wp) &
-                                                *(omega/(d_cbR_${XYZ}$ (:, j)**2._wp + omega*(1._wp - 2._wp*d_cbR_${XYZ}$ (:, j))))
+                                        alpha(0:weno_num_stencils) = (d_cbR_${XYZ}$ (0:weno_num_stencils, j)*(1._wp + d_cbR_${XYZ}$ (0:weno_num_stencils, j) - 3._wp*omega(0:weno_num_stencils)) + omega(0:weno_num_stencils)**2._wp) &
+                                                *(omega(0:weno_num_stencils)/(d_cbR_${XYZ}$ (0:weno_num_stencils, j)**2._wp + omega(0:weno_num_stencils)*(1._wp - 2._wp*d_cbR_${XYZ}$ (0:weno_num_stencils, j))))
 
                                     elseif (wenoz) then
 
-                                        alpha = d_cbR_${XYZ}$ (:, j)*(1._wp + tau/beta)
+                                        alpha(0:weno_num_stencils) = d_cbR_${XYZ}$ (0:weno_num_stencils, j)*(1._wp + tau/beta(0:weno_num_stencils))
 
                                     end if
 
@@ -789,7 +803,8 @@ contains
                     $:END_GPU_PARALLEL_LOOP()
                 end if
             #:endfor
-        elseif (weno_order == 5) then
+        end if
+        if (weno_order == 5 .or. dummy) then
             #:if not MFC_CASE_OPTIMIZATION or weno_num_stencils > 1
                 #:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
                     if (weno_dir == ${WENO_DIR}$) then
@@ -834,29 +849,30 @@ contains
                                                   + weno_eps
 
                                         if (wenojs) then
-                                            alpha = d_cbL_${XYZ}$ (:, j)/(beta*beta)
+                                            alpha(0:weno_num_stencils) = d_cbL_${XYZ}$ (0:weno_num_stencils, j)/(beta(0:weno_num_stencils)**2._wp)
 
                                         elseif (mapped_weno) then
-                                            alpha = d_cbL_${XYZ}$ (:, j)/(beta*beta)
+                                            alpha(0:weno_num_stencils) = d_cbL_${XYZ}$ (0:weno_num_stencils, j)/(beta(0:weno_num_stencils)**2._wp)
                                             omega = alpha/sum(alpha)
-                                            alpha = (d_cbL_${XYZ}$ (:, j)*(1._wp + d_cbL_${XYZ}$ (:, j) - 3._wp*omega) + omega**2._wp) &
-                                                    *(omega/(d_cbL_${XYZ}$ (:, j)**2._wp + omega*(1._wp - 2._wp*d_cbL_${XYZ}$ (:, j))))
+                                            alpha(0:weno_num_stencils) = (d_cbL_${XYZ}$ (0:weno_num_stencils, j)*(1._wp + d_cbL_${XYZ}$ (0:weno_num_stencils, j) - 3._wp*omega(0:weno_num_stencils)) + omega(0:weno_num_stencils)**2._wp) &
+                                                    *(omega(0:weno_num_stencils)/(d_cbL_${XYZ}$ (0:weno_num_stencils, j)**2._wp + omega(0:weno_num_stencils)*(1._wp - 2._wp*d_cbL_${XYZ}$ (0:weno_num_stencils, j))))
 
                                         elseif (wenoz) then
+
                                             ! Borges, et al. (2008)
 
                                             tau = abs(beta(2) - beta(0))                   ! Equation 25
-                                            alpha = d_cbL_${XYZ}$ (:, j)*(1._wp + tau/beta)  ! Equation 28 (note: weno_eps was already added to beta)
+                                            alpha(0:weno_num_stencils) = d_cbL_${XYZ}$ (0:weno_num_stencils, j)*(1._wp + tau/beta(0:weno_num_stencils))  ! Equation 28 (note: weno_eps was already added to beta)
 
                                         elseif (teno) then
-                                            ! Fu, et al. (2016)
+                                             ! Fu, et al. (2016)
                                             ! Fu''s code: https://dx.doi.org/10.13140/RG.2.2.36250.34247
                                             tau = abs(beta(2) - beta(0))
                                             alpha = 1._wp + tau/beta                    ! Equation 22 (reuse alpha as gamma; pick C=1 & q=6)
                                             alpha = (alpha*alpha*alpha)**2._wp          ! Equation 22 cont. (some CPU compilers cannot optimize x**6.0)
                                             omega = alpha/sum(alpha)                    ! Equation 25 (reuse omega as xi)
                                             delta = merge(0._wp, 1._wp, omega < teno_CT)! Equation 26
-                                            alpha = delta*d_cbL_${XYZ}$ (:, j)          ! Equation 27
+                                            alpha(0:weno_num_stencils) = delta(0:weno_num_stencils)*d_cbL_${XYZ}$ (0:weno_num_stencils, j)    ! Equation 27
 
                                         end if
 
@@ -876,21 +892,22 @@ contains
                                                   + poly_coef_cbR_${XYZ}$ (j, 2, 0)*dvd(-1) &
                                                   + poly_coef_cbR_${XYZ}$ (j, 2, 1)*dvd(-2)
 
+
                                         if (wenojs) then
-                                            alpha = d_cbR_${XYZ}$ (:, j)/(beta*beta)
+                                            alpha(0:weno_num_stencils) = d_cbR_${XYZ}$ (0:weno_num_stencils, j)/(beta(0:weno_num_stencils)**2._wp)
 
                                         elseif (mapped_weno) then
-                                            alpha = d_cbR_${XYZ}$ (:, j)/(beta*beta)
+                                            alpha(0:weno_num_stencils) = d_cbR_${XYZ}$ (0:weno_num_stencils, j)/(beta(0:weno_num_stencils)**2._wp)
                                             omega = alpha/sum(alpha)
-                                            alpha = (d_cbR_${XYZ}$ (:, j)*(1._wp + d_cbR_${XYZ}$ (:, j) - 3._wp*omega) + omega**2._wp) &
-                                                    *(omega/(d_cbR_${XYZ}$ (:, j)**2._wp + omega*(1._wp - 2._wp*d_cbR_${XYZ}$ (:, j))))
+                                            alpha(0:weno_num_stencils) = (d_cbR_${XYZ}$ (0:weno_num_stencils, j)*(1._wp + d_cbR_${XYZ}$ (0:weno_num_stencils, j) - 3._wp*omega(0:weno_num_stencils)) + omega(0:weno_num_stencils)**2._wp) &
+                                                    *(omega(0:weno_num_stencils)/(d_cbR_${XYZ}$ (0:weno_num_stencils, j)**2._wp + omega(0:weno_num_stencils)*(1._wp - 2._wp*d_cbR_${XYZ}$ (0:weno_num_stencils, j))))
 
                                         elseif (wenoz) then
 
-                                            alpha = d_cbR_${XYZ}$ (:, j)*(1._wp + tau/beta)
+                                            alpha(0:weno_num_stencils) = d_cbR_${XYZ}$ (0:weno_num_stencils, j)*(1._wp + tau/beta(0:weno_num_stencils))
 
                                         elseif (teno) then
-                                            alpha = delta*d_cbR_${XYZ}$ (:, j)
+                                            alpha(0:weno_num_stencils) = delta(0:weno_num_stencils)*d_cbR_${XYZ}$ (0:weno_num_stencils, j)
 
                                         end if
 
@@ -911,7 +928,8 @@ contains
                     end if
                 #:endfor
             #:endif
-        elseif (weno_order == 7) then
+        end if
+        if (weno_order == 7 .or. dummy) then
             #:if not MFC_CASE_OPTIMIZATION or weno_num_stencils > 2
                 #:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
                     if (weno_dir == ${WENO_DIR}$) then
@@ -1026,28 +1044,28 @@ contains
                                         end if
 
                                         if (wenojs) then
-                                            alpha = d_cbL_${XYZ}$ (:, j)/(beta*beta)
+                                            alpha(0:weno_num_stencils) = d_cbL_${XYZ}$ (0:weno_num_stencils, j)/(beta(0:weno_num_stencils)**2._wp)
 
                                         elseif (mapped_weno) then
-                                            alpha = d_cbL_${XYZ}$ (:, j)/(beta*beta)
+                                            alpha(0:weno_num_stencils) = d_cbL_${XYZ}$ (0:weno_num_stencils, j)/(beta(0:weno_num_stencils)**2._wp)
                                             omega = alpha/sum(alpha)
-                                            alpha = (d_cbL_${XYZ}$ (:, j)*(1._wp + d_cbL_${XYZ}$ (:, j) - 3._wp*omega) + omega**2._wp) &
-                                                    *(omega/(d_cbL_${XYZ}$ (:, j)**2._wp + omega*(1._wp - 2._wp*d_cbL_${XYZ}$ (:, j))))
+                                            alpha(0:weno_num_stencils) = (d_cbL_${XYZ}$ (0:weno_num_stencils, j)*(1._wp + d_cbL_${XYZ}$ (0:weno_num_stencils, j) - 3._wp*omega(0:weno_num_stencils)) + omega(0:weno_num_stencils)**2._wp) &
+                                                    *(omega(0:weno_num_stencils)/(d_cbL_${XYZ}$ (0:weno_num_stencils, j)**2._wp + omega(0:weno_num_stencils)*(1._wp - 2._wp*d_cbL_${XYZ}$ (0:weno_num_stencils, j))))
 
                                         elseif (wenoz) then
                                             ! Castro, et al. (2010)
                                             ! Don & Borges (2013) also helps
                                             tau = abs(beta(3) - beta(0)) ! Equation 50
-                                            alpha = d_cbL_${XYZ}$ (:, j)*(1._wp + (tau/beta)**wenoz_q) ! q = 2,3,4 for stability
+                                            alpha(0:weno_num_stencils) = d_cbL_${XYZ}$ (0:weno_num_stencils, j)*(1._wp + (tau/beta(0:weno_num_stencils))**wenoz_q) ! q = 2,3,4 for stability
 
                                         elseif (teno) then
                                             #:if not MFC_CASE_OPTIMIZATION or weno_num_stencils > 3
                                                 tau = abs(beta(4) - beta(3)) ! Note the reordering of stencils
                                                 alpha = 1._wp + tau/beta
-                                                alpha = (alpha*alpha*alpha)**2._wp ! some CPU compilers cannot optimize x**6.0
+                                                alpha = (alpha**3._wp)**2._wp ! some CPU compilers cannot optimize x**6.0
                                                 omega = alpha/sum(alpha)
                                                 delta = merge(0._wp, 1._wp, omega < teno_CT)
-                                                alpha = delta*d_cbL_${XYZ}$ (:, j)
+                                                alpha(0:weno_num_stencils) = delta(0:weno_num_stencils)*d_cbL_${XYZ}$ (0:weno_num_stencils, j)
                                             #:endif
                                         end if
 
@@ -1083,19 +1101,20 @@ contains
                                         end if
 
                                         if (wenojs) then
-                                            alpha = d_cbR_${XYZ}$ (:, j)/(beta*beta)
+                                            alpha(0:weno_num_stencils) = d_cbR_${XYZ}$ (0:weno_num_stencils, j)/(beta(0:weno_num_stencils)**2._wp)
 
                                         elseif (mapped_weno) then
-                                            alpha = d_cbR_${XYZ}$ (:, j)/(beta*beta)
+                                            alpha(0:weno_num_stencils) = d_cbR_${XYZ}$ (0:weno_num_stencils, j)/(beta(0:weno_num_stencils)**2._wp)
                                             omega = alpha/sum(alpha)
-                                            alpha = (d_cbR_${XYZ}$ (:, j)*(1._wp + d_cbR_${XYZ}$ (:, j) - 3._wp*omega) + omega**2._wp) &
-                                                    *(omega/(d_cbR_${XYZ}$ (:, j)**2._wp + omega*(1._wp - 2._wp*d_cbR_${XYZ}$ (:, j))))
+                                            alpha(0:weno_num_stencils) = (d_cbR_${XYZ}$ (0:weno_num_stencils, j)*(1._wp + d_cbR_${XYZ}$ (0:weno_num_stencils, j) - 3._wp*omega(0:weno_num_stencils)) + omega(0:weno_num_stencils)**2._wp) &
+                                                    *(omega(0:weno_num_stencils)/(d_cbR_${XYZ}$ (0:weno_num_stencils, j)**2._wp + omega(0:weno_num_stencils)*(1._wp - 2._wp*d_cbR_${XYZ}$ (0:weno_num_stencils, j))))
 
                                         elseif (wenoz) then
-                                            alpha = d_cbR_${XYZ}$ (:, j)*(1._wp + (tau/beta)**wenoz_q)
+
+                                            alpha(0:weno_num_stencils) = d_cbR_${XYZ}$ (0:weno_num_stencils, j)*(1._wp + tau/beta(0:weno_num_stencils))
 
                                         elseif (teno) then
-                                            alpha = delta*d_cbR_${XYZ}$ (:, j)
+                                            alpha(0:weno_num_stencils) = delta(0:weno_num_stencils)*d_cbR_${XYZ}$ (0:weno_num_stencils, j)
 
                                         end if
 

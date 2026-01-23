@@ -2,6 +2,7 @@
 !! @brief Contains module m_data_output
 
 #:include 'macros.fpp'
+#:include 'case.fpp'
 
 !> @brief The primary purpose of this module is to output the grid and the
 !!              conservative variables data at the chosen time-step interval. In
@@ -267,10 +268,15 @@ contains
         integer, intent(in) :: t_step
 
         real(wp) :: rho        !< Cell-avg. density
+#:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        real(wp), dimension(2) :: alpha      !< Cell-avg. volume fraction
+        real(wp), dimension(3) :: vel        !< Cell-avg. velocity
+#:else
+        real(wp), dimension(num_fluids) :: alpha      !< Cell-avg. volume fraction
         real(wp), dimension(num_vels) :: vel        !< Cell-avg. velocity
+#:endif
         real(wp) :: vel_sum    !< Cell-avg. velocity sum
         real(wp) :: pres       !< Cell-avg. pressure
-        real(wp), dimension(num_fluids) :: alpha      !< Cell-avg. volume fraction
         real(wp) :: gamma      !< Cell-avg. sp. heat ratio
         real(wp) :: pi_inf     !< Cell-avg. liquid stiffness function
         real(wp) :: qv         !< Cell-avg. internal energy reference value
@@ -320,7 +326,7 @@ contains
         #:call GPU_PARALLEL(copyout='[icfl_max_loc]', copyin='[icfl_sf]')
             icfl_max_loc = maxval(icfl_sf)
         #:endcall GPU_PARALLEL
-        if (viscous) then
+        if (viscous .or. dummy) then
             #:call GPU_PARALLEL(copyout='[vcfl_max_loc, Rc_min_loc]', copyin='[vcfl_sf,Rc_sf]')
                 vcfl_max_loc = maxval(vcfl_sf)
                 Rc_min_loc = minval(Rc_sf)
@@ -1567,6 +1573,7 @@ contains
                     end if
                 elseif (p == 0) then
                     if (bubbles_euler) then
+                        #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
                         write (i + 30, '(6X,10F24.8)') &
                             nondim_time, &
                             rho, &
@@ -1578,7 +1585,9 @@ contains
                             nRdot(1), &
                             R(1), &
                             Rdot(1)
+                        #:endif
                     else if (elasticity) then
+                        #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
                         write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
                                'F24.8,F24.8,F24.8)') &
                             nondim_time, &
@@ -1589,6 +1598,7 @@ contains
                             tau_e(1), &
                             tau_e(2), &
                             tau_e(3)
+                        #:endif
                     else
                         write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8)') &
                             nondim_time, &
@@ -1598,6 +1608,7 @@ contains
                         print *, 'time =', nondim_time, 'rho =', rho, 'pres =', pres
                     end if
                 else
+                    #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                     write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
                            'F24.8,F24.8,F24.8,F24.8,F24.8,'// &
                            'F24.8)') &
@@ -1612,6 +1623,7 @@ contains
                         qv, &
                         c, &
                         accel
+                    #:endif
                 end if
             end if
         end do

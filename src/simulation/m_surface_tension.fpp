@@ -134,7 +134,7 @@ contains
             $:END_GPU_PARALLEL_LOOP()
 
         elseif (id == 2) then
-
+            #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
             $:GPU_PARALLEL_LOOP(collapse=3, private='[Omega, w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW]')
             do l = isz%beg, isz%end
                 do k = isy%beg, isy%end
@@ -178,6 +178,7 @@ contains
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
+            #:endif
 
         elseif (id == 3) then
             #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
@@ -324,7 +325,7 @@ contains
         integer :: i, j, k, l
 
         #:for SCHEME, TYPE in [('weno', 'WENO_TYPE'),('muscl', 'MUSCL_TYPE')]
-            if (recon_type == ${TYPE}$) then
+            if (recon_type == ${TYPE}$ .or. dummy) then
                 ! Reconstruction in s1-direction
 
                 if (norm_dir == 1) then
@@ -345,49 +346,49 @@ contains
                 end if
 
                 $:GPU_UPDATE(device='[is1,is2,is3,iv]')
-
-                if (recon_dir == 1) then
-                    $:GPU_PARALLEL_LOOP(collapse=4)
-                    do i = iv%beg, iv%end
-                        do l = is3%beg, is3%end
-                            do k = is2%beg, is2%end
-                                do j = is1%beg, is1%end
-                                    vL_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
-                                    vR_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
-                                end do
-                            end do
-                        end do
-                    end do
-                    $:END_GPU_PARALLEL_LOOP()
-                else if (recon_dir == 2) then
-                    $:GPU_PARALLEL_LOOP(collapse=4)
-                    do i = iv%beg, iv%end
-                        do l = is3%beg, is3%end
-                            do k = is2%beg, is2%end
-                                do j = is1%beg, is1%end
-                                    vL_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
-                                    vR_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
-                                end do
-                            end do
-                        end do
-                    end do
-                    $:END_GPU_PARALLEL_LOOP()
-                else if (recon_dir == 3) then
-                    $:GPU_PARALLEL_LOOP(collapse=4)
-                    do i = iv%beg, iv%end
-                        do l = is3%beg, is3%end
-                            do k = is2%beg, is2%end
-                                do j = is1%beg, is1%end
-                                    vL_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
-                                    vR_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
-                                end do
-                            end do
-                        end do
-                    end do
-                    $:END_GPU_PARALLEL_LOOP()
-                end if
             end if
         #:endfor
+
+        if (recon_dir == 1) then
+            $:GPU_PARALLEL_LOOP(collapse=4)
+            do i = iv%beg, iv%end
+                do l = is3%beg, is3%end
+                    do k = is2%beg, is2%end
+                        do j = is1%beg, is1%end
+                            vL_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
+                            vR_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
+                        end do
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        else if (recon_dir == 2) then
+            $:GPU_PARALLEL_LOOP(collapse=4)
+            do i = iv%beg, iv%end
+                do l = is3%beg, is3%end
+                    do k = is2%beg, is2%end
+                        do j = is1%beg, is1%end
+                            vL_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
+                            vR_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
+                        end do
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        else if (recon_dir == 3) then
+            $:GPU_PARALLEL_LOOP(collapse=4)
+            do i = iv%beg, iv%end
+                do l = is3%beg, is3%end
+                    do k = is2%beg, is2%end
+                        do j = is1%beg, is1%end
+                            vL_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
+                            vR_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
+                        end do
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
 
     end subroutine s_reconstruct_cell_boundary_values_capillary
 

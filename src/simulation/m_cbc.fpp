@@ -37,9 +37,9 @@ module m_cbc
         molecular_weights, get_species_specific_heats_r, &
         get_mole_fractions, get_species_specific_heats_r
 
-    #:block DEF_AMD
+    #:if USING_AMD
         use m_chemistry, only: molecular_weights_nonparameter
-    #:endblock DEF_AMD
+    #:endif
     implicit none
 
     private; public :: s_initialize_cbc_module, s_cbc, s_finalize_cbc_module
@@ -700,7 +700,7 @@ contains
             if (cbc_dir == ${CBC_DIR}$ .and. recon_type == WENO_TYPE) then
 
                 ! PI2 of flux_rs_vf and flux_src_rs_vf at j = 1/2
-                if (weno_order == 3) then
+                if (weno_order == 3 .or. dummy) then
 
                     call s_convert_primitive_to_flux_variables(q_prim_rs${XYZ}$_vf, &
                                                                F_rs${XYZ}$_vf, &
@@ -732,9 +732,10 @@ contains
                         end do
                     end do
                     $:END_GPU_PARALLEL_LOOP()
+                end if
 
                     ! PI4 of flux_rs_vf and flux_src_rs_vf at j = 1/2, 3/2
-                else
+                if(weno_order == 5 .or. dummy) then
                     call s_convert_primitive_to_flux_variables(q_prim_rs${XYZ}$_vf, &
                                                                F_rs${XYZ}$_vf, &
                                                                F_src_rs${XYZ}$_vf, &
@@ -1059,15 +1060,14 @@ contains
                             sum_Enthalpies = 0._wp
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_species
-                                #:block UNDEF_AMD
-                                    h_k(i) = h_k(i)*gas_constant/molecular_weights(i)*T
-                                    sum_Enthalpies = sum_Enthalpies + (rho*h_k(i) - pres*Mw/molecular_weights(i)*Cp/R_gas)*dYs_dt(i)
-                                #:endblock UNDEF_AMD
-
-                                #:block DEF_AMD
+                                
+                                #:if USING_AMD
                                     h_k(i) = h_k(i)*gas_constant/molecular_weights_nonparameter(i)*T
                                     sum_Enthalpies = sum_Enthalpies + (rho*h_k(i) - pres*Mw/molecular_weights_nonparameter(i)*Cp/R_gas)*dYs_dt(i)
-                                #:endblock DEF_AMD
+                                #:else
+                                    h_k(i) = h_k(i)*gas_constant/molecular_weights(i)*T
+                                    sum_Enthalpies = sum_Enthalpies + (rho*h_k(i) - pres*Mw/molecular_weights(i)*Cp/R_gas)*dYs_dt(i)
+                                #:endif
                             end do
                             flux_rs${XYZ}$_vf_l(-1, k, r, E_idx) = flux_rs${XYZ}$_vf_l(0, k, r, E_idx) &
                                                                    + ds(0)*((E/rho + pres/rho)*drho_dt + rho*vel_dv_dt_sum + Cp*T*L(2)/(c*c) + sum_Enthalpies)
