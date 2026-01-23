@@ -848,8 +848,8 @@ contains
         if (hyper_cleaning) then
             do j = 0, m
                 do k = 0, n
-                    q_cons_vf(psi_idx)%sf(j,k,0) = 1d-2*exp(-( x_cc(j)**2 + y_cc(k)**2 )/(2.0*0.05**2))
-                    q_prim_vf(psi_idx)%sf(j,k,0) = q_cons_vf(psi_idx)%sf(j,k,0)
+                    q_cons_vf(psi_idx)%sf(j, k, 0) = 1d-2*exp(-(x_cc(j)**2 + y_cc(k)**2)/(2.0*0.05**2))
+                    q_prim_vf(psi_idx)%sf(j, k, 0) = q_cons_vf(psi_idx)%sf(j, k, 0)
                 end do
             end do
         end if

@@ -219,11 +219,11 @@
             ! Set velocity components for rotation
             ! v_x = -omega * (y - y_c)
             ! v_y =  omega * (x - x_c)
-            q_prim_vf(momxb)%sf(i, j, 0) = -omega * (y_cc(j) - y_center)
-            q_prim_vf(momxb + 1)%sf(i, j, 0) = omega * (x_cc(i) - x_center)
+            q_prim_vf(momxb)%sf(i, j, 0) = -omega*(y_cc(j) - y_center)
+            q_prim_vf(momxb + 1)%sf(i, j, 0) = omega*(x_cc(i) - x_center)
         end if
 
-      case (253) ! MHD Smooth Magnetic Vortex
+    case (253) ! MHD Smooth Magnetic Vortex
         ! Section 5.2 of
         ! Implicit hybridized discontinuous Galerkin methods for compressible magnetohydrodynamics
         ! C. Ciuca, P. Fernandez, A. Christophe, N.C. Nguyen, J. Peraire
@@ -247,12 +247,12 @@
         !  ψ is initialized to zero everywhere.
         !---------------------------------------------------------
 
-        eps_mhd   = patch_icpp(patch_id)%a(2)
-        sigma     = patch_icpp(patch_id)%a(3)
-        C_mhd     = eps_mhd * sigma * sqrt(pi) * 0.5_wp
+        eps_mhd = patch_icpp(patch_id)%a(2)
+        sigma = patch_icpp(patch_id)%a(3)
+        C_mhd = eps_mhd*sigma*sqrt(pi)*0.5_wp
 
         ! B-field
-        q_prim_vf(B_idx%beg)%sf(i,j,0) = 1._wp + C_mhd * erf( (x_cc(i) - 0.5_wp) / sigma )
+        q_prim_vf(B_idx%beg)%sf(i, j, 0) = 1._wp + C_mhd*erf((x_cc(i) - 0.5_wp)/sigma)
 
     case (261)  ! Blob
         r0 = 1._wp/sqrt(8._wp)
@@ -260,7 +260,7 @@
         r = sqrt(r2)
         alpha = r/r0
         if (alpha < 1) then
-            q_prim_vf(B_idx%beg)%sf(i,j,0) = 1._wp/sqrt(4._wp*pi) * (alpha**8 - 2._wp*alpha**4 + 1._wp)
+            q_prim_vf(B_idx%beg)%sf(i, j, 0) = 1._wp/sqrt(4._wp*pi)*(alpha**8 - 2._wp*alpha**4 + 1._wp)
             ! q_prim_vf(B_idx%beg)%sf(i,j,0) = 1._wp/sqrt(4000._wp*pi) * (4096._wp*r2**4 - 128._wp*r2**2 + 1._wp)
             ! q_prim_vf(B_idx%beg)%sf(i,j,0) = 1._wp/(4._wp*pi) * (alpha**8 - 2._wp*alpha**4 + 1._wp)
             ! q_prim_vf(E_idx)%sf(i,j,0) = 6._wp - q_prim_vf(B_idx%beg)%sf(i,j,0)**2/2._wp
@@ -276,24 +276,24 @@
 
         if (r <= 0.5_wp) then
             ! LEFT state: ρ=1, v∥=+10, v⊥=0, p=20, B∥=B⊥=5/√(4π)
-            q_prim_vf(contxb)%sf(i,j,0)    = 1._wp
-            q_prim_vf(momxb)%sf(i,j,0)     = 10._wp * cosA
-            q_prim_vf(momxb+1)%sf(i,j,0)   = 10._wp * sinA
-            q_prim_vf(E_idx)%sf(i,j,0)     = 20._wp
-            q_prim_vf(B_idx%beg)%sf(i,j,0)   = (5._wp/sqrt(4._wp*pi)) * cosA &
-                                                - (5._wp/sqrt(4._wp*pi)) * sinA
-            q_prim_vf(B_idx%beg+1)%sf(i,j,0) = (5._wp/sqrt(4._wp*pi)) * sinA &
-                                                + (5._wp/sqrt(4._wp*pi)) * cosA
+            q_prim_vf(contxb)%sf(i, j, 0) = 1._wp
+            q_prim_vf(momxb)%sf(i, j, 0) = 10._wp*cosA
+            q_prim_vf(momxb + 1)%sf(i, j, 0) = 10._wp*sinA
+            q_prim_vf(E_idx)%sf(i, j, 0) = 20._wp
+            q_prim_vf(B_idx%beg)%sf(i, j, 0) = (5._wp/sqrt(4._wp*pi))*cosA &
+                                               - (5._wp/sqrt(4._wp*pi))*sinA
+            q_prim_vf(B_idx%beg + 1)%sf(i, j, 0) = (5._wp/sqrt(4._wp*pi))*sinA &
+                                                   + (5._wp/sqrt(4._wp*pi))*cosA
         else
             ! RIGHT state: ρ=1, v∥=−10, v⊥=0, p=1, B∥=B⊥=5/√(4π)
-            q_prim_vf(contxb)%sf(i,j,0)    = 1._wp
-            q_prim_vf(momxb)%sf(i,j,0)     = -10._wp * cosA
-            q_prim_vf(momxb+1)%sf(i,j,0)   = -10._wp * sinA
-            q_prim_vf(E_idx)%sf(i,j,0)     = 1._wp
-            q_prim_vf(B_idx%beg)%sf(i,j,0)   = (5._wp/sqrt(4._wp*pi)) * cosA &
-                                                - (5._wp/sqrt(4._wp*pi)) * sinA
-            q_prim_vf(B_idx%beg+1)%sf(i,j,0) = (5._wp/sqrt(4._wp*pi)) * sinA &
-                                                + (5._wp/sqrt(4._wp*pi)) * cosA
+            q_prim_vf(contxb)%sf(i, j, 0) = 1._wp
+            q_prim_vf(momxb)%sf(i, j, 0) = -10._wp*cosA
+            q_prim_vf(momxb + 1)%sf(i, j, 0) = -10._wp*sinA
+            q_prim_vf(E_idx)%sf(i, j, 0) = 1._wp
+            q_prim_vf(B_idx%beg)%sf(i, j, 0) = (5._wp/sqrt(4._wp*pi))*cosA &
+                                               - (5._wp/sqrt(4._wp*pi))*sinA
+            q_prim_vf(B_idx%beg + 1)%sf(i, j, 0) = (5._wp/sqrt(4._wp*pi))*sinA &
+                                                   + (5._wp/sqrt(4._wp*pi))*cosA
         end if
         ! v^z and B^z remain zero by default
 
