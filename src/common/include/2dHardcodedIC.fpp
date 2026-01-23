@@ -1,6 +1,6 @@
 #:def Hardcoded2DVariables()
     ! Place any declaration of intermediate variables here
-    real(wp) :: eps, C_mhd
+    real(wp) :: eps, eps_mhd, C_mhd
     real(wp) :: r, rmax, gam, umax, p0
     real(wp) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, intL, alph
     real(wp) :: factor

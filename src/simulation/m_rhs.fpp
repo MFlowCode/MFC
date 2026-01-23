@@ -248,8 +248,8 @@ contains
         if (hyper_cleaning) then
             q_prim_qp%vf(psi_idx)%sf => &
                 q_cons_qp%vf(psi_idx)%sf
-            $:GPU_ENTER_DATA(attach=q_prim_qp%vf(psi_idx)%sf)
-            $:GPU_ENTER_DATA(attach=q_prim_qp%vf(psi_idx)%sf)
+            $:GPU_ENTER_DATA(copyin='[q_prim_qp%vf(psi_idx)%sf]')
+            $:GPU_ENTER_DATA(attach='[q_prim_qp%vf(psi_idx)%sf]')
         end if
 
         ! Allocation/Association of flux_n, flux_src_n, and flux_gsrc_n
