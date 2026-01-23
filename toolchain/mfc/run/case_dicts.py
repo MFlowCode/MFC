@@ -60,16 +60,13 @@ COMMON = {
     'Bx0': ParamType.REAL,
     'relativity': ParamType.LOG,
     'cont_damage': ParamType.LOG,
-<<<<<<< HEAD
     'hyper_cleaning': ParamType.LOG,
-=======
     'num_bc_patches': ParamType.INT,
     'igr': ParamType.LOG,
     'igr_order': ParamType.INT,
     'down_sample': ParamType.LOG,
     'recon_type': ParamType.INT,
     'muscl_order': ParamType.INT,
->>>>>>> master
 }
 
 PRE_PROCESS = COMMON.copy()
