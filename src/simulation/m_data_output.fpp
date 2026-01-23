@@ -1233,9 +1233,9 @@ contains
                             q_cons_vf(mom_idx%beg)%sf(j - 2, k, l), G_local)
                     else
                         call s_compute_pressure( &
-                            q_cons_vf(1)%sf(j - 2, k, l), &
+                            q_cons_vf(E_idx)%sf(j - 2, k, l), &
                             q_cons_vf(alf_idx)%sf(j - 2, k, l), &
-                            dyn_p, pi_inf, gamma, rho, qv, rhoYks(:), pres, T)
+                            dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T)
                     end if
 
                     if (model_eqns == 4) then

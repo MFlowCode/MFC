@@ -2,7 +2,6 @@
 import json
 import math
 
-
 mu = 1.0e-4
 lambd = 1.0
 time_end = 15.0
@@ -16,9 +15,9 @@ print(
             # Logistics
             "run_time_info": "T",
             # Computational Domain Parameters
-            "x_domain%beg": 0,
+            "x_domain%beg": 0.0,
             "x_domain%end": 16.0 * lambd,
-            "y_domain%beg": 0,
+            "y_domain%beg": 0.0,
             "y_domain%end": lambd,
             "m": 4096,
             "n": 256,

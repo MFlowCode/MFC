@@ -514,11 +514,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             stack.push('', {
                 'nb' : 3, 'fluid_pp(1)%gamma' : 0.16, 'fluid_pp(1)%pi_inf': 3515.0,
-                'fluid_pp(2)%gamma': 2.5, 'fluid_pp(2)%pi_inf': 0.0, 'fluid_pp(1)%mul0' : 0.001002,
-                'fluid_pp(1)%ss' : 0.07275,'fluid_pp(1)%pv' : 2338.8,'fluid_pp(1)%gamma_v' : 1.33,
-                'fluid_pp(1)%M_v' : 18.02,'fluid_pp(1)%mu_v' : 8.816e-06,'fluid_pp(1)%k_v' : 0.019426,
-                'fluid_pp(2)%gamma_v' : 1.4,'fluid_pp(2)%M_v' : 28.97,'fluid_pp(2)%mu_v' : 1.8e-05,
-                'fluid_pp(2)%k_v' : 0.02556, 'fluid_pp(2)%D_v' : 0.242e-4, 
+                'bub_pp%R0ref': 1.0, 'bub_pp%p0ref': 1.0, 'bub_pp%rho0ref': 1.0, 'bub_pp%T0ref': 1.0,
+                'bub_pp%ss': 0.07179866765358993, 'bub_pp%pv': 0.02308216136195411, 'bub_pp%vd': 0.2404125083932959, 
+                'bub_pp%mu_l': 0.009954269975623244, 'bub_pp%mu_v': 8.758168074360729e-05, 
+                'bub_pp%mu_g': 0.00017881922111898042, 'bub_pp%gam_v': 1.33, 'bub_pp%gam_g': 1.4,
+                'bub_pp%M_v': 18.02, 'bub_pp%M_g': 28.97, 'bub_pp%k_v': 0.5583395141263873, 
+                'bub_pp%k_g': 0.7346421281308791, 'bub_pp%R_v': 1334.8378710170155, 'bub_pp%R_g': 830.2995663005393,
                 'patch_icpp(1)%alpha_rho(1)': 0.96, 'patch_icpp(1)%alpha(1)': 4e-02, 
                 'patch_icpp(2)%alpha_rho(1)': 0.96, 'patch_icpp(2)%alpha(1)': 4e-02,  'patch_icpp(3)%alpha_rho(1)': 0.96,
                 'patch_icpp(3)%alpha(1)': 4e-02, 'patch_icpp(1)%pres': 1.0, 'patch_icpp(2)%pres': 1.0,
@@ -721,67 +722,68 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # Phase Change checks
         for relax_model in [5] + ([6] if ndims <= 2 else []):
             for num_fluids in ([2] if ndims == 1 or relax_model == 5 else []) + [3]:
-                stack.push(f"Phase Change model {relax_model} -> {num_fluids} Fluid(s)", {
-                    "relax": 'T',
-                    "relax_model": relax_model,
-                    'model_eqns': 3,
-                    'palpha_eps': 1E-02,
-                    'ptgalpha_eps': 1E-02,
-                    "num_fluids": num_fluids,
-                    'riemann_solver':           2,
-                    'fluid_pp(1)%gamma':        0.7409,       'fluid_pp(1)%pi_inf':   1.7409E+09,
-                    'fluid_pp(1)%cv':           1816,         'fluid_pp(1)%qv':   -1167000,
-                    'fluid_pp(1)%qvp':          0.0,
-                    'fluid_pp(2)%gamma':        2.3266,       'fluid_pp(2)%pi_inf':   0.0E+00,
-                    'fluid_pp(2)%cv':           1040,         'fluid_pp(2)%qv':   2030000,
-                    'fluid_pp(2)%qvp':          -23400,
-                    'patch_icpp(1)%pres':       4.3755E+05,
-                    'patch_icpp(1)%alpha(1)':   8.7149E-06,    'patch_icpp(1)%alpha_rho(1)': 9.6457E+02 * 8.7149E-06,
-                    'patch_icpp(1)%alpha(2)':   1-8.7149E-06,  'patch_icpp(1)%alpha_rho(2)': 2.3132 * ( 1 - 8.7149E-06 ),
-                    'patch_icpp(2)%pres':       9.6602E+04,
-                    'patch_icpp(2)%alpha(1)':   3.6749E-05,   'patch_icpp(2)%alpha_rho(1)': 1.0957E+03 * 3.6749E-05,
-                    'patch_icpp(2)%alpha(2)':   1-3.6749E-05, 'patch_icpp(2)%alpha_rho(2)': 0.5803 * ( 1 - 3.6749E-05 ),
-                    'patch_icpp(3)%pres':       9.6602E+04,
-                    'patch_icpp(3)%alpha(1)':   3.6749E-05,   'patch_icpp(3)%alpha_rho(1)': 1.0957E+03 * 3.6749E-05,
-                    'patch_icpp(3)%alpha(2)':   1-3.6749E-05, 'patch_icpp(3)%alpha_rho(2)': 0.5803 * ( 1 - 3.6749E-05 )
-                })
-
-                if num_fluids == 3:
-                    stack.push("", {
-                        'fluid_pp(3)%gamma':        2.4870,        'fluid_pp(3)%pi_inf':   0.0E+00,
-                        'fluid_pp(3)%cv':           717.5,         'fluid_pp(3)%qv':   0.0E+00,
-                        'fluid_pp(3)%qvp':          0.0,
-                        'patch_icpp(1)%alpha(2)':   2.5893E-02,                 'patch_icpp(1)%alpha_rho(2)':   2.3132 * 2.5893E-02,
-                        'patch_icpp(2)%alpha(2)':   2.8728E-02,                 'patch_icpp(2)%alpha_rho(2)':   0.5803 * 2.8728E-02,
-                        'patch_icpp(3)%alpha(2)':   2.8728E-02,                 'patch_icpp(3)%alpha_rho(2)':   0.5803 * 2.8728E-02,
-                        'patch_icpp(1)%alpha(3)':   1-8.7149E-06-2.5893E-02,    'patch_icpp(1)%alpha_rho(3)':   3.5840 * ( 1-8.7149E-06-2.5893E-02 ),
-                        'patch_icpp(2)%alpha(3)':   1-3.6749E-05-2.8728E-02,    'patch_icpp(2)%alpha_rho(3)':   0.8991 * ( 1-3.6749E-05-2.8728E-02 ),
-                        'patch_icpp(3)%alpha(3)':   1-3.6749E-05-2.8728E-02,    'patch_icpp(3)%alpha_rho(3)':   0.8991 * ( 1-3.6749E-05-2.8728E-02 )
+                for model_eqns in [3, 2]:
+                    stack.push(f"Phase Change model {relax_model} -> {num_fluids} Fluid(s) -> model equation -> {model_eqns}", {
+                        "relax": 'T',
+                        "relax_model": relax_model,
+                        'model_eqns': model_eqns,
+                        'palpha_eps': 1E-02,
+                        'ptgalpha_eps': 1E-02,
+                        "num_fluids": num_fluids,
+                        'riemann_solver':           2,
+                        'fluid_pp(1)%gamma':        0.7409,       'fluid_pp(1)%pi_inf':   1.7409E+09,
+                        'fluid_pp(1)%cv':           1816,         'fluid_pp(1)%qv':   -1167000,
+                        'fluid_pp(1)%qvp':          0.0,
+                        'fluid_pp(2)%gamma':        2.3266,       'fluid_pp(2)%pi_inf':   0.0E+00,
+                        'fluid_pp(2)%cv':           1040,         'fluid_pp(2)%qv':   2030000,
+                        'fluid_pp(2)%qvp':          -23400,
+                        'patch_icpp(1)%pres':       4.3755E+05,
+                        'patch_icpp(1)%alpha(1)':   8.7149E-06,    'patch_icpp(1)%alpha_rho(1)': 9.6457E+02 * 8.7149E-06,
+                        'patch_icpp(1)%alpha(2)':   1-8.7149E-06,  'patch_icpp(1)%alpha_rho(2)': 2.3132 * ( 1 - 8.7149E-06 ),
+                        'patch_icpp(2)%pres':       9.6602E+04,
+                        'patch_icpp(2)%alpha(1)':   3.6749E-05,   'patch_icpp(2)%alpha_rho(1)': 1.0957E+03 * 3.6749E-05,
+                        'patch_icpp(2)%alpha(2)':   1-3.6749E-05, 'patch_icpp(2)%alpha_rho(2)': 0.5803 * ( 1 - 3.6749E-05 ),
+                        'patch_icpp(3)%pres':       9.6602E+04,
+                        'patch_icpp(3)%alpha(1)':   3.6749E-05,   'patch_icpp(3)%alpha_rho(1)': 1.0957E+03 * 3.6749E-05,
+                        'patch_icpp(3)%alpha(2)':   1-3.6749E-05, 'patch_icpp(3)%alpha_rho(2)': 0.5803 * ( 1 - 3.6749E-05 )
                     })
 
-                if ndims == 1:
-                    stack.push("", {
-                        'patch_icpp(1)%vel(1)':   606.15, 'patch_icpp(2)%vel(1)': 10.0, 'patch_icpp(3)%vel(1)': 10.0
-                    })
-                elif ndims == 2:
-                    stack.push("", {
-                        'patch_icpp(1)%vel(1)':   0.0, 'patch_icpp(2)%vel(1)': 0.0, 'patch_icpp(3)%vel(1)': 0.0,
-                        'patch_icpp(1)%vel(2)':   606.15, 'patch_icpp(2)%vel(2)': 10.0, 'patch_icpp(3)%vel(2)': 10.0
-                    })
-                elif ndims == 3:
-                    stack.push("", {
-                        'patch_icpp(1)%vel(1)':   0.0, 'patch_icpp(2)%vel(1)': 0.0, 'patch_icpp(3)%vel(1)': 0.0,
-                        'patch_icpp(1)%vel(2)':   0.0, 'patch_icpp(2)%vel(2)': 0.0, 'patch_icpp(3)%vel(2)': 0.0,
-                        'patch_icpp(1)%vel(3)':   606.15, 'patch_icpp(2)%vel(3)': 10.0, 'patch_icpp(3)%vel(3)': 10.0
-                    })
+                    if num_fluids == 3:
+                        stack.push("", {
+                            'fluid_pp(3)%gamma':        2.4870,        'fluid_pp(3)%pi_inf':   0.0E+00,
+                            'fluid_pp(3)%cv':           717.5,         'fluid_pp(3)%qv':   0.0E+00,
+                            'fluid_pp(3)%qvp':          0.0,
+                            'patch_icpp(1)%alpha(2)':   2.5893E-02,                 'patch_icpp(1)%alpha_rho(2)':   2.3132 * 2.5893E-02,
+                            'patch_icpp(2)%alpha(2)':   2.8728E-02,                 'patch_icpp(2)%alpha_rho(2)':   0.5803 * 2.8728E-02,
+                            'patch_icpp(3)%alpha(2)':   2.8728E-02,                 'patch_icpp(3)%alpha_rho(2)':   0.5803 * 2.8728E-02,
+                            'patch_icpp(1)%alpha(3)':   1-8.7149E-06-2.5893E-02,    'patch_icpp(1)%alpha_rho(3)':   3.5840 * ( 1-8.7149E-06-2.5893E-02 ),
+                            'patch_icpp(2)%alpha(3)':   1-3.6749E-05-2.8728E-02,    'patch_icpp(2)%alpha_rho(3)':   0.8991 * ( 1-3.6749E-05-2.8728E-02 ),
+                            'patch_icpp(3)%alpha(3)':   1-3.6749E-05-2.8728E-02,    'patch_icpp(3)%alpha_rho(3)':   0.8991 * ( 1-3.6749E-05-2.8728E-02 )
+                        })
 
-                cases.append(define_case_d(stack, '', {}))
+                    if ndims == 1:
+                        stack.push("", {
+                            'patch_icpp(1)%vel(1)':   606.15, 'patch_icpp(2)%vel(1)': 10.0, 'patch_icpp(3)%vel(1)': 10.0
+                        })
+                    elif ndims == 2:
+                        stack.push("", {
+                            'patch_icpp(1)%vel(1)':   0.0, 'patch_icpp(2)%vel(1)': 0.0, 'patch_icpp(3)%vel(1)': 0.0,
+                            'patch_icpp(1)%vel(2)':   606.15, 'patch_icpp(2)%vel(2)': 10.0, 'patch_icpp(3)%vel(2)': 10.0
+                        })
+                    elif ndims == 3:
+                        stack.push("", {
+                            'patch_icpp(1)%vel(1)':   0.0, 'patch_icpp(2)%vel(1)': 0.0, 'patch_icpp(3)%vel(1)': 0.0,
+                            'patch_icpp(1)%vel(2)':   0.0, 'patch_icpp(2)%vel(2)': 0.0, 'patch_icpp(3)%vel(2)': 0.0,
+                            'patch_icpp(1)%vel(3)':   606.15, 'patch_icpp(2)%vel(3)': 10.0, 'patch_icpp(3)%vel(3)': 10.0
+                        })
 
-                stack.pop()
-                stack.pop()
+                    cases.append(define_case_d(stack, '', {}))
 
-                if num_fluids == 3:
                     stack.pop()
+                    stack.pop()
+
+                    if num_fluids == 3:
+                        stack.pop()
 
     def alter_viscosity(dimInfo):
         # Viscosity & bubbles checks
@@ -791,11 +793,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             stack.push('', {
                 'nb' : 1, 'fluid_pp(1)%gamma' : 0.16, 'fluid_pp(1)%pi_inf': 3515.0,
-                'fluid_pp(2)%gamma': 2.5, 'fluid_pp(2)%pi_inf': 0.0, 'fluid_pp(1)%mul0' : 0.001002,
-                'fluid_pp(1)%ss' : 0.07275,'fluid_pp(1)%pv' : 2338.8,'fluid_pp(1)%gamma_v' : 1.33,
-                'fluid_pp(1)%M_v' : 18.02,'fluid_pp(1)%mu_v' : 8.816e-06,'fluid_pp(1)%k_v' : 0.019426,
-                'fluid_pp(2)%gamma_v' : 1.4,'fluid_pp(2)%M_v' : 28.97,'fluid_pp(2)%mu_v' : 1.8e-05,
-                'fluid_pp(2)%k_v' : 0.02556, 'patch_icpp(1)%alpha_rho(1)': 0.96, 'patch_icpp(1)%alpha(1)': 4e-02,
+                'bub_pp%R0ref': 1.0, 'bub_pp%p0ref': 1.0, 'bub_pp%rho0ref': 1.0, 'bub_pp%T0ref': 1.0,
+                'bub_pp%ss': 0.07179866765358993, 'bub_pp%pv': 0.02308216136195411, 'bub_pp%vd': 0.2404125083932959, 
+                'bub_pp%mu_l': 0.009954269975623244, 'bub_pp%mu_v': 8.758168074360729e-05, 
+                'bub_pp%mu_g': 0.00017881922111898042, 'bub_pp%gam_v': 1.33, 'bub_pp%gam_g': 1.4,
+                'bub_pp%M_v': 18.02, 'bub_pp%M_g': 28.97, 'bub_pp%k_v': 0.5583395141263873, 
+                'bub_pp%k_g': 0.7346421281308791, 'bub_pp%R_v': 1334.8378710170155, 'bub_pp%R_g': 830.2995663005393,
+                'patch_icpp(1)%alpha_rho(1)': 0.96, 'patch_icpp(1)%alpha(1)': 4e-02,
                 'patch_icpp(2)%alpha_rho(1)': 0.96, 'patch_icpp(2)%alpha(1)': 4e-02,  'patch_icpp(3)%alpha_rho(1)': 0.96,
                 'patch_icpp(3)%alpha(1)': 4e-02, 'patch_icpp(1)%pres': 1.0, 'patch_icpp(2)%pres': 1.0,
                 'patch_icpp(3)%pres': 1.0
@@ -843,11 +847,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         'dt': 1e-06, 'lag_params%pressure_corrector': 'T', 'bubble_model': 2,
                         'num_fluids': 2, 'lag_params%heatTransfer_model': 'T', 'lag_params%massTransfer_model': 'T',
                         'fluid_pp(1)%gamma' : 0.16, 'fluid_pp(1)%pi_inf': 3515.0, 'fluid_pp(2)%gamma': 2.5,
-                        'fluid_pp(2)%pi_inf': 0.0, 'fluid_pp(1)%mul0' : 0.001002, 'fluid_pp(1)%ss' : 0.07275,
-                        'fluid_pp(1)%pv' : 2338.8,'fluid_pp(1)%gamma_v' : 1.33, 'fluid_pp(1)%M_v' : 18.02,
-                        'fluid_pp(1)%mu_v' : 8.816e-06,'fluid_pp(1)%k_v' : 0.019426, 'fluid_pp(1)%cp_v' : 2.1e3,
-                        'fluid_pp(2)%gamma_v' : 1.4,'fluid_pp(2)%M_v' : 28.97, 'fluid_pp(2)%mu_v' : 1.8e-05,
-                        'fluid_pp(2)%k_v' : 0.02556, 'fluid_pp(2)%cp_v' : 1.e3, 'fluid_pp(2)%D_v' : 2.5e-5, 
+                        'fluid_pp(2)%pi_inf': 0.0, 
                         'patch_icpp(1)%alpha_rho(1)': 0.96,
                         'patch_icpp(1)%alpha(1)': 4e-02, 'patch_icpp(1)%alpha_rho(2)': 0., 'patch_icpp(1)%alpha(2)': 0.,
                         'patch_icpp(2)%alpha_rho(1)': 0.96, 'patch_icpp(2)%alpha(1)': 4e-02, 'patch_icpp(2)%alpha_rho(2)': 0.,
@@ -860,7 +860,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         'lag_rvel_wrt': "T",'lag_r0_wrt': "T", 'lag_rmax_wrt': "T", 'lag_rmin_wrt': "T",
                         'lag_dphidt_wrt': "T", 'lag_pres_wrt': "T", 'lag_mv_wrt': "T", 'lag_mg_wrt': "T",
                         'lag_betaT_wrt': "T", 'lag_betaC_wrt': "T", 'lag_params%write_bubbles': "T",
-                        'lag_params%write_bubbles_stats': "T"
+                        'lag_params%write_bubbles_stats': "T", "polytropic": "F",
+                        'bub_pp%R0ref': 1.0, 'bub_pp%p0ref': 1.0, 'bub_pp%rho0ref': 1.0, 'bub_pp%T0ref': 1.0,
+                        'bub_pp%ss': 7.131653759435349e-07, 'bub_pp%pv': 0.02292716400352907, 'bub_pp%vd': 2.4752475247524753e-06, 
+                        'bub_pp%mu_l': 9.920792079207921e-08, 'bub_pp%gam_v': 1.33, 'bub_pp%gam_g': 1.4,
+                        'bub_pp%M_v': 18.02, 'bub_pp%M_g': 28.97, 'bub_pp%k_v': 5.618695895665441e-06,
+                        'bub_pp%k_g': 7.392868685947116e-06, 'bub_pp%R_v': 1347.810235139403, 'bub_pp%R_g': 838.3686723235085,
+                        'bub_pp%cp_g': 2921.2822272326243, 'bub_pp%cp_v': 6134.692677188511
                     })
 
                     if len(dimInfo[0]) == 2:
@@ -1025,7 +1031,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                            "2D_backward_facing_step",
                            "2D_forward_facing_step",
                            "1D_convergence",
-                           "3D_IGR_33jet"]
+                           "3D_IGR_33jet","1D_multispecies_diffusion"]
             if path in casesToSkip:
                 continue
             name = f"{path.split('_')[0]} -> Example -> {'_'.join(path.split('_')[1:])}"

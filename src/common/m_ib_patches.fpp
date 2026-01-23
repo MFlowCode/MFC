@@ -765,7 +765,6 @@ contains
 
     end subroutine s_ib_cylinder
 
-
     subroutine s_ib_ellipse(patch_id, ib_markers_sf)
 
         integer, intent(in) :: patch_id
@@ -777,17 +776,15 @@ contains
         real(wp), dimension(1:2) :: center !< x and y coordinates in local IB frame
         real(wp), dimension(1:3, 1:3) :: inverse_rotation
 
-        ! Transferring the rectangle's centroid and length information
+        ! Transferring the ellipse's centroid and length information
         center(1) = patch_ib(patch_id)%x_centroid
         center(2) = patch_ib(patch_id)%y_centroid
-        ellipse_coeffs(1) = 0.5_wp * patch_ib(patch_id)%length_x
-        ellipse_coeffs(2) = 0.5_wp * patch_ib(patch_id)%length_y
+        ellipse_coeffs(1) = 0.5_wp*patch_ib(patch_id)%length_x
+        ellipse_coeffs(2) = 0.5_wp*patch_ib(patch_id)%length_y
         inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
 
-        ! Checking whether the rectangle covers a particular cell in the
-        ! domain and verifying whether the current patch has the permission
-        ! to write to that cell. If both queries check out, the primitive
-        ! variables of the current patch are assigned to this cell.
+        ! Checking whether the ellipse covers a particular cell in the
+        ! domain
         $:GPU_PARALLEL_LOOP(private='[i,j, xy_local]', copy='[ib_markers_sf]',&
                   & copyin='[patch_id,center,ellipse_coeffs,inverse_rotation,x_cc,y_cc]', collapse=2)
         do j = 0, n
