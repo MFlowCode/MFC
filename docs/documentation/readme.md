@@ -3,13 +3,14 @@
 ## User Documentation
 
 - [Getting Started](getting-started.md)
-- [Testing MFC](testing.md)
+- [Testing](testing.md)
 - [Case Files](case.md)
 - [Example Cases](examples.md)
-- [Running MFC](running.md)
+- [Running](running.md)
 - [Flow Visualization](visualization.md)
 - [Performance](expectedPerformance.md)
-- [MFC's Authors](authors.md)
+- [GPU Offloading](gpuParallelization.md)
+- [Authors](authors.md)
 - [References](references.md)
 
 ## Code/API Documentation

@@ -11,7 +11,7 @@ module m_delay_file_access
 
 contains
 
-    subroutine DelayFileAccess(ProcessRank)
+    impure subroutine DelayFileAccess(ProcessRank)
         integer, intent(in) :: ProcessRank
 
         integer :: iDelay, nFileAccessDelayIterations

@@ -10,6 +10,8 @@
 
 - <a id="Bryngelson19">Bryngelson, S. H., Schmidmayer, K., Coralic, V., Meng, J. C., Maeda, K., and Colonius, T. (2019). Mfc: An open-source high-order multi-component, multi-phase, and multi-scale compressible flow solver. arXiv preprint arXiv:1907.10512.</a>
 
+- <a id="Cao24">Cao A. and. Sch&auml;fer F. (2024). Information Geometric Regularization of the Barotropic Euler Equations. arXiv preprint arXiv:2308.14127.</a>
+
 - <a id="Chen22">Chen, S. S., Li, J. P., Li, Z., Yuan, W., & Gao, Z. H. (2022). Anti-dissipation pressure correction under low Mach numbers for Godunov-type schemes. Journal of Computational Physics, 456, 111027. </a>
 
 - <a id="Childs12">Childs, H., Brugger, E., Whitlock, B., Meredith, J., Ahern, S., Pugmire, D., Biagas, K., Miller, M., Harrison, C., Weber, G. H., Krishnan, H., Fogal, T., Sanderson, A., Garth, C., Bethel, E. W., Camp, D., R¨ubel, O., Durant, M., Favre, J. M., and Navr´atil, P. (2012). VisIt: An End-User Tool For Visualizing and Analyzing Very Large Data. In High Performance Visualization–Enabling Extreme-Scale Scientific Insight, pages 357–372.</a>
@@ -19,6 +21,8 @@
 - <a id="Coralic14">Coralic, V. and Colonius, T. (2014). Finite-volume weno scheme for viscous compressible multicomponent flows. Journal of computational physics, 274:95–121.</a>
 
 - <a id="Gottlieb98">Gottlieb, S. and Shu, C.-W. (1998). Total variation diminishing runge-kutta schemes. Mathematics of computation of the American Mathematical Society, 67(221):73–85.</a>
+
+- <a id="Guo23">Guo, H., Jiang, P., Ye, L., & Zhu, Y. (2023). An efficient and low-divergence method for generating inhomogeneous and anisotropic turbulence with arbitrary spectra. Journal of Fluid Mechanics, 970, A2.</a>
 
 - <a id="Henrick05">Henrick, A. K., Aslam, T. D., and Powers, J. M. (2005). Mapped weighted essentially nonoscillatory schemes: achieving optimal order near critical points. Journal of Computational Physics, 207(2):542–567.</a>
 
@@ -33,6 +37,8 @@
 - <a id="Maeda18">Maeda, K. and Colonius, T. (2018). Eulerian–lagrangian method for simulation of cloud cavitation. Journal of computational physics, 371:994–1017.</a>
 
 - <a id="Meng16">Meng, J. C. C. (2016). Numerical simulations of droplet aerobreakup. PhD thesis, California Institute of Technology.</a>
+
+- <a id="Michalke64"> Michalke, A. (1964). On the inviscid instability of the hyperbolictangent velocity profile. Journal of Fluid Mechanics, 19(4), 543-556.</a>
 
 - <a id="Pirozzoli13">Pirozzoli, S., and Colonius, T. (2013). Generalized characteristic relaxation boundary conditions for unsteady compressible flow simulations. Journal of Computational Physics, 248:109-126.</a>
 
@@ -63,3 +69,5 @@
 - <a id="Powell94">Powell, K. G. (1994). An approximate Riemann solver for magnetohydrodynamics: (That works in more than one dimension). In Upwind and high-resolution schemes (pp. 570-583). Springer.</a>
 
 - <a id="Cao19">Cao, S., Zhang, Y., Liao, D., Zhong, P., and Wang, K. G. (2019). Shock-induced damage and dynamic fracture in cylindrical bodies submerged in liquid. International Journal of Solids and Structures, 169:55–71. Elsevier.</a>
+
+- <a id="Xu2019">Xu, W., Gao, Y., Deng, Y., Liu, J., and Liu, C. (2019). An explicit expression for the calculation of the Rortex vector. Physics of Fluids, 31(9)..</a>

@@ -27,7 +27,7 @@ contains
         integer, intent(in) :: nBubs
         real(wp), dimension(1:lag_params%nBubs_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_pos
         real(wp), dimension(1:lag_params%nBubs_glb, 1:2), intent(in) :: lbk_rad, lbk_vel
-        type(vector_field), intent(inout) :: updatedvar
+        type(scalar_field), dimension(:), intent(inout) :: updatedvar
 
         smoothfunc:select case(lag_params%smooth_type)
         case (1)
@@ -45,7 +45,7 @@ contains
         integer, intent(in) :: nBubs
         real(wp), dimension(1:lag_params%nBubs_glb, 1:3, 1:2), intent(in) :: lbk_s
         real(wp), dimension(1:lag_params%nBubs_glb, 1:2), intent(in) :: lbk_rad, lbk_vel
-        type(vector_field), intent(inout) :: updatedvar
+        type(scalar_field), dimension(:), intent(inout) :: updatedvar
 
         integer, dimension(3) :: cell
         real(wp) :: strength_vel, strength_vol
@@ -55,7 +55,7 @@ contains
         real(wp), dimension(3) :: s_coord
         integer :: l
 
-        !$acc parallel loop gang vector default(present) private(l, s_coord, cell)
+        $:GPU_PARALLEL_LOOP(private='[l,s_coord,cell]')
         do l = 1, nBubs
 
             volpart = 4._wp/3._wp*pi*lbk_rad(l, 2)**3._wp
@@ -74,22 +74,23 @@ contains
 
             !Update void fraction field
             addFun1 = strength_vol/Vol
-            !$acc atomic update
-            updatedvar%vf(1)%sf(cell(1), cell(2), cell(3)) = updatedvar%vf(1)%sf(cell(1), cell(2), cell(3)) + addFun1
+            $:GPU_ATOMIC(atomic='update')
+            updatedvar(1)%sf(cell(1), cell(2), cell(3)) = updatedvar(1)%sf(cell(1), cell(2), cell(3)) + real(addFun1, kind=stp)
 
             !Update time derivative of void fraction
             addFun2 = strength_vel/Vol
-            !$acc atomic update
-            updatedvar%vf(2)%sf(cell(1), cell(2), cell(3)) = updatedvar%vf(2)%sf(cell(1), cell(2), cell(3)) + addFun2
+            $:GPU_ATOMIC(atomic='update')
+            updatedvar(2)%sf(cell(1), cell(2), cell(3)) = updatedvar(2)%sf(cell(1), cell(2), cell(3)) + real(addFun2, kind=stp)
 
             !Product of two smeared functions
             !Update void fraction * time derivative of void fraction
             if (lag_params%cluster_type >= 4) then
                 addFun3 = (strength_vol*strength_vel)/Vol
-                !$acc atomic update
-                updatedvar%vf(5)%sf(cell(1), cell(2), cell(3)) = updatedvar%vf(5)%sf(cell(1), cell(2), cell(3)) + addFun3
+                $:GPU_ATOMIC(atomic='update')
+                updatedvar(5)%sf(cell(1), cell(2), cell(3)) = updatedvar(5)%sf(cell(1), cell(2), cell(3)) + real(addFun3, kind=stp)
             end if
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_deltafunc
 
@@ -100,7 +101,7 @@ contains
         integer, intent(in) :: nBubs
         real(wp), dimension(1:lag_params%nBubs_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_pos
         real(wp), dimension(1:lag_params%nBubs_glb, 1:2), intent(in) :: lbk_rad, lbk_vel
-        type(vector_field), intent(inout) :: updatedvar
+        type(scalar_field), dimension(:), intent(inout) :: updatedvar
 
         real(wp), dimension(3) :: center
         integer, dimension(3) :: cell
@@ -120,7 +121,7 @@ contains
         smearGridz = smearGrid
         if (p == 0) smearGridz = 1
 
-        !$acc parallel loop gang vector default(present) private(nodecoord, l, s_coord, cell, center) copyin(smearGrid, smearGridz)
+        $:GPU_PARALLEL_LOOP(private='[nodecoord,l,s_coord,cell,center]', copyin='[smearGrid,smearGridz]')
         do l = 1, nBubs
             nodecoord(1:3) = 0
             center(1:3) = 0._wp
@@ -134,7 +135,7 @@ contains
             strength_vol = volpart
             strength_vel = 4._wp*pi*lbk_rad(l, 2)**2._wp*lbk_vel(l, 2)
 
-            !$acc loop collapse(3) private(cellaux, nodecoord)
+            $:GPU_LOOP(collapse=3,private='[cellaux,nodecoord]')
             do i = 1, smearGrid
                 do j = 1, smearGrid
                     do k = 1, smearGridz
@@ -156,8 +157,7 @@ contains
                             if (lag_params%cluster_type >= 4) call s_applygaussian(center, cellaux, nodecoord, stddsv, 1._wp, func2)
 
                             ! Relocate cells for bubbles intersecting symmetric boundaries
-                            if (bc_x%beg == -2 .or. bc_x%end == -2 .or. bc_y%beg == -2 .or. bc_y%end == -2 &
-                                .or. bc_z%beg == -2 .or. bc_z%end == -2) then
+                            if (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == BC_REFLECTIVE)) then
                                 call s_shift_cell_symmetric_bc(cellaux, cell)
                             end if
                         else
@@ -171,41 +171,40 @@ contains
 
                         !Update void fraction field
                         addFun1 = func*strength_vol
-                        !$acc atomic update
-                        updatedvar%vf(1)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                            updatedvar%vf(1)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                            + addFun1
+                        $:GPU_ATOMIC(atomic='update')
+                        updatedvar(1)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
+                            updatedvar(1)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                            + real(addFun1, kind=stp)
 
                         !Update time derivative of void fraction
                         addFun2 = func*strength_vel
-                        !$acc atomic update
-                        updatedvar%vf(2)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                            updatedvar%vf(2)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                            + addFun2
+                        $:GPU_ATOMIC(atomic='update')
+                        updatedvar(2)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
+                            updatedvar(2)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                            + real(addFun2, kind=stp)
 
                         !Product of two smeared functions
                         !Update void fraction * time derivative of void fraction
                         if (lag_params%cluster_type >= 4) then
                             addFun3 = func2*strength_vol*strength_vel
-                            !$acc atomic update
-                            updatedvar%vf(5)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                                updatedvar%vf(5)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                + addFun3
+                            $:GPU_ATOMIC(atomic='update')
+                            updatedvar(5)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
+                                updatedvar(5)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                                + real(addFun3, kind=stp)
                         end if
                     end do
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_gaussian
 
     !> The purpose of this subroutine is to apply the gaussian kernel function for each bubble (Maeda and Colonius, 2018)).
     subroutine s_applygaussian(center, cellaux, nodecoord, stddsv, strength_idx, func)
-#ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_applygaussian
-#else
-        !$acc routine seq
-#endif
+        $:GPU_ROUTINE(function_name='s_applygaussian',parallelism='[seq]', &
+            & cray_inline=True)
+
         real(wp), dimension(3), intent(in) :: center
         integer, dimension(3), intent(in) :: cellaux
         real(wp), dimension(3), intent(in) :: nodecoord
@@ -271,11 +270,9 @@ contains
             !! @param cellaux Tested cell to smear the bubble effect in.
             !! @param celloutside If true, then cellaux is outside the computational domain.
     subroutine s_check_celloutside(cellaux, celloutside)
-#ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_check_celloutside
-#else
-        !$acc routine seq
-#endif
+        $:GPU_ROUTINE(function_name='s_check_celloutside',parallelism='[seq]', &
+            & cray_inline=True)
+
         integer, dimension(3), intent(inout) :: cellaux
         logical, intent(out) :: celloutside
 
@@ -307,61 +304,35 @@ contains
             !! @param cell Cell of the current bubble
             !! @param cellaux Cell to map the bubble effect in.
     subroutine s_shift_cell_symmetric_bc(cellaux, cell)
-#ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_shift_cell_symmetric_bc
-#else
-        !$acc routine seq
-#endif
+        $:GPU_ROUTINE(function_name='s_shift_cell_symmetric_bc', &
+            & parallelism='[seq]', cray_inline=True)
+
         integer, dimension(3), intent(inout) :: cellaux
         integer, dimension(3), intent(in) :: cell
 
         ! x-dir
-        if (bc_x%beg == -2 .and. (cell(1) <= mapCells - 1)) then
-            if (cell(1) >= 0) then
-                cellaux(1) = abs(cellaux(1)) - 1
-            else
-                stop "Lagrangian bubbles must not be located in the ghost cells of a symmetric boundary (bc_x%beg)."
-            end if
+        if (bc_x%beg == BC_REFLECTIVE .and. (cell(1) <= mapCells - 1)) then
+            cellaux(1) = abs(cellaux(1)) - 1
         end if
-        if (bc_x%end == -2 .and. (cell(1) >= m + 1 - mapCells)) then
-            if (cell(1) <= m) then
-                cellaux(1) = cellaux(1) - (2*(cellaux(1) - m) - 1)
-            else
-                stop "Lagrangian bubbles must not be located in the ghost cells of a symmetric boundary (bc_x%end)."
-            end if
+        if (bc_x%end == BC_REFLECTIVE .and. (cell(1) >= m + 1 - mapCells)) then
+            cellaux(1) = cellaux(1) - (2*(cellaux(1) - m) - 1)
         end if
 
         !y-dir
-        if (bc_y%beg == -2 .and. (cell(2) <= mapCells - 1)) then
-            if (cell(2) >= 0) then
-                cellaux(2) = abs(cellaux(2)) - 1
-            else
-                stop "Lagrangian bubbles must not be located in the ghost cells of a symmetric boundary (bc_y%beg)."
-            end if
+        if (bc_y%beg == BC_REFLECTIVE .and. (cell(2) <= mapCells - 1)) then
+            cellaux(2) = abs(cellaux(2)) - 1
         end if
-        if (bc_y%end == -2 .and. (cell(2) >= n + 1 - mapCells)) then
-            if (cell(2) <= n) then
-                cellaux(2) = cellaux(2) - (2*(cellaux(2) - n) - 1)
-            else
-                stop "Lagrangian bubbles must not be located in the ghost cells of a symmetric boundary (bc_y%end)."
-            end if
+        if (bc_y%end == BC_REFLECTIVE .and. (cell(2) >= n + 1 - mapCells)) then
+            cellaux(2) = cellaux(2) - (2*(cellaux(2) - n) - 1)
         end if
 
         if (p > 0) then
             !z-dir
-            if (bc_z%beg == -2 .and. (cell(3) <= mapCells - 1)) then
-                if (cell(3) >= 0) then
-                    cellaux(3) = abs(cellaux(3)) - 1
-                else
-                    stop "Lagrangian bubbles must not be located in the ghost cells of a symmetric boundary (bc_z%beg)."
-                end if
+            if (bc_z%beg == BC_REFLECTIVE .and. (cell(3) <= mapCells - 1)) then
+                cellaux(3) = abs(cellaux(3)) - 1
             end if
-            if (bc_z%end == -2 .and. (cell(3) >= p + 1 - mapCells)) then
-                if (cell(3) <= p) then
-                    cellaux(3) = cellaux(3) - (2*(cellaux(3) - p) - 1)
-                else
-                    stop "Lagrangian bubbles must not be located in the ghost cells of a symmetric boundary (bc_z%end)."
-                end if
+            if (bc_z%end == BC_REFLECTIVE .and. (cell(3) >= p + 1 - mapCells)) then
+                cellaux(3) = cellaux(3) - (2*(cellaux(3) - p) - 1)
             end if
         end if
 
@@ -372,11 +343,9 @@ contains
             !! @param volpart Volume of the bubble
             !! @param stddsv Standard deviaton
     subroutine s_compute_stddsv(cell, volpart, stddsv)
-#ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_compute_stddsv
-#else
-        !$acc routine seq
-#endif
+        $:GPU_ROUTINE(function_name='s_compute_stddsv',parallelism='[seq]', &
+            & cray_inline=True)
+
         integer, dimension(3), intent(in) :: cell
         real(wp), intent(in) :: volpart
         real(wp), intent(out) :: stddsv
@@ -413,11 +382,9 @@ contains
             !! @param cell Computational coordinates (x, y, z)
             !! @param Charvol Characteristic volume
     subroutine s_get_char_vol(cellx, celly, cellz, Charvol)
-#ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_get_char_vol
-#else
-        !$acc routine seq
-#endif
+        $:GPU_ROUTINE(function_name='s_get_char_vol',parallelism='[seq]', &
+            & cray_inline=True)
+
         integer, intent(in) :: cellx, celly, cellz
         real(wp), intent(out) :: Charvol
 
@@ -438,11 +405,9 @@ contains
             !! @param s Computational coordinates of the bubble, real type
             !! @param get_cell Computational coordinates of the bubble, integer type
     subroutine s_get_cell(s_cell, get_cell)
-#ifdef _CRAYFTN
-        !DIR$ INLINEALWAYS s_get_cell
-#else
-        !$acc routine seq
-#endif
+        $:GPU_ROUTINE(function_name='s_get_cell',parallelism='[seq]', &
+            & cray_inline=True)
+
         real(wp), dimension(3), intent(in) :: s_cell
         integer, dimension(3), intent(out) :: get_cell
         integer :: i

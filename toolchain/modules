@@ -6,18 +6,11 @@
 # [slug]-cpu [cpu-only modules]  (any number of lines)
 # [slug]-gpu [gpu-only modules]  (any number of lines)
 
-s     OLCF Summit
-s-all python/3.8.10 darshan-runtime/3.3.1-lite hsi/5.0.2.p5 xalt/1.2.1
-s-cpu lsf-tools/2.0 cmake/3.23.2 ninja/1.10.2 spectrum-mpi/10.4.0.3-20210112
-s-cpu gcc/12.1.0
-s-gpu nvhpc/22.11 cuda/nvhpc
-s-gpu CC=nvc CXX=nvc++ FC=nvfortran
-
 b     PSC Bridges2
-b-all python/3.8.6
+b-all python/3.8.6 hdf5 anaconda3
 b-cpu allocations/1.0 gcc/10.2.0 openmpi/4.0.5-gcc10.2.0
-b-gpu openmpi/4.0.5-nvhpc22.9 nvhpc/22.9 cuda
-b-gpu CC=nvc CXX=nvc++ FC=nvfortran
+b-gpu nvhpc/22.9 cuda/11.7 openmpi/4.0.5-nvhpc22.9
+b-gpu MFC_CUDA_CC=70,75,80 NVHPC_CUDA_HOME=$CUDA_HOME CC=nvc CXX=nvc++ FC=nvfortran
 
 a     OLCF Ascent
 a-all python cmake/3.22.2
@@ -42,15 +35,15 @@ e-gpu gpu/0.15.4 cuda/11.0.2 nvhpc/22.2 openmpi/4.0.5 cmake/3.19.8
 e-gpu CC=nvc CXX=nvc++ FC=nvfortran
 
 p     GT Phoenix
-p-all python/3.10.10
+p-all python/3.12.5
 p-cpu gcc/12.3.0 openmpi/4.1.5
-p-gpu nvhpc/24.5 hpcx/2.19-cuda cuda/12.1.1
+p-gpu python/3.12.5 nvhpc/24.5 hpcx/2.19-cuda cuda/12.1.1
 p-gpu MFC_CUDA_CC=70,75,80,89,90 NVHPC_CUDA_HOME=$CUDA_HOME CC=nvc CXX=nvc++ FC=nvfortran
 
 f     OLCF Frontier
-f-all cce/18.0.0 cpe/24.07 rocm/6.1.3 cray-mpich/8.1.28
-f-all cray-fftw cray-hdf5 cray-python omniperf
-f-gpu craype-accel-amd-gfx90a
+f-all cpe/25.03 rocm/6.3.1
+f-all cray-fftw cray-hdf5 python cmake
+f-gpu python craype-accel-amd-gfx90a rocprofiler-compute/3.0.0
 
 d     NCSA Delta
 d-all python/3.11.6
@@ -61,7 +54,7 @@ d-gpu MFC_CUDA_CC=80,86
 
 o     Brown Oscar
 o-all python
-o-cpu hpcx-mpi
+o-cpu hpcx-mpi python/3.13.10s
 o-gpu nvhpc cuda/12.3.0 cmake/3.26.3
 o-gpu CC=nvc CXX=nvc++ FC=nvfortran
 
@@ -70,10 +63,14 @@ dai-all python cmake nvhpc-openmpi3/24.3 cuda
 dai-all CC=nvc CXX=nvc++ FC=nvfortran
 dai-gpu MFC_CUDA_CC=89,90
 
-c     DoD Carpenter
+c     DoD Carpenter (GNU)
 c-all python/3.12.1
 c-cpu compiler-rt/2024.2.0 ifort/2024.2.0 icc/2023.1.0 mpi/latest cmake/3.28.1-intel-2023.0.0
 c-cpu CC=gcc CXX=g++ FC=gfortran
+
+cc     DoD Carpenter (Cray)
+cc-all cray-python/3.11.7 craype-x86-rome
+cc-cpu PrgEnv-cray/8.5.0 cray-fftw/3.3.10.8 cray-hdf5/1.14.3.1 cray-pals/1.4.0 cray-libpals/1.4.0
 
 n     DoD Nautilus
 n-all slurm
@@ -81,3 +78,16 @@ n-cpu penguin/openmpi/4.1.5/gcc-8.5.0
 n-gpu penguin/openmpi/4.1.5/nvhpc-22.3 nvidia/nvhpc/22.3 cuda/cuda-11.6
 n-gpu CC=nvc CXX=nvc++ FC=nvfortran
 
+san   CSCS Santis
+san-all cmake python
+san-gpu nvhpc cuda cray-mpich
+
+h     hipergator
+h-gpu nvhpc/25.9
+h-gpu CUDA_HOME="/apps/compilers/cuda/12.8.1"
+h-all HPC_OMPI_DIR="/apps/mpi/cuda/12.8.1/nvhpc/25.3/openmpi/5.0.7"
+h-all HPC_OMPI_BIN="/apps/mpi/cuda/12.8.1/nvhpc/25.3/openmpi/5.0.7/bin"
+h-all OMPI_MCA_pml=ob1 OMPI_MCA_coll_hcoll_enable=0
+h-gpu PATH="/apps/mpi/cuda/12.8.1/nvhpc/25.3/openmpi/5.0.7/bin:${PATH}"
+h-all LD_LIBRARY_PATH=/apps/compilers/cuda/12.8.1/lib64:$LD_LIBRARY_PATH
+h-gpu MFC_CUDA_CC=100 NVHPC_CUDA_HOME="/apps/compilers/cuda/12.8.1"

@@ -1,10 +1,10 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
 name = "mfc"
-version = "4.9.6"
+dynamic = ["version"]
 dependencies = [
     # General
     "rich",
@@ -26,7 +26,6 @@ dependencies = [
     "pylint",
     "fprettify",
     "black",
-    "fortitude-lint",
     "ansi2txt",
 
     # Profiling
@@ -38,9 +37,33 @@ dependencies = [
     "matplotlib",
 
     # Chemistry
-    "cantera==3.0.1",
-    "pyrometheus==1.0.2"
+    "cantera>=3.1.0",
+    #"pyrometheus == 1.0.5",
+    "pyrometheus @ git+https://github.com/pyrometheus/pyrometheus.git",
+
+    # Frontier Profiling
+    "astunparse==1.6.2",
+    "colorlover",
+    "dash>=1.12.0",
+    "pymongo",
+    "tabulate",
+    "tqdm",
+    "dash-svg",
+    "dash-bootstrap-components",
+    "kaleido",
+    "plotille"
 ]
 
 [tool.hatch.metadata]
 allow-direct-references = true
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.version.raw-options]
+root = ".."
+relative_to = "pyproject.toml"
+version_file = "mfc/_version.py"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "mfc/_version.py"

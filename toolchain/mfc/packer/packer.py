@@ -41,7 +41,10 @@ def packer():
         if err is not None:
             raise MFCException(err)
     elif ARG("packer") == "compare":
-        cons.print(f"Comparing [magenta]{os.path.relpath(ARG('input1'))}[/magenta] to [magenta]{os.path.relpath(ARG('input1'))}[/magenta]:")
+        cons.print(
+            f"Comparing [magenta]{os.path.relpath(ARG('input1'))}[/magenta] to "
+            f"[magenta]{os.path.relpath(ARG('input2'))}[/magenta]:"
+        )
 
         cons.indent()
         cons.print()

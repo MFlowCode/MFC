@@ -1,6 +1,7 @@
 !>
 !! @file m_viscous.f90
 !! @brief Contains module m_viscous
+#:include 'case.fpp'
 #:include 'macros.fpp'
 
 !> @brief The module contains the subroutines used to compute viscous terms.
@@ -11,6 +12,9 @@ module m_viscous
     use m_global_parameters    !< Definitions of the global parameters
 
     use m_weno
+
+    use m_muscl                !< Monotonic Upstream-centered (MUSCL)
+                               !! schemes for conservation laws
 
     use m_helper
 
@@ -24,26 +28,26 @@ module m_viscous
 
     type(int_bounds_info) :: iv
     type(int_bounds_info) :: is1_viscous, is2_viscous, is3_viscous
-    !$acc declare create(is1_viscous, is2_viscous, is3_viscous, iv)
+    $:GPU_DECLARE(create='[is1_viscous,is2_viscous,is3_viscous,iv]')
 
     real(wp), allocatable, dimension(:, :) :: Res_viscous
-    !$acc declare create(Res_viscous)
+    $:GPU_DECLARE(create='[Res_viscous]')
 
 contains
 
-    subroutine s_initialize_viscous_module
+    impure subroutine s_initialize_viscous_module
 
         integer :: i, j !< generic loop iterators
 
-        @:ALLOCATE(Res_viscous(1:2, 1:maxval(Re_size)))
+        @:ALLOCATE(Res_viscous(1:2, 1:Re_size_max))
 
         do i = 1, 2
             do j = 1, Re_size(i)
                 Res_viscous(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
             end do
         end do
-        !$acc update device(Res_viscous, Re_idx, Re_size)
-        !$acc enter data copyin(is1_viscous, is2_viscous, is3_viscous, iv)
+        $:GPU_UPDATE(device='[Res_viscous,Re_idx,Re_size]')
+        $:GPU_ENTER_DATA(copyin='[is1_viscous,is2_viscous,is3_viscous,iv]')
 
     end subroutine s_initialize_viscous_module
 
@@ -75,26 +79,28 @@ contains
 
         is1_viscous = ix; is2_viscous = iy; is3_viscous = iz
 
-        !$acc update device(is1_viscous, is2_viscous, is3_viscous)
+        $:GPU_UPDATE(device='[is1_viscous,is2_viscous,is3_viscous]')
 
-        !$acc parallel loop collapse(3) gang vector default(present)
+        $:GPU_PARALLEL_LOOP(collapse=3)
         do l = is3_viscous%beg, is3_viscous%end
             do k = is2_viscous%beg, is2_viscous%end
                 do j = is1_viscous%beg, is1_viscous%end
-                    !$acc loop seq
+                    $:GPU_LOOP(parallelism='[seq]')
                     do i = momxb, E_idx
                         tau_Re_vf(i)%sf(j, k, l) = 0._wp
                     end do
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
+
         if (shear_stress) then    ! Shear stresses
-            !$acc parallel loop collapse(3) gang vector default(present) private(alpha_visc, alpha_rho_visc, Re_visc, tau_Re )
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
             do l = is3_viscous%beg, is3_viscous%end
                 do k = -1, 1
                     do j = is1_viscous%beg, is1_viscous%end
 
-                        !$acc loop seq
+                        $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, num_fluids
                             alpha_rho_visc(i) = q_prim_vf(i)%sf(j, k, l)
                             if (bubbles_euler .and. num_fluids == 1) then
@@ -110,14 +116,14 @@ contains
                             pi_inf_visc = 0._wp
 
                             if (mpp_lim .and. (model_eqns == 2) .and. (num_fluids > 2)) then
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids
                                     rho_visc = rho_visc + alpha_rho_visc(i)
                                     gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
                                     pi_inf_visc = pi_inf_visc + alpha_visc(i)*pi_infs(i)
                                 end do
                             else if ((model_eqns == 2) .and. (num_fluids > 2)) then
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids - 1
                                     rho_visc = rho_visc + alpha_rho_visc(i)
                                     gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
@@ -136,7 +142,7 @@ contains
                             alpha_visc_sum = 0._wp
 
                             if (mpp_lim) then
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids
                                     alpha_rho_visc(i) = max(0._wp, alpha_rho_visc(i))
                                     alpha_visc(i) = min(max(0._wp, alpha_visc(i)), 1._wp)
@@ -147,7 +153,7 @@ contains
 
                             end if
 
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_fluids
                                 rho_visc = rho_visc + alpha_rho_visc(i)
                                 gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
@@ -155,12 +161,12 @@ contains
                             end do
 
                             if (viscous) then
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, 2
                                     Re_visc(i) = dflt_real
 
                                     if (Re_size(i) > 0) Re_visc(i) = 0._wp
-                                    !$acc loop seq
+                                    $:GPU_LOOP(parallelism='[seq]')
                                     do q = 1, Re_size(i)
                                         Re_visc(i) = alpha_visc(Re_idx(i, q))/Res_viscous(i, q) &
                                                      + Re_visc(i)
@@ -180,7 +186,7 @@ contains
                                         - 2._wp*grad_x_vf(1)%sf(j, k, l) &
                                         - 2._wp*q_prim_vf(momxb + 1)%sf(j, k, l)/y_cc(k))/ &
                                        (3._wp*Re_visc(1))
-                        !$acc loop seq
+                        $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, 2
                             tau_Re_vf(contxe + i)%sf(j, k, l) = &
                                 tau_Re_vf(contxe + i)%sf(j, k, l) - &
@@ -193,15 +199,16 @@ contains
                     end do
                 end do
             end do
+            $:END_GPU_PARALLEL_LOOP()
         end if
 
         if (bulk_stress) then    ! Bulk stresses
-            !$acc parallel loop collapse(3) gang vector default(present) private(alpha_visc, alpha_rho_visc, Re_visc, tau_Re )
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
             do l = is3_viscous%beg, is3_viscous%end
                 do k = -1, 1
                     do j = is1_viscous%beg, is1_viscous%end
 
-                        !$acc loop seq
+                        $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, num_fluids
                             alpha_rho_visc(i) = q_prim_vf(i)%sf(j, k, l)
                             if (bubbles_euler .and. num_fluids == 1) then
@@ -217,14 +224,14 @@ contains
                             pi_inf_visc = 0._wp
 
                             if (mpp_lim .and. (model_eqns == 2) .and. (num_fluids > 2)) then
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids
                                     rho_visc = rho_visc + alpha_rho_visc(i)
                                     gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
                                     pi_inf_visc = pi_inf_visc + alpha_visc(i)*pi_infs(i)
                                 end do
                             else if ((model_eqns == 2) .and. (num_fluids > 2)) then
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids - 1
                                     rho_visc = rho_visc + alpha_rho_visc(i)
                                     gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
@@ -243,7 +250,7 @@ contains
                             alpha_visc_sum = 0._wp
 
                             if (mpp_lim) then
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids
                                     alpha_rho_visc(i) = max(0._wp, alpha_rho_visc(i))
                                     alpha_visc(i) = min(max(0._wp, alpha_visc(i)), 1._wp)
@@ -254,7 +261,7 @@ contains
 
                             end if
 
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_fluids
                                 rho_visc = rho_visc + alpha_rho_visc(i)
                                 gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
@@ -262,12 +269,12 @@ contains
                             end do
 
                             if (viscous) then
-                                !$acc loop seq
+                                $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, 2
                                     Re_visc(i) = dflt_real
 
                                     if (Re_size(i) > 0) Re_visc(i) = 0._wp
-                                    !$acc loop seq
+                                    $:GPU_LOOP(parallelism='[seq]')
                                     do q = 1, Re_size(i)
                                         Re_visc(i) = alpha_visc(Re_idx(i, q))/Res_viscous(i, q) &
                                                      + Re_visc(i)
@@ -295,217 +302,222 @@ contains
                     end do
                 end do
             end do
+            $:END_GPU_PARALLEL_LOOP()
         end if
 
         if (p == 0) return
+        #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
 
-        if (shear_stress) then    ! Shear stresses
-            !$acc parallel loop collapse(3) gang vector default(present) private(alpha_visc, alpha_rho_visc, Re_visc, tau_Re )
-            do l = is3_viscous%beg, is3_viscous%end
-                do k = -1, 1
-                    do j = is1_viscous%beg, is1_viscous%end
+            if (shear_stress) then    ! Shear stresses
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
+                do l = is3_viscous%beg, is3_viscous%end
+                    do k = -1, 1
+                        do j = is1_viscous%beg, is1_viscous%end
 
-                        !$acc loop seq
-                        do i = 1, num_fluids
-                            alpha_rho_visc(i) = q_prim_vf(i)%sf(j, k, l)
-                            if (bubbles_euler .and. num_fluids == 1) then
-                                alpha_visc(i) = 1._wp - q_prim_vf(E_idx + i)%sf(j, k, l)
-                            else
-                                alpha_visc(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
-                            end if
-                        end do
-
-                        if (bubbles_euler) then
-                            rho_visc = 0._wp
-                            gamma_visc = 0._wp
-                            pi_inf_visc = 0._wp
-
-                            if (mpp_lim .and. (model_eqns == 2) .and. (num_fluids > 2)) then
-                                !$acc loop seq
-                                do i = 1, num_fluids
-                                    rho_visc = rho_visc + alpha_rho_visc(i)
-                                    gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
-                                    pi_inf_visc = pi_inf_visc + alpha_visc(i)*pi_infs(i)
-                                end do
-                            else if ((model_eqns == 2) .and. (num_fluids > 2)) then
-                                !$acc loop seq
-                                do i = 1, num_fluids - 1
-                                    rho_visc = rho_visc + alpha_rho_visc(i)
-                                    gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
-                                    pi_inf_visc = pi_inf_visc + alpha_visc(i)*pi_infs(i)
-                                end do
-                            else
-                                rho_visc = alpha_rho_visc(1)
-                                gamma_visc = gammas(1)
-                                pi_inf_visc = pi_infs(1)
-                            end if
-                        else
-                            rho_visc = 0._wp
-                            gamma_visc = 0._wp
-                            pi_inf_visc = 0._wp
-
-                            alpha_visc_sum = 0._wp
-
-                            if (mpp_lim) then
-                                !$acc loop seq
-                                do i = 1, num_fluids
-                                    alpha_rho_visc(i) = max(0._wp, alpha_rho_visc(i))
-                                    alpha_visc(i) = min(max(0._wp, alpha_visc(i)), 1._wp)
-                                    alpha_visc_sum = alpha_visc_sum + alpha_visc(i)
-                                end do
-
-                                alpha_visc = alpha_visc/max(alpha_visc_sum, sgm_eps)
-
-                            end if
-
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_fluids
-                                rho_visc = rho_visc + alpha_rho_visc(i)
-                                gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
-                                pi_inf_visc = pi_inf_visc + alpha_visc(i)*pi_infs(i)
+                                alpha_rho_visc(i) = q_prim_vf(i)%sf(j, k, l)
+                                if (bubbles_euler .and. num_fluids == 1) then
+                                    alpha_visc(i) = 1._wp - q_prim_vf(E_idx + i)%sf(j, k, l)
+                                else
+                                    alpha_visc(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
+                                end if
                             end do
 
-                            if (viscous) then
-                                !$acc loop seq
-                                do i = 1, 2
-                                    Re_visc(i) = dflt_real
+                            if (bubbles_euler) then
+                                rho_visc = 0._wp
+                                gamma_visc = 0._wp
+                                pi_inf_visc = 0._wp
 
-                                    if (Re_size(i) > 0) Re_visc(i) = 0._wp
-                                    !$acc loop seq
-                                    do q = 1, Re_size(i)
-                                        Re_visc(i) = alpha_visc(Re_idx(i, q))/Res_viscous(i, q) &
-                                                     + Re_visc(i)
+                                if (mpp_lim .and. (model_eqns == 2) .and. (num_fluids > 2)) then
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = 1, num_fluids
+                                        rho_visc = rho_visc + alpha_rho_visc(i)
+                                        gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
+                                        pi_inf_visc = pi_inf_visc + alpha_visc(i)*pi_infs(i)
+                                    end do
+                                else if ((model_eqns == 2) .and. (num_fluids > 2)) then
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = 1, num_fluids - 1
+                                        rho_visc = rho_visc + alpha_rho_visc(i)
+                                        gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
+                                        pi_inf_visc = pi_inf_visc + alpha_visc(i)*pi_infs(i)
+                                    end do
+                                else
+                                    rho_visc = alpha_rho_visc(1)
+                                    gamma_visc = gammas(1)
+                                    pi_inf_visc = pi_infs(1)
+                                end if
+                            else
+                                rho_visc = 0._wp
+                                gamma_visc = 0._wp
+                                pi_inf_visc = 0._wp
+
+                                alpha_visc_sum = 0._wp
+
+                                if (mpp_lim) then
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = 1, num_fluids
+                                        alpha_rho_visc(i) = max(0._wp, alpha_rho_visc(i))
+                                        alpha_visc(i) = min(max(0._wp, alpha_visc(i)), 1._wp)
+                                        alpha_visc_sum = alpha_visc_sum + alpha_visc(i)
                                     end do
 
-                                    Re_visc(i) = 1._wp/max(Re_visc(i), sgm_eps)
+                                    alpha_visc = alpha_visc/max(alpha_visc_sum, sgm_eps)
 
+                                end if
+
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, num_fluids
+                                    rho_visc = rho_visc + alpha_rho_visc(i)
+                                    gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
+                                    pi_inf_visc = pi_inf_visc + alpha_visc(i)*pi_infs(i)
                                 end do
+
+                                if (viscous) then
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = 1, 2
+                                        Re_visc(i) = dflt_real
+
+                                        if (Re_size(i) > 0) Re_visc(i) = 0._wp
+                                        $:GPU_LOOP(parallelism='[seq]')
+                                        do q = 1, Re_size(i)
+                                            Re_visc(i) = alpha_visc(Re_idx(i, q))/Res_viscous(i, q) &
+                                                         + Re_visc(i)
+                                        end do
+
+                                        Re_visc(i) = 1._wp/max(Re_visc(i), sgm_eps)
+
+                                    end do
+                                end if
                             end if
-                        end if
 
-                        tau_Re(2, 2) = -(2._wp/3._wp)*grad_z_vf(3)%sf(j, k, l)/y_cc(k)/ &
-                                       Re_visc(1)
+                            tau_Re(2, 2) = -(2._wp/3._wp)*grad_z_vf(3)%sf(j, k, l)/y_cc(k)/ &
+                                           Re_visc(1)
 
-                        tau_Re(2, 3) = ((grad_z_vf(2)%sf(j, k, l) - &
-                                         q_prim_vf(momxe)%sf(j, k, l))/ &
-                                        y_cc(k) + grad_y_vf(3)%sf(j, k, l))/ &
-                                       Re_visc(1)
+                            tau_Re(2, 3) = ((grad_z_vf(2)%sf(j, k, l) - &
+                                             q_prim_vf(momxe)%sf(j, k, l))/ &
+                                            y_cc(k) + grad_y_vf(3)%sf(j, k, l))/ &
+                                           Re_visc(1)
 
-                        !$acc loop seq
-                        do i = 2, 3
-                            tau_Re_vf(contxe + i)%sf(j, k, l) = &
-                                tau_Re_vf(contxe + i)%sf(j, k, l) - &
-                                tau_Re(2, i)
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 2, 3
+                                tau_Re_vf(contxe + i)%sf(j, k, l) = &
+                                    tau_Re_vf(contxe + i)%sf(j, k, l) - &
+                                    tau_Re(2, i)
+
+                                tau_Re_vf(E_idx)%sf(j, k, l) = &
+                                    tau_Re_vf(E_idx)%sf(j, k, l) - &
+                                    q_prim_vf(contxe + i)%sf(j, k, l)*tau_Re(2, i)
+                            end do
+
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
+
+            if (bulk_stress) then    ! Bulk stresses
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
+                do l = is3_viscous%beg, is3_viscous%end
+                    do k = -1, 1
+                        do j = is1_viscous%beg, is1_viscous%end
+
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, num_fluids
+                                alpha_rho_visc(i) = q_prim_vf(i)%sf(j, k, l)
+                                if (bubbles_euler .and. num_fluids == 1) then
+                                    alpha_visc(i) = 1._wp - q_prim_vf(E_idx + i)%sf(j, k, l)
+                                else
+                                    alpha_visc(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
+                                end if
+                            end do
+
+                            if (bubbles_euler) then
+                                rho_visc = 0._wp
+                                gamma_visc = 0._wp
+                                pi_inf_visc = 0._wp
+
+                                if (mpp_lim .and. (model_eqns == 2) .and. (num_fluids > 2)) then
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = 1, num_fluids
+                                        rho_visc = rho_visc + alpha_rho_visc(i)
+                                        gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
+                                        pi_inf_visc = pi_inf_visc + alpha_visc(i)*pi_infs(i)
+                                    end do
+                                else if ((model_eqns == 2) .and. (num_fluids > 2)) then
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = 1, num_fluids - 1
+                                        rho_visc = rho_visc + alpha_rho_visc(i)
+                                        gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
+                                        pi_inf_visc = pi_inf_visc + alpha_visc(i)*pi_infs(i)
+                                    end do
+                                else
+                                    rho_visc = alpha_rho_visc(1)
+                                    gamma_visc = gammas(1)
+                                    pi_inf_visc = pi_infs(1)
+                                end if
+                            else
+                                rho_visc = 0._wp
+                                gamma_visc = 0._wp
+                                pi_inf_visc = 0._wp
+
+                                alpha_visc_sum = 0._wp
+
+                                if (mpp_lim) then
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = 1, num_fluids
+                                        alpha_rho_visc(i) = max(0._wp, alpha_rho_visc(i))
+                                        alpha_visc(i) = min(max(0._wp, alpha_visc(i)), 1._wp)
+                                        alpha_visc_sum = alpha_visc_sum + alpha_visc(i)
+                                    end do
+
+                                    alpha_visc = alpha_visc/max(alpha_visc_sum, sgm_eps)
+
+                                end if
+
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, num_fluids
+                                    rho_visc = rho_visc + alpha_rho_visc(i)
+                                    gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
+                                    pi_inf_visc = pi_inf_visc + alpha_visc(i)*pi_infs(i)
+                                end do
+
+                                if (viscous) then
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = 1, 2
+                                        Re_visc(i) = dflt_real
+
+                                        if (Re_size(i) > 0) Re_visc(i) = 0._wp
+                                        $:GPU_LOOP(parallelism='[seq]')
+                                        do q = 1, Re_size(i)
+                                            Re_visc(i) = alpha_visc(Re_idx(i, q))/Res_viscous(i, q) &
+                                                         + Re_visc(i)
+                                        end do
+
+                                        Re_visc(i) = 1._wp/max(Re_visc(i), sgm_eps)
+
+                                    end do
+                                end if
+                            end if
+
+                            tau_Re(2, 2) = grad_z_vf(3)%sf(j, k, l)/y_cc(k)/ &
+                                           Re_visc(2)
+
+                            tau_Re_vf(momxb + 1)%sf(j, k, l) = &
+                                tau_Re_vf(momxb + 1)%sf(j, k, l) - &
+                                tau_Re(2, 2)
 
                             tau_Re_vf(E_idx)%sf(j, k, l) = &
                                 tau_Re_vf(E_idx)%sf(j, k, l) - &
-                                q_prim_vf(contxe + i)%sf(j, k, l)*tau_Re(2, i)
-                        end do
+                                q_prim_vf(momxb + 1)%sf(j, k, l)*tau_Re(2, 2)
 
+                        end do
                     end do
                 end do
-            end do
-        end if
-
-        if (bulk_stress) then    ! Bulk stresses
-            !$acc parallel loop collapse(3) gang vector default(present) private(alpha_visc, alpha_rho_visc, Re_visc, tau_Re )
-            do l = is3_viscous%beg, is3_viscous%end
-                do k = -1, 1
-                    do j = is1_viscous%beg, is1_viscous%end
-
-                        !$acc loop seq
-                        do i = 1, num_fluids
-                            alpha_rho_visc(i) = q_prim_vf(i)%sf(j, k, l)
-                            if (bubbles_euler .and. num_fluids == 1) then
-                                alpha_visc(i) = 1._wp - q_prim_vf(E_idx + i)%sf(j, k, l)
-                            else
-                                alpha_visc(i) = q_prim_vf(E_idx + i)%sf(j, k, l)
-                            end if
-                        end do
-
-                        if (bubbles_euler) then
-                            rho_visc = 0._wp
-                            gamma_visc = 0._wp
-                            pi_inf_visc = 0._wp
-
-                            if (mpp_lim .and. (model_eqns == 2) .and. (num_fluids > 2)) then
-                                !$acc loop seq
-                                do i = 1, num_fluids
-                                    rho_visc = rho_visc + alpha_rho_visc(i)
-                                    gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
-                                    pi_inf_visc = pi_inf_visc + alpha_visc(i)*pi_infs(i)
-                                end do
-                            else if ((model_eqns == 2) .and. (num_fluids > 2)) then
-                                !$acc loop seq
-                                do i = 1, num_fluids - 1
-                                    rho_visc = rho_visc + alpha_rho_visc(i)
-                                    gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
-                                    pi_inf_visc = pi_inf_visc + alpha_visc(i)*pi_infs(i)
-                                end do
-                            else
-                                rho_visc = alpha_rho_visc(1)
-                                gamma_visc = gammas(1)
-                                pi_inf_visc = pi_infs(1)
-                            end if
-                        else
-                            rho_visc = 0._wp
-                            gamma_visc = 0._wp
-                            pi_inf_visc = 0._wp
-
-                            alpha_visc_sum = 0._wp
-
-                            if (mpp_lim) then
-                                !$acc loop seq
-                                do i = 1, num_fluids
-                                    alpha_rho_visc(i) = max(0._wp, alpha_rho_visc(i))
-                                    alpha_visc(i) = min(max(0._wp, alpha_visc(i)), 1._wp)
-                                    alpha_visc_sum = alpha_visc_sum + alpha_visc(i)
-                                end do
-
-                                alpha_visc = alpha_visc/max(alpha_visc_sum, sgm_eps)
-
-                            end if
-
-                            !$acc loop seq
-                            do i = 1, num_fluids
-                                rho_visc = rho_visc + alpha_rho_visc(i)
-                                gamma_visc = gamma_visc + alpha_visc(i)*gammas(i)
-                                pi_inf_visc = pi_inf_visc + alpha_visc(i)*pi_infs(i)
-                            end do
-
-                            if (viscous) then
-                                !$acc loop seq
-                                do i = 1, 2
-                                    Re_visc(i) = dflt_real
-
-                                    if (Re_size(i) > 0) Re_visc(i) = 0._wp
-                                    !$acc loop seq
-                                    do q = 1, Re_size(i)
-                                        Re_visc(i) = alpha_visc(Re_idx(i, q))/Res_viscous(i, q) &
-                                                     + Re_visc(i)
-                                    end do
-
-                                    Re_visc(i) = 1._wp/max(Re_visc(i), sgm_eps)
-
-                                end do
-                            end if
-                        end if
-
-                        tau_Re(2, 2) = grad_z_vf(3)%sf(j, k, l)/y_cc(k)/ &
-                                       Re_visc(2)
-
-                        tau_Re_vf(momxb + 1)%sf(j, k, l) = &
-                            tau_Re_vf(momxb + 1)%sf(j, k, l) - &
-                            tau_Re(2, 2)
-
-                        tau_Re_vf(E_idx)%sf(j, k, l) = &
-                            tau_Re_vf(E_idx)%sf(j, k, l) - &
-                            q_prim_vf(momxb + 1)%sf(j, k, l)*tau_Re(2, 2)
-
-                    end do
-                end do
-            end do
-        end if
+                $:END_GPU_PARALLEL_LOOP()
+            end if
+        #:endif
     end subroutine s_compute_viscous_stress_tensor
 
     !>  Computes viscous terms
@@ -545,7 +557,7 @@ contains
 
             iv%beg = mom_idx%beg; iv%end = mom_idx%end
 
-            !$acc update device(iv)
+            $:GPU_UPDATE(device='[iv]')
 
             call s_reconstruct_cell_boundary_values_visc( &
                 q_prim_qp%vf(iv%beg:iv%end), &
@@ -583,17 +595,17 @@ contains
         else ! Compute velocity gradient at cell centers using finite differences
 
             iv%beg = mom_idx%beg; iv%end = mom_idx%end
-            !$acc update device(iv)
+            $:GPU_UPDATE(device='[iv]')
 
             is1_viscous = ix; is2_viscous = iy; is3_viscous = iz
 
-            !$acc update device(is1_viscous, is2_viscous, is3_viscous)
+            $:GPU_UPDATE(device='[is1_viscous,is2_viscous,is3_viscous]')
 
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:GPU_PARALLEL_LOOP(collapse=3)
             do l = is3_viscous%beg, is3_viscous%end
                 do k = iy%beg, iy%end
                     do j = is1_viscous%beg + 1, is1_viscous%end
-                        !$acc loop seq
+                        $:GPU_LOOP(parallelism='[seq]')
                         do i = iv%beg, iv%end
                             dqL_prim_dx_n(1)%vf(i)%sf(j, k, l) = &
                                 (q_prim_qp%vf(i)%sf(j, k, l) - &
@@ -603,12 +615,13 @@ contains
                     end do
                 end do
             end do
+            $:END_GPU_PARALLEL_LOOP()
 
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:GPU_PARALLEL_LOOP(collapse=3)
             do l = is3_viscous%beg, is3_viscous%end
                 do k = is2_viscous%beg, is2_viscous%end
                     do j = is1_viscous%beg, is1_viscous%end - 1
-                        !$acc loop seq
+                        $:GPU_LOOP(parallelism='[seq]')
                         do i = iv%beg, iv%end
                             dqR_prim_dx_n(1)%vf(i)%sf(j, k, l) = &
                                 (q_prim_qp%vf(i)%sf(j + 1, k, l) - &
@@ -618,14 +631,15 @@ contains
                     end do
                 end do
             end do
+            $:END_GPU_PARALLEL_LOOP()
 
             if (n > 0) then
 
-                !$acc parallel loop collapse(3) gang vector default(present)
+                $:GPU_PARALLEL_LOOP(collapse=3)
                 do l = is3_viscous%beg, is3_viscous%end
                     do j = is2_viscous%beg + 1, is2_viscous%end
                         do k = is1_viscous%beg, is1_viscous%end
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do i = iv%beg, iv%end
                                 dqL_prim_dy_n(2)%vf(i)%sf(k, j, l) = &
                                     (q_prim_qp%vf(i)%sf(k, j, l) - &
@@ -635,12 +649,13 @@ contains
                         end do
                     end do
                 end do
+                $:END_GPU_PARALLEL_LOOP()
 
-                !$acc parallel loop collapse(3) gang vector default(present)
+                $:GPU_PARALLEL_LOOP(collapse=3)
                 do l = is3_viscous%beg, is3_viscous%end
                     do j = is2_viscous%beg, is2_viscous%end - 1
                         do k = is1_viscous%beg, is1_viscous%end
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do i = iv%beg, iv%end
                                 dqR_prim_dy_n(2)%vf(i)%sf(k, j, l) = &
                                     (q_prim_qp%vf(i)%sf(k, j + 1, l) - &
@@ -650,12 +665,13 @@ contains
                         end do
                     end do
                 end do
+                $:END_GPU_PARALLEL_LOOP()
 
-                !$acc parallel loop collapse(3) gang vector default(present)
+                $:GPU_PARALLEL_LOOP(collapse=3)
                 do l = is3_viscous%beg, is3_viscous%end
                     do j = is2_viscous%beg + 1, is2_viscous%end
                         do k = is1_viscous%beg + 1, is1_viscous%end - 1
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do i = iv%beg, iv%end
                                 dqL_prim_dx_n(2)%vf(i)%sf(k, j, l) = &
                                     (dqL_prim_dx_n(1)%vf(i)%sf(k, j, l) + &
@@ -663,18 +679,19 @@ contains
                                      dqL_prim_dx_n(1)%vf(i)%sf(k, j - 1, l) + &
                                      dqR_prim_dx_n(1)%vf(i)%sf(k, j - 1, l))
 
-                                dqL_prim_dx_n(2)%vf(i)%sf(k, j, l) = 25e-2_wp* &
+                                dqL_prim_dx_n(2)%vf(i)%sf(k, j, l) = 25.e-2_wp* &
                                                                      dqL_prim_dx_n(2)%vf(i)%sf(k, j, l)
                             end do
                         end do
                     end do
                 end do
+                $:END_GPU_PARALLEL_LOOP()
 
-                !$acc parallel loop collapse(3) gang vector default(present)
+                $:GPU_PARALLEL_LOOP(collapse=3)
                 do l = is3_viscous%beg, is3_viscous%end
                     do j = is2_viscous%beg, is2_viscous%end - 1
                         do k = is1_viscous%beg + 1, is1_viscous%end - 1
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do i = iv%beg, iv%end
                                 dqR_prim_dx_n(2)%vf(i)%sf(k, j, l) = &
                                     (dqL_prim_dx_n(1)%vf(i)%sf(k, j + 1, l) + &
@@ -682,19 +699,20 @@ contains
                                      dqL_prim_dx_n(1)%vf(i)%sf(k, j, l) + &
                                      dqR_prim_dx_n(1)%vf(i)%sf(k, j, l))
 
-                                dqR_prim_dx_n(2)%vf(i)%sf(k, j, l) = 25e-2_wp* &
+                                dqR_prim_dx_n(2)%vf(i)%sf(k, j, l) = 25.e-2_wp* &
                                                                      dqR_prim_dx_n(2)%vf(i)%sf(k, j, l)
 
                             end do
                         end do
                     end do
                 end do
+                $:END_GPU_PARALLEL_LOOP()
 
-                !$acc parallel loop collapse(3) gang vector default(present)
+                $:GPU_PARALLEL_LOOP(collapse=3)
                 do l = is3_viscous%beg, is3_viscous%end
                     do k = is2_viscous%beg + 1, is2_viscous%end - 1
                         do j = is1_viscous%beg + 1, is1_viscous%end
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do i = iv%beg, iv%end
                                 dqL_prim_dy_n(1)%vf(i)%sf(j, k, l) = &
                                     (dqL_prim_dy_n(2)%vf(i)%sf(j, k, l) + &
@@ -702,19 +720,20 @@ contains
                                      dqL_prim_dy_n(2)%vf(i)%sf(j - 1, k, l) + &
                                      dqR_prim_dy_n(2)%vf(i)%sf(j - 1, k, l))
 
-                                dqL_prim_dy_n(1)%vf(i)%sf(j, k, l) = 25e-2_wp* &
+                                dqL_prim_dy_n(1)%vf(i)%sf(j, k, l) = 25.e-2_wp* &
                                                                      dqL_prim_dy_n(1)%vf(i)%sf(j, k, l)
 
                             end do
                         end do
                     end do
                 end do
+                $:END_GPU_PARALLEL_LOOP()
 
-                !$acc parallel loop collapse(3) gang vector default(present)
+                $:GPU_PARALLEL_LOOP(collapse=3)
                 do l = is3_viscous%beg, is3_viscous%end
                     do k = is2_viscous%beg + 1, is2_viscous%end - 1
                         do j = is1_viscous%beg, is1_viscous%end - 1
-                            !$acc loop seq
+                            $:GPU_LOOP(parallelism='[seq]')
                             do i = iv%beg, iv%end
                                 dqR_prim_dy_n(1)%vf(i)%sf(j, k, l) = &
                                     (dqL_prim_dy_n(2)%vf(i)%sf(j + 1, k, l) + &
@@ -722,219 +741,231 @@ contains
                                      dqL_prim_dy_n(2)%vf(i)%sf(j, k, l) + &
                                      dqR_prim_dy_n(2)%vf(i)%sf(j, k, l))
 
-                                dqR_prim_dy_n(1)%vf(i)%sf(j, k, l) = 25e-2_wp* &
+                                dqR_prim_dy_n(1)%vf(i)%sf(j, k, l) = 25.e-2_wp* &
                                                                      dqR_prim_dy_n(1)%vf(i)%sf(j, k, l)
 
                             end do
                         end do
                     end do
                 end do
+                $:END_GPU_PARALLEL_LOOP()
 
                 if (p > 0) then
+                    #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                        $:GPU_PARALLEL_LOOP(collapse=3)
+                        do j = is3_viscous%beg + 1, is3_viscous%end
+                            do l = is2_viscous%beg, is2_viscous%end
+                                do k = is1_viscous%beg, is1_viscous%end
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = iv%beg, iv%end
 
-                    !$acc parallel loop collapse(3) gang vector default(present)
-                    do j = is3_viscous%beg + 1, is3_viscous%end
-                        do l = is2_viscous%beg, is2_viscous%end
-                            do k = is1_viscous%beg, is1_viscous%end
-                                !$acc loop seq
-                                do i = iv%beg, iv%end
-
-                                    dqL_prim_dz_n(3)%vf(i)%sf(k, l, j) = &
-                                        (q_prim_qp%vf(i)%sf(k, l, j) - &
-                                         q_prim_qp%vf(i)%sf(k, l, j - 1))/ &
-                                        (z_cc(j) - z_cc(j - 1))
+                                        dqL_prim_dz_n(3)%vf(i)%sf(k, l, j) = &
+                                            (q_prim_qp%vf(i)%sf(k, l, j) - &
+                                             q_prim_qp%vf(i)%sf(k, l, j - 1))/ &
+                                            (z_cc(j) - z_cc(j - 1))
+                                    end do
                                 end do
                             end do
                         end do
-                    end do
+                        $:END_GPU_PARALLEL_LOOP()
 
-                    !$acc parallel loop collapse(3) gang vector default(present)
-                    do j = is3_viscous%beg, is3_viscous%end - 1
-                        do l = is2_viscous%beg, is2_viscous%end
-                            do k = is1_viscous%beg, is1_viscous%end
-                                !$acc loop seq
-                                do i = iv%beg, iv%end
+                        $:GPU_PARALLEL_LOOP(collapse=3)
+                        do j = is3_viscous%beg, is3_viscous%end - 1
+                            do l = is2_viscous%beg, is2_viscous%end
+                                do k = is1_viscous%beg, is1_viscous%end
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = iv%beg, iv%end
 
-                                    dqR_prim_dz_n(3)%vf(i)%sf(k, l, j) = &
-                                        (q_prim_qp%vf(i)%sf(k, l, j + 1) - &
-                                         q_prim_qp%vf(i)%sf(k, l, j))/ &
-                                        (z_cc(j + 1) - z_cc(j))
+                                        dqR_prim_dz_n(3)%vf(i)%sf(k, l, j) = &
+                                            (q_prim_qp%vf(i)%sf(k, l, j + 1) - &
+                                             q_prim_qp%vf(i)%sf(k, l, j))/ &
+                                            (z_cc(j + 1) - z_cc(j))
+                                    end do
                                 end do
                             end do
                         end do
-                    end do
+                        $:END_GPU_PARALLEL_LOOP()
 
-                    !$acc parallel loop collapse(3) gang vector default(present)
-                    do l = is3_viscous%beg + 1, is3_viscous%end - 1
-                        do k = is2_viscous%beg, is2_viscous%end
-                            do j = is1_viscous%beg + 1, is1_viscous%end
-                                !$acc loop seq
-                                do i = iv%beg, iv%end
+                        $:GPU_PARALLEL_LOOP(collapse=3)
+                        do l = is3_viscous%beg + 1, is3_viscous%end - 1
+                            do k = is2_viscous%beg, is2_viscous%end
+                                do j = is1_viscous%beg + 1, is1_viscous%end
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = iv%beg, iv%end
 
-                                    dqL_prim_dz_n(1)%vf(i)%sf(j, k, l) = &
-                                        (dqL_prim_dz_n(3)%vf(i)%sf(j, k, l) + &
-                                         dqR_prim_dz_n(3)%vf(i)%sf(j, k, l) + &
-                                         dqL_prim_dz_n(3)%vf(i)%sf(j - 1, k, l) + &
-                                         dqR_prim_dz_n(3)%vf(i)%sf(j - 1, k, l))
+                                        dqL_prim_dz_n(1)%vf(i)%sf(j, k, l) = &
+                                            (dqL_prim_dz_n(3)%vf(i)%sf(j, k, l) + &
+                                             dqR_prim_dz_n(3)%vf(i)%sf(j, k, l) + &
+                                             dqL_prim_dz_n(3)%vf(i)%sf(j - 1, k, l) + &
+                                             dqR_prim_dz_n(3)%vf(i)%sf(j - 1, k, l))
 
-                                    dqL_prim_dz_n(1)%vf(i)%sf(j, k, l) = 25e-2_wp* &
-                                                                         dqL_prim_dz_n(1)%vf(i)%sf(j, k, l)
+                                        dqL_prim_dz_n(1)%vf(i)%sf(j, k, l) = 25.e-2_wp* &
+                                                                             dqL_prim_dz_n(1)%vf(i)%sf(j, k, l)
 
+                                    end do
                                 end do
                             end do
                         end do
-                    end do
+                        $:END_GPU_PARALLEL_LOOP()
 
-                    !$acc parallel loop collapse(3) gang vector default(present)
-                    do l = is3_viscous%beg + 1, is3_viscous%end - 1
-                        do k = is2_viscous%beg, is2_viscous%end
-                            do j = is1_viscous%beg, is1_viscous%end - 1
-                                !$acc loop seq
-                                do i = iv%beg, iv%end
+                        $:GPU_PARALLEL_LOOP(collapse=3)
+                        do l = is3_viscous%beg + 1, is3_viscous%end - 1
+                            do k = is2_viscous%beg, is2_viscous%end
+                                do j = is1_viscous%beg, is1_viscous%end - 1
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = iv%beg, iv%end
 
-                                    dqR_prim_dz_n(1)%vf(i)%sf(j, k, l) = &
-                                        (dqL_prim_dz_n(3)%vf(i)%sf(j + 1, k, l) + &
-                                         dqR_prim_dz_n(3)%vf(i)%sf(j + 1, k, l) + &
-                                         dqL_prim_dz_n(3)%vf(i)%sf(j, k, l) + &
-                                         dqR_prim_dz_n(3)%vf(i)%sf(j, k, l))
+                                        dqR_prim_dz_n(1)%vf(i)%sf(j, k, l) = &
+                                            (dqL_prim_dz_n(3)%vf(i)%sf(j + 1, k, l) + &
+                                             dqR_prim_dz_n(3)%vf(i)%sf(j + 1, k, l) + &
+                                             dqL_prim_dz_n(3)%vf(i)%sf(j, k, l) + &
+                                             dqR_prim_dz_n(3)%vf(i)%sf(j, k, l))
 
-                                    dqR_prim_dz_n(1)%vf(i)%sf(j, k, l) = 25e-2_wp* &
-                                                                         dqR_prim_dz_n(1)%vf(i)%sf(j, k, l)
+                                        dqR_prim_dz_n(1)%vf(i)%sf(j, k, l) = 25.e-2_wp* &
+                                                                             dqR_prim_dz_n(1)%vf(i)%sf(j, k, l)
 
+                                    end do
                                 end do
                             end do
                         end do
-                    end do
+                        $:END_GPU_PARALLEL_LOOP()
 
-                    !$acc parallel loop collapse(3) gang vector default(present)
-                    do l = is3_viscous%beg + 1, is3_viscous%end - 1
-                        do j = is2_viscous%beg + 1, is2_viscous%end
-                            do k = is1_viscous%beg, is1_viscous%end
-                                !$acc loop seq
-                                do i = iv%beg, iv%end
+                        $:GPU_PARALLEL_LOOP(collapse=3)
+                        do l = is3_viscous%beg + 1, is3_viscous%end - 1
+                            do j = is2_viscous%beg + 1, is2_viscous%end
+                                do k = is1_viscous%beg, is1_viscous%end
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = iv%beg, iv%end
 
-                                    dqL_prim_dz_n(2)%vf(i)%sf(k, j, l) = &
-                                        (dqL_prim_dz_n(3)%vf(i)%sf(k, j, l) + &
-                                         dqR_prim_dz_n(3)%vf(i)%sf(k, j, l) + &
-                                         dqL_prim_dz_n(3)%vf(i)%sf(k, j - 1, l) + &
-                                         dqR_prim_dz_n(3)%vf(i)%sf(k, j - 1, l))
+                                        dqL_prim_dz_n(2)%vf(i)%sf(k, j, l) = &
+                                            (dqL_prim_dz_n(3)%vf(i)%sf(k, j, l) + &
+                                             dqR_prim_dz_n(3)%vf(i)%sf(k, j, l) + &
+                                             dqL_prim_dz_n(3)%vf(i)%sf(k, j - 1, l) + &
+                                             dqR_prim_dz_n(3)%vf(i)%sf(k, j - 1, l))
 
-                                    dqL_prim_dz_n(2)%vf(i)%sf(k, j, l) = 25e-2_wp* &
-                                                                         dqL_prim_dz_n(2)%vf(i)%sf(k, j, l)
+                                        dqL_prim_dz_n(2)%vf(i)%sf(k, j, l) = 25.e-2_wp* &
+                                                                             dqL_prim_dz_n(2)%vf(i)%sf(k, j, l)
 
+                                    end do
                                 end do
                             end do
                         end do
-                    end do
+                        $:END_GPU_PARALLEL_LOOP()
 
-                    !$acc parallel loop collapse(3) gang vector default(present)
-                    do l = is3_viscous%beg + 1, is3_viscous%end - 1
-                        do j = is2_viscous%beg, is2_viscous%end - 1
-                            do k = is1_viscous%beg, is1_viscous%end
-                                !$acc loop seq
-                                do i = iv%beg, iv%end
+                        $:GPU_PARALLEL_LOOP(collapse=3)
+                        do l = is3_viscous%beg + 1, is3_viscous%end - 1
+                            do j = is2_viscous%beg, is2_viscous%end - 1
+                                do k = is1_viscous%beg, is1_viscous%end
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = iv%beg, iv%end
 
-                                    dqR_prim_dz_n(2)%vf(i)%sf(k, j, l) = &
-                                        (dqL_prim_dz_n(3)%vf(i)%sf(k, j + 1, l) + &
-                                         dqR_prim_dz_n(3)%vf(i)%sf(k, j + 1, l) + &
-                                         dqL_prim_dz_n(3)%vf(i)%sf(k, j, l) + &
-                                         dqR_prim_dz_n(3)%vf(i)%sf(k, j, l))
+                                        dqR_prim_dz_n(2)%vf(i)%sf(k, j, l) = &
+                                            (dqL_prim_dz_n(3)%vf(i)%sf(k, j + 1, l) + &
+                                             dqR_prim_dz_n(3)%vf(i)%sf(k, j + 1, l) + &
+                                             dqL_prim_dz_n(3)%vf(i)%sf(k, j, l) + &
+                                             dqR_prim_dz_n(3)%vf(i)%sf(k, j, l))
 
-                                    dqR_prim_dz_n(2)%vf(i)%sf(k, j, l) = 25e-2_wp* &
-                                                                         dqR_prim_dz_n(2)%vf(i)%sf(k, j, l)
+                                        dqR_prim_dz_n(2)%vf(i)%sf(k, j, l) = 25.e-2_wp* &
+                                                                             dqR_prim_dz_n(2)%vf(i)%sf(k, j, l)
 
+                                    end do
                                 end do
                             end do
                         end do
-                    end do
+                        $:END_GPU_PARALLEL_LOOP()
 
-                    !$acc parallel loop collapse(3) gang vector default(present)
-                    do j = is3_viscous%beg + 1, is3_viscous%end
-                        do l = is2_viscous%beg + 1, is2_viscous%end - 1
-                            do k = is1_viscous%beg, is1_viscous%end
-                                !$acc loop seq
-                                do i = iv%beg, iv%end
+                        $:GPU_PARALLEL_LOOP(collapse=3)
+                        do j = is3_viscous%beg + 1, is3_viscous%end
+                            do l = is2_viscous%beg + 1, is2_viscous%end - 1
+                                do k = is1_viscous%beg, is1_viscous%end
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = iv%beg, iv%end
 
-                                    dqL_prim_dy_n(3)%vf(i)%sf(k, l, j) = &
-                                        (dqL_prim_dy_n(2)%vf(i)%sf(k, l, j) + &
-                                         dqR_prim_dy_n(2)%vf(i)%sf(k, l, j) + &
-                                         dqL_prim_dy_n(2)%vf(i)%sf(k, l, j - 1) + &
-                                         dqR_prim_dy_n(2)%vf(i)%sf(k, l, j - 1))
+                                        dqL_prim_dy_n(3)%vf(i)%sf(k, l, j) = &
+                                            (dqL_prim_dy_n(2)%vf(i)%sf(k, l, j) + &
+                                             dqR_prim_dy_n(2)%vf(i)%sf(k, l, j) + &
+                                             dqL_prim_dy_n(2)%vf(i)%sf(k, l, j - 1) + &
+                                             dqR_prim_dy_n(2)%vf(i)%sf(k, l, j - 1))
 
-                                    dqL_prim_dy_n(3)%vf(i)%sf(k, l, j) = 25e-2_wp* &
-                                                                         dqL_prim_dy_n(3)%vf(i)%sf(k, l, j)
+                                        dqL_prim_dy_n(3)%vf(i)%sf(k, l, j) = 25.e-2_wp* &
+                                                                             dqL_prim_dy_n(3)%vf(i)%sf(k, l, j)
 
+                                    end do
                                 end do
                             end do
                         end do
-                    end do
+                        $:END_GPU_PARALLEL_LOOP()
 
-                    !$acc parallel loop collapse(3) gang vector default(present)
-                    do j = is3_viscous%beg, is3_viscous%end - 1
-                        do l = is2_viscous%beg + 1, is2_viscous%end - 1
-                            do k = is1_viscous%beg, is1_viscous%end
-                                !$acc loop seq
-                                do i = iv%beg, iv%end
+                        $:GPU_PARALLEL_LOOP(collapse=3)
+                        do j = is3_viscous%beg, is3_viscous%end - 1
+                            do l = is2_viscous%beg + 1, is2_viscous%end - 1
+                                do k = is1_viscous%beg, is1_viscous%end
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = iv%beg, iv%end
 
-                                    dqR_prim_dy_n(3)%vf(i)%sf(k, l, j) = &
-                                        (dqL_prim_dy_n(2)%vf(i)%sf(k, l, j + 1) + &
-                                         dqR_prim_dy_n(2)%vf(i)%sf(k, l, j + 1) + &
-                                         dqL_prim_dy_n(2)%vf(i)%sf(k, l, j) + &
-                                         dqR_prim_dy_n(2)%vf(i)%sf(k, l, j))
+                                        dqR_prim_dy_n(3)%vf(i)%sf(k, l, j) = &
+                                            (dqL_prim_dy_n(2)%vf(i)%sf(k, l, j + 1) + &
+                                             dqR_prim_dy_n(2)%vf(i)%sf(k, l, j + 1) + &
+                                             dqL_prim_dy_n(2)%vf(i)%sf(k, l, j) + &
+                                             dqR_prim_dy_n(2)%vf(i)%sf(k, l, j))
 
-                                    dqR_prim_dy_n(3)%vf(i)%sf(k, l, j) = 25e-2_wp* &
-                                                                         dqR_prim_dy_n(3)%vf(i)%sf(k, l, j)
+                                        dqR_prim_dy_n(3)%vf(i)%sf(k, l, j) = 25.e-2_wp* &
+                                                                             dqR_prim_dy_n(3)%vf(i)%sf(k, l, j)
 
+                                    end do
                                 end do
                             end do
                         end do
-                    end do
-                    !$acc parallel loop collapse(3) gang vector default(present)
-                    do j = is3_viscous%beg + 1, is3_viscous%end
-                        do l = is2_viscous%beg, is2_viscous%end
-                            do k = is1_viscous%beg + 1, is1_viscous%end - 1
-                                !$acc loop seq
-                                do i = iv%beg, iv%end
+                        $:END_GPU_PARALLEL_LOOP()
+                        $:GPU_PARALLEL_LOOP(collapse=3)
+                        do j = is3_viscous%beg + 1, is3_viscous%end
+                            do l = is2_viscous%beg, is2_viscous%end
+                                do k = is1_viscous%beg + 1, is1_viscous%end - 1
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = iv%beg, iv%end
 
-                                    dqL_prim_dx_n(3)%vf(i)%sf(k, l, j) = &
-                                        (dqL_prim_dx_n(1)%vf(i)%sf(k, l, j) + &
-                                         dqR_prim_dx_n(1)%vf(i)%sf(k, l, j) + &
-                                         dqL_prim_dx_n(1)%vf(i)%sf(k, l, j - 1) + &
-                                         dqR_prim_dx_n(1)%vf(i)%sf(k, l, j - 1))
+                                        dqL_prim_dx_n(3)%vf(i)%sf(k, l, j) = &
+                                            (dqL_prim_dx_n(1)%vf(i)%sf(k, l, j) + &
+                                             dqR_prim_dx_n(1)%vf(i)%sf(k, l, j) + &
+                                             dqL_prim_dx_n(1)%vf(i)%sf(k, l, j - 1) + &
+                                             dqR_prim_dx_n(1)%vf(i)%sf(k, l, j - 1))
 
-                                    dqL_prim_dx_n(3)%vf(i)%sf(k, l, j) = 25e-2_wp* &
-                                                                         dqL_prim_dx_n(3)%vf(i)%sf(k, l, j)
+                                        dqL_prim_dx_n(3)%vf(i)%sf(k, l, j) = 25.e-2_wp* &
+                                                                             dqL_prim_dx_n(3)%vf(i)%sf(k, l, j)
 
+                                    end do
                                 end do
                             end do
                         end do
-                    end do
-                    !$acc parallel loop collapse(3) gang vector default(present)
-                    do j = is3_viscous%beg, is3_viscous%end - 1
-                        do l = is2_viscous%beg, is2_viscous%end
-                            do k = is1_viscous%beg + 1, is1_viscous%end - 1
-                                !$acc loop seq
-                                do i = iv%beg, iv%end
-                                    dqR_prim_dx_n(3)%vf(i)%sf(k, l, j) = &
-                                        (dqL_prim_dx_n(1)%vf(i)%sf(k, l, j + 1) + &
-                                         dqR_prim_dx_n(1)%vf(i)%sf(k, l, j + 1) + &
-                                         dqL_prim_dx_n(1)%vf(i)%sf(k, l, j) + &
-                                         dqR_prim_dx_n(1)%vf(i)%sf(k, l, j))
+                        $:END_GPU_PARALLEL_LOOP()
+                        $:GPU_PARALLEL_LOOP(collapse=3)
+                        do j = is3_viscous%beg, is3_viscous%end - 1
+                            do l = is2_viscous%beg, is2_viscous%end
+                                do k = is1_viscous%beg + 1, is1_viscous%end - 1
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = iv%beg, iv%end
+                                        dqR_prim_dx_n(3)%vf(i)%sf(k, l, j) = &
+                                            (dqL_prim_dx_n(1)%vf(i)%sf(k, l, j + 1) + &
+                                             dqR_prim_dx_n(1)%vf(i)%sf(k, l, j + 1) + &
+                                             dqL_prim_dx_n(1)%vf(i)%sf(k, l, j) + &
+                                             dqR_prim_dx_n(1)%vf(i)%sf(k, l, j))
 
-                                    dqR_prim_dx_n(3)%vf(i)%sf(k, l, j) = 25e-2_wp* &
-                                                                         dqR_prim_dx_n(3)%vf(i)%sf(k, l, j)
+                                        dqR_prim_dx_n(3)%vf(i)%sf(k, l, j) = 25.e-2_wp* &
+                                                                             dqR_prim_dx_n(3)%vf(i)%sf(k, l, j)
 
+                                    end do
                                 end do
                             end do
                         end do
-                    end do
+                        $:END_GPU_PARALLEL_LOOP()
 
-                    do i = iv%beg, iv%end
-                        call s_compute_fd_gradient(q_prim_qp%vf(i), &
-                                                   dq_prim_dx_qp(1)%vf(i), &
-                                                   dq_prim_dy_qp(1)%vf(i), &
-                                                   dq_prim_dz_qp(1)%vf(i))
-                    end do
+                        do i = iv%beg, iv%end
+                            call s_compute_fd_gradient(q_prim_qp%vf(i), &
+                                                       dq_prim_dx_qp(1)%vf(i), &
+                                                       dq_prim_dy_qp(1)%vf(i), &
+                                                       dq_prim_dz_qp(1)%vf(i))
+                        end do
+                    #:endif
 
                 else
 
@@ -972,97 +1003,102 @@ contains
         integer, intent(in) :: norm_dir
         type(int_bounds_info), intent(in) :: ix, iy, iz
 
-        integer :: weno_dir !< Coordinate direction of the WENO reconstruction
+        integer :: recon_dir !< Coordinate direction of the WENO reconstruction
 
         integer :: i, j, k, l
 
-        ! Reconstruction in s1-direction
+        #:for SCHEME, TYPE in [('weno','WENO_TYPE'), ('muscl','MUSCL_TYPE')]
+            if (recon_type == ${TYPE}$) then
+                ! Reconstruction in s1-direction
 
-        if (norm_dir == 1) then
-            is1_viscous = ix; is2_viscous = iy; is3_viscous = iz
-            weno_dir = 1; is1_viscous%beg = is1_viscous%beg + weno_polyn
-            is1_viscous%end = is1_viscous%end - weno_polyn
+                if (norm_dir == 1) then
+                    is1_viscous = ix; is2_viscous = iy; is3_viscous = iz
+                    recon_dir = 1; is1_viscous%beg = is1_viscous%beg + ${SCHEME}$_polyn
+                    is1_viscous%end = is1_viscous%end - ${SCHEME}$_polyn
 
-        elseif (norm_dir == 2) then
-            is1_viscous = iy; is2_viscous = ix; is3_viscous = iz
-            weno_dir = 2; is1_viscous%beg = is1_viscous%beg + weno_polyn
-            is1_viscous%end = is1_viscous%end - weno_polyn
+                elseif (norm_dir == 2) then
+                    is1_viscous = iy; is2_viscous = ix; is3_viscous = iz
+                    recon_dir = 2; is1_viscous%beg = is1_viscous%beg + ${SCHEME}$_polyn
+                    is1_viscous%end = is1_viscous%end - ${SCHEME}$_polyn
 
-        else
-            is1_viscous = iz; is2_viscous = iy; is3_viscous = ix
-            weno_dir = 3; is1_viscous%beg = is1_viscous%beg + weno_polyn
-            is1_viscous%end = is1_viscous%end - weno_polyn
+                else
+                    is1_viscous = iz; is2_viscous = iy; is3_viscous = ix
+                    recon_dir = 3; is1_viscous%beg = is1_viscous%beg + ${SCHEME}$_polyn
+                    is1_viscous%end = is1_viscous%end - ${SCHEME}$_polyn
 
-        end if
+                end if
 
-        !$acc update device(is1_viscous, is2_viscous, is3_viscous, iv)
+                $:GPU_UPDATE(device='[is1_viscous, is2_viscous, is3_viscous, iv]')
+                if (n > 0) then
+                    if (p > 0) then
+                        call s_${SCHEME}$ (v_vf(iv%beg:iv%end), &
+                                           vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, iv%beg:iv%end), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, iv%beg:iv%end), &
+                                           recon_dir, &
+                                           is1_viscous, is2_viscous, is3_viscous)
+                    else
+                        call s_${SCHEME}$ (v_vf(iv%beg:iv%end), &
+                                           vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, :), &
+                                           recon_dir, &
+                                           is1_viscous, is2_viscous, is3_viscous)
+                    end if
+                else
+                    call s_${SCHEME}$ (v_vf(iv%beg:iv%end), &
+                                       vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, :), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, :), vR_z(:, :, :, :), &
+                                       recon_dir, &
+                                       is1_viscous, is2_viscous, is3_viscous)
+                end if
 
-        if (n > 0) then
-            if (p > 0) then
-                call s_weno(v_vf(iv%beg:iv%end), &
-                            vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, iv%beg:iv%end), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, iv%beg:iv%end), &
-                            norm_dir, weno_dir, &
-                            is1_viscous, is2_viscous, is3_viscous)
-            else
-                call s_weno(v_vf(iv%beg:iv%end), &
-                            vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, :), &
-                            norm_dir, weno_dir, &
-                            is1_viscous, is2_viscous, is3_viscous)
-            end if
-        else
-            call s_weno(v_vf(iv%beg:iv%end), &
-                        vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, :), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, :), vR_z(:, :, :, :), &
-                        norm_dir, weno_dir, &
-                        is1_viscous, is2_viscous, is3_viscous)
-        end if
-
-        if (viscous) then
-            if (weno_Re_flux) then
-                if (norm_dir == 2) then
-                    !$acc parallel loop collapse(4) gang vector default(present)
-                    do i = iv%beg, iv%end
-                        do l = is3_viscous%beg, is3_viscous%end
-                            do j = is1_viscous%beg, is1_viscous%end
-                                do k = is2_viscous%beg, is2_viscous%end
-                                    vL_prim_vf(i)%sf(k, j, l) = vL_y(j, k, l, i)
-                                    vR_prim_vf(i)%sf(k, j, l) = vR_y(j, k, l, i)
-                                end do
-                            end do
-                        end do
-                    end do
-                elseif (norm_dir == 3) then
-                    !$acc parallel loop collapse(4) gang vector default(present)
-                    do i = iv%beg, iv%end
-                        do j = is1_viscous%beg, is1_viscous%end
-                            do k = is2_viscous%beg, is2_viscous%end
+                if (viscous) then
+                    if (weno_Re_flux) then
+                        if (norm_dir == 2) then
+                            $:GPU_PARALLEL_LOOP(collapse=4)
+                            do i = iv%beg, iv%end
                                 do l = is3_viscous%beg, is3_viscous%end
-                                    vL_prim_vf(i)%sf(l, k, j) = vL_z(j, k, l, i)
-                                    vR_prim_vf(i)%sf(l, k, j) = vR_z(j, k, l, i)
+                                    do j = is1_viscous%beg, is1_viscous%end
+                                        do k = is2_viscous%beg, is2_viscous%end
+                                            vL_prim_vf(i)%sf(k, j, l) = vL_y(j, k, l, i)
+                                            vR_prim_vf(i)%sf(k, j, l) = vR_y(j, k, l, i)
+                                        end do
+                                    end do
                                 end do
                             end do
-                        end do
-                    end do
-                elseif (norm_dir == 1) then
-                    !$acc parallel loop collapse(4) gang vector default(present)
-                    do i = iv%beg, iv%end
-                        do l = is3_viscous%beg, is3_viscous%end
-                            do k = is2_viscous%beg, is2_viscous%end
+                            $:END_GPU_PARALLEL_LOOP()
+                        elseif (norm_dir == 3) then
+                            $:GPU_PARALLEL_LOOP(collapse=4)
+                            do i = iv%beg, iv%end
                                 do j = is1_viscous%beg, is1_viscous%end
-                                    vL_prim_vf(i)%sf(j, k, l) = vL_x(j, k, l, i)
-                                    vR_prim_vf(i)%sf(j, k, l) = vR_x(j, k, l, i)
+                                    do k = is2_viscous%beg, is2_viscous%end
+                                        do l = is3_viscous%beg, is3_viscous%end
+                                            vL_prim_vf(i)%sf(l, k, j) = vL_z(j, k, l, i)
+                                            vR_prim_vf(i)%sf(l, k, j) = vR_z(j, k, l, i)
+                                        end do
+                                    end do
                                 end do
                             end do
-                        end do
-                    end do
+                            $:END_GPU_PARALLEL_LOOP()
+                        elseif (norm_dir == 1) then
+                            $:GPU_PARALLEL_LOOP(collapse=4)
+                            do i = iv%beg, iv%end
+                                do l = is3_viscous%beg, is3_viscous%end
+                                    do k = is2_viscous%beg, is2_viscous%end
+                                        do j = is1_viscous%beg, is1_viscous%end
+                                            vL_prim_vf(i)%sf(j, k, l) = vL_x(j, k, l, i)
+                                            vR_prim_vf(i)%sf(j, k, l) = vR_x(j, k, l, i)
+                                        end do
+                                    end do
+                                end do
+                            end do
+                            $:END_GPU_PARALLEL_LOOP()
+                        end if
+                    end if
                 end if
             end if
-        end if
+        #:endfor
 
     end subroutine s_reconstruct_cell_boundary_values_visc
 
     subroutine s_reconstruct_cell_boundary_values_visc_deriv(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, &
                                                              norm_dir, vL_prim_vf, vR_prim_vf, ix, iy, iz)
-
         type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, iv%beg:), intent(inout) :: vL_x, vL_y, vL_z, vR_x, vR_y, vR_z
         type(scalar_field), dimension(iv%beg:iv%end), intent(inout) :: vL_prim_vf, vR_prim_vf
@@ -1070,93 +1106,98 @@ contains
 
         integer, intent(IN) :: norm_dir
 
-        integer :: weno_dir !< Coordinate direction of the WENO reconstruction
+        integer :: recon_dir !< Coordinate direction of the WENO reconstruction
 
         integer :: i, j, k, l
-        ! Reconstruction in s1-direction
+        #:for SCHEME, TYPE in [('weno','WENO_TYPE'), ('muscl','MUSCL_TYPE')]
+            if (recon_type == ${TYPE}$) then
+                ! Reconstruction in s1-direction
 
-        if (norm_dir == 1) then
-            is1_viscous = ix; is2_viscous = iy; is3_viscous = iz
-            weno_dir = 1; is1_viscous%beg = is1_viscous%beg + weno_polyn
-            is1_viscous%end = is1_viscous%end - weno_polyn
+                if (norm_dir == 1) then
+                    is1_viscous = ix; is2_viscous = iy; is3_viscous = iz
+                    recon_dir = 1; is1_viscous%beg = is1_viscous%beg + ${SCHEME}$_polyn
+                    is1_viscous%end = is1_viscous%end - ${SCHEME}$_polyn
 
-        elseif (norm_dir == 2) then
-            is1_viscous = iy; is2_viscous = ix; is3_viscous = iz
-            weno_dir = 2; is1_viscous%beg = is1_viscous%beg + weno_polyn
-            is1_viscous%end = is1_viscous%end - weno_polyn
+                elseif (norm_dir == 2) then
+                    is1_viscous = iy; is2_viscous = ix; is3_viscous = iz
+                    recon_dir = 2; is1_viscous%beg = is1_viscous%beg + ${SCHEME}$_polyn
+                    is1_viscous%end = is1_viscous%end - ${SCHEME}$_polyn
 
-        else
-            is1_viscous = iz; is2_viscous = iy; is3_viscous = ix
-            weno_dir = 3; is1_viscous%beg = is1_viscous%beg + weno_polyn
-            is1_viscous%end = is1_viscous%end - weno_polyn
+                else
+                    is1_viscous = iz; is2_viscous = iy; is3_viscous = ix
+                    recon_dir = 3; is1_viscous%beg = is1_viscous%beg + ${SCHEME}$_polyn
+                    is1_viscous%end = is1_viscous%end - ${SCHEME}$_polyn
 
-        end if
+                end if
+                $:GPU_UPDATE(device='[is1_viscous, is2_viscous, is3_viscous, iv]')
+                if (n > 0) then
+                    if (p > 0) then
 
-        !$acc update device(is1_viscous, is2_viscous, is3_viscous, iv)
+                        call s_${SCHEME}$ (v_vf(iv%beg:iv%end), &
+                                           vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, iv%beg:iv%end), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, iv%beg:iv%end), &
+                                           recon_dir, &
+                                           is1_viscous, is2_viscous, is3_viscous)
+                    else
+                        call s_${SCHEME}$ (v_vf(iv%beg:iv%end), &
+                                           vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, :), &
+                                           recon_dir, &
+                                           is1_viscous, is2_viscous, is3_viscous)
+                    end if
+                else
 
-        if (n > 0) then
-            if (p > 0) then
+                    call s_${SCHEME}$ (v_vf(iv%beg:iv%end), &
+                                       vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, :), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, :), vR_z(:, :, :, :), &
+                                       recon_dir, &
+                                       is1_viscous, is2_viscous, is3_viscous)
+                end if
 
-                call s_weno(v_vf(iv%beg:iv%end), &
-                            vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, iv%beg:iv%end), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, iv%beg:iv%end), &
-                            norm_dir, weno_dir, &
-                            is1_viscous, is2_viscous, is3_viscous)
-            else
-                call s_weno(v_vf(iv%beg:iv%end), &
-                            vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, iv%beg:iv%end), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, iv%beg:iv%end), vR_z(:, :, :, :), &
-                            norm_dir, weno_dir, &
-                            is1_viscous, is2_viscous, is3_viscous)
-            end if
-        else
-
-            call s_weno(v_vf(iv%beg:iv%end), &
-                        vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, :), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, :), vR_z(:, :, :, :), &
-                        norm_dir, weno_dir, &
-                        is1_viscous, is2_viscous, is3_viscous)
-        end if
-
-        if (viscous) then
-            if (weno_Re_flux) then
-                if (norm_dir == 2) then
-                    !$acc parallel loop collapse(4) gang vector default(present)
-                    do i = iv%beg, iv%end
-                        do l = is3_viscous%beg, is3_viscous%end
-                            do j = is1_viscous%beg, is1_viscous%end
-                                do k = is2_viscous%beg, is2_viscous%end
-                                    vL_prim_vf(i)%sf(k, j, l) = vL_y(j, k, l, i)
-                                    vR_prim_vf(i)%sf(k, j, l) = vR_y(j, k, l, i)
-                                end do
-                            end do
-                        end do
-                    end do
-                elseif (norm_dir == 3) then
-                    !$acc parallel loop collapse(4) gang vector default(present)
-                    do i = iv%beg, iv%end
-                        do j = is1_viscous%beg, is1_viscous%end
-                            do k = is2_viscous%beg, is2_viscous%end
+                if (viscous) then
+                    if (weno_Re_flux) then
+                        if (norm_dir == 2) then
+                            $:GPU_PARALLEL_LOOP(collapse=4)
+                            do i = iv%beg, iv%end
                                 do l = is3_viscous%beg, is3_viscous%end
-                                    vL_prim_vf(i)%sf(l, k, j) = vL_z(j, k, l, i)
-                                    vR_prim_vf(i)%sf(l, k, j) = vR_z(j, k, l, i)
+                                    do j = is1_viscous%beg, is1_viscous%end
+                                        do k = is2_viscous%beg, is2_viscous%end
+                                            vL_prim_vf(i)%sf(k, j, l) = vL_y(j, k, l, i)
+                                            vR_prim_vf(i)%sf(k, j, l) = vR_y(j, k, l, i)
+                                        end do
+                                    end do
                                 end do
                             end do
-                        end do
-                    end do
-                elseif (norm_dir == 1) then
-                    !$acc parallel loop collapse(4) gang vector default(present)
-                    do i = iv%beg, iv%end
-                        do l = is3_viscous%beg, is3_viscous%end
-                            do k = is2_viscous%beg, is2_viscous%end
+                            $:END_GPU_PARALLEL_LOOP()
+                        elseif (norm_dir == 3) then
+                            $:GPU_PARALLEL_LOOP(collapse=4)
+                            do i = iv%beg, iv%end
                                 do j = is1_viscous%beg, is1_viscous%end
-                                    vL_prim_vf(i)%sf(j, k, l) = vL_x(j, k, l, i)
-                                    vR_prim_vf(i)%sf(j, k, l) = vR_x(j, k, l, i)
+                                    do k = is2_viscous%beg, is2_viscous%end
+                                        do l = is3_viscous%beg, is3_viscous%end
+                                            vL_prim_vf(i)%sf(l, k, j) = vL_z(j, k, l, i)
+                                            vR_prim_vf(i)%sf(l, k, j) = vR_z(j, k, l, i)
+                                        end do
+                                    end do
                                 end do
                             end do
-                        end do
-                    end do
+                            $:END_GPU_PARALLEL_LOOP()
+                        elseif (norm_dir == 1) then
+                            $:GPU_PARALLEL_LOOP(collapse=4)
+                            do i = iv%beg, iv%end
+                                do l = is3_viscous%beg, is3_viscous%end
+                                    do k = is2_viscous%beg, is2_viscous%end
+                                        do j = is1_viscous%beg, is1_viscous%end
+                                            vL_prim_vf(i)%sf(j, k, l) = vL_x(j, k, l, i)
+                                            vR_prim_vf(i)%sf(j, k, l) = vR_x(j, k, l, i)
+                                        end do
+                                    end do
+                                end do
+                            end do
+                            $:END_GPU_PARALLEL_LOOP()
+                        end if
+                    end if
                 end if
             end if
-        end if
 
+        #:endfor
     end subroutine s_reconstruct_cell_boundary_values_visc_deriv
 
     !>  The purpose of this subroutine is to employ the inputted
@@ -1195,7 +1236,7 @@ contains
         is3_viscous = iz
         iv = iv_in
 
-        !$acc update device(is1_viscous, is2_viscous, is3_viscous, iv)
+        $:GPU_UPDATE(device='[is1_viscous, is2_viscous, is3_viscous, iv]')
 
         ! First-Order Spatial Derivatives in x-direction
         if (norm_dir == 1) then
@@ -1206,11 +1247,11 @@ contains
             ! cell-boundaries, to calculate the cell-averaged first-order
             ! spatial derivatives inside the cell.
 
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:GPU_PARALLEL_LOOP(collapse=3)
             do l = is3_viscous%beg, is3_viscous%end
                 do k = is2_viscous%beg, is2_viscous%end
                     do j = is1_viscous%beg + 1, is1_viscous%end - 1
-                        !$acc loop seq
+                        $:GPU_LOOP(parallelism='[seq]')
                         do i = iv%beg, iv%end
                             dv_ds_vf(i)%sf(j, k, l) = &
                                 1._wp/((1._wp + wa_flg)*dL(j)) &
@@ -1222,6 +1263,7 @@ contains
                     end do
                 end do
             end do
+            $:END_GPU_PARALLEL_LOOP()
 
             ! END: First-Order Spatial Derivatives in x-direction
 
@@ -1234,11 +1276,11 @@ contains
             ! cell-boundaries, to calculate the cell-averaged first-order
             ! spatial derivatives inside the cell.
 
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:GPU_PARALLEL_LOOP(collapse=3)
             do l = is3_viscous%beg, is3_viscous%end
                 do k = is2_viscous%beg + 1, is2_viscous%end - 1
                     do j = is1_viscous%beg, is1_viscous%end
-                        !$acc loop seq
+                        $:GPU_LOOP(parallelism='[seq]')
                         do i = iv%beg, iv%end
                             dv_ds_vf(i)%sf(j, k, l) = &
                                 1._wp/((1._wp + wa_flg)*dL(k)) &
@@ -1250,6 +1292,7 @@ contains
                     end do
                 end do
             end do
+            $:END_GPU_PARALLEL_LOOP()
 
             ! END: First-Order Spatial Derivatives in y-direction
 
@@ -1262,11 +1305,11 @@ contains
             ! cell-boundaries, to calculate the cell-averaged first-order
             ! spatial derivatives inside the cell.
 
-            !$acc parallel loop collapse(3) gang vector default(present)
+            $:GPU_PARALLEL_LOOP(collapse=3)
             do l = is3_viscous%beg + 1, is3_viscous%end - 1
                 do k = is2_viscous%beg, is2_viscous%end
                     do j = is1_viscous%beg, is1_viscous%end
-                        !$acc loop seq
+                        $:GPU_LOOP(parallelism='[seq]')
                         do i = iv%beg, iv%end
                             dv_ds_vf(i)%sf(j, k, l) = &
                                 1._wp/((1._wp + wa_flg)*dL(l)) &
@@ -1278,6 +1321,7 @@ contains
                     end do
                 end do
             end do
+            $:END_GPU_PARALLEL_LOOP()
 
         end if
         ! END: First-Order Spatial Derivatives in z-direction
@@ -1315,9 +1359,9 @@ contains
 
         is1_viscous = ix; is2_viscous = iy; is3_viscous = iz
 
-        !$acc update device(is1_viscous, is2_viscous, is3_viscous)
+        $:GPU_UPDATE(device='[is1_viscous,is2_viscous,is3_viscous]')
 
-        !$acc parallel loop collapse(3) gang vector default(present)
+        $:GPU_PARALLEL_LOOP(collapse=3)
         do l = is3_viscous%beg, is3_viscous%end
             do k = is2_viscous%beg, is2_viscous%end
                 do j = is1_viscous%beg, is1_viscous%end
@@ -1327,9 +1371,10 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
         if (n > 0) then
-            !$acc parallel loop collapse(3) gang vector
+            $:GPU_PARALLEL_LOOP(collapse=3)
             do l = is3_viscous%beg, is3_viscous%end
                 do k = is2_viscous%beg, is2_viscous%end
                     do j = is1_viscous%beg, is1_viscous%end
@@ -1339,10 +1384,11 @@ contains
                     end do
                 end do
             end do
+            $:END_GPU_PARALLEL_LOOP()
         end if
 
         if (p > 0) then
-            !$acc parallel loop collapse(3) gang vector
+            $:GPU_PARALLEL_LOOP(collapse=3)
             do l = is3_viscous%beg, is3_viscous%end
                 do k = is2_viscous%beg, is2_viscous%end
                     do j = is1_viscous%beg, is1_viscous%end
@@ -1352,9 +1398,10 @@ contains
                     end do
                 end do
             end do
+            $:END_GPU_PARALLEL_LOOP()
         end if
 
-        !$acc parallel loop collapse(2) gang vector default(present)
+        $:GPU_PARALLEL_LOOP(collapse=2)
         do l = idwbuff(3)%beg, idwbuff(3)%end
             do k = idwbuff(2)%beg, idwbuff(2)%end
                 grad_x%sf(idwbuff(1)%beg, k, l) = &
@@ -1365,8 +1412,9 @@ contains
                     (x_cc(idwbuff(1)%end) - x_cc(idwbuff(1)%end - 2))
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
         if (n > 0) then
-            !$acc parallel loop collapse(2) gang vector default(present)
+            $:GPU_PARALLEL_LOOP(collapse=2)
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do j = idwbuff(1)%beg, idwbuff(1)%end
                     grad_y%sf(j, idwbuff(2)%beg, l) = &
@@ -1377,8 +1425,9 @@ contains
                         (y_cc(idwbuff(2)%end) - y_cc(idwbuff(2)%end - 2))
                 end do
             end do
+            $:END_GPU_PARALLEL_LOOP()
             if (p > 0) then
-                !$acc parallel loop collapse(2) gang vector default(present)
+                $:GPU_PARALLEL_LOOP(collapse=2)
                 do k = idwbuff(2)%beg, idwbuff(2)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
                         grad_z%sf(j, k, idwbuff(3)%beg) = &
@@ -1389,49 +1438,54 @@ contains
                             (z_cc(idwbuff(3)%end) - z_cc(idwbuff(3)%end - 2))
                     end do
                 end do
+                $:END_GPU_PARALLEL_LOOP()
             end if
         end if
 
-        if (bc_x%beg <= -3) then
-            !$acc parallel loop collapse(2) gang vector default(present)
+        if (bc_x%beg <= BC_GHOST_EXTRAP) then
+            $:GPU_PARALLEL_LOOP(collapse=2)
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end
                     grad_x%sf(0, k, l) = (-3._wp*var%sf(0, k, l) + 4._wp*var%sf(1, k, l) - var%sf(2, k, l))/ &
                                          (x_cc(2) - x_cc(0))
                 end do
             end do
+            $:END_GPU_PARALLEL_LOOP()
         end if
-        if (bc_x%end <= -3) then
-            !$acc parallel loop collapse(2) gang vector default(present)
+        if (bc_x%end <= BC_GHOST_EXTRAP) then
+            $:GPU_PARALLEL_LOOP(collapse=2)
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end
                     grad_x%sf(m, k, l) = (3._wp*var%sf(m, k, l) - 4._wp*var%sf(m - 1, k, l) + var%sf(m - 2, k, l))/ &
                                          (x_cc(m) - x_cc(m - 2))
                 end do
             end do
+            $:END_GPU_PARALLEL_LOOP()
         end if
         if (n > 0) then
-            if (bc_y%beg <= -3 .and. bc_y%beg /= -13) then
-                !$acc parallel loop collapse(2) gang vector default(present)
+            if (bc_y%beg <= BC_GHOST_EXTRAP .and. bc_y%beg /= BC_NULL) then
+                $:GPU_PARALLEL_LOOP(collapse=2)
                 do l = idwbuff(3)%beg, idwbuff(3)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
                         grad_y%sf(j, 0, l) = (-3._wp*var%sf(j, 0, l) + 4._wp*var%sf(j, 1, l) - var%sf(j, 2, l))/ &
                                              (y_cc(2) - y_cc(0))
                     end do
                 end do
+                $:END_GPU_PARALLEL_LOOP()
             end if
-            if (bc_y%end <= -3) then
-                !$acc parallel loop collapse(2) gang vector default(present)
+            if (bc_y%end <= BC_GHOST_EXTRAP) then
+                $:GPU_PARALLEL_LOOP(collapse=2)
                 do l = idwbuff(3)%beg, idwbuff(3)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
                         grad_y%sf(j, n, l) = (3._wp*var%sf(j, n, l) - 4._wp*var%sf(j, n - 1, l) + var%sf(j, n - 2, l))/ &
                                              (y_cc(n) - y_cc(n - 2))
                     end do
                 end do
+                $:END_GPU_PARALLEL_LOOP()
             end if
             if (p > 0) then
-                if (bc_z%beg <= -3) then
-                    !$acc parallel loop collapse(2) gang vector default(present)
+                if (bc_z%beg <= BC_GHOST_EXTRAP) then
+                    $:GPU_PARALLEL_LOOP(collapse=2)
                     do k = idwbuff(2)%beg, idwbuff(2)%end
                         do j = idwbuff(1)%beg, idwbuff(1)%end
                             grad_z%sf(j, k, 0) = &
@@ -1439,9 +1493,10 @@ contains
                                 (z_cc(2) - z_cc(0))
                         end do
                     end do
+                    $:END_GPU_PARALLEL_LOOP()
                 end if
-                if (bc_z%end <= -3) then
-                    !$acc parallel loop collapse(2) gang vector default(present)
+                if (bc_z%end <= BC_GHOST_EXTRAP) then
+                    $:GPU_PARALLEL_LOOP(collapse=2)
                     do k = idwbuff(2)%beg, idwbuff(2)%end
                         do j = idwbuff(1)%beg, idwbuff(1)%end
                             grad_z%sf(j, k, p) = &
@@ -1449,13 +1504,14 @@ contains
                                 (z_cc(p) - z_cc(p - 2))
                         end do
                     end do
+                    $:END_GPU_PARALLEL_LOOP()
                 end if
             end if
         end if
 
     end subroutine s_compute_fd_gradient
 
-    subroutine s_finalize_viscous_module()
+    impure subroutine s_finalize_viscous_module()
 
         @:DEALLOCATE(Res_viscous)
 

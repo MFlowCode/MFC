@@ -40,7 +40,10 @@ module m_global_parameters
     integer :: n
     integer :: p
 
-    integer(8) :: nGlobal !< Global number of cells in the domain
+    !> @name Max and min number of cells in a direction of each combination of x-,y-, and z-
+    type(cell_num_bounds) :: cells_bounds
+
+    integer(kind=8) :: nGlobal !< Global number of cells in the domain
 
     integer :: m_glb, n_glb, p_glb !< Global number of cells in each direction
 
@@ -78,13 +81,16 @@ module m_global_parameters
     integer :: model_eqns            !< Multicomponent flow model
     logical :: relax                 !< activate phase change
     integer :: relax_model           !< Relax Model
-    real(wp) :: palpha_eps    !< trigger parameter for the p relaxation procedure, phase change model
-    real(wp) :: ptgalpha_eps  !< trigger parameter for the pTg relaxation procedure, phase change model
+    real(wp) :: palpha_eps           !< trigger parameter for the p relaxation procedure, phase change model
+    real(wp) :: ptgalpha_eps         !< trigger parameter for the pTg relaxation procedure, phase change model
     integer :: num_fluids            !< Number of different fluids present in the flow
     logical :: mpp_lim               !< Alpha limiter
     integer :: sys_size              !< Number of unknowns in the system of equations
-    integer :: weno_polyn     !< Degree of the WENO polynomials (polyn)
+    integer :: recon_type            !< Reconstruction Type
+    integer :: weno_polyn            !< Degree of the WENO polynomials (polyn)
+    integer :: muscl_polyn           !< Degree of the MUSCL polynomials (polyn)
     integer :: weno_order            !< Order of accuracy for the WENO reconstruction
+    integer :: muscl_order           !< Order of accuracy for the MUSCL reconstruction
     logical :: hypoelasticity        !< activate hypoelasticity
     logical :: hyperelasticity       !< activate hyperelasticity
     logical :: elasticity            !< elasticity modeling, true for hyper or hypo
@@ -95,6 +101,8 @@ module m_global_parameters
     logical :: pre_stress            !< activate pre_stressed domain
     logical :: cont_damage           !< continuum damage modeling
     logical :: hyper_cleaning        !< Hyperbolic cleaning for MHD
+    logical :: igr                   !< Use information geometric regularization
+    integer :: igr_order             !< IGR reconstruction order
     logical, parameter :: chemistry = .${chemistry}$. !< Chemistry modeling
 
     ! Annotations of the structure, i.e. the organization, of the state vectors
@@ -140,11 +148,17 @@ module m_global_parameters
     logical :: parallel_io !< Format of the data files
     logical :: file_per_process !< type of data output
     integer :: precision !< Precision of output files
+    logical :: down_sample !< Down-sample the output data
 
     logical :: mixlayer_vel_profile !< Set hyperbolic tangent streamwise velocity profile
     real(wp) :: mixlayer_vel_coef !< Coefficient for the hyperbolic tangent streamwise velocity profile
-    real(wp) :: mixlayer_domain !< Domain for the hyperbolic tangent streamwise velocity profile
     logical :: mixlayer_perturb !< Superimpose instability waves to surrounding fluid flow
+    integer :: mixlayer_perturb_nk  !< Number of Fourier modes for perturbation with mixlayer_perturb flag
+    real(wp) :: mixlayer_perturb_k0  !< Peak wavenumber of prescribed energy spectra with mixlayer_perturb flag
+                                     !! Default value (k0 = 0.4446) is most unstable mode obtained from linear stability analysis
+                                     !! See Michalke (1964, JFM) for details
+    logical :: simplex_perturb
+    type(simplex_noise_params) :: simplex_params
 
     real(wp) :: pi_fac !< Factor for artificial pi_inf
 
@@ -182,8 +196,6 @@ module m_global_parameters
 
 #endif
 
-    integer, private :: ierr
-
     ! Initial Condition Parameters
     integer :: num_patches     !< Number of patches composing initial condition
 
@@ -192,6 +204,12 @@ module m_global_parameters
     !! patches employed in the configuration of the initial condition. Note that
     !! the maximum allowable number of patches, num_patches_max, may be changed
     !! in the module m_derived_types.f90.
+
+    integer :: num_bc_patches  !< Number of boundary condition patches
+    logical :: bc_io !< whether or not to save BC data
+    type(bc_patch_parameters), dimension(num_bc_patches_max) :: patch_bc
+    !! Database of the boundary condition patch parameters for each of the patches
+    !! employed in the configuration of the boundary conditions
 
     ! Fluids Physical Parameters
     type(physical_parameters), dimension(num_fluids_max) :: fluid_pp !<
@@ -206,7 +224,7 @@ module m_global_parameters
     integer :: nb
     real(wp) :: R0ref
     real(wp) :: Ca, Web, Re_inv
-    real(wp), dimension(:), allocatable :: weight, R0, V0
+    real(wp), dimension(:), allocatable :: weight, R0
     logical :: bubbles_euler
     logical :: qbmm      !< Quadrature moment method
     integer :: nmom  !< Number of carried moments
@@ -242,7 +260,6 @@ module m_global_parameters
     real(wp) :: gamma_m, gamma_n, mu_n
     real(wp) :: poly_sigma
     integer :: dist_type !1 = binormal, 2 = lognormal-normal
-    integer :: R0_type   !1 = simpson
     !> @}
 
     !> @name Surface Tension Modeling
@@ -263,10 +280,6 @@ module m_global_parameters
     integer :: chemxb, chemxe
     !> @}
 
-    !> @ lagrangian solver parameters
-    logical :: rkck_adap_dt
-    !> @}
-
     integer, allocatable, dimension(:, :, :) :: logic_grid
 
     type(pres_field) :: pb
@@ -279,12 +292,14 @@ module m_global_parameters
     !! conditions data to march the solution in the physical computational domain
     !! to the next time-step.
 
+    logical :: fft_wrt
+
 contains
 
     !>  Assigns default values to user inputs prior to reading
         !!              them in. This allows for an easier consistency check of
         !!              these parameters once they are read from the input file.
-    subroutine s_assign_default_values_to_user_inputs
+    impure subroutine s_assign_default_values_to_user_inputs
 
         integer :: i !< Generic loop operator
 
@@ -302,6 +317,8 @@ contains
 
         ! Computational domain parameters
         m = dflt_int; n = 0; p = 0
+
+        call s_update_cell_bounds(cells_bounds, m, n, p)
 
         cyl_coord = .false.
 
@@ -336,7 +353,11 @@ contains
         palpha_eps = dflt_real
         ptgalpha_eps = dflt_real
         num_fluids = dflt_int
+        recon_type = WENO_TYPE
         weno_order = dflt_int
+        igr = .false.
+        igr_order = dflt_int
+        muscl_order = dflt_int
 
         hypoelasticity = .false.
         hyperelasticity = .false.
@@ -364,12 +385,14 @@ contains
         parallel_io = .false.
         file_per_process = .false.
         precision = 2
+        down_sample = .false.
         viscous = .false.
         bubbles_lagrange = .false.
         mixlayer_vel_profile = .false.
         mixlayer_vel_coef = 1._wp
-        mixlayer_domain = 1._wp
         mixlayer_perturb = .false.
+        mixlayer_perturb_nk = 100
+        mixlayer_perturb_k0 = 0.4446_wp
         perturb_flow = .false.
         perturb_flow_fluid = dflt_int
         perturb_flow_mag = dflt_real
@@ -378,6 +401,18 @@ contains
         fluid_rho = dflt_real
         elliptic_smoothing_iters = dflt_int
         elliptic_smoothing = .false.
+
+        fft_wrt = .false.
+
+        simplex_perturb = .false.
+        simplex_params%perturb_vel(:) = .false.
+        simplex_params%perturb_vel_freq(:) = dflt_real
+        simplex_params%perturb_vel_scale(:) = dflt_real
+        simplex_params%perturb_vel_offset(:, :) = dflt_real
+        simplex_params%perturb_dens(:) = .false.
+        simplex_params%perturb_dens_freq(:) = dflt_real
+        simplex_params%perturb_dens_scale(:) = dflt_real
+        simplex_params%perturb_dens_offset(:, :) = dflt_real
 
         ! Initial condition parameters
         num_patches = dflt_int
@@ -443,6 +478,19 @@ contains
             end if
         end do
 
+        num_bc_patches = 0
+        bc_io = .false.
+
+        do i = 1, num_bc_patches_max
+            patch_bc(i)%geometry = dflt_int
+            patch_bc(i)%type = dflt_int
+            patch_bc(i)%dir = dflt_int
+            patch_bc(i)%loc = dflt_int
+            patch_bc(i)%centroid(:) = dflt_real
+            patch_bc(i)%length(:) = dflt_real
+            patch_bc(i)%radius = dflt_real
+        end do
+
         ! Tait EOS
         rhoref = dflt_real
         pref = dflt_real
@@ -470,7 +518,6 @@ contains
         sigV = dflt_real
         rhoRV = 0._wp
         dist_type = dflt_int
-        R0_type = dflt_int
 
         R_n = dflt_real
         R_v = dflt_real
@@ -510,6 +557,21 @@ contains
             patch_ib(i)%model_filepath(:) = dflt_char
             patch_ib(i)%model_spc = num_ray
             patch_ib(i)%model_threshold = ray_tracing_threshold
+
+            ! Variables to handle moving imersed boundaries, defaulting to no movement
+            patch_ib(i)%moving_ibm = 0
+            patch_ib(i)%vel(:) = 0._wp
+            patch_ib(i)%angles(:) = 0._wp
+            patch_ib(i)%angular_vel(:) = 0._wp
+            patch_ib(i)%mass = dflt_real
+            patch_ib(i)%moment = dflt_real
+
+            ! sets values of a rotation matrix which can be used when calculating rotations
+            patch_ib(i)%rotation_matrix = 0._wp
+            patch_ib(i)%rotation_matrix(1, 1) = 1._wp
+            patch_ib(i)%rotation_matrix(2, 2) = 1._wp
+            patch_ib(i)%rotation_matrix(3, 3) = 1._wp
+            patch_ib(i)%rotation_matrix_inverse = patch_ib(i)%rotation_matrix
         end do
 
         ! Fluids physical parameters
@@ -527,10 +589,8 @@ contains
             fluid_pp(i)%qv = 0._wp
             fluid_pp(i)%qvp = 0._wp
             fluid_pp(i)%G = 0._wp
+            fluid_pp(i)%D_v = dflt_real
         end do
-
-        ! Lagrangian solver
-        rkck_adap_dt = .false.
 
         Bx0 = dflt_real
 
@@ -538,11 +598,15 @@ contains
 
     !> Computation of parameters, allocation procedures, and/or
         !! any other tasks needed to properly setup the module
-    subroutine s_initialize_global_parameters_module
+    impure subroutine s_initialize_global_parameters_module
 
         integer :: i, j, fac
 
-        weno_polyn = (weno_order - 1)/2
+        if (recon_type == WENO_TYPE) then
+            weno_polyn = (weno_order - 1)/2
+        elseif (recon_type == MUSCL_TYPE) then
+            muscl_polyn = muscl_order
+        end if
 
         ! Determining the layout of the state vectors and overall size of
         ! the system of equations, given the dimensionality and choice of
@@ -579,8 +643,22 @@ contains
             mom_idx%beg = cont_idx%end + 1
             mom_idx%end = cont_idx%end + num_vels
             E_idx = mom_idx%end + 1
-            adv_idx%beg = E_idx + 1
-            adv_idx%end = E_idx + num_fluids
+
+            if (igr) then
+                ! Volume fractions are stored in the indices immediately following
+                ! the energy equation. IGR tracks a total of (N-1) volume fractions
+                ! for N fluids, hence the "-1" in adv_idx%end. If num_fluids = 1
+                ! then adv_idx%end < adv_idx%beg, which skips all loops over the
+                ! volume fractions since there is no volume fraction to track
+                adv_idx%beg = E_idx + 1
+                adv_idx%end = E_idx + num_fluids - 1
+            else
+                ! Volume fractions are stored in the indices immediately following
+                ! the energy equation. WENO/MUSCL + Riemann tracks a total of (N)
+                ! volume fractions for N fluids, hence the lack of  "-1" in adv_idx%end
+                adv_idx%beg = E_idx + 1
+                adv_idx%end = E_idx + num_fluids
+            end if
 
             sys_size = adv_idx%end
 
@@ -611,7 +689,7 @@ contains
                     sys_size = n_idx
                 end if
 
-                allocate (weight(nb), R0(nb), V0(nb))
+                allocate (weight(nb), R0(nb))
                 allocate (bub_idx%rs(nb), bub_idx%vs(nb))
                 allocate (bub_idx%ps(nb), bub_idx%ms(nb))
 
@@ -652,11 +730,7 @@ contains
                 if (nb == 1) then
                     weight(:) = 1._wp
                     R0(:) = 1._wp
-                    V0(:) = 1._wp
-                else if (nb > 1) then
-                    V0(:) = 1._wp
-                    !R0 and weight initialized in s_simpson
-                else
+                else if (nb < 1) then
                     stop 'Invalid value of nb'
                 end if
 
@@ -731,7 +805,7 @@ contains
 
                 allocate (bub_idx%rs(nb), bub_idx%vs(nb))
                 allocate (bub_idx%ps(nb), bub_idx%ms(nb))
-                allocate (weight(nb), R0(nb), V0(nb))
+                allocate (weight(nb), R0(nb))
 
                 do i = 1, nb
                     if (.not. polytropic) then
@@ -752,10 +826,7 @@ contains
                 if (nb == 1) then
                     weight(:) = 1._wp
                     R0(:) = 1._wp
-                    V0(:) = 0._wp
-                else if (nb > 1) then
-                    V0(:) = 1._wp
-                else
+                else if (nb < 1) then
                     stop 'Invalid value of nb'
                 end if
 
@@ -849,10 +920,11 @@ contains
         chemxb = species_idx%beg
         chemxe = species_idx%end
 
-        call s_configure_coordinate_bounds(weno_polyn, buff_size, &
+        call s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, &
+                                           igr_order, buff_size, &
                                            idwint, idwbuff, viscous, &
                                            bubbles_lagrange, m, n, p, &
-                                           num_dims)
+                                           num_dims, igr, ib)
 
 #ifdef MFC_MPI
 
@@ -864,10 +936,12 @@ contains
             allocate (MPI_IO_DATA%var(1:sys_size))
         end if
 
-        do i = 1, sys_size
-            allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
-            MPI_IO_DATA%var(i)%sf => null()
-        end do
+        if (.not. down_sample) then
+            do i = 1, sys_size
+                allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
+                MPI_IO_DATA%var(i)%sf => null()
+            end do
+        end if
         if (qbmm .and. .not. polytropic) then
             do i = sys_size + 1, sys_size + 2*nb*4
                 allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
@@ -900,11 +974,17 @@ contains
             grid_geometry = 3
         end if
 
-        allocate (logic_grid(0:m, 0:n, 0:p))
+        if (.not. igr) then
+            allocate (logic_grid(0:m, 0:n, 0:p))
+        end if
 
     end subroutine s_initialize_global_parameters_module
 
-    subroutine s_initialize_parallel_io
+    impure subroutine s_initialize_parallel_io
+
+#ifdef MFC_MPI
+        integer :: ierr !< Generic flag used to identify and report MPI errors
+#endif
 
         num_dims = 1 + min(1, n) + min(1, p)
 
@@ -937,7 +1017,7 @@ contains
 
     end subroutine s_initialize_parallel_io
 
-    subroutine s_finalize_global_parameters_module
+    impure subroutine s_finalize_global_parameters_module
 
         integer :: i
 
@@ -964,8 +1044,6 @@ contains
             deallocate (MPI_IO_DATA%var)
             deallocate (MPI_IO_DATA%view)
         end if
-
-        if (ib) deallocate (MPI_IO_IB_DATA%var%sf)
 
 #endif
 

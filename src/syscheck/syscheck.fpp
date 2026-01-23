@@ -30,6 +30,15 @@
 #endif
 #:enddef ACCC
 
+#:def OMPC(*args)
+#ifdef MFC_OpenMP
+    @:LOG("[TEST] OMP: ${','.join([ x.replace("'", '') for x in args ])}$")
+    ${','.join([ x.replace("'", '') for x in args ])}$
+#else
+    @:LOG("[SKIP] OMP: ${','.join([ x.replace("'", '') for x in args ])}$")
+#endif
+#:enddef OMPC
+
 #:def MPI(*args)
 #ifdef MFC_MPI
     ${','.join([ x.replace("'", '') for x in args ])}$
@@ -42,10 +51,17 @@
 #endif
 #:enddef ACC
 
+#:def OMP(*args)
+#ifdef MFC_OpenMP
+    ${','.join([ x.replace("'", '') for x in args ])}$
+#endif
+#:enddef OMP
+
 program syscheck
 
     @:MPI(use mpi)
     @:ACC(use openacc)
+    @:OMP(use omp_lib)
 
     implicit none
 
@@ -55,6 +71,7 @@ program syscheck
     @:ACC(integer :: i, num_devices)
     @:ACC(real(8), allocatable, dimension(:) :: arr)
     @:ACC(integer, parameter :: N = 100)
+    @:OMP(integer :: num_devices_omp)
 
     @:MPIC(call mpi_init(ierr))
     @:MPIC(call mpi_comm_rank(MPI_COMM_WORLD, rank, ierr))
@@ -75,6 +92,10 @@ program syscheck
     @:ACC(end do)
     @:ACCC('!$acc update host(arr(1:N))')
     @:ACCC('!$acc exit data delete(arr)')
+
+    @:OMPC('num_devices_omp = omp_get_num_devices()')
+    @:OMPC(call assert(num_devices_omp > 0))
+    @:OMPC(call omp_set_default_device(mod(rank, nRanks)))
 
     @:MPIC(call mpi_barrier(MPI_COMM_WORLD, ierr))
     @:MPIC(call mpi_finalize(ierr))

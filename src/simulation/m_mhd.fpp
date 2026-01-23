@@ -21,29 +21,27 @@ module m_mhd
  s_finalize_mhd_clean_module, &
  s_compute_mhd_powell_rhs
 
-    real(wp), allocatable, dimension(:, :, :) :: du_dx, du_dy, du_dz
-    real(wp), allocatable, dimension(:, :, :) :: dv_dx, dv_dy, dv_dz
-    real(wp), allocatable, dimension(:, :, :) :: dw_dx, dw_dy, dw_dz
-    !$acc declare create(du_dx,du_dy,du_dz,dv_dx,dv_dy,dv_dz,dw_dx,dw_dy,dw_dz)
+    real(wp), allocatable, dimension(:, :, :) :: du_dx_mhd, du_dy_mhd, du_dz_mhd
+    real(wp), allocatable, dimension(:, :, :) :: dv_dx_mhd, dv_dy_mhd, dv_dz_mhd
+    real(wp), allocatable, dimension(:, :, :) :: dw_dx_mhd, dw_dy_mhd, dw_dz_mhd
+    $:GPU_DECLARE(create='[du_dx_mhd,du_dy_mhd,du_dz_mhd,dv_dx_mhd,dv_dy_mhd,dv_dz_mhd,dw_dx_mhd,dw_dy_mhd,dw_dz_mhd]')
 
     real(wp), allocatable, dimension(:, :) :: fd_coeff_x_h
     real(wp), allocatable, dimension(:, :) :: fd_coeff_y_h
     real(wp), allocatable, dimension(:, :) :: fd_coeff_z_h
-    !$acc declare create(fd_coeff_x_h,fd_coeff_y_h,fd_coeff_z_h)
+    $:GPU_DECLARE(create='[fd_coeff_x_h,fd_coeff_y_h,fd_coeff_z_h]')
 
 contains
 
     subroutine s_initialize_mhd_clean_module
 
-        integer :: i, k, r
-
         ! Additional safety check beyond m_checker
         if (n == 0) call s_mpi_abort('Fatal Error: Powell correction is not applicable for 1D')
 
-        @:ALLOCATE(du_dx(0:m,0:n,0:p), dv_dx(0:m,0:n,0:p), dw_dx(0:m,0:n,0:p))
-        @:ALLOCATE(du_dy(0:m,0:n,0:p), dv_dy(0:m,0:n,0:p), dw_dy(0:m,0:n,0:p))
+        @:ALLOCATE(du_dx_mhd(0:m,0:n,0:p), dv_dx_mhd(0:m,0:n,0:p), dw_dx_mhd(0:m,0:n,0:p))
+        @:ALLOCATE(du_dy_mhd(0:m,0:n,0:p), dv_dy_mhd(0:m,0:n,0:p), dw_dy_mhd(0:m,0:n,0:p))
         if (p > 0) then
-            @:ALLOCATE(dw_dx(0:m,0:n,0:p), dw_dy(0:m,0:n,0:p), dw_dz(0:m,0:n,0:p))
+            @:ALLOCATE(dw_dx_mhd(0:m,0:n,0:p), dw_dy_mhd(0:m,0:n,0:p), dw_dz_mhd(0:m,0:n,0:p))
         end if
 
         @:ALLOCATE(fd_coeff_x_h(-fd_number:fd_number, 0:m))
@@ -54,12 +52,12 @@ contains
 
         ! Computing centered finite difference coefficients
         call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x_h, buff_size, fd_number, fd_order)
-        !$acc update device(fd_coeff_x_h)
+        $:GPU_UPDATE(device='[fd_coeff_x_h]')
         call s_compute_finite_difference_coefficients(n, y_cc, fd_coeff_y_h, buff_size, fd_number, fd_order)
-        !$acc update device(fd_coeff_y_h)
+        $:GPU_UPDATE(device='[fd_coeff_y_h]')
         if (p > 0) then
             call s_compute_finite_difference_coefficients(p, z_cc, fd_coeff_z_h, buff_size, fd_number, fd_order)
-            !$acc update device(fd_coeff_z_h)
+            $:GPU_UPDATE(device='[fd_coeff_z_h]')
         end if
 
     end subroutine s_initialize_mhd_clean_module
@@ -80,21 +78,25 @@ contains
         real(wp), dimension(3) :: v, B
         real(wp) :: divB, vdotB
 
-        !$acc parallel loop collapse(3) gang vector default(present) &
-        !$acc private(v, B)
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[k,l,q,v,B,r,divB,vdotB]')
         do q = 0, p
             do l = 0, n
                 do k = 0, m
 
-                    if (idir == 1) then
-                        divB = 1._wp/dx(k)* &
-                               (flux_gsrc_n(1)%sf(k, l, q) - flux_gsrc_n(1)%sf(k - 1, l, q))
-                    else if (idir == 2) then
-                        divB = 1._wp/dy(l)* &
-                               (flux_gsrc_n(1)%sf(k, l, q) - flux_gsrc_n(1)%sf(k, l - 1, q))
-                    else if (idir == 3) then
-                        divB = 1._wp/dz(l)* &
-                               (flux_gsrc_n(1)%sf(k, l, q) - flux_gsrc_n(1)%sf(k, l, q - 1))
+                    divB = 0._wp
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do r = -fd_number, fd_number
+                        divB = divB + q_prim_vf(B_idx%beg)%sf(k + r, l, q)*fd_coeff_x_h(r, k)
+                    end do
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do r = -fd_number, fd_number
+                        divB = divB + q_prim_vf(B_idx%beg + 1)%sf(k, l + r, q)*fd_coeff_y_h(r, l)
+                    end do
+                    if (p > 0) then
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do r = -fd_number, fd_number
+                            divB = divB + q_prim_vf(B_idx%beg + 2)%sf(k, l, q + r)*fd_coeff_z_h(r, q)
+                        end do
                     end if
 
                     v(1) = q_prim_vf(momxb)%sf(k, l, q)
@@ -129,18 +131,18 @@ contains
                 end do
             end do
         end do
-        !$acc end parallel loop
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_compute_mhd_powell_rhs
 
     subroutine s_finalize_mhd_clean_module
 
-        @:DEALLOCATE(du_dx, dv_dx, dw_dx)
+        @:DEALLOCATE(du_dx_mhd, dv_dx_mhd, dw_dx_mhd)
         @:DEALLOCATE(fd_coeff_x_h)
-        @:DEALLOCATE(du_dy, dv_dy, dw_dy)
+        @:DEALLOCATE(du_dy_mhd, dv_dy_mhd, dw_dy_mhd)
         @:DEALLOCATE(fd_coeff_y_h)
         if (p > 0) then
-            @:DEALLOCATE(dw_dx, dw_dy, dw_dz)
+            @:DEALLOCATE(dw_dx_mhd, dw_dy_mhd, dw_dz_mhd)
             @:DEALLOCATE(fd_coeff_z_h)
         end if
 

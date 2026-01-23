@@ -1,0 +1,18 @@
+This file was created on 2025-09-23 21:50:08.684640.
+
+mfc.sh:
+
+    Invocation: test -o Chemistry --generate -j10
+    Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No & single=No & fastmath=No
+    Git:        34497cd90a64e432495bfdb188156789c7516337 on Diffusion (dirty)
+
+CPU:
+
+    CPU Info:
+    From sysctl -a 
+    machdep.cpu.cores_per_package: 8
+    machdep.cpu.core_count: 8
+    machdep.cpu.logical_per_package: 8
+    machdep.cpu.thread_count: 8
+    machdep.cpu.brand_string: Apple M3
+

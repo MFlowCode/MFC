@@ -20,6 +20,8 @@ module m_grid
 
     use m_mpi_proxy             ! Message passing interface (MPI) module proxy
 
+    use m_helper_basic         !< Functions to compare floating point numbers
+
 #ifdef MFC_MPI
     use mpi                     ! Message passing interface (MPI) module
 #endif
@@ -35,7 +37,7 @@ module m_grid
 
     abstract interface
 
-        subroutine s_generate_abstract_grid
+        impure subroutine s_generate_abstract_grid
 
         end subroutine s_generate_abstract_grid
 
@@ -50,7 +52,7 @@ contains
         !!              inputted by the user. The grid information is stored in
         !!              the grid variables containing coordinates of the cell-
         !!              centers and cell-boundaries.
-    subroutine s_generate_serial_grid
+    impure subroutine s_generate_serial_grid
 
         ! Generic loop iterator
         integer :: i, j             !< generic loop operators
@@ -60,7 +62,7 @@ contains
         dx = (x_domain%end - x_domain%beg)/real(m + 1, wp)
 
         do i = 0, m
-            x_cc(i) = x_domain%beg + 5e-1_wp*dx*real(2*i + 1, wp)
+            x_cc(i) = x_domain%beg + 5.e-1_wp*dx*real(2*i + 1, wp)
             x_cb(i - 1) = x_domain%beg + dx*real(i, wp)
         end do
 
@@ -83,7 +85,7 @@ contains
             end do
             x_cb = x_cb*length
 
-            x_cc = (x_cb(0:m) + x_cb(-1:m - 1))/2._wp
+            x_cc(0:m) = (x_cb(0:m) + x_cb(-1:m - 1))/2._wp
 
             dx = minval(x_cb(0:m) - x_cb(-1:m - 1))
             print *, 'Stretched grid: min/max x grid: ', minval(x_cc(:)), maxval(x_cc(:))
@@ -94,12 +96,12 @@ contains
         ! Grid Generation in the y-direction
         if (n == 0) return
 
-        if (grid_geometry == 2 .and. y_domain%beg == 0.0_wp) then
+        if (grid_geometry == 2 .and. f_approx_equal(y_domain%beg, 0.0_wp)) then
             !IF (grid_geometry == 2) THEN
 
             dy = (y_domain%end - y_domain%beg)/real(2*n + 1, wp)
 
-            y_cc(0) = y_domain%beg + 5e-1_wp*dy
+            y_cc(0) = y_domain%beg + 5.e-1_wp*dy
             y_cb(-1) = y_domain%beg
 
             do i = 1, n
@@ -112,7 +114,7 @@ contains
             dy = (y_domain%end - y_domain%beg)/real(n + 1, wp)
 
             do i = 0, n
-                y_cc(i) = y_domain%beg + 5e-1_wp*dy*real(2*i + 1, wp)
+                y_cc(i) = y_domain%beg + 5.e-1_wp*dy*real(2*i + 1, wp)
                 y_cb(i - 1) = y_domain%beg + dy*real(i, wp)
             end do
 
@@ -137,7 +139,7 @@ contains
             end do
 
             y_cb = y_cb*length
-            y_cc = (y_cb(0:n) + y_cb(-1:n - 1))/2._wp
+            y_cc(0:m) = (y_cb(0:n) + y_cb(-1:n - 1))/2._wp
 
             dy = minval(y_cb(0:n) - y_cb(-1:n - 1))
 
@@ -151,7 +153,7 @@ contains
         dz = (z_domain%end - z_domain%beg)/real(p + 1, wp)
 
         do i = 0, p
-            z_cc(i) = z_domain%beg + 5e-1_wp*dz*real(2*i + 1, wp)
+            z_cc(i) = z_domain%beg + 5.e-1_wp*dz*real(2*i + 1, wp)
             z_cb(i - 1) = z_domain%beg + dz*real(i, wp)
         end do
 
@@ -174,7 +176,7 @@ contains
             end do
 
             z_cb = z_cb*length
-            z_cc = (z_cb(0:p) + z_cb(-1:p - 1))/2._wp
+            z_cc(0:m) = (z_cb(0:p) + z_cb(-1:p - 1))/2._wp
 
             dz = minval(z_cb(0:p) - z_cb(-1:p - 1))
 
@@ -189,7 +191,7 @@ contains
         !!              inputted by the user. The grid information is stored in
         !!              the grid variables containing coordinates of the cell-
         !!              centers and cell-boundaries.
-    subroutine s_generate_parallel_grid
+    impure subroutine s_generate_parallel_grid
 
 #ifdef MFC_MPI
 
@@ -241,7 +243,7 @@ contains
         ! Grid generation in the y-direction
         if (n_glb > 0) then
 
-            if (grid_geometry == 2 .and. y_domain%beg == 0.0_wp) then
+            if (grid_geometry == 2 .and. f_approx_equal(y_domain%beg, 0.0_wp)) then
                 dy = (y_domain%end - y_domain%beg)/real(2*n_glb + 1, wp)
                 y_cb_glb(-1) = y_domain%beg
                 do i = 1, n_glb
@@ -338,7 +340,7 @@ contains
 
     !> Computation of parameters, allocation procedures, and/or
         !!              any other tasks needed to properly setup the module
-    subroutine s_initialize_grid_module
+    impure subroutine s_initialize_grid_module
 
         if (parallel_io .neqv. .true.) then
             s_generate_grid => s_generate_serial_grid
@@ -349,7 +351,7 @@ contains
     end subroutine s_initialize_grid_module
 
     !> Deallocation procedures for the module
-    subroutine s_finalize_grid_module
+    impure subroutine s_finalize_grid_module
 
         s_generate_grid => null()
 

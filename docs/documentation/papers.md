@@ -1,5 +1,19 @@
 # Papers
 
+MFC 5.0: An exascale many-physics flow solver. [<b>Wilfong, B., Le Berre, H., Radhakrishnan, A.,</b> Gupta, A., Vaca-Revelo, D., Adam , D., Yu, H., Lee, H., Chreim, J. R., Carcana Barbosa, M., Zhang, Y., Cisneros-Garibay, E., Gnanaskandan, A., Rodriguez Jr., M., Budiardja, R. D., Abbott, S., Colonius, T., & Bryngelson, S. H. (2025) MFC 5.0: An exascale many-physics flow solver. arXiv:2503.07953. <b>Equal contribution.</b>](https://doi.org/10.48550/arXiv.2503.07953)
+
+```bibtex
+@article{Wilfong_2025,
+  author = {Wilfong, Benjamin and {Le Berre}, Henry and Radhakrishnan, Anand and Gupta, Ansh and Vaca-Revelo, Diego and Adam, Dimitrios and Yu, Haocheng and Lee, Hyeoksu and Chreim, Jose Rodolfo and {Carcana Barbosa}, Mirelys and Zhang, Yanjun and Cisneros-Garibay, Esteban and Gnanaskandan, Aswin and {Rodriguez Jr.}, Mauro and Budiardja, Reuben D. and Abbott, Stephen and Colonius, Tim and Bryngelson, Spencer H.},
+  title = {{MFC 5.0: A}n exascale many-physics flow solver},
+  journal = {arXiv preprint arXiv:2503.07953},
+  year = {2025},
+  doi = {10.48550/arXiv.2503.07953}
+}
+```
+
+<br/>
+
 MFC: An open-source high-order multi-component, multi-phase, and multi-scale compressible flow solver. [S. H. Bryngelson, K. Schmidmayer, V. Coralic, K. Maeda, J. Meng, T. Colonius (2021) Computer Physics Communications **266**, 107396](https://doi.org/10.1016/j.cpc.2020.107396)
 
 ```bibtex

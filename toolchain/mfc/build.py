@@ -6,6 +6,7 @@ from .common  import MFCException, system, delete_directory, create_directory, \
                      format_list_to_string
 from .state   import ARG, CFG
 from .run     import input
+from .state   import gpuConfigOptions
 
 @dataclasses.dataclass
 class MFCTarget:
@@ -17,7 +18,7 @@ class MFCTarget:
 
         def compute(self) -> typing.Set:
             r  = self.all[:]
-            r += self.gpu[:] if ARG("gpu") else self.cpu[:]
+            r += self.gpu[:] if (ARG("gpu") != gpuConfigOptions.NONE.value) else self.cpu[:]
 
             return r
 
@@ -63,6 +64,9 @@ class MFCTarget:
     def get_install_dirpath(self, case: Case ) -> str:
         # The install directory is located <root>/build/install/<slug>
         return os.sep.join([os.getcwd(), "build", "install", self.get_slug(case)])
+
+    def get_home_dirpath(self) -> str:
+        return os.sep.join([os.getcwd()])
 
     def get_install_binpath(self, case: Case ) -> str:
         # <root>/install/<slug>/bin/<target>
@@ -133,7 +137,8 @@ class MFCTarget:
             # Location prefix to install bin/, lib/, include/, etc.
             # See: https://cmake.org/cmake/help/latest/command/install.html.
             f"-DCMAKE_INSTALL_PREFIX={install_dirpath}",
-            f"-DMFC_SINGLE_PRECISION={'ON' if ARG('single') else 'OFF'}"
+            f"-DMFC_SINGLE_PRECISION={'ON' if (ARG('single') or ARG('mixed')) else 'OFF'}",
+            f"-DMFC_MIXED_PRECISION={'ON' if ARG('mixed') else 'OFF'}"
         ]
 
         if ARG("verbose"):
@@ -141,9 +146,13 @@ class MFCTarget:
 
         if not self.isDependency:
             flags.append(f"-DMFC_MPI={    'ON' if ARG('mpi') else 'OFF'}")
-            flags.append(f"-DMFC_OpenACC={'ON' if ARG('gpu') else 'OFF'}")
+            # flags.append(f"-DMFC_OpenACC={'ON' if ARG('acc') else 'OFF'}")
+            # flags.append(f"-DMFC_OpenMP={'ON' if ARG('mp') else 'OFF'}")
+            flags.append(f"-DMFC_OpenACC={'ON' if (ARG('gpu') == gpuConfigOptions.ACC.value) else 'OFF'}")
+            flags.append(f"-DMFC_OpenMP={'ON' if (ARG('gpu') == gpuConfigOptions.MP.value) else 'OFF'}")
             flags.append(f"-DMFC_GCov={   'ON' if ARG('gcov') else 'OFF'}")
             flags.append(f"-DMFC_Unified={'ON' if ARG('unified') else 'OFF'}")
+            flags.append(f"-DMFC_Fastmath={'ON' if ARG('fastmath') else 'OFF'}")
 
         command = ["cmake"] + flags + ["-S", cmake_dirpath, "-B", build_dirpath]
 
@@ -184,14 +193,15 @@ class MFCTarget:
 FFTW          = MFCTarget('fftw',          ['-DMFC_FFTW=ON'],          True,  False, False, MFCTarget.Dependencies([], [], []), -1)
 HDF5          = MFCTarget('hdf5',          ['-DMFC_HDF5=ON'],          True,  False, False, MFCTarget.Dependencies([], [], []), -1)
 SILO          = MFCTarget('silo',          ['-DMFC_SILO=ON'],          True,  False, False, MFCTarget.Dependencies([HDF5], [], []), -1)
+LAPACK        = MFCTarget('lapack',        ['-DMFC_LAPACK=ON'],        True,  False, False, MFCTarget.Dependencies([],[],[]), -1)
 HIPFORT       = MFCTarget('hipfort',       ['-DMFC_HIPFORT=ON'],       True,  False, False, MFCTarget.Dependencies([], [], []), -1)
 PRE_PROCESS   = MFCTarget('pre_process',   ['-DMFC_PRE_PROCESS=ON'],   False, True,  False, MFCTarget.Dependencies([], [], []), 0)
 SIMULATION    = MFCTarget('simulation',    ['-DMFC_SIMULATION=ON'],    False, True,  False, MFCTarget.Dependencies([], [FFTW], [HIPFORT]), 1)
-POST_PROCESS  = MFCTarget('post_process',  ['-DMFC_POST_PROCESS=ON'],  False, True,  False, MFCTarget.Dependencies([FFTW, HDF5, SILO], [], []), 2)
+POST_PROCESS  = MFCTarget('post_process',  ['-DMFC_POST_PROCESS=ON'],  False, True,  False, MFCTarget.Dependencies([FFTW, HDF5, SILO, LAPACK], [], []), 2)
 SYSCHECK      = MFCTarget('syscheck',      ['-DMFC_SYSCHECK=ON'],      False, False, True,  MFCTarget.Dependencies([], [], [HIPFORT]), -1)
 DOCUMENTATION = MFCTarget('documentation', ['-DMFC_DOCUMENTATION=ON'], False, False, False, MFCTarget.Dependencies([], [], []), -1)
 
-TARGETS = { FFTW, HDF5, SILO, HIPFORT, PRE_PROCESS, SIMULATION, POST_PROCESS, SYSCHECK, DOCUMENTATION }
+TARGETS = { FFTW, HDF5, SILO, LAPACK, HIPFORT, PRE_PROCESS, SIMULATION, POST_PROCESS, SYSCHECK, DOCUMENTATION }
 
 DEFAULT_TARGETS    = { target for target in TARGETS if target.isDefault }
 REQUIRED_TARGETS   = { target for target in TARGETS if target.isRequired }

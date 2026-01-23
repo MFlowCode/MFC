@@ -23,46 +23,48 @@ module m_acoustic_src
     private; public :: s_initialize_acoustic_src, s_precalculate_acoustic_spatial_sources, s_acoustic_src_calculations
 
     integer, allocatable, dimension(:) :: pulse, support
-    !$acc declare create(pulse, support)
+    $:GPU_DECLARE(create='[pulse,support]')
 
     logical, allocatable, dimension(:) :: dipole
-    !$acc declare create(dipole)
+    $:GPU_DECLARE(create='[dipole]')
 
     real(wp), allocatable, target, dimension(:, :) :: loc_acoustic
-    !$acc declare create(loc_acoustic)
+    $:GPU_DECLARE(create='[loc_acoustic]')
 
-    real(wp), allocatable, dimension(:) :: mag, length, height, wavelength, frequency, gauss_sigma_dist, gauss_sigma_time, npulse, dir, delay
-    !$acc declare create(mag, length, height, wavelength, frequency, gauss_sigma_dist, gauss_sigma_time, npulse, dir, delay)
+    real(wp), allocatable, dimension(:) :: mag, length, height, wavelength, frequency
+    real(wp), allocatable, dimension(:) :: gauss_sigma_dist, gauss_sigma_time, npulse, dir, delay
+    $:GPU_DECLARE(create='[mag,length,height,wavelength,frequency]')
+    $:GPU_DECLARE(create='[gauss_sigma_dist,gauss_sigma_time,npulse,dir,delay]')
 
     real(wp), allocatable, dimension(:) :: foc_length, aperture
-    !$acc declare create(foc_length, aperture)
+    $:GPU_DECLARE(create='[foc_length,aperture]')
 
     real(wp), allocatable, dimension(:) :: element_spacing_angle, element_polygon_ratio, rotate_angle
-    !$acc declare create(element_spacing_angle, element_polygon_ratio, rotate_angle)
+    $:GPU_DECLARE(create='[element_spacing_angle,element_polygon_ratio,rotate_angle]')
 
     real(wp), allocatable, dimension(:) :: bb_bandwidth, bb_lowest_freq
-    !$acc declare create(bb_bandwidth, bb_lowest_freq)
+    $:GPU_DECLARE(create='[bb_bandwidth,bb_lowest_freq]')
 
     integer, allocatable, dimension(:) :: num_elements, element_on, bb_num_freq
-    !$acc declare create(num_elements, element_on, bb_num_freq)
+    $:GPU_DECLARE(create='[num_elements,element_on,bb_num_freq]')
 
     !> @name Acoustic source terms
     !> @{
     real(wp), allocatable, dimension(:, :, :) :: mass_src, e_src
     real(wp), allocatable, dimension(:, :, :, :) :: mom_src
     !> @}
-    !$acc declare create(mass_src, e_src, mom_src)
+    $:GPU_DECLARE(create='[mass_src,e_src,mom_src]')
 
     integer, dimension(:), allocatable :: source_spatials_num_points !< Number of non-zero source grid points for each source
-    !$acc declare create(source_spatials_num_points)
+    $:GPU_DECLARE(create='[source_spatials_num_points]')
 
     type(source_spatial_type), dimension(:), allocatable :: source_spatials !< Data of non-zero source grid points for each source
-    !$acc declare create(source_spatials)
+    $:GPU_DECLARE(create='[source_spatials]')
 
 contains
 
     !> This subroutine initializes the acoustic source module
-    subroutine s_initialize_acoustic_src
+    impure subroutine s_initialize_acoustic_src
         integer :: i, j !< generic loop variables
 
         @:ALLOCATE(loc_acoustic(1:3, 1:num_source), mag(1:num_source), dipole(1:num_source), support(1:num_source), length(1:num_source), height(1:num_source), wavelength(1:num_source), frequency(1:num_source), gauss_sigma_dist(1:num_source), gauss_sigma_time(1:num_source), foc_length(1:num_source), aperture(1:num_source), npulse(1:num_source), pulse(1:num_source), dir(1:num_source), delay(1:num_source), element_polygon_ratio(1:num_source), rotate_angle(1:num_source), element_spacing_angle(1:num_source), num_elements(1:num_source), element_on(1:num_source), bb_num_freq(1:num_source), bb_bandwidth(1:num_source), bb_lowest_freq(1:num_source))
@@ -108,7 +110,12 @@ contains
                 delay(i) = acoustic(i)%delay
             end if
         end do
-        !$acc update device(loc_acoustic, mag, dipole, support, length, height, wavelength, frequency, gauss_sigma_dist, gauss_sigma_time, foc_length, aperture, npulse, pulse, dir, delay, element_polygon_ratio, rotate_angle, element_spacing_angle, num_elements, element_on, bb_num_freq, bb_bandwidth, bb_lowest_freq)
+        $:GPU_UPDATE(device='[loc_acoustic,mag,dipole,support,length, &
+            & height,wavelength,frequency,gauss_sigma_dist, &
+            & gauss_sigma_time,foc_length,aperture,npulse,pulse, &
+            & dir,delay,element_polygon_ratio,rotate_angle, &
+            & element_spacing_angle,num_elements,element_on, &
+            & bb_num_freq,bb_bandwidth,bb_lowest_freq]')
 
         @:ALLOCATE(mass_src(0:m, 0:n, 0:p))
         @:ALLOCATE(mom_src(1:num_vels, 0:m, 0:n, 0:p))
@@ -121,7 +128,7 @@ contains
     !! @param q_prim_vf Primitive variables
     !! @param t_step Current time step
     !! @param rhs_vf rhs variables
-    subroutine s_acoustic_src_calculations(q_cons_vf, q_prim_vf, t_step, rhs_vf)
+    impure subroutine s_acoustic_src_calculations(q_cons_vf, q_prim_vf, t_step, rhs_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf !<
         !! This variable contains the WENO-reconstructed values of the cell-average
@@ -137,7 +144,7 @@ contains
 
         integer, intent(in) :: t_step
 
-        real(wp) :: myalpha(num_fluids), myalpha_rho(num_fluids)
+        real(wp), dimension(num_fluids) :: myalpha, myalpha_rho
         real(wp) :: myRho, B_tait
         real(wp) :: sim_time, c, small_gamma
         real(wp) :: frequency_local, gauss_sigma_time_local
@@ -158,9 +165,8 @@ contains
         integer, parameter :: mass_label = 1, mom_label = 2
 
         sim_time = t_step*dt
-        if (time_stepper == 4) sim_time = rkck_time_tmp ! Probably create a time_stepper == 5 for the rkck stepper
 
-        !$acc parallel loop collapse(3) gang vector default(present)
+        $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -172,156 +178,159 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
         ! Keep outer loop sequel because different sources can have very different number of points
         do ai = 1, num_source
             ! Skip if the pulse has not started yet for sine and square waves
-            if (sim_time < delay(ai) .and. (pulse(ai) == 1 .or. pulse(ai) == 3)) cycle
+            if (.not. (sim_time < delay(ai) .and. (pulse(ai) == 1 .or. pulse(ai) == 3))) then
 
-            ! Decide if frequency need to be converted from wavelength
-            freq_conv_flag = f_is_default(frequency(ai))
-            gauss_conv_flag = f_is_default(gauss_sigma_time(ai))
+                ! Decide if frequency need to be converted from wavelength
+                freq_conv_flag = f_is_default(frequency(ai))
+                gauss_conv_flag = f_is_default(gauss_sigma_time(ai))
 
-            num_points = source_spatials_num_points(ai) ! Use scalar to force firstprivate to prevent GPU bug
+                num_points = source_spatials_num_points(ai) ! Use scalar to force firstprivate to prevent GPU bug
 
-            ! Calculate the broadband source
-            period_BB = 0._wp
-            sl_BB = 0._wp
-            ffre_BB = 0._wp
-            sum_BB = 0._wp
+                ! Calculate the broadband source
+                period_BB = 0._wp
+                sl_BB = 0._wp
+                ffre_BB = 0._wp
+                sum_BB = 0._wp
 
-            ! Allocate buffers for random phase shift
-            allocate (phi_rn(1:bb_num_freq(ai)))
+                ! Allocate buffers for random phase shift
+                allocate (phi_rn(1:bb_num_freq(ai)))
+                phi_rn(1:bb_num_freq(ai)) = 0._wp
 
-            if (pulse(ai) == 4) then
-                call random_number(phi_rn(1:bb_num_freq(ai)))
-                ! Ensure all the ranks have the same random phase shift
-                call s_mpi_send_random_number(phi_rn, bb_num_freq(ai))
-            end if
+                if (pulse(ai) == 4) then
+                    call random_number(phi_rn(1:bb_num_freq(ai)))
+                    ! Ensure all the ranks have the same random phase shift
+                    call s_mpi_send_random_number(phi_rn, bb_num_freq(ai))
+                end if
 
-            !$acc loop reduction(+:sum_BB)
-            do k = 1, bb_num_freq(ai)
-                ! Acoustic period of the wave at each discrete frequency
-                period_BB = 1._wp/(bb_lowest_freq(ai) + k*bb_bandwidth(ai))
-                ! Spectral level at each frequency
-                sl_BB = broadband_spectral_level_constant*mag(ai) + k*mag(ai)/broadband_spectral_level_growth_rate
-                ! Source term corresponding to each frequencies
-                ffre_BB = sqrt((2._wp*sl_BB*bb_bandwidth(ai)))*cos((sim_time)*2._wp*pi/period_BB + 2._wp*pi*phi_rn(k))
-                ! Sum up the source term of each frequency to obtain the total source term for broadband wave
-                sum_BB = sum_BB + ffre_BB
-            end do
-
-            deallocate (phi_rn)
-
-            !$acc parallel loop gang vector default(present) private(myalpha, myalpha_rho)
-            do i = 1, num_points
-                j = source_spatials(ai)%coord(1, i)
-                k = source_spatials(ai)%coord(2, i)
-                l = source_spatials(ai)%coord(3, i)
-
-                ! Compute speed of sound
-                myRho = 0._wp
-                B_tait = 0._wp
-                small_gamma = 0._wp
-
-                !$acc loop
-                do q = 1, num_fluids
-                    myalpha_rho(q) = q_cons_vf(q)%sf(j, k, l)
-                    myalpha(q) = q_cons_vf(advxb + q - 1)%sf(j, k, l)
+                do k = 1, bb_num_freq(ai)
+                    ! Acoustic period of the wave at each discrete frequency
+                    period_BB = 1._wp/(bb_lowest_freq(ai) + k*bb_bandwidth(ai))
+                    ! Spectral level at each frequency
+                    sl_BB = broadband_spectral_level_constant*mag(ai) + k*mag(ai)/broadband_spectral_level_growth_rate
+                    ! Source term corresponding to each frequencies
+                    ffre_BB = sqrt((2._wp*sl_BB*bb_bandwidth(ai)))*cos((sim_time)*2._wp*pi/period_BB + 2._wp*pi*phi_rn(k))
+                    ! Sum up the source term of each frequency to obtain the total source term for broadband wave
+                    sum_BB = sum_BB + ffre_BB
                 end do
 
-                if (bubbles_euler) then
-                    if (num_fluids > 2) then
-                        !$acc loop seq
-                        do q = 1, num_fluids - 1
+                deallocate (phi_rn)
+
+                $:GPU_PARALLEL_LOOP(private='[myalpha,myalpha_rho, myRho, B_tait,c,  small_gamma, frequency_local, gauss_sigma_time_local, mass_src_diff, mom_src_diff, source_temporal, j, k, l, q ]', copyin = '[sum_BB, freq_conv_flag, gauss_conv_flag, sim_time]')
+                do i = 1, num_points
+                    j = source_spatials(ai)%coord(1, i)
+                    k = source_spatials(ai)%coord(2, i)
+                    l = source_spatials(ai)%coord(3, i)
+
+                    ! Compute speed of sound
+                    myRho = 0._wp
+                    B_tait = 0._wp
+                    small_gamma = 0._wp
+
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do q = 1, num_fluids
+                        myalpha_rho(q) = q_cons_vf(q)%sf(j, k, l)
+                        myalpha(q) = q_cons_vf(advxb + q - 1)%sf(j, k, l)
+                    end do
+
+                    if (bubbles_euler) then
+                        if (num_fluids > 2) then
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do q = 1, num_fluids - 1
+                                myRho = myRho + myalpha_rho(q)
+                                B_tait = B_tait + myalpha(q)*pi_infs(q)
+                                small_gamma = small_gamma + myalpha(q)*gammas(q)
+                            end do
+                        else
+                            myRho = myalpha_rho(1)
+                            B_tait = pi_infs(1)
+                            small_gamma = gammas(1)
+                        end if
+                    end if
+
+                    if ((.not. bubbles_euler) .or. (mpp_lim .and. (num_fluids > 2))) then
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do q = 1, num_fluids
                             myRho = myRho + myalpha_rho(q)
                             B_tait = B_tait + myalpha(q)*pi_infs(q)
                             small_gamma = small_gamma + myalpha(q)*gammas(q)
                         end do
-                    else
-                        myRho = myalpha_rho(1)
-                        B_tait = pi_infs(1)
-                        small_gamma = gammas(1)
                     end if
-                end if
 
-                if ((.not. bubbles_euler) .or. (mpp_lim .and. (num_fluids > 2))) then
-                    !$acc loop seq
-                    do q = 1, num_fluids
-                        myRho = myRho + myalpha_rho(q)
-                        B_tait = B_tait + myalpha(q)*pi_infs(q)
-                        small_gamma = small_gamma + myalpha(q)*gammas(q)
-                    end do
-                end if
+                    small_gamma = 1._wp/small_gamma + 1._wp
+                    c = sqrt(small_gamma*(q_prim_vf(E_idx)%sf(j, k, l) + ((small_gamma - 1._wp)/small_gamma)*B_tait)/myRho)
 
-                small_gamma = 1._wp/small_gamma + 1._wp
-                c = sqrt(small_gamma*(q_prim_vf(E_idx)%sf(j, k, l) + ((small_gamma - 1._wp)/small_gamma)*B_tait)/myRho)
+                    ! Wavelength to frequency conversion
+                    if (pulse(ai) == 1 .or. pulse(ai) == 3) frequency_local = f_frequency_local(freq_conv_flag, ai, c)
+                    if (pulse(ai) == 2) gauss_sigma_time_local = f_gauss_sigma_time_local(gauss_conv_flag, ai, c)
 
-                ! Wavelength to frequency conversion
-                if (pulse(ai) == 1 .or. pulse(ai) == 3) frequency_local = f_frequency_local(freq_conv_flag, ai, c)
-                if (pulse(ai) == 2) gauss_sigma_time_local = f_gauss_sigma_time_local(gauss_conv_flag, ai, c)
+                    ! Update momentum source term
+                    call s_source_temporal(sim_time, c, ai, mom_label, frequency_local, gauss_sigma_time_local, source_temporal, sum_BB)
+                    mom_src_diff = source_temporal*source_spatials(ai)%val(i)
 
-                ! Update momentum source term
-                call s_source_temporal(sim_time, c, ai, mom_label, frequency_local, gauss_sigma_time_local, source_temporal, sum_BB)
-                mom_src_diff = source_temporal*source_spatials(ai)%val(i)
+                    if (dipole(ai)) then ! Double amplitude & No momentum source term (only works for Planar)
+                        mass_src(j, k, l) = mass_src(j, k, l) + 2._wp*mom_src_diff/c
+                        if (model_eqns /= 4) E_src(j, k, l) = E_src(j, k, l) + 2._wp*mom_src_diff*c/(small_gamma - 1._wp)
+                        cycle
+                    end if
 
-                if (dipole(ai)) then ! Double amplitude & No momentum source term (only works for Planar)
-                    mass_src(j, k, l) = mass_src(j, k, l) + 2._wp*mom_src_diff/c
-                    if (model_eqns /= 4) E_src(j, k, l) = E_src(j, k, l) + 2._wp*mom_src_diff*c/(small_gamma - 1._wp)
-                    cycle
-                end if
+                    if (n == 0) then ! 1D
+                        mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*sign(1._wp, dir(ai)) ! Left or right-going wave
 
-                if (n == 0) then ! 1D
-                    mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*sign(1._wp, dir(ai)) ! Left or right-going wave
+                    elseif (p == 0) then ! 2D
+                        if (support(ai) < 5) then ! Planar
+                            mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*cos(dir(ai))
+                            mom_src(2, j, k, l) = mom_src(2, j, k, l) + mom_src_diff*sin(dir(ai))
+                        else
+                            mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*cos(source_spatials(ai)%angle(i))
+                            mom_src(2, j, k, l) = mom_src(2, j, k, l) + mom_src_diff*sin(source_spatials(ai)%angle(i))
+                        end if
 
-                elseif (p == 0) then ! 2D
+                    else ! 3D
+                        if (support(ai) < 5) then ! Planar
+                            mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*cos(dir(ai))
+                            mom_src(2, j, k, l) = mom_src(2, j, k, l) + mom_src_diff*sin(dir(ai))
+                        else
+                            mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*source_spatials(ai)%xyz_to_r_ratios(1, i)
+                            mom_src(2, j, k, l) = mom_src(2, j, k, l) + mom_src_diff*source_spatials(ai)%xyz_to_r_ratios(2, i)
+                            mom_src(3, j, k, l) = mom_src(3, j, k, l) + mom_src_diff*source_spatials(ai)%xyz_to_r_ratios(3, i)
+                        end if
+                    end if
+
+                    ! Update mass source term
                     if (support(ai) < 5) then ! Planar
-                        mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*cos(dir(ai))
-                        mom_src(2, j, k, l) = mom_src(2, j, k, l) + mom_src_diff*sin(dir(ai))
-                    else
-                        mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*cos(source_spatials(ai)%angle(i))
-                        mom_src(2, j, k, l) = mom_src(2, j, k, l) + mom_src_diff*sin(source_spatials(ai)%angle(i))
+                        mass_src_diff = mom_src_diff/c
+                    else ! Spherical or cylindrical support
+                        ! Mass source term must be calculated differently using a correction term for spherical and cylindrical support
+                        call s_source_temporal(sim_time, c, ai, mass_label, frequency_local, gauss_sigma_time_local, source_temporal, sum_BB)
+                        mass_src_diff = source_temporal*source_spatials(ai)%val(i)
+                    end if
+                    mass_src(j, k, l) = mass_src(j, k, l) + mass_src_diff
+
+                    ! Update energy source term
+                    if (model_eqns /= 4) then
+                        E_src(j, k, l) = E_src(j, k, l) + mass_src_diff*c**2._wp/(small_gamma - 1._wp)
                     end if
 
-                else ! 3D
-                    if (support(ai) < 5) then ! Planar
-                        mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*cos(dir(ai))
-                        mom_src(2, j, k, l) = mom_src(2, j, k, l) + mom_src_diff*sin(dir(ai))
-                    else
-                        mom_src(1, j, k, l) = mom_src(1, j, k, l) + mom_src_diff*source_spatials(ai)%xyz_to_r_ratios(1, i)
-                        mom_src(2, j, k, l) = mom_src(2, j, k, l) + mom_src_diff*source_spatials(ai)%xyz_to_r_ratios(2, i)
-                        mom_src(3, j, k, l) = mom_src(3, j, k, l) + mom_src_diff*source_spatials(ai)%xyz_to_r_ratios(3, i)
-                    end if
-                end if
-
-                ! Update mass source term
-                if (support(ai) < 5) then ! Planar
-                    mass_src_diff = mom_src_diff/c
-                else ! Spherical or cylindrical support
-                    ! Mass source term must be calculated differently using a correction term for spherical and cylindrical support
-                    call s_source_temporal(sim_time, c, ai, mass_label, frequency_local, gauss_sigma_time_local, source_temporal, sum_BB)
-                    mass_src_diff = source_temporal*source_spatials(ai)%val(i)
-                end if
-                mass_src(j, k, l) = mass_src(j, k, l) + mass_src_diff
-
-                ! Update energy source term
-                if (model_eqns /= 4) then
-                    E_src(j, k, l) = E_src(j, k, l) + mass_src_diff*c**2._wp/(small_gamma - 1._wp)
-                end if
-
-            end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
         end do
 
         ! Update the rhs variables
-        !$acc parallel loop collapse(3) gang vector default(present)
+        $:GPU_PARALLEL_LOOP(private='[j,k,l]',collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    !$acc loop seq
+                    $:GPU_LOOP(parallelism='[seq]')
                     do q = contxb, contxe
                         rhs_vf(q)%sf(j, k, l) = rhs_vf(q)%sf(j, k, l) + mass_src(j, k, l)
                     end do
-                    !$acc loop seq
+                    $:GPU_LOOP(parallelism='[seq]')
                     do q = momxb, momxe
                         rhs_vf(q)%sf(j, k, l) = rhs_vf(q)%sf(j, k, l) + mom_src(q - contxe, j, k, l)
                     end do
@@ -329,6 +338,7 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
     end subroutine s_acoustic_src_calculations
 
     !> This subroutine gives the temporally varying amplitude of the pulse
@@ -339,8 +349,8 @@ contains
     !! @param frequency_local Frequency at the spatial location for sine and square waves
     !! @param gauss_sigma_time_local sigma in time for Gaussian pulse
     !! @param source Source term amplitude
-    subroutine s_source_temporal(sim_time, c, ai, term_index, frequency_local, gauss_sigma_time_local, source, sum_BB)
-        !$acc routine seq
+    elemental subroutine s_source_temporal(sim_time, c, ai, term_index, frequency_local, gauss_sigma_time_local, source, sum_BB)
+        $:GPU_ROUTINE(parallelism='[seq]')
         integer, intent(in) :: ai, term_index
         real(wp), intent(in) :: sim_time, c, sum_BB
         real(wp), intent(in) :: frequency_local, gauss_sigma_time_local
@@ -389,8 +399,8 @@ contains
             source = mag(ai)*sign(1._wp, sine_wave)
 
             ! Prevent max-norm differences due to compilers to pass CI
-            if (abs(sine_wave) < 1e-2_wp) then
-                source = mag(ai)*sine_wave*1e2_wp
+            if (abs(sine_wave) < 1.e-2_wp) then
+                source = mag(ai)*sine_wave*1.e2_wp
             end if
 
         elseif (pulse(ai) == 4) then ! Broadband wave
@@ -399,12 +409,12 @@ contains
     end subroutine s_source_temporal
 
     !> This subroutine identifies and precalculates the non-zero acoustic spatial sources before time-stepping
-    subroutine s_precalculate_acoustic_spatial_sources
+    impure subroutine s_precalculate_acoustic_spatial_sources
         integer :: j, k, l, ai
         integer :: count
         integer :: dim
         real(wp) :: source_spatial, angle, xyz_to_r_ratios(3)
-        real(wp), parameter :: threshold = 1e-10_wp
+        real(wp), parameter :: threshold = 1.e-10_wp
 
         if (n == 0) then
             dim = 1
@@ -432,15 +442,12 @@ contains
             source_spatials_num_points(ai) = count
 
             ! Allocate arrays with the correct size
+
             @:ALLOCATE(source_spatials(ai)%coord(1:3, 1:count))
             @:ALLOCATE(source_spatials(ai)%val(1:count))
-            if (support(ai) >= 5) then ! Planar supports don't need angle or xyz_to_r_ratios
-                if (dim == 2) then
-                    @:ALLOCATE(source_spatials(ai)%angle(1:count))
-                elseif (dim == 3) then
-                    @:ALLOCATE(source_spatials(ai)%xyz_to_r_ratios(1:3, 1:count))
-                end if
-            end if
+            @:ALLOCATE(source_spatials(ai)%angle(1:count))
+            @:ALLOCATE(source_spatials(ai)%xyz_to_r_ratios(1:3, 1:count))
+
             @:ACC_SETUP_source_spatials(source_spatials(ai))
 
             ! Second pass: Store the values
@@ -457,7 +464,7 @@ contains
                         source_spatials(ai)%val(count) = source_spatial
                         if (support(ai) >= 5) then
                             if (dim == 2) source_spatials(ai)%angle(count) = angle
-                            if (dim == 3) source_spatials(ai)%xyz_to_r_ratios(:, count) = xyz_to_r_ratios
+                            if (dim == 3) source_spatials(ai)%xyz_to_r_ratios(1:3, count) = xyz_to_r_ratios
                         end if
                     end do
                 end do
@@ -467,14 +474,14 @@ contains
                 call s_mpi_abort('Fatal Error: Inconsistent allocation of source_spatials')
             end if
 
-            !$acc update device(source_spatials(ai)%coord)
-            !$acc update device(source_spatials(ai)%val)
+            $:GPU_UPDATE(device='[source_spatials(ai)%coord]')
+            $:GPU_UPDATE(device='[source_spatials(ai)%val]')
             if (support(ai) >= 5) then
                 if (dim == 2) then
-                    !$acc update device(source_spatials(ai)%angle)
+                    $:GPU_UPDATE(device='[source_spatials(ai)%angle]')
                 end if
                 if (dim == 3) then
-                    !$acc update device(source_spatials(ai)%xyz_to_r_ratios)
+                    $:GPU_UPDATE(device='[source_spatials(ai)%xyz_to_r_ratios]')
                 end if
             end if
 
@@ -691,8 +698,8 @@ contains
     !! @param ai Acoustic source index
     !! @param c Speed of sound
     !! @return frequency_local Converted frequency
-    function f_frequency_local(freq_conv_flag, ai, c)
-        !$acc routine seq
+    elemental function f_frequency_local(freq_conv_flag, ai, c)
+        $:GPU_ROUTINE(parallelism='[seq]')
         logical, intent(in) :: freq_conv_flag
         integer, intent(in) :: ai
         real(wp), intent(in) :: c
@@ -711,7 +718,7 @@ contains
     !! @param ai Acoustic source index
     !! @return gauss_sigma_time_local Converted Gaussian sigma time
     function f_gauss_sigma_time_local(gauss_conv_flag, ai, c)
-        !$acc routine seq
+        $:GPU_ROUTINE(parallelism='[seq]')
         logical, intent(in) :: gauss_conv_flag
         integer, intent(in) :: ai
         real(wp), intent(in) :: c

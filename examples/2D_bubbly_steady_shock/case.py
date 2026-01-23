@@ -191,7 +191,6 @@ print(
             "bubble_model": 2,
             "polytropic": "T",
             "polydisperse": "F",
-            "R0_type": 1,
             "poly_sigma": 0.3,
             "thermal": 3,
             "R0ref": x0,

@@ -4,9 +4,10 @@ from .run.run      import get_baked_templates
 from .build        import TARGETS, DEFAULT_TARGETS
 from .common       import MFCException, format_list_to_string
 from .test.cases   import list_cases
+from .state        import gpuConfigOptions, MFCConfig
 
 # pylint: disable=too-many-locals, too-many-branches, too-many-statements
-def parse(config):
+def parse(config: MFCConfig):
     parser = argparse.ArgumentParser(
         prog="./mfc.sh",
         description="""\
@@ -17,16 +18,23 @@ started, run ./mfc.sh build -h.""",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
 
+    # Here are all of the parser arguments that call functions in other python files
     parsers = parser.add_subparsers(dest="command")
-    run        = parsers.add_parser(name="run",        help="Run a case with MFC.",                 formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    test       = parsers.add_parser(name="test",       help="Run MFC's test suite.",                formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    build      = parsers.add_parser(name="build",      help="Build MFC and its dependencies.",      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    clean      = parsers.add_parser(name="clean",      help="Clean build artifacts.",               formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    bench      = parsers.add_parser(name="bench",      help="Benchmark MFC (for CI).",              formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    bench_diff = parsers.add_parser(name="bench_diff", help="Compare MFC Benchmarks (for CI).",     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    count      = parsers.add_parser(name="count",      help="Count LOC in MFC.",                    formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    count_diff = parsers.add_parser(name="count_diff", help="Count LOC in MFC.",                    formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    packer     = parsers.add_parser(name="packer",     help="Packer utility (pack/unpack/compare)", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    run        = parsers.add_parser(name="run",        help="Run a case with MFC.",                   formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    test       = parsers.add_parser(name="test",       help="Run MFC's test suite.",                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    build      = parsers.add_parser(name="build",      help="Build MFC and its dependencies.",        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    clean      = parsers.add_parser(name="clean",      help="Clean build artifacts.",                 formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    bench      = parsers.add_parser(name="bench",      help="Benchmark MFC (for CI).",                formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    bench_diff = parsers.add_parser(name="bench_diff", help="Compare MFC Benchmarks (for CI).",       formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    count      = parsers.add_parser(name="count",      help="Count LOC in MFC.",                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    count_diff = parsers.add_parser(name="count_diff", help="Count LOC in MFC.",                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    packer     = parsers.add_parser(name="packer",     help="Packer utility (pack/unpack/compare).",  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+    # These parser arguments all call BASH scripts, and they only exist so that they show up in the help message
+    parsers.add_parser(name="load",       help="Loads the MFC environment with source.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parsers.add_parser(name="lint",       help="Lints all code after editing.",          formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parsers.add_parser(name="format",     help="Formats all code after editing.",        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parsers.add_parser(name="spelling",   help="Runs the spell checker after editing.",  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     packers = packer.add_subparsers(dest="packer")
     pack = packers.add_parser(name="pack", help="Pack a case into a single file.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -39,7 +47,7 @@ started, run ./mfc.sh build -h.""",
     compare.add_argument("-rel", "--reltol", metavar="RELTOL", type=float, default=1e-12, help="Relative tolerance.")
     compare.add_argument("-abs", "--abstol", metavar="ABSTOL", type=float, default=1e-12, help="Absolute tolerance.")
 
-    def add_common_arguments(p, mask = None):
+    def add_common_arguments(p: argparse.ArgumentParser, mask = None):
         if mask is None:
             mask = ""
 
@@ -50,6 +58,10 @@ started, run ./mfc.sh build -h.""",
 
         if "m" not in mask:
             for f in dataclasses.fields(config):
+                if f.name == 'gpu':
+                    p.add_argument(f"--{f.name}", action="store", nargs='?', const= gpuConfigOptions.ACC.value,default=gpuConfigOptions.NONE.value, dest=f.name, choices=[e.value for e in gpuConfigOptions], help=f"Turn the {f.name} option to OpenACC or OpenMP.")
+                    p.add_argument(f"--no-{f.name}", action="store_const", const = gpuConfigOptions.NONE.value, dest=f.name, help=f"Turn the {f.name} option OFF.")
+                    continue
                 p.add_argument(   f"--{f.name}", action="store_true",               help=f"Turn the {f.name} option ON.")
                 p.add_argument(f"--no-{f.name}", action="store_false", dest=f.name, help=f"Turn the {f.name} option OFF.")
 
@@ -76,14 +88,15 @@ started, run ./mfc.sh build -h.""",
     test.add_argument("-l", "--list",         action="store_true", help="List all available tests.")
     test.add_argument("-f", "--from",         default=test_cases[0].get_uuid(), type=str, help="First test UUID to run.")
     test.add_argument("-t", "--to",           default=test_cases[-1].get_uuid(), type=str, help="Last test UUID to run.")
-    test.add_argument("-o", "--only",         nargs="+", type=str, default=[], metavar="L", help="Only run tests with specified properties.")
-    test.add_argument("-a", "--test-all",     action="store_true", default=False, help="Run the Post Process Tests too.")
-    test.add_argument("-%", "--percent",      type=int, default=100, help="Percentage of tests to run.")
-    test.add_argument("-m", "--max-attempts", type=int, default=1, help="Maximum number of attempts to run a test.")
-    test.add_argument(      "--no-build",     action="store_true",                    default=False,      help="(Testing) Do not rebuild MFC.")
-    test.add_argument(      "--no-examples",  action="store_true",                    default=False,      help="Do not test example cases." )
-    test.add_argument("--case-optimization",  action="store_true", default=False, help="(GPU Optimization) Compile MFC targets with some case parameters hard-coded.")
-    test.add_argument(      "--dry-run",      action="store_true",                    default=False,      help="Build and generate case files but do not run tests.")
+    test.add_argument("-o", "--only",         nargs="+", type=str,     default=[], metavar="L", help="Only run tests with specified properties.")
+    test.add_argument("-a", "--test-all",     action="store_true",     default=False,     help="Run the Post Process Tests too.")
+    test.add_argument("-%", "--percent",      type=int,                default=100,       help="Percentage of tests to run.")
+    test.add_argument("-m", "--max-attempts", type=int,                default=1,         help="Maximum number of attempts to run a test.")
+    test.add_argument(      "--rdma-mpi",     action="store_true",     default=False,     help="Run tests with RDMA MPI enabled")
+    test.add_argument(      "--no-build",     action="store_true",     default=False,     help="(Testing) Do not rebuild MFC.")
+    test.add_argument(      "--no-examples",  action="store_true",     default=False,     help="Do not test example cases." )
+    test.add_argument("--case-optimization",  action="store_true",     default=False,     help="(GPU Optimization) Compile MFC targets with some case parameters hard-coded.")
+    test.add_argument(      "--dry-run",      action="store_true",     default=False,     help="Build and generate case files but do not run tests.")
 
     test_meg = test.add_mutually_exclusive_group()
     test_meg.add_argument("--generate",          action="store_true", default=False, help="(Test Generation) Generate golden files.")
@@ -113,8 +126,8 @@ started, run ./mfc.sh build -h.""",
     run.add_argument("--clean",                    action="store_true",                    default=False,      help="Clean the case before running.")
     run.add_argument("--ncu",                      nargs=argparse.REMAINDER,     type=str,                     help="Profile with NVIDIA Nsight Compute.")
     run.add_argument("--nsys",                     nargs=argparse.REMAINDER,     type=str,                     help="Profile with NVIDIA Nsight Systems.")
-    run.add_argument("--omni",                     nargs=argparse.REMAINDER,     type=str,                     help="Profile with ROCM omniperf.")
-    run.add_argument("--roc",                      nargs=argparse.REMAINDER,     type=str,                     help="Profile with ROCM rocprof.")
+    run.add_argument("--rcu",                      nargs=argparse.REMAINDER,     type=str,                     help="Profile with ROCM rocprof-compute.")
+    run.add_argument("--rsys",                     nargs=argparse.REMAINDER,     type=str,                     help="Profile with ROCM rocprof-systems.")
 
     # BENCH
     add_common_arguments(bench)

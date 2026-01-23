@@ -27,15 +27,17 @@ module m_initial_condition
     use m_variables_conversion  ! Subroutines to change the state variables from
     ! one form to another
 
-    use m_patches
+    use m_ib_patches
 
-    use m_compute_levelset      ! Subroutines to calculate levelsets for IBs
+    use m_icpp_patches
 
     use m_assign_variables
 
     use m_perturbation          ! Subroutines to perturb initial flow fields
 
     use m_chemistry
+
+    use m_boundary_conditions
 
     implicit none
 
@@ -49,7 +51,14 @@ module m_initial_condition
 
     type(scalar_field) :: q_T_sf !< Temperature field
 
-    integer, allocatable, dimension(:, :, :) :: patch_id_fp !<
+    type(integer_field), dimension(:, :), allocatable :: bc_type !< bc_type fields
+
+#ifdef MFC_MIXED_PRECISION
+    integer(kind=1), allocatable, dimension(:, :, :) :: patch_id_fp
+#else
+    integer, allocatable, dimension(:, :, :) :: patch_id_fp
+#endif
+
     !! Bookkepping variable used to track the patch identities (id) associated
     !! with each of the cells in the computational domain. Note that only one
     !! patch identity may be associated with any one cell.
@@ -66,9 +75,9 @@ contains
 
     !> Computation of parameters, allocation procedures, and/or
         !!              any other tasks needed to properly setup the module
-    subroutine s_initialize_initial_condition_module
+    impure subroutine s_initialize_initial_condition_module
 
-        integer :: i !< generic loop iterator
+        integer :: i, j, k, l !< generic loop iterators
 
         ! Allocating the primitive and conservative variables
         allocate (q_prim_vf(1:sys_size))
@@ -78,7 +87,9 @@ contains
             allocate (q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                                       idwbuff(2)%beg:idwbuff(2)%end, &
                                       idwbuff(3)%beg:idwbuff(3)%end))
-            allocate (q_cons_vf(i)%sf(0:m, 0:n, 0:p))
+            allocate (q_cons_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                                      idwbuff(2)%beg:idwbuff(2)%end, &
+                                      idwbuff(3)%beg:idwbuff(3)%end))
         end do
 
         if (chemistry) then
@@ -88,10 +99,12 @@ contains
         ! Allocating the patch identities bookkeeping variable
         allocate (patch_id_fp(0:m, 0:n, 0:p))
 
-        allocate (ib_markers%sf(0:m, 0:n, 0:p))
-
-        allocate (levelset%sf(0:m, 0:n, 0:p, 1:num_ibs))
-        allocate (levelset_norm%sf(0:m, 0:n, 0:p, 1:num_ibs, 1:3))
+        if (ib) then
+            allocate (ib_markers%sf(0:m, 0:n, 0:p))
+            allocate (levelset%sf(0:m, 0:n, 0:p, 1:num_ibs))
+            allocate (levelset_norm%sf(0:m, 0:n, 0:p, 1:num_ibs, 1:3))
+            ib_markers%sf = 0
+        end if
 
         if (qbmm .and. .not. polytropic) then
             !Allocate bubble pressure pb and vapor mass mv for non-polytropic qbmm at all quad nodes and R0 bins
@@ -109,9 +122,46 @@ contains
         ! up. The conservative variables do not need to be similarly treated
         ! since they are computed directly from the primitive variables.
         do i = 1, sys_size
-            q_cons_vf(i)%sf = dflt_real
-            q_prim_vf(i)%sf = dflt_real
+            q_cons_vf(i)%sf = -1.e-6_stp ! real(dflt_real, kind=stp) ! TODO :: remove this magic number
+            q_prim_vf(i)%sf = -1.e-6_stp ! real(dflt_real, kind=stp)
         end do
+
+        ! Allocating arrays to store the bc types
+        allocate (bc_type(1:num_dims, 1:2))
+
+        allocate (bc_type(1, 1)%sf(0:0, 0:n, 0:p))
+        allocate (bc_type(1, 2)%sf(0:0, 0:n, 0:p))
+
+        do l = 0, p
+            do k = 0, n
+                bc_type(1, 1)%sf(0, k, l) = int(min(bc_x%beg, 0), kind=1)
+                bc_type(1, 2)%sf(0, k, l) = int(min(bc_x%end, 0), kind=1)
+            end do
+        end do
+
+        if (n > 0) then
+            allocate (bc_type(2, 1)%sf(-buff_size:m + buff_size, 0:0, 0:p))
+            allocate (bc_type(2, 2)%sf(-buff_size:m + buff_size, 0:0, 0:p))
+
+            do l = 0, p
+                do j = -buff_size, m + buff_size
+                    bc_type(2, 1)%sf(j, 0, l) = int(min(bc_y%beg, 0), kind=1)
+                    bc_type(2, 2)%sf(j, 0, l) = int(min(bc_y%end, 0), kind=1)
+                end do
+            end do
+
+            if (p > 0) then
+                allocate (bc_type(3, 1)%sf(-buff_size:m + buff_size, -buff_size:n + buff_size, 0:0))
+                allocate (bc_type(3, 2)%sf(-buff_size:m + buff_size, -buff_size:n + buff_size, 0:0))
+
+                do k = -buff_size, n + buff_size
+                    do j = -buff_size, m + buff_size
+                        bc_type(3, 1)%sf(j, k, 0) = int(min(bc_z%beg, 0), kind=1)
+                        bc_type(3, 2)%sf(j, k, 0) = int(min(bc_z%end, 0), kind=1)
+                    end do
+                end do
+            end if
+        end if
 
         ! Initial damage state is always zero
         if (cont_damage) then
@@ -131,7 +181,6 @@ contains
         ! extent of application that the overwrite permissions give a patch
         ! when it is being applied in the domain.
         patch_id_fp = 0
-        ib_markers%sf = 0
 
     end subroutine s_initialize_initial_condition_module
 
@@ -141,14 +190,9 @@ contains
         !!              on the grid using the primitive variables included with
         !!              the patch parameters. The subroutine is complete once the
         !!              primitive variables are converted to conservative ones.
-    subroutine s_generate_initial_condition
+    impure subroutine s_generate_initial_condition
 
-        integer :: i  !< Generic loop operator
-
-        character(len=10) :: iStr
-
-        ! First, compute the temperature field from the conservative variables.
-        if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_vf, idwint)
+        integer :: i
 
         ! Converting the conservative variables to the primitive ones given
         ! preexisting initial condition data files were read in on start-up
@@ -156,208 +200,29 @@ contains
             call s_convert_conservative_to_primitive_variables(q_cons_vf, &
                                                                q_T_sf, &
                                                                q_prim_vf, &
-                                                               idwint)
+                                                               idwbuff)
         end if
 
-        !  3D Patch Geometries
-        if (p > 0) then
-
-            do i = 1, num_patches
-
-                if (proc_rank == 0) then
-                    print *, 'Processing patch', i
-                end if
-
-                !> ICPP Patches
-                !> @{
-                ! Spherical patch
-                if (patch_icpp(i)%geometry == 8) then
-                    call s_sphere(i, patch_id_fp, q_prim_vf)
-
-                    ! Cuboidal patch
-                elseif (patch_icpp(i)%geometry == 9) then
-                    call s_cuboid(i, patch_id_fp, q_prim_vf)
-
-                    ! Cylindrical patch
-                elseif (patch_icpp(i)%geometry == 10) then
-                    call s_cylinder(i, patch_id_fp, q_prim_vf)
-
-                    ! Swept plane patch
-                elseif (patch_icpp(i)%geometry == 11) then
-                    call s_sweep_plane(i, patch_id_fp, q_prim_vf)
-
-                    ! Ellipsoidal patch
-                elseif (patch_icpp(i)%geometry == 12) then
-                    call s_ellipsoid(i, patch_id_fp, q_prim_vf)
-
-                    ! Analytical function patch for testing purposes
-                elseif (patch_icpp(i)%geometry == 13) then
-                    call s_3D_analytical(i, patch_id_fp, q_prim_vf)
-
-                    ! Spherical harmonic patch
-                elseif (patch_icpp(i)%geometry == 14) then
-                    call s_spherical_harmonic(i, patch_id_fp, q_prim_vf)
-
-                    ! 3D Modified circular patch
-                elseif (patch_icpp(i)%geometry == 19) then
-                    call s_3dvarcircle(i, patch_id_fp, q_prim_vf)
-
-                    ! 3D STL patch
-                elseif (patch_icpp(i)%geometry == 21) then
-                    call s_model(i, patch_id_fp, q_prim_vf)
-
-                end if
-
-            end do
-            !> @}
-
-            !> IB Patches
-            !> @{
-            ! Spherical patch
+        if (ib) then
             do i = 1, num_ibs
-                if (proc_rank == 0) then
-                    print *, 'Processing 3D ib patch ', i
-                end if
-
-                if (patch_ib(i)%geometry == 8) then
-                    call s_sphere(i, ib_markers%sf, q_prim_vf, ib)
-                    call s_sphere_levelset(levelset, levelset_norm, i)
-                    ! Cylindrical patch
-                elseif (patch_ib(i)%geometry == 9) then
-                    call s_cuboid(i, ib_markers%sf, q_prim_vf, ib)
-                    call s_cuboid_levelset(levelset, levelset_norm, i)
-                elseif (patch_ib(i)%geometry == 10) then
-                    call s_cylinder(i, ib_markers%sf, q_prim_vf, ib)
-                    call s_cylinder_levelset(levelset, levelset_norm, i)
-                elseif (patch_ib(i)%geometry == 11) then
-                    call s_3D_airfoil(i, ib_markers%sf, q_prim_vf, ib)
-                    call s_3D_airfoil_levelset(levelset, levelset_norm, i)
-
-                    ! STL+IBM patch
-                elseif (patch_ib(i)%geometry == 12) then
-                    call s_model(i, ib_markers%sf, q_prim_vf, ib, levelset, levelset_norm)
-                end if
+                call s_update_ib_rotation_matrix(i)
             end do
-            !> @}
-
-            ! 2D Patch Geometries
-        elseif (n > 0) then
-
-            do i = 1, num_patches
-
-                if (proc_rank == 0) then
-                    print *, 'Processing patch', i
-                end if
-
-                !> ICPP Patches
-                !> @{
-                ! Circular patch
-                if (patch_icpp(i)%geometry == 2) then
-                    call s_circle(i, patch_id_fp, q_prim_vf)
-
-                    ! Rectangular patch
-                elseif (patch_icpp(i)%geometry == 3) then
-                    call s_rectangle(i, patch_id_fp, q_prim_vf)
-
-                    ! Swept line patch
-                elseif (patch_icpp(i)%geometry == 4) then
-                    call s_sweep_line(i, patch_id_fp, q_prim_vf)
-
-                    ! Elliptical patch
-                elseif (patch_icpp(i)%geometry == 5) then
-                    call s_ellipse(i, patch_id_fp, q_prim_vf)
-
-                    ! Unimplemented patch (formerly isentropic vortex)
-                elseif (patch_icpp(i)%geometry == 6) then
-                    call s_mpi_abort('This used to be the isentropic vortex patch, '// &
-                                     'which no longer exists. See Examples. Exiting.')
-
-                    ! Analytical function patch for testing purposes
-                elseif (patch_icpp(i)%geometry == 7) then
-                    call s_2D_analytical(i, patch_id_fp, q_prim_vf)
-
-                    ! Spherical Harmonic Patch
-                elseif (patch_icpp(i)%geometry == 14) then
-                    call s_spherical_harmonic(i, patch_id_fp, q_prim_vf)
-
-                    ! Spiral patch
-                elseif (patch_icpp(i)%geometry == 17) then
-                    call s_spiral(i, patch_id_fp, q_prim_vf)
-
-                    ! Modified circular patch
-                elseif (patch_icpp(i)%geometry == 18) then
-                    call s_varcircle(i, patch_id_fp, q_prim_vf)
-
-                    ! TaylorGreen vortex patch
-                elseif (patch_icpp(i)%geometry == 20) then
-                    call s_2D_TaylorGreen_vortex(i, patch_id_fp, q_prim_vf)
-
-                    ! STL patch
-                elseif (patch_icpp(i)%geometry == 21) then
-                    call s_model(i, patch_id_fp, q_prim_vf)
-
-                end if
-                !> @}
-            end do
-
-            !> IB Patches
-            !> @{
-            do i = 1, num_ibs
-                if (proc_rank == 0) then
-                    print *, 'Processing 2D ib patch ', i
-                end if
-                if (patch_ib(i)%geometry == 2) then
-                    call s_circle(i, ib_markers%sf, q_prim_vf, ib)
-                    call s_circle_levelset(levelset, levelset_norm, i)
-                    ! Rectangular patch
-                elseif (patch_ib(i)%geometry == 3) then
-                    call s_rectangle(i, ib_markers%sf, q_prim_vf, ib)
-                    call s_rectangle_levelset(levelset, levelset_norm, i)
-                elseif (patch_ib(i)%geometry == 4) then
-                    call s_airfoil(i, ib_markers%sf, q_prim_vf, ib)
-                    call s_airfoil_levelset(levelset, levelset_norm, i)
-                    ! STL+IBM patch
-                elseif (patch_ib(i)%geometry == 5) then
-                    call s_model(i, ib_markers%sf, q_prim_vf, ib, levelset, levelset_norm)
-                end if
-            end do
-            !> @}
-
-            ! 1D Patch Geometries
-        else
-
-            do i = 1, num_patches
-
-                if (proc_rank == 0) then
-                    print *, 'Processing patch', i
-                end if
-
-                ! Line segment patch
-                if (patch_icpp(i)%geometry == 1) then
-                    call s_line_segment(i, patch_id_fp, q_prim_vf)
-
-                    ! 1d analytical
-                elseif (patch_icpp(i)%geometry == 15) then
-                    call s_1d_analytical(i, patch_id_fp, q_prim_vf)
-
-                    ! 1d bubble screen with sinusoidal pressure pulse
-                elseif (patch_icpp(i)%geometry == 16) then
-                    call s_1d_bubble_pulse(i, patch_id_fp, q_prim_vf)
-                end if
-
-            end do
-
+            call s_apply_ib_patches(ib_markers%sf, levelset, levelset_norm)
         end if
+        call s_apply_icpp_patches(patch_id_fp, q_prim_vf)
+
+        if (num_bc_patches > 0) call s_apply_boundary_patches(q_prim_vf, bc_type)
 
         if (perturb_flow) call s_perturb_surrounding_flow(q_prim_vf)
         if (perturb_sph) call s_perturb_sphere(q_prim_vf)
-        if (mixlayer_perturb) call s_superposition_instability_wave(q_prim_vf)
-        if (elliptic_smoothing) call s_elliptic_smoothing(q_prim_vf)
+        if (mixlayer_perturb) call s_perturb_mixlayer(q_prim_vf)
+        if (simplex_perturb) call s_perturb_simplex(q_prim_vf)
+        if (elliptic_smoothing) call s_elliptic_smoothing(q_prim_vf, bc_type)
 
         ! Converting the primitive variables to the conservative ones
         call s_convert_primitive_to_conservative_variables(q_prim_vf, q_cons_vf)
 
-        if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_vf, idwint)
+        if (chemistry) call s_compute_T_from_primitives(q_T_sf, q_prim_vf, idwint)
 
         if (qbmm .and. .not. polytropic) then
             !Initialize pb and mv
@@ -368,7 +233,7 @@ contains
     end subroutine s_generate_initial_condition
 
     !>  Deallocation procedures for the module
-    subroutine s_finalize_initial_condition_module
+    impure subroutine s_finalize_initial_condition_module
 
         integer :: i !< Generic loop iterator
 
@@ -387,7 +252,25 @@ contains
 
         ! Deallocating the patch identities bookkeeping variable
         deallocate (patch_id_fp)
-        deallocate (ib_markers%sf)
+
+        if (ib) then
+            deallocate (ib_markers%sf, levelset%sf, levelset_norm%sf)
+        end if
+
+        deallocate (bc_type(1, 1)%sf)
+        deallocate (bc_type(1, 2)%sf)
+
+        if (n > 0) then
+            deallocate (bc_type(2, 1)%sf)
+            deallocate (bc_type(2, 2)%sf)
+        end if
+
+        if (p > 0) then
+            deallocate (bc_type(3, 1)%sf)
+            deallocate (bc_type(3, 2)%sf)
+        end if
+
+        deallocate (bc_type)
 
     end subroutine s_finalize_initial_condition_module
 

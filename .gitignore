@@ -19,6 +19,9 @@ __pycache__
 
 *.egg-info
 
+# Auto-generated version file
+toolchain/mfc/_version.py
+
 .DS_Store
 
 /tests/*/**
@@ -33,6 +36,7 @@ docs/*/initial*
 docs/*/result*
 docs/documentation/*-example.png
 docs/documentation/examples.md
+docs/documentation/case_constraints.md
 
 examples/*batch/*/
 examples/**/D/*
@@ -86,3 +90,6 @@ benchmarks/*.png
 *.mov
 *.mkv
 *.avi
+
+**isolation_rules/
+**.supercode/

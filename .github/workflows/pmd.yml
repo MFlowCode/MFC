@@ -1,0 +1,131 @@
+name: Source DRYness
+
+on: [push, pull_request, workflow_dispatch]
+
+jobs:    
+  pmd:
+      name: PMD
+      runs-on: "ubuntu-latest"
+      env:
+          pr_everything: 0
+      steps:
+          - name: Clone - PR
+            uses: actions/checkout@v4
+
+          - name: Set up Java
+            uses: actions/setup-java@v4
+            with:
+              distribution: temurin
+              java-version: '17'
+
+          - name: Run CPD for Fortran
+            continue-on-error: true
+            run: |
+              # Get latest PMD version from GitHub API
+              PMD_VERSION=$(curl -s https://api.github.com/repos/pmd/pmd/releases/latest | grep '"tag_name":' | cut -d'"' -f4 | sed 's/pmd_releases\///')
+              echo "Using PMD version: $PMD_VERSION"
+
+              curl -sSL -o pmd.zip \
+                "https://github.com/pmd/pmd/releases/download/pmd_releases/${PMD_VERSION}/pmd-dist-${PMD_VERSION}-bin.zip"
+              unzip -q pmd.zip
+              PMD_HOME="pmd-bin-${PMD_VERSION}"
+          
+              SOURCE_DIR="${1:-src}"
+              total_files=$(find "$SOURCE_DIR" -type f \( -name "*.f" -o -name "*.f90" -o -name "*.for" -o -name "*.fpp" -o -name "*.F" -o -name "*.F90" \) | wc -l)
+              processed=0
+
+              find "$SOURCE_DIR" -type f \( -name "*.f" -o -name "*.f90" -o -name "*.for" -o -name "*.fpp" -o -name "*.F" -o -name "*.F90" \) -print0 | 
+              while IFS= read -r -d $'\0' file; do
+                  processed=$((processed + 1))
+                  
+                  # Create a temporary file with same permissions as original
+                  TMP_FILE=$(mktemp)
+                  if [ $? -ne 0 ]; then
+                      echo -e "Failed to create temporary file for $file, skipping"
+                      continue
+                  fi
+                  
+                  # Copy permissions from original file
+                  chmod --reference="$file" "$TMP_FILE"
+                  
+                  # More comprehensive sed command to handle different Fortran comment styles:
+                  # 1. Replace lines that are entirely comments with an empty line:
+                  #    - Lines starting with '!' (free form comments)
+                  #    - Lines starting with 'c', 'C', '*', 'd', 'D' in column 1 (fixed form comments)
+                  # 2. Remove end-of-line comments (anything after '!' that isn't in a string)
+                  # 3. Preserve strings containing '!' characters                  
+                  sed -E '
+                    # First handle & continuation style (modern Fortran)
+                    :ampersand_loop
+                    /&[[:space:]]*$/ {
+                      N
+                      s/&[[:space:]]*\n[[:space:]]*(&)?/ /g
+                      tampersand_loop
+                    }
+                    
+                    # Handle fixed-form continuation (column 6 indicator)
+                    :fixed_form_loop
+                    /^[[:space:]]{0,5}[^[:space:]!&]/ {
+                      N
+                      s/\n[[:space:]]{5}[^[:space:]]/ /g
+                      tfixed_form_loop
+                    }
+                    
+                    # Remove any remaining continuation markers
+                    s/&//g
+                    
+                    # Normalize spacing - replace multiple spaces with single space
+                    s/[[:space:]]{2,}/ /g
+                    
+                    # Remove spaces around mathematical operators
+                    s/[[:space:]]*\*[[:space:]]*/*/g
+                    s/[[:space:]]*\+[[:space:]]*/+/g
+                    s/[[:space:]]*-[[:space:]]*/-/g
+                    s/[[:space:]]*\/[[:space:]]*/\//g
+                    s/[[:space:]]*\*\*[[:space:]]*/\*\*/g
+                    
+                    # Remove spaces in common Fortran constructs (array indexing, function calls)
+                    s/\([[:space:]]*([^,)[:space:]]+)[[:space:]]*,/(\1,/g      # First argument
+                    s/,[[:space:]]*([^,)[:space:]]+)[[:space:]]*,/,\1,/g       # Middle arguments
+                    s/,[[:space:]]*([^,)[:space:]]+)[[:space:]]*\)/,\1)/g      # Last argument
+                    s/\([[:space:]]*([^,)[:space:]]+)[[:space:]]*\)/(\1)/g     # Single argument
+                    
+                    # Remove spaces around brackets and parentheses
+                    s/\[[[:space:]]*/</g
+                    s/\[[[:space:]]*/>/g
+                    s/\[[[:space:]]*/</g
+                    s/[[:space:]]*\]/]/g
+                    s/\([[:space:]]*/(/g
+                    s/[[:space:]]*\)/)/g
+
+                    # Remove spaces around comparison operators
+                    s/[[:space:]]*<=[[:space:]]*/</g
+                    s/[[:space:]]*>=[[:space:]]*/>/g
+                    s/[[:space:]]*<[[:space:]]*/</g
+                    s/[[:space:]]*>[[:space:]]*/>/g
+                    s/[[:space:]]*==[[:space:]]*/==/g
+
+                    # Remove full-line comments
+                    /^\s*!/d
+                    /^[cC*dD]/d
+                    /^[ \t]*[cC*dD]/d
+                    /^[[:space:]]*$/d
+
+                    # Remove end-of-line comments, preserving quoted strings
+                    s/([^"'\''\\]*("[^"]*")?('\''[^'\'']*'\''?)?[^"'\''\\]*)[!].*$/\1/
+                  ' "$file" > "$TMP_FILE"
+
+                  if cmp -s "$file" "$TMP_FILE"; then
+                      rm "$TMP_FILE"
+                  else
+                      # Overwrite the original file with the processed content
+                      mv "$TMP_FILE" "$file"
+                  fi
+              done
+
+              "${PMD_HOME}/bin/pmd" cpd \
+                --dir src \
+                --language fortran \
+                --minimum-tokens=20 \
+                --no-fail-on-violation \
+                --no-fail-on-error

@@ -15,3 +15,6 @@ retry_wait_time = 4
 accept = ["200", "429"]
 
 verbose = "error"
+
+# Exclude sitemap from link checking (it contains pre-publish production URLs)
+exclude_path = ["**/sitemap.txt"]

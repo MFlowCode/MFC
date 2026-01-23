@@ -1,0 +1,177 @@
+---
+description: Full MFC project rules – consolidated for Agent Mode
+alwaysApply: true
+---
+
+# 0  Purpose & Scope
+Consolidated guidance for the MFC exascale, many-physics solver.
+Written primarily for Fortran/Fypp; the GPU and style sections matter only when `.fpp` / `.f90` files are in view.
+
+---
+
+# 1  Global Project Context (always)
+- **Project**: *MFC* is modern Fortran 2008+ generated with **Fypp**.
+  - Sources `src/`, tests `tests/`, examples `examples/`.
+  - Most sources are `.fpp`; CMake transpiles them to `.f90`.
+- **Fypp macros** live in `src/<subprogram>/include/` you should scan these first.
+  `<subprogram>` ∈ {`simulation`,`common`,`pre_process`,`post_process`}.
+- Only `simulation` (+ its `common` calls) is GPU-accelerated via **OpenACC** or **OpenMP**.
+- Assume free-form Fortran 2008+, `implicit none`, explicit `intent`, and modern intrinsics.
+- Prefer `module … contains … subroutine foo()`; avoid `COMMON` blocks and file-level `include` files.
+- **Read the full codebase and docs *before* changing code.**
+  - Docs: <https://mflowcode.github.io/documentation/md_readme.html> and the repository root `README.md`.
+
+### Incremental-change workflow
+
+1. Draft a step-by-step plan.
+2. After each step, build:
+   ```bash
+   ./mfc.sh build -t pre_process simulation -j $(nproc)
+    ```
+3. If it compiles, run focused tests:
+   ```bash
+   ./mfc.sh test -j $(nproc) -f EA8FA07E -t 9E2CA336
+   ```
+4. Roll back & fix if a step fails.
+
+* Do not run ./mfc.sh test -j $(nproc) without any other arguments (it takes too long to run all tests).
+
+---
+
+# 2  Style & Naming Conventions (for \*.fpp / \*.f90)
+
+* **Indent 2 spaces**; continuation lines align under `&`.
+* Lower-case keywords and intrinsics (`do`, `end subroutine`, …).
+* **Modules**: `m_<feature>` (e.g. `m_transport`).
+* **Public procedures**:
+  * Subroutine → `s_<verb>_<noun>` (e.g. `s_compute_flux`)
+  * Function   → `f_<verb>_<noun>`
+* Private helpers stay in the module; avoid nested procedures.
+* **Size limits**: subroutine ≤ 500 lines, helper ≤ 150, function ≤ 100, module/file ≤ 1000.
+* ≤ 6 arguments per routine; otherwise pass a derived-type "params" struct.
+* No `goto` (except unavoidable legacy); no global state (`COMMON`, `save`).
+* Every variable: `intent(in|out|inout)` + appropriate `dimension` / `allocatable` / `pointer`.
+* Use `s_mpi_abort(<msg>)` for errors, not `stop`.
+* Mark GPU-callable helpers that are called from GPU parallel loops immediately after declaration:
+  ```fortran
+  subroutine s_flux_update(...)
+    $:GPU_ROUTINE(function_name='s_flux_update', parallelism='[seq]')
+    ...
+  end subroutine
+  ```
+
+---
+
+# 3  File & Module Structure
+
+- **File Naming**:
+  - `.fpp` files: Fypp preprocessed files that get translated to `.f90`
+  - Modules are named with `m_` prefix followed by feature name: `m_helper_basic`, `m_viscous`
+  - Primary program file is named `p_main.fpp`
+
+- **Module Layout**:
+  - Start with Fypp include for macros: `#:include 'macros.fpp'`
+  - Header comments using `!>` style documentation
+  - `module` declaration with name matching filename
+  - `use` statements for dependencies
+  - `implicit none` statement
+  - `private` declaration followed by explicit `public` exports
+  - `contains` section
+  - Implementation of subroutines and functions
+
+---
+
+# 4  Fypp Macros
+
+- **Fypp Directives**:
+  - Start with `#:` (e.g., `#:include`, `#:def`, `#:enddef`)
+  - Macros defined in `include/*.fpp` files
+  - Used for code generation, conditional compilation, and GPU offloading
+
+---
+
+# 5  FYPP Macros for GPU Acceleration Programming Guidelines (for GPU kernels)
+
+- Do not use OpenACC or OpenMP directives directly.
+- Instead, use the FYPP macros contained in `src/common/include/parallel_macros.fpp`
+- Documentation on how to use the Fypp macros for GPU offloading is available at https://mflowcode.github.io/documentation/md_gpuParallelization.html
+
+Wrap tight loops with
+```fortran
+$:GPU_PARALLEL_FOR(private='[...]', copy='[...]')
+```
+* Add `collapse=n` to merge nested loops when safe.
+* Declare loop-local variables with `private='[...]'`.
+* Allocate large arrays with `managed` or move them into a persistent
+  `$:GPU_ENTER_DATA(...)` region at start-up.
+* **Do not** place `stop` / `error stop` inside device code.
+* Must compile with Cray `ftn` or NVIDIA `nvfortran` for GPU offloading; also build CPU-only with
+  GNU `gfortran` and Intel `ifx`/`ifort`.
+
+- Example GPU macros include the below, among others:
+  - `$:GPU_ROUTINE(parallelism='[seq]')` - Marks GPU-callable routines
+  - `$:GPU_PARALLEL_LOOP(collapse=N)` - Parallelizes loops
+  - `$:GPU_LOOP(parallelism='[seq]')` - Marks sequential loops
+  - `$:GPU_UPDATE(device='[var1,var2]')` - Updates device data
+  - `$:GPU_ENTER_DATA(copyin='[var]')` - Copies data to device
+  - `$:GPU_EXIT_DATA(delete='[var]')` - Removes data from device
+
+---
+
+# 6  Documentation Style
+
+- **Subroutine/Function Documentation**:
+  ```fortran
+  !> This procedure <description>
+  !! @param param_name Description of the parameter
+  !! @return Description of the return value (for functions)
+  ```
+which conforms to the Doxygen Fortran format.
+
+# 7  Error Handling
+
+- **Assertions**:
+  - Use the fypp `ASSERT` macro for validating conditions
+  - Example: `@:ASSERT(predicate, message)`
+
+- **Error Reporting**:
+  - Use `s_mpi_abort(error_message)` for error termination, not `stop`
+  - No `stop` / `error stop` inside device code
+
+# 8  Memory Management
+
+- **Allocation/Deallocation**:
+  - Use fypp macro `@:ALLOCATE(var1, var2)` macro for device-aware allocation
+  - Use fypp macro `@:DEALLOCATE(var1, var2)` macro for device-aware deallocation
+
+# 9. Additional Observed Patterns
+
+- **Derived Types**:
+  - Extensive use of derived types for encapsulation
+  - Use pointers within derived types (e.g., `pointer, dimension(:,:,:) => null()`)
+  - Clear documentation of derived type components
+
+- **Pure & Elemental Functions**:
+  - Use `pure` and `elemental` attributes for side-effect-free functions
+  - Combine them for operations on arrays (`pure elemental function`)
+
+- **Precision Handling**:
+  - Use `wp` (working precision) parameter from `m_precision_select`
+  - Never hardcode precision with `real*8` or similar
+
+- **Loop Optimization**:
+  - Favor array operations over explicit loops when possible
+  - Use `collapse=N` directive to optimize nested loops
+
+# 10. Fortran Practices to Avoid
+
+- **Fixed Format**: Only free-form Fortran is used
+  - No column-position dependent code
+
+- **Older Intrinsics**: Avoid outdated Fortran features like:
+  - `equivalence` statements
+  - `data` statements (use initialization expressions)
+  - Character*N (use `character(len=N)` instead)
+
+- **Using same variable for multiple purposes**: Maintain single responsibility
+  - Each variable should have one clear purpose

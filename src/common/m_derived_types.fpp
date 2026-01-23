@@ -17,32 +17,36 @@ module m_derived_types
 
     !> Derived type adding the field position (fp) as an attribute
     type field_position
-        real(wp), allocatable, dimension(:, :, :) :: fp !< Field position
+        real(stp), allocatable, dimension(:, :, :) :: fp !< Field position
     end type field_position
 
     !> Derived type annexing a scalar field (SF)
     type scalar_field
-        real(wp), pointer, dimension(:, :, :) :: sf => null()
+        real(stp), pointer, dimension(:, :, :) :: sf => null()
     end type scalar_field
 
     !> Derived type for bubble variables pb and mv at quadrature nodes (qbmm)
     type pres_field
-        real(wp), pointer, dimension(:, :, :, :, :) :: sf => null()
+        real(stp), pointer, dimension(:, :, :, :, :) :: sf => null()
     end type pres_field
 
     !> Derived type annexing an integer scalar field (SF)
     type integer_field
+#ifdef MFC_MIXED_PRECISION
+        integer(kind=1), pointer, dimension(:, :, :) :: sf => null()
+#else
         integer, pointer, dimension(:, :, :) :: sf => null()
+#endif
     end type integer_field
 
     !> Derived type for levelset
     type levelset_field
-        real(wp), pointer, dimension(:, :, :, :) :: sf => null()
+        real(stp), pointer, dimension(:, :, :, :) :: sf => null()
     end type levelset_field
 
     !> Derived type for levelset norm
     type levelset_norm_field
-        real(wp), pointer, dimension(:, :, :, :, :) :: sf => null()
+        real(stp), pointer, dimension(:, :, :, :, :) :: sf => null()
     end type levelset_norm_field
 
     type mpi_io_var
@@ -108,6 +112,16 @@ module m_derived_types
 
     end type int_bounds_info
 
+    type bc_patch_parameters
+        integer :: geometry
+        integer :: type
+        integer :: dir
+        integer :: loc
+        real(wp), dimension(3) :: centroid
+        real(wp), dimension(3) :: length
+        real(wp) :: radius
+    end type bc_patch_parameters
+
     !> Derived type adding beginning (beg) and end bounds info as attributes
     type bounds_info
         real(wp) :: beg
@@ -131,13 +145,13 @@ module m_derived_types
         character(LEN=pathlen_max) :: filepath !<
         !! Path the STL file relative to case_dir.
 
-        t_vec3 :: translate !<
+        real(wp), dimension(1:3) :: translate !<
         !! Translation of the STL object.
 
-        t_vec3 :: scale !<
+        real(wp), dimension(1:3) :: scale !<
         !! Scale factor for the STL object.
 
-        t_vec3 :: rotate !<
+        real(wp), dimension(1:3) :: rotate !<
         !! Angle to rotate the STL object along each cartesian coordinate axis,
         !! in radians.
 
@@ -150,17 +164,17 @@ module m_derived_types
 
     type :: t_triangle
         real(wp), dimension(1:3, 1:3) :: v ! Vertices of the triangle
-        t_vec3 :: n ! Normal vector
+        real(wp), dimension(1:3) :: n ! Normal vector
     end type t_triangle
 
     type :: t_ray
-        t_vec3 :: o ! Origin
-        t_vec3 :: d ! Direction
+        real(wp), dimension(1:3) :: o ! Origin
+        real(wp), dimension(1:3) :: d ! Direction
     end type t_ray
 
     type :: t_bbox
-        t_vec3 :: min ! Minimum coordinates
-        t_vec3 :: max ! Maximum coordinates
+        real(wp), dimension(1:3) :: min ! Minimum coordinates
+        real(wp), dimension(1:3) :: max ! Maximum coordinates
     end type t_bbox
 
     type :: t_model
@@ -255,13 +269,13 @@ module m_derived_types
         character(LEN=pathlen_max) :: model_filepath !<
         !! Path the STL file relative to case_dir.
 
-        t_vec3 :: model_translate !<
+        real(wp), dimension(1:3) :: model_translate !<
         !! Translation of the STL object.
 
-        t_vec3 :: model_scale !<
+        real(wp), dimension(1:3) :: model_scale !<
         !! Scale factor for the STL object.
 
-        t_vec3 :: model_rotate !<
+        real(wp), dimension(1:3) :: model_rotate !<
         !! Angle to rotate the STL object along each cartesian coordinate axis,
         !! in radians.
 
@@ -280,6 +294,13 @@ module m_derived_types
         real(wp) :: x_centroid, y_centroid, z_centroid !<
         !! Location of the geometric center, i.e. the centroid, of the patch. It
         !! is specified through its x-, y- and z-coordinates, respectively.
+        real(wp) :: step_x_centroid, step_y_centroid, step_z_centroid !<
+        !! Centroid locations of intermediate steps in the time_stepper module
+
+        real(wp), dimension(1:3) :: angles
+        real(wp), dimension(1:3) :: step_angles
+        real(wp), dimension(1:3, 1:3) :: rotation_matrix !< matrix that converts from IB reference frame to fluid reference frame
+        real(wp), dimension(1:3, 1:3) :: rotation_matrix_inverse !< matrix that converts from fluid reference frame to IB reference frame
 
         real(wp) :: c, p, t, m
 
@@ -293,13 +314,13 @@ module m_derived_types
         character(LEN=pathlen_max) :: model_filepath !<
         !! Path the STL file relative to case_dir.
 
-        t_vec3 :: model_translate !<
+        real(wp), dimension(1:3) :: model_translate !<
         !! Translation of the STL object.
 
-        t_vec3 :: model_scale !<
+        real(wp), dimension(1:3) :: model_scale !<
         !! Scale factor for the STL object.
 
-        t_vec3 :: model_rotate !<
+        real(wp), dimension(1:3) :: model_rotate !<
         !! Angle to rotate the STL object along each cartesian coordinate axis,
         !! in radians.
 
@@ -308,6 +329,16 @@ module m_derived_types
 
         real(wp) :: model_threshold !<
         !! Threshold to turn on smoothen STL patch.
+
+        !! Patch conditions for moving imersed boundaries
+        integer :: moving_ibm ! 0 for no moving, 1 for moving, 2 for moving on forced path
+        real(wp) :: mass, moment ! mass and moment of inertia of object used to compute forces in 2-way coupling
+        real(wp), dimension(1:3) :: force, torque ! vectors for the computed force and torque values applied to an IB
+        real(wp), dimension(1:3) :: vel
+        real(wp), dimension(1:3) :: step_vel ! velocity array used to store intermediate steps in the time_stepper module
+        real(wp), dimension(1:3) :: angular_vel
+        real(wp), dimension(1:3) :: step_angular_vel ! velocity array used to store intermediate steps in the time_stepper module
+
     end type ib_patch_parameters
 
     !> Derived type annexing the physical parameters (PP) of the fluids. These
@@ -328,6 +359,8 @@ module m_derived_types
         real(wp) :: k_v     !< Bubble constants (see Preston (2007), Ando (2010))
         real(wp) :: cp_v
         real(wp) :: G
+        real(wp) :: D_v     !< Vapor diffusivity in the gas
+
     end type physical_parameters
 
     type mpi_io_airfoil_ib_var
@@ -375,10 +408,11 @@ module m_derived_types
 
     !> Acoustic source source_spatial pre-calculated values
     type source_spatial_type
-        integer, dimension(:, :), allocatable :: coord !< List of grid points indices with non-zero source_spatial values
-        real(wp), dimension(:), allocatable :: val !< List of non-zero source_spatial values
-        real(wp), dimension(:), allocatable :: angle !< List of angles with x-axis for mom source term vector
-        real(wp), dimension(:, :), allocatable :: xyz_to_r_ratios !< List of [xyz]/r for mom source term vector
+        integer, pointer, dimension(:, :) :: coord => null() !< List of grid points indices with non-zero source_spatial values
+        real(wp), pointer, dimension(:) :: val => null() !< List of non-zero source_spatial values
+        real(wp), pointer, dimension(:) :: angle => null() !< List of angles with x-axis for mom source term vector
+        real(wp), pointer, dimension(:, :) :: xyz_to_r_ratios => null() !< List of [xyz]/r for mom source term vector
+
     end type source_spatial_type
 
     !> Ghost Point for Immersed Boundaries
@@ -429,8 +463,26 @@ module m_derived_types
         real(wp) :: rho0             !< Reference density
         real(wp) :: T0, Thost        !< Reference temperature and host temperature
         real(wp) :: x0               !< Reference length
-        real(wp) :: diffcoefvap      !< Vapor diffusivity in the gas
 
     end type bubbles_lagrange_parameters
 
+    !> Max and min number of cells in a direction of each combination of x-,y-, and z-
+    type cell_num_bounds
+        integer :: mn_max, np_max, mp_max, mnp_max
+        integer :: mn_min, np_min, mp_min, mnp_min
+    end type cell_num_bounds
+
+    type simplex_noise_params
+        logical, dimension(3) :: perturb_vel
+        real(wp), dimension(3) :: perturb_vel_freq
+        real(wp), dimension(3) :: perturb_vel_scale
+        real(wp), dimension(3, 3) :: perturb_vel_offset
+
+        logical, dimension(1:num_fluids_max) :: perturb_dens
+        real(wp), dimension(1:num_fluids_max) :: perturb_dens_freq
+        real(wp), dimension(1:num_fluids_max) :: perturb_dens_scale
+        real(wp), dimension(1:num_fluids_max, 3) :: perturb_dens_offset
+    end type
+
 end module m_derived_types
+

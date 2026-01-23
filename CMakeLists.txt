@@ -18,8 +18,10 @@ project(MFC LANGUAGES C CXX Fortran)
 
 option(MFC_MPI           "Build with MPI"                                     ON)
 option(MFC_OpenACC       "Build with OpenACC"                                OFF)
+option(MFC_OpenMP        "Build with OpenMP"                                 OFF)
 option(MFC_GCov          "Build with GCov"                                   OFF)
 option(MFC_Unified       "Build with unified CPU & GPU memory (GH-200 only)" OFF)
+option(MFC_Fastmath      "Build with -gpu=fastmath on NV GPUs"               OFF)
 option(MFC_PRE_PROCESS   "Build pre_process"                                 OFF)
 option(MFC_SIMULATION    "Build simulation"                                  OFF)
 option(MFC_POST_PROCESS  "Build post_process"                                OFF)
@@ -27,6 +29,7 @@ option(MFC_SYSCHECK      "Build syscheck"                                    OFF
 option(MFC_DOCUMENTATION "Build documentation"                               OFF)
 option(MFC_ALL           "Build everything"                                  OFF)
 option(MFC_SINGLE_PRECISION "Build single precision"                         OFF)
+option(MFC_MIXED_PRECISION "Build mixed precision"                           OFF)
 
 if (MFC_ALL)
     set(MFC_PRE_PROCESS   ON FORCE)
@@ -39,6 +42,10 @@ if (MFC_SINGLE_PRECISION)
     add_compile_definitions(MFC_SINGLE_PRECISION)
 else()
     add_compile_definitions(MFC_DOUBLE_PRECISION)
+endif()
+
+if (MFC_MIXED_PRECISION)
+    add_compile_definitions(MFC_MIXED_PRECISION)
 endif()
 
 
@@ -124,6 +131,7 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
         add_compile_options(
             $<$<COMPILE_LANGUAGE:Fortran>:-fprofile-arcs>
             $<$<COMPILE_LANGUAGE:Fortran>:-ftest-coverage>
+            $<$<COMPILE_LANGUAGE:Fortran>:-O1>
 	    )
 
         add_link_options(
@@ -135,13 +143,17 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_compile_options(
             -Wall
+            -Wextra
             -fcheck=all,no-array-temps
             -fbacktrace
             -fimplicit-none
-            #-ffpe-trap=invalid,zero,denormal,overflow
             -fsignaling-nans
             -finit-real=snan
             -finit-integer=-99999999
+            -Wintrinsic-shadow
+            -Wunderflow
+            -Wrealloc-lhs
+            -Wsurprising
 	    )
     endif()
 
@@ -159,6 +171,7 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
         "SHELL:-h acc_model=auto_async_none"
         "SHELL: -h acc_model=no_fast_addr"
         "SHELL: -h list=adm"
+        "SHELL: -munsafe-fp-atomics" # Not unsafe for operations we do
     )
 
     add_link_options("SHELL:-hkeepfiles")
@@ -168,7 +181,6 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
                 "SHELL:-h acc_model=auto_async_none"
                 "SHELL: -h acc_model=no_fast_addr"
                 "SHELL: -K trap=fp" "SHELL: -G2"
-
         )
         add_link_options("SHELL: -K trap=fp" "SHELL: -G2")
     endif()
@@ -189,17 +201,17 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
     add_compile_options(
         $<$<COMPILE_LANGUAGE:Fortran>:-Mfreeform>
         $<$<COMPILE_LANGUAGE:Fortran>:-cpp>
-	    $<$<COMPILE_LANGUAGE:Fortran>:-Minfo=inline>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Minfo=inline>
         $<$<COMPILE_LANGUAGE:Fortran>:-Minfo=accel>
     )
 
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_compile_options(
             $<$<COMPILE_LANGUAGE:Fortran>:-O0>
-            $<$<COMPILE_LANGUAGE:Fortran>:-C> 
+            $<$<COMPILE_LANGUAGE:Fortran>:-C>
             $<$<COMPILE_LANGUAGE:Fortran>:-g>
-            $<$<COMPILE_LANGUAGE:Fortran>:-traceback> 
-            $<$<COMPILE_LANGUAGE:Fortran>:-Minform=inform> 
+            $<$<COMPILE_LANGUAGE:Fortran>:-traceback>
+            $<$<COMPILE_LANGUAGE:Fortran>:-Minform=inform>
             $<$<COMPILE_LANGUAGE:Fortran>:-Mbounds>
         )
     endif()
@@ -322,6 +334,13 @@ macro(HANDLE_SOURCES target useCommon)
                                                "${CMAKE_BINARY_DIR}/modules/${target}/*.fpp")
     if (${useCommon})
         file(GLOB common_FPPs CONFIGURE_DEPENDS "${common_DIR}/*.fpp")
+
+        # If we're building post_process, exclude m_compute_levelset.fpp
+        if("${target}" STREQUAL "post_process")
+            list(FILTER common_FPPs EXCLUDE REGEX ".*/m_compute_levelset\.fpp$")
+            list(FILTER common_FPPs EXCLUDE REGEX ".*/m_ib_patches\.fpp$")
+        endif()
+
         list(APPEND ${target}_FPPs ${common_FPPs})
     endif()
 
@@ -356,6 +375,8 @@ macro(HANDLE_SOURCES target useCommon)
                                  -D chemistry=False
                                  --line-numbering
                                  --no-folding
+								 --line-length=999
+		 						 --line-numbering-mode=nocontlines
                                  "${fpp}" "${f90}"
             DEPENDS  "${fpp};${${target}_incs}"
             COMMENT  "Preprocessing (Fypp) ${fpp_filename}"
@@ -387,15 +408,16 @@ HANDLE_SOURCES(syscheck OFF)
 #  * FFTW     (optional) Should be linked with an FFTW-like library (fftw/cufftw),
 #             depending on whether OpenACC is enabled and which compiler is
 #             being used.
+#  * LAPACK   (optional) Should be linked with LAPACK
 
 function(MFC_SETUP_TARGET)
-    cmake_parse_arguments(ARGS "OpenACC;MPI;SILO;HDF5;FFTW" "TARGET" "SOURCES" ${ARGN})
+    cmake_parse_arguments(ARGS "OpenACC;MPI;SILO;HDF5;FFTW;LAPACK;OpenMP" "TARGET" "SOURCES" ${ARGN})
 
     add_executable(${ARGS_TARGET} ${ARGS_SOURCES})
     set(IPO_TARGETS ${ARGS_TARGET})
     # Here we need to split into "library" and "executable" to perform IPO on the NVIDIA compiler.
     # A little hacky, but it *is* an edge-case for *one* compiler.
-    if (NVHPC_USE_TWO_PASS_IPO)
+    if (NVHPC_USE_TWO_PASS_IPO AND NOT(MFC_OpenMP AND ARGS_OpenMP))
         add_library(${ARGS_TARGET}_lib OBJECT ${ARGS_SOURCES})
         target_compile_options(${ARGS_TARGET}_lib PRIVATE
 		    $<$<COMPILE_LANGUAGE:Fortran>:-Mextract=lib:${ARGS_TARGET}_lib>
@@ -434,7 +456,7 @@ function(MFC_SETUP_TARGET)
 
         if (ARGS_SILO)
             find_package(SILO REQUIRED)
-            target_link_libraries(${a_target} PRIVATE SILO::SILO)
+            target_link_libraries(${a_target} PRIVATE SILO::SILO stdc++)
         endif()
 
         if (ARGS_HDF5)
@@ -443,7 +465,7 @@ function(MFC_SETUP_TARGET)
         endif()
 
         if (ARGS_FFTW)
-            if (MFC_OpenACC AND ARGS_OpenACC)
+            if ((MFC_OpenACC AND ARGS_OpenACC) OR (MFC_OpenMP AND ARGS_OpenMP))
                 if (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
                     find_package(CUDAToolkit REQUIRED)
                     target_link_libraries(${a_target} PRIVATE CUDA::cudart CUDA::cufft)
@@ -457,16 +479,48 @@ function(MFC_SETUP_TARGET)
             endif()
         endif()
 
-        if (MFC_OpenACC AND ARGS_OpenACC)
-            find_package(OpenACC)
+        if (ARGS_LAPACK)
+            find_package(LAPACK REQUIRED)
+            target_link_libraries(${a_target} PRIVATE LAPACK::LAPACK)
+        endif()
 
-            # This should be equivalent to if (NOT OpenACC_FC_FOUND)
-            if (NOT TARGET OpenACC::OpenACC_Fortran)
-                message(FATAL_ERROR "OpenACC + Fortran is unsupported.")
+        if ((MFC_OpenACC AND ARGS_OpenACC) OR (MFC_OpenMP AND ARGS_OpenMP))
+            if ((MFC_OpenACC AND ARGS_OpenACC))
+                find_package(OpenACC)
+
+                # This should be equivalent to if (NOT OpenACC_FC_FOUND)
+                if (NOT TARGET OpenACC::OpenACC_Fortran)
+                    message(FATAL_ERROR "OpenACC + Fortran is unsupported.")
+                endif()
+
+                target_link_libraries(${a_target} PRIVATE OpenACC::OpenACC_Fortran)
+                target_compile_definitions(${a_target} PRIVATE MFC_OpenACC MFC_GPU)
+            elseif((MFC_OpenMP AND ARGS_OpenMP))
+                find_package(OpenMP)
+
+                # This should be equivalent to if (NOT OpenACC_FC_FOUND)
+                if (NOT TARGET OpenMP::OpenMP_Fortran)
+                    message(FATAL_ERROR "OpenMP + Fortran is unsupported.")
+                endif()
+                set(ENV{OMP_TARGET_OFFLOAD} [MANDATORY])
+                # target_link_libraries(${a_target} PRIVATE OpenMP::OpenMP_Fortran)
+                target_compile_definitions(${a_target} PRIVATE MFC_OpenMP MFC_GPU)
+
+                if(CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
+                    target_compile_options(${a_target} PRIVATE "-mp=gpu" "-Minfo=mp")
+                    target_link_options(${a_target} PRIVATE "-mp=gpu")
+                    set_target_properties(${a_target} PROPERTIES Fortran_FLAGS "-mp=gpu -gpu=ccall")
+                elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "Intel")
+                    target_compile_options(${a_target} PRIVATE -fopenmp -fopenmp-targets=spir64)
+                    target_link_options(${a_target} PRIVATE -fopenmp -fopenmp-targets=spir64)
+                elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
+                    target_compile_options(${a_target} PRIVATE -fopenmp)
+                    target_link_options(${a_target} PRIVATE -fopenmp)
+                elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
+                    target_compile_options(${a_target} PRIVATE -fopenmp --offload-arch=gfx90a)
+                    target_link_options(${a_target} PRIVATE -fopenmp --offload-arch=gfx90a)
+                endif()
             endif()
-
-            target_link_libraries(${a_target} PRIVATE OpenACC::OpenACC_Fortran)
-            target_compile_definitions(${a_target} PRIVATE MFC_OpenACC)
 
             if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
                 # FIXME: This should work with other cards than gfx90a ones.
@@ -474,18 +528,10 @@ function(MFC_SETUP_TARGET)
                     "-foffload=amdgcn-amdhsa='-march=gfx90a'"
                     "-foffload-options=-lgfortran\ -lm"
                     "-fno-exceptions")
-            elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
-                find_package(cuTENSOR)
-                if (NOT cuTENSOR_FOUND)
-                    message(WARNING
-                        "Failed to locate the NVIDIA cuTENSOR library. MFC will be "
-                        "built without support for it, disallowing the use of "
-                        "cu_tensor=T. This can result in degraded performance.")
-                else()
-                    target_link_libraries     (${a_target} PRIVATE cuTENSOR::cuTENSOR)
-                    target_compile_definitions(${a_target} PRIVATE MFC_cuTENSOR)
+                if (MFC_Fastmath)
+                    message(WARNING "--fastmath has no effect with the GNU compiler")
                 endif()
-
+            elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
                 foreach (cc ${MFC_CUDA_CC})
                     target_compile_options(${a_target}
                         PRIVATE -gpu=cc${cc}
@@ -496,33 +542,66 @@ function(MFC_SETUP_TARGET)
                     PRIVATE -gpu=keep,ptxinfo,lineinfo
                 )
 
+                if (MFC_Fastmath)
+                    target_compile_options(${a_target}
+                        PRIVATE -gpu=fastmath
+                    )
+                endif()
+
                 # GH-200 Unified Memory Support
                 if (MFC_Unified)
                     target_compile_options(${ARGS_TARGET}
-                        PRIVATE -gpu=unified
+                        PRIVATE -gpu=mem:unified:managedalloc -cuda
                     )
                     # "This option must appear in both the compile and link lines" -- NVHPC Docs
                     target_link_options(${ARGS_TARGET}
-                        PRIVATE -gpu=unified
+                        PRIVATE -gpu=mem:unified:managedalloc -cuda
                     )
                 endif()
 
                 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
                     target_compile_options(${a_target}
-                        PRIVATE -gpu=autocompare,debug
+                        PRIVATE -gpu=debug
                     )
                 endif()
             elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
+                # Frontier Unified Memory Support
+                if (MFC_Unified)
+                    target_compile_options(${ARGS_TARGET}
+                        PRIVATE -DFRONTIER_UNIFIED)
+                endif()
+
+                if (MFC_Fastmath)
+                    message(WARNING "--fastmath has no effect with the CCE")
+                endif()
+
                 find_package(hipfort COMPONENTS hip CONFIG REQUIRED)
                 target_link_libraries(${a_target} PRIVATE hipfort::hip hipfort::hipfort-amdgcn)
+            elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
+
+                if (MFC_Unified)
+                    target_compile_options(${ARGS_TARGET}
+                        PRIVATE -DFRONTIER_UNIFIED)
+                endif()
+
+    		find_package(hipfort COMPONENTS hip CONFIG REQUIRED)
+                target_link_libraries(${a_target} PRIVATE hipfort::hip hipfort::hipfort-amdgcn flang_rt.hostdevice)
             endif()
         elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
             target_compile_options(${a_target} PRIVATE "SHELL:-h noacc" "SHELL:-x acc")
+            if (MFC_Fastmath)
+                message(WARNING "--fastmath has no effect with the CCE")
+            endif()
         endif()
 
         if (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
             find_package(CUDAToolkit REQUIRED)
-            target_link_libraries(${a_target} PRIVATE CUDA::nvToolsExt)
+            if (TARGET CUDA::nvToolsExt) # CUDA <= 12.8
+                target_link_libraries(${a_target} PRIVATE CUDA::nvToolsExt)
+            else() # CUDA >= 12.9
+                target_link_libraries(${a_target} PRIVATE nvhpcwrapnvtx)
+                target_link_options(${a_target} PRIVATE "-cudalib=nvtx3")
+            endif()
         endif()
     endforeach()
 
@@ -542,13 +621,13 @@ endif()
 if (MFC_SIMULATION)
     MFC_SETUP_TARGET(TARGET  simulation
                      SOURCES "${simulation_SRCs}"
-                     MPI OpenACC FFTW)
+                     MPI FFTW OpenACC OpenMP)
 endif()
 
 if (MFC_POST_PROCESS)
     MFC_SETUP_TARGET(TARGET  post_process
                      SOURCES "${post_process_SRCs}"
-                     MPI SILO HDF5 FFTW)
+                     MPI SILO HDF5 FFTW LAPACK)
 
     # -O0 is in response to https://github.com/MFlowCode/MFC-develop/issues/95
     target_compile_options(post_process PRIVATE -O0)
@@ -557,7 +636,7 @@ endif()
 if (MFC_SYSCHECK)
     MFC_SETUP_TARGET(TARGET  syscheck
                      SOURCES "${syscheck_SRCs}"
-                     MPI OpenACC)
+                     MPI OpenACC OpenMP)
 endif()
 
 if (MFC_DOCUMENTATION)
@@ -570,6 +649,18 @@ if (MFC_DOCUMENTATION)
         COMMAND "bash" "${CMAKE_CURRENT_SOURCE_DIR}/docs/examples.sh"
                        "${CMAKE_CURRENT_SOURCE_DIR}"
         COMMENT "Generating examples.md"
+        VERBATIM
+    )
+
+    # Generate case_constraints.md from case_validator.py and examples/
+    add_custom_command(
+        OUTPUT  "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/case_constraints.md"
+        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/mfc/gen_case_constraints_docs.py"
+                "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/mfc/case_validator.py"
+                "${examples_DOCs}"
+        COMMAND "bash" "${CMAKE_CURRENT_SOURCE_DIR}/docs/gen_constraints.sh"
+                       "${CMAKE_CURRENT_SOURCE_DIR}"
+        COMMENT "Generating case_constraints.md"
         VERBATIM
     )
 
@@ -606,8 +697,10 @@ if (MFC_DOCUMENTATION)
             "${CMAKE_CURRENT_BINARY_DIR}/${target}-Doxyfile" @ONLY)
 
         set(opt_example_dependency "")
+        set(opt_constraints_dependency "")
         if (${target} STREQUAL documentation)
             set(opt_example_dependency "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/examples.md")
+            set(opt_constraints_dependency "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/case_constraints.md")
         endif()
 
         file(GLOB_RECURSE ${target}_DOCs CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/docs/${target}/*")
@@ -617,6 +710,7 @@ if (MFC_DOCUMENTATION)
             OUTPUT  "${CMAKE_CURRENT_BINARY_DIR}/${target}/html/index.html"
             DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/${target}-Doxyfile"
                     "${opt_example_dependency}"
+                    "${opt_constraints_dependency}"
                     "${${target}_SRCs}" "${${target}_DOCs}"
             COMMAND "${DOXYGEN_EXECUTABLE}" "${target}-Doxyfile"
             WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"

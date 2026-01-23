@@ -3,7 +3,7 @@
 set -e
 
 usage() {
-    echo "Usage: $0 [script.sh] [cpu|gpu]"
+    echo "Usage: $0 [script.sh] [cpu|gpu] [none|acc|omp]"
 }
 
 if [ ! -z "$1" ]; then
@@ -25,16 +25,16 @@ sbatch_gpu_opts="\
 #SBATCH -G2\
 "
 
-if [ "$2" == "cpu" ]; then
+if [ "$2" = "cpu" ]; then
     sbatch_device_opts="$sbatch_cpu_opts"
-elif [ "$2" == "gpu" ]; then
+elif [ "$2" = "gpu" ]; then
     sbatch_device_opts="$sbatch_gpu_opts"
 else
     usage
     exit 1
 fi
 
-job_slug="`basename "$1" | sed 's/\.sh$//' | sed 's/[^a-zA-Z0-9]/-/g'`-$2"
+job_slug="`basename "$1" | sed 's/\.sh$//' | sed 's/[^a-zA-Z0-9]/-/g'`-$2-$3"
 
 sbatch <<EOT
 #!/bin/bash
@@ -42,10 +42,9 @@ sbatch <<EOT
 #SBATCH --account=gts-sbryngelson3 # charge account
 #SBATCH -N1                        # Number of nodes required
 $sbatch_device_opts
-#SBATCH -t 02:00:00                # Duration of the job (Ex: 15 mins)
+#SBATCH -t 04:00:00                # Duration of the job (Ex: 15 mins)
 #SBATCH -q embers                  # QOS Name
 #SBATCH -o$job_slug.out            # Combined output and error messages file
-#SBATCH -W                         # Do not exit until the submitted job terminates.
 
 set -e
 set -x
@@ -55,6 +54,7 @@ echo "Running in $(pwd):"
 
 job_slug="$job_slug"
 job_device="$2"
+job_interface="$3"
 
 . ./mfc.sh load -c p -m $2
 

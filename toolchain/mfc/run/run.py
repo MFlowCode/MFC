@@ -7,7 +7,7 @@ from mako.template import Template
 
 from ..build   import get_targets, build, REQUIRED_TARGETS, SIMULATION
 from ..printer import cons
-from ..state   import ARG, ARGS, CFG
+from ..state   import ARG, ARGS, CFG, gpuConfigOptions
 from ..common  import MFCException, isspace, file_read, does_command_exist
 from ..common  import MFC_TEMPLATE_DIR, file_write, system, MFC_ROOT_DIR
 from ..common  import format_list_to_string, file_dump_yaml
@@ -45,17 +45,17 @@ def __profiler_prepend() -> typing.List[str]:
 
         return ["nsys", "profile", "--stats=true", "--trace=mpi,nvtx,openacc"] + ARG("nsys")
 
-    if ARG("omni") is not None:
-        if not does_command_exist("omniperf"):
-            raise MFCException("Failed to locate [bold red]ROCM Omniperf[/bold red] (omniperf).")
+    if ARG("rcu") is not None:
+        if not does_command_exist("rocprof-compute"):
+            raise MFCException("Failed to locate [bold red]ROCM rocprof-compute[/bold red] (rocprof-compute).")
 
-        return ["omniperf", "profile"] + ARG("omni") + ["--"]
+        return ["rocprof-compute", "profile", "-n", ARG("name").replace('-', '_').replace('.', '_')] + ARG("rcu") + ["--"]
 
-    if ARG("roc") is not None:
+    if ARG("rsys") is not None:
         if not does_command_exist("rocprof"):
-            raise MFCException("Failed to locate [bold red]ROCM rocprof[/bold red] (rocprof).")
+            raise MFCException("Failed to locate [bold red]ROCM rocprof-systems[/bold red] (rocprof-systems).")
 
-        return ["rocprof"] + ARG("roc")
+        return ["rocprof"] + ARG("rsys")
 
     return []
 
@@ -99,6 +99,20 @@ def __generate_job_script(targets, case: input.MFCInputFile):
             'HIP_VISIBLE_DEVICES':  gpu_ids
         })
 
+    # Compute GPU mode booleans for templates
+    gpu_mode = ARG('gpu')
+
+    # Validate gpu_mode is one of the expected values
+    valid_gpu_modes = {e.value for e in gpuConfigOptions}
+    if gpu_mode not in valid_gpu_modes:
+        raise MFCException(
+            f"Invalid GPU mode '{gpu_mode}'. Must be one of: {', '.join(sorted(valid_gpu_modes))}"
+        )
+
+    gpu_enabled = gpu_mode != gpuConfigOptions.NONE.value
+    gpu_acc = gpu_mode == gpuConfigOptions.ACC.value
+    gpu_mp = gpu_mode == gpuConfigOptions.MP.value
+
     content = __get_template().render(
         **{**ARGS(), 'targets': targets},
         ARG=ARG,
@@ -107,7 +121,10 @@ def __generate_job_script(targets, case: input.MFCInputFile):
         MFC_ROOT_DIR=MFC_ROOT_DIR,
         SIMULATION=SIMULATION,
         qsystem=queues.get_system(),
-        profiler=shlex.join(__profiler_prepend())
+        profiler=shlex.join(__profiler_prepend()),
+        gpu_enabled=gpu_enabled,
+        gpu_acc=gpu_acc,
+        gpu_mp=gpu_mp
     )
 
     file_write(__job_script_filepath(), content)
@@ -117,9 +134,7 @@ def __generate_input_files(targets, case: input.MFCInputFile):
     for target in targets:
         cons.print(f"Generating input files for [magenta]{target.name}[/magenta]...")
         cons.indent()
-        cons.print()
-        case.generate_inp(target)
-        cons.print()
+        case.generate(target)
         cons.unindent()
 
 

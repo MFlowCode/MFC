@@ -35,8 +35,8 @@ print(
             "p": 0,
             "dt": dt,
             "t_step_start": 0,
-            "t_step_stop": Nt,
-            "t_step_save": int(Nt / 20.0),
+            "t_step_stop": 1000,
+            "t_step_save": 10,
             # Simulation Algorithm Parameters
             "num_patches": 3,
             "model_eqns": 2,
