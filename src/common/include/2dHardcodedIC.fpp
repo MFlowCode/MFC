@@ -1,11 +1,9 @@
 #:def Hardcoded2DVariables()
     ! Place any declaration of intermediate variables here
-    real(wp) :: eps
+    real(wp) :: eps, C_mhd
     real(wp) :: r, rmax, gam, umax, p0
     real(wp) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, intL, alph
     real(wp) :: factor
-<<<<<<< HEAD:src/pre_process/include/2dHardcodedIC.fpp
-    real(wp) :: eps_mhd, sigma, C_mhd
     real(wp) :: r0, alpha, r2
     real(wp) :: sinA, cosA
 
@@ -18,12 +16,11 @@
     ! Center of the domain
     real(wp), parameter :: x_center = 0.5_wp
     real(wp), parameter :: y_center = 0.5_wp
-=======
+
     ! # 207
     real(wp) :: sigma, gauss1, gauss2
     ! # 208
     real(wp) :: ei, d, fsm, alpha_air, alpha_sf6
->>>>>>> master:src/common/include/2dHardcodedIC.fpp
 
     eps = 1.e-9_wp
 #:enddef
@@ -199,7 +196,6 @@
             q_prim_vf(E_idx)%sf(i, j, 0) = 3.e-5_wp
         end if
 
-<<<<<<< HEAD:src/pre_process/include/2dHardcodedIC.fpp
         ! case 252 is for the 2D MHD Rotor problem
     case (252) ! 2D MHD Rotor Problem
         ! Ambient conditions are set in the JSON file.
@@ -226,6 +222,22 @@
             q_prim_vf(momxb)%sf(i, j, 0) = -omega * (y_cc(j) - y_center)
             q_prim_vf(momxb + 1)%sf(i, j, 0) = omega * (x_cc(i) - x_center)
         end if
+
+      case (253) ! MHD Smooth Magnetic Vortex
+        ! Section 5.2 of
+        ! Implicit hybridized discontinuous Galerkin methods for compressible magnetohydrodynamics
+        ! C. Ciuca, P. Fernandez, A. Christophe, N.C. Nguyen, J. Peraire
+
+        ! velocity
+        q_prim_vf(momxb)%sf(i, j, 0) = 1._wp - (y_cc(j)*exp(1 - (x_cc(i)**2 + y_cc(j)**2))/(2.*pi))
+        q_prim_vf(momxb + 1)%sf(i, j, 0) = 1._wp + (x_cc(i)*exp(1 - (x_cc(i)**2 + y_cc(j)**2))/(2.*pi))
+
+        ! magnetic field
+        q_prim_vf(B_idx%beg)%sf(i, j, 0) = -y_cc(j)*exp(1 - (x_cc(i)**2 + y_cc(j)**2))/(2.*pi)
+        q_prim_vf(B_idx%beg + 1)%sf(i, j, 0) = x_cc(i)*exp(1 - (x_cc(i)**2 + y_cc(j)**2))/(2.*pi)
+
+        ! pressure
+        q_prim_vf(E_idx)%sf(i, j, 0) = 1._wp + (1 - 2._wp*(x_cc(i)**2 + y_cc(j)**2))*exp(1 - (x_cc(i)**2 + y_cc(j)**2))/((2._wp*pi)**3)
 
     case (260)  ! Gaussian Divergence Pulse
         !---------------------------------------------------------
@@ -284,22 +296,6 @@
                                                 + (5._wp/sqrt(4._wp*pi)) * cosA
         end if
         ! v^z and B^z remain zero by default
-=======
-    case (252) ! MHD Smooth Magnetic Vortex
-        ! Section 5.2 of
-        ! Implicit hybridized discontinuous Galerkin methods for compressible magnetohydrodynamics
-        ! C. Ciuca, P. Fernandez, A. Christophe, N.C. Nguyen, J. Peraire
-
-        ! velocity
-        q_prim_vf(momxb)%sf(i, j, 0) = 1._wp - (y_cc(j)*exp(1 - (x_cc(i)**2 + y_cc(j)**2))/(2.*pi))
-        q_prim_vf(momxb + 1)%sf(i, j, 0) = 1._wp + (x_cc(i)*exp(1 - (x_cc(i)**2 + y_cc(j)**2))/(2.*pi))
-
-        ! magnetic field
-        q_prim_vf(B_idx%beg)%sf(i, j, 0) = -y_cc(j)*exp(1 - (x_cc(i)**2 + y_cc(j)**2))/(2.*pi)
-        q_prim_vf(B_idx%beg + 1)%sf(i, j, 0) = x_cc(i)*exp(1 - (x_cc(i)**2 + y_cc(j)**2))/(2.*pi)
-
-        ! pressure
-        q_prim_vf(E_idx)%sf(i, j, 0) = 1._wp + (1 - 2._wp*(x_cc(i)**2 + y_cc(j)**2))*exp(1 - (x_cc(i)**2 + y_cc(j)**2))/((2._wp*pi)**3)
 
     case (270)
         ! This hardcoded case extrudes a 1D profile to initialize a 2D simulation domain
@@ -335,7 +331,6 @@
             q_prim_vf(momxb + 0)%sf(i, j, 0) = 112.99092883944267*(1 - (0.1/0.3))*y_cc(j)*exp(0.5*(1 - sqrt(x_cc(i)**2 + y_cc(j)**2)))
             q_prim_vf(momxb + 1)%sf(i, j, 0) = 112.99092883944267*((0.1/0.3))*x_cc(i)*exp(0.5*(1 - sqrt(x_cc(i)**2 + y_cc(j)**2)))
         end if
->>>>>>> master:src/common/include/2dHardcodedIC.fpp
 
     case default
         if (proc_rank == 0) then
