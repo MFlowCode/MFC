@@ -88,6 +88,7 @@ contains
         real(wp) :: rhoe, dynE, rhos !< total internal energy, kinetic energy, and total entropy
         real(wp) :: rho, rM, m1, m2, MCT !< total density, total reacting mass, individual reacting masses
         real(wp) :: TvF !< total volume fraction
+        real(wp) :: m1_old, dm_evap !< For multiphase chemistry: store initial liquid mass and compute evaporated mass
 
         ! $:GPU_DECLARE(create='[pS,pSOV,pSSL,TS,TSOV,TSSL,TSatOV,TSatSL]')
         ! $:GPU_DECLARE(create='[rhoe,dynE,rhos,rho,rM,m1,m2,MCT,TvF]')
@@ -99,7 +100,7 @@ contains
         integer :: i, j, k, l
 
         ! starting equilibrium solver
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[j,k,l,p_infOV, p_infpT, p_infSL, sk, hk, gk, ek, rhok,pS, pSOV, pSSL, TS, TSOV, TSatOV, TSatSL, TSSL, rhoe, dynE, rhos, rho, rM, m1, m2, MCT, TvF]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[j,k,l,p_infOV, p_infpT, p_infSL, sk, hk, gk, ek, rhok,pS, pSOV, pSSL, TS, TSOV, TSatOV, TSatSL, TSSL, rhoe, dynE, rhos, rho, rM, m1, m2, MCT, TvF, m1_old, dm_evap]')
         do j = 0, m
             do k = 0, n
                 do l = 0, p
@@ -126,6 +127,9 @@ contains
                     ! fixing m1 and m2 AFTER correcting the partial densities. Note that these values must be stored for the phase
                     ! change process that will happen a posteriori
                     m1 = q_cons_vf(lp + contxb - 1)%sf(j, k, l)
+
+                    ! Store initial liquid mass for multiphase chemistry coupling
+                    m1_old = m1
 
                     m2 = q_cons_vf(vp + contxb - 1)%sf(j, k, l)
 
@@ -268,6 +272,21 @@ contains
                         rhos = rhos + q_cons_vf(i + contxb - 1)%sf(j, k, l)*sk(i)
 
                     end do
+
+                    ! Multiphase chemistry coupling: Add evaporated mass to fuel species
+                    ! When liquid evaporates, the mass becomes fuel vapor which should be
+                    ! tracked by the species equations
+                    if (chemistry .and. chem_params%multiphase) then
+                        ! Compute evaporated mass (positive when liquid evaporates)
+                        dm_evap = m1_old - q_cons_vf(lp + contxb - 1)%sf(j, k, l)
+
+                        ! Add evaporated mass to fuel species
+                        ! The fuel species is at index chem_params%fuel_species_idx
+                        if (dm_evap > 0.0_wp) then
+                            q_cons_vf(chemxb + chem_params%fuel_species_idx - 1)%sf(j, k, l) = &
+                                q_cons_vf(chemxb + chem_params%fuel_species_idx - 1)%sf(j, k, l) + dm_evap
+                        end if
+                    end if
                 end do
             end do
         end do

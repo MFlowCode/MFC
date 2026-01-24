@@ -650,6 +650,10 @@ contains
         chem_params%reactions = .false.
         chem_params%gamma_method = 1
         chem_params%transport_model = 1
+        chem_params%multiphase = .false.
+        chem_params%liquid_phase_idx = 1
+        chem_params%fuel_species_idx = 1
+        chem_params%gas_phase_threshold = 0.01_wp
 
         num_bc_patches = 0
         bc_io = .false.

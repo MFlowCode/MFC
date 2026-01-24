@@ -128,11 +128,23 @@ contains
         real(wp) :: rho, omega_m
         real(wp), dimension(num_species) :: Ys
         real(wp), dimension(num_species) :: omega
+        real(wp) :: alpha_liquid, alpha_gas
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[Ys, omega, eqn, T, rho, omega, omega_m]', copyin='[bounds]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[Ys, omega, eqn, T, rho, omega, omega_m, alpha_liquid, alpha_gas]', copyin='[bounds]')
         do z = bounds(3)%beg, bounds(3)%end
             do y = bounds(2)%beg, bounds(2)%end
                 do x = bounds(1)%beg, bounds(1)%end
+
+                    ! For multiphase chemistry, skip liquid-dominated cells
+                    ! Chemistry only occurs in gas phase regions
+                    if (chem_params%multiphase) then
+                        ! Get liquid volume fraction (liquid is at index liquid_phase_idx)
+                        alpha_liquid = q_prim_qp(advxb + chem_params%liquid_phase_idx - 1)%sf(x, y, z)
+                        alpha_gas = 1.0_wp - alpha_liquid
+
+                        ! Skip if gas volume fraction is below threshold
+                        if (alpha_gas < chem_params%gas_phase_threshold) cycle
+                    end if
 
                     $:GPU_LOOP(parallelism='[seq]')
                     do eqn = chemxb, chemxe

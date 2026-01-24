@@ -121,13 +121,15 @@ contains
         #:endfor
 
         if (chemistry) then
-            #:for VAR in [ 'diffusion', 'reactions' ]
+            #:for VAR in [ 'diffusion', 'reactions', 'multiphase' ]
                 call MPI_BCAST(chem_params%${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 
-            #:for VAR in [ 'gamma_method', 'transport_model' ]
+            #:for VAR in [ 'gamma_method', 'transport_model', 'liquid_phase_idx', 'fuel_species_idx' ]
                 call MPI_BCAST(chem_params%${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             #:endfor
+
+            call MPI_BCAST(chem_params%gas_phase_threshold, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
         end if
 
         if (bubbles_lagrange) then

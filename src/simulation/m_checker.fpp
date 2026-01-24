@@ -40,6 +40,7 @@ contains
         end if
 
         call s_check_inputs_time_stepping
+        call s_check_inputs_multiphase_chemistry
 
     end subroutine s_check_inputs
 
@@ -98,5 +99,21 @@ contains
             "nv_uvm_igr_temps_on_gpu must be in the range [0, 2] for igr_iter_solver == 2")
 #endif
     end subroutine s_check_inputs_nvidia_uvm
+
+    !> Checks constraints on multiphase chemistry parameters
+    impure subroutine s_check_inputs_multiphase_chemistry
+        if (chemistry .and. chem_params%multiphase) then
+            @:PROHIBIT(.not. relax, &
+                "Multiphase chemistry requires relax = T for phase change")
+            @:PROHIBIT(num_fluids < 2, &
+                "Multiphase chemistry requires num_fluids >= 2 (liquid + vapor)")
+            @:PROHIBIT(chem_params%liquid_phase_idx < 1 .or. chem_params%liquid_phase_idx > num_fluids, &
+                "chem_params%liquid_phase_idx must be in range [1, num_fluids]")
+            @:PROHIBIT(chem_params%fuel_species_idx < 1 .or. chem_params%fuel_species_idx > num_species, &
+                "chem_params%fuel_species_idx must be in range [1, num_species]")
+            @:PROHIBIT(chem_params%gas_phase_threshold < 0.0_wp .or. chem_params%gas_phase_threshold > 1.0_wp, &
+                "chem_params%gas_phase_threshold must be in range [0, 1]")
+        end if
+    end subroutine s_check_inputs_multiphase_chemistry
 
 end module m_checker

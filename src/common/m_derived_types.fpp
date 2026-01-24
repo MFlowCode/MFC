@@ -457,6 +457,13 @@ module m_derived_types
         !> gamma_method = 2: c_p / c_v where c_p, c_v are specific heats.
         integer :: gamma_method
         integer :: transport_model
+
+        !> Multiphase chemistry parameters for burning droplet simulations
+        !> When enabled, chemistry operates only in gas-phase regions
+        logical :: multiphase           !< Enable multiphase chemistry coupling
+        integer :: liquid_phase_idx     !< Index of liquid phase fluid (default: 1)
+        integer :: fuel_species_idx     !< Index of fuel species in mechanism (default: 1)
+        real(wp) :: gas_phase_threshold !< Min gas volume fraction for chemistry (default: 0.01)
     end type chemistry_parameters
 
     !> Lagrangian bubble parameters
