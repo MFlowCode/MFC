@@ -14,11 +14,19 @@ In a burning droplet, several coupled processes occur:
 
 ### Simplified Gas-Phase Model
 This example uses a **gas-phase approximation** where:
-- The "droplet" is a region of pre-vaporized fuel vapor
+- The "droplet" is a region of pre-vaporized fuel vapor with smooth transitions
+- A tanh profile creates realistic fuel-oxidizer mixing layers
 - Chemistry handles species transport and reactions
 - No explicit liquid-vapor phase change (simplified model)
 
 This approach captures the essential mixing and combustion physics while avoiding the complexity of multiphase coupling.
+
+### Why Gas-Phase Only?
+MFC currently has two separate physics modules:
+1. **Phase Change Module**: Handles liquid-vapor transitions (num_fluids > 1)
+2. **Chemistry Module**: Handles species reactions (num_fluids = 1)
+
+These modules use different paradigms (volume fractions vs mass fractions) and are not yet directly coupled. This example focuses on the gas-phase combustion physics, which is the rate-limiting step in most droplet combustion scenarios.
 
 ## Running the Simulation
 
@@ -26,22 +34,34 @@ This approach captures the essential mixing and combustion physics while avoidin
 - MFC compiled with chemistry support
 - Cantera installed with the `h2o2.yaml` mechanism
 
-### Basic Run
+### Quick Test Run
 ```bash
-# Pre-process and run simulation
+# Fast mode for testing (coarser grid, shorter time)
+./mfc.sh run examples/2D_burning_droplet/case.py -t pre_process simulation -j $(nproc) -- --fast
+```
+
+### Full Simulation
+```bash
+# Pre-process and run full simulation
 ./mfc.sh run examples/2D_burning_droplet/case.py -t pre_process simulation -j $(nproc)
 ```
 
 ### Command-Line Options
 ```bash
-# Scale up resolution (2x)
-./mfc.sh run examples/2D_burning_droplet/case.py -t pre_process simulation -- --scale 2
+# Scale up resolution (2x finer grid)
+./mfc.sh run examples/2D_burning_droplet/case.py -- --scale 2
 
-# Disable chemistry (for debugging)
-./mfc.sh run examples/2D_burning_droplet/case.py -t pre_process simulation -- --no-chem
+# Adjust initial droplet temperature (controls ignition)
+./mfc.sh run examples/2D_burning_droplet/case.py -- --T_droplet 2000
+
+# Disable chemistry (for debugging/pure mixing)
+./mfc.sh run examples/2D_burning_droplet/case.py -- --no-chem
 
 # Disable diffusion (for debugging)
-./mfc.sh run examples/2D_burning_droplet/case.py -t pre_process simulation -- --no-diffusion
+./mfc.sh run examples/2D_burning_droplet/case.py -- --no-diffusion
+
+# Fast test mode (coarse grid, short time)
+./mfc.sh run examples/2D_burning_droplet/case.py -- --fast
 ```
 
 ## Configuration Details
@@ -101,10 +121,27 @@ For true spherical droplet combustion:
 "patch_icpp(2)%geometry": 8,  # Sphere
 ```
 
-### Phase Change (Advanced)
-For liquid-vapor phase change combined with combustion:
-- Requires coupling MFC's phase change module with chemistry
-- Currently experimental - see `2D_phasechange_bubble` for phase change physics
+### Phase Change + Combustion (Future/Advanced)
+For liquid-vapor phase change combined with combustion, there are several approaches:
+
+**Approach 1: Sequential Simulation**
+1. Run phase change simulation to get vapor distribution over time
+2. Use vapor profile as initial condition for chemistry simulation
+3. Repeat to capture quasi-steady behavior
+
+**Approach 2: Source Term Modeling (Advanced)**
+Add evaporation source terms to the chemistry simulation using the d² law:
+```
+dm/dt = -π * d * D * ρ * B * ln(1 + B) / (1 + B^0.7)
+```
+where B is the transfer number.
+
+**Approach 3: Future MFC Development**
+Coupling the phase change module (num_fluids > 1) with chemistry (multispecies) 
+would require extending MFC to handle both volume fractions AND species mass 
+fractions simultaneously. This is an area of active research.
+
+See `2D_phasechange_bubble` for phase change physics examples.
 
 ## Theory: Classical Droplet Burning
 
