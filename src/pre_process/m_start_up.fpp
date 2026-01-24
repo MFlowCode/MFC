@@ -150,7 +150,7 @@ contains
             sigma, adv_n, cfl_adap_dt, cfl_const_dt, n_start, &
             n_start_old, surface_tension, hyperelasticity, pre_stress, &
             elliptic_smoothing, elliptic_smoothing_iters, &
-            viscous, bubbles_lagrange, bc_x, bc_y, bc_z, num_bc_patches, &
+            viscous, bubbles_lagrange, num_bc_patches, &
             patch_bc, Bx0, relativity, cont_damage, igr, igr_order, &
             down_sample, recon_type, muscl_order, hyper_cleaning, &
             simplex_perturb, simplex_params, fft_wrt
