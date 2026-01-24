@@ -3,6 +3,7 @@
 !! @brief Contains module m_time_steppers
 
 #:include 'macros.fpp'
+#:include 'case.fpp'
 
 !> @brief The following module features a variety of time-stepping schemes.
 !!              Currently, it includes the following Runge-Kutta (RK) algorithms:
@@ -614,44 +615,10 @@ contains
             if (ib) then
                 ! check if any IBMS are moving, and if so, update the markers, ghost points, levelsets, and levelset norms
                 if (moving_immersed_boundary_flag) then
-                    do i = 1, num_ibs
-                        if (s == 1) then
-                            patch_ib(i)%step_vel = patch_ib(i)%vel
-                            patch_ib(i)%step_angular_vel = patch_ib(i)%angular_vel
-                            patch_ib(i)%step_angles = patch_ib(i)%angles
-                            patch_ib(i)%step_x_centroid = patch_ib(i)%x_centroid
-                            patch_ib(i)%step_y_centroid = patch_ib(i)%y_centroid
-                            patch_ib(i)%step_z_centroid = patch_ib(i)%z_centroid
-                        end if
-
-                        if (patch_ib(i)%moving_ibm > 0) then
-                            patch_ib(i)%vel = (rk_coef(s, 1)*patch_ib(i)%step_vel + rk_coef(s, 2)*patch_ib(i)%vel)/rk_coef(s, 4)
-                            patch_ib(i)%angular_vel = (rk_coef(s, 1)*patch_ib(i)%step_angular_vel + rk_coef(s, 2)*patch_ib(i)%angular_vel)/rk_coef(s, 4)
-
-                            if (patch_ib(i)%moving_ibm == 2) then ! if we are using two-way coupling, apply force and torque
-                                ! compute the force and torque on the IB from the fluid
-                                call s_compute_ib_forces(q_prim_vf, 1._wp/fluid_pp(1)%Re(1))
-
-                                ! update the velocity from the force value
-                                patch_ib(i)%vel = patch_ib(i)%vel + rk_coef(s, 3)*dt*(patch_ib(i)%force/patch_ib(i)%mass)/rk_coef(s, 4)
-
-                                ! update the angular velocity with the torque value
-                                patch_ib(i)%angular_vel = (patch_ib(i)%angular_vel*patch_ib(i)%moment) + (rk_coef(s, 3)*dt*patch_ib(i)%torque/rk_coef(s, 4)) ! add the torque to the angular momentum
-                                call s_compute_moment_of_inertia(i, patch_ib(i)%angular_vel) ! update the moment of inertia to be based on the direction of the angular momentum
-                                patch_ib(i)%angular_vel = patch_ib(i)%angular_vel/patch_ib(i)%moment ! convert back to angular velocity with the new moment of inertia
-                            end if
-
-                            ! Update the angle of the IB
-                            patch_ib(i)%angles = (rk_coef(s, 1)*patch_ib(i)%step_angles + rk_coef(s, 2)*patch_ib(i)%angles + rk_coef(s, 3)*patch_ib(i)%angular_vel*dt)/rk_coef(s, 4)
-
-                            ! Update the position of the IB
-                            patch_ib(i)%x_centroid = (rk_coef(s, 1)*patch_ib(i)%step_x_centroid + rk_coef(s, 2)*patch_ib(i)%x_centroid + rk_coef(s, 3)*patch_ib(i)%vel(1)*dt)/rk_coef(s, 4)
-                            patch_ib(i)%y_centroid = (rk_coef(s, 1)*patch_ib(i)%step_y_centroid + rk_coef(s, 2)*patch_ib(i)%y_centroid + rk_coef(s, 3)*patch_ib(i)%vel(2)*dt)/rk_coef(s, 4)
-                            patch_ib(i)%z_centroid = (rk_coef(s, 1)*patch_ib(i)%step_z_centroid + rk_coef(s, 2)*patch_ib(i)%z_centroid + rk_coef(s, 3)*patch_ib(i)%vel(3)*dt)/rk_coef(s, 4)
-                        end if
-                    end do
-                    call s_update_mib(num_ibs, levelset, levelset_norm)
+                    call s_propagate_immersed_boundaries(s)
                 end if
+
+                ! update the ghost fluid properties point values based on IB state
                 if (qbmm .and. .not. polytropic) then
                     call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
                 else
@@ -804,6 +771,61 @@ contains
         call nvtxEndRange
 
     end subroutine s_apply_bodyforces
+
+    subroutine s_propagate_immersed_boundaries(s)
+
+        integer, intent(in) :: s
+        integer :: i
+        logical :: forces_computed
+
+        forces_computed = .false.
+
+        do i = 1, num_ibs
+            if (s == 1) then
+                patch_ib(i)%step_vel = patch_ib(i)%vel
+                patch_ib(i)%step_angular_vel = patch_ib(i)%angular_vel
+                patch_ib(i)%step_angles = patch_ib(i)%angles
+                patch_ib(i)%step_x_centroid = patch_ib(i)%x_centroid
+                patch_ib(i)%step_y_centroid = patch_ib(i)%y_centroid
+                patch_ib(i)%step_z_centroid = patch_ib(i)%z_centroid
+            end if
+
+            if (patch_ib(i)%moving_ibm > 0) then
+                patch_ib(i)%vel = (rk_coef(s, 1)*patch_ib(i)%step_vel + rk_coef(s, 2)*patch_ib(i)%vel)/rk_coef(s, 4)
+                patch_ib(i)%angular_vel = (rk_coef(s, 1)*patch_ib(i)%step_angular_vel + rk_coef(s, 2)*patch_ib(i)%angular_vel)/rk_coef(s, 4)
+
+                if (patch_ib(i)%moving_ibm == 1) then
+                    ! plug in analytic velocities for 1-way coupling, if it exists
+                    @:mib_analytical()
+                else if (patch_ib(i)%moving_ibm == 2) then ! if we are using two-way coupling, apply force and torque
+                    ! compute the force and torque on the IB from the fluid
+                    if (.not. forces_computed) then
+                        call s_compute_ib_forces(q_prim_vf, fluid_pp)
+                        forces_computed = .true.
+                    end if
+
+                    ! update the velocity from the force value
+                    patch_ib(i)%vel = patch_ib(i)%vel + rk_coef(s, 3)*dt*(patch_ib(i)%force/patch_ib(i)%mass)/rk_coef(s, 4)
+
+                    ! update the angular velocity with the torque value
+                    patch_ib(i)%angular_vel = (patch_ib(i)%angular_vel*patch_ib(i)%moment) + (rk_coef(s, 3)*dt*patch_ib(i)%torque/rk_coef(s, 4)) ! add the torque to the angular momentum
+                    call s_compute_moment_of_inertia(i, patch_ib(i)%angular_vel) ! update the moment of inertia to be based on the direction of the angular momentum
+                    patch_ib(i)%angular_vel = patch_ib(i)%angular_vel/patch_ib(i)%moment ! convert back to angular velocity with the new moment of inertia
+                end if
+
+                ! Update the angle of the IB
+                patch_ib(i)%angles = (rk_coef(s, 1)*patch_ib(i)%step_angles + rk_coef(s, 2)*patch_ib(i)%angles + rk_coef(s, 3)*patch_ib(i)%angular_vel*dt)/rk_coef(s, 4)
+
+                ! Update the position of the IB
+                patch_ib(i)%x_centroid = (rk_coef(s, 1)*patch_ib(i)%step_x_centroid + rk_coef(s, 2)*patch_ib(i)%x_centroid + rk_coef(s, 3)*patch_ib(i)%vel(1)*dt)/rk_coef(s, 4)
+                patch_ib(i)%y_centroid = (rk_coef(s, 1)*patch_ib(i)%step_y_centroid + rk_coef(s, 2)*patch_ib(i)%y_centroid + rk_coef(s, 3)*patch_ib(i)%vel(2)*dt)/rk_coef(s, 4)
+                patch_ib(i)%z_centroid = (rk_coef(s, 1)*patch_ib(i)%step_z_centroid + rk_coef(s, 2)*patch_ib(i)%z_centroid + rk_coef(s, 3)*patch_ib(i)%vel(3)*dt)/rk_coef(s, 4)
+            end if
+        end do
+
+        call s_update_mib(num_ibs, levelset, levelset_norm)
+
+    end subroutine s_propagate_immersed_boundaries
 
     !> This subroutine saves the temporary q_prim_vf vector
         !!      into the q_prim_ts vector that is then used in p_main
