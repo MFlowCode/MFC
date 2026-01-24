@@ -21,12 +21,40 @@ This example uses a **gas-phase approximation** where:
 
 This approach captures the essential mixing and combustion physics while avoiding the complexity of multiphase coupling.
 
-### Why Gas-Phase Only?
-MFC currently has two separate physics modules:
-1. **Phase Change Module**: Handles liquid-vapor transitions (num_fluids > 1)
-2. **Chemistry Module**: Handles species reactions (num_fluids = 1)
+### Current Limitation: Phase Change vs Chemistry
 
-These modules use different paradigms (volume fractions vs mass fractions) and are not yet directly coupled. This example focuses on the gas-phase combustion physics, which is the rate-limiting step in most droplet combustion scenarios.
+MFC has two physics modules that use different approaches:
+
+| Feature | Phase Change | Chemistry |
+|---------|-------------|-----------|
+| Tracking | Volume fractions (α) | Mass fractions (Y) |
+| Fluids | `num_fluids > 1` (liquid, vapor, gas) | `num_fluids = 1` |
+| Model | 5/6-equation + relaxation | 5-equation + species |
+| Physics | Evaporation/condensation | Reactions/diffusion |
+
+**The modules are not yet coupled.** This means:
+- Phase change can vaporize a droplet but won't react the vapor
+- Chemistry can burn fuel vapor but needs pre-vaporized initial conditions
+
+### Workarounds for True Burning Droplet
+
+**Option 1: Gas-Phase Approximation** (this example, `case.py`)
+- Assume droplet is already vaporized
+- Use smooth fuel profile to mimic diffusion from droplet surface
+- Chemistry handles mixing and combustion
+- Best for studying flame dynamics and combustion chemistry
+
+**Option 2: Two-Stage Simulation**
+1. Run `case_liquid_droplet.py` to get vapor distribution over time
+2. Extract vapor field at specific time
+3. Use as initial condition for chemistry case
+4. Repeat to capture quasi-steady behavior
+
+**Option 3: Future MFC Development**
+Coupling phase change with chemistry would require:
+- Tracking species mass fractions within each fluid phase
+- Modifying the equation system to include both α and Y
+- This is an area of active research/development
 
 ## Running the Simulation
 
@@ -155,10 +183,23 @@ Where B is the transfer number combining thermodynamic and kinetic effects.
 
 | File | Description |
 |------|-------------|
-| `case.py` | Main H2-O2 burning droplet example (recommended starting point) |
-| `case_hydrocarbon.py` | Template for hydrocarbon (CH4) combustion with GRI30 |
-| `viz.py` | Visualization script for post-processing |
+| `case.py` | **Recommended**: Gas-phase H2-O2 combustion with smooth fuel profile |
+| `case_liquid_droplet.py` | Phase change droplet (vaporization only, no chemistry) |
+| `case_hydrocarbon.py` | Template for CH4/GRI30 mechanism |
+| `viz.py` | Visualization script |
 | `README.md` | This documentation |
+
+## Which Case Should I Use?
+
+**For combustion physics (flame, reactions):** Use `case.py`
+- Pre-vaporized fuel with smooth transition profile
+- Full chemistry with reactions and diffusion
+- Captures flame dynamics and species evolution
+
+**For vaporization physics (liquid-vapor):** Use `case_liquid_droplet.py`  
+- True liquid droplet with phase change
+- Three fluids: liquid, vapor, air
+- No chemistry reactions (phase change only)
 
 ## Available Chemistry Mechanisms
 
