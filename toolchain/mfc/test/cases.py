@@ -1032,7 +1032,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                            "2D_forward_facing_step",
                            "2D_IGR_forward_facing_step",
                            "1D_convergence",
-                           "3D_IGR_33jet","1D_multispecies_diffusion"]
+                           "3D_IGR_33jet","1D_multispecies_diffusion",
+                           "3D_IGR_bowshock"]
             if path in casesToSkip:
                 continue
             name = f"{path.split('_')[0]} -> Example -> {'_'.join(path.split('_')[1:])}"

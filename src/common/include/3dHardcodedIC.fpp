@@ -189,6 +189,27 @@
             q_prim_vf(momxb + 1)%sf(i, j, k) = -Mach*376.636429464809*cos(x_cc(i)/1)*sin(y_cc(j)/1)*sin(z_cc(k)/1)
         end if
 
+    case (390)
+        ! This is for smoothing the x-velocity in a small neighborhood around the sphere for the bowshock case
+        r = (x_cc(i) + 0.3_wp)*(x_cc(i) + 0.3_wp) + y_cc(j)*y_cc(j) + z_cc(k)*z_cc(k)
+        r = sqrt(r)
+        ! Size of smoothing region
+        rcut = 0.025_wp
+
+        if (r < 0.05 + rcut + 0.01) then
+            if (r < 0.05_wp - 0.005) then
+                ! If inside sphere, set velocity to 0
+                q_prim_vf(momxb)%sf(i, j, k) = 0.0_wp
+            else if (r > 0.05_wp + rcut + 0.005) then
+                ! If outside the smoothing region, do nothing
+            else
+                ! If inside the smoothing region, then interpolate values via tanh function
+                r = (r - 0.05_wp)/rcut
+                q_prim_vf(momxb)%sf(i, j, k) = 0.0_wp + (527.2_wp - 0.0_wp)* &
+                                               (0.5_wp*(1.0_wp + tanh(5.0_wp*(r - 0.5_wp))))
+            end if
+        end if
+
     case default
         call s_int_to_str(patch_id, iStr)
         call s_mpi_abort("Invalid hcid specified for patch "//trim(iStr))
