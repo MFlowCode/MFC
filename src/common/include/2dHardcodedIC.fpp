@@ -240,12 +240,10 @@
         q_prim_vf(E_idx)%sf(i, j, 0) = 1._wp + (1 - 2._wp*(x_cc(i)**2 + y_cc(j)**2))*exp(1 - (x_cc(i)**2 + y_cc(j)**2))/((2._wp*pi)**3)
 
     case (260)  ! Gaussian Divergence Pulse
-        !---------------------------------------------------------
         !  Bx(x) = 1 + C * erf((x-0.5)/σ)
         !  ⇒  ∂Bx/∂x = C * (2/√π) * exp[-((x-0.5)/σ)**2] * (1/σ)
         !  Choose C = ε * σ * √π / 2  ⇒ ∂Bx/∂x = ε * exp[-((x-0.5)/σ)**2]
         !  ψ is initialized to zero everywhere.
-        !---------------------------------------------------------
 
         eps_mhd = patch_icpp(patch_id)%a(2)
         sigma = patch_icpp(patch_id)%a(3)
