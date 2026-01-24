@@ -264,10 +264,14 @@ case = {
 }
 
 # =============================================================================
-# CHEMISTRY CONFIGURATION (EXPERIMENTAL)
+# CHEMISTRY CONFIGURATION (EXPERIMENTAL - MULTIPHASE CHEMISTRY COUPLING)
 # =============================================================================
-# Uncomment below to attempt adding chemistry to the phase change case
-# This may not work and could cause errors
+# With the new multiphase chemistry coupling (Phase 1), you can now enable
+# chemistry with phase change. The system will:
+# - Only compute chemistry in gas-phase regions (alpha_gas > threshold)
+# - Add evaporated mass to the fuel species automatically
+#
+# To enable multiphase chemistry coupling, uncomment below:
 
 # ctfile = "h2o2.yaml"
 # num_species = 10
@@ -278,9 +282,22 @@ case = {
 # case["chem_params%transport_model"] = 2
 # case["cantera_file"] = ctfile
 # case["chem_wrt_T"] = "T"
+#
+# # NEW: Enable multiphase chemistry coupling
+# case["chem_params%multiphase"] = "T"           # Enable coupling
+# case["chem_params%liquid_phase_idx"] = 1        # Liquid is fluid 1
+# case["chem_params%fuel_species_idx"] = 1        # Fuel species index in mechanism (e.g., H2=1)
+# case["chem_params%gas_phase_threshold"] = 0.01  # Min gas fraction for chemistry
 # 
-# # Species mass fractions would need to be defined here
-# # This is where the coupling becomes complex
+# # Species mass fractions for the gas phase (fluid 3: oxidizer)
+# # For H2-O2 mechanism: H2, H, O, O2, OH, H2O, HO2, H2O2, AR, N2
+# for i in range(num_species):
+#     case[f"patch_icpp(1)%Y({i+1})"] = 0.0  # Droplet: no species initially
+#     case[f"patch_icpp(2)%Y({i+1})"] = 0.0  # Ambient (will be set below)
+# 
+# # Set oxidizer composition (O2 + N2 for air)
+# case["patch_icpp(2)%Y(4)"] = 0.233  # O2 mass fraction in air
+# case["patch_icpp(2)%Y(10)"] = 0.767  # N2 mass fraction in air
 
 # =============================================================================
 # OUTPUT

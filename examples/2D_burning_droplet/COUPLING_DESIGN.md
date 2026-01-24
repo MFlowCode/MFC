@@ -1,5 +1,9 @@
 # Design Document: Coupling Phase Change with Chemistry in MFC
 
+## Status
+
+**Phase 1 is now IMPLEMENTED.** See the Parameters section below for usage.
+
 ## Overview
 
 This document describes the code modifications required to enable simulation of a **burning liquid droplet** where:
@@ -247,11 +251,27 @@ New parameters needed:
 
 ## Implementation Priority
 
-### Phase 1: Minimal Viable Product
-1. Add `multiphase_chemistry` flag
-2. Modify chemistry to skip liquid-dominated cells
-3. Add evaporation source term to species equations
-4. Test with simple 2-fluid (liquid + gas) case
+### Phase 1: Minimal Viable Product - **COMPLETED**
+1. ✅ Add `multiphase_chemistry` flag (now `chem_params%multiphase`)
+2. ✅ Modify chemistry to skip liquid-dominated cells
+3. ✅ Add evaporation source term to species equations
+4. ✅ Add validation checks in m_checker.fpp
+
+**New Parameters (Phase 1):**
+```fortran
+chem_params%multiphase = .true.       ! Enable coupling
+chem_params%liquid_phase_idx = 1      ! Index of liquid phase
+chem_params%fuel_species_idx = 1      ! Index of fuel species in mechanism
+chem_params%gas_phase_threshold = 0.01  ! Min gas fraction for chemistry
+```
+
+**Usage in case.py:**
+```python
+"chem_params%multiphase": "T",
+"chem_params%liquid_phase_idx": 1,
+"chem_params%fuel_species_idx": 1,
+"chem_params%gas_phase_threshold": 0.01,
+```
 
 ### Phase 2: Full Coupling
 1. Proper gas-phase averaging for thermodynamic properties

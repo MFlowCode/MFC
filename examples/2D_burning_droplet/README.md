@@ -149,25 +149,36 @@ For true spherical droplet combustion:
 "patch_icpp(2)%geometry": 8,  # Sphere
 ```
 
-### Phase Change + Combustion (Future/Advanced)
-For liquid-vapor phase change combined with combustion, there are several approaches:
+### Phase Change + Combustion (NEW: Multiphase Chemistry Coupling)
 
-**Approach 1: Sequential Simulation**
-1. Run phase change simulation to get vapor distribution over time
-2. Use vapor profile as initial condition for chemistry simulation
-3. Repeat to capture quasi-steady behavior
+MFC now supports coupling phase change (vaporization) with chemistry reactions
+through the **multiphase chemistry** feature. This allows you to simulate a
+liquid droplet that vaporizes and burns.
 
-**Approach 2: Source Term Modeling (Advanced)**
-Add evaporation source terms to the chemistry simulation using the d² law:
+**How it works:**
+1. **Phase change** is handled by MFC's relaxation model (relax = T)
+2. **Chemistry** reactions only occur in gas-phase regions (alpha_gas > threshold)
+3. **Evaporated mass** is automatically added to the fuel species
+
+**Enabling multiphase chemistry:**
+```python
+# In your case.py, add:
+"chemistry": "T",
+"chem_params%multiphase": "T",           # Enable coupling
+"chem_params%liquid_phase_idx": 1,        # Liquid phase index
+"chem_params%fuel_species_idx": 1,        # Fuel species in mechanism
+"chem_params%gas_phase_threshold": 0.01,  # Min gas fraction for chemistry
+
+# Also need relax enabled for phase change:
+"relax": "T",
+"relax_model": 6,  # 6-equation model
 ```
-dm/dt = -π * d * D * ρ * B * ln(1 + B) / (1 + B^0.7)
-```
-where B is the transfer number.
 
-**Approach 3: Future MFC Development**
-Coupling the phase change module (num_fluids > 1) with chemistry (multispecies) 
-would require extending MFC to handle both volume fractions AND species mass 
-fractions simultaneously. This is an area of active research.
+See `case_liquid_droplet.py` for a complete example with the chemistry 
+configuration commented out (uncomment to enable).
+
+**Note:** This coupling assumes a simplified single-fuel vaporization model.
+For complex multi-component fuels, additional development is needed.
 
 See `2D_phasechange_bubble` for phase change physics examples.
 
