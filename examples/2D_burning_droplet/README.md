@@ -151,9 +151,76 @@ The Burke-Schumann flame sheet model predicts:
 
 Where B is the transfer number combining thermodynamic and kinetic effects.
 
+## Files in This Example
+
+| File | Description |
+|------|-------------|
+| `case.py` | Main H2-O2 burning droplet example (recommended starting point) |
+| `case_hydrocarbon.py` | Template for hydrocarbon (CH4) combustion with GRI30 |
+| `viz.py` | Visualization script for post-processing |
+| `README.md` | This documentation |
+
+## Available Chemistry Mechanisms
+
+MFC uses Cantera for chemistry. Common built-in mechanisms:
+
+| Mechanism | Fuel | Species | Description |
+|-----------|------|---------|-------------|
+| `h2o2.yaml` | H2 | 10 | Hydrogen-oxygen combustion |
+| `gri30.yaml` | CH4 | 53 | Natural gas (methane) combustion |
+
+For heavier hydrocarbons (heptane, dodecane, kerosene), you need external mechanisms:
+- UC San Diego mechanism: https://web.eng.ucsd.edu/mae/groups/combustion/mechanism.html
+- Lawrence Livermore mechanisms: https://combustion.llnl.gov/mechanisms
+
+## Combining Vaporizing Droplet with Combustion
+
+If you have a working vaporizing droplet case and want to add combustion:
+
+### Current Limitation
+MFC's phase change (num_fluids > 1) and chemistry (num_fluids = 1) use different 
+formulations that aren't directly coupled. Here are workarounds:
+
+### Workaround 1: Gas-Phase Approximation (This Example)
+Use the chemistry module with a pre-vaporized fuel profile:
+- Set up smooth fuel-oxidizer distribution (tanh profile)
+- Use high initial temperature for ignition
+- Chemistry handles diffusion and reactions
+
+### Workaround 2: Sequential Simulation
+1. Run phase change simulation (your vaporizing droplet case)
+2. Extract vapor volume fraction at desired time
+3. Convert to species mass fraction for chemistry simulation
+4. Run chemistry simulation with this initial condition
+
+### Workaround 3: External Coupling
+Use a script to:
+1. Run phase change for small time step
+2. Extract evaporated fuel mass
+3. Add to chemistry domain as source term
+4. Repeat
+
+## Troubleshooting
+
+### Chemistry doesn't ignite
+- Increase `--T_droplet` (try 1500-2500 K)
+- Ensure fuel and oxidizer overlap (check transition sharpness)
+- Verify species mass fractions sum to 1.0
+
+### Simulation crashes
+- Reduce CFL (edit `cfl` in case.py)
+- Use `--fast` mode first
+- Check boundary conditions for acoustic reflections
+
+### Wrong species
+- Verify mechanism file exists and is correct
+- Check species indices match mechanism ordering
+- Use Cantera Python to verify: `ct.Solution('h2o2.yaml').species_names`
+
 ## References
 
 1. Williams, F.A. (1985) "Combustion Theory"
 2. Law, C.K. (2006) "Combustion Physics" 
 3. Turns, S.R. (2011) "An Introduction to Combustion"
 4. MFC Documentation: https://mflowcode.github.io
+5. Cantera Documentation: https://cantera.org
