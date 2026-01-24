@@ -558,7 +558,7 @@ module m_global_parameters
     !> @{!
     real(wp) :: hyper_cleaning_speed    !< Hyperbolic cleaning wave speed (c_h)
     real(wp) :: hyper_cleaning_tau      !< Hyperbolic cleaning tau
-    !$acc declare create(hyper_cleaning_speed, hyper_cleaning_tau)
+    $:GPU_DECLARE(create='[hyper_cleaning_speed, hyper_cleaning_tau]')
     !> @}
 
 contains
@@ -1301,7 +1301,7 @@ contains
 
         $:GPU_UPDATE(device='[cont_damage,tau_star,cont_damage_s,alpha_bar]')
 
-        !$acc update device(hyper_cleaning, hyper_cleaning_speed, hyper_cleaning_tau)
+        $:GPU_UPDATE(device='[hyper_cleaning, hyper_cleaning_speed, hyper_cleaning_tau]')
 
         #:if not MFC_CASE_OPTIMIZATION
             $:GPU_UPDATE(device='[wenojs,mapped_weno,wenoz,teno]')
