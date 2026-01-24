@@ -112,7 +112,7 @@ contains
             relax_model, cf_wrt, sigma, adv_n, ib, num_ibs, &
             cfl_adap_dt, cfl_const_dt, t_save, t_stop, n_start, &
             cfl_target, surface_tension, bubbles_lagrange, &
-            sim_data, hyperelasticity, Bx0, relativity, cont_damage, hyper_cleaning &
+            sim_data, hyperelasticity, Bx0, relativity, cont_damage, hyper_cleaning, &
             num_bc_patches, igr, igr_order, down_sample, recon_type, &
             muscl_order, lag_header, lag_txt_wrt, lag_db_wrt, &
             lag_id_wrt, lag_pos_wrt, lag_pos_prev_wrt, lag_vel_wrt, &
