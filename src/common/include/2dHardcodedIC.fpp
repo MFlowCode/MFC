@@ -7,15 +7,7 @@
     real(wp) :: r0, alpha, r2
     real(wp) :: sinA, cosA
 
-    real(wp), parameter :: r_0 = 0.1_wp       ! Rotor radius
-    real(wp), parameter :: r0_sq = r_0*r_0
-    real(wp), parameter :: rho_rotor = 10._wp ! Rotor density
-    real(wp), parameter :: omega = 20._wp     ! Angular velocity (v_0/r_0)
     real(wp) :: r_sq
-
-    ! Center of the domain
-    real(wp), parameter :: x_center = 0.5_wp
-    real(wp), parameter :: y_center = 0.5_wp
 
     ! # 207
     real(wp) :: sigma, gauss1, gauss2
@@ -209,18 +201,27 @@
         !   v has angular velocity w=20, giving v_tan=2 at r=0.1
 
         ! Calculate distance squared from the center
-        r_sq = (x_cc(i) - x_center)**2 + (y_cc(j) - y_center)**2
+        r_sq = (x_cc(i) - 0.5_wp)**2 + (y_cc(j) - 0.5_wp)**2
 
-        if (r_sq <= r0_sq) then
+        ! inner radius of 0.1
+        if (r_sq <= 0.1**2) then
             ! -- Inside the rotor --
-            ! Set density
-            q_prim_vf(contxb)%sf(i, j, 0) = rho_rotor
+            ! Set density uniformly to 10
+            q_prim_vf(contxb)%sf(i, j, 0) = 10._wp
 
-            ! Set velocity components for rotation
+            ! Set vup constant rotation of rate v=2
             ! v_x = -omega * (y - y_c)
             ! v_y =  omega * (x - x_c)
-            q_prim_vf(momxb)%sf(i, j, 0) = -omega*(y_cc(j) - y_center)
-            q_prim_vf(momxb + 1)%sf(i, j, 0) = omega*(x_cc(i) - x_center)
+            q_prim_vf(momxb)%sf(i, j, 0) = -20._wp*(y_cc(j) - 0.5_wp)
+            q_prim_vf(momxb + 1)%sf(i, j, 0) = 20._wp*(x_cc(i) - 0.5_wp)
+
+        ! taper width of 0.015
+        else if (r_sq <= 0.115**2) then
+            ! linearly smooth the function between r = 0.1 and 0.115
+            q_prim_vf(contxb)%sf(i, j, 0) = 1._wp + 9._wp * (0.115_wp - sqrt(r_sq)) / (0.015_wp)
+
+            q_prim_vf(momxb)%sf(i, j, 0) = -(2._wp / sqrt(r_sq))*(y_cc(j) - 0.5_wp) * (0.115_wp - sqrt(r_sq)) / (0.015_wp)
+            q_prim_vf(momxb + 1)%sf(i, j, 0) = (2._wp / sqrt(r_sq))*(x_cc(i) - 0.5_wp) * (0.115_wp - sqrt(r_sq)) / (0.015_wp)
         end if
 
     case (253) ! MHD Smooth Magnetic Vortex
