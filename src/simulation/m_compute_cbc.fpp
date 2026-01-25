@@ -35,11 +35,14 @@ contains
     !> Fill density L variables
     subroutine s_fill_density_L(L, lambda_factor, lambda2, c, mf, dalpha_rho_ds, dpres_ds)
         $:GPU_ROUTINE(parallelism='[seq]')
-#:if not MFC_CASE_OPTIMIZATION and USING_AMD
+#:if USING_AMD 
         real(wp), dimension(12), intent(inout) :: L
-        real(wp), dimension(3), intent(in) :: mf, dalpha_rho_ds
 #:else 
-        real(wp), dimension(sys_size), intent(inout) :: L
+        real(wp), dimension(sys_size), intent(inout) :: L 
+#:endif
+#:if not MFC_CASE_OPTIMIZATION and USING_AMD       
+        real(wp), dimension(3), intent(in) :: mf, dalpha_rho_ds
+#:else   
         real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
 #:endif
         real(wp), intent(in) :: lambda_factor, lambda2, c
@@ -55,11 +58,14 @@ contains
     !> Fill velocity L variables
     subroutine s_fill_velocity_L(L, lambda_factor, lambda2, dvel_ds)
         $:GPU_ROUTINE(parallelism='[seq]')
-#:if not MFC_CASE_OPTIMIZATION and USING_AMD
+#:if USING_AMD 
         real(wp), dimension(12), intent(inout) :: L
-        real(wp), dimension(3), intent(in) :: dvel_ds
 #:else 
-        real(wp), dimension(sys_size), intent(inout) :: L
+        real(wp), dimension(sys_size), intent(inout) :: L 
+#:endif
+#:if not MFC_CASE_OPTIMIZATION and USING_AMD        
+        real(wp), dimension(3), intent(in) :: dvel_ds
+#:else         
         real(wp), dimension(num_dims), intent(in) :: dvel_ds
 #:endif
         real(wp), intent(in) :: lambda_factor, lambda2
@@ -74,11 +80,14 @@ contains
     !> Fill advection L variables
     subroutine s_fill_advection_L(L, lambda_factor, lambda2, dadv_ds)
         $:GPU_ROUTINE(parallelism='[seq]')
-#:if not MFC_CASE_OPTIMIZATION and USING_AMD
+#:if USING_AMD 
         real(wp), dimension(12), intent(inout) :: L
-        real(wp), dimension(3), intent(in) :: dadv_ds
 #:else 
-        real(wp), dimension(sys_size), intent(inout) :: L
+        real(wp), dimension(sys_size), intent(inout) :: L 
+#:endif
+#:if not MFC_CASE_OPTIMIZATION and USING_AMD        
+        real(wp), dimension(3), intent(in) :: dadv_ds
+#:else         
         real(wp), dimension(num_fluids), intent(in) :: dadv_ds
 #:endif
         real(wp), intent(in) :: lambda_factor, lambda2
@@ -93,11 +102,14 @@ contains
     !> Fill chemistry L variables
     subroutine s_fill_chemistry_L(L, lambda_factor, lambda2, dYs_ds)
         $:GPU_ROUTINE(parallelism='[seq]')
-#:if not MFC_CASE_OPTIMIZATION and USING_AMD
+#:if USING_AMD 
         real(wp), dimension(12), intent(inout) :: L
-        real(wp), dimension(10), intent(in) :: dYs_ds
 #:else 
-        real(wp), dimension(sys_size), intent(inout) :: L
+        real(wp), dimension(sys_size), intent(inout) :: L 
+#:endif
+#:if not MFC_CASE_OPTIMIZATION and USING_AMD       
+        real(wp), dimension(10), intent(in) :: dYs_ds
+#:else    
         real(wp), dimension(num_species), intent(in) :: dYs_ds
 #:endif
         real(wp), intent(in) :: lambda_factor, lambda2
@@ -117,11 +129,14 @@ contains
             & cray_inline=True)
 
         real(wp), dimension(3), intent(in) :: lambda
-#:if not MFC_CASE_OPTIMIZATION and USING_AMD
+#:if USING_AMD 
         real(wp), dimension(12), intent(inout) :: L
-        real(wp), dimension(3), intent(in) :: dvel_ds
 #:else 
-        real(wp), dimension(sys_size), intent(inout) :: L
+        real(wp), dimension(sys_size), intent(inout) :: L 
+#:endif
+#:if not MFC_CASE_OPTIMIZATION and USING_AMD        
+        real(wp), dimension(3), intent(in) :: dvel_ds
+#:else        
         real(wp), dimension(num_dims), intent(in) :: dvel_ds
 #:endif
         real(wp), intent(in) :: rho, c, dpres_ds
@@ -138,14 +153,17 @@ contains
             & parallelism='[seq]', cray_inline=True)
 
         real(wp), dimension(3), intent(in) :: lambda
-#:if not MFC_CASE_OPTIMIZATION and USING_AMD
+#:if USING_AMD 
         real(wp), dimension(12), intent(inout) :: L
+#:else 
+        real(wp), dimension(sys_size), intent(inout) :: L 
+#:endif
+#:if not MFC_CASE_OPTIMIZATION and USING_AMD      
         real(wp), dimension(3), intent(in) :: mf, dalpha_rho_ds
         real(wp), dimension(3), intent(in) :: dvel_ds
         real(wp), dimension(3), intent(in) :: dadv_ds
         real(wp), dimension(10), intent(in) :: dYs_ds
-#:else 
-        real(wp), dimension(sys_size), intent(inout) :: L
+#:else      
         real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
         real(wp), dimension(num_dims), intent(in) :: dvel_ds
         real(wp), dimension(num_fluids), intent(in) :: dadv_ds
@@ -175,11 +193,14 @@ contains
             & parallelism='[seq]', cray_inline=True)
 
         real(wp), dimension(3), intent(in) :: lambda
-#:if not MFC_CASE_OPTIMIZATION and USING_AMD
+#:if USING_AMD 
         real(wp), dimension(12), intent(inout) :: L
+#:else 
+        real(wp), dimension(sys_size), intent(inout) :: L 
+#:endif
+#:if not MFC_CASE_OPTIMIZATION and USING_AMD       
         real(wp), dimension(3), intent(in) :: dvel_ds
-#:else
-        real(wp), dimension(sys_size), intent(inout) :: L
+#:else      
         real(wp), dimension(num_dims), intent(in) :: dvel_ds 
 #:endif
         real(wp), intent(in) :: rho, c, dpres_ds
@@ -196,14 +217,17 @@ contains
             & parallelism='[seq]', cray_inline=True)
 
         real(wp), dimension(3), intent(in) :: lambda
-#:if not MFC_CASE_OPTIMIZATION and USING_AMD
+#:if USING_AMD 
         real(wp), dimension(12), intent(inout) :: L
+#:else 
+        real(wp), dimension(sys_size), intent(inout) :: L 
+#:endif
+#:if not MFC_CASE_OPTIMIZATION and USING_AMD       
         real(wp), dimension(3), intent(in) :: mf, dalpha_rho_ds
         real(wp), dimension(3), intent(in) :: dvel_ds
         real(wp), dimension(3), intent(in) :: dadv_ds
         real(wp), dimension(10), intent(in) :: dYs_ds
-#:else 
-        real(wp), dimension(sys_size), intent(inout) :: L
+#:else        
         real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
         real(wp), dimension(num_dims), intent(in) :: dvel_ds
         real(wp), dimension(num_fluids), intent(in) :: dadv_ds
@@ -226,13 +250,16 @@ contains
             & parallelism='[seq]', cray_inline=True)
 
         real(wp), dimension(3), intent(in) :: lambda
-#:if not MFC_CASE_OPTIMIZATION and USING_AMD
+#:if USING_AMD 
         real(wp), dimension(12), intent(inout) :: L
+#:else 
+        real(wp), dimension(sys_size), intent(inout) :: L 
+#:endif
+#:if not MFC_CASE_OPTIMIZATION and USING_AMD        
         real(wp), dimension(3), intent(in) :: mf, dalpha_rho_ds
         real(wp), dimension(3), intent(in) :: dvel_ds
         real(wp), dimension(3), intent(in) :: dadv_ds
-#:else 
-        real(wp), dimension(sys_size), intent(inout) :: L
+#:else         
         real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
         real(wp), dimension(num_dims), intent(in) :: dvel_ds
         real(wp), dimension(num_fluids), intent(in) :: dadv_ds
@@ -253,13 +280,16 @@ contains
             & parallelism='[seq]', cray_inline=True)
 
         real(wp), dimension(3), intent(in) :: lambda
-#:if not MFC_CASE_OPTIMIZATION and USING_AMD
+#:if USING_AMD 
         real(wp), dimension(12), intent(inout) :: L
+#:else 
+        real(wp), dimension(sys_size), intent(inout) :: L 
+#:endif
+#:if not MFC_CASE_OPTIMIZATION and USING_AMD       
         real(wp), dimension(3), intent(in) :: mf, dalpha_rho_ds
         real(wp), dimension(3), intent(in) :: dvel_ds
         real(wp), dimension(3), intent(in) :: dadv_ds
-#:else 
-        real(wp), dimension(sys_size), intent(inout) :: L
+#:else        
         real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
         real(wp), dimension(num_dims), intent(in) :: dvel_ds
         real(wp), dimension(num_fluids), intent(in) :: dadv_ds
@@ -279,10 +309,10 @@ contains
     subroutine s_compute_supersonic_inflow_L(L)
         $:GPU_ROUTINE(function_name='s_compute_supersonic_inflow_L', &
             & parallelism='[seq]', cray_inline=True)
-#:if not MFC_CASE_OPTIMIZATION and USING_AMD
+#:if USING_AMD 
         real(wp), dimension(12), intent(inout) :: L
 #:else 
-        real(wp), dimension(sys_size), intent(inout) :: L
+        real(wp), dimension(sys_size), intent(inout) :: L 
 #:endif
         L(1:advxe) = 0._wp
         if (chemistry) L(chemxb:chemxe) = 0._wp
@@ -294,14 +324,17 @@ contains
             & parallelism='[seq]', cray_inline=True)
 
         real(wp), dimension(3), intent(in) :: lambda
-#:if not MFC_CASE_OPTIMIZATION and USING_AMD
+#:if USING_AMD 
         real(wp), dimension(12), intent(inout) :: L
+#:else 
+        real(wp), dimension(sys_size), intent(inout) :: L 
+#:endif
+#:if not MFC_CASE_OPTIMIZATION and USING_AMD
         real(wp), dimension(3), intent(in) :: mf, dalpha_rho_ds
         real(wp), dimension(3), intent(in) :: dvel_ds
         real(wp), dimension(3), intent(in) :: dadv_ds
         real(wp), dimension(10), intent(in) :: dYs_ds
-#:else 
-        real(wp), dimension(sys_size), intent(inout) :: L
+#:else  
         real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
         real(wp), dimension(num_dims), intent(in) :: dvel_ds
         real(wp), dimension(num_fluids), intent(in) :: dadv_ds

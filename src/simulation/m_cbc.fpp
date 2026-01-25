@@ -650,20 +650,23 @@ contains
         real(wp) :: dpi_inf_dt
         real(wp) :: dqv_dt
         real(wp) :: dpres_ds
+#:if USING_AMD 
+        real(wp), dimension(12) :: L
+#:else 
+        real(wp), dimension(sys_size) :: L 
+#:endif
 #:if not MFC_CASE_OPTIMIZATION and USING_AMD
         real(wp), dimension(3) :: alpha_rho, dalpha_rho_ds, mf
         real(wp), dimension(3) :: vel, dvel_ds
         real(wp), dimension(3) :: adv_local, dadv_ds
-        real(wp), dimension(12) :: L
         real(wp), dimension(3) :: dadv_dt
         real(wp), dimension(3) :: dvel_dt
         real(wp), dimension(3) :: dalpha_rho_dt
         real(wp), dimension(10) :: Ys, h_k, dYs_dt, dYs_ds, Xs, Gamma_i, Cp_i
 #:else 
-        real(wp), dimension(contxe) :: alpha_rho, dalpha_rho_ds, mf
+        real(wp), dimension(num_fluids) :: alpha_rho, dalpha_rho_ds, mf
         real(wp), dimension(num_vels) :: vel, dvel_ds
         real(wp), dimension(num_fluids) :: adv_local, dadv_ds
-        real(wp), dimension(sys_size) :: L
         real(wp), dimension(num_fluids) :: dadv_dt
         real(wp), dimension(num_dims) :: dvel_dt
         real(wp), dimension(num_fluids) :: dalpha_rho_dt

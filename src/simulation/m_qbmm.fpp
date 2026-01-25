@@ -571,7 +571,7 @@ contains
             & cray_inline=True)
 
         real(wp), intent(in) :: pres, rho, c
-#:if not MFC_CASE_OPTIMIZATION and USING_AMD
+#:if USING_AMD
         real(wp), dimension(32, 0:2, 0:2), intent(out) :: coeffs
 #:else
         real(wp), dimension(nterms, 0:2, 0:2), intent(out) :: coeffs
@@ -650,7 +650,7 @@ contains
             & cray_inline=True)
 
         real(wp), intent(in) :: pres, rho, c
-#:if not MFC_CASE_OPTIMIZATION and USING_AMD
+#:if USING_AMD
         real(wp), dimension(32, 0:2, 0:2), intent(out) :: coeffs
 #:else
         real(wp), dimension(nterms, 0:2, 0:2), intent(out) :: coeffs
@@ -726,11 +726,14 @@ contains
 #:if not MFC_CASE_OPTIMIZATION and USING_AMD
         real(wp), dimension(6) :: moms, msum
         real(wp), dimension(4, 3) :: wght, abscX, abscY, wght_pb, wght_mv, wght_ht, ht
-        real(wp), dimension(32, 0:2, 0:2) :: coeff
 #:else 
         real(wp), dimension(nmom) :: moms, msum
         real(wp), dimension(nnode, nb) :: wght, abscX, abscY, wght_pb, wght_mv, wght_ht, ht
-        real(wp), dimension(nterms, 0:2, 0:2) :: coeff
+#:endif
+#:if USING_AMD
+        real(wp), dimension(32, 0:2, 0:2), intent(out) :: coeff
+#:else
+        real(wp), dimension(nterms, 0:2, 0:2), intent(out) :: coeff
 #:endif
         real(wp) :: pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, grad_T
         real(wp) :: n_tait, B_tait
@@ -884,7 +887,7 @@ contains
             $:GPU_ROUTINE(function_name='s_coeff_selector',parallelism='[seq]', &
                 & cray_inline=True)
             real(wp), intent(in) :: pres, rho, c
-#:if not MFC_CASE_OPTIMIZATION and USING_AMD
+#:if USING_AMD
             real(wp), dimension(32, 0:2, 0:2), intent(out) :: coeff
 #:else
             real(wp), dimension(nterms, 0:2, 0:2), intent(out) :: coeff

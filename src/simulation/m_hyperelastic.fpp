@@ -98,11 +98,15 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-#:if not MFC_CASE_OPTIMIZATION and USING_AMD
+#:if USING_AMD
         real(wp), dimension(9) :: tensora, tensorb
-        real(wp), dimension(3) :: alpha_k, alpha_rho_k
 #:else 
         real(wp), dimension(tensor_size) :: tensora, tensorb
+#:endif
+
+#:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        real(wp), dimension(3) :: alpha_k, alpha_rho_k
+#:else 
         real(wp), dimension(num_fluids) :: alpha_k, alpha_rho_k
 #:endif
         real(wp), dimension(2) :: Re

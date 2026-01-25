@@ -308,14 +308,16 @@ contains
         real(wp), intent(in) :: rhoe
         real(wp), intent(out) :: TS
         real(wp) :: gp, gpp, hp, pO, mCP, mQ !< variables for the Newton Solver
+        real(wp) :: p_infpT_sum
 
         integer :: i, ns !< generic loop iterators
 
         ! auxiliary variables for the pT-equilibrium solver
-        mCP = 0.0_wp; mQ = 0.0_wp; 
+        mCP = 0.0_wp; mQ = 0.0_wp; p_infpT_sum = 0._wp
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_fluids 
             p_infpT(i) = ps_inf(i)
+            p_infpT_sum = p_infpT_sum + abs(p_infpT(i))
         end do
         ! Performing tests before initializing the pT-equilibrium
         $:GPU_LOOP(parallelism='[seq]')
@@ -332,7 +334,7 @@ contains
         if(num_fluids < 3) then
             $:GPU_LOOP(parallelism='[seq]')
             do i = num_fluids+1, 3 
-                p_infpT(i) = 10**32_wp
+                p_infpT(i) = p_infpT_sum
             end do
         end if
 

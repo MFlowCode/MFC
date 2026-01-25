@@ -540,7 +540,7 @@ contains
 #:if not MFC_CASE_OPTIMIZATION and USING_AMD
         real(wp), dimension(3) :: myalpha_rho, myalpha
 #:else 
-        real(wp), dimension(contxe) :: myalpha_rho, myalpha
+        real(wp), dimension(num_fluids) :: myalpha_rho, myalpha
 #:endif
         real(wp), dimension(2) :: Re
         integer, dimension(3) :: cell
