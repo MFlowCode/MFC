@@ -260,7 +260,9 @@ contains
                         q_cons_vf(i + advxb - 1)%sf(j, k, l) = q_cons_vf(i + contxb - 1)%sf(j, k, l)/rhok(i)
 
                         ! alpha*rho*e
-                        q_cons_vf(i + intxb - 1)%sf(j, k, l) = q_cons_vf(i + contxb - 1)%sf(j, k, l)*ek(i)
+                        if (model_eqns == 3) then
+                            q_cons_vf(i + intxb - 1)%sf(j, k, l) = q_cons_vf(i + contxb - 1)%sf(j, k, l)*ek(i)
+                        end if
 
                         ! Total entropy
                         rhos = rhos + q_cons_vf(i + contxb - 1)%sf(j, k, l)*sk(i)

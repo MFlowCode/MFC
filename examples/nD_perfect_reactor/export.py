@@ -5,7 +5,6 @@ from tqdm import tqdm
 import mfc.viz
 from case import dt, NS, Tend, SAVE_COUNT, sol
 
-
 case = mfc.viz.Case(".", dt)
 
 for name in tqdm(sol.species_names, desc="Loading Variables"):

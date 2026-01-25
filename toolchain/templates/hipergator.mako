@@ -8,10 +8,11 @@
 #SBATCH --job-name="${name}"
 #SBATCH --output="${name}.out"
 #SBATCH --time=${walltime}
-#SBATCH --cpus-per-task=7
 % if gpu_enabled:
 #SBATCH --gpus-per-task=1
+#SBATCH --cpus-per-task=3
 #SBATCH --gpu-bind=closest
+#SBATCH --mem-per-cpu=50GB
 % endif
 % if account:
 #SBATCH --account=${account}
@@ -48,7 +49,7 @@ echo
         (set -x; ${profiler} "${target.get_install_binpath(case)}")
     % else:
         (set -x; ${profiler}    \
-            mpirun -np ${nodes*tasks_per_node}            \
+            /apps/compilers/nvhpc/25.9/Linux_x86_64/25.9/comm_libs/mpi/bin/mpirun -np ${nodes*tasks_per_node}            \
                    --bind-to none                         \
                    "${target.get_install_binpath(case)}")
     % endif

@@ -6,7 +6,6 @@ import matplotlib.pyplot as plt
 import mfc.viz
 from case import dt, Tend, SAVE_COUNT, sol
 
-
 case = mfc.viz.Case(".", dt)
 
 sns.set_theme(style=mfc.viz.generate_cpg_style())

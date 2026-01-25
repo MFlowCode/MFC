@@ -6,8 +6,8 @@
 class Mfc < Formula
   desc "Exascale multiphase/multiphysics compressible flow solver"
   homepage "https://mflowcode.github.io/"
-  url "https://github.com/MFlowCode/MFC/archive/refs/tags/v5.1.0.tar.gz"
-  sha256 "4684bee6a529287f243f8929fb7edb0dfebbb04df7c1806459761c9a6c9261cf"
+  url "https://github.com/MFlowCode/MFC/archive/refs/tags/v5.1.5.tar.gz"
+  sha256 "229ba4532d9b31e54e7db67cc6c6a4c069034bb143be7c57cba31c5a56fe6a0b"
   license "MIT"
   head "https://github.com/MFlowCode/MFC.git", branch: "master"
 
@@ -29,7 +29,11 @@ class Mfc < Formula
     # Create Python virtual environment inside libexec (inside Cellar for proper bottling)
     venv = libexec/"venv"
     system Formula["python@3.12"].opt_bin/"python3.12", "-m", "venv", venv
-    system venv/"bin/pip", "install", "--upgrade", "pip", "setuptools", "wheel", "setuptools-scm"
+    system venv/"bin/pip", "install", "--upgrade",
+           "pip", "setuptools", "wheel",
+           "setuptools-scm",
+           "hatchling", "hatch-vcs",
+           "editables"
 
     # Install Cantera from PyPI using pre-built wheel (complex package, doesn't need custom flags)
     # Cantera has CMake compatibility issues when building from source with newer CMake versions
@@ -42,8 +46,9 @@ class Mfc < Formula
     # Keep toolchain in buildpath for now - mfc.sh needs it there
     #
     # MFC's toolchain uses VCS-derived versioning (via Hatch/hatch-vcs) and Homebrew builds from
-    # GitHub release tarballs without a .git directory. Scope pretend-version env vars tightly
-    # to avoid polluting subsequent pip installs.
+    # GitHub release tarballs without a .git directory. Use --no-build-isolation so the build
+    # backend can see our environment variables, and set SETUPTOOLS_SCM_PRETEND_VERSION which
+    # hatch-vcs respects when VCS metadata is unavailable.
     pretend_env = {
       "SETUPTOOLS_SCM_PRETEND_VERSION_FOR_MFC" => version.to_s,
       "SETUPTOOLS_SCM_PRETEND_VERSION_FOR_mfc" => version.to_s,
@@ -56,7 +61,7 @@ class Mfc < Formula
     end
 
     begin
-      system venv/"bin/pip", "install", "-e", buildpath/"toolchain"
+      system venv/"bin/pip", "install", "--no-build-isolation", "-e", buildpath/"toolchain"
     ensure
       pretend_env.each_key do |k|
         if saved_env[k].nil?
@@ -74,6 +79,11 @@ class Mfc < Formula
     # Now build MFC with pre-configured venv
     # Set VIRTUAL_ENV so mfc.sh uses existing venv instead of creating new one
     ENV["VIRTUAL_ENV"] = venv
+
+    # Also set pretend-version env vars for mfc.sh in case it tries to reinstall toolchain
+    ENV["SETUPTOOLS_SCM_PRETEND_VERSION_FOR_MFC"] = version.to_s
+    ENV["SETUPTOOLS_SCM_PRETEND_VERSION_FOR_mfc"] = version.to_s
+    ENV["SETUPTOOLS_SCM_PRETEND_VERSION"] = version.to_s
 
     # Build MFC using pre-configured venv
     # Must run from buildpath (MFC root directory) where toolchain/ exists

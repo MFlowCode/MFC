@@ -23,7 +23,8 @@ module m_compute_levelset
  s_3D_airfoil_levelset, &
  s_rectangle_levelset, &
  s_cuboid_levelset, &
- s_sphere_levelset
+ s_sphere_levelset, &
+ s_ellipse_levelset
 
 contains
 
@@ -93,6 +94,7 @@ contains
             do j = 0, n
                 xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp] ! get coordinate frame centered on IB
                 xy_local = matmul(inverse_rotation, xy_local) ! rotate the frame into the IB's coordinate
+                xy_local = xy_local - patch_ib(ib_patch_id)%centroid_offset ! airfoils are a patch that require a centroid offset
 
                 if (xy_local(2) >= 0._wp) then
                     ! finds the location on the airfoil grid with the minimum distance (closest)
@@ -188,6 +190,7 @@ contains
 
                     xyz_local = [x_cc(i) - center(1), y_cc(j) - center(2), z_cc(l) - center(3)] ! get coordinate frame centered on IB
                     xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordinates
+                    xyz_local = xyz_local - patch_ib(ib_patch_id)%centroid_offset ! airfoils are a patch that require a centroid offset
 
                     if (xyz_local(2) >= center(2)) then
                         do k = 1, Np
@@ -335,6 +338,62 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_rectangle_levelset
+
+    subroutine s_ellipse_levelset(ib_patch_id, levelset, levelset_norm)
+
+        type(levelset_field), intent(INOUT), optional :: levelset
+        type(levelset_norm_field), intent(INOUT), optional :: levelset_norm
+
+        integer, intent(in) :: ib_patch_id
+        real(wp) :: ellipse_coeffs(2) ! a and b in the ellipse equation
+        real(wp) :: quadratic_coeffs(3) ! A, B, C in the quadratic equation to compute levelset
+
+        real(wp) :: length_x, length_y
+        real(wp), dimension(1:3) :: xy_local, normal_vector !< x and y coordinates in local IB frame
+        real(wp), dimension(2) :: center !< x and y coordinates in local IB frame
+        real(wp), dimension(1:3, 1:3) :: rotation, inverse_rotation
+
+        integer :: i, j, k !< Loop index variables
+        integer :: idx !< Shortest path direction indicator
+
+        length_x = patch_ib(ib_patch_id)%length_x
+        length_y = patch_ib(ib_patch_id)%length_y
+        center(1) = patch_ib(ib_patch_id)%x_centroid
+        center(2) = patch_ib(ib_patch_id)%y_centroid
+        inverse_rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:, :)
+        rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix(:, :)
+
+        ellipse_coeffs(1) = 0.5_wp*length_x
+        ellipse_coeffs(2) = 0.5_wp*length_y
+
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,idx,quadratic_coeffs,xy_local,normal_vector]', &
+                  & copyin='[ib_patch_id,center,ellipse_coeffs,inverse_rotation,rotation]', collapse=2)
+        do i = 0, m
+            do j = 0, n
+                xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]
+                xy_local = matmul(inverse_rotation, xy_local)
+
+                ! we will get NaNs in the levelset if we compute this outside the ellipse
+                if ((xy_local(1)/ellipse_coeffs(1))**2 + (xy_local(2)/ellipse_coeffs(2))**2 <= 1._wp) then
+
+                    normal_vector = xy_local
+                    normal_vector(2) = normal_vector(2)*(ellipse_coeffs(1)/ellipse_coeffs(2))**2._wp ! get the normal direction via the coordinate transformation method
+                    normal_vector = normal_vector/sqrt(dot_product(normal_vector, normal_vector)) ! normalize the vector
+                    levelset_norm%sf(i, j, 0, ib_patch_id, :) = matmul(rotation, normal_vector) ! save after rotating the vector to the global frame
+
+                    ! use the normal vector to set up the quadratic equation for the levelset, using A, B, and C in indices 1, 2, and 3
+                    quadratic_coeffs(1) = (normal_vector(1)/ellipse_coeffs(1))**2 + (normal_vector(2)/ellipse_coeffs(2))**2
+                    quadratic_coeffs(2) = 2._wp*((xy_local(1)*normal_vector(1)/(ellipse_coeffs(1)**2)) + (xy_local(2)*normal_vector(2)/(ellipse_coeffs(2)**2)))
+                    quadratic_coeffs(3) = (xy_local(1)/ellipse_coeffs(1))**2._wp + (xy_local(2)/ellipse_coeffs(2))**2._wp - 1._wp
+
+                    ! compute the levelset with the quadratic equation [ -B + sqrt(B^2 - 4AC) ] / 2A
+                    levelset%sf(i, j, 0, ib_patch_id) = -0.5_wp*(-quadratic_coeffs(2) + sqrt(quadratic_coeffs(2)**2._wp - 4._wp*quadratic_coeffs(1)*quadratic_coeffs(3)))/quadratic_coeffs(1)
+                end if
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_ellipse_levelset
 
     subroutine s_cuboid_levelset(ib_patch_id, levelset, levelset_norm)
 
@@ -552,9 +611,8 @@ contains
                         end if
                     else
                         levelset%sf(i, j, k, ib_patch_id) = dist_surface
-
                         xyz_local = xyz_local*dist_surface_vec
-                        xyz_local = xyz_local/norm2(xyz_local)
+                        xyz_local = xyz_local/max(norm2(xyz_local), sgm_eps)
                         levelset_norm%sf(i, j, k, ib_patch_id, :) = matmul(rotation, xyz_local)
                     end if
                 end do
