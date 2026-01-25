@@ -25,7 +25,7 @@ parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
 )
 
-parser.add_argument("--no-chemistry", action="store_true",
+parser.add_argument("--no-chemistry", action="store_true", default=True,
                     help="Disable chemistry (phase change only)")
 parser.add_argument("--no-multiphase", action="store_true", 
                     help="Disable multiphase coupling (test should fail)")
