@@ -488,7 +488,8 @@ contains
         real(wp) :: h0, h !< Time step size
         real(wp), dimension(4) :: myR_tmp1, myV_tmp1, myR_tmp2, myV_tmp2 !< Bubble radius, radial velocity, and radial acceleration for the inner loop
         real(wp), dimension(4) :: myPb_tmp1, myMv_tmp1, myPb_tmp2, myMv_tmp2 !< Gas pressure and vapor mass for the inner loop (EL)
-        real(wp) :: fR2, fV2, fpb2, fmass_v2, vTemp, aTemp, f_bTemp
+        real(wp) :: fR2, fV2, fpb2, fmass_v2, f_bTemp
+        real(wp), dimension(3) :: vTemp, aTemp
         integer :: adap_dt_stop
         integer :: l, iter_count
 
@@ -573,29 +574,41 @@ contains
                         fpb = myPb_tmp1(4)
                         fmass_v = myMv_tmp1(4)
 
-                        do l = 1, num_dims
-                            select case (lag_vel_model)
-                            case (1)
-                                vTemp = f_interpolate_velocity(fR, cell, l, q_prim_vf)
-                                fPos(l) = fPos(l) + h*vTemp
-                                fVel(l) = vTemp
-                            case (2)
+                        select case (lag_vel_model)
+                        case (1)
+                            do l = 1, num_dims
+                                vTemp(l) = f_interpolate_velocity(fR, cell, l, q_prim_vf)
+                            end do
+                            do l = 1, num_dims
+                                fVel(l) = vTemp(l)
+                                fPos(l) = fPos(l) + h*vTemp(l)
+                            end do
+                        case (2)
+                            do l = 1, num_dims
                                 f_bTemp = f_get_bubble_force(fPos(l), fR, fV, fVel(l), fmass_g, fmass_v, &
                                                              fRe, fRho, cell, l, q_prim_vf)
-                                aTemp = f_bTemp/(fmass_g + fmass_v)
+                                aTemp(l) = f_bTemp/(fmass_g + fmass_v)
+                            end do
+                            do l = 1, num_dims
+                                fVel(l) = fVel(l) + h*aTemp(l)
                                 fPos(l) = fPos(l) + h*fVel(l)
-                                fVel(l) = fVel(l) + h*aTemp
-                            case (3)
+                            end do
+                        case (3)
+                            do l = 1, num_dims
                                 f_bTemp = f_get_bubble_force(fPos(l), fR, fV, fVel(l), fmass_g, fmass_v, &
                                                              fRe, fRho, cell, l, q_prim_vf)
-                                aTemp = 2._wp*f_bTemp/(fmass_g + fmass_v) - 3*fV*fVel(l)/fR
+                                aTemp(l) = 2._wp*f_bTemp/(fmass_g + fmass_v) - 3*fV*fVel(l)/fR
+                            end do
+                            do l = 1, num_dims
+                                fVel(l) = fVel(l) + h*aTemp(l)
                                 fPos(l) = fPos(l) + h*fVel(l)
-                                fVel(l) = fVel(l) + h*aTemp
-                            case default
-                                fPos(l) = fPos(l)
+                            end do
+                        case default
+                            do l = 1, num_dims
                                 fVel(l) = fVel(l)
-                            end select
-                        end do
+                                fPos(l) = fPos(l)
+                            end do
+                        end select
                     end if
 
                     ! Update step size for the next sub-step

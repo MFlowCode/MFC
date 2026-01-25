@@ -128,10 +128,10 @@ contains
             volpart = 4._wp/3._wp*pi*lbk_rad(l, 2)**3._wp
             s_coord(1:3) = lbk_s(l, 1:3, 2)
             center(1:2) = lbk_pos(l, 1:2, 2)
+
             if (p > 0) center(3) = lbk_pos(l, 3, 2)
             call s_get_cell(s_coord, cell)
             call s_compute_stddsv(cell, volpart, stddsv)
-
             strength_vol = volpart
             strength_vel = 4._wp*pi*lbk_rad(l, 2)**2._wp*lbk_vel(l, 2)
 
@@ -149,7 +149,6 @@ contains
                         call s_check_celloutside(cellaux, celloutside)
 
                         if (.not. celloutside) then
-
                             nodecoord(1) = x_cc(cellaux(1))
                             nodecoord(2) = y_cc(cellaux(2))
                             if (p > 0) nodecoord(3) = z_cc(cellaux(3))
@@ -254,6 +253,7 @@ contains
                 Lz2 = (center(3) - (dzp*(0.5_wp + Nr_count) - lag_params%charwidth/2._wp))**2._wp
                 distance = sqrt((center(1) - nodecoord(1))**2._wp + (center(2) - nodecoord(2))**2._wp + Lz2)
                 func = dzp/lag_params%charwidth*exp(-0.5_wp*(distance/stddsv)**2._wp)/(sqrt(2._wp*pi)*stddsv)**3._wp
+
                 do while (Nr_count < Nr - 1._wp + ((mapCells - 1)*1._wp))
                     Nr_count = Nr_count + 1._wp
                     Lz2 = (center(3) - (dzp*(0.5_wp + Nr_count) - lag_params%charwidth/2._wp))**2._wp
@@ -279,21 +279,19 @@ contains
         celloutside = .false.
 
         if (num_dims == 2) then
-            if ((cellaux(1) < fd_number - buff_size) .or. (cellaux(2) < fd_number - buff_size)) then
-                celloutside = .true.
-            end if
-            if (cyl_coord .and. cellaux(2) < 0) then
-                celloutside = .true.
-            end if
-            if ((cellaux(2) > n + buff_size - fd_number) .or. (cellaux(1) > m + buff_size - fd_number)) then
-                celloutside = .true.
-            end if
-        else
-            if ((cellaux(3) < fd_number - buff_size) .or. (cellaux(1) < fd_number - buff_size) .or. (cellaux(2) < fd_number - buff_size)) then
+            if ((cellaux(1) < -buff_size) .or. (cellaux(2) < -buff_size)) then
                 celloutside = .true.
             end if
 
-            if ((cellaux(3) > p + buff_size - fd_number) .or. (cellaux(2) > n + buff_size - fd_number) .or. (cellaux(1) > m + buff_size - fd_number)) then
+            if ((cellaux(1) > m + buff_size) .or. (cellaux(2) > n + buff_size)) then
+                celloutside = .true.
+            end if
+        else
+            if ((cellaux(1) < -buff_size) .or. (cellaux(2) < -buff_size) .or. (cellaux(3) < -buff_size)) then
+                celloutside = .true.
+            end if
+
+            if ((cellaux(1) > m + buff_size) .or. (cellaux(2) > n + buff_size) .or. (cellaux(3) > p + buff_size)) then
                 celloutside = .true.
             end if
         end if
