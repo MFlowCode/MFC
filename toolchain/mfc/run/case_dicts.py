@@ -127,9 +127,7 @@ for ib_id in range(1, 10+1):
         PRE_PROCESS[f"patch_ib({ib_id})%{real_attr}"] = ty
 
     for dir_id in range(1, 4):
-        PRE_PROCESS[f"patch_ib({ib_id})%vel({dir_id})"] = ParamType.REAL
         PRE_PROCESS[f"patch_ib({ib_id})%angles({dir_id})"] = ParamType.REAL
-        PRE_PROCESS[f"patch_ib({ib_id})%angular_vel({dir_id})"] = ParamType.REAL
 
     for cmp_id, cmp in enumerate(["x", "y", "z"]):
         cmp_id += 1
@@ -357,8 +355,7 @@ for var in [ 'solver_approach', 'cluster_type', 'smooth_type', 'nBubs_glb',
              'vel_model', 'drag_model']:
     SIMULATION[f'lag_params%{var}'] = ParamType.INT
 
-for var in [ 'epsilonb', 'valmaxvoid', 'charwidth',
-            'c0', 'rho0', 'T0', 'x0', 'Thost' ]:
+for var in [ 'epsilonb', 'valmaxvoid', 'charwidth']:
     SIMULATION[f'lag_params%{var}'] = ParamType.REAL
 
 SIMULATION[f'lag_params%input_path'] = ParamType.STR
@@ -366,7 +363,7 @@ SIMULATION[f'lag_params%input_path'] = ParamType.STR
 for var in [ 'diffusion', 'reactions' ]:
     SIMULATION[f'chem_params%{var}'] = ParamType.LOG
 
-for var in [ 'gamma_method' ]:
+for var in [ 'gamma_method', 'transport_model']:
     SIMULATION[f'chem_params%{var}'] = ParamType.INT
 
 for var in ["R0ref", "p0ref", "rho0ref", "T0ref", "ss", "pv", "vd",
@@ -383,9 +380,9 @@ for ib_id in range(1, 10+1):
         SIMULATION[f"patch_ib({ib_id})%{real_attr}"] = ty
 
     for dir_id in range(1, 4):
-        SIMULATION[f"patch_ib({ib_id})%vel({dir_id})"] = ParamType.REAL
+        SIMULATION[f"patch_ib({ib_id})%vel({dir_id})"] = ParamType.REAL.analytic()
         SIMULATION[f"patch_ib({ib_id})%angles({dir_id})"] = ParamType.REAL
-        SIMULATION[f"patch_ib({ib_id})%angular_vel({dir_id})"] = ParamType.REAL
+        SIMULATION[f"patch_ib({ib_id})%angular_vel({dir_id})"] = ParamType.REAL.analytic()
 
     for cmp_id, cmp in enumerate(["x", "y", "z"]):
         cmp_id += 1

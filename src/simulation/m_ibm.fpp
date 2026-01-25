@@ -26,6 +26,8 @@ module m_ibm
 
     use m_ib_patches
 
+    use m_viscous
+
     implicit none
 
     private :: s_compute_image_points, &
@@ -93,13 +95,15 @@ contains
         integer :: i, j, k
         integer :: max_num_gps, max_num_inner_gps
 
+        ! do all set up for moving immersed boundaries
         moving_immersed_boundary_flag = .false.
         do i = 1, num_ibs
             if (patch_ib(i)%moving_ibm /= 0) then
+                call s_compute_moment_of_inertia(i, patch_ib(i)%angular_vel)
                 moving_immersed_boundary_flag = .true.
-
             end if
             call s_update_ib_rotation_matrix(i)
+            call s_compute_centroid_offset(i)
         end do
         $:GPU_ENTER_DATA(copyin='[patch_ib]')
 
@@ -197,12 +201,25 @@ contains
         type(ghost_point) :: innerp
 
         ! set the Moving IBM interior Pressure Values
-        $:GPU_PARALLEL_LOOP(private='[i,j,k]', copyin='[E_idx]', collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,patch_id,rho]', copyin='[E_idx,momxb]', collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    if (ib_markers%sf(j, k, l) /= 0) then
+                    patch_id = ib_markers%sf(j, k, l)
+                    if (patch_id /= 0) then
                         q_prim_vf(E_idx)%sf(j, k, l) = 1._wp
+                        if (patch_ib(patch_id)%moving_ibm > 0) then
+                            rho = 0._wp
+                            do i = 1, num_fluids
+                                rho = rho + q_prim_vf(contxb + i - 1)%sf(j, k, l)
+                            end do
+
+                            ! Sets the momentum
+                            do i = 1, num_dims
+                                q_cons_vf(momxb + i - 1)%sf(j, k, l) = patch_ib(patch_id)%vel(i)*rho
+                                q_prim_vf(momxb + i - 1)%sf(j, k, l) = patch_ib(patch_id)%vel(i)
+                            end do
+                        end if
                     end if
                 end do
             end do
@@ -997,62 +1014,122 @@ contains
     ! compute the surface integrals of the IB via a volume integraion method described in
     ! "A coupled IBM/Euler-Lagrange framework for simulating shock-induced particle size segregation"
     ! by Archana Sridhar and Jesse Capecelatro
-    subroutine s_compute_ib_forces(pressure)
+    subroutine s_compute_ib_forces(q_prim_vf, fluid_pp)
 
         ! real(wp), dimension(idwbuff(1)%beg:idwbuff(1)%end, &
         !             idwbuff(2)%beg:idwbuff(2)%end, &
         !             idwbuff(3)%beg:idwbuff(3)%end), intent(in) :: pressure
-        type(scalar_field), intent(in) :: pressure
+        type(scalar_field), dimension(1:sys_size), intent(in) :: q_prim_vf
+        type(physical_parameters), dimension(1:num_fluids), intent(in) :: fluid_pp
 
-        integer :: i, j, k, l, ib_idx
+        integer :: gp_id, i, j, k, l, q, ib_idx, fluid_idx
         real(wp), dimension(num_ibs, 3) :: forces, torques
-        real(wp), dimension(1:3) :: pressure_divergence, radial_vector, local_torque_contribution
-        real(wp) :: cell_volume, dx, dy, dz
+        real(wp), dimension(1:3, 1:3) :: viscous_stress_div, viscous_stress_div_1, viscous_stress_div_2, viscous_cross_1, viscous_cross_2 ! viscous stress tensor with temp vectors to hold divergence calculations
+        real(wp), dimension(1:3) :: local_force_contribution, radial_vector, local_torque_contribution, vel
+        real(wp) :: cell_volume, dx, dy, dz, dynamic_viscosity
+        real(wp), dimension(1:num_fluids) :: dynamic_viscosities
 
         forces = 0._wp
         torques = 0._wp
 
-        ! TODO :: This is currently only valid inviscid, and needs to be extended to add viscocity
-        $:GPU_PARALLEL_LOOP(private='[ib_idx,radial_vector,pressure_divergence,cell_volume,local_torque_contribution, dx, dy, dz]', copy='[forces,torques]', copyin='[ib_markers,patch_ib]', collapse=3)
+        if (viscous) then
+            do fluid_idx = 1, num_fluids
+                if (fluid_pp(fluid_idx)%Re(1) /= 0._wp) then
+                    dynamic_viscosities(fluid_idx) = 1._wp/fluid_pp(fluid_idx)%Re(1)
+                else
+                    dynamic_viscosities(fluid_idx) = 0._wp
+                end if
+            end do
+        end if
+
+        $:GPU_PARALLEL_LOOP(private='[ib_idx,fluid_idx, radial_vector,local_force_contribution,cell_volume,local_torque_contribution, dynamic_viscosity, viscous_stress_div, viscous_stress_div_1, viscous_stress_div_2, viscous_cross_1, viscous_cross_2, dx, dy, dz]', copy='[forces,torques]', copyin='[ib_markers,patch_ib,dynamic_viscosities]', collapse=3)
         do i = 0, m
             do j = 0, n
                 do k = 0, p
                     ib_idx = ib_markers%sf(i, j, k)
-                    if (ib_idx /= 0) then ! only need to compute the gradient for cells inside a IB
-                        if (patch_ib(ib_idx)%moving_ibm == 2) then ! make sure that this IB has 2-way coupling enabled
-                            ! get the vector pointing to the grid cell from the IB centroid
-                            if (num_dims == 3) then
-                                radial_vector = [x_cc(i), y_cc(j), z_cc(k)] - [patch_ib(ib_idx)%x_centroid, patch_ib(ib_idx)%y_centroid, patch_ib(ib_idx)%z_centroid]
-                            else
-                                radial_vector = [x_cc(i), y_cc(j), 0._wp] - [patch_ib(ib_idx)%x_centroid, patch_ib(ib_idx)%y_centroid, 0._wp]
-                            end if
-                            dx = x_cc(i + 1) - x_cc(i)
-                            dy = y_cc(j + 1) - y_cc(j)
+                    if (ib_idx /= 0) then
+                        ! get the vector pointing to the grid cell from the IB centroid
+                        if (num_dims == 3) then
+                            radial_vector = [x_cc(i), y_cc(j), z_cc(k)] - [patch_ib(ib_idx)%x_centroid, patch_ib(ib_idx)%y_centroid, patch_ib(ib_idx)%z_centroid]
+                        else
+                            radial_vector = [x_cc(i), y_cc(j), 0._wp] - [patch_ib(ib_idx)%x_centroid, patch_ib(ib_idx)%y_centroid, 0._wp]
+                        end if
+                        dx = x_cc(i + 1) - x_cc(i)
+                        dy = y_cc(j + 1) - y_cc(j)
 
-                            ! use a finite difference to compute the 2D components of the gradient of the pressure and cell volume
-                            pressure_divergence(1) = (pressure%sf(i + 1, j, k) - pressure%sf(i - 1, j, k))/(2._wp*dx)
-                            pressure_divergence(2) = (pressure%sf(i, j + 1, k) - pressure%sf(i, j - 1, k))/(2._wp*dy)
-                            cell_volume = dx*dy
-
-                            ! add the 3D component, if we are working in 3 dimensions
+                        local_force_contribution(:) = 0._wp
+                        do fluid_idx = 0, num_fluids - 1
+                            ! Get the pressure contribution to force via a finite difference to compute the 2D components of the gradient of the pressure and cell volume
+                            local_force_contribution(1) = local_force_contribution(1) - (q_prim_vf(E_idx + fluid_idx)%sf(i + 1, j, k) - q_prim_vf(E_idx + fluid_idx)%sf(i - 1, j, k))/(2._wp*dx) ! force is the negative pressure gradient
+                            local_force_contribution(2) = local_force_contribution(2) - (q_prim_vf(E_idx + fluid_idx)%sf(i, j + 1, k) - q_prim_vf(E_idx + fluid_idx)%sf(i, j - 1, k))/(2._wp*dy)
+                            cell_volume = abs(dx*dy)
+                            ! add the 3D component of the pressure gradient, if we are working in 3 dimensions
                             if (num_dims == 3) then
                                 dz = z_cc(k + 1) - z_cc(k)
-                                pressure_divergence(3) = (pressure%sf(i, j, k + 1) - pressure%sf(i, j, k - 1))/(2._wp*dz)
-                                cell_volume = cell_volume*dz
-                            else
-                                pressure_divergence(3) = 0._wp
+                                local_force_contribution(3) = local_force_contribution(3) - (q_prim_vf(E_idx + fluid_idx)%sf(i, j, k + 1) - q_prim_vf(E_idx + fluid_idx)%sf(i, j, k - 1))/(2._wp*dz)
+                                cell_volume = abs(cell_volume*dz)
                             end if
+                        end do
 
-                            ! Update the force values atomically to prevent race conditions
-                            call s_cross_product(radial_vector, pressure_divergence, local_torque_contribution) ! separate out to make atomics safe
-                            local_torque_contribution = local_torque_contribution*cell_volume
-                            do l = 1, 3
-                                $:GPU_ATOMIC(atomic='update')
-                                forces(ib_idx, l) = forces(ib_idx, l) - (pressure_divergence(l)*cell_volume)
-                                $:GPU_ATOMIC(atomic='update')
-                                torques(ib_idx, l) = torques(ib_idx, l) - local_torque_contribution(l)
+                        ! Update the force values atomically to prevent race conditions
+                        call s_cross_product(radial_vector, local_force_contribution, local_torque_contribution)
+
+                        ! get the viscous stress and add its contribution if that is considered
+                        ! TODO :: This is really bad code
+                        if (viscous) then
+                            ! compute the volume-weighted local dynamic viscosity
+                            dynamic_viscosity = 0._wp
+                            do fluid_idx = 1, num_fluids
+                                ! local dynamic viscosity is the dynamic viscosity of the fluid times alpha of the fluid
+                                dynamic_viscosity = dynamic_viscosity + (q_prim_vf(fluid_idx + advxb - 1)%sf(i, j, k)*dynamic_viscosities(fluid_idx))
                             end do
+
+                            ! get the linear force component first
+                            call s_compute_viscous_stress_tensor(viscous_stress_div_1, q_prim_vf, dynamic_viscosity, i - 1, j, k)
+                            call s_compute_viscous_stress_tensor(viscous_stress_div_2, q_prim_vf, dynamic_viscosity, i + 1, j, k)
+                            viscous_stress_div = (viscous_stress_div_2 - viscous_stress_div_1)/(2._wp*dx) ! get the x derivative of the viscous stress tensor
+                            local_force_contribution(1:3) = local_force_contribution(1:3) + viscous_stress_div(1, 1:3) ! add te x components of the derivative to the force
+                            do l = 1, 3
+                                ! take the cross products for the torque component
+                                call s_cross_product(radial_vector, viscous_stress_div_1(l, 1:3), viscous_cross_1(l, 1:3))
+                                call s_cross_product(radial_vector, viscous_stress_div_2(l, 1:3), viscous_cross_2(l, 1:3))
+                            end do
+
+                            viscous_stress_div = (viscous_cross_2 - viscous_cross_1)/(2._wp*dx) ! get the x derivative of the cross product
+                            local_torque_contribution(1:3) = local_torque_contribution(1:3) + viscous_stress_div(1, 1:3) ! apply the cross product derivative to the torque
+
+                            call s_compute_viscous_stress_tensor(viscous_stress_div_1, q_prim_vf, dynamic_viscosity, i, j - 1, k)
+                            call s_compute_viscous_stress_tensor(viscous_stress_div_2, q_prim_vf, dynamic_viscosity, i, j + 1, k)
+                            viscous_stress_div = (viscous_stress_div_2 - viscous_stress_div_1)/(2._wp*dy)
+                            local_force_contribution(1:3) = local_force_contribution(1:3) + viscous_stress_div(2, 1:3)
+                            do l = 1, 3
+                                call s_cross_product(radial_vector, viscous_stress_div_1(l, 1:3), viscous_cross_1(l, 1:3))
+                                call s_cross_product(radial_vector, viscous_stress_div_2(l, 1:3), viscous_cross_2(l, 1:3))
+                            end do
+
+                            viscous_stress_div = (viscous_cross_2 - viscous_cross_1)/(2._wp*dy)
+                            local_torque_contribution(1:3) = local_torque_contribution(1:3) + viscous_stress_div(2, 1:3)
+
+                            if (num_dims == 3) then
+                                call s_compute_viscous_stress_tensor(viscous_stress_div_1, q_prim_vf, dynamic_viscosity, i, j, k - 1)
+                                call s_compute_viscous_stress_tensor(viscous_stress_div_2, q_prim_vf, dynamic_viscosity, i, j, k + 1)
+                                viscous_stress_div = (viscous_stress_div_2 - viscous_stress_div_1)/(2._wp*dz)
+                                local_force_contribution(1:3) = local_force_contribution(1:3) + viscous_stress_div(3, 1:3)
+                                do l = 1, 3
+                                    call s_cross_product(radial_vector, viscous_stress_div_1(l, 1:3), viscous_cross_1(l, 1:3))
+                                    call s_cross_product(radial_vector, viscous_stress_div_2(l, 1:3), viscous_cross_2(l, 1:3))
+                                end do
+                                viscous_stress_div = (viscous_cross_2 - viscous_cross_1)/(2._wp*dz)
+                                local_torque_contribution(1:3) = local_torque_contribution(1:3) + viscous_stress_div(3, 1:3)
+                            end if
                         end if
+
+                        do l = 1, 3
+                            $:GPU_ATOMIC(atomic='update')
+                            forces(ib_idx, l) = forces(ib_idx, l) + (local_force_contribution(l)*cell_volume)
+                            $:GPU_ATOMIC(atomic='update')
+                            torques(ib_idx, l) = torques(ib_idx, l) + local_torque_contribution(l)*cell_volume
+                        end do
                     end if
                 end do
             end do
@@ -1063,10 +1140,23 @@ contains
         call s_mpi_allreduce_vectors_sum(forces, forces, num_ibs, 3)
         call s_mpi_allreduce_vectors_sum(torques, torques, num_ibs, 3)
 
+        ! consider body forces after reducing to avoid double counting
+        do i = 1, num_ibs
+            if (bf_x) then
+                forces(i, 1) = forces(i, 1) + accel_bf(1)*patch_ib(i)%mass
+            end if
+            if (bf_y) then
+                forces(i, 2) = forces(i, 2) + accel_bf(2)*patch_ib(i)%mass
+            end if
+            if (bf_z) then
+                forces(i, 3) = forces(i, 3) + accel_bf(3)*patch_ib(i)%mass
+            end if
+        end do
+
         ! apply the summed forces
         do i = 1, num_ibs
             patch_ib(i)%force(:) = forces(i, :)
-            patch_ib(i)%torque(:) = matmul(patch_ib(i)%rotation_matrix_inverse, torques(i, :)) ! torques must be computed in the local coordinates of the IB
+            patch_ib(i)%torque(:) = matmul(patch_ib(i)%rotation_matrix_inverse, torques(i, :)) ! torques must be converted to the local coordinates of the IB
         end do
 
     end subroutine s_compute_ib_forces
@@ -1080,34 +1170,94 @@ contains
 
     end subroutine s_finalize_ibm_module
 
+    !> Computes the center of mass for IB patch types where we are unable to determine their center of mass analytically.
+    !> These patches include things like NACA airfoils and STL models
+    subroutine s_compute_centroid_offset(ib_marker)
+
+        integer, intent(in) :: ib_marker
+
+        integer :: i, j, k, num_cells, num_cells_local
+        real(wp), dimension(1:3) :: center_of_mass, center_of_mass_local
+
+        ! Offset only needs to be computes for specific geometries
+        if (patch_ib(ib_marker)%geometry == 4 .or. &
+            patch_ib(ib_marker)%geometry == 5 .or. &
+            patch_ib(ib_marker)%geometry == 11 .or. &
+            patch_ib(ib_marker)%geometry == 12) then
+
+            center_of_mass_local = [0._wp, 0._wp, 0._wp]
+            num_cells_local = 0
+
+            ! get the summed mass distribution and number of cells to divide by
+            do i = 0, m
+                do j = 0, n
+                    do k = 0, p
+                        if (ib_markers%sf(i, j, k) == ib_marker) then
+                            num_cells_local = num_cells_local + 1
+                            center_of_mass_local = center_of_mass_local + [x_cc(i), y_cc(j), 0._wp]
+                            if (num_dims == 3) center_of_mass_local(3) = center_of_mass_local(3) + z_cc(k)
+                        end if
+                    end do
+                end do
+            end do
+
+            ! reduce the mass contribution over all MPI ranks and compute COM
+            call s_mpi_allreduce_integer_sum(num_cells_local, num_cells)
+            if (num_cells /= 0) then
+                call s_mpi_allreduce_sum(center_of_mass_local(1), center_of_mass(1))
+                call s_mpi_allreduce_sum(center_of_mass_local(2), center_of_mass(2))
+                call s_mpi_allreduce_sum(center_of_mass_local(3), center_of_mass(3))
+                center_of_mass = center_of_mass/real(num_cells, wp)
+            else
+                patch_ib(ib_marker)%centroid_offset = [0._wp, 0._wp, 0._wp]
+                return
+            end if
+
+            ! assign the centroid offset as a vector pointing from the true COM to the "centroid" in the input file and replace the current centroid
+            patch_ib(ib_marker)%centroid_offset = [patch_ib(ib_marker)%x_centroid, patch_ib(ib_marker)%y_centroid, patch_ib(ib_marker)%z_centroid] &
+                                                  - center_of_mass
+            patch_ib(ib_marker)%x_centroid = center_of_mass(1)
+            patch_ib(ib_marker)%y_centroid = center_of_mass(2)
+            patch_ib(ib_marker)%z_centroid = center_of_mass(3)
+
+            ! rotate the centroid offset back into the local coords of the IB
+            patch_ib(ib_marker)%centroid_offset = matmul(patch_ib(ib_marker)%rotation_matrix_inverse, patch_ib(ib_marker)%centroid_offset)
+        else
+            patch_ib(ib_marker)%centroid_offset(:) = [0._wp, 0._wp, 0._wp]
+        end if
+
+    end subroutine s_compute_centroid_offset
+
     subroutine s_compute_moment_of_inertia(ib_marker, axis)
 
-        real(wp), dimension(3), optional :: axis !< the axis about which we compute the moment. Only required in 3D.
+        real(wp), dimension(3), intent(in) :: axis !< the axis about which we compute the moment. Only required in 3D.
         integer, intent(in) :: ib_marker
 
         real(wp) :: moment, distance_to_axis, cell_volume
-        real(wp), dimension(3) :: position, closest_point_along_axis, vector_to_axis
+        real(wp), dimension(3) :: position, closest_point_along_axis, vector_to_axis, normal_axis
         integer :: i, j, k, count
 
         if (p == 0) then
-            axis = [0, 1, 0]
+            normal_axis = [0, 0, 1]
         else if (sqrt(sum(axis**2)) == 0) then
             ! if the object is not actually rotating at this time, return a dummy value and exit
             patch_ib(ib_marker)%moment = 1._wp
             return
         else
-            axis = axis/sqrt(sum(axis))
+            normal_axis = axis/sqrt(sum(axis))
         end if
 
         ! if the IB is in 2D or a 3D sphere, we can compute this exactly
         if (patch_ib(ib_marker)%geometry == 2) then ! circle
-            patch_ib(ib_marker)%moment = 0.5*patch_ib(ib_marker)%mass*(patch_ib(ib_marker)%radius)**2
+            patch_ib(ib_marker)%moment = 0.5_wp*patch_ib(ib_marker)%mass*(patch_ib(ib_marker)%radius)**2
         elseif (patch_ib(ib_marker)%geometry == 3) then ! rectangle
             patch_ib(ib_marker)%moment = patch_ib(ib_marker)%mass*(patch_ib(ib_marker)%length_x**2 + patch_ib(ib_marker)%length_y**2)/6._wp
+        elseif (patch_ib(ib_marker)%geometry == 6) then ! ellipse
+            patch_ib(ib_marker)%moment = 0.0625_wp*patch_ib(ib_marker)%mass*(patch_ib(ib_marker)%length_x**2 + patch_ib(ib_marker)%length_y**2)
         elseif (patch_ib(ib_marker)%geometry == 8) then ! sphere
             patch_ib(ib_marker)%moment = 0.4*patch_ib(ib_marker)%mass*(patch_ib(ib_marker)%radius)**2
 
-        else ! we do not have an analytic moment of inertia calculation and need to approximate it directly
+        else ! we do not have an analytic moment of inertia calculation and need to approximate it directly via a sum
             count = 0
             moment = 0._wp
             cell_volume = (x_cc(1) - x_cc(0))*(y_cc(1) - y_cc(0)) ! computed without grid stretching. Update in the loop to perform with stretching
@@ -1115,7 +1265,7 @@ contains
                 cell_volume = cell_volume*(z_cc(1) - z_cc(0))
             end if
 
-            $:GPU_PARALLEL_LOOP(private='[position,closest_point_along_axis,vector_to_axis,distance_to_axis]', copy='[moment,count]', copyin='[ib_marker,cell_volume,axis]', collapse=3)
+            $:GPU_PARALLEL_LOOP(private='[position,closest_point_along_axis,vector_to_axis,distance_to_axis]', copy='[moment,count]', copyin='[ib_marker,cell_volume,normal_axis]', collapse=3)
             do i = 0, m
                 do j = 0, n
                     do k = 0, p
@@ -1131,7 +1281,7 @@ contains
                             end if
 
                             ! project the position along the axis to find the closest distance to the rotation axis
-                            closest_point_along_axis = axis*dot_product(axis, position)
+                            closest_point_along_axis = normal_axis*dot_product(normal_axis, position)
                             vector_to_axis = position - closest_point_along_axis
                             distance_to_axis = dot_product(vector_to_axis, vector_to_axis) ! saves the distance to the axis squared
 

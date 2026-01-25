@@ -240,6 +240,7 @@ module m_global_parameters
 
     real(wp) :: rhoref, pref !< Reference parameters for Tait EOS
 
+    type(chemistry_parameters) :: chem_params
     !> @name Bubble modeling
     !> @{
     integer :: nb
@@ -615,6 +616,7 @@ contains
             patch_ib(i)%angular_vel(:) = 0._wp
             patch_ib(i)%mass = dflt_real
             patch_ib(i)%moment = dflt_real
+            patch_ib(i)%centroid_offset(:) = 0._wp
 
             ! sets values of a rotation matrix which can be used when calculating rotations
             patch_ib(i)%rotation_matrix = 0._wp
@@ -623,6 +625,9 @@ contains
             patch_ib(i)%rotation_matrix(3, 3) = 1._wp
             patch_ib(i)%rotation_matrix_inverse = patch_ib(i)%rotation_matrix
         end do
+
+        chem_params%gamma_method = 1
+        chem_params%transport_model = 1
 
         ! Fluids physical parameters
         do i = 1, num_fluids_max
