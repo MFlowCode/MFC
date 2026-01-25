@@ -264,6 +264,8 @@ print(json.dumps({{**case, **mods}}))
             tolerance = 1e-9
         elif self.params.get("mhd", 'F') == 'T':
             tolerance = 1e-8
+        elif "Axisymmetric" in self.trace.split(" -> "):
+            tolerance = 1e-11
 
         return 1e8 * tolerance if single else tolerance
 

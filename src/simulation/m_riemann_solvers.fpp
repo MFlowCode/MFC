@@ -49,6 +49,10 @@ module m_riemann_solvers
         get_species_specific_heats_r, get_species_enthalpies_rt, &
         get_mixture_specific_heat_cp_mass
 
+    #:if USING_AMD
+        use m_chemistry, only: molecular_weights_nonparameter
+    #:endif
+
     implicit none
 
     private; public :: s_initialize_riemann_solvers_module, &
@@ -287,17 +291,25 @@ contains
 
         integer, intent(in) :: norm_dir
         type(int_bounds_info), intent(in) :: ix, iy, iz
-
+#:if not MFC_CASE_OPTIMIZATION and USING_AMD 
+        real(wp), dimension(3) :: alpha_rho_L, alpha_rho_R
+        real(wp), dimension(3) :: vel_L, vel_R
+        real(wp), dimension(3) :: alpha_L, alpha_R
+        real(wp), dimension(10) :: Ys_L, Ys_R
+        real(wp), dimension(10) :: Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR
+        real(wp), dimension(10) :: Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2
+#:else
         real(wp), dimension(num_fluids) :: alpha_rho_L, alpha_rho_R
-        real(wp) :: rho_L, rho_R
         real(wp), dimension(num_vels) :: vel_L, vel_R
-        real(wp) :: pres_L, pres_R
-        real(wp) :: E_L, E_R
-        real(wp) :: H_L, H_R
         real(wp), dimension(num_fluids) :: alpha_L, alpha_R
         real(wp), dimension(num_species) :: Ys_L, Ys_R
         real(wp), dimension(num_species) :: Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR
         real(wp), dimension(num_species) :: Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2
+#:endif
+        real(wp) :: rho_L, rho_R     
+        real(wp) :: pres_L, pres_R
+        real(wp) :: E_L, E_R
+        real(wp) :: H_L, H_R
         real(wp) :: Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi
         real(wp) :: T_L, T_R
         real(wp) :: Y_L, Y_R
@@ -481,9 +493,13 @@ contains
 
                                 call get_mixture_molecular_weight(Ys_L, MW_L)
                                 call get_mixture_molecular_weight(Ys_R, MW_R)
-
+#:if USING_AMD
+                                Xs_L(:) = Ys_L(:)*MW_L/molecular_weights_nonparameter(:)
+                                Xs_R(:) = Ys_R(:)*MW_R/molecular_weights_nonparameter(:)
+#:else
                                 Xs_L(:) = Ys_L(:)*MW_L/molecular_weights(:)
-                                Xs_R(:) = Ys_R(:)*MW_R/molecular_weights(:)
+                                Xs_R(:) = Ys_R(:)*MW_R/molecular_weights(:) 
+#:endif
 
                                 R_gas_L = gas_constant/MW_L
                                 R_gas_R = gas_constant/MW_R
@@ -1052,17 +1068,28 @@ contains
 
         integer, intent(in) :: norm_dir
         type(int_bounds_info), intent(in) :: ix, iy, iz
-
+#:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        real(wp), dimension(3) :: alpha_rho_L, alpha_rho_R
+        real(wp), dimension(3) :: vel_L, vel_R
+        real(wp), dimension(3) :: alpha_L, alpha_R
+        real(wp), dimension(10) :: Ys_L, Ys_R
+        real(wp), dimension(10) :: Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR
+        real(wp), dimension(10) :: Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2
+         real(wp), dimension(3, 3) :: vel_grad_L, vel_grad_R       !< Averaged velocity gradient tensor `d(vel_i)/d(coord_j)`.
+#:else 
         real(wp), dimension(num_fluids) :: alpha_rho_L, alpha_rho_R
-        real(wp) :: rho_L, rho_R
         real(wp), dimension(num_vels) :: vel_L, vel_R
-        real(wp) :: pres_L, pres_R
-        real(wp) :: E_L, E_R
-        real(wp) :: H_L, H_R
         real(wp), dimension(num_fluids) :: alpha_L, alpha_R
         real(wp), dimension(num_species) :: Ys_L, Ys_R
         real(wp), dimension(num_species) :: Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR
         real(wp), dimension(num_species) :: Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2
+        real(wp), dimension(num_dims, num_dims) :: vel_grad_L, vel_grad_R       !< Averaged velocity gradient tensor `d(vel_i)/d(coord_j)`.
+#:endif
+        real(wp) :: rho_L, rho_R
+       
+        real(wp) :: pres_L, pres_R
+        real(wp) :: E_L, E_R
+        real(wp) :: H_L, H_R
         real(wp) :: Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi
         real(wp) :: T_L, T_R
         real(wp) :: Y_L, Y_R
@@ -1104,8 +1131,6 @@ contains
         type(riemann_states_vec3) :: cm ! Conservative momentum variables
 
         integer :: i, j, k, l, q !< Generic loop iterators
-
-        real(wp), dimension(num_dims, num_dims) :: vel_grad_L, vel_grad_R       !< Averaged velocity gradient tensor `d(vel_i)/d(coord_j)`.
         integer, dimension(3) :: idx_right_phys                     !< Physical (j,k,l) indices for right state.
 
         ! Populating the buffers of the left and right Riemann problem
@@ -1249,8 +1274,13 @@ contains
                                 call get_mixture_molecular_weight(Ys_L, MW_L)
                                 call get_mixture_molecular_weight(Ys_R, MW_R)
 
+#:if USING_AMD
+                                Xs_L(:) = Ys_L(:)*MW_L/molecular_weights_nonparameter(:)
+                                Xs_R(:) = Ys_R(:)*MW_R/molecular_weights_nonparameter(:)
+#:else
                                 Xs_L(:) = Ys_L(:)*MW_L/molecular_weights(:)
-                                Xs_R(:) = Ys_R(:)*MW_R/molecular_weights(:)
+                                Xs_R(:) = Ys_R(:)*MW_R/molecular_weights(:) 
+#:endif
 
                                 R_gas_L = gas_constant/MW_L
                                 R_gas_R = gas_constant/MW_R
@@ -1943,8 +1973,8 @@ contains
         type(int_bounds_info), intent(in) :: ix, iy, iz
 
 #:if not MFC_CASE_OPTIMIZATION and USING_AMD 
-        real(wp), dimension(2) :: alpha_rho_L, alpha_rho_R
-        real(wp), dimension(2) :: alpha_L, alpha_R
+        real(wp), dimension(3) :: alpha_rho_L, alpha_rho_R
+        real(wp), dimension(3) :: alpha_L, alpha_R
         real(wp), dimension(3) :: vel_L, vel_R
 #:else
         real(wp), dimension(num_fluids) :: alpha_rho_L, alpha_rho_R
@@ -1956,8 +1986,13 @@ contains
         real(wp) :: pres_L, pres_R
         real(wp) :: E_L, E_R
         real(wp) :: H_L, H_R
+#:if not MFC_CASE_OPTIMIZATION and USING_AMD 
+        real(wp), dimension(10) :: Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR
+        real(wp), dimension(10) :: Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2
+#:else
         real(wp), dimension(num_species) :: Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR
         real(wp), dimension(num_species) :: Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2
+#:endif
         real(wp) :: Cp_avg, Cv_avg, T_avg, c_sum_Yi_Phi, eps
         real(wp) :: T_L, T_R
         real(wp) :: MW_L, MW_R
@@ -3227,8 +3262,13 @@ contains
                                     call get_mixture_molecular_weight(Ys_L, MW_L)
                                     call get_mixture_molecular_weight(Ys_R, MW_R)
 
+#:if USING_AMD
+                                    Xs_L(:) = Ys_L(:)*MW_L/molecular_weights_nonparameter(:)
+                                    Xs_R(:) = Ys_R(:)*MW_R/molecular_weights_nonparameter(:)
+#:else
                                     Xs_L(:) = Ys_L(:)*MW_L/molecular_weights(:)
-                                    Xs_R(:) = Ys_R(:)*MW_R/molecular_weights(:)
+                                    Xs_R(:) = Ys_R(:)*MW_R/molecular_weights(:) 
+#:endif
 
                                     R_gas_L = gas_constant/MW_L
                                     R_gas_R = gas_constant/MW_R
@@ -3680,7 +3720,11 @@ contains
         type(int_bounds_info), intent(in) :: ix, iy, iz
 
         ! Local variables:
+#:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        real(wp), dimension(3) :: alpha_L, alpha_R, alpha_rho_L, alpha_rho_R
+#:else 
         real(wp), dimension(num_fluids) :: alpha_L, alpha_R, alpha_rho_L, alpha_rho_R
+#:endif
         type(riemann_states_vec3) :: vel
         type(riemann_states) :: rho, pres, E, H_no_mag
         type(riemann_states) :: gamma, pi_inf, qv
@@ -4638,16 +4682,24 @@ contains
         type(int_bounds_info), intent(in) :: ix, iy, iz
 
         ! Local variables
+#:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        real(wp), dimension(3) :: avg_v_int       !!< Averaged interface velocity $(v_x, v_y, v_z)$ (grid directions).
+        real(wp), dimension(3) :: avg_dvdx_int    !!< Averaged interface $\partial v_i/\partial x$ (grid dir 1).
+        real(wp), dimension(3) :: avg_dvdy_int    !!< Averaged interface $\partial v_i/\partial y$ (grid dir 2).
+        real(wp), dimension(3) :: avg_dvdz_int    !!< Averaged interface $\partial v_i/\partial z$ (grid dir 3).
+        real(wp), dimension(3) :: vel_src_int !!< Interface velocity $(v_1,v_2,v_3)$ (grid directions) for viscous work.
+        real(wp), dimension(3) :: stress_vector_shear !!< Shear stress vector $(\sigma_{N1}, \sigma_{N2}, \sigma_{N3})$ on N-face (grid directions).
+#:else 
         real(wp), dimension(num_dims) :: avg_v_int       !!< Averaged interface velocity $(v_x, v_y, v_z)$ (grid directions).
         real(wp), dimension(num_dims) :: avg_dvdx_int    !!< Averaged interface $\partial v_i/\partial x$ (grid dir 1).
         real(wp), dimension(num_dims) :: avg_dvdy_int    !!< Averaged interface $\partial v_i/\partial y$ (grid dir 2).
         real(wp), dimension(num_dims) :: avg_dvdz_int    !!< Averaged interface $\partial v_i/\partial z$ (grid dir 3).
-
+        real(wp), dimension(num_dims) :: vel_src_int !!< Interface velocity $(v_1,v_2,v_3)$ (grid directions) for viscous work.
         real(wp), dimension(num_dims) :: stress_vector_shear !!< Shear stress vector $(\sigma_{N1}, \sigma_{N2}, \sigma_{N3})$ on N-face (grid directions).
+#:endif
         real(wp) :: stress_normal_bulk  !!< Normal bulk stress component $\sigma_{NN}$ on N-face.
 
         real(wp) :: Re_s, Re_b        !!< Effective interface shear and bulk Reynolds numbers.
-        real(wp), dimension(num_dims) :: vel_src_int !!< Interface velocity $(v_1,v_2,v_3)$ (grid directions) for viscous work.
         real(wp) :: r_eff             !!< Effective radius at interface for cylindrical terms.
         real(wp) :: div_v_term_const  !!< Common term $-(2/3)(\nabla \cdot \mathbf{v}) / \text{Re}_s$ for shear stress diagonal.
         real(wp) :: divergence_cyl    !!< Full divergence $\nabla \cdot \mathbf{v}$ in cylindrical coordinates.
@@ -4813,10 +4865,17 @@ contains
         integer, intent(in) :: norm_dir
 
         ! Local variables
+#:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        real(wp), dimension(3, 3) :: vel_grad_avg        !< Averaged velocity gradient tensor `d(vel_i)/d(coord_j)`.
+        real(wp), dimension(3, 3) :: current_tau_shear   !< Current shear stress tensor.
+        real(wp), dimension(3, 3) :: current_tau_bulk    !< Current bulk stress tensor.
+        real(wp), dimension(3) :: vel_src_at_interface         !< Interface velocities (u,v,w) for viscous work.
+#:else 
         real(wp), dimension(num_dims, num_dims) :: vel_grad_avg        !< Averaged velocity gradient tensor `d(vel_i)/d(coord_j)`.
         real(wp), dimension(num_dims, num_dims) :: current_tau_shear   !< Current shear stress tensor.
         real(wp), dimension(num_dims, num_dims) :: current_tau_bulk    !< Current bulk stress tensor.
         real(wp), dimension(num_dims) :: vel_src_at_interface         !< Interface velocities (u,v,w) for viscous work.
+#:endif
         integer, dimension(3) :: idx_right_phys                     !< Physical (j,k,l) indices for right state.
 
         real(wp) :: Re_shear !< Interface shear Reynolds number.
@@ -4929,10 +4988,15 @@ contains
         $:GPU_ROUTINE(parallelism='[seq]')
 
         ! Arguments
+#:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        real(wp), dimension(3, 3), intent(in) :: vel_grad_avg
+        real(wp), dimension(3, 3), intent(out) :: tau_shear_out
+#:else 
         real(wp), dimension(num_dims, num_dims), intent(in) :: vel_grad_avg
+        real(wp), dimension(num_dims, num_dims), intent(out) :: tau_shear_out
+#:endif
         real(wp), intent(in) :: Re_shear
         real(wp), intent(in) :: divergence_v
-        real(wp), dimension(num_dims, num_dims), intent(out) :: tau_shear_out
 
         ! Local variables
         integer :: i_dim !< Loop iterator for face normal.
@@ -4963,7 +5027,11 @@ contains
         ! Arguments
         real(wp), intent(in) :: Re_bulk
         real(wp), intent(in) :: divergence_v
+#:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        real(wp), dimension(3, 3), intent(out) :: tau_bulk_out
+#:else 
         real(wp), dimension(num_dims, num_dims), intent(out) :: tau_bulk_out
+#:endif
 
         ! Local variables
         integer :: i_dim !< Loop iterator for diagonal components.

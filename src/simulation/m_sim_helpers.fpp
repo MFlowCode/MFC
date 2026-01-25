@@ -98,7 +98,7 @@ contains
 
         type(scalar_field), intent(in), dimension(sys_size) :: q_prim_vf
 #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-        real(wp), intent(inout), dimension(2) :: alpha
+        real(wp), intent(inout), dimension(3) :: alpha
         real(wp), intent(inout), dimension(3) :: vel
 #:else 
         real(wp), intent(inout), dimension(num_fluids) :: alpha
@@ -109,7 +109,7 @@ contains
         integer, intent(in) :: j, k, l
         real(wp), dimension(2), intent(inout) :: Re
 #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-        real(wp), dimension(2) :: alpha_rho, Gs
+        real(wp), dimension(3) :: alpha_rho, Gs
 #:else
         real(wp), dimension(num_fluids) :: alpha_rho, Gs
 #:endif

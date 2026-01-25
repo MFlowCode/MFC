@@ -126,8 +126,13 @@ contains
         integer :: eqn
         real(wp) :: T
         real(wp) :: rho, omega_m
+#:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        real(wp), dimension(10) :: Ys
+        real(wp), dimension(10) :: omega
+#:else 
         real(wp), dimension(num_species) :: Ys
         real(wp), dimension(num_species) :: omega
+#:endif
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[Ys, omega, eqn, T, rho, omega_m]', copyin='[bounds]')
         do z = bounds(3)%beg, bounds(3)%end
@@ -169,11 +174,18 @@ contains
         type(int_bounds_info), intent(in) :: irx, iry, irz
 
         integer, intent(in) :: idir
-
+#:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        real(wp), dimension(10) :: Xs_L, Xs_R, Xs_cell, Ys_L, Ys_R, Ys_cell
+        real(wp), dimension(10) :: mass_diffusivities_mixavg1, mass_diffusivities_mixavg2
+        real(wp), dimension(10) :: mass_diffusivities_mixavg_Cell, dXk_dxi, h_l, h_r, h_k
+        real(wp), dimension(10) :: Mass_Diffu_Flux, dYk_dxi
+#:else 
         real(wp), dimension(num_species) :: Xs_L, Xs_R, Xs_cell, Ys_L, Ys_R, Ys_cell
         real(wp), dimension(num_species) :: mass_diffusivities_mixavg1, mass_diffusivities_mixavg2
         real(wp), dimension(num_species) :: mass_diffusivities_mixavg_Cell, dXk_dxi, h_l, h_r, h_k
         real(wp), dimension(num_species) :: Mass_Diffu_Flux, dYk_dxi
+#:endif
+
         real(wp) :: Mass_Diffu_Energy
         real(wp) :: MW_L, MW_R, MW_cell, Rgas_L, Rgas_R, T_L, T_R, P_L, P_R, rho_L, rho_R, rho_cell, rho_Vic
         real(wp) :: lambda_L, lambda_R, lambda_Cell, dT_dxi, grid_spacing

@@ -82,8 +82,11 @@ contains
             intent(inout) :: flux_src_vf
         integer, intent(in) :: id
         type(int_bounds_info), intent(in) :: isx, isy, isz
-
-        real(wp), dimension(num_dims, num_dims) :: Omega
+#:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        real(wp), dimension(3, 3) :: Omega
+#:else
+        real(wp), dimension(num_dims, num_dims) :: Omega 
+#:endif
         real(wp) :: w1L, w1R, w2L, w2R, w3L, w3R, w1, w2, w3
         real(wp) :: normWL, normWR, normW
         integer :: j, k, l, i

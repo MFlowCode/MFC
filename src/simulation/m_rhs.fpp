@@ -339,7 +339,7 @@ contains
             ! END: Allocation/Association of flux_n, flux_src_n, and flux_gsrc_n
         end if
 
-        if (.not. igr) then
+        if ((.not. igr) .or. dummy) then
 
             ! Allocation of dq_prim_ds_qp
             @:ALLOCATE(dq_prim_dx_qp(1:1))
@@ -781,7 +781,7 @@ contains
                     call nvtxEndRange
                 end if
             end if 
-            if(.not. igr .or. dummy) then! Finite volume solve
+            if((.not. igr) .or. dummy) then! Finite volume solve
 
                 ! Reconstructing Primitive/Conservative Variables
                 call nvtxStartRange("RHS-WENO")

@@ -44,7 +44,7 @@ module m_boundary_common
  s_populate_grid_variables_buffers, &
  s_finalize_boundary_common_module
 
-    public :: bc_buffers
+    !public :: bc_buffers
 
 #ifdef MFC_MPI
     public :: MPI_BC_TYPE_TYPE, MPI_BC_BUFFER_TYPE
@@ -54,24 +54,31 @@ contains
 
     impure subroutine s_initialize_boundary_common_module()
 
+        integer :: i, j 
+
         @:ALLOCATE(bc_buffers(1:num_dims, 1:2))
 
         if (bc_io) then
             @:ALLOCATE(bc_buffers(1, 1)%sf(1:sys_size, 0:n, 0:p))
             @:ALLOCATE(bc_buffers(1, 2)%sf(1:sys_size, 0:n, 0:p))
-            @:ACC_SETUP_SFs(bc_buffers(1,1), bc_buffers(1,2))
+            #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
             if (n > 0) then
                 @:ALLOCATE(bc_buffers(2,1)%sf(-buff_size:m+buff_size,1:sys_size,0:p))
-                @:ALLOCATE(bc_buffers(2,2)%sf(-buff_size:m+buff_size,1:sys_size,0:p))
-                @:ACC_SETUP_SFs(bc_buffers(2,1), bc_buffers(2,2))
-                if (p > 0) then
-                    #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
-                        @:ALLOCATE(bc_buffers(3,1)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,1:sys_size))
-                        @:ALLOCATE(bc_buffers(3,2)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,1:sys_size))
-                        @:ACC_SETUP_SFs(bc_buffers(3,1), bc_buffers(3,2))
-                    #:endif
-                end if
+                @:ALLOCATE(bc_buffers(2,2)%sf(-buff_size:m+buff_size,1:sys_size,0:p))                
+                #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                if (p > 0) then            
+                    @:ALLOCATE(bc_buffers(3,1)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,1:sys_size))
+                    @:ALLOCATE(bc_buffers(3,2)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,1:sys_size))
+                end if  
+                #:endif
             end if
+            #:endif
+            do i = 1, num_dims
+                do j = 1, 2
+                @:ACC_SETUP_SFs(bc_buffers(i,j))
+                end do
+            end do
+
         end if
 
     end subroutine s_initialize_boundary_common_module
@@ -1056,6 +1063,7 @@ contains
                 end do
             end if
         elseif (bc_dir == 2) then !< y-direction
+#:if not MFC_CASE_OPTIMIZATION or num_dims > 1
             if (bc_loc == -1) then !< bc_y%beg
                 do i = 1, sys_size
                     do j = 1, buff_size
@@ -1071,7 +1079,9 @@ contains
                     end do
                 end do
             end if
+#:endif
         elseif (bc_dir == 3) then !< z-direction
+#:if not MFC_CASE_OPTIMIZATION or num_dims > 2
             if (bc_loc == -1) then !< bc_z%beg
                 do i = 1, sys_size
                     do j = 1, buff_size
@@ -1087,6 +1097,7 @@ contains
                     end do
                 end do
             end if
+#:endif
         end if
 #else
         call s_ghost_cell_extrapolation(q_prim_vf, bc_dir, bc_loc, k, l)

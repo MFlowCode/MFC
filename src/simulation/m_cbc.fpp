@@ -644,25 +644,32 @@ contains
         integer, intent(in) :: cbc_dir_norm, cbc_loc_norm
 
         type(int_bounds_info), intent(in) :: ix, iy, iz
-
-        ! First-order time derivatives of the partial densities, density,
-        ! velocity, pressure, advection variables, and the specific heat
-        ! ratio and liquid stiffness functions
-
-        real(wp), dimension(num_fluids) :: dalpha_rho_dt
         real(wp) :: drho_dt
-        real(wp), dimension(num_dims) :: dvel_dt
         real(wp) :: dpres_dt
-        real(wp), dimension(num_fluids) :: dadv_dt
         real(wp) :: dgamma_dt
         real(wp) :: dpi_inf_dt
         real(wp) :: dqv_dt
         real(wp) :: dpres_ds
+#:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        real(wp), dimension(3) :: alpha_rho, dalpha_rho_ds, mf
+        real(wp), dimension(3) :: vel, dvel_ds
+        real(wp), dimension(3) :: adv_local, dadv_ds
+        real(wp), dimension(12) :: L
+        real(wp), dimension(3) :: dadv_dt
+        real(wp), dimension(3) :: dvel_dt
+        real(wp), dimension(3) :: dalpha_rho_dt
+        real(wp), dimension(10) :: Ys, h_k, dYs_dt, dYs_ds, Xs, Gamma_i, Cp_i
+#:else 
         real(wp), dimension(contxe) :: alpha_rho, dalpha_rho_ds, mf
-        real(wp), dimension(2) :: Re_cbc
         real(wp), dimension(num_vels) :: vel, dvel_ds
         real(wp), dimension(num_fluids) :: adv_local, dadv_ds
         real(wp), dimension(sys_size) :: L
+        real(wp), dimension(num_fluids) :: dadv_dt
+        real(wp), dimension(num_dims) :: dvel_dt
+        real(wp), dimension(num_fluids) :: dalpha_rho_dt
+        real(wp), dimension(num_species) :: Ys, h_k, dYs_dt, dYs_ds, Xs, Gamma_i, Cp_i
+#:endif
+        real(wp), dimension(2) :: Re_cbc
         real(wp), dimension(3) :: lambda
 
         real(wp) :: rho         !< Cell averaged density
@@ -676,7 +683,7 @@ contains
         real(wp) :: Ma
         real(wp) :: T, sum_Enthalpies
         real(wp) :: Cv, Cp, e_mix, Mw, R_gas
-        real(wp), dimension(num_species) :: Ys, h_k, dYs_dt, dYs_ds, Xs, Gamma_i, Cp_i
+        
 
         real(wp) :: vel_K_sum, vel_dv_dt_sum
 
