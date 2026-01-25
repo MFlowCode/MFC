@@ -192,6 +192,7 @@ data = {
     "lag_params%valmaxvoid": 0.9,
     "lag_params%write_bubbles": "T",
     "lag_params%write_bubbles_stats": "F",
+    "lag_params%charwidth": cw,
 }
 
 mods = {}

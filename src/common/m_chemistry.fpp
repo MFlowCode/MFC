@@ -277,7 +277,7 @@ contains
                                 rho_Vic = rho_Vic + Mass_Diffu_Flux(eqn - chemxb + 1)
                                 Mass_Diffu_Energy = Mass_Diffu_Energy + h_k(eqn - chemxb + 1)*Mass_Diffu_Flux(eqn - chemxb + 1)
                             end do
-print*, chemxe
+
                             ! Apply corrections for mass conservation
                             $:GPU_LOOP(parallelism='[seq]')
                             do eqn = chemxb, chemxe

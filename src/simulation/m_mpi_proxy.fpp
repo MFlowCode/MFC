@@ -799,7 +799,7 @@ contains
             j = neighbor_list(l, 2)
             k = neighbor_list(l, 3)
 
-            if (p_send_counts(i, j, k) > 0) then
+            if (p_send_counts(i, j, k) > 0 .and. abs(i) + abs(j) + abs(k) /= 0 .and. abs(i) + abs(j) + abs(k) /= 0) then
                 partner = neighbor_ranks(i, j, k)
                 send_tag = neighbor_tag(-i, -j, -k)
 
@@ -807,6 +807,7 @@ contains
                 position = 0
                 do q = 0, p_send_counts(i, j, k) - 1
                     bub_id = p_send_ids(i, j, k, q)
+
                     call MPI_Pack(lag_id(bub_id, 1), 1, MPI_INTEGER, p_send_buff(send_offset), p_buff_size, position, MPI_COMM_WORLD, ierr)
                     call MPI_Pack(bub_R0(bub_id), 1, mpi_p, p_send_buff(send_offset), p_buff_size, position, MPI_COMM_WORLD, ierr)
                     call MPI_Pack(Rmax_stats(bub_id), 1, mpi_p, p_send_buff(send_offset), p_buff_size, position, MPI_COMM_WORLD, ierr)

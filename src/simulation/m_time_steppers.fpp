@@ -681,7 +681,7 @@ contains
             q_cons_ts(1)%vf, &
             q_T_sf, &
             q_prim_vf, &
-            idwint)
+            idwbuff)
 
         if (bubbles_euler) then
 
@@ -692,8 +692,7 @@ contains
 
             call s_populate_variables_buffers(bc_type, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
             call s_compute_bubble_EL_dynamics(q_prim_vf, stage)
-            call s_transfer_data_to_tmp()
-            call s_smear_voidfraction()
+
             if (stage == 3) then
                 if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
                 if (lag_params%write_bubbles) then

@@ -142,7 +142,7 @@ contains
 
         ! Correction for smearing function in the lagrangian subgrid bubble model
         if (bubbles_lagrange) then
-            buff_size = max(buff_size + fd_number, 6 + fd_number)
+            buff_size = max(buff_size + fd_number, mapCells + 1 + fd_number)
         end if
 
         if (ib) then
