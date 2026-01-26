@@ -95,6 +95,7 @@ contains
         integer :: i, j, k
         integer :: max_num_gps, max_num_inner_gps
 
+        ! do all set up for moving immersed boundaries
         moving_immersed_boundary_flag = .false.
         do i = 1, num_ibs
             if (patch_ib(i)%moving_ibm /= 0) then
@@ -102,6 +103,7 @@ contains
                 moving_immersed_boundary_flag = .true.
             end if
             call s_update_ib_rotation_matrix(i)
+            call s_compute_centroid_offset(i)
         end do
         $:GPU_ENTER_DATA(copyin='[patch_ib]')
 
@@ -1012,24 +1014,35 @@ contains
     ! compute the surface integrals of the IB via a volume integraion method described in
     ! "A coupled IBM/Euler-Lagrange framework for simulating shock-induced particle size segregation"
     ! by Archana Sridhar and Jesse Capecelatro
-    subroutine s_compute_ib_forces(q_prim_vf, dynamic_viscosity)
+    subroutine s_compute_ib_forces(q_prim_vf, fluid_pp)
 
         ! real(wp), dimension(idwbuff(1)%beg:idwbuff(1)%end, &
         !             idwbuff(2)%beg:idwbuff(2)%end, &
         !             idwbuff(3)%beg:idwbuff(3)%end), intent(in) :: pressure
         type(scalar_field), dimension(1:sys_size), intent(in) :: q_prim_vf
-        real(wp), intent(in) :: dynamic_viscosity
+        type(physical_parameters), dimension(1:num_fluids), intent(in) :: fluid_pp
 
-        integer :: gp_id, i, j, k, l, q, ib_idx
+        integer :: gp_id, i, j, k, l, q, ib_idx, fluid_idx
         real(wp), dimension(num_ibs, 3) :: forces, torques
         real(wp), dimension(1:3, 1:3) :: viscous_stress_div, viscous_stress_div_1, viscous_stress_div_2, viscous_cross_1, viscous_cross_2 ! viscous stress tensor with temp vectors to hold divergence calculations
         real(wp), dimension(1:3) :: local_force_contribution, radial_vector, local_torque_contribution, vel
-        real(wp) :: cell_volume, dx, dy, dz
+        real(wp) :: cell_volume, dx, dy, dz, dynamic_viscosity
+        real(wp), dimension(1:num_fluids) :: dynamic_viscosities
 
         forces = 0._wp
         torques = 0._wp
 
-        $:GPU_PARALLEL_LOOP(private='[ib_idx,radial_vector,local_force_contribution,cell_volume,local_torque_contribution, viscous_stress_div, viscous_stress_div_1, viscous_stress_div_2, viscous_cross_1, viscous_cross_2, dx, dy, dz]', copy='[forces,torques]', copyin='[ib_markers,patch_ib,dynamic_viscosity]', collapse=3)
+        if (viscous) then
+            do fluid_idx = 1, num_fluids
+                if (fluid_pp(fluid_idx)%Re(1) /= 0._wp) then
+                    dynamic_viscosities(fluid_idx) = 1._wp/fluid_pp(fluid_idx)%Re(1)
+                else
+                    dynamic_viscosities(fluid_idx) = 0._wp
+                end if
+            end do
+        end if
+
+        $:GPU_PARALLEL_LOOP(private='[ib_idx,fluid_idx, radial_vector,local_force_contribution,cell_volume,local_torque_contribution, dynamic_viscosity, viscous_stress_div, viscous_stress_div_1, viscous_stress_div_2, viscous_cross_1, viscous_cross_2, dx, dy, dz]', copy='[forces,torques]', copyin='[ib_markers,patch_ib,dynamic_viscosities]', collapse=3)
         do i = 0, m
             do j = 0, n
                 do k = 0, p
@@ -1044,26 +1057,33 @@ contains
                         dx = x_cc(i + 1) - x_cc(i)
                         dy = y_cc(j + 1) - y_cc(j)
 
-                        ! Get the pressure contribution to force via a finite difference to compute the 2D components of the gradient of the pressure and cell volume
-                        local_force_contribution(1) = -1._wp*(q_prim_vf(E_idx)%sf(i + 1, j, k) - q_prim_vf(E_idx)%sf(i - 1, j, k))/(2._wp*dx) ! force is the negative pressure gradient
-                        local_force_contribution(2) = -1._wp*(q_prim_vf(E_idx)%sf(i, j + 1, k) - q_prim_vf(E_idx)%sf(i, j - 1, k))/(2._wp*dy)
-                        cell_volume = abs(dx*dy)
-                        ! add the 3D component of the pressure gradient, if we are working in 3 dimensions
-                        if (num_dims == 3) then
-                            dz = z_cc(k + 1) - z_cc(k)
-                            local_force_contribution(3) = -1._wp*(q_prim_vf(E_idx)%sf(i, j, k + 1) - q_prim_vf(E_idx)%sf(i, j, k - 1))/(2._wp*dz)
-                            cell_volume = abs(cell_volume*dz)
-                        else
-                            local_force_contribution(3) = 0._wp
-                        end if
+                        local_force_contribution(:) = 0._wp
+                        do fluid_idx = 0, num_fluids - 1
+                            ! Get the pressure contribution to force via a finite difference to compute the 2D components of the gradient of the pressure and cell volume
+                            local_force_contribution(1) = local_force_contribution(1) - (q_prim_vf(E_idx + fluid_idx)%sf(i + 1, j, k) - q_prim_vf(E_idx + fluid_idx)%sf(i - 1, j, k))/(2._wp*dx) ! force is the negative pressure gradient
+                            local_force_contribution(2) = local_force_contribution(2) - (q_prim_vf(E_idx + fluid_idx)%sf(i, j + 1, k) - q_prim_vf(E_idx + fluid_idx)%sf(i, j - 1, k))/(2._wp*dy)
+                            cell_volume = abs(dx*dy)
+                            ! add the 3D component of the pressure gradient, if we are working in 3 dimensions
+                            if (num_dims == 3) then
+                                dz = z_cc(k + 1) - z_cc(k)
+                                local_force_contribution(3) = local_force_contribution(3) - (q_prim_vf(E_idx + fluid_idx)%sf(i, j, k + 1) - q_prim_vf(E_idx + fluid_idx)%sf(i, j, k - 1))/(2._wp*dz)
+                                cell_volume = abs(cell_volume*dz)
+                            end if
+                        end do
 
                         ! Update the force values atomically to prevent race conditions
                         call s_cross_product(radial_vector, local_force_contribution, local_torque_contribution)
 
                         ! get the viscous stress and add its contribution if that is considered
                         ! TODO :: This is really bad code
-                        ! if (.false.) then
                         if (viscous) then
+                            ! compute the volume-weighted local dynamic viscosity
+                            dynamic_viscosity = 0._wp
+                            do fluid_idx = 1, num_fluids
+                                ! local dynamic viscosity is the dynamic viscosity of the fluid times alpha of the fluid
+                                dynamic_viscosity = dynamic_viscosity + (q_prim_vf(fluid_idx + advxb - 1)%sf(i, j, k)*dynamic_viscosities(fluid_idx))
+                            end do
+
                             ! get the linear force component first
                             call s_compute_viscous_stress_tensor(viscous_stress_div_1, q_prim_vf, dynamic_viscosity, i - 1, j, k)
                             call s_compute_viscous_stress_tensor(viscous_stress_div_2, q_prim_vf, dynamic_viscosity, i + 1, j, k)
@@ -1149,6 +1169,64 @@ contains
         @:DEALLOCATE(levelset_norm%sf)
 
     end subroutine s_finalize_ibm_module
+
+    !> Computes the center of mass for IB patch types where we are unable to determine their center of mass analytically.
+    !> These patches include things like NACA airfoils and STL models
+    subroutine s_compute_centroid_offset(ib_marker)
+
+        integer, intent(in) :: ib_marker
+
+        integer :: i, j, k, num_cells, num_cells_local
+        real(wp), dimension(1:3) :: center_of_mass, center_of_mass_local
+
+        ! Offset only needs to be computes for specific geometries
+        if (patch_ib(ib_marker)%geometry == 4 .or. &
+            patch_ib(ib_marker)%geometry == 5 .or. &
+            patch_ib(ib_marker)%geometry == 11 .or. &
+            patch_ib(ib_marker)%geometry == 12) then
+
+            center_of_mass_local = [0._wp, 0._wp, 0._wp]
+            num_cells_local = 0
+
+            ! get the summed mass distribution and number of cells to divide by
+            do i = 0, m
+                do j = 0, n
+                    do k = 0, p
+                        if (ib_markers%sf(i, j, k) == ib_marker) then
+                            num_cells_local = num_cells_local + 1
+                            center_of_mass_local = center_of_mass_local + [x_cc(i), y_cc(j), 0._wp]
+                            if (num_dims == 3) center_of_mass_local(3) = center_of_mass_local(3) + z_cc(k)
+                        end if
+                    end do
+                end do
+            end do
+
+            ! reduce the mass contribution over all MPI ranks and compute COM
+            call s_mpi_allreduce_integer_sum(num_cells_local, num_cells)
+            if (num_cells /= 0) then
+                call s_mpi_allreduce_sum(center_of_mass_local(1), center_of_mass(1))
+                call s_mpi_allreduce_sum(center_of_mass_local(2), center_of_mass(2))
+                call s_mpi_allreduce_sum(center_of_mass_local(3), center_of_mass(3))
+                center_of_mass = center_of_mass/real(num_cells, wp)
+            else
+                patch_ib(ib_marker)%centroid_offset = [0._wp, 0._wp, 0._wp]
+                return
+            end if
+
+            ! assign the centroid offset as a vector pointing from the true COM to the "centroid" in the input file and replace the current centroid
+            patch_ib(ib_marker)%centroid_offset = [patch_ib(ib_marker)%x_centroid, patch_ib(ib_marker)%y_centroid, patch_ib(ib_marker)%z_centroid] &
+                                                  - center_of_mass
+            patch_ib(ib_marker)%x_centroid = center_of_mass(1)
+            patch_ib(ib_marker)%y_centroid = center_of_mass(2)
+            patch_ib(ib_marker)%z_centroid = center_of_mass(3)
+
+            ! rotate the centroid offset back into the local coords of the IB
+            patch_ib(ib_marker)%centroid_offset = matmul(patch_ib(ib_marker)%rotation_matrix_inverse, patch_ib(ib_marker)%centroid_offset)
+        else
+            patch_ib(ib_marker)%centroid_offset(:) = [0._wp, 0._wp, 0._wp]
+        end if
+
+    end subroutine s_compute_centroid_offset
 
     subroutine s_compute_moment_of_inertia(ib_marker, axis)
 
