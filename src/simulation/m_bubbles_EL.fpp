@@ -120,7 +120,7 @@ contains
         $:GPU_UPDATE(device='[pcomm_coords(1)]')
         if (n > 0) then
             pcomm_coords(2)%beg = y_cb(mapcells)
-            pcomm_coords(2)%end = y_cb(m - mapcells - 1)
+            pcomm_coords(2)%end = y_cb(n - mapcells - 1)
             $:GPU_UPDATE(device='[pcomm_coords(2)]')
             if (p > 0) then
                 pcomm_coords(3)%beg = z_cb(mapCells)
@@ -1563,6 +1563,7 @@ contains
 
         $:GPU_PARALLEL_LOOP(private='[cell]')
         do k = 1, n_el_bubs_loc
+            cell = fd_number - buff_size
             call s_locate_cell(mtn_pos(k, 1:3, 2), cell, mtn_s(k, 1:3, 2))
         end do
 
