@@ -1263,16 +1263,27 @@ contains
                     ! Computing the energy from the pressure
 
                     if (chemistry) then
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = chemxb, chemxe
-                            Y_K(i - chemxb + 1) = qK_prim_vf(j, k, l, i)
-                        end do
-                        !Computing the energy from the internal energy of the mixture
-                        call get_mixture_molecular_weight(Y_k, mix_mol_weight)
-                        R_gas = gas_constant/mix_mol_weight
-                        T_K = pres_K/rho_K/R_gas
-                        call get_mixture_energy_mass(T_K, Y_K, E_K)
-                        E_K = rho_K*E_K + 5.e-1_wp*rho_K*vel_K_sum
+                        ! For multiphase chemistry, check if cell is liquid-dominated
+                        if (chem_params%multiphase .and. &
+                            qK_prim_vf(j, k, l, advxb + chem_params%liquid_phase_idx - 1) > &
+                            (1.0_wp - chem_params%gas_phase_threshold)) then
+                            ! Use standard EOS for liquid cells
+                            E_K = gamma_K*pres_K + pi_inf_K &
+                                  + 5.e-1_wp*rho_K*vel_K_sum + qv_K
+                        else
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = chemxb, chemxe
+                                Y_K(i - chemxb + 1) = qK_prim_vf(j, k, l, i)
+                            end do
+                            !Computing the energy from the internal energy of the mixture
+                            call get_mixture_molecular_weight(Y_k, mix_mol_weight)
+                            R_gas = gas_constant/mix_mol_weight
+                            ! Ensure non-zero density
+                            if (rho_K < 1.0e-12_wp) rho_K = 1.0e-12_wp
+                            T_K = pres_K/rho_K/R_gas
+                            call get_mixture_energy_mass(T_K, Y_K, E_K)
+                            E_K = rho_K*E_K + 5.e-1_wp*rho_K*vel_K_sum
+                        end if
                     else
                         ! Computing the energy from the pressure
                         E_K = gamma_K*pres_K + pi_inf_K &
