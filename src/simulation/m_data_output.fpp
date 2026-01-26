@@ -956,15 +956,15 @@ contains
 
             if (ib) then
                 call s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm)
-                if (q_filtered_wrt .and. (t_step == 0 .or. t_step == t_step_stop)) then
-                    call s_initialize_mpi_data_filtered(filtered_fluid_indicator_function, &
-                                                        stat_q_cons_filtered, stat_filtered_pressure, &
-                                                        stat_reynolds_stress, stat_eff_visc, stat_int_mom_exch)
-                end if
             elseif (present(beta)) then
                 call s_initialize_mpi_data(q_cons_vf, beta=beta)
             else
                 call s_initialize_mpi_data(q_cons_vf)
+            end if
+            if (q_filtered_wrt .and. (t_step == 0 .or. t_step == t_step_stop)) then
+                call s_initialize_mpi_data_filtered(filtered_fluid_indicator_function, &
+                                                    stat_q_cons_filtered, stat_filtered_pressure, &
+                                                    stat_reynolds_stress, stat_eff_visc, stat_int_mom_exch)
             end if
 
             write (file_loc, '(I0,A)') t_step, '.dat'

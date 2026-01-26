@@ -1114,14 +1114,14 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
 
         if not periodic_forcing:
             return
-        
+
         for direction in ['x', 'y', 'z']:
             for end in ['beg', 'end']:
                 bc_val = self.get(f'bc_{direction}%{end}')
                 if bc_val is not None:
                     self.prohibit(bc_val != -1,
                                  "Periodic forcing requires periodicity in all directions (all BCs should be -1)")
-        
+
         u_inf_ref = self.get('u_inf_ref')
         rho_inf_ref = self.get('rho_inf_ref')
         P_inf_ref = self.get('P_inf_ref')
@@ -1159,7 +1159,7 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
                           "periodic_forcing currently only supported with num_fluids=1")
         self.prohibit(model_eqns != 2,
                       "periodic_forcing requires model_eqns=2")
-        
+
     def check_volume_filtering(self): # pylint: disable=too-many-locals
         """Checks requirements for computing unclosed terms in the volume filtered momentum equation"""
         volume_filtering = self.get('volume_filter_momentum_eqn', 'F') == 'T'
@@ -1197,7 +1197,7 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
                      "file_per_process must be false for q_filtered_wrt")
         self.prohibit(q_filtered_wrt and not parallel_io,
                       "q_filtered_wrt requires parallel_io to be set to true")
-        
+
     # ===================================================================
     # Pre-Process Specific Checks
     # ===================================================================

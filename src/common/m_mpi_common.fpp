@@ -384,7 +384,7 @@ contains
         end if
 
         ! Define the view for each variable
-        do i = sys_size, alt_sys
+        do i = sys_size + 1, alt_sys
             call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, &
                                           MPI_ORDER_FORTRAN, mpi_p, MPI_IO_DATA%view(i), ierr)
             call MPI_TYPE_COMMIT(MPI_IO_DATA%view(i), ierr)
