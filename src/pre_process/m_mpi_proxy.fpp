@@ -165,6 +165,17 @@ contains
             #:endfor
         end if
 
+        ! Chemistry parameters (for multiphase chemistry coupling)
+        if (chemistry) then
+            #:for VAR in [ 'diffusion', 'reactions', 'multiphase' ]
+                call MPI_BCAST(chem_params%${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
+            #:for VAR in [ 'gamma_method', 'transport_model', 'liquid_phase_idx', 'fuel_species_idx' ]
+                call MPI_BCAST(chem_params%${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
+            call MPI_BCAST(chem_params%gas_phase_threshold, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+        end if
+
         do i = 1, 3
             call MPI_BCAST(simplex_params%perturb_vel(i), 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(simplex_params%perturb_vel_freq(i), 1, mpi_p, 0, MPI_COMM_WORLD, ierr)

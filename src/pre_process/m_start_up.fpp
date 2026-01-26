@@ -135,7 +135,7 @@ contains
             a_z, x_a, y_a, z_a, x_b, y_b, z_b, &
             model_eqns, num_fluids, mpp_lim, &
             weno_order, bc_x, bc_y, bc_z, num_patches, &
-            hypoelasticity, mhd, patch_icpp, fluid_pp, bub_pp, &
+            hypoelasticity, mhd, patch_icpp, fluid_pp, bub_pp, chem_params, &
             precision, parallel_io, mixlayer_vel_profile, mixlayer_vel_coef, &
             mixlayer_perturb, mixlayer_perturb_nk, mixlayer_perturb_k0, &
             pi_fac, perturb_flow, perturb_flow_fluid, perturb_flow_mag, &

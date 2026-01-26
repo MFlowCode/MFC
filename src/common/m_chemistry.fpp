@@ -58,26 +58,54 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         type(int_bounds_info), dimension(1:3), intent(in) :: bounds
 
-        integer :: x, y, z, eqn
-        real(wp) :: energy, T_in
+        integer :: x, y, z, eqn, i
+        real(wp) :: energy, T_in, rho_total, alpha_gas
         real(wp), dimension(num_species) :: Ys
 
         do z = bounds(3)%beg, bounds(3)%end
             do y = bounds(2)%beg, bounds(2)%end
                 do x = bounds(1)%beg, bounds(1)%end
+
+                    ! For multiphase chemistry, handle liquid cells specially
+                    if (chem_params%multiphase) then
+                        ! Get gas volume fraction from advection variables
+                        alpha_gas = 1.0_wp - q_cons_vf(advxb + chem_params%liquid_phase_idx - 1)%sf(x, y, z)
+
+                        ! Skip liquid cells - set default temperature
+                        if (alpha_gas < chem_params%gas_phase_threshold) then
+                            q_T_sf%sf(x, y, z) = 300.0_wp
+                            cycle
+                        end if
+
+                        ! Compute total density from all partial densities
+                        rho_total = 0.0_wp
+                        do i = contxb, contxe
+                            rho_total = rho_total + q_cons_vf(i)%sf(x, y, z)
+                        end do
+
+                        ! Ensure non-zero density
+                        if (rho_total < 1.0e-10_wp) then
+                            q_T_sf%sf(x, y, z) = 300.0_wp
+                            cycle
+                        end if
+                    else
+                        ! Single fluid - use first continuity variable
+                        rho_total = q_cons_vf(contxb)%sf(x, y, z)
+                    end if
+
+                    ! Compute species mass fractions
                     do eqn = chemxb, chemxe
-                        Ys(eqn - chemxb + 1) = &
-                            q_cons_vf(eqn)%sf(x, y, z)/q_cons_vf(contxb)%sf(x, y, z)
+                        Ys(eqn - chemxb + 1) = q_cons_vf(eqn)%sf(x, y, z)/rho_total
+                        ! Clamp to valid range
+                        Ys(eqn - chemxb + 1) = max(0.0_wp, min(1.0_wp, Ys(eqn - chemxb + 1)))
                     end do
 
                     ! e = E - 1/2*|u|^2
                     ! cons. E_idx     = \rho E
-                    ! cons. contxb    = \rho         (1-fluid model)
                     ! cons. momxb + i = \rho u_i
-                    energy = q_cons_vf(E_idx)%sf(x, y, z)/q_cons_vf(contxb)%sf(x, y, z)
+                    energy = q_cons_vf(E_idx)%sf(x, y, z)/rho_total
                     do eqn = momxb, momxe
-                        energy = energy - &
-                                 0.5_wp*(q_cons_vf(eqn)%sf(x, y, z)/q_cons_vf(contxb)%sf(x, y, z))**2._wp
+                        energy = energy - 0.5_wp*(q_cons_vf(eqn)%sf(x, y, z)/rho_total)**2._wp
                     end do
 
                     T_in = real(q_T_sf%sf(x, y, z), kind=wp)
@@ -99,16 +127,50 @@ contains
         integer :: x, y, z, i
         real(wp), dimension(num_species) :: Ys
         real(wp) :: mix_mol_weight
+        real(wp) :: rho_total, alpha_gas, pres
 
         do z = bounds(3)%beg, bounds(3)%end
             do y = bounds(2)%beg, bounds(2)%end
                 do x = bounds(1)%beg, bounds(1)%end
+
+                    ! For multiphase chemistry, skip liquid-dominated cells
+                    ! and use proper gas-phase density
+                    if (chem_params%multiphase) then
+                        ! Get gas volume fraction
+                        alpha_gas = 1.0_wp - q_prim_vf(advxb + chem_params%liquid_phase_idx - 1)%sf(x, y, z)
+
+                        ! Skip liquid cells - set default temperature
+                        if (alpha_gas < chem_params%gas_phase_threshold) then
+                            q_T_sf%sf(x, y, z) = 300.0_wp  ! Default temperature for liquid
+                            cycle
+                        end if
+
+                        ! Compute total gas density from partial densities
+                        ! Skip liquid phase (index liquid_phase_idx)
+                        rho_total = 0.0_wp
+                        do i = 1, num_fluids
+                            if (i /= chem_params%liquid_phase_idx) then
+                                rho_total = rho_total + q_prim_vf(i)%sf(x, y, z)
+                            end if
+                        end do
+
+                        ! Ensure non-zero density
+                        if (rho_total < 1.0e-10_wp) then
+                            q_T_sf%sf(x, y, z) = 300.0_wp
+                            cycle
+                        end if
+                    else
+                        ! Single fluid case - density is first primitive
+                        rho_total = q_prim_vf(1)%sf(x, y, z)
+                    end if
+
                     do i = chemxb, chemxe
                         Ys(i - chemxb + 1) = q_prim_vf(i)%sf(x, y, z)
                     end do
 
                     call get_mixture_molecular_weight(Ys, mix_mol_weight)
-                    q_T_sf%sf(x, y, z) = q_prim_vf(E_idx)%sf(x, y, z)*mix_mol_weight/(gas_constant*q_prim_vf(1)%sf(x, y, z))
+                    pres = q_prim_vf(E_idx)%sf(x, y, z)
+                    q_T_sf%sf(x, y, z) = pres*mix_mol_weight/(gas_constant*rho_total)
                 end do
             end do
         end do
@@ -214,6 +276,17 @@ contains
                     do z = isc3%beg, isc3%end
                         do y = isc2%beg, isc2%end
                             do x = isc1%beg, isc1%end
+
+                                ! For multiphase chemistry, skip diffusion at liquid interfaces
+                                if (chem_params%multiphase) then
+                                    ! Skip if either cell is liquid-dominated
+                                    if (q_prim_qp(advxb + chem_params%liquid_phase_idx - 1)%sf(x, y, z) > &
+                                        (1.0_wp - chem_params%gas_phase_threshold)) cycle
+                                    if (q_prim_qp(advxb + chem_params%liquid_phase_idx - 1)%sf( &
+                                        x + offsets(1), y + offsets(2), z + offsets(3)) > &
+                                        (1.0_wp - chem_params%gas_phase_threshold)) cycle
+                                end if
+
                                 ! Calculate grid spacing using direction-based indexing
                                 select case (idir)
                                 case (1)
@@ -247,8 +320,8 @@ contains
                                 P_L = q_prim_qp(E_idx)%sf(x, y, z)
                                 P_R = q_prim_qp(E_idx)%sf(x + offsets(1), y + offsets(2), z + offsets(3))
 
-                                rho_L = q_prim_qp(1)%sf(x, y, z)
-                                rho_R = q_prim_qp(1)%sf(x + offsets(1), y + offsets(2), z + offsets(3))
+                                rho_L = max(q_prim_qp(1)%sf(x, y, z), 1.0e-12_wp)
+                                rho_R = max(q_prim_qp(1)%sf(x + offsets(1), y + offsets(2), z + offsets(3)), 1.0e-12_wp)
 
                                 T_L = P_L/rho_L/Rgas_L
                                 T_R = P_R/rho_R/Rgas_R
@@ -328,6 +401,17 @@ contains
                     do z = isc3%beg, isc3%end
                         do y = isc2%beg, isc2%end
                             do x = isc1%beg, isc1%end
+
+                                ! For multiphase chemistry, skip diffusion at liquid interfaces
+                                if (chem_params%multiphase) then
+                                    ! Skip if either cell is liquid-dominated
+                                    if (q_prim_qp(advxb + chem_params%liquid_phase_idx - 1)%sf(x, y, z) > &
+                                        (1.0_wp - chem_params%gas_phase_threshold)) cycle
+                                    if (q_prim_qp(advxb + chem_params%liquid_phase_idx - 1)%sf( &
+                                        x + offsets(1), y + offsets(2), z + offsets(3)) > &
+                                        (1.0_wp - chem_params%gas_phase_threshold)) cycle
+                                end if
+
                                 ! Calculate grid spacing using direction-based indexing
                                 select case (idir)
                                 case (1)
@@ -358,8 +442,8 @@ contains
                                 P_L = q_prim_qp(E_idx)%sf(x, y, z)
                                 P_R = q_prim_qp(E_idx)%sf(x + offsets(1), y + offsets(2), z + offsets(3))
 
-                                rho_L = q_prim_qp(1)%sf(x, y, z)
-                                rho_R = q_prim_qp(1)%sf(x + offsets(1), y + offsets(2), z + offsets(3))
+                                rho_L = max(q_prim_qp(1)%sf(x, y, z), 1.0e-12_wp)
+                                rho_R = max(q_prim_qp(1)%sf(x + offsets(1), y + offsets(2), z + offsets(3)), 1.0e-12_wp)
 
                                 T_L = P_L/rho_L/Rgas_L
                                 T_R = P_R/rho_R/Rgas_R

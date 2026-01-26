@@ -267,7 +267,7 @@ case = {
 if not args.no_chemistry:
     case["chemistry"] = "T"
     case["chem_params%diffusion"] = "F"  # Disable diffusion for simpler test
-    case["chem_params%reactions"] = "T"
+    case["chem_params%reactions"] = "F"  # Disable reactions to test basic coupling
     case["chem_params%transport_model"] = 2
     case["cantera_file"] = ctfile
     case["chem_wrt_T"] = "T"

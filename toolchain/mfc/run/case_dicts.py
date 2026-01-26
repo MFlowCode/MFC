@@ -354,11 +354,14 @@ for var in [ 'epsilonb', 'valmaxvoid', 'charwidth']:
 
 for var in [ 'diffusion', 'reactions', 'multiphase' ]:
     SIMULATION[f'chem_params%{var}'] = ParamType.LOG
+    PRE_PROCESS[f'chem_params%{var}'] = ParamType.LOG
 
 for var in [ 'gamma_method', 'transport_model', 'liquid_phase_idx', 'fuel_species_idx']:
     SIMULATION[f'chem_params%{var}'] = ParamType.INT
+    PRE_PROCESS[f'chem_params%{var}'] = ParamType.INT
 
 SIMULATION['chem_params%gas_phase_threshold'] = ParamType.REAL
+PRE_PROCESS['chem_params%gas_phase_threshold'] = ParamType.REAL
 
 for var in ["R0ref", "p0ref", "rho0ref", "T0ref", "ss", "pv", "vd",
             "mu_l", "mu_v", "mu_g", "gam_v", "gam_g",

@@ -719,6 +719,12 @@ contains
                             rho_K = rho_K + max(0._wp, qK_cons_vf(i)%sf(j, k, l))
                         end do
 
+                        ! For multiphase chemistry, ensure non-zero density
+                        ! In liquid cells, species mass may be zero
+                        if (rho_K < 1.0e-12_wp) then
+                            rho_K = 1.0e-12_wp
+                        end if
+
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, contxe
                             qK_prim_vf(i)%sf(j, k, l) = rho_K
@@ -1017,17 +1023,34 @@ contains
                     end do
 
                     if (chemistry) then
-                        do i = chemxb, chemxe
-                            Ys(i - chemxb + 1) = q_prim_vf(i)%sf(j, k, l)
-                            q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
-                        end do
+                        ! For multiphase chemistry, check if cell is liquid-dominated
+                        ! In liquid cells, skip chemistry energy calculation and use standard EOS
+                        if (chem_params%multiphase .and. &
+                            q_prim_vf(advxb + chem_params%liquid_phase_idx - 1)%sf(j, k, l) > &
+                            (1.0_wp - chem_params%gas_phase_threshold)) then
+                            ! Use standard multiphase EOS for liquid cells
+                            do i = chemxb, chemxe
+                                q_cons_vf(i)%sf(j, k, l) = 0.0_wp
+                            end do
+                            q_cons_vf(E_idx)%sf(j, k, l) = &
+                                gamma*q_prim_vf(E_idx)%sf(j, k, l) + dyn_pres + pi_inf + qv
+                        else
+                            ! Gas cell - use chemistry EOS
+                            do i = chemxb, chemxe
+                                Ys(i - chemxb + 1) = q_prim_vf(i)%sf(j, k, l)
+                                q_cons_vf(i)%sf(j, k, l) = rho*q_prim_vf(i)%sf(j, k, l)
+                            end do
 
-                        call get_mixture_molecular_weight(Ys, mix_mol_weight)
-                        T = q_prim_vf(E_idx)%sf(j, k, l)*mix_mol_weight/(gas_constant*rho)
-                        call get_mixture_energy_mass(T, Ys, e_mix)
+                            ! Ensure non-zero density for division
+                            if (rho < 1.0e-12_wp) rho = 1.0e-12_wp
 
-                        q_cons_vf(E_idx)%sf(j, k, l) = &
-                            dyn_pres + rho*e_mix
+                            call get_mixture_molecular_weight(Ys, mix_mol_weight)
+                            T = q_prim_vf(E_idx)%sf(j, k, l)*mix_mol_weight/(gas_constant*rho)
+                            call get_mixture_energy_mass(T, Ys, e_mix)
+
+                            q_cons_vf(E_idx)%sf(j, k, l) = &
+                                dyn_pres + rho*e_mix
+                        end if
                     else
                         ! Computing the energy from the pressure
                         if (mhd) then
