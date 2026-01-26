@@ -243,7 +243,6 @@ contains
                            dtheta/2._wp/pi*exp(-0.5_wp*(distance/stddsv)**2._wp)/(sqrt(2._wp*pi)*stddsv)**(3._wp*(strength_idx + 1._wp))
                 end do
             else
-
                 !< 2D cartesian function:
                 ! We smear particles considering a virtual depth (lag_params%charwidth)
                 theta = 0._wp
