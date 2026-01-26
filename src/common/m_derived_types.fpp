@@ -296,6 +296,7 @@ module m_derived_types
         !! is specified through its x-, y- and z-coordinates, respectively.
         real(wp) :: step_x_centroid, step_y_centroid, step_z_centroid !<
         !! Centroid locations of intermediate steps in the time_stepper module
+        real(wp), dimension(1:3) :: centroid_offset ! offset of center of mass from computed cell center for odd-shaped IBs
 
         real(wp), dimension(1:3) :: angles
         real(wp), dimension(1:3) :: step_angles

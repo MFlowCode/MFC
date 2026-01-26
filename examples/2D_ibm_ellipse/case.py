@@ -81,7 +81,7 @@ print(
             "patch_icpp(1)%pres": 1.0e00,
             "patch_icpp(1)%alpha_rho(1)": 1.0e00,
             "patch_icpp(1)%alpha(1)": 1.0e00,
-            # Patch: Cylinder Immersed Boundary
+            # Patch: Ellipse Immersed Boundary
             "patch_ib(1)%geometry": 6,
             "patch_ib(1)%x_centroid": 1.5e-03,
             "patch_ib(1)%y_centroid": 3.0e-03,
