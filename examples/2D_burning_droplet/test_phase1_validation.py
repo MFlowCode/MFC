@@ -172,12 +172,12 @@ case = {
     "bc_x%end": -3,  # Reflective
     
     # -------------------------------------------------------------------------
-    # Phase Change - DISABLED FOR DEBUGGING
+    # Phase Change
     # -------------------------------------------------------------------------
-    "relax": "F",
-    # "relax_model": 6,  # pTg relaxation
-    # "palpha_eps": 1.0e-2,
-    # "ptgalpha_eps": 1.0e-2,
+    "relax": "T",
+    "relax_model": 6,  # pTg relaxation
+    "palpha_eps": 1.0e-2,
+    "ptgalpha_eps": 1.0e-2,
     
     # -------------------------------------------------------------------------
     # Patch 1: Background - Oxidizer gas (entire domain)
@@ -273,12 +273,11 @@ if not args.no_chemistry:
     case["chem_wrt_T"] = "T"
     
     # Multiphase chemistry coupling (Phase 1)
-    # Disabled for debugging - requires relax=T
-    # if not args.no_multiphase:
-    #     case["chem_params%multiphase"] = "T"
-    #     case["chem_params%liquid_phase_idx"] = 1
-    #     case["chem_params%fuel_species_idx"] = idx_H2
-    #     case["chem_params%gas_phase_threshold"] = args.threshold
+    if not args.no_multiphase:
+        case["chem_params%multiphase"] = "T"
+        case["chem_params%liquid_phase_idx"] = 1
+        case["chem_params%fuel_species_idx"] = idx_H2
+        case["chem_params%gas_phase_threshold"] = args.threshold
     
     # Species mass fractions for Patch 1 (oxidizer gas)
     for i in range(1, num_species + 1):
