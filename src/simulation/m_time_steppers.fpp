@@ -632,19 +632,8 @@ contains
                     call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
                 end if
             end if
-        end do
 
-        if (hyper_cleaning) then
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        q_cons_ts(1)%vf(psi_idx)%sf(j, k, l) = &
-                            q_cons_ts(1)%vf(psi_idx)%sf(j, k, l)* &
-                            exp(-dt/hyper_cleaning_tau)
-                    end do
-                end do
-            end do
-        end if
+        end do
 
         ! Adaptive dt: final stage
         if (adap_dt) call s_adaptive_dt_bubble(3)

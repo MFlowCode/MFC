@@ -950,6 +950,7 @@ contains
                                     end do
 
                                     if (hyper_cleaning) then
+                                        ! propagate magnetic field divergence as a wave
                                         flux_rs${XYZ}$_vf(j, k, l, B_idx%beg + norm_dir - 1) = flux_rs${XYZ}$_vf(j, k, l, B_idx%beg + norm_dir - 1) + &
                                                                                                (s_M*qR_prim_rs${XYZ}$_vf(j + 1, k, l, psi_idx) - s_P*qL_prim_rs${XYZ}$_vf(j, k, l, psi_idx))/(s_M - s_P)
 
