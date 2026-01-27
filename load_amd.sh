@@ -11,6 +11,7 @@ export LD_LIBRARY_PATH=${OLCF_AFAR_ROOT}/lib:${OLCF_AFAR_ROOT}/lib/llvm/lib:${LD
 
 export CRAY_MPICH_INC="-I${OLCF_AFAR_ROOT}/include/mpich3.4a2"
 export CRAY_HIPFORT_INC="-I${OLCF_AFAR_ROOT}/include/hipfort/amdgcn"
+export CRAY_HIPFORT_LIB="-L${OLCF_AFAR_ROOT}/lib -lhipfft"
 export CRAY_HIP_INC="-I${OLCF_AFAR_ROOT}/include/hip"
 export CRAY_MPICH_LIB="-L${CRAY_MPICH_PREFIX}/lib \
                         ${CRAY_PMI_POST_LINK_OPTS} \
