@@ -955,7 +955,7 @@ contains
 
                                         flux_rs${XYZ}$_vf(j, k, l, psi_idx) = (hyper_cleaning_speed**2*(s_M*B%R(norm_dir) - s_P*B%L(norm_dir)) + s_M*s_P*(qL_prim_rs${XYZ}$_vf(j, k, l, psi_idx) - qR_prim_rs${XYZ}$_vf(j + 1, k, l, psi_idx)))/(s_M - s_P)
                                     else
-                                        flux_rs${XYZ}$_vf(j, k, l, B_idx%beg + norm_dir - 1) = 0d0 ! Without hyperbolic cleaning, make sure flux of B_normal is identically zero
+                                        flux_rs${XYZ}$_vf(j, k, l, B_idx%beg + norm_dir - 1) = 0._wp ! Without hyperbolic cleaning, make sure flux of B_normal is identically zero
                                     end if
                                 end if
                                 flux_src_rs${XYZ}$_vf(j, k, l, advxb) = 0._wp
