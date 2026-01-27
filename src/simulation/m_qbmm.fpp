@@ -731,9 +731,9 @@ contains
         real(wp), dimension(nnode, nb) :: wght, abscX, abscY, wght_pb, wght_mv, wght_ht, ht
 #:endif
 #:if USING_AMD
-        real(wp), dimension(32, 0:2, 0:2), intent(out) :: coeff
+        real(wp), dimension(32, 0:2, 0:2) :: coeff
 #:else
-        real(wp), dimension(nterms, 0:2, 0:2), intent(out) :: coeff
+        real(wp), dimension(nterms, 0:2, 0:2) :: coeff
 #:endif
         real(wp) :: pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, grad_T
         real(wp) :: n_tait, B_tait

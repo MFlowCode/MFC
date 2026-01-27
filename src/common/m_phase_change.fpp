@@ -331,12 +331,14 @@ contains
 
         end do
 
+#:if not MFC_CASE_OPTIMIZATION and USING_AMD
         if(num_fluids < 3) then
             $:GPU_LOOP(parallelism='[seq]')
             do i = num_fluids+1, 3 
                 p_infpT(i) = p_infpT_sum
             end do
         end if
+#:endif
 
         ! Checking energy constraint
         if ((rhoe - mQ - minval(p_infpT)) < 0.0_wp) then

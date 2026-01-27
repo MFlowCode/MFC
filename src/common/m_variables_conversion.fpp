@@ -253,7 +253,7 @@ contains
 
         real(wp), optional, dimension(2), intent(out) :: Re_K
         real(wp), optional, intent(out) :: G_K 
-        real(wp), dimension(num_fluids), intent(inout) :: alpha_rho_K, alpha_K !<
+        real(wp), dimension(num_fluids) :: alpha_rho_K, alpha_K !<
         real(wp), optional, dimension(num_fluids), intent(in) :: G
         
 
