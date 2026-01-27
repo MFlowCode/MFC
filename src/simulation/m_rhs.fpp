@@ -985,6 +985,7 @@ contains
                 ! END: Additional physics and source terms
 
                 if (hyper_cleaning) then
+                  $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
                     do l = 0, p
                         do k = 0, n
                             do j = 0, m
@@ -993,6 +994,7 @@ contains
                             end do
                         end do
                     end do
+                    $:END_GPU_PARALLEL_LOOP()
                 end if
 
                 ! END: Additional physics and source terms
