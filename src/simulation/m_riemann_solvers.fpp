@@ -943,8 +943,7 @@ contains
                                     ! B_z d/d${XYZ}$ flux = (1 - delta(z,${XYZ}$)) * (v_${XYZ}$ * B_z - v_z * B_${XYZ}$)
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 0, 2
-                                        flux_rs${XYZ}$_vf(j, k, l, B_idx%beg + i) = (1 - dir_flg(i + 1))*( &
-                                                                                    s_M*(vel_R(dir_idx(1))*B%R(i + 1) - vel_R(i + 1)*B%R(norm_dir)) - &
+                                        flux_rs${XYZ}$_vf(j, k, l, B_idx%beg + i) = (s_M*(vel_R(dir_idx(1))*B%R(i + 1) - vel_R(i + 1)*B%R(norm_dir)) - &
                                                                                     s_P*(vel_L(dir_idx(1))*B%L(i + 1) - vel_L(i + 1)*B%L(norm_dir)) + &
                                                                                     s_M*s_P*(B%L(i + 1) - B%R(i + 1)))/(s_M - s_P)
                                     end do
@@ -955,6 +954,8 @@ contains
                                                                                                (s_M*qR_prim_rs${XYZ}$_vf(j + 1, k, l, psi_idx) - s_P*qL_prim_rs${XYZ}$_vf(j, k, l, psi_idx))/(s_M - s_P)
 
                                         flux_rs${XYZ}$_vf(j, k, l, psi_idx) = (hyper_cleaning_speed**2*(s_M*B%R(norm_dir) - s_P*B%L(norm_dir)) + s_M*s_P*(qL_prim_rs${XYZ}$_vf(j, k, l, psi_idx) - qR_prim_rs${XYZ}$_vf(j + 1, k, l, psi_idx)))/(s_M - s_P)
+                                    else
+                                        flux_rs${XYZ}$_vf(j, k, l, B_idx%beg + norm_dir - 1) = 0d0 ! Without hyperbolic cleaning, make sure flux of B_normal is identically zero
                                     end if
                                 end if
                                 flux_src_rs${XYZ}$_vf(j, k, l, advxb) = 0._wp
