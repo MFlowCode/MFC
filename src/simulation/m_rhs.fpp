@@ -65,8 +65,6 @@ module m_rhs
 
     use m_chemistry
 
-    use m_mhd
-
     use m_igr
 
     use m_pressure_relaxation
@@ -986,16 +984,12 @@ contains
                 end if
                 ! END: Additional physics and source terms
 
-                call nvtxStartRange("RHS-MHD")
-                if (powell) call s_compute_mhd_powell_rhs(id, q_prim_qp%vf, rhs_vf, flux_gsrc_n(id)%vf)
-                call nvtxEndRange
-
                 if (hyper_cleaning) then
                     do l = 0, p
                         do k = 0, n
                             do j = 0, m
-                                rhs_vf(psi_idx)%sf(j,k,l) = rhs_vf(psi_idx)%sf(j,k,l) - &
-                                    q_prim_vf(psi_idx)%sf(j,k,l) / hyper_cleaning_tau
+                                rhs_vf(psi_idx)%sf(j, k, l) = rhs_vf(psi_idx)%sf(j, k, l) - &
+                                                              q_prim_vf(psi_idx)%sf(j, k, l)/hyper_cleaning_tau
                             end do
                         end do
                     end do

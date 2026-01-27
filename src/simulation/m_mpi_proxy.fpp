@@ -105,7 +105,7 @@ contains
         #:endfor
 
         #:for VAR in [ 'run_time_info','cyl_coord', 'mpp_lim',     &
-            &  'mp_weno', 'rdma_mpi', 'powell', 'cont_damage', 'bc_io', &
+            &  'mp_weno', 'rdma_mpi', 'cont_damage', 'bc_io', &
             & 'weno_Re_flux', 'alt_soundspeed', 'null_weights', 'mixture_err',   &
             & 'parallel_io', 'hypoelasticity', 'bubbles_euler', 'polytropic',    &
             & 'polydisperse', 'qbmm', 'acoustic_source', 'probe_wrt', 'integral_wrt',   &

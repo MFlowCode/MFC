@@ -215,13 +215,13 @@
             q_prim_vf(momxb)%sf(i, j, 0) = -20._wp*(y_cc(j) - 0.5_wp)
             q_prim_vf(momxb + 1)%sf(i, j, 0) = 20._wp*(x_cc(i) - 0.5_wp)
 
-        ! taper width of 0.015
+            ! taper width of 0.015
         else if (r_sq <= 0.115**2) then
             ! linearly smooth the function between r = 0.1 and 0.115
-            q_prim_vf(contxb)%sf(i, j, 0) = 1._wp + 9._wp * (0.115_wp - sqrt(r_sq)) / (0.015_wp)
+            q_prim_vf(contxb)%sf(i, j, 0) = 1._wp + 9._wp*(0.115_wp - sqrt(r_sq))/(0.015_wp)
 
-            q_prim_vf(momxb)%sf(i, j, 0) = -(2._wp / sqrt(r_sq))*(y_cc(j) - 0.5_wp) * (0.115_wp - sqrt(r_sq)) / (0.015_wp)
-            q_prim_vf(momxb + 1)%sf(i, j, 0) = (2._wp / sqrt(r_sq))*(x_cc(i) - 0.5_wp) * (0.115_wp - sqrt(r_sq)) / (0.015_wp)
+            q_prim_vf(momxb)%sf(i, j, 0) = -(2._wp/sqrt(r_sq))*(y_cc(j) - 0.5_wp)*(0.115_wp - sqrt(r_sq))/(0.015_wp)
+            q_prim_vf(momxb + 1)%sf(i, j, 0) = (2._wp/sqrt(r_sq))*(x_cc(i) - 0.5_wp)*(0.115_wp - sqrt(r_sq))/(0.015_wp)
         end if
 
     case (253) ! MHD Smooth Magnetic Vortex

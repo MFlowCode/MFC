@@ -541,8 +541,7 @@ module m_global_parameters
     !> @}
 
     real(wp) :: Bx0 !< Constant magnetic field in the x-direction (1D)
-    logical :: powell !< Powell‐correction for div B = 0
-    $:GPU_DECLARE(create='[Bx0,powell]')
+    $:GPU_DECLARE(create='[Bx0]')
 
     logical :: fft_wrt
 
@@ -851,7 +850,6 @@ contains
 
         ! MHD
         Bx0 = dflt_real
-        powell = .false.
         hyper_cleaning_speed = dflt_real
         hyper_cleaning_tau = dflt_real
 
@@ -1295,7 +1293,7 @@ contains
             & teno_CT,hyperelasticity,hyper_model,elasticity,xi_idx, &
             & B_idx,low_Mach]')
 
-        $:GPU_UPDATE(device='[Bx0, powell]')
+        $:GPU_UPDATE(device='[Bx0]')
 
         $:GPU_UPDATE(device='[chem_params]')
 

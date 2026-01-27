@@ -91,8 +91,6 @@ module m_start_up
 
     use m_sim_helpers
 
-    use m_mhd
-
     use m_igr
 
     implicit none
@@ -183,7 +181,7 @@ contains
             g_x, g_y, g_z, n_start, t_save, t_stop, &
             cfl_adap_dt, cfl_const_dt, cfl_target, &
             surface_tension, bubbles_lagrange, lag_params, &
-            hyperelasticity, R0ref, num_bc_patches, Bx0, powell, &
+            hyperelasticity, R0ref, num_bc_patches, Bx0, &
             cont_damage, tau_star, cont_damage_s, alpha_bar, &
             hyper_cleaning, hyper_cleaning_speed, hyper_cleaning_tau, &
             alf_factor, num_igr_iters, num_igr_warm_start_iters, &
@@ -1392,8 +1390,6 @@ contains
         if (hypoelasticity) call s_initialize_hypoelastic_module()
         if (hyperelasticity) call s_initialize_hyperelastic_module()
 
-        if (powell) call s_initialize_mhd_clean_module
-
     end subroutine s_initialize_modules
 
     impure subroutine s_initialize_mpi_domain
@@ -1579,7 +1575,6 @@ contains
 
         if (surface_tension) call s_finalize_surface_tension_module()
         if (bodyForces) call s_finalize_body_forces_module()
-        if (powell) call s_finalize_mhd_clean_module
 
         ! Terminating MPI execution environment
         call s_mpi_finalize()

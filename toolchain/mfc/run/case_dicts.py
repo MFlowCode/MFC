@@ -320,7 +320,6 @@ SIMULATION.update({
     'viscous': ParamType.LOG,
     'bubbles_lagrange': ParamType.LOG,
     'num_bc_patches': ParamType.INT,
-    'powell': ParamType.LOG,
     'tau_star': ParamType.REAL,
     'cont_damage_s': ParamType.REAL,
     'alpha_bar': ParamType.REAL,

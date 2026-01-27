@@ -944,8 +944,8 @@ contains
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 0, 2
                                         flux_rs${XYZ}$_vf(j, k, l, B_idx%beg + i) = (s_M*(vel_R(dir_idx(1))*B%R(i + 1) - vel_R(i + 1)*B%R(norm_dir)) - &
-                                                                                    s_P*(vel_L(dir_idx(1))*B%L(i + 1) - vel_L(i + 1)*B%L(norm_dir)) + &
-                                                                                    s_M*s_P*(B%L(i + 1) - B%R(i + 1)))/(s_M - s_P)
+                                                                                     s_P*(vel_L(dir_idx(1))*B%L(i + 1) - vel_L(i + 1)*B%L(norm_dir)) + &
+                                                                                     s_M*s_P*(B%L(i + 1) - B%R(i + 1)))/(s_M - s_P)
                                     end do
 
                                     if (hyper_cleaning) then
@@ -959,10 +959,6 @@ contains
                                     end if
                                 end if
                                 flux_src_rs${XYZ}$_vf(j, k, l, advxb) = 0._wp
-                            end if
-
-                            if (powell) then
-                                flux_gsrc_rs${XYZ}$_vf(j, k, l, 1) = flux_rs${XYZ}$_vf(j, k, l, B_idx%beg + norm_dir - 1)
                             end if
 
                             #:if (NORM_DIR == 2)
@@ -4970,7 +4966,7 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
 
-            if (cyl_coord .or. powell) then
+            if (cyl_coord) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
                 do i = 1, sys_size
                     do l = is3%beg, is3%end
@@ -5026,7 +5022,7 @@ contains
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
-            if (grid_geometry == 3 .or. powell) then
+            if (grid_geometry == 3) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
                 do i = 1, sys_size
                     do j = is1%beg, is1%end
@@ -5081,21 +5077,6 @@ contains
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
-
-            if (powell) then
-                $:GPU_PARALLEL_LOOP(collapse=4)
-                do i = 1, sys_size
-                    do l = is3%beg, is3%end
-                        do k = is2%beg, is2%end
-                            do j = is1%beg, is1%end
-                                flux_gsrc_vf(i)%sf(j, k, l) = &
-                                    flux_gsrc_rsx_vf(j, k, l, i)
-                            end do
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            end if
 
             $:GPU_PARALLEL_LOOP(collapse=3)
             do l = is3%beg, is3%end
