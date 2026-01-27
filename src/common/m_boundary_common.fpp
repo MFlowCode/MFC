@@ -44,7 +44,7 @@ module m_boundary_common
  s_populate_grid_variables_buffers, &
  s_finalize_boundary_common_module
 
-    !public :: bc_buffers
+    public :: bc_buffers
 
 #ifdef MFC_MPI
     public :: MPI_BC_TYPE_TYPE, MPI_BC_BUFFER_TYPE
@@ -56,7 +56,7 @@ contains
 
         integer :: i, j 
 
-        @:ALLOCATE(bc_buffers(1:num_dims, 1:2))
+        @:ALLOCATE(bc_buffers(1:3, 1:2))
 
         if (bc_io) then
             @:ALLOCATE(bc_buffers(1, 1)%sf(1:sys_size, 0:n, 0:p))

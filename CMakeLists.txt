@@ -185,11 +185,9 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
         add_link_options("SHELL: -K trap=fp" "SHELL: -G2")
     endif()
 
-elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Flang")
+elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
     add_compile_options(
-        $<$<COMPILE_LANGUAGE:Fortran>:-Mfreeform>
-        $<$<COMPILE_LANGUAGE:Fortran>:-Mpreprocess>
-        $<$<COMPILE_LANGUAGE:Fortran>:-fdefault-real-8>
+	    #$<$<COMPILE_LANGUAGE:Fortran>:-Wall>
     )
 elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Intel")
     add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-free>)
@@ -529,8 +527,8 @@ function(MFC_SETUP_TARGET)
                     target_compile_options(${a_target} PRIVATE -fopenmp)
                     target_link_options(${a_target} PRIVATE -fopenmp)
                 elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
-                    target_compile_options(${a_target} PRIVATE -fopenmp --offload-arch=gfx90a $ENV{CRAY_MPICH_INC})
-		    target_link_options(${a_target} PRIVATE -fopenmp --offload-arch=gfx90a $ENV{CRAY_MPICH_LIB})
+		    target_compile_options(${a_target} PRIVATE -fopenmp --offload-arch=gfx90a $ENV{CRAY_MPICH_INC})
+		    target_link_options(${a_target} PRIVATE -fopenmp --offload-arch=gfx90a  $ENV{CRAY_MPICH_LIB})
                 endif()
             endif()
 
