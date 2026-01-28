@@ -103,6 +103,8 @@ contains
         end do
         $:GPU_ENTER_DATA(copyin='[patch_ib]')
 
+        call s_update_mib(ib_markers%sf(0:m, 0:n, 0:p), levelset, levelset_norm)
+
         ! Allocating the patch identities bookkeeping variable
         allocate (patch_id_fp(0:m, 0:n, 0:p))
 
