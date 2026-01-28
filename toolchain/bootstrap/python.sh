@@ -131,12 +131,7 @@ ok "(venv) Entered the $MAGENTA$(python3 --version)$COLOR_RESET virtual environm
 if ! cmp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/pyproject.toml" > /dev/null 2>&1; then
     # Check if this is a fresh install (no previous pyproject.toml in build/)
     if [ ! -f "$(pwd)/build/pyproject.toml" ]; then
-        if command -v uv > /dev/null 2>&1; then
-            log "(venv) Installing$MAGENTA ~70 Python packages$COLOR_RESET with$MAGENTA uv$COLOR_RESET (fast)..."
-        else
-            log "(venv) Installing$MAGENTA ~70 Python packages$COLOR_RESET. This may take a few minutes..."
-            log "(venv) Tip: Install$MAGENTA uv$COLOR_RESET for 10-100x faster installs: pip install uv"
-        fi
+        log "(venv) Installing$MAGENTA ~70 Python packages$COLOR_RESET..."
     else
         log "(venv) Updating Python dependencies..."
     fi
@@ -158,19 +153,27 @@ if ! cmp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/pyproject.toml" > /dev/
     # Run package installer and show progress
     PIP_LOG="$(pwd)/build/.pip_install.log"
 
-    # Check if uv is available (10-100x faster than pip)
+    # Bootstrap uv if not available (uv is 10-100x faster than pip)
+    # Installing uv itself is quick (~2-3 seconds) and pays off immediately
+    if ! command -v uv > /dev/null 2>&1; then
+        log "(venv) Installing$MAGENTA uv$COLOR_RESET package manager for fast installation..."
+        if PIP_DISABLE_PIP_VERSION_CHECK=1 pip3 install uv > "$PIP_LOG" 2>&1; then
+            ok "(venv) Installed$MAGENTA uv$COLOR_RESET."
+        else
+            # uv install failed, fall back to pip for everything
+            warn "(venv) Could not install uv, falling back to pip (slower)."
+        fi
+    fi
+
+    # Now check if uv is available (either was already installed or we just installed it)
     USE_UV=0
     if command -v uv > /dev/null 2>&1; then
         USE_UV=1
-        INSTALLER="uv"
-    else
-        INSTALLER="pip"
     fi
 
-    # Start installer in background, capturing output
+    # Use uv if available, otherwise fall back to pip
     if [ "$USE_UV" = "1" ]; then
-        # uv is much faster - use it if available (typically <10 seconds)
-        # Run synchronously since it's fast and has its own progress display
+        # uv is much faster (typically <10 seconds for all packages)
         log "(venv) Using$MAGENTA uv$COLOR_RESET for fast installation..."
         if uv pip install "$(pwd)/toolchain" > "$PIP_LOG" 2>&1; then
             rm -f "$PIP_LOG"
