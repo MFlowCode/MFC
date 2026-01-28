@@ -174,6 +174,8 @@ if ! cmp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/pyproject.toml" > /dev/
     # Use uv if available, otherwise fall back to pip
     if [ "$USE_UV" = "1" ]; then
         # uv is much faster and has its own progress display - show it
+        # UV_LINK_MODE=copy avoids slow hardlink failures on cross-filesystem installs (common on HPC)
+        export UV_LINK_MODE=copy
         log "(venv) Using$MAGENTA uv$COLOR_RESET for fast installation..."
         if [ -t 1 ]; then
             # Interactive terminal: show uv's native progress
