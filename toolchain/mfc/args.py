@@ -30,6 +30,7 @@ started, run ./mfc.sh build -h.""",
     count_diff = parsers.add_parser(name="count_diff", help="Count LOC in MFC.",                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     packer     = parsers.add_parser(name="packer",     help="Packer utility (pack/unpack/compare).",  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     validate   = parsers.add_parser(name="validate",   help="Validate a case file without running.",  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    init       = parsers.add_parser(name="init",       help="Create a new case from a template.",     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     # These parser arguments all call BASH scripts, and they only exist so that they show up in the help message
     parsers.add_parser(name="load",       help="Loads the MFC environment with source.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -153,6 +154,11 @@ started, run ./mfc.sh build -h.""",
     add_common_arguments(validate, "tjmgv")  # Only add debug-log flag
     validate.add_argument("input", metavar="INPUT", type=str, help="Path to case file to validate.")
 
+    # INIT
+    init.add_argument("name", metavar="NAME", type=str, nargs="?", default=None, help="Name/path for the new case directory.")
+    init.add_argument("-t", "--template", type=str, default="1D_minimal", help="Template to use (e.g., 1D_minimal, 2D_minimal, 3D_minimal, or example:<name>).")
+    init.add_argument("-l", "--list", action="store_true", help="List available templates.")
+
     try:
         extra_index = sys.argv.index('--')
     except ValueError:
@@ -179,8 +185,9 @@ started, run ./mfc.sh build -h.""",
         parser.print_help()
         exit(-1)
 
-    # "Slugify" the name of the job
-    args["name"] = re.sub(r'[\W_]+', '-', args["name"])
+    # "Slugify" the name of the job (only for batch jobs, not for init command)
+    if args.get("name") is not None and isinstance(args["name"], str) and args["command"] != "init":
+        args["name"] = re.sub(r'[\W_]+', '-', args["name"])
 
     # We need to check for some invalid combinations of arguments because of
     # the limitations of argparse.

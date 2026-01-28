@@ -2,7 +2,7 @@
 
 import signal, getpass, platform, itertools
 
-from mfc         import args, lock, build, bench, state, count, clean, validate
+from mfc         import args, lock, build, bench, state, count, clean, validate, init
 from mfc.state   import ARG
 from mfc.run     import run
 from mfc.test    import test
@@ -51,7 +51,7 @@ def __run():
     {"test":   test.test,     "run":        run.run,          "build":      build.build,
      "bench":      bench.bench,      "count":      count.count,      "clean":      clean.clean,
      "packer": packer.packer, "count_diff": count.count_diff, "bench_diff": bench.diff,
-     "validate": validate.validate
+     "validate": validate.validate, "init": init.init
     }[ARG("command")]()
 
 
