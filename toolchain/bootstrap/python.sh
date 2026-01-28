@@ -171,12 +171,14 @@ if ! cmp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/pyproject.toml" > /dev/
     LAST_MILESTONE=0
     LAST_PHASE=""
     START_TIME=$SECONDS
+    FIRST_PRINT=1
 
     while kill -0 $PIP_PID 2>/dev/null; do
         # Determine current phase and count from log
         PHASE="resolving"
         COUNT=0
         BUILD_COUNT=0
+        CURRENT_PKG=""
 
         if [ -f "$PIP_LOG" ]; then
             # Count packages being collected (dependency resolution)
@@ -198,6 +200,19 @@ if ! cmp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/pyproject.toml" > /dev/
                 PHASE="installing"
             elif [ "$BUILD_COUNT" -gt 0 ]; then
                 PHASE="building"
+            fi
+
+            # Extract the current package being processed
+            CURRENT_LINE=$(grep -E "^Collecting |^  Downloading |^  Building wheel for " "$PIP_LOG" 2>/dev/null | tail -1)
+            if [[ "$CURRENT_LINE" == Collecting* ]]; then
+                # "Collecting numpy>=1.21.0" -> "numpy"
+                CURRENT_PKG=$(echo "$CURRENT_LINE" | sed 's/^Collecting //; s/[<>=\[( ].*//; s/\[.*//')
+            elif [[ "$CURRENT_LINE" == *Downloading* ]]; then
+                # "  Downloading numpy-1.24.0-cp312..." -> "numpy"
+                CURRENT_PKG=$(echo "$CURRENT_LINE" | sed 's/.*Downloading //; s/-[0-9].*//')
+            elif [[ "$CURRENT_LINE" == *"Building wheel"* ]]; then
+                # "  Building wheel for numpy (pyproject.toml)" -> "numpy"
+                CURRENT_PKG=$(echo "$CURRENT_LINE" | sed 's/.*Building wheel for //; s/ .*//')
             fi
         fi
 
@@ -246,8 +261,20 @@ if ! cmp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/pyproject.toml" > /dev/
                 TIME_STR="${SECS}s"
             fi
 
-            # Print progress bar
-            printf "\r  ${CYAN}│${BAR}│${COLOR_RESET} %3d%% (%s, %s)  " "$PERCENT" "$STATUS" "$TIME_STR"
+            # Truncate package name if too long
+            if [ ${#CURRENT_PKG} -gt 40 ]; then
+                CURRENT_PKG="${CURRENT_PKG:0:37}..."
+            fi
+
+            # Print progress bar and current package on two lines
+            # First time: just print. After that: move up one line first
+            if [ "$FIRST_PRINT" = "1" ]; then
+                FIRST_PRINT=0
+            else
+                printf "\033[1A"  # Move cursor up one line
+            fi
+            printf "\r  ${CYAN}│${BAR}│${COLOR_RESET} %3d%% (%s, %s)            \n" "$PERCENT" "$STATUS" "$TIME_STR"
+            printf "  ${MAGENTA}→${COLOR_RESET} %-45s\r" "${CURRENT_PKG:-starting...}"
         else
             # Non-interactive: print milestone updates and phase changes
             if [ "$PHASE" != "$LAST_PHASE" ]; then
@@ -278,9 +305,12 @@ if ! cmp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/pyproject.toml" > /dev/
     wait $PIP_PID
     PIP_EXIT=$?
 
-    # Clear the progress line if in terminal
+    # Clear the progress lines if in terminal (2 lines: progress bar + current package)
     if [ "$IS_TTY" = "1" ]; then
-        printf "\r%60s\r" " "
+        printf "\033[1A"           # Move up one line
+        printf "\r%60s\n" " "      # Clear progress bar line
+        printf "\r%60s\r" " "      # Clear current package line
+        printf "\033[1A"           # Move back up
     fi
 
     if [ $PIP_EXIT -ne 0 ]; then
