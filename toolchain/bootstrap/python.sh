@@ -129,7 +129,12 @@ ok "(venv) Entered the $MAGENTA$(python3 --version)$COLOR_RESET virtual environm
 # (or)
 # - The pyproject.toml file has changed
 if ! cmp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/pyproject.toml" > /dev/null 2>&1; then
-    log "(venv) (Re)Installing mfc.sh's Python dependencies (via Pip)."
+    # Check if this is a fresh install (no previous pyproject.toml in build/)
+    if [ ! -f "$(pwd)/build/pyproject.toml" ]; then
+        log "(venv) Installing$MAGENTA ~70 Python packages$COLOR_RESET. This may take a few minutes..."
+    else
+        log "(venv) Updating Python dependencies..."
+    fi
 
     next_arg=0
     nthreads=1
@@ -145,15 +150,99 @@ if ! cmp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/pyproject.toml" > /dev/
         fi
     done
 
-    if ! PIP_DISABLE_PIP_VERSION_CHECK=1 MAKEFLAGS=$nthreads pip3 install "$(pwd)/toolchain"; then
-        error "(venv) Installation failed."
+    # Run pip and show progress
+    PIP_LOG="$(pwd)/build/.pip_install.log"
+
+    # Start pip in background, capturing output
+    PIP_DISABLE_PIP_VERSION_CHECK=1 MAKEFLAGS=$nthreads pip3 install "$(pwd)/toolchain" > "$PIP_LOG" 2>&1 &
+    PIP_PID=$!
+
+    # Check if we're in an interactive terminal
+    if [ -t 1 ]; then
+        IS_TTY=1
+    else
+        IS_TTY=0
+    fi
+
+    # Progress bar configuration
+    TOTAL=70
+    BAR_WIDTH=30
+    LAST_MILESTONE=0
+    START_TIME=$SECONDS
+
+    while kill -0 $PIP_PID 2>/dev/null; do
+        # Count packages from log
+        if [ -f "$PIP_LOG" ]; then
+            COUNT=$(grep -c "^Collecting" "$PIP_LOG" 2>/dev/null | tr -d '[:space:]')
+            COUNT=${COUNT:-0}
+            if ! [[ "$COUNT" =~ ^[0-9]+$ ]]; then
+                COUNT=0
+            fi
+        else
+            COUNT=0
+        fi
+
+        ELAPSED=$((SECONDS - START_TIME))
+
+        if [ "$IS_TTY" = "1" ]; then
+            # Calculate progress
+            if [ "$COUNT" -gt "$TOTAL" ]; then
+                TOTAL=$COUNT
+            fi
+            PERCENT=$((COUNT * 100 / TOTAL))
+            FILLED=$((COUNT * BAR_WIDTH / TOTAL))
+            EMPTY=$((BAR_WIDTH - FILLED))
+
+            # Build the bar with Unicode blocks
+            BAR=""
+            for ((i=0; i<FILLED; i++)); do BAR="${BAR}█"; done
+            for ((i=0; i<EMPTY; i++)); do BAR="${BAR}░"; done
+
+            # Format time
+            MINS=$((ELAPSED / 60))
+            SECS=$((ELAPSED % 60))
+            if [ "$MINS" -gt 0 ]; then
+                TIME_STR="${MINS}m${SECS}s"
+            else
+                TIME_STR="${SECS}s"
+            fi
+
+            # Print progress bar
+            printf "\r  ${CYAN}│${BAR}│${COLOR_RESET} %3d%% (%d pkgs, %s)  " "$PERCENT" "$COUNT" "$TIME_STR"
+        else
+            # Non-interactive: print milestone updates
+            MILESTONE=$((COUNT / 20 * 20))
+            if [ "$MILESTONE" -gt "$LAST_MILESTONE" ] && [ "$MILESTONE" -gt 0 ]; then
+                LAST_MILESTONE=$MILESTONE
+                log "(venv) Progress: ~$COUNT packages..."
+            fi
+        fi
+
+        sleep 0.3
+    done
+
+    # Wait for pip to finish and get exit code
+    wait $PIP_PID
+    PIP_EXIT=$?
+
+    # Clear the progress line if in terminal
+    if [ "$IS_TTY" = "1" ]; then
+        printf "\r%60s\r" " "
+    fi
+
+    if [ $PIP_EXIT -ne 0 ]; then
+        error "(venv) Installation failed. See output below:"
+        echo ""
+        cat "$PIP_LOG"
+        echo ""
 
         log   "(venv) Exiting the$MAGENTA Python$COLOR_RESET virtual environment."
         deactivate
-
+        rm -f "$PIP_LOG"
         exit 1
     fi
 
+    rm -f "$PIP_LOG"
     ok "(venv) Installation succeeded."
 
     # Save the new/current pyproject.toml

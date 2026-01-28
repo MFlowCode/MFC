@@ -137,12 +137,13 @@ started, run ./mfc.sh build -h.""",
     build.add_argument("--case-optimization", action="store_true", default=False, help="(GPU Optimization) Compile MFC targets with some case parameters hard-coded (requires --input).")
 
     # TEST
-    test_cases = list_cases()
+    # Note: list_cases() is deferred until actually needed (when running 'test' command)
+    # to avoid slow startup for other commands like './mfc.sh' or './mfc.sh build'
 
     add_common_arguments(test, "t")
     test.add_argument("-l", "--list",         action="store_true", help="List all available tests.")
-    test.add_argument("-f", "--from",         default=test_cases[0].get_uuid(), type=str, help="First test UUID to run.")
-    test.add_argument("-t", "--to",           default=test_cases[-1].get_uuid(), type=str, help="Last test UUID to run.")
+    test.add_argument("-f", "--from",         default=None, type=str, help="First test UUID to run.")
+    test.add_argument("-t", "--to",           default=None, type=str, help="Last test UUID to run.")
     test.add_argument("-o", "--only",         nargs="+", type=str,     default=[], metavar="L", help="Only run tests with specified properties.")
     test.add_argument("-a", "--test-all",     action="store_true",     default=False,     help="Run the Post Process Tests too.")
     test.add_argument("-%", "--percent",      type=int,                default=100,       help="Percentage of tests to run.")
@@ -269,6 +270,14 @@ started, run ./mfc.sh build -h.""",
     if args["command"] == "run":
         if args["binary"] is not None and args["engine"] != "interactive":
             raise MFCException("./mfc.sh run's --binary can only be used with --engine=interactive.")
+
+    # Resolve test case defaults (deferred to avoid slow startup for non-test commands)
+    if args["command"] == "test":
+        test_cases = list_cases()
+        if args.get("from") is None:
+            args["from"] = test_cases[0].get_uuid()
+        if args.get("to") is None:
+            args["to"] = test_cases[-1].get_uuid()
 
     # Input files to absolute paths
     for e in ["input", "input1", "input2"]:

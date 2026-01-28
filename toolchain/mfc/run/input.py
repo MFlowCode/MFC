@@ -1,7 +1,7 @@
 import os, json, glob, typing, dataclasses
 
-import pyrometheus as pyro
-import cantera     as ct
+# Note: pyrometheus and cantera are imported lazily in the methods that need them
+# to avoid slow startup times for commands that don't use chemistry features
 
 from ..printer import cons
 from ..        import common, build
@@ -34,7 +34,10 @@ class MFCInputFile(Case):
         cons.print("Writing a (new) custom case.fpp file.")
         common.file_write(fpp_path, contents, True)
 
-    def get_cantera_solution(self) -> ct.Solution:
+    def get_cantera_solution(self):
+        # Lazy import to avoid slow startup for commands that don't need chemistry
+        import cantera as ct  # pylint: disable=import-outside-toplevel
+
         if self.params.get("chemistry", 'F') == 'T':
             cantera_file = self.params["cantera_file"]
 
@@ -58,6 +61,9 @@ class MFCInputFile(Case):
         raise common.MFCException(f"Cantera file '{cantera_file}' not found. Searched: {', '.join(candidates)}.")
 
     def generate_fpp(self, target) -> None:
+        # Lazy import to avoid slow startup for commands that don't need chemistry
+        import pyrometheus as pyro  # pylint: disable=import-outside-toplevel
+
         if target.isDependency:
             return
 
