@@ -54,17 +54,18 @@ started, run ./mfc.sh build -h.""",
     parser.add_argument("-h", "--help", action="store_true", help="Show help message")
 
     # Here are all of the parser arguments that call functions in other python files
+    # Aliases are defined using the aliases= parameter so they share arguments with the main command
     parsers = parser.add_subparsers(dest="command")
-    run        = parsers.add_parser(name="run",        help="Run a case with MFC.",                   formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    test       = parsers.add_parser(name="test",       help="Run MFC's test suite.",                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    build      = parsers.add_parser(name="build",      help="Build MFC and its dependencies.",        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    clean      = parsers.add_parser(name="clean",      help="Clean build artifacts.",                 formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    run        = parsers.add_parser(name="run",        aliases=["r"], help="Run a case with MFC.",                   formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    test       = parsers.add_parser(name="test",       aliases=["t"], help="Run MFC's test suite.",                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    build      = parsers.add_parser(name="build",      aliases=["b"], help="Build MFC and its dependencies.",        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    clean      = parsers.add_parser(name="clean",      aliases=["c"], help="Clean build artifacts.",                 formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     bench      = parsers.add_parser(name="bench",      help="Benchmark MFC (for CI).",                formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     bench_diff = parsers.add_parser(name="bench_diff", help="Compare MFC Benchmarks (for CI).",       formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     count      = parsers.add_parser(name="count",      help="Count LOC in MFC.",                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     count_diff = parsers.add_parser(name="count_diff", help="Count LOC in MFC.",                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     packer     = parsers.add_parser(name="packer",     help="Packer utility (pack/unpack/compare).",  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    validate   = parsers.add_parser(name="validate",   help="Validate a case file without running.",  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    validate   = parsers.add_parser(name="validate",   aliases=["v"], help="Validate a case file without running.",  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     init       = parsers.add_parser(name="init",       help="Create a new case from a template.",     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parsers.add_parser(name="interactive", help="Launch interactive menu-driven interface.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     comp       = parsers.add_parser(name="completion",  help="Install shell tab-completion.",            formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -74,13 +75,6 @@ started, run ./mfc.sh build -h.""",
     help_parser.add_argument("topic", metavar="TOPIC", type=str, nargs="?", default=None,
                              choices=list(HELP_TOPICS.keys()),
                              help=f"Help topic: {', '.join(HELP_TOPICS.keys())}")
-
-    # Command aliases (b=build, r=run, t=test, v=validate, c=clean)
-    parsers.add_parser(name="b", help="Alias for 'build'.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parsers.add_parser(name="r", help="Alias for 'run'.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parsers.add_parser(name="t", help="Alias for 'test'.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parsers.add_parser(name="v", help="Alias for 'validate'.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parsers.add_parser(name="c", help="Alias for 'clean'.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     # Completion subcommands
     comp.add_argument("completion_action", metavar="ACTION", type=str, nargs="?", default=None,
