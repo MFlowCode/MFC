@@ -131,7 +131,7 @@ ok "(venv) Entered the $MAGENTA$(python3 --version)$COLOR_RESET virtual environm
 if ! cmp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/pyproject.toml" > /dev/null 2>&1; then
     # Check if this is a fresh install (no previous pyproject.toml in build/)
     if [ ! -f "$(pwd)/build/pyproject.toml" ]; then
-        log "(venv) Installing$MAGENTA ~70 Python packages$COLOR_RESET..."
+        log "(venv) Installing$MAGENTA Python packages$COLOR_RESET..."
     else
         log "(venv) Updating Python dependencies..."
     fi
@@ -206,8 +206,8 @@ if ! cmp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/pyproject.toml" > /dev/
     fi
 
     # Progress bar configuration
-    # Two phases: Collecting (50%) and Installing (50%)
-    TOTAL_PKGS=70
+    # Two phases: Collecting (60%) and Installing (40%)
+    TOTAL_PKGS=70  # Initial estimate, adjusts dynamically
     BAR_WIDTH=30
     LAST_MILESTONE=0
     LAST_PHASE=""
