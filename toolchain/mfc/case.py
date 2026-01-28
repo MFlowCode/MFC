@@ -1,7 +1,6 @@
 import re, json, math, copy, dataclasses, fastjsonschema
 
 from . import common
-from . import build
 from .printer import cons
 
 from .state import ARG
@@ -38,6 +37,7 @@ class Case:
         return json.dumps(self.params, indent=4)
 
     def get_inp(self, _target) -> str:
+        from . import build  # pylint: disable=import-outside-toplevel
         target = build.get_target(_target)
 
         cons.print(f"Generating [magenta]{target.name}.inp[/magenta]:")
@@ -358,6 +358,8 @@ class Case:
         return out
 
     def get_fpp(self, target, print = True) -> str:
+        from . import build  # pylint: disable=import-outside-toplevel
+
         def _prepend() -> str:
             return f"""\
 #:set chemistry             = {self.params.get("chemistry", 'F') == 'T'}
