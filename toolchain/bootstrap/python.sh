@@ -173,21 +173,35 @@ if ! cmp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/pyproject.toml" > /dev/
 
     # Use uv if available, otherwise fall back to pip
     if [ "$USE_UV" = "1" ]; then
-        # uv is much faster (typically <10 seconds for all packages)
+        # uv is much faster and has its own progress display - show it
         log "(venv) Using$MAGENTA uv$COLOR_RESET for fast installation..."
-        if uv pip install "$(pwd)/toolchain" > "$PIP_LOG" 2>&1; then
-            rm -f "$PIP_LOG"
-            ok "(venv) Installation succeeded."
-            cp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/"
+        if [ -t 1 ]; then
+            # Interactive terminal: show uv's native progress
+            if uv pip install "$(pwd)/toolchain"; then
+                ok "(venv) Installation succeeded."
+                cp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/"
+            else
+                error "(venv) Installation failed."
+                log "(venv) Exiting the$MAGENTA Python$COLOR_RESET virtual environment."
+                deactivate
+                exit 1
+            fi
         else
-            error "(venv) Installation failed. See output below:"
-            echo ""
-            cat "$PIP_LOG"
-            echo ""
-            log "(venv) Exiting the$MAGENTA Python$COLOR_RESET virtual environment."
-            deactivate
-            rm -f "$PIP_LOG"
-            exit 1
+            # Non-interactive: capture output for logging
+            if uv pip install "$(pwd)/toolchain" > "$PIP_LOG" 2>&1; then
+                rm -f "$PIP_LOG"
+                ok "(venv) Installation succeeded."
+                cp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/"
+            else
+                error "(venv) Installation failed. See output below:"
+                echo ""
+                cat "$PIP_LOG"
+                echo ""
+                log "(venv) Exiting the$MAGENTA Python$COLOR_RESET virtual environment."
+                deactivate
+                rm -f "$PIP_LOG"
+                exit 1
+            fi
         fi
     else
         # Fall back to pip (slower, show progress bar)
