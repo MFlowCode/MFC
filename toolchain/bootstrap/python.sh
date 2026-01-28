@@ -131,7 +131,12 @@ ok "(venv) Entered the $MAGENTA$(python3 --version)$COLOR_RESET virtual environm
 if ! cmp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/pyproject.toml" > /dev/null 2>&1; then
     # Check if this is a fresh install (no previous pyproject.toml in build/)
     if [ ! -f "$(pwd)/build/pyproject.toml" ]; then
-        log "(venv) Installing$MAGENTA ~70 Python packages$COLOR_RESET. This may take a few minutes..."
+        if command -v uv > /dev/null 2>&1; then
+            log "(venv) Installing$MAGENTA ~70 Python packages$COLOR_RESET with$MAGENTA uv$COLOR_RESET (fast)..."
+        else
+            log "(venv) Installing$MAGENTA ~70 Python packages$COLOR_RESET. This may take a few minutes..."
+            log "(venv) Tip: Install$MAGENTA uv$COLOR_RESET for 10-100x faster installs: pip install uv"
+        fi
     else
         log "(venv) Updating Python dependencies..."
     fi
@@ -150,12 +155,45 @@ if ! cmp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/pyproject.toml" > /dev/
         fi
     done
 
-    # Run pip and show progress
+    # Run package installer and show progress
     PIP_LOG="$(pwd)/build/.pip_install.log"
 
-    # Start pip in background, capturing output
-    PIP_DISABLE_PIP_VERSION_CHECK=1 MAKEFLAGS=$nthreads pip3 install "$(pwd)/toolchain" > "$PIP_LOG" 2>&1 &
-    PIP_PID=$!
+    # Check if uv is available (10-100x faster than pip)
+    USE_UV=0
+    if command -v uv > /dev/null 2>&1; then
+        USE_UV=1
+        INSTALLER="uv"
+    else
+        INSTALLER="pip"
+    fi
+
+    # Start installer in background, capturing output
+    if [ "$USE_UV" = "1" ]; then
+        # uv is much faster - use it if available (typically <10 seconds)
+        # Run synchronously since it's fast and has its own progress display
+        log "(venv) Using$MAGENTA uv$COLOR_RESET for fast installation..."
+        if uv pip install "$(pwd)/toolchain" > "$PIP_LOG" 2>&1; then
+            rm -f "$PIP_LOG"
+            ok "(venv) Installation succeeded."
+            cp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/"
+        else
+            error "(venv) Installation failed. See output below:"
+            echo ""
+            cat "$PIP_LOG"
+            echo ""
+            log "(venv) Exiting the$MAGENTA Python$COLOR_RESET virtual environment."
+            deactivate
+            rm -f "$PIP_LOG"
+            exit 1
+        fi
+    else
+        # Fall back to pip (slower, show progress bar)
+        PIP_DISABLE_PIP_VERSION_CHECK=1 MAKEFLAGS=$nthreads pip3 install "$(pwd)/toolchain" > "$PIP_LOG" 2>&1 &
+        PIP_PID=$!
+    fi
+
+    # Only run progress bar for pip (uv handles its own output and already completed above)
+    if [ "$USE_UV" = "0" ]; then
 
     # Check if we're in an interactive terminal
     if [ -t 1 ]; then
@@ -330,4 +368,6 @@ if ! cmp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/pyproject.toml" > /dev/
 
     # Save the new/current pyproject.toml
     cp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/"
+
+    fi  # end of USE_UV=0 (pip) block
 fi
