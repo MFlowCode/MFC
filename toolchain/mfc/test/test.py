@@ -3,7 +3,6 @@ from random import sample, seed
 
 import rich, rich.table
 from rich.panel import Panel
-from rich.text import Text
 
 from ..printer import cons
 from ..        import common
@@ -111,7 +110,7 @@ def __filter(cases_) -> typing.List[TestCase]:
     return selected_cases, skipped_cases
 
 def test():
-    # pylint: disable=global-statement, global-variable-not-assigned, too-many-statements
+    # pylint: disable=global-statement, global-variable-not-assigned, too-many-statements, too-many-locals
     global nFAIL, nPASS, nSKIP, total_test_count
     global errors, failed_tests, test_start_time
 
@@ -211,7 +210,8 @@ def test():
 
 
 def _print_test_summary(passed: int, failed: int, skipped: int, minutes: int, seconds: float,
-                        failed_tests: list, skipped_cases: list):
+                        failed_test_list: list, _skipped_cases: list):
+    # pylint: disable=too-many-arguments, too-many-positional-arguments, too-many-locals
     """Print a comprehensive test summary report."""
     total = passed + failed + skipped
 
@@ -245,10 +245,10 @@ def _print_test_summary(passed: int, failed: int, skipped: int, minutes: int, se
     ]
 
     # Add failed tests details if any
-    if failed_tests:
+    if failed_test_list:
         summary_lines.append("")
         summary_lines.append("  [bold red]Failed Tests:[/bold red]")
-        for test_info in failed_tests[:10]:  # Limit to first 10
+        for test_info in failed_test_list[:10]:  # Limit to first 10
             trace = test_info.get('trace', 'Unknown')
             uuid = test_info.get('uuid', 'Unknown')
             error_type = test_info.get('error_type', '')
@@ -258,8 +258,8 @@ def _print_test_summary(passed: int, failed: int, skipped: int, minutes: int, se
             summary_lines.append(f"      [dim]UUID: {uuid}[/dim]")
             if error_type:
                 summary_lines.append(f"      [dim]({error_type})[/dim]")
-        if len(failed_tests) > 10:
-            summary_lines.append(f"    [dim]... and {len(failed_tests) - 10} more[/dim]")
+        if len(failed_test_list) > 10:
+            summary_lines.append(f"    [dim]... and {len(failed_test_list) - 10} more[/dim]")
 
     # Add next steps for failures
     if failed > 0:

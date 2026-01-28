@@ -10,7 +10,7 @@ _debug_logger = None
 
 def setup_debug_logging(enabled: bool = False):
     """Setup debug logging for troubleshooting."""
-    global _debug_logger
+    global _debug_logger  # pylint: disable=global-statement
     if enabled:
         logging.basicConfig(
             level=logging.DEBUG,
