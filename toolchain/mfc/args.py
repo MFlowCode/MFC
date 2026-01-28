@@ -5,10 +5,34 @@ from .build        import TARGETS, DEFAULT_TARGETS
 from .common       import MFCException, format_list_to_string
 from .test.cases   import list_cases
 from .state        import gpuConfigOptions, MFCConfig
-from .user_guide   import print_help, is_first_time_user, print_welcome
+from .user_guide   import (print_help, is_first_time_user, print_welcome,
+                           print_command_help, print_topic_help, print_help_topics,
+                           COMMAND_ALIASES, HELP_TOPICS)
+
+
+def _handle_enhanced_help(args_list):
+    """Handle --help with enhanced output for known commands."""
+    if len(args_list) >= 2 and args_list[1] in ("-h", "--help"):
+        # ./mfc.sh --help -> show enhanced help
+        print_help()
+        sys.exit(0)
+
+    if len(args_list) >= 3 and args_list[2] in ("-h", "--help"):
+        # ./mfc.sh <command> --help -> show enhanced command help
+        command = args_list[1]
+        # Resolve alias
+        command = COMMAND_ALIASES.get(command, command)
+        if print_command_help(command, show_argparse=False):
+            # Return True to indicate we should also show argparse help
+            return command
+    return None
+
 
 # pylint: disable=too-many-locals, too-many-branches, too-many-statements
 def parse(config: MFCConfig):
+    # Handle enhanced help before argparse
+    _handle_enhanced_help(sys.argv)
+
     parser = argparse.ArgumentParser(
         prog="./mfc.sh",
         description="""\
@@ -17,7 +41,9 @@ running, and cleaning of MFC in various configurations on all supported platform
 The README documents this tool and its various commands in more detail. To get \
 started, run ./mfc.sh build -h.""",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        add_help=False,  # We handle --help ourselves
     )
+    parser.add_argument("-h", "--help", action="store_true", help="Show help message")
 
     # Here are all of the parser arguments that call functions in other python files
     parsers = parser.add_subparsers(dest="command")
@@ -34,6 +60,19 @@ started, run ./mfc.sh build -h.""",
     init       = parsers.add_parser(name="init",       help="Create a new case from a template.",     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parsers.add_parser(name="interactive", help="Launch interactive menu-driven interface.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     comp       = parsers.add_parser(name="completion",  help="Install shell tab-completion.",            formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+    # Help command with topics
+    help_parser = parsers.add_parser(name="help", help="Show help on a topic.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    help_parser.add_argument("topic", metavar="TOPIC", type=str, nargs="?", default=None,
+                             choices=list(HELP_TOPICS.keys()),
+                             help=f"Help topic: {', '.join(HELP_TOPICS.keys())}")
+
+    # Command aliases (b=build, r=run, t=test, v=validate, c=clean)
+    parsers.add_parser(name="b", help="Alias for 'build'.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parsers.add_parser(name="r", help="Alias for 'run'.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parsers.add_parser(name="t", help="Alias for 'test'.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parsers.add_parser(name="v", help="Alias for 'validate'.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parsers.add_parser(name="c", help="Alias for 'clean'.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     # Completion subcommands
     comp.add_argument("completion_action", metavar="ACTION", type=str, nargs="?", default=None,
@@ -178,18 +217,36 @@ started, run ./mfc.sh build -h.""",
     args: dict = vars(parser.parse_args(sys.argv[1:extra_index]))
     args["--"] = sys.argv[extra_index + 1:]
 
+    # Handle --help at top level
+    if args.get("help") and args["command"] is None:
+        print_help()
+        sys.exit(0)
+
+    # Handle 'help' command
+    if args["command"] == "help":
+        topic = args.get("topic")
+        if topic:
+            print_topic_help(topic)
+        else:
+            print_help_topics()
+        sys.exit(0)
+
+    # Resolve command aliases
+    if args["command"] in COMMAND_ALIASES:
+        args["command"] = COMMAND_ALIASES[args["command"]]
+
     # Add default arguments of other subparsers
-    for name, parser in [("run",    run),   ("test",   test), ("build", build),
-                         ("clean",  clean), ("count", count), ("count_diff", count_diff),
-                         ("validate", validate)]:
+    for name, subparser in [("run",    run),   ("test",   test), ("build", build),
+                            ("clean",  clean), ("count", count), ("count_diff", count_diff),
+                            ("validate", validate)]:
         if args["command"] == name:
             continue
 
-        vals, _ = parser.parse_known_args(["-i", "None"])
+        vals, _ = subparser.parse_known_args(["-i", "None"])
         for key, val in vars(vals).items():
             if key == "input":
                 args[key] = args.get(key)
-            elif not key in args:
+            elif key not in args:
                 args[key] = args.get(key, val)
 
     if args["command"] is None:
@@ -198,7 +255,7 @@ started, run ./mfc.sh build -h.""",
             print_welcome()
         else:
             print_help()
-        exit(0)
+        sys.exit(0)
 
     # "Slugify" the name of the job (only for batch jobs, not for init command)
     if args.get("name") is not None and isinstance(args["name"], str) and args["command"] != "init":

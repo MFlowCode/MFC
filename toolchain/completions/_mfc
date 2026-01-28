@@ -25,6 +25,12 @@ _mfc() {
         'spelling:Run spell checker'
         'interactive:Launch interactive menu'
         'completion:Install shell tab-completion'
+        'help:Show help on a topic'
+        'b:Alias for build'
+        'r:Alias for run'
+        't:Alias for test'
+        'v:Alias for validate'
+        'c:Alias for clean'
     )
 
     local targets=(
@@ -191,8 +197,47 @@ _mfc() {
                             ;;
                     esac
                     ;;
-                clean|count|interactive|lint|format|spelling)
+                clean|count|interactive|lint|format|spelling|c)
                     # No additional arguments
+                    ;;
+                help)
+                    local -a help_topics=(
+                        'gpu:GPU configuration and troubleshooting'
+                        'clusters:HPC cluster setup'
+                        'batch:Batch job submission'
+                        'debugging:Debugging and troubleshooting'
+                    )
+                    _describe -t help_topics 'help topic' help_topics
+                    ;;
+                b)
+                    # Alias for build
+                    _arguments \
+                        '-t[Targets to build]:target:->targets' \
+                        '-j[Number of parallel jobs]:jobs:(1 2 4 8 16 32)' \
+                        '--gpu[Enable GPU support]:mode:(acc mp)' \
+                        '--no-gpu[Disable GPU support]' \
+                        '--debug[Enable debug build]'
+                    ;;
+                r)
+                    # Alias for run
+                    _arguments \
+                        '1:case file:_files -g "*.py"' \
+                        '-n[Tasks per node]:tasks:' \
+                        '-N[Number of nodes]:nodes:' \
+                        '-e[Execution engine]:engine:(interactive batch)'
+                    ;;
+                t)
+                    # Alias for test
+                    _arguments \
+                        '-j[Number of parallel jobs]:jobs:(1 2 4 8 16 32)' \
+                        '--only[Run only specific tests]:uuid:' \
+                        '--generate[Generate golden files]'
+                    ;;
+                v)
+                    # Alias for validate
+                    _arguments \
+                        '1:case file:_files -g "*.py"' \
+                        '-d[Enable debug logging]'
                     ;;
             esac
             ;;

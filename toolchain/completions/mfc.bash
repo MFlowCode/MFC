@@ -12,8 +12,8 @@ _mfc_completions() {
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
-    # Main commands
-    local commands="build run test clean validate init count packer load lint format spelling interactive completion"
+    # Main commands (including aliases: b=build, r=run, t=test, v=validate, c=clean)
+    local commands="build run test clean validate init count packer load lint format spelling interactive completion help b r t v c"
 
     # Build targets
     local targets="pre_process simulation post_process"
@@ -179,6 +179,59 @@ _mfc_completions() {
                     return 0
                     ;;
             esac
+            ;;
+        help)
+            # Complete help topics
+            local topics="gpu clusters batch debugging"
+            COMPREPLY=( $(compgen -W "${topics}" -- "${cur}") )
+            return 0
+            ;;
+        b)
+            # Alias for build - same completions
+            case "${prev}" in
+                -t|--targets)
+                    COMPREPLY=( $(compgen -W "${targets}" -- "${cur}") )
+                    return 0
+                    ;;
+                -j|--jobs)
+                    COMPREPLY=( $(compgen -W "1 2 4 8 16 32" -- "${cur}") )
+                    return 0
+                    ;;
+                *)
+                    local build_opts="-t --targets -j --jobs -v --verbose --gpu --no-gpu --debug --no-debug"
+                    COMPREPLY=( $(compgen -W "${build_opts}" -- "${cur}") )
+                    return 0
+                    ;;
+            esac
+            ;;
+        r)
+            # Alias for run - complete case files
+            if [[ "${cur}" == -* ]]; then
+                local run_opts="-n --nodes -N --tasks-per-node -e --engine --gpu --no-gpu"
+                COMPREPLY=( $(compgen -W "${run_opts}" -- "${cur}") )
+            else
+                COMPREPLY=( $(compgen -f -X '!*.py' -- "${cur}") )
+            fi
+            return 0
+            ;;
+        t)
+            # Alias for test
+            local test_opts="-j --jobs --only --from --to --generate --no-build"
+            COMPREPLY=( $(compgen -W "${test_opts}" -- "${cur}") )
+            return 0
+            ;;
+        v)
+            # Alias for validate - complete case files
+            if [[ "${cur}" == -* ]]; then
+                COMPREPLY=( $(compgen -W "-d --debug-log" -- "${cur}") )
+            else
+                COMPREPLY=( $(compgen -f -X '!*.py' -- "${cur}") )
+            fi
+            return 0
+            ;;
+        c)
+            # Alias for clean - no additional arguments
+            return 0
             ;;
     esac
 

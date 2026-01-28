@@ -6,6 +6,7 @@ This module provides:
 - Contextual tips after errors/failures
 - Interactive mode with menu
 - Onboarding for new users
+- Topic-based help system
 """
 
 import os
@@ -20,76 +21,324 @@ from .common import MFC_ROOT_DIR
 
 
 # =============================================================================
+# COMMAND ALIASES
+# =============================================================================
+
+COMMAND_ALIASES = {
+    "b": "build",
+    "r": "run",
+    "t": "test",
+    "v": "validate",
+    "c": "clean",
+}
+
+
+# =============================================================================
 # COMMAND DEFINITIONS
 # =============================================================================
 
 COMMANDS = {
     "build": {
         "description": "Build MFC and its dependencies",
+        "alias": "b",
         "examples": [
-            ("./mfc.sh build", "Build all targets"),
-            ("./mfc.sh build -t simulation", "Build only simulation"),
+            ("./mfc.sh build", "Build all default targets (CPU)"),
             ("./mfc.sh build -j 8", "Build with 8 parallel jobs"),
             ("./mfc.sh build --gpu", "Build with GPU (OpenACC) support"),
+            ("./mfc.sh build -t simulation", "Build only simulation target"),
+        ],
+        "key_options": [
+            ("-j, --jobs N", "Number of parallel build jobs"),
+            ("-t, --targets", "Targets: pre_process, simulation, post_process"),
+            ("--gpu [acc|mp]", "Enable GPU support (OpenACC or OpenMP)"),
+            ("--debug", "Build in debug mode"),
+            ("--case-optimization", "Hard-code case parameters (with -i)"),
         ]
     },
     "run": {
         "description": "Run a simulation case",
+        "alias": "r",
         "examples": [
-            ("./mfc.sh run case.py", "Run a case file"),
+            ("./mfc.sh run case.py", "Run interactively with 1 rank"),
             ("./mfc.sh run case.py -n 4", "Run with 4 MPI ranks"),
-            ("./mfc.sh run case.py -e batch", "Submit as batch job"),
+            ("./mfc.sh run case.py -e batch -N 2 -n 4", "Submit batch job: 2 nodes, 4 ranks/node"),
+            ("./mfc.sh run case.py -e batch -a myaccount", "Submit with account"),
+        ],
+        "key_options": [
+            ("-n, --tasks-per-node", "MPI ranks per node"),
+            ("-N, --nodes", "Number of nodes (batch)"),
+            ("-e, --engine", "interactive or batch"),
+            ("-a, --account", "Account to charge (batch)"),
+            ("-w, --walltime", "Wall time limit (batch)"),
+            ("-p, --partition", "Queue/partition (batch)"),
         ]
     },
     "test": {
         "description": "Run the MFC test suite",
+        "alias": "t",
         "examples": [
             ("./mfc.sh test", "Run all tests"),
-            ("./mfc.sh test -j 4", "Run tests with 4 parallel jobs"),
-            ("./mfc.sh test --only <UUID>", "Run a specific test"),
+            ("./mfc.sh test -j 4", "Run with 4 parallel jobs"),
+            ("./mfc.sh test --only 3D", "Run only 3D tests"),
+            ("./mfc.sh test --generate", "Regenerate golden files"),
+        ],
+        "key_options": [
+            ("-j, --jobs N", "Number of parallel test jobs"),
+            ("-o, --only PROP", "Run tests matching property"),
+            ("-f, --from UUID", "Start from specific test"),
+            ("--generate", "Generate/update golden files"),
+            ("--no-build", "Skip rebuilding MFC"),
         ]
     },
     "clean": {
         "description": "Remove build artifacts and cache",
+        "alias": "c",
         "examples": [
             ("./mfc.sh clean", "Clean all build files"),
-        ]
+        ],
+        "key_options": []
     },
     "validate": {
-        "description": "Check a case file for errors",
+        "description": "Check a case file for errors without running",
+        "alias": "v",
         "examples": [
-            ("./mfc.sh validate case.py", "Validate case file syntax and constraints"),
+            ("./mfc.sh validate case.py", "Check syntax and constraints"),
+            ("./mfc.sh validate case.py -d", "Validate with debug output"),
+        ],
+        "key_options": [
+            ("-d, --debug-log", "Enable debug logging"),
         ]
     },
     "init": {
         "description": "Create a new case from a template",
+        "alias": None,
         "examples": [
-            ("./mfc.sh init my_case", "Create case with default 1D template"),
-            ("./mfc.sh init my_case -t 2D_minimal", "Create case with 2D template"),
+            ("./mfc.sh init my_case", "Create with 1D_minimal template"),
+            ("./mfc.sh init my_case -t 2D_minimal", "Create with 2D template"),
+            ("./mfc.sh init my_case -t example:3D_sphbubcollapse", "Copy from example"),
             ("./mfc.sh init --list", "List available templates"),
+        ],
+        "key_options": [
+            ("-t, --template NAME", "Template: 1D_minimal, 2D_minimal, 3D_minimal"),
+            ("-l, --list", "List all available templates"),
         ]
     },
     "count": {
         "description": "Count lines of code in MFC",
+        "alias": None,
         "examples": [
             ("./mfc.sh count", "Show LOC statistics"),
-        ]
+        ],
+        "key_options": []
     },
     "packer": {
         "description": "Pack/unpack/compare simulation data",
+        "alias": None,
         "examples": [
             ("./mfc.sh packer pack case.py", "Pack case output"),
             ("./mfc.sh packer compare a.pack b.pack", "Compare two packed files"),
-        ]
+        ],
+        "key_options": []
     },
     "load": {
         "description": "Load MFC environment (use with source)",
+        "alias": None,
         "examples": [
             ("source ./mfc.sh load -c p -m g", "Load Phoenix GPU modules"),
             ("source ./mfc.sh load -c f -m c", "Load Frontier CPU modules"),
+            ("source ./mfc.sh load -c a -m g", "Load Andes GPU modules"),
+        ],
+        "key_options": [
+            ("-c CLUSTER", "Cluster: p(hoenix), f(rontier), a(ndes), s(ummit)"),
+            ("-m MODE", "Mode: c(pu), g(pu)"),
         ]
     },
 }
+
+
+# =============================================================================
+# HELP TOPICS
+# =============================================================================
+
+HELP_TOPICS = {
+    "gpu": {
+        "title": "GPU Configuration",
+        "content": """\
+[bold cyan]GPU Support in MFC[/bold cyan]
+
+MFC supports GPU acceleration via OpenACC or OpenMP offloading.
+
+[bold]Building with GPU support:[/bold]
+  [green]./mfc.sh build --gpu[/green]           Enable OpenACC (default)
+  [green]./mfc.sh build --gpu acc[/green]       Explicitly use OpenACC
+  [green]./mfc.sh build --gpu mp[/green]        Use OpenMP offloading
+
+[bold]Running on GPUs:[/bold]
+  [green]./mfc.sh run case.py --gpu[/green]     Run with GPU support
+  [green]./mfc.sh run case.py -g 0 1[/green]    Use specific GPU IDs
+
+[bold]Environment Setup:[/bold]
+  Most HPC systems require loading GPU modules first:
+  [cyan]source ./mfc.sh load -c <cluster> -m g[/cyan]
+
+[bold]Supported Compilers:[/bold]
+  • NVIDIA HPC SDK (nvfortran) - OpenACC
+  • AMD ROCm (amdflang) - OpenMP offload
+  • GCC with OpenACC/OpenMP offload support
+
+[bold]Troubleshooting:[/bold]
+  • Ensure CUDA/ROCm toolkit is in PATH
+  • Check GPU visibility: [cyan]nvidia-smi[/cyan] or [cyan]rocm-smi[/cyan]
+  • Use [cyan]--debug-log[/cyan] for detailed build output"""
+    },
+    "clusters": {
+        "title": "Cluster Configuration",
+        "content": """\
+[bold cyan]Supported HPC Clusters[/bold cyan]
+
+MFC includes pre-configured module sets for several clusters.
+
+[bold]Loading Cluster Modules:[/bold]
+  [green]source ./mfc.sh load -c <cluster> -m <mode>[/green]
+
+[bold]Available Clusters:[/bold]
+  [cyan]p[/cyan] - Georgia Tech Phoenix
+  [cyan]f[/cyan] - OLCF Frontier (AMD MI250X)
+  [cyan]s[/cyan] - OLCF Summit (NVIDIA V100)
+  [cyan]a[/cyan] - OLCF Andes
+
+[bold]Modes:[/bold]
+  [cyan]c[/cyan] - CPU only
+  [cyan]g[/cyan] - GPU enabled
+
+[bold]Examples:[/bold]
+  [green]source ./mfc.sh load -c p -m g[/green]   Phoenix with GPU
+  [green]source ./mfc.sh load -c f -m g[/green]   Frontier with GPU
+  [green]source ./mfc.sh load -c f -m c[/green]   Frontier CPU-only
+
+[bold]Custom Clusters:[/bold]
+  For unlisted clusters, manually load required modules:
+  • Fortran compiler (gfortran, nvfortran, etc.)
+  • MPI implementation
+  • CMake 3.18+
+  • Python 3.11+"""
+    },
+    "batch": {
+        "title": "Batch Job Submission",
+        "content": """\
+[bold cyan]Submitting Batch Jobs[/bold cyan]
+
+Use [green]-e batch[/green] to submit jobs to a scheduler instead of running interactively.
+
+[bold]Basic Batch Submission:[/bold]
+  [green]./mfc.sh run case.py -e batch[/green]
+
+[bold]Common Options:[/bold]
+  [cyan]-N, --nodes[/cyan]           Number of nodes
+  [cyan]-n, --tasks-per-node[/cyan]  MPI ranks per node
+  [cyan]-w, --walltime[/cyan]        Time limit (HH:MM:SS)
+  [cyan]-a, --account[/cyan]         Account/allocation to charge
+  [cyan]-p, --partition[/cyan]       Queue/partition name
+  [cyan]-q, --qos[/cyan]             Quality of service
+
+[bold]Examples:[/bold]
+  [green]./mfc.sh run case.py -e batch -N 4 -n 8 -w 02:00:00[/green]
+    4 nodes, 8 ranks/node, 2 hour limit
+
+  [green]./mfc.sh run case.py -e batch -a myproject -p gpu[/green]
+    Submit to 'gpu' partition with account 'myproject'
+
+[bold]Dry Run:[/bold]
+  [green]./mfc.sh run case.py -e batch --dry-run[/green]
+  Shows the generated batch script without submitting.
+
+[bold]Wait for Completion:[/bold]
+  [green]./mfc.sh run case.py -e batch --wait[/green]
+  Blocks until the job finishes."""
+    },
+    "debugging": {
+        "title": "Debugging & Troubleshooting",
+        "content": """\
+[bold cyan]Debugging MFC[/bold cyan]
+
+[bold]Debug Logging:[/bold]
+  Add [green]-d[/green] or [green]--debug-log[/green] to any command for verbose output:
+  [green]./mfc.sh build --debug-log[/green]
+  [green]./mfc.sh run case.py --debug-log[/green]
+
+[bold]Debug Builds:[/bold]
+  [green]./mfc.sh build --debug[/green]
+  Compiles with debug symbols and reduced optimization.
+
+[bold]Validating Cases:[/bold]
+  [green]./mfc.sh validate case.py[/green]
+  Checks case file for syntax errors and constraint violations.
+
+[bold]Common Issues:[/bold]
+
+  [yellow]Build fails with missing MPI:[/yellow]
+    → Load cluster modules: [cyan]source ./mfc.sh load -c <cluster> -m <mode>[/cyan]
+
+  [yellow]Tests fail with tolerance errors:[/yellow]
+    → May be expected for different compilers/platforms
+    → Use [cyan]--generate[/cyan] to update golden files if intentional
+
+  [yellow]Case validation errors:[/yellow]
+    → Check parameter constraints in the error message
+    → See documentation for valid parameter ranges
+
+[bold]Getting Help:[/bold]
+  • Check [cyan]docs/documentation/troubleshooting.md[/cyan]
+  • Report issues: [cyan]https://github.com/MFlowCode/MFC/issues[/cyan]"""
+    },
+}
+
+
+def print_topic_help(topic: str):
+    """Print help for a specific topic."""
+    if topic not in HELP_TOPICS:
+        cons.print(f"[red]Unknown topic: {topic}[/red]")
+        cons.print()
+        cons.print("[bold]Available topics:[/bold]")
+        for t, info in HELP_TOPICS.items():
+            cons.print(f"  [green]{t:12}[/green] {info['title']}")
+        cons.print()
+        cons.print("[dim]Usage: ./mfc.sh help <topic>[/dim]")
+        return
+
+    topic_info = HELP_TOPICS[topic]
+    cons.print()
+    cons.raw.print(Panel(
+        topic_info["content"],
+        title=f"[bold]{topic_info['title']}[/bold]",
+        box=box.ROUNDED,
+        padding=(1, 2)
+    ))
+    cons.print()
+
+
+def print_help_topics():
+    """Print list of available help topics."""
+    cons.print()
+    cons.raw.print(Panel(
+        "[bold cyan]MFC Help System[/bold cyan]",
+        box=box.ROUNDED,
+        padding=(0, 2)
+    ))
+    cons.print()
+
+    table = Table(box=box.SIMPLE, show_header=False, padding=(0, 2))
+    table.add_column("Topic", style="green")
+    table.add_column("Description")
+
+    for topic, info in HELP_TOPICS.items():
+        table.add_row(topic, info["title"])
+
+    cons.raw.print(table)
+    cons.print()
+    cons.print("[dim]Usage: [cyan]./mfc.sh help <topic>[/cyan][/dim]")
+    cons.print("[dim]Example: [cyan]./mfc.sh help gpu[/cyan][/dim]")
+    cons.print()
 
 
 # =============================================================================
@@ -119,17 +368,23 @@ def print_help():
         padding=(0, 2)
     )
     table.add_column("Command", style="green", no_wrap=True)
+    table.add_column("Alias", style="dim", no_wrap=True)
     table.add_column("Description", style="white")
 
-    # Primary commands
+    # Primary commands with aliases
     for cmd in ["build", "run", "test", "validate", "init", "clean"]:
-        table.add_row(cmd, COMMANDS[cmd]["description"])
+        alias = COMMANDS[cmd].get("alias", "")
+        alias_str = alias if alias else ""
+        table.add_row(cmd, alias_str, COMMANDS[cmd]["description"])
 
-    table.add_row("", "")  # Spacer
+    table.add_row("", "", "")  # Spacer
 
     # Secondary commands
     for cmd in ["count", "packer", "load"]:
-        table.add_row(f"[dim]{cmd}[/dim]", f"[dim]{COMMANDS[cmd]['description']}[/dim]")
+        table.add_row(f"[dim]{cmd}[/dim]", "", f"[dim]{COMMANDS[cmd]['description']}[/dim]")
+
+    table.add_row("", "", "")  # Spacer
+    table.add_row("[dim]help[/dim]", "", "[dim]Show help on a topic (gpu, clusters, batch, debugging)[/dim]")
 
     cons.raw.print(table)
     cons.print()
@@ -150,28 +405,49 @@ def print_help():
 
     # Footer
     cons.print("[dim]Run [cyan]./mfc.sh <command> --help[/cyan] for detailed options[/dim]")
-    cons.print("[dim]Run [cyan]./mfc.sh interactive[/cyan] for guided menu[/dim]")
+    cons.print("[dim]Run [cyan]./mfc.sh help <topic>[/cyan] for topic help (gpu, clusters, batch, debugging)[/dim]")
     cons.print()
 
 
-def print_command_help(command: str):
-    """Print detailed help for a specific command."""
+def print_command_help(command: str, show_argparse: bool = True):
+    """Print enhanced help for a specific command."""
     if command not in COMMANDS:
         cons.print(f"[red]Unknown command: {command}[/red]")
-        return
+        return False
 
     cmd = COMMANDS[command]
+    alias = cmd.get("alias", "")
+    alias_str = f" [dim](alias: {alias})[/dim]" if alias else ""
 
+    # Header panel
     cons.print()
-    cons.print(f"[bold cyan]{command}[/bold cyan] - {cmd['description']}")
+    cons.raw.print(Panel(
+        f"[bold cyan]{command}[/bold cyan]{alias_str}\n"
+        f"[dim]{cmd['description']}[/dim]",
+        box=box.ROUNDED,
+        padding=(0, 2)
+    ))
     cons.print()
 
+    # Examples
     if cmd.get("examples"):
         cons.print("[bold]Examples:[/bold]")
         for example, desc in cmd["examples"]:
             cons.print(f"  [green]{example}[/green]")
-            cons.print(f"    [dim]{desc}[/dim]")
+            cons.print(f"      [dim]{desc}[/dim]")
         cons.print()
+
+    # Key options
+    if cmd.get("key_options"):
+        cons.print("[bold]Key Options:[/bold]")
+        for opt, desc in cmd["key_options"]:
+            cons.print(f"  [cyan]{opt:24}[/cyan] {desc}")
+        cons.print()
+        if show_argparse:
+            cons.print("[dim]Run with --help for full option list[/dim]")
+            cons.print()
+
+    return True
 
 
 # =============================================================================
