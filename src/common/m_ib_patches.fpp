@@ -184,17 +184,17 @@ contains
 
             $:GPU_PARALLEL_LOOP(private='[i,j,ix,iy]', copy='[ib_markers_sf]',&
                       & copyin='[patch_id,center,r2]', collapse=2)
-            do j = 0, n 
+            do j = 0, n
                 do i = 0, m
-                    do ix = 1, 2 
+                    do ix = 1, 2
                         do iy = 1, 2
                             if ((x_cc(i) - center(1, ix))**2 &
-                              + (y_cc(j) - center(2, iy))**2 <= r2) then
+                                + (y_cc(j) - center(2, iy))**2 <= r2) then
                                 ib_markers_sf(i, j, 0) = patch_id
                             end if
-                        end do 
+                        end do
                     end do
-                end do 
+                end do
             end do
             $:END_GPU_PARALLEL_LOOP()
         else
@@ -203,14 +203,14 @@ contains
             do j = 0, n
                 do i = 0, m
                     if ((x_cc(i) - center(1, 1))**2 &
-                      + (y_cc(j) - center(2, 1))**2 <= r2) &
+                        + (y_cc(j) - center(2, 1))**2 <= r2) &
                         then
                         ib_markers_sf(i, j, 0) = patch_id
                     end if
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
-        end if 
+        end if
 
     end subroutine s_ib_circle
 

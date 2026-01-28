@@ -38,8 +38,8 @@ contains
         real(wp), dimension(2, 2) :: center
         real(wp), dimension(3) :: dist_vec
         !< temporary distance and distance vector used for periodicity
-        real(wp) :: dist_temp 
-        real(wp), dimension(3) :: dist_vec_temp 
+        real(wp) :: dist_temp
+        real(wp), dimension(3) :: dist_vec_temp
 
         integer :: i, j, ix, iy !< Loop index variables
 
@@ -547,8 +547,8 @@ contains
         real(wp), dimension(3) :: dist_vec
         real(wp), dimension(3, 2) :: center
         !< temporary distance and distance vector used for periodicity
-        real(wp) :: dist_temp 
-        real(wp), dimension(3) :: dist_vec_temp 
+        real(wp) :: dist_temp
+        real(wp), dimension(3) :: dist_vec_temp
 
         integer :: i, j, k, ix, iy, iz !< Loop index variables
 

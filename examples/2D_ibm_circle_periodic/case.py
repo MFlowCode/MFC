@@ -8,7 +8,7 @@ gam_a = 1.4
 D = 0.1
 
 # circle density
-rho_c = 200  
+rho_c = 200
 
 # domain length
 L = 10 * D
@@ -32,12 +32,12 @@ v1 = M * np.sqrt(gam_a * P / rho)
 mu = rho * v1 * D / Re
 
 dt = 1.0e-06
-Nt = 1000 # int(10 * L / v1 / dt)
-t_save = 10 # Nt // 300
+Nt = 1000  # int(10 * L / v1 / dt)
+t_save = 10  # Nt // 300
 
-Nx = 511 # to fully resolve requires ~ 40-60 cells across sphere diameter
+Nx = 511  # to fully resolve requires ~ 40-60 cells across sphere diameter
 Ny = Nx
-Nz = 0 
+Nz = 0
 
 # immersed boundary dictionary
 ib_dict = {}
@@ -122,8 +122,8 @@ case_dict = {
     "patch_icpp(1)%length_x": 10 * D,
     "patch_icpp(1)%length_y": 10 * D,
     # Specify the patch primitive variables
-    "patch_icpp(1)%vel(1)": v1/np.sqrt(2),
-    "patch_icpp(1)%vel(2)": v1/np.sqrt(2),
+    "patch_icpp(1)%vel(1)": v1,
+    "patch_icpp(1)%vel(2)": 0.0,
     "patch_icpp(1)%pres": P,
     "patch_icpp(1)%alpha_rho(1)": rho,
     "patch_icpp(1)%alpha(1)": 1.0e00,

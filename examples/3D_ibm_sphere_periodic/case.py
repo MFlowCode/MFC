@@ -32,10 +32,10 @@ v1 = M * np.sqrt(gam_a * P / rho)
 mu = rho * v1 * D / Re
 
 dt = 2.0e-06
-Nt = int(10 * L / v1 / dt)
+Nt = int(4 * L / v1 / dt)
 t_save = Nt // 300
 
-Nx = 127 # to fully resolve requires ~ 40-60 cells across sphere diameter
+Nx = 127  # to fully resolve requires ~ 40-60 cells across sphere diameter
 Ny = Nx
 Nz = Ny
 
