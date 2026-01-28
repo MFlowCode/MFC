@@ -238,6 +238,7 @@ module m_global_parameters
     logical :: ib           !< Turn immersed boundaries on
     integer :: num_ibs      !< Number of immersed boundaries
     integer :: Np
+    logical :: periodic_ibs !< Periodically wrap immersed boundaries around domain
 
     type(ib_patch_parameters), dimension(num_patches_max) :: patch_ib
 
@@ -540,6 +541,7 @@ contains
         ! Immersed Boundaries
         ib = .false.
         num_ibs = dflt_int
+        periodic_ibs = .false.
 
         do i = 1, num_patches_max
             patch_ib(i)%geometry = dflt_int

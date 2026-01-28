@@ -511,34 +511,98 @@ contains
         integer, intent(IN) :: ib_patch_id
 
         real(wp) :: radius, dist
-        real(wp), dimension(3) :: dist_vec, center
+        real(wp), dimension(3) :: dist_vec
+        real(wp), dimension(3, 2) :: center
+        real(wp) :: dist_temp ! temporary distance used for periodicity
+        real(wp), dimension(3) :: dist_vec_temp ! temporary distance vector used for periodicity
 
-        integer :: i, j, k !< Loop index variables
+        integer :: i, j, k, ix, iy, iz !< Loop index variables
 
         radius = patch_ib(ib_patch_id)%radius
-        center(1) = patch_ib(ib_patch_id)%x_centroid
-        center(2) = patch_ib(ib_patch_id)%y_centroid
-        center(3) = patch_ib(ib_patch_id)%z_centroid
+        center(1, 1) = patch_ib(ib_patch_id)%x_centroid
+        center(2, 1) = patch_ib(ib_patch_id)%y_centroid
+        center(3, 1) = patch_ib(ib_patch_id)%z_centroid
 
-        $:GPU_PARALLEL_LOOP(private='[i,j,k,dist_vec,dist]', &
-                  & copyin='[ib_patch_id,center,radius]', collapse=3)
-        do i = 0, m
-            do j = 0, n
-                do k = 0, p
-                    dist_vec(1) = x_cc(i) - center(1)
-                    dist_vec(2) = y_cc(j) - center(2)
-                    dist_vec(3) = z_cc(k) - center(3)
-                    dist = sqrt(sum(dist_vec**2))
-                    levelset%sf(i, j, k, ib_patch_id) = dist - radius
-                    if (f_approx_equal(dist, 0._wp)) then
-                        levelset_norm%sf(i, j, k, ib_patch_id, :) = (/1, 0, 0/)
-                    else
-                        levelset_norm%sf(i, j, k, ib_patch_id, :) = dist_vec(:)/dist
-                    end if
+        if (periodic_ibs) then ! periodically wrap spheres around domain
+            if ((center(1, 1) - domain_glb(1, 1)) <= radius) then
+                center(1, 2) = domain_glb(1, 2) + (center(1, 1) - domain_glb(1, 1))
+            else if ((domain_glb(1, 2) - center(1, 1)) <= radius) then
+                center(1, 2) = domain_glb(1, 1) - (domain_glb(1, 2) - center(1, 1))
+            else
+                center(1, 2) = center(1, 1)
+            end if
+            if ((center(2, 1) - domain_glb(2, 1)) <= radius) then
+                center(2, 2) = domain_glb(2, 2) + (center(2, 1) - domain_glb(2, 1))
+            else if ((domain_glb(2, 2) - center(2, 1)) <= radius) then
+                center(2, 2) = domain_glb(2, 1) - (domain_glb(2, 2) - center(2, 1))
+            else
+                center(2, 2) = center(2, 1)
+            end if
+            if ((center(3, 1) - domain_glb(3, 1)) <= radius) then
+                center(3, 2) = domain_glb(3, 2) + (center(3, 1) - domain_glb(3, 1))
+            else if ((domain_glb(3, 2) - center(3, 1)) <= radius) then
+                center(3, 2) = domain_glb(3, 1) - (domain_glb(3, 2) - center(3, 1))
+            else
+                center(3, 2) = center(3, 1)
+            end if
+
+            $:GPU_PARALLEL_LOOP(private='[dist_vec,dist,dist_vec_temp,dist_temp,ix,iy,iz]', &
+                          & copyin='[ib_patch_id,center,radius]', collapse=3)
+            do i = 0, m
+                do j = 0, n
+                    do k = 0, p
+                        dist_vec(1) = x_cc(i) - center(1, 1)
+                        dist_vec(2) = y_cc(j) - center(2, 1)
+                        dist_vec(3) = z_cc(k) - center(3, 1)
+                        dist = sqrt(sum(dist_vec**2))
+
+                        ! check all permutations of periodically projected ib to find minimum distance
+                        do ix = 1, 2
+                            do iy = 1, 2
+                                do iz = 1, 2
+                                    dist_vec_temp(1) = x_cc(i) - center(1, ix)
+                                    dist_vec_temp(2) = y_cc(j) - center(2, iy)
+                                    dist_vec_temp(3) = z_cc(k) - center(3, iz)
+                                    dist_temp = sqrt(sum(dist_vec_temp**2))
+                                    if (dist_temp < dist) then
+                                        dist = dist_temp
+                                        dist_vec = dist_vec_temp
+                                    end if
+                                end do
+                            end do
+                        end do
+
+                        levelset%sf(i, j, k, ib_patch_id) = dist - radius
+                        if (f_approx_equal(dist, 0._wp)) then
+                            levelset_norm%sf(i, j, k, ib_patch_id, :) = (/1, 0, 0/)
+                        else
+                            levelset_norm%sf(i, j, k, ib_patch_id, :) = dist_vec(:)/dist
+                        end if
+                    end do
                 end do
             end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
+            $:END_GPU_PARALLEL_LOOP()
+        else
+            $:GPU_PARALLEL_LOOP(private='[i,j,k,dist_vec,dist]', &
+                      & copyin='[ib_patch_id,center,radius]', collapse=3)
+            do i = 0, m
+                do j = 0, n
+                    do k = 0, p
+                        dist_vec(1) = x_cc(i) - center(1, 1)
+                        dist_vec(2) = y_cc(j) - center(2, 1)
+                        dist_vec(3) = z_cc(k) - center(3, 1)
+                        dist = sqrt(sum(dist_vec**2))
+                        levelset%sf(i, j, k, ib_patch_id) = dist - radius
+                        if (f_approx_equal(dist, 0._wp)) then
+                            levelset_norm%sf(i, j, k, ib_patch_id, :) = (/1, 0, 0/)
+                        else
+                            levelset_norm%sf(i, j, k, ib_patch_id, :) = dist_vec(:)/dist
+                        end if
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
 
     end subroutine s_sphere_levelset
 

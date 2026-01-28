@@ -63,6 +63,7 @@ COMMON = {
     'down_sample': ParamType.LOG,
     'recon_type': ParamType.INT,
     'muscl_order': ParamType.INT,
+    "periodic_ibs": ParamType.LOG,
 }
 
 PRE_PROCESS = COMMON.copy()

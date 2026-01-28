@@ -143,6 +143,7 @@ contains
     end subroutine s_ibm_setup
 
     subroutine s_populate_ib_buffers()
+        integer :: j, k, l
 
         #:for DIRC, DIRI in [('x', 1), ('y', 2), ('z', 3)]
             #:for LOCC, LOCI in [('beg', -1), ('end', 1)]
@@ -151,6 +152,83 @@ contains
                 end if
             #:endfor
         #:endfor
+
+        if (periodic_ibs) then
+            ! Population of Buffers in x-direction
+            if (bc_x%beg == BC_PERIODIC) then
+                $:GPU_PARALLEL_LOOP(collapse=3)
+                do l = 0, p
+                    do k = 0, n
+                        do j = 1, buff_size
+                            ib_markers%sf(-j, k, l) = &
+                                ib_markers%sf(m - (j - 1), k, l)
+                        end do
+                    end do
+                end do
+            end if
+
+            if (bc_x%end == BC_PERIODIC) then
+                $:GPU_PARALLEL_LOOP(collapse=3)
+                do l = 0, p
+                    do k = 0, n
+                        do j = 1, buff_size
+                            ib_markers%sf(m + j, k, l) = &
+                                ib_markers%sf(j - 1, k, l)
+                        end do
+                    end do
+                end do
+            end if
+
+            ! Population of Buffers in y-direction
+            if (bc_y%beg == BC_PERIODIC) then
+                $:GPU_PARALLEL_LOOP(collapse=3)
+                do l = 0, p
+                    do k = -buff_size, m + buff_size
+                        do j = 1, buff_size
+                            ib_markers%sf(k, -j, l) = &
+                                ib_markers%sf(k, n - (j - 1), l)
+                        end do
+                    end do
+                end do
+            end if
+
+            if (bc_y%end == BC_PERIODIC) then
+                $:GPU_PARALLEL_LOOP(collapse=3)
+                do l = 0, p
+                    do k = -buff_size, m + buff_size
+                        do j = 1, buff_size
+                            ib_markers%sf(k, n + j, l) = &
+                                ib_markers%sf(k, j - 1, l)
+                        end do
+                    end do
+                end do
+            end if
+
+            ! Population of Buffers in z-direction
+            if (bc_z%beg == BC_PERIODIC) then
+                $:GPU_PARALLEL_LOOP(collapse=3)
+                do l = -buff_size, n + buff_size
+                    do k = -buff_size, m + buff_size
+                        do j = 1, buff_size
+                            ib_markers%sf(k, l, -j) = &
+                                ib_markers%sf(k, l, p - (j - 1))
+                        end do
+                    end do
+                end do
+            end if
+
+            if (bc_z%end == BC_PERIODIC) then
+                $:GPU_PARALLEL_LOOP(collapse=3)
+                do l = -buff_size, n + buff_size
+                    do k = -buff_size, m + buff_size
+                        do j = 1, buff_size
+                            ib_markers%sf(k, l, p + j) = &
+                                ib_markers%sf(k, l, j - 1)
+                        end do
+                    end do
+                end do
+            end if
+        end if
 
     end subroutine s_populate_ib_buffers
 

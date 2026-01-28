@@ -349,6 +349,7 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         ib = self.get('ib', 'F') == 'T'
         n = self.get('n', 0)
         num_ibs = self.get('num_ibs', 0)
+        periodic_ibs = self.get('periodic_ibs', 'F') == 'T'
 
         self.prohibit(ib and n <= 0,
                      "Immersed Boundaries do not work in 1D (requires n > 0)")
@@ -356,6 +357,17 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
                      "num_ibs must be between 1 and num_patches_max (10)")
         self.prohibit(not ib and num_ibs > 0,
                      "num_ibs is set, but ib is not enabled")
+        if periodic_ibs:
+            for direction in ['x', 'y', 'z']:
+                for end in ['beg', 'end']:
+                    bc_val = self.get(f'bc_{direction}%{end}')
+                    if bc_val is not None:
+                        self.prohibit(bc_val != -1,
+                                      "periodic_ibs requires periodicity in all directions (all BCs should be -1)")
+            for i in range(1, num_ibs+1):
+                ib_geometry = self.get(f'patch_ib({i})%geometry')
+                self.prohibit(periodic_ibs and ib_geometry != 8,
+                              "periodic_ibs requires all immersed boundaries to be spherical (geometry=8)")
 
     def check_stiffened_eos(self):
         """Checks constraints on stiffened equation of state fluids parameters"""

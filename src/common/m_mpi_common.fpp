@@ -45,6 +45,10 @@ module m_mpi_common
     integer(kind=8) :: halo_size
     $:GPU_DECLARE(create='[halo_size]')
 
+    real(wp), allocatable, dimension(:, :), public :: domain_glb
+    $:GPU_DECLARE(create='[domain_glb]')
+    !! This variable holds the physical locations of the global domain bounds
+
 contains
 
     !> The computation of parameters, the allocation of memory,
@@ -1886,6 +1890,36 @@ contains
 #endif
 
     end subroutine s_mpi_sendrecv_grid_variables_buffers
+#endif
+
+    !> The goal of this subroutine is to determine the physical global domain bounds
+#ifndef MFC_POST_PROCESS
+    impure subroutine s_mpi_global_domain_bounds
+        @:ALLOCATE(domain_glb(num_dims, 2))
+#ifdef MFC_MPI
+        call s_mpi_allreduce_min(x_domain%beg, domain_glb(1, 1))
+        call s_mpi_allreduce_max(x_domain%end, domain_glb(1, 2))
+        if (n > 0) then ! 2D
+            call s_mpi_allreduce_min(y_domain%beg, domain_glb(2, 1))
+            call s_mpi_allreduce_max(y_domain%end, domain_glb(2, 2))
+            if (p > 0) then ! 3D
+                call s_mpi_allreduce_min(z_domain%beg, domain_glb(3, 1))
+                call s_mpi_allreduce_max(z_domain%end, domain_glb(3, 2))
+            end if
+        end if
+#else
+        domain_glb(1, 1) = x_domain%beg
+        domain_glb(1, 2) = x_domain%end
+        if (n > 0) then ! 2D
+            domain_glb(2, 1) = y_domain%beg
+            domain_glb(2, 2) = y_domain%end
+            if (p > 0) then ! 3D
+                domain_glb(3, 1) = z_domain%beg
+                domain_glb(3, 2) = z_domain%end
+            end if
+        end if
+#endif
+    end subroutine s_mpi_global_domain_bounds
 #endif
 
     !> Module deallocation and/or disassociation procedures

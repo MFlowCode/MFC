@@ -119,7 +119,7 @@ contains
             lag_rad_wrt, lag_rvel_wrt, lag_r0_wrt, lag_rmax_wrt, &
             lag_rmin_wrt, lag_dphidt_wrt, lag_pres_wrt, lag_mv_wrt, &
             lag_mg_wrt, lag_betaT_wrt, lag_betaC_wrt, &
-            alpha_rho_e_wrt
+            alpha_rho_e_wrt, periodic_ibs
 
         ! Inquiring the status of the post_process.inp file
         file_loc = 'post_process.inp'
