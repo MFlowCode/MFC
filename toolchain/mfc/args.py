@@ -29,16 +29,17 @@ def _handle_enhanced_help(args_list):
         command = args_list[1]
         # Resolve alias
         command = COMMAND_ALIASES.get(command, command)
-        if print_command_help(command, show_argparse=False):
-            # Return True to indicate we should also show argparse help
-            return command
+        # Print enhanced help, then let argparse show its help too
+        print_command_help(command, show_argparse=True)
+        # Return command so argparse can show its help
+        return command
     return None
 
 
 # pylint: disable=too-many-locals, too-many-branches, too-many-statements
 def parse(config: MFCConfig):
     # Handle enhanced help before argparse
-    _handle_enhanced_help(sys.argv)
+    help_command = _handle_enhanced_help(sys.argv)
 
     parser = argparse.ArgumentParser(
         prog="./mfc.sh",
@@ -216,6 +217,17 @@ started, run ./mfc.sh build -h.""",
     init.add_argument("name", metavar="NAME", type=str, nargs="?", default=None, help="Name/path for the new case directory.")
     init.add_argument("-t", "--template", type=str, default="1D_minimal", help="Template to use (e.g., 1D_minimal, 2D_minimal, 3D_minimal, or example:<name>).")
     init.add_argument("-l", "--list", action="store_true", help="List available templates.")
+
+    # If enhanced help was printed, also show argparse help and exit
+    if help_command:
+        subparser_map = {
+            "build": build, "run": run, "test": test, "clean": clean,
+            "bench": bench, "count": count, "validate": validate, "init": init,
+            "packer": packer, "completion": comp
+        }
+        if help_command in subparser_map:
+            subparser_map[help_command].print_help()
+        sys.exit(0)
 
     try:
         extra_index = sys.argv.index('--')
