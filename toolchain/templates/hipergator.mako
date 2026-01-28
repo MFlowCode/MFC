@@ -48,10 +48,19 @@ echo
     % if not mpi:
         (set -x; ${profiler} "${target.get_install_binpath(case)}")
     % else:
+        % if gpu_enabled:
         (set -x; ${profiler}    \
-            /apps/compilers/nvhpc/25.9/Linux_x86_64/25.9/comm_libs/mpi/bin/mpirun -np ${nodes*tasks_per_node}            \
+            /apps/compilers/nvhpc/25.9/Linux_x86_64/25.9/comm_libs/mpi/bin/mpirun \
+                   -np ${nodes*tasks_per_node}            \
                    --bind-to none                         \
                    "${target.get_install_binpath(case)}")
+        % else:
+        (set -x; ${profiler}    \
+            mpirun              \
+                   -np ${nodes*tasks_per_node}            \
+                   --bind-to none                         \
+                   "${target.get_install_binpath(case)}")
+        % endif
     % endif
 
     ${helpers.run_epilogue(target)}
