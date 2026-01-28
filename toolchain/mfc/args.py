@@ -1,13 +1,20 @@
 import re, sys, os.path, argparse, dataclasses
 
-from .run.run      import get_baked_templates
-from .build        import TARGETS, DEFAULT_TARGETS
 from .common       import MFCException, format_list_to_string
-from .test.cases   import list_cases
 from .state        import gpuConfigOptions, MFCConfig
 from .user_guide   import (print_help, is_first_time_user, print_welcome,
                            print_command_help, print_topic_help, print_help_topics,
                            COMMAND_ALIASES, HELP_TOPICS)
+
+# Hardcoded values to avoid heavy imports at startup
+# These must be kept in sync with build.py and run/run.py
+_TARGET_NAMES = ['fftw', 'hdf5', 'silo', 'lapack', 'hipfort',
+                 'pre_process', 'simulation', 'post_process',
+                 'syscheck', 'documentation']
+_DEFAULT_TARGET_NAMES = ['pre_process', 'simulation', 'post_process']
+_TEMPLATE_NAMES = ['bridges2', 'carpenter', 'carpenter-cray', 'default',
+                   'delta', 'deltaai', 'frontier', 'hipergator', 'nautilus',
+                   'oscar', 'phoenix', 'phoenix-bench', 'santis', 'tuo']
 
 
 def _handle_enhanced_help(args_list):
@@ -104,9 +111,9 @@ started, run ./mfc.sh build -h.""",
             mask = ""
 
         if "t" not in mask:
-            p.add_argument("-t", "--targets", metavar="TARGET", nargs="+", type=str.lower, choices=[ _.name for _ in TARGETS ],
-                           default=[ _.name for _ in sorted(DEFAULT_TARGETS, key=lambda t: t.runOrder) ],
-                           help=f"Space separated list of targets to act upon. Allowed values are: {format_list_to_string([ _.name for _ in TARGETS ])}.")
+            p.add_argument("-t", "--targets", metavar="TARGET", nargs="+", type=str.lower, choices=_TARGET_NAMES,
+                           default=_DEFAULT_TARGET_NAMES,
+                           help=f"Space separated list of targets to act upon. Allowed values are: {format_list_to_string(_TARGET_NAMES)}.")
 
         if "m" not in mask:
             for f in dataclasses.fields(config):
@@ -177,7 +184,7 @@ started, run ./mfc.sh build -h.""",
     run.add_argument("--case-optimization",        action="store_true",                    default=False,      help="(GPU Optimization) Compile MFC targets with some case parameters hard-coded.")
     run.add_argument(      "--no-build",           action="store_true",                    default=False,      help="(Testing) Do not rebuild MFC.")
     run.add_argument("--wait",                     action="store_true",                    default=False,      help="(Batch) Wait for the job to finish.")
-    run.add_argument("-c", "--computer",           metavar="COMPUTER",           type=str, default="default",  help=f"(Batch) Path to a custom submission file template or one of {format_list_to_string(list(get_baked_templates().keys()))}.")
+    run.add_argument("-c", "--computer",           metavar="COMPUTER",           type=str, default="default",  help=f"(Batch) Path to a custom submission file template or one of {format_list_to_string(_TEMPLATE_NAMES)}.")
     run.add_argument("-o", "--output-summary",     metavar="OUTPUT",             type=str, default=None,       help="Output file (YAML) for summary.")
     run.add_argument("--clean",                    action="store_true",                    default=False,      help="Clean the case before running.")
     run.add_argument("--ncu",                      nargs=argparse.REMAINDER,     type=str,                     help="Profile with NVIDIA Nsight Compute.")
@@ -273,6 +280,7 @@ started, run ./mfc.sh build -h.""",
 
     # Resolve test case defaults (deferred to avoid slow startup for non-test commands)
     if args["command"] == "test":
+        from .test.cases import list_cases  # pylint: disable=import-outside-toplevel
         test_cases = list_cases()
         if args.get("from") is None:
             args["from"] = test_cases[0].get_uuid()
