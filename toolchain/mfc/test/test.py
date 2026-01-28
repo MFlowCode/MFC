@@ -164,7 +164,7 @@ def test():
 
     # Run cases with multiple threads (if available)
     cons.print()
-    cons.print("  Progress      [bold magenta]UUID[/bold magenta]          (s)      Summary")
+    cons.print("  Progress      Test Name                                        Time(s)   UUID")
     cons.print()
 
     # Select the correct number of threads to use to launch test cases
@@ -259,7 +259,9 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
     case.create_directory()
 
     if ARG("dry_run"):
-        cons.print(f"  [bold magenta]{case.get_uuid()}[/bold magenta]     SKIP     {case.trace}")
+        # Truncate long traces for readability
+        trace_display = case.trace if len(case.trace) <= 50 else case.trace[:47] + "..."
+        cons.print(f"  (dry-run)     {trace_display:50s}   SKIP    [magenta]{case.get_uuid()}[/magenta]")
         timeout_timer.cancel()
         return
 
@@ -335,7 +337,9 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
 
         current_test_number += 1
         progress_str = f"({current_test_number:3d}/{total_test_count:3d})"
-        cons.print(f"  {progress_str}    [bold magenta]{case.get_uuid()}[/bold magenta]    {duration:6.2f}    {case.trace}")
+        # Truncate long traces for readability, showing test name prominently
+        trace_display = case.trace if len(case.trace) <= 50 else case.trace[:47] + "..."
+        cons.print(f"  {progress_str}    {trace_display:50s}  {duration:6.2f}    [magenta]{case.get_uuid()}[/magenta]")
 
     except TestTimeoutError as exc:
         log_path = os.path.join(case.get_dirpath(), 'out_pre_sim.txt')
@@ -382,7 +386,33 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
             if nAttempts < max_attempts:
                 continue
             nFAIL += 1
-            cons.print(f"[bold red]Failed test {case} after {nAttempts} attempt(s).[/bold red]")
+
+            # Enhanced real-time failure feedback
+            trace_display = case.trace if len(case.trace) <= 50 else case.trace[:47] + "..."
+            cons.print()
+            cons.print(f"  [bold red]✗ FAILED:[/bold red] {trace_display}")
+            cons.print(f"    UUID: [magenta]{case.get_uuid()}[/magenta]")
+            cons.print(f"    Attempts: {nAttempts}")
+
+            # Show truncated error message
+            exc_str = str(exc)
+            if len(exc_str) > 300:
+                exc_str = exc_str[:297] + "..."
+            cons.print(f"    Error: {exc_str}")
+
+            # Provide helpful hints based on error type
+            exc_lower = str(exc).lower()
+            if "tolerance" in exc_lower or "golden" in exc_lower or "mismatch" in exc_lower:
+                cons.print(f"    [dim]Hint: Consider --generate to update golden files or check tolerances[/dim]")
+            elif "timeout" in exc_lower:
+                cons.print(f"    [dim]Hint: Test may be hanging - check case configuration[/dim]")
+            elif "nan" in exc_lower:
+                cons.print(f"    [dim]Hint: NaN detected - check numerical stability of the case[/dim]")
+            elif "failed to execute" in exc_lower:
+                cons.print(f"    [dim]Hint: Check build logs and case parameters[/dim]")
+            cons.print()
+
+            # Still collect for final summary
             errors.append(f"[bold red]Failed test {case} after {nAttempts} attempt(s).[/bold red]")
             errors.append(f"{exc}")
 

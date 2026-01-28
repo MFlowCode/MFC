@@ -29,6 +29,7 @@ started, run ./mfc.sh build -h.""",
     count      = parsers.add_parser(name="count",      help="Count LOC in MFC.",                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     count_diff = parsers.add_parser(name="count_diff", help="Count LOC in MFC.",                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     packer     = parsers.add_parser(name="packer",     help="Packer utility (pack/unpack/compare).",  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    validate   = parsers.add_parser(name="validate",   help="Validate a case file without running.",  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     # These parser arguments all call BASH scripts, and they only exist so that they show up in the help message
     parsers.add_parser(name="load",       help="Loads the MFC environment with source.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -72,6 +73,9 @@ started, run ./mfc.sh build -h.""",
 
         if "v" not in mask:
             p.add_argument("-v", "--verbose", action="store_true", help="Enables verbose compiler & linker output.")
+
+        if "d" not in mask:
+            p.add_argument("-d", "--debug-log", action="store_true", dest="debug_log", help="Enable debug logging for troubleshooting.")
 
         if "g" not in mask:
             p.add_argument("-g", "--gpus", nargs="+", type=int, default=None, help="(Optional GPU override) List of GPU #s to use (environment default if unspecified).")
@@ -145,6 +149,10 @@ started, run ./mfc.sh build -h.""",
     # COUNT
     add_common_arguments(count_diff, "g")
 
+    # VALIDATE
+    add_common_arguments(validate, "tjmgv")  # Only add debug-log flag
+    validate.add_argument("input", metavar="INPUT", type=str, help="Path to case file to validate.")
+
     try:
         extra_index = sys.argv.index('--')
     except ValueError:
@@ -155,7 +163,8 @@ started, run ./mfc.sh build -h.""",
 
     # Add default arguments of other subparsers
     for name, parser in [("run",    run),   ("test",   test), ("build", build),
-                         ("clean",  clean), ("count", count), ("count_diff", count_diff)]:
+                         ("clean",  clean), ("count", count), ("count_diff", count_diff),
+                         ("validate", validate)]:
         if args["command"] == name:
             continue
 

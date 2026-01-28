@@ -2,12 +2,12 @@
 
 import signal, getpass, platform, itertools
 
-from mfc         import args, lock, build, bench, state, count
+from mfc         import args, lock, build, bench, state, count, clean, validate
 from mfc.state   import ARG
 from mfc.run     import run
 from mfc.test    import test
 from mfc.packer  import packer
-from mfc.common  import MFC_LOGO, MFCException, quit, format_list_to_string, does_command_exist
+from mfc.common  import MFC_LOGO, MFCException, quit, format_list_to_string, does_command_exist, setup_debug_logging
 from mfc.printer import cons
 
 def __print_greeting():
@@ -49,8 +49,9 @@ def __checks():
 
 def __run():
     {"test":   test.test,     "run":        run.run,          "build":      build.build,
-     "bench":      bench.bench,      "count":      count.count,
-     "packer": packer.packer, "count_diff": count.count_diff, "bench_diff": bench.diff
+     "bench":      bench.bench,      "count":      count.count,      "clean":      clean.clean,
+     "packer": packer.packer, "count_diff": count.count_diff, "bench_diff": bench.diff,
+     "validate": validate.validate
     }[ARG("command")]()
 
 
@@ -58,6 +59,9 @@ if __name__ == "__main__":
     try:
         lock.init()
         state.gARG = args.parse(state.gCFG)
+
+        # Setup debug logging if requested
+        setup_debug_logging(ARG("debug_log"))
 
         lock.switch(state.MFCConfig.from_dict(state.gARG))
 

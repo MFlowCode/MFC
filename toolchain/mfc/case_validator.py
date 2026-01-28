@@ -1673,8 +1673,33 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
             return
 
         if self.errors:
-            error_msg = "Case parameter constraint violations:\n" + "\n".join(f"  • {err}" for err in self.errors)
+            error_msg = self._format_errors()
             raise CaseConstraintError(error_msg)
+
+    def _format_errors(self) -> str:
+        """Format errors with enhanced context and suggestions."""
+        lines = ["[bold red]Case parameter constraint violations:[/bold red]\n"]
+
+        for i, err in enumerate(self.errors, 1):
+            lines.append(f"  [bold]{i}.[/bold] {err}")
+
+            # Add helpful hints for common errors
+            err_lower = err.lower()
+            if "must be positive" in err_lower or "must be set" in err_lower:
+                lines.append(f"     [dim]Check that this required parameter is defined in your case file[/dim]")
+            elif "weno_order" in err_lower:
+                lines.append(f"     [dim]Valid values: 1, 3, 5, or 7[/dim]")
+            elif "riemann_solver" in err_lower:
+                lines.append(f"     [dim]Valid values: 1 (HLL), 2 (HLLC), 3 (Exact), etc.[/dim]")
+            elif "model_eqns" in err_lower:
+                lines.append(f"     [dim]Valid values: 1, 2 (5-eq), 3 (6-eq), or 4[/dim]")
+            elif "boundary" in err_lower or "bc_" in err_lower:
+                lines.append(f"     [dim]Common BC values: -1 (periodic), -2 (reflective), -3 (extrapolation)[/dim]")
+
+        lines.append("")
+        lines.append("[dim]Tip: Run './mfc.sh validate case.py' for detailed validation[/dim]")
+
+        return "\n".join(lines)
 
 
 def validate_case_constraints(params: Dict[str, Any], stage: str = 'simulation'):

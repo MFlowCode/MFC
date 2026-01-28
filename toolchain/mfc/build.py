@@ -1,12 +1,41 @@
-import os, typing, hashlib, dataclasses
+import os, typing, hashlib, dataclasses, subprocess
+
+from rich.panel import Panel
 
 from .case    import Case
 from .printer import cons
 from .common  import MFCException, system, delete_directory, create_directory, \
-                     format_list_to_string
+                     format_list_to_string, debug
 from .state   import ARG, CFG
 from .run     import input
 from .state   import gpuConfigOptions
+
+
+def _show_build_error(result: subprocess.CompletedProcess, stage: str, target_name: str):
+    """Display build error details from captured subprocess output."""
+    cons.print()
+    cons.print(f"[bold red]{stage} Failed - Error Details:[/bold red]")
+
+    # Show stdout if available (often contains the actual error for CMake)
+    if result.stdout:
+        stdout_text = result.stdout if isinstance(result.stdout, str) else result.stdout.decode('utf-8', errors='replace')
+        stdout_lines = stdout_text.strip().split('\n')
+        # Show last 40 lines to capture the relevant error
+        if len(stdout_lines) > 40:
+            stdout_lines = ['... (truncated) ...'] + stdout_lines[-40:]
+        if stdout_lines and stdout_lines != ['']:
+            cons.raw.print(Panel('\n'.join(stdout_lines), title="Output", border_style="yellow"))
+
+    # Show stderr if available
+    if result.stderr:
+        stderr_text = result.stderr if isinstance(result.stderr, str) else result.stderr.decode('utf-8', errors='replace')
+        stderr_lines = stderr_text.strip().split('\n')
+        if len(stderr_lines) > 40:
+            stderr_lines = ['... (truncated) ...'] + stderr_lines[-40:]
+        if stderr_lines and stderr_lines != ['']:
+            cons.raw.print(Panel('\n'.join(stderr_lines), title="Errors", border_style="red"))
+
+    cons.print()
 
 @dataclasses.dataclass
 class MFCTarget:
@@ -161,8 +190,20 @@ class MFCTarget:
 
         case.generate_fpp(self)
 
-        if system(command).returncode != 0:
+        debug(f"Configuring {self.name} in {build_dirpath}")
+        debug(f"CMake flags: {' '.join(flags)}")
+
+        # Show progress indicator during configuration
+        cons.print(f"  [bold blue]Configuring[/bold blue] [magenta]{self.name}[/magenta]...")
+
+        # Capture output to show detailed errors on failure
+        result = system(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, print_cmd=False)
+        if result.returncode != 0:
+            cons.print(f"  [bold red]✗[/bold red] Configuration failed for [magenta]{self.name}[/magenta]")
+            _show_build_error(result, "Configuration", self.name)
             raise MFCException(f"Failed to configure the [bold magenta]{self.name}[/bold magenta] target.")
+        else:
+            cons.print(f"  [bold green]✓[/bold green] Configured [magenta]{self.name}[/magenta]")
 
         cons.print(no_indent=True)
 
@@ -176,16 +217,37 @@ class MFCTarget:
         if ARG('verbose'):
             command.append("--verbose")
 
-        if system(command).returncode != 0:
+        debug(f"Building {self.name} with {ARG('jobs')} parallel jobs")
+        debug(f"Build command: {' '.join(str(c) for c in command)}")
+
+        # Show progress indicator during build (can take a long time)
+        cons.print(f"  [bold blue]Building[/bold blue] [magenta]{self.name}[/magenta]...")
+
+        # Capture output to show detailed errors on failure
+        result = system(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, print_cmd=False)
+        if result.returncode != 0:
+            cons.print(f"  [bold red]✗[/bold red] Build failed for [magenta]{self.name}[/magenta]")
+            _show_build_error(result, "Build", self.name)
             raise MFCException(f"Failed to build the [bold magenta]{self.name}[/bold magenta] target.")
+        else:
+            cons.print(f"  [bold green]✓[/bold green] Built [magenta]{self.name}[/magenta]")
 
         cons.print(no_indent=True)
 
     def install(self, case: input.MFCInputFile):
         command = ["cmake", "--install", self.get_staging_dirpath(case)]
 
-        if system(command).returncode != 0:
+        # Show progress indicator during install
+        cons.print(f"  [bold blue]Installing[/bold blue] [magenta]{self.name}[/magenta]...")
+
+        # Capture output to show detailed errors on failure
+        result = system(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, print_cmd=False)
+        if result.returncode != 0:
+            cons.print(f"  [bold red]✗[/bold red] Install failed for [magenta]{self.name}[/magenta]")
+            _show_build_error(result, "Install", self.name)
             raise MFCException(f"Failed to install the [bold magenta]{self.name}[/bold magenta] target.")
+        else:
+            cons.print(f"  [bold green]✓[/bold green] Installed [magenta]{self.name}[/magenta]")
 
         cons.print(no_indent=True)
 
