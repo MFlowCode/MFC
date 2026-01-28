@@ -23,6 +23,19 @@ fi
 
 # If the user wishes to run the "load" script
 if [ "$1" '==' 'load' ]; then
+    # Check if the script is being sourced (required for load to work)
+    if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+        echo ""
+        echo "mfc: ERROR > The 'load' command must be run with 'source' to set environment variables."
+        echo ""
+        echo "  Instead of:  ./mfc.sh load ..."
+        echo "  Please use:  source ./mfc.sh load ..."
+        echo "          or:  . ./mfc.sh load ..."
+        echo ""
+        echo "  Example:     source ./mfc.sh load -c p -m g"
+        echo ""
+        exit 1
+    fi
     shift; . "$(pwd)/toolchain/bootstrap/modules.sh" $@; return
 elif [ "$1" '==' "lint" ]; then
     . "$(pwd)/toolchain/bootstrap/python.sh"
