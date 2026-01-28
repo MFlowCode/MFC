@@ -25,7 +25,7 @@ if [ -d "$(pwd)/bootstrap" ] || [ -d "$(pwd)/dependencies" ] || [ -f "$(pwd)/bui
 fi
 
 # If the user wishes to run the "load" script
-if [ "$1" '==' 'load' ]; then
+if [ "$1" '==' 'load' ] && [ "$2" != "--help" ] && [ "$2" != "-h" ]; then
     # Check if the script is being sourced (required for load to work)
     if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
         echo ""
@@ -40,19 +40,19 @@ if [ "$1" '==' 'load' ]; then
         exit 1
     fi
     shift; . "$(pwd)/toolchain/bootstrap/modules.sh" $@; return
-elif [ "$1" '==' "lint" ]; then
+elif [ "$1" '==' "lint" ] && [ "$2" != "--help" ] && [ "$2" != "-h" ]; then
     . "$(pwd)/toolchain/bootstrap/python.sh"
 
     shift; . "$(pwd)/toolchain/bootstrap/lint.sh"    $@; exit 0
-elif [ "$1" '==' "format" ]; then
+elif [ "$1" '==' "format" ] && [ "$2" != "--help" ] && [ "$2" != "-h" ]; then
     . "$(pwd)/toolchain/bootstrap/python.sh"
 
     shift; . "$(pwd)/toolchain/bootstrap/format.sh"  $@; exit 0
 elif [ "$1" '==' "venv" ]; then
     shift; . "$(pwd)/toolchain/bootstrap/python.sh"  $@; return
-elif [ "$1" '==' "clean" ]; then
+elif [ "$1" '==' "clean" ] && [ "$2" != "--help" ] && [ "$2" != "-h" ]; then
     rm -rf "$(pwd)/build"; exit 0
-elif [ "$1" '==' "spelling" ]; then
+elif [ "$1" '==' "spelling" ] && [ "$2" != "--help" ] && [ "$2" != "-h" ]; then
     . "$(pwd)/toolchain/bootstrap/python.sh"
 
     shift; . "$(pwd)/toolchain/bootstrap/spelling.sh" $@; exit 0

@@ -140,6 +140,17 @@ COMMANDS = {
         ],
         "key_options": []
     },
+    "bench": {
+        "description": "Benchmark MFC (for CI)",
+        "alias": None,
+        "examples": [
+            ("./mfc.sh bench -o results.json", "Run benchmarks and save results"),
+        ],
+        "key_options": [
+            ("-o, --output FILE", "Output file for benchmark results (required)"),
+            ("-m, --mem SIZE", "Memory limit for benchmarks"),
+        ]
+    },
     "load": {
         "description": "Load MFC environment (use with source)",
         "alias": None,
@@ -152,6 +163,47 @@ COMMANDS = {
             ("-c CLUSTER", "Cluster: p(hoenix), f(rontier), a(ndes), s(ummit)"),
             ("-m MODE", "Mode: c(pu), g(pu)"),
         ]
+    },
+    "completion": {
+        "description": "Install shell tab-completion",
+        "alias": None,
+        "examples": [
+            ("./mfc.sh completion install", "Install tab completion for current shell"),
+            ("./mfc.sh completion install bash", "Install for bash specifically"),
+            ("./mfc.sh completion status", "Check completion installation status"),
+        ],
+        "key_options": [
+            ("install", "Install completion scripts"),
+            ("uninstall", "Remove completion scripts"),
+            ("status", "Check installation status"),
+        ]
+    },
+    "lint": {
+        "description": "Run linting on MFC's toolchain",
+        "alias": None,
+        "examples": [
+            ("./mfc.sh lint", "Run pylint on Python code"),
+        ],
+        "key_options": []
+    },
+    "format": {
+        "description": "Format all code in the repository",
+        "alias": None,
+        "examples": [
+            ("./mfc.sh format", "Format all code"),
+            ("./mfc.sh format -j 8", "Format with 8 parallel jobs"),
+        ],
+        "key_options": [
+            ("-j, --jobs N", "Number of parallel formatting jobs"),
+        ]
+    },
+    "spelling": {
+        "description": "Run spell checker on documentation",
+        "alias": None,
+        "examples": [
+            ("./mfc.sh spelling", "Check spelling in docs"),
+        ],
+        "key_options": []
     },
 }
 
