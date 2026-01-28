@@ -165,32 +165,71 @@ if ! cmp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/pyproject.toml" > /dev/
     fi
 
     # Progress bar configuration
-    TOTAL=70
+    # Two phases: Collecting (50%) and Installing (50%)
+    TOTAL_PKGS=70
     BAR_WIDTH=30
     LAST_MILESTONE=0
+    LAST_PHASE=""
     START_TIME=$SECONDS
 
     while kill -0 $PIP_PID 2>/dev/null; do
-        # Count packages from log
+        # Determine current phase and count from log
+        PHASE="resolving"
+        COUNT=0
+        BUILD_COUNT=0
+
         if [ -f "$PIP_LOG" ]; then
+            # Count packages being collected (dependency resolution)
             COUNT=$(grep -c "^Collecting" "$PIP_LOG" 2>/dev/null | tr -d '[:space:]')
             COUNT=${COUNT:-0}
             if ! [[ "$COUNT" =~ ^[0-9]+$ ]]; then
                 COUNT=0
             fi
-        else
-            COUNT=0
+
+            # Count wheels being built
+            BUILD_COUNT=$(grep -c "Building wheel" "$PIP_LOG" 2>/dev/null | tr -d '[:space:]')
+            BUILD_COUNT=${BUILD_COUNT:-0}
+            if ! [[ "$BUILD_COUNT" =~ ^[0-9]+$ ]]; then
+                BUILD_COUNT=0
+            fi
+
+            # Check if we're in the installing phase
+            if grep -q "Installing collected packages" "$PIP_LOG" 2>/dev/null; then
+                PHASE="installing"
+            elif [ "$BUILD_COUNT" -gt 0 ]; then
+                PHASE="building"
+            fi
         fi
 
         ELAPSED=$((SECONDS - START_TIME))
 
         if [ "$IS_TTY" = "1" ]; then
-            # Calculate progress
-            if [ "$COUNT" -gt "$TOTAL" ]; then
-                TOTAL=$COUNT
+            # Calculate progress based on phase
+            # Phase 1 (0-60%): Collecting dependencies
+            # Phase 2 (60-80%): Building wheels
+            # Phase 3 (80-100%): Installing
+
+            if [ "$COUNT" -gt "$TOTAL_PKGS" ]; then
+                TOTAL_PKGS=$COUNT
             fi
-            PERCENT=$((COUNT * 100 / TOTAL))
-            FILLED=$((COUNT * BAR_WIDTH / TOTAL))
+
+            if [ "$PHASE" = "installing" ]; then
+                PERCENT=90
+                STATUS="Installing..."
+            elif [ "$PHASE" = "building" ]; then
+                # During building, progress from 60-80%
+                PERCENT=$((60 + BUILD_COUNT * 2))
+                if [ "$PERCENT" -gt 80 ]; then
+                    PERCENT=80
+                fi
+                STATUS="Building ($BUILD_COUNT wheels)"
+            else
+                # During collecting, progress from 0-60%
+                PERCENT=$((COUNT * 60 / TOTAL_PKGS))
+                STATUS="$COUNT packages"
+            fi
+
+            FILLED=$((PERCENT * BAR_WIDTH / 100))
             EMPTY=$((BAR_WIDTH - FILLED))
 
             # Build the bar with Unicode blocks
@@ -208,13 +247,27 @@ if ! cmp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/pyproject.toml" > /dev/
             fi
 
             # Print progress bar
-            printf "\r  ${CYAN}│${BAR}│${COLOR_RESET} %3d%% (%d pkgs, %s)  " "$PERCENT" "$COUNT" "$TIME_STR"
+            printf "\r  ${CYAN}│${BAR}│${COLOR_RESET} %3d%% (%s, %s)  " "$PERCENT" "$STATUS" "$TIME_STR"
         else
-            # Non-interactive: print milestone updates
-            MILESTONE=$((COUNT / 20 * 20))
-            if [ "$MILESTONE" -gt "$LAST_MILESTONE" ] && [ "$MILESTONE" -gt 0 ]; then
-                LAST_MILESTONE=$MILESTONE
-                log "(venv) Progress: ~$COUNT packages..."
+            # Non-interactive: print milestone updates and phase changes
+            if [ "$PHASE" != "$LAST_PHASE" ]; then
+                case "$PHASE" in
+                    "building")
+                        log "(venv) Building wheels..."
+                        ;;
+                    "installing")
+                        log "(venv) Installing packages..."
+                        ;;
+                esac
+                LAST_PHASE="$PHASE"
+            fi
+
+            if [ "$PHASE" = "resolving" ]; then
+                MILESTONE=$((COUNT / 20 * 20))
+                if [ "$MILESTONE" -gt "$LAST_MILESTONE" ] && [ "$MILESTONE" -gt 0 ]; then
+                    LAST_MILESTONE=$MILESTONE
+                    log "(venv) Resolving: ~$COUNT packages..."
+                fi
             fi
         fi
 

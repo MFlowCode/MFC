@@ -10,6 +10,9 @@ fi
 # Load utility script
 . "$(pwd)/toolchain/util.sh"
 
+# Print startup message immediately for user feedback
+log "Starting..."
+
 # Handle upgrading from older MFC build systems
 if [ -d "$(pwd)/bootstrap" ] || [ -d "$(pwd)/dependencies" ] || [ -f "$(pwd)/build/mfc.lock.yaml" ]; then
     error "Please remove, if applicable, the following directories:"
