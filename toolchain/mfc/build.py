@@ -9,9 +9,10 @@ from .common  import MFCException, system, delete_directory, create_directory, \
 from .state   import ARG, CFG
 from .run     import input
 from .state   import gpuConfigOptions
+from .user_guide import Tips
 
 
-def _show_build_error(result: subprocess.CompletedProcess, stage: str, target_name: str):
+def _show_build_error(result: subprocess.CompletedProcess, stage: str):
     """Display build error details from captured subprocess output."""
     cons.print()
     cons.print(f"[bold red]{stage} Failed - Error Details:[/bold red]")
@@ -200,11 +201,11 @@ class MFCTarget:
         result = system(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, print_cmd=False)
         if result.returncode != 0:
             cons.print(f"  [bold red]✗[/bold red] Configuration failed for [magenta]{self.name}[/magenta]")
-            _show_build_error(result, "Configuration", self.name)
+            _show_build_error(result, "Configuration")
+            Tips.after_build_failure()
             raise MFCException(f"Failed to configure the [bold magenta]{self.name}[/bold magenta] target.")
-        else:
-            cons.print(f"  [bold green]✓[/bold green] Configured [magenta]{self.name}[/magenta]")
 
+        cons.print(f"  [bold green]✓[/bold green] Configured [magenta]{self.name}[/magenta]")
         cons.print(no_indent=True)
 
     def build(self, case: input.MFCInputFile):
@@ -227,11 +228,11 @@ class MFCTarget:
         result = system(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, print_cmd=False)
         if result.returncode != 0:
             cons.print(f"  [bold red]✗[/bold red] Build failed for [magenta]{self.name}[/magenta]")
-            _show_build_error(result, "Build", self.name)
+            _show_build_error(result, "Build")
+            Tips.after_build_failure()
             raise MFCException(f"Failed to build the [bold magenta]{self.name}[/bold magenta] target.")
-        else:
-            cons.print(f"  [bold green]✓[/bold green] Built [magenta]{self.name}[/magenta]")
 
+        cons.print(f"  [bold green]✓[/bold green] Built [magenta]{self.name}[/magenta]")
         cons.print(no_indent=True)
 
     def install(self, case: input.MFCInputFile):
@@ -244,11 +245,10 @@ class MFCTarget:
         result = system(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, print_cmd=False)
         if result.returncode != 0:
             cons.print(f"  [bold red]✗[/bold red] Install failed for [magenta]{self.name}[/magenta]")
-            _show_build_error(result, "Install", self.name)
+            _show_build_error(result, "Install")
             raise MFCException(f"Failed to install the [bold magenta]{self.name}[/bold magenta] target.")
-        else:
-            cons.print(f"  [bold green]✓[/bold green] Installed [magenta]{self.name}[/magenta]")
 
+        cons.print(f"  [bold green]✓[/bold green] Installed [magenta]{self.name}[/magenta]")
         cons.print(no_indent=True)
 
 #                         name             flags                       isDep  isDef  isReq  dependencies                        run order

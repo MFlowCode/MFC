@@ -5,6 +5,7 @@ from .build        import TARGETS, DEFAULT_TARGETS
 from .common       import MFCException, format_list_to_string
 from .test.cases   import list_cases
 from .state        import gpuConfigOptions, MFCConfig
+from .user_guide   import print_help, is_first_time_user, print_welcome
 
 # pylint: disable=too-many-locals, too-many-branches, too-many-statements
 def parse(config: MFCConfig):
@@ -31,6 +32,16 @@ started, run ./mfc.sh build -h.""",
     packer     = parsers.add_parser(name="packer",     help="Packer utility (pack/unpack/compare).",  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     validate   = parsers.add_parser(name="validate",   help="Validate a case file without running.",  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     init       = parsers.add_parser(name="init",       help="Create a new case from a template.",     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parsers.add_parser(name="interactive", help="Launch interactive menu-driven interface.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    comp       = parsers.add_parser(name="completion",  help="Install shell tab-completion.",            formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+    # Completion subcommands
+    comp.add_argument("completion_action", metavar="ACTION", type=str, nargs="?", default=None,
+                      choices=["install", "uninstall", "status"],
+                      help="Action: install, uninstall, or status")
+    comp.add_argument("completion_shell", metavar="SHELL", type=str, nargs="?", default=None,
+                      choices=["bash", "zsh"],
+                      help="Shell type: bash or zsh (auto-detected if not specified)")
 
     # These parser arguments all call BASH scripts, and they only exist so that they show up in the help message
     parsers.add_parser(name="load",       help="Loads the MFC environment with source.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -182,8 +193,12 @@ started, run ./mfc.sh build -h.""",
                 args[key] = args.get(key, val)
 
     if args["command"] is None:
-        parser.print_help()
-        exit(-1)
+        # Show welcome for first-time users, otherwise show enhanced help
+        if is_first_time_user():
+            print_welcome()
+        else:
+            print_help()
+        exit(0)
 
     # "Slugify" the name of the job (only for batch jobs, not for init command)
     if args.get("name") is not None and isinstance(args["name"], str) and args["command"] != "init":
