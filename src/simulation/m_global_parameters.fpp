@@ -408,7 +408,7 @@ module m_global_parameters
     !! the maximum allowable number of patches, num_patches_max, may be changed
     !! in the module m_derived_types.f90.
 
-    $:GPU_DECLARE(create='[ib,num_ibs,patch_ib]')
+    $:GPU_DECLARE(create='[ib,num_ibs,patch_ib,periodic_ibs]')
     !> @}
 
     !> @name Bubble modeling

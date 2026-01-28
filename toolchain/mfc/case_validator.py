@@ -366,8 +366,8 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
                                       "periodic_ibs requires periodicity in all directions (all BCs should be -1)")
             for i in range(1, num_ibs+1):
                 ib_geometry = self.get(f'patch_ib({i})%geometry')
-                self.prohibit(periodic_ibs and ib_geometry != 8,
-                              "periodic_ibs requires all immersed boundaries to be spherical (geometry=8)")
+                self.prohibit(ib_geometry not in [2, 8],
+                              "periodic_ibs requires all immersed boundaries to be circles (2D) or spheres (3D)")
 
     def check_stiffened_eos(self):
         """Checks constraints on stiffened equation of state fluids parameters"""

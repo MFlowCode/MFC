@@ -143,17 +143,18 @@ contains
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: ib_markers_sf
 
-        real(wp), dimension(1:2) :: center
-        real(wp) :: radius
+        real(wp), dimension(2, 2) :: center
+        real(wp) :: radius, r2
 
-        integer :: i, j, k !< Generic loop iterators
+        integer :: i, j, k, ix, iy !< Generic loop iterators
 
         ! Transferring the circular patch's radius, centroid, smearing patch
         ! identity and smearing coefficient information
 
-        center(1) = patch_ib(patch_id)%x_centroid
-        center(2) = patch_ib(patch_id)%y_centroid
+        center(1, 1) = patch_ib(patch_id)%x_centroid
+        center(2, 1) = patch_ib(patch_id)%y_centroid
         radius = patch_ib(patch_id)%radius
+        r2 = radius**2
 
         ! Initializing the pseudo volume fraction value to 1. The value will
         ! be modified as the patch is laid out on the grid, but only in the
@@ -165,18 +166,51 @@ contains
         ! that cell. If both queries check out, the primitive variables of
         ! the current patch are assigned to this cell.
 
-        $:GPU_PARALLEL_LOOP(private='[i,j]', copy='[ib_markers_sf]',&
-                  & copyin='[patch_id,center,radius]', collapse=2)
-        do j = 0, n
-            do i = 0, m
-                if ((x_cc(i) - center(1))**2 &
-                    + (y_cc(j) - center(2))**2 <= radius**2) &
-                    then
-                    ib_markers_sf(i, j, 0) = patch_id
-                end if
+        if (periodic_ibs) then ! periodically wrap spheres around domain
+            if ((center(1, 1) - domain_glb(1, 1)) <= radius) then
+                center(1, 2) = domain_glb(1, 2) + (center(1, 1) - domain_glb(1, 1))
+            else if ((domain_glb(1, 2) - center(1, 1)) <= radius) then
+                center(1, 2) = domain_glb(1, 1) - (domain_glb(1, 2) - center(1, 1))
+            else
+                center(1, 2) = center(1, 1)
+            end if
+            if ((center(2, 1) - domain_glb(2, 1)) <= radius) then
+                center(2, 2) = domain_glb(2, 2) + (center(2, 1) - domain_glb(2, 1))
+            else if ((domain_glb(2, 2) - center(2, 1)) <= radius) then
+                center(2, 2) = domain_glb(2, 1) - (domain_glb(2, 2) - center(2, 1))
+            else
+                center(2, 2) = center(2, 1)
+            end if
+
+            $:GPU_PARALLEL_LOOP(private='[i,j,ix,iy]', copy='[ib_markers_sf]',&
+                      & copyin='[patch_id,center,r2]', collapse=2)
+            do j = 0, n 
+                do i = 0, m
+                    do ix = 1, 2 
+                        do iy = 1, 2
+                            if ((x_cc(i) - center(1, ix))**2 &
+                              + (y_cc(j) - center(2, iy))**2 <= r2) then
+                                ib_markers_sf(i, j, 0) = patch_id
+                            end if
+                        end do 
+                    end do
+                end do 
             end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
+            $:END_GPU_PARALLEL_LOOP()
+        else
+            $:GPU_PARALLEL_LOOP(private='[i,j]', copy='[ib_markers_sf]',&
+                      & copyin='[patch_id,center,r2]', collapse=2)
+            do j = 0, n
+                do i = 0, m
+                    if ((x_cc(i) - center(1, 1))**2 &
+                      + (y_cc(j) - center(2, 1))**2 <= r2) &
+                        then
+                        ib_markers_sf(i, j, 0) = patch_id
+                    end if
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if 
 
     end subroutine s_ib_circle
 
@@ -577,7 +611,6 @@ contains
         center(2, 1) = patch_ib(patch_id)%y_centroid
         center(3, 1) = patch_ib(patch_id)%z_centroid
         radius = patch_ib(patch_id)%radius
-
         r2 = radius**2
 
         ! Initializing the pseudo volume fraction value to 1. The value will
@@ -613,7 +646,8 @@ contains
                 center(3, 2) = center(3, 1)
             end if
 
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[ix, iy, iz]', copy='[ib_markers_sf]', copyin='[patch_id, center, r2]')
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[i,j,k,ix,iy,iz]', copy='[ib_markers_sf]', &
+                              & copyin='[patch_id,center,r2]')
             do k = 0, p
                 do j = 0, n
                     do i = 0, m
