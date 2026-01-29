@@ -82,9 +82,9 @@ module m_bubbles_EL
     integer, parameter :: LAG_STATS_ID = 12 ! File id for stats_lag_bubbles_*.dat
     integer, parameter :: LAG_VOID_ID = 13 ! File id for voidfraction.dat
 
-    integer, allocatable, dimension(:) :: keep_bubble, prefix_sum
+    integer, allocatable, dimension(:) :: keep_bubble
     integer, allocatable, dimension(:, :) :: wrap_bubble_loc, wrap_bubble_dir
-    $:GPU_DECLARE(create='[keep_bubble, prefix_sum]')
+    $:GPU_DECLARE(create='[keep_bubble]')
     $:GPU_DECLARE(create='[wrap_bubble_loc, wrap_bubble_dir]')
 
 contains
@@ -166,7 +166,7 @@ contains
         @:ALLOCATE(mtn_dposdt(1:nBubs_glb, 1:3, 1:lag_num_ts))
         @:ALLOCATE(mtn_dveldt(1:nBubs_glb, 1:3, 1:lag_num_ts))
 
-        @:ALLOCATE(keep_bubble(1:nBubs_glb), prefix_sum(1:nBubs_glb))
+        @:ALLOCATE(keep_bubble(1:nBubs_glb))
         @:ALLOCATE(wrap_bubble_loc(1:nBubs_glb, 1:num_dims), wrap_bubble_dir(1:nBubs_glb, 1:num_dims))
 
         if (adap_dt .and. f_is_default(adap_dt_tol)) adap_dt_tol = dflt_adap_dt_tol
@@ -769,93 +769,89 @@ contains
 
         integer :: i, j, k, l
 
-        if (lag_params%solver_approach == 2) then
+        ! (q / (1 - beta)) * d(beta)/dt source
+        if (p == 0) then
+            $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
+            do k = idwint(3)%beg, idwint(3)%end
+                do j = idwint(2)%beg, idwint(2)%end
+                    do i = idwint(1)%beg, idwint(1)%end
+                        do l = 1, E_idx
+                            if (q_beta(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
+                                rhs_vf(l)%sf(i, j, k) = rhs_vf(l)%sf(i, j, k) + &
+                                                        q_cons_vf(l)%sf(i, j, k)*(q_beta(2)%sf(i, j, k) + &
+                                                                                  q_beta(5)%sf(i, j, k))
+                            end if
+                        end do
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        else
+            $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
+            do k = idwint(3)%beg, idwint(3)%end
+                do j = idwint(2)%beg, idwint(2)%end
+                    do i = idwint(1)%beg, idwint(1)%end
+                        do l = 1, E_idx
+                            if (q_beta(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
+                                rhs_vf(l)%sf(i, j, k) = rhs_vf(l)%sf(i, j, k) + &
+                                                        q_cons_vf(l)%sf(i, j, k)/q_beta(1)%sf(i, j, k)* &
+                                                        q_beta(2)%sf(i, j, k)
+                            end if
+                        end do
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+
+        do l = 1, num_dims
+
+            call s_gradient_dir(q_prim_vf(E_idx)%sf, q_beta(3)%sf, l)
 
             ! (q / (1 - beta)) * d(beta)/dt source
-            if (p == 0) then
-                $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
-                do k = idwint(3)%beg, idwint(3)%end
-                    do j = idwint(2)%beg, idwint(2)%end
-                        do i = idwint(1)%beg, idwint(1)%end
-                            do l = 1, E_idx
-                                if (q_beta(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
-                                    rhs_vf(l)%sf(i, j, k) = rhs_vf(l)%sf(i, j, k) + &
-                                                            q_cons_vf(l)%sf(i, j, k)*(q_beta(2)%sf(i, j, k) + &
-                                                                                      q_beta(5)%sf(i, j, k))
-                                end if
-                            end do
-                        end do
+            $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3)
+            do k = idwint(3)%beg, idwint(3)%end
+                do j = idwint(2)%beg, idwint(2)%end
+                    do i = idwint(1)%beg, idwint(1)%end
+                        if (q_beta(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
+                            rhs_vf(contxe + l)%sf(i, j, k) = rhs_vf(contxe + l)%sf(i, j, k) - &
+                                                             (1._wp - q_beta(1)%sf(i, j, k))/ &
+                                                             q_beta(1)%sf(i, j, k) * &
+                                                             q_beta(3)%sf(i, j, k)
+                        end if
                     end do
                 end do
-                $:END_GPU_PARALLEL_LOOP()
-            else
-                $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
-                do k = idwint(3)%beg, idwint(3)%end
-                    do j = idwint(2)%beg, idwint(2)%end
-                        do i = idwint(1)%beg, idwint(1)%end
-                            do l = 1, E_idx
-                                if (q_beta(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
-                                    rhs_vf(l)%sf(i, j, k) = rhs_vf(l)%sf(i, j, k) + &
-                                                            q_cons_vf(l)%sf(i, j, k)/q_beta(1)%sf(i, j, k)* &
-                                                            q_beta(2)%sf(i, j, k)
-                                end if
-                            end do
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            end if
-
-            do l = 1, num_dims
-
-                call s_gradient_dir(q_prim_vf(E_idx)%sf, q_beta(3)%sf, l)
-
-                ! (q / (1 - beta)) * d(beta)/dt source
-                $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3)
-                do k = idwint(3)%beg, idwint(3)%end
-                    do j = idwint(2)%beg, idwint(2)%end
-                        do i = idwint(1)%beg, idwint(1)%end
-                            if (q_beta(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
-                                rhs_vf(contxe + l)%sf(i, j, k) = rhs_vf(contxe + l)%sf(i, j, k) - &
-                                                                 (1._wp - q_beta(1)%sf(i, j, k))/ &
-                                                                 q_beta(1)%sf(i, j, k) * &
-                                                                 q_beta(3)%sf(i, j, k)
-                            end if
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-
-                !source in energy
-                $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3)
-                do k = idwbuff(3)%beg, idwbuff(3)%end
-                    do j = idwbuff(2)%beg, idwbuff(2)%end
-                        do i = idwbuff(1)%beg, idwbuff(1)%end
-                            q_beta(3)%sf(i, j, k) = q_prim_vf(E_idx)%sf(i, j, k)*q_prim_vf(contxe + l)%sf(i, j, k)
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-
-                call s_gradient_dir(q_beta(3)%sf, q_beta(4)%sf, l)
-
-                ! (beta / (1 - beta)) * d(Pu)/dl source
-                $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3)
-                do k = idwint(3)%beg, idwint(3)%end
-                    do j = idwint(2)%beg, idwint(2)%end
-                        do i = idwint(1)%beg, idwint(1)%end
-                            if (q_beta(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
-                                rhs_vf(E_idx)%sf(i, j, k) = rhs_vf(E_idx)%sf(i, j, k) - &
-                                                            q_beta(4)%sf(i, j, k)*(1._wp - q_beta(1)%sf(i, j, k))/ &
-                                                            q_beta(1)%sf(i, j, k)
-                            end if
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
             end do
+            $:END_GPU_PARALLEL_LOOP()
 
-        end if
+            !source in energy
+            $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3)
+            do k = idwbuff(3)%beg, idwbuff(3)%end
+                do j = idwbuff(2)%beg, idwbuff(2)%end
+                    do i = idwbuff(1)%beg, idwbuff(1)%end
+                        q_beta(3)%sf(i, j, k) = q_prim_vf(E_idx)%sf(i, j, k)*q_prim_vf(contxe + l)%sf(i, j, k)
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+
+            call s_gradient_dir(q_beta(3)%sf, q_beta(4)%sf, l)
+
+            ! (beta / (1 - beta)) * d(Pu)/dl source
+            $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3)
+            do k = idwint(3)%beg, idwint(3)%end
+                do j = idwint(2)%beg, idwint(2)%end
+                    do i = idwint(1)%beg, idwint(1)%end
+                        if (q_beta(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
+                            rhs_vf(E_idx)%sf(i, j, k) = rhs_vf(E_idx)%sf(i, j, k) - &
+                                                        q_beta(4)%sf(i, j, k)*(1._wp - q_beta(1)%sf(i, j, k))/ &
+                                                        q_beta(1)%sf(i, j, k)
+                        end if
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end do
 
     end subroutine s_compute_bubbles_EL_source
 
@@ -932,7 +928,7 @@ contains
             #:for DIRC, DIRI in [('x', 1), ('y', 2), ('z', 3)]
                 #:for LOCC, LOCI in [('beg', -1), ('end', 1)]
                     if (bc_${DIRC}$%${LOCC}$ >= 0) then
-                        call s_mpi_sendrecv_variables_buffers(q_beta, ${DIRI}$, ${LOCI}$, 3)
+                        call s_mpi_sendrecv_variables_buffers(q_beta, ${DIRI}$, ${LOCI}$, 2)
                     end if
                 #:endfor
             #:endfor
@@ -1417,10 +1413,8 @@ contains
                 wrap_bubble_dir(k, 2) = 1
                 wrap_bubble_loc(k, 2) = 1
             elseif (mtn_pos(k, 2, 2) >= y_cb(n + mapcells + 1)) then
-                print*, "deleting yend", proc_rank, mtn_pos(k, 2, 2)
                 keep_bubble(k) = 0
             elseif (mtn_pos(k, 2, 2) < y_cb(-mapcells - 2)) then
-                print*, "deleting ybeg", proc_rank, mtn_pos(k, 2, 2)
                 keep_bubble(k) = 0
             end if
 
@@ -1488,26 +1482,19 @@ contains
         call nvtxEndRange
 
         if (n_el_bubs_loc > 0) then
-            ! Handle deletion of bubbles leaving local domain
-            do k = 1, n_el_bubs_loc
-                if (k == 1) then
-                    prefix_sum(k) = keep_bubble(k)
-                else
-                    prefix_sum(k) = prefix_sum(k - 1) + keep_bubble(k)
-                end if
-            end do
 
+            newBubs = 0
             do k = 1, n_el_bubs_loc
                 if (keep_bubble(k) == 1) then
-                    if (prefix_sum(k) /= k) then
-                        call s_copy_lag_bubble(prefix_sum(k), k)
-                        wrap_bubble_dir(prefix_sum(k), :) = wrap_bubble_dir(k, :)
-                        wrap_bubble_loc(prefix_sum(k), :) = wrap_bubble_loc(k, :)
+                    newBubs = newBubs + 1
+                    if (newBubs /= k) then
+                        call s_copy_lag_bubble(newBubs, k)
+                        wrap_bubble_dir(newBubs,:) = wrap_bubble_dir(k,:)
+                        wrap_bubble_loc(newBubs,:) = wrap_bubble_loc(k,:)
                     end if
                 end if
             end do
-
-            n_el_bubs_loc = prefix_sum(n_el_bubs_loc)
+            n_el_bubs_loc = newBubs
 
             ! Handle periodic wrapping of bubbles on same processor
             newBubs = 0

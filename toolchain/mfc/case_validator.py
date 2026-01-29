@@ -960,8 +960,6 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         qbmm = self.get('qbmm', 'F') == 'T'
         adv_n = self.get('adv_n', 'F') == 'T'
 
-        self.prohibit(time_stepper is not None and time_stepper != 3,
-                     "adap_dt requires Runge-Kutta 3 (time_stepper = 3)")
         self.prohibit(model_eqns == 1,
                      "adap_dt is not supported for model_eqns = 1")
         self.prohibit(qbmm,
