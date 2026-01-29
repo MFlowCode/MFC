@@ -109,14 +109,14 @@ COMMANDS = {
             ("-d, --debug-log", "Enable debug logging"),
         ]
     },
-    "init": {
+    "new": {
         "description": "Create a new case from a template",
         "alias": None,
         "examples": [
-            ("./mfc.sh init my_case", "Create with 1D_minimal template"),
-            ("./mfc.sh init my_case -t 2D_minimal", "Create with 2D template"),
-            ("./mfc.sh init my_case -t example:3D_sphbubcollapse", "Copy from example"),
-            ("./mfc.sh init --list", "List available templates"),
+            ("./mfc.sh new my_case", "Create with 1D_minimal template"),
+            ("./mfc.sh new my_case -t 2D_minimal", "Create with 2D template"),
+            ("./mfc.sh new my_case -t example:3D_sphbubcollapse", "Copy from example"),
+            ("./mfc.sh new --list", "List available templates"),
         ],
         "key_options": [
             ("-t, --template NAME", "Template: 1D_minimal, 2D_minimal, 3D_minimal"),
@@ -424,7 +424,7 @@ def print_help():
     table.add_column("Description", style="white")
 
     # Primary commands with aliases
-    for cmd in ["build", "run", "test", "validate", "init", "clean"]:
+    for cmd in ["build", "run", "test", "validate", "new", "clean"]:
         alias = COMMANDS[cmd].get("alias", "")
         alias_str = alias if alias else ""
         table.add_row(cmd, alias_str, COMMANDS[cmd]["description"])
@@ -444,7 +444,7 @@ def print_help():
     # Quick start
     cons.raw.print(Panel(
         "[bold]Quick Start[/bold]\n\n"
-        "  [green]1.[/green] [cyan]./mfc.sh init my_case[/cyan]           Create a new case\n"
+        "  [green]1.[/green] [cyan]./mfc.sh new my_case[/cyan]            Create a new case\n"
         "  [green]2.[/green] [cyan]vim my_case/case.py[/cyan]             Edit parameters\n"
         "  [green]3.[/green] [cyan]./mfc.sh validate my_case/case.py[/cyan]  Check for errors\n"
         "  [green]4.[/green] [cyan]./mfc.sh build -j $(nproc)[/cyan]      Build MFC\n"
@@ -597,7 +597,7 @@ def print_welcome():
         "     [cyan]source ./mfc.sh load -c <cluster> -m <mode>[/cyan]\n"
         "     Example: [dim]source ./mfc.sh load -c p -m g[/dim] (Phoenix, GPU)\n\n"
         "  [green]2.[/green] [bold]Create a new case[/bold]:\n"
-        "     [cyan]./mfc.sh init my_first_case[/cyan]\n\n"
+        "     [cyan]./mfc.sh new my_first_case[/cyan]\n\n"
         "  [green]3.[/green] [bold]Build MFC[/bold]:\n"
         "     [cyan]./mfc.sh build -j $(nproc)[/cyan]\n\n"
         "  [green]4.[/green] [bold]Run your simulation[/bold]:\n"
@@ -632,7 +632,7 @@ def interactive_mode():
 
         # Menu options
         options = [
-            ("1", "Create a new case", "init"),
+            ("1", "Create a new case", "new"),
             ("2", "Validate a case file", "validate"),
             ("3", "Build MFC", "build"),
             ("4", "Run a simulation", "run"),
@@ -668,7 +668,7 @@ def interactive_mode():
 
         # Dispatch to handler
         handlers = {
-            "init": _interactive_init,
+            "new": _interactive_new,
             "validate": _interactive_validate,
             "build": _interactive_build,
             "run": _interactive_run,
@@ -679,7 +679,7 @@ def interactive_mode():
             handlers[cmd]()
 
 
-def _interactive_init():
+def _interactive_new():
     """Interactive case creation."""
     cons.print("[bold]Create a New Case[/bold]")
     cons.print()
@@ -692,7 +692,7 @@ def _interactive_init():
     name = Prompt.ask("Case name", default="my_case")
     template = Prompt.ask("Template", default="1D_minimal")
 
-    cmd = f"./mfc.sh init {name} -t {template}"
+    cmd = f"./mfc.sh new {name} -t {template}"
     cons.print()
     cons.print(f"[dim]Running: {cmd}[/dim]")
     cons.print()

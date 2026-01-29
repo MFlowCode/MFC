@@ -420,9 +420,9 @@ def list_templates():
 
     cons.print()
     cons.print("  [bold]Usage:[/bold]")
-    cons.print("    ./mfc.sh init my_case                        # Use default 1D template")
-    cons.print("    ./mfc.sh init my_case --template 2D_minimal  # Use 2D template")
-    cons.print("    ./mfc.sh init my_case --template example:1D_sodshocktube  # Copy from example")
+    cons.print("    ./mfc.sh new my_case                        # Use default 1D template")
+    cons.print("    ./mfc.sh new my_case --template 2D_minimal  # Use 2D template")
+    cons.print("    ./mfc.sh new my_case --template example:1D_sodshocktube  # Copy from example")
     cons.print()
 
 
@@ -477,7 +477,7 @@ def create_case(name: str, template: str):
             f"Unknown template: {template}\n"
             f"Available built-in templates: {available}\n"
             f"Or use 'example:<name>' to copy from examples.\n"
-            f"Run './mfc.sh init --list' to see all available templates."
+            f"Run './mfc.sh new --list' to see all available templates."
         )
 
 
@@ -493,8 +493,8 @@ def init():
     if not name:
         raise MFCException(
             "Please specify a case name.\n"
-            "Usage: ./mfc.sh init <name> [--template <template>]\n"
-            "       ./mfc.sh init --list"
+            "Usage: ./mfc.sh new <name> [--template <template>]\n"
+            "       ./mfc.sh new --list"
         )
 
     create_case(name, template)

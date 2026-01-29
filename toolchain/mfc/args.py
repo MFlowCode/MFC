@@ -66,7 +66,7 @@ started, run ./mfc.sh build -h.""",
     count_diff = parsers.add_parser(name="count_diff", help="Count LOC in MFC.",                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     packer     = parsers.add_parser(name="packer",     help="Packer utility (pack/unpack/compare).",  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     validate   = parsers.add_parser(name="validate",   aliases=["v"], help="Validate a case file without running.",  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    init       = parsers.add_parser(name="init",       help="Create a new case from a template.",     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    new        = parsers.add_parser(name="new",        help="Create a new case from a template.",     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parsers.add_parser(name="interactive", help="Launch interactive menu-driven interface.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     comp       = parsers.add_parser(name="completion",  help="Install shell tab-completion.",            formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
@@ -207,16 +207,16 @@ started, run ./mfc.sh build -h.""",
     add_common_arguments(validate, "tjmgv")  # Only add debug-log flag
     validate.add_argument("input", metavar="INPUT", type=str, help="Path to case file to validate.")
 
-    # INIT
-    init.add_argument("name", metavar="NAME", type=str, nargs="?", default=None, help="Name/path for the new case directory.")
-    init.add_argument("-t", "--template", type=str, default="1D_minimal", help="Template to use (e.g., 1D_minimal, 2D_minimal, 3D_minimal, or example:<name>).")
-    init.add_argument("-l", "--list", action="store_true", help="List available templates.")
+    # NEW (create new case from template)
+    new.add_argument("name", metavar="NAME", type=str, nargs="?", default=None, help="Name/path for the new case directory.")
+    new.add_argument("-t", "--template", type=str, default="1D_minimal", help="Template to use (e.g., 1D_minimal, 2D_minimal, 3D_minimal, or example:<name>).")
+    new.add_argument("-l", "--list", action="store_true", help="List available templates.")
 
     # If enhanced help was printed, also show argparse help and exit
     if help_command:
         subparser_map = {
             "build": build, "run": run, "test": test, "clean": clean,
-            "bench": bench, "count": count, "validate": validate, "init": init,
+            "bench": bench, "count": count, "validate": validate, "new": new,
             "packer": packer, "completion": comp
         }
         if help_command in subparser_map:
@@ -271,8 +271,8 @@ started, run ./mfc.sh build -h.""",
             print_help()
         sys.exit(0)
 
-    # "Slugify" the name of the job (only for batch jobs, not for init command)
-    if args.get("name") is not None and isinstance(args["name"], str) and args["command"] != "init":
+    # "Slugify" the name of the job (only for batch jobs, not for new command)
+    if args.get("name") is not None and isinstance(args["name"], str) and args["command"] != "new":
         args["name"] = re.sub(r'[\W_]+', '-', args["name"])
 
     # We need to check for some invalid combinations of arguments because of

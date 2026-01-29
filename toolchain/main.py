@@ -79,7 +79,7 @@ def __run():
     elif cmd == "validate":
         from mfc import validate  # pylint: disable=import-outside-toplevel
         validate.validate()
-    elif cmd == "init":
+    elif cmd == "new":
         from mfc import init  # pylint: disable=import-outside-toplevel
         init.init()
     elif cmd == "interactive":
