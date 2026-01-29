@@ -441,9 +441,9 @@ function(MFC_SETUP_TARGET)
 
     foreach (a_target ${IPO_TARGETS})
         set_target_properties(${a_target} PROPERTIES Fortran_PREPROCESS ON)
-	   message(STATUS ${CMAKE_Fortran_COMPILER_ID})
+	    message(STATUS ${CMAKE_Fortran_COMPILER_ID})
 
-       target_include_directories(${a_target} PRIVATE
+        target_include_directories(${a_target} PRIVATE
             "${CMAKE_SOURCE_DIR}/src/common"
             "${CMAKE_SOURCE_DIR}/src/common/include"
             "${CMAKE_SOURCE_DIR}/src/${ARGS_TARGET}")
@@ -603,8 +603,8 @@ function(MFC_SETUP_TARGET)
                         PRIVATE -DFRONTIER_UNIFIED)
                 endif()
 
-		find_package(hipfort COMPONENTS hip CONFIG REQUIRED)
-		target_link_libraries(${a_target} PRIVATE hipfort::hip hipfort::hipfort-amdgcn flang_rt.hostdevice)
+                find_package(hipfort COMPONENTS hip CONFIG REQUIRED)
+                target_link_libraries(${a_target} PRIVATE hipfort::hip hipfort::hipfort-amdgcn flang_rt.hostdevice)
             endif()
         elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
             target_compile_options(${a_target} PRIVATE "SHELL:-h noacc" "SHELL:-x acc")
