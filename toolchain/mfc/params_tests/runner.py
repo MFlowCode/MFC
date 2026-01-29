@@ -221,7 +221,8 @@ def main():
     )
     parser.add_argument(
         "command",
-        choices=["build", "verify", "summary", "inventory", "coverage"],
+        choices=["build", "verify", "summary", "inventory", "coverage",
+                 "negative", "mutation"],
         help="Command to run"
     )
     parser.add_argument(
@@ -244,6 +245,12 @@ def main():
         print_inventory_summary()
     elif args.command == "coverage":
         print_coverage_report()
+    elif args.command == "negative":
+        from .negative_tests import print_test_report
+        print_test_report()
+    elif args.command == "mutation":
+        from .mutation_tests import print_mutation_report
+        print_mutation_report()
 
 
 if __name__ == "__main__":
