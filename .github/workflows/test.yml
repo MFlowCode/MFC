@@ -138,6 +138,11 @@ jobs:
             cluster_name: 'Oak Ridge | Frontier (AMD)'
             device: 'gpu'
             interface: 'omp'
+          - lbl: 'frontier'
+            lbl_comp: 'frontier_amd'
+            cluster_name: 'Oak Ridge | Frontier (AMD)'
+            device: 'cpu'
+            interface: 'none'
     runs-on:
       group:  phoenix
       labels: ${{ matrix.lbl }}

@@ -651,7 +651,7 @@ contains
         real(wp) :: dqv_dt
         real(wp) :: dpres_ds
         #:if USING_AMD
-            real(wp), dimension(12) :: L
+            real(wp), dimension(20) :: L
         #:else
             real(wp), dimension(sys_size) :: L
         #:endif

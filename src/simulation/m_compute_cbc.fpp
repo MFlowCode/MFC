@@ -36,7 +36,7 @@ contains
     subroutine s_fill_density_L(L, lambda_factor, lambda2, c, mf, dalpha_rho_ds, dpres_ds)
         $:GPU_ROUTINE(parallelism='[seq]')
         #:if USING_AMD
-            real(wp), dimension(12), intent(inout) :: L
+            real(wp), dimension(20), intent(inout) :: L
         #:else
             real(wp), dimension(sys_size), intent(inout) :: L
         #:endif
@@ -59,7 +59,7 @@ contains
     subroutine s_fill_velocity_L(L, lambda_factor, lambda2, dvel_ds)
         $:GPU_ROUTINE(parallelism='[seq]')
         #:if USING_AMD
-            real(wp), dimension(12), intent(inout) :: L
+            real(wp), dimension(20), intent(inout) :: L
         #:else
             real(wp), dimension(sys_size), intent(inout) :: L
         #:endif
@@ -81,7 +81,7 @@ contains
     subroutine s_fill_advection_L(L, lambda_factor, lambda2, dadv_ds)
         $:GPU_ROUTINE(parallelism='[seq]')
         #:if USING_AMD
-            real(wp), dimension(12), intent(inout) :: L
+            real(wp), dimension(20), intent(inout) :: L
         #:else
             real(wp), dimension(sys_size), intent(inout) :: L
         #:endif
@@ -103,7 +103,7 @@ contains
     subroutine s_fill_chemistry_L(L, lambda_factor, lambda2, dYs_ds)
         $:GPU_ROUTINE(parallelism='[seq]')
         #:if USING_AMD
-            real(wp), dimension(12), intent(inout) :: L
+            real(wp), dimension(20), intent(inout) :: L
         #:else
             real(wp), dimension(sys_size), intent(inout) :: L
         #:endif
@@ -130,7 +130,7 @@ contains
 
         real(wp), dimension(3), intent(in) :: lambda
         #:if USING_AMD
-            real(wp), dimension(12), intent(inout) :: L
+            real(wp), dimension(20), intent(inout) :: L
         #:else
             real(wp), dimension(sys_size), intent(inout) :: L
         #:endif
@@ -154,7 +154,7 @@ contains
 
         real(wp), dimension(3), intent(in) :: lambda
         #:if USING_AMD
-            real(wp), dimension(12), intent(inout) :: L
+            real(wp), dimension(20), intent(inout) :: L
         #:else
             real(wp), dimension(sys_size), intent(inout) :: L
         #:endif
@@ -194,7 +194,7 @@ contains
 
         real(wp), dimension(3), intent(in) :: lambda
         #:if USING_AMD
-            real(wp), dimension(12), intent(inout) :: L
+            real(wp), dimension(20), intent(inout) :: L
         #:else
             real(wp), dimension(sys_size), intent(inout) :: L
         #:endif
@@ -217,7 +217,7 @@ contains
 
         real(wp), dimension(3), intent(in) :: lambda
         #:if USING_AMD
-            real(wp), dimension(12), intent(inout) :: L
+            real(wp), dimension(20), intent(inout) :: L
         #:else
             real(wp), dimension(sys_size), intent(inout) :: L
         #:endif
@@ -250,7 +250,7 @@ contains
 
         real(wp), dimension(3), intent(in) :: lambda
         #:if USING_AMD
-            real(wp), dimension(12), intent(inout) :: L
+            real(wp), dimension(20), intent(inout) :: L
         #:else
             real(wp), dimension(sys_size), intent(inout) :: L
         #:endif
@@ -280,7 +280,7 @@ contains
 
         real(wp), dimension(3), intent(in) :: lambda
         #:if USING_AMD
-            real(wp), dimension(12), intent(inout) :: L
+            real(wp), dimension(20), intent(inout) :: L
         #:else
             real(wp), dimension(sys_size), intent(inout) :: L
         #:endif
@@ -308,7 +308,7 @@ contains
         $:GPU_ROUTINE(function_name='s_compute_supersonic_inflow_L', &
             & parallelism='[seq]', cray_inline=True)
         #:if USING_AMD
-            real(wp), dimension(12), intent(inout) :: L
+            real(wp), dimension(20), intent(inout) :: L
         #:else
             real(wp), dimension(sys_size), intent(inout) :: L
         #:endif
@@ -323,7 +323,7 @@ contains
 
         real(wp), dimension(3), intent(in) :: lambda
         #:if USING_AMD
-            real(wp), dimension(12), intent(inout) :: L
+            real(wp), dimension(20), intent(inout) :: L
         #:else
             real(wp), dimension(sys_size), intent(inout) :: L
         #:endif

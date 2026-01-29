@@ -543,7 +543,7 @@ module m_global_parameters
     $:GPU_DECLARE(create='[Bx0,powell]')
 
     logical :: fft_wrt
-    logical :: dummy
+    logical :: dummy  !< AMDFlang workaround: keep a dummy logical to avoid a compiler case-optimization bug when a parameter+GPU-kernel conditional is false
 
     !> @name Continuum damage model parameters
     !> @{!
