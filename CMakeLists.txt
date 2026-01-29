@@ -185,9 +185,11 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
         add_link_options("SHELL: -K trap=fp" "SHELL: -G2")
     endif()
 
-elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
+elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Flang")
     add_compile_options(
-	    #$<$<COMPILE_LANGUAGE:Fortran>:-Wall>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Mfreeform>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Mpreprocess>
+        $<$<COMPILE_LANGUAGE:Fortran>:-fdefault-real-8>
     )
 elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Intel")
     add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-free>)
@@ -381,7 +383,7 @@ macro(HANDLE_SOURCES target useCommon useOpenACC useOpenMP)
                                  -D MFC_${${target}_UPPER}
                                  -D MFC_COMPILER="${CMAKE_Fortran_COMPILER_ID}"
                                  -D MFC_GPU_MODE="${MFC_GPU_MODE}"
-				 -D MFC_CASE_OPTIMIZATION=False
+				                 -D MFC_CASE_OPTIMIZATION=False
                                  -D chemistry=False
                                  --line-numbering
                                  --no-folding
@@ -439,9 +441,9 @@ function(MFC_SETUP_TARGET)
 
     foreach (a_target ${IPO_TARGETS})
         set_target_properties(${a_target} PROPERTIES Fortran_PREPROCESS ON)
-	message(STATUS ${CMAKE_Fortran_COMPILER_ID})
+	   message(STATUS ${CMAKE_Fortran_COMPILER_ID})
 
-	target_include_directories(${a_target} PRIVATE
+       target_include_directories(${a_target} PRIVATE
             "${CMAKE_SOURCE_DIR}/src/common"
             "${CMAKE_SOURCE_DIR}/src/common/include"
             "${CMAKE_SOURCE_DIR}/src/${ARGS_TARGET}")
@@ -484,12 +486,14 @@ function(MFC_SETUP_TARGET)
                 if (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
                     find_package(CUDAToolkit REQUIRED)
                     target_link_libraries(${a_target} PRIVATE CUDA::cudart CUDA::cufft)
-                else()
-			#find_package(hipfort COMPONENTS hipfft CONFIG REQUIRED)
-		    target_link_libraries(${a_target} PRIVATE $ENV{CRAY_HIPFORT_LIB})
-		endif()
+                elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
+                    target_link_libraries(${a_target} PRIVATE $ENV{CRAY_HIPFORT_LIB})
+                else() 
+                    find_package(hipfort COMPONENTS hipfft CONFIG REQUIRED)
+                    target_link_libraries(${a_target} PRIVATE hipfort::hipfft)                    
+                endif()
             else()
-		find_package(FFTW REQUIRED)
+                find_package(FFTW REQUIRED)
                 target_link_libraries(${a_target} PRIVATE FFTW::FFTW)
             endif()
         endif()
