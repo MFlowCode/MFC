@@ -42,6 +42,44 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         if condition:
             self.errors.append(message)
 
+    def _validate_logical(self, key: str):
+        """Validate that a parameter is a valid Fortran logical ('T' or 'F')."""
+        val = self.get(key)
+        if val is not None and val not in ('T', 'F'):
+            self.errors.append(
+                f"{key} must be 'T' or 'F', got '{val}'"
+            )
+
+    def check_parameter_types(self):
+        """Validate parameter types before other checks.
+
+        This catches invalid values early with clear error messages,
+        rather than letting them cause confusing failures later.
+        """
+        # Logical (boolean) parameters that must be 'T' or 'F'
+        logical_params = [
+            'mpp_lim', 'cyl_coord', 'bubbles_euler', 'adv_n', 'adap_dt',
+            'polytropic', 'polydisperse', 'acoustic_source', 'hypoelasticity',
+            'hyperelasticity', 'cont_damage', 'mapped_weno', 'mp_weno',
+            'teno', 'weno_avg', 'weno_Re_flux', 'null_weights', 'alt_soundspeed',
+            'mixture_err', 'parallel_io', 'prim_vars_wrt', 'rho_wrt', 'E_wrt',
+            'mom_wrt(1)', 'mom_wrt(2)', 'mom_wrt(3)', 'vel_wrt(1)', 'vel_wrt(2)',
+            'vel_wrt(3)', 'flux_wrt(1)', 'flux_wrt(2)', 'flux_wrt(3)',
+            'c_wrt', 'omega_wrt(1)', 'omega_wrt(2)', 'omega_wrt(3)', 'qm_wrt',
+            'schlieren_wrt', 'probe_wrt', 'integral_wrt', 'viscous', 'shear_stress',
+            'bulk_stress', 'bubbles_lagrange', 'relativity', 'cu_tensor', 'igr',
+        ]
+        for param in logical_params:
+            self._validate_logical(param)
+
+        # Required domain parameters when m > 0
+        m = self.get('m')
+        if m is not None and m > 0:
+            self.prohibit(not self.is_set('x_domain%beg'),
+                         "x_domain%beg must be set when m > 0")
+            self.prohibit(not self.is_set('x_domain%end'),
+                         "x_domain%end must be set when m > 0")
+
     # ===================================================================
     # Common Checks (All Stages)
     # ===================================================================
@@ -478,13 +516,23 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
     def check_time_stepping(self):
         """Checks time stepping parameters (simulation/post-process)"""
         cfl_dt = self.get('cfl_dt', 'F') == 'T'
+        cfl_adap_dt = self.get('cfl_adap_dt', 'F') == 'T'
+        adap_dt = self.get('adap_dt', 'F') == 'T'
         time_stepper = self.get('time_stepper')
 
         # Check time_stepper bounds
         self.prohibit(time_stepper is not None and (time_stepper < 1 or time_stepper > 3),
                      "time_stepper must be 1, 2, or 3")
 
-        if cfl_dt:
+        # Variable dt modes (CFL-based or adaptive)
+        variable_dt = cfl_dt or cfl_adap_dt
+
+        # dt validation (applies to all modes if dt is set)
+        dt = self.get('dt')
+        self.prohibit(dt is not None and dt <= 0,
+                     "dt must be positive")
+
+        if variable_dt:
             cfl_target = self.get('cfl_target')
             t_stop = self.get('t_stop')
             t_save = self.get('t_save')
@@ -500,21 +548,29 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
                          "t_save must be <= t_stop")
             self.prohibit(n_start is not None and n_start < 0,
                          "n_start must be non-negative")
-        else:
-            t_step_start = self.get('t_step_start')
-            t_step_stop = self.get('t_step_stop')
-            t_step_save = self.get('t_step_save')
-            dt = self.get('dt')
+        # t_step_* validation (applies to fixed and adap_dt modes)
+        t_step_start = self.get('t_step_start')
+        t_step_stop = self.get('t_step_stop')
+        t_step_save = self.get('t_step_save')
 
-            self.prohibit(t_step_start is not None and t_step_start < 0,
-                         "t_step_start must be non-negative")
-            self.prohibit(t_step_stop is not None and t_step_start is not None and t_step_stop <= t_step_start,
-                         "t_step_stop must be > t_step_start")
-            self.prohibit(t_step_save is not None and t_step_stop is not None and t_step_start is not None and
-                         t_step_save > t_step_stop - t_step_start,
-                         "t_step_save must be <= (t_step_stop - t_step_start)")
-            self.prohibit(dt is not None and dt <= 0,
-                         "dt must be positive")
+        self.prohibit(t_step_start is not None and t_step_start < 0,
+                     "t_step_start must be non-negative")
+        self.prohibit(t_step_stop is not None and t_step_stop < 0,
+                     "t_step_stop must be non-negative")
+        self.prohibit(t_step_stop is not None and t_step_start is not None and t_step_stop <= t_step_start,
+                     "t_step_stop must be > t_step_start")
+        self.prohibit(t_step_save is not None and t_step_save <= 0,
+                     "t_step_save must be positive")
+        self.prohibit(t_step_save is not None and t_step_stop is not None and t_step_start is not None and
+                     t_step_save > t_step_stop - t_step_start,
+                     "t_step_save must be <= (t_step_stop - t_step_start)")
+
+        if not variable_dt:
+            # dt is required in pure fixed dt mode (not cfl_dt, not cfl_adap_dt)
+            # adap_dt mode uses dt as initial value, so it's optional
+            uses_fixed_stepping = self.is_set('t_step_start') or self.is_set('t_step_stop')
+            self.prohibit(uses_fixed_stepping and not adap_dt and not self.is_set('dt'),
+                         "dt must be set when using fixed time stepping (t_step_start/t_step_stop)")
 
     def check_finite_difference(self):
         """Checks constraints on finite difference parameters"""
@@ -1578,6 +1634,7 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
 
     def validate_common(self):
         """Validate parameters common to all stages"""
+        self.check_parameter_types()  # Type validation first
         self.check_simulation_domain()
         self.check_model_eqns_and_num_fluids()
         self.check_igr()
