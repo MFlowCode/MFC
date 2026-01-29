@@ -20,3 +20,6 @@ jobs:
 
     - name: Lint the toolchain
       run: ./mfc.sh lint
+
+    - name: Check generated files are up to date
+      run: ./mfc.sh generate --check
