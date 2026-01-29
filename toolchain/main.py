@@ -45,7 +45,7 @@ def __checks():
         raise MFCException("CMake is required to build MFC but couldn't be located on your system. Please ensure it installed and discoverable (e.g in your system's $PATH).")
 
 
-def __run():
+def __run():  # pylint: disable=too-many-branches
     # Lazy import modules only when needed for the specific command
     cmd = ARG("command")
 

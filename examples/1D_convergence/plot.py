@@ -18,15 +18,15 @@ for i in range(len(N)):
         exact_a1 = pd.read_csv(f"N{N[i]}_O{Ord[j]}/D/cons.5.00.000000.dat", sep=r"\s+", header=None, names=["x", "y"])
         exact_a2 = pd.read_csv(f"N{N[i]}_O{Ord[j]}/D/cons.6.00.000000.dat", sep=r"\s+", header=None, names=["x", "y"])
 
-        ## 2 norm
+        # 2 norm
         errors[i, j, 0] = np.linalg.norm(sim_a1.y - exact_a1.y) / np.sqrt(N[i])
         errors[i, j, 0] += np.linalg.norm(sim_a2.y - exact_a2.y) / np.sqrt(N[i])
 
-        ## 1 norm
+        # 1 norm
         errors[i, j, 1] = 1 / N[i] * np.sum(np.abs(sim_a1.y - exact_a1.y))
         errors[i, j, 1] += 1 / N[i] * np.sum(np.abs(sim_a2.y - exact_a2.y))
 
-        ## Inf norm
+        # Inf norm
         errors[i, j, 2] = np.max([np.nanmax(np.abs(sim_a1.y - exact_a1.y)), np.nanmax(np.abs(sim_a2.y - exact_a2.y))])
 
 fig, ax = plt.subplots(1, 3, figsize=(12, 8), sharex=True)

@@ -1,10 +1,7 @@
-import os, typing, hashlib, dataclasses, subprocess, re, time, sys
+import os, typing, hashlib, dataclasses, subprocess, re, time, sys, threading, queue
 
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TimeElapsedColumn, TaskProgressColumn
-from rich.live import Live
-from rich.table import Table
-from rich.text import Text
 
 from .case    import Case
 from .printer import cons
@@ -16,13 +13,22 @@ from .state   import gpuConfigOptions
 from .user_guide import Tips
 
 
-# Regex to parse ninja progress: [42/156] Building Fortran object ...
+# Regex to parse build progress
+# Ninja format: [42/156] Building Fortran object ...
 _NINJA_PROGRESS_RE = re.compile(r'^\[(\d+)/(\d+)\]\s+(.*)$')
+# Make format: [ 16%] Building Fortran object ... or [100%] Linking ...
+_MAKE_PROGRESS_RE = re.compile(r'^\[\s*(\d+)%\]\s+(.*)$')
 
 
-def _run_build_with_progress(command: typing.List[str], target_name: str) -> subprocess.CompletedProcess:
+# pylint: disable=too-many-locals,too-many-branches,too-many-statements,too-many-nested-blocks
+def _run_build_with_progress(command: typing.List[str], target_name: str, streaming: bool = False) -> subprocess.CompletedProcess:
     """
     Run a build command with a progress bar that parses ninja output.
+
+    Args:
+        command: The cmake build command to run
+        target_name: Name of the target being built
+        streaming: If True, print [X/Y] lines as they happen instead of progress bar (-v mode)
 
     Shows:
     - Progress bar with file count (e.g., 42/156)
@@ -40,8 +46,8 @@ def _run_build_with_progress(command: typing.List[str], target_name: str) -> sub
     all_stdout = []
     all_stderr = []
 
-    # Start the process
-    process = subprocess.Popen(
+    # Start the process (can't use 'with' since process is used in multiple branches)
+    process = subprocess.Popen(  # pylint: disable=consider-using-with
         cmd,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -49,8 +55,59 @@ def _run_build_with_progress(command: typing.List[str], target_name: str) -> sub
         bufsize=1  # Line buffered
     )
 
+    if streaming:
+        # Streaming mode (-v): print build progress lines as they happen
+        cons.print(f"  [bold blue]Building[/bold blue] [magenta]{target_name}[/magenta] [dim](-v)[/dim]...")
+        start_time = time.time()
+
+        # Read stdout and print matching lines
+        for line in iter(process.stdout.readline, ''):
+            all_stdout.append(line)
+            stripped = line.strip()
+
+            # Try ninja format first: [42/156] Action
+            ninja_match = _NINJA_PROGRESS_RE.match(stripped)
+            if ninja_match:
+                completed = ninja_match.group(1)
+                total = ninja_match.group(2)
+                action = ninja_match.group(3)
+                # Extract filename from action
+                parts = action.split()
+                if len(parts) >= 3:
+                    filename = os.path.basename(parts[-1]).replace('.o', '').replace('.obj', '')
+                    if len(filename) > 40:
+                        filename = filename[:37] + "..."
+                    cons.print(f"  [dim][{completed}/{total}][/dim] {filename}")
+                continue
+
+            # Try make format: [ 16%] Action
+            make_match = _MAKE_PROGRESS_RE.match(stripped)
+            if make_match:
+                percent = make_match.group(1)
+                action = make_match.group(2)
+                # Extract filename from action
+                parts = action.split()
+                if len(parts) >= 3:
+                    # Get the last part which is usually the file path
+                    obj_path = parts[-1]
+                    filename = os.path.basename(obj_path).replace('.o', '').replace('.obj', '')
+                    if len(filename) > 40:
+                        filename = filename[:37] + "..."
+                    cons.print(f"  [dim][{percent:>3}%][/dim] {filename}")
+
+        # Read any remaining stderr
+        stderr = process.stderr.read()
+        all_stderr.append(stderr)
+        process.wait()
+
+        elapsed = time.time() - start_time
+        if elapsed > 5:
+            cons.print(f"  [dim](build took {elapsed:.1f}s)[/dim]")
+
+        return subprocess.CompletedProcess(cmd, process.returncode, ''.join(all_stdout), ''.join(all_stderr))
+
     if not is_tty:
-        # Non-interactive: show message with elapsed time
+        # Non-interactive, non-streaming: show message with elapsed time
         cons.print(f"  [bold blue]Building[/bold blue] [magenta]{target_name}[/magenta]...")
         start_time = time.time()
         stdout, stderr = process.communicate()
@@ -86,14 +143,7 @@ def _run_build_with_progress(command: typing.List[str], target_name: str) -> sub
             current_file=""
         )
 
-        # Read stdout line by line
-        import select
-        import io
-
         # Use threads to read stdout and stderr concurrently
-        import threading
-        import queue
-
         stdout_queue = queue.Queue()
         stderr_queue = queue.Queue()
 
@@ -123,27 +173,25 @@ def _run_build_with_progress(command: typing.List[str], target_name: str) -> sub
                     stdout_done = True
                 else:
                     all_stdout.append(line)
-                    # Parse ninja progress
-                    match = _NINJA_PROGRESS_RE.match(line.strip())
-                    if match:
-                        completed_files = int(match.group(1))
-                        total_files = int(match.group(2))
-                        action = match.group(3)
+                    stripped = line.strip()
+
+                    # Try ninja format first: [42/156] Action
+                    ninja_match = _NINJA_PROGRESS_RE.match(stripped)
+                    if ninja_match:
+                        completed_files = int(ninja_match.group(1))
+                        total_files = int(ninja_match.group(2))
+                        action = ninja_match.group(3)
 
                         # Extract just the filename from the action
-                        # e.g., "Building Fortran object src/simulation/m_rhs.fpp.f90.o"
                         if action:
                             parts = action.split()
                             if len(parts) >= 3:
-                                # Get last part and extract filename
                                 obj_path = parts[-1]
                                 current_file = os.path.basename(obj_path).replace('.o', '').replace('.obj', '')
-                                # Truncate if too long
                                 if len(current_file) > 30:
                                     current_file = current_file[:27] + "..."
 
                         if not progress_detected:
-                            # First time we detected progress, set the total
                             progress_detected = True
                             progress.update(task, total=total_files)
 
@@ -152,6 +200,32 @@ def _run_build_with_progress(command: typing.List[str], target_name: str) -> sub
                             completed=completed_files,
                             current_file=current_file
                         )
+                    else:
+                        # Try make format: [ 16%] Action
+                        make_match = _MAKE_PROGRESS_RE.match(stripped)
+                        if make_match:
+                            percent = int(make_match.group(1))
+                            action = make_match.group(2)
+
+                            # Extract filename from action
+                            if action:
+                                parts = action.split()
+                                if len(parts) >= 3:
+                                    obj_path = parts[-1]
+                                    current_file = os.path.basename(obj_path).replace('.o', '').replace('.obj', '')
+                                    if len(current_file) > 30:
+                                        current_file = current_file[:27] + "..."
+
+                            if not progress_detected:
+                                progress_detected = True
+                                # Make uses percentage, so set total to 100
+                                progress.update(task, total=100)
+
+                            progress.update(
+                                task,
+                                completed=percent,
+                                current_file=current_file
+                            )
             except queue.Empty:
                 pass
 
@@ -343,7 +417,8 @@ class MFCTarget:
             f"-DMFC_MIXED_PRECISION={'ON' if ARG('mixed') else 'OFF'}"
         ]
 
-        if ARG("verbose"):
+        # Verbosity level 3 (-vvv): add cmake debug flags
+        if ARG("verbose") >= 3:
             flags.append('--debug-find')
 
         if not self.isDependency:
@@ -366,9 +441,13 @@ class MFCTarget:
         debug(f"Configuring {self.name} in {build_dirpath}")
         debug(f"CMake flags: {' '.join(flags)}")
 
-        if ARG('verbose'):
-            # Verbose mode: show raw cmake output
-            cons.print(f"  [bold blue]Configuring[/bold blue] [magenta]{self.name}[/magenta] [dim](verbose)[/dim]...")
+        verbosity = ARG('verbose')
+        if verbosity >= 2:
+            # -vv or higher: show raw cmake output
+            level_str = "vv" + "v" * (verbosity - 2) if verbosity > 2 else "vv"
+            cons.print(f"  [bold blue]Configuring[/bold blue] [magenta]{self.name}[/magenta] [dim](-{level_str})[/dim]...")
+            if verbosity >= 2:
+                cons.print(f"  [dim]$ {' '.join(str(c) for c in command)}[/dim]")
             cons.print()
             result = system(command, print_cmd=False)
         else:
@@ -378,7 +457,7 @@ class MFCTarget:
 
         if result.returncode != 0:
             cons.print(f"  [bold red]✗[/bold red] Configuration failed for [magenta]{self.name}[/magenta]")
-            if not ARG('verbose'):
+            if verbosity < 2:
                 _show_build_error(result, "Configuration")
             Tips.after_build_failure()
             raise MFCException(f"Failed to configure the [bold magenta]{self.name}[/bold magenta] target.")
@@ -393,24 +472,32 @@ class MFCTarget:
                             "--target",   self.name,
                             "--parallel", ARG("jobs"),
                             "--config",   'Debug' if ARG('debug') else 'Release']
-        if ARG('verbose'):
+
+        verbosity = ARG('verbose')
+        # -vv or higher: add cmake --verbose flag for full compiler commands
+        if verbosity >= 2:
             command.append("--verbose")
 
         debug(f"Building {self.name} with {ARG('jobs')} parallel jobs")
         debug(f"Build command: {' '.join(str(c) for c in command)}")
 
-        if ARG('verbose'):
-            # Verbose mode: show raw compiler output (no progress bar)
-            cons.print(f"  [bold blue]Building[/bold blue] [magenta]{self.name}[/magenta] [dim](verbose)[/dim]...")
+        if verbosity >= 2:
+            # -vv or higher: show raw compiler output (full verbose)
+            level_str = "vv" + "v" * (verbosity - 2) if verbosity > 2 else "vv"
+            cons.print(f"  [bold blue]Building[/bold blue] [magenta]{self.name}[/magenta] [dim](-{level_str})[/dim]...")
+            cons.print(f"  [dim]$ {' '.join(str(c) for c in command)}[/dim]")
             cons.print()
             result = system(command, print_cmd=False)
+        elif verbosity == 1:
+            # -v: show ninja [X/Y] lines as they compile (streaming, no progress bar)
+            result = _run_build_with_progress(command, self.name, streaming=True)
         else:
-            # Normal mode: show progress bar
-            result = _run_build_with_progress(command, self.name)
+            # Default: show progress bar
+            result = _run_build_with_progress(command, self.name, streaming=False)
 
         if result.returncode != 0:
             cons.print(f"  [bold red]✗[/bold red] Build failed for [magenta]{self.name}[/magenta]")
-            if not ARG('verbose'):
+            if verbosity < 2:
                 _show_build_error(result, "Build")
             Tips.after_build_failure()
             raise MFCException(f"Failed to build the [bold magenta]{self.name}[/bold magenta] target.")

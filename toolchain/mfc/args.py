@@ -125,7 +125,8 @@ started, run ./mfc.sh build -h.""",
             p.add_argument("-j", "--jobs", metavar="JOBS", type=int, default=1, help="Allows for JOBS concurrent jobs.")
 
         if "v" not in mask:
-            p.add_argument("-v", "--verbose", action="store_true", help="Enables verbose compiler & linker output.")
+            p.add_argument("-v", "--verbose", action="count", default=0,
+                           help="Increase verbosity level. Use -v, -vv, or -vvv for more detail.")
 
         if "d" not in mask:
             p.add_argument("-d", "--debug-log", action="store_true", dest="debug_log", help="Enable debug logging for troubleshooting.")

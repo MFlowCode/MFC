@@ -1,4 +1,8 @@
-import re, os, csv, glob, statistics
+import re
+import os
+import csv
+import glob
+import statistics
 from dataclasses import dataclass, fields
 
 CDIR = os.path.abspath(os.path.join("examples", "scaling"))

@@ -37,7 +37,7 @@ _mfc_completions() {
     local command="${COMP_WORDS[1]}"
 
     case "${command}" in
-        build)
+        build|b)
             case "${prev}" in
                 -t|--targets)
                     COMPREPLY=( $(compgen -W "${targets}" -- "${cur}") )
@@ -52,7 +52,8 @@ _mfc_completions() {
                     return 0
                     ;;
                 -i|--input)
-                    COMPREPLY=( $(compgen -f -X '!*.py' -- "${cur}") )
+                    # Include both .py files AND directories for navigation
+                    COMPREPLY=( $(compgen -f -X '!*.py' -- "${cur}") $(compgen -d -- "${cur}") )
                     return 0
                     ;;
                 *)
@@ -62,7 +63,7 @@ _mfc_completions() {
                     ;;
             esac
             ;;
-        run)
+        run|r)
             case "${prev}" in
                 -n|--nodes|-N|--tasks-per-node|-w|--walltime|-a|--account|-p|--partition|-e|--engine)
                     if [[ "${prev}" == "-e" || "${prev}" == "--engine" ]]; then
@@ -76,13 +77,14 @@ _mfc_completions() {
                         local run_opts="-n --nodes -N --tasks-per-node -w --walltime -a --account -p --partition -e --engine -t --targets --mpi --no-mpi --gpu --no-gpu"
                         COMPREPLY=( $(compgen -W "${run_opts}" -- "${cur}") )
                     else
-                        COMPREPLY=( $(compgen -f -X '!*.py' -- "${cur}") )
+                        # Include both .py files AND directories for navigation
+                        COMPREPLY=( $(compgen -f -X '!*.py' -- "${cur}") $(compgen -d -- "${cur}") )
                     fi
                     return 0
                     ;;
             esac
             ;;
-        test)
+        test|t)
             case "${prev}" in
                 -j|--jobs)
                     COMPREPLY=( $(compgen -W "1 2 4 8 16 32" -- "${cur}") )
@@ -93,19 +95,20 @@ _mfc_completions() {
                     return 0
                     ;;
                 *)
-                    local test_opts="-j --jobs --only --from --to --generate --mpi --no-mpi --gpu --no-gpu"
+                    local test_opts="-j --jobs --only --from --to --generate --mpi --no-mpi --gpu --no-gpu --no-build"
                     COMPREPLY=( $(compgen -W "${test_opts}" -- "${cur}") )
                     return 0
                     ;;
             esac
             ;;
-        validate)
+        validate|v)
             # Complete .py files
             if [[ "${cur}" == -* ]]; then
                 local validate_opts="-d --debug-log"
                 COMPREPLY=( $(compgen -W "${validate_opts}" -- "${cur}") )
             else
-                COMPREPLY=( $(compgen -f -X '!*.py' -- "${cur}") )
+                # Include both .py files AND directories for navigation
+                COMPREPLY=( $(compgen -f -X '!*.py' -- "${cur}") $(compgen -d -- "${cur}") )
             fi
             return 0
             ;;
@@ -134,11 +137,13 @@ _mfc_completions() {
                     return 0
                     ;;
                 pack)
-                    COMPREPLY=( $(compgen -f -X '!*.py' -- "${cur}") )
+                    # Include both .py files AND directories for navigation
+                    COMPREPLY=( $(compgen -f -X '!*.py' -- "${cur}") $(compgen -d -- "${cur}") )
                     return 0
                     ;;
                 compare)
-                    COMPREPLY=( $(compgen -f -X '!*.pack' -- "${cur}") )
+                    # Include both .pack files AND directories for navigation
+                    COMPREPLY=( $(compgen -f -X '!*.pack' -- "${cur}") $(compgen -d -- "${cur}") )
                     return 0
                     ;;
             esac
@@ -161,7 +166,7 @@ _mfc_completions() {
                     ;;
             esac
             ;;
-        clean|count|interactive)
+        count|interactive)
             # No additional arguments
             return 0
             ;;
@@ -186,50 +191,7 @@ _mfc_completions() {
             COMPREPLY=( $(compgen -W "${topics}" -- "${cur}") )
             return 0
             ;;
-        b)
-            # Alias for build - same completions
-            case "${prev}" in
-                -t|--targets)
-                    COMPREPLY=( $(compgen -W "${targets}" -- "${cur}") )
-                    return 0
-                    ;;
-                -j|--jobs)
-                    COMPREPLY=( $(compgen -W "1 2 4 8 16 32" -- "${cur}") )
-                    return 0
-                    ;;
-                *)
-                    local build_opts="-t --targets -j --jobs -v --verbose --gpu --no-gpu --debug --no-debug"
-                    COMPREPLY=( $(compgen -W "${build_opts}" -- "${cur}") )
-                    return 0
-                    ;;
-            esac
-            ;;
-        r)
-            # Alias for run - complete case files
-            if [[ "${cur}" == -* ]]; then
-                local run_opts="-n --nodes -N --tasks-per-node -e --engine --gpu --no-gpu"
-                COMPREPLY=( $(compgen -W "${run_opts}" -- "${cur}") )
-            else
-                COMPREPLY=( $(compgen -f -X '!*.py' -- "${cur}") )
-            fi
-            return 0
-            ;;
-        t)
-            # Alias for test
-            local test_opts="-j --jobs --only --from --to --generate --no-build"
-            COMPREPLY=( $(compgen -W "${test_opts}" -- "${cur}") )
-            return 0
-            ;;
-        v)
-            # Alias for validate - complete case files
-            if [[ "${cur}" == -* ]]; then
-                COMPREPLY=( $(compgen -W "-d --debug-log" -- "${cur}") )
-            else
-                COMPREPLY=( $(compgen -f -X '!*.py' -- "${cur}") )
-            fi
-            return 0
-            ;;
-        c)
+        c|clean)
             # Alias for clean - no additional arguments
             return 0
             ;;
@@ -239,6 +201,8 @@ _mfc_completions() {
 }
 
 # Register the completion function
-complete -F _mfc_completions ./mfc.sh
-complete -F _mfc_completions mfc.sh
-complete -F _mfc_completions mfc
+# -o filenames: Properly handle directory trailing slashes and file escaping
+# -o bashdefault: Fall back to default bash completion when COMPREPLY is empty
+complete -o filenames -o bashdefault -F _mfc_completions ./mfc.sh
+complete -o filenames -o bashdefault -F _mfc_completions mfc.sh
+complete -o filenames -o bashdefault -F _mfc_completions mfc
