@@ -1,31 +1,14 @@
 #!/usr/bin/env bash
-# Bash completion for MFC (mfc.sh)
-#
-# To enable, add one of the following to your ~/.bashrc:
-#   source /path/to/MFC/toolchain/completions/mfc.bash
-# Or:
-#   eval "$(./mfc.sh completion bash)"
+# AUTO-GENERATED from cli/commands.py - Do not edit manually
+# Regenerate with: ./mfc.sh generate
 
 _mfc_completions() {
-    local cur prev opts
+    local cur prev command
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
-    # Main commands (including aliases: b=build, r=run, t=test, v=validate, c=clean)
-    local commands="build run test clean validate init count packer load lint format spelling interactive completion help b r t v c"
-
-    # Build targets
-    local targets="pre_process simulation post_process"
-
-    # Templates for init
-    local templates="1D_minimal 2D_minimal 3D_minimal"
-
-    # GPU options
-    local gpu_options="acc mp"
-
-    # Engines for run
-    local engines="interactive batch"
+    local commands="b bench bench_diff build c clean completion count count_diff format generate help interactive lint load new packer r run spelling t test v validate"
 
     # First argument - complete commands
     if [[ ${COMP_CWORD} -eq 1 ]]; then
@@ -33,166 +16,162 @@ _mfc_completions() {
         return 0
     fi
 
-    # Get the command (first argument after mfc.sh)
     local command="${COMP_WORDS[1]}"
 
     case "${command}" in
         build|b)
             case "${prev}" in
-                -t|--targets)
-                    COMPREPLY=( $(compgen -W "${targets}" -- "${cur}") )
-                    return 0
-                    ;;
-                -j|--jobs)
-                    COMPREPLY=( $(compgen -W "1 2 4 8 16 32" -- "${cur}") )
-                    return 0
-                    ;;
-                --gpu)
-                    COMPREPLY=( $(compgen -W "${gpu_options}" -- "${cur}") )
-                    return 0
-                    ;;
                 -i|--input)
-                    # Include both .py files AND directories for navigation
-                    COMPREPLY=( $(compgen -f -X '!*.py' -- "${cur}") $(compgen -d -- "${cur}") )
+                    COMPREPLY=( $(compgen -f -X "!*.py" -- "${cur}") $(compgen -d -- "${cur}") )
                     return 0
                     ;;
-                *)
-                    local build_opts="-t --targets -j --jobs -v --verbose -d --debug-log --mpi --no-mpi --gpu --no-gpu --debug --no-debug -i --input --case-optimization"
-                    COMPREPLY=( $(compgen -W "${build_opts}" -- "${cur}") )
-                    return 0
-                    ;;
-            esac
-            ;;
-        run|r)
-            case "${prev}" in
-                -n|--nodes|-N|--tasks-per-node|-w|--walltime|-a|--account|-p|--partition|-e|--engine)
-                    if [[ "${prev}" == "-e" || "${prev}" == "--engine" ]]; then
-                        COMPREPLY=( $(compgen -W "${engines}" -- "${cur}") )
-                    fi
-                    return 0
-                    ;;
-                *)
-                    # Complete case files
-                    if [[ "${cur}" == -* ]]; then
-                        local run_opts="-n --nodes -N --tasks-per-node -w --walltime -a --account -p --partition -e --engine -t --targets --mpi --no-mpi --gpu --no-gpu"
-                        COMPREPLY=( $(compgen -W "${run_opts}" -- "${cur}") )
-                    else
-                        # Include both .py files AND directories for navigation
-                        COMPREPLY=( $(compgen -f -X '!*.py' -- "${cur}") $(compgen -d -- "${cur}") )
-                    fi
+                -t|--targets)
+                    COMPREPLY=( $(compgen -W "fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation" -- "${cur}") )
                     return 0
                     ;;
             esac
-            ;;
-        test|t)
-            case "${prev}" in
-                -j|--jobs)
-                    COMPREPLY=( $(compgen -W "1 2 4 8 16 32" -- "${cur}") )
-                    return 0
-                    ;;
-                --only|--from|--to)
-                    # Would need to dynamically get test UUIDs - leave empty for now
-                    return 0
-                    ;;
-                *)
-                    local test_opts="-j --jobs --only --from --to --generate --mpi --no-mpi --gpu --no-gpu --no-build"
-                    COMPREPLY=( $(compgen -W "${test_opts}" -- "${cur}") )
-                    return 0
-                    ;;
-            esac
-            ;;
-        validate|v)
-            # Complete .py files
+            local opts="--case-optimization --debug --debug-log --fastmath --gcov --gpu --input --jobs --mixed --mpi --no-debug --no-fastmath --no-gcov --no-gpu --no-mixed --no-mpi --no-single --no-unified --single --targets --unified --verbose -d -i -j -t -v"
             if [[ "${cur}" == -* ]]; then
-                local validate_opts="-d --debug-log"
-                COMPREPLY=( $(compgen -W "${validate_opts}" -- "${cur}") )
-            else
-                # Include both .py files AND directories for navigation
-                COMPREPLY=( $(compgen -f -X '!*.py' -- "${cur}") $(compgen -d -- "${cur}") )
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             fi
             return 0
             ;;
-        init)
+        run|r)
+            case "${prev}" in
+                -e|--engine)
+                    COMPREPLY=( $(compgen -W "interactive batch" -- "${cur}") )
+                    return 0
+                    ;;
+                -b|--binary)
+                    COMPREPLY=( $(compgen -W "mpirun jsrun srun mpiexec" -- "${cur}") )
+                    return 0
+                    ;;
+                -c|--computer)
+                    COMPREPLY=( $(compgen -W "bridges2 carpenter carpenter-cray default delta deltaai frontier hipergator nautilus oscar phoenix phoenix-bench santis tuo" -- "${cur}") )
+                    return 0
+                    ;;
+                -t|--targets)
+                    COMPREPLY=( $(compgen -W "fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation" -- "${cur}") )
+                    return 0
+                    ;;
+            esac
+            local opts="-# --account --binary --case-optimization --clean --computer --debug --debug-log --dry-run --email --engine --fastmath --gcov --gpu --gpus --jobs --mixed --mpi --name --ncu --no-build --no-debug --no-fastmath --no-gcov --no-gpu --no-mixed --no-mpi --no-single --no-unified --nodes --nsys --output-summary --partition --quality_of_service --rcu --rsys --scratch --single --targets --tasks-per-node --unified --verbose --wait --walltime -@ -N -a -b -c -d -e -g -j -n -o -p -q -s -t -v -w"
+            if [[ "${cur}" == -* ]]; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            else
+                COMPREPLY=( $(compgen -f -X "!*.py" -- "${cur}") $(compgen -d -- "${cur}") )
+            fi
+            return 0
+            ;;
+        test|t)
+            local opts="-% --add-new-variables --case-optimization --debug --debug-log --dry-run --fastmath --from --gcov --generate --gpu --gpus --jobs --list --max-attempts --mixed --mpi --no-build --no-debug --no-examples --no-fastmath --no-gcov --no-gpu --no-mixed --no-mpi --no-single --no-unified --only --percent --rdma-mpi --remove-old-tests --single --test-all --to --unified --verbose -a -d -f -g -j -l -m -o -t -v"
+            if [[ "${cur}" == -* ]]; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            fi
+            return 0
+            ;;
+        clean|c)
+            case "${prev}" in
+                -t|--targets)
+                    COMPREPLY=( $(compgen -W "fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation" -- "${cur}") )
+                    return 0
+                    ;;
+            esac
+            local opts="--debug --debug-log --fastmath --gcov --gpu --jobs --mixed --mpi --no-debug --no-fastmath --no-gcov --no-gpu --no-mixed --no-mpi --no-single --no-unified --single --targets --unified --verbose -d -j -t -v"
+            if [[ "${cur}" == -* ]]; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            fi
+            return 0
+            ;;
+        validate|v)
+            local opts="--debug-log -d"
+            if [[ "${cur}" == -* ]]; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            else
+                COMPREPLY=( $(compgen -f -X "!*.py" -- "${cur}") $(compgen -d -- "${cur}") )
+            fi
+            return 0
+            ;;
+        new)
             case "${prev}" in
                 -t|--template)
-                    COMPREPLY=( $(compgen -W "${templates}" -- "${cur}") )
-                    return 0
-                    ;;
-                *)
-                    if [[ "${cur}" == -* ]]; then
-                        local init_opts="-t --template -l --list"
-                        COMPREPLY=( $(compgen -W "${init_opts}" -- "${cur}") )
-                    else
-                        # Complete directories for case name
-                        COMPREPLY=( $(compgen -d -- "${cur}") )
-                    fi
+                    COMPREPLY=( $(compgen -W "1D_minimal 2D_minimal 3D_minimal" -- "${cur}") )
                     return 0
                     ;;
             esac
+            local opts="--list --template -l -t"
+            if [[ "${cur}" == -* ]]; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            else
+                COMPREPLY=( $(compgen -d -- "${cur}") )
+            fi
+            return 0
             ;;
         packer)
-            case "${prev}" in
-                packer)
-                    COMPREPLY=( $(compgen -W "pack compare" -- "${cur}") )
-                    return 0
-                    ;;
-                pack)
-                    # Include both .py files AND directories for navigation
-                    COMPREPLY=( $(compgen -f -X '!*.py' -- "${cur}") $(compgen -d -- "${cur}") )
-                    return 0
-                    ;;
-                compare)
-                    # Include both .pack files AND directories for navigation
-                    COMPREPLY=( $(compgen -f -X '!*.pack' -- "${cur}") $(compgen -d -- "${cur}") )
-                    return 0
-                    ;;
-            esac
-            ;;
-        load)
-            case "${prev}" in
-                -c)
-                    # Cluster options
-                    COMPREPLY=( $(compgen -W "p f s a" -- "${cur}") )
-                    return 0
-                    ;;
-                -m)
-                    # Mode options
-                    COMPREPLY=( $(compgen -W "c g" -- "${cur}") )
-                    return 0
-                    ;;
-                *)
-                    COMPREPLY=( $(compgen -W "-c -m" -- "${cur}") )
-                    return 0
-                    ;;
-            esac
-            ;;
-        count|interactive)
-            # No additional arguments
-            return 0
+            if [[ ${COMP_CWORD} -eq 2 ]]; then
+                COMPREPLY=( $(compgen -W "pack compare" -- "${cur}") )
+                return 0
+            fi
             ;;
         completion)
+            COMPREPLY=( $(compgen -W "install uninstall status" -- "${cur}") )
+            return 0
+            ;;
+        help)
+            COMPREPLY=( $(compgen -W "gpu clusters batch debugging" -- "${cur}") )
+            return 0
+            ;;
+        generate)
+            local opts="--check"
+            if [[ "${cur}" == -* ]]; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            fi
+            return 0
+            ;;
+        bench)
             case "${prev}" in
-                completion)
-                    COMPREPLY=( $(compgen -W "install uninstall status" -- "${cur}") )
-                    return 0
-                    ;;
-                install)
-                    COMPREPLY=( $(compgen -W "bash zsh" -- "${cur}") )
-                    return 0
-                    ;;
-                *)
+                -t|--targets)
+                    COMPREPLY=( $(compgen -W "fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation" -- "${cur}") )
                     return 0
                     ;;
             esac
-            ;;
-        help)
-            # Complete help topics
-            local topics="gpu clusters batch debugging"
-            COMPREPLY=( $(compgen -W "${topics}" -- "${cur}") )
+            local opts="--debug --debug-log --fastmath --gcov --gpu --gpus --jobs --mem --mixed --mpi --no-debug --no-fastmath --no-gcov --no-gpu --no-mixed --no-mpi --no-single --no-unified --output --single --targets --unified --verbose -d -g -j -m -o -t -v"
+            if [[ "${cur}" == -* ]]; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            fi
             return 0
             ;;
-        c|clean)
-            # Alias for clean - no additional arguments
+        bench_diff)
+            local opts="--debug --debug-log --fastmath --gcov --gpu --jobs --mixed --mpi --no-debug --no-fastmath --no-gcov --no-gpu --no-mixed --no-mpi --no-single --no-unified --single --unified --verbose -d -j -v"
+            if [[ "${cur}" == -* ]]; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            fi
+            return 0
+            ;;
+        count)
+            case "${prev}" in
+                -t|--targets)
+                    COMPREPLY=( $(compgen -W "fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation" -- "${cur}") )
+                    return 0
+                    ;;
+            esac
+            local opts="--debug --debug-log --fastmath --gcov --gpu --jobs --mixed --mpi --no-debug --no-fastmath --no-gcov --no-gpu --no-mixed --no-mpi --no-single --no-unified --single --targets --unified --verbose -d -j -t -v"
+            if [[ "${cur}" == -* ]]; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            fi
+            return 0
+            ;;
+        count_diff)
+            case "${prev}" in
+                -t|--targets)
+                    COMPREPLY=( $(compgen -W "fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation" -- "${cur}") )
+                    return 0
+                    ;;
+            esac
+            local opts="--debug --debug-log --fastmath --gcov --gpu --jobs --mixed --mpi --no-debug --no-fastmath --no-gcov --no-gpu --no-mixed --no-mpi --no-single --no-unified --single --targets --unified --verbose -d -j -t -v"
+            if [[ "${cur}" == -* ]]; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            fi
             return 0
             ;;
     esac
@@ -200,9 +179,6 @@ _mfc_completions() {
     return 0
 }
 
-# Register the completion function
-# -o filenames: Properly handle directory trailing slashes and file escaping
-# -o bashdefault: Fall back to default bash completion when COMPREPLY is empty
 complete -o filenames -o bashdefault -F _mfc_completions ./mfc.sh
 complete -o filenames -o bashdefault -F _mfc_completions mfc.sh
 complete -o filenames -o bashdefault -F _mfc_completions mfc

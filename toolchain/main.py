@@ -88,6 +88,9 @@ def __run():  # pylint: disable=too-many-branches
     elif cmd == "completion":
         from mfc import completion  # pylint: disable=import-outside-toplevel
         completion.completion()
+    elif cmd == "generate":
+        from mfc import generate  # pylint: disable=import-outside-toplevel
+        generate.generate()
 
 
 if __name__ == "__main__":

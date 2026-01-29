@@ -1,48 +1,37 @@
 #compdef mfc.sh ./mfc.sh mfc
-# Zsh completion for MFC (mfc.sh)
-#
-# To enable, add this directory to your fpath and run compinit:
-#   fpath=(/path/to/MFC/toolchain/completions $fpath)
-#   autoload -Uz compinit && compinit
-# Or copy this file to a directory already in your fpath (e.g., ~/.zsh/completions/)
+# AUTO-GENERATED from cli/commands.py - Do not edit manually
+# Regenerate with: ./mfc.sh generate
 
 _mfc() {
     local context state state_descr line
     typeset -A opt_args
 
-    local commands=(
-        'build:Build MFC and its dependencies'
-        'run:Run a simulation case'
-        'test:Run the MFC test suite'
-        'clean:Remove build artifacts'
-        'validate:Check a case file for errors'
-        'init:Create a new case from a template'
-        'count:Count lines of code'
-        'packer:Pack/unpack/compare simulation data'
-        'load:Load MFC environment (use with source)'
-        'lint:Lint code after editing'
-        'format:Format code after editing'
-        'spelling:Run spell checker'
-        'interactive:Launch interactive menu'
-        'completion:Install shell tab-completion'
-        'help:Show help on a topic'
-        'b:Alias for build'
-        'r:Alias for run'
-        't:Alias for test'
-        'v:Alias for validate'
-        'c:Alias for clean'
-    )
-
-    local targets=(
-        'pre_process:Pre-processing target'
-        'simulation:Main simulation target'
-        'post_process:Post-processing target'
-    )
-
-    local templates=(
-        '1D_minimal:Minimal 1D shock tube case'
-        '2D_minimal:Minimal 2D case with circular perturbation'
-        '3D_minimal:Minimal 3D case with spherical perturbation'
+    local -a commands
+    commands=(
+        "build:Build MFC and its dependencies."
+        "b:Alias for build"
+        "run:Run a case with MFC."
+        "r:Alias for run"
+        "test:Run MFC\'s test suite."
+        "t:Alias for test"
+        "clean:Clean build artifacts."
+        "c:Alias for clean"
+        "validate:Validate a case file without running."
+        "v:Alias for validate"
+        "new:Create a new case from a template."
+        "packer:Packer utility (pack/unpack/compare)."
+        "completion:Install shell tab-completion."
+        "help:Show help on a topic."
+        "generate:Regenerate completion scripts from CLI schema."
+        "load:Loads the MFC environment with source."
+        "lint:Lints all code after editing."
+        "format:Formats all code after editing."
+        "spelling:Runs the spell checker after editing."
+        "interactive:Launch interactive menu-driven interface."
+        "bench:Benchmark MFC (for CI)."
+        "bench_diff:Compare MFC Benchmarks (for CI)."
+        "count:Count LOC in MFC."
+        "count_diff:Count LOC in MFC."
     )
 
     _arguments -C \
@@ -57,187 +46,384 @@ _mfc() {
             case $words[1] in
                 build)
                     _arguments \
-                        '-t[Targets to build]:target:->targets' \
-                        '--targets[Targets to build]:target:->targets' \
-                        '-j[Number of parallel jobs]:jobs:(1 2 4 8 16 32)' \
-                        '--jobs[Number of parallel jobs]:jobs:(1 2 4 8 16 32)' \
-                        '-v[Enable verbose output]' \
-                        '--verbose[Enable verbose output]' \
-                        '-d[Enable debug logging]' \
-                        '--debug-log[Enable debug logging]' \
+                        '-t[Space separated list of targets to act u]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
+                        '--targets[Space separated list of targets to act u]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
                         '--mpi[Enable MPI]' \
                         '--no-mpi[Disable MPI]' \
-                        '--gpu[Enable GPU support]:mode:(acc mp)' \
-                        '--no-gpu[Disable GPU support]' \
-                        '--debug[Enable debug build]' \
-                        '--no-debug[Disable debug build]' \
-                        '-i[Input case for optimization]:file:_files -g "*.py"' \
-                        '--input[Input case for optimization]:file:_files -g "*.py"' \
-                        '--case-optimization[Enable case-specific optimization]'
-
-                    case $state in
-                        targets)
-                            _describe -t targets 'build target' targets
-                            ;;
-                    esac
+                        '--gpu[Enable GPU]:mode:(acc mp)' \
+                        '--no-gpu[Disable GPU]' \
+                        '--debug[Enable debug mode]' \
+                        '--no-debug[Disable debug mode]' \
+                        '-j[Allows for JOBS concurrent jobs.]' \
+                        '--jobs[Allows for JOBS concurrent jobs.]' \
+                        '-v[Increase verbosity level. Use -v, -vv, o]' \
+                        '--verbose[Increase verbosity level. Use -v, -vv, o]' \
+                        '-d[Enable debug logging for troubleshooting]' \
+                        '--debug-log[Enable debug logging for troubleshooting]' \
+                        '-i[(GPU Optimization) Build a version of MF]:_files -g "*.py"' \
+                        '--input[(GPU Optimization) Build a version of MF]:_files -g "*.py"' \
+                        '--case-optimization[(GPU Optimization) Compile MFC targets w]'
+                    ;;
+                b)
+                    _arguments \
+                        '-t[Space separated list of targets to act u]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
+                        '--targets[Space separated list of targets to act u]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
+                        '--mpi[Enable MPI]' \
+                        '--no-mpi[Disable MPI]' \
+                        '--gpu[Enable GPU]:mode:(acc mp)' \
+                        '--no-gpu[Disable GPU]' \
+                        '--debug[Enable debug mode]' \
+                        '--no-debug[Disable debug mode]' \
+                        '-j[Allows for JOBS concurrent jobs.]' \
+                        '--jobs[Allows for JOBS concurrent jobs.]' \
+                        '-v[Increase verbosity level. Use -v, -vv, o]' \
+                        '--verbose[Increase verbosity level. Use -v, -vv, o]' \
+                        '-d[Enable debug logging for troubleshooting]' \
+                        '--debug-log[Enable debug logging for troubleshooting]' \
+                        '-i[(GPU Optimization) Build a version of MF]:_files -g "*.py"' \
+                        '--input[(GPU Optimization) Build a version of MF]:_files -g "*.py"' \
+                        '--case-optimization[(GPU Optimization) Compile MFC targets w]'
                     ;;
                 run)
                     _arguments \
-                        '1:case file:_files -g "*.py"' \
-                        '-n[Number of nodes]:nodes:' \
-                        '--nodes[Number of nodes]:nodes:' \
-                        '-N[Tasks per node]:tasks:' \
-                        '--tasks-per-node[Tasks per node]:tasks:' \
-                        '-w[Wall time]:time:' \
-                        '--walltime[Wall time]:time:' \
-                        '-a[Account name]:account:' \
-                        '--account[Account name]:account:' \
-                        '-p[Partition name]:partition:' \
-                        '--partition[Partition name]:partition:' \
-                        '-e[Execution engine]:engine:(interactive batch)' \
-                        '--engine[Execution engine]:engine:(interactive batch)' \
-                        '-t[Targets to run]:target:->targets' \
-                        '--targets[Targets to run]:target:->targets' \
+                        '1:Input file to run.:_files -g "*.py"' \
+                        '-t[Space separated list of targets to act u]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
+                        '--targets[Space separated list of targets to act u]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
                         '--mpi[Enable MPI]' \
                         '--no-mpi[Disable MPI]' \
                         '--gpu[Enable GPU]:mode:(acc mp)' \
-                        '--no-gpu[Disable GPU]'
-
-                    case $state in
-                        targets)
-                            _describe -t targets 'target' targets
-                            ;;
-                    esac
+                        '--no-gpu[Disable GPU]' \
+                        '--debug[Enable debug mode]' \
+                        '--no-debug[Disable debug mode]' \
+                        '-j[Allows for JOBS concurrent jobs.]' \
+                        '--jobs[Allows for JOBS concurrent jobs.]' \
+                        '-v[Increase verbosity level. Use -v, -vv, o]' \
+                        '--verbose[Increase verbosity level. Use -v, -vv, o]' \
+                        '-d[Enable debug logging for troubleshooting]' \
+                        '--debug-log[Enable debug logging for troubleshooting]' \
+                        '-g[(Optional GPU override) List of GPU #s t]' \
+                        '--gpus[(Optional GPU override) List of GPU #s t]' \
+                        '-e[Job execution/submission engine choice.]:(interactive batch)' \
+                        '--engine[Job execution/submission engine choice.]:(interactive batch)' \
+                        '-p[(Batch) Partition for job submission.]' \
+                        '--partition[(Batch) Partition for job submission.]' \
+                        '-q[(Batch) Quality of Service for job submi]' \
+                        '--quality_of_service[(Batch) Quality of Service for job submi]' \
+                        '-N[(Batch) Number of nodes.]' \
+                        '--nodes[(Batch) Number of nodes.]' \
+                        '-n[Number of tasks per node.]' \
+                        '--tasks-per-node[Number of tasks per node.]' \
+                        '-w[(Batch) Walltime.]' \
+                        '--walltime[(Batch) Walltime.]' \
+                        '-a[(Batch) Account to charge.]' \
+                        '--account[(Batch) Account to charge.]' \
+                        '-@[(Batch) Email for job notification.]' \
+                        '--email[(Batch) Email for job notification.]' \
+                        '-#[(Batch) Job name.]' \
+                        '--name[(Batch) Job name.]' \
+                        '-s[Build from scratch.]' \
+                        '--scratch[Build from scratch.]' \
+                        '-b[(Interactive) Override MPI execution bin]:(mpirun jsrun srun mpiexec)' \
+                        '--binary[(Interactive) Override MPI execution bin]:(mpirun jsrun srun mpiexec)' \
+                        '--dry-run[(Batch) Run without submitting batch fil]' \
+                        '--case-optimization[(GPU Optimization) Compile MFC targets w]' \
+                        '--no-build[(Testing) Do not rebuild MFC.]' \
+                        '--wait[(Batch) Wait for the job to finish.]' \
+                        '-c[(Batch) Path to a custom submission file]:(bridges2 carpenter carpenter-cray default delta deltaai frontier hipergator nautilus oscar phoenix phoenix-bench santis tuo)' \
+                        '--computer[(Batch) Path to a custom submission file]:(bridges2 carpenter carpenter-cray default delta deltaai frontier hipergator nautilus oscar phoenix phoenix-bench santis tuo)' \
+                        '-o[Output file (YAML) for summary.]' \
+                        '--output-summary[Output file (YAML) for summary.]' \
+                        '--clean[Clean the case before running.]' \
+                        '--ncu[Profile with NVIDIA Nsight Compute.]' \
+                        '--nsys[Profile with NVIDIA Nsight Systems.]' \
+                        '--rcu[Profile with ROCM rocprof-compute.]' \
+                        '--rsys[Profile with ROCM rocprof-systems.]'
+                    ;;
+                r)
+                    _arguments \
+                        '1:Input file to run.:_files -g "*.py"' \
+                        '-t[Space separated list of targets to act u]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
+                        '--targets[Space separated list of targets to act u]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
+                        '--mpi[Enable MPI]' \
+                        '--no-mpi[Disable MPI]' \
+                        '--gpu[Enable GPU]:mode:(acc mp)' \
+                        '--no-gpu[Disable GPU]' \
+                        '--debug[Enable debug mode]' \
+                        '--no-debug[Disable debug mode]' \
+                        '-j[Allows for JOBS concurrent jobs.]' \
+                        '--jobs[Allows for JOBS concurrent jobs.]' \
+                        '-v[Increase verbosity level. Use -v, -vv, o]' \
+                        '--verbose[Increase verbosity level. Use -v, -vv, o]' \
+                        '-d[Enable debug logging for troubleshooting]' \
+                        '--debug-log[Enable debug logging for troubleshooting]' \
+                        '-g[(Optional GPU override) List of GPU #s t]' \
+                        '--gpus[(Optional GPU override) List of GPU #s t]' \
+                        '-e[Job execution/submission engine choice.]:(interactive batch)' \
+                        '--engine[Job execution/submission engine choice.]:(interactive batch)' \
+                        '-p[(Batch) Partition for job submission.]' \
+                        '--partition[(Batch) Partition for job submission.]' \
+                        '-q[(Batch) Quality of Service for job submi]' \
+                        '--quality_of_service[(Batch) Quality of Service for job submi]' \
+                        '-N[(Batch) Number of nodes.]' \
+                        '--nodes[(Batch) Number of nodes.]' \
+                        '-n[Number of tasks per node.]' \
+                        '--tasks-per-node[Number of tasks per node.]' \
+                        '-w[(Batch) Walltime.]' \
+                        '--walltime[(Batch) Walltime.]' \
+                        '-a[(Batch) Account to charge.]' \
+                        '--account[(Batch) Account to charge.]' \
+                        '-@[(Batch) Email for job notification.]' \
+                        '--email[(Batch) Email for job notification.]' \
+                        '-#[(Batch) Job name.]' \
+                        '--name[(Batch) Job name.]' \
+                        '-s[Build from scratch.]' \
+                        '--scratch[Build from scratch.]' \
+                        '-b[(Interactive) Override MPI execution bin]:(mpirun jsrun srun mpiexec)' \
+                        '--binary[(Interactive) Override MPI execution bin]:(mpirun jsrun srun mpiexec)' \
+                        '--dry-run[(Batch) Run without submitting batch fil]' \
+                        '--case-optimization[(GPU Optimization) Compile MFC targets w]' \
+                        '--no-build[(Testing) Do not rebuild MFC.]' \
+                        '--wait[(Batch) Wait for the job to finish.]' \
+                        '-c[(Batch) Path to a custom submission file]:(bridges2 carpenter carpenter-cray default delta deltaai frontier hipergator nautilus oscar phoenix phoenix-bench santis tuo)' \
+                        '--computer[(Batch) Path to a custom submission file]:(bridges2 carpenter carpenter-cray default delta deltaai frontier hipergator nautilus oscar phoenix phoenix-bench santis tuo)' \
+                        '-o[Output file (YAML) for summary.]' \
+                        '--output-summary[Output file (YAML) for summary.]' \
+                        '--clean[Clean the case before running.]' \
+                        '--ncu[Profile with NVIDIA Nsight Compute.]' \
+                        '--nsys[Profile with NVIDIA Nsight Systems.]' \
+                        '--rcu[Profile with ROCM rocprof-compute.]' \
+                        '--rsys[Profile with ROCM rocprof-systems.]'
                     ;;
                 test)
                     _arguments \
-                        '-j[Number of parallel jobs]:jobs:(1 2 4 8 16 32)' \
-                        '--jobs[Number of parallel jobs]:jobs:(1 2 4 8 16 32)' \
-                        '--only[Run only specific tests]:uuid:' \
-                        '--from[Start from test UUID]:uuid:' \
-                        '--to[End at test UUID]:uuid:' \
-                        '--generate[Generate golden files]' \
                         '--mpi[Enable MPI]' \
                         '--no-mpi[Disable MPI]' \
                         '--gpu[Enable GPU]:mode:(acc mp)' \
-                        '--no-gpu[Disable GPU]'
+                        '--no-gpu[Disable GPU]' \
+                        '--debug[Enable debug mode]' \
+                        '--no-debug[Disable debug mode]' \
+                        '-j[Allows for JOBS concurrent jobs.]' \
+                        '--jobs[Allows for JOBS concurrent jobs.]' \
+                        '-v[Increase verbosity level. Use -v, -vv, o]' \
+                        '--verbose[Increase verbosity level. Use -v, -vv, o]' \
+                        '-d[Enable debug logging for troubleshooting]' \
+                        '--debug-log[Enable debug logging for troubleshooting]' \
+                        '-g[(Optional GPU override) List of GPU #s t]' \
+                        '--gpus[(Optional GPU override) List of GPU #s t]' \
+                        '-l[List all available tests.]' \
+                        '--list[List all available tests.]' \
+                        '-f[First test UUID to run.]' \
+                        '--from[First test UUID to run.]' \
+                        '-t[Last test UUID to run.]' \
+                        '--to[Last test UUID to run.]' \
+                        '-o[Only run tests with specified properties]' \
+                        '--only[Only run tests with specified properties]' \
+                        '-a[Run the Post Process Tests too.]' \
+                        '--test-all[Run the Post Process Tests too.]' \
+                        '-%[Percentage of tests to run.]' \
+                        '--percent[Percentage of tests to run.]' \
+                        '-m[Maximum number of attempts to run a test]' \
+                        '--max-attempts[Maximum number of attempts to run a test]' \
+                        '--rdma-mpi[Run tests with RDMA MPI enabled]' \
+                        '--no-build[(Testing) Do not rebuild MFC.]' \
+                        '--no-examples[Do not test example cases.]' \
+                        '--case-optimization[(GPU Optimization) Compile MFC targets w]' \
+                        '--dry-run[Build and generate case files but do not]' \
+                        '--generate[(Test Generation) Generate golden files.]' \
+                        '--add-new-variables[(Test Generation) If new variables are f]' \
+                        '--remove-old-tests[(Test Generation) Delete tests directori]'
+                    ;;
+                t)
+                    _arguments \
+                        '--mpi[Enable MPI]' \
+                        '--no-mpi[Disable MPI]' \
+                        '--gpu[Enable GPU]:mode:(acc mp)' \
+                        '--no-gpu[Disable GPU]' \
+                        '--debug[Enable debug mode]' \
+                        '--no-debug[Disable debug mode]' \
+                        '-j[Allows for JOBS concurrent jobs.]' \
+                        '--jobs[Allows for JOBS concurrent jobs.]' \
+                        '-v[Increase verbosity level. Use -v, -vv, o]' \
+                        '--verbose[Increase verbosity level. Use -v, -vv, o]' \
+                        '-d[Enable debug logging for troubleshooting]' \
+                        '--debug-log[Enable debug logging for troubleshooting]' \
+                        '-g[(Optional GPU override) List of GPU #s t]' \
+                        '--gpus[(Optional GPU override) List of GPU #s t]' \
+                        '-l[List all available tests.]' \
+                        '--list[List all available tests.]' \
+                        '-f[First test UUID to run.]' \
+                        '--from[First test UUID to run.]' \
+                        '-t[Last test UUID to run.]' \
+                        '--to[Last test UUID to run.]' \
+                        '-o[Only run tests with specified properties]' \
+                        '--only[Only run tests with specified properties]' \
+                        '-a[Run the Post Process Tests too.]' \
+                        '--test-all[Run the Post Process Tests too.]' \
+                        '-%[Percentage of tests to run.]' \
+                        '--percent[Percentage of tests to run.]' \
+                        '-m[Maximum number of attempts to run a test]' \
+                        '--max-attempts[Maximum number of attempts to run a test]' \
+                        '--rdma-mpi[Run tests with RDMA MPI enabled]' \
+                        '--no-build[(Testing) Do not rebuild MFC.]' \
+                        '--no-examples[Do not test example cases.]' \
+                        '--case-optimization[(GPU Optimization) Compile MFC targets w]' \
+                        '--dry-run[Build and generate case files but do not]' \
+                        '--generate[(Test Generation) Generate golden files.]' \
+                        '--add-new-variables[(Test Generation) If new variables are f]' \
+                        '--remove-old-tests[(Test Generation) Delete tests directori]'
+                    ;;
+                clean)
+                    _arguments \
+                        '-t[Space separated list of targets to act u]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
+                        '--targets[Space separated list of targets to act u]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
+                        '--mpi[Enable MPI]' \
+                        '--no-mpi[Disable MPI]' \
+                        '--gpu[Enable GPU]:mode:(acc mp)' \
+                        '--no-gpu[Disable GPU]' \
+                        '--debug[Enable debug mode]' \
+                        '--no-debug[Disable debug mode]' \
+                        '-j[Allows for JOBS concurrent jobs.]' \
+                        '--jobs[Allows for JOBS concurrent jobs.]' \
+                        '-v[Increase verbosity level. Use -v, -vv, o]' \
+                        '--verbose[Increase verbosity level. Use -v, -vv, o]' \
+                        '-d[Enable debug logging for troubleshooting]' \
+                        '--debug-log[Enable debug logging for troubleshooting]'
+                    ;;
+                c)
+                    _arguments \
+                        '-t[Space separated list of targets to act u]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
+                        '--targets[Space separated list of targets to act u]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
+                        '--mpi[Enable MPI]' \
+                        '--no-mpi[Disable MPI]' \
+                        '--gpu[Enable GPU]:mode:(acc mp)' \
+                        '--no-gpu[Disable GPU]' \
+                        '--debug[Enable debug mode]' \
+                        '--no-debug[Disable debug mode]' \
+                        '-j[Allows for JOBS concurrent jobs.]' \
+                        '--jobs[Allows for JOBS concurrent jobs.]' \
+                        '-v[Increase verbosity level. Use -v, -vv, o]' \
+                        '--verbose[Increase verbosity level. Use -v, -vv, o]' \
+                        '-d[Enable debug logging for troubleshooting]' \
+                        '--debug-log[Enable debug logging for troubleshooting]'
                     ;;
                 validate)
                     _arguments \
-                        '1:case file:_files -g "*.py"' \
-                        '-d[Enable debug logging]' \
-                        '--debug-log[Enable debug logging]'
-                    ;;
-                init)
-                    _arguments \
-                        '1:case name:_files -/' \
-                        '-t[Template to use]:template:->templates' \
-                        '--template[Template to use]:template:->templates' \
-                        '-l[List available templates]' \
-                        '--list[List available templates]'
-
-                    case $state in
-                        templates)
-                            _describe -t templates 'template' templates
-                            ;;
-                    esac
-                    ;;
-                packer)
-                    local -a packer_cmds=(
-                        'pack:Pack a case into a single file'
-                        'compare:Compare two packed files'
-                    )
-                    _arguments \
-                        '1: :->packer_cmd' \
-                        '*:: :->packer_args'
-
-                    case $state in
-                        packer_cmd)
-                            _describe -t packer_cmds 'packer command' packer_cmds
-                            ;;
-                        packer_args)
-                            case $words[1] in
-                                pack)
-                                    _arguments '1:case file:_files -g "*.py"'
-                                    ;;
-                                compare)
-                                    _arguments \
-                                        '1:first pack file:_files -g "*.pack"' \
-                                        '2:second pack file:_files -g "*.pack"'
-                                    ;;
-                            esac
-                            ;;
-                    esac
-                    ;;
-                load)
-                    _arguments \
-                        '-c[Cluster]:cluster:(p f s a)' \
-                        '-m[Mode]:mode:(c g)'
-                    ;;
-                completion)
-                    local -a completion_cmds=(
-                        'install:Install shell completion'
-                        'uninstall:Remove shell completion'
-                        'status:Show completion status'
-                    )
-                    _arguments \
-                        '1: :->completion_cmd' \
-                        '*:: :->completion_args'
-
-                    case $state in
-                        completion_cmd)
-                            _describe -t completion_cmds 'completion command' completion_cmds
-                            ;;
-                        completion_args)
-                            case $words[1] in
-                                install)
-                                    _arguments '1:shell:(bash zsh)'
-                                    ;;
-                            esac
-                            ;;
-                    esac
-                    ;;
-                clean|count|interactive|lint|format|spelling|c)
-                    # No additional arguments
-                    ;;
-                help)
-                    local -a help_topics=(
-                        'gpu:GPU configuration and troubleshooting'
-                        'clusters:HPC cluster setup'
-                        'batch:Batch job submission'
-                        'debugging:Debugging and troubleshooting'
-                    )
-                    _describe -t help_topics 'help topic' help_topics
-                    ;;
-                b)
-                    # Alias for build
-                    _arguments \
-                        '-t[Targets to build]:target:->targets' \
-                        '-j[Number of parallel jobs]:jobs:(1 2 4 8 16 32)' \
-                        '--gpu[Enable GPU support]:mode:(acc mp)' \
-                        '--no-gpu[Disable GPU support]' \
-                        '--debug[Enable debug build]'
-                    ;;
-                r)
-                    # Alias for run
-                    _arguments \
-                        '1:case file:_files -g "*.py"' \
-                        '-n[Tasks per node]:tasks:' \
-                        '-N[Number of nodes]:nodes:' \
-                        '-e[Execution engine]:engine:(interactive batch)'
-                    ;;
-                t)
-                    # Alias for test
-                    _arguments \
-                        '-j[Number of parallel jobs]:jobs:(1 2 4 8 16 32)' \
-                        '--only[Run only specific tests]:uuid:' \
-                        '--generate[Generate golden files]'
+                        '1:Path to case file to validate.:_files -g "*.py"' \
+                        '-d[Enable debug logging for troubleshooting]' \
+                        '--debug-log[Enable debug logging for troubleshooting]'
                     ;;
                 v)
-                    # Alias for validate
                     _arguments \
-                        '1:case file:_files -g "*.py"' \
-                        '-d[Enable debug logging]'
+                        '1:Path to case file to validate.:_files -g "*.py"' \
+                        '-d[Enable debug logging for troubleshooting]' \
+                        '--debug-log[Enable debug logging for troubleshooting]'
+                    ;;
+                new)
+                    _arguments \
+                        '1:Name/path for the new case directory.:_files -/' \
+                        '-t[Template to use (e.g., 1D_minimal, 2D_mi]:(1D_minimal 2D_minimal 3D_minimal)' \
+                        '--template[Template to use (e.g., 1D_minimal, 2D_mi]:(1D_minimal 2D_minimal 3D_minimal)' \
+                        '-l[List available templates.]' \
+                        '--list[List available templates.]'
+                    ;;
+                packer)
+                    ;;
+                completion)
+                    _arguments \
+                        '1:Action: install, uninstall, or status:(install uninstall status)' \
+                        '2:Shell type: bash or zsh (auto-detected i:(bash zsh)'
+                    ;;
+                help)
+                    _arguments \
+                        '1:Help topic: gpu, clusters, batch, debugg:(gpu clusters batch debugging)'
+                    ;;
+                generate)
+                    _arguments \
+                        '--check[Check if generated files are up to date ]'
+                    ;;
+                load)
+                    ;;
+                lint)
+                    ;;
+                format)
+                    ;;
+                spelling)
+                    ;;
+                interactive)
+                    ;;
+                bench)
+                    _arguments \
+                        '-t[Space separated list of targets to act u]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
+                        '--targets[Space separated list of targets to act u]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
+                        '--mpi[Enable MPI]' \
+                        '--no-mpi[Disable MPI]' \
+                        '--gpu[Enable GPU]:mode:(acc mp)' \
+                        '--no-gpu[Disable GPU]' \
+                        '--debug[Enable debug mode]' \
+                        '--no-debug[Disable debug mode]' \
+                        '-j[Allows for JOBS concurrent jobs.]' \
+                        '--jobs[Allows for JOBS concurrent jobs.]' \
+                        '-v[Increase verbosity level. Use -v, -vv, o]' \
+                        '--verbose[Increase verbosity level. Use -v, -vv, o]' \
+                        '-d[Enable debug logging for troubleshooting]' \
+                        '--debug-log[Enable debug logging for troubleshooting]' \
+                        '-g[(Optional GPU override) List of GPU #s t]' \
+                        '--gpus[(Optional GPU override) List of GPU #s t]' \
+                        '-o[Path to the YAML output file to write th]' \
+                        '--output[Path to the YAML output file to write th]' \
+                        '-m[Memory per task for benchmarking cases]' \
+                        '--mem[Memory per task for benchmarking cases]'
+                    ;;
+                bench_diff)
+                    _arguments \
+                        '1:Path to a benchmark result YAML file.' \
+                        '2:Path to a benchmark result YAML file.' \
+                        '--mpi[Enable MPI]' \
+                        '--no-mpi[Disable MPI]' \
+                        '--gpu[Enable GPU]:mode:(acc mp)' \
+                        '--no-gpu[Disable GPU]' \
+                        '--debug[Enable debug mode]' \
+                        '--no-debug[Disable debug mode]' \
+                        '-j[Allows for JOBS concurrent jobs.]' \
+                        '--jobs[Allows for JOBS concurrent jobs.]' \
+                        '-v[Increase verbosity level. Use -v, -vv, o]' \
+                        '--verbose[Increase verbosity level. Use -v, -vv, o]' \
+                        '-d[Enable debug logging for troubleshooting]' \
+                        '--debug-log[Enable debug logging for troubleshooting]'
+                    ;;
+                count)
+                    _arguments \
+                        '-t[Space separated list of targets to act u]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
+                        '--targets[Space separated list of targets to act u]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
+                        '--mpi[Enable MPI]' \
+                        '--no-mpi[Disable MPI]' \
+                        '--gpu[Enable GPU]:mode:(acc mp)' \
+                        '--no-gpu[Disable GPU]' \
+                        '--debug[Enable debug mode]' \
+                        '--no-debug[Disable debug mode]' \
+                        '-j[Allows for JOBS concurrent jobs.]' \
+                        '--jobs[Allows for JOBS concurrent jobs.]' \
+                        '-v[Increase verbosity level. Use -v, -vv, o]' \
+                        '--verbose[Increase verbosity level. Use -v, -vv, o]' \
+                        '-d[Enable debug logging for troubleshooting]' \
+                        '--debug-log[Enable debug logging for troubleshooting]'
+                    ;;
+                count_diff)
+                    _arguments \
+                        '-t[Space separated list of targets to act u]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
+                        '--targets[Space separated list of targets to act u]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
+                        '--mpi[Enable MPI]' \
+                        '--no-mpi[Disable MPI]' \
+                        '--gpu[Enable GPU]:mode:(acc mp)' \
+                        '--no-gpu[Disable GPU]' \
+                        '--debug[Enable debug mode]' \
+                        '--no-debug[Disable debug mode]' \
+                        '-j[Allows for JOBS concurrent jobs.]' \
+                        '--jobs[Allows for JOBS concurrent jobs.]' \
+                        '-v[Increase verbosity level. Use -v, -vv, o]' \
+                        '--verbose[Increase verbosity level. Use -v, -vv, o]' \
+                        '-d[Enable debug logging for troubleshooting]' \
+                        '--debug-log[Enable debug logging for troubleshooting]'
                     ;;
             esac
             ;;
