@@ -77,7 +77,7 @@ contains
         integer :: global_id
         real(wp), dimension(3) :: dist_vec
 
-        real(wp), dimension(1:3) :: xy_local !< x and y coordinates in local IB frame
+        real(wp), dimension(1:3) :: xy_local, offset !< x and y coordinates in local IB frame
         real(wp), dimension(1:2) :: center
         real(wp), dimension(1:3, 1:3) :: rotation, inverse_rotation
 
@@ -87,14 +87,15 @@ contains
         center(2) = patch_ib(ib_patch_id)%y_centroid
         inverse_rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:, :)
         rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix(:, :)
+        offset(:) = patch_ib(ib_patch_id)%centroid_offset(:)
 
         $:GPU_PARALLEL_LOOP(private='[i,j,xy_local,k,dist_vec,dist,global_dist,global_id]', &
-                  & copyin='[ib_patch_id,center,rotation,inverse_rotation,airfoil_grid_u,airfoil_grid_l]', collapse=2)
+                  & copyin='[ib_patch_id,center,rotation,inverse_rotation,offset,airfoil_grid_u,airfoil_grid_l]', collapse=2)
         do i = 0, m
             do j = 0, n
                 xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp] ! get coordinate frame centered on IB
                 xy_local = matmul(inverse_rotation, xy_local) ! rotate the frame into the IB's coordinate
-                xy_local = xy_local - patch_ib(ib_patch_id)%centroid_offset ! airfoils are a patch that require a centroid offset
+                xy_local = xy_local - offset ! airfoils are a patch that require a centroid offset
 
                 if (xy_local(2) >= 0._wp) then
                     ! finds the location on the airfoil grid with the minimum distance (closest)
@@ -165,7 +166,7 @@ contains
         real(wp) :: lz, z_max, z_min
         real(wp), dimension(3) :: dist_vec
 
-        real(wp), dimension(1:3) :: xyz_local, center !< x, y, z coordinates in local IB frame
+        real(wp), dimension(1:3) :: xyz_local, center, offset !< x, y, z coordinates in local IB frame
         real(wp), dimension(1:3, 1:3) :: rotation, inverse_rotation
 
         real(wp) :: length_z
@@ -178,19 +179,20 @@ contains
         lz = patch_ib(ib_patch_id)%length_z
         inverse_rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:, :)
         rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix(:, :)
+        offset(:) = patch_ib(ib_patch_id)%centroid_offset(:)
 
         z_max = center(3) + lz/2
         z_min = center(3) - lz/2
 
         $:GPU_PARALLEL_LOOP(private='[i,j,l,xyz_local,k,dist_vec,dist,global_dist,global_id,dist_side,dist_surf]', &
-                  & copyin='[ib_patch_id,center,rotation,inverse_rotation,airfoil_grid_u,airfoil_grid_l,z_min,z_max]', collapse=3)
+                  & copyin='[ib_patch_id,center,rotation,inverse_rotation,offset,airfoil_grid_u,airfoil_grid_l,z_min,z_max]', collapse=3)
         do l = 0, p
             do j = 0, n
                 do i = 0, m
 
                     xyz_local = [x_cc(i) - center(1), y_cc(j) - center(2), z_cc(l) - center(3)] ! get coordinate frame centered on IB
                     xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordinates
-                    xyz_local = xyz_local - patch_ib(ib_patch_id)%centroid_offset ! airfoils are a patch that require a centroid offset
+                    xyz_local = xyz_local - offset ! airfoils are a patch that require a centroid offset
 
                     if (xyz_local(2) >= center(2)) then
                         do k = 1, Np
@@ -239,12 +241,12 @@ contains
                     if (dist_side < dist_surf) then
                         levelset%sf(i, j, l, ib_patch_id) = dist_side
                         if (f_approx_equal(dist_side, abs(z_cc(l) - z_min))) then
-                            levelset_norm%sf(i, j, l, ib_patch_id, :) = (/0, 0, -1/)
+                            levelset_norm%sf(i, j, l, ib_patch_id, :) = (/0._wp, 0._wp, -1._wp/)
                         else
-                            levelset_norm%sf(i, j, l, ib_patch_id, :) = (/0, 0, 1/)
+                            levelset_norm%sf(i, j, l, ib_patch_id, :) = (/0._wp, 0._wp, 1._wp/)
                         end if
                         levelset_norm%sf(i, j, l, ib_patch_id, :) = &
-                            matmul(rotation, levelset_norm%sf(i, j, l, ib_patch_id, :)/dist_surf)
+                            matmul(rotation, levelset_norm%sf(i, j, l, ib_patch_id, :))
                     else
                         levelset%sf(i, j, l, ib_patch_id) = dist_surf
                         if (f_approx_equal(dist_surf, 0._wp)) then

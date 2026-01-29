@@ -192,7 +192,7 @@ contains
         integer :: i, j, k
         integer :: Np1, Np2
 
-        real(wp), dimension(1:3) :: xy_local !< x and y coordinates in local IB frame
+        real(wp), dimension(1:3) :: xy_local, offset !< x and y coordinates in local IB frame
         real(wp), dimension(1:2) :: center !< x and y coordinates in local IB frame
         real(wp), dimension(1:3, 1:3) :: inverse_rotation
 
@@ -203,6 +203,7 @@ contains
         ma = patch_ib(patch_id)%m
         ta = patch_ib(patch_id)%t
         inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
+        offset(:) = patch_ib(patch_id)%centroid_offset(:)
 
         ! rank(dx) is not consistent between pre_process and simulation. This IFDEF prevents compilation errors
 #ifdef MFC_PRE_PROCESS
@@ -274,12 +275,12 @@ contains
         end if
 
         $:GPU_PARALLEL_LOOP(private='[i,j,xy_local,k,f]', copy='[ib_markers_sf]',&
-                  & copyin='[patch_id,center,inverse_rotation,ma,ca_in,airfoil_grid_u,airfoil_grid_l]', collapse=2)
+                  & copyin='[patch_id,center,inverse_rotation,offset,ma,ca_in,airfoil_grid_u,airfoil_grid_l]', collapse=2)
         do j = 0, n
             do i = 0, m
                 xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp] ! get coordinate frame centered on IB
                 xy_local = matmul(inverse_rotation, xy_local) ! rotate the frame into the IB's coordinates
-                xy_local = xy_local - patch_ib(patch_id)%centroid_offset ! airfoils are a patch that require a centroid offset
+                xy_local = xy_local - offset ! airfoils are a patch that require a centroid offset
 
                 if (xy_local(1) >= 0._wp .and. xy_local(1) <= ca_in) then
                     xa = xy_local(1)/ca_in
@@ -345,7 +346,7 @@ contains
         integer :: i, j, k, l
         integer :: Np1, Np2
 
-        real(wp), dimension(1:3) :: xyz_local, center !< x, y, z coordinates in local IB frame
+        real(wp), dimension(1:3) :: xyz_local, center, offset !< x, y, z coordinates in local IB frame
         real(wp), dimension(1:3, 1:3) :: inverse_rotation
 
         center(1) = patch_ib(patch_id)%x_centroid
@@ -357,6 +358,7 @@ contains
         ma = patch_ib(patch_id)%m
         ta = patch_ib(patch_id)%t
         inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
+        offset(:) = patch_ib(patch_id)%centroid_offset(:)
 
         ! rank(dx) is not consistent between pre_process and simulation. This IFDEF prevents compilation errors
 #ifdef MFC_PRE_PROCESS
@@ -428,13 +430,13 @@ contains
         end if
 
         $:GPU_PARALLEL_LOOP(private='[i,j,l,xyz_local,k,f]', copy='[ib_markers_sf]',&
-                  & copyin='[patch_id,center,inverse_rotation,ma,ca_in,airfoil_grid_u,airfoil_grid_l]', collapse=3)
+                  & copyin='[patch_id,center,inverse_rotation,offset,ma,ca_in,airfoil_grid_u,airfoil_grid_l]', collapse=3)
         do l = 0, p
             do j = 0, n
                 do i = 0, m
                     xyz_local = [x_cc(i) - center(1), y_cc(j) - center(2), z_cc(l) - center(3)] ! get coordinate frame centered on IB
                     xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordinates
-                    xyz_local = xyz_local - patch_ib(patch_id)%centroid_offset ! airfoils are a patch that require a centroid offset
+                    xyz_local = xyz_local - offset ! airfoils are a patch that require a centroid offset
 
                     if (xyz_local(3) >= z_min .and. xyz_local(3) <= z_max) then
 
