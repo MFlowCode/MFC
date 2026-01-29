@@ -159,37 +159,30 @@ contains
                             if (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == BC_REFLECTIVE)) then
                                 call s_shift_cell_symmetric_bc(cellaux, cell)
                             end if
-                        else
-                            func = 0._wp
-                            func2 = 0._wp
-                            cellaux(1) = cell(1)
-                            cellaux(2) = cell(2)
-                            cellaux(3) = cell(3)
-                            if (p == 0) cellaux(3) = 0
-                        end if
 
-                        !Update void fraction field
-                        addFun1 = func*strength_vol
-                        $:GPU_ATOMIC(atomic='update')
-                        updatedvar(1)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                            updatedvar(1)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                            + real(addFun1, kind=stp)
-
-                        !Update time derivative of void fraction
-                        addFun2 = func*strength_vel
-                        $:GPU_ATOMIC(atomic='update')
-                        updatedvar(2)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                            updatedvar(2)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                            + real(addFun2, kind=stp)
-
-                        !Product of two smeared functions
-                        !Update void fraction * time derivative of void fraction
-                        if (lag_params%cluster_type >= 4) then
-                            addFun3 = func2*strength_vol*strength_vel
+                            !Update void fraction field
+                            addFun1 = func*strength_vol
                             $:GPU_ATOMIC(atomic='update')
-                            updatedvar(5)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                                updatedvar(5)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                + real(addFun3, kind=stp)
+                            updatedvar(1)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
+                                updatedvar(1)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                                + real(addFun1, kind=stp)
+
+                            !Update time derivative of void fraction
+                            addFun2 = func*strength_vel
+                            $:GPU_ATOMIC(atomic='update')
+                            updatedvar(2)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
+                                updatedvar(2)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                                + real(addFun2, kind=stp)
+
+                            !Product of two smeared functions
+                            !Update void fraction * time derivative of void fraction
+                            if (lag_params%cluster_type >= 4) then
+                                addFun3 = func2*strength_vol*strength_vel
+                                $:GPU_ATOMIC(atomic='update')
+                                updatedvar(5)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
+                                    updatedvar(5)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                                    + real(addFun3, kind=stp)
+                            end if
                         end if
                     end do
                 end do
