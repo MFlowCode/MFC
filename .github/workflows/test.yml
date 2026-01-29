@@ -127,6 +127,10 @@ jobs:
             cluster_name: 'Oak Ridge | Frontier'
             device: 'cpu'
             interface: 'none'
+          - lbl: 'frontier_amd'
+            cluster_name: 'Oak Ridge | Frontier (AMD)'
+            device: 'gpu'
+            interface: 'omp'
     runs-on:
       group:  phoenix
       labels: ${{ matrix.lbl }}
@@ -150,6 +154,14 @@ jobs:
         if:   matrix.lbl == 'frontier'
         run:  bash .github/workflows/frontier/submit.sh .github/workflows/frontier/test.sh ${{matrix.device}} ${{ matrix.interface }}
 
+      - name: Build
+        if:   matrix.lbl == 'frontier_amd'
+        run:  bash .github/workflows/frontier_amd/build.sh ${{ matrix.device }} ${{ matrix.interface }}
+
+      - name: Test
+        if:   matrix.lbl == 'frontier_amd'
+        run:  bash .github/workflows/frontier_amd/submit.sh .github/workflows/frontier_amd/test.sh ${{matrix.device}} ${{ matrix.interface }}  
+
       - name: Print Logs
         if:   always()
         run:  cat test-${{ matrix.device }}-${{ matrix.interface }}.out
@@ -157,6 +169,13 @@ jobs:
       - name: Archive Logs
         uses: actions/upload-artifact@v4
         if:   matrix.lbl == 'frontier'
+        with:
+          name: logs-${{ strategy.job-index }}-${{ matrix.device }}-${{ matrix.interface }}
+          path: test-${{ matrix.device }}-${{ matrix.interface }}.out
+
+      - name: Archive Logs
+        uses: actions/upload-artifact@v4
+        if:   matrix.lbl == 'frontier_amd'
         with:
           name: logs-${{ strategy.job-index }}-${{ matrix.device }}-${{ matrix.interface }}
           path: test-${{ matrix.device }}-${{ matrix.interface }}.out
