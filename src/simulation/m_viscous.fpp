@@ -72,13 +72,13 @@ contains
 
         real(wp) :: rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum  !< Mixture variables
         real(wp), dimension(2) :: Re_visc
-#:if not MFC_CASE_OPTIMIZATION and USING_AMD
-        real(wp), dimension(3) :: alpha_visc, alpha_rho_visc
-        real(wp), dimension(3, 3) :: tau_Re
-#:else 
-        real(wp), dimension(num_fluids) :: alpha_visc, alpha_rho_visc
-        real(wp), dimension(num_dims, num_dims) :: tau_Re
-#:endif
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3) :: alpha_visc, alpha_rho_visc
+            real(wp), dimension(3, 3) :: tau_Re
+        #:else
+            real(wp), dimension(num_fluids) :: alpha_visc, alpha_rho_visc
+            real(wp), dimension(num_dims, num_dims) :: tau_Re
+        #:endif
 
         integer :: i, j, k, l, q !< Generic loop iterator
 

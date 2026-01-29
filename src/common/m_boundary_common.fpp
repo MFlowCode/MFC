@@ -54,7 +54,7 @@ contains
 
     impure subroutine s_initialize_boundary_common_module()
 
-        integer :: i, j 
+        integer :: i, j
 
         @:ALLOCATE(bc_buffers(1:3, 1:2))
 
@@ -62,20 +62,20 @@ contains
             @:ALLOCATE(bc_buffers(1, 1)%sf(1:sys_size, 0:n, 0:p))
             @:ALLOCATE(bc_buffers(1, 2)%sf(1:sys_size, 0:n, 0:p))
             #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
-            if (n > 0) then
-                @:ALLOCATE(bc_buffers(2,1)%sf(-buff_size:m+buff_size,1:sys_size,0:p))
-                @:ALLOCATE(bc_buffers(2,2)%sf(-buff_size:m+buff_size,1:sys_size,0:p))                
-                #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
-                if (p > 0) then            
-                    @:ALLOCATE(bc_buffers(3,1)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,1:sys_size))
-                    @:ALLOCATE(bc_buffers(3,2)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,1:sys_size))
-                end if  
-                #:endif
-            end if
+                if (n > 0) then
+                    @:ALLOCATE(bc_buffers(2,1)%sf(-buff_size:m+buff_size,1:sys_size,0:p))
+                    @:ALLOCATE(bc_buffers(2,2)%sf(-buff_size:m+buff_size,1:sys_size,0:p))
+                    #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                        if (p > 0) then
+                            @:ALLOCATE(bc_buffers(3,1)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,1:sys_size))
+                            @:ALLOCATE(bc_buffers(3,2)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,1:sys_size))
+                        end if
+                    #:endif
+                end if
             #:endif
             do i = 1, num_dims
                 do j = 1, 2
-                @:ACC_SETUP_SFs(bc_buffers(i,j))
+                    @:ACC_SETUP_SFs(bc_buffers(i,j))
                 end do
             end do
 
@@ -160,7 +160,7 @@ contains
         if (n == 0) return
 
         #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
-        
+
             if (bc_y%beg >= 0) then
                 call s_mpi_sendrecv_variables_buffers(q_prim_vf, 2, -1, sys_size, pb_in, mv_in)
             else
@@ -193,8 +193,6 @@ contains
                 end do
                 $:END_GPU_PARALLEL_LOOP()
             end if
-
-         
 
             if (bc_y%end >= 0) then
                 call s_mpi_sendrecv_variables_buffers(q_prim_vf, 2, 1, sys_size, pb_in, mv_in)
@@ -1063,41 +1061,41 @@ contains
                 end do
             end if
         elseif (bc_dir == 2) then !< y-direction
-#:if not MFC_CASE_OPTIMIZATION or num_dims > 1
-            if (bc_loc == -1) then !< bc_y%beg
-                do i = 1, sys_size
-                    do j = 1, buff_size
-                        q_prim_vf(i)%sf(k, -j, l) = &
-                            bc_buffers(2, 1)%sf(k, i, l)
+            #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
+                if (bc_loc == -1) then !< bc_y%beg
+                    do i = 1, sys_size
+                        do j = 1, buff_size
+                            q_prim_vf(i)%sf(k, -j, l) = &
+                                bc_buffers(2, 1)%sf(k, i, l)
+                        end do
                     end do
-                end do
-            else !< bc_y%end
-                do i = 1, sys_size
-                    do j = 1, buff_size
-                        q_prim_vf(i)%sf(k, n + j, l) = &
-                            bc_buffers(2, 2)%sf(k, i, l)
+                else !< bc_y%end
+                    do i = 1, sys_size
+                        do j = 1, buff_size
+                            q_prim_vf(i)%sf(k, n + j, l) = &
+                                bc_buffers(2, 2)%sf(k, i, l)
+                        end do
                     end do
-                end do
-            end if
-#:endif
+                end if
+            #:endif
         elseif (bc_dir == 3) then !< z-direction
-#:if not MFC_CASE_OPTIMIZATION or num_dims > 2
-            if (bc_loc == -1) then !< bc_z%beg
-                do i = 1, sys_size
-                    do j = 1, buff_size
-                        q_prim_vf(i)%sf(k, l, -j) = &
-                            bc_buffers(3, 1)%sf(k, l, i)
+            #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                if (bc_loc == -1) then !< bc_z%beg
+                    do i = 1, sys_size
+                        do j = 1, buff_size
+                            q_prim_vf(i)%sf(k, l, -j) = &
+                                bc_buffers(3, 1)%sf(k, l, i)
+                        end do
                     end do
-                end do
-            else !< bc_z%end
-                do i = 1, sys_size
-                    do j = 1, buff_size
-                        q_prim_vf(i)%sf(k, l, p + j) = &
-                            bc_buffers(3, 2)%sf(k, l, i)
+                else !< bc_z%end
+                    do i = 1, sys_size
+                        do j = 1, buff_size
+                            q_prim_vf(i)%sf(k, l, p + j) = &
+                                bc_buffers(3, 2)%sf(k, l, i)
+                        end do
                     end do
-                end do
-            end if
-#:endif
+                end if
+            #:endif
         end if
 #else
         call s_ghost_cell_extrapolation(q_prim_vf, bc_dir, bc_loc, k, l)
@@ -2191,16 +2189,16 @@ contains
             deallocate (bc_buffers(1, 1)%sf)
             deallocate (bc_buffers(1, 2)%sf)
             #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
-            if (n > 0) then
-                deallocate (bc_buffers(2, 1)%sf)
-                deallocate (bc_buffers(2, 2)%sf)
-                #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
-                if (p > 0) then
-                    deallocate (bc_buffers(3, 1)%sf)
-                    deallocate (bc_buffers(3, 2)%sf)
+                if (n > 0) then
+                    deallocate (bc_buffers(2, 1)%sf)
+                    deallocate (bc_buffers(2, 2)%sf)
+                    #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                        if (p > 0) then
+                            deallocate (bc_buffers(3, 1)%sf)
+                            deallocate (bc_buffers(3, 2)%sf)
+                        end if
+                    #:endif
                 end if
-                #:endif
-            end if
             #:endif
         end if
 

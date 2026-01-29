@@ -571,11 +571,11 @@ contains
             & cray_inline=True)
 
         real(wp), intent(in) :: pres, rho, c
-#:if USING_AMD
-        real(wp), dimension(32, 0:2, 0:2), intent(out) :: coeffs
-#:else
-        real(wp), dimension(nterms, 0:2, 0:2), intent(out) :: coeffs
-#:endif
+        #:if USING_AMD
+            real(wp), dimension(32, 0:2, 0:2), intent(out) :: coeffs
+        #:else
+            real(wp), dimension(nterms, 0:2, 0:2), intent(out) :: coeffs
+        #:endif
 
         integer :: i1, i2
 
@@ -650,11 +650,11 @@ contains
             & cray_inline=True)
 
         real(wp), intent(in) :: pres, rho, c
-#:if USING_AMD
-        real(wp), dimension(32, 0:2, 0:2), intent(out) :: coeffs
-#:else
-        real(wp), dimension(nterms, 0:2, 0:2), intent(out) :: coeffs
-#:endif
+        #:if USING_AMD
+            real(wp), dimension(32, 0:2, 0:2), intent(out) :: coeffs
+        #:else
+            real(wp), dimension(nterms, 0:2, 0:2), intent(out) :: coeffs
+        #:endif
 
         integer :: i1, i2
 
@@ -723,18 +723,18 @@ contains
         real(stp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: mv
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: rhs_mv
         type(int_bounds_info), intent(in) :: ix, iy, iz
-#:if not MFC_CASE_OPTIMIZATION and USING_AMD
-        real(wp), dimension(6) :: moms, msum
-        real(wp), dimension(4, 3) :: wght, abscX, abscY, wght_pb, wght_mv, wght_ht, ht
-#:else 
-        real(wp), dimension(nmom) :: moms, msum
-        real(wp), dimension(nnode, nb) :: wght, abscX, abscY, wght_pb, wght_mv, wght_ht, ht
-#:endif
-#:if USING_AMD
-        real(wp), dimension(32, 0:2, 0:2) :: coeff
-#:else
-        real(wp), dimension(nterms, 0:2, 0:2) :: coeff
-#:endif
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(6) :: moms, msum
+            real(wp), dimension(4, 3) :: wght, abscX, abscY, wght_pb, wght_mv, wght_ht, ht
+        #:else
+            real(wp), dimension(nmom) :: moms, msum
+            real(wp), dimension(nnode, nb) :: wght, abscX, abscY, wght_pb, wght_mv, wght_ht, ht
+        #:endif
+        #:if USING_AMD
+            real(wp), dimension(32, 0:2, 0:2) :: coeff
+        #:else
+            real(wp), dimension(nterms, 0:2, 0:2) :: coeff
+        #:endif
         real(wp) :: pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, grad_T
         real(wp) :: n_tait, B_tait
         integer :: id1, id2, id3, i1, i2, j, q, r
@@ -887,11 +887,11 @@ contains
             $:GPU_ROUTINE(function_name='s_coeff_selector',parallelism='[seq]', &
                 & cray_inline=True)
             real(wp), intent(in) :: pres, rho, c
-#:if USING_AMD
-            real(wp), dimension(32, 0:2, 0:2), intent(out) :: coeff
-#:else
-            real(wp), dimension(nterms, 0:2, 0:2), intent(out) :: coeff
-#:endif
+            #:if USING_AMD
+                real(wp), dimension(32, 0:2, 0:2), intent(out) :: coeff
+            #:else
+                real(wp), dimension(nterms, 0:2, 0:2), intent(out) :: coeff
+            #:endif
             logical, intent(in) :: polytropic
             if (polytropic) then
                 call s_coeff(pres, rho, c, coeff)
@@ -980,11 +980,11 @@ contains
 
         function f_quad(abscX, abscY, wght_in, q, r, s)
             $:GPU_ROUTINE(parallelism='[seq]')
-#:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(4, 3), intent(in) :: abscX, abscY, wght_in
-#:else
-            real(wp), dimension(nnode, nb), intent(in) :: abscX, abscY, wght_in 
-#:endif
+            #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+                real(wp), dimension(4, 3), intent(in) :: abscX, abscY, wght_in
+            #:else
+                real(wp), dimension(nnode, nb), intent(in) :: abscX, abscY, wght_in
+            #:endif
             real(wp), intent(in) :: q, r, s
 
             real(wp) :: f_quad_RV, f_quad
@@ -1005,11 +1005,11 @@ contains
 
         function f_quad2D(abscX, abscY, wght_in, pow)
             $:GPU_ROUTINE(parallelism='[seq]')
-#:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(4), intent(in) :: abscX, abscY, wght_in
-#:else 
-            real(wp), dimension(nnode), intent(in) :: abscX, abscY, wght_in
-#:endif
+            #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+                real(wp), dimension(4), intent(in) :: abscX, abscY, wght_in
+            #:else
+                real(wp), dimension(nnode), intent(in) :: abscX, abscY, wght_in
+            #:endif
             real(wp), dimension(3), intent(in) :: pow
 
             real(wp) :: f_quad2D

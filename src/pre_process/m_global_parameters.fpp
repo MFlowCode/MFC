@@ -300,7 +300,7 @@ module m_global_parameters
     !! to the next time-step.
 
     logical :: fft_wrt
-    logical :: dummy 
+    logical :: dummy
 
 contains
 

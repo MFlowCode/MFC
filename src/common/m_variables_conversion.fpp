@@ -128,7 +128,6 @@ contains
         real(wp) :: E_e
         real(wp) :: e_Per_Kg, Pdyn_Per_Kg
         real(wp) :: T_guess
-        
 
         integer :: s !< Generic loop iterator
 
@@ -252,10 +251,9 @@ contains
         real(wp), intent(out), target :: qv
 
         real(wp), optional, dimension(2), intent(out) :: Re_K
-        real(wp), optional, intent(out) :: G_K 
+        real(wp), optional, intent(out) :: G_K
         real(wp), dimension(num_fluids) :: alpha_rho_K, alpha_K !<
         real(wp), optional, dimension(num_fluids), intent(in) :: G
-        
 
         integer :: i, j !< Generic loop iterator
 
@@ -323,17 +321,16 @@ contains
             & parallelism='[seq]', cray_inline=True)
 
         real(wp), intent(out) :: rho_K, gamma_K, pi_inf_K, qv_K
-#:if not MFC_CASE_OPTIMIZATION and USING_AMD
-        real(wp), dimension(3), intent(inout) :: alpha_rho_K, alpha_K !<
-        real(wp), optional, dimension(3), intent(in) :: G
-#:else 
-        real(wp), dimension(num_fluids), intent(inout) :: alpha_rho_K, alpha_K !<
-        real(wp), optional, dimension(num_fluids), intent(in) :: G
-#:endif
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3), intent(inout) :: alpha_rho_K, alpha_K !<
+            real(wp), optional, dimension(3), intent(in) :: G
+        #:else
+            real(wp), dimension(num_fluids), intent(inout) :: alpha_rho_K, alpha_K !<
+            real(wp), optional, dimension(num_fluids), intent(in) :: G
+        #:endif
         real(wp), dimension(2), intent(out) :: Re_K
         real(wp), optional, intent(out) :: G_K
         real(wp) :: alpha_K_sum
-        
 
         integer :: i, j !< Generic loop iterators
 
@@ -590,15 +587,15 @@ contains
         type(scalar_field), intent(inout) :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(inout) :: qK_prim_vf
         type(int_bounds_info), dimension(1:3), intent(in) :: ibounds
-#:if USING_AMD and not MFC_CASE_OPTIMIZATION
-        real(wp), dimension(3) :: alpha_K, alpha_rho_K
-        real(wp), dimension(3) :: nRtmp
-        real(wp) :: rhoYks(1:10)
-#:else
-        real(wp), dimension(num_fluids) :: alpha_K, alpha_rho_K
-        real(wp), dimension(nb) :: nRtmp
-        real(wp) :: rhoYks(1:num_species) 
-#:endif
+        #:if USING_AMD and not MFC_CASE_OPTIMIZATION
+            real(wp), dimension(3) :: alpha_K, alpha_rho_K
+            real(wp), dimension(3) :: nRtmp
+            real(wp) :: rhoYks(1:10)
+        #:else
+            real(wp), dimension(num_fluids) :: alpha_K, alpha_rho_K
+            real(wp), dimension(nb) :: nRtmp
+            real(wp) :: rhoYks(1:num_species)
+        #:endif
         real(wp), dimension(2) :: Re_K
         real(wp) :: rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K
 
@@ -1190,17 +1187,17 @@ contains
         ! Partial densities, density, velocity, pressure, energy, advection
         ! variables, the specific heat ratio and liquid stiffness functions,
         ! the shear and volume Reynolds numbers and the Weber numbers
-#:if not MFC_CASE_OPTIMIZATION and USING_AMD
-        real(wp), dimension(3) :: alpha_rho_K
-        real(wp), dimension(3) :: alpha_K
-        real(wp), dimension(3) :: vel_K
-        real(wp), dimension(10) :: Y_K
-#:else
-        real(wp), dimension(num_fluids) :: alpha_rho_K
-        real(wp), dimension(num_fluids) :: alpha_K
-        real(wp), dimension(num_vels) :: vel_K
-        real(wp), dimension(num_species) :: Y_K 
-#:endif
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3) :: alpha_rho_K
+            real(wp), dimension(3) :: alpha_K
+            real(wp), dimension(3) :: vel_K
+            real(wp), dimension(10) :: Y_K
+        #:else
+            real(wp), dimension(num_fluids) :: alpha_rho_K
+            real(wp), dimension(num_fluids) :: alpha_K
+            real(wp), dimension(num_vels) :: vel_K
+            real(wp), dimension(num_species) :: Y_K
+        #:endif
         real(wp) :: rho_K
         real(wp) :: vel_K_sum
         real(wp) :: pres_K
@@ -1337,11 +1334,11 @@ contains
             & parallelism='[seq]', cray_inline=True)
         type(scalar_field), dimension(sys_size), intent(in) :: q_vf
         integer, intent(in) :: k, l, r
-#:if not MFC_CASE_OPTIMIZATION and USING_AMD
-        real(wp), dimension(3), intent(out) :: alpha_rho_K, alpha_K
-#:else 
-        real(wp), dimension(num_fluids), intent(out) :: alpha_rho_K, alpha_K
-#:endif
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3), intent(out) :: alpha_rho_K, alpha_K
+        #:else
+            real(wp), dimension(num_fluids), intent(out) :: alpha_rho_K, alpha_K
+        #:endif
         integer :: i
         real(wp) :: alpha_K_sum
 
@@ -1411,11 +1408,11 @@ contains
         real(wp), intent(in) :: pres
         real(wp), intent(in) :: rho, gamma, pi_inf, qv
         real(wp), intent(in) :: H
-#:if not MFC_CASE_OPTIMIZATION and USING_AMD
-        real(wp), dimension(3), intent(in) :: adv
-#:else
-        real(wp), dimension(num_fluids), intent(in) :: adv 
-#:endif
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3), intent(in) :: adv
+        #:else
+            real(wp), dimension(num_fluids), intent(in) :: adv
+        #:endif
         real(wp), intent(in) :: vel_sum
         real(wp), intent(in) :: c_c
         real(wp), intent(out) :: c

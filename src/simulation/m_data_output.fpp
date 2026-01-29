@@ -268,13 +268,13 @@ contains
         integer, intent(in) :: t_step
 
         real(wp) :: rho        !< Cell-avg. density
-#:if not MFC_CASE_OPTIMIZATION and USING_AMD
-        real(wp), dimension(3) :: alpha      !< Cell-avg. volume fraction
-        real(wp), dimension(3) :: vel        !< Cell-avg. velocity
-#:else
-        real(wp), dimension(num_fluids) :: alpha      !< Cell-avg. volume fraction
-        real(wp), dimension(num_vels) :: vel        !< Cell-avg. velocity
-#:endif
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3) :: alpha      !< Cell-avg. volume fraction
+            real(wp), dimension(3) :: vel        !< Cell-avg. velocity
+        #:else
+            real(wp), dimension(num_fluids) :: alpha      !< Cell-avg. volume fraction
+            real(wp), dimension(num_vels) :: vel        !< Cell-avg. velocity
+        #:endif
         real(wp) :: vel_sum    !< Cell-avg. velocity sum
         real(wp) :: pres       !< Cell-avg. pressure
         real(wp) :: gamma      !< Cell-avg. sp. heat ratio
@@ -1574,30 +1574,30 @@ contains
                 elseif (p == 0) then
                     if (bubbles_euler) then
                         #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
-                        write (i + 30, '(6X,10F24.8)') &
-                            nondim_time, &
-                            rho, &
-                            vel(1), &
-                            vel(2), &
-                            pres, &
-                            alf, &
-                            nR(1), &
-                            nRdot(1), &
-                            R(1), &
-                            Rdot(1)
+                            write (i + 30, '(6X,10F24.8)') &
+                                nondim_time, &
+                                rho, &
+                                vel(1), &
+                                vel(2), &
+                                pres, &
+                                alf, &
+                                nR(1), &
+                                nRdot(1), &
+                                R(1), &
+                                Rdot(1)
                         #:endif
                     else if (elasticity) then
                         #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
-                        write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
-                               'F24.8,F24.8,F24.8)') &
-                            nondim_time, &
-                            rho, &
-                            vel(1), &
-                            vel(2), &
-                            pres, &
-                            tau_e(1), &
-                            tau_e(2), &
-                            tau_e(3)
+                            write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
+                                   'F24.8,F24.8,F24.8)') &
+                                nondim_time, &
+                                rho, &
+                                vel(1), &
+                                vel(2), &
+                                pres, &
+                                tau_e(1), &
+                                tau_e(2), &
+                                tau_e(3)
                         #:endif
                     else
                         write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8)') &
@@ -1609,20 +1609,20 @@ contains
                     end if
                 else
                     #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
-                    write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
-                           'F24.8,F24.8,F24.8,F24.8,F24.8,'// &
-                           'F24.8)') &
-                        nondim_time, &
-                        rho, &
-                        vel(1), &
-                        vel(2), &
-                        vel(3), &
-                        pres, &
-                        gamma, &
-                        pi_inf, &
-                        qv, &
-                        c, &
-                        accel
+                        write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
+                               'F24.8,F24.8,F24.8,F24.8,F24.8,'// &
+                               'F24.8)') &
+                            nondim_time, &
+                            rho, &
+                            vel(1), &
+                            vel(2), &
+                            vel(3), &
+                            pres, &
+                            gamma, &
+                            pi_inf, &
+                            qv, &
+                            c, &
+                            accel
                     #:endif
                 end if
             end if

@@ -650,28 +650,28 @@ contains
         real(wp) :: dpi_inf_dt
         real(wp) :: dqv_dt
         real(wp) :: dpres_ds
-#:if USING_AMD 
-        real(wp), dimension(12) :: L
-#:else 
-        real(wp), dimension(sys_size) :: L 
-#:endif
-#:if not MFC_CASE_OPTIMIZATION and USING_AMD
-        real(wp), dimension(3) :: alpha_rho, dalpha_rho_ds, mf
-        real(wp), dimension(3) :: vel, dvel_ds
-        real(wp), dimension(3) :: adv_local, dadv_ds
-        real(wp), dimension(3) :: dadv_dt
-        real(wp), dimension(3) :: dvel_dt
-        real(wp), dimension(3) :: dalpha_rho_dt
-        real(wp), dimension(10) :: Ys, h_k, dYs_dt, dYs_ds, Xs, Gamma_i, Cp_i
-#:else 
-        real(wp), dimension(num_fluids) :: alpha_rho, dalpha_rho_ds, mf
-        real(wp), dimension(num_vels) :: vel, dvel_ds
-        real(wp), dimension(num_fluids) :: adv_local, dadv_ds
-        real(wp), dimension(num_fluids) :: dadv_dt
-        real(wp), dimension(num_dims) :: dvel_dt
-        real(wp), dimension(num_fluids) :: dalpha_rho_dt
-        real(wp), dimension(num_species) :: Ys, h_k, dYs_dt, dYs_ds, Xs, Gamma_i, Cp_i
-#:endif
+        #:if USING_AMD
+            real(wp), dimension(12) :: L
+        #:else
+            real(wp), dimension(sys_size) :: L
+        #:endif
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3) :: alpha_rho, dalpha_rho_ds, mf
+            real(wp), dimension(3) :: vel, dvel_ds
+            real(wp), dimension(3) :: adv_local, dadv_ds
+            real(wp), dimension(3) :: dadv_dt
+            real(wp), dimension(3) :: dvel_dt
+            real(wp), dimension(3) :: dalpha_rho_dt
+            real(wp), dimension(10) :: Ys, h_k, dYs_dt, dYs_ds, Xs, Gamma_i, Cp_i
+        #:else
+            real(wp), dimension(num_fluids) :: alpha_rho, dalpha_rho_ds, mf
+            real(wp), dimension(num_vels) :: vel, dvel_ds
+            real(wp), dimension(num_fluids) :: adv_local, dadv_ds
+            real(wp), dimension(num_fluids) :: dadv_dt
+            real(wp), dimension(num_dims) :: dvel_dt
+            real(wp), dimension(num_fluids) :: dalpha_rho_dt
+            real(wp), dimension(num_species) :: Ys, h_k, dYs_dt, dYs_ds, Xs, Gamma_i, Cp_i
+        #:endif
         real(wp), dimension(2) :: Re_cbc
         real(wp), dimension(3) :: lambda
 
@@ -686,7 +686,6 @@ contains
         real(wp) :: Ma
         real(wp) :: T, sum_Enthalpies
         real(wp) :: Cv, Cp, e_mix, Mw, R_gas
-        
 
         real(wp) :: vel_K_sum, vel_dv_dt_sum
 
@@ -744,8 +743,8 @@ contains
                     $:END_GPU_PARALLEL_LOOP()
                 end if
 
-                    ! PI4 of flux_rs_vf and flux_src_rs_vf at j = 1/2, 3/2
-                if(weno_order == 5 .or. dummy) then
+                ! PI4 of flux_rs_vf and flux_src_rs_vf at j = 1/2, 3/2
+                if (weno_order == 5 .or. dummy) then
                     call s_convert_primitive_to_flux_variables(q_prim_rs${XYZ}$_vf, &
                                                                F_rs${XYZ}$_vf, &
                                                                F_src_rs${XYZ}$_vf, &
@@ -1070,7 +1069,7 @@ contains
                             sum_Enthalpies = 0._wp
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_species
-                                
+
                                 #:if USING_AMD
                                     h_k(i) = h_k(i)*gas_constant/molecular_weights_nonparameter(i)*T
                                     sum_Enthalpies = sum_Enthalpies + (rho*h_k(i) - pres*Mw/molecular_weights_nonparameter(i)*Cp/R_gas)*dYs_dt(i)

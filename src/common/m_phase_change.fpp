@@ -91,11 +91,11 @@ contains
 
         ! $:GPU_DECLARE(create='[pS,pSOV,pSSL,TS,TSOV,TSSL,TSatOV,TSatSL]')
         ! $:GPU_DECLARE(create='[rhoe,dynE,rhos,rho,rM,m1,m2,MCT,TvF]')
-#:if not MFC_CASE_OPTIMIZATION and USING_AMD
-        real(wp), dimension(3) :: p_infOV, p_infpT, p_infSL, sk, hk, gk, ek, rhok
-#:else 
-        real(wp), dimension(num_fluids) :: p_infOV, p_infpT, p_infSL, sk, hk, gk, ek, rhok
-#:endif
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3) :: p_infOV, p_infpT, p_infSL, sk, hk, gk, ek, rhok
+        #:else
+            real(wp), dimension(num_fluids) :: p_infOV, p_infpT, p_infSL, sk, hk, gk, ek, rhok
+        #:endif
         ! $:GPU_DECLARE(create='[p_infOV,p_infpT,p_infSL,sk,hk,gk,ek,rhok]')
 
         !< Generic loop iterators
@@ -238,23 +238,23 @@ contains
                     do i = 1, num_fluids
                         ! entropy
                         sk(i) = cvs(i)*log((TS**gs_min(i)) &
-                                                                 /((pS + ps_inf(i))**(gs_min(i) - 1.0_wp))) + qvps(i)
+                                           /((pS + ps_inf(i))**(gs_min(i) - 1.0_wp))) + qvps(i)
 
                         ! enthalpy
                         hk(i) = gs_min(i)*cvs(i)*TS &
-                                           + qvs(i)
+                                + qvs(i)
 
                         ! Gibbs-free energy
                         gk(i) = hk(i) - TS*sk(i)
 
                         ! densities
                         rhok(i) = (pS + ps_inf(i)) &
-                                             /((gs_min(i) - 1)*cvs(i)*TS)
+                                  /((gs_min(i) - 1)*cvs(i)*TS)
 
                         ! internal energy
                         ek(i) = (pS + gs_min(i) &
-                                            *ps_inf(i))/(pS + ps_inf(i)) &
-                                           *cvs(i)*TS + qvs(i)
+                                 *ps_inf(i))/(pS + ps_inf(i)) &
+                                *cvs(i)*TS + qvs(i)
                     end do
 
                     ! calculating volume fractions, internal energies, and total entropy
@@ -299,11 +299,11 @@ contains
         ! initializing variables
         integer, intent(in) :: j, k, l, MFL
         real(wp), intent(out) :: pS
-#:if not MFC_CASE_OPTIMIZATION and USING_AMD
-        real(wp), dimension(3), intent(out) :: p_infpT
-#:else
-        real(wp), dimension(num_fluids), intent(out) :: p_infpT 
-#:endif
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3), intent(out) :: p_infpT
+        #:else
+            real(wp), dimension(num_fluids), intent(out) :: p_infpT
+        #:endif
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         real(wp), intent(in) :: rhoe
         real(wp), intent(out) :: TS
@@ -315,7 +315,7 @@ contains
         ! auxiliary variables for the pT-equilibrium solver
         mCP = 0.0_wp; mQ = 0.0_wp; p_infpT_sum = 0._wp
         $:GPU_LOOP(parallelism='[seq]')
-        do i = 1, num_fluids 
+        do i = 1, num_fluids
             p_infpT(i) = ps_inf(i)
             p_infpT_sum = p_infpT_sum + abs(p_infpT(i))
         end do
@@ -331,14 +331,14 @@ contains
 
         end do
 
-#:if not MFC_CASE_OPTIMIZATION and USING_AMD
-        if(num_fluids < 3) then
-            $:GPU_LOOP(parallelism='[seq]')
-            do i = num_fluids+1, 3 
-                p_infpT(i) = p_infpT_sum
-            end do
-        end if
-#:endif
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            if (num_fluids < 3) then
+                $:GPU_LOOP(parallelism='[seq]')
+                do i = num_fluids + 1, 3
+                    p_infpT(i) = p_infpT_sum
+                end do
+            end if
+        #:endif
 
         ! Checking energy constraint
         if ((rhoe - mQ - minval(p_infpT)) < 0.0_wp) then
@@ -417,19 +417,19 @@ contains
 
         integer, intent(in) :: j, k, l
         real(wp), intent(inout) :: pS
-#:if not MFC_CASE_OPTIMIZATION and USING_AMD 
-        real(wp), dimension(3), intent(in) :: p_infpT
-#:else
-        real(wp), dimension(num_fluids), intent(in) :: p_infpT 
-#:endif
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3), intent(in) :: p_infpT
+        #:else
+            real(wp), dimension(num_fluids), intent(in) :: p_infpT
+        #:endif
         real(wp), intent(in) :: rhoe
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         real(wp), intent(inout) :: TS
-#:if not MFC_CASE_OPTIMIZATION and USING_AMD
-        real(wp), dimension(3) :: p_infpTg !< stiffness for the participating fluids for pTg-equilibrium
-#:else
-        real(wp), dimension(num_fluids) :: p_infpTg !< stiffness for the participating fluids for pTg-equilibrium 
-#:endif
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3) :: p_infpTg !< stiffness for the participating fluids for pTg-equilibrium
+        #:else
+            real(wp), dimension(num_fluids) :: p_infpTg !< stiffness for the participating fluids for pTg-equilibrium
+        #:endif
         real(wp), dimension(2, 2) :: Jac, InvJac, TJac !< matrices for the Newton Solver
         real(wp), dimension(2) :: R2D, DeltamP !< residual and correction array
         real(wp) :: Om ! underrelaxation factor
@@ -582,7 +582,7 @@ contains
             TJac(2, 2) = Jac(2, 2)
 
             ! dividing by det(J)
-            InvJac = InvJac / (Jac(1, 1)*Jac(2, 2) - Jac(1, 2)*Jac(2, 1))
+            InvJac = InvJac/(Jac(1, 1)*Jac(2, 2) - Jac(1, 2)*Jac(2, 1))
 
             ! calculating correction array for Newton's method
             DeltamP = -1.0_wp*(matmul(InvJac, R2D))

@@ -647,21 +647,21 @@ contains
         integer, intent(in) :: weno_dir
         type(int_bounds_info), intent(in) :: is1_weno_d, is2_weno_d, is3_weno_d
 
-#:if not MFC_CASE_OPTIMIZATION and USING_AMD 
-        real(wp), dimension(-3:2) :: dvd
-        real(wp), dimension(0:4) :: poly
-        real(wp), dimension(0:4) :: alpha
-        real(wp), dimension(0:4) :: omega
-        real(wp), dimension(0:4) :: beta
-        real(wp), dimension(0:4) :: delta
-#:else
-        real(wp), dimension(-weno_polyn:weno_polyn - 1) :: dvd
-        real(wp), dimension(0:weno_num_stencils) :: poly
-        real(wp), dimension(0:weno_num_stencils) :: alpha
-        real(wp), dimension(0:weno_num_stencils) :: omega
-        real(wp), dimension(0:weno_num_stencils) :: beta
-        real(wp), dimension(0:weno_num_stencils) :: delta
-#:endif
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(-3:2) :: dvd
+            real(wp), dimension(0:4) :: poly
+            real(wp), dimension(0:4) :: alpha
+            real(wp), dimension(0:4) :: omega
+            real(wp), dimension(0:4) :: beta
+            real(wp), dimension(0:4) :: delta
+        #:else
+            real(wp), dimension(-weno_polyn:weno_polyn - 1) :: dvd
+            real(wp), dimension(0:weno_num_stencils) :: poly
+            real(wp), dimension(0:weno_num_stencils) :: alpha
+            real(wp), dimension(0:weno_num_stencils) :: omega
+            real(wp), dimension(0:weno_num_stencils) :: beta
+            real(wp), dimension(0:weno_num_stencils) :: delta
+        #:endif
         real(wp), dimension(-3:3) :: v ! temporary field value array for clarity (WENO7 only)
         real(wp) :: tau
 
@@ -730,8 +730,8 @@ contains
                                 do i = 1, v_size
                                     ! reconstruct from left side
 
-                                    alpha(:) = 0._wp 
-                                    omega(:) = 0._wp 
+                                    alpha(:) = 0._wp
+                                    omega(:) = 0._wp
                                     beta(:) = weno_eps
 
                                     dvd(0) = v_rs_ws_${XYZ}$ (j + 1, k, l, i) &
@@ -756,7 +756,7 @@ contains
                                         alpha(0:weno_num_stencils) = d_cbL_${XYZ}$ (0:weno_num_stencils, j)/(beta(0:weno_num_stencils)**2._wp)
                                         omega = alpha/sum(alpha)
                                         alpha(0:weno_num_stencils) = (d_cbL_${XYZ}$ (0:weno_num_stencils, j)*(1._wp + d_cbL_${XYZ}$ (0:weno_num_stencils, j) - 3._wp*omega(0:weno_num_stencils)) + omega(0:weno_num_stencils)**2._wp) &
-                                                *(omega(0:weno_num_stencils)/(d_cbL_${XYZ}$ (0:weno_num_stencils, j)**2._wp + omega(0:weno_num_stencils)*(1._wp - 2._wp*d_cbL_${XYZ}$ (0:weno_num_stencils, j))))
+                                                                     *(omega(0:weno_num_stencils)/(d_cbL_${XYZ}$ (0:weno_num_stencils, j)**2._wp + omega(0:weno_num_stencils)*(1._wp - 2._wp*d_cbL_${XYZ}$ (0:weno_num_stencils, j))))
 
                                     elseif (wenoz) then
                                         ! Borges, et al. (2008)
@@ -784,7 +784,7 @@ contains
                                         alpha(0:weno_num_stencils) = d_cbR_${XYZ}$ (0:weno_num_stencils, j)/(beta(0:weno_num_stencils)**2._wp)
                                         omega = alpha/sum(alpha)
                                         alpha(0:weno_num_stencils) = (d_cbR_${XYZ}$ (0:weno_num_stencils, j)*(1._wp + d_cbR_${XYZ}$ (0:weno_num_stencils, j) - 3._wp*omega(0:weno_num_stencils)) + omega(0:weno_num_stencils)**2._wp) &
-                                                *(omega(0:weno_num_stencils)/(d_cbR_${XYZ}$ (0:weno_num_stencils, j)**2._wp + omega(0:weno_num_stencils)*(1._wp - 2._wp*d_cbR_${XYZ}$ (0:weno_num_stencils, j))))
+                                                                     *(omega(0:weno_num_stencils)/(d_cbR_${XYZ}$ (0:weno_num_stencils, j)**2._wp + omega(0:weno_num_stencils)*(1._wp - 2._wp*d_cbR_${XYZ}$ (0:weno_num_stencils, j))))
 
                                     elseif (wenoz) then
 
@@ -816,8 +816,8 @@ contains
                                     do i = 1, v_size
                                         ! reconstruct from left side
 
-                                        alpha(:) = 0._wp 
-                                        omega(:) = 0._wp 
+                                        alpha(:) = 0._wp
+                                        omega(:) = 0._wp
                                         delta(:) = 0._wp
                                         beta(:) = weno_eps
 
@@ -860,7 +860,7 @@ contains
                                             alpha(0:weno_num_stencils) = d_cbL_${XYZ}$ (0:weno_num_stencils, j)/(beta(0:weno_num_stencils)**2._wp)
                                             omega = alpha/sum(alpha)
                                             alpha(0:weno_num_stencils) = (d_cbL_${XYZ}$ (0:weno_num_stencils, j)*(1._wp + d_cbL_${XYZ}$ (0:weno_num_stencils, j) - 3._wp*omega(0:weno_num_stencils)) + omega(0:weno_num_stencils)**2._wp) &
-                                                    *(omega(0:weno_num_stencils)/(d_cbL_${XYZ}$ (0:weno_num_stencils, j)**2._wp + omega(0:weno_num_stencils)*(1._wp - 2._wp*d_cbL_${XYZ}$ (0:weno_num_stencils, j))))
+                                                                         *(omega(0:weno_num_stencils)/(d_cbL_${XYZ}$ (0:weno_num_stencils, j)**2._wp + omega(0:weno_num_stencils)*(1._wp - 2._wp*d_cbL_${XYZ}$ (0:weno_num_stencils, j))))
 
                                         elseif (wenoz) then
 
@@ -870,10 +870,10 @@ contains
                                             $:GPU_LOOP(parallelism='[seq]')
                                             do q = 0, weno_num_stencils
                                                 alpha(q) = d_cbL_${XYZ}$ (q, j)*(1._wp + (tau/beta(q))) ! Equation 28 (note: weno_eps was already added to beta)
-                                            end do 
+                                            end do
 
                                         elseif (teno) then
-                                             ! Fu, et al. (2016)
+                                            ! Fu, et al. (2016)
                                             ! Fu''s code: https://dx.doi.org/10.13140/RG.2.2.36250.34247
                                             tau = abs(beta(2) - beta(0))
                                             $:GPU_LOOP(parallelism='[seq]')
@@ -882,14 +882,14 @@ contains
                                                 alpha(q) = (alpha(q)**3._wp)**2._wp          ! Equation 22 cont. (some CPU compilers cannot optimize x**6.0)
                                             end do
                                             omega = alpha/sum(alpha)                    ! Equation 25 (reuse omega as xi)
-                                            
+
                                             $:GPU_LOOP(parallelism='[seq]')
                                             do q = 0, weno_num_stencils
-                                                if(omega(q) < teno_CT) then             ! Equation 26
-                                                    delta(q) = 0._wp 
-                                                else 
-                                                    delta(q) = 1._wp 
-                                                end if 
+                                                if (omega(q) < teno_CT) then             ! Equation 26
+                                                    delta(q) = 0._wp
+                                                else
+                                                    delta(q) = 1._wp
+                                                end if
                                                 alpha(q) = delta(q)*d_cbL_${XYZ}$ (q, j) ! Equation 27
                                             end do
                                         end if
@@ -910,7 +910,6 @@ contains
                                                   + poly_coef_cbR_${XYZ}$ (j, 2, 0)*dvd(-1) &
                                                   + poly_coef_cbR_${XYZ}$ (j, 2, 1)*dvd(-2)
 
-
                                         if (wenojs) then
                                             alpha(0:weno_num_stencils) = d_cbR_${XYZ}$ (0:weno_num_stencils, j)/(beta(0:weno_num_stencils)**2._wp)
 
@@ -918,19 +917,19 @@ contains
                                             alpha(0:weno_num_stencils) = d_cbR_${XYZ}$ (0:weno_num_stencils, j)/(beta(0:weno_num_stencils)**2._wp)
                                             omega = alpha/sum(alpha)
                                             alpha(0:weno_num_stencils) = (d_cbR_${XYZ}$ (0:weno_num_stencils, j)*(1._wp + d_cbR_${XYZ}$ (0:weno_num_stencils, j) - 3._wp*omega(0:weno_num_stencils)) + omega(0:weno_num_stencils)**2._wp) &
-                                                    *(omega(0:weno_num_stencils)/(d_cbR_${XYZ}$ (0:weno_num_stencils, j)**2._wp + omega(0:weno_num_stencils)*(1._wp - 2._wp*d_cbR_${XYZ}$ (0:weno_num_stencils, j))))
+                                                                         *(omega(0:weno_num_stencils)/(d_cbR_${XYZ}$ (0:weno_num_stencils, j)**2._wp + omega(0:weno_num_stencils)*(1._wp - 2._wp*d_cbR_${XYZ}$ (0:weno_num_stencils, j))))
 
                                         elseif (wenoz) then
 
                                             $:GPU_LOOP(parallelism='[seq]')
                                             do q = 0, weno_num_stencils
-                                                alpha(q) = d_cbR_${XYZ}$ (q, j)*(1._wp + (tau/beta(q))) 
-                                            end do 
+                                                alpha(q) = d_cbR_${XYZ}$ (q, j)*(1._wp + (tau/beta(q)))
+                                            end do
 
                                         elseif (teno) then
                                             $:GPU_LOOP(parallelism='[seq]')
                                             do q = 0, weno_num_stencils
-                                                alpha(q) = delta(q)*d_cbR_${XYZ}$ (q, j) 
+                                                alpha(q) = delta(q)*d_cbR_${XYZ}$ (q, j)
                                             end do
                                         end if
 
@@ -963,8 +962,8 @@ contains
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, v_size
 
-                                        alpha(:) = 0._wp 
-                                        omega(:) = 0._wp 
+                                        alpha(:) = 0._wp
+                                        omega(:) = 0._wp
                                         delta(:) = 0._wp
                                         beta(:) = weno_eps
 
@@ -1078,7 +1077,7 @@ contains
                                             alpha(0:weno_num_stencils) = d_cbL_${XYZ}$ (0:weno_num_stencils, j)/(beta(0:weno_num_stencils)**2._wp)
                                             omega = alpha/sum(alpha)
                                             alpha(0:weno_num_stencils) = (d_cbL_${XYZ}$ (0:weno_num_stencils, j)*(1._wp + d_cbL_${XYZ}$ (0:weno_num_stencils, j) - 3._wp*omega(0:weno_num_stencils)) + omega(0:weno_num_stencils)**2._wp) &
-                                                    *(omega(0:weno_num_stencils)/(d_cbL_${XYZ}$ (0:weno_num_stencils, j)**2._wp + omega(0:weno_num_stencils)*(1._wp - 2._wp*d_cbL_${XYZ}$ (0:weno_num_stencils, j))))
+                                                                         *(omega(0:weno_num_stencils)/(d_cbL_${XYZ}$ (0:weno_num_stencils, j)**2._wp + omega(0:weno_num_stencils)*(1._wp - 2._wp*d_cbL_${XYZ}$ (0:weno_num_stencils, j))))
 
                                         elseif (wenoz) then
                                             ! Castro, et al. (2010)
@@ -1087,7 +1086,7 @@ contains
                                             $:GPU_LOOP(parallelism='[seq]')
                                             do q = 0, weno_num_stencils
                                                 alpha(q) = d_cbL_${XYZ}$ (q, j)*(1._wp + (tau/beta(q))**wenoz_q) ! wenoz_q = 2,3,4 for stability
-                                            end do 
+                                            end do
 
                                         elseif (teno) then
                                             #:if not MFC_CASE_OPTIMIZATION or weno_num_stencils > 3
@@ -1095,14 +1094,14 @@ contains
                                                 alpha = 1._wp + tau/beta
                                                 alpha = (alpha**3._wp)**2._wp ! some CPU compilers cannot optimize x**6.0
                                                 omega = alpha/sum(alpha)
-                                                
+
                                                 $:GPU_LOOP(parallelism='[seq]')
                                                 do q = 0, weno_num_stencils
-                                                    if(omega(q) < teno_CT) then             ! Equation 26
-                                                        delta(q) = 0._wp 
-                                                    else 
-                                                        delta(q) = 1._wp 
-                                                    end if 
+                                                    if (omega(q) < teno_CT) then             ! Equation 26
+                                                        delta(q) = 0._wp
+                                                    else
+                                                        delta(q) = 1._wp
+                                                    end if
                                                     alpha(q) = delta(q)*d_cbL_${XYZ}$ (q, j) ! Equation 27
                                                 end do
                                             #:endif
@@ -1112,7 +1111,7 @@ contains
 
                                         vL_rs_vf_${XYZ}$ (j, k, l, i) = omega(0)*poly(0) + omega(1)*poly(1) + omega(2)*poly(2) + omega(3)*poly(3)
 
-                                        if(teno) then 
+                                        if (teno) then
                                             #:if not MFC_CASE_OPTIMIZATION or weno_num_stencils > 3
                                                 vL_rs_vf_${XYZ}$ (j, k, l, i) = vL_rs_vf_${XYZ}$ (j, k, l, i) + omega(4)*poly(4)
                                             #:endif
@@ -1152,19 +1151,19 @@ contains
                                             alpha(0:weno_num_stencils) = d_cbR_${XYZ}$ (0:weno_num_stencils, j)/(beta(0:weno_num_stencils)**2._wp)
                                             omega = alpha/sum(alpha)
                                             alpha(0:weno_num_stencils) = (d_cbR_${XYZ}$ (0:weno_num_stencils, j)*(1._wp + d_cbR_${XYZ}$ (0:weno_num_stencils, j) - 3._wp*omega(0:weno_num_stencils)) + omega(0:weno_num_stencils)**2._wp) &
-                                                    *(omega(0:weno_num_stencils)/(d_cbR_${XYZ}$ (0:weno_num_stencils, j)**2._wp + omega(0:weno_num_stencils)*(1._wp - 2._wp*d_cbR_${XYZ}$ (0:weno_num_stencils, j))))
+                                                                         *(omega(0:weno_num_stencils)/(d_cbR_${XYZ}$ (0:weno_num_stencils, j)**2._wp + omega(0:weno_num_stencils)*(1._wp - 2._wp*d_cbR_${XYZ}$ (0:weno_num_stencils, j))))
 
                                         elseif (wenoz) then
 
-                                           $:GPU_LOOP(parallelism='[seq]')
+                                            $:GPU_LOOP(parallelism='[seq]')
                                             do q = 0, weno_num_stencils
                                                 alpha(q) = d_cbR_${XYZ}$ (q, j)*(1._wp + (tau/beta(q))**wenoz_q) ! wenoz_q = 2,3,4 for stability
-                                            end do 
+                                            end do
 
                                         elseif (teno) then
                                             $:GPU_LOOP(parallelism='[seq]')
                                             do q = 0, weno_num_stencils
-                                                alpha(q) = delta(q)*d_cbR_${XYZ}$ (q, j) 
+                                                alpha(q) = delta(q)*d_cbR_${XYZ}$ (q, j)
                                             end do
                                         end if
 
@@ -1172,7 +1171,7 @@ contains
 
                                         vR_rs_vf_${XYZ}$ (j, k, l, i) = omega(0)*poly(0) + omega(1)*poly(1) + omega(2)*poly(2) + omega(3)*poly(3)
 
-                                        if(teno) then 
+                                        if (teno) then
                                             #:if not MFC_CASE_OPTIMIZATION or weno_num_stencils > 3
                                                 vR_rs_vf_${XYZ}$ (j, k, l, i) = vR_rs_vf_${XYZ}$ (j, k, l, i) + omega(4)*poly(4)
                                             #:endif

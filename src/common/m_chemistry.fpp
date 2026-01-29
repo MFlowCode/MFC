@@ -126,13 +126,13 @@ contains
         integer :: eqn
         real(wp) :: T
         real(wp) :: rho, omega_m
-#:if not MFC_CASE_OPTIMIZATION and USING_AMD
-        real(wp), dimension(10) :: Ys
-        real(wp), dimension(10) :: omega
-#:else 
-        real(wp), dimension(num_species) :: Ys
-        real(wp), dimension(num_species) :: omega
-#:endif
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(10) :: Ys
+            real(wp), dimension(10) :: omega
+        #:else
+            real(wp), dimension(num_species) :: Ys
+            real(wp), dimension(num_species) :: omega
+        #:endif
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[Ys, omega, eqn, T, rho, omega_m]', copyin='[bounds]')
         do z = bounds(3)%beg, bounds(3)%end
@@ -174,17 +174,17 @@ contains
         type(int_bounds_info), intent(in) :: irx, iry, irz
 
         integer, intent(in) :: idir
-#:if not MFC_CASE_OPTIMIZATION and USING_AMD
-        real(wp), dimension(10) :: Xs_L, Xs_R, Xs_cell, Ys_L, Ys_R, Ys_cell
-        real(wp), dimension(10) :: mass_diffusivities_mixavg1, mass_diffusivities_mixavg2
-        real(wp), dimension(10) :: mass_diffusivities_mixavg_Cell, dXk_dxi, h_l, h_r, h_k
-        real(wp), dimension(10) :: Mass_Diffu_Flux, dYk_dxi
-#:else 
-        real(wp), dimension(num_species) :: Xs_L, Xs_R, Xs_cell, Ys_L, Ys_R, Ys_cell
-        real(wp), dimension(num_species) :: mass_diffusivities_mixavg1, mass_diffusivities_mixavg2
-        real(wp), dimension(num_species) :: mass_diffusivities_mixavg_Cell, dXk_dxi, h_l, h_r, h_k
-        real(wp), dimension(num_species) :: Mass_Diffu_Flux, dYk_dxi
-#:endif
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(10) :: Xs_L, Xs_R, Xs_cell, Ys_L, Ys_R, Ys_cell
+            real(wp), dimension(10) :: mass_diffusivities_mixavg1, mass_diffusivities_mixavg2
+            real(wp), dimension(10) :: mass_diffusivities_mixavg_Cell, dXk_dxi, h_l, h_r, h_k
+            real(wp), dimension(10) :: Mass_Diffu_Flux, dYk_dxi
+        #:else
+            real(wp), dimension(num_species) :: Xs_L, Xs_R, Xs_cell, Ys_L, Ys_R, Ys_cell
+            real(wp), dimension(num_species) :: mass_diffusivities_mixavg1, mass_diffusivities_mixavg2
+            real(wp), dimension(num_species) :: mass_diffusivities_mixavg_Cell, dXk_dxi, h_l, h_r, h_k
+            real(wp), dimension(num_species) :: Mass_Diffu_Flux, dYk_dxi
+        #:endif
 
         real(wp) :: Mass_Diffu_Energy
         real(wp) :: MW_L, MW_R, MW_cell, Rgas_L, Rgas_R, T_L, T_R, P_L, P_R, rho_L, rho_R, rho_cell, rho_Vic
@@ -268,11 +268,11 @@ contains
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = chemxb, chemxe
                                 #:if USING_AMD
-                                h_l(i - chemxb + 1) = h_l(i - chemxb + 1)*gas_constant*T_L/molecular_weights_nonparameter(i - chemxb + 1)
-                                h_r(i - chemxb + 1) = h_r(i - chemxb + 1)*gas_constant*T_R/molecular_weights_nonparameter(i - chemxb + 1)
+                                    h_l(i - chemxb + 1) = h_l(i - chemxb + 1)*gas_constant*T_L/molecular_weights_nonparameter(i - chemxb + 1)
+                                    h_r(i - chemxb + 1) = h_r(i - chemxb + 1)*gas_constant*T_R/molecular_weights_nonparameter(i - chemxb + 1)
                                 #:else
-                                h_l(i - chemxb + 1) = h_l(i - chemxb + 1)*gas_constant*T_L/molecular_weights(i - chemxb + 1)
-                                h_r(i - chemxb + 1) = h_r(i - chemxb + 1)*gas_constant*T_R/molecular_weights(i - chemxb + 1)
+                                    h_l(i - chemxb + 1) = h_l(i - chemxb + 1)*gas_constant*T_L/molecular_weights(i - chemxb + 1)
+                                    h_r(i - chemxb + 1) = h_r(i - chemxb + 1)*gas_constant*T_R/molecular_weights(i - chemxb + 1)
                                 #:endif
                                 Xs_cell(i - chemxb + 1) = 0.5_wp*(Xs_L(i - chemxb + 1) + Xs_R(i - chemxb + 1))
                                 h_k(i - chemxb + 1) = 0.5_wp*(h_l(i - chemxb + 1) + h_r(i - chemxb + 1))
@@ -295,11 +295,11 @@ contains
                             $:GPU_LOOP(parallelism='[seq]')
                             do eqn = chemxb, chemxe
                                 #:if USING_AMD
-                                Mass_Diffu_Flux(eqn - chemxb + 1) = rho_cell*mass_diffusivities_mixavg_Cell(eqn - chemxb + 1)* &
-                                                                    molecular_weights_nonparameter(eqn - chemxb + 1)/MW_cell*dXk_dxi(eqn - chemxb + 1)
+                                    Mass_Diffu_Flux(eqn - chemxb + 1) = rho_cell*mass_diffusivities_mixavg_Cell(eqn - chemxb + 1)* &
+                                                                        molecular_weights_nonparameter(eqn - chemxb + 1)/MW_cell*dXk_dxi(eqn - chemxb + 1)
                                 #:else
-                                Mass_Diffu_Flux(eqn - chemxb + 1) = rho_cell*mass_diffusivities_mixavg_Cell(eqn - chemxb + 1)* &
-                                                                    molecular_weights(eqn - chemxb + 1)/MW_cell*dXk_dxi(eqn - chemxb + 1)
+                                    Mass_Diffu_Flux(eqn - chemxb + 1) = rho_cell*mass_diffusivities_mixavg_Cell(eqn - chemxb + 1)* &
+                                                                        molecular_weights(eqn - chemxb + 1)/MW_cell*dXk_dxi(eqn - chemxb + 1)
                                 #:endif
                                 rho_Vic = rho_Vic + Mass_Diffu_Flux(eqn - chemxb + 1)
                                 Mass_Diffu_Energy = Mass_Diffu_Energy + h_k(eqn - chemxb + 1)*Mass_Diffu_Flux(eqn - chemxb + 1)

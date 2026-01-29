@@ -702,7 +702,7 @@ contains
             call s_populate_variables_buffers(bc_type, q_cons_vf, pb_in, mv_in)
             call nvtxEndRange
         end if
-        if(.not. igr .or. dummy) then
+        if (.not. igr .or. dummy) then
             call nvtxStartRange("RHS-CONVERT")
             call s_convert_conservative_to_primitive_variables( &
                 q_cons_qp%vf, &
@@ -780,8 +780,8 @@ contains
                     call s_igr_sigma_x(q_cons_vf, rhs_vf)
                     call nvtxEndRange
                 end if
-            end if 
-            if((.not. igr) .or. dummy) then! Finite volume solve
+            end if
+            if ((.not. igr) .or. dummy) then! Finite volume solve
 
                 ! Reconstructing Primitive/Conservative Variables
                 call nvtxStartRange("RHS-WENO")
@@ -1953,7 +1953,7 @@ contains
             end if
         #:endfor
 
-         if (recon_dir == 1) then
+        if (recon_dir == 1) then
             $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
             do i = iv%beg, iv%end
                 do l = is3%beg, is3%end

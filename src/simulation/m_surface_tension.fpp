@@ -82,11 +82,11 @@ contains
             intent(inout) :: flux_src_vf
         integer, intent(in) :: id
         type(int_bounds_info), intent(in) :: isx, isy, isz
-#:if not MFC_CASE_OPTIMIZATION and USING_AMD
-        real(wp), dimension(3, 3) :: Omega
-#:else
-        real(wp), dimension(num_dims, num_dims) :: Omega 
-#:endif
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3, 3) :: Omega
+        #:else
+            real(wp), dimension(num_dims, num_dims) :: Omega
+        #:endif
         real(wp) :: w1L, w1R, w2L, w2R, w3L, w3R, w1, w2, w3
         real(wp) :: normWL, normWR, normW
         integer :: j, k, l, i
@@ -138,49 +138,49 @@ contains
 
         elseif (id == 2) then
             #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[Omega, w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW]')
-            do l = isz%beg, isz%end
-                do k = isy%beg, isy%end
-                    do j = isx%beg, isx%end
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[Omega, w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW]')
+                do l = isz%beg, isz%end
+                    do k = isy%beg, isy%end
+                        do j = isx%beg, isx%end
 
-                        w1L = gL_y(k, j, l, 1)
-                        w2L = gL_y(k, j, l, 2)
-                        w3L = 0._wp
-                        if (p > 0) w3L = gL_y(k, j, l, 3)
+                            w1L = gL_y(k, j, l, 1)
+                            w2L = gL_y(k, j, l, 2)
+                            w3L = 0._wp
+                            if (p > 0) w3L = gL_y(k, j, l, 3)
 
-                        w1R = gR_y(k + 1, j, l, 1)
-                        w2R = gR_y(k + 1, j, l, 2)
-                        w3R = 0._wp
-                        if (p > 0) w3R = gR_y(k + 1, j, l, 3)
+                            w1R = gR_y(k + 1, j, l, 1)
+                            w2R = gR_y(k + 1, j, l, 2)
+                            w3R = 0._wp
+                            if (p > 0) w3R = gR_y(k + 1, j, l, 3)
 
-                        normWL = gL_y(k, j, l, num_dims + 1)
-                        normWR = gR_y(k + 1, j, l, num_dims + 1)
+                            normWL = gL_y(k, j, l, num_dims + 1)
+                            normWR = gR_y(k + 1, j, l, num_dims + 1)
 
-                        w1 = (w1L + w1R)/2._wp
-                        w2 = (w2L + w2R)/2._wp
-                        w3 = (w3L + w3R)/2._wp
-                        normW = (normWL + normWR)/2._wp
+                            w1 = (w1L + w1R)/2._wp
+                            w2 = (w2L + w2R)/2._wp
+                            w3 = (w3L + w3R)/2._wp
+                            normW = (normWL + normWR)/2._wp
 
-                        if (normW > capillary_cutoff) then
-                            @:compute_capillary_stress_tensor()
+                            if (normW > capillary_cutoff) then
+                                @:compute_capillary_stress_tensor()
 
-                            do i = 1, num_dims
+                                do i = 1, num_dims
 
-                                flux_src_vf(momxb + i - 1)%sf(j, k, l) = &
-                                    flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(2, i)
+                                    flux_src_vf(momxb + i - 1)%sf(j, k, l) = &
+                                        flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(2, i)
+
+                                    flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + &
+                                                                     Omega(2, i)*vSrc_rsy_vf(k, j, l, i)
+
+                                end do
 
                                 flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + &
-                                                                 Omega(2, i)*vSrc_rsy_vf(k, j, l, i)
-
-                            end do
-
-                            flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + &
-                                                             sigma*c_divs(num_dims + 1)%sf(j, k, l)*vSrc_rsy_vf(k, j, l, 2)
-                        end if
+                                                                 sigma*c_divs(num_dims + 1)%sf(j, k, l)*vSrc_rsy_vf(k, j, l, 2)
+                            end if
+                        end do
                     end do
                 end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
+                $:END_GPU_PARALLEL_LOOP()
             #:endif
 
         elseif (id == 3) then

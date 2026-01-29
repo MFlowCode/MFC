@@ -1375,8 +1375,8 @@ contains
         ! the modules. The preparations below DO DEPEND on the grid being complete.
         if (igr .or. dummy) then
             call s_initialize_igr_module()
-        end if 
-        if(.not. igr .or. dummy) then
+        end if
+        if (.not. igr .or. dummy) then
             if (recon_type == WENO_TYPE) then
                 call s_initialize_weno_module()
             elseif (recon_type == MUSCL_TYPE) then
