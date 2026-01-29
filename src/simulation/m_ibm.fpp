@@ -95,6 +95,8 @@ contains
         integer :: i, j, k
         integer :: max_num_gps, max_num_inner_gps
 
+        print *, "Creating IBM Setup"
+
         ! do all set up for moving immersed boundaries
         moving_immersed_boundary_flag = .false.
         do i = 1, num_ibs
@@ -107,7 +109,9 @@ contains
         end do
         $:GPU_ENTER_DATA(copyin='[patch_ib]')
 
-        call s_update_mib(ib_markers%sf(0:m, 0:n, 0:p), levelset, levelset_norm)
+        ! recompute the new ib_patch locations and broadcast them.
+        call s_apply_ib_patches(ib_markers%sf(0:m, 0:n, 0:p), levelset, levelset_norm)
+        call s_populate_ib_buffers() ! transmits the new IB markers via MPI
 
         ! Allocating the patch identities bookkeeping variable
         allocate (patch_id_fp(0:m, 0:n, 0:p))
@@ -142,6 +146,7 @@ contains
         call s_compute_interpolation_coeffs(ghost_points)
         $:GPU_UPDATE(device='[ghost_points]')
 
+        print *, "Exiting IBM Setup"
     end subroutine s_ibm_setup
 
     subroutine s_populate_ib_buffers()
