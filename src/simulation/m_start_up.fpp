@@ -1301,7 +1301,7 @@ contains
         real(wp) :: temp1, temp2, temp3, temp4
 
         call s_initialize_global_parameters_module()
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        #:if USING_AMD
             #:for BC in {-5, -6, -7, -8, -9, -10, -11, -12, -13}
                 @:PROHIBIT(any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == ${BC}$) .and. sys_size > 12, "CBC module with AMD compiler requires sys_size <= 12 when case optimization is turned off")
             #:endfor

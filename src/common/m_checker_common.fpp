@@ -50,6 +50,8 @@ contains
             "which is currently "//trim(numStr))
     end subroutine s_check_total_cells
 
+#endif
+
     impure subroutine s_check_amd
 
         #:if not MFC_CASE_OPTIMIZATION
@@ -59,8 +61,6 @@ contains
         #:endif
 
     end subroutine s_check_amd
-
-#endif
 
 #ifndef MFC_POST_PROCESS
 
