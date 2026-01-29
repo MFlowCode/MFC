@@ -140,6 +140,54 @@ def _add_common_arguments(
                 _add_argument(parser, arg)
 
 
+def _add_command_subparser(
+    subparsers,
+    cmd: Command,
+    common_sets: Dict[str, CommonArgumentSet],
+    config
+) -> argparse.ArgumentParser:
+    """Add a single command's subparser and return it."""
+    subparser = subparsers.add_parser(
+        name=cmd.name,
+        aliases=cmd.aliases or [],
+        help=cmd.help,
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+
+    # Add positional arguments first
+    for pos in cmd.positionals:
+        _add_positional(subparser, pos)
+
+    # Add common arguments
+    _add_common_arguments(subparser, cmd, common_sets, config)
+
+    # Add command-specific arguments
+    for arg in cmd.arguments:
+        _add_argument(subparser, arg)
+
+    # Add mutually exclusive groups
+    for meg in cmd.mutually_exclusive:
+        group = subparser.add_mutually_exclusive_group(required=meg.required)
+        for arg in meg.arguments:
+            _add_argument(group, arg)
+
+    # Handle subcommands (e.g., packer pack, packer compare)
+    if cmd.subcommands:
+        sub_subparsers = subparser.add_subparsers(dest=cmd.name)
+        for subcmd in cmd.subcommands:
+            sub_sub = sub_subparsers.add_parser(
+                name=subcmd.name,
+                help=subcmd.help,
+                formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+            )
+            for pos in subcmd.positionals:
+                _add_positional(sub_sub, pos)
+            for arg in subcmd.arguments:
+                _add_argument(sub_sub, arg)
+
+    return subparser
+
+
 def generate_parser(
     schema: CLISchema,
     config=None  # MFCConfig instance
@@ -173,44 +221,6 @@ def generate_parser(
     subparser_map: Dict[str, argparse.ArgumentParser] = {}
 
     for cmd in schema.commands:
-        aliases = cmd.aliases if cmd.aliases else []
-        subparser = subparsers.add_parser(
-            name=cmd.name,
-            aliases=aliases,
-            help=cmd.help,
-            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-        )
-        subparser_map[cmd.name] = subparser
-
-        # Add positional arguments first
-        for pos in cmd.positionals:
-            _add_positional(subparser, pos)
-
-        # Add common arguments
-        _add_common_arguments(subparser, cmd, common_sets, config)
-
-        # Add command-specific arguments
-        for arg in cmd.arguments:
-            _add_argument(subparser, arg)
-
-        # Add mutually exclusive groups
-        for meg in cmd.mutually_exclusive:
-            group = subparser.add_mutually_exclusive_group(required=meg.required)
-            for arg in meg.arguments:
-                _add_argument(group, arg)
-
-        # Handle subcommands (e.g., packer pack, packer compare)
-        if cmd.subcommands:
-            sub_subparsers = subparser.add_subparsers(dest=cmd.name)
-            for subcmd in cmd.subcommands:
-                sub_subparser = sub_subparsers.add_parser(
-                    name=subcmd.name,
-                    help=subcmd.help,
-                    formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-                )
-                for pos in subcmd.positionals:
-                    _add_positional(sub_subparser, pos)
-                for arg in subcmd.arguments:
-                    _add_argument(sub_subparser, arg)
+        subparser_map[cmd.name] = _add_command_subparser(subparsers, cmd, common_sets, config)
 
     return parser, subparser_map

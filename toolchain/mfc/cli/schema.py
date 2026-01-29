@@ -41,7 +41,7 @@ class Completion:
 
 
 @dataclass
-class Argument:
+class Argument:  # pylint: disable=too-many-instance-attributes
     """
     Definition of a single CLI option argument (--flag).
 
@@ -110,7 +110,7 @@ class MutuallyExclusiveGroup:
 
 
 @dataclass
-class Command:
+class Command:  # pylint: disable=too-many-instance-attributes
     """
     Definition of a CLI command/subcommand.
 
