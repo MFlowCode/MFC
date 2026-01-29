@@ -123,7 +123,7 @@ if [ ! -z ${CRAY_LD_LIBRARY_PATH+x} ] && [ "$u_c" '!=' 'c' ] &&  [ "$u_c" '!=' '
     export LD_LIBRARY_PATH="$CRAY_LD_LIBRARY_PATH:$LD_LIBRARY_PATH"
 fi
 
-if[ "$u_c" '==' 'famd' ]; then 
+if [ "$u_c" '==' 'famd' ]; then 
     export OLCF_AFAR_ROOT="/sw/crusher/ums/compilers/afar/rocm-afar-8873-drop-22.2.0"
 
     export PATH=${OLCF_AFAR_ROOT}/lib/llvm/bin:${PATH}

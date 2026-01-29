@@ -1039,8 +1039,11 @@ contains
         real(wp), dimension(1:3, 1:3) :: viscous_stress_div, viscous_stress_div_1, viscous_stress_div_2, viscous_cross_1, viscous_cross_2 ! viscous stress tensor with temp vectors to hold divergence calculations
         real(wp), dimension(1:3) :: local_force_contribution, radial_vector, local_torque_contribution, vel
         real(wp) :: cell_volume, dx, dy, dz, dynamic_viscosity
-        real(wp), dimension(1:num_fluids) :: dynamic_viscosities
-
+#:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        real(wp), dimension(3) :: dynamic_viscosities
+#:else
+        real(wp), dimension(num_fluids) :: dynamic_viscosities
+#:endif
         forces = 0._wp
         torques = 0._wp
 
