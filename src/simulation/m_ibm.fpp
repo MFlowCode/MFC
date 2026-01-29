@@ -95,8 +95,6 @@ contains
         integer :: i, j, k
         integer :: max_num_gps, max_num_inner_gps
 
-        print *, "Creating IBM Setup"
-
         ! do all set up for moving immersed boundaries
         moving_immersed_boundary_flag = .false.
         do i = 1, num_ibs
@@ -146,7 +144,6 @@ contains
         call s_compute_interpolation_coeffs(ghost_points)
         $:GPU_UPDATE(device='[ghost_points]')
 
-        print *, "Exiting IBM Setup"
     end subroutine s_ibm_setup
 
     subroutine s_populate_ib_buffers()

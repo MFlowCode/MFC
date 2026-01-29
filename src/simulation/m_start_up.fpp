@@ -1156,7 +1156,10 @@ contains
         call s_populate_grid_variables_buffers()
 
         if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
-        if (ib) call s_ibm_setup()
+        if (ib) then
+            call s_ibm_setup()
+            call s_write_ib_data_file(0)
+        end if
         if (bodyForces) call s_initialize_body_forces_module()
         if (acoustic_source) call s_precalculate_acoustic_spatial_sources()
 
