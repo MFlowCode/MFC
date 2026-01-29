@@ -2,6 +2,7 @@
 !!@file m_checker_common.f90
 !!@brief Contains module m_checker_common
 
+#:include 'case.fpp'
 #:include 'macros.fpp'
 
 !> @brief The purpose of the module is to check for compatible input files for.
@@ -29,6 +30,9 @@ contains
 #ifndef MFC_SIMULATION
         call s_check_total_cells
 #endif
+        #:if USING_AMD
+            call s_check_amd
+        #:endif
 
     end subroutine s_check_inputs_common
 
@@ -45,6 +49,16 @@ contains
             "Total number of cells must be at least (2^[number of dimensions])*num_procs, " // &
             "which is currently "//trim(numStr))
     end subroutine s_check_total_cells
+
+    impure subroutine s_check_amd
+
+        #:if not MFC_CASE_OPTIMIZATION 
+            @:PROHIBIT(num_fluids > 3, "num_fluids <= 3 for AMDFLang when Case optimization is off")
+            @:PROHIBIT((bubbles_euler .or. bubbles_lagrange) .and. nb > 3, "nb <= 3 for AMDFLang when Case optimization is off")
+            @:PROHIBIT(chemistry .and. num_species /= 10, "num_species = 10 for AMDFLang when Case optimization is off")
+        #:endif
+
+    end subroutine s_check_amd
 
 #endif
 

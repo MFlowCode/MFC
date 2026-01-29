@@ -70,10 +70,10 @@ jobs:
             device: gpu
             interface: omp
             build_script: "bash .github/workflows/frontier/build.sh gpu omp bench"
-          - cluster: frontier
+          - cluster: frontier_amd
             name: Oak Ridge | Frontier (AMD)
             group: phoenix
-            labels: frontier_amd
+            labels: frontier
             flag: famd
             device: gpu
             interface: omp

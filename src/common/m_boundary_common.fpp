@@ -1558,7 +1558,7 @@ contains
 
         end if
 
-        #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+        #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
 
             if (n == 0) then
                 return
