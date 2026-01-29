@@ -310,17 +310,7 @@ endif()
 # and generate documentation. Instead, we can simply include the list of .f90
 # files that will eventually be used to compile <target>.
 
-macro(HANDLE_SOURCES target useCommon useOpenACC useOpenMP)
-
-    if (${useOpenACC} AND ${useOpenMP})
-      message(FATAL_ERROR "OpenACC and OpenMP at same time is unsupported.")
-    elseif (${useOpenACC})
-      set(MFC_GPU_MODE "OpenACC")
-    elseif (${useOpenMP})
-      set(MFC_GPU_MODE "OpenMP")
-    else()
-      set(MFC_GPU_MODE "")
-    endif()
+macro(HANDLE_SOURCES target useCommon)
 
     set(${target}_DIR "${CMAKE_SOURCE_DIR}/src/${target}")
     set(common_DIR    "${CMAKE_SOURCE_DIR}/src/common")
@@ -382,7 +372,6 @@ macro(HANDLE_SOURCES target useCommon useOpenACC useOpenMP)
                                  -D MFC_${CMAKE_Fortran_COMPILER_ID}
                                  -D MFC_${${target}_UPPER}
                                  -D MFC_COMPILER="${CMAKE_Fortran_COMPILER_ID}"
-                                 -D MFC_GPU_MODE="${MFC_GPU_MODE}"
 				                 -D MFC_CASE_OPTIMIZATION=False
                                  -D chemistry=False
                                  --line-numbering
@@ -400,10 +389,10 @@ macro(HANDLE_SOURCES target useCommon useOpenACC useOpenMP)
 endmacro()
 
 
-HANDLE_SOURCES(pre_process ON OFF OFF)
-HANDLE_SOURCES(simulation ON ${MFC_OpenACC} ${MFC_OpenMP})
-HANDLE_SOURCES(post_process ON OFF OFF)
-HANDLE_SOURCES(syscheck OFF ${MFC_OpenACC} ${MFC_OpenMP})
+HANDLE_SOURCES(pre_process ON)
+HANDLE_SOURCES(simulation ON)
+HANDLE_SOURCES(post_process ON)
+HANDLE_SOURCES(syscheck OFF)
 
 # MFC_SETUP_TARGET: Given a target (herein <target>), this macro creates a new
 # executable <target> with the appropriate sources, compiler definitions, and
