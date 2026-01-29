@@ -203,6 +203,16 @@ contains
         end if
 #endif
 
+#ifndef MFC_PRE_PROCESS
+        if (present(ib_markers)) then
+            MPI_IO_IB_DATA%var%sf => ib_markers%sf(0:m, 0:n, 0:p)
+
+            call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, &
+                                          MPI_ORDER_FORTRAN, MPI_INTEGER, MPI_IO_IB_DATA%view, ierr)
+            call MPI_TYPE_COMMIT(MPI_IO_IB_DATA%view, ierr)
+        end if
+#endif
+
 #endif
 
     end subroutine s_initialize_mpi_data
