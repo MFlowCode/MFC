@@ -1,6 +1,10 @@
-import os, typing, hashlib, dataclasses, subprocess
+import os, typing, hashlib, dataclasses, subprocess, re, time, sys
 
 from rich.panel import Panel
+from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TimeElapsedColumn, TaskProgressColumn
+from rich.live import Live
+from rich.table import Table
+from rich.text import Text
 
 from .case    import Case
 from .printer import cons
@@ -10,6 +14,174 @@ from .state   import ARG, CFG
 from .run     import input
 from .state   import gpuConfigOptions
 from .user_guide import Tips
+
+
+# Regex to parse ninja progress: [42/156] Building Fortran object ...
+_NINJA_PROGRESS_RE = re.compile(r'^\[(\d+)/(\d+)\]\s+(.*)$')
+
+
+def _run_build_with_progress(command: typing.List[str], target_name: str) -> subprocess.CompletedProcess:
+    """
+    Run a build command with a progress bar that parses ninja output.
+
+    Shows:
+    - Progress bar with file count (e.g., 42/156)
+    - Current file being compiled
+    - Elapsed time
+
+    Falls back to spinner with elapsed time if ninja progress can't be parsed.
+    """
+    cmd = [str(x) for x in command]
+
+    # Check if we're in a TTY (interactive terminal)
+    is_tty = sys.stdout.isatty()
+
+    # Collect all output for error reporting
+    all_stdout = []
+    all_stderr = []
+
+    # Start the process
+    process = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        bufsize=1  # Line buffered
+    )
+
+    if not is_tty:
+        # Non-interactive: show message with elapsed time
+        cons.print(f"  [bold blue]Building[/bold blue] [magenta]{target_name}[/magenta]...")
+        start_time = time.time()
+        stdout, stderr = process.communicate()
+        elapsed = time.time() - start_time
+        if elapsed > 5:  # Only show time for longer builds
+            cons.print(f"  [dim](build took {elapsed:.1f}s)[/dim]")
+        return subprocess.CompletedProcess(cmd, process.returncode, stdout, stderr)
+
+    # Interactive: show progress bar
+    current_file = ""
+    total_files = 0
+    completed_files = 0
+    progress_detected = False
+
+    # Create a custom progress display
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[bold blue]Building[/bold blue] [magenta]{task.fields[target]}[/magenta]"),
+        BarColumn(bar_width=30),
+        TaskProgressColumn(),
+        TextColumn("•"),
+        TimeElapsedColumn(),
+        TextColumn("[dim]{task.fields[current_file]}[/dim]"),
+        console=cons.raw,
+        transient=True,  # Remove progress bar when done
+        refresh_per_second=4,
+    ) as progress:
+        # Start with indeterminate progress (total=None shows spinner behavior)
+        task = progress.add_task(
+            "build",
+            total=None,
+            target=target_name,
+            current_file=""
+        )
+
+        # Read stdout line by line
+        import select
+        import io
+
+        # Use threads to read stdout and stderr concurrently
+        import threading
+        import queue
+
+        stdout_queue = queue.Queue()
+        stderr_queue = queue.Queue()
+
+        def read_stdout():
+            for line in iter(process.stdout.readline, ''):
+                stdout_queue.put(line)
+            stdout_queue.put(None)  # Signal EOF
+
+        def read_stderr():
+            for line in iter(process.stderr.readline, ''):
+                stderr_queue.put(line)
+            stderr_queue.put(None)  # Signal EOF
+
+        stdout_thread = threading.Thread(target=read_stdout, daemon=True)
+        stderr_thread = threading.Thread(target=read_stderr, daemon=True)
+        stdout_thread.start()
+        stderr_thread.start()
+
+        stdout_done = False
+        stderr_done = False
+
+        while not (stdout_done and stderr_done):
+            # Check stdout
+            try:
+                line = stdout_queue.get_nowait()
+                if line is None:
+                    stdout_done = True
+                else:
+                    all_stdout.append(line)
+                    # Parse ninja progress
+                    match = _NINJA_PROGRESS_RE.match(line.strip())
+                    if match:
+                        completed_files = int(match.group(1))
+                        total_files = int(match.group(2))
+                        action = match.group(3)
+
+                        # Extract just the filename from the action
+                        # e.g., "Building Fortran object src/simulation/m_rhs.fpp.f90.o"
+                        if action:
+                            parts = action.split()
+                            if len(parts) >= 3:
+                                # Get last part and extract filename
+                                obj_path = parts[-1]
+                                current_file = os.path.basename(obj_path).replace('.o', '').replace('.obj', '')
+                                # Truncate if too long
+                                if len(current_file) > 30:
+                                    current_file = current_file[:27] + "..."
+
+                        if not progress_detected:
+                            # First time we detected progress, set the total
+                            progress_detected = True
+                            progress.update(task, total=total_files)
+
+                        progress.update(
+                            task,
+                            completed=completed_files,
+                            current_file=current_file
+                        )
+            except queue.Empty:
+                pass
+
+            # Check stderr
+            try:
+                line = stderr_queue.get_nowait()
+                if line is None:
+                    stderr_done = True
+                else:
+                    all_stderr.append(line)
+            except queue.Empty:
+                pass
+
+            # Small sleep to avoid busy waiting
+            if not stdout_done or not stderr_done:
+                time.sleep(0.01)
+
+        # Wait for process to complete
+        process.wait()
+
+        # Ensure threads are done
+        stdout_thread.join(timeout=1)
+        stderr_thread.join(timeout=1)
+
+    return subprocess.CompletedProcess(
+        cmd,
+        process.returncode,
+        ''.join(all_stdout),
+        ''.join(all_stderr)
+    )
 
 
 def _show_build_error(result: subprocess.CompletedProcess, stage: str):
@@ -221,11 +393,8 @@ class MFCTarget:
         debug(f"Building {self.name} with {ARG('jobs')} parallel jobs")
         debug(f"Build command: {' '.join(str(c) for c in command)}")
 
-        # Show progress indicator during build (can take a long time)
-        cons.print(f"  [bold blue]Building[/bold blue] [magenta]{self.name}[/magenta]...")
-
-        # Capture output to show detailed errors on failure
-        result = system(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, print_cmd=False)
+        # Run build with progress bar (shows ninja compile progress)
+        result = _run_build_with_progress(command, self.name)
         if result.returncode != 0:
             cons.print(f"  [bold red]✗[/bold red] Build failed for [magenta]{self.name}[/magenta]")
             _show_build_error(result, "Build")
