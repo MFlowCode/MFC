@@ -366,14 +366,20 @@ class MFCTarget:
         debug(f"Configuring {self.name} in {build_dirpath}")
         debug(f"CMake flags: {' '.join(flags)}")
 
-        # Show progress indicator during configuration
-        cons.print(f"  [bold blue]Configuring[/bold blue] [magenta]{self.name}[/magenta]...")
+        if ARG('verbose'):
+            # Verbose mode: show raw cmake output
+            cons.print(f"  [bold blue]Configuring[/bold blue] [magenta]{self.name}[/magenta] [dim](verbose)[/dim]...")
+            cons.print()
+            result = system(command, print_cmd=False)
+        else:
+            # Normal mode: capture output, show on error
+            cons.print(f"  [bold blue]Configuring[/bold blue] [magenta]{self.name}[/magenta]...")
+            result = system(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, print_cmd=False)
 
-        # Capture output to show detailed errors on failure
-        result = system(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, print_cmd=False)
         if result.returncode != 0:
             cons.print(f"  [bold red]✗[/bold red] Configuration failed for [magenta]{self.name}[/magenta]")
-            _show_build_error(result, "Configuration")
+            if not ARG('verbose'):
+                _show_build_error(result, "Configuration")
             Tips.after_build_failure()
             raise MFCException(f"Failed to configure the [bold magenta]{self.name}[/bold magenta] target.")
 
@@ -393,11 +399,19 @@ class MFCTarget:
         debug(f"Building {self.name} with {ARG('jobs')} parallel jobs")
         debug(f"Build command: {' '.join(str(c) for c in command)}")
 
-        # Run build with progress bar (shows ninja compile progress)
-        result = _run_build_with_progress(command, self.name)
+        if ARG('verbose'):
+            # Verbose mode: show raw compiler output (no progress bar)
+            cons.print(f"  [bold blue]Building[/bold blue] [magenta]{self.name}[/magenta] [dim](verbose)[/dim]...")
+            cons.print()
+            result = system(command, print_cmd=False)
+        else:
+            # Normal mode: show progress bar
+            result = _run_build_with_progress(command, self.name)
+
         if result.returncode != 0:
             cons.print(f"  [bold red]✗[/bold red] Build failed for [magenta]{self.name}[/magenta]")
-            _show_build_error(result, "Build")
+            if not ARG('verbose'):
+                _show_build_error(result, "Build")
             Tips.after_build_failure()
             raise MFCException(f"Failed to build the [bold magenta]{self.name}[/bold magenta] target.")
 
