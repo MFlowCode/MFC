@@ -63,11 +63,7 @@ contains
                          patch_ib(i)%geometry == 12) then
                     call s_check_model_ib_patch_geometry(i)
                 else if (patch_ib(i)%geometry == 6) then
-<<<<<<< HEAD
-                    print *, "Ellipse Patch"
-=======
                     call s_check_ellipse_ib_patch_geometry(i)
->>>>>>> master
                 else
                     call s_prohibit_abort("Invalid IB patch", &
                                           "patch_ib("//trim(iStr)//")%geometry must be "// &
