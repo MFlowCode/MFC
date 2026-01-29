@@ -74,7 +74,7 @@ data = {
     "fd_order": 2,
     "fluid_pp(1)%gamma": 1.0e00 / (1.4e00 - 1.0e00),
     "fluid_pp(1)%pi_inf": 0.0e00,
-    "fluid_pp(1)%Re(1)": 100000,
+    "fluid_pp(1)%Re(1)": 200000,
     "patch_icpp(1)%geometry": 3,
     "patch_icpp(1)%hcid": 271,
     "patch_icpp(1)%x_centroid": L / 2,
