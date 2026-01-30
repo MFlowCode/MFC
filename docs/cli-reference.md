@@ -375,7 +375,7 @@ Show help on a topic.
 
 ### generate
 
-Regenerate shell completion scripts and documentation from the CLI schema.
+Regenerate shell completion scripts, documentation, and JSON schema from the CLI schema.
 
 **Usage:** `./mfc.sh generate [OPTIONS]`
 
@@ -384,6 +384,7 @@ Regenerate shell completion scripts and documentation from the CLI schema.
 | Option | Description | Default |
 |--------|-------------|---------|
 | `--check` | Check if generated files are up to date (exit 1 if not). | false |
+| `--json-schema` | Generate JSON Schema for IDE auto-completion of case files. | false |
 
 **Examples:**
 
@@ -393,6 +394,9 @@ Regenerate shell completion scripts and documentation from the CLI schema.
 
 # Check if completions are up to date
 ./mfc.sh generate --check
+
+# Generate JSON Schema for IDE support
+./mfc.sh generate --json-schema
 
 ```
 

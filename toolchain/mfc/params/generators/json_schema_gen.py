@@ -6,9 +6,9 @@ Generates VS Code / PyCharm compatible JSON Schema for case file auto-completion
 
 import json
 from typing import Dict, Any
-from ..schema import ParamType, Stage
+from ..schema import ParamType
 from ..registry import REGISTRY
-from .. import definitions  # noqa: F401 - loads definitions
+from .. import definitions  # noqa: F401  pylint: disable=unused-import
 
 
 def _param_type_to_json_schema(param_type: ParamType, constraints: Dict = None) -> Dict[str, Any]:
@@ -121,7 +121,7 @@ def get_schema_stats() -> Dict[str, int]:
     stats = {
         "total_params": len(props),
         "with_constraints": sum(1 for p in props.values() if "enum" in p or "minimum" in p or "maximum" in p),
-        "with_descriptions": sum(1 for name in REGISTRY.all_params.keys() if get_description(name)),
+        "with_descriptions": sum(1 for name in REGISTRY.all_params if get_description(name)),
     }
 
     return stats

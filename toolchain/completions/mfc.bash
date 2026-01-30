@@ -129,7 +129,7 @@ _mfc_completions() {
             return 0
             ;;
         generate)
-            local opts="--check"
+            local opts="--check --json-schema"
             if [[ "${cur}" == -* ]]; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             fi

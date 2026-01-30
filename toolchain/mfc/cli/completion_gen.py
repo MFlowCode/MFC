@@ -227,7 +227,7 @@ def _zsh_completion_for_positional(pos, index: int) -> str:
     elif pos.completion.type == CompletionType.FILES:
         completion = ':_files'
 
-    help_text = pos.help.replace("'", "").replace("[", "").replace("]", "")[:40]
+    help_text = pos.help.replace("'", "").replace("[", "").replace("]", "")[:120]
     return f"'{index}:{help_text}{completion}'"
 
 
@@ -272,7 +272,7 @@ def _generate_zsh_command_args(cmd: Command, schema: CLISchema) -> List[str]:
             ])
         else:
             for arg in common_set.arguments:
-                desc = arg.help.replace("'", "").replace("[", "").replace("]", "")[:40]
+                desc = arg.help.replace("'", "").replace("[", "").replace("]", "")[:120]
                 completion = _zsh_completion_for_arg(arg)
                 if arg.short:
                     arg_lines.append(f"'-{arg.short}[{desc}]{completion}'")
@@ -284,7 +284,7 @@ def _generate_zsh_command_args(cmd: Command, schema: CLISchema) -> List[str]:
         all_args.extend(meg.arguments)
 
     for arg in all_args:
-        desc = arg.help.replace("'", "").replace("[", "").replace("]", "")[:40]
+        desc = arg.help.replace("'", "").replace("[", "").replace("]", "")[:120]
         completion = _zsh_completion_for_arg(arg)
         if arg.short:
             arg_lines.append(f"'-{arg.short}[{desc}]{completion}'")

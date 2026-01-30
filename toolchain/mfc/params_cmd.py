@@ -12,7 +12,7 @@ from .printer import cons
 def params():
     """Execute the params command based on CLI arguments."""
     from .params import REGISTRY
-    from .params import definitions  # noqa: F401 - loads definitions
+    from .params import definitions  # noqa: F401  pylint: disable=unused-import
 
     query = ARG("query")
     type_filter = ARG("param_type")

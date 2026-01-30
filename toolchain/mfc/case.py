@@ -93,8 +93,7 @@ class Case:
             raise common.MFCException(f"{e}")
 
         # Constraint and dependency validation
-        from .params.validate import validate_case, format_validation_results
-        from .printer import cons
+        from .params.validate import validate_case
 
         errors, warnings = validate_case(self.params)
 

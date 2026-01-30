@@ -113,7 +113,7 @@ def _load():
     """Load all parameter definitions."""
     C, P, S, O = Stage.COMMON, Stage.PRE_PROCESS, Stage.SIMULATION, Stage.POST_PROCESS
     INT, REAL, LOG, STR = ParamType.INT, ParamType.REAL, ParamType.LOG, ParamType.STR
-    A_INT, A_REAL = ParamType.ANALYTIC_INT, ParamType.ANALYTIC_REAL
+    A_INT, A_REAL = ParamType.ANALYTIC_INT, ParamType.ANALYTIC_REAL  # pylint: disable=unused-variable
 
     # === COMMON ===
     for n in ["m", "n", "p", "model_eqns", "num_fluids", "num_patches", "weno_order",

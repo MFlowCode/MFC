@@ -23,7 +23,7 @@ def get_stage_dict(stage: Stage, include_common: bool = True) -> Dict[str, "Case
         Dict mapping parameter names to ParamType enum values
     """
     from mfc.run.case_dicts import ParamType as CDParamType
-    from .. import definitions  # noqa: F401 - loads definitions
+    from .. import definitions  # noqa: F401  pylint: disable=unused-import
     from ..registry import REGISTRY
 
     type_map = {

@@ -7,7 +7,7 @@ Central storage for MFC parameter definitions.
 from typing import Dict, Set
 from collections import defaultdict
 
-from .schema import ParamDef, ParamType, Stage
+from .schema import ParamDef, Stage
 
 
 class ParamRegistry:

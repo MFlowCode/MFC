@@ -6,7 +6,7 @@ Provides enhanced validation beyond JSON schema type checking.
 
 from typing import Dict, Any, List, Tuple
 from .registry import REGISTRY
-from . import definitions  # noqa: F401 - loads definitions
+from . import definitions  # noqa: F401  pylint: disable=unused-import
 
 
 def validate_constraints(params: Dict[str, Any]) -> List[str]:
