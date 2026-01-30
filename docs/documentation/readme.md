@@ -13,6 +13,12 @@
 - [Authors](authors.md)
 - [References](references.md)
 
+## Reference
+
+- [CLI Reference](../cli-reference.md) - Command-line interface documentation
+- [Case Parameters](../parameters.md) - All ~3,300 case parameters
+- [Case Constraints](case_constraints.md) - Feature compatibility and working examples
+
 ## Code/API Documentation
 
 MFC's three codes have their own documentation:

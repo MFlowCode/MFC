@@ -285,6 +285,51 @@ Create a new simulation case directory from a built-in or example template.
 
 ---
 
+### params
+
+Search, list, and get information about MFC's ~3,300 case parameters.
+
+**Usage:** `./mfc.sh params [QUERY] [OPTIONS]`
+
+**Arguments:**
+
+- `QUERY` - Search query (parameter name or pattern to search for).
+
+**Options:**
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `-t`, `--type` | Filter by type: int, real, log, str. | - |
+| `-f`, `--families` | List parameter families (grouped by prefix). | false |
+| `-c`, `--count` | Show count statistics only. | false |
+| `-n`, `--limit` | Maximum number of results to show. | `25` |
+| `-d`, `--describe` | Show parameter descriptions. | false |
+
+**Examples:**
+
+```bash
+# Search for parameters containing 'weno'
+./mfc.sh params weno
+
+# Search for bubble-related parameters
+./mfc.sh params bubble
+
+# Show patch_icpp parameters
+./mfc.sh params patch_icpp
+
+# List all parameter families
+./mfc.sh params -f
+
+# Show parameter count statistics
+./mfc.sh params -c
+
+# Show only REAL type weno params
+./mfc.sh params -t real weno
+
+```
+
+---
+
 ### packer
 
 Pack simulation output into a single file or compare packed files.

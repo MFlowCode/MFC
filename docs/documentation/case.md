@@ -75,7 +75,9 @@ Before diving into parameter details, check the **[Feature Compatibility Guide](
 - Common configuration patterns with copy-paste examples
 - Requirements for each model equation and Riemann solver
 
-💡 **Tip:** If you get a validation error, the compatibility guide explains what each parameter requires.
+**Parameter Lookup:**
+- CLI search: `./mfc.sh params <query>` - Search ~3,300 parameters from the command line
+- Full reference: **[Case Parameters](../parameters.md)** - Complete parameter documentation
 
 There are multiple sets of parameters that must be specified in the python input file:
 1. [Runtime Parameters](#1-runtime)

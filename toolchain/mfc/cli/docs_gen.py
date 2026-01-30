@@ -223,7 +223,7 @@ def generate_cli_reference(schema: CLISchema) -> str:
 
     # Command categories
     core_commands = ["build", "run", "test", "clean", "validate"]
-    utility_commands = ["new", "packer", "completion", "generate", "help"]
+    utility_commands = ["new", "params", "packer", "completion", "generate", "help"]
     dev_commands = ["lint", "format", "spelling", "count", "count_diff"]
     ci_commands = ["bench", "bench_diff"]
     other_commands = ["load", "interactive"]
