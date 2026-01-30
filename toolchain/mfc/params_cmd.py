@@ -124,10 +124,10 @@ def _search_params(registry, query, stage_filter, type_filter, limit):
 
         matches.append((name, param))
 
-    # Sort: prioritize exact prefix matches, then by length
+    # Sort: prioritize exact prefix matches, then by name
     matches.sort(key=lambda x: (
         0 if x[0].lower().startswith(query_lower) else 1,
-        len(x[0])
+        x[0]  # Alphabetical within each group
     ))
 
     if not matches:
@@ -138,14 +138,12 @@ def _search_params(registry, query, stage_filter, type_filter, limit):
     cons.print(f"[bold]Parameters matching '{query}'[/bold] ({len(matches)} found)")
     cons.print()
 
-    # Group by family if many results
-    if len(matches) > 20:
-        _show_grouped_results(matches[:limit])
-    else:
-        _show_results(matches[:limit])
+    # Always show as simple list - user can use -n to control count
+    _show_results(matches[:limit])
 
     if len(matches) > limit:
-        cons.print(f"  ... and {len(matches) - limit} more (use -n to show more)")
+        cons.print()
+        cons.print(f"  [dim]... {len(matches) - limit} more results (use -n {len(matches)} to show all)[/dim]")
 
 
 def _list_stage_params(registry, stage, type_filter, limit):
@@ -159,7 +157,7 @@ def _list_stage_params(registry, stage, type_filter, limit):
     cons.print(f"[bold]{stage.name} Parameters[/bold] ({len(params)} total)")
     cons.print()
 
-    # Group by prefix
+    # Group by prefix for summary
     by_prefix = {}
     simple = []
     for name, param in sorted(params.items()):
@@ -179,52 +177,31 @@ def _list_stage_params(registry, stage, type_filter, limit):
         cons.print("  [cyan]Simple parameters:[/cyan]")
         for name, param in simple[:limit]:
             cons.print(f"    {name:<30} {param.param_type.name:6}")
+        if len(simple) > limit:
+            cons.print(f"    [dim]... and {len(simple) - limit} more[/dim]")
         cons.print()
 
-    # Show families
+    # Show families summary
     if by_prefix:
         cons.print("  [cyan]Parameter families:[/cyan]")
-        for prefix, items in sorted(by_prefix.items(), key=lambda x: -len(x[1]))[:15]:
+        sorted_families = sorted(by_prefix.items(), key=lambda x: -len(x[1]))
+        for prefix, items in sorted_families[:limit]:
             cons.print(f"    {prefix}: {len(items)} parameters")
+        if len(sorted_families) > limit:
+            cons.print(f"    [dim]... and {len(sorted_families) - limit} more families[/dim]")
+
+    cons.print()
+    cons.print("[yellow]Tip:[/yellow] Use './mfc.sh params <family>' to search within a family")
 
 
 def _show_results(matches):
     """Show search results in a simple list."""
-    cons.print(f"  {'Parameter':<45} {'Type':6} {'Stages'}")
-    cons.print(f"  {'-'*45} {'-'*6} {'-'*20}")
+    cons.print(f"  {'Parameter':<50} {'Type':6} {'Stages'}")
+    cons.print(f"  {'-'*50} {'-'*6} {'-'*15}")
 
     for name, param in matches:
         stages = ",".join(s.name[:3] for s in param.stages)
-        cons.print(f"  {name:<45} {param.param_type.name:6} {stages}")
-
-
-def _show_grouped_results(matches):
-    """Show results grouped by family."""
-    by_family = {}
-    for name, param in matches:
-        if "%" in name:
-            family = name.split("%")[0]
-        elif "(" in name:
-            family = name.split("(")[0]
-        else:
-            family = "_simple"
-        if family not in by_family:
-            by_family[family] = []
-        by_family[family].append((name, param))
-
-    for family, items in sorted(by_family.items(), key=lambda x: -len(x[1])):
-        if family == "_simple":
-            cons.print(f"  [cyan]Simple parameters:[/cyan]")
-        else:
-            cons.print(f"  [cyan]{family}[/cyan] ({len(items)} params):")
-
-        # Show first few items
-        for name, param in items[:5]:
-            short_name = name.replace(f"{family}%", "").replace(f"{family}(", "(")
-            cons.print(f"    {short_name:<35} {param.param_type.name:6}")
-        if len(items) > 5:
-            cons.print(f"    ... and {len(items) - 5} more")
-        cons.print()
+        cons.print(f"  {name:<50} {param.param_type.name:6} {stages}")
 
 
 def _suggest_alternatives(registry, query):
