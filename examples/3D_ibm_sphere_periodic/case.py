@@ -8,7 +8,7 @@ gam_a = 1.4
 D = 0.1
 
 # sphere density
-rho_s = 200 
+rho_s = 200
 
 # domain length
 L = 10 * D
