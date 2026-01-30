@@ -59,7 +59,8 @@ contains
             & 'cfl_const_dt', 'cfl_dt', 'surface_tension',                     &
             & 'hyperelasticity', 'pre_stress', 'elliptic_smoothing', 'viscous',&
             & 'bubbles_lagrange', 'bc_io', 'mhd', 'relativity', 'cont_damage', &
-            & 'igr', 'down_sample', 'simplex_perturb','fft_wrt', 'hyper_cleaning' ]
+            & 'igr', 'down_sample', 'simplex_perturb','fft_wrt', 'hyper_cleaning',&
+            & 'particles_lagrange' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
         call MPI_BCAST(fluid_rho(1), num_fluids_max, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
@@ -147,6 +148,13 @@ contains
                 'ss','pv','vd','mu_l','mu_v','mu_g','gam_v','gam_g', &
                 'M_v','M_g','k_v','k_g','cp_v','cp_g','R_v','R_g']
                 call MPI_BCAST(bub_pp%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
+        end if
+
+        ! Subgrid particle parameters
+        if (particles_lagrange) then
+            #:for VAR in [ 'rho0ref_particle','cp_particle']
+                call MPI_BCAST(particle_pp%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
         end if
 
