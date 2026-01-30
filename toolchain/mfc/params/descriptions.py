@@ -155,6 +155,76 @@ DESCRIPTIONS = {
     "old_ic": "Use initial conditions from previous simulation",
     "t_step_old": "Time step to restart from",
     "fd_order": "Finite difference order for gradients",
+
+    # Additional simple params
+    "thermal": "Thermal model selection",
+    "relax_model": "Relaxation model type",
+    "igr_order": "Implicit gradient reconstruction order",
+    "pref": "Reference pressure",
+    "poly_sigma": "Polydisperse distribution standard deviation",
+    "rhoref": "Reference density",
+    "sigma": "Surface tension coefficient",
+    "Bx0": "Background magnetic field in x-direction",
+    "relax": "Enable relaxation terms",
+    "adv_n": "Enable advection of number density",
+    "cont_damage": "Enable continuum damage model",
+    "igr": "Enable implicit gradient reconstruction",
+    "down_sample": "Enable output downsampling",
+    "perturb_flow_fluid": "Fluid index for flow perturbation",
+    "perturb_sph_fluid": "Fluid index for spherical perturbation",
+    "dist_type": "Distribution type for polydisperse bubbles",
+    "mixlayer_perturb_nk": "Number of perturbation modes for mixing layer",
+    "elliptic_smoothing_iters": "Number of elliptic smoothing iterations",
+    "mixlayer_vel_coef": "Velocity coefficient for mixing layer",
+    "mixlayer_domain": "Mixing layer domain size",
+    "mixlayer_perturb_k0": "Base wavenumber for mixing layer perturbation",
+    "perturb_flow_mag": "Magnitude of flow perturbation",
+    "fluid_rho": "Reference fluid density",
+    "sigR": "Bubble radius standard deviation",
+    "sigV": "Bubble velocity standard deviation",
+    "rhoRV": "Bubble radius-velocity correlation",
+    "mixlayer_vel_profile": "Enable mixing layer velocity profile",
+    "mixlayer_perturb": "Enable mixing layer perturbation",
+    "perturb_flow": "Enable flow perturbation",
+    "perturb_sph": "Enable spherical perturbation",
+    "cfl_dt": "Enable CFL-based time stepping",
+    "pre_stress": "Enable pre-stress initialization",
+    "elliptic_smoothing": "Enable elliptic smoothing",
+    "simplex_perturb": "Enable simplex noise perturbation",
+    "n_start_old": "Starting index from previous simulation",
+    "palpha_eps": "Volume fraction epsilon for pressure relaxation",
+    "ptgalpha_eps": "Volume fraction epsilon for PTG relaxation",
+    "pi_fac": "Pi infinity factor",
+    "n_start": "Starting time step index",
+    "tau_star": "Non-dimensional relaxation time",
+    "cont_damage_s": "Continuum damage shape parameter",
+    "alpha_bar": "Average volume fraction",
+    "alf_factor": "Artificial viscosity factor",
+    "ic_eps": "Interface compression epsilon",
+    "ic_beta": "Interface compression beta",
+    "powell": "Enable Powell source terms for MHD",
+    "igr_pres_lim": "Enable IGR pressure limiting",
+    "int_comp": "Enable interface compression",
+    "nv_uvm_out_of_core": "Enable NVIDIA UVM out-of-core",
+    "nv_uvm_pref_gpu": "Prefer GPU for NVIDIA UVM",
+    "nv_uvm_igr_temps_on_gpu": "Store IGR temporaries on GPU",
+    "num_igr_iters": "Number of IGR iterations",
+    "num_igr_warm_start_iters": "Number of IGR warm-start iterations",
+    "igr_iter_solver": "IGR iterative solver type",
+    "schlieren_alpha": "Schlieren alpha coefficient",
+    "t_tol": "Time tolerance",
+    "flux_lim": "Flux limiter type",
+    "heat_ratio_wrt": "Write heat capacity ratio field",
+    "pi_inf_wrt": "Write pi_inf field",
+    "pres_inf_wrt": "Write reference pressure field",
+    "qm_wrt": "Write Q-criterion field",
+    "liutex_wrt": "Write Liutex vortex field",
+    "sim_data": "Enable simulation data output",
+    "output_partial_domain": "Enable partial domain output",
+    "fft_wrt": "Enable FFT output",
+    "kappa_wrt": "Write curvature field",
+    "lag_header": "Enable Lagrangian output header",
+    "chem_wrt_T": "Write temperature field for chemistry",
 }
 
 # Patterns for auto-generating descriptions of indexed parameters
@@ -191,8 +261,26 @@ PATTERNS = [
     (r"patch_icpp\((\d+)\)%model_translate\((\d+)\)", "Model translation component {1} for patch {0}"),
     (r"patch_icpp\((\d+)\)%model_scale\((\d+)\)", "Model scale component {1} for patch {0}"),
     (r"patch_icpp\((\d+)\)%model_rotate\((\d+)\)", "Model rotation component {1} for patch {0}"),
+    (r"patch_icpp\((\d+)\)%model_threshold", "Model threshold for patch {0}"),
     (r"patch_icpp\((\d+)\)%epsilon", "Interface thickness for patch {0}"),
     (r"patch_icpp\((\d+)\)%beta", "Shape parameter beta for patch {0}"),
+    (r"patch_icpp\((\d+)\)%a\((\d+)\)", "Shape coefficient a({1}) for patch {0}"),
+    (r"patch_icpp\((\d+)\)%cf_val", "Color function value for patch {0}"),
+    (r"patch_icpp\((\d+)\)%cv", "Specific heat at constant volume for patch {0}"),
+    (r"patch_icpp\((\d+)\)%qv", "Heat of formation for patch {0}"),
+    (r"patch_icpp\((\d+)\)%qvp", "Heat of formation prime for patch {0}"),
+    (r"patch_icpp\((\d+)\)%hcid", "Hard-coded patch ID for patch {0}"),
+    (r"patch_icpp\((\d+)\)%model_spc", "Model spacing for patch {0}"),
+    (r"patch_icpp\((\d+)\)%non_axis_sym", "Non-axisymmetric parameter for patch {0}"),
+    (r"patch_icpp\((\d+)\)%r0", "Initial bubble radius for patch {0}"),
+    (r"patch_icpp\((\d+)\)%v0", "Initial bubble velocity for patch {0}"),
+    (r"patch_icpp\((\d+)\)%p0", "Initial bubble pressure for patch {0}"),
+    (r"patch_icpp\((\d+)\)%m0", "Initial bubble mass for patch {0}"),
+    (r"patch_icpp\((\d+)\)%vel", "Velocity magnitude for patch {0}"),
+    (r"patch_icpp\((\d+)\)%alpha", "Volume fraction for patch {0}"),
+    (r"patch_icpp\((\d+)\)%alpha_rho", "Partial density for patch {0}"),
+    (r"patch_icpp\((\d+)\)%radii", "Radii for patch {0}"),
+    (r"patch_icpp\((\d+)\)%normal", "Normal direction for patch {0}"),
 
     # fluid_pp patterns
     (r"fluid_pp\((\d+)\)%gamma", "Specific heat ratio for fluid {0}"),
@@ -212,12 +300,23 @@ PATTERNS = [
     (r"patch_ib\((\d+)\)%length_y", "Y-dimension length for IB patch {0}"),
     (r"patch_ib\((\d+)\)%length_z", "Z-dimension length for IB patch {0}"),
     (r"patch_ib\((\d+)\)%radius", "Radius for IB patch {0}"),
+    (r"patch_ib\((\d+)\)%theta", "Theta angle for IB patch {0}"),
+    (r"patch_ib\((\d+)\)%c", "Shape parameter c for IB patch {0}"),
+    (r"patch_ib\((\d+)\)%p", "Shape parameter p for IB patch {0}"),
+    (r"patch_ib\((\d+)\)%t", "Shape parameter t for IB patch {0}"),
+    (r"patch_ib\((\d+)\)%m", "Shape parameter m for IB patch {0}"),
+    (r"patch_ib\((\d+)\)%mass", "Mass for IB patch {0}"),
     (r"patch_ib\((\d+)\)%vel\((\d+)\)", "Velocity component {1} for IB patch {0}"),
     (r"patch_ib\((\d+)\)%angular_vel\((\d+)\)", "Angular velocity component {1} for IB patch {0}"),
     (r"patch_ib\((\d+)\)%angles\((\d+)\)", "Orientation angle {1} for IB patch {0}"),
     (r"patch_ib\((\d+)\)%slip", "Enable slip condition for IB patch {0}"),
     (r"patch_ib\((\d+)\)%moving_ibm", "Enable moving boundary for IB patch {0}"),
     (r"patch_ib\((\d+)\)%model_filepath", "STL model file path for IB patch {0}"),
+    (r"patch_ib\((\d+)\)%model_spc", "Model spacing for IB patch {0}"),
+    (r"patch_ib\((\d+)\)%model_threshold", "Model threshold for IB patch {0}"),
+    (r"patch_ib\((\d+)\)%model_translate\((\d+)\)", "Model translation component {1} for IB patch {0}"),
+    (r"patch_ib\((\d+)\)%model_scale\((\d+)\)", "Model scale component {1} for IB patch {0}"),
+    (r"patch_ib\((\d+)\)%model_rotate\((\d+)\)", "Model rotation component {1} for IB patch {0}"),
 
     # bc patterns
     (r"bc_([xyz])%vel_in\((\d+)\)", "Inlet velocity component {1} at {0}-boundary"),
@@ -252,6 +351,20 @@ PATTERNS = [
     (r"acoustic\((\d+)\)%height", "Height for acoustic source {0}"),
     (r"acoustic\((\d+)\)%delay", "Delay for acoustic source {0}"),
     (r"acoustic\((\d+)\)%dipole", "Enable dipole for acoustic source {0}"),
+    (r"acoustic\((\d+)\)%dir", "Direction for acoustic source {0}"),
+    (r"acoustic\((\d+)\)%npulse", "Number of pulses for acoustic source {0}"),
+    (r"acoustic\((\d+)\)%gauss_sigma_dist", "Gaussian spatial width for acoustic source {0}"),
+    (r"acoustic\((\d+)\)%gauss_sigma_time", "Gaussian temporal width for acoustic source {0}"),
+    (r"acoustic\((\d+)\)%num_elements", "Number of array elements for acoustic source {0}"),
+    (r"acoustic\((\d+)\)%element_on", "Active element index for acoustic source {0}"),
+    (r"acoustic\((\d+)\)%element_spacing_angle", "Element spacing angle for acoustic source {0}"),
+    (r"acoustic\((\d+)\)%element_polygon_ratio", "Element polygon ratio for acoustic source {0}"),
+    (r"acoustic\((\d+)\)%foc_length", "Focal length for acoustic source {0}"),
+    (r"acoustic\((\d+)\)%aperture", "Aperture for acoustic source {0}"),
+    (r"acoustic\((\d+)\)%rotate_angle", "Rotation angle for acoustic source {0}"),
+    (r"acoustic\((\d+)\)%bb_num_freq", "Number of broadband frequencies for source {0}"),
+    (r"acoustic\((\d+)\)%bb_bandwidth", "Broadband bandwidth for acoustic source {0}"),
+    (r"acoustic\((\d+)\)%bb_lowest_freq", "Lowest broadband frequency for source {0}"),
 
     # probe patterns
     (r"probe\((\d+)\)%x", "X-coordinate of probe {0}"),
@@ -273,11 +386,16 @@ PATTERNS = [
     (r"schlieren_alpha\((\d+)\)", "Schlieren coefficient for fluid {0}"),
     (r"alpha_rho_wrt\((\d+)\)", "Write partial density for fluid {0}"),
     (r"alpha_wrt\((\d+)\)", "Write volume fraction for fluid {0}"),
+    (r"alpha_rho_e_wrt\((\d+)\)", "Write partial energy for fluid {0}"),
+    (r"kappa_wrt\((\d+)\)", "Write curvature for fluid {0}"),
     (r"mom_wrt\((\d+)\)", "Write momentum component {0}"),
     (r"vel_wrt\((\d+)\)", "Write velocity component {0}"),
     (r"flux_wrt\((\d+)\)", "Write flux component {0}"),
     (r"omega_wrt\((\d+)\)", "Write vorticity component {0}"),
     (r"chem_wrt_Y\((\d+)\)", "Write mass fraction of species {0}"),
+
+    # Lagrangian output patterns
+    (r"lag_(\w+)_wrt", "Write Lagrangian {0} field"),
 
     # Body force patterns
     (r"([kgwp])_([xyz])", "Body force parameter {0} in {1}-direction"),
@@ -287,9 +405,11 @@ PATTERNS = [
     (r"simplex_params%perturb_dens\((\d+)\)", "Enable density perturbation for fluid {0}"),
     (r"simplex_params%perturb_dens_freq\((\d+)\)", "Density perturbation frequency for fluid {0}"),
     (r"simplex_params%perturb_dens_scale\((\d+)\)", "Density perturbation scale for fluid {0}"),
+    (r"simplex_params%perturb_dens_offset\((\d+),\s*(\d+)\)", "Density perturbation offset ({1}) for fluid {0}"),
     (r"simplex_params%perturb_vel\((\d+)\)", "Enable velocity perturbation for direction {0}"),
     (r"simplex_params%perturb_vel_freq\((\d+)\)", "Velocity perturbation frequency for direction {0}"),
     (r"simplex_params%perturb_vel_scale\((\d+)\)", "Velocity perturbation scale for direction {0}"),
+    (r"simplex_params%perturb_vel_offset\((\d+),(\d+)\)", "Velocity perturbation offset ({1}) for direction {0}"),
 
     # lag_params patterns
     (r"lag_params%(\w+)", "Lagrangian tracking parameter: {0}"),
@@ -313,6 +433,99 @@ def get_description(param_name: str) -> str:
         match = re.match(pattern, param_name)
         if match:
             return template.format(*match.groups())
+
+    # Try naming convention auto-generation as fallback
+    return _infer_from_naming(param_name)
+
+
+def _infer_from_naming(param_name: str) -> str:
+    """Infer description from naming conventions."""
+    name = param_name
+
+    # Handle nested params (e.g., simplex_params%perturb_dens_offset)
+    if "%" in name:
+        parts = name.split("%")
+        prefix = parts[0]
+        suffix = parts[1]
+
+        # Extract prefix context
+        prefix_map = {
+            "simplex_params": "Simplex noise",
+            "lag_params": "Lagrangian tracking",
+            "chem_params": "Chemistry",
+            "bub_pp": "Bubble",
+            "x_output": "X-direction output",
+            "y_output": "Y-direction output",
+            "z_output": "Z-direction output",
+        }
+
+        # Remove index from prefix if present
+        base_prefix = re.sub(r"\(\d+\)", "", prefix)
+        context = prefix_map.get(base_prefix, "")
+
+        # Handle common suffix patterns
+        if suffix.endswith("_wrt"):
+            field = suffix[:-4].replace("_", " ")
+            return f"Write {field} output" + (f" ({context})" if context else "")
+
+        if "offset" in suffix:
+            return f"Offset parameter" + (f" for {context}" if context else "")
+
+        if context:
+            # Clean up suffix for display
+            clean_suffix = re.sub(r"\(\d+\)", "", suffix).replace("_", " ")
+            return f"{context} {clean_suffix} parameter"
+
+    # Handle *_wrt patterns (write flags)
+    if name.endswith("_wrt"):
+        field = name[:-4].replace("_", " ")
+        return f"Write {field} to output"
+
+    # Handle num_* patterns
+    if name.startswith("num_"):
+        thing = name[4:].replace("_", " ")
+        return f"Number of {thing}"
+
+    # Handle *_order patterns
+    if name.endswith("_order"):
+        thing = name[:-6].replace("_", " ")
+        return f"Order of {thing}"
+
+    # Handle *_model patterns
+    if name.endswith("_model"):
+        thing = name[:-6].replace("_", " ")
+        return f"{thing.title()} model selection"
+
+    # Handle *_tol patterns
+    if name.endswith("_tol"):
+        thing = name[:-4].replace("_", " ")
+        return f"Tolerance for {thing}"
+
+    # Handle *_eps patterns
+    if name.endswith("_eps"):
+        thing = name[:-4].replace("_", " ")
+        return f"Epsilon parameter for {thing}"
+
+    # Handle *_coef or *_coeff patterns
+    if name.endswith("_coef") or name.endswith("_coeff"):
+        thing = name.rsplit("_", 1)[0].replace("_", " ")
+        return f"Coefficient for {thing}"
+
+    # Handle *_max / *_min patterns
+    if name.endswith("_max"):
+        thing = name[:-4].replace("_", " ")
+        return f"Maximum {thing}"
+    if name.endswith("_min"):
+        thing = name[:-4].replace("_", " ")
+        return f"Minimum {thing}"
+
+    # Handle *%beg / *%end patterns
+    if name.endswith("%beg"):
+        thing = name[:-4].replace("_", " ").replace("%", " ")
+        return f"Beginning value for {thing}"
+    if name.endswith("%end"):
+        thing = name[:-4].replace("_", " ").replace("%", " ")
+        return f"End value for {thing}"
 
     return ""
 
