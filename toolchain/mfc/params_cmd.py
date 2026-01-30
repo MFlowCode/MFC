@@ -49,83 +49,135 @@ def _collapse_indexed_params(matches):
     """
     Collapse indexed parameters into patterns.
 
-    e.g., bc_z%alpha_in(1), bc_z%alpha_in(2), ... bc_z%alpha_in(10)
-    becomes: bc_z%alpha_in(N)  [N=1..10]
+    Handles multiple index patterns:
+    - Suffix index: bc_z%alpha_in(1) -> bc_z%alpha_in(N)
+    - Prefix index: patch_icpp(1)%geometry -> patch_icpp(N)%geometry
+    - Both: patch_icpp(1)%alpha(1) -> patch_icpp(N)%alpha(M)
     """
-    # Pattern to match indexed parameters: name(N) or name(N, M)
-    index_pattern = re.compile(r'^(.+)\((\d+)(?:,\s*(\d+))?\)$')
+    # Patterns for different index positions
+    # Pattern 1: prefix(N)%suffix or prefix(N)%suffix(M)
+    prefix_pattern = re.compile(r'^([^(]+)\((\d+)\)%(.+)$')
+    # Pattern 2: name(N) or name(N, M) at end
+    suffix_pattern = re.compile(r'^(.+)\((\d+)(?:,\s*(\d+))?\)$')
 
-    # Group by base pattern
-    groups = {}  # base_pattern -> {indices: [(i, j, param), ...], param_type, stages}
-    non_indexed = []
+    # Two-level grouping: first by base pattern (with indices replaced), then collect indices
+    groups = {}  # normalized_pattern -> {indices: [...], param_type, stages, pattern_type}
 
     for name, param in matches:
-        match = index_pattern.match(name)
-        if match:
-            base = match.group(1)
-            idx1 = int(match.group(2))
-            idx2 = int(match.group(3)) if match.group(3) else None
+        # Try prefix pattern first: patch_icpp(1)%geometry
+        prefix_match = prefix_pattern.match(name)
+        if prefix_match:
+            prefix = prefix_match.group(1)
+            idx1 = int(prefix_match.group(2))
+            suffix = prefix_match.group(3)
 
-            if base not in groups:
-                groups[base] = {
+            # Check if suffix also has an index
+            suffix_match = suffix_pattern.match(suffix)
+            if suffix_match:
+                suffix_base = suffix_match.group(1)
+                idx2 = int(suffix_match.group(2))
+                idx3 = int(suffix_match.group(3)) if suffix_match.group(3) else None
+                # Pattern: prefix(N)%suffix_base(M) or prefix(N)%suffix_base(M, K)
+                if idx3 is not None:
+                    base_pattern = f"{prefix}(N)%{suffix_base}(M, K)"
+                    indices_key = (idx1, idx2, idx3)
+                else:
+                    base_pattern = f"{prefix}(N)%{suffix_base}(M)"
+                    indices_key = (idx1, idx2, None)
+            else:
+                # Pattern: prefix(N)%suffix
+                base_pattern = f"{prefix}(N)%{suffix}"
+                indices_key = (idx1, None, None)
+
+            if base_pattern not in groups:
+                groups[base_pattern] = {
                     'indices': [],
                     'param_type': param.param_type,
                     'stages': param.stages,
                 }
-            groups[base]['indices'].append((idx1, idx2, param))
+            groups[base_pattern]['indices'].append((indices_key, param))
+            continue
+
+        # Try suffix-only pattern: name(N) or name(N, M)
+        suffix_match = suffix_pattern.match(name)
+        if suffix_match:
+            base = suffix_match.group(1)
+            idx1 = int(suffix_match.group(2))
+            idx2 = int(suffix_match.group(3)) if suffix_match.group(3) else None
+
+            if idx2 is not None:
+                base_pattern = f"{base}(N, M)"
+                indices_key = (idx1, idx2, None)
+            else:
+                base_pattern = f"{base}(N)"
+                indices_key = (idx1, None, None)
+
+            if base_pattern not in groups:
+                groups[base_pattern] = {
+                    'indices': [],
+                    'param_type': param.param_type,
+                    'stages': param.stages,
+                }
+            groups[base_pattern]['indices'].append((indices_key, param))
+            continue
+
+        # No index pattern - add as-is
+        if name not in groups:
+            groups[name] = {
+                'indices': [(None, param)],
+                'param_type': param.param_type,
+                'stages': param.stages,
+            }
         else:
-            non_indexed.append((name, param))
+            groups[name]['indices'].append((None, param))
 
     # Build collapsed results
     collapsed = []
 
-    for base, data in sorted(groups.items()):
+    for pattern, data in sorted(groups.items()):
         indices = data['indices']
-        param_type = data['param_type']
-        stages = data['stages']
+        param = indices[0][1]  # Get param from first entry
+        count = len(indices)
 
-        if len(indices) == 1:
-            # Single index - show as-is
-            idx1, idx2, param = indices[0]
-            if idx2 is not None:
-                name = f"{base}({idx1}, {idx2})"
-            else:
-                name = f"{base}({idx1})"
-            collapsed.append((name, param, 1))
+        if count == 1 and indices[0][0] is None:
+            # Non-indexed parameter
+            collapsed.append((pattern, param, 1))
+        elif count == 1:
+            # Single indexed parameter - show with actual index
+            idx_tuple = indices[0][0]
+            # Reconstruct the actual name
+            actual_name = pattern
+            if idx_tuple[0] is not None:
+                actual_name = actual_name.replace('(N)', f'({idx_tuple[0]})', 1)
+            if idx_tuple[1] is not None:
+                actual_name = actual_name.replace('(M)', f'({idx_tuple[1]})', 1)
+            if idx_tuple[2] is not None:
+                actual_name = actual_name.replace('(K)', f'({idx_tuple[2]})', 1)
+            collapsed.append((actual_name, param, 1))
         else:
-            # Multiple indices - collapse
-            # Check if it's 1D or 2D indexing
-            has_2d = any(idx2 is not None for idx1, idx2, _ in indices)
+            # Multiple indices - build range string
+            range_parts = []
 
-            if has_2d:
-                # 2D indexing - show range for both dimensions
-                idx1_vals = sorted(set(idx1 for idx1, _, _ in indices))
-                idx2_vals = sorted(set(idx2 for _, idx2, _ in indices if idx2 is not None))
+            # Extract index values
+            idx1_vals = sorted(set(idx[0] for idx, _ in indices if idx and idx[0] is not None))
+            idx2_vals = sorted(set(idx[1] for idx, _ in indices if idx and idx[1] is not None))
+            idx3_vals = sorted(set(idx[2] for idx, _ in indices if idx and idx[2] is not None))
 
-                if len(idx1_vals) > 1 and len(idx2_vals) > 1:
-                    name = f"{base}(N, M)"
-                    range_str = f"N={min(idx1_vals)}..{max(idx1_vals)}, M={min(idx2_vals)}..{max(idx2_vals)}"
-                elif len(idx1_vals) > 1:
-                    name = f"{base}(N, {idx2_vals[0]})"
-                    range_str = f"N={min(idx1_vals)}..{max(idx1_vals)}"
+            if idx1_vals:
+                if idx1_vals == list(range(min(idx1_vals), max(idx1_vals) + 1)):
+                    range_parts.append(f"N={min(idx1_vals)}..{max(idx1_vals)}")
                 else:
-                    name = f"{base}({idx1_vals[0]}, M)"
-                    range_str = f"M={min(idx2_vals)}..{max(idx2_vals)}"
-            else:
-                # 1D indexing
-                idx_vals = sorted(idx1 for idx1, _, _ in indices)
-                name = f"{base}(N)"
-                if idx_vals == list(range(min(idx_vals), max(idx_vals) + 1)):
-                    range_str = f"N={min(idx_vals)}..{max(idx_vals)}"
+                    range_parts.append(f"N={min(idx1_vals)}..{max(idx1_vals)}")
+            if idx2_vals:
+                if idx2_vals == list(range(min(idx2_vals), max(idx2_vals) + 1)):
+                    range_parts.append(f"M={min(idx2_vals)}..{max(idx2_vals)}")
                 else:
-                    range_str = f"N in {{{','.join(map(str, idx_vals[:5]))}{', ...' if len(idx_vals) > 5 else ''}}}"
+                    range_parts.append(f"M={min(idx2_vals)}..{max(idx2_vals)}")
+            if idx3_vals:
+                range_parts.append(f"K={min(idx3_vals)}..{max(idx3_vals)}")
 
-            # Create a pseudo-param for display
-            collapsed.append((name, indices[0][2], len(indices), range_str))
-
-    # Add non-indexed params
-    for name, param in non_indexed:
-        collapsed.append((name, param, 1))
+            range_str = ", ".join(range_parts) if range_parts else ""
+            collapsed.append((pattern, param, count, range_str))
 
     # Sort by name
     collapsed.sort(key=lambda x: x[0])
