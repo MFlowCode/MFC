@@ -27,7 +27,7 @@ class MutationResult:
 
 # Mutations to apply to parameters
 MUTATIONS = {
-    # Numeric parameters: try invalid values
+    # === BASIC NUMERIC PARAMETERS ===
     "m": [0, -1, None],
     "n": [-1, -10],
     "p": [-1, -5],
@@ -42,20 +42,78 @@ MUTATIONS = {
     "time_stepper": [0, 6, -1],
     "riemann_solver": [0, 10, -1],
 
-    # Boolean parameters: try invalid strings
+    # === BOOLEAN PARAMETERS (Fortran logicals) ===
     "bubbles_euler": ["X", "yes", "1"],
     "mpp_lim": ["X", "yes"],
     "cyl_coord": ["X", "maybe"],
 
-    # Boundary conditions
+    # === BOUNDARY CONDITIONS ===
     "bc_x%beg": [None, 100, -100],
     "bc_x%end": [None, 100, -100],
     "bc_y%beg": [100, -100],
     "bc_y%end": [100, -100],
 
-    # Remove required parameters
+    # === DOMAIN PARAMETERS ===
     "x_domain%beg": [None],
     "x_domain%end": [None],
+
+    # === PHYSICS: THERMODYNAMICS ===
+    # gamma must be > 1 for physical gases (gamma = Cp/Cv)
+    # In MFC, fluid_pp(i)%gamma stores 1/(gamma-1), so it must be > 0
+    "fluid_pp(1)%gamma": [0, -1, -0.5],
+
+    # pi_inf (stiffness) must be >= 0 for stiffened gas EOS
+    "fluid_pp(1)%pi_inf": [-1, -1e6],
+
+    # === PHYSICS: PATCH INITIAL CONDITIONS ===
+    # Pressure must be positive
+    "patch_icpp(1)%pres": [0, -1, -1e5],
+
+    # Density (alpha_rho) must be non-negative (0 allowed for vacuum)
+    "patch_icpp(1)%alpha_rho(1)": [-1, -1000],
+
+    # Volume fraction must be in [0, 1]
+    "patch_icpp(1)%alpha(1)": [-0.1, 1.5, 2.0],
+
+    # === PHYSICS: GEOMETRY ===
+    # Patch dimensions must be positive
+    "patch_icpp(1)%length_x": [0, -1, -10],
+    "patch_icpp(1)%length_y": [0, -1],
+    "patch_icpp(1)%length_z": [0, -1],
+    "patch_icpp(1)%radius": [0, -1],
+
+    # === PHYSICS: BUBBLES ===
+    # Bubble radius must be positive
+    "patch_icpp(1)%r0": [0, -1],
+    # Number of bubble bins must be positive
+    "nb": [0, -1],
+    # Bubble reference parameters must be positive
+    "bub_pp%R0ref": [0, -1],
+    "bub_pp%p0ref": [0, -1],
+    "bub_pp%rho0ref": [0, -1],
+    "bub_pp%T0ref": [0, -1],
+    # Bubble viscosities must be non-negative
+    "bub_pp%mu_l": [-1, -1e-3],
+    "bub_pp%mu_g": [-1, -1e-3],
+    # Surface tension must be non-negative
+    "bub_pp%ss": [-1, -0.01],
+    # Global bubble reference values
+    "rhoref": [0, -1, -1000],
+    "pref": [0, -1, -1e5],
+
+    # === PHYSICS: ACOUSTICS ===
+    # Frequency/wavelength must be positive
+    "acoustic(1)%frequency": [0, -1],
+    "acoustic(1)%wavelength": [0, -1],
+    "acoustic(1)%gauss_sigma_time": [0, -1],
+    "acoustic(1)%gauss_sigma_dist": [0, -1],
+
+    # === NUMERICS ===
+    # CFL target should be in (0, 1]
+    "cfl_target": [-0.1, 0, 1.5, 2.0],
+
+    # WENO epsilon must be positive (small regularization)
+    "weno_eps": [0, -1e-6],
 }
 
 

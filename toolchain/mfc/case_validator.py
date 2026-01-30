@@ -300,12 +300,53 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
                      "Bubble models untested with pi-gamma model (model_eqns = 1)")
         self.prohibit(model_eqns == 4 and rhoref is None,
                      "rhoref must be set if using bubbles_euler with model_eqns = 4")
+        self.prohibit(rhoref is not None and rhoref <= 0,
+                     "rhoref (reference density) must be positive")
         self.prohibit(model_eqns == 4 and pref is None,
                      "pref must be set if using bubbles_euler with model_eqns = 4")
+        self.prohibit(pref is not None and pref <= 0,
+                     "pref (reference pressure) must be positive")
         self.prohibit(model_eqns == 4 and num_fluids != 1,
                      "4-equation model (model_eqns = 4) is single-component and requires num_fluids = 1")
         self.prohibit(cyl_coord,
                      "Bubble models untested in cylindrical coordinates")
+
+        # === BUBBLE PHYSICS PARAMETERS ===
+        # Validate bubble reference parameters (bub_pp%)
+        R0ref = self.get('bub_pp%R0ref')
+        p0ref = self.get('bub_pp%p0ref')
+        rho0ref = self.get('bub_pp%rho0ref')
+        T0ref = self.get('bub_pp%T0ref')
+
+        if R0ref is not None:
+            self.prohibit(R0ref <= 0,
+                         "bub_pp%R0ref (reference bubble radius) must be positive")
+        if p0ref is not None:
+            self.prohibit(p0ref <= 0,
+                         "bub_pp%p0ref (reference pressure) must be positive")
+        if rho0ref is not None:
+            self.prohibit(rho0ref <= 0,
+                         "bub_pp%rho0ref (reference density) must be positive")
+        if T0ref is not None:
+            self.prohibit(T0ref <= 0,
+                         "bub_pp%T0ref (reference temperature) must be positive")
+
+        # Viscosities must be non-negative
+        mu_l = self.get('bub_pp%mu_l')
+        mu_g = self.get('bub_pp%mu_g')
+        mu_v = self.get('bub_pp%mu_v')
+
+        if mu_l is not None:
+            self.prohibit(mu_l < 0, "bub_pp%mu_l (liquid viscosity) must be non-negative")
+        if mu_g is not None:
+            self.prohibit(mu_g < 0, "bub_pp%mu_g (gas viscosity) must be non-negative")
+        if mu_v is not None:
+            self.prohibit(mu_v < 0, "bub_pp%mu_v (vapor viscosity) must be non-negative")
+
+        # Surface tension must be non-negative
+        ss = self.get('bub_pp%ss')
+        if ss is not None:
+            self.prohibit(ss < 0, "bub_pp%ss (surface tension) must be non-negative")
 
     def check_qbmm_and_polydisperse(self):
         """Checks constraints on QBMM and polydisperse bubble parameters"""
@@ -538,8 +579,8 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
             t_save = self.get('t_save')
             n_start = self.get('n_start')
 
-            self.prohibit(cfl_target is not None and (cfl_target < 0 or cfl_target > 1),
-                         "cfl_target must be between 0 and 1")
+            self.prohibit(cfl_target is not None and (cfl_target <= 0 or cfl_target > 1),
+                         "cfl_target must be in (0, 1]")
             self.prohibit(t_stop is not None and t_stop <= 0,
                          "t_stop must be positive")
             self.prohibit(t_save is not None and t_save <= 0,
@@ -925,6 +966,11 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
                 wave_set = wavelength is not None
                 self.prohibit(freq_set == wave_set,
                              f"One and only one of acoustic({jstr})%frequency or wavelength must be specified for pulse = {pulse}")
+                # Physics: frequency and wavelength must be positive
+                self.prohibit(frequency is not None and frequency <= 0,
+                             f"acoustic({jstr})%frequency must be positive")
+                self.prohibit(wavelength is not None and wavelength <= 0,
+                             f"acoustic({jstr})%wavelength must be positive")
 
             if pulse == 2:
                 time_set = gauss_sigma_time is not None
@@ -933,6 +979,11 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
                              f"One and only one of acoustic({jstr})%gauss_sigma_time or gauss_sigma_dist must be specified for pulse = 2")
                 self.prohibit(delay is None,
                              f"acoustic({jstr})%delay must be specified for pulse = 2 (Gaussian)")
+                # Physics: gaussian parameters must be positive
+                self.prohibit(gauss_sigma_time is not None and gauss_sigma_time <= 0,
+                             f"acoustic({jstr})%gauss_sigma_time must be positive")
+                self.prohibit(gauss_sigma_dist is not None and gauss_sigma_dist <= 0,
+                             f"acoustic({jstr})%gauss_sigma_dist must be positive")
 
             if pulse == 4:
                 self.prohibit(bb_num_freq is None,
@@ -1311,6 +1362,106 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
             self.prohibit(elliptic_smoothing_iters < 1,
                          "elliptic_smoothing_iters must be positive")
 
+    def _is_numeric(self, value) -> bool:
+        """Check if value is numeric (not a string expression)."""
+        return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+    def check_patch_physics(self):  # pylint: disable=too-many-locals,too-many-branches
+        """Checks physics constraints on patch initial conditions (pre-process).
+
+        Validates that initial conditions are physically meaningful:
+        - Pressure must be positive (thermodynamic requirement)
+        - Density (alpha_rho) must be positive
+        - Volume fractions must sum appropriately and be in [0, 1]
+        - Geometric dimensions must be positive
+
+        Note: String values (analytical expressions like "0.5*sin(x)") are
+        evaluated at runtime by Fortran and cannot be validated here.
+        """
+        num_patches = self.get('num_patches', 0)
+        num_fluids = self.get('num_fluids', 1)
+        bubbles_euler = self.get('bubbles_euler', 'F') == 'T'
+        num_ibs = self.get('num_ibs', 0) or 0  # IBM (Immersed Boundary Method)
+
+        if num_patches is None or num_patches <= 0:
+            return
+
+        for i in range(1, num_patches + 1):
+            istr = str(i)
+            geometry = self.get(f'patch_icpp({i})%geometry')
+
+            # Skip if patch not defined
+            if geometry is None:
+                continue
+
+            # Skip thermodynamic validation for special patches:
+            # - alter_patch patches (modifications to other patches)
+            # - hcid patches (hard-coded initial conditions computed at runtime)
+            hcid = self.get(f'patch_icpp({i})%hcid')
+            alter_patches = [self.get(f'patch_icpp({i})%alter_patch({j})') == 'T'
+                           for j in range(1, num_patches + 1)]
+            is_special = hcid is not None or any(alter_patches)
+
+            # === THERMODYNAMICS ===
+            # Pressure must be positive for physical stability
+            # (skip for special patches where values are computed differently)
+            if not is_special:
+                pres = self.get(f'patch_icpp({i})%pres')
+                if pres is not None and self._is_numeric(pres):
+                    self.prohibit(pres <= 0,
+                                 f"patch_icpp({istr})%pres must be positive (got {pres})")
+
+            # === FLUID PROPERTIES ===
+            # (skip for special patches where values are computed differently)
+            if not is_special:
+                for j in range(1, num_fluids + 1):
+                    jstr = str(j)
+
+                    # Volume fraction must be in [0, 1] (or non-negative for IBM cases)
+                    alpha = self.get(f'patch_icpp({i})%alpha({j})')
+                    if alpha is not None and self._is_numeric(alpha):
+                        self.prohibit(alpha < 0,
+                                     f"patch_icpp({istr})%alpha({jstr}) must be non-negative (got {alpha})")
+                        # For non-IBM cases, alpha should be in [0, 1]
+                        if num_ibs == 0:
+                            self.prohibit(alpha > 1,
+                                         f"patch_icpp({istr})%alpha({jstr}) must be <= 1 (got {alpha})")
+
+                    # Density (alpha_rho) must be non-negative
+                    # Note: alpha_rho = 0 is allowed for vacuum regions and numerical convenience
+                    alpha_rho = self.get(f'patch_icpp({i})%alpha_rho({j})')
+                    if alpha_rho is not None and self._is_numeric(alpha_rho):
+                        self.prohibit(alpha_rho < 0,
+                                     f"patch_icpp({istr})%alpha_rho({jstr}) must be non-negative (got {alpha_rho})")
+
+            # === GEOMETRY ===
+            # Patch dimensions must be positive
+            length_x = self.get(f'patch_icpp({i})%length_x')
+            length_y = self.get(f'patch_icpp({i})%length_y')
+            length_z = self.get(f'patch_icpp({i})%length_z')
+            radius = self.get(f'patch_icpp({i})%radius')
+
+            if length_x is not None and self._is_numeric(length_x):
+                self.prohibit(length_x <= 0,
+                             f"patch_icpp({istr})%length_x must be positive (got {length_x})")
+            if length_y is not None and self._is_numeric(length_y):
+                self.prohibit(length_y <= 0,
+                             f"patch_icpp({istr})%length_y must be positive (got {length_y})")
+            if length_z is not None and self._is_numeric(length_z):
+                self.prohibit(length_z <= 0,
+                             f"patch_icpp({istr})%length_z must be positive (got {length_z})")
+            if radius is not None and self._is_numeric(radius):
+                self.prohibit(radius <= 0,
+                             f"patch_icpp({istr})%radius must be positive (got {radius})")
+
+            # === BUBBLES ===
+            # Bubble radius must be positive
+            if bubbles_euler:
+                r0 = self.get(f'patch_icpp({i})%r0')
+                if r0 is not None and self._is_numeric(r0):
+                    self.prohibit(r0 <= 0,
+                                 f"patch_icpp({istr})%r0 must be positive (got {r0})")
+
     def check_bc_patches(self):  # pylint: disable=too-many-branches,too-many-statements
         """Checks boundary condition patch geometry (pre-process)"""
         num_bc_patches = self.get('num_bc_patches', 0)
@@ -1684,6 +1835,7 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         self.check_perturb_density()
         self.check_chemistry()
         self.check_misc_pre_process()
+        self.check_patch_physics()
         self.check_bc_patches()
 
     def validate_post_process(self):
