@@ -65,15 +65,21 @@ def generate():
 
 
 def _generate_json_schema():
-    """Generate JSON Schema for IDE auto-completion."""
+    """Generate JSON Schema and parameter documentation."""
     import json
     from .params.generators.json_schema_gen import generate_json_schema, get_schema_stats
+    from .params.generators.docs_gen import write_parameter_docs
     from .ide import update_vscode_settings
 
+    # Generate JSON Schema
     schema = generate_json_schema(include_descriptions=True)
     schema_path = Path(MFC_ROOT_DIR) / "toolchain" / "mfc-case-schema.json"
     with open(schema_path, 'w') as f:
         json.dump(schema, f, indent=2)
+
+    # Generate parameter documentation
+    docs_path = Path(MFC_ROOT_DIR) / "docs" / "parameters.md"
+    write_parameter_docs(str(docs_path))
 
     # Update VS Code settings
     update_vscode_settings()
@@ -81,12 +87,13 @@ def _generate_json_schema():
     stats = get_schema_stats()
 
     cons.print(f"[green]Generated[/green] {schema_path}")
+    cons.print(f"[green]Generated[/green] {docs_path}")
     cons.print()
-    cons.print(f"[bold]Schema Statistics:[/bold]")
+    cons.print(f"[bold]Parameter Statistics:[/bold]")
     cons.print(f"  Total parameters: {stats['total_params']}")
     cons.print(f"  With constraints: {stats['with_constraints']}")
     cons.print(f"  With descriptions: {stats['with_descriptions']}")
     cons.print()
     cons.print("[bold]Parameter Lookup:[/bold]")
-    cons.print("  Use [cyan]./mfc.sh params <query>[/cyan] to search parameters")
-    cons.print("  Example: [cyan]./mfc.sh params weno -d[/cyan]")
+    cons.print("  CLI: [cyan]./mfc.sh params <query>[/cyan]")
+    cons.print("  Docs: [cyan]docs/parameters.md[/cyan]")
