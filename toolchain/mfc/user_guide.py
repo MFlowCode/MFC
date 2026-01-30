@@ -247,7 +247,7 @@ def print_help():
     table.add_row("", "", "")  # Spacer
 
     # Secondary commands
-    for cmd in ["count", "packer", "load"]:
+    for cmd in ["params", "count", "packer", "load"]:
         table.add_row(f"[dim]{cmd}[/dim]", "", f"[dim]{COMMANDS[cmd]['description']}[/dim]")
 
     table.add_row("", "", "")  # Spacer
