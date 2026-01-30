@@ -25,7 +25,7 @@ CONSTRAINTS = {
     "weno_order": {"choices": [1, 3, 5, 7]},
     "recon_type": {"choices": [1, 2]},  # 1=WENO, 2=MUSCL
     "muscl_order": {"choices": [1, 2]},
-    "muscl_lim": {"choices": [1, 2]},  # 1=minmod, 2=MC
+    "muscl_lim": {"choices": [1, 2, 3, 4, 5]},  # minmod, MC, Van Albada, Van Leer, SUPERBEE
 
     # Time stepping
     "time_stepper": {"choices": [1, 2, 3, 4, 5]},  # Euler, TVD-RK2/3, RK4/5

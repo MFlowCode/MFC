@@ -56,7 +56,7 @@ def _format_constraints(param) -> str:
     return ", ".join(parts)
 
 
-def generate_parameter_docs() -> str:
+def generate_parameter_docs() -> str:  # pylint: disable=too-many-locals,too-many-statements
     """Generate markdown documentation for all parameters."""
     lines = [
         "# MFC Case Parameters Reference",
