@@ -15,15 +15,16 @@ _VSCODE_MARKER_BEGIN = "// MFC-SCHEMA-CONFIG-BEGIN (auto-generated, do not edit)
 _VSCODE_MARKER_END = "// MFC-SCHEMA-CONFIG-END"
 
 # The MFC schema configuration to insert
+# Matches common case file names - users get auto-completion for JSON/YAML case files
 _VSCODE_MFC_CONFIG = '''\
     "json.schemas": [
         {
-            "fileMatch": ["**/case.json", "**/mfc-case.json"],
+            "fileMatch": ["**/case.json", "**/input.json", "**/mfc-case.json", "**/mfc.json"],
             "url": "./toolchain/mfc-case-schema.json"
         }
     ],
     "yaml.schemas": {
-        "./toolchain/mfc-case-schema.json": ["**/case.yaml", "**/mfc-case.yaml"]
+        "./toolchain/mfc-case-schema.json": ["**/case.yaml", "**/case.yml", "**/input.yaml", "**/input.yml", "**/mfc-case.yaml", "**/mfc.yaml"]
     }'''
 
 

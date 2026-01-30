@@ -23582,7 +23582,8 @@
       "enum": [
         1,
         2,
-        3
+        3,
+        4
       ],
       "description": "Riemann solver (1=HLL, 2=HLLC, 3=exact)"
     },

@@ -96,12 +96,12 @@
     // MFC-SCHEMA-CONFIG-BEGIN (auto-generated, do not edit)
     "json.schemas": [
         {
-            "fileMatch": ["**/case.json", "**/mfc-case.json"],
+            "fileMatch": ["**/case.json", "**/input.json", "**/mfc-case.json", "**/mfc.json"],
             "url": "./toolchain/mfc-case-schema.json"
         }
     ],
     "yaml.schemas": {
-        "./toolchain/mfc-case-schema.json": ["**/case.yaml", "**/mfc-case.yaml"]
+        "./toolchain/mfc-case-schema.json": ["**/case.yaml", "**/case.yml", "**/input.yaml", "**/input.yml", "**/mfc-case.yaml", "**/mfc.yaml"]
     }
     // MFC-SCHEMA-CONFIG-END
 }

@@ -191,8 +191,13 @@ def load(filepath: str = None, args: typing.List[str] = None, empty_data: dict =
             raise common.MFCException(f"Input file {filename} terminated with a non-zero exit code. Please make sure running the file doesn't produce any errors.")
     elif filename.endswith(".json"):
         json_str = common.file_read(filename)
+    elif filename.endswith((".yaml", ".yml")):
+        import yaml  # pylint: disable=import-outside-toplevel
+        with open(filename, 'r') as f:
+            dictionary = yaml.safe_load(f)
+        json_str = json.dumps(dictionary)
     else:
-        raise common.MFCException("Unrecognized input file format. Only .py and .json files are supported. Please check the README and sample cases in the examples directory.")
+        raise common.MFCException("Unrecognized input file format. Supported: .py, .json, .yaml, .yml. Please check the README and sample cases in the examples directory.")
 
     try:
         dictionary = json.loads(json_str)
