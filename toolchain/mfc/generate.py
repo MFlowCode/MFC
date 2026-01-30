@@ -74,6 +74,9 @@ def _generate_json_schema():
     with open(output_path, 'w') as f:
         json.dump(schema, f, indent=2)
 
+    # Update VS Code settings
+    _update_vscode_settings()
+
     stats = get_schema_stats()
 
     cons.print(f"[green]Generated[/green] {output_path}")
@@ -84,6 +87,73 @@ def _generate_json_schema():
     cons.print(f"  With descriptions: {stats['with_descriptions']}")
     cons.print()
     cons.print("[bold]Usage:[/bold]")
-    cons.print("  VS Code settings are pre-configured in .vscode/settings.json")
+    cons.print("  VS Code: .vscode/settings.json auto-configured")
     cons.print("  Auto-completion works for case.json and case.yaml files")
     cons.print("  For Python case files, use ./mfc.sh params <name> for parameter info")
+
+
+# Marker comments for the auto-generated section
+_VSCODE_MARKER_BEGIN = "// MFC-SCHEMA-CONFIG-BEGIN (auto-generated, do not edit)"
+_VSCODE_MARKER_END = "// MFC-SCHEMA-CONFIG-END"
+
+# The MFC schema configuration to insert
+_VSCODE_MFC_CONFIG = '''\
+    "json.schemas": [
+        {
+            "fileMatch": ["**/case.json", "**/mfc-case.json"],
+            "url": "./toolchain/mfc-case-schema.json"
+        }
+    ],
+    "yaml.schemas": {
+        "./toolchain/mfc-case-schema.json": ["**/case.yaml", "**/mfc-case.yaml"]
+    }'''
+
+
+def _update_vscode_settings():
+    """Update .vscode/settings.json with MFC schema configuration."""
+    import re
+
+    vscode_dir = Path(MFC_ROOT_DIR) / ".vscode"
+    settings_path = vscode_dir / "settings.json"
+
+    # Ensure .vscode directory exists
+    vscode_dir.mkdir(exist_ok=True)
+
+    # Build the marked config block
+    marked_config = f"{_VSCODE_MARKER_BEGIN}\n{_VSCODE_MFC_CONFIG}\n    {_VSCODE_MARKER_END}"
+
+    if settings_path.exists():
+        content = settings_path.read_text()
+
+        # Check if our markers already exist
+        marker_pattern = re.compile(
+            rf'{re.escape(_VSCODE_MARKER_BEGIN)}.*?{re.escape(_VSCODE_MARKER_END)}',
+            re.DOTALL
+        )
+
+        if marker_pattern.search(content):
+            # Replace existing marked section
+            new_content = marker_pattern.sub(marked_config, content)
+        else:
+            # Insert before the final closing brace
+            last_brace = content.rfind('}')
+            if last_brace != -1:
+                # Check if we need a comma (look for last non-whitespace char before brace)
+                before_brace = content[:last_brace].rstrip()
+                needs_comma = before_brace and not before_brace.endswith('{') and not before_brace.endswith(',')
+                comma = ',' if needs_comma else ''
+                new_content = (
+                    content[:last_brace].rstrip() +
+                    comma + '\n\n    ' +
+                    marked_config + '\n' +
+                    content[last_brace:]
+                )
+            else:
+                # Malformed JSON, just append
+                new_content = content + '\n' + marked_config
+    else:
+        # Create new settings file with just our config
+        new_content = f'{{\n    {marked_config}\n}}\n'
+
+    settings_path.write_text(new_content)
+    cons.print(f"[green]Updated[/green] {settings_path}")
