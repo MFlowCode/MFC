@@ -1,10 +1,15 @@
-import re, json, math, copy, dataclasses, fastjsonschema
+import re, json, math, copy, dataclasses, difflib, fastjsonschema
 
 from . import common
 from .printer import cons
 
 from .state import ARG
 from .run   import case_dicts
+
+
+def _suggest_similar_params(unknown_key: str, valid_keys: list, n: int = 3) -> list:
+    """Find similar parameter names for typo suggestions."""
+    return difflib.get_close_matches(unknown_key, valid_keys, n=n, cutoff=0.6)
 
 QPVF_IDX_VARS = {
     'alpha_rho': 'contxb', 'vel'  : 'momxb',         'pres': 'E_idx', 
@@ -64,7 +69,9 @@ class Case:
                 ignored.append(key)
 
             if key not in case_dicts.ALL:
-                raise common.MFCException(f"MFCInputFile::dump: Case parameter '{key}' is not used by any MFC code. Please check your spelling or add it as a new parameter.")
+                suggestions = _suggest_similar_params(key, list(case_dicts.ALL.keys()))
+                hint = f" Did you mean: {', '.join(suggestions)}?" if suggestions else ""
+                raise common.MFCException(f"Unknown parameter '{key}'.{hint}")
 
         cons.print(f"[yellow]INFO:[/yellow] Forwarded {len(self.params)-len(ignored)}/{len(self.params)} parameters.")
         cons.unindent()

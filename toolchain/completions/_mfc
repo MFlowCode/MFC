@@ -19,6 +19,7 @@ _mfc() {
         "validate:Validate a case file without running."
         "v:Alias for validate"
         "new:Create a new case from a template."
+        "params:Search and explore MFC case parameters."
         "packer:Packer utility (pack/unpack/compare)."
         "completion:Install shell tab-completion."
         "help:Show help on a topic."
@@ -325,6 +326,20 @@ _mfc() {
                         '--template[Template to use (e.g., 1D_minimal, 2D_mi]:(1D_minimal 2D_minimal 3D_minimal)' \
                         '-l[List available templates.]' \
                         '--list[List available templates.]'
+                    ;;
+                params)
+                    _arguments \
+                        '1:Search query (parameter name or pattern ' \
+                        '-s[Filter by stage: common, pre_process, si]' \
+                        '--stage[Filter by stage: common, pre_process, si]' \
+                        '-T[Filter by type: int, real, log, str.]' \
+                        '--type[Filter by type: int, real, log, str.]' \
+                        '-f[List parameter families (grouped by pref]' \
+                        '--families[List parameter families (grouped by pref]' \
+                        '-c[Show count statistics only.]' \
+                        '--count[Show count statistics only.]' \
+                        '-n[Maximum number of results to show.]' \
+                        '--limit[Maximum number of results to show.]'
                     ;;
                 packer)
                     ;;

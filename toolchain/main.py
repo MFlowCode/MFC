@@ -91,6 +91,9 @@ def __run():  # pylint: disable=too-many-branches
     elif cmd == "generate":
         from mfc import generate  # pylint: disable=import-outside-toplevel
         generate.generate()
+    elif cmd == "params":
+        from mfc import params_cmd  # pylint: disable=import-outside-toplevel
+        params_cmd.params()
 
 
 if __name__ == "__main__":

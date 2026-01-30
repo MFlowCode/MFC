@@ -18,6 +18,7 @@ Welcome to the MFC master script. This tool automates and manages building, test
 | [`clean`](#clean) | `c` | Clean build artifacts. |
 | [`validate`](#validate) | `v` | Validate a case file without running. |
 | [`new`](#new) | - | Create a new case from a template. |
+| [`params`](#params) | - | Search and explore MFC case parameters. |
 | [`packer`](#packer) | - | Packer utility (pack/unpack/compare). |
 | [`completion`](#completion) | - | Install shell tab-completion. |
 | [`help`](#help) | - | Show help on a topic. |

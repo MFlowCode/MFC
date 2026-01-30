@@ -8,7 +8,7 @@ _mfc_completions() {
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
-    local commands="b bench bench_diff build c clean completion count count_diff format generate help interactive lint load new packer r run spelling t test v validate"
+    local commands="b bench bench_diff build c clean completion count count_diff format generate help interactive lint load new packer params r run spelling t test v validate"
 
     # First argument - complete commands
     if [[ ${COMP_CWORD} -eq 1 ]]; then
@@ -104,6 +104,13 @@ _mfc_completions() {
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             else
                 COMPREPLY=( $(compgen -d -- "${cur}") )
+            fi
+            return 0
+            ;;
+        params)
+            local opts="--count --families --limit --stage --type -T -c -f -n -s"
+            if [[ "${cur}" == -* ]]; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             fi
             return 0
             ;;

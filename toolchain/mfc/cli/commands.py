@@ -820,6 +820,72 @@ COUNT_DIFF_COMMAND = Command(
     include_common=["targets", "mfc_config", "jobs", "verbose", "debug_log"],
 )
 
+PARAMS_COMMAND = Command(
+    name="params",
+    help="Search and explore MFC case parameters.",
+    description="Search, list, and get information about MFC's ~3,300 case parameters.",
+    positionals=[
+        Positional(
+            name="query",
+            help="Search query (parameter name or pattern to search for).",
+            nargs="?",
+            default=None,
+        ),
+    ],
+    arguments=[
+        Argument(
+            name="stage",
+            short="s",
+            help="Filter by stage: common, pre_process, simulation, post_process.",
+            choices=["common", "pre_process", "simulation", "post_process"],
+            default=None,
+        ),
+        Argument(
+            name="type",
+            short="T",
+            help="Filter by type: int, real, log, str.",
+            choices=["int", "real", "log", "str"],
+            default=None,
+            dest="param_type",
+        ),
+        Argument(
+            name="families",
+            short="f",
+            help="List parameter families (grouped by prefix).",
+            action=ArgAction.STORE_TRUE,
+            default=False,
+        ),
+        Argument(
+            name="count",
+            short="c",
+            help="Show count statistics only.",
+            action=ArgAction.STORE_TRUE,
+            default=False,
+        ),
+        Argument(
+            name="limit",
+            short="n",
+            help="Maximum number of results to show.",
+            type=int,
+            default=25,
+        ),
+    ],
+    examples=[
+        Example("./mfc.sh params weno", "Search for parameters containing 'weno'"),
+        Example("./mfc.sh params bubble", "Search for bubble-related parameters"),
+        Example("./mfc.sh params patch_icpp", "Show patch_icpp parameters"),
+        Example("./mfc.sh params -f", "List all parameter families"),
+        Example("./mfc.sh params -s simulation", "List all simulation parameters"),
+        Example("./mfc.sh params -c", "Show parameter count statistics"),
+    ],
+    key_options=[
+        ("query", "Search term (searches parameter names)"),
+        ("-s, --stage", "Filter by stage"),
+        ("-f, --families", "List parameter families"),
+        ("-c, --count", "Show statistics"),
+    ],
+)
+
 
 # =============================================================================
 # HELP TOPICS
@@ -873,6 +939,7 @@ started, run ./mfc.sh build -h.""",
         CLEAN_COMMAND,
         VALIDATE_COMMAND,
         NEW_COMMAND,
+        PARAMS_COMMAND,
         PACKER_COMMAND,
         COMPLETION_COMMAND,
         HELP_COMMAND,
