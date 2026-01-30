@@ -40,7 +40,6 @@ module m_ibm
  s_ibm_correct_state, &
  s_finalize_ibm_module
 
-    integer, allocatable, dimension(:, :, :) :: patch_id_fp
     type(integer_field), public :: ib_markers
     type(levelset_field), public :: levelset
     type(levelset_norm_field), public :: levelset_norm
@@ -115,9 +114,6 @@ contains
         $:GPU_UPDATE(device='[ib_markers%sf]')
         $:GPU_UPDATE(device='[levelset%sf]')
         $:GPU_UPDATE(device='[levelset_norm%sf]')
-
-        ! Allocating the patch identities bookkeeping variable
-        allocate (patch_id_fp(0:m, 0:n, 0:p))
 
         ! find the number of ghost points and set them to be the maximum total across ranks
         call s_find_num_ghost_points(num_gps, num_inner_gps)
