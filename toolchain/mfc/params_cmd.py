@@ -199,8 +199,12 @@ def _show_families(registry, limit):
     families = {}
     for name in registry.all_params.keys():
         if "%" in name:
+            # Get prefix before %, then strip any index: patch_icpp(1)%x -> patch_icpp
             prefix = name.split("%")[0]
+            if "(" in prefix:
+                prefix = prefix.split("(")[0]
         elif "(" in name:
+            # Simple indexed: chem_wrt_Y(0) -> chem_wrt_Y
             prefix = name.split("(")[0]
         else:
             continue  # Skip simple params
