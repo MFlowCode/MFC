@@ -1,12 +1,12 @@
-This file was created on 2026-01-28 13:42:01.167031.
+This file was created on 2026-01-29 18:27:29.448182.
 
 mfc.sh:
 
-    Invocation: test --generate -j 2 -f FF27BC5E -t FF27BC5E
+    Invocation: test --generate -f FF27BC5E -t FF27BC5E
     Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        89068101210ad92ccbfe97d3570964deb48629d2 on master (dirty)
+    Git:        1aa4b082059aacbb5d9a0183076414923e9f6044 on master (dirty)
 
-post_process:
+simulation:
 
     CMake Configuration:
     
@@ -16,8 +16,8 @@ post_process:
         Fortran : GNU v13.3.0 (/usr/bin/gfortran)
     
         PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : ON
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
@@ -74,7 +74,7 @@ pre_process:
         OMPI_CXX : 
         OMPI_FC  : 
 
-syscheck:
+post_process:
 
     CMake Configuration:
     
@@ -85,8 +85,8 @@ syscheck:
     
         PRE_PROCESS   : OFF
         SIMULATION    : OFF
-        POST_PROCESS  : OFF
-        SYSCHECK      : ON
+        POST_PROCESS  : ON
+        SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
     
@@ -108,7 +108,7 @@ syscheck:
         OMPI_CXX : 
         OMPI_FC  : 
 
-simulation:
+syscheck:
 
     CMake Configuration:
     
@@ -118,9 +118,9 @@ simulation:
         Fortran : GNU v13.3.0 (/usr/bin/gfortran)
     
         PRE_PROCESS   : OFF
-        SIMULATION    : ON
+        SIMULATION    : OFF
         POST_PROCESS  : OFF
-        SYSCHECK      : OFF
+        SYSCHECK      : ON
         DOCUMENTATION : OFF
         ALL           : OFF
     
@@ -160,7 +160,7 @@ CPU:
     Core(s) per socket:                      24
     Socket(s):                               1
     Stepping:                                1
-    CPU(s) scaling MHz:                      22%
+    CPU(s) scaling MHz:                      21%
     CPU max MHz:                             5800.0000
     CPU min MHz:                             800.0000
     BogoMIPS:                                5990.40

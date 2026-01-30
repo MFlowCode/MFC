@@ -17,13 +17,13 @@ L = 10 * D
 M = 1.2
 
 # reynolds number
-Re = 1500.0
+Re = 400.0
 
 # pressure
 P = 101325
 
 # density
-rho = 1.225
+rho = 1.0
 
 # fluid velocity
 v1 = M * np.sqrt(gam_a * P / rho)
@@ -32,8 +32,8 @@ v1 = M * np.sqrt(gam_a * P / rho)
 mu = rho * v1 * D / Re
 
 dt = 1.0e-06
-Nt = 1000  # int(10 * L / v1 / dt)
-t_save = 10  # Nt // 300
+Nt = 5000 
+t_save = 20 
 
 Nx = 511  # to fully resolve requires ~ 40-60 cells across sphere diameter
 Ny = Nx

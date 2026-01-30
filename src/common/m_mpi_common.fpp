@@ -1919,6 +1919,7 @@ contains
             end if
         end if
 #endif
+        $:GPU_UPDATE(device='[domain_glb]')
     end subroutine s_mpi_global_domain_bounds
 #endif
 

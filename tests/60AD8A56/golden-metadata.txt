@@ -1,10 +1,10 @@
-This file was created on 2026-01-28 13:41:14.276634.
+This file was created on 2026-01-29 18:26:42.881513.
 
 mfc.sh:
 
-    Invocation: test --generate -j 2 -f 60AD8A56 -t 60AD8A56
+    Invocation: test --generate -f 60AD8A56 -t 60AD8A56
     Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        89068101210ad92ccbfe97d3570964deb48629d2 on master (dirty)
+    Git:        1aa4b082059aacbb5d9a0183076414923e9f6044 on master (dirty)
 
 pre_process:
 
@@ -74,7 +74,7 @@ simulation:
         OMPI_CXX : 
         OMPI_FC  : 
 
-syscheck:
+post_process:
 
     CMake Configuration:
     
@@ -85,8 +85,8 @@ syscheck:
     
         PRE_PROCESS   : OFF
         SIMULATION    : OFF
-        POST_PROCESS  : OFF
-        SYSCHECK      : ON
+        POST_PROCESS  : ON
+        SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
     
@@ -108,7 +108,7 @@ syscheck:
         OMPI_CXX : 
         OMPI_FC  : 
 
-post_process:
+syscheck:
 
     CMake Configuration:
     
@@ -119,8 +119,8 @@ post_process:
     
         PRE_PROCESS   : OFF
         SIMULATION    : OFF
-        POST_PROCESS  : ON
-        SYSCHECK      : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : ON
         DOCUMENTATION : OFF
         ALL           : OFF
     
@@ -160,7 +160,7 @@ CPU:
     Core(s) per socket:                      24
     Socket(s):                               1
     Stepping:                                1
-    CPU(s) scaling MHz:                      53%
+    CPU(s) scaling MHz:                      23%
     CPU max MHz:                             5800.0000
     CPU min MHz:                             800.0000
     BogoMIPS:                                5990.40

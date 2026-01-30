@@ -8,7 +8,7 @@ gam_a = 1.4
 D = 0.1
 
 # sphere density
-rho_s = 200  # water 1000 kg/m^3
+rho_s = 200 
 
 # domain length
 L = 10 * D
@@ -17,13 +17,13 @@ L = 10 * D
 M = 1.2
 
 # reynolds number
-Re = 1500.0
+Re = 400.0
 
 # pressure
 P = 101325
 
 # density
-rho = 1.225
+rho = 1.0
 
 # fluid velocity
 v1 = M * np.sqrt(gam_a * P / rho)
@@ -32,8 +32,8 @@ v1 = M * np.sqrt(gam_a * P / rho)
 mu = rho * v1 * D / Re
 
 dt = 2.0e-06
-Nt = int(4 * L / v1 / dt)
-t_save = Nt // 300
+Nt = 2000
+t_save = Nt // 250
 
 Nx = 127  # to fully resolve requires ~ 40-60 cells across sphere diameter
 Ny = Nx
@@ -46,7 +46,7 @@ ib_dict.update(
         f"patch_ib({1})%geometry": 8,
         f"patch_ib({1})%x_centroid": 0.5 * L,
         f"patch_ib({1})%y_centroid": 0.5 * L,
-        f"patch_ib({1})%z_centroid": 0.0 * L,
+        f"patch_ib({1})%z_centroid": 0.5 * L,
         f"patch_ib({1})%radius": D / 2,
         f"patch_ib({1})%slip": "F",
         f"patch_ib({1})%moving_ibm": 0,
