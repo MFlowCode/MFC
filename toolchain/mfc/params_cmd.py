@@ -19,18 +19,20 @@ def params():
     show_families = ARG("families")
     show_count = ARG("count")
     limit = ARG("limit")
+    describe = ARG("describe")
 
     if show_count:
         _show_statistics(REGISTRY)
     elif show_families:
         _show_families(REGISTRY, limit)
     elif query:
-        _search_params(REGISTRY, query, type_filter, limit)
+        _search_params(REGISTRY, query, type_filter, limit, describe)
     else:
         _show_statistics(REGISTRY)
         cons.print()
         cons.print("[yellow]Tip:[/yellow] Use './mfc.sh params <query>' to search for parameters")
         cons.print("     Use './mfc.sh params -f' to see parameter families")
+        cons.print("     Use './mfc.sh params -d <query>' to see parameter descriptions")
 
 
 def _collapse_indexed_params(matches):
@@ -221,7 +223,7 @@ def _show_families(registry, limit):
     cons.print("[yellow]Tip:[/yellow] Use './mfc.sh params <family>' to see parameters in a family")
 
 
-def _search_params(registry, query, type_filter, limit):
+def _search_params(registry, query, type_filter, limit, describe=False):
     """Search for parameters matching a query."""
     query_lower = query.lower()
     matches = []
@@ -248,41 +250,66 @@ def _search_params(registry, query, type_filter, limit):
     cons.print()
 
     # Show collapsed results
-    _show_collapsed_results(collapsed[:limit])
+    _show_collapsed_results(collapsed[:limit], describe)
 
     if len(collapsed) > limit:
         cons.print()
         cons.print(f"  [dim]... {len(collapsed) - limit} more patterns (use -n {len(collapsed)} to show all)[/dim]")
 
 
-def _show_collapsed_results(collapsed):
+def _show_collapsed_results(collapsed, describe=False):
     """Show collapsed search results."""
+    from .params.descriptions import get_description, get_pattern_description
+
     # Check if any items have index ranges to show
     has_ranges = any(len(item) == 4 and item[2] > 1 for item in collapsed)
 
-    if has_ranges:
-        cons.print(f"  {'Parameter':<40} {'Type':12} {'#':>4}  {'Index Range'}")
-        cons.print(f"  {'-'*40} {'-'*12} {'-'*4}  {'-'*15}")
-    else:
-        cons.print(f"  {'Parameter':<40} {'Type':12}")
-        cons.print(f"  {'-'*40} {'-'*12}")
+    if describe:
+        # Description mode: one param per block with description
+        for item in collapsed:
+            name = item[0]
+            param = item[1]
+            count = item[2]
+            range_str = item[3] if len(item) == 4 else ""
 
-    for item in collapsed:
-        if len(item) == 4:
-            name, param, count, range_str = item
-            if count > 1:
-                cons.print(f"  {name:<40} {param.param_type.name:12} {count:>4}  {range_str}")
+            # Get description - use pattern description for indexed params
+            if "(N)" in name or "(M)" in name:
+                desc = get_pattern_description(name)
             else:
+                desc = get_description(name)
+
+            cons.print(f"  [cyan]{name}[/cyan]")
+            cons.print(f"    Type: {param.param_type.name}")
+            if count > 1:
+                cons.print(f"    Count: {count}  ({range_str})")
+            if desc:
+                cons.print(f"    [dim]{desc}[/dim]")
+            cons.print()
+    else:
+        # Compact table mode
+        if has_ranges:
+            cons.print(f"  {'Parameter':<40} {'Type':12} {'#':>4}  {'Index Range'}")
+            cons.print(f"  {'-'*40} {'-'*12} {'-'*4}  {'-'*15}")
+        else:
+            cons.print(f"  {'Parameter':<40} {'Type':12}")
+            cons.print(f"  {'-'*40} {'-'*12}")
+
+        for item in collapsed:
+            if len(item) == 4:
+                name, param, count, range_str = item
+                if count > 1:
+                    cons.print(f"  {name:<40} {param.param_type.name:12} {count:>4}  {range_str}")
+                else:
+                    if has_ranges:
+                        cons.print(f"  {name:<40} {param.param_type.name:12} {count:>4}")
+                    else:
+                        cons.print(f"  {name:<40} {param.param_type.name:12}")
+            else:
+                name, param, count = item
                 if has_ranges:
                     cons.print(f"  {name:<40} {param.param_type.name:12} {count:>4}")
                 else:
                     cons.print(f"  {name:<40} {param.param_type.name:12}")
-        else:
-            name, param, count = item
-            if has_ranges:
-                cons.print(f"  {name:<40} {param.param_type.name:12} {count:>4}")
-            else:
-                cons.print(f"  {name:<40} {param.param_type.name:12}")
 
 
 def _suggest_alternatives(registry, query):

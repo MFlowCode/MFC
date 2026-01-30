@@ -862,6 +862,13 @@ PARAMS_COMMAND = Command(
             type=int,
             default=25,
         ),
+        Argument(
+            name="describe",
+            short="d",
+            help="Show parameter descriptions.",
+            action=ArgAction.STORE_TRUE,
+            default=False,
+        ),
     ],
     examples=[
         Example("./mfc.sh params weno", "Search for parameters containing 'weno'"),

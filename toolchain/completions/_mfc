@@ -337,7 +337,9 @@ _mfc() {
                         '-c[Show count statistics only.]' \
                         '--count[Show count statistics only.]' \
                         '-n[Maximum number of results to show.]' \
-                        '--limit[Maximum number of results to show.]'
+                        '--limit[Maximum number of results to show.]' \
+                        '-d[Show parameter descriptions.]' \
+                        '--describe[Show parameter descriptions.]'
                     ;;
                 packer)
                     ;;

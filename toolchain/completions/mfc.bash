@@ -108,7 +108,7 @@ _mfc_completions() {
             return 0
             ;;
         params)
-            local opts="--count --families --limit --type -c -f -n -t"
+            local opts="--count --describe --families --limit --type -c -d -f -n -t"
             if [[ "${cur}" == -* ]]; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             fi
