@@ -4,6 +4,7 @@ MFC Parameter Search and Discovery Command.
 Provides CLI access to search and explore MFC's ~3,300 case parameters.
 """
 
+import re
 from .state import ARG
 from .printer import cons
 
@@ -42,6 +43,94 @@ def params():
         cons.print()
         cons.print("[yellow]Tip:[/yellow] Use './mfc.sh params <query>' to search for parameters")
         cons.print("     Use './mfc.sh params -f' to see parameter families")
+
+
+def _collapse_indexed_params(matches):
+    """
+    Collapse indexed parameters into patterns.
+
+    e.g., bc_z%alpha_in(1), bc_z%alpha_in(2), ... bc_z%alpha_in(10)
+    becomes: bc_z%alpha_in(N)  [N=1..10]
+    """
+    # Pattern to match indexed parameters: name(N) or name(N, M)
+    index_pattern = re.compile(r'^(.+)\((\d+)(?:,\s*(\d+))?\)$')
+
+    # Group by base pattern
+    groups = {}  # base_pattern -> {indices: [(i, j, param), ...], param_type, stages}
+    non_indexed = []
+
+    for name, param in matches:
+        match = index_pattern.match(name)
+        if match:
+            base = match.group(1)
+            idx1 = int(match.group(2))
+            idx2 = int(match.group(3)) if match.group(3) else None
+
+            if base not in groups:
+                groups[base] = {
+                    'indices': [],
+                    'param_type': param.param_type,
+                    'stages': param.stages,
+                }
+            groups[base]['indices'].append((idx1, idx2, param))
+        else:
+            non_indexed.append((name, param))
+
+    # Build collapsed results
+    collapsed = []
+
+    for base, data in sorted(groups.items()):
+        indices = data['indices']
+        param_type = data['param_type']
+        stages = data['stages']
+
+        if len(indices) == 1:
+            # Single index - show as-is
+            idx1, idx2, param = indices[0]
+            if idx2 is not None:
+                name = f"{base}({idx1}, {idx2})"
+            else:
+                name = f"{base}({idx1})"
+            collapsed.append((name, param, 1))
+        else:
+            # Multiple indices - collapse
+            # Check if it's 1D or 2D indexing
+            has_2d = any(idx2 is not None for idx1, idx2, _ in indices)
+
+            if has_2d:
+                # 2D indexing - show range for both dimensions
+                idx1_vals = sorted(set(idx1 for idx1, _, _ in indices))
+                idx2_vals = sorted(set(idx2 for _, idx2, _ in indices if idx2 is not None))
+
+                if len(idx1_vals) > 1 and len(idx2_vals) > 1:
+                    name = f"{base}(N, M)"
+                    range_str = f"N={min(idx1_vals)}..{max(idx1_vals)}, M={min(idx2_vals)}..{max(idx2_vals)}"
+                elif len(idx1_vals) > 1:
+                    name = f"{base}(N, {idx2_vals[0]})"
+                    range_str = f"N={min(idx1_vals)}..{max(idx1_vals)}"
+                else:
+                    name = f"{base}({idx1_vals[0]}, M)"
+                    range_str = f"M={min(idx2_vals)}..{max(idx2_vals)}"
+            else:
+                # 1D indexing
+                idx_vals = sorted(idx1 for idx1, _, _ in indices)
+                name = f"{base}(N)"
+                if idx_vals == list(range(min(idx_vals), max(idx_vals) + 1)):
+                    range_str = f"N={min(idx_vals)}..{max(idx_vals)}"
+                else:
+                    range_str = f"N in {{{','.join(map(str, idx_vals[:5]))}{', ...' if len(idx_vals) > 5 else ''}}}"
+
+            # Create a pseudo-param for display
+            collapsed.append((name, indices[0][2], len(indices), range_str))
+
+    # Add non-indexed params
+    for name, param in non_indexed:
+        collapsed.append((name, param, 1))
+
+    # Sort by name
+    collapsed.sort(key=lambda x: x[0])
+
+    return collapsed
 
 
 def _show_statistics(registry):
@@ -124,26 +213,23 @@ def _search_params(registry, query, stage_filter, type_filter, limit):
 
         matches.append((name, param))
 
-    # Sort: prioritize exact prefix matches, then by name
-    matches.sort(key=lambda x: (
-        0 if x[0].lower().startswith(query_lower) else 1,
-        x[0]  # Alphabetical within each group
-    ))
-
     if not matches:
         cons.print(f"[yellow]No parameters found matching '{query}'[/yellow]")
         _suggest_alternatives(registry, query)
         return
 
-    cons.print(f"[bold]Parameters matching '{query}'[/bold] ({len(matches)} found)")
+    # Collapse indexed parameters
+    collapsed = _collapse_indexed_params(matches)
+
+    cons.print(f"[bold]Parameters matching '{query}'[/bold] ({len(matches)} params, {len(collapsed)} unique patterns)")
     cons.print()
 
-    # Always show as simple list - user can use -n to control count
-    _show_results(matches[:limit])
+    # Show collapsed results
+    _show_collapsed_results(collapsed[:limit])
 
-    if len(matches) > limit:
+    if len(collapsed) > limit:
         cons.print()
-        cons.print(f"  [dim]... {len(matches) - limit} more results (use -n {len(matches)} to show all)[/dim]")
+        cons.print(f"  [dim]... {len(collapsed) - limit} more patterns (use -n {len(collapsed)} to show all)[/dim]")
 
 
 def _list_stage_params(registry, stage, type_filter, limit):
@@ -194,14 +280,23 @@ def _list_stage_params(registry, stage, type_filter, limit):
     cons.print("[yellow]Tip:[/yellow] Use './mfc.sh params <family>' to search within a family")
 
 
-def _show_results(matches):
-    """Show search results in a simple list."""
-    cons.print(f"  {'Parameter':<50} {'Type':6} {'Stages'}")
-    cons.print(f"  {'-'*50} {'-'*6} {'-'*15}")
+def _show_collapsed_results(collapsed):
+    """Show collapsed search results."""
+    cons.print(f"  {'Parameter':<40} {'Type':6} {'Count':>6}  {'Range/Stages'}")
+    cons.print(f"  {'-'*40} {'-'*6} {'-'*6}  {'-'*20}")
 
-    for name, param in matches:
-        stages = ",".join(s.name[:3] for s in param.stages)
-        cons.print(f"  {name:<50} {param.param_type.name:6} {stages}")
+    for item in collapsed:
+        if len(item) == 4:
+            name, param, count, range_str = item
+            stages = ",".join(s.name[:3] for s in param.stages)
+            if count > 1:
+                cons.print(f"  {name:<40} {param.param_type.name:6} {count:>6}  {range_str}")
+            else:
+                cons.print(f"  {name:<40} {param.param_type.name:6} {count:>6}  {stages}")
+        else:
+            name, param, count = item
+            stages = ",".join(s.name[:3] for s in param.stages)
+            cons.print(f"  {name:<40} {param.param_type.name:6} {count:>6}  {stages}")
 
 
 def _suggest_alternatives(registry, query):
