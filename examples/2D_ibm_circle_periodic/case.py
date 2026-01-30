@@ -35,7 +35,8 @@ dt = 1.0e-06
 Nt = 5000
 t_save = 20
 
-Nx = 511  # to fully resolve requires ~ 40-60 cells across sphere diameter
+# to fully resolve requires 40-60 cells across sphere diameter
+Nx = 511
 Ny = Nx
 Nz = 0
 

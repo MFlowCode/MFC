@@ -666,7 +666,7 @@ contains
             $:END_GPU_PARALLEL_LOOP()
         else
             $:GPU_PARALLEL_LOOP(private='[i,j,k,cart_y,cart_z]', copy='[ib_markers_sf]',&
-                      & copyin='[patch_id,center,radius]', collapse=3)
+                      & copyin='[patch_id,center,r2]', collapse=3)
             do k = 0, p
                 do j = 0, n
                     do i = 0, m
