@@ -65,21 +65,15 @@ def generate():
 
 
 def _generate_json_schema():
-    """Generate JSON Schema and TypedDict for IDE auto-completion."""
+    """Generate JSON Schema for IDE auto-completion."""
     import json
     from .params.generators.json_schema_gen import generate_json_schema, get_schema_stats
-    from .params.generators.typeddict_gen import write_typeddict
     from .ide import update_vscode_settings
 
-    # Generate JSON Schema (for JSON/YAML case files)
     schema = generate_json_schema(include_descriptions=True)
     schema_path = Path(MFC_ROOT_DIR) / "toolchain" / "mfc-case-schema.json"
     with open(schema_path, 'w') as f:
         json.dump(schema, f, indent=2)
-
-    # Generate TypedDict (for Python case files)
-    typeddict_path = Path(MFC_ROOT_DIR) / "toolchain" / "mfc" / "params" / "case_types.py"
-    num_typed_params = write_typeddict(str(typeddict_path))
 
     # Update VS Code settings
     update_vscode_settings()
@@ -87,18 +81,12 @@ def _generate_json_schema():
     stats = get_schema_stats()
 
     cons.print(f"[green]Generated[/green] {schema_path}")
-    cons.print(f"[green]Generated[/green] {typeddict_path}")
     cons.print()
     cons.print(f"[bold]Schema Statistics:[/bold]")
     cons.print(f"  Total parameters: {stats['total_params']}")
     cons.print(f"  With constraints: {stats['with_constraints']}")
     cons.print(f"  With descriptions: {stats['with_descriptions']}")
-    cons.print(f"  TypedDict params: {num_typed_params} (valid Python identifiers)")
     cons.print()
-    cons.print("[bold]Python IDE Auto-completion:[/bold]")
-    cons.print("  Add this to your case.py for auto-completion:")
-    cons.print("    [cyan]from mfc.params.case_types import MFCParams[/cyan]")
-    cons.print("    [cyan]case: MFCParams = { 'm': 200, ... }[/cyan]")
-    cons.print()
-    cons.print("  For indexed params (patch_icpp, fluid_pp), use:")
-    cons.print("    [cyan]./mfc.sh params patch[/cyan]")
+    cons.print("[bold]Parameter Lookup:[/bold]")
+    cons.print("  Use [cyan]./mfc.sh params <query>[/cyan] to search parameters")
+    cons.print("  Example: [cyan]./mfc.sh params weno -d[/cyan]")
