@@ -155,7 +155,8 @@ contains
             down_sample, recon_type, muscl_order, fft_wrt, &
             fd_order, lag_params, simplex_perturb, simplex_params, &
             interface_file, normFac, normMag, &
-            g0_ic, p0_ic, hyper_cleaning
+            g0_ic, p0_ic, hyper_cleaning, &
+            particles_lagrange, particle_pp
 
         ! Inquiring the status of the pre_process.inp file
         file_loc = 'pre_process.inp'
@@ -776,6 +777,9 @@ contains
         call s_initialize_global_parameters_module()
         if (bubbles_euler .or. bubbles_lagrange) then
             call s_initialize_bubbles_model()
+        end if
+        if (particles_lagrange) then
+            call s_initialize_particles_model()
         end if
         call s_initialize_mpi_common_module()
         call s_initialize_data_output_module()

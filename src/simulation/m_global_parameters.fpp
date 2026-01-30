@@ -376,6 +376,9 @@ module m_global_parameters
     ! Subgrid Bubble Parameters
     type(subgrid_bubble_physical_parameters) :: bub_pp
 
+    ! Subgrid Particle Parameters
+    type(subgrid_particle_physical_parameters) :: particle_pp
+
     integer :: fd_order !<
     !! The order of the finite-difference (fd) approximations of the first-order
     !! derivatives that need to be evaluated when the CoM or flow probe data
@@ -492,6 +495,11 @@ module m_global_parameters
                 gam_v, gam_g, M_v, M_g, cp_v, cp_g, R_v, R_g
     $:GPU_DECLARE(create='[R0ref, p0ref, rho0ref, T0ref, ss, pv, vd, mu_l, mu_v, mu_g, &
         gam_v, gam_g, M_v, M_g, cp_v, cp_g, R_v, R_g]')
+
+    !Solid particle physical paramters
+    real(wp) :: cp_particle, rho0ref_particle
+    $:GPU_DECLARE(create='[rho0ref_particle, cp_particle]')
+
     !> @}
 
     !> @name Acoustic acoustic_source parameters
@@ -540,13 +548,18 @@ module m_global_parameters
     !> @name lagrangian subgrid bubble parameters
     !> @{!
     logical :: bubbles_lagrange                         !< Lagrangian subgrid bubble model switch
+    logical :: particles_lagrange                         !< Lagrangian subgrid particle model switch
     type(bubbles_lagrange_parameters) :: lag_params     !< Lagrange bubbles' parameters
     integer :: n_el_bubs_loc, n_el_bubs_glb             !< Number of Lagrangian bubbles (local and global)
+    integer :: n_el_particles_loc, n_el_particles_glb             !< Number of Lagrangian bubbles (local and global)
     logical :: moving_lag_bubbles
+    logical :: moving_lag_particles
     logical :: lag_pressure_force
     logical :: lag_gravity_force
     integer :: lag_vel_model, lag_drag_model
     $:GPU_DECLARE(create='[bubbles_lagrange,lag_params,n_el_bubs_loc,n_el_bubs_glb]')
+    $:GPU_DECLARE(create='[particles_lagrange,lag_params,n_el_particles_loc,n_el_particles_glb]')
+    $:GPU_DECLARE(create='[moving_lag_particles]')
     $:GPU_DECLARE(create='[moving_lag_bubbles, lag_vel_model, lag_drag_model]')
     $:GPU_DECLARE(create='[lag_pressure_force,lag_gravity_force]')
     !> @}
@@ -724,6 +737,10 @@ contains
         bub_pp%R_v = dflt_real; R_v = dflt_real
         bub_pp%R_g = dflt_real; R_g = dflt_real
 
+        ! Subgrid particle parameters
+        particle_pp%rho0ref_particle = dflt_real
+        particle_pp%cp_particle = dflt_real
+
         ! Tait EOS
         rhoref = dflt_real
         pref = dflt_real
@@ -862,8 +879,15 @@ contains
         lag_params%charwidth = dflt_real
         lag_params%valmaxvoid = dflt_real
         lag_params%input_path = 'input/lag_bubbles.dat'
+        lag_params%nParticles_glb = dflt_int
+        lag_params%qs_drag_model = dflt_int
+        lag_params%stokes_drag = dflt_int
+
         moving_lag_bubbles = .false.
         lag_vel_model = dflt_int
+
+        particles_lagrange = .false.
+        moving_lag_particles = .false.
 
         ! Continuum damage model
         tau_star = dflt_real
@@ -1204,6 +1228,9 @@ contains
         elseif (bubbles_lagrange) then
             allocate (MPI_IO_DATA%view(1:sys_size + 1))
             allocate (MPI_IO_DATA%var(1:sys_size + 1))
+        elseif (particles_lagrange) then
+            allocate (MPI_IO_DATA%view(1:sys_size + 1))
+            allocate (MPI_IO_DATA%var(1:sys_size + 1))
         else
             allocate (MPI_IO_DATA%view(1:sys_size))
             allocate (MPI_IO_DATA%var(1:sys_size))
@@ -1221,6 +1248,11 @@ contains
                 MPI_IO_DATA%var(i)%sf => null()
             end do
         elseif (bubbles_lagrange) then
+            do i = 1, sys_size + 1
+                allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
+                MPI_IO_DATA%var(i)%sf => null()
+            end do
+        elseif (particles_lagrange) then
             do i = 1, sys_size + 1
                 allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
                 MPI_IO_DATA%var(i)%sf => null()
@@ -1249,12 +1281,13 @@ contains
         end if
         if (probe_wrt) fd_number = max(1, fd_order/2)
         if (bubbles_lagrange) fd_number = max(1, fd_order/2)
+        if (particles_lagrange) fd_number = max(1, fd_order/2)
 
         call s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, &
                                            igr_order, buff_size, &
                                            idwint, idwbuff, viscous, &
                                            bubbles_lagrange, m, n, p, &
-                                           num_dims, igr, ib, fd_number)
+                                           num_dims, igr, ib, fd_number, particles_lagrange)
         $:GPU_UPDATE(device='[idwint, idwbuff]')
 
         ! Configuring Coordinate Direction Indexes
@@ -1417,6 +1450,10 @@ contains
             deallocate (start_idx)
 
             if (bubbles_lagrange) then
+                do i = 1, sys_size + 1
+                    MPI_IO_DATA%var(i)%sf => null()
+                end do
+            elseif (particles_lagrange) then
                 do i = 1, sys_size + 1
                     MPI_IO_DATA%var(i)%sf => null()
                 end do

@@ -67,6 +67,8 @@ module m_start_up
 
     use m_bubbles_EL            !< Lagrange bubble dynamics routines
 
+    use m_particles_EL            !< Lagrange particle dynamics routines
+
     use ieee_arithmetic
 
     use m_helper_basic          !< Functions to compare floating point numbers
@@ -184,7 +186,8 @@ contains
             hyper_cleaning, hyper_cleaning_speed, hyper_cleaning_tau, &
             alf_factor, num_igr_iters, num_igr_warm_start_iters, &
             int_comp, ic_eps, ic_beta, nv_uvm_out_of_core, &
-            nv_uvm_igr_temps_on_gpu, nv_uvm_pref_gpu, down_sample, fft_wrt
+            nv_uvm_igr_temps_on_gpu, nv_uvm_pref_gpu, down_sample, fft_wrt, &
+            particles_lagrange, particle_pp
 
         ! Checking that an input file has been provided by the user. If it
         ! has, then the input file is read in, otherwise, simulation exits.
@@ -1275,6 +1278,23 @@ contains
             $:GPU_UPDATE(host='[Rmax_stats,Rmin_stats,gas_p,gas_mv,intfc_vel]')
             call s_write_restart_lag_bubbles(save_count) !parallel
             if (lag_params%write_bubbles_stats) call s_write_lag_bubble_stats()
+
+        elseif (particles_lagrange) then
+            $:GPU_UPDATE(host='[lag_id, mtn_pos, mtn_posPrev, mtn_vel, particle_rad, &
+                & particle_R0, Rmax_stats, Rmin_stats, &
+                & particle_mass, gas_betaT, gas_betaC]')
+            ! do i = 1, n_el_particles_loc
+            !     if (ieee_is_nan(particle_rad(i, 1)) .or. particle_rad(i, 1) <= 0._wp) then
+            !         call s_mpi_abort("Particle radius is negative or NaN, please reduce dt.")
+            !     end if
+            ! end do
+
+            $:GPU_UPDATE(host='[q_beta(1)%sf]')
+            call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count, bc_type, q_beta_particles(1))
+            $:GPU_UPDATE(host='[Rmax_stats,Rmin_stats,gas_p,gas_mv,intfc_vel]')
+            call s_write_restart_lag_particles(save_count) !parallel
+            if (lag_params%write_bubbles_stats) call s_write_lag_particle_stats()
+
         else
             call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count, bc_type)
         end if
@@ -1311,6 +1331,11 @@ contains
         if (bubbles_euler .or. bubbles_lagrange) then
             call s_initialize_bubbles_model()
         end if
+
+        if (particles_lagrange) then
+            call s_initialize_particles_model()
+        end if
+
         call s_initialize_mpi_common_module()
         call s_initialize_mpi_proxy_module()
         call s_initialize_variables_conversion_module()
@@ -1394,7 +1419,9 @@ contains
         end if
 
         call s_initialize_derived_variables()
+
         if (bubbles_lagrange) call s_initialize_bubbles_EL_module(q_cons_ts(1)%vf, bc_type)
+        if (particles_lagrange) call s_initialize_particles_EL_module(q_cons_ts(1)%vf)
 
         if (hypoelasticity) call s_initialize_hypoelastic_module()
         if (hyperelasticity) call s_initialize_hyperelastic_module()
@@ -1581,6 +1608,7 @@ contains
         call s_finalize_boundary_common_module()
         if (relax) call s_finalize_relaxation_solver_module()
         if (bubbles_lagrange) call s_finalize_lagrangian_solver()
+        if (particles_lagrange) call s_finalize_particle_lagrangian_solver()
         if (viscous .and. (.not. igr)) then
             call s_finalize_viscous_module()
         end if
