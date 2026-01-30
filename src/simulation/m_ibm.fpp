@@ -109,19 +109,15 @@ contains
 
         ! recompute the new ib_patch locations and broadcast them.
         call s_apply_ib_patches(ib_markers%sf(0:m, 0:n, 0:p), levelset, levelset_norm)
-        call s_populate_ib_buffers() ! transmits the new IB markers via MPI
-
-        ! Allocating the patch identities bookkeeping variable
-        allocate (patch_id_fp(0:m, 0:n, 0:p))
+        ! Get neighboring IB variables from other processors
+        call s_populate_ib_buffers()
 
         $:GPU_UPDATE(device='[ib_markers%sf]')
         $:GPU_UPDATE(device='[levelset%sf]')
         $:GPU_UPDATE(device='[levelset_norm%sf]')
 
-        ! Get neighboring IB variables from other processors
-        call s_populate_ib_buffers()
-
-        $:GPU_UPDATE(host='[ib_markers%sf]')
+        ! Allocating the patch identities bookkeeping variable
+        allocate (patch_id_fp(0:m, 0:n, 0:p))
 
         ! find the number of ghost points and set them to be the maximum total across ranks
         call s_find_num_ghost_points(num_gps, num_inner_gps)
