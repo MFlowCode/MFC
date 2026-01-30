@@ -44,7 +44,7 @@ def generate():
         return
 
     completions_dir = Path(MFC_ROOT_DIR) / "toolchain" / "completions"
-    docs_dir = Path(MFC_ROOT_DIR) / "docs"
+    docs_dir = Path(MFC_ROOT_DIR) / "docs" / "documentation"
     docs_dir.mkdir(exist_ok=True)
 
     # Generate and check/write all files
@@ -78,7 +78,7 @@ def _generate_json_schema():
         json.dump(schema, f, indent=2)
 
     # Generate parameter documentation
-    docs_path = Path(MFC_ROOT_DIR) / "docs" / "parameters.md"
+    docs_path = Path(MFC_ROOT_DIR) / "docs" / "documentation" / "parameters.md"
     write_parameter_docs(str(docs_path))
 
     # Update VS Code settings
@@ -96,4 +96,4 @@ def _generate_json_schema():
     cons.print()
     cons.print("[bold]Parameter Lookup:[/bold]")
     cons.print("  CLI: [cyan]./mfc.sh params <query>[/cyan]")
-    cons.print("  Docs: [cyan]docs/parameters.md[/cyan]")
+    cons.print("  Docs: [cyan]docs/documentation/parameters.md[/cyan]")
