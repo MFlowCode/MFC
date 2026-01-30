@@ -91,5 +91,16 @@
     
     // Keep problems panel available
     "problems.showOn": "toggle",
-    "problems.defaultViewMode": "list"
+    "problems.defaultViewMode": "list",
+
+    // MFC case parameter schema for auto-completion
+    "json.schemas": [
+        {
+            "fileMatch": ["**/case.json", "**/mfc-case.json"],
+            "url": "./toolchain/mfc-case-schema.json"
+        }
+    ],
+    "yaml.schemas": {
+        "./toolchain/mfc-case-schema.json": ["**/case.yaml", "**/mfc-case.yaml"]
+    }
 }
