@@ -39,7 +39,7 @@ def validate_constraints(params: Dict[str, Any]) -> List[str]:
     return errors
 
 
-def check_dependencies(params: Dict[str, Any]) -> Tuple[List[str], List[str]]:
+def check_dependencies(params: Dict[str, Any]) -> Tuple[List[str], List[str]]:  # pylint: disable=too-many-branches
     """
     Check parameter dependencies.
 

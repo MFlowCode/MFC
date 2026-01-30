@@ -1,3 +1,4 @@
+# pylint: disable=import-outside-toplevel
 import re, json, math, copy, dataclasses, difflib, fastjsonschema
 
 from . import common

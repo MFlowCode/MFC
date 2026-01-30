@@ -4,6 +4,7 @@ Generate completion scripts and documentation from CLI schema.
 This module regenerates all derived files from the single source of truth
 in cli/commands.py. Run `./mfc.sh generate` after modifying commands.
 """
+# pylint: disable=import-outside-toplevel
 
 from pathlib import Path
 

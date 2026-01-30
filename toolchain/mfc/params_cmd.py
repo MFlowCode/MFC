@@ -3,6 +3,7 @@ MFC Parameter Search and Discovery Command.
 
 Provides CLI access to search and explore MFC's ~3,300 case parameters.
 """
+# pylint: disable=import-outside-toplevel
 
 import re
 from .state import ARG
@@ -35,7 +36,7 @@ def params():
         cons.print("     Use './mfc.sh params -d <query>' to see parameter descriptions")
 
 
-def _collapse_indexed_params(matches):
+def _collapse_indexed_params(matches):  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
     """
     Collapse indexed parameters into patterns.
 
@@ -261,7 +262,7 @@ def _search_params(registry, query, type_filter, limit, describe=False):
         cons.print(f"  [dim]... {len(collapsed) - limit} more patterns (use -n {len(collapsed)} to show all)[/dim]")
 
 
-def _show_collapsed_results(collapsed, describe=False):
+def _show_collapsed_results(collapsed, describe=False):  # pylint: disable=too-many-branches
     """Show collapsed search results."""
     from .params.descriptions import get_description, get_pattern_description
 

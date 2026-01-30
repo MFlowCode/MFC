@@ -3,6 +3,7 @@ Case Dictionary Schema Generator (Minimal).
 
 Generates case_dicts.py compatible type schemas from the parameter registry.
 """
+# pylint: disable=import-outside-toplevel
 
 from typing import Dict, TYPE_CHECKING
 from ..schema import Stage, ParamType as RegistryParamType
@@ -31,8 +32,8 @@ def get_stage_dict(stage: Stage, include_common: bool = True) -> Dict[str, "Case
         RegistryParamType.REAL: CDParamType.REAL,
         RegistryParamType.LOG: CDParamType.LOG,
         RegistryParamType.STR: CDParamType.STR,
-        RegistryParamType.ANALYTIC_INT: CDParamType._ANALYTIC_INT,
-        RegistryParamType.ANALYTIC_REAL: CDParamType._ANALYTIC_REAL,
+        RegistryParamType.ANALYTIC_INT: CDParamType._ANALYTIC_INT,  # pylint: disable=protected-access
+        RegistryParamType.ANALYTIC_REAL: CDParamType._ANALYTIC_REAL,  # pylint: disable=protected-access
     }
 
     result = {}

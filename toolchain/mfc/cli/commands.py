@@ -10,6 +10,7 @@ All command definitions live here. This file is used to generate:
 When adding a new command or option, ONLY modify this file.
 Then run `./mfc.sh generate` to update completions.
 """
+# pylint: disable=too-many-lines
 
 from .schema import (
     CLISchema, Command, Argument, Positional, Example,

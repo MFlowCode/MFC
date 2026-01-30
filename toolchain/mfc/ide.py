@@ -3,6 +3,7 @@ IDE Configuration Module.
 
 Automatically configures IDE settings (VS Code, etc.) for MFC development.
 """
+# pylint: disable=import-outside-toplevel
 
 import re
 from pathlib import Path

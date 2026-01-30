@@ -7,6 +7,7 @@ of truth for all ~3,300 parameters.
 
 The ParamType enum defines JSON schema types for validation.
 """
+# pylint: disable=import-outside-toplevel
 
 import fastjsonschema
 

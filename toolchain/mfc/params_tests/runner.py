@@ -3,6 +3,7 @@ Test Safety Net Runner.
 
 Main entry point for building and verifying the parameter validation test suite.
 """
+# pylint: disable=import-outside-toplevel
 
 import sys
 import json

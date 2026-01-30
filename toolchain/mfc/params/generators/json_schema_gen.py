@@ -3,6 +3,7 @@ JSON Schema Generator for MFC Case Files.
 
 Generates VS Code / PyCharm compatible JSON Schema for case file auto-completion.
 """
+# pylint: disable=import-outside-toplevel
 
 import json
 from typing import Dict, Any

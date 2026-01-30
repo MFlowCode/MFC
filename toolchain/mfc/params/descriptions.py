@@ -438,7 +438,7 @@ def get_description(param_name: str) -> str:
     return _infer_from_naming(param_name)
 
 
-def _infer_from_naming(param_name: str) -> str:
+def _infer_from_naming(param_name: str) -> str:  # pylint: disable=too-many-return-statements,too-many-branches
     """Infer description from naming conventions."""
     name = param_name
 

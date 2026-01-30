@@ -31,7 +31,7 @@ CONSTRAINTS = {
     "time_stepper": {"choices": [1, 2, 3, 4, 5]},  # Euler, TVD-RK2/3, RK4/5
 
     # Riemann solver
-    "riemann_solver": {"choices": [1, 2, 3]},  # HLL, HLLC, exact
+    "riemann_solver": {"choices": [1, 2, 3, 4]},  # HLL, HLLC, exact, HLLD
     "wave_speeds": {"choices": [1, 2]},  # direct, pressure
     "avg_state": {"choices": [1, 2]},  # Roe, arithmetic
 
@@ -109,7 +109,7 @@ def _r(name, ptype, stages):
         dependencies=DEPENDENCIES.get(name),
     ))
 
-def _load():
+def _load():  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
     """Load all parameter definitions."""
     C, P, S, O = Stage.COMMON, Stage.PRE_PROCESS, Stage.SIMULATION, Stage.POST_PROCESS
     INT, REAL, LOG, STR = ParamType.INT, ParamType.REAL, ParamType.LOG, ParamType.STR
