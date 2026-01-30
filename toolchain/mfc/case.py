@@ -93,18 +93,23 @@ class Case:
                 raise common.MFCException(f"{origin_txt}: {e}")
             raise common.MFCException(f"{e}")
 
-        # Constraint and dependency validation (disabled pending CI fix)
-        # from .params.validate import validate_case
-        # errors, warnings = validate_case(self.params)
-        # if warnings:
-        #     cons.print()
-        #     for w in warnings:
-        #         cons.print(f"[yellow]Warning:[/yellow] {w}")
-        # if errors:
-        #     error_msg = "\n".join(f"  - {e}" for e in errors)
-        #     if origin_txt:
-        #         raise common.MFCException(f"{origin_txt}:\n{error_msg}")
-        #     raise common.MFCException(f"Validation errors:\n{error_msg}")
+        # Constraint and dependency validation
+        from .params.validate import validate_case
+
+        errors, warnings = validate_case(self.params)
+
+        # Show warnings (non-fatal)
+        if warnings:
+            cons.print()
+            for w in warnings:
+                cons.print(f"[yellow]Warning:[/yellow] {w}")
+
+        # Raise errors (fatal)
+        if errors:
+            error_msg = "\n".join(f"  - {e}" for e in errors)
+            if origin_txt:
+                raise common.MFCException(f"{origin_txt}:\n{error_msg}")
+            raise common.MFCException(f"Validation errors:\n{error_msg}")
 
     def __get_ndims(self) -> int:
         return 1 + min(int(self.params.get("n", 0)), 1) + min(int(self.params.get("p", 0)), 1)
