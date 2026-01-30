@@ -34,6 +34,7 @@ class ParamDef:
     param_type: ParamType
     stages: Set[Stage] = field(default_factory=lambda: {Stage.COMMON})
     description: str = ""
+    case_optimization: bool = False  # Can be hard-coded for GPU builds
 
     def __post_init__(self):
         if not isinstance(self.stages, set):

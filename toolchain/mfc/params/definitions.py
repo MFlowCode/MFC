@@ -11,9 +11,22 @@ from .registry import REGISTRY
 # Index limits
 NP, NF, NI, NA, NPR, NB = 10, 10, 10, 4, 10, 5  # patches, fluids, ibs, acoustic, probes, bc_patches
 
+# Parameters that can be hard-coded for GPU case optimization
+CASE_OPT_PARAMS = {
+    "mapped_weno", "wenoz", "teno", "wenoz_q", "nb", "weno_order",
+    "num_fluids", "mhd", "relativity", "igr_order", "viscous",
+    "igr_iter_solver", "igr", "igr_pres_lim", "recon_type",
+    "muscl_order", "muscl_lim"
+}
+
 def _r(name, ptype, stages):
     """Register a parameter."""
-    REGISTRY.register(ParamDef(name=name, param_type=ptype, stages=stages))
+    REGISTRY.register(ParamDef(
+        name=name,
+        param_type=ptype,
+        stages=stages,
+        case_optimization=(name in CASE_OPT_PARAMS)
+    ))
 
 def _load():
     """Load all parameter definitions."""

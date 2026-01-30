@@ -69,13 +69,15 @@ ALL.update(PRE_PROCESS)
 ALL.update(SIMULATION)
 ALL.update(POST_PROCESS)
 
-# Parameters that can be hard-coded for GPU case optimization
-CASE_OPTIMIZATION = [
-    "mapped_weno", "wenoz", "teno", "wenoz_q", "nb", "weno_order",
-    "num_fluids", "mhd", "relativity", "igr_order", "viscous",
-    "igr_iter_solver", "igr", "igr_pres_lim", "recon_type",
-    "muscl_order", "muscl_lim"
-]
+
+def _get_case_optimization_params():
+    """Get params that can be hard-coded for GPU optimization from registry."""
+    from ..params import REGISTRY
+    return [name for name, param in REGISTRY.all_params.items() if param.case_optimization]
+
+
+# Parameters that can be hard-coded for GPU case optimization (from registry)
+CASE_OPTIMIZATION = _get_case_optimization_params()
 
 # Build JSON schema for validation
 _properties = {k: v.value for k, v in ALL.items()}
