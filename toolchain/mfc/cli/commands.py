@@ -834,15 +834,8 @@ PARAMS_COMMAND = Command(
     ],
     arguments=[
         Argument(
-            name="stage",
-            short="s",
-            help="Filter by stage: common, pre_process, simulation, post_process.",
-            choices=["common", "pre_process", "simulation", "post_process"],
-            default=None,
-        ),
-        Argument(
             name="type",
-            short="T",
+            short="t",
             help="Filter by type: int, real, log, str.",
             choices=["int", "real", "log", "str"],
             default=None,
@@ -875,12 +868,12 @@ PARAMS_COMMAND = Command(
         Example("./mfc.sh params bubble", "Search for bubble-related parameters"),
         Example("./mfc.sh params patch_icpp", "Show patch_icpp parameters"),
         Example("./mfc.sh params -f", "List all parameter families"),
-        Example("./mfc.sh params -s simulation", "List all simulation parameters"),
         Example("./mfc.sh params -c", "Show parameter count statistics"),
+        Example("./mfc.sh params -t real weno", "Show only REAL type weno params"),
     ],
     key_options=[
         ("query", "Search term (searches parameter names)"),
-        ("-s, --stage", "Filter by stage"),
+        ("-t, --type", "Filter by type (int, real, log, str)"),
         ("-f, --families", "List parameter families"),
         ("-c, --count", "Show statistics"),
     ],

@@ -330,9 +330,7 @@ _mfc() {
                 params)
                     _arguments \
                         '1:Search query (parameter name or pattern ' \
-                        '-s[Filter by stage: common, pre_process, si]' \
-                        '--stage[Filter by stage: common, pre_process, si]' \
-                        '-T[Filter by type: int, real, log, str.]' \
+                        '-t[Filter by type: int, real, log, str.]' \
                         '--type[Filter by type: int, real, log, str.]' \
                         '-f[List parameter families (grouped by pref]' \
                         '--families[List parameter families (grouped by pref]' \

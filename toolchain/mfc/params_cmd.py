@@ -13,31 +13,19 @@ def params():
     """Execute the params command based on CLI arguments."""
     from .params import REGISTRY
     from .params import definitions  # noqa: F401 - loads definitions
-    from .params.schema import Stage
 
     query = ARG("query")
-    stage_filter = ARG("stage")
     type_filter = ARG("param_type")
     show_families = ARG("families")
     show_count = ARG("count")
     limit = ARG("limit")
-
-    # Map stage names to Stage enum
-    stage_map = {
-        "common": Stage.COMMON,
-        "pre_process": Stage.PRE_PROCESS,
-        "simulation": Stage.SIMULATION,
-        "post_process": Stage.POST_PROCESS,
-    }
 
     if show_count:
         _show_statistics(REGISTRY)
     elif show_families:
         _show_families(REGISTRY, limit)
     elif query:
-        _search_params(REGISTRY, query, stage_map.get(stage_filter), type_filter, limit)
-    elif stage_filter:
-        _list_stage_params(REGISTRY, stage_map[stage_filter], type_filter, limit)
+        _search_params(REGISTRY, query, type_filter, limit)
     else:
         _show_statistics(REGISTRY)
         cons.print()
@@ -187,23 +175,10 @@ def _collapse_indexed_params(matches):
 
 def _show_statistics(registry):
     """Show parameter count statistics."""
-    from .params.schema import Stage
-
     cons.print("[bold]MFC Parameter Statistics[/bold]")
     cons.print()
 
-    # Count by stage
-    by_stage = {}
-    for name, param in registry.all_params.items():
-        for stage in param.stages:
-            by_stage[stage.name] = by_stage.get(stage.name, 0) + 1
-
     cons.print(f"  Total parameters: [cyan]{len(registry.all_params)}[/cyan]")
-    cons.print()
-    cons.print("  By stage:")
-    for stage in Stage:
-        count = by_stage.get(stage.name, 0)
-        cons.print(f"    {stage.name:15} {count:5}")
 
     # Count by type
     by_type = {}
@@ -246,17 +221,13 @@ def _show_families(registry, limit):
     cons.print("[yellow]Tip:[/yellow] Use './mfc.sh params <family>' to see parameters in a family")
 
 
-def _search_params(registry, query, stage_filter, type_filter, limit):
+def _search_params(registry, query, type_filter, limit):
     """Search for parameters matching a query."""
     query_lower = query.lower()
     matches = []
 
     for name, param in registry.all_params.items():
         if query_lower not in name.lower():
-            continue
-
-        # Apply stage filter
-        if stage_filter and stage_filter not in param.stages:
             continue
 
         # Apply type filter
@@ -284,71 +255,34 @@ def _search_params(registry, query, stage_filter, type_filter, limit):
         cons.print(f"  [dim]... {len(collapsed) - limit} more patterns (use -n {len(collapsed)} to show all)[/dim]")
 
 
-def _list_stage_params(registry, stage, type_filter, limit):
-    """List all parameters for a specific stage."""
-    params = registry.get_params_by_stage(stage)
-
-    # Apply type filter
-    if type_filter:
-        params = {k: v for k, v in params.items() if v.param_type.value == type_filter}
-
-    cons.print(f"[bold]{stage.name} Parameters[/bold] ({len(params)} total)")
-    cons.print()
-
-    # Group by prefix for summary
-    by_prefix = {}
-    simple = []
-    for name, param in sorted(params.items()):
-        if "%" in name or "(" in name:
-            if "%" in name:
-                prefix = name.split("%")[0]
-            else:
-                prefix = name.split("(")[0]
-            if prefix not in by_prefix:
-                by_prefix[prefix] = []
-            by_prefix[prefix].append((name, param))
-        else:
-            simple.append((name, param))
-
-    # Show simple params first
-    if simple:
-        cons.print("  [cyan]Simple parameters:[/cyan]")
-        for name, param in simple[:limit]:
-            cons.print(f"    {name:<30} {param.param_type.name:6}")
-        if len(simple) > limit:
-            cons.print(f"    [dim]... and {len(simple) - limit} more[/dim]")
-        cons.print()
-
-    # Show families summary
-    if by_prefix:
-        cons.print("  [cyan]Parameter families:[/cyan]")
-        sorted_families = sorted(by_prefix.items(), key=lambda x: -len(x[1]))
-        for prefix, items in sorted_families[:limit]:
-            cons.print(f"    {prefix}: {len(items)} parameters")
-        if len(sorted_families) > limit:
-            cons.print(f"    [dim]... and {len(sorted_families) - limit} more families[/dim]")
-
-    cons.print()
-    cons.print("[yellow]Tip:[/yellow] Use './mfc.sh params <family>' to search within a family")
-
-
 def _show_collapsed_results(collapsed):
     """Show collapsed search results."""
-    cons.print(f"  {'Parameter':<40} {'Type':6} {'Count':>6}  {'Range/Stages'}")
-    cons.print(f"  {'-'*40} {'-'*6} {'-'*6}  {'-'*20}")
+    # Check if any items have index ranges to show
+    has_ranges = any(len(item) == 4 and item[2] > 1 for item in collapsed)
+
+    if has_ranges:
+        cons.print(f"  {'Parameter':<40} {'Type':12} {'#':>4}  {'Index Range'}")
+        cons.print(f"  {'-'*40} {'-'*12} {'-'*4}  {'-'*15}")
+    else:
+        cons.print(f"  {'Parameter':<40} {'Type':12}")
+        cons.print(f"  {'-'*40} {'-'*12}")
 
     for item in collapsed:
         if len(item) == 4:
             name, param, count, range_str = item
-            stages = ",".join(s.name[:3] for s in param.stages)
             if count > 1:
-                cons.print(f"  {name:<40} {param.param_type.name:6} {count:>6}  {range_str}")
+                cons.print(f"  {name:<40} {param.param_type.name:12} {count:>4}  {range_str}")
             else:
-                cons.print(f"  {name:<40} {param.param_type.name:6} {count:>6}  {stages}")
+                if has_ranges:
+                    cons.print(f"  {name:<40} {param.param_type.name:12} {count:>4}")
+                else:
+                    cons.print(f"  {name:<40} {param.param_type.name:12}")
         else:
             name, param, count = item
-            stages = ",".join(s.name[:3] for s in param.stages)
-            cons.print(f"  {name:<40} {param.param_type.name:6} {count:>6}  {stages}")
+            if has_ranges:
+                cons.print(f"  {name:<40} {param.param_type.name:12} {count:>4}")
+            else:
+                cons.print(f"  {name:<40} {param.param_type.name:12}")
 
 
 def _suggest_alternatives(registry, query):
