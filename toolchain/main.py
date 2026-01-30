@@ -14,7 +14,7 @@ def __print_greeting():
 
     host_line    = f"{getpass.getuser()}@{platform.node()} [{platform.system()}]"
     targets_line = f"[bold]--targets {format_list_to_string(ARG('targets'), 'magenta', 'None')}[/bold]"
-    help_line    = "$ ./mfc.sh (build, run, test, clean, count, packer) --help"
+    help_line    = "$ ./mfc.sh (build, run, test, clean, new, validate, params) --help"
 
     MFC_SIDEBAR_LINES = [
         f"[bold]{host_line}[/bold]",
