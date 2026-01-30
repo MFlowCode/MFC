@@ -41,7 +41,8 @@ module m_helper
               f_cut_on, &
               f_cut_off, &
               s_downsample_data, &
-              s_upsample_data
+              s_upsample_data, &
+              s_initialize_particles_model
 
 contains
 
@@ -106,6 +107,13 @@ contains
         write (*, fmt="(A1)") " "
 
     end subroutine s_print_2D_array
+
+    impure subroutine s_initialize_particles_model()
+
+        rho0ref_particle = particle_pp%rho0ref_particle
+        cp_particle = particle_pp%cp_particle
+
+    end subroutine s_initialize_particles_model
 
     !>
           !! bubbles_euler + polytropic
