@@ -79,16 +79,37 @@ class Case:
         return f"&user_inputs\n{dict_str}&end/\n"
 
     def validate_params(self, origin_txt: str = None):
-        '''Typechecks parameters read from case file. If a parameter
-        is assigned a vlaie of the wrong type, this method throws an exception
-        highlighting the violating parameter and specifying what it expects.'''
+        '''Validates parameters read from case file:
+        1. Type checking via JSON schema
+        2. Constraint validation (valid values, ranges)
+        3. Dependency checking (required/recommended params)
+        '''
+        # Type checking
         try:
             case_dicts.get_validator()(self.params)
         except fastjsonschema.JsonSchemaException as e:
             if origin_txt:
                 raise common.MFCException(f"{origin_txt}: {e}")
-
             raise common.MFCException(f"{e}")
+
+        # Constraint and dependency validation
+        from .params.validate import validate_case, format_validation_results
+        from .printer import cons
+
+        errors, warnings = validate_case(self.params)
+
+        # Show warnings (non-fatal)
+        if warnings:
+            cons.print()
+            for w in warnings:
+                cons.print(f"[yellow]Warning:[/yellow] {w}")
+
+        # Raise errors (fatal)
+        if errors:
+            error_msg = "\n".join(f"  - {e}" for e in errors)
+            if origin_txt:
+                raise common.MFCException(f"{origin_txt}:\n{error_msg}")
+            raise common.MFCException(f"Validation errors:\n{error_msg}")
 
     def __get_ndims(self) -> int:
         return 1 + min(int(self.params.get("n", 0)), 1) + min(int(self.params.get("p", 0)), 1)

@@ -33,8 +33,15 @@ def _check_or_write(path: Path, content: str, check_mode: bool) -> bool:
 
 
 def generate():
-    """Regenerate completion scripts from CLI schema."""
+    """Regenerate completion scripts and optionally JSON schema."""
     check_mode = ARG("check")
+    json_schema_mode = ARG("json_schema")
+
+    # If only generating JSON schema, do that and return
+    if json_schema_mode:
+        _generate_json_schema()
+        return
+
     completions_dir = Path(MFC_ROOT_DIR) / "toolchain" / "completions"
     docs_dir = Path(MFC_ROOT_DIR) / "docs"
     docs_dir.mkdir(exist_ok=True)
@@ -54,3 +61,29 @@ def generate():
         cons.print()
         cons.print("[bold]Files regenerated from cli/commands.py[/bold]")
         cons.print("[dim]Commit these files to keep them in sync[/dim]")
+
+
+def _generate_json_schema():
+    """Generate JSON Schema for IDE auto-completion."""
+    import json
+    from .params.generators.json_schema_gen import generate_json_schema, get_schema_stats
+
+    schema = generate_json_schema(include_descriptions=True)
+    output_path = Path(MFC_ROOT_DIR) / "toolchain" / "mfc-case-schema.json"
+
+    with open(output_path, 'w') as f:
+        json.dump(schema, f, indent=2)
+
+    stats = get_schema_stats()
+
+    cons.print(f"[green]Generated[/green] {output_path}")
+    cons.print()
+    cons.print(f"[bold]JSON Schema Statistics:[/bold]")
+    cons.print(f"  Total parameters: {stats['total_params']}")
+    cons.print(f"  With constraints: {stats['with_constraints']}")
+    cons.print(f"  With descriptions: {stats['with_descriptions']}")
+    cons.print()
+    cons.print("[bold]To use in VS Code:[/bold]")
+    cons.print("  1. Copy mfc-case-schema.json to your project")
+    cons.print("  2. Add to .vscode/settings.json:")
+    cons.print('     {"json.schemas": [{"fileMatch": ["case.py"], "url": "./mfc-case-schema.json"}]}')

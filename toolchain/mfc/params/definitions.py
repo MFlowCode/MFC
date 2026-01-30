@@ -19,13 +19,94 @@ CASE_OPT_PARAMS = {
     "muscl_order", "muscl_lim"
 }
 
+# Parameter constraints (choices, min, max)
+CONSTRAINTS = {
+    # Reconstruction
+    "weno_order": {"choices": [1, 3, 5, 7]},
+    "recon_type": {"choices": [1, 2]},  # 1=WENO, 2=MUSCL
+    "muscl_order": {"choices": [1, 2]},
+    "muscl_lim": {"choices": [1, 2]},  # 1=minmod, 2=MC
+
+    # Time stepping
+    "time_stepper": {"choices": [1, 2, 3, 4, 5]},  # Euler, TVD-RK2/3, RK4/5
+
+    # Riemann solver
+    "riemann_solver": {"choices": [1, 2, 3]},  # HLL, HLLC, exact
+    "wave_speeds": {"choices": [1, 2]},  # direct, pressure
+    "avg_state": {"choices": [1, 2]},  # Roe, arithmetic
+
+    # Model equations
+    "model_eqns": {"choices": [1, 2, 3, 4]},  # gamma-law, 5-eq, 6-eq, 4-eq
+
+    # Bubbles
+    "bubble_model": {"choices": [1, 2, 3]},  # Gilmore, Keller-Miksis, RP
+
+    # Output
+    "format": {"choices": [1, 2]},  # Silo, binary
+    "precision": {"choices": [1, 2]},  # single, double
+
+    # Counts (must be positive)
+    "num_fluids": {"min": 1, "max": 10},
+    "num_patches": {"min": 0, "max": 10},
+    "num_ibs": {"min": 0, "max": 10},
+    "m": {"min": 0},
+    "n": {"min": 0},
+    "p": {"min": 0},
+}
+
+# Parameter dependencies (requires, recommends)
+DEPENDENCIES = {
+    "bubbles_euler": {
+        "when_true": {
+            "recommends": ["nb", "R0ref", "polytropic"],
+        }
+    },
+    "viscous": {
+        "when_true": {
+            "recommends": ["fluid_pp(1)%Re(1)"],
+        }
+    },
+    "polydisperse": {
+        "when_true": {
+            "requires": ["nb"],
+        }
+    },
+    "chemistry": {
+        "when_true": {
+            "requires": ["cantera_file"],
+        }
+    },
+    "qbmm": {
+        "when_true": {
+            "recommends": ["bubbles_euler"],
+        }
+    },
+    "ib": {
+        "when_true": {
+            "requires": ["num_ibs"],
+        }
+    },
+    "acoustic_source": {
+        "when_true": {
+            "requires": ["num_source"],
+        }
+    },
+    "probe_wrt": {
+        "when_true": {
+            "requires": ["num_probes"],
+        }
+    },
+}
+
 def _r(name, ptype, stages):
     """Register a parameter."""
     REGISTRY.register(ParamDef(
         name=name,
         param_type=ptype,
         stages=stages,
-        case_optimization=(name in CASE_OPT_PARAMS)
+        case_optimization=(name in CASE_OPT_PARAMS),
+        constraints=CONSTRAINTS.get(name),
+        dependencies=DEPENDENCIES.get(name),
     ))
 
 def _load():

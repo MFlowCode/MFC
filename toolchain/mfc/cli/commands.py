@@ -748,7 +748,7 @@ INTERACTIVE_COMMAND = Command(
 GENERATE_COMMAND = Command(
     name="generate",
     help="Regenerate completion scripts from CLI schema.",
-    description="Regenerate shell completion scripts and documentation from the CLI schema.",
+    description="Regenerate shell completion scripts, documentation, and JSON schema from the CLI schema.",
     arguments=[
         Argument(
             name="check",
@@ -756,10 +756,18 @@ GENERATE_COMMAND = Command(
             action=ArgAction.STORE_TRUE,
             default=False,
         ),
+        Argument(
+            name="json-schema",
+            help="Generate JSON Schema for IDE auto-completion of case files.",
+            action=ArgAction.STORE_TRUE,
+            default=False,
+            dest="json_schema",
+        ),
     ],
     examples=[
         Example("./mfc.sh generate", "Regenerate completion scripts"),
         Example("./mfc.sh generate --check", "Check if completions are up to date"),
+        Example("./mfc.sh generate --json-schema", "Generate JSON Schema for IDE support"),
     ],
 )
 
