@@ -681,89 +681,89 @@ contains
 
         integer :: i, j, k, l
 
-        ! (q / (1 - beta)) * d(beta)/dt source
-        if (p == 0) then
-            $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
-            do k = idwint(3)%beg, idwint(3)%end
-                do j = idwint(2)%beg, idwint(2)%end
-                    do i = idwint(1)%beg, idwint(1)%end
-                        do l = 1, E_idx
-                            if (q_beta(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
-                                rhs_vf(l)%sf(i, j, k) = rhs_vf(l)%sf(i, j, k) + &
-                                                        q_cons_vf(l)%sf(i, j, k)*(q_beta(2)%sf(i, j, k) + &
-                                                                                  q_beta(5)%sf(i, j, k))
-                            end if
-                        end do
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        else
-            $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
-            do k = idwint(3)%beg, idwint(3)%end
-                do j = idwint(2)%beg, idwint(2)%end
-                    do i = idwint(1)%beg, idwint(1)%end
-                        do l = 1, E_idx
-                            if (q_beta(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
-                                rhs_vf(l)%sf(i, j, k) = rhs_vf(l)%sf(i, j, k) + &
-                                                        q_cons_vf(l)%sf(i, j, k)/q_beta(1)%sf(i, j, k)* &
-                                                        q_beta(2)%sf(i, j, k)
-                            end if
-                        end do
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        end if
+        ! ! (q / (1 - beta)) * d(beta)/dt source
+        ! if (p == 0) then
+        !     $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
+        !     do k = idwint(3)%beg, idwint(3)%end
+        !         do j = idwint(2)%beg, idwint(2)%end
+        !             do i = idwint(1)%beg, idwint(1)%end
+        !                 do l = 1, E_idx
+        !                     if (q_beta_particles(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
+        !                         rhs_vf(l)%sf(i, j, k) = rhs_vf(l)%sf(i, j, k) + &
+        !                                                 q_cons_vf(l)%sf(i, j, k)*(q_beta_particles(2)%sf(i, j, k) + &
+        !                                                                           q_beta_particles(5)%sf(i, j, k))
+        !                     end if
+        !                 end do
+        !             end do
+        !         end do
+        !     end do
+        !     $:END_GPU_PARALLEL_LOOP()
+        ! else
+        !     $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
+        !     do k = idwint(3)%beg, idwint(3)%end
+        !         do j = idwint(2)%beg, idwint(2)%end
+        !             do i = idwint(1)%beg, idwint(1)%end
+        !                 do l = 1, E_idx
+        !                     if (q_beta_particles(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
+        !                         rhs_vf(l)%sf(i, j, k) = rhs_vf(l)%sf(i, j, k) + &
+        !                                                 q_cons_vf(l)%sf(i, j, k)/q_beta_particles(1)%sf(i, j, k)* &
+        !                                                 q_beta_particles(2)%sf(i, j, k)
+        !                     end if
+        !                 end do
+        !             end do
+        !         end do
+        !     end do
+        !     $:END_GPU_PARALLEL_LOOP()
+        ! end if
 
-        do l = 1, num_dims
+        ! do l = 1, num_dims
 
-            call s_gradient_dir(q_prim_vf(E_idx)%sf, q_beta(3)%sf, l)
+        !     call s_gradient_dir(q_prim_vf(E_idx)%sf, q_beta_particles(3)%sf, l)
 
-            ! (q / (1 - beta)) * d(beta)/dt source
-            $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3)
-            do k = idwint(3)%beg, idwint(3)%end
-                do j = idwint(2)%beg, idwint(2)%end
-                    do i = idwint(1)%beg, idwint(1)%end
-                        if (q_beta(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
-                            rhs_vf(contxe + l)%sf(i, j, k) = rhs_vf(contxe + l)%sf(i, j, k) - &
-                                                             (1._wp - q_beta(1)%sf(i, j, k))/ &
-                                                             q_beta(1)%sf(i, j, k) * &
-                                                             q_beta(3)%sf(i, j, k)
-                        end if
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
+        !     ! (q / (1 - beta)) * d(beta)/dt source
+        !     $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3)
+        !     do k = idwint(3)%beg, idwint(3)%end
+        !         do j = idwint(2)%beg, idwint(2)%end
+        !             do i = idwint(1)%beg, idwint(1)%end
+        !                 if (q_beta_particles(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
+        !                     rhs_vf(contxe + l)%sf(i, j, k) = rhs_vf(contxe + l)%sf(i, j, k) - &
+        !                                                      (1._wp - q_beta_particles(1)%sf(i, j, k))/ &
+        !                                                      q_beta_particles(1)%sf(i, j, k) * &
+        !                                                      q_beta_particles(3)%sf(i, j, k)
+        !                 end if
+        !             end do
+        !         end do
+        !     end do
+        !     $:END_GPU_PARALLEL_LOOP()
 
-            !source in energy
-            $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3)
-            do k = idwbuff(3)%beg, idwbuff(3)%end
-                do j = idwbuff(2)%beg, idwbuff(2)%end
-                    do i = idwbuff(1)%beg, idwbuff(1)%end
-                        q_beta(3)%sf(i, j, k) = q_prim_vf(E_idx)%sf(i, j, k)*q_prim_vf(contxe + l)%sf(i, j, k)
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
+        !     !source in energy
+        !     $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3)
+        !     do k = idwbuff(3)%beg, idwbuff(3)%end
+        !         do j = idwbuff(2)%beg, idwbuff(2)%end
+        !             do i = idwbuff(1)%beg, idwbuff(1)%end
+        !                 q_beta_particles(3)%sf(i, j, k) = q_prim_vf(E_idx)%sf(i, j, k)*q_prim_vf(contxe + l)%sf(i, j, k)
+        !             end do
+        !         end do
+        !     end do
+        !     $:END_GPU_PARALLEL_LOOP()
 
-            call s_gradient_dir(q_beta(3)%sf, q_beta(4)%sf, l)
+        !     call s_gradient_dir(q_beta_particles(3)%sf, q_beta_particles(4)%sf, l)
 
-            ! (beta / (1 - beta)) * d(Pu)/dl source
-            $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3)
-            do k = idwint(3)%beg, idwint(3)%end
-                do j = idwint(2)%beg, idwint(2)%end
-                    do i = idwint(1)%beg, idwint(1)%end
-                        if (q_beta(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
-                            rhs_vf(E_idx)%sf(i, j, k) = rhs_vf(E_idx)%sf(i, j, k) - &
-                                                        q_beta(4)%sf(i, j, k)*(1._wp - q_beta(1)%sf(i, j, k))/ &
-                                                        q_beta(1)%sf(i, j, k)
-                        end if
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        end do
+        !     ! (beta / (1 - beta)) * d(Pu)/dl source
+        !     $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3)
+        !     do k = idwint(3)%beg, idwint(3)%end
+        !         do j = idwint(2)%beg, idwint(2)%end
+        !             do i = idwint(1)%beg, idwint(1)%end
+        !                 if (q_beta_particles(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
+        !                     rhs_vf(E_idx)%sf(i, j, k) = rhs_vf(E_idx)%sf(i, j, k) - &
+        !                                                 q_beta_particles(4)%sf(i, j, k)*(1._wp - q_beta_particles(1)%sf(i, j, k))/ &
+        !                                                 q_beta_particles(1)%sf(i, j, k)
+        !                 end if
+        !             end do
+        !         end do
+        !     end do
+        !     $:END_GPU_PARALLEL_LOOP()
+        ! end do
 
     end subroutine s_compute_particles_EL_source
 
@@ -810,7 +810,7 @@ contains
         !     do l = idwbuff(3)%beg, idwbuff(3)%end
         !         do k = idwbuff(2)%beg, idwbuff(2)%end
         !             do j = idwbuff(1)%beg, idwbuff(1)%end
-        !                 q_beta(i)%sf(j, k, l) = 0._wp
+        !                 q_beta_particles(i)%sf(j, k, l) = 0._wp
         !             end do
         !         end do
         !     end do
@@ -825,9 +825,9 @@ contains
         ! do l = idwbuff(3)%beg, idwbuff(3)%end
         !     do k = idwbuff(2)%beg, idwbuff(2)%end
         !         do j = idwbuff(1)%beg, idwbuff(1)%end
-        !             q_beta(1)%sf(j, k, l) = 1._wp - q_beta(1)%sf(j, k, l)
+        !             q_beta_particles(1)%sf(j, k, l) = 1._wp - q_beta_particles(1)%sf(j, k, l)
         !             ! Limiting void fraction given max value
-        !             q_beta(1)%sf(j, k, l) = max(q_beta(1)%sf(j, k, l), &
+        !             q_beta_particles(1)%sf(j, k, l) = max(q_beta_particles(1)%sf(j, k, l), &
         !                                         1._wp - lag_params%valmaxvoid)
         !         end do
         !     end do
@@ -1079,9 +1079,9 @@ contains
         !                 !< Update values
         !                 charvol = charvol + vol
         !                 charpres = charpres + q_prim_vf(E_idx)%sf(cellaux(1), cellaux(2), cellaux(3))*vol
-        !                 charvol2 = charvol2 + vol*q_beta(1)%sf(cellaux(1), cellaux(2), cellaux(3))
+        !                 charvol2 = charvol2 + vol*q_beta_particles(1)%sf(cellaux(1), cellaux(2), cellaux(3))
         !                 charpres2 = charpres2 + q_prim_vf(E_idx)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-        !                             *vol*q_beta(1)%sf(cellaux(1), cellaux(2), cellaux(3))
+        !                             *vol*q_beta_particles(1)%sf(cellaux(1), cellaux(2), cellaux(3))
         !             end do
         !         end do
         !     end do
@@ -1404,7 +1404,7 @@ contains
                 if (keep_bubble(k) == 1) then
                     newBubs = newBubs + 1
                     if (newBubs /= k) then
-                        call s_copy_lag_bubble(newBubs, k)
+                        call s_copy_lag_particle(newBubs, k)
                         wrap_bubble_dir(newBubs,:) = wrap_bubble_dir(k,:)
                         wrap_bubble_loc(newBubs,:) = wrap_bubble_loc(k,:)
                     end if
