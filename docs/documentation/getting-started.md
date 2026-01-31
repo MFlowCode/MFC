@@ -195,3 +195,41 @@ MFC has example cases in the `examples` folder. You can run such a case interact
 ```
 
 Please refer to the [Running](running.md) document for more information on `case.py` files and how to run them.
+
+## Helpful Tools
+
+### Parameter Lookup
+
+MFC has over 3,000 case parameters. Use the `params` command to search and explore them:
+
+```shell
+./mfc.sh params dt          # Search for parameters matching "dt"
+./mfc.sh params -d dt       # Show parameter with description
+./mfc.sh params patch       # Find all patch-related parameters
+./mfc.sh params --family    # List all parameter families
+```
+
+### Creating a New Case
+
+Generate a case file template to get started quickly:
+
+```shell
+./mfc.sh new my_case.py     # Create a new case file from template
+```
+
+### Shell Completion
+
+Enable tab-completion for `./mfc.sh` commands:
+
+**Bash** (add to `~/.bashrc`):
+```bash
+source /path/to/MFC/toolchain/completions/mfc.bash
+```
+
+**Zsh** (add to `~/.zshrc`):
+```zsh
+fpath=(/path/to/MFC/toolchain/completions $fpath)
+autoload -Uz compinit && compinit
+```
+
+After reloading your shell, press Tab to complete commands and options.
