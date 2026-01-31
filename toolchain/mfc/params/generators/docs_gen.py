@@ -107,6 +107,26 @@ def generate_parameter_docs() -> str:  # pylint: disable=too-many-locals,too-man
         "chem_wrt_Y": "Chemistry species output parameters",
         "bub_pp": "Bubble property parameters",
         "lag_params": "Lagrangian particle parameters",
+        # Post-processing output flags
+        "alpha_rho_wrt": "Partial density output flags",
+        "alpha_rho_e_wrt": "Partial density-energy output flags",
+        "alpha_wrt": "Volume fraction output flags",
+        "kappa_wrt": "Curvature output flags",
+        "schlieren_alpha": "Numerical schlieren coefficients",
+        "mom_wrt": "Momentum output flags",
+        "vel_wrt": "Velocity output flags",
+        "flux_wrt": "Flux output flags",
+        "omega_wrt": "Vorticity output flags",
+        # Domain and output regions
+        "x_domain": "X-direction domain parameters",
+        "y_domain": "Y-direction domain parameters",
+        "z_domain": "Z-direction domain parameters",
+        "x_output": "X-direction output region",
+        "y_output": "Y-direction output region",
+        "z_output": "Z-direction output region",
+        # Other
+        "fluid_rho": "Fluid reference densities",
+        "chem_params": "Chemistry model parameters",
     }
 
     for family, params in sorted_families:

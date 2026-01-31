@@ -1,6 +1,4 @@
-@page parameters Case Parameters Reference
-
-# Case Parameters Reference
+# MFC Case Parameters Reference
 
 > **Auto-generated** from parameter registry
 > 
@@ -8,7 +6,7 @@
 
 ## Overview
 
-MFC supports **3,247** case parameters organized into families.
+MFC supports **3,400** case parameters organized into families.
 
 **Quick search:** Use `./mfc.sh params <query>` to search parameters from the command line.
 
@@ -18,35 +16,35 @@ MFC supports **3,247** case parameters organized into families.
 |--------|-------|-------------|
 | [patch_icpp](#patch-icpp) | 1954 | Initial condition patch parameters |
 | [patch_ib](#patch-ib) | 370 | Immersed boundary patch parameters |
+| [fluid_pp](#fluid-pp) | 170 | Fluid material properties |
+| [patch_bc](#patch-bc) | 110 | Boundary condition patch parameters |
 | [acoustic](#acoustic) | 104 | Acoustic source parameters |
-| [fluid_pp](#fluid-pp) | 80 | Fluid material properties |
 | [simplex_params](#simplex-params) | 78 | Simplex noise perturbation parameters |
-| [patch_bc](#patch-bc) | 55 | Boundary condition patch parameters |
 | [bc_x](#bc-x) | 39 | X-direction boundary conditions |
 | [bc_y](#bc-y) | 39 | Y-direction boundary conditions |
 | [bc_z](#bc-z) | 39 | Z-direction boundary conditions |
 | [integral](#integral) | 30 | Integral region parameters |
 | [probe](#probe) | 30 | Probe/monitoring point parameters |
 | [bub_pp](#bub-pp) | 20 | Bubble property parameters |
-| [lag_params](#lag-params) | 12 | Lagrangian particle parameters |
-| [alpha_rho_e_wrt](#alpha-rho-e-wrt) | 10 |  |
-| [alpha_rho_wrt](#alpha-rho-wrt) | 10 |  |
-| [alpha_wrt](#alpha-wrt) | 10 |  |
-| [fluid_rho](#fluid-rho) | 10 |  |
-| [kappa_wrt](#kappa-wrt) | 10 |  |
-| [schlieren_alpha](#schlieren-alpha) | 10 |  |
-| [chem_params](#chem-params) | 4 |  |
-| [flux_wrt](#flux-wrt) | 3 |  |
-| [mom_wrt](#mom-wrt) | 3 |  |
-| [omega_wrt](#omega-wrt) | 3 |  |
-| [vel_wrt](#vel-wrt) | 3 |  |
-| [x_domain](#x-domain) | 2 |  |
-| [x_output](#x-output) | 2 |  |
-| [y_domain](#y-domain) | 2 |  |
-| [y_output](#y-output) | 2 |  |
-| [z_domain](#z-domain) | 2 |  |
-| [z_output](#z-output) | 2 |  |
-| [general](#general) | 309 | Core simulation parameters (grid, time, model, etc.) |
+| [lag_params](#lag-params) | 17 | Lagrangian particle parameters |
+| [alpha_rho_e_wrt](#alpha-rho-e-wrt) | 10 | Partial density-energy output flags |
+| [alpha_rho_wrt](#alpha-rho-wrt) | 10 | Partial density output flags |
+| [alpha_wrt](#alpha-wrt) | 10 | Volume fraction output flags |
+| [fluid_rho](#fluid-rho) | 10 | Fluid reference densities |
+| [kappa_wrt](#kappa-wrt) | 10 | Curvature output flags |
+| [schlieren_alpha](#schlieren-alpha) | 10 | Numerical schlieren coefficients |
+| [chem_params](#chem-params) | 4 | Chemistry model parameters |
+| [flux_wrt](#flux-wrt) | 3 | Flux output flags |
+| [mom_wrt](#mom-wrt) | 3 | Momentum output flags |
+| [omega_wrt](#omega-wrt) | 3 | Vorticity output flags |
+| [vel_wrt](#vel-wrt) | 3 | Velocity output flags |
+| [x_domain](#x-domain) | 2 | X-direction domain parameters |
+| [x_output](#x-output) | 2 | X-direction output region |
+| [y_domain](#y-domain) | 2 | Y-direction domain parameters |
+| [y_output](#y-output) | 2 | Y-direction output region |
+| [z_domain](#z-domain) | 2 | Z-direction domain parameters |
+| [z_output](#z-output) | 2 | Z-direction output region |
+| [general](#general) | 312 | Core simulation parameters (grid, time, model, etc.) |
 
 ---
 
@@ -152,6 +150,55 @@ MFC supports **3,247** case parameters organized into families.
 
 ---
 
+## fluid_pp
+
+*Fluid material properties*
+
+**170 parameters**
+
+### Patterns
+
+| Pattern | Example | Description |
+|---------|---------|-------------|
+| `fluid_pp(N)%D_v` | `fluid_pp(1)%D_v` |  |
+| `fluid_pp(N)%G` | `fluid_pp(1)%G` | Shear modulus for fluid 1 |
+| `fluid_pp(N)%M_v` | `fluid_pp(1)%M_v` |  |
+| `fluid_pp(N)%Re(N)` | `fluid_pp(1)%Re(1)` | Reynolds number component 1 for fluid 1 |
+| `fluid_pp(N)%cp_v` | `fluid_pp(1)%cp_v` |  |
+| `fluid_pp(N)%cv` | `fluid_pp(1)%cv` | Specific heat at constant volume for fluid 1 |
+| `fluid_pp(N)%gamma` | `fluid_pp(1)%gamma` | Specific heat ratio for fluid 1 |
+| `fluid_pp(N)%gamma_v` | `fluid_pp(1)%gamma_v` | Specific heat ratio for fluid 1 |
+| `fluid_pp(N)%k_v` | `fluid_pp(1)%k_v` |  |
+| `fluid_pp(N)%mu_v` | `fluid_pp(1)%mu_v` |  |
+| `fluid_pp(N)%mul0` | `fluid_pp(1)%mul0` |  |
+| `fluid_pp(N)%pi_inf` | `fluid_pp(1)%pi_inf` | Stiffness pressure for fluid 1 |
+| `fluid_pp(N)%pv` | `fluid_pp(1)%pv` |  |
+| `fluid_pp(N)%qv` | `fluid_pp(1)%qv` | Heat of formation for fluid 1 |
+| `fluid_pp(N)%qvp` | `fluid_pp(1)%qvp` | Heat of formation for fluid 1 |
+| `fluid_pp(N)%ss` | `fluid_pp(1)%ss` |  |
+
+---
+
+## patch_bc
+
+*Boundary condition patch parameters*
+
+**110 parameters**
+
+### Patterns
+
+| Pattern | Example | Description |
+|---------|---------|-------------|
+| `patch_bc(N)%centroid(N)` | `patch_bc(1)%centroid(1)` | Centroid component 1 for BC patch 1 |
+| `patch_bc(N)%dir` | `patch_bc(1)%dir` | Direction for BC patch 1 |
+| `patch_bc(N)%geometry` | `patch_bc(1)%geometry` | Geometry type for BC patch 1 |
+| `patch_bc(N)%length(N)` | `patch_bc(1)%length(1)` | Length component 1 for BC patch 1 |
+| `patch_bc(N)%loc` | `patch_bc(1)%loc` | Location for BC patch 1 |
+| `patch_bc(N)%radius` | `patch_bc(1)%radius` | Radius for BC patch 1 |
+| `patch_bc(N)%type` | `patch_bc(1)%type` | BC type for patch 1 |
+
+---
+
 ## acoustic
 
 *Acoustic source parameters*
@@ -186,26 +233,6 @@ MFC supports **3,247** case parameters organized into families.
 | `acoustic(N)%rotate_angle` | `acoustic(1)%rotate_angle` | Rotation angle for acoustic source 1 |
 | `acoustic(N)%support` | `acoustic(1)%support` | Support type for acoustic source 1 |
 | `acoustic(N)%wavelength` | `acoustic(1)%wavelength` | Wavelength for acoustic source 1 |
-
----
-
-## fluid_pp
-
-*Fluid material properties*
-
-**80 parameters**
-
-### Patterns
-
-| Pattern | Example | Description |
-|---------|---------|-------------|
-| `fluid_pp(N)%G` | `fluid_pp(1)%G` | Shear modulus for fluid 1 |
-| `fluid_pp(N)%Re(N)` | `fluid_pp(1)%Re(1)` | Reynolds number component 1 for fluid 1 |
-| `fluid_pp(N)%cv` | `fluid_pp(1)%cv` | Specific heat at constant volume for fluid 1 |
-| `fluid_pp(N)%gamma` | `fluid_pp(1)%gamma` | Specific heat ratio for fluid 1 |
-| `fluid_pp(N)%pi_inf` | `fluid_pp(1)%pi_inf` | Stiffness pressure for fluid 1 |
-| `fluid_pp(N)%qv` | `fluid_pp(1)%qv` | Heat of formation for fluid 1 |
-| `fluid_pp(N)%qvp` | `fluid_pp(1)%qvp` | Heat of formation for fluid 1 |
 
 ---
 
@@ -264,26 +291,6 @@ MFC supports **3,247** case parameters organized into families.
 | `simplex_params%perturb_vel_offset(3,2)` | `simplex_params%perturb_vel_offset(3,2)` | Velocity perturbation offset (2) for direction 3 |
 | `simplex_params%perturb_vel_offset(3,3)` | `simplex_params%perturb_vel_offset(3,3)` | Velocity perturbation offset (3) for direction 3 |
 | `simplex_params%perturb_vel_scale(N)` | `simplex_params%perturb_vel_scale(1)` | Velocity perturbation scale for direction 1 |
-
----
-
-## patch_bc
-
-*Boundary condition patch parameters*
-
-**55 parameters**
-
-### Patterns
-
-| Pattern | Example | Description |
-|---------|---------|-------------|
-| `patch_bc(N)%centroid(N)` | `patch_bc(1)%centroid(1)` | Centroid component 1 for BC patch 1 |
-| `patch_bc(N)%dir` | `patch_bc(1)%dir` | Direction for BC patch 1 |
-| `patch_bc(N)%geometry` | `patch_bc(1)%geometry` | Geometry type for BC patch 1 |
-| `patch_bc(N)%length(N)` | `patch_bc(1)%length(1)` | Length component 1 for BC patch 1 |
-| `patch_bc(N)%loc` | `patch_bc(1)%loc` | Location for BC patch 1 |
-| `patch_bc(N)%radius` | `patch_bc(1)%radius` | Radius for BC patch 1 |
-| `patch_bc(N)%type` | `patch_bc(1)%type` | BC type for patch 1 |
 
 ---
 
@@ -447,10 +454,13 @@ MFC supports **3,247** case parameters organized into families.
 
 *Lagrangian particle parameters*
 
-**12 parameters**
+**17 parameters**
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
+| `lag_params%T0` | Real | Lagrangian tracking parameter: T0 |
+| `lag_params%Thost` | Real | Lagrangian tracking parameter: Thost |
+| `lag_params%c0` | Real | Lagrangian tracking parameter: c0 |
 | `lag_params%charwidth` | Real | Lagrangian tracking parameter: charwidth |
 | `lag_params%cluster_type` | Integer | Lagrangian tracking parameter: cluster_type |
 | `lag_params%epsilonb` | Real | Lagrangian tracking parameter: epsilonb |
@@ -458,15 +468,19 @@ MFC supports **3,247** case parameters organized into families.
 | `lag_params%massTransfer_model` | Logical (T/F) | Lagrangian tracking parameter: massTransfer_model |
 | `lag_params%nBubs_glb` | Integer | Lagrangian tracking parameter: nBubs_glb |
 | `lag_params%pressure_corrector` | Logical (T/F) | Lagrangian tracking parameter: pressure_corrector |
+| `lag_params%rho0` | Real | Lagrangian tracking parameter: rho0 |
 | `lag_params%smooth_type` | Integer | Lagrangian tracking parameter: smooth_type |
 | `lag_params%solver_approach` | Integer | Lagrangian tracking parameter: solver_approach |
 | `lag_params%valmaxvoid` | Real | Lagrangian tracking parameter: valmaxvoid |
 | `lag_params%write_bubbles` | Logical (T/F) | Lagrangian tracking parameter: write_bubbles |
 | `lag_params%write_bubbles_stats` | Logical (T/F) | Lagrangian tracking parameter: write_bubbles_stats |
+| `lag_params%x0` | Real | Lagrangian tracking parameter: x0 |
 
 ---
 
 ## alpha_rho_e_wrt
+
+*Partial density-energy output flags*
 
 **10 parameters**
 
@@ -487,6 +501,8 @@ MFC supports **3,247** case parameters organized into families.
 
 ## alpha_rho_wrt
 
+*Partial density output flags*
+
 **10 parameters**
 
 | Parameter | Type | Description |
@@ -505,6 +521,8 @@ MFC supports **3,247** case parameters organized into families.
 ---
 
 ## alpha_wrt
+
+*Volume fraction output flags*
 
 **10 parameters**
 
@@ -525,6 +543,8 @@ MFC supports **3,247** case parameters organized into families.
 
 ## fluid_rho
 
+*Fluid reference densities*
+
 **10 parameters**
 
 | Parameter | Type | Description |
@@ -543,6 +563,8 @@ MFC supports **3,247** case parameters organized into families.
 ---
 
 ## kappa_wrt
+
+*Curvature output flags*
 
 **10 parameters**
 
@@ -563,6 +585,8 @@ MFC supports **3,247** case parameters organized into families.
 
 ## schlieren_alpha
 
+*Numerical schlieren coefficients*
+
 **10 parameters**
 
 | Parameter | Type | Description |
@@ -582,6 +606,8 @@ MFC supports **3,247** case parameters organized into families.
 
 ## chem_params
 
+*Chemistry model parameters*
+
 **4 parameters**
 
 | Parameter | Type | Description |
@@ -595,6 +621,8 @@ MFC supports **3,247** case parameters organized into families.
 
 ## flux_wrt
 
+*Flux output flags*
+
 **3 parameters**
 
 | Parameter | Type | Description |
@@ -606,6 +634,8 @@ MFC supports **3,247** case parameters organized into families.
 ---
 
 ## mom_wrt
+
+*Momentum output flags*
 
 **3 parameters**
 
@@ -619,6 +649,8 @@ MFC supports **3,247** case parameters organized into families.
 
 ## omega_wrt
 
+*Vorticity output flags*
+
 **3 parameters**
 
 | Parameter | Type | Description |
@@ -630,6 +662,8 @@ MFC supports **3,247** case parameters organized into families.
 ---
 
 ## vel_wrt
+
+*Velocity output flags*
 
 **3 parameters**
 
@@ -643,6 +677,8 @@ MFC supports **3,247** case parameters organized into families.
 
 ## x_domain
 
+*X-direction domain parameters*
+
 **2 parameters**
 
 | Parameter | Type | Description |
@@ -653,6 +689,8 @@ MFC supports **3,247** case parameters organized into families.
 ---
 
 ## x_output
+
+*X-direction output region*
 
 **2 parameters**
 
@@ -665,6 +703,8 @@ MFC supports **3,247** case parameters organized into families.
 
 ## y_domain
 
+*Y-direction domain parameters*
+
 **2 parameters**
 
 | Parameter | Type | Description |
@@ -675,6 +715,8 @@ MFC supports **3,247** case parameters organized into families.
 ---
 
 ## y_output
+
+*Y-direction output region*
 
 **2 parameters**
 
@@ -687,6 +729,8 @@ MFC supports **3,247** case parameters organized into families.
 
 ## z_domain
 
+*Z-direction domain parameters*
+
 **2 parameters**
 
 | Parameter | Type | Description |
@@ -697,6 +741,8 @@ MFC supports **3,247** case parameters organized into families.
 ---
 
 ## z_output
+
+*Z-direction output region*
 
 **2 parameters**
 
@@ -711,15 +757,18 @@ MFC supports **3,247** case parameters organized into families.
 
 *Core simulation parameters (grid, time, model, etc.)*
 
-**309 parameters**
+**312 parameters**
 
 ### Patterns
 
 | Pattern | Example | Description |
 |---------|---------|-------------|
 | `Bx0` | `Bx0` | Background magnetic field in x-direction |
+| `Ca` | `Ca` |  |
 | `E_wrt` | `E_wrt` | Write energy field |
 | `R0ref` | `R0ref` | Reference bubble radius |
+| `Re_inv` | `Re_inv` |  |
+| `Web` | `Web` |  |
 | `a_x` | `a_x` | Rate of grid stretching in the x-direction |
 | `a_y` | `a_y` | Rate of grid stretching in the y-direction |
 | `a_z` | `a_z` | Rate of grid stretching in the z-direction |
