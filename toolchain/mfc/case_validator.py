@@ -1435,19 +1435,22 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
                                      f"patch_icpp({istr})%alpha_rho({jstr}) must be non-negative (got {alpha_rho})")
 
             # === GEOMETRY ===
-            # Patch dimensions must be positive
+            # Patch dimensions must be positive (except in cylindrical coords where
+            # length_y/length_z can be sentinel values like -1000000.0)
             length_x = self.get(f'patch_icpp({i})%length_x')
             length_y = self.get(f'patch_icpp({i})%length_y')
             length_z = self.get(f'patch_icpp({i})%length_z')
             radius = self.get(f'patch_icpp({i})%radius')
+            cyl_coord = self.get('cyl_coord')
 
             if length_x is not None and self._is_numeric(length_x):
                 self.prohibit(length_x <= 0,
                              f"patch_icpp({istr})%length_x must be positive (got {length_x})")
-            if length_y is not None and self._is_numeric(length_y):
+            # In cylindrical coordinates, length_y and length_z can be negative sentinel values
+            if length_y is not None and self._is_numeric(length_y) and not cyl_coord:
                 self.prohibit(length_y <= 0,
                              f"patch_icpp({istr})%length_y must be positive (got {length_y})")
-            if length_z is not None and self._is_numeric(length_z):
+            if length_z is not None and self._is_numeric(length_z) and not cyl_coord:
                 self.prohibit(length_z <= 0,
                              f"patch_icpp({istr})%length_z must be positive (got {length_z})")
             if radius is not None and self._is_numeric(radius):
