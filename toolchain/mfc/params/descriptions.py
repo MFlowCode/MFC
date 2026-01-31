@@ -429,8 +429,9 @@ def get_description(param_name: str) -> str:
         return DESCRIPTIONS[param_name]
 
     # Try pattern matching for indexed params
+    # Use fullmatch to ensure exact pattern match (not just prefix)
     for pattern, template in PATTERNS:
-        match = re.match(pattern, param_name)
+        match = re.fullmatch(pattern, param_name)
         if match:
             return template.format(*match.groups())
 

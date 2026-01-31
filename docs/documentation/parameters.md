@@ -67,7 +67,7 @@ MFC supports **3,400** case parameters organized into families.
 | `patch_icpp(N)%a(N)` | `patch_icpp(1)%a(2)` | Shape coefficient a(2) for patch 1 |
 | `patch_icpp(N)%alpha` | `patch_icpp(1)%alpha` | Volume fraction for patch 1 |
 | `patch_icpp(N)%alpha(N)` | `patch_icpp(1)%alpha(1)` | Volume fraction of fluid 1 for patch 1 |
-| `patch_icpp(N)%alpha_rho` | `patch_icpp(1)%alpha_rho` | Volume fraction for patch 1 |
+| `patch_icpp(N)%alpha_rho` | `patch_icpp(1)%alpha_rho` | Partial density for patch 1 |
 | `patch_icpp(N)%alpha_rho(N)` | `patch_icpp(1)%alpha_rho(1)` | Partial density of fluid 1 for patch 1 |
 | `patch_icpp(N)%alter_patch` | `patch_icpp(10)%alter_patch` | Enable patch alteration for patch 10 |
 | `patch_icpp(N)%alter_patch(N)` | `patch_icpp(10)%alter_patch(1)` | Alter patch 1 with patch 10 |
@@ -95,7 +95,7 @@ MFC supports **3,400** case parameters organized into families.
 | `patch_icpp(N)%pi_inf` | `patch_icpp(1)%pi_inf` | Stiffness pressure for patch 1 |
 | `patch_icpp(N)%pres` | `patch_icpp(1)%pres` | Pressure for patch 1 |
 | `patch_icpp(N)%qv` | `patch_icpp(1)%qv` | Heat of formation for patch 1 |
-| `patch_icpp(N)%qvp` | `patch_icpp(1)%qvp` | Heat of formation for patch 1 |
+| `patch_icpp(N)%qvp` | `patch_icpp(1)%qvp` | Heat of formation prime for patch 1 |
 | `patch_icpp(N)%r0` | `patch_icpp(1)%r0` | Initial bubble radius for patch 1 |
 | `patch_icpp(N)%radii` | `patch_icpp(1)%radii` | Radii for patch 1 |
 | `patch_icpp(N)%radii(N)` | `patch_icpp(1)%radii(1)` | Radius component 1 for patch 1 |
@@ -132,14 +132,14 @@ MFC supports **3,400** case parameters organized into families.
 | `patch_ib(N)%length_y` | `patch_ib(1)%length_y` | Y-dimension length for IB patch 1 |
 | `patch_ib(N)%length_z` | `patch_ib(1)%length_z` | Z-dimension length for IB patch 1 |
 | `patch_ib(N)%m` | `patch_ib(1)%m` | Shape parameter m for IB patch 1 |
-| `patch_ib(N)%mass` | `patch_ib(1)%mass` | Shape parameter m for IB patch 1 |
-| `patch_ib(N)%model_filepath` | `patch_ib(1)%model_filepath` | Shape parameter m for IB patch 1 |
-| `patch_ib(N)%model_rotate(N)` | `patch_ib(1)%model_rotate(1)` | Shape parameter m for IB patch 1 |
-| `patch_ib(N)%model_scale(N)` | `patch_ib(1)%model_scale(1)` | Shape parameter m for IB patch 1 |
-| `patch_ib(N)%model_spc` | `patch_ib(1)%model_spc` | Shape parameter m for IB patch 1 |
-| `patch_ib(N)%model_threshold` | `patch_ib(1)%model_threshold` | Shape parameter m for IB patch 1 |
-| `patch_ib(N)%model_translate(N)` | `patch_ib(1)%model_translate(1)` | Shape parameter m for IB patch 1 |
-| `patch_ib(N)%moving_ibm` | `patch_ib(1)%moving_ibm` | Shape parameter m for IB patch 1 |
+| `patch_ib(N)%mass` | `patch_ib(1)%mass` | Mass for IB patch 1 |
+| `patch_ib(N)%model_filepath` | `patch_ib(1)%model_filepath` | STL model file path for IB patch 1 |
+| `patch_ib(N)%model_rotate(N)` | `patch_ib(1)%model_rotate(1)` | Model rotation component 1 for IB patch 1 |
+| `patch_ib(N)%model_scale(N)` | `patch_ib(1)%model_scale(1)` | Model scale component 1 for IB patch 1 |
+| `patch_ib(N)%model_spc` | `patch_ib(1)%model_spc` | Model spacing for IB patch 1 |
+| `patch_ib(N)%model_threshold` | `patch_ib(1)%model_threshold` | Model threshold for IB patch 1 |
+| `patch_ib(N)%model_translate(N)` | `patch_ib(1)%model_translate(1)` | Model translation component 1 for IB patch 1 |
+| `patch_ib(N)%moving_ibm` | `patch_ib(1)%moving_ibm` | Enable moving boundary for IB patch 1 |
 | `patch_ib(N)%p` | `patch_ib(1)%p` | Shape parameter p for IB patch 1 |
 | `patch_ib(N)%radius` | `patch_ib(1)%radius` | Radius for IB patch 1 |
 | `patch_ib(N)%slip` | `patch_ib(1)%slip` | Enable slip condition for IB patch 1 |
@@ -169,14 +169,14 @@ MFC supports **3,400** case parameters organized into families.
 | `fluid_pp(N)%cp_v` | `fluid_pp(1)%cp_v` |  |
 | `fluid_pp(N)%cv` | `fluid_pp(1)%cv` | Specific heat at constant volume for fluid 1 |
 | `fluid_pp(N)%gamma` | `fluid_pp(1)%gamma` | Specific heat ratio for fluid 1 |
-| `fluid_pp(N)%gamma_v` | `fluid_pp(1)%gamma_v` | Specific heat ratio for fluid 1 |
+| `fluid_pp(N)%gamma_v` | `fluid_pp(1)%gamma_v` |  |
 | `fluid_pp(N)%k_v` | `fluid_pp(1)%k_v` |  |
 | `fluid_pp(N)%mu_v` | `fluid_pp(1)%mu_v` |  |
 | `fluid_pp(N)%mul0` | `fluid_pp(1)%mul0` |  |
 | `fluid_pp(N)%pi_inf` | `fluid_pp(1)%pi_inf` | Stiffness pressure for fluid 1 |
 | `fluid_pp(N)%pv` | `fluid_pp(1)%pv` |  |
 | `fluid_pp(N)%qv` | `fluid_pp(1)%qv` | Heat of formation for fluid 1 |
-| `fluid_pp(N)%qvp` | `fluid_pp(1)%qvp` | Heat of formation for fluid 1 |
+| `fluid_pp(N)%qvp` | `fluid_pp(1)%qvp` | Heat of formation prime for fluid 1 |
 | `fluid_pp(N)%ss` | `fluid_pp(1)%ss` |  |
 
 ---

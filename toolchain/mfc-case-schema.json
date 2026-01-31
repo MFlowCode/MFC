@@ -2421,8 +2421,7 @@
       "description": "Specific heat ratio for fluid 1"
     },
     "fluid_pp(1)%gamma_v": {
-      "type": "number",
-      "description": "Specific heat ratio for fluid 1"
+      "type": "number"
     },
     "fluid_pp(1)%k_v": {
       "type": "number"
@@ -2446,7 +2445,7 @@
     },
     "fluid_pp(1)%qvp": {
       "type": "number",
-      "description": "Heat of formation for fluid 1"
+      "description": "Heat of formation prime for fluid 1"
     },
     "fluid_pp(1)%ss": {
       "type": "number"
@@ -2481,8 +2480,7 @@
       "description": "Specific heat ratio for fluid 10"
     },
     "fluid_pp(10)%gamma_v": {
-      "type": "number",
-      "description": "Specific heat ratio for fluid 10"
+      "type": "number"
     },
     "fluid_pp(10)%k_v": {
       "type": "number"
@@ -2506,7 +2504,7 @@
     },
     "fluid_pp(10)%qvp": {
       "type": "number",
-      "description": "Heat of formation for fluid 10"
+      "description": "Heat of formation prime for fluid 10"
     },
     "fluid_pp(10)%ss": {
       "type": "number"
@@ -2541,8 +2539,7 @@
       "description": "Specific heat ratio for fluid 2"
     },
     "fluid_pp(2)%gamma_v": {
-      "type": "number",
-      "description": "Specific heat ratio for fluid 2"
+      "type": "number"
     },
     "fluid_pp(2)%k_v": {
       "type": "number"
@@ -2566,7 +2563,7 @@
     },
     "fluid_pp(2)%qvp": {
       "type": "number",
-      "description": "Heat of formation for fluid 2"
+      "description": "Heat of formation prime for fluid 2"
     },
     "fluid_pp(2)%ss": {
       "type": "number"
@@ -2601,8 +2598,7 @@
       "description": "Specific heat ratio for fluid 3"
     },
     "fluid_pp(3)%gamma_v": {
-      "type": "number",
-      "description": "Specific heat ratio for fluid 3"
+      "type": "number"
     },
     "fluid_pp(3)%k_v": {
       "type": "number"
@@ -2626,7 +2622,7 @@
     },
     "fluid_pp(3)%qvp": {
       "type": "number",
-      "description": "Heat of formation for fluid 3"
+      "description": "Heat of formation prime for fluid 3"
     },
     "fluid_pp(3)%ss": {
       "type": "number"
@@ -2661,8 +2657,7 @@
       "description": "Specific heat ratio for fluid 4"
     },
     "fluid_pp(4)%gamma_v": {
-      "type": "number",
-      "description": "Specific heat ratio for fluid 4"
+      "type": "number"
     },
     "fluid_pp(4)%k_v": {
       "type": "number"
@@ -2686,7 +2681,7 @@
     },
     "fluid_pp(4)%qvp": {
       "type": "number",
-      "description": "Heat of formation for fluid 4"
+      "description": "Heat of formation prime for fluid 4"
     },
     "fluid_pp(4)%ss": {
       "type": "number"
@@ -2721,8 +2716,7 @@
       "description": "Specific heat ratio for fluid 5"
     },
     "fluid_pp(5)%gamma_v": {
-      "type": "number",
-      "description": "Specific heat ratio for fluid 5"
+      "type": "number"
     },
     "fluid_pp(5)%k_v": {
       "type": "number"
@@ -2746,7 +2740,7 @@
     },
     "fluid_pp(5)%qvp": {
       "type": "number",
-      "description": "Heat of formation for fluid 5"
+      "description": "Heat of formation prime for fluid 5"
     },
     "fluid_pp(5)%ss": {
       "type": "number"
@@ -2781,8 +2775,7 @@
       "description": "Specific heat ratio for fluid 6"
     },
     "fluid_pp(6)%gamma_v": {
-      "type": "number",
-      "description": "Specific heat ratio for fluid 6"
+      "type": "number"
     },
     "fluid_pp(6)%k_v": {
       "type": "number"
@@ -2806,7 +2799,7 @@
     },
     "fluid_pp(6)%qvp": {
       "type": "number",
-      "description": "Heat of formation for fluid 6"
+      "description": "Heat of formation prime for fluid 6"
     },
     "fluid_pp(6)%ss": {
       "type": "number"
@@ -2841,8 +2834,7 @@
       "description": "Specific heat ratio for fluid 7"
     },
     "fluid_pp(7)%gamma_v": {
-      "type": "number",
-      "description": "Specific heat ratio for fluid 7"
+      "type": "number"
     },
     "fluid_pp(7)%k_v": {
       "type": "number"
@@ -2866,7 +2858,7 @@
     },
     "fluid_pp(7)%qvp": {
       "type": "number",
-      "description": "Heat of formation for fluid 7"
+      "description": "Heat of formation prime for fluid 7"
     },
     "fluid_pp(7)%ss": {
       "type": "number"
@@ -2901,8 +2893,7 @@
       "description": "Specific heat ratio for fluid 8"
     },
     "fluid_pp(8)%gamma_v": {
-      "type": "number",
-      "description": "Specific heat ratio for fluid 8"
+      "type": "number"
     },
     "fluid_pp(8)%k_v": {
       "type": "number"
@@ -2926,7 +2917,7 @@
     },
     "fluid_pp(8)%qvp": {
       "type": "number",
-      "description": "Heat of formation for fluid 8"
+      "description": "Heat of formation prime for fluid 8"
     },
     "fluid_pp(8)%ss": {
       "type": "number"
@@ -2961,8 +2952,7 @@
       "description": "Specific heat ratio for fluid 9"
     },
     "fluid_pp(9)%gamma_v": {
-      "type": "number",
-      "description": "Specific heat ratio for fluid 9"
+      "type": "number"
     },
     "fluid_pp(9)%k_v": {
       "type": "number"
@@ -2986,7 +2976,7 @@
     },
     "fluid_pp(9)%qvp": {
       "type": "number",
-      "description": "Heat of formation for fluid 9"
+      "description": "Heat of formation prime for fluid 9"
     },
     "fluid_pp(9)%ss": {
       "type": "number"
@@ -4455,59 +4445,59 @@
     },
     "patch_ib(1)%mass": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 1"
+      "description": "Mass for IB patch 1"
     },
     "patch_ib(1)%model_filepath": {
       "type": "string",
-      "description": "Shape parameter m for IB patch 1"
+      "description": "STL model file path for IB patch 1"
     },
     "patch_ib(1)%model_rotate(1)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 1"
+      "description": "Model rotation component 1 for IB patch 1"
     },
     "patch_ib(1)%model_rotate(2)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 1"
+      "description": "Model rotation component 2 for IB patch 1"
     },
     "patch_ib(1)%model_rotate(3)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 1"
+      "description": "Model rotation component 3 for IB patch 1"
     },
     "patch_ib(1)%model_scale(1)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 1"
+      "description": "Model scale component 1 for IB patch 1"
     },
     "patch_ib(1)%model_scale(2)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 1"
+      "description": "Model scale component 2 for IB patch 1"
     },
     "patch_ib(1)%model_scale(3)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 1"
+      "description": "Model scale component 3 for IB patch 1"
     },
     "patch_ib(1)%model_spc": {
       "type": "integer",
-      "description": "Shape parameter m for IB patch 1"
+      "description": "Model spacing for IB patch 1"
     },
     "patch_ib(1)%model_threshold": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 1"
+      "description": "Model threshold for IB patch 1"
     },
     "patch_ib(1)%model_translate(1)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 1"
+      "description": "Model translation component 1 for IB patch 1"
     },
     "patch_ib(1)%model_translate(2)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 1"
+      "description": "Model translation component 2 for IB patch 1"
     },
     "patch_ib(1)%model_translate(3)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 1"
+      "description": "Model translation component 3 for IB patch 1"
     },
     "patch_ib(1)%moving_ibm": {
       "type": "integer",
-      "description": "Shape parameter m for IB patch 1"
+      "description": "Enable moving boundary for IB patch 1"
     },
     "patch_ib(1)%p": {
       "type": "number",
@@ -4607,59 +4597,59 @@
     },
     "patch_ib(10)%mass": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 10"
+      "description": "Mass for IB patch 10"
     },
     "patch_ib(10)%model_filepath": {
       "type": "string",
-      "description": "Shape parameter m for IB patch 10"
+      "description": "STL model file path for IB patch 10"
     },
     "patch_ib(10)%model_rotate(1)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 10"
+      "description": "Model rotation component 1 for IB patch 10"
     },
     "patch_ib(10)%model_rotate(2)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 10"
+      "description": "Model rotation component 2 for IB patch 10"
     },
     "patch_ib(10)%model_rotate(3)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 10"
+      "description": "Model rotation component 3 for IB patch 10"
     },
     "patch_ib(10)%model_scale(1)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 10"
+      "description": "Model scale component 1 for IB patch 10"
     },
     "patch_ib(10)%model_scale(2)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 10"
+      "description": "Model scale component 2 for IB patch 10"
     },
     "patch_ib(10)%model_scale(3)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 10"
+      "description": "Model scale component 3 for IB patch 10"
     },
     "patch_ib(10)%model_spc": {
       "type": "integer",
-      "description": "Shape parameter m for IB patch 10"
+      "description": "Model spacing for IB patch 10"
     },
     "patch_ib(10)%model_threshold": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 10"
+      "description": "Model threshold for IB patch 10"
     },
     "patch_ib(10)%model_translate(1)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 10"
+      "description": "Model translation component 1 for IB patch 10"
     },
     "patch_ib(10)%model_translate(2)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 10"
+      "description": "Model translation component 2 for IB patch 10"
     },
     "patch_ib(10)%model_translate(3)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 10"
+      "description": "Model translation component 3 for IB patch 10"
     },
     "patch_ib(10)%moving_ibm": {
       "type": "integer",
-      "description": "Shape parameter m for IB patch 10"
+      "description": "Enable moving boundary for IB patch 10"
     },
     "patch_ib(10)%p": {
       "type": "number",
@@ -4759,59 +4749,59 @@
     },
     "patch_ib(2)%mass": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 2"
+      "description": "Mass for IB patch 2"
     },
     "patch_ib(2)%model_filepath": {
       "type": "string",
-      "description": "Shape parameter m for IB patch 2"
+      "description": "STL model file path for IB patch 2"
     },
     "patch_ib(2)%model_rotate(1)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 2"
+      "description": "Model rotation component 1 for IB patch 2"
     },
     "patch_ib(2)%model_rotate(2)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 2"
+      "description": "Model rotation component 2 for IB patch 2"
     },
     "patch_ib(2)%model_rotate(3)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 2"
+      "description": "Model rotation component 3 for IB patch 2"
     },
     "patch_ib(2)%model_scale(1)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 2"
+      "description": "Model scale component 1 for IB patch 2"
     },
     "patch_ib(2)%model_scale(2)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 2"
+      "description": "Model scale component 2 for IB patch 2"
     },
     "patch_ib(2)%model_scale(3)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 2"
+      "description": "Model scale component 3 for IB patch 2"
     },
     "patch_ib(2)%model_spc": {
       "type": "integer",
-      "description": "Shape parameter m for IB patch 2"
+      "description": "Model spacing for IB patch 2"
     },
     "patch_ib(2)%model_threshold": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 2"
+      "description": "Model threshold for IB patch 2"
     },
     "patch_ib(2)%model_translate(1)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 2"
+      "description": "Model translation component 1 for IB patch 2"
     },
     "patch_ib(2)%model_translate(2)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 2"
+      "description": "Model translation component 2 for IB patch 2"
     },
     "patch_ib(2)%model_translate(3)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 2"
+      "description": "Model translation component 3 for IB patch 2"
     },
     "patch_ib(2)%moving_ibm": {
       "type": "integer",
-      "description": "Shape parameter m for IB patch 2"
+      "description": "Enable moving boundary for IB patch 2"
     },
     "patch_ib(2)%p": {
       "type": "number",
@@ -4911,59 +4901,59 @@
     },
     "patch_ib(3)%mass": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 3"
+      "description": "Mass for IB patch 3"
     },
     "patch_ib(3)%model_filepath": {
       "type": "string",
-      "description": "Shape parameter m for IB patch 3"
+      "description": "STL model file path for IB patch 3"
     },
     "patch_ib(3)%model_rotate(1)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 3"
+      "description": "Model rotation component 1 for IB patch 3"
     },
     "patch_ib(3)%model_rotate(2)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 3"
+      "description": "Model rotation component 2 for IB patch 3"
     },
     "patch_ib(3)%model_rotate(3)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 3"
+      "description": "Model rotation component 3 for IB patch 3"
     },
     "patch_ib(3)%model_scale(1)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 3"
+      "description": "Model scale component 1 for IB patch 3"
     },
     "patch_ib(3)%model_scale(2)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 3"
+      "description": "Model scale component 2 for IB patch 3"
     },
     "patch_ib(3)%model_scale(3)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 3"
+      "description": "Model scale component 3 for IB patch 3"
     },
     "patch_ib(3)%model_spc": {
       "type": "integer",
-      "description": "Shape parameter m for IB patch 3"
+      "description": "Model spacing for IB patch 3"
     },
     "patch_ib(3)%model_threshold": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 3"
+      "description": "Model threshold for IB patch 3"
     },
     "patch_ib(3)%model_translate(1)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 3"
+      "description": "Model translation component 1 for IB patch 3"
     },
     "patch_ib(3)%model_translate(2)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 3"
+      "description": "Model translation component 2 for IB patch 3"
     },
     "patch_ib(3)%model_translate(3)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 3"
+      "description": "Model translation component 3 for IB patch 3"
     },
     "patch_ib(3)%moving_ibm": {
       "type": "integer",
-      "description": "Shape parameter m for IB patch 3"
+      "description": "Enable moving boundary for IB patch 3"
     },
     "patch_ib(3)%p": {
       "type": "number",
@@ -5063,59 +5053,59 @@
     },
     "patch_ib(4)%mass": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 4"
+      "description": "Mass for IB patch 4"
     },
     "patch_ib(4)%model_filepath": {
       "type": "string",
-      "description": "Shape parameter m for IB patch 4"
+      "description": "STL model file path for IB patch 4"
     },
     "patch_ib(4)%model_rotate(1)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 4"
+      "description": "Model rotation component 1 for IB patch 4"
     },
     "patch_ib(4)%model_rotate(2)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 4"
+      "description": "Model rotation component 2 for IB patch 4"
     },
     "patch_ib(4)%model_rotate(3)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 4"
+      "description": "Model rotation component 3 for IB patch 4"
     },
     "patch_ib(4)%model_scale(1)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 4"
+      "description": "Model scale component 1 for IB patch 4"
     },
     "patch_ib(4)%model_scale(2)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 4"
+      "description": "Model scale component 2 for IB patch 4"
     },
     "patch_ib(4)%model_scale(3)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 4"
+      "description": "Model scale component 3 for IB patch 4"
     },
     "patch_ib(4)%model_spc": {
       "type": "integer",
-      "description": "Shape parameter m for IB patch 4"
+      "description": "Model spacing for IB patch 4"
     },
     "patch_ib(4)%model_threshold": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 4"
+      "description": "Model threshold for IB patch 4"
     },
     "patch_ib(4)%model_translate(1)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 4"
+      "description": "Model translation component 1 for IB patch 4"
     },
     "patch_ib(4)%model_translate(2)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 4"
+      "description": "Model translation component 2 for IB patch 4"
     },
     "patch_ib(4)%model_translate(3)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 4"
+      "description": "Model translation component 3 for IB patch 4"
     },
     "patch_ib(4)%moving_ibm": {
       "type": "integer",
-      "description": "Shape parameter m for IB patch 4"
+      "description": "Enable moving boundary for IB patch 4"
     },
     "patch_ib(4)%p": {
       "type": "number",
@@ -5215,59 +5205,59 @@
     },
     "patch_ib(5)%mass": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 5"
+      "description": "Mass for IB patch 5"
     },
     "patch_ib(5)%model_filepath": {
       "type": "string",
-      "description": "Shape parameter m for IB patch 5"
+      "description": "STL model file path for IB patch 5"
     },
     "patch_ib(5)%model_rotate(1)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 5"
+      "description": "Model rotation component 1 for IB patch 5"
     },
     "patch_ib(5)%model_rotate(2)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 5"
+      "description": "Model rotation component 2 for IB patch 5"
     },
     "patch_ib(5)%model_rotate(3)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 5"
+      "description": "Model rotation component 3 for IB patch 5"
     },
     "patch_ib(5)%model_scale(1)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 5"
+      "description": "Model scale component 1 for IB patch 5"
     },
     "patch_ib(5)%model_scale(2)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 5"
+      "description": "Model scale component 2 for IB patch 5"
     },
     "patch_ib(5)%model_scale(3)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 5"
+      "description": "Model scale component 3 for IB patch 5"
     },
     "patch_ib(5)%model_spc": {
       "type": "integer",
-      "description": "Shape parameter m for IB patch 5"
+      "description": "Model spacing for IB patch 5"
     },
     "patch_ib(5)%model_threshold": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 5"
+      "description": "Model threshold for IB patch 5"
     },
     "patch_ib(5)%model_translate(1)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 5"
+      "description": "Model translation component 1 for IB patch 5"
     },
     "patch_ib(5)%model_translate(2)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 5"
+      "description": "Model translation component 2 for IB patch 5"
     },
     "patch_ib(5)%model_translate(3)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 5"
+      "description": "Model translation component 3 for IB patch 5"
     },
     "patch_ib(5)%moving_ibm": {
       "type": "integer",
-      "description": "Shape parameter m for IB patch 5"
+      "description": "Enable moving boundary for IB patch 5"
     },
     "patch_ib(5)%p": {
       "type": "number",
@@ -5367,59 +5357,59 @@
     },
     "patch_ib(6)%mass": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 6"
+      "description": "Mass for IB patch 6"
     },
     "patch_ib(6)%model_filepath": {
       "type": "string",
-      "description": "Shape parameter m for IB patch 6"
+      "description": "STL model file path for IB patch 6"
     },
     "patch_ib(6)%model_rotate(1)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 6"
+      "description": "Model rotation component 1 for IB patch 6"
     },
     "patch_ib(6)%model_rotate(2)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 6"
+      "description": "Model rotation component 2 for IB patch 6"
     },
     "patch_ib(6)%model_rotate(3)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 6"
+      "description": "Model rotation component 3 for IB patch 6"
     },
     "patch_ib(6)%model_scale(1)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 6"
+      "description": "Model scale component 1 for IB patch 6"
     },
     "patch_ib(6)%model_scale(2)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 6"
+      "description": "Model scale component 2 for IB patch 6"
     },
     "patch_ib(6)%model_scale(3)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 6"
+      "description": "Model scale component 3 for IB patch 6"
     },
     "patch_ib(6)%model_spc": {
       "type": "integer",
-      "description": "Shape parameter m for IB patch 6"
+      "description": "Model spacing for IB patch 6"
     },
     "patch_ib(6)%model_threshold": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 6"
+      "description": "Model threshold for IB patch 6"
     },
     "patch_ib(6)%model_translate(1)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 6"
+      "description": "Model translation component 1 for IB patch 6"
     },
     "patch_ib(6)%model_translate(2)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 6"
+      "description": "Model translation component 2 for IB patch 6"
     },
     "patch_ib(6)%model_translate(3)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 6"
+      "description": "Model translation component 3 for IB patch 6"
     },
     "patch_ib(6)%moving_ibm": {
       "type": "integer",
-      "description": "Shape parameter m for IB patch 6"
+      "description": "Enable moving boundary for IB patch 6"
     },
     "patch_ib(6)%p": {
       "type": "number",
@@ -5519,59 +5509,59 @@
     },
     "patch_ib(7)%mass": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 7"
+      "description": "Mass for IB patch 7"
     },
     "patch_ib(7)%model_filepath": {
       "type": "string",
-      "description": "Shape parameter m for IB patch 7"
+      "description": "STL model file path for IB patch 7"
     },
     "patch_ib(7)%model_rotate(1)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 7"
+      "description": "Model rotation component 1 for IB patch 7"
     },
     "patch_ib(7)%model_rotate(2)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 7"
+      "description": "Model rotation component 2 for IB patch 7"
     },
     "patch_ib(7)%model_rotate(3)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 7"
+      "description": "Model rotation component 3 for IB patch 7"
     },
     "patch_ib(7)%model_scale(1)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 7"
+      "description": "Model scale component 1 for IB patch 7"
     },
     "patch_ib(7)%model_scale(2)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 7"
+      "description": "Model scale component 2 for IB patch 7"
     },
     "patch_ib(7)%model_scale(3)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 7"
+      "description": "Model scale component 3 for IB patch 7"
     },
     "patch_ib(7)%model_spc": {
       "type": "integer",
-      "description": "Shape parameter m for IB patch 7"
+      "description": "Model spacing for IB patch 7"
     },
     "patch_ib(7)%model_threshold": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 7"
+      "description": "Model threshold for IB patch 7"
     },
     "patch_ib(7)%model_translate(1)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 7"
+      "description": "Model translation component 1 for IB patch 7"
     },
     "patch_ib(7)%model_translate(2)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 7"
+      "description": "Model translation component 2 for IB patch 7"
     },
     "patch_ib(7)%model_translate(3)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 7"
+      "description": "Model translation component 3 for IB patch 7"
     },
     "patch_ib(7)%moving_ibm": {
       "type": "integer",
-      "description": "Shape parameter m for IB patch 7"
+      "description": "Enable moving boundary for IB patch 7"
     },
     "patch_ib(7)%p": {
       "type": "number",
@@ -5671,59 +5661,59 @@
     },
     "patch_ib(8)%mass": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 8"
+      "description": "Mass for IB patch 8"
     },
     "patch_ib(8)%model_filepath": {
       "type": "string",
-      "description": "Shape parameter m for IB patch 8"
+      "description": "STL model file path for IB patch 8"
     },
     "patch_ib(8)%model_rotate(1)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 8"
+      "description": "Model rotation component 1 for IB patch 8"
     },
     "patch_ib(8)%model_rotate(2)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 8"
+      "description": "Model rotation component 2 for IB patch 8"
     },
     "patch_ib(8)%model_rotate(3)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 8"
+      "description": "Model rotation component 3 for IB patch 8"
     },
     "patch_ib(8)%model_scale(1)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 8"
+      "description": "Model scale component 1 for IB patch 8"
     },
     "patch_ib(8)%model_scale(2)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 8"
+      "description": "Model scale component 2 for IB patch 8"
     },
     "patch_ib(8)%model_scale(3)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 8"
+      "description": "Model scale component 3 for IB patch 8"
     },
     "patch_ib(8)%model_spc": {
       "type": "integer",
-      "description": "Shape parameter m for IB patch 8"
+      "description": "Model spacing for IB patch 8"
     },
     "patch_ib(8)%model_threshold": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 8"
+      "description": "Model threshold for IB patch 8"
     },
     "patch_ib(8)%model_translate(1)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 8"
+      "description": "Model translation component 1 for IB patch 8"
     },
     "patch_ib(8)%model_translate(2)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 8"
+      "description": "Model translation component 2 for IB patch 8"
     },
     "patch_ib(8)%model_translate(3)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 8"
+      "description": "Model translation component 3 for IB patch 8"
     },
     "patch_ib(8)%moving_ibm": {
       "type": "integer",
-      "description": "Shape parameter m for IB patch 8"
+      "description": "Enable moving boundary for IB patch 8"
     },
     "patch_ib(8)%p": {
       "type": "number",
@@ -5823,59 +5813,59 @@
     },
     "patch_ib(9)%mass": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 9"
+      "description": "Mass for IB patch 9"
     },
     "patch_ib(9)%model_filepath": {
       "type": "string",
-      "description": "Shape parameter m for IB patch 9"
+      "description": "STL model file path for IB patch 9"
     },
     "patch_ib(9)%model_rotate(1)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 9"
+      "description": "Model rotation component 1 for IB patch 9"
     },
     "patch_ib(9)%model_rotate(2)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 9"
+      "description": "Model rotation component 2 for IB patch 9"
     },
     "patch_ib(9)%model_rotate(3)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 9"
+      "description": "Model rotation component 3 for IB patch 9"
     },
     "patch_ib(9)%model_scale(1)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 9"
+      "description": "Model scale component 1 for IB patch 9"
     },
     "patch_ib(9)%model_scale(2)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 9"
+      "description": "Model scale component 2 for IB patch 9"
     },
     "patch_ib(9)%model_scale(3)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 9"
+      "description": "Model scale component 3 for IB patch 9"
     },
     "patch_ib(9)%model_spc": {
       "type": "integer",
-      "description": "Shape parameter m for IB patch 9"
+      "description": "Model spacing for IB patch 9"
     },
     "patch_ib(9)%model_threshold": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 9"
+      "description": "Model threshold for IB patch 9"
     },
     "patch_ib(9)%model_translate(1)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 9"
+      "description": "Model translation component 1 for IB patch 9"
     },
     "patch_ib(9)%model_translate(2)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 9"
+      "description": "Model translation component 2 for IB patch 9"
     },
     "patch_ib(9)%model_translate(3)": {
       "type": "number",
-      "description": "Shape parameter m for IB patch 9"
+      "description": "Model translation component 3 for IB patch 9"
     },
     "patch_ib(9)%moving_ibm": {
       "type": "integer",
-      "description": "Shape parameter m for IB patch 9"
+      "description": "Enable moving boundary for IB patch 9"
     },
     "patch_ib(9)%p": {
       "type": "number",
@@ -7206,7 +7196,7 @@
     },
     "patch_icpp(1)%alpha_rho": {
       "type": "number",
-      "description": "Volume fraction for patch 1"
+      "description": "Partial density for patch 1"
     },
     "patch_icpp(1)%alpha_rho(1)": {
       "oneOf": [
@@ -7462,7 +7452,7 @@
     },
     "patch_icpp(1)%qvp": {
       "type": "number",
-      "description": "Heat of formation for patch 1"
+      "description": "Heat of formation prime for patch 1"
     },
     "patch_icpp(1)%r0": {
       "type": "number",
@@ -8908,7 +8898,7 @@
     },
     "patch_icpp(10)%alpha_rho": {
       "type": "number",
-      "description": "Volume fraction for patch 10"
+      "description": "Partial density for patch 10"
     },
     "patch_icpp(10)%alpha_rho(1)": {
       "oneOf": [
@@ -9244,7 +9234,7 @@
     },
     "patch_icpp(10)%qvp": {
       "type": "number",
-      "description": "Heat of formation for patch 10"
+      "description": "Heat of formation prime for patch 10"
     },
     "patch_icpp(10)%r0": {
       "type": "number",
@@ -10690,7 +10680,7 @@
     },
     "patch_icpp(2)%alpha_rho": {
       "type": "number",
-      "description": "Volume fraction for patch 2"
+      "description": "Partial density for patch 2"
     },
     "patch_icpp(2)%alpha_rho(1)": {
       "oneOf": [
@@ -10962,7 +10952,7 @@
     },
     "patch_icpp(2)%qvp": {
       "type": "number",
-      "description": "Heat of formation for patch 2"
+      "description": "Heat of formation prime for patch 2"
     },
     "patch_icpp(2)%r0": {
       "type": "number",
@@ -12408,7 +12398,7 @@
     },
     "patch_icpp(3)%alpha_rho": {
       "type": "number",
-      "description": "Volume fraction for patch 3"
+      "description": "Partial density for patch 3"
     },
     "patch_icpp(3)%alpha_rho(1)": {
       "oneOf": [
@@ -12688,7 +12678,7 @@
     },
     "patch_icpp(3)%qvp": {
       "type": "number",
-      "description": "Heat of formation for patch 3"
+      "description": "Heat of formation prime for patch 3"
     },
     "patch_icpp(3)%r0": {
       "type": "number",
@@ -14134,7 +14124,7 @@
     },
     "patch_icpp(4)%alpha_rho": {
       "type": "number",
-      "description": "Volume fraction for patch 4"
+      "description": "Partial density for patch 4"
     },
     "patch_icpp(4)%alpha_rho(1)": {
       "oneOf": [
@@ -14422,7 +14412,7 @@
     },
     "patch_icpp(4)%qvp": {
       "type": "number",
-      "description": "Heat of formation for patch 4"
+      "description": "Heat of formation prime for patch 4"
     },
     "patch_icpp(4)%r0": {
       "type": "number",
@@ -15868,7 +15858,7 @@
     },
     "patch_icpp(5)%alpha_rho": {
       "type": "number",
-      "description": "Volume fraction for patch 5"
+      "description": "Partial density for patch 5"
     },
     "patch_icpp(5)%alpha_rho(1)": {
       "oneOf": [
@@ -16164,7 +16154,7 @@
     },
     "patch_icpp(5)%qvp": {
       "type": "number",
-      "description": "Heat of formation for patch 5"
+      "description": "Heat of formation prime for patch 5"
     },
     "patch_icpp(5)%r0": {
       "type": "number",
@@ -17610,7 +17600,7 @@
     },
     "patch_icpp(6)%alpha_rho": {
       "type": "number",
-      "description": "Volume fraction for patch 6"
+      "description": "Partial density for patch 6"
     },
     "patch_icpp(6)%alpha_rho(1)": {
       "oneOf": [
@@ -17914,7 +17904,7 @@
     },
     "patch_icpp(6)%qvp": {
       "type": "number",
-      "description": "Heat of formation for patch 6"
+      "description": "Heat of formation prime for patch 6"
     },
     "patch_icpp(6)%r0": {
       "type": "number",
@@ -19360,7 +19350,7 @@
     },
     "patch_icpp(7)%alpha_rho": {
       "type": "number",
-      "description": "Volume fraction for patch 7"
+      "description": "Partial density for patch 7"
     },
     "patch_icpp(7)%alpha_rho(1)": {
       "oneOf": [
@@ -19672,7 +19662,7 @@
     },
     "patch_icpp(7)%qvp": {
       "type": "number",
-      "description": "Heat of formation for patch 7"
+      "description": "Heat of formation prime for patch 7"
     },
     "patch_icpp(7)%r0": {
       "type": "number",
@@ -21118,7 +21108,7 @@
     },
     "patch_icpp(8)%alpha_rho": {
       "type": "number",
-      "description": "Volume fraction for patch 8"
+      "description": "Partial density for patch 8"
     },
     "patch_icpp(8)%alpha_rho(1)": {
       "oneOf": [
@@ -21438,7 +21428,7 @@
     },
     "patch_icpp(8)%qvp": {
       "type": "number",
-      "description": "Heat of formation for patch 8"
+      "description": "Heat of formation prime for patch 8"
     },
     "patch_icpp(8)%r0": {
       "type": "number",
@@ -22884,7 +22874,7 @@
     },
     "patch_icpp(9)%alpha_rho": {
       "type": "number",
-      "description": "Volume fraction for patch 9"
+      "description": "Partial density for patch 9"
     },
     "patch_icpp(9)%alpha_rho(1)": {
       "oneOf": [
@@ -23212,7 +23202,7 @@
     },
     "patch_icpp(9)%qvp": {
       "type": "number",
-      "description": "Heat of formation for patch 9"
+      "description": "Heat of formation prime for patch 9"
     },
     "patch_icpp(9)%r0": {
       "type": "number",
