@@ -100,14 +100,6 @@ def _count_prohibit_calls(func_node: ast.FunctionDef) -> int:
     return count
 
 
-def _find_case_validator_class(tree: ast.AST) -> ast.ClassDef:
-    """Find the CaseValidator class in AST."""
-    for node in ast.walk(tree):
-        if isinstance(node, ast.ClassDef) and node.name == "CaseValidator":
-            return node
-    return None
-
-
 def extract_check_methods() -> Dict[str, Dict[str, Any]]:
     """Extract all check_* methods from validator with their stage."""
     validator_path = Path(__file__).parent.parent / "case_validator.py"
