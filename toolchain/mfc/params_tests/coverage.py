@@ -43,6 +43,14 @@ def _is_prohibit_call(node: ast.AST) -> bool:
     return node.func.attr == 'prohibit' and len(node.args) >= 2
 
 
+def _find_case_validator_class(tree: ast.Module) -> ast.ClassDef:
+    """Find the CaseValidator class in the AST."""
+    for node in tree.body:
+        if isinstance(node, ast.ClassDef) and node.name == "CaseValidator":
+            return node
+    return None
+
+
 def extract_constraints_from_validator() -> List[ConstraintInfo]:
     """Parse case_validator.py and extract all prohibit() calls."""
     validator_path = Path(__file__).parent.parent / "case_validator.py"
@@ -50,30 +58,35 @@ def extract_constraints_from_validator() -> List[ConstraintInfo]:
     with open(validator_path, 'r', encoding='utf-8') as f:
         source = f.read()
 
-    constraints = []
-    current_method = None
     tree = ast.parse(source)
+    validator_class = _find_case_validator_class(tree)
+    if validator_class is None:
+        return []
 
-    for node in ast.walk(tree):
-        if isinstance(node, ast.FunctionDef):
-            current_method = node.name
+    constraints: List[ConstraintInfo] = []
+
+    # Iterate through each method in the class
+    for item in validator_class.body:
+        if not isinstance(item, ast.FunctionDef):
             continue
 
-        if not _is_prohibit_call(node):
-            continue
+        # Walk only within this method to find prohibit() calls
+        for node in ast.walk(item):
+            if not _is_prohibit_call(node):
+                continue
 
-        message = _extract_message(node.args[1])
-        try:
-            condition_code = ast.unparse(node.args[0])
-        except Exception:
-            condition_code = "<complex>"
+            message = _extract_message(node.args[1])
+            try:
+                condition_code = ast.unparse(node.args[0])
+            except Exception:
+                condition_code = "<complex>"
 
-        constraints.append(ConstraintInfo(
-            method=current_method or "<unknown>",
-            line_number=node.lineno,
-            message=message,
-            condition_code=condition_code
-        ))
+            constraints.append(ConstraintInfo(
+                method=item.name,
+                line_number=node.lineno,
+                message=message,
+                condition_code=condition_code
+            ))
 
     return constraints
 
