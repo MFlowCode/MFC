@@ -22,7 +22,7 @@ CASE_OPT_PARAMS = {
 # Parameter constraints (choices, min, max)
 CONSTRAINTS = {
     # Reconstruction
-    "weno_order": {"choices": [1, 3, 5, 7]},
+    "weno_order": {"choices": [0, 1, 3, 5, 7]},  # 0 for MUSCL mode
     "recon_type": {"choices": [1, 2]},  # 1=WENO, 2=MUSCL
     "muscl_order": {"choices": [1, 2]},
     "muscl_lim": {"choices": [1, 2, 3, 4, 5]},  # minmod, MC, Van Albada, Van Leer, SUPERBEE
