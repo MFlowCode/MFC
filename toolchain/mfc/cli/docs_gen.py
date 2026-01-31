@@ -31,14 +31,17 @@ def _format_default(default) -> str:
     if default is None:
         return "-"
     if isinstance(default, bool):
-        return "true" if default else "false"
+        return "`true`" if default else "`false`"
     if isinstance(default, list):
         if not default:
-            return "[]"
+            return "`[]`"
         result = ", ".join(str(d) for d in default[:3])
         if len(default) > 3:
             result += "..."
-        return result
+        return f"`{result}`"
+    # Handle empty strings
+    if default == "":
+        return "-"
     return f"`{default}`"
 
 
@@ -79,7 +82,7 @@ def _generate_options_table(cmd: Command, schema: CLISchema) -> List[str]:
         # Add MFC config flags if included
         if "mfc_config" in cmd.include_common:
             lines.append("| `--mpi`, `--no-mpi` | Enable/disable MPI | `true` |")
-            lines.append("| `--gpu [acc\\|mp]`, `--no-gpu` | Enable GPU (OpenACC/OpenMP) | `no` |")
+            lines.append("| `--gpu [acc/mp]`, `--no-gpu` | Enable GPU (OpenACC/OpenMP) | `no` |")
             lines.append("| `--debug`, `--no-debug` | Enable debug mode | `false` |")
 
         lines.append("")
@@ -262,7 +265,7 @@ def generate_cli_reference(schema: CLISchema) -> str:
         "| Flag | Description |",
         "|------|-------------|",
         "| `--mpi` / `--no-mpi` | Enable/disable MPI support |",
-        "| `--gpu [acc\\|mp]` / `--no-gpu` | Enable GPU with OpenACC or OpenMP |",
+        "| `--gpu [acc/mp]` / `--no-gpu` | Enable GPU with OpenACC or OpenMP |",
         "| `--debug` / `--no-debug` | Enable debug build |",
         "| `--gcov` / `--no-gcov` | Enable code coverage |",
         "| `--single` / `--no-single` | Single precision |",

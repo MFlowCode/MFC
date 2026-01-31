@@ -47,14 +47,14 @@ Build MFC targets with optional GPU support and case optimization.
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `-t`, `--targets` | Space separated list of targets to act upon. | pre_process, simulation, post_process |
+| `-t`, `--targets` | Space separated list of targets to act upon. | `pre_process, simulation, post_process` |
 | `-j`, `--jobs` | Allows for JOBS concurrent jobs. | `1` |
 | `-v`, `--verbose` | Increase verbosity level. Use -v, -vv, or -vvv for more detail. | `0` |
 | `-d`, `--debug-log` | Enable debug logging for troubleshooting. | - |
 | `-i`, `--input` | (GPU Optimization) Build a version of MFC optimized for a case. | - |
-| `--case-optimization` | (GPU Optimization) Compile MFC targets with some case parameters hard-coded (requires --input). | false |
+| `--case-optimization` | (GPU Optimization) Compile MFC targets with some case parameters hard-coded (requires --input). | `false` |
 | `--mpi`, `--no-mpi` | Enable/disable MPI | `true` |
-| `--gpu [acc\|mp]`, `--no-gpu` | Enable GPU (OpenACC/OpenMP) | `no` |
+| `--gpu [acc/mp]`, `--no-gpu` | Enable GPU (OpenACC/OpenMP) | `no` |
 | `--debug`, `--no-debug` | Enable debug mode | `false` |
 
 **Examples:**
@@ -90,35 +90,35 @@ Run an MFC simulation case interactively or submit as a batch job.
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `-t`, `--targets` | Space separated list of targets to act upon. | pre_process, simulation, post_process |
+| `-t`, `--targets` | Space separated list of targets to act upon. | `pre_process, simulation, post_process` |
 | `-j`, `--jobs` | Allows for JOBS concurrent jobs. | `1` |
 | `-v`, `--verbose` | Increase verbosity level. Use -v, -vv, or -vvv for more detail. | `0` |
 | `-d`, `--debug-log` | Enable debug logging for troubleshooting. | - |
 | `-g`, `--gpus` | (Optional GPU override) List of GPU #s to use (environment default if unspecified). | - |
 | `-e`, `--engine` | Job execution/submission engine choice. | `interactive` |
-| `-p`, `--partition` | (Batch) Partition for job submission. | `` |
-| `-q`, `--quality_of_service` | (Batch) Quality of Service for job submission. | `` |
+| `-p`, `--partition` | (Batch) Partition for job submission. | - |
+| `-q`, `--quality_of_service` | (Batch) Quality of Service for job submission. | - |
 | `-N`, `--nodes` | (Batch) Number of nodes. | `1` |
 | `-n`, `--tasks-per-node` | Number of tasks per node. | `1` |
 | `-w`, `--walltime` | (Batch) Walltime. | `01:00:00` |
-| `-a`, `--account` | (Batch) Account to charge. | `` |
-| `-@`, `--email` | (Batch) Email for job notification. | `` |
+| `-a`, `--account` | (Batch) Account to charge. | - |
+| `-@`, `--email` | (Batch) Email for job notification. | - |
 | `-#`, `--name` | (Batch) Job name. | `MFC` |
-| `-s`, `--scratch` | Build from scratch. | false |
+| `-s`, `--scratch` | Build from scratch. | `false` |
 | `-b`, `--binary` | (Interactive) Override MPI execution binary | - |
-| `--dry-run` | (Batch) Run without submitting batch file. | false |
-| `--case-optimization` | (GPU Optimization) Compile MFC targets with some case parameters hard-coded. | false |
-| `--no-build` | (Testing) Do not rebuild MFC. | false |
-| `--wait` | (Batch) Wait for the job to finish. | false |
+| `--dry-run` | (Batch) Run without submitting batch file. | `false` |
+| `--case-optimization` | (GPU Optimization) Compile MFC targets with some case parameters hard-coded. | `false` |
+| `--no-build` | (Testing) Do not rebuild MFC. | `false` |
+| `--wait` | (Batch) Wait for the job to finish. | `false` |
 | `-c`, `--computer` | (Batch) Path to a custom submission file template or one of the built-in templates. | `default` |
 | `-o`, `--output-summary` | Output file (YAML) for summary. | - |
-| `--clean` | Clean the case before running. | false |
+| `--clean` | Clean the case before running. | `false` |
 | `--ncu` | Profile with NVIDIA Nsight Compute. | - |
 | `--nsys` | Profile with NVIDIA Nsight Systems. | - |
 | `--rcu` | Profile with ROCM rocprof-compute. | - |
 | `--rsys` | Profile with ROCM rocprof-systems. | - |
 | `--mpi`, `--no-mpi` | Enable/disable MPI | `true` |
-| `--gpu [acc\|mp]`, `--no-gpu` | Enable GPU (OpenACC/OpenMP) | `no` |
+| `--gpu [acc/mp]`, `--no-gpu` | Enable GPU (OpenACC/OpenMP) | `no` |
 | `--debug`, `--no-debug` | Enable debug mode | `false` |
 
 **Examples:**
@@ -157,20 +157,20 @@ Run MFC's test suite with various filtering and generation options.
 | `-l`, `--list` | List all available tests. | - |
 | `-f`, `--from` | First test UUID to run. | - |
 | `-t`, `--to` | Last test UUID to run. | - |
-| `-o`, `--only` | Only run tests with specified properties. | [] |
-| `-a`, `--test-all` | Run the Post Process Tests too. | false |
+| `-o`, `--only` | Only run tests with specified properties. | `[]` |
+| `-a`, `--test-all` | Run the Post Process Tests too. | `false` |
 | `-%`, `--percent` | Percentage of tests to run. | `100` |
 | `-m`, `--max-attempts` | Maximum number of attempts to run a test. | `1` |
-| `--rdma-mpi` | Run tests with RDMA MPI enabled | false |
-| `--no-build` | (Testing) Do not rebuild MFC. | false |
-| `--no-examples` | Do not test example cases. | false |
-| `--case-optimization` | (GPU Optimization) Compile MFC targets with some case parameters hard-coded. | false |
-| `--dry-run` | Build and generate case files but do not run tests. | false |
-| `--generate` | (Test Generation) Generate golden files. | false |
-| `--add-new-variables` | (Test Generation) If new variables are found in D/ when running tests, add them to the golden files. | false |
-| `--remove-old-tests` | (Test Generation) Delete tests directories that are no longer. | false |
+| `--rdma-mpi` | Run tests with RDMA MPI enabled | `false` |
+| `--no-build` | (Testing) Do not rebuild MFC. | `false` |
+| `--no-examples` | Do not test example cases. | `false` |
+| `--case-optimization` | (GPU Optimization) Compile MFC targets with some case parameters hard-coded. | `false` |
+| `--dry-run` | Build and generate case files but do not run tests. | `false` |
+| `--generate` | (Test Generation) Generate golden files. | `false` |
+| `--add-new-variables` | (Test Generation) If new variables are found in D/ when running tests, add them to the golden files. | `false` |
+| `--remove-old-tests` | (Test Generation) Delete tests directories that are no longer. | `false` |
 | `--mpi`, `--no-mpi` | Enable/disable MPI | `true` |
-| `--gpu [acc\|mp]`, `--no-gpu` | Enable GPU (OpenACC/OpenMP) | `no` |
+| `--gpu [acc/mp]`, `--no-gpu` | Enable GPU (OpenACC/OpenMP) | `no` |
 | `--debug`, `--no-debug` | Enable debug mode | `false` |
 
 **Examples:**
@@ -202,12 +202,12 @@ Remove build artifacts and cache files.
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `-t`, `--targets` | Space separated list of targets to act upon. | pre_process, simulation, post_process |
+| `-t`, `--targets` | Space separated list of targets to act upon. | `pre_process, simulation, post_process` |
 | `-j`, `--jobs` | Allows for JOBS concurrent jobs. | `1` |
 | `-v`, `--verbose` | Increase verbosity level. Use -v, -vv, or -vvv for more detail. | `0` |
 | `-d`, `--debug-log` | Enable debug logging for troubleshooting. | - |
 | `--mpi`, `--no-mpi` | Enable/disable MPI | `true` |
-| `--gpu [acc\|mp]`, `--no-gpu` | Enable GPU (OpenACC/OpenMP) | `no` |
+| `--gpu [acc/mp]`, `--no-gpu` | Enable GPU (OpenACC/OpenMP) | `no` |
 | `--debug`, `--no-debug` | Enable debug mode | `false` |
 
 **Examples:**
@@ -302,10 +302,10 @@ Search, list, and get information about MFC's ~3,300 case parameters.
 | Option | Description | Default |
 |--------|-------------|---------|
 | `-t`, `--type` | Filter by type: int, real, log, str. | - |
-| `-f`, `--families` | List parameter families (grouped by prefix). | false |
-| `-c`, `--count` | Show count statistics only. | false |
+| `-f`, `--families` | List parameter families (grouped by prefix). | `false` |
+| `-c`, `--count` | Show count statistics only. | `false` |
 | `-n`, `--limit` | Maximum number of results to show. | `25` |
-| `-d`, `--describe` | Show parameter descriptions. | false |
+| `-d`, `--describe` | Show parameter descriptions. | `false` |
 
 **Examples:**
 
@@ -430,8 +430,8 @@ Regenerate shell completion scripts, documentation, and JSON schema from the CLI
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--check` | Check if generated files are up to date (exit 1 if not). | false |
-| `--json-schema` | Generate JSON Schema for IDE auto-completion of case files. | false |
+| `--check` | Check if generated files are up to date (exit 1 if not). | `false` |
+| `--json-schema` | Generate JSON Schema for IDE auto-completion of case files. | `false` |
 
 **Examples:**
 
@@ -512,12 +512,12 @@ Count LOC in MFC.
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `-t`, `--targets` | Space separated list of targets to act upon. | pre_process, simulation, post_process |
+| `-t`, `--targets` | Space separated list of targets to act upon. | `pre_process, simulation, post_process` |
 | `-j`, `--jobs` | Allows for JOBS concurrent jobs. | `1` |
 | `-v`, `--verbose` | Increase verbosity level. Use -v, -vv, or -vvv for more detail. | `0` |
 | `-d`, `--debug-log` | Enable debug logging for troubleshooting. | - |
 | `--mpi`, `--no-mpi` | Enable/disable MPI | `true` |
-| `--gpu [acc\|mp]`, `--no-gpu` | Enable GPU (OpenACC/OpenMP) | `no` |
+| `--gpu [acc/mp]`, `--no-gpu` | Enable GPU (OpenACC/OpenMP) | `no` |
 | `--debug`, `--no-debug` | Enable debug mode | `false` |
 
 **Examples:**
@@ -540,12 +540,12 @@ Count LOC in MFC.
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `-t`, `--targets` | Space separated list of targets to act upon. | pre_process, simulation, post_process |
+| `-t`, `--targets` | Space separated list of targets to act upon. | `pre_process, simulation, post_process` |
 | `-j`, `--jobs` | Allows for JOBS concurrent jobs. | `1` |
 | `-v`, `--verbose` | Increase verbosity level. Use -v, -vv, or -vvv for more detail. | `0` |
 | `-d`, `--debug-log` | Enable debug logging for troubleshooting. | - |
 | `--mpi`, `--no-mpi` | Enable/disable MPI | `true` |
-| `--gpu [acc\|mp]`, `--no-gpu` | Enable GPU (OpenACC/OpenMP) | `no` |
+| `--gpu [acc/mp]`, `--no-gpu` | Enable GPU (OpenACC/OpenMP) | `no` |
 | `--debug`, `--no-debug` | Enable debug mode | `false` |
 
 ---
@@ -562,7 +562,7 @@ Benchmark MFC (for CI).
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `-t`, `--targets` | Space separated list of targets to act upon. | pre_process, simulation, post_process |
+| `-t`, `--targets` | Space separated list of targets to act upon. | `pre_process, simulation, post_process` |
 | `-j`, `--jobs` | Allows for JOBS concurrent jobs. | `1` |
 | `-v`, `--verbose` | Increase verbosity level. Use -v, -vv, or -vvv for more detail. | `0` |
 | `-d`, `--debug-log` | Enable debug logging for troubleshooting. | - |
@@ -570,7 +570,7 @@ Benchmark MFC (for CI).
 | `-o`, `--output` | Path to the YAML output file to write the results to. | - |
 | `-m`, `--mem` | Memory per task for benchmarking cases | `1` |
 | `--mpi`, `--no-mpi` | Enable/disable MPI | `true` |
-| `--gpu [acc\|mp]`, `--no-gpu` | Enable GPU (OpenACC/OpenMP) | `no` |
+| `--gpu [acc/mp]`, `--no-gpu` | Enable GPU (OpenACC/OpenMP) | `no` |
 | `--debug`, `--no-debug` | Enable debug mode | `false` |
 
 **Examples:**
@@ -602,7 +602,7 @@ Compare MFC Benchmarks (for CI).
 | `-v`, `--verbose` | Increase verbosity level. Use -v, -vv, or -vvv for more detail. | `0` |
 | `-d`, `--debug-log` | Enable debug logging for troubleshooting. | - |
 | `--mpi`, `--no-mpi` | Enable/disable MPI | `true` |
-| `--gpu [acc\|mp]`, `--no-gpu` | Enable GPU (OpenACC/OpenMP) | `no` |
+| `--gpu [acc/mp]`, `--no-gpu` | Enable GPU (OpenACC/OpenMP) | `no` |
 | `--debug`, `--no-debug` | Enable debug mode | `false` |
 
 ---
@@ -654,7 +654,7 @@ Available targets:
 | Flag | Description |
 |------|-------------|
 | `--mpi` / `--no-mpi` | Enable/disable MPI support |
-| `--gpu [acc\|mp]` / `--no-gpu` | Enable GPU with OpenACC or OpenMP |
+| `--gpu [acc/mp]` / `--no-gpu` | Enable GPU with OpenACC or OpenMP |
 | `--debug` / `--no-debug` | Enable debug build |
 | `--gcov` / `--no-gcov` | Enable code coverage |
 | `--single` / `--no-single` | Single precision |
