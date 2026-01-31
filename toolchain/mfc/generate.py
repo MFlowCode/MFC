@@ -6,6 +6,7 @@ in cli/commands.py. Run `./mfc.sh generate` after modifying commands.
 """
 # pylint: disable=import-outside-toplevel
 
+import json
 from pathlib import Path
 
 from .printer import cons
@@ -35,6 +36,9 @@ def _check_or_write(path: Path, content: str, check_mode: bool) -> bool:
 
 def generate():
     """Regenerate completion scripts and optionally JSON schema."""
+    from .params.generators.json_schema_gen import generate_json_schema
+    from .params.generators.docs_gen import generate_parameter_docs
+
     check_mode = ARG("check")
     json_schema_mode = ARG("json_schema")
 
@@ -47,28 +51,41 @@ def generate():
     docs_dir = Path(MFC_ROOT_DIR) / "docs" / "documentation"
     docs_dir.mkdir(exist_ok=True)
 
-    # Generate and check/write all files
-    files = [
+    # Generate CLI files
+    cli_files = [
         (completions_dir / "mfc.bash", generate_bash_completion(MFC_CLI_SCHEMA)),
         (completions_dir / "_mfc", generate_zsh_completion(MFC_CLI_SCHEMA)),
         (docs_dir / "cli-reference.md", generate_cli_reference(MFC_CLI_SCHEMA)),
     ]
 
-    for path, content in files:
+    # Generate parameter files
+    schema = generate_json_schema(include_descriptions=True)
+    schema_content = json.dumps(schema, indent=2)
+    params_content = generate_parameter_docs()
+
+    param_files = [
+        (Path(MFC_ROOT_DIR) / "toolchain" / "mfc-case-schema.json", schema_content),
+        (docs_dir / "parameters.md", params_content),
+    ]
+
+    all_ok = True
+    for path, content in cli_files + param_files:
         if not _check_or_write(path, content, check_mode):
-            exit(1)
+            all_ok = False
+
+    if not all_ok:
+        exit(1)
 
     if not check_mode:
         cons.print()
-        cons.print("[bold]Files regenerated from cli/commands.py[/bold]")
+        cons.print("[bold]Files regenerated from cli/commands.py and params/definitions.py[/bold]")
         cons.print("[dim]Commit these files to keep them in sync[/dim]")
 
 
 def _generate_json_schema():
-    """Generate JSON Schema and parameter documentation."""
-    import json
+    """Generate JSON Schema and parameter documentation (standalone mode)."""
     from .params.generators.json_schema_gen import generate_json_schema, get_schema_stats
-    from .params.generators.docs_gen import write_parameter_docs
+    from .params.generators.docs_gen import generate_parameter_docs
     from .ide import update_vscode_settings
 
     # Generate JSON Schema
@@ -79,7 +96,7 @@ def _generate_json_schema():
 
     # Generate parameter documentation
     docs_path = Path(MFC_ROOT_DIR) / "docs" / "documentation" / "parameters.md"
-    write_parameter_docs(str(docs_path))
+    docs_path.write_text(generate_parameter_docs())
 
     # Update VS Code settings
     update_vscode_settings()
