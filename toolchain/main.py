@@ -102,7 +102,7 @@ if __name__ == "__main__":
         state.gARG = args.parse(state.gCFG)
 
         # Setup debug logging if requested
-        setup_debug_logging(ARG("debug_log"))
+        setup_debug_logging(ARG("debug_log", dflt=None))
 
         lock.switch(state.MFCConfig.from_dict(state.gARG))
 

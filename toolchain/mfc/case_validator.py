@@ -1441,7 +1441,7 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
             length_y = self.get(f'patch_icpp({i})%length_y')
             length_z = self.get(f'patch_icpp({i})%length_z')
             radius = self.get(f'patch_icpp({i})%radius')
-            cyl_coord = self.get('cyl_coord')
+            cyl_coord = self.get('cyl_coord', 'F') == 'T'
 
             if length_x is not None and self._is_numeric(length_x):
                 self.prohibit(length_x <= 0,
