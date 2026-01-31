@@ -8,7 +8,7 @@
 
 ## Overview
 
-Welcome to the MFC master script. This tool automates and manages building, testing, running, and cleaning of MFC in various configurations on all supported platforms. The README documents this tool and its various commands in more detail. To get started, run ./mfc.sh build -h.
+Welcome to the MFC master script. This tool automates and manages building, testing, running, and cleaning of MFC in various configurations on all supported platforms. The README documents this tool and its various commands in more detail. To get started, run `./mfc.sh build -h`.
 
 ## Quick Reference
 
@@ -33,7 +33,7 @@ Welcome to the MFC master script. This tool automates and manages building, test
 | [<code>bench</code>](#bench) | - | Benchmark MFC (for CI). |
 | [<code>bench_diff</code>](#bench_diff) | - | Compare MFC Benchmarks (for CI). |
 | [<code>count</code>](#count) | - | Count LOC in MFC. |
-| [<code>count_diff</code>](#count_diff) | - | Count LOC in MFC. |
+| [<code>count_diff</code>](#count_diff) | - | Compare LOC between branches. |
 
 ## Commands
 
@@ -532,7 +532,7 @@ Count LOC in MFC.
 
 ### count_diff
 
-Count LOC in MFC.
+Compare LOC between branches.
 
 **Usage:** `./mfc.sh count_diff [OPTIONS]`
 

@@ -32,7 +32,7 @@ _mfc() {
         "bench:Benchmark MFC (for CI)."
         "bench_diff:Compare MFC Benchmarks (for CI)."
         "count:Count LOC in MFC."
-        "count_diff:Count LOC in MFC."
+        "count_diff:Compare LOC between branches."
     )
 
     _arguments -C \

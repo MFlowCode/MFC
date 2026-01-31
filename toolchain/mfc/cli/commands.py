@@ -825,7 +825,7 @@ COUNT_COMMAND = Command(
 
 COUNT_DIFF_COMMAND = Command(
     name="count_diff",
-    help="Count LOC in MFC.",
+    help="Compare LOC between branches.",
     include_common=["targets", "mfc_config", "jobs", "verbose", "debug_log"],
 )
 
@@ -930,7 +930,7 @@ MFC_CLI_SCHEMA = CLISchema(
 Welcome to the MFC master script. This tool automates and manages building, testing, \
 running, and cleaning of MFC in various configurations on all supported platforms. \
 The README documents this tool and its various commands in more detail. To get \
-started, run ./mfc.sh build -h.""",
+started, run `./mfc.sh build -h`.""",
 
     arguments=[
         Argument(
