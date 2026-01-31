@@ -262,7 +262,7 @@ def generate_cli_reference(schema: CLISchema) -> str:
         "| Flag | Description |",
         "|------|-------------|",
         "| `--mpi` / `--no-mpi` | Enable/disable MPI support |",
-        "| `--gpu [acc|mp]` / `--no-gpu` | Enable GPU with OpenACC or OpenMP |",
+        "| `--gpu [acc\\|mp]` / `--no-gpu` | Enable GPU with OpenACC or OpenMP |",
         "| `--debug` / `--no-debug` | Enable debug build |",
         "| `--gcov` / `--no-gcov` | Enable code coverage |",
         "| `--single` / `--no-single` | Single precision |",
