@@ -196,6 +196,8 @@ def _generate_commands_by_category(
 def generate_cli_reference(schema: CLISchema) -> str:
     """Generate complete CLI reference documentation in markdown."""
     lines = [
+        "@page cli-reference MFC Command Line Reference",
+        "",
         "# MFC Command Line Reference",
         "",
         "> **Auto-generated** from `toolchain/mfc/cli/commands.py`",
