@@ -141,7 +141,7 @@ def _load():  # pylint: disable=too-many-locals,too-many-branches,too-many-state
         _r(n, REAL, {P})
     for n in ["old_grid", "old_ic", "mixlayer_vel_profile", "mixlayer_perturb",
               "perturb_flow", "perturb_sph", "stretch_x", "stretch_y", "stretch_z",
-              "cfl_dt", "pre_stress", "elliptic_smoothing", "simplex_perturb", "qbmm"]:
+              "cfl_dt", "pre_stress", "elliptic_smoothing", "simplex_perturb"]:
         _r(n, LOG, {P})
     for d in ["x", "y", "z"]:
         _r(f"{d}_a", REAL, {P}); _r(f"{d}_b", REAL, {P})
@@ -163,7 +163,7 @@ def _load():  # pylint: disable=too-many-locals,too-many-branches,too-many-state
     # PRE + SIM + POST
     for n in ["n_start", "num_ibs"]:
         _r(n, INT, {P, S, O})
-    for n in ["ib", "surface_tension", "bubbles_lagrange", "fft_wrt"]:
+    for n in ["qbmm", "ib", "surface_tension", "bubbles_lagrange", "fft_wrt"]:
         _r(n, LOG, {P, S, O})
 
     # === SIMULATION ===
@@ -255,7 +255,8 @@ def _load():  # pylint: disable=too-many-locals,too-many-branches,too-many-state
     # fluid_pp (PRE + SIM + POST)
     for f in range(1, NF + 1):
         px = f"fluid_pp({f})%"
-        for a in ["gamma", "pi_inf", "G", "cv", "qv", "qvp"]:
+        for a in ["gamma", "pi_inf", "mul0", "ss", "pv", "gamma_v", "M_v",
+                  "mu_v", "k_v", "cp_v", "G", "cv", "qv", "qvp", "D_v"]:
             _r(f"{px}{a}", REAL, {P, S, O})
         for j in [1, 2]:
             _r(f"{px}Re({j})", REAL, {S})
