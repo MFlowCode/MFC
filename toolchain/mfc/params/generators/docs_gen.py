@@ -133,8 +133,8 @@ def generate_parameter_docs() -> str:  # pylint: disable=too-many-locals,too-man
 
     for family, params in sorted_families:
         desc = family_descriptions.get(family, "")
-        anchor = family.replace("_", "-")
-        lines.append(f"| [{family}](#{anchor}) | {len(params)} | {desc} |")
+        # Use family name directly as anchor (GitHub keeps underscores in heading anchors)
+        lines.append(f"| [{family}](#{family}) | {len(params)} | {desc} |")
 
     lines.append("")
     lines.append("---")

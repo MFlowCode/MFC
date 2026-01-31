@@ -16,36 +16,36 @@ MFC supports **3,400** case parameters organized into families.
 
 | Family | Count | Description |
 |--------|-------|-------------|
-| [patch_icpp](#patch-icpp) | 1954 | Initial condition patch parameters |
-| [patch_ib](#patch-ib) | 370 | Immersed boundary patch parameters |
-| [fluid_pp](#fluid-pp) | 170 | Fluid material properties |
-| [patch_bc](#patch-bc) | 110 | Boundary condition patch parameters |
+| [patch_icpp](#patch_icpp) | 1954 | Initial condition patch parameters |
+| [patch_ib](#patch_ib) | 370 | Immersed boundary patch parameters |
+| [fluid_pp](#fluid_pp) | 170 | Fluid material properties |
+| [patch_bc](#patch_bc) | 110 | Boundary condition patch parameters |
 | [acoustic](#acoustic) | 104 | Acoustic source parameters |
-| [simplex_params](#simplex-params) | 78 | Simplex noise perturbation parameters |
-| [bc_x](#bc-x) | 39 | X-direction boundary conditions |
-| [bc_y](#bc-y) | 39 | Y-direction boundary conditions |
-| [bc_z](#bc-z) | 39 | Z-direction boundary conditions |
+| [simplex_params](#simplex_params) | 78 | Simplex noise perturbation parameters |
+| [bc_x](#bc_x) | 39 | X-direction boundary conditions |
+| [bc_y](#bc_y) | 39 | Y-direction boundary conditions |
+| [bc_z](#bc_z) | 39 | Z-direction boundary conditions |
 | [integral](#integral) | 30 | Integral region parameters |
 | [probe](#probe) | 30 | Probe/monitoring point parameters |
-| [bub_pp](#bub-pp) | 20 | Bubble property parameters |
-| [lag_params](#lag-params) | 17 | Lagrangian particle parameters |
-| [alpha_rho_e_wrt](#alpha-rho-e-wrt) | 10 | Partial density-energy output flags |
-| [alpha_rho_wrt](#alpha-rho-wrt) | 10 | Partial density output flags |
-| [alpha_wrt](#alpha-wrt) | 10 | Volume fraction output flags |
-| [fluid_rho](#fluid-rho) | 10 | Fluid reference densities |
-| [kappa_wrt](#kappa-wrt) | 10 | Curvature output flags |
-| [schlieren_alpha](#schlieren-alpha) | 10 | Numerical schlieren coefficients |
-| [chem_params](#chem-params) | 4 | Chemistry model parameters |
-| [flux_wrt](#flux-wrt) | 3 | Flux output flags |
-| [mom_wrt](#mom-wrt) | 3 | Momentum output flags |
-| [omega_wrt](#omega-wrt) | 3 | Vorticity output flags |
-| [vel_wrt](#vel-wrt) | 3 | Velocity output flags |
-| [x_domain](#x-domain) | 2 | X-direction domain parameters |
-| [x_output](#x-output) | 2 | X-direction output region |
-| [y_domain](#y-domain) | 2 | Y-direction domain parameters |
-| [y_output](#y-output) | 2 | Y-direction output region |
-| [z_domain](#z-domain) | 2 | Z-direction domain parameters |
-| [z_output](#z-output) | 2 | Z-direction output region |
+| [bub_pp](#bub_pp) | 20 | Bubble property parameters |
+| [lag_params](#lag_params) | 17 | Lagrangian particle parameters |
+| [alpha_rho_e_wrt](#alpha_rho_e_wrt) | 10 | Partial density-energy output flags |
+| [alpha_rho_wrt](#alpha_rho_wrt) | 10 | Partial density output flags |
+| [alpha_wrt](#alpha_wrt) | 10 | Volume fraction output flags |
+| [fluid_rho](#fluid_rho) | 10 | Fluid reference densities |
+| [kappa_wrt](#kappa_wrt) | 10 | Curvature output flags |
+| [schlieren_alpha](#schlieren_alpha) | 10 | Numerical schlieren coefficients |
+| [chem_params](#chem_params) | 4 | Chemistry model parameters |
+| [flux_wrt](#flux_wrt) | 3 | Flux output flags |
+| [mom_wrt](#mom_wrt) | 3 | Momentum output flags |
+| [omega_wrt](#omega_wrt) | 3 | Vorticity output flags |
+| [vel_wrt](#vel_wrt) | 3 | Velocity output flags |
+| [x_domain](#x_domain) | 2 | X-direction domain parameters |
+| [x_output](#x_output) | 2 | X-direction output region |
+| [y_domain](#y_domain) | 2 | Y-direction domain parameters |
+| [y_output](#y_output) | 2 | Y-direction output region |
+| [z_domain](#z_domain) | 2 | Z-direction domain parameters |
+| [z_output](#z_output) | 2 | Z-direction output region |
 | [general](#general) | 312 | Core simulation parameters (grid, time, model, etc.) |
 
 ---

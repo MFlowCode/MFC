@@ -127,10 +127,14 @@ def _generate_command_section(cmd: Command, schema: CLISchema) -> List[str]:
     """Generate markdown section for a single command."""
     lines = []
 
-    # Command header
-    alias_str = f" (alias: `{cmd.aliases[0]}`)" if cmd.aliases else ""
-    lines.append(f"### {cmd.name}{alias_str}")
+    # Command header (no alias in heading to keep anchor simple)
+    lines.append(f"### {cmd.name}")
     lines.append("")
+
+    # Alias note if present
+    if cmd.aliases:
+        lines.append(f"**Alias:** `{cmd.aliases[0]}`")
+        lines.append("")
 
     # Description
     description = cmd.description or cmd.help

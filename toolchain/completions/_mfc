@@ -47,8 +47,8 @@ _mfc() {
             case $words[1] in
                 build)
                     _arguments \
-                        '-t[Space separated list of targets to act upon.]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
-                        '--targets[Space separated list of targets to act upon.]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
+                        '-t[Space-separated list of targets to act upon.]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
+                        '--targets[Space-separated list of targets to act upon.]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
                         '--mpi[Enable MPI]' \
                         '--no-mpi[Disable MPI]' \
                         '--gpu[Enable GPU]:mode:(acc mp)' \
@@ -67,8 +67,8 @@ _mfc() {
                     ;;
                 b)
                     _arguments \
-                        '-t[Space separated list of targets to act upon.]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
-                        '--targets[Space separated list of targets to act upon.]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
+                        '-t[Space-separated list of targets to act upon.]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
+                        '--targets[Space-separated list of targets to act upon.]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
                         '--mpi[Enable MPI]' \
                         '--no-mpi[Disable MPI]' \
                         '--gpu[Enable GPU]:mode:(acc mp)' \
@@ -88,8 +88,8 @@ _mfc() {
                 run)
                     _arguments \
                         '1:Input file to run.:_files -g "*.py"' \
-                        '-t[Space separated list of targets to act upon.]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
-                        '--targets[Space separated list of targets to act upon.]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
+                        '-t[Space-separated list of targets to act upon.]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
+                        '--targets[Space-separated list of targets to act upon.]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
                         '--mpi[Enable MPI]' \
                         '--no-mpi[Disable MPI]' \
                         '--gpu[Enable GPU]:mode:(acc mp)' \
@@ -143,8 +143,8 @@ _mfc() {
                 r)
                     _arguments \
                         '1:Input file to run.:_files -g "*.py"' \
-                        '-t[Space separated list of targets to act upon.]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
-                        '--targets[Space separated list of targets to act upon.]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
+                        '-t[Space-separated list of targets to act upon.]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
+                        '--targets[Space-separated list of targets to act upon.]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
                         '--mpi[Enable MPI]' \
                         '--no-mpi[Disable MPI]' \
                         '--gpu[Enable GPU]:mode:(acc mp)' \
@@ -275,8 +275,8 @@ _mfc() {
                     ;;
                 clean)
                     _arguments \
-                        '-t[Space separated list of targets to act upon.]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
-                        '--targets[Space separated list of targets to act upon.]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
+                        '-t[Space-separated list of targets to act upon.]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
+                        '--targets[Space-separated list of targets to act upon.]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
                         '--mpi[Enable MPI]' \
                         '--no-mpi[Disable MPI]' \
                         '--gpu[Enable GPU]:mode:(acc mp)' \
@@ -292,8 +292,8 @@ _mfc() {
                     ;;
                 c)
                     _arguments \
-                        '-t[Space separated list of targets to act upon.]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
-                        '--targets[Space separated list of targets to act upon.]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
+                        '-t[Space-separated list of targets to act upon.]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
+                        '--targets[Space-separated list of targets to act upon.]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
                         '--mpi[Enable MPI]' \
                         '--no-mpi[Disable MPI]' \
                         '--gpu[Enable GPU]:mode:(acc mp)' \
@@ -369,8 +369,8 @@ _mfc() {
                     ;;
                 bench)
                     _arguments \
-                        '-t[Space separated list of targets to act upon.]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
-                        '--targets[Space separated list of targets to act upon.]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
+                        '-t[Space-separated list of targets to act upon.]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
+                        '--targets[Space-separated list of targets to act upon.]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
                         '--mpi[Enable MPI]' \
                         '--no-mpi[Disable MPI]' \
                         '--gpu[Enable GPU]:mode:(acc mp)' \
@@ -409,8 +409,8 @@ _mfc() {
                     ;;
                 count)
                     _arguments \
-                        '-t[Space separated list of targets to act upon.]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
-                        '--targets[Space separated list of targets to act upon.]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
+                        '-t[Space-separated list of targets to act upon.]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
+                        '--targets[Space-separated list of targets to act upon.]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
                         '--mpi[Enable MPI]' \
                         '--no-mpi[Disable MPI]' \
                         '--gpu[Enable GPU]:mode:(acc mp)' \
@@ -426,8 +426,8 @@ _mfc() {
                     ;;
                 count_diff)
                     _arguments \
-                        '-t[Space separated list of targets to act upon.]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
-                        '--targets[Space separated list of targets to act upon.]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
+                        '-t[Space-separated list of targets to act upon.]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
+                        '--targets[Space-separated list of targets to act upon.]:(fftw hdf5 silo lapack hipfort pre_process simulation post_process syscheck documentation)' \
                         '--mpi[Enable MPI]' \
                         '--no-mpi[Disable MPI]' \
                         '--gpu[Enable GPU]:mode:(acc mp)' \

@@ -54,7 +54,7 @@ COMMON_TARGETS = CommonArgumentSet(
         Argument(
             name="targets",
             short="t",
-            help="Space separated list of targets to act upon.",
+            help="Space-separated list of targets to act upon.",
             nargs="+",
             type=str,
             default=DEFAULT_TARGET_NAMES,

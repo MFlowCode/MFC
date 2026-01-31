@@ -37,7 +37,9 @@ Welcome to the MFC master script. This tool automates and manages building, test
 
 ## Commands
 
-### build (alias: `b`)
+### build
+
+**Alias:** `b`
 
 Build MFC targets with optional GPU support and case optimization.
 
@@ -47,7 +49,7 @@ Build MFC targets with optional GPU support and case optimization.
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `-t`, `--targets` | Space separated list of targets to act upon. | `pre_process, simulation, post_process` |
+| `-t`, `--targets` | Space-separated list of targets to act upon. | `pre_process, simulation, post_process` |
 | `-j`, `--jobs` | Allows for JOBS concurrent jobs. | `1` |
 | `-v`, `--verbose` | Increase verbosity level. Use -v, -vv, or -vvv for more detail. | `0` |
 | `-d`, `--debug-log` | Enable debug logging for troubleshooting. | - |
@@ -76,7 +78,9 @@ Build MFC targets with optional GPU support and case optimization.
 
 ---
 
-### run (alias: `r`)
+### run
+
+**Alias:** `r`
 
 Run an MFC simulation case interactively or submit as a batch job.
 
@@ -90,7 +94,7 @@ Run an MFC simulation case interactively or submit as a batch job.
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `-t`, `--targets` | Space separated list of targets to act upon. | `pre_process, simulation, post_process` |
+| `-t`, `--targets` | Space-separated list of targets to act upon. | `pre_process, simulation, post_process` |
 | `-j`, `--jobs` | Allows for JOBS concurrent jobs. | `1` |
 | `-v`, `--verbose` | Increase verbosity level. Use -v, -vv, or -vvv for more detail. | `0` |
 | `-d`, `--debug-log` | Enable debug logging for troubleshooting. | - |
@@ -140,7 +144,9 @@ Run an MFC simulation case interactively or submit as a batch job.
 
 ---
 
-### test (alias: `t`)
+### test
+
+**Alias:** `t`
 
 Run MFC's test suite with various filtering and generation options.
 
@@ -192,7 +198,9 @@ Run MFC's test suite with various filtering and generation options.
 
 ---
 
-### clean (alias: `c`)
+### clean
+
+**Alias:** `c`
 
 Remove build artifacts and cache files.
 
@@ -202,7 +210,7 @@ Remove build artifacts and cache files.
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `-t`, `--targets` | Space separated list of targets to act upon. | `pre_process, simulation, post_process` |
+| `-t`, `--targets` | Space-separated list of targets to act upon. | `pre_process, simulation, post_process` |
 | `-j`, `--jobs` | Allows for JOBS concurrent jobs. | `1` |
 | `-v`, `--verbose` | Increase verbosity level. Use -v, -vv, or -vvv for more detail. | `0` |
 | `-d`, `--debug-log` | Enable debug logging for troubleshooting. | - |
@@ -220,7 +228,9 @@ Remove build artifacts and cache files.
 
 ---
 
-### validate (alias: `v`)
+### validate
+
+**Alias:** `v`
 
 Check a case file for syntax errors and constraint violations.
 
@@ -512,7 +522,7 @@ Count LOC in MFC.
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `-t`, `--targets` | Space separated list of targets to act upon. | `pre_process, simulation, post_process` |
+| `-t`, `--targets` | Space-separated list of targets to act upon. | `pre_process, simulation, post_process` |
 | `-j`, `--jobs` | Allows for JOBS concurrent jobs. | `1` |
 | `-v`, `--verbose` | Increase verbosity level. Use -v, -vv, or -vvv for more detail. | `0` |
 | `-d`, `--debug-log` | Enable debug logging for troubleshooting. | - |
@@ -540,7 +550,7 @@ Compare LOC between branches.
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `-t`, `--targets` | Space separated list of targets to act upon. | `pre_process, simulation, post_process` |
+| `-t`, `--targets` | Space-separated list of targets to act upon. | `pre_process, simulation, post_process` |
 | `-j`, `--jobs` | Allows for JOBS concurrent jobs. | `1` |
 | `-v`, `--verbose` | Increase verbosity level. Use -v, -vv, or -vvv for more detail. | `0` |
 | `-d`, `--debug-log` | Enable debug logging for troubleshooting. | - |
@@ -562,7 +572,7 @@ Benchmark MFC (for CI).
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `-t`, `--targets` | Space separated list of targets to act upon. | `pre_process, simulation, post_process` |
+| `-t`, `--targets` | Space-separated list of targets to act upon. | `pre_process, simulation, post_process` |
 | `-j`, `--jobs` | Allows for JOBS concurrent jobs. | `1` |
 | `-v`, `--verbose` | Increase verbosity level. Use -v, -vv, or -vvv for more detail. | `0` |
 | `-d`, `--debug-log` | Enable debug logging for troubleshooting. | - |

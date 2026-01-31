@@ -470,7 +470,7 @@ def _infer_from_naming(param_name: str) -> str:  # pylint: disable=too-many-retu
             return f"Write {field} output" + (f" ({context})" if context else "")
 
         if "offset" in suffix:
-            return f"Offset parameter" + (f" for {context}" if context else "")
+            return "Offset parameter" + (f" for {context}" if context else "")
 
         if context:
             # Clean up suffix for display

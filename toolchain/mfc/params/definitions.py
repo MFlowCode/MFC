@@ -111,9 +111,9 @@ def _r(name, ptype, stages):
 
 def _load():  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
     """Load all parameter definitions."""
-    C, P, S, O = Stage.COMMON, Stage.PRE_PROCESS, Stage.SIMULATION, Stage.POST_PROCESS
+    C, P, S, POST = Stage.COMMON, Stage.PRE_PROCESS, Stage.SIMULATION, Stage.POST_PROCESS
     INT, REAL, LOG, STR = ParamType.INT, ParamType.REAL, ParamType.LOG, ParamType.STR
-    A_INT, A_REAL = ParamType.ANALYTIC_INT, ParamType.ANALYTIC_REAL  # pylint: disable=unused-variable
+    A_REAL = ParamType.ANALYTIC_REAL
 
     # === COMMON ===
     # Truly common params (used in multiple stages via inheritance)
@@ -144,8 +144,10 @@ def _load():  # pylint: disable=too-many-locals,too-many-branches,too-many-state
               "cfl_dt", "pre_stress", "elliptic_smoothing", "simplex_perturb"]:
         _r(n, LOG, {P})
     for d in ["x", "y", "z"]:
-        _r(f"{d}_a", REAL, {P}); _r(f"{d}_b", REAL, {P})
-        _r(f"a_{d}", REAL, {P}); _r(f"loops_{d}", INT, {P})
+        _r(f"{d}_a", REAL, {P})
+        _r(f"{d}_b", REAL, {P})
+        _r(f"a_{d}", REAL, {P})
+        _r(f"loops_{d}", INT, {P})
         # Domain and BC params (PRE+SIM for both)
         _r(f"{d}_domain%beg", REAL, {P, S})
         _r(f"{d}_domain%end", REAL, {P, S})
@@ -162,9 +164,9 @@ def _load():  # pylint: disable=too-many-locals,too-many-branches,too-many-state
 
     # PRE + SIM + POST
     for n in ["n_start", "num_ibs"]:
-        _r(n, INT, {P, S, O})
+        _r(n, INT, {P, S, POST})
     for n in ["qbmm", "ib", "surface_tension", "bubbles_lagrange", "fft_wrt"]:
-        _r(n, LOG, {P, S, O})
+        _r(n, LOG, {P, S, POST})
 
     # === SIMULATION ===
     for n in ["time_stepper", "t_step_start", "t_step_stop", "t_step_save", "t_step_print",
@@ -184,7 +186,7 @@ def _load():  # pylint: disable=too-many-locals,too-many-branches,too-many-state
               "nv_uvm_pref_gpu"]:
         _r(n, LOG, {S})
     # cfl_target also POST_PROCESS
-    _r("cfl_target", REAL, {O})
+    _r("cfl_target", REAL, {POST})
 
     # Body force (SIM)
     for d in ["x", "y", "z"]:
@@ -194,27 +196,27 @@ def _load():  # pylint: disable=too-many-locals,too-many-branches,too-many-state
 
     # === POST_PROCESS ===
     for n in ["format", "flux_lim", "t_step_start", "t_step_stop", "t_step_save"]:
-        _r(n, INT, {O})
+        _r(n, INT, {POST})
     for d in ["x", "y", "z"]:
-        _r(f"bc_{d}%beg", INT, {O})
-        _r(f"bc_{d}%end", INT, {O})
+        _r(f"bc_{d}%beg", INT, {POST})
+        _r(f"bc_{d}%end", INT, {POST})
     for n in ["schlieren_alpha"]:
-        _r(n, REAL, {O})
+        _r(n, REAL, {POST})
     for n in ["schlieren_wrt", "alpha_rho_wrt", "rho_wrt", "mom_wrt", "vel_wrt",
               "flux_wrt", "E_wrt", "pres_wrt", "alpha_wrt", "kappa_wrt", "gamma_wrt",
               "heat_ratio_wrt", "pi_inf_wrt", "pres_inf_wrt", "cons_vars_wrt", "c_wrt",
               "omega_wrt", "qm_wrt", "liutex_wrt", "cf_wrt", "sim_data", "output_partial_domain"]:
-        _r(n, LOG, {O})
+        _r(n, LOG, {POST})
     for d in ["x", "y", "z"]:
-        _r(f"{d}_output%beg", REAL, {O})
-        _r(f"{d}_output%end", REAL, {O})
+        _r(f"{d}_output%beg", REAL, {POST})
+        _r(f"{d}_output%end", REAL, {POST})
     for n in ["prim_vars_wrt", "alt_soundspeed", "mixture_err", "t_stop", "t_save", "fd_order"]:
-        _r(n, LOG if "wrt" in n or n in ["alt_soundspeed", "mixture_err"] else (INT if n == "fd_order" else REAL), {O})
+        _r(n, LOG if "wrt" in n or n in ["alt_soundspeed", "mixture_err"] else (INT if n == "fd_order" else REAL), {POST})
     for v in ["lag_header", "lag_txt_wrt", "lag_db_wrt", "lag_id_wrt", "lag_pos_wrt",
               "lag_pos_prev_wrt", "lag_vel_wrt", "lag_rad_wrt", "lag_rvel_wrt",
               "lag_r0_wrt", "lag_rmax_wrt", "lag_rmin_wrt", "lag_dphidt_wrt",
               "lag_pres_wrt", "lag_mv_wrt", "lag_mg_wrt", "lag_betaT_wrt", "lag_betaC_wrt"]:
-        _r(v, LOG, {O})
+        _r(v, LOG, {POST})
 
     # === INDEXED PARAMETERS ===
 
@@ -260,7 +262,7 @@ def _load():  # pylint: disable=too-many-locals,too-many-branches,too-many-state
         px = f"fluid_pp({f})%"
         for a in ["gamma", "pi_inf", "mul0", "ss", "pv", "gamma_v", "M_v",
                   "mu_v", "k_v", "cp_v", "G", "cv", "qv", "qvp", "D_v"]:
-            _r(f"{px}{a}", REAL, {P, S, O})
+            _r(f"{px}{a}", REAL, {P, S, POST})
         for j in [1, 2]:
             _r(f"{px}Re({j})", REAL, {S})
 
@@ -268,7 +270,7 @@ def _load():  # pylint: disable=too-many-locals,too-many-branches,too-many-state
     for a in ["R0ref", "p0ref", "rho0ref", "T0ref", "ss", "pv", "vd",
               "mu_l", "mu_v", "mu_g", "gam_v", "gam_g",
               "M_v", "M_g", "k_v", "k_g", "cp_v", "cp_g", "R_v", "R_g"]:
-        _r(f"bub_pp%{a}", REAL, {P, S, O})
+        _r(f"bub_pp%{a}", REAL, {P, S, POST})
 
     # patch_ib (PRE + SIM)
     for i in range(1, NI + 1):
@@ -373,17 +375,17 @@ def _load():  # pylint: disable=too-many-locals,too-many-branches,too-many-state
 
     # Per-fluid post-process output (POST)
     for f in range(1, NF + 1):
-        _r(f"schlieren_alpha({f})", REAL, {O})
+        _r(f"schlieren_alpha({f})", REAL, {POST})
         for a in ["alpha_rho_wrt", "alpha_wrt", "kappa_wrt", "alpha_rho_e_wrt"]:
-            _r(f"{a}({f})", LOG, {O})
+            _r(f"{a}({f})", LOG, {POST})
     for j in range(1, 4):
         for a in ["mom_wrt", "vel_wrt", "flux_wrt", "omega_wrt"]:
-            _r(f"{a}({j})", LOG, {O})
+            _r(f"{a}({j})", LOG, {POST})
 
     # chem_wrt (POST)
     for j in range(1, 101):
-        _r(f"chem_wrt_Y({j})", LOG, {O})
-    _r("chem_wrt_T", LOG, {O})
+        _r(f"chem_wrt_Y({j})", LOG, {POST})
+    _r("chem_wrt_T", LOG, {POST})
 
     # fluid_rho (PRE)
     for f in range(1, NF + 1):
