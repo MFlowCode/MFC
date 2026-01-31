@@ -1,3 +1,5 @@
+@page parameters MFC Case Parameters Reference
+
 # MFC Case Parameters Reference
 
 > **Auto-generated** from parameter registry

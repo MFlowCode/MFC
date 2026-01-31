@@ -1,3 +1,5 @@
+@page running Running
+
 # Running
 
 MFC can be run using `mfc.sh`'s `run` command.

@@ -1,3 +1,5 @@
+@page troubleshooting Troubleshooting Guide
+
 # Troubleshooting Guide
 
 This guide covers common issues you may encounter when building, running, or testing MFC.

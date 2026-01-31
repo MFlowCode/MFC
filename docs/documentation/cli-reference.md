@@ -1,3 +1,5 @@
+@page cli-reference MFC Command Line Reference
+
 # MFC Command Line Reference
 
 > **Auto-generated** from `toolchain/mfc/cli/commands.py`

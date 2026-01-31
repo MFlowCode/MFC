@@ -1,3 +1,5 @@
+@page visualization Flow visualization
+
 # Flow visualization
 
 A post-processed database in Silo-HDF5 format can be visualized and analyzed using Paraview and VisIt.

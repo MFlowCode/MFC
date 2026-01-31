@@ -1,3 +1,5 @@
+@page getting-started Getting Started
+
 # Getting Started
 
 ## Fetching MFC

@@ -1,29 +1,40 @@
-# Documentation
+@page documentation Documentation
+@tableofcontents
 
-## User Documentation
+# User Guide
 
-- [Getting Started](getting-started.md)
-- [Testing](testing.md)
-- [Case Files](case.md)
-- [Example Cases](examples.md)
-- [Running](running.md)
-- [Flow Visualization](visualization.md)
-- [Performance](expectedPerformance.md)
-- [GPU Offloading](gpuParallelization.md)
-- [Authors](authors.md)
-- [References](references.md)
+@subpage getting-started
 
-## Reference
+@subpage running
 
-- [CLI Reference](cli-reference.md) - Command-line interface documentation
-- [Case Parameters](parameters.md) - All ~3,300 case parameters
-- [Case Constraints](case_constraints.md) - Feature compatibility and working examples
+@subpage case
 
-## Code/API Documentation
+@subpage parameters
 
-MFC's three codes have their own documentation:
+@subpage cli-reference
 
-- [Pre-Process](../pre_process/)
-- [Simulation](../simulation/)
-- [Post-Process](../post_process/)
- 
+@subpage case_constraints
+
+@subpage testing
+
+@subpage examples
+
+@subpage visualization
+
+# Advanced Topics
+
+@subpage gpuParallelization
+
+@subpage docker
+
+@subpage expectedPerformance
+
+@subpage troubleshooting
+
+# Reference
+
+@subpage papers
+
+@subpage references
+
+@subpage authors
