@@ -9,7 +9,7 @@ from .schema import ParamDef, ParamType, Stage
 from .registry import REGISTRY
 
 # Index limits
-NP, NF, NI, NA, NPR, NB = 10, 10, 10, 4, 10, 5  # patches, fluids, ibs, acoustic, probes, bc_patches
+NP, NF, NI, NA, NPR, NB = 10, 10, 10, 4, 10, 10  # patches, fluids, ibs, acoustic, probes, bc_patches
 
 # Parameters that can be hard-coded for GPU case optimization
 CASE_OPT_PARAMS = {
@@ -359,7 +359,7 @@ def _load():  # pylint: disable=too-many-locals,too-many-branches,too-many-state
         _r(f"lag_params%{a}", LOG, {S})
     for a in ["solver_approach", "cluster_type", "smooth_type", "nBubs_glb"]:
         _r(f"lag_params%{a}", INT, {S})
-    for a in ["epsilonb", "valmaxvoid", "charwidth"]:
+    for a in ["epsilonb", "valmaxvoid", "charwidth", "c0", "rho0", "T0", "x0", "Thost"]:
         _r(f"lag_params%{a}", REAL, {S})
 
     # chem_params (SIM)
