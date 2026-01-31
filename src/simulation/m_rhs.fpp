@@ -41,6 +41,8 @@ module m_rhs
 
     use m_bubbles_EL
 
+    use m_particles_EL
+
     use m_qbmm                 !< Moment inversion
 
     use m_hypoelastic
@@ -1063,6 +1065,25 @@ contains
             end if
         end if
 
+        if (particles_lagrange) then
+            ! Compute particle dynamics
+            if (.not. adap_dt) then
+                call nvtxStartRange("RHS-EL-PARTICLES-DYN")
+                call s_compute_particle_EL_dynamics( &
+                    q_prim_qp%vf(1:sys_size), &
+                    stage)
+                call nvtxEndRange
+            end if
+
+            ! RHS additions for sub-grid particles_lagrange
+            call nvtxStartRange("RHS-EL-PARTICLES-SRC")
+            call s_compute_particles_EL_source( &
+                q_cons_qp%vf(1:sys_size), &
+                q_prim_qp%vf(1:sys_size), &
+                rhs_vf)
+            call nvtxEndRange
+        end if
+
         if (chemistry .and. chem_params%reactions) then
             call nvtxStartRange("RHS-CHEM-REACTIONS")
             call s_compute_chemistry_reaction_flux(rhs_vf, q_cons_qp%vf, q_T_sf, q_prim_qp%vf, idwint)
@@ -1073,7 +1094,8 @@ contains
 
         ! END: Additional pphysics and source terms
 
-        if (run_time_info .or. probe_wrt .or. ib .or. bubbles_lagrange) then
+        
+        if (run_time_info .or. probe_wrt .or. ib .or. bubbles_lagrange .or. particles_lagrange) then
             if (.not. igr .or. dummy) then
                 $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
                 do i = 1, sys_size
