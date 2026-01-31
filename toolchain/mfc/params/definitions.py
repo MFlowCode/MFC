@@ -146,11 +146,11 @@ def _load():  # pylint: disable=too-many-locals,too-many-branches,too-many-state
     for d in ["x", "y", "z"]:
         _r(f"{d}_a", REAL, {P}); _r(f"{d}_b", REAL, {P})
         _r(f"a_{d}", REAL, {P}); _r(f"loops_{d}", INT, {P})
-        # Domain and BC params (PRE_PROCESS only for bc, PRE+SIM for domain)
+        # Domain and BC params (PRE+SIM for both)
         _r(f"{d}_domain%beg", REAL, {P, S})
         _r(f"{d}_domain%end", REAL, {P, S})
-        _r(f"bc_{d}%beg", INT, {P})
-        _r(f"bc_{d}%end", INT, {P})
+        _r(f"bc_{d}%beg", INT, {P, S})
+        _r(f"bc_{d}%end", INT, {P, S})
 
     # PRE + SIM
     for n in ["n_start_old"]:
@@ -193,8 +193,11 @@ def _load():  # pylint: disable=too-many-locals,too-many-branches,too-many-state
         _r(f"bf_{d}", LOG, {S})
 
     # === POST_PROCESS ===
-    for n in ["format", "flux_lim"]:
+    for n in ["format", "flux_lim", "t_step_start", "t_step_stop", "t_step_save"]:
         _r(n, INT, {O})
+    for d in ["x", "y", "z"]:
+        _r(f"bc_{d}%beg", INT, {O})
+        _r(f"bc_{d}%end", INT, {O})
     for n in ["schlieren_alpha"]:
         _r(n, REAL, {O})
     for n in ["schlieren_wrt", "alpha_rho_wrt", "rho_wrt", "mom_wrt", "vel_wrt",
@@ -286,8 +289,8 @@ def _load():  # pylint: disable=too-many-locals,too-many-branches,too-many-state
             for j in range(1, 4):
                 _r(f"{px}model_{t}({j})", REAL, {P})
         for j in range(1, 4):
-            _r(f"{px}vel({j})", A_REAL, {S})
-            _r(f"{px}angular_vel({j})", A_REAL, {S})
+            _r(f"{px}vel({j})", REAL, {P, S})  # Both PRE_PROCESS and SIMULATION
+            _r(f"{px}angular_vel({j})", REAL, {P, S})  # Both PRE_PROCESS and SIMULATION
 
     # acoustic sources (SIM)
     for i in range(1, NA + 1):
