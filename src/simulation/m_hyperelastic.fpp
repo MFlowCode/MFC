@@ -99,7 +99,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         #:if USING_AMD
-            real(wp), dimension(9) :: tensora, tensorb
+            real(wp), dimension(10) :: tensora, tensorb
         #:else
             real(wp), dimension(tensor_size) :: tensora, tensorb
         #:endif

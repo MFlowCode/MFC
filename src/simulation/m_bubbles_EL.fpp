@@ -789,6 +789,7 @@ contains
         #:endif
         integer :: i
 
+        vel(:) = 0._wp
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_dims
             vel(i) = q_prim_vf(i + contxe)%sf(cell(1), cell(2), cell(3))

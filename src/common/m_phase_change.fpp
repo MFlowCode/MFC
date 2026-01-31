@@ -299,11 +299,7 @@ contains
         ! initializing variables
         integer, intent(in) :: j, k, l, MFL
         real(wp), intent(out) :: pS
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3), intent(out) :: p_infpT
-        #:else
-            real(wp), dimension(num_fluids), intent(out) :: p_infpT
-        #:endif
+        real(wp), dimension(1:), intent(out) :: p_infpT
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         real(wp), intent(in) :: rhoe
         real(wp), intent(out) :: TS
@@ -417,11 +413,7 @@ contains
 
         integer, intent(in) :: j, k, l
         real(wp), intent(inout) :: pS
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3), intent(in) :: p_infpT
-        #:else
-            real(wp), dimension(num_fluids), intent(in) :: p_infpT
-        #:endif
+        real(wp), dimension(1:), intent(in) :: p_infpT
         real(wp), intent(in) :: rhoe
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         real(wp), intent(inout) :: TS
