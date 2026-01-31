@@ -1507,14 +1507,6 @@
       ],
       "description": "Write temperature field for chemistry"
     },
-    "chem_wrt_Y(0)": {
-      "type": "string",
-      "enum": [
-        "T",
-        "F"
-      ],
-      "description": "Write mass fraction of species 0"
-    },
     "chem_wrt_Y(1)": {
       "type": "string",
       "enum": [
@@ -1530,6 +1522,14 @@
         "F"
       ],
       "description": "Write mass fraction of species 10"
+    },
+    "chem_wrt_Y(100)": {
+      "type": "string",
+      "enum": [
+        "T",
+        "F"
+      ],
+      "description": "Write mass fraction of species 100"
     },
     "chem_wrt_Y(11)": {
       "type": "string",
@@ -5958,17 +5958,6 @@
       ],
       "description": "Z-component of magnetic field for patch 1"
     },
-    "patch_icpp(1)%Y(0)": {
-      "oneOf": [
-        {
-          "type": "number"
-        },
-        {
-          "type": "string"
-        }
-      ],
-      "description": "Mass fraction of species 0 for patch 1"
-    },
     "patch_icpp(1)%Y(1)": {
       "oneOf": [
         {
@@ -5990,6 +5979,17 @@
         }
       ],
       "description": "Mass fraction of species 10 for patch 1"
+    },
+    "patch_icpp(1)%Y(100)": {
+      "oneOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "string"
+        }
+      ],
+      "description": "Mass fraction of species 100 for patch 1"
     },
     "patch_icpp(1)%Y(11)": {
       "oneOf": [
@@ -7660,17 +7660,6 @@
       ],
       "description": "Z-component of magnetic field for patch 10"
     },
-    "patch_icpp(10)%Y(0)": {
-      "oneOf": [
-        {
-          "type": "number"
-        },
-        {
-          "type": "string"
-        }
-      ],
-      "description": "Mass fraction of species 0 for patch 10"
-    },
     "patch_icpp(10)%Y(1)": {
       "oneOf": [
         {
@@ -7692,6 +7681,17 @@
         }
       ],
       "description": "Mass fraction of species 10 for patch 10"
+    },
+    "patch_icpp(10)%Y(100)": {
+      "oneOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "string"
+        }
+      ],
+      "description": "Mass fraction of species 100 for patch 10"
     },
     "patch_icpp(10)%Y(11)": {
       "oneOf": [
@@ -9442,17 +9442,6 @@
       ],
       "description": "Z-component of magnetic field for patch 2"
     },
-    "patch_icpp(2)%Y(0)": {
-      "oneOf": [
-        {
-          "type": "number"
-        },
-        {
-          "type": "string"
-        }
-      ],
-      "description": "Mass fraction of species 0 for patch 2"
-    },
     "patch_icpp(2)%Y(1)": {
       "oneOf": [
         {
@@ -9474,6 +9463,17 @@
         }
       ],
       "description": "Mass fraction of species 10 for patch 2"
+    },
+    "patch_icpp(2)%Y(100)": {
+      "oneOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "string"
+        }
+      ],
+      "description": "Mass fraction of species 100 for patch 2"
     },
     "patch_icpp(2)%Y(11)": {
       "oneOf": [
@@ -11160,17 +11160,6 @@
       ],
       "description": "Z-component of magnetic field for patch 3"
     },
-    "patch_icpp(3)%Y(0)": {
-      "oneOf": [
-        {
-          "type": "number"
-        },
-        {
-          "type": "string"
-        }
-      ],
-      "description": "Mass fraction of species 0 for patch 3"
-    },
     "patch_icpp(3)%Y(1)": {
       "oneOf": [
         {
@@ -11192,6 +11181,17 @@
         }
       ],
       "description": "Mass fraction of species 10 for patch 3"
+    },
+    "patch_icpp(3)%Y(100)": {
+      "oneOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "string"
+        }
+      ],
+      "description": "Mass fraction of species 100 for patch 3"
     },
     "patch_icpp(3)%Y(11)": {
       "oneOf": [
@@ -12886,17 +12886,6 @@
       ],
       "description": "Z-component of magnetic field for patch 4"
     },
-    "patch_icpp(4)%Y(0)": {
-      "oneOf": [
-        {
-          "type": "number"
-        },
-        {
-          "type": "string"
-        }
-      ],
-      "description": "Mass fraction of species 0 for patch 4"
-    },
     "patch_icpp(4)%Y(1)": {
       "oneOf": [
         {
@@ -12918,6 +12907,17 @@
         }
       ],
       "description": "Mass fraction of species 10 for patch 4"
+    },
+    "patch_icpp(4)%Y(100)": {
+      "oneOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "string"
+        }
+      ],
+      "description": "Mass fraction of species 100 for patch 4"
     },
     "patch_icpp(4)%Y(11)": {
       "oneOf": [
@@ -14620,17 +14620,6 @@
       ],
       "description": "Z-component of magnetic field for patch 5"
     },
-    "patch_icpp(5)%Y(0)": {
-      "oneOf": [
-        {
-          "type": "number"
-        },
-        {
-          "type": "string"
-        }
-      ],
-      "description": "Mass fraction of species 0 for patch 5"
-    },
     "patch_icpp(5)%Y(1)": {
       "oneOf": [
         {
@@ -14652,6 +14641,17 @@
         }
       ],
       "description": "Mass fraction of species 10 for patch 5"
+    },
+    "patch_icpp(5)%Y(100)": {
+      "oneOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "string"
+        }
+      ],
+      "description": "Mass fraction of species 100 for patch 5"
     },
     "patch_icpp(5)%Y(11)": {
       "oneOf": [
@@ -16362,17 +16362,6 @@
       ],
       "description": "Z-component of magnetic field for patch 6"
     },
-    "patch_icpp(6)%Y(0)": {
-      "oneOf": [
-        {
-          "type": "number"
-        },
-        {
-          "type": "string"
-        }
-      ],
-      "description": "Mass fraction of species 0 for patch 6"
-    },
     "patch_icpp(6)%Y(1)": {
       "oneOf": [
         {
@@ -16394,6 +16383,17 @@
         }
       ],
       "description": "Mass fraction of species 10 for patch 6"
+    },
+    "patch_icpp(6)%Y(100)": {
+      "oneOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "string"
+        }
+      ],
+      "description": "Mass fraction of species 100 for patch 6"
     },
     "patch_icpp(6)%Y(11)": {
       "oneOf": [
@@ -18112,17 +18112,6 @@
       ],
       "description": "Z-component of magnetic field for patch 7"
     },
-    "patch_icpp(7)%Y(0)": {
-      "oneOf": [
-        {
-          "type": "number"
-        },
-        {
-          "type": "string"
-        }
-      ],
-      "description": "Mass fraction of species 0 for patch 7"
-    },
     "patch_icpp(7)%Y(1)": {
       "oneOf": [
         {
@@ -18144,6 +18133,17 @@
         }
       ],
       "description": "Mass fraction of species 10 for patch 7"
+    },
+    "patch_icpp(7)%Y(100)": {
+      "oneOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "string"
+        }
+      ],
+      "description": "Mass fraction of species 100 for patch 7"
     },
     "patch_icpp(7)%Y(11)": {
       "oneOf": [
@@ -19870,17 +19870,6 @@
       ],
       "description": "Z-component of magnetic field for patch 8"
     },
-    "patch_icpp(8)%Y(0)": {
-      "oneOf": [
-        {
-          "type": "number"
-        },
-        {
-          "type": "string"
-        }
-      ],
-      "description": "Mass fraction of species 0 for patch 8"
-    },
     "patch_icpp(8)%Y(1)": {
       "oneOf": [
         {
@@ -19902,6 +19891,17 @@
         }
       ],
       "description": "Mass fraction of species 10 for patch 8"
+    },
+    "patch_icpp(8)%Y(100)": {
+      "oneOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "string"
+        }
+      ],
+      "description": "Mass fraction of species 100 for patch 8"
     },
     "patch_icpp(8)%Y(11)": {
       "oneOf": [
@@ -21636,17 +21636,6 @@
       ],
       "description": "Z-component of magnetic field for patch 9"
     },
-    "patch_icpp(9)%Y(0)": {
-      "oneOf": [
-        {
-          "type": "number"
-        },
-        {
-          "type": "string"
-        }
-      ],
-      "description": "Mass fraction of species 0 for patch 9"
-    },
     "patch_icpp(9)%Y(1)": {
       "oneOf": [
         {
@@ -21668,6 +21657,17 @@
         }
       ],
       "description": "Mass fraction of species 10 for patch 9"
+    },
+    "patch_icpp(9)%Y(100)": {
+      "oneOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "string"
+        }
+      ],
+      "description": "Mass fraction of species 100 for patch 9"
     },
     "patch_icpp(9)%Y(11)": {
       "oneOf": [
@@ -24241,11 +24241,9 @@
       "enum": [
         1,
         2,
-        3,
-        4,
-        5
+        3
       ],
-      "description": "Time integration scheme (1=Euler, 2=TVD-RK2, 3=TVD-RK3, 4=RK4, 5=RK5)"
+      "description": "Time integration scheme (1=Euler, 2=TVD-RK2, 3=TVD-RK3)"
     },
     "vel_wrt": {
       "type": "string",

@@ -107,7 +107,7 @@ def get_input_dict_keys(target_name: str) -> list:
     }.get(target_name, {}).keys()
 
     if not ARG("case_optimization") or target_name != "simulation":
-        return result
+        return list(result)
 
     return [x for x in result if x not in CASE_OPTIMIZATION]
 

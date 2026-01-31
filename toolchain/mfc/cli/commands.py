@@ -795,7 +795,7 @@ BENCH_COMMAND = Command(
         ),
     ],
     examples=[
-        Example("./mfc.sh bench -o results.json", "Run benchmarks and save results"),
+        Example("./mfc.sh bench -o results.yaml", "Run benchmarks and save results"),
     ],
     key_options=[
         ("-o, --output FILE", "Output file for benchmark results (required)"),

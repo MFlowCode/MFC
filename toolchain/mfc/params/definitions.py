@@ -28,7 +28,7 @@ CONSTRAINTS = {
     "muscl_lim": {"choices": [1, 2, 3, 4, 5]},  # minmod, MC, Van Albada, Van Leer, SUPERBEE
 
     # Time stepping
-    "time_stepper": {"choices": [1, 2, 3, 4, 5]},  # Euler, TVD-RK2/3, RK4/5
+    "time_stepper": {"choices": [1, 2, 3]},  # 1=Euler, 2=TVD-RK2, 3=TVD-RK3
 
     # Riemann solver
     "riemann_solver": {"choices": [1, 2, 3, 4, 5]},  # HLL, HLLC, Exact, HLLD, LF
@@ -233,7 +233,7 @@ def _load():  # pylint: disable=too-many-locals,too-many-branches,too-many-state
             _r(f"{px}a({j})", REAL, {P})
         for a in ["pres", "Bx", "By", "Bz", "cf_val"]:
             _r(f"{px}{a}", A_REAL, {P})
-        for j in range(100):
+        for j in range(1, 101):
             _r(f"{px}Y({j})", A_REAL, {P})
         _r(f"{px}model_filepath", STR, {P})
         for t in ["translate", "scale", "rotate"]:
@@ -381,7 +381,7 @@ def _load():  # pylint: disable=too-many-locals,too-many-branches,too-many-state
             _r(f"{a}({j})", LOG, {O})
 
     # chem_wrt (POST)
-    for j in range(100):
+    for j in range(1, 101):
         _r(f"chem_wrt_Y({j})", LOG, {O})
     _r("chem_wrt_T", LOG, {O})
 

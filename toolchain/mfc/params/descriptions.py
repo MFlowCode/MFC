@@ -44,7 +44,7 @@ DESCRIPTIONS = {
     "t_step_print": "Time step interval for printing info",
     "t_stop": "Simulation stop time",
     "t_save": "Time interval for saving data",
-    "time_stepper": "Time integration scheme (1=Euler, 2=TVD-RK2, 3=TVD-RK3, 4=RK4, 5=RK5)",
+    "time_stepper": "Time integration scheme (1=Euler, 2=TVD-RK2, 3=TVD-RK3)",
     "cfl_adap_dt": "Enable adaptive time stepping based on CFL",
     "cfl_const_dt": "Use constant CFL for time stepping",
     "cfl_target": "Target CFL number for adaptive time stepping",

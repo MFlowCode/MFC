@@ -577,7 +577,7 @@ Benchmark MFC (for CI).
 
 ```bash
 # Run benchmarks and save results
-./mfc.sh bench -o results.json
+./mfc.sh bench -o results.yaml
 
 ```
 

@@ -63,7 +63,7 @@ MFC supports **3,400** case parameters organized into families.
 | `patch_icpp(N)%Bx` | `patch_icpp(1)%Bx` | X-component of magnetic field for patch 1 |
 | `patch_icpp(N)%By` | `patch_icpp(1)%By` | Y-component of magnetic field for patch 1 |
 | `patch_icpp(N)%Bz` | `patch_icpp(1)%Bz` | Z-component of magnetic field for patch 1 |
-| `patch_icpp(N)%Y(N)` | `patch_icpp(1)%Y(0)` | Mass fraction of species 0 for patch 1 |
+| `patch_icpp(N)%Y(N)` | `patch_icpp(1)%Y(1)` | Mass fraction of species 1 for patch 1 |
 | `patch_icpp(N)%a(N)` | `patch_icpp(1)%a(2)` | Shape coefficient a(2) for patch 1 |
 | `patch_icpp(N)%alpha` | `patch_icpp(1)%alpha` | Volume fraction for patch 1 |
 | `patch_icpp(N)%alpha(N)` | `patch_icpp(1)%alpha(1)` | Volume fraction of fluid 1 for patch 1 |
@@ -801,7 +801,7 @@ MFC supports **3,400** case parameters organized into families.
 | `cfl_max` | `cfl_max` | Maximum allowed CFL number |
 | `cfl_target` | `cfl_target` | Target CFL number for adaptive time stepping |
 | `chem_wrt_T` | `chem_wrt_T` | Write temperature field for chemistry |
-| `chem_wrt_Y(N)` | `chem_wrt_Y(0)` | Write mass fraction of species 0 |
+| `chem_wrt_Y(N)` | `chem_wrt_Y(1)` | Write mass fraction of species 1 |
 | `chemistry` | `chemistry` | Enable chemical reactions |
 | `cons_vars_wrt` | `cons_vars_wrt` | Write conservative variables |
 | `cont_damage` | `cont_damage` | Enable continuum damage model |
@@ -959,7 +959,7 @@ MFC supports **3,400** case parameters organized into families.
 | `teno` | `teno` | Enable TENO scheme |
 | `teno_CT` | `teno_CT` | TENO cutoff parameter |
 | `thermal` | `thermal` | Thermal model selection |
-| `time_stepper` | `time_stepper` | Time integration scheme (1=Euler, 2=TVD-RK2, 3=TVD-RK3, 4... |
+| `time_stepper` | `time_stepper` | Time integration scheme (1=Euler, 2=TVD-RK2, 3=TVD-RK3) |
 | `vel_wrt` | `vel_wrt` | Write velocity field |
 | `viscous` | `viscous` | Enable viscous effects |
 | `w_x` | `w_x` | Body force parameter w in x-direction |
