@@ -116,13 +116,13 @@ def _load():  # pylint: disable=too-many-locals,too-many-branches,too-many-state
     A_INT, A_REAL = ParamType.ANALYTIC_INT, ParamType.ANALYTIC_REAL  # pylint: disable=unused-variable
 
     # === COMMON ===
-    for n in ["m", "n", "p", "model_eqns", "num_fluids", "num_patches", "weno_order",
-              "t_step_start", "t_step_stop", "t_step_save", "thermal", "precision",
-              "relax_model", "igr_order", "recon_type", "muscl_order", "num_bc_patches"]:
+    # Truly common params (used in multiple stages via inheritance)
+    for n in ["m", "n", "p", "model_eqns", "num_fluids", "weno_order",
+              "thermal", "precision", "relax_model", "igr_order",
+              "recon_type", "muscl_order", "num_bc_patches"]:
         _r(n, INT, {C})
-    for n in ["dt", "x_domain%beg", "x_domain%end", "y_domain%beg", "y_domain%end",
-              "z_domain%beg", "z_domain%end", "pref", "poly_sigma", "R0ref", "nb",
-              "rhoref", "sigma", "Bx0"]:
+    for n in ["pref", "poly_sigma", "R0ref", "nb", "rhoref", "sigma", "Bx0",
+              "Web", "Re_inv", "Ca"]:
         _r(n, REAL, {C})
     for n in ["cyl_coord", "mhd", "hypoelasticity", "hyperelasticity", "parallel_io",
               "polytropic", "mpp_lim", "bubbles_euler", "polydisperse", "file_per_process",
@@ -131,24 +131,26 @@ def _load():  # pylint: disable=too-many-locals,too-many-branches,too-many-state
         _r(n, LOG, {C})
     for n in ["case_dir", "cantera_file"]:
         _r(n, STR, {C})
-    for d in ["x", "y", "z"]:
-        _r(f"bc_{d}%beg", INT, {C})
-        _r(f"bc_{d}%end", INT, {C})
 
     # === PRE_PROCESS ===
-    for n in ["t_step_old", "perturb_flow_fluid", "perturb_sph_fluid", "dist_type",
-              "mixlayer_perturb_nk", "elliptic_smoothing_iters"]:
+    for n in ["t_step_old", "t_step_start", "perturb_flow_fluid", "perturb_sph_fluid",
+              "dist_type", "mixlayer_perturb_nk", "elliptic_smoothing_iters", "num_patches"]:
         _r(n, INT, {P})
     for n in ["mixlayer_vel_coef", "mixlayer_domain", "mixlayer_perturb_k0",
               "perturb_flow_mag", "fluid_rho", "sigR", "sigV", "rhoRV"]:
         _r(n, REAL, {P})
     for n in ["old_grid", "old_ic", "mixlayer_vel_profile", "mixlayer_perturb",
               "perturb_flow", "perturb_sph", "stretch_x", "stretch_y", "stretch_z",
-              "cfl_dt", "pre_stress", "elliptic_smoothing", "simplex_perturb"]:
+              "cfl_dt", "pre_stress", "elliptic_smoothing", "simplex_perturb", "qbmm"]:
         _r(n, LOG, {P})
     for d in ["x", "y", "z"]:
         _r(f"{d}_a", REAL, {P}); _r(f"{d}_b", REAL, {P})
         _r(f"a_{d}", REAL, {P}); _r(f"loops_{d}", INT, {P})
+        # Domain and BC params (PRE_PROCESS only for bc, PRE+SIM for domain)
+        _r(f"{d}_domain%beg", REAL, {P, S})
+        _r(f"{d}_domain%end", REAL, {P, S})
+        _r(f"bc_{d}%beg", INT, {P})
+        _r(f"bc_{d}%end", INT, {P})
 
     # PRE + SIM
     for n in ["n_start_old"]:
@@ -161,16 +163,17 @@ def _load():  # pylint: disable=too-many-locals,too-many-branches,too-many-state
     # PRE + SIM + POST
     for n in ["n_start", "num_ibs"]:
         _r(n, INT, {P, S, O})
-    for n in ["qbmm", "ib", "surface_tension", "bubbles_lagrange", "fft_wrt"]:
+    for n in ["ib", "surface_tension", "bubbles_lagrange", "fft_wrt"]:
         _r(n, LOG, {P, S, O})
 
     # === SIMULATION ===
-    for n in ["time_stepper", "t_step_print", "riemann_solver", "wave_speeds", "avg_state",
-              "fd_order", "num_probes", "bubble_model", "num_source", "num_integrals",
-              "adap_dt_max_iters", "low_Mach", "num_igr_iters", "num_igr_warm_start_iters",
-              "igr_iter_solver", "muscl_lim", "nv_uvm_igr_temps_on_gpu", "t_step_old"]:
+    for n in ["time_stepper", "t_step_start", "t_step_stop", "t_step_save", "t_step_print",
+              "riemann_solver", "wave_speeds", "avg_state", "fd_order", "num_probes",
+              "bubble_model", "num_source", "num_integrals", "adap_dt_max_iters", "low_Mach",
+              "num_igr_iters", "num_igr_warm_start_iters", "igr_iter_solver", "muscl_lim",
+              "nv_uvm_igr_temps_on_gpu", "t_step_old"]:
         _r(n, INT, {S})
-    for n in ["cfl_target", "cfl_max", "t_tol", "weno_eps", "teno_CT", "wenoz_q",
+    for n in ["dt", "cfl_target", "cfl_max", "t_tol", "weno_eps", "teno_CT", "wenoz_q",
               "adap_dt_tol", "t_stop", "t_save", "tau_star", "cont_damage_s", "alpha_bar",
               "alf_factor", "ic_eps", "ic_beta"]:
         _r(n, REAL, {S})
