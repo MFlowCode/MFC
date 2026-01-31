@@ -215,7 +215,8 @@ def generate_cli_reference(schema: CLISchema) -> str:
     # Quick reference table
     for cmd in schema.commands:
         alias = f"`{cmd.aliases[0]}`" if cmd.aliases else "-"
-        lines.append(f"| [`{cmd.name}`](#{cmd.name}) | {alias} | {cmd.help} |")
+        # Use HTML code tag inside link to avoid Doxygen markdown parsing issues
+        lines.append(f"| [<code>{cmd.name}</code>](#{cmd.name}) | {alias} | {cmd.help} |")
 
     lines.append("")
     lines.append("## Commands")

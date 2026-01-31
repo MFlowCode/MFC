@@ -12,26 +12,26 @@ Welcome to the MFC master script. This tool automates and manages building, test
 
 | Command | Alias | Description |
 |---------|-------|-------------|
-| [`build`](#build) | `b` | Build MFC and its dependencies. |
-| [`run`](#run) | `r` | Run a case with MFC. |
-| [`test`](#test) | `t` | Run MFC's test suite. |
-| [`clean`](#clean) | `c` | Clean build artifacts. |
-| [`validate`](#validate) | `v` | Validate a case file without running. |
-| [`new`](#new) | - | Create a new case from a template. |
-| [`params`](#params) | - | Search and explore MFC case parameters. |
-| [`packer`](#packer) | - | Packer utility (pack/unpack/compare). |
-| [`completion`](#completion) | - | Install shell tab-completion. |
-| [`help`](#help) | - | Show help on a topic. |
-| [`generate`](#generate) | - | Regenerate completion scripts from CLI schema. |
-| [`load`](#load) | - | Loads the MFC environment with source. |
-| [`lint`](#lint) | - | Lints all code after editing. |
-| [`format`](#format) | - | Formats all code after editing. |
-| [`spelling`](#spelling) | - | Runs the spell checker after editing. |
-| [`interactive`](#interactive) | - | Launch interactive menu-driven interface. |
-| [`bench`](#bench) | - | Benchmark MFC (for CI). |
-| [`bench_diff`](#bench_diff) | - | Compare MFC Benchmarks (for CI). |
-| [`count`](#count) | - | Count LOC in MFC. |
-| [`count_diff`](#count_diff) | - | Count LOC in MFC. |
+| [<code>build</code>](#build) | `b` | Build MFC and its dependencies. |
+| [<code>run</code>](#run) | `r` | Run a case with MFC. |
+| [<code>test</code>](#test) | `t` | Run MFC's test suite. |
+| [<code>clean</code>](#clean) | `c` | Clean build artifacts. |
+| [<code>validate</code>](#validate) | `v` | Validate a case file without running. |
+| [<code>new</code>](#new) | - | Create a new case from a template. |
+| [<code>params</code>](#params) | - | Search and explore MFC case parameters. |
+| [<code>packer</code>](#packer) | - | Packer utility (pack/unpack/compare). |
+| [<code>completion</code>](#completion) | - | Install shell tab-completion. |
+| [<code>help</code>](#help) | - | Show help on a topic. |
+| [<code>generate</code>](#generate) | - | Regenerate completion scripts from CLI schema. |
+| [<code>load</code>](#load) | - | Loads the MFC environment with source. |
+| [<code>lint</code>](#lint) | - | Lints all code after editing. |
+| [<code>format</code>](#format) | - | Formats all code after editing. |
+| [<code>spelling</code>](#spelling) | - | Runs the spell checker after editing. |
+| [<code>interactive</code>](#interactive) | - | Launch interactive menu-driven interface. |
+| [<code>bench</code>](#bench) | - | Benchmark MFC (for CI). |
+| [<code>bench_diff</code>](#bench_diff) | - | Compare MFC Benchmarks (for CI). |
+| [<code>count</code>](#count) | - | Count LOC in MFC. |
+| [<code>count_diff</code>](#count_diff) | - | Count LOC in MFC. |
 
 ## Commands
 
