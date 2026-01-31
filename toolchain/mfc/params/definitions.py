@@ -31,7 +31,7 @@ CONSTRAINTS = {
     "time_stepper": {"choices": [1, 2, 3, 4, 5]},  # Euler, TVD-RK2/3, RK4/5
 
     # Riemann solver
-    "riemann_solver": {"choices": [1, 2, 3, 4]},  # HLL, HLLC, exact, HLLD
+    "riemann_solver": {"choices": [1, 2, 3, 4, 5]},  # HLL, HLLC, Exact, HLLD, LF
     "wave_speeds": {"choices": [1, 2]},  # direct, pressure
     "avg_state": {"choices": [1, 2]},  # Roe, arithmetic
 
