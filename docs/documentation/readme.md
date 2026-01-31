@@ -1,20 +1,34 @@
-@page documentation Documentation
+@mainpage MFC Documentation
 
-This is the MFC documentation. Select a topic from the sidebar or below.
+Welcome to the Multi-component Flow Code (MFC) documentation.
 
-@subpage getting-started
-@subpage running
-@subpage case
-@subpage parameters
-@subpage cli-reference
-@subpage case_constraints
-@subpage testing
-@subpage examples
-@subpage visualization
-@subpage gpuParallelization
-@subpage docker
-@subpage expectedPerformance
-@subpage troubleshooting
-@subpage papers
-@subpage references
-@subpage authors
+## Getting Started
+
+- @ref getting-started "Getting Started" - Installation and first steps
+- @ref running "Running" - How to run simulations
+- @ref case "Case Files" - Setting up input files
+- @ref testing "Testing" - Running the test suite
+
+## Reference
+
+- @ref parameters "Case Parameters" - All ~3,300 parameters
+- @ref cli-reference "CLI Reference" - Command line options
+- @ref case_constraints "Case Constraints" - Feature compatibility
+
+## Examples & Visualization
+
+- @ref examples "Example Cases" - Sample simulations
+- @ref visualization "Flow Visualization" - Post-processing
+
+## Advanced Topics
+
+- @ref gpuParallelization "GPU Parallelization" - GPU offloading
+- @ref docker "Containers" - Docker usage
+- @ref expectedPerformance "Performance" - Benchmarks
+- @ref troubleshooting "Troubleshooting" - Common issues
+
+## About
+
+- @ref papers "Papers" - Publications using MFC
+- @ref references "References" - Bibliography
+- @ref authors "Authors" - Contributors
