@@ -1,4 +1,4 @@
-@page testing ## Testing
+@page testing Testing
 
 ## Testing
 

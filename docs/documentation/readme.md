@@ -1,40 +1,20 @@
 @page documentation Documentation
-@tableofcontents
 
-# User Guide
+This is the MFC documentation. Select a topic from the sidebar or below.
 
 @subpage getting-started
-
 @subpage running
-
 @subpage case
-
 @subpage parameters
-
 @subpage cli-reference
-
 @subpage case_constraints
-
 @subpage testing
-
 @subpage examples
-
 @subpage visualization
-
-# Advanced Topics
-
 @subpage gpuParallelization
-
 @subpage docker
-
 @subpage expectedPerformance
-
 @subpage troubleshooting
-
-# Reference
-
 @subpage papers
-
 @subpage references
-
 @subpage authors

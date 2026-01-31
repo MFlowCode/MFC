@@ -1,4 +1,4 @@
-@page authors ## Authors
+@page authors Authors
 
 ## Authors
 
