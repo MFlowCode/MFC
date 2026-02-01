@@ -124,10 +124,10 @@ contains
 
         ! Chemistry
         real(wp), dimension(1:num_species), intent(in) :: rhoYks
+        real(wp), dimension(1:num_species) :: Y_rs
         real(wp) :: E_e
         real(wp) :: e_Per_Kg, Pdyn_Per_Kg
         real(wp) :: T_guess
-        real(wp), dimension(1:num_species) :: Y_rs
 
         integer :: s !< Generic loop iterator
 
@@ -252,8 +252,8 @@ contains
 
         real(wp), optional, dimension(2), intent(out) :: Re_K
         real(wp), optional, intent(out) :: G_K
-        real(wp), optional, dimension(num_fluids), intent(in) :: G
         real(wp), dimension(num_fluids) :: alpha_rho_K, alpha_K !<
+        real(wp), optional, dimension(num_fluids), intent(in) :: G
 
         integer :: i, j !< Generic loop iterator
 
@@ -321,10 +321,16 @@ contains
             & parallelism='[seq]', cray_inline=True)
 
         real(wp), intent(out) :: rho_K, gamma_K, pi_inf_K, qv_K
-        real(wp), dimension(num_fluids), intent(inout) :: alpha_rho_K, alpha_K !<
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3), intent(inout) :: alpha_rho_K, alpha_K !<
+            real(wp), optional, dimension(3), intent(in) :: G
+        #:else
+            real(wp), dimension(num_fluids), intent(inout) :: alpha_rho_K, alpha_K !<
+            real(wp), optional, dimension(num_fluids), intent(in) :: G
+        #:endif
         real(wp), dimension(2), intent(out) :: Re_K
         real(wp), optional, intent(out) :: G_K
-        real(wp), optional, dimension(num_fluids), intent(in) :: G
+        real(wp) :: alpha_K_sum
 
         integer :: i, j !< Generic loop iterators
 
@@ -340,11 +346,13 @@ contains
             qv_K = qvs(1)
         else
             if (mpp_lim) then
+                alpha_K_sum = 0._wp
                 do i = 1, num_fluids
                     alpha_rho_K(i) = max(0._wp, alpha_rho_K(i))
                     alpha_K(i) = min(max(0._wp, alpha_K(i)), 1._wp)
+                    alpha_K_sum = alpha_K_sum + alpha_K(i)
                 end do
-                alpha_K = alpha_K/max(sum(alpha_K), sgm_eps)
+                alpha_K = alpha_K/max(alpha_K_sum, sgm_eps)
             end if
             rho_K = 0._wp; gamma_K = 0._wp; pi_inf_K = 0._wp; qv_K = 0._wp
             do i = 1, num_fluids
@@ -579,13 +587,17 @@ contains
         type(scalar_field), intent(inout) :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(inout) :: qK_prim_vf
         type(int_bounds_info), dimension(1:3), intent(in) :: ibounds
-
-        real(wp), dimension(num_fluids) :: alpha_K, alpha_rho_K
+        #:if USING_AMD and not MFC_CASE_OPTIMIZATION
+            real(wp), dimension(3) :: alpha_K, alpha_rho_K
+            real(wp), dimension(3) :: nRtmp
+            real(wp) :: rhoYks(1:10)
+        #:else
+            real(wp), dimension(num_fluids) :: alpha_K, alpha_rho_K
+            real(wp), dimension(nb) :: nRtmp
+            real(wp) :: rhoYks(1:num_species)
+        #:endif
         real(wp), dimension(2) :: Re_K
         real(wp) :: rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K
-        real(wp), dimension(nb) :: nRtmp
-
-        real(wp) :: rhoYks(1:num_species)
 
         real(wp) :: vftmp, nbub_sc
 
@@ -1166,19 +1178,27 @@ contains
                                                      is1, is2, is3, s2b, s3b)
 
         integer, intent(in) :: s2b, s3b
-        real(wp), dimension(0:, s2b:, s3b:, 1:), intent(in) :: qK_prim_vf
-        real(wp), dimension(0:, s2b:, s3b:, 1:), intent(inout) :: FK_vf
-        real(wp), dimension(0:, s2b:, s3b:, advxb:), intent(inout) :: FK_src_vf
+        real(wp), dimension(0:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(in) :: qK_prim_vf
+        real(wp), dimension(0:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: FK_vf
+        real(wp), dimension(0:, idwbuff(2)%beg:, idwbuff(3)%beg:, advxb:), intent(inout) :: FK_src_vf
 
         type(int_bounds_info), intent(in) :: is1, is2, is3
 
         ! Partial densities, density, velocity, pressure, energy, advection
         ! variables, the specific heat ratio and liquid stiffness functions,
         ! the shear and volume Reynolds numbers and the Weber numbers
-        real(wp), dimension(num_fluids) :: alpha_rho_K
-        real(wp), dimension(num_fluids) :: alpha_K
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3) :: alpha_rho_K
+            real(wp), dimension(3) :: alpha_K
+            real(wp), dimension(3) :: vel_K
+            real(wp), dimension(10) :: Y_K
+        #:else
+            real(wp), dimension(num_fluids) :: alpha_rho_K
+            real(wp), dimension(num_fluids) :: alpha_K
+            real(wp), dimension(num_vels) :: vel_K
+            real(wp), dimension(num_species) :: Y_K
+        #:endif
         real(wp) :: rho_K
-        real(wp), dimension(num_vels) :: vel_K
         real(wp) :: vel_K_sum
         real(wp) :: pres_K
         real(wp) :: E_K
@@ -1187,7 +1207,6 @@ contains
         real(wp) :: qv_K
         real(wp), dimension(2) :: Re_K
         real(wp) :: G_K
-        real(wp), dimension(num_species) :: Y_K
         real(wp) :: T_K, mix_mol_weight, R_gas
 
         integer :: i, j, k, l !< Generic loop iterators
@@ -1315,8 +1334,13 @@ contains
             & parallelism='[seq]', cray_inline=True)
         type(scalar_field), dimension(sys_size), intent(in) :: q_vf
         integer, intent(in) :: k, l, r
-        real(wp), dimension(num_fluids), intent(out) :: alpha_rho_K, alpha_K
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3), intent(out) :: alpha_rho_K, alpha_K
+        #:else
+            real(wp), dimension(num_fluids), intent(out) :: alpha_rho_K, alpha_K
+        #:endif
         integer :: i
+        real(wp) :: alpha_K_sum
 
         if (num_fluids == 1) then
             alpha_rho_K(1) = q_vf(contxb)%sf(k, l, r)
@@ -1342,11 +1366,13 @@ contains
         end if
 
         if (mpp_lim) then
+            alpha_K_sum = 0._wp
             do i = 1, num_fluids
                 alpha_rho_K(i) = max(0._wp, alpha_rho_K(i))
                 alpha_K(i) = min(max(0._wp, alpha_K(i)), 1._wp)
+                alpha_K_sum = alpha_K_sum + alpha_K(i)
             end do
-            alpha_K = alpha_K/max(sum(alpha_K), 1.e-16_wp)
+            alpha_K = alpha_K/max(alpha_K_sum, 1.e-16_wp)
         end if
 
         if (num_fluids == 1 .and. bubbles_euler) alpha_K(1) = q_vf(advxb)%sf(k, l, r)
@@ -1382,7 +1408,11 @@ contains
         real(wp), intent(in) :: pres
         real(wp), intent(in) :: rho, gamma, pi_inf, qv
         real(wp), intent(in) :: H
-        real(wp), dimension(num_fluids), intent(in) :: adv
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3), intent(in) :: adv
+        #:else
+            real(wp), dimension(num_fluids), intent(in) :: adv
+        #:endif
         real(wp), intent(in) :: vel_sum
         real(wp), intent(in) :: c_c
         real(wp), intent(out) :: c

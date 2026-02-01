@@ -8,19 +8,17 @@
 #SBATCH --job-name="${name}"
 #SBATCH --output="${name}.out"
 #SBATCH --time=${walltime}
+#SBATCH --cpus-per-task=7
+#SBATCH -C nvme
 % if gpu_enabled:
 #SBATCH --gpus-per-task=1
-#SBATCH --cpus-per-task=3
 #SBATCH --gpu-bind=closest
-#SBATCH --mem-per-cpu=50GB
 % endif
 % if account:
 #SBATCH --account=${account}
 % endif
 % if partition:
 #SBATCH --partition=${partition}
-% else:
-#SBATCH --partition=hpg-b200
 % endif
 % if quality_of_service:
 #SBATCH --qos=${quality_of_service}
@@ -36,30 +34,34 @@ ${helpers.template_prologue()}
 ok ":) Loading modules:\n"
 cd "${MFC_ROOT_DIR}"
 % if engine == 'batch':
-. ./mfc.sh load -c h -m ${'g' if gpu_enabled else 'c'}
+. ./mfc.sh load -c famd -m ${'g' if gpu_enabled else 'c'}
 % endif
 cd - > /dev/null
 echo
 
+ulimit -s unlimited
 
 % for target in targets:
     ${helpers.run_prologue(target)}
 
+    % if engine == 'batch':
+        # Broadcast binary to compute nodes
+        sbcast --send-libs -pf ${target.get_install_binpath(case)} /mnt/bb/$USER/${target.name}
+    % endif
+
     % if not mpi:
         (set -x; ${profiler} "${target.get_install_binpath(case)}")
     % else:
-        % if gpu_enabled:
-        (set -x; ${profiler}    \
-            /apps/compilers/nvhpc/25.9/Linux_x86_64/25.9/comm_libs/mpi/bin/mpirun \
-                   -np ${nodes*tasks_per_node}            \
-                   --bind-to none                         \
-                   "${target.get_install_binpath(case)}")
+        (set -x; srun --unbuffered \
+        % if engine == 'interactive':
+                --unbuffered --nodes ${nodes} --ntasks-per-node ${tasks_per_node} \
+                --cpus-per-task 7                                    \
+            % if gpu_enabled:
+                --gpus-per-task 1 --gpu-bind closest                 \
+            % endif
+            ${profiler} "${target.get_install_binpath(case)}")
         % else:
-        (set -x; ${profiler}    \
-            mpirun              \
-                   -np ${nodes*tasks_per_node}            \
-                   --bind-to none                         \
-                   "${target.get_install_binpath(case)}")
+            ${profiler} "/mnt/bb/$USER/${target.name}")
         % endif
     % endif
 

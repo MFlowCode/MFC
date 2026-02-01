@@ -8,7 +8,7 @@ show_help() {
   echo "Options:"
   echo "  -h, --help                  Display this help message and exit."
   echo "  -c, --computer COMPUTER     Configures for COMPUTER environment."
-  echo "                 Options:     Ascent (a) | Frontier (f) | Summit (s) | Wombat (w)"
+  echo "                 Options:     Ascent (a) | Frontier (f) | Frontier_amd (famd) | Summit (s) | Wombat (w)"
   echo "                              Bridges2 (b) | Expanse (e) | Delta (d) | DeltaAI (dai)"
   echo "                              Phoenix (p) | Richardson (r) | Oscar (o)"
   echo "                              Carpenter Cray (cc) | Carpenter GNU (c) |  Nautilus (n)"
@@ -38,7 +38,7 @@ done
 # Get computer (if not supplied in command line)
 if [ -v $u_c ]; then
     log   "Select a system:"
-    log   "$G""ORNL$W:    Ascent     (a) | Frontier (f) | Summit (s) | Wombat (w)"
+    log   "$G""ORNL$W:    Ascent     (a) | Frontier (f) | Frontier_amd (famd) | Summit (s) | Wombat (w)"
     log   "$B""LLNL $W:   Tuolumne   (tuo)"
     log   "$C""ACCESS$W:  Bridges2   (b) | Expanse (e) | Delta  (d) | DeltaAI (dai)"
     log   "$Y""Gatech$W:  Phoenix    (p)"
@@ -118,9 +118,29 @@ if [ $(echo "$VARIABLES" | grep = | wc -c) -gt 0 ]; then
 fi
 
 # Don't check for Cray paths on Carpenter, otherwise do check if they exist
-if [ ! -z ${CRAY_LD_LIBRARY_PATH+x} ] && [ "$u_c" '!=' 'c' ]; then
+if [ ! -z ${CRAY_LD_LIBRARY_PATH+x} ] && [ "$u_c" '!=' 'c' ] &&  [ "$u_c" '!=' 'famd' ] ; then
     ok "Found $M\$CRAY_LD_LIBRARY_PATH$CR. Prepending to $M\$LD_LIBRARY_PATH$CR."
     export LD_LIBRARY_PATH="$CRAY_LD_LIBRARY_PATH:$LD_LIBRARY_PATH"
+fi
+
+if [ "$u_c" '==' 'famd' ]; then 
+    export OLCF_AFAR_ROOT="/sw/crusher/ums/compilers/afar/rocm-afar-8873-drop-22.2.0"
+
+    export PATH=${OLCF_AFAR_ROOT}/lib/llvm/bin:${PATH}
+    export LD_LIBRARY_PATH=${OLCF_AFAR_ROOT}/lib:${OLCF_AFAR_ROOT}/lib/llvm/lib:${LD_LIBRARY_PATH}
+
+    export CRAY_MPICH_INC="-I${OLCF_AFAR_ROOT}/include/mpich3.4a2"
+    export CRAY_HIPFORT_INC="-I${OLCF_AFAR_ROOT}/include/hipfort/amdgcn"
+    export CRAY_HIPFORT_LIB="-L${OLCF_AFAR_ROOT}/lib -lhipfft"
+    export CRAY_HIP_INC="-I${OLCF_AFAR_ROOT}/include/hip"
+    export CRAY_MPICH_LIB="-L${CRAY_MPICH_PREFIX}/lib \
+                        ${CRAY_PMI_POST_LINK_OPTS} \
+                        -lmpifort_amd -lmpi_amd -lmpi -lpmi -lpmi2"
+    export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${CRAY_LD_LIBRARY_PATH}" 
+    export CMAKE_PREFIX_PATH="${OLCF_AFAR_ROOT}:${CMAKE_PREFIX_PATH}"
+    export FC="${OLCF_AFAR_ROOT}/bin/amdflang"
+
+    unset MPICH_GPU_SUPPORT_ENABLED
 fi
 
 ok 'All modules and environment variables have been loaded.'

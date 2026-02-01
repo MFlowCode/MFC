@@ -311,6 +311,7 @@ endif()
 # files that will eventually be used to compile <target>.
 
 macro(HANDLE_SOURCES target useCommon)
+
     set(${target}_DIR "${CMAKE_SOURCE_DIR}/src/${target}")
     set(common_DIR    "${CMAKE_SOURCE_DIR}/src/common")
 
@@ -371,7 +372,7 @@ macro(HANDLE_SOURCES target useCommon)
                                  -D MFC_${CMAKE_Fortran_COMPILER_ID}
                                  -D MFC_${${target}_UPPER}
                                  -D MFC_COMPILER="${CMAKE_Fortran_COMPILER_ID}"
-                                 -D MFC_CASE_OPTIMIZATION=False
+				                 -D MFC_CASE_OPTIMIZATION=False
                                  -D chemistry=False
                                  --line-numbering
                                  --no-folding
@@ -392,7 +393,6 @@ HANDLE_SOURCES(pre_process ON)
 HANDLE_SOURCES(simulation ON)
 HANDLE_SOURCES(post_process ON)
 HANDLE_SOURCES(syscheck OFF)
-
 
 # MFC_SETUP_TARGET: Given a target (herein <target>), this macro creates a new
 # executable <target> with the appropriate sources, compiler definitions, and
@@ -430,6 +430,7 @@ function(MFC_SETUP_TARGET)
 
     foreach (a_target ${IPO_TARGETS})
         set_target_properties(${a_target} PROPERTIES Fortran_PREPROCESS ON)
+	    message(STATUS ${CMAKE_Fortran_COMPILER_ID})
 
         target_include_directories(${a_target} PRIVATE
             "${CMAKE_SOURCE_DIR}/src/common"
@@ -449,9 +450,14 @@ function(MFC_SETUP_TARGET)
 
         if (MFC_MPI AND ARGS_MPI)
             find_package(MPI COMPONENTS Fortran REQUIRED)
-
+	    
             target_compile_definitions(${a_target} PRIVATE MFC_MPI)
-            target_link_libraries     (${a_target} PRIVATE MPI::MPI_Fortran)
+            if(CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
+                target_compile_options(${a_target} PRIVATE "$ENV{CRAY_MPICH_INC}")
+                target_link_libraries(${a_target} PRIVATE $ENV{CRAY_MPICH_LIB})
+            else() 
+                target_link_libraries(${a_target} PRIVATE MPI::MPI_Fortran)
+            endif()
         endif()
 
         if (ARGS_SILO)
@@ -469,9 +475,11 @@ function(MFC_SETUP_TARGET)
                 if (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
                     find_package(CUDAToolkit REQUIRED)
                     target_link_libraries(${a_target} PRIVATE CUDA::cudart CUDA::cufft)
-                else()
+                elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
+                    target_link_libraries(${a_target} PRIVATE $ENV{CRAY_HIPFORT_LIB})
+                else() 
                     find_package(hipfort COMPONENTS hipfft CONFIG REQUIRED)
-                    target_link_libraries(${a_target} PRIVATE hipfort::hipfft)
+                    target_link_libraries(${a_target} PRIVATE hipfort::hipfft)                    
                 endif()
             else()
                 find_package(FFTW REQUIRED)
@@ -584,7 +592,7 @@ function(MFC_SETUP_TARGET)
                         PRIVATE -DFRONTIER_UNIFIED)
                 endif()
 
-    		find_package(hipfort COMPONENTS hip CONFIG REQUIRED)
+                find_package(hipfort COMPONENTS hip CONFIG REQUIRED)
                 target_link_libraries(${a_target} PRIVATE hipfort::hip hipfort::hipfort-amdgcn flang_rt.hostdevice)
             endif()
         elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")

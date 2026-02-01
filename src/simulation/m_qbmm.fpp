@@ -571,11 +571,15 @@ contains
             & cray_inline=True)
 
         real(wp), intent(in) :: pres, rho, c
-        real(wp), dimension(nterms, 0:2, 0:2), intent(out) :: coeffs
+        #:if USING_AMD
+            real(wp), dimension(32, 0:2, 0:2), intent(out) :: coeffs
+        #:else
+            real(wp), dimension(nterms, 0:2, 0:2), intent(out) :: coeffs
+        #:endif
 
         integer :: i1, i2
 
-        coeffs = 0._wp
+        coeffs(:, :, :) = 0._wp
 
         do i2 = 0, 2; do i1 = 0, 2
                 if ((i1 + i2) <= 2) then
@@ -646,17 +650,21 @@ contains
             & cray_inline=True)
 
         real(wp), intent(in) :: pres, rho, c
-        real(wp), dimension(nterms, 0:2, 0:2), intent(out) :: coeffs
+        #:if USING_AMD
+            real(wp), dimension(32, 0:2, 0:2), intent(out) :: coeffs
+        #:else
+            real(wp), dimension(nterms, 0:2, 0:2), intent(out) :: coeffs
+        #:endif
 
         integer :: i1, i2
 
-        coeffs = 0._wp
+        coeffs(:, :, :) = 0._wp
 
         do i2 = 0, 2; do i1 = 0, 2
                 if ((i1 + i2) <= 2) then
                     if (bubble_model == 3) then
                         ! RPE
-                        #:if not MFC_CASE_OPTIMIZATION or nterms > 7
+                        #:if not MFC_CASE_OPTIMIZATION or nterms > 1
                             coeffs(1, i1, i2) = -1._wp*i2*pres/rho
                             coeffs(2, i1, i2) = -3._wp*i2/2._wp
                             coeffs(3, i1, i2) = i2/rho
@@ -715,10 +723,18 @@ contains
         real(stp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: mv
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: rhs_mv
         type(int_bounds_info), intent(in) :: ix, iy, iz
-
-        real(wp), dimension(nmom) :: moms, msum
-        real(wp), dimension(nnode, nb) :: wght, abscX, abscY, wght_pb, wght_mv, wght_ht, ht
-        real(wp), dimension(nterms, 0:2, 0:2) :: coeff
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(6) :: moms, msum
+            real(wp), dimension(4, 3) :: wght, abscX, abscY, wght_pb, wght_mv, wght_ht, ht
+        #:else
+            real(wp), dimension(nmom) :: moms, msum
+            real(wp), dimension(nnode, nb) :: wght, abscX, abscY, wght_pb, wght_mv, wght_ht, ht
+        #:endif
+        #:if USING_AMD
+            real(wp), dimension(32, 0:2, 0:2) :: coeff
+        #:else
+            real(wp), dimension(nterms, 0:2, 0:2) :: coeff
+        #:endif
         real(wp) :: pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, grad_T
         real(wp) :: n_tait, B_tait
         integer :: id1, id2, id3, i1, i2, j, q, r
@@ -871,7 +887,11 @@ contains
             $:GPU_ROUTINE(function_name='s_coeff_selector',parallelism='[seq]', &
                 & cray_inline=True)
             real(wp), intent(in) :: pres, rho, c
-            real(wp), dimension(nterms, 0:2, 0:2), intent(out) :: coeff
+            #:if USING_AMD
+                real(wp), dimension(32, 0:2, 0:2), intent(out) :: coeff
+            #:else
+                real(wp), dimension(nterms, 0:2, 0:2), intent(out) :: coeff
+            #:endif
             logical, intent(in) :: polytropic
             if (polytropic) then
                 call s_coeff(pres, rho, c, coeff)
@@ -960,15 +980,24 @@ contains
 
         function f_quad(abscX, abscY, wght_in, q, r, s)
             $:GPU_ROUTINE(parallelism='[seq]')
-            real(wp), dimension(nnode, nb), intent(in) :: abscX, abscY, wght_in
+            #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+                real(wp), dimension(4, 3), intent(in) :: abscX, abscY, wght_in
+            #:else
+                real(wp), dimension(nnode, nb), intent(in) :: abscX, abscY, wght_in
+            #:endif
             real(wp), intent(in) :: q, r, s
 
             real(wp) :: f_quad_RV, f_quad
-            integer :: i
+            integer :: i, i1
 
             f_quad = 0._wp
+            $:GPU_LOOP(parallelism='[seq]')
             do i = 1, nb
-                f_quad_RV = sum(wght_in(:, i)*(abscX(:, i)**q)*(abscY(:, i)**r))
+                f_quad_RV = 0._wp
+                $:GPU_LOOP(parallelism='[seq]')
+                do i1 = 1, nnode
+                    f_quad_RV = f_quad_RV + wght_in(i1, i)*(abscX(i1, i)**q)*(abscY(i1, i)**r)
+                end do
                 f_quad = f_quad + weight(i)*(R0(i)**s)*f_quad_RV
             end do
 
@@ -976,12 +1005,21 @@ contains
 
         function f_quad2D(abscX, abscY, wght_in, pow)
             $:GPU_ROUTINE(parallelism='[seq]')
-            real(wp), dimension(nnode), intent(in) :: abscX, abscY, wght_in
+            #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+                real(wp), dimension(4), intent(in) :: abscX, abscY, wght_in
+            #:else
+                real(wp), dimension(nnode), intent(in) :: abscX, abscY, wght_in
+            #:endif
             real(wp), dimension(3), intent(in) :: pow
 
             real(wp) :: f_quad2D
+            integer :: i
 
-            f_quad2D = sum(wght_in(:)*(abscX(:)**pow(1))*(abscY(:)**pow(2)))
+            f_quad2D = 0._wp
+            $:GPU_LOOP(parallelism='[seq]')
+            do i = 1, nnode
+                f_quad2D = f_quad2D + wght_in(i)*(abscX(i)**pow(1))*(abscY(i)**pow(2))
+            end do
         end function f_quad2D
 
     end subroutine s_mom_inv
