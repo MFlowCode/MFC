@@ -119,24 +119,6 @@ def get_param_suggestions_cached(unknown_param: str) -> tuple:
     return tuple(suggest_parameter(unknown_param))
 
 
-def unknown_param_error(param_name: str) -> str:
-    """
-    Create an error message for an unknown parameter with suggestions.
-
-    Args:
-        param_name: The unknown parameter name.
-
-    Returns:
-        Error message with "did you mean?" suggestion if available.
-    """
-    suggestions = suggest_parameter(param_name)
-    suggestion_text = format_suggestion(suggestions)
-
-    if suggestion_text:
-        return f"Unknown parameter '{param_name}'. {suggestion_text}"
-    return f"Unknown parameter '{param_name}'."
-
-
 def invalid_key_error(
     context: str,
     invalid_key: str,
