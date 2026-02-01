@@ -1,11 +1,14 @@
 """
 Fuzzy Matching for Parameter Suggestions.
 
-Provides "did you mean?" functionality for typo detection in parameter names,
-constraint keys, and dependency keys using rapidfuzz for fast string matching.
+Provides "did you mean?" functionality for typo detection using rapidfuzz
+for fast string matching.
 
-This replaces manual typo detection with automatic fuzzy matching against
-the known valid options (parameter names from REGISTRY, valid constraint keys, etc.)
+Primary use case: When users mistype parameter names in case files, suggest
+the correct parameter name (e.g., "model_eqn" -> "Did you mean 'model_eqns'?").
+
+Also used internally to validate constraint/dependency schemas during
+module initialization, catching developer typos in CONSTRAINTS/DEPENDENCIES dicts.
 """
 
 from typing import List, Iterable
@@ -104,54 +107,6 @@ def suggest_parameter(unknown_param: str) -> List[str]:
     from .registry import REGISTRY  # pylint: disable=import-outside-toplevel
 
     return suggest_similar(unknown_param, REGISTRY.all_params.keys())
-
-
-def suggest_constraint_key(unknown_key: str) -> List[str]:
-    """
-    Suggest similar constraint keys.
-
-    Valid constraint keys are: choices, min, max
-
-    Args:
-        unknown_key: Unknown constraint key.
-
-    Returns:
-        List of similar valid constraint keys.
-    """
-    valid_keys = {"choices", "min", "max"}
-    return suggest_similar(unknown_key, valid_keys)
-
-
-def suggest_dependency_key(unknown_key: str) -> List[str]:
-    """
-    Suggest similar top-level dependency keys.
-
-    Valid keys are: when_true, when_set
-
-    Args:
-        unknown_key: Unknown dependency key.
-
-    Returns:
-        List of similar valid dependency keys.
-    """
-    valid_keys = {"when_true", "when_set"}
-    return suggest_similar(unknown_key, valid_keys)
-
-
-def suggest_condition_key(unknown_key: str) -> List[str]:
-    """
-    Suggest similar condition keys within dependencies.
-
-    Valid keys are: requires, recommends
-
-    Args:
-        unknown_key: Unknown condition key.
-
-    Returns:
-        List of similar valid condition keys.
-    """
-    valid_keys = {"requires", "recommends"}
-    return suggest_similar(unknown_key, valid_keys)
 
 
 @lru_cache(maxsize=128)
