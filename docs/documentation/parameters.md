@@ -449,18 +449,11 @@ MFC supports **3,400** case parameters organized into families.
 
 **10 parameters**
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `alpha_rho_e_wrt(1)` | Logical (T/F) | Write partial energy for fluid 1 |
-| `alpha_rho_e_wrt(10)` | Logical (T/F) | Write partial energy for fluid 10 |
-| `alpha_rho_e_wrt(2)` | Logical (T/F) | Write partial energy for fluid 2 |
-| `alpha_rho_e_wrt(3)` | Logical (T/F) | Write partial energy for fluid 3 |
-| `alpha_rho_e_wrt(4)` | Logical (T/F) | Write partial energy for fluid 4 |
-| `alpha_rho_e_wrt(5)` | Logical (T/F) | Write partial energy for fluid 5 |
-| `alpha_rho_e_wrt(6)` | Logical (T/F) | Write partial energy for fluid 6 |
-| `alpha_rho_e_wrt(7)` | Logical (T/F) | Write partial energy for fluid 7 |
-| `alpha_rho_e_wrt(8)` | Logical (T/F) | Write partial energy for fluid 8 |
-| `alpha_rho_e_wrt(9)` | Logical (T/F) | Write partial energy for fluid 9 |
+### Patterns
+
+| Pattern | Example | Description |
+|---------|---------|-------------|
+| `alpha_rho_e_wrt(N)` | `alpha_rho_e_wrt(1)` | Write partial energy for fluid 1 |
 
 ---
 
@@ -470,18 +463,11 @@ MFC supports **3,400** case parameters organized into families.
 
 **10 parameters**
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `alpha_rho_wrt(1)` | Logical (T/F) | Write partial density for fluid 1 |
-| `alpha_rho_wrt(10)` | Logical (T/F) | Write partial density for fluid 10 |
-| `alpha_rho_wrt(2)` | Logical (T/F) | Write partial density for fluid 2 |
-| `alpha_rho_wrt(3)` | Logical (T/F) | Write partial density for fluid 3 |
-| `alpha_rho_wrt(4)` | Logical (T/F) | Write partial density for fluid 4 |
-| `alpha_rho_wrt(5)` | Logical (T/F) | Write partial density for fluid 5 |
-| `alpha_rho_wrt(6)` | Logical (T/F) | Write partial density for fluid 6 |
-| `alpha_rho_wrt(7)` | Logical (T/F) | Write partial density for fluid 7 |
-| `alpha_rho_wrt(8)` | Logical (T/F) | Write partial density for fluid 8 |
-| `alpha_rho_wrt(9)` | Logical (T/F) | Write partial density for fluid 9 |
+### Patterns
+
+| Pattern | Example | Description |
+|---------|---------|-------------|
+| `alpha_rho_wrt(N)` | `alpha_rho_wrt(1)` | Write partial density for fluid 1 |
 
 ---
 
@@ -491,18 +477,11 @@ MFC supports **3,400** case parameters organized into families.
 
 **10 parameters**
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `alpha_wrt(1)` | Logical (T/F) | Write volume fraction for fluid 1 |
-| `alpha_wrt(10)` | Logical (T/F) | Write volume fraction for fluid 10 |
-| `alpha_wrt(2)` | Logical (T/F) | Write volume fraction for fluid 2 |
-| `alpha_wrt(3)` | Logical (T/F) | Write volume fraction for fluid 3 |
-| `alpha_wrt(4)` | Logical (T/F) | Write volume fraction for fluid 4 |
-| `alpha_wrt(5)` | Logical (T/F) | Write volume fraction for fluid 5 |
-| `alpha_wrt(6)` | Logical (T/F) | Write volume fraction for fluid 6 |
-| `alpha_wrt(7)` | Logical (T/F) | Write volume fraction for fluid 7 |
-| `alpha_wrt(8)` | Logical (T/F) | Write volume fraction for fluid 8 |
-| `alpha_wrt(9)` | Logical (T/F) | Write volume fraction for fluid 9 |
+### Patterns
+
+| Pattern | Example | Description |
+|---------|---------|-------------|
+| `alpha_wrt(N)` | `alpha_wrt(1)` | Write volume fraction for fluid 1 |
 
 ---
 
@@ -512,18 +491,11 @@ MFC supports **3,400** case parameters organized into families.
 
 **10 parameters**
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `fluid_rho(1)` | Real | Reference density for fluid 1 |
-| `fluid_rho(10)` | Real | Reference density for fluid 10 |
-| `fluid_rho(2)` | Real | Reference density for fluid 2 |
-| `fluid_rho(3)` | Real | Reference density for fluid 3 |
-| `fluid_rho(4)` | Real | Reference density for fluid 4 |
-| `fluid_rho(5)` | Real | Reference density for fluid 5 |
-| `fluid_rho(6)` | Real | Reference density for fluid 6 |
-| `fluid_rho(7)` | Real | Reference density for fluid 7 |
-| `fluid_rho(8)` | Real | Reference density for fluid 8 |
-| `fluid_rho(9)` | Real | Reference density for fluid 9 |
+### Patterns
+
+| Pattern | Example | Description |
+|---------|---------|-------------|
+| `fluid_rho(N)` | `fluid_rho(1)` | Reference density for fluid 1 |
 
 ---
 
@@ -533,18 +505,11 @@ MFC supports **3,400** case parameters organized into families.
 
 **10 parameters**
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `kappa_wrt(1)` | Logical (T/F) | Write curvature for fluid 1 |
-| `kappa_wrt(10)` | Logical (T/F) | Write curvature for fluid 10 |
-| `kappa_wrt(2)` | Logical (T/F) | Write curvature for fluid 2 |
-| `kappa_wrt(3)` | Logical (T/F) | Write curvature for fluid 3 |
-| `kappa_wrt(4)` | Logical (T/F) | Write curvature for fluid 4 |
-| `kappa_wrt(5)` | Logical (T/F) | Write curvature for fluid 5 |
-| `kappa_wrt(6)` | Logical (T/F) | Write curvature for fluid 6 |
-| `kappa_wrt(7)` | Logical (T/F) | Write curvature for fluid 7 |
-| `kappa_wrt(8)` | Logical (T/F) | Write curvature for fluid 8 |
-| `kappa_wrt(9)` | Logical (T/F) | Write curvature for fluid 9 |
+### Patterns
+
+| Pattern | Example | Description |
+|---------|---------|-------------|
+| `kappa_wrt(N)` | `kappa_wrt(1)` | Write curvature for fluid 1 |
 
 ---
 
@@ -554,18 +519,11 @@ MFC supports **3,400** case parameters organized into families.
 
 **10 parameters**
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `schlieren_alpha(1)` | Real | Schlieren coefficient for fluid 1 |
-| `schlieren_alpha(10)` | Real | Schlieren coefficient for fluid 10 |
-| `schlieren_alpha(2)` | Real | Schlieren coefficient for fluid 2 |
-| `schlieren_alpha(3)` | Real | Schlieren coefficient for fluid 3 |
-| `schlieren_alpha(4)` | Real | Schlieren coefficient for fluid 4 |
-| `schlieren_alpha(5)` | Real | Schlieren coefficient for fluid 5 |
-| `schlieren_alpha(6)` | Real | Schlieren coefficient for fluid 6 |
-| `schlieren_alpha(7)` | Real | Schlieren coefficient for fluid 7 |
-| `schlieren_alpha(8)` | Real | Schlieren coefficient for fluid 8 |
-| `schlieren_alpha(9)` | Real | Schlieren coefficient for fluid 9 |
+### Patterns
+
+| Pattern | Example | Description |
+|---------|---------|-------------|
+| `schlieren_alpha(N)` | `schlieren_alpha(1)` | Schlieren coefficient for fluid 1 |
 
 ---
 
@@ -590,11 +548,11 @@ MFC supports **3,400** case parameters organized into families.
 
 **3 parameters**
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `flux_wrt(1)` | Logical (T/F) | Write flux component 1 |
-| `flux_wrt(2)` | Logical (T/F) | Write flux component 2 |
-| `flux_wrt(3)` | Logical (T/F) | Write flux component 3 |
+### Patterns
+
+| Pattern | Example | Description |
+|---------|---------|-------------|
+| `flux_wrt(N)` | `flux_wrt(1)` | Write flux component 1 |
 
 ---
 
@@ -604,11 +562,11 @@ MFC supports **3,400** case parameters organized into families.
 
 **3 parameters**
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `mom_wrt(1)` | Logical (T/F) | Write momentum component 1 |
-| `mom_wrt(2)` | Logical (T/F) | Write momentum component 2 |
-| `mom_wrt(3)` | Logical (T/F) | Write momentum component 3 |
+### Patterns
+
+| Pattern | Example | Description |
+|---------|---------|-------------|
+| `mom_wrt(N)` | `mom_wrt(1)` | Write momentum component 1 |
 
 ---
 
@@ -618,11 +576,11 @@ MFC supports **3,400** case parameters organized into families.
 
 **3 parameters**
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `omega_wrt(1)` | Logical (T/F) | Write vorticity component 1 |
-| `omega_wrt(2)` | Logical (T/F) | Write vorticity component 2 |
-| `omega_wrt(3)` | Logical (T/F) | Write vorticity component 3 |
+### Patterns
+
+| Pattern | Example | Description |
+|---------|---------|-------------|
+| `omega_wrt(N)` | `omega_wrt(1)` | Write vorticity component 1 |
 
 ---
 
@@ -632,11 +590,11 @@ MFC supports **3,400** case parameters organized into families.
 
 **3 parameters**
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `vel_wrt(1)` | Logical (T/F) | Write velocity component 1 |
-| `vel_wrt(2)` | Logical (T/F) | Write velocity component 2 |
-| `vel_wrt(3)` | Logical (T/F) | Write velocity component 3 |
+### Patterns
+
+| Pattern | Example | Description |
+|---------|---------|-------------|
+| `vel_wrt(N)` | `vel_wrt(1)` | Write velocity component 1 |
 
 ---
 

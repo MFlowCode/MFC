@@ -209,15 +209,15 @@ def generate_parameter_docs() -> str:  # pylint: disable=too-many-locals,too-man
         lines.append(f"**{len(params)} parameters**")
         lines.append("")
 
-        # For large families, show a collapsed pattern
-        if len(params) > 20:
-            # Group by pattern
-            patterns: Dict[str, List[str]] = defaultdict(list)
-            for name, _ in params:
-                # Extract pattern (replace indices with N, M, K, etc.)
-                pattern = _collapse_indices(name)
-                patterns[pattern].append(name)
+        # Group by pattern (collapse indices to N, M, etc.)
+        patterns: Dict[str, List[str]] = defaultdict(list)
+        for name, _ in params:
+            pattern = _collapse_indices(name)
+            patterns[pattern].append(name)
 
+        # Use pattern view if it reduces rows, otherwise show full table
+        if len(patterns) < len(params):
+            # Pattern view - shows collapsed patterns
             lines.append("### Patterns")
             lines.append("")
             lines.append("| Pattern | Example | Description |")
@@ -236,7 +236,7 @@ def generate_parameter_docs() -> str:  # pylint: disable=too-many-locals,too-man
 
             lines.append("")
         else:
-            # Show full table for small families
+            # Full table - no patterns to collapse
             lines.append("| Parameter | Type | Description |")
             lines.append("|-----------|------|-------------|")
 
