@@ -27,6 +27,11 @@ def _get_family(name: str) -> str:
     return "general"
 
 
+def _escape_percent(s: str) -> str:
+    """Escape % for Doxygen (% is a special character, use %% to get literal %)."""
+    return s.replace('%', '%%')
+
+
 def _type_to_str(param_type: ParamType) -> str:
     """Convert ParamType to readable string."""
     return {
@@ -173,7 +178,10 @@ def generate_parameter_docs() -> str:  # pylint: disable=too-many-locals,too-man
                 # Truncate long descriptions
                 if len(desc) > 60:
                     desc = desc[:57] + "..."
-                lines.append(f"| `{pattern}` | `{example}` | {desc} |")
+                # Escape % for Doxygen
+                pattern_escaped = _escape_percent(pattern)
+                example_escaped = _escape_percent(example)
+                lines.append(f"| `{pattern_escaped}` | `{example_escaped}` | {desc} |")
 
             lines.append("")
         else:
@@ -190,7 +198,9 @@ def generate_parameter_docs() -> str:  # pylint: disable=too-many-locals,too-man
                 # Truncate long descriptions
                 if len(desc) > 80:
                     desc = desc[:77] + "..."
-                lines.append(f"| `{name}` | {type_str} | {desc} |")
+                # Escape % for Doxygen
+                name_escaped = _escape_percent(name)
+                lines.append(f"| `{name_escaped}` | {type_str} | {desc} |")
 
             lines.append("")
 
