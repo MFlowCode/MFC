@@ -8,6 +8,8 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Set, Any, Optional, Dict, List
 
+from .errors import constraint_error
+
 
 class ParamType(Enum):
     """Parameter types matching MFC's Fortran types."""
@@ -50,8 +52,20 @@ class ParamDef:
     dependencies: Optional[Dict[str, Any]] = None  # {"requires": [...], "recommends": [...]}
 
     def __post_init__(self):
+        # Validate name
+        if not self.name or not isinstance(self.name, str):
+            raise ValueError("ParamDef name must be a non-empty string")
+
+        # Convert stages to set if needed
         if not isinstance(self.stages, set):
             self.stages = set(self.stages)
+
+        # Validate stages is non-empty
+        if not self.stages:
+            raise ValueError(
+                f"ParamDef '{self.name}' must have at least one stage. "
+                "Use Stage.COMMON for parameters shared across all stages."
+            )
 
     @property
     def type_tag(self) -> str:
@@ -62,6 +76,7 @@ class ParamDef:
         Validate a value against this parameter's constraints.
 
         Returns list of error messages (empty if valid).
+        Uses consistent error formatting from errors.py.
         """
         errors = []
         if self.constraints is None:
@@ -71,18 +86,17 @@ class ParamDef:
         if "choices" in self.constraints:
             choices = self.constraints["choices"]
             if value not in choices:
-                errors.append(
-                    f"{self.name} must be one of {choices}, got {value}"
-                )
+                errors.append(constraint_error(self.name, "choices", choices, value))
 
-        # Check numeric range constraints
-        if "min" in self.constraints and value < self.constraints["min"]:
-            errors.append(
-                f"{self.name} must be >= {self.constraints['min']}, got {value}"
-            )
-        if "max" in self.constraints and value > self.constraints["max"]:
-            errors.append(
-                f"{self.name} must be <= {self.constraints['max']}, got {value}"
-            )
+        # Check numeric range constraints (only for numeric values, not analytic strings)
+        if isinstance(value, (int, float)):
+            if "min" in self.constraints and value < self.constraints["min"]:
+                errors.append(
+                    constraint_error(self.name, "min", self.constraints["min"], value)
+                )
+            if "max" in self.constraints and value > self.constraints["max"]:
+                errors.append(
+                    constraint_error(self.name, "max", self.constraints["max"], value)
+                )
 
         return errors

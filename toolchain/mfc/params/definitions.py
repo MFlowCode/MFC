@@ -5,6 +5,7 @@ Single file containing all ~3,300 parameter definitions using loops.
 This replaces the definitions/ directory.
 """
 
+from typing import Dict, List, Any, Union
 from .schema import ParamDef, ParamType, Stage
 from .registry import REGISTRY
 
@@ -18,6 +19,77 @@ CASE_OPT_PARAMS = {
     "igr_iter_solver", "igr", "igr_pres_lim", "recon_type",
     "muscl_order", "muscl_lim"
 }
+
+
+# ============================================================================
+# Schema Validation for Constraints and Dependencies
+# ============================================================================
+# These validation functions catch typos like "choises" instead of "choices"
+
+_VALID_CONSTRAINT_KEYS = {"choices", "min", "max"}
+_VALID_DEPENDENCY_KEYS = {"when_true", "when_set"}
+_VALID_CONDITION_KEYS = {"requires", "recommends"}
+
+
+def _validate_constraint(param_name: str, constraint: Dict[str, Any]) -> None:
+    """Validate a constraint dict has valid keys."""
+    invalid_keys = set(constraint.keys()) - _VALID_CONSTRAINT_KEYS
+    if invalid_keys:
+        raise ValueError(
+            f"Invalid constraint keys for '{param_name}': {invalid_keys}. "
+            f"Valid keys are: {_VALID_CONSTRAINT_KEYS}"
+        )
+
+    # Validate types
+    if "choices" in constraint and not isinstance(constraint["choices"], list):
+        raise ValueError(f"Constraint 'choices' for '{param_name}' must be a list")
+    if "min" in constraint and not isinstance(constraint["min"], (int, float)):
+        raise ValueError(f"Constraint 'min' for '{param_name}' must be a number")
+    if "max" in constraint and not isinstance(constraint["max"], (int, float)):
+        raise ValueError(f"Constraint 'max' for '{param_name}' must be a number")
+
+
+def _validate_dependency(param_name: str, dependency: Dict[str, Any]) -> None:
+    """Validate a dependency dict has valid structure."""
+    invalid_keys = set(dependency.keys()) - _VALID_DEPENDENCY_KEYS
+    if invalid_keys:
+        raise ValueError(
+            f"Invalid dependency keys for '{param_name}': {invalid_keys}. "
+            f"Valid keys are: {_VALID_DEPENDENCY_KEYS}"
+        )
+
+    for condition_key in ["when_true", "when_set"]:
+        if condition_key in dependency:
+            condition = dependency[condition_key]
+            if not isinstance(condition, dict):
+                raise ValueError(
+                    f"Dependency '{condition_key}' for '{param_name}' must be a dict"
+                )
+            invalid_cond_keys = set(condition.keys()) - _VALID_CONDITION_KEYS
+            if invalid_cond_keys:
+                raise ValueError(
+                    f"Invalid condition keys in '{condition_key}' for '{param_name}': "
+                    f"{invalid_cond_keys}. Valid keys are: {_VALID_CONDITION_KEYS}"
+                )
+            for req_key in ["requires", "recommends"]:
+                if req_key in condition and not isinstance(condition[req_key], list):
+                    raise ValueError(
+                        f"Dependency '{condition_key}/{req_key}' for '{param_name}' "
+                        "must be a list"
+                    )
+
+
+def _validate_all_constraints(constraints: Dict[str, Dict]) -> None:
+    """Validate all constraint definitions."""
+    for param_name, constraint in constraints.items():
+        _validate_constraint(param_name, constraint)
+
+
+def _validate_all_dependencies(dependencies: Dict[str, Dict]) -> None:
+    """Validate all dependency definitions."""
+    for param_name, dependency in dependencies.items():
+        _validate_dependency(param_name, dependency)
+
 
 # Parameter constraints (choices, min, max)
 CONSTRAINTS = {
@@ -392,5 +464,25 @@ def _load():  # pylint: disable=too-many-locals,too-many-branches,too-many-state
         _r(f"fluid_rho({f})", REAL, {P})
 
 
-# Load definitions when module imported
-_load()
+# Load definitions when module imported and freeze registry
+def _init_registry():
+    """Initialize and freeze the registry. Called once at module import."""
+    try:
+        # Validate constraint and dependency schemas first
+        # This catches typos like "choises" instead of "choices"
+        _validate_all_constraints(CONSTRAINTS)
+        _validate_all_dependencies(DEPENDENCIES)
+
+        # Load all parameter definitions
+        _load()
+
+        # Freeze registry to prevent further modifications
+        REGISTRY.freeze()
+    except Exception as e:
+        # Re-raise with context to help debugging initialization failures
+        raise RuntimeError(
+            f"Failed to initialize parameter registry: {e}\n"
+            "This is likely a bug in the parameter definitions."
+        ) from e
+
+_init_registry()

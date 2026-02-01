@@ -14,8 +14,29 @@ Based on the constraints enforced in:
 # pylint: disable=too-many-lines
 # Justification: Comprehensive validator covering all MFC parameter constraints
 
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Set
+from functools import lru_cache
 from .common import MFCException
+
+
+@lru_cache(maxsize=1)
+def _get_logical_params_from_registry() -> Set[str]:
+    """
+    Get all LOG-type parameter names from the registry.
+
+    This replaces the hardcoded logical_params list with a dynamic lookup,
+    ensuring all LOG parameters are validated without manual maintenance.
+
+    Returns:
+        Set of parameter names that have LOG type.
+    """
+    from .params import REGISTRY  # pylint: disable=import-outside-toplevel
+    from .params.schema import ParamType  # pylint: disable=import-outside-toplevel
+
+    return {
+        name for name, param in REGISTRY.all_params.items()
+        if param.param_type == ParamType.LOG
+    }
 
 
 class CaseConstraintError(MFCException):
@@ -55,22 +76,15 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
 
         This catches invalid values early with clear error messages,
         rather than letting them cause confusing failures later.
+
+        LOG parameters are discovered dynamically from the registry,
+        eliminating the need to maintain a hardcoded list.
         """
-        # Logical (boolean) parameters that must be 'T' or 'F'
-        logical_params = [
-            'mpp_lim', 'cyl_coord', 'bubbles_euler', 'adv_n', 'adap_dt',
-            'polytropic', 'polydisperse', 'acoustic_source', 'hypoelasticity',
-            'hyperelasticity', 'cont_damage', 'mapped_weno', 'mp_weno',
-            'teno', 'weno_avg', 'weno_Re_flux', 'null_weights', 'alt_soundspeed',
-            'mixture_err', 'parallel_io', 'prim_vars_wrt', 'rho_wrt', 'E_wrt',
-            'mom_wrt(1)', 'mom_wrt(2)', 'mom_wrt(3)', 'vel_wrt(1)', 'vel_wrt(2)',
-            'vel_wrt(3)', 'flux_wrt(1)', 'flux_wrt(2)', 'flux_wrt(3)',
-            'c_wrt', 'omega_wrt(1)', 'omega_wrt(2)', 'omega_wrt(3)', 'qm_wrt',
-            'schlieren_wrt', 'probe_wrt', 'integral_wrt', 'viscous', 'shear_stress',
-            'bulk_stress', 'bubbles_lagrange', 'relativity', 'cu_tensor', 'igr',
-        ]
+        # Validate all LOG-type parameters from registry
+        logical_params = _get_logical_params_from_registry()
         for param in logical_params:
-            self._validate_logical(param)
+            if param in self.params:  # Only validate params that are set
+                self._validate_logical(param)
 
         # Required domain parameters when m > 0
         m = self.get('m')

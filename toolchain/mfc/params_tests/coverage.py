@@ -14,7 +14,16 @@ from dataclasses import dataclass
 
 @dataclass
 class ConstraintInfo:
-    """Information about a single constraint."""
+    """
+    Information about a single constraint.
+
+    Attributes:
+        method: Name of the check_* method containing this constraint.
+        line_number: Line number of the prohibit() call start (1-indexed).
+            For multi-line calls, this is the first line.
+        message: Error message shown when constraint is violated.
+        condition_code: Unparsed source code of the condition expression.
+    """
     method: str
     line_number: int
     message: str
@@ -78,9 +87,13 @@ def extract_constraints_from_validator() -> List[ConstraintInfo]:
             message = _extract_message(node.args[1])
             try:
                 condition_code = ast.unparse(node.args[0])
-            except Exception:
+            except (ValueError, TypeError, AttributeError):
+                # ast.unparse can fail on malformed AST or missing attributes
                 condition_code = "<complex>"
 
+            # Note: node.lineno points to the start of the prohibit() call.
+            # For multi-line calls, this is the first line, not where the
+            # condition or message appears.
             constraints.append(ConstraintInfo(
                 method=item.name,
                 line_number=node.lineno,

@@ -2,10 +2,41 @@
 Parameter Validation with Constraints and Dependencies.
 
 Provides enhanced validation beyond JSON schema type checking.
+
+Relationship to case_validator.py
+---------------------------------
+This module (params/validate.py) provides **generic parameter validation**:
+- Type checking (int, real, string, etc.)
+- Range constraints (min/max values)
+- Choice validation (enum-like constraints)
+- Parameter dependencies (requires/recommends)
+
+The case_validator.py module provides **domain-specific physics validation**:
+- Cross-parameter consistency checks (e.g., bubble model + polytropic settings)
+- Model-specific requirements (e.g., WENO order constraints)
+- Stage-specific validation (pre_process, simulation, post_process)
+- 50+ physics-aware constraint checks
+
+These modules are complementary:
+- params/validate.py: Fast, generic checks that apply to all parameters
+- case_validator.py: Comprehensive physics validation for MFC simulations
+
+Typical usage:
+    1. JSON schema validation (via mfc-case-schema.json)
+    2. Generic constraint validation (via this module)
+    3. Physics validation (via case_validator.py)
 """
 
 from typing import Dict, Any, List, Tuple
 from .registry import REGISTRY
+from .errors import (
+    dependency_error,
+    dependency_recommendation,
+    format_error_list,
+)
+# Note: definitions is imported by params/__init__.py to populate REGISTRY.
+# This redundant import ensures REGISTRY is populated even if this module
+# is imported directly (e.g., during testing).
 from . import definitions  # noqa: F401  pylint: disable=unused-import
 
 
@@ -69,17 +100,13 @@ def check_dependencies(params: Dict[str, Any]) -> Tuple[List[str], List[str]]:  
             if "requires" in when_true:
                 for req in when_true["requires"]:
                     if req not in params:
-                        errors.append(
-                            f"{name}=T requires '{req}' to be set"
-                        )
+                        errors.append(dependency_error(name, req, "=T"))
 
             # Recommended params
             if "recommends" in when_true:
                 for rec in when_true["recommends"]:
                     if rec not in params:
-                        warnings.append(
-                            f"{name}=T: consider setting '{rec}'"
-                        )
+                        warnings.append(dependency_recommendation(name, rec, "=T"))
 
         # Check "when_set" dependencies (for any param that's set)
         if "when_set" in deps:
@@ -88,16 +115,12 @@ def check_dependencies(params: Dict[str, Any]) -> Tuple[List[str], List[str]]:  
             if "requires" in when_set:
                 for req in when_set["requires"]:
                     if req not in params:
-                        errors.append(
-                            f"'{name}' requires '{req}' to be set"
-                        )
+                        errors.append(dependency_error(name, req))
 
             if "recommends" in when_set:
                 for rec in when_set["recommends"]:
                     if rec not in params:
-                        warnings.append(
-                            f"'{name}' is set: consider also setting '{rec}'"
-                        )
+                        warnings.append(dependency_recommendation(name, rec))
 
     return errors, warnings
 
@@ -130,19 +153,10 @@ def validate_case(params: Dict[str, Any], warn: bool = True) -> Tuple[List[str],
 
 
 def format_validation_results(errors: List[str], warnings: List[str]) -> str:
-    """Format validation results for display."""
-    lines = []
+    """
+    Format validation results for display.
 
-    if errors:
-        lines.append("[red]Validation Errors:[/red]")
-        for err in errors:
-            lines.append(f"  [red]✗[/red] {err}")
-
-    if warnings:
-        if lines:
-            lines.append("")
-        lines.append("[yellow]Warnings:[/yellow]")
-        for warn in warnings:
-            lines.append(f"  [yellow]![/yellow] {warn}")
-
-    return "\n".join(lines)
+    Uses the centralized formatting from errors.py for consistency
+    across all validation systems.
+    """
+    return format_error_list(errors, warnings, use_rich=True)

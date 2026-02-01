@@ -66,7 +66,8 @@ def validate_case_for_stage(params: Dict[str, Any], stage: str) -> ValidationRes
             param_hash=hash_params(params),
             error_count=len(validator.errors)
         )
-    except Exception as e:
+    except (ValueError, KeyError, TypeError, AttributeError) as e:
+        # Catch expected validation errors, not programming bugs like SystemExit
         return ValidationResult(
             case_path="",
             stage=stage,
@@ -106,7 +107,9 @@ def capture_case_snapshot(case_path: Path) -> CaseSnapshot:
 
     try:
         params = load_case_params(case_path)
-    except Exception as e:
+    except (ValueError, json.JSONDecodeError, subprocess.TimeoutExpired,
+            subprocess.SubprocessError, OSError, FileNotFoundError) as e:
+        # Catch expected case loading errors, not programming bugs
         return CaseSnapshot(
             case_path=str(case_path),
             param_count=0,
@@ -156,7 +159,8 @@ def capture_all_examples(examples_dir: Path = None) -> Dict[str, CaseSnapshot]:
                     print(f"ERRORS: {errors}")
                 else:
                     print("OK")
-        except Exception as e:
+        except (ValueError, KeyError, TypeError, OSError, json.JSONDecodeError) as e:
+            # Catch expected errors during capture, not programming bugs
             print(f"EXCEPTION: {e}")
             snapshots[case_name] = CaseSnapshot(
                 case_path=str(case_file),
