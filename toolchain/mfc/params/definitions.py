@@ -33,7 +33,8 @@ _VALID_CONDITION_KEYS = {"requires", "recommends"}
 
 def _validate_constraint(param_name: str, constraint: Dict[str, Any]) -> None:
     """Validate a constraint dict has valid keys with 'did you mean?' suggestions."""
-    from .suggest import invalid_key_error
+    # Import here to avoid circular import at module load time
+    from .suggest import invalid_key_error  # pylint: disable=import-outside-toplevel
 
     invalid_keys = set(constraint.keys()) - _VALID_CONSTRAINT_KEYS
     if invalid_keys:
@@ -58,7 +59,8 @@ def _validate_constraint(param_name: str, constraint: Dict[str, Any]) -> None:
 
 def _validate_dependency(param_name: str, dependency: Dict[str, Any]) -> None:
     """Validate a dependency dict has valid structure with 'did you mean?' suggestions."""
-    from .suggest import invalid_key_error
+    # Import here to avoid circular import at module load time
+    from .suggest import invalid_key_error  # pylint: disable=import-outside-toplevel
 
     invalid_keys = set(dependency.keys()) - _VALID_DEPENDENCY_KEYS
     if invalid_keys:

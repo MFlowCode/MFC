@@ -86,9 +86,8 @@ def format_suggestion(suggestions: List[str]) -> str:
 
     if len(suggestions) == 1:
         return f"Did you mean '{suggestions[0]}'?"
-    else:
-        quoted = [f"'{s}'" for s in suggestions]
-        return f"Did you mean one of: {', '.join(quoted)}?"
+    quoted = [f"'{s}'" for s in suggestions]
+    return f"Did you mean one of: {', '.join(quoted)}?"
 
 
 def suggest_parameter(unknown_param: str) -> List[str]:
@@ -101,7 +100,8 @@ def suggest_parameter(unknown_param: str) -> List[str]:
     Returns:
         List of similar valid parameter names.
     """
-    from .registry import REGISTRY
+    # Import here to avoid circular import (registry imports definitions which may use suggest)
+    from .registry import REGISTRY  # pylint: disable=import-outside-toplevel
 
     return suggest_similar(unknown_param, REGISTRY.all_params.keys())
 
