@@ -5,7 +5,7 @@ Generates markdown documentation for all MFC case parameters,
 organized by family with descriptions, types, and constraints.
 """
 
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
 from collections import defaultdict
 import re
 
@@ -32,6 +32,18 @@ def _escape_percent(s: str) -> str:
     return s.replace('%', '%%')
 
 
+def _parse_paren_content(name: str, start: int) -> Tuple[str, int]:
+    """Parse content within parentheses, return (content, end_index) or ('', -1) if invalid."""
+    j = start + 1
+    paren_content = []
+    while j < len(name) and name[j] != ')':
+        paren_content.append(name[j])
+        j += 1
+    if j < len(name):
+        return ''.join(paren_content), j
+    return '', -1
+
+
 def _collapse_indices(name: str) -> str:
     """
     Collapse numeric indices to placeholders for pattern grouping.
@@ -47,38 +59,33 @@ def _collapse_indices(name: str) -> str:
     i = 0
 
     while i < len(name):
-        if name[i] == '(':
-            # Found opening paren, look for indices
-            j = i + 1
-            paren_content = []
-
-            while j < len(name) and name[j] != ')':
-                paren_content.append(name[j])
-                j += 1
-
-            if j < len(name):  # Found closing paren
-                content = ''.join(paren_content)
-                # Check if content is numeric indices (possibly comma-separated)
-                parts = [p.strip() for p in content.split(',')]
-                if all(p.isdigit() for p in parts):
-                    # Replace each index with a placeholder
-                    new_parts = []
-                    for _ in parts:
-                        if placeholder_idx < len(placeholders):
-                            new_parts.append(placeholders[placeholder_idx])
-                            placeholder_idx += 1
-                        else:
-                            new_parts.append('?')
-                    result.append('(' + ', '.join(new_parts) + ')')
-                    i = j + 1
-                    continue
-
-            # Not a numeric index, keep as-is
+        if name[i] != '(':
             result.append(name[i])
             i += 1
-        else:
+            continue
+
+        # Found opening paren, look for indices
+        content, end_idx = _parse_paren_content(name, i)
+        if end_idx == -1:
             result.append(name[i])
             i += 1
+            continue
+
+        # Check if content is numeric indices (possibly comma-separated)
+        parts = [p.strip() for p in content.split(',')]
+        if not all(p.isdigit() for p in parts):
+            result.append(name[i])
+            i += 1
+            continue
+
+        # Replace each index with a placeholder
+        new_parts = []
+        for _ in parts:
+            ph = placeholders[placeholder_idx] if placeholder_idx < len(placeholders) else '?'
+            new_parts.append(ph)
+            placeholder_idx += 1
+        result.append('(' + ', '.join(new_parts) + ')')
+        i = end_idx + 1
 
     return ''.join(result)
 
@@ -134,7 +141,7 @@ def generate_parameter_docs() -> str:  # pylint: disable=too-many-locals,too-man
     ]
 
     # Group parameters by family
-    families: Dict[str, List[Tuple[str, any]]] = defaultdict(list)
+    families: Dict[str, List[Tuple[str, Any]]] = defaultdict(list)
     for name, param in sorted(REGISTRY.all_params.items()):
         family = _get_family(name)
         families[family].append((name, param))
