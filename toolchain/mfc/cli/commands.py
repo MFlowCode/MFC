@@ -470,7 +470,7 @@ TEST_COMMAND = Command(
             ),
             Argument(
                 name="remove-old-tests",
-                help="(Test Generation) Delete tests directories that are no longer.",
+                help="(Test Generation) Delete test directories that are no longer needed.",
                 action=ArgAction.STORE_TRUE,
                 default=False,
                 dest="remove_old_tests",

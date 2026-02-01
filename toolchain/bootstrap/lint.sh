@@ -35,4 +35,4 @@ if [ "$RUN_TESTS" = true ]; then
     cd - > /dev/null
 fi
 
-exit $?
+exit 0
