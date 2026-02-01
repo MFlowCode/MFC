@@ -1,5 +1,6 @@
 """Code Generators for Parameter Schema."""
 
-from .case_dicts_gen import get_stage_dict
+from .json_schema_gen import generate_json_schema
+from .docs_gen import generate_parameter_docs
 
-__all__ = ['get_stage_dict']
+__all__ = ['generate_json_schema', 'generate_parameter_docs']

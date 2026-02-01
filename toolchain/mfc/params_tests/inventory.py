@@ -10,22 +10,15 @@ from pathlib import Path
 from typing import Dict, Any
 
 from ..run.case_dicts import (
-    COMMON, PRE_PROCESS, SIMULATION, POST_PROCESS, ALL, ParamType
+    COMMON, PRE_PROCESS, SIMULATION, POST_PROCESS, ALL
 )
+from ..params.schema import ParamType
 
 
 def get_param_type_name(param_type) -> str:
     """Convert ParamType to string name."""
     if isinstance(param_type, ParamType):
         return param_type.name
-    # Handle analytic types (dict)
-    if isinstance(param_type, dict):
-        if param_type.get("type") == ["integer", "string"]:
-            return "ANALYTIC_INT"
-        if param_type.get("type") == ["number", "string"]:
-            return "ANALYTIC_REAL"
-        if param_type.get("type") == "string":
-            return "STR"
     return "UNKNOWN"
 
 

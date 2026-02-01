@@ -1,93 +1,89 @@
 """
 MFC Case Parameter Type Definitions.
 
-This module defines parameter types for MFC case files. The parameter definitions
-are now sourced from the central registry (mfc.params), providing a single source
-of truth for all ~3,300 parameters.
+This module provides backward-compatible exports from the central parameter
+registry (mfc.params). All parameter definitions are now sourced from the
+registry, eliminating the previous dual type system.
 
-The ParamType enum defines JSON schema types for validation.
+Exports:
+    COMMON, PRE_PROCESS, SIMULATION, POST_PROCESS: Stage-specific param dicts
+    ALL: Combined dict of all parameters
+    IGNORE: Parameters to skip during certain operations
+    CASE_OPTIMIZATION: Parameters that can be hard-coded for GPU builds
+    SCHEMA: JSON schema for fastjsonschema validation
+    get_validator(): Returns compiled JSON schema validator
+    get_input_dict_keys(): Get parameter keys for a target
 """
 # pylint: disable=import-outside-toplevel
 
-import fastjsonschema
-
-from enum import Enum
 from ..state import ARG
-from functools import cache
 
 
-class ParamType(Enum):
-    """
-    Parameter types for JSON schema validation.
-
-    Each type maps to a JSON schema fragment used by fastjsonschema
-    to validate case file parameters.
-    """
-    INT = {"type": "integer"}
-    REAL = {"type": "number"}
-    LOG = {"enum": ["T", "F"]}
-    STR = {"type": "string"}
-
-    _ANALYTIC_INT = {"type": ["integer", "string"]}
-    _ANALYTIC_REAL = {"type": ["number", "string"]}
-
-    def analytic(self):
-        """Return the analytic version of this type (allows string expressions)."""
-        if self == self.INT:
-            return self._ANALYTIC_INT
-        if self == self.REAL:
-            return self._ANALYTIC_REAL
-        return self.STR
-
-
-def _load_from_registry():
+def _load_stage_dicts():
     """
     Load parameter definitions from the central registry.
 
-    Returns:
-        Tuple of (COMMON, PRE_PROCESS, SIMULATION, POST_PROCESS) dicts
+    Returns dicts mapping parameter names to their ParamType.
     """
-    from ..params.generators.case_dicts_gen import get_stage_dict
-    from ..params.schema import Stage
+    from ..params import REGISTRY
+    from ..params.schema import Stage, ParamType
 
-    return (
-        get_stage_dict(Stage.COMMON, include_common=False),
-        get_stage_dict(Stage.PRE_PROCESS, include_common=True),
-        get_stage_dict(Stage.SIMULATION, include_common=True),
-        get_stage_dict(Stage.POST_PROCESS, include_common=True),
-    )
+    def params_for_stage(stage, include_common=True):
+        """Get params for a stage as {name: ParamType} dict."""
+        result = {}
+        for name, param in REGISTRY.all_params.items():
+            if stage in param.stages:
+                result[name] = param.param_type
+            elif include_common and Stage.COMMON in param.stages:
+                result[name] = param.param_type
+        return result
 
+    common = params_for_stage(Stage.COMMON, include_common=False)
+    pre = params_for_stage(Stage.PRE_PROCESS, include_common=True)
+    sim = params_for_stage(Stage.SIMULATION, include_common=True)
+    post = params_for_stage(Stage.POST_PROCESS, include_common=True)
 
-# Load parameter definitions from registry
-COMMON, PRE_PROCESS, SIMULATION, POST_PROCESS = _load_from_registry()
-
-# Parameters to ignore during certain operations
-IGNORE = ["cantera_file", "chemistry"]
-
-# Build combined ALL dict
-ALL = COMMON.copy()
-ALL.update(PRE_PROCESS)
-ALL.update(SIMULATION)
-ALL.update(POST_PROCESS)
+    return common, pre, sim, post
 
 
-def _get_case_optimization_params():
-    """Get params that can be hard-coded for GPU optimization from registry."""
+def _load_all_params():
+    """Load all parameters as {name: ParamType} dict."""
+    from ..params import REGISTRY
+    return {name: param.param_type for name, param in REGISTRY.all_params.items()}
+
+
+def _load_case_optimization_params():
+    """Get params that can be hard-coded for GPU optimization."""
     from ..params import REGISTRY
     return [name for name, param in REGISTRY.all_params.items() if param.case_optimization]
 
 
-# Parameters that can be hard-coded for GPU case optimization (from registry)
-CASE_OPTIMIZATION = _get_case_optimization_params()
+def _build_schema():
+    """Build JSON schema from registry."""
+    from ..params import REGISTRY
+    return REGISTRY.get_json_schema()
 
-# Build JSON schema for validation
-_properties = {k: v.value for k, v in ALL.items()}
 
-SCHEMA = {
-    "type": "object",
-    "properties": _properties,
-    "additionalProperties": False
-}
+def _get_validator_func():
+    """Get the cached validator from registry."""
+    from ..params import REGISTRY
+    return REGISTRY.get_validator()
+
+
+# Load parameter definitions from registry
+COMMON, PRE_PROCESS, SIMULATION, POST_PROCESS = _load_stage_dicts()
+
+# Parameters to ignore during certain operations
+IGNORE = ["cantera_file", "chemistry"]
+
+# Combined dict of all parameters
+ALL = _load_all_params()
+
+# Parameters that can be hard-coded for GPU case optimization
+CASE_OPTIMIZATION = _load_case_optimization_params()
+
+# JSON schema for validation
+SCHEMA = _build_schema()
 
 
 def get_input_dict_keys(target_name: str) -> list:
@@ -112,7 +108,6 @@ def get_input_dict_keys(target_name: str) -> list:
     return [x for x in result if x not in CASE_OPTIMIZATION]
 
 
-@cache
 def get_validator():
     """Get the cached JSON schema validator."""
-    return fastjsonschema.compile(SCHEMA)
+    return _get_validator_func()

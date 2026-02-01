@@ -12,13 +12,31 @@ from .errors import constraint_error
 
 
 class ParamType(Enum):
-    """Parameter types matching MFC's Fortran types."""
+    """Parameter types matching MFC's Fortran types with JSON schema support."""
     INT = "int"
     REAL = "real"
     LOG = "log"
     STR = "str"
     ANALYTIC_INT = "analytic:int"
     ANALYTIC_REAL = "analytic:real"
+
+    @property
+    def json_schema(self) -> Dict[str, Any]:
+        """
+        Return JSON schema fragment for this parameter type.
+
+        Used by fastjsonschema for case file validation.
+        """
+        schemas = {
+            ParamType.INT: {"type": "integer"},
+            ParamType.REAL: {"type": "number"},
+            ParamType.LOG: {"enum": ["T", "F"]},
+            ParamType.STR: {"type": "string"},
+            # Analytic types accept either the base type or a string expression
+            ParamType.ANALYTIC_INT: {"type": ["integer", "string"]},
+            ParamType.ANALYTIC_REAL: {"type": ["number", "string"]},
+        }
+        return schemas[self]
 
 
 class Stage(Enum):

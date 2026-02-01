@@ -25,9 +25,10 @@ After freezing, it is safe to read from multiple threads. Attempts to
 register new parameters after freezing will raise RuntimeError.
 """
 
-from typing import Dict, Set, Mapping
+from typing import Dict, Set, Mapping, Any, Optional
 from types import MappingProxyType
 from collections import defaultdict
+from functools import lru_cache
 
 from .schema import ParamDef, Stage
 
@@ -148,6 +149,50 @@ class ParamRegistry:
             for name in self._by_stage.get(stage, set()):
                 result[name] = self._params[name]
         return result
+
+    def get_json_schema(self, stage: Optional[Stage] = None) -> Dict[str, Any]:
+        """
+        Generate JSON schema for case file validation.
+
+        Args:
+            stage: If provided, only include params for that stage.
+                   If None, include all parameters.
+
+        Returns:
+            JSON schema dict compatible with fastjsonschema.
+        """
+        if stage is not None:
+            params = self.get_params_by_stage(stage)
+        else:
+            params = self.all_params
+
+        properties = {
+            name: param.param_type.json_schema
+            for name, param in params.items()
+        }
+
+        return {
+            "type": "object",
+            "properties": properties,
+            "additionalProperties": False
+        }
+
+    def get_validator(self):
+        """
+        Get a cached JSON schema validator for all parameters.
+
+        Returns:
+            Compiled fastjsonschema validator function.
+        """
+        # Use module-level cache since registry is frozen
+        return _get_cached_validator(id(self))
+
+
+@lru_cache(maxsize=1)
+def _get_cached_validator(registry_id: int):
+    """Cache the validator at module level (registry is immutable after freeze)."""
+    import fastjsonschema  # pylint: disable=import-outside-toplevel
+    return fastjsonschema.compile(REGISTRY.get_json_schema())
 
 
 # Global registry instance - populated when definitions module is imported
