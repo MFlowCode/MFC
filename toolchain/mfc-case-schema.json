@@ -1484,11 +1484,11 @@
         "T",
         "F"
       ],
-      "description": "Chemistry parameter: diffusion"
+      "description": "Enable species diffusion for chemistry"
     },
     "chem_params%gamma_method": {
       "type": "integer",
-      "description": "Chemistry parameter: gamma_method"
+      "description": "Gamma calculation method (1=formulation, 2=cp/cv ratio)"
     },
     "chem_params%reactions": {
       "type": "string",
@@ -1496,11 +1496,11 @@
         "T",
         "F"
       ],
-      "description": "Chemistry parameter: reactions"
+      "description": "Enable chemical reactions"
     },
     "chem_params%transport_model": {
       "type": "integer",
-      "description": "Chemistry parameter: transport_model"
+      "description": "Transport model selection for chemistry"
     },
     "chem_wrt_T": {
       "type": "string",
@@ -3488,7 +3488,7 @@
         "T",
         "F"
       ],
-      "description": "Write Lagrangian betaC field"
+      "description": "Write Lagrangian concentration beta coefficient"
     },
     "lag_betaT_wrt": {
       "type": "string",
@@ -3496,7 +3496,7 @@
         "T",
         "F"
       ],
-      "description": "Write Lagrangian betaT field"
+      "description": "Write Lagrangian thermal beta coefficient"
     },
     "lag_db_wrt": {
       "type": "string",
@@ -3504,7 +3504,7 @@
         "T",
         "F"
       ],
-      "description": "Write Lagrangian db field"
+      "description": "Write Lagrangian bubble diameter"
     },
     "lag_dphidt_wrt": {
       "type": "string",
@@ -3512,7 +3512,7 @@
         "T",
         "F"
       ],
-      "description": "Write Lagrangian dphidt field"
+      "description": "Write Lagrangian void fraction time derivative"
     },
     "lag_header": {
       "type": "string",
@@ -3528,7 +3528,7 @@
         "T",
         "F"
       ],
-      "description": "Write Lagrangian id field"
+      "description": "Write Lagrangian bubble ID"
     },
     "lag_mg_wrt": {
       "type": "string",
@@ -3536,7 +3536,7 @@
         "T",
         "F"
       ],
-      "description": "Write Lagrangian mg field"
+      "description": "Write Lagrangian gas mass"
     },
     "lag_mv_wrt": {
       "type": "string",
@@ -3544,31 +3544,31 @@
         "T",
         "F"
       ],
-      "description": "Write Lagrangian mv field"
+      "description": "Write Lagrangian vapor mass"
     },
     "lag_params%T0": {
       "type": "number",
-      "description": "Lagrangian tracking parameter: T0"
+      "description": "Initial bubble temperature"
     },
     "lag_params%Thost": {
       "type": "number",
-      "description": "Lagrangian tracking parameter: Thost"
+      "description": "Host fluid temperature"
     },
     "lag_params%c0": {
       "type": "number",
-      "description": "Lagrangian tracking parameter: c0"
+      "description": "Initial sound speed"
     },
     "lag_params%charwidth": {
       "type": "number",
-      "description": "Lagrangian tracking parameter: charwidth"
+      "description": "Domain virtual depth for 2D simulations"
     },
     "lag_params%cluster_type": {
       "type": "integer",
-      "description": "Lagrangian tracking parameter: cluster_type"
+      "description": "Cluster model for pressure at infinity"
     },
     "lag_params%epsilonb": {
       "type": "number",
-      "description": "Lagrangian tracking parameter: epsilonb"
+      "description": "Standard deviation scaling for Gaussian smoothing"
     },
     "lag_params%heatTransfer_model": {
       "type": "string",
@@ -3576,7 +3576,7 @@
         "T",
         "F"
       ],
-      "description": "Lagrangian tracking parameter: heatTransfer_model"
+      "description": "Enable heat transfer at bubble-liquid interface"
     },
     "lag_params%massTransfer_model": {
       "type": "string",
@@ -3584,11 +3584,11 @@
         "T",
         "F"
       ],
-      "description": "Lagrangian tracking parameter: massTransfer_model"
+      "description": "Enable mass transfer at bubble-liquid interface"
     },
     "lag_params%nBubs_glb": {
       "type": "integer",
-      "description": "Lagrangian tracking parameter: nBubs_glb"
+      "description": "Global number of Lagrangian bubbles"
     },
     "lag_params%pressure_corrector": {
       "type": "string",
@@ -3596,23 +3596,23 @@
         "T",
         "F"
       ],
-      "description": "Lagrangian tracking parameter: pressure_corrector"
+      "description": "Enable cell pressure correction for Lagrangian bubbles"
     },
     "lag_params%rho0": {
       "type": "number",
-      "description": "Lagrangian tracking parameter: rho0"
+      "description": "Initial density"
     },
     "lag_params%smooth_type": {
       "type": "integer",
-      "description": "Lagrangian tracking parameter: smooth_type"
+      "description": "Smoothing function type (1=Gaussian, 2=Delta 3x3)"
     },
     "lag_params%solver_approach": {
       "type": "integer",
-      "description": "Lagrangian tracking parameter: solver_approach"
+      "description": "Lagrangian solver approach (1=one-way, 2=two-way coupling)"
     },
     "lag_params%valmaxvoid": {
       "type": "number",
-      "description": "Lagrangian tracking parameter: valmaxvoid"
+      "description": "Maximum permitted void fraction"
     },
     "lag_params%write_bubbles": {
       "type": "string",
@@ -3620,7 +3620,7 @@
         "T",
         "F"
       ],
-      "description": "Lagrangian tracking parameter: write_bubbles"
+      "description": "Write bubble evolution data each time step"
     },
     "lag_params%write_bubbles_stats": {
       "type": "string",
@@ -3628,11 +3628,11 @@
         "T",
         "F"
       ],
-      "description": "Lagrangian tracking parameter: write_bubbles_stats"
+      "description": "Write max/min radius statistics for bubbles"
     },
     "lag_params%x0": {
       "type": "number",
-      "description": "Lagrangian tracking parameter: x0"
+      "description": "Initial bubble position"
     },
     "lag_pos_prev_wrt": {
       "type": "string",
@@ -3640,7 +3640,7 @@
         "T",
         "F"
       ],
-      "description": "Write Lagrangian pos_prev field"
+      "description": "Write Lagrangian bubble previous position"
     },
     "lag_pos_wrt": {
       "type": "string",
@@ -3648,7 +3648,7 @@
         "T",
         "F"
       ],
-      "description": "Write Lagrangian pos field"
+      "description": "Write Lagrangian bubble position"
     },
     "lag_pres_wrt": {
       "type": "string",
@@ -3656,7 +3656,7 @@
         "T",
         "F"
       ],
-      "description": "Write Lagrangian pres field"
+      "description": "Write Lagrangian bubble pressure"
     },
     "lag_r0_wrt": {
       "type": "string",
@@ -3664,7 +3664,7 @@
         "T",
         "F"
       ],
-      "description": "Write Lagrangian r0 field"
+      "description": "Write Lagrangian initial bubble radius"
     },
     "lag_rad_wrt": {
       "type": "string",
@@ -3672,7 +3672,7 @@
         "T",
         "F"
       ],
-      "description": "Write Lagrangian rad field"
+      "description": "Write Lagrangian bubble radius"
     },
     "lag_rmax_wrt": {
       "type": "string",
@@ -3680,7 +3680,7 @@
         "T",
         "F"
       ],
-      "description": "Write Lagrangian rmax field"
+      "description": "Write Lagrangian max bubble radius"
     },
     "lag_rmin_wrt": {
       "type": "string",
@@ -3688,7 +3688,7 @@
         "T",
         "F"
       ],
-      "description": "Write Lagrangian rmin field"
+      "description": "Write Lagrangian min bubble radius"
     },
     "lag_rvel_wrt": {
       "type": "string",
@@ -3696,7 +3696,7 @@
         "T",
         "F"
       ],
-      "description": "Write Lagrangian rvel field"
+      "description": "Write Lagrangian bubble radial velocity"
     },
     "lag_txt_wrt": {
       "type": "string",
@@ -3704,7 +3704,7 @@
         "T",
         "F"
       ],
-      "description": "Write Lagrangian txt field"
+      "description": "Write Lagrangian data to text files"
     },
     "lag_vel_wrt": {
       "type": "string",
@@ -3712,7 +3712,7 @@
         "T",
         "F"
       ],
-      "description": "Write Lagrangian vel field"
+      "description": "Write Lagrangian bubble velocity"
     },
     "liutex_wrt": {
       "type": "string",

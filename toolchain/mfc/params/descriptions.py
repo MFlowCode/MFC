@@ -426,7 +426,24 @@ PATTERNS = [
     (r"omega_wrt\((\d+)\)", "Write vorticity component {0}"),
     (r"chem_wrt_Y\((\d+)\)", "Write mass fraction of species {0}"),
 
-    # Lagrangian output patterns
+    # Lagrangian output patterns - specific fields first
+    (r"lag_pos_wrt", "Write Lagrangian bubble position"),
+    (r"lag_pos_prev_wrt", "Write Lagrangian bubble previous position"),
+    (r"lag_vel_wrt", "Write Lagrangian bubble velocity"),
+    (r"lag_rvel_wrt", "Write Lagrangian bubble radial velocity"),
+    (r"lag_rad_wrt", "Write Lagrangian bubble radius"),
+    (r"lag_r0_wrt", "Write Lagrangian initial bubble radius"),
+    (r"lag_rmax_wrt", "Write Lagrangian max bubble radius"),
+    (r"lag_rmin_wrt", "Write Lagrangian min bubble radius"),
+    (r"lag_pres_wrt", "Write Lagrangian bubble pressure"),
+    (r"lag_mv_wrt", "Write Lagrangian vapor mass"),
+    (r"lag_mg_wrt", "Write Lagrangian gas mass"),
+    (r"lag_db_wrt", "Write Lagrangian bubble diameter"),
+    (r"lag_dphidt_wrt", "Write Lagrangian void fraction time derivative"),
+    (r"lag_betaT_wrt", "Write Lagrangian thermal beta coefficient"),
+    (r"lag_betaC_wrt", "Write Lagrangian concentration beta coefficient"),
+    (r"lag_id_wrt", "Write Lagrangian bubble ID"),
+    (r"lag_txt_wrt", "Write Lagrangian data to text files"),
     (r"lag_(\w+)_wrt", "Write Lagrangian {0} field"),
 
     # Body force patterns
@@ -443,10 +460,31 @@ PATTERNS = [
     (r"simplex_params%perturb_vel_scale\((\d+)\)", "Velocity perturbation scale for direction {0}"),
     (r"simplex_params%perturb_vel_offset\((\d+),(\d+)\)", "Velocity perturbation offset ({1}) for direction {0}"),
 
-    # lag_params patterns
+    # lag_params patterns - specific fields first
+    (r"lag_params%solver_approach", "Lagrangian solver approach (1=one-way, 2=two-way coupling)"),
+    (r"lag_params%cluster_type", "Cluster model for pressure at infinity"),
+    (r"lag_params%pressure_corrector", "Enable cell pressure correction for Lagrangian bubbles"),
+    (r"lag_params%smooth_type", "Smoothing function type (1=Gaussian, 2=Delta 3x3)"),
+    (r"lag_params%heatTransfer_model", "Enable heat transfer at bubble-liquid interface"),
+    (r"lag_params%massTransfer_model", "Enable mass transfer at bubble-liquid interface"),
+    (r"lag_params%write_bubbles", "Write bubble evolution data each time step"),
+    (r"lag_params%write_bubbles_stats", "Write max/min radius statistics for bubbles"),
+    (r"lag_params%nBubs_glb", "Global number of Lagrangian bubbles"),
+    (r"lag_params%epsilonb", "Standard deviation scaling for Gaussian smoothing"),
+    (r"lag_params%charwidth", "Domain virtual depth for 2D simulations"),
+    (r"lag_params%valmaxvoid", "Maximum permitted void fraction"),
+    (r"lag_params%T0", "Initial bubble temperature"),
+    (r"lag_params%Thost", "Host fluid temperature"),
+    (r"lag_params%c0", "Initial sound speed"),
+    (r"lag_params%rho0", "Initial density"),
+    (r"lag_params%x0", "Initial bubble position"),
     (r"lag_params%(\w+)", "Lagrangian tracking parameter: {0}"),
 
-    # chem_params patterns
+    # chem_params patterns - specific fields first
+    (r"chem_params%diffusion", "Enable species diffusion for chemistry"),
+    (r"chem_params%reactions", "Enable chemical reactions"),
+    (r"chem_params%gamma_method", "Gamma calculation method (1=formulation, 2=cp/cv ratio)"),
+    (r"chem_params%transport_model", "Transport model selection for chemistry"),
     (r"chem_params%(\w+)", "Chemistry parameter: {0}"),
 
     # fluid_rho patterns

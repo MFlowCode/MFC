@@ -423,23 +423,23 @@ MFC supports **3,400** case parameters organized into families.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `lag_params%%T0` | Real | Lagrangian tracking parameter: T0 |
-| `lag_params%%Thost` | Real | Lagrangian tracking parameter: Thost |
-| `lag_params%%c0` | Real | Lagrangian tracking parameter: c0 |
-| `lag_params%%charwidth` | Real | Lagrangian tracking parameter: charwidth |
-| `lag_params%%cluster_type` | Integer | Lagrangian tracking parameter: cluster_type |
-| `lag_params%%epsilonb` | Real | Lagrangian tracking parameter: epsilonb |
-| `lag_params%%heatTransfer_model` | Logical (T/F) | Lagrangian tracking parameter: heatTransfer_model |
-| `lag_params%%massTransfer_model` | Logical (T/F) | Lagrangian tracking parameter: massTransfer_model |
-| `lag_params%%nBubs_glb` | Integer | Lagrangian tracking parameter: nBubs_glb |
-| `lag_params%%pressure_corrector` | Logical (T/F) | Lagrangian tracking parameter: pressure_corrector |
-| `lag_params%%rho0` | Real | Lagrangian tracking parameter: rho0 |
-| `lag_params%%smooth_type` | Integer | Lagrangian tracking parameter: smooth_type |
-| `lag_params%%solver_approach` | Integer | Lagrangian tracking parameter: solver_approach |
-| `lag_params%%valmaxvoid` | Real | Lagrangian tracking parameter: valmaxvoid |
-| `lag_params%%write_bubbles` | Logical (T/F) | Lagrangian tracking parameter: write_bubbles |
-| `lag_params%%write_bubbles_stats` | Logical (T/F) | Lagrangian tracking parameter: write_bubbles_stats |
-| `lag_params%%x0` | Real | Lagrangian tracking parameter: x0 |
+| `lag_params%%T0` | Real | Initial bubble temperature |
+| `lag_params%%Thost` | Real | Host fluid temperature |
+| `lag_params%%c0` | Real | Initial sound speed |
+| `lag_params%%charwidth` | Real | Domain virtual depth for 2D simulations |
+| `lag_params%%cluster_type` | Integer | Cluster model for pressure at infinity |
+| `lag_params%%epsilonb` | Real | Standard deviation scaling for Gaussian smoothing |
+| `lag_params%%heatTransfer_model` | Logical (T/F) | Enable heat transfer at bubble-liquid interface |
+| `lag_params%%massTransfer_model` | Logical (T/F) | Enable mass transfer at bubble-liquid interface |
+| `lag_params%%nBubs_glb` | Integer | Global number of Lagrangian bubbles |
+| `lag_params%%pressure_corrector` | Logical (T/F) | Enable cell pressure correction for Lagrangian bubbles |
+| `lag_params%%rho0` | Real | Initial density |
+| `lag_params%%smooth_type` | Integer | Smoothing function type (1=Gaussian, 2=Delta 3x3) |
+| `lag_params%%solver_approach` | Integer | Lagrangian solver approach (1=one-way, 2=two-way coupling) |
+| `lag_params%%valmaxvoid` | Real | Maximum permitted void fraction |
+| `lag_params%%write_bubbles` | Logical (T/F) | Write bubble evolution data each time step |
+| `lag_params%%write_bubbles_stats` | Logical (T/F) | Write max/min radius statistics for bubbles |
+| `lag_params%%x0` | Real | Initial bubble position |
 
 ---
 
@@ -535,10 +535,10 @@ MFC supports **3,400** case parameters organized into families.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `chem_params%%diffusion` | Logical (T/F) | Chemistry parameter: diffusion |
-| `chem_params%%gamma_method` | Integer | Chemistry parameter: gamma_method |
-| `chem_params%%reactions` | Logical (T/F) | Chemistry parameter: reactions |
-| `chem_params%%transport_model` | Integer | Chemistry parameter: transport_model |
+| `chem_params%%diffusion` | Logical (T/F) | Enable species diffusion for chemistry |
+| `chem_params%%gamma_method` | Integer | Gamma calculation method (1=formulation, 2=cp/cv ratio) |
+| `chem_params%%reactions` | Logical (T/F) | Enable chemical reactions |
+| `chem_params%%transport_model` | Integer | Transport model selection for chemistry |
 
 ---
 
@@ -760,24 +760,24 @@ MFC supports **3,400** case parameters organized into families.
 | `k_y` | `k_y` | Body force parameter k in y-direction |
 | `k_z` | `k_z` | Body force parameter k in z-direction |
 | `kappa_wrt` | `kappa_wrt` | Write curvature field |
-| `lag_betaC_wrt` | `lag_betaC_wrt` | Write Lagrangian betaC field |
-| `lag_betaT_wrt` | `lag_betaT_wrt` | Write Lagrangian betaT field |
-| `lag_db_wrt` | `lag_db_wrt` | Write Lagrangian db field |
-| `lag_dphidt_wrt` | `lag_dphidt_wrt` | Write Lagrangian dphidt field |
+| `lag_betaC_wrt` | `lag_betaC_wrt` | Write Lagrangian concentration beta coefficient |
+| `lag_betaT_wrt` | `lag_betaT_wrt` | Write Lagrangian thermal beta coefficient |
+| `lag_db_wrt` | `lag_db_wrt` | Write Lagrangian bubble diameter |
+| `lag_dphidt_wrt` | `lag_dphidt_wrt` | Write Lagrangian void fraction time derivative |
 | `lag_header` | `lag_header` | Enable Lagrangian output header |
-| `lag_id_wrt` | `lag_id_wrt` | Write Lagrangian id field |
-| `lag_mg_wrt` | `lag_mg_wrt` | Write Lagrangian mg field |
-| `lag_mv_wrt` | `lag_mv_wrt` | Write Lagrangian mv field |
-| `lag_pos_prev_wrt` | `lag_pos_prev_wrt` | Write Lagrangian pos_prev field |
-| `lag_pos_wrt` | `lag_pos_wrt` | Write Lagrangian pos field |
-| `lag_pres_wrt` | `lag_pres_wrt` | Write Lagrangian pres field |
-| `lag_r0_wrt` | `lag_r0_wrt` | Write Lagrangian r0 field |
-| `lag_rad_wrt` | `lag_rad_wrt` | Write Lagrangian rad field |
-| `lag_rmax_wrt` | `lag_rmax_wrt` | Write Lagrangian rmax field |
-| `lag_rmin_wrt` | `lag_rmin_wrt` | Write Lagrangian rmin field |
-| `lag_rvel_wrt` | `lag_rvel_wrt` | Write Lagrangian rvel field |
-| `lag_txt_wrt` | `lag_txt_wrt` | Write Lagrangian txt field |
-| `lag_vel_wrt` | `lag_vel_wrt` | Write Lagrangian vel field |
+| `lag_id_wrt` | `lag_id_wrt` | Write Lagrangian bubble ID |
+| `lag_mg_wrt` | `lag_mg_wrt` | Write Lagrangian gas mass |
+| `lag_mv_wrt` | `lag_mv_wrt` | Write Lagrangian vapor mass |
+| `lag_pos_prev_wrt` | `lag_pos_prev_wrt` | Write Lagrangian bubble previous position |
+| `lag_pos_wrt` | `lag_pos_wrt` | Write Lagrangian bubble position |
+| `lag_pres_wrt` | `lag_pres_wrt` | Write Lagrangian bubble pressure |
+| `lag_r0_wrt` | `lag_r0_wrt` | Write Lagrangian initial bubble radius |
+| `lag_rad_wrt` | `lag_rad_wrt` | Write Lagrangian bubble radius |
+| `lag_rmax_wrt` | `lag_rmax_wrt` | Write Lagrangian max bubble radius |
+| `lag_rmin_wrt` | `lag_rmin_wrt` | Write Lagrangian min bubble radius |
+| `lag_rvel_wrt` | `lag_rvel_wrt` | Write Lagrangian bubble radial velocity |
+| `lag_txt_wrt` | `lag_txt_wrt` | Write Lagrangian data to text files |
+| `lag_vel_wrt` | `lag_vel_wrt` | Write Lagrangian bubble velocity |
 | `liutex_wrt` | `liutex_wrt` | Write Liutex vortex field |
 | `loops_x` | `loops_x` | Number of times to apply grid stretching in x |
 | `loops_y` | `loops_y` | Number of times to apply grid stretching in y |
