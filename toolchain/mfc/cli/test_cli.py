@@ -3,6 +3,7 @@ Smoke tests for cli/ modules.
 
 Verifies that modules can be imported and basic functionality works.
 """
+# pylint: disable=import-outside-toplevel
 
 import unittest
 

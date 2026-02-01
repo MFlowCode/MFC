@@ -3,6 +3,7 @@ Unit tests for params/registry.py module.
 
 Tests registry functionality, freezing, and stage queries.
 """
+# pylint: disable=import-outside-toplevel
 
 import unittest
 from ..params.registry import ParamRegistry, RegistryFrozenError
@@ -120,7 +121,7 @@ class TestGlobalRegistry(unittest.TestCase):
 
     def test_global_registry_cannot_be_modified(self):
         """Global REGISTRY should reject new registrations."""
-        from ..params import REGISTRY, RegistryFrozenError
+        from ..params import REGISTRY
 
         with self.assertRaises(RegistryFrozenError):
             REGISTRY.register(

@@ -5,7 +5,7 @@ Single file containing all ~3,300 parameter definitions using loops.
 This replaces the definitions/ directory.
 """
 
-from typing import Dict, List, Any, Union
+from typing import Dict, Any
 from .schema import ParamDef, ParamType, Stage
 from .registry import REGISTRY
 

@@ -34,7 +34,6 @@ from .schema import ParamDef, Stage
 
 class RegistryFrozenError(RuntimeError):
     """Raised when attempting to modify a frozen registry."""
-    pass
 
 
 class ParamRegistry:

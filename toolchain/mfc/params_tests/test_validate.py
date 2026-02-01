@@ -11,9 +11,6 @@ from ..params.validate import (
     validate_case,
     format_validation_results,
 )
-from ..params.schema import ParamDef, ParamType, Stage
-from ..params.registry import REGISTRY
-from ..params import definitions  # noqa: F401  Populate registry
 
 
 class TestValidateConstraints(unittest.TestCase):
@@ -90,13 +87,13 @@ class TestValidateCase(unittest.TestCase):
             "p": 0,
             "dt": 1e-5,
         }
-        errors, warnings = validate_case(params)
+        errors, _ = validate_case(params)
         self.assertEqual(errors, [])
 
     def test_warn_false_skips_warnings(self):
         """warn=False should skip dependency warnings."""
         params = {"m": 100}
-        errors, warnings = validate_case(params, warn=False)
+        _, warnings = validate_case(params, warn=False)
         self.assertEqual(warnings, [])
 
     def test_returns_tuple(self):

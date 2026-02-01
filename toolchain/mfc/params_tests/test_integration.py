@@ -3,6 +3,7 @@ Integration tests for params module with case_dicts.
 
 Tests that the parameter registry integrates correctly with case_dicts.py.
 """
+# pylint: disable=import-outside-toplevel
 
 import unittest
 from ..params import REGISTRY

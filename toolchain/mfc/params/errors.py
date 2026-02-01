@@ -19,7 +19,7 @@ Examples:
 - "'m' must be >= 0, got -1"
 """
 
-from typing import Any, List, Optional, Union
+from typing import Any, List, Optional
 
 
 def format_param(name: str) -> str:
