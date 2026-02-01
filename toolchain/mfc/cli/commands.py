@@ -711,10 +711,21 @@ LOAD_COMMAND = Command(
 
 LINT_COMMAND = Command(
     name="lint",
-    help="Lints all code after editing.",
-    description="Run pylint on MFC's toolchain Python code.",
+    help="Lints and tests all toolchain code.",
+    description="Run pylint and unit tests on MFC's toolchain Python code.",
+    arguments=[
+        Argument(
+            name="no-test",
+            help="Skip running unit tests (only run pylint).",
+            action=ArgAction.STORE_TRUE,
+        ),
+    ],
     examples=[
-        Example("./mfc.sh lint", "Run pylint on Python code"),
+        Example("./mfc.sh lint", "Run pylint and unit tests"),
+        Example("./mfc.sh lint --no-test", "Run only pylint (skip unit tests)"),
+    ],
+    key_options=[
+        ("--no-test", "Skip unit tests, only run pylint"),
     ],
 )
 

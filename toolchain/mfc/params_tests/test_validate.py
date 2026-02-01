@@ -12,6 +12,7 @@ from ..params.validate import (
     validate_case,
     format_validation_results,
 )
+from ..params.suggest import RAPIDFUZZ_AVAILABLE
 
 
 class TestValidateConstraints(unittest.TestCase):
@@ -77,6 +78,7 @@ class TestCheckUnknownParams(unittest.TestCase):
         self.assertIn("Unknown parameter", errors[0])
         self.assertIn("totally_unknown_xyz_123", errors[0])
 
+    @unittest.skipUnless(RAPIDFUZZ_AVAILABLE, "rapidfuzz not installed")
     def test_similar_param_suggests_correction(self):
         """Typo near valid param should suggest 'did you mean?'."""
         # "model_eqn" is close to "model_eqns"
@@ -90,6 +92,7 @@ class TestCheckUnknownParams(unittest.TestCase):
         self.assertIn("model_eqns", errors[0])
         self.assertIn("Did you mean", errors[0])
 
+    @unittest.skipUnless(RAPIDFUZZ_AVAILABLE, "rapidfuzz not installed")
     def test_weno_typo_suggests_correction(self):
         """Typo in weno_order should suggest correction."""
         params = {

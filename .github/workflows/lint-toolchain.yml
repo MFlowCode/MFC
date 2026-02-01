@@ -18,7 +18,7 @@ jobs:
     - name: Initialize MFC
       run: ./mfc.sh init
 
-    - name: Lint the toolchain
+    - name: Lint and test the toolchain
       run: ./mfc.sh lint
 
     - name: Check generated files are up to date
@@ -32,11 +32,6 @@ jobs:
         ./mfc.sh test --help
         ./mfc.sh params --count
         ./mfc.sh new --list
-
-    - name: Parameter registry validation
-      run: |
-        source build/venv/bin/activate
-        python3 -c "from mfc.params import REGISTRY; from mfc.run.case_dicts import ALL; n=len(REGISTRY.all_params); assert n>3000; print(f'Registry: {n} parameters'); assert set(REGISTRY.all_params.keys())==set(ALL.keys()); print('Registry matches case_dicts')"
 
     - name: Bash completion syntax check
       run: bash -n toolchain/completions/mfc.bash
