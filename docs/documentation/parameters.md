@@ -63,14 +63,14 @@ MFC supports **3,400** case parameters organized into families.
 | `patch_icpp(N)%%Bx` | `patch_icpp(1)%%Bx` | X-component of magnetic field for patch 1 |
 | `patch_icpp(N)%%By` | `patch_icpp(1)%%By` | Y-component of magnetic field for patch 1 |
 | `patch_icpp(N)%%Bz` | `patch_icpp(1)%%Bz` | Z-component of magnetic field for patch 1 |
-| `patch_icpp(N)%%Y(N)` | `patch_icpp(1)%%Y(1)` | Mass fraction of species 1 for patch 1 |
-| `patch_icpp(N)%%a(N)` | `patch_icpp(1)%%a(2)` | Shape coefficient a(2) for patch 1 |
+| `patch_icpp(N)%%Y(M)` | `patch_icpp(1)%%Y(1)` | Mass fraction of species 1 for patch 1 |
+| `patch_icpp(N)%%a(M)` | `patch_icpp(1)%%a(2)` | Shape coefficient a(2) for patch 1 |
 | `patch_icpp(N)%%alpha` | `patch_icpp(1)%%alpha` | Volume fraction for patch 1 |
-| `patch_icpp(N)%%alpha(N)` | `patch_icpp(1)%%alpha(1)` | Volume fraction of fluid 1 for patch 1 |
+| `patch_icpp(N)%%alpha(M)` | `patch_icpp(1)%%alpha(1)` | Volume fraction of fluid 1 for patch 1 |
 | `patch_icpp(N)%%alpha_rho` | `patch_icpp(1)%%alpha_rho` | Partial density for patch 1 |
-| `patch_icpp(N)%%alpha_rho(N)` | `patch_icpp(1)%%alpha_rho(1)` | Partial density of fluid 1 for patch 1 |
+| `patch_icpp(N)%%alpha_rho(M)` | `patch_icpp(1)%%alpha_rho(1)` | Partial density of fluid 1 for patch 1 |
 | `patch_icpp(N)%%alter_patch` | `patch_icpp(10)%%alter_patch` | Enable patch alteration for patch 10 |
-| `patch_icpp(N)%%alter_patch(N)` | `patch_icpp(10)%%alter_patch(1)` | Alter patch 1 with patch 10 |
+| `patch_icpp(N)%%alter_patch(M)` | `patch_icpp(10)%%alter_patch(1)` | Alter patch 1 with patch 10 |
 | `patch_icpp(N)%%beta` | `patch_icpp(1)%%beta` | Shape parameter beta for patch 1 |
 | `patch_icpp(N)%%cf_val` | `patch_icpp(1)%%cf_val` | Color function value for patch 1 |
 | `patch_icpp(N)%%cv` | `patch_icpp(1)%%cv` | Specific heat at constant volume for patch 1 |
@@ -83,14 +83,14 @@ MFC supports **3,400** case parameters organized into families.
 | `patch_icpp(N)%%length_z` | `patch_icpp(1)%%length_z` | Z-dimension length for patch 1 |
 | `patch_icpp(N)%%m0` | `patch_icpp(1)%%m0` | Initial bubble mass for patch 1 |
 | `patch_icpp(N)%%model_filepath` | `patch_icpp(1)%%model_filepath` | STL model file path for patch 1 |
-| `patch_icpp(N)%%model_rotate(N)` | `patch_icpp(1)%%model_rotate(1)` | Model rotation component 1 for patch 1 |
-| `patch_icpp(N)%%model_scale(N)` | `patch_icpp(1)%%model_scale(1)` | Model scale component 1 for patch 1 |
+| `patch_icpp(N)%%model_rotate(M)` | `patch_icpp(1)%%model_rotate(1)` | Model rotation component 1 for patch 1 |
+| `patch_icpp(N)%%model_scale(M)` | `patch_icpp(1)%%model_scale(1)` | Model scale component 1 for patch 1 |
 | `patch_icpp(N)%%model_spc` | `patch_icpp(1)%%model_spc` | Model spacing for patch 1 |
 | `patch_icpp(N)%%model_threshold` | `patch_icpp(1)%%model_threshold` | Model threshold for patch 1 |
-| `patch_icpp(N)%%model_translate(N)` | `patch_icpp(1)%%model_translate(1)` | Model translation component 1 for patch 1 |
+| `patch_icpp(N)%%model_translate(M)` | `patch_icpp(1)%%model_translate(1)` | Model translation component 1 for patch 1 |
 | `patch_icpp(N)%%non_axis_sym` | `patch_icpp(1)%%non_axis_sym` | Non-axisymmetric parameter for patch 1 |
 | `patch_icpp(N)%%normal` | `patch_icpp(1)%%normal` | Normal direction for patch 1 |
-| `patch_icpp(N)%%normal(N)` | `patch_icpp(1)%%normal(1)` | Normal component 1 for patch 1 |
+| `patch_icpp(N)%%normal(M)` | `patch_icpp(1)%%normal(1)` | Normal component 1 for patch 1 |
 | `patch_icpp(N)%%p0` | `patch_icpp(1)%%p0` | Initial bubble pressure for patch 1 |
 | `patch_icpp(N)%%pi_inf` | `patch_icpp(1)%%pi_inf` | Stiffness pressure for patch 1 |
 | `patch_icpp(N)%%pres` | `patch_icpp(1)%%pres` | Pressure for patch 1 |
@@ -98,16 +98,16 @@ MFC supports **3,400** case parameters organized into families.
 | `patch_icpp(N)%%qvp` | `patch_icpp(1)%%qvp` | Heat of formation prime for patch 1 |
 | `patch_icpp(N)%%r0` | `patch_icpp(1)%%r0` | Initial bubble radius for patch 1 |
 | `patch_icpp(N)%%radii` | `patch_icpp(1)%%radii` | Radii for patch 1 |
-| `patch_icpp(N)%%radii(N)` | `patch_icpp(1)%%radii(1)` | Radius component 1 for patch 1 |
+| `patch_icpp(N)%%radii(M)` | `patch_icpp(1)%%radii(1)` | Radius component 1 for patch 1 |
 | `patch_icpp(N)%%radius` | `patch_icpp(1)%%radius` | Radius for patch 1 |
 | `patch_icpp(N)%%rho` | `patch_icpp(1)%%rho` | Density for patch 1 |
 | `patch_icpp(N)%%smooth_coeff` | `patch_icpp(1)%%smooth_coeff` | Smoothing coefficient for patch 1 |
 | `patch_icpp(N)%%smooth_patch_id` | `patch_icpp(1)%%smooth_patch_id` | Patch ID to smooth against for patch 1 |
 | `patch_icpp(N)%%smoothen` | `patch_icpp(1)%%smoothen` | Enable smoothing for patch 1 |
-| `patch_icpp(N)%%tau_e(N)` | `patch_icpp(1)%%tau_e(1)` | Elastic stress component 1 for patch 1 |
+| `patch_icpp(N)%%tau_e(M)` | `patch_icpp(1)%%tau_e(1)` | Elastic stress component 1 for patch 1 |
 | `patch_icpp(N)%%v0` | `patch_icpp(1)%%v0` | Initial bubble velocity for patch 1 |
 | `patch_icpp(N)%%vel` | `patch_icpp(1)%%vel` | Velocity magnitude for patch 1 |
-| `patch_icpp(N)%%vel(N)` | `patch_icpp(1)%%vel(1)` | Velocity component 1 for patch 1 |
+| `patch_icpp(N)%%vel(M)` | `patch_icpp(1)%%vel(1)` | Velocity component 1 for patch 1 |
 | `patch_icpp(N)%%x_centroid` | `patch_icpp(1)%%x_centroid` | X-coordinate of centroid for patch 1 |
 | `patch_icpp(N)%%y_centroid` | `patch_icpp(1)%%y_centroid` | Y-coordinate of centroid for patch 1 |
 | `patch_icpp(N)%%z_centroid` | `patch_icpp(1)%%z_centroid` | Z-coordinate of centroid for patch 1 |
@@ -124,8 +124,8 @@ MFC supports **3,400** case parameters organized into families.
 
 | Pattern | Example | Description |
 |---------|---------|-------------|
-| `patch_ib(N)%%angles(N)` | `patch_ib(1)%%angles(1)` | Orientation angle 1 for IB patch 1 |
-| `patch_ib(N)%%angular_vel(N)` | `patch_ib(1)%%angular_vel(1)` | Angular velocity component 1 for IB patch 1 |
+| `patch_ib(N)%%angles(M)` | `patch_ib(1)%%angles(1)` | Orientation angle 1 for IB patch 1 |
+| `patch_ib(N)%%angular_vel(M)` | `patch_ib(1)%%angular_vel(1)` | Angular velocity component 1 for IB patch 1 |
 | `patch_ib(N)%%c` | `patch_ib(1)%%c` | Shape parameter c for IB patch 1 |
 | `patch_ib(N)%%geometry` | `patch_ib(1)%%geometry` | Geometry type for immersed boundary 1 |
 | `patch_ib(N)%%length_x` | `patch_ib(1)%%length_x` | X-dimension length for IB patch 1 |
@@ -134,18 +134,18 @@ MFC supports **3,400** case parameters organized into families.
 | `patch_ib(N)%%m` | `patch_ib(1)%%m` | Shape parameter m for IB patch 1 |
 | `patch_ib(N)%%mass` | `patch_ib(1)%%mass` | Mass for IB patch 1 |
 | `patch_ib(N)%%model_filepath` | `patch_ib(1)%%model_filepath` | STL model file path for IB patch 1 |
-| `patch_ib(N)%%model_rotate(N)` | `patch_ib(1)%%model_rotate(1)` | Model rotation component 1 for IB patch 1 |
-| `patch_ib(N)%%model_scale(N)` | `patch_ib(1)%%model_scale(1)` | Model scale component 1 for IB patch 1 |
+| `patch_ib(N)%%model_rotate(M)` | `patch_ib(1)%%model_rotate(1)` | Model rotation component 1 for IB patch 1 |
+| `patch_ib(N)%%model_scale(M)` | `patch_ib(1)%%model_scale(1)` | Model scale component 1 for IB patch 1 |
 | `patch_ib(N)%%model_spc` | `patch_ib(1)%%model_spc` | Model spacing for IB patch 1 |
 | `patch_ib(N)%%model_threshold` | `patch_ib(1)%%model_threshold` | Model threshold for IB patch 1 |
-| `patch_ib(N)%%model_translate(N)` | `patch_ib(1)%%model_translate(1)` | Model translation component 1 for IB patch 1 |
+| `patch_ib(N)%%model_translate(M)` | `patch_ib(1)%%model_translate(1)` | Model translation component 1 for IB patch 1 |
 | `patch_ib(N)%%moving_ibm` | `patch_ib(1)%%moving_ibm` | Enable moving boundary for IB patch 1 |
 | `patch_ib(N)%%p` | `patch_ib(1)%%p` | Shape parameter p for IB patch 1 |
 | `patch_ib(N)%%radius` | `patch_ib(1)%%radius` | Radius for IB patch 1 |
 | `patch_ib(N)%%slip` | `patch_ib(1)%%slip` | Enable slip condition for IB patch 1 |
 | `patch_ib(N)%%t` | `patch_ib(1)%%t` | Shape parameter t for IB patch 1 |
 | `patch_ib(N)%%theta` | `patch_ib(1)%%theta` | Theta angle for IB patch 1 |
-| `patch_ib(N)%%vel(N)` | `patch_ib(1)%%vel(1)` | Velocity component 1 for IB patch 1 |
+| `patch_ib(N)%%vel(M)` | `patch_ib(1)%%vel(1)` | Velocity component 1 for IB patch 1 |
 | `patch_ib(N)%%x_centroid` | `patch_ib(1)%%x_centroid` | X-coordinate of centroid for IB patch 1 |
 | `patch_ib(N)%%y_centroid` | `patch_ib(1)%%y_centroid` | Y-coordinate of centroid for IB patch 1 |
 | `patch_ib(N)%%z_centroid` | `patch_ib(1)%%z_centroid` | Z-coordinate of centroid for IB patch 1 |
@@ -165,7 +165,7 @@ MFC supports **3,400** case parameters organized into families.
 | `fluid_pp(N)%%D_v` | `fluid_pp(1)%%D_v` |  |
 | `fluid_pp(N)%%G` | `fluid_pp(1)%%G` | Shear modulus for fluid 1 |
 | `fluid_pp(N)%%M_v` | `fluid_pp(1)%%M_v` |  |
-| `fluid_pp(N)%%Re(N)` | `fluid_pp(1)%%Re(1)` | Reynolds number component 1 for fluid 1 |
+| `fluid_pp(N)%%Re(M)` | `fluid_pp(1)%%Re(1)` | Reynolds number component 1 for fluid 1 |
 | `fluid_pp(N)%%cp_v` | `fluid_pp(1)%%cp_v` |  |
 | `fluid_pp(N)%%cv` | `fluid_pp(1)%%cv` | Specific heat at constant volume for fluid 1 |
 | `fluid_pp(N)%%gamma` | `fluid_pp(1)%%gamma` | Specific heat ratio for fluid 1 |
@@ -191,10 +191,10 @@ MFC supports **3,400** case parameters organized into families.
 
 | Pattern | Example | Description |
 |---------|---------|-------------|
-| `patch_bc(N)%%centroid(N)` | `patch_bc(1)%%centroid(1)` | Centroid component 1 for BC patch 1 |
+| `patch_bc(N)%%centroid(M)` | `patch_bc(1)%%centroid(1)` | Centroid component 1 for BC patch 1 |
 | `patch_bc(N)%%dir` | `patch_bc(1)%%dir` | Direction for BC patch 1 |
 | `patch_bc(N)%%geometry` | `patch_bc(1)%%geometry` | Geometry type for BC patch 1 |
-| `patch_bc(N)%%length(N)` | `patch_bc(1)%%length(1)` | Length component 1 for BC patch 1 |
+| `patch_bc(N)%%length(M)` | `patch_bc(1)%%length(1)` | Length component 1 for BC patch 1 |
 | `patch_bc(N)%%loc` | `patch_bc(1)%%loc` | Location for BC patch 1 |
 | `patch_bc(N)%%radius` | `patch_bc(1)%%radius` | Radius for BC patch 1 |
 | `patch_bc(N)%%type` | `patch_bc(1)%%type` | BC type for patch 1 |
@@ -227,7 +227,7 @@ MFC supports **3,400** case parameters organized into families.
 | `acoustic(N)%%gauss_sigma_time` | `acoustic(1)%%gauss_sigma_time` | Gaussian temporal width for acoustic source 1 |
 | `acoustic(N)%%height` | `acoustic(1)%%height` | Height for acoustic source 1 |
 | `acoustic(N)%%length` | `acoustic(1)%%length` | Length for acoustic source 1 |
-| `acoustic(N)%%loc(N)` | `acoustic(1)%%loc(1)` | Location component 1 for acoustic source 1 |
+| `acoustic(N)%%loc(M)` | `acoustic(1)%%loc(1)` | Location component 1 for acoustic source 1 |
 | `acoustic(N)%%mag` | `acoustic(1)%%mag` | Magnitude for acoustic source 1 |
 | `acoustic(N)%%npulse` | `acoustic(1)%%npulse` | Number of pulses for acoustic source 1 |
 | `acoustic(N)%%num_elements` | `acoustic(1)%%num_elements` | Number of array elements for acoustic source 1 |
@@ -250,48 +250,11 @@ MFC supports **3,400** case parameters organized into families.
 |---------|---------|-------------|
 | `simplex_params%%perturb_dens(N)` | `simplex_params%%perturb_dens(1)` | Enable density perturbation for fluid 1 |
 | `simplex_params%%perturb_dens_freq(N)` | `simplex_params%%perturb_dens_freq(1)` | Density perturbation frequency for fluid 1 |
-| `simplex_params%%perturb_dens_offset(1, 1)` | `simplex_params%%perturb_dens_offset(1, 1)` | Density perturbation offset (1) for fluid 1 |
-| `simplex_params%%perturb_dens_offset(1, 2)` | `simplex_params%%perturb_dens_offset(1, 2)` | Density perturbation offset (2) for fluid 1 |
-| `simplex_params%%perturb_dens_offset(1, 3)` | `simplex_params%%perturb_dens_offset(1, 3)` | Density perturbation offset (3) for fluid 1 |
-| `simplex_params%%perturb_dens_offset(10, 1)` | `simplex_params%%perturb_dens_offset(10, 1)` | Density perturbation offset (1) for fluid 10 |
-| `simplex_params%%perturb_dens_offset(10, 2)` | `simplex_params%%perturb_dens_offset(10, 2)` | Density perturbation offset (2) for fluid 10 |
-| `simplex_params%%perturb_dens_offset(10, 3)` | `simplex_params%%perturb_dens_offset(10, 3)` | Density perturbation offset (3) for fluid 10 |
-| `simplex_params%%perturb_dens_offset(2, 1)` | `simplex_params%%perturb_dens_offset(2, 1)` | Density perturbation offset (1) for fluid 2 |
-| `simplex_params%%perturb_dens_offset(2, 2)` | `simplex_params%%perturb_dens_offset(2, 2)` | Density perturbation offset (2) for fluid 2 |
-| `simplex_params%%perturb_dens_offset(2, 3)` | `simplex_params%%perturb_dens_offset(2, 3)` | Density perturbation offset (3) for fluid 2 |
-| `simplex_params%%perturb_dens_offset(3, 1)` | `simplex_params%%perturb_dens_offset(3, 1)` | Density perturbation offset (1) for fluid 3 |
-| `simplex_params%%perturb_dens_offset(3, 2)` | `simplex_params%%perturb_dens_offset(3, 2)` | Density perturbation offset (2) for fluid 3 |
-| `simplex_params%%perturb_dens_offset(3, 3)` | `simplex_params%%perturb_dens_offset(3, 3)` | Density perturbation offset (3) for fluid 3 |
-| `simplex_params%%perturb_dens_offset(4, 1)` | `simplex_params%%perturb_dens_offset(4, 1)` | Density perturbation offset (1) for fluid 4 |
-| `simplex_params%%perturb_dens_offset(4, 2)` | `simplex_params%%perturb_dens_offset(4, 2)` | Density perturbation offset (2) for fluid 4 |
-| `simplex_params%%perturb_dens_offset(4, 3)` | `simplex_params%%perturb_dens_offset(4, 3)` | Density perturbation offset (3) for fluid 4 |
-| `simplex_params%%perturb_dens_offset(5, 1)` | `simplex_params%%perturb_dens_offset(5, 1)` | Density perturbation offset (1) for fluid 5 |
-| `simplex_params%%perturb_dens_offset(5, 2)` | `simplex_params%%perturb_dens_offset(5, 2)` | Density perturbation offset (2) for fluid 5 |
-| `simplex_params%%perturb_dens_offset(5, 3)` | `simplex_params%%perturb_dens_offset(5, 3)` | Density perturbation offset (3) for fluid 5 |
-| `simplex_params%%perturb_dens_offset(6, 1)` | `simplex_params%%perturb_dens_offset(6, 1)` | Density perturbation offset (1) for fluid 6 |
-| `simplex_params%%perturb_dens_offset(6, 2)` | `simplex_params%%perturb_dens_offset(6, 2)` | Density perturbation offset (2) for fluid 6 |
-| `simplex_params%%perturb_dens_offset(6, 3)` | `simplex_params%%perturb_dens_offset(6, 3)` | Density perturbation offset (3) for fluid 6 |
-| `simplex_params%%perturb_dens_offset(7, 1)` | `simplex_params%%perturb_dens_offset(7, 1)` | Density perturbation offset (1) for fluid 7 |
-| `simplex_params%%perturb_dens_offset(7, 2)` | `simplex_params%%perturb_dens_offset(7, 2)` | Density perturbation offset (2) for fluid 7 |
-| `simplex_params%%perturb_dens_offset(7, 3)` | `simplex_params%%perturb_dens_offset(7, 3)` | Density perturbation offset (3) for fluid 7 |
-| `simplex_params%%perturb_dens_offset(8, 1)` | `simplex_params%%perturb_dens_offset(8, 1)` | Density perturbation offset (1) for fluid 8 |
-| `simplex_params%%perturb_dens_offset(8, 2)` | `simplex_params%%perturb_dens_offset(8, 2)` | Density perturbation offset (2) for fluid 8 |
-| `simplex_params%%perturb_dens_offset(8, 3)` | `simplex_params%%perturb_dens_offset(8, 3)` | Density perturbation offset (3) for fluid 8 |
-| `simplex_params%%perturb_dens_offset(9, 1)` | `simplex_params%%perturb_dens_offset(9, 1)` | Density perturbation offset (1) for fluid 9 |
-| `simplex_params%%perturb_dens_offset(9, 2)` | `simplex_params%%perturb_dens_offset(9, 2)` | Density perturbation offset (2) for fluid 9 |
-| `simplex_params%%perturb_dens_offset(9, 3)` | `simplex_params%%perturb_dens_offset(9, 3)` | Density perturbation offset (3) for fluid 9 |
+| `simplex_params%%perturb_dens_offset(N, M)` | `simplex_params%%perturb_dens_offset(1, 1)` | Density perturbation offset (1) for fluid 1 |
 | `simplex_params%%perturb_dens_scale(N)` | `simplex_params%%perturb_dens_scale(1)` | Density perturbation scale for fluid 1 |
 | `simplex_params%%perturb_vel(N)` | `simplex_params%%perturb_vel(1)` | Enable velocity perturbation for direction 1 |
 | `simplex_params%%perturb_vel_freq(N)` | `simplex_params%%perturb_vel_freq(1)` | Velocity perturbation frequency for direction 1 |
-| `simplex_params%%perturb_vel_offset(1,1)` | `simplex_params%%perturb_vel_offset(1,1)` | Velocity perturbation offset (1) for direction 1 |
-| `simplex_params%%perturb_vel_offset(1,2)` | `simplex_params%%perturb_vel_offset(1,2)` | Velocity perturbation offset (2) for direction 1 |
-| `simplex_params%%perturb_vel_offset(1,3)` | `simplex_params%%perturb_vel_offset(1,3)` | Velocity perturbation offset (3) for direction 1 |
-| `simplex_params%%perturb_vel_offset(2,1)` | `simplex_params%%perturb_vel_offset(2,1)` | Velocity perturbation offset (1) for direction 2 |
-| `simplex_params%%perturb_vel_offset(2,2)` | `simplex_params%%perturb_vel_offset(2,2)` | Velocity perturbation offset (2) for direction 2 |
-| `simplex_params%%perturb_vel_offset(2,3)` | `simplex_params%%perturb_vel_offset(2,3)` | Velocity perturbation offset (3) for direction 2 |
-| `simplex_params%%perturb_vel_offset(3,1)` | `simplex_params%%perturb_vel_offset(3,1)` | Velocity perturbation offset (1) for direction 3 |
-| `simplex_params%%perturb_vel_offset(3,2)` | `simplex_params%%perturb_vel_offset(3,2)` | Velocity perturbation offset (2) for direction 3 |
-| `simplex_params%%perturb_vel_offset(3,3)` | `simplex_params%%perturb_vel_offset(3,3)` | Velocity perturbation offset (3) for direction 3 |
+| `simplex_params%%perturb_vel_offset(N, M)` | `simplex_params%%perturb_vel_offset(1,1)` | Velocity perturbation offset (1) for direction 1 |
 | `simplex_params%%perturb_vel_scale(N)` | `simplex_params%%perturb_vel_scale(1)` | Velocity perturbation scale for direction 1 |
 
 ---

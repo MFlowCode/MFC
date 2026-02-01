@@ -32,6 +32,57 @@ def _escape_percent(s: str) -> str:
     return s.replace('%', '%%')
 
 
+def _collapse_indices(name: str) -> str:
+    """
+    Collapse numeric indices to placeholders for pattern grouping.
+
+    Examples:
+        patch_icpp(1)%vel(2) -> patch_icpp(N)%vel(M)
+        simplex_params%perturb_dens_offset(1, 2) -> simplex_params%perturb_dens_offset(N, M)
+        bc_x%vel_in(1) -> bc_x%vel_in(N)
+    """
+    placeholders = ['N', 'M', 'K', 'L', 'P', 'Q']
+    placeholder_idx = 0
+    result = []
+    i = 0
+
+    while i < len(name):
+        if name[i] == '(':
+            # Found opening paren, look for indices
+            j = i + 1
+            paren_content = []
+
+            while j < len(name) and name[j] != ')':
+                paren_content.append(name[j])
+                j += 1
+
+            if j < len(name):  # Found closing paren
+                content = ''.join(paren_content)
+                # Check if content is numeric indices (possibly comma-separated)
+                parts = [p.strip() for p in content.split(',')]
+                if all(p.isdigit() for p in parts):
+                    # Replace each index with a placeholder
+                    new_parts = []
+                    for _ in parts:
+                        if placeholder_idx < len(placeholders):
+                            new_parts.append(placeholders[placeholder_idx])
+                            placeholder_idx += 1
+                        else:
+                            new_parts.append('?')
+                    result.append('(' + ', '.join(new_parts) + ')')
+                    i = j + 1
+                    continue
+
+            # Not a numeric index, keep as-is
+            result.append(name[i])
+            i += 1
+        else:
+            result.append(name[i])
+            i += 1
+
+    return ''.join(result)
+
+
 def _type_to_str(param_type: ParamType) -> str:
     """Convert ParamType to readable string."""
     return {
@@ -163,8 +214,8 @@ def generate_parameter_docs() -> str:  # pylint: disable=too-many-locals,too-man
             # Group by pattern
             patterns: Dict[str, List[str]] = defaultdict(list)
             for name, _ in params:
-                # Extract pattern (replace indices with N)
-                pattern = re.sub(r'\(\d+\)', '(N)', name)
+                # Extract pattern (replace indices with N, M, K, etc.)
+                pattern = _collapse_indices(name)
                 patterns[pattern].append(name)
 
             lines.append("### Patterns")
