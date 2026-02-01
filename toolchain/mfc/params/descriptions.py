@@ -577,9 +577,13 @@ def get_pattern_description(pattern_name: str) -> str:
         desc = re.sub(r"component 2", "component M", desc)
         # Then handle primary index (1 -> N)
         desc = re.sub(r"(patch|fluid|IB patch|source|probe|region|species|direction|component) 1", r"\1 N", desc)
-        # Generic fallback
+        # Generic fallback for space-separated indices
         desc = re.sub(r" 1([,\s]|$)", r" N\1", desc)
         desc = re.sub(r" 2([,\s]|$)", r" M\1", desc)
         desc = re.sub(r" 3([,\s]|$)", r" K\1", desc)
+        # Handle parenthesized indices (e.g., "a(2)" -> "a(M)")
+        desc = re.sub(r"\(1\)", "(N)", desc)
+        desc = re.sub(r"\(2\)", "(M)", desc)
+        desc = re.sub(r"\(3\)", "(K)", desc)
 
     return desc
