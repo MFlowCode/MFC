@@ -321,8 +321,8 @@ class Case:
 #:set recon_type            = {recon_type}
 #:set weno_order            = {weno_order}
 #:set weno_polyn            = {weno_polyn}
-#:set muscl_order           = {int(self.params.get("muscl_order", 0))}
-#:set muscl_polyn           = {int(self.params.get("muscl_order", 0))}
+#:set muscl_order           = {int(self.params.get("muscl_order", 1))}
+#:set muscl_polyn           = {int(self.params.get("muscl_order", 1))}
 #:set muscl_lim             = {int(self.params.get("muscl_lim", 1))}
 #:set weno_num_stencils     = {weno_num_stencils}
 #:set nb                    = {int(self.params.get("nb", 1))}
