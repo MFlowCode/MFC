@@ -464,14 +464,18 @@ contains
 
         @:ALLOCATE(bc_type(1,1)%sf(0:0,0:n,0:p))
         @:ALLOCATE(bc_type(1,2)%sf(0:0,0:n,0:p))
-        if (n > 0) then
-            @:ALLOCATE(bc_type(2,1)%sf(-buff_size:m+buff_size,0:0,0:p))
-            @:ALLOCATE(bc_type(2,2)%sf(-buff_size:m+buff_size,0:0,0:p))
-            if (p > 0) then
-                @:ALLOCATE(bc_type(3,1)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,0:0))
-                @:ALLOCATE(bc_type(3,2)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,0:0))
+        #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
+            if (n > 0) then
+                @:ALLOCATE(bc_type(2,1)%sf(-buff_size:m+buff_size,0:0,0:p))
+                @:ALLOCATE(bc_type(2,2)%sf(-buff_size:m+buff_size,0:0,0:p))
+                #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                    if (p > 0) then
+                        @:ALLOCATE(bc_type(3,1)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,0:0))
+                        @:ALLOCATE(bc_type(3,2)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,0:0))
+                    end if
+                #:endif
             end if
-        end if
+        #:endif
 
         do i = 1, num_dims
             do j = 1, 2
@@ -527,9 +531,10 @@ contains
 
             if (s == 1) then
                 if (run_time_info) then
-                    if (igr) then
+                    if (igr .or. dummy) then
                         call s_write_run_time_information(q_cons_ts(1)%vf, t_step)
-                    else
+                    end if
+                    if (.not. igr .or. dummy) then
                         call s_write_run_time_information(q_prim_vf, t_step)
                     end if
                 end if
@@ -684,10 +689,15 @@ contains
     impure subroutine s_compute_dt()
 
         real(wp) :: rho        !< Cell-avg. density
-        real(wp), dimension(num_vels) :: vel        !< Cell-avg. velocity
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3) :: vel        !< Cell-avg. velocity
+            real(wp), dimension(3) :: alpha      !< Cell-avg. volume fraction
+        #:else
+            real(wp), dimension(num_vels) :: vel        !< Cell-avg. velocity
+            real(wp), dimension(num_fluids) :: alpha      !< Cell-avg. volume fraction
+        #:endif
         real(wp) :: vel_sum    !< Cell-avg. velocity sum
         real(wp) :: pres       !< Cell-avg. pressure
-        real(wp), dimension(num_fluids) :: alpha      !< Cell-avg. volume fraction
         real(wp) :: gamma      !< Cell-avg. sp. heat ratio
         real(wp) :: pi_inf     !< Cell-avg. liquid stiffness function
         real(wp) :: qv         !< Cell-avg. fluid reference energy
@@ -699,7 +709,7 @@ contains
         real(wp) :: dt_local
         integer :: j, k, l !< Generic loop iterators
 
-        if (.not. igr) then
+        if (.not. igr .or. dummy) then
             call s_convert_conservative_to_primitive_variables( &
                 q_cons_ts(1)%vf, &
                 q_T_sf, &
