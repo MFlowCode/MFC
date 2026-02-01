@@ -26,7 +26,7 @@ def _load_stage_dicts():
     Returns dicts mapping parameter names to their ParamType.
     """
     from ..params import REGISTRY
-    from ..params.schema import Stage, ParamType
+    from ..params.schema import Stage
 
     def params_for_stage(stage, include_common=True):
         """Get params for a stage as {name: ParamType} dict."""

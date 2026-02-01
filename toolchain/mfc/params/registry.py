@@ -189,8 +189,11 @@ class ParamRegistry:
 
 
 @lru_cache(maxsize=1)
-def _get_cached_validator(registry_id: int):
-    """Cache the validator at module level (registry is immutable after freeze)."""
+def _get_cached_validator(registry_id: int):  # pylint: disable=unused-argument
+    """Cache the validator at module level (registry is immutable after freeze).
+
+    Note: registry_id is used as cache key to invalidate when registry changes.
+    """
     import fastjsonschema  # pylint: disable=import-outside-toplevel
     return fastjsonschema.compile(REGISTRY.get_json_schema())
 
