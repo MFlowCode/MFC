@@ -24,7 +24,7 @@ CASE_OPT_PARAMS = {
 # ============================================================================
 # Schema Validation for Constraints and Dependencies
 # ============================================================================
-# These validation functions catch typos like "choises" instead of "choices"
+# Uses rapidfuzz for "did you mean?" suggestions when typos are detected
 
 _VALID_CONSTRAINT_KEYS = {"choices", "min", "max"}
 _VALID_DEPENDENCY_KEYS = {"when_true", "when_set"}
@@ -32,12 +32,19 @@ _VALID_CONDITION_KEYS = {"requires", "recommends"}
 
 
 def _validate_constraint(param_name: str, constraint: Dict[str, Any]) -> None:
-    """Validate a constraint dict has valid keys."""
+    """Validate a constraint dict has valid keys with 'did you mean?' suggestions."""
+    from .suggest import invalid_key_error
+
     invalid_keys = set(constraint.keys()) - _VALID_CONSTRAINT_KEYS
     if invalid_keys:
+        # Get suggestion for the first invalid key
+        first_invalid = next(iter(invalid_keys))
         raise ValueError(
-            f"Invalid constraint keys for '{param_name}': {invalid_keys}. "
-            f"Valid keys are: {_VALID_CONSTRAINT_KEYS}"
+            invalid_key_error(
+                f"constraint for '{param_name}'",
+                first_invalid,
+                _VALID_CONSTRAINT_KEYS
+            )
         )
 
     # Validate types
@@ -50,12 +57,18 @@ def _validate_constraint(param_name: str, constraint: Dict[str, Any]) -> None:
 
 
 def _validate_dependency(param_name: str, dependency: Dict[str, Any]) -> None:
-    """Validate a dependency dict has valid structure."""
+    """Validate a dependency dict has valid structure with 'did you mean?' suggestions."""
+    from .suggest import invalid_key_error
+
     invalid_keys = set(dependency.keys()) - _VALID_DEPENDENCY_KEYS
     if invalid_keys:
+        first_invalid = next(iter(invalid_keys))
         raise ValueError(
-            f"Invalid dependency keys for '{param_name}': {invalid_keys}. "
-            f"Valid keys are: {_VALID_DEPENDENCY_KEYS}"
+            invalid_key_error(
+                f"dependency for '{param_name}'",
+                first_invalid,
+                _VALID_DEPENDENCY_KEYS
+            )
         )
 
     for condition_key in ["when_true", "when_set"]:
@@ -67,9 +80,13 @@ def _validate_dependency(param_name: str, dependency: Dict[str, Any]) -> None:
                 )
             invalid_cond_keys = set(condition.keys()) - _VALID_CONDITION_KEYS
             if invalid_cond_keys:
+                first_invalid = next(iter(invalid_cond_keys))
                 raise ValueError(
-                    f"Invalid condition keys in '{condition_key}' for '{param_name}': "
-                    f"{invalid_cond_keys}. Valid keys are: {_VALID_CONDITION_KEYS}"
+                    invalid_key_error(
+                        f"condition in '{condition_key}' for '{param_name}'",
+                        first_invalid,
+                        _VALID_CONDITION_KEYS
+                    )
                 )
             for req_key in ["requires", "recommends"]:
                 if req_key in condition and not isinstance(condition[req_key], list):

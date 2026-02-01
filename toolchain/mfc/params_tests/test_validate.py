@@ -8,6 +8,7 @@ import unittest
 from ..params.validate import (
     validate_constraints,
     check_dependencies,
+    check_unknown_params,
     validate_case,
     format_validation_results,
 )
@@ -51,6 +52,52 @@ class TestValidateConstraints(unittest.TestCase):
         }
         errors = validate_constraints(params)
         self.assertEqual(errors, [])
+
+
+class TestCheckUnknownParams(unittest.TestCase):
+    """Tests for check_unknown_params with 'did you mean?' suggestions."""
+
+    def test_known_params_no_errors(self):
+        """Known parameters should not generate errors."""
+        params = {
+            "m": 100,
+            "n": 50,
+            "dt": 1e-5,
+        }
+        errors = check_unknown_params(params)
+        self.assertEqual(errors, [])
+
+    def test_unknown_param_returns_error(self):
+        """Unknown parameter should return an error."""
+        params = {
+            "totally_unknown_xyz_123": 42,
+        }
+        errors = check_unknown_params(params)
+        self.assertEqual(len(errors), 1)
+        self.assertIn("Unknown parameter", errors[0])
+        self.assertIn("totally_unknown_xyz_123", errors[0])
+
+    def test_similar_param_suggests_correction(self):
+        """Typo near valid param should suggest 'did you mean?'."""
+        # "model_eqn" is close to "model_eqns"
+        params = {
+            "model_eqn": 2,  # Missing 's'
+        }
+        errors = check_unknown_params(params)
+        self.assertEqual(len(errors), 1)
+        self.assertIn("model_eqn", errors[0])
+        # Should suggest the correct parameter
+        self.assertIn("model_eqns", errors[0])
+        self.assertIn("Did you mean", errors[0])
+
+    def test_weno_typo_suggests_correction(self):
+        """Typo in weno_order should suggest correction."""
+        params = {
+            "weno_ordr": 5,  # Typo for weno_order
+        }
+        errors = check_unknown_params(params)
+        self.assertEqual(len(errors), 1)
+        self.assertIn("weno_order", errors[0])
 
 
 class TestCheckDependencies(unittest.TestCase):
@@ -104,6 +151,27 @@ class TestValidateCase(unittest.TestCase):
         self.assertEqual(len(result), 2)
         self.assertIsInstance(result[0], list)
         self.assertIsInstance(result[1], list)
+
+    def test_check_unknown_true_catches_unknown(self):
+        """check_unknown=True should catch unknown parameters."""
+        params = {
+            "m": 100,
+            "unknwn_prm": 42,  # Unknown param
+        }
+        errors, _ = validate_case(params, check_unknown=True)
+        self.assertGreater(len(errors), 0)
+        self.assertIn("unknwn_prm", str(errors))
+
+    def test_check_unknown_false_ignores_unknown(self):
+        """check_unknown=False should ignore unknown parameters."""
+        params = {
+            "m": 100,
+            "unknwn_prm": 42,  # Unknown param
+        }
+        errors, _ = validate_case(params, check_unknown=False)
+        # No errors from unknown params (may have other errors)
+        unknown_errors = [e for e in errors if "unknwn_prm" in e]
+        self.assertEqual(unknown_errors, [])
 
 
 class TestFormatValidationResults(unittest.TestCase):

@@ -33,11 +33,36 @@ from .errors import (
     dependency_error,
     dependency_recommendation,
     format_error_list,
+    unknown_param_error,
 )
+from .suggest import suggest_parameter
 # Note: definitions is imported by params/__init__.py to populate REGISTRY.
 # This redundant import ensures REGISTRY is populated even if this module
 # is imported directly (e.g., during testing).
 from . import definitions  # noqa: F401  pylint: disable=unused-import
+
+
+def check_unknown_params(params: Dict[str, Any]) -> List[str]:
+    """
+    Check for unknown parameters and suggest corrections.
+
+    Uses fuzzy matching via rapidfuzz to provide "Did you mean?" suggestions
+    for parameter names that don't exist in the registry.
+
+    Args:
+        params: Dictionary of parameter name -> value
+
+    Returns:
+        List of error messages for unknown parameters with suggestions.
+    """
+    errors = []
+
+    for name in params.keys():
+        if name not in REGISTRY.all_params:
+            suggestions = suggest_parameter(name)
+            errors.append(unknown_param_error(name, suggestions))
+
+    return errors
 
 
 def validate_constraints(params: Dict[str, Any]) -> List[str]:
@@ -55,7 +80,7 @@ def validate_constraints(params: Dict[str, Any]) -> List[str]:
     for name, value in params.items():
         param_def = REGISTRY.all_params.get(name)
         if param_def is None:
-            continue  # Unknown param handled elsewhere
+            continue  # Unknown params handled by check_unknown_params
 
         # Skip analytic expressions (strings for numeric params)
         if isinstance(value, str) and param_def.param_type.value.startswith("analytic"):
@@ -125,19 +150,29 @@ def check_dependencies(params: Dict[str, Any]) -> Tuple[List[str], List[str]]:  
     return errors, warnings
 
 
-def validate_case(params: Dict[str, Any], warn: bool = True) -> Tuple[List[str], List[str]]:
+def validate_case(
+    params: Dict[str, Any],
+    warn: bool = True,
+    check_unknown: bool = True,
+) -> Tuple[List[str], List[str]]:
     """
     Full validation of case parameters.
 
     Args:
         params: Dictionary of parameter name -> value
         warn: Whether to check for warnings (recommended params)
+        check_unknown: Whether to check for unknown parameters
 
     Returns:
         Tuple of (errors, warnings)
     """
     errors = []
     warnings = []
+
+    # Check for unknown parameters with "did you mean?" suggestions
+    if check_unknown:
+        unknown_errors = check_unknown_params(params)
+        errors.extend(unknown_errors)
 
     # Check constraints
     constraint_errors = validate_constraints(params)

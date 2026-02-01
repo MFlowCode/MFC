@@ -167,6 +167,26 @@ def dimension_error(param: str, requirement: str) -> str:
     return f"{format_param(param)}: {requirement}"
 
 
+def unknown_param_error(param: str, suggestions: Optional[List[str]] = None) -> str:
+    """
+    Create an error message for an unknown parameter with suggestions.
+
+    Args:
+        param: The unknown parameter name.
+        suggestions: Optional list of similar valid parameter names.
+
+    Returns:
+        Formatted error message with "Did you mean?" if suggestions available.
+    """
+    base_msg = f"Unknown parameter {format_param(param)}"
+    if suggestions:
+        if len(suggestions) == 1:
+            return f"{base_msg}. Did you mean {format_param(suggestions[0])}?"
+        quoted = [format_param(s) for s in suggestions]
+        return f"{base_msg}. Did you mean one of: {', '.join(quoted)}?"
+    return base_msg
+
+
 def format_error_list(
     errors: List[str],
     warnings: Optional[List[str]] = None,

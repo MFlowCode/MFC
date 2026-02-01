@@ -73,9 +73,11 @@ class TestConstraintValidation(unittest.TestCase):
     def test_invalid_key_raises(self):
         """Invalid constraint key should raise ValueError."""
         with self.assertRaises(ValueError) as ctx:
-            _validate_constraint("test", {"choises": [1, 2]})  # Typo
+            _validate_constraint("test", {"chioces": [1, 2]})  # Typo for choices
 
-        self.assertIn("choises", str(ctx.exception))
+        self.assertIn("chioces", str(ctx.exception))
+        # Verify "did you mean?" suggestion is provided
+        self.assertIn("choices", str(ctx.exception))
 
     def test_choices_must_be_list(self):
         """choices value must be a list."""
@@ -119,10 +121,12 @@ class TestDependencyValidation(unittest.TestCase):
         """Invalid condition key should raise."""
         with self.assertRaises(ValueError) as ctx:
             _validate_dependency("test", {
-                "when_true": {"requirs": ["foo"]}  # Typo
+                "when_true": {"reqires": ["foo"]}  # Typo for requires
             })
 
-        self.assertIn("requirs", str(ctx.exception))
+        self.assertIn("reqires", str(ctx.exception))
+        # Verify "did you mean?" suggestion is provided
+        self.assertIn("requires", str(ctx.exception))
 
     def test_requires_must_be_list(self):
         """requires value must be a list."""
