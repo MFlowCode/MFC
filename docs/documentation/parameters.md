@@ -162,22 +162,22 @@ MFC supports **3,400** case parameters organized into families.
 
 | Pattern | Example | Description |
 |---------|---------|-------------|
-| `fluid_pp(N)%%D_v` | `fluid_pp(1)%%D_v` |  |
+| `fluid_pp(N)%%D_v` | `fluid_pp(1)%%D_v` | Vapor mass diffusivity for fluid 1 |
 | `fluid_pp(N)%%G` | `fluid_pp(1)%%G` | Shear modulus for fluid 1 |
-| `fluid_pp(N)%%M_v` | `fluid_pp(1)%%M_v` |  |
+| `fluid_pp(N)%%M_v` | `fluid_pp(1)%%M_v` | Molecular weight of vapor phase for fluid 1 |
 | `fluid_pp(N)%%Re(M)` | `fluid_pp(1)%%Re(1)` | Reynolds number component 1 for fluid 1 |
-| `fluid_pp(N)%%cp_v` | `fluid_pp(1)%%cp_v` |  |
+| `fluid_pp(N)%%cp_v` | `fluid_pp(1)%%cp_v` | Specific heat capacity (const. pressure) of vapor for flu... |
 | `fluid_pp(N)%%cv` | `fluid_pp(1)%%cv` | Specific heat at constant volume for fluid 1 |
 | `fluid_pp(N)%%gamma` | `fluid_pp(1)%%gamma` | Specific heat ratio for fluid 1 |
-| `fluid_pp(N)%%gamma_v` | `fluid_pp(1)%%gamma_v` |  |
-| `fluid_pp(N)%%k_v` | `fluid_pp(1)%%k_v` |  |
-| `fluid_pp(N)%%mu_v` | `fluid_pp(1)%%mu_v` |  |
-| `fluid_pp(N)%%mul0` | `fluid_pp(1)%%mul0` |  |
+| `fluid_pp(N)%%gamma_v` | `fluid_pp(1)%%gamma_v` | Specific heat ratio of vapor phase for fluid 1 |
+| `fluid_pp(N)%%k_v` | `fluid_pp(1)%%k_v` | Thermal conductivity of vapor phase for fluid 1 |
+| `fluid_pp(N)%%mu_v` | `fluid_pp(1)%%mu_v` | Viscosity of vapor phase for fluid 1 |
+| `fluid_pp(N)%%mul0` | `fluid_pp(1)%%mul0` | Reference liquid viscosity for fluid 1 |
 | `fluid_pp(N)%%pi_inf` | `fluid_pp(1)%%pi_inf` | Stiffness pressure for fluid 1 |
-| `fluid_pp(N)%%pv` | `fluid_pp(1)%%pv` |  |
+| `fluid_pp(N)%%pv` | `fluid_pp(1)%%pv` | Vapor pressure for fluid 1 |
 | `fluid_pp(N)%%qv` | `fluid_pp(1)%%qv` | Heat of formation for fluid 1 |
 | `fluid_pp(N)%%qvp` | `fluid_pp(1)%%qvp` | Heat of formation prime for fluid 1 |
-| `fluid_pp(N)%%ss` | `fluid_pp(1)%%ss` |  |
+| `fluid_pp(N)%%ss` | `fluid_pp(1)%%ss` | Surface tension for fluid 1 |
 
 ---
 
@@ -392,26 +392,26 @@ MFC supports **3,400** case parameters organized into families.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `bub_pp%%M_g` | Real | Bubble parameter: M_g |
-| `bub_pp%%M_v` | Real | Bubble parameter: M_v |
-| `bub_pp%%R0ref` | Real | Bubble parameter: R0ref |
-| `bub_pp%%R_g` | Real | Bubble parameter: R_g |
-| `bub_pp%%R_v` | Real | Bubble parameter: R_v |
-| `bub_pp%%T0ref` | Real | Bubble parameter: T0ref |
-| `bub_pp%%cp_g` | Real | Bubble parameter: cp_g |
-| `bub_pp%%cp_v` | Real | Bubble parameter: cp_v |
-| `bub_pp%%gam_g` | Real | Bubble parameter: gam_g |
-| `bub_pp%%gam_v` | Real | Bubble parameter: gam_v |
-| `bub_pp%%k_g` | Real | Bubble parameter: k_g |
-| `bub_pp%%k_v` | Real | Bubble parameter: k_v |
-| `bub_pp%%mu_g` | Real | Bubble parameter: mu_g |
-| `bub_pp%%mu_l` | Real | Bubble parameter: mu_l |
-| `bub_pp%%mu_v` | Real | Bubble parameter: mu_v |
-| `bub_pp%%p0ref` | Real | Bubble parameter: p0ref |
-| `bub_pp%%pv` | Real | Bubble parameter: pv |
-| `bub_pp%%rho0ref` | Real | Bubble parameter: rho0ref |
-| `bub_pp%%ss` | Real | Bubble parameter: ss |
-| `bub_pp%%vd` | Real | Bubble parameter: vd |
+| `bub_pp%%M_g` | Real | Molecular weight of gas (bubble) |
+| `bub_pp%%M_v` | Real | Molecular weight of host vapor |
+| `bub_pp%%R0ref` | Real | Reference bubble radius |
+| `bub_pp%%R_g` | Real | Gas constant of gas (bubble) |
+| `bub_pp%%R_v` | Real | Gas constant of host in vapor state |
+| `bub_pp%%T0ref` | Real | Reference temperature for bubbles |
+| `bub_pp%%cp_g` | Real | Specific heat (const. pressure) of gas (bubble) |
+| `bub_pp%%cp_v` | Real | Specific heat (const. pressure) of host vapor |
+| `bub_pp%%gam_g` | Real | Specific heat ratio of gas (bubble) |
+| `bub_pp%%gam_v` | Real | Specific heat ratio of host in vapor state |
+| `bub_pp%%k_g` | Real | Thermal conductivity of gas (bubble) |
+| `bub_pp%%k_v` | Real | Thermal conductivity of host in vapor state |
+| `bub_pp%%mu_g` | Real | Viscosity of gas (bubble) |
+| `bub_pp%%mu_l` | Real | Viscosity of host in liquid state |
+| `bub_pp%%mu_v` | Real | Viscosity of host in vapor state |
+| `bub_pp%%p0ref` | Real | Reference pressure for bubbles |
+| `bub_pp%%pv` | Real | Vapor pressure of host fluid |
+| `bub_pp%%rho0ref` | Real | Reference density for bubbles |
+| `bub_pp%%ss` | Real | Surface tension between host and gas (bubble) |
+| `bub_pp%%vd` | Real | Vapor diffusion coefficient |
 
 ---
 
@@ -687,11 +687,11 @@ MFC supports **3,400** case parameters organized into families.
 | Pattern | Example | Description |
 |---------|---------|-------------|
 | `Bx0` | `Bx0` | Background magnetic field in x-direction |
-| `Ca` | `Ca` |  |
+| `Ca` | `Ca` | Cavitation number |
 | `E_wrt` | `E_wrt` | Write energy field |
 | `R0ref` | `R0ref` | Reference bubble radius |
-| `Re_inv` | `Re_inv` |  |
-| `Web` | `Web` |  |
+| `Re_inv` | `Re_inv` | Inverse Reynolds number |
+| `Web` | `Web` | Weber number |
 | `a_x` | `a_x` | Rate of grid stretching in the x-direction |
 | `a_y` | `a_y` | Rate of grid stretching in the y-direction |
 | `a_z` | `a_z` | Rate of grid stretching in the z-direction |

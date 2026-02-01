@@ -10,7 +10,8 @@
       "description": "Background magnetic field in x-direction"
     },
     "Ca": {
-      "type": "number"
+      "type": "number",
+      "description": "Cavitation number"
     },
     "E_wrt": {
       "type": "string",
@@ -25,10 +26,12 @@
       "description": "Reference bubble radius"
     },
     "Re_inv": {
-      "type": "number"
+      "type": "number",
+      "description": "Inverse Reynolds number"
     },
     "Web": {
-      "type": "number"
+      "type": "number",
+      "description": "Weber number"
     },
     "a_x": {
       "type": "number",
@@ -1316,83 +1319,83 @@
     },
     "bub_pp%M_g": {
       "type": "number",
-      "description": "Bubble parameter: M_g"
+      "description": "Molecular weight of gas (bubble)"
     },
     "bub_pp%M_v": {
       "type": "number",
-      "description": "Bubble parameter: M_v"
+      "description": "Molecular weight of host vapor"
     },
     "bub_pp%R0ref": {
       "type": "number",
-      "description": "Bubble parameter: R0ref"
+      "description": "Reference bubble radius"
     },
     "bub_pp%R_g": {
       "type": "number",
-      "description": "Bubble parameter: R_g"
+      "description": "Gas constant of gas (bubble)"
     },
     "bub_pp%R_v": {
       "type": "number",
-      "description": "Bubble parameter: R_v"
+      "description": "Gas constant of host in vapor state"
     },
     "bub_pp%T0ref": {
       "type": "number",
-      "description": "Bubble parameter: T0ref"
+      "description": "Reference temperature for bubbles"
     },
     "bub_pp%cp_g": {
       "type": "number",
-      "description": "Bubble parameter: cp_g"
+      "description": "Specific heat (const. pressure) of gas (bubble)"
     },
     "bub_pp%cp_v": {
       "type": "number",
-      "description": "Bubble parameter: cp_v"
+      "description": "Specific heat (const. pressure) of host vapor"
     },
     "bub_pp%gam_g": {
       "type": "number",
-      "description": "Bubble parameter: gam_g"
+      "description": "Specific heat ratio of gas (bubble)"
     },
     "bub_pp%gam_v": {
       "type": "number",
-      "description": "Bubble parameter: gam_v"
+      "description": "Specific heat ratio of host in vapor state"
     },
     "bub_pp%k_g": {
       "type": "number",
-      "description": "Bubble parameter: k_g"
+      "description": "Thermal conductivity of gas (bubble)"
     },
     "bub_pp%k_v": {
       "type": "number",
-      "description": "Bubble parameter: k_v"
+      "description": "Thermal conductivity of host in vapor state"
     },
     "bub_pp%mu_g": {
       "type": "number",
-      "description": "Bubble parameter: mu_g"
+      "description": "Viscosity of gas (bubble)"
     },
     "bub_pp%mu_l": {
       "type": "number",
-      "description": "Bubble parameter: mu_l"
+      "description": "Viscosity of host in liquid state"
     },
     "bub_pp%mu_v": {
       "type": "number",
-      "description": "Bubble parameter: mu_v"
+      "description": "Viscosity of host in vapor state"
     },
     "bub_pp%p0ref": {
       "type": "number",
-      "description": "Bubble parameter: p0ref"
+      "description": "Reference pressure for bubbles"
     },
     "bub_pp%pv": {
       "type": "number",
-      "description": "Bubble parameter: pv"
+      "description": "Vapor pressure of host fluid"
     },
     "bub_pp%rho0ref": {
       "type": "number",
-      "description": "Bubble parameter: rho0ref"
+      "description": "Reference density for bubbles"
     },
     "bub_pp%ss": {
       "type": "number",
-      "description": "Bubble parameter: ss"
+      "description": "Surface tension between host and gas (bubble)"
     },
     "bub_pp%vd": {
       "type": "number",
-      "description": "Bubble parameter: vd"
+      "description": "Vapor diffusion coefficient"
     },
     "bubble_model": {
       "type": "integer",
@@ -2392,14 +2395,16 @@
       "description": "Write separate file per MPI process"
     },
     "fluid_pp(1)%D_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Vapor mass diffusivity for fluid 1"
     },
     "fluid_pp(1)%G": {
       "type": "number",
       "description": "Shear modulus for fluid 1"
     },
     "fluid_pp(1)%M_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Molecular weight of vapor phase for fluid 1"
     },
     "fluid_pp(1)%Re(1)": {
       "type": "number",
@@ -2410,7 +2415,8 @@
       "description": "Reynolds number component 2 for fluid 1"
     },
     "fluid_pp(1)%cp_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Specific heat capacity (const. pressure) of vapor for fluid 1"
     },
     "fluid_pp(1)%cv": {
       "type": "number",
@@ -2421,23 +2427,28 @@
       "description": "Specific heat ratio for fluid 1"
     },
     "fluid_pp(1)%gamma_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Specific heat ratio of vapor phase for fluid 1"
     },
     "fluid_pp(1)%k_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Thermal conductivity of vapor phase for fluid 1"
     },
     "fluid_pp(1)%mu_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Viscosity of vapor phase for fluid 1"
     },
     "fluid_pp(1)%mul0": {
-      "type": "number"
+      "type": "number",
+      "description": "Reference liquid viscosity for fluid 1"
     },
     "fluid_pp(1)%pi_inf": {
       "type": "number",
       "description": "Stiffness pressure for fluid 1"
     },
     "fluid_pp(1)%pv": {
-      "type": "number"
+      "type": "number",
+      "description": "Vapor pressure for fluid 1"
     },
     "fluid_pp(1)%qv": {
       "type": "number",
@@ -2448,17 +2459,20 @@
       "description": "Heat of formation prime for fluid 1"
     },
     "fluid_pp(1)%ss": {
-      "type": "number"
+      "type": "number",
+      "description": "Surface tension for fluid 1"
     },
     "fluid_pp(10)%D_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Vapor mass diffusivity for fluid 10"
     },
     "fluid_pp(10)%G": {
       "type": "number",
       "description": "Shear modulus for fluid 10"
     },
     "fluid_pp(10)%M_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Molecular weight of vapor phase for fluid 10"
     },
     "fluid_pp(10)%Re(1)": {
       "type": "number",
@@ -2469,7 +2483,8 @@
       "description": "Reynolds number component 2 for fluid 10"
     },
     "fluid_pp(10)%cp_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Specific heat capacity (const. pressure) of vapor for fluid 10"
     },
     "fluid_pp(10)%cv": {
       "type": "number",
@@ -2480,23 +2495,28 @@
       "description": "Specific heat ratio for fluid 10"
     },
     "fluid_pp(10)%gamma_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Specific heat ratio of vapor phase for fluid 10"
     },
     "fluid_pp(10)%k_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Thermal conductivity of vapor phase for fluid 10"
     },
     "fluid_pp(10)%mu_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Viscosity of vapor phase for fluid 10"
     },
     "fluid_pp(10)%mul0": {
-      "type": "number"
+      "type": "number",
+      "description": "Reference liquid viscosity for fluid 10"
     },
     "fluid_pp(10)%pi_inf": {
       "type": "number",
       "description": "Stiffness pressure for fluid 10"
     },
     "fluid_pp(10)%pv": {
-      "type": "number"
+      "type": "number",
+      "description": "Vapor pressure for fluid 10"
     },
     "fluid_pp(10)%qv": {
       "type": "number",
@@ -2507,17 +2527,20 @@
       "description": "Heat of formation prime for fluid 10"
     },
     "fluid_pp(10)%ss": {
-      "type": "number"
+      "type": "number",
+      "description": "Surface tension for fluid 10"
     },
     "fluid_pp(2)%D_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Vapor mass diffusivity for fluid 2"
     },
     "fluid_pp(2)%G": {
       "type": "number",
       "description": "Shear modulus for fluid 2"
     },
     "fluid_pp(2)%M_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Molecular weight of vapor phase for fluid 2"
     },
     "fluid_pp(2)%Re(1)": {
       "type": "number",
@@ -2528,7 +2551,8 @@
       "description": "Reynolds number component 2 for fluid 2"
     },
     "fluid_pp(2)%cp_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Specific heat capacity (const. pressure) of vapor for fluid 2"
     },
     "fluid_pp(2)%cv": {
       "type": "number",
@@ -2539,23 +2563,28 @@
       "description": "Specific heat ratio for fluid 2"
     },
     "fluid_pp(2)%gamma_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Specific heat ratio of vapor phase for fluid 2"
     },
     "fluid_pp(2)%k_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Thermal conductivity of vapor phase for fluid 2"
     },
     "fluid_pp(2)%mu_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Viscosity of vapor phase for fluid 2"
     },
     "fluid_pp(2)%mul0": {
-      "type": "number"
+      "type": "number",
+      "description": "Reference liquid viscosity for fluid 2"
     },
     "fluid_pp(2)%pi_inf": {
       "type": "number",
       "description": "Stiffness pressure for fluid 2"
     },
     "fluid_pp(2)%pv": {
-      "type": "number"
+      "type": "number",
+      "description": "Vapor pressure for fluid 2"
     },
     "fluid_pp(2)%qv": {
       "type": "number",
@@ -2566,17 +2595,20 @@
       "description": "Heat of formation prime for fluid 2"
     },
     "fluid_pp(2)%ss": {
-      "type": "number"
+      "type": "number",
+      "description": "Surface tension for fluid 2"
     },
     "fluid_pp(3)%D_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Vapor mass diffusivity for fluid 3"
     },
     "fluid_pp(3)%G": {
       "type": "number",
       "description": "Shear modulus for fluid 3"
     },
     "fluid_pp(3)%M_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Molecular weight of vapor phase for fluid 3"
     },
     "fluid_pp(3)%Re(1)": {
       "type": "number",
@@ -2587,7 +2619,8 @@
       "description": "Reynolds number component 2 for fluid 3"
     },
     "fluid_pp(3)%cp_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Specific heat capacity (const. pressure) of vapor for fluid 3"
     },
     "fluid_pp(3)%cv": {
       "type": "number",
@@ -2598,23 +2631,28 @@
       "description": "Specific heat ratio for fluid 3"
     },
     "fluid_pp(3)%gamma_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Specific heat ratio of vapor phase for fluid 3"
     },
     "fluid_pp(3)%k_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Thermal conductivity of vapor phase for fluid 3"
     },
     "fluid_pp(3)%mu_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Viscosity of vapor phase for fluid 3"
     },
     "fluid_pp(3)%mul0": {
-      "type": "number"
+      "type": "number",
+      "description": "Reference liquid viscosity for fluid 3"
     },
     "fluid_pp(3)%pi_inf": {
       "type": "number",
       "description": "Stiffness pressure for fluid 3"
     },
     "fluid_pp(3)%pv": {
-      "type": "number"
+      "type": "number",
+      "description": "Vapor pressure for fluid 3"
     },
     "fluid_pp(3)%qv": {
       "type": "number",
@@ -2625,17 +2663,20 @@
       "description": "Heat of formation prime for fluid 3"
     },
     "fluid_pp(3)%ss": {
-      "type": "number"
+      "type": "number",
+      "description": "Surface tension for fluid 3"
     },
     "fluid_pp(4)%D_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Vapor mass diffusivity for fluid 4"
     },
     "fluid_pp(4)%G": {
       "type": "number",
       "description": "Shear modulus for fluid 4"
     },
     "fluid_pp(4)%M_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Molecular weight of vapor phase for fluid 4"
     },
     "fluid_pp(4)%Re(1)": {
       "type": "number",
@@ -2646,7 +2687,8 @@
       "description": "Reynolds number component 2 for fluid 4"
     },
     "fluid_pp(4)%cp_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Specific heat capacity (const. pressure) of vapor for fluid 4"
     },
     "fluid_pp(4)%cv": {
       "type": "number",
@@ -2657,23 +2699,28 @@
       "description": "Specific heat ratio for fluid 4"
     },
     "fluid_pp(4)%gamma_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Specific heat ratio of vapor phase for fluid 4"
     },
     "fluid_pp(4)%k_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Thermal conductivity of vapor phase for fluid 4"
     },
     "fluid_pp(4)%mu_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Viscosity of vapor phase for fluid 4"
     },
     "fluid_pp(4)%mul0": {
-      "type": "number"
+      "type": "number",
+      "description": "Reference liquid viscosity for fluid 4"
     },
     "fluid_pp(4)%pi_inf": {
       "type": "number",
       "description": "Stiffness pressure for fluid 4"
     },
     "fluid_pp(4)%pv": {
-      "type": "number"
+      "type": "number",
+      "description": "Vapor pressure for fluid 4"
     },
     "fluid_pp(4)%qv": {
       "type": "number",
@@ -2684,17 +2731,20 @@
       "description": "Heat of formation prime for fluid 4"
     },
     "fluid_pp(4)%ss": {
-      "type": "number"
+      "type": "number",
+      "description": "Surface tension for fluid 4"
     },
     "fluid_pp(5)%D_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Vapor mass diffusivity for fluid 5"
     },
     "fluid_pp(5)%G": {
       "type": "number",
       "description": "Shear modulus for fluid 5"
     },
     "fluid_pp(5)%M_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Molecular weight of vapor phase for fluid 5"
     },
     "fluid_pp(5)%Re(1)": {
       "type": "number",
@@ -2705,7 +2755,8 @@
       "description": "Reynolds number component 2 for fluid 5"
     },
     "fluid_pp(5)%cp_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Specific heat capacity (const. pressure) of vapor for fluid 5"
     },
     "fluid_pp(5)%cv": {
       "type": "number",
@@ -2716,23 +2767,28 @@
       "description": "Specific heat ratio for fluid 5"
     },
     "fluid_pp(5)%gamma_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Specific heat ratio of vapor phase for fluid 5"
     },
     "fluid_pp(5)%k_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Thermal conductivity of vapor phase for fluid 5"
     },
     "fluid_pp(5)%mu_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Viscosity of vapor phase for fluid 5"
     },
     "fluid_pp(5)%mul0": {
-      "type": "number"
+      "type": "number",
+      "description": "Reference liquid viscosity for fluid 5"
     },
     "fluid_pp(5)%pi_inf": {
       "type": "number",
       "description": "Stiffness pressure for fluid 5"
     },
     "fluid_pp(5)%pv": {
-      "type": "number"
+      "type": "number",
+      "description": "Vapor pressure for fluid 5"
     },
     "fluid_pp(5)%qv": {
       "type": "number",
@@ -2743,17 +2799,20 @@
       "description": "Heat of formation prime for fluid 5"
     },
     "fluid_pp(5)%ss": {
-      "type": "number"
+      "type": "number",
+      "description": "Surface tension for fluid 5"
     },
     "fluid_pp(6)%D_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Vapor mass diffusivity for fluid 6"
     },
     "fluid_pp(6)%G": {
       "type": "number",
       "description": "Shear modulus for fluid 6"
     },
     "fluid_pp(6)%M_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Molecular weight of vapor phase for fluid 6"
     },
     "fluid_pp(6)%Re(1)": {
       "type": "number",
@@ -2764,7 +2823,8 @@
       "description": "Reynolds number component 2 for fluid 6"
     },
     "fluid_pp(6)%cp_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Specific heat capacity (const. pressure) of vapor for fluid 6"
     },
     "fluid_pp(6)%cv": {
       "type": "number",
@@ -2775,23 +2835,28 @@
       "description": "Specific heat ratio for fluid 6"
     },
     "fluid_pp(6)%gamma_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Specific heat ratio of vapor phase for fluid 6"
     },
     "fluid_pp(6)%k_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Thermal conductivity of vapor phase for fluid 6"
     },
     "fluid_pp(6)%mu_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Viscosity of vapor phase for fluid 6"
     },
     "fluid_pp(6)%mul0": {
-      "type": "number"
+      "type": "number",
+      "description": "Reference liquid viscosity for fluid 6"
     },
     "fluid_pp(6)%pi_inf": {
       "type": "number",
       "description": "Stiffness pressure for fluid 6"
     },
     "fluid_pp(6)%pv": {
-      "type": "number"
+      "type": "number",
+      "description": "Vapor pressure for fluid 6"
     },
     "fluid_pp(6)%qv": {
       "type": "number",
@@ -2802,17 +2867,20 @@
       "description": "Heat of formation prime for fluid 6"
     },
     "fluid_pp(6)%ss": {
-      "type": "number"
+      "type": "number",
+      "description": "Surface tension for fluid 6"
     },
     "fluid_pp(7)%D_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Vapor mass diffusivity for fluid 7"
     },
     "fluid_pp(7)%G": {
       "type": "number",
       "description": "Shear modulus for fluid 7"
     },
     "fluid_pp(7)%M_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Molecular weight of vapor phase for fluid 7"
     },
     "fluid_pp(7)%Re(1)": {
       "type": "number",
@@ -2823,7 +2891,8 @@
       "description": "Reynolds number component 2 for fluid 7"
     },
     "fluid_pp(7)%cp_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Specific heat capacity (const. pressure) of vapor for fluid 7"
     },
     "fluid_pp(7)%cv": {
       "type": "number",
@@ -2834,23 +2903,28 @@
       "description": "Specific heat ratio for fluid 7"
     },
     "fluid_pp(7)%gamma_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Specific heat ratio of vapor phase for fluid 7"
     },
     "fluid_pp(7)%k_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Thermal conductivity of vapor phase for fluid 7"
     },
     "fluid_pp(7)%mu_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Viscosity of vapor phase for fluid 7"
     },
     "fluid_pp(7)%mul0": {
-      "type": "number"
+      "type": "number",
+      "description": "Reference liquid viscosity for fluid 7"
     },
     "fluid_pp(7)%pi_inf": {
       "type": "number",
       "description": "Stiffness pressure for fluid 7"
     },
     "fluid_pp(7)%pv": {
-      "type": "number"
+      "type": "number",
+      "description": "Vapor pressure for fluid 7"
     },
     "fluid_pp(7)%qv": {
       "type": "number",
@@ -2861,17 +2935,20 @@
       "description": "Heat of formation prime for fluid 7"
     },
     "fluid_pp(7)%ss": {
-      "type": "number"
+      "type": "number",
+      "description": "Surface tension for fluid 7"
     },
     "fluid_pp(8)%D_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Vapor mass diffusivity for fluid 8"
     },
     "fluid_pp(8)%G": {
       "type": "number",
       "description": "Shear modulus for fluid 8"
     },
     "fluid_pp(8)%M_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Molecular weight of vapor phase for fluid 8"
     },
     "fluid_pp(8)%Re(1)": {
       "type": "number",
@@ -2882,7 +2959,8 @@
       "description": "Reynolds number component 2 for fluid 8"
     },
     "fluid_pp(8)%cp_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Specific heat capacity (const. pressure) of vapor for fluid 8"
     },
     "fluid_pp(8)%cv": {
       "type": "number",
@@ -2893,23 +2971,28 @@
       "description": "Specific heat ratio for fluid 8"
     },
     "fluid_pp(8)%gamma_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Specific heat ratio of vapor phase for fluid 8"
     },
     "fluid_pp(8)%k_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Thermal conductivity of vapor phase for fluid 8"
     },
     "fluid_pp(8)%mu_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Viscosity of vapor phase for fluid 8"
     },
     "fluid_pp(8)%mul0": {
-      "type": "number"
+      "type": "number",
+      "description": "Reference liquid viscosity for fluid 8"
     },
     "fluid_pp(8)%pi_inf": {
       "type": "number",
       "description": "Stiffness pressure for fluid 8"
     },
     "fluid_pp(8)%pv": {
-      "type": "number"
+      "type": "number",
+      "description": "Vapor pressure for fluid 8"
     },
     "fluid_pp(8)%qv": {
       "type": "number",
@@ -2920,17 +3003,20 @@
       "description": "Heat of formation prime for fluid 8"
     },
     "fluid_pp(8)%ss": {
-      "type": "number"
+      "type": "number",
+      "description": "Surface tension for fluid 8"
     },
     "fluid_pp(9)%D_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Vapor mass diffusivity for fluid 9"
     },
     "fluid_pp(9)%G": {
       "type": "number",
       "description": "Shear modulus for fluid 9"
     },
     "fluid_pp(9)%M_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Molecular weight of vapor phase for fluid 9"
     },
     "fluid_pp(9)%Re(1)": {
       "type": "number",
@@ -2941,7 +3027,8 @@
       "description": "Reynolds number component 2 for fluid 9"
     },
     "fluid_pp(9)%cp_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Specific heat capacity (const. pressure) of vapor for fluid 9"
     },
     "fluid_pp(9)%cv": {
       "type": "number",
@@ -2952,23 +3039,28 @@
       "description": "Specific heat ratio for fluid 9"
     },
     "fluid_pp(9)%gamma_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Specific heat ratio of vapor phase for fluid 9"
     },
     "fluid_pp(9)%k_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Thermal conductivity of vapor phase for fluid 9"
     },
     "fluid_pp(9)%mu_v": {
-      "type": "number"
+      "type": "number",
+      "description": "Viscosity of vapor phase for fluid 9"
     },
     "fluid_pp(9)%mul0": {
-      "type": "number"
+      "type": "number",
+      "description": "Reference liquid viscosity for fluid 9"
     },
     "fluid_pp(9)%pi_inf": {
       "type": "number",
       "description": "Stiffness pressure for fluid 9"
     },
     "fluid_pp(9)%pv": {
-      "type": "number"
+      "type": "number",
+      "description": "Vapor pressure for fluid 9"
     },
     "fluid_pp(9)%qv": {
       "type": "number",
@@ -2979,7 +3071,8 @@
       "description": "Heat of formation prime for fluid 9"
     },
     "fluid_pp(9)%ss": {
-      "type": "number"
+      "type": "number",
+      "description": "Surface tension for fluid 9"
     },
     "fluid_rho": {
       "type": "number",
