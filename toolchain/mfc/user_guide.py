@@ -191,23 +191,56 @@ MFC includes pre-configured module sets for many clusters.
 # MARKDOWN-BASED HELP (Single source of truth from docs/)
 # =============================================================================
 
-# Mapping of help topics to their source markdown files
+# Mapping of help topics to their source markdown files and optional section
+# Format: {"topic": ("file_path", "section_heading" or None for full file)}
 MARKDOWN_HELP_FILES = {
-    "debugging": "docs/documentation/troubleshooting.md",
-    # "batch": "docs/documentation/running.md",  # Could enable if desired
-    # "gpu": "docs/documentation/gpuParallelization.md",  # Very technical, keep manual
+    "debugging": ("docs/documentation/troubleshooting.md", None),  # Full file
+    "gpu": ("docs/documentation/running.md", "Running on GPUs"),  # Section only
+    "batch": ("docs/documentation/running.md", "Batch Execution"),  # Section only
+    "performance": ("docs/documentation/expectedPerformance.md", "Achieving Maximum Performance"),
 }
+
+
+def _extract_markdown_section(content: str, section_heading: str) -> str:
+    """Extract a specific section from markdown content.
+
+    Extracts from the given heading until the next heading of same or higher level,
+    or until a horizontal rule (---).
+    """
+    # Find the section heading (## or ###)
+    # Note: In f-strings, literal braces must be doubled: {{1,3}} -> {1,3}
+    pattern = rf'^(#{{1,3}})\s+{re.escape(section_heading)}\s*$'
+    match = re.search(pattern, content, re.MULTILINE)
+    if not match:
+        return None
+
+    heading_level = len(match.group(1))
+    start_pos = match.end()
+
+    # Find the end: next heading of same/higher level, or ---
+    # Match ## or # (same or higher level than our heading)
+    end_pattern = rf'^(?:#{{{{1,{heading_level}}}}}\s|\-\-\-)'
+    end_match = re.search(end_pattern, content[start_pos:], re.MULTILINE)
+
+    if end_match:
+        section = content[start_pos:start_pos + end_match.start()]
+    else:
+        section = content[start_pos:]
+
+    return section.strip()
 
 
 def _load_markdown_help(topic: str) -> str:
     """Load help content from a markdown file.
 
+    Can load full file or extract a specific section.
     Strips Doxygen-specific syntax and returns clean markdown.
     """
     if topic not in MARKDOWN_HELP_FILES:
         return None
 
-    filepath = os.path.join(MFC_ROOT_DIR, MARKDOWN_HELP_FILES[topic])
+    file_path, section = MARKDOWN_HELP_FILES[topic]
+    filepath = os.path.join(MFC_ROOT_DIR, file_path)
 
     try:
         with open(filepath, "r", encoding="utf-8") as f:
@@ -215,11 +248,18 @@ def _load_markdown_help(topic: str) -> str:
     except FileNotFoundError:
         return None
 
+    # Extract section if specified
+    if section:
+        content = _extract_markdown_section(content, section)
+        if content is None:
+            return None
+
     # Strip Doxygen-specific syntax
     # Remove @page directives
     content = re.sub(r'^@page\s+\S+\s+.*$', '', content, flags=re.MULTILINE)
-    # Remove @ref, @see directives
-    content = re.sub(r'@(ref|see)\s+\S+', '', content)
+    # Remove @ref, @see directives (but keep the text after them readable)
+    content = re.sub(r'@(ref|see)\s+"([^"]+)"', r'\2', content)  # @ref "Text" -> Text
+    content = re.sub(r'@(ref|see)\s+(\S+)', '', content)  # @ref name -> (remove)
     # Clean up any resulting empty lines at the start
     content = content.lstrip('\n')
 
@@ -239,47 +279,10 @@ def _generate_markdown_help(topic: str):
 
 HELP_TOPICS = {
     "gpu": {
-        "title": "GPU Configuration",
-        "content": """\
-[bold cyan]GPU Support in MFC[/bold cyan]
-
-MFC supports GPU acceleration via OpenACC or OpenMP offloading.
-
-[bold]Building with GPU support:[/bold]
-  [green]./mfc.sh build --gpu[/green]           Enable OpenACC (default)
-  [green]./mfc.sh build --gpu acc[/green]       Explicitly use OpenACC
-  [green]./mfc.sh build --gpu mp[/green]        Use OpenMP offloading
-
-[bold]Running on GPUs:[/bold]
-  [green]./mfc.sh run case.py --gpu[/green]     Run with GPU support
-  [green]./mfc.sh run case.py -g 0 1[/green]    Use specific GPU IDs
-
-[bold yellow]⚡ Case Optimization (10x speedup!):[/bold yellow]
-  [green]./mfc.sh run case.py --case-optimization -j 8[/green]
-  Hard-codes parameters at compile time for maximum performance.
-  See [cyan]./mfc.sh help performance[/cyan] for details.
-
-[bold]GPU Profiling:[/bold]
-  [green]./mfc.sh run case.py --ncu[/green]     NVIDIA Nsight Compute
-  [green]./mfc.sh run case.py --nsys[/green]    NVIDIA Nsight Systems
-  [green]./mfc.sh run case.py --rcu[/green]     AMD ROCm rocprof-compute
-  [green]./mfc.sh run case.py --rsys[/green]    AMD ROCm rocprof-systems
-
-[bold]Environment Setup:[/bold]
-  Most HPC systems require loading GPU modules first:
-  [cyan]source ./mfc.sh load -c <cluster> -m g[/cyan]
-
-[bold]Supported Compilers:[/bold]
-  [yellow]NVIDIA GPUs:[/yellow]
-    • NVHPC (nvfortran) - OpenACC or OpenMP
-  [yellow]AMD GPUs:[/yellow]
-    • Cray (ftn) - OpenACC or OpenMP
-    • AMD (amdflang) - OpenMP only
-
-[bold]Troubleshooting:[/bold]
-  • Ensure CUDA/ROCm toolkit is in PATH
-  • Check GPU visibility: [cyan]nvidia-smi[/cyan] or [cyan]rocm-smi[/cyan]
-  • Use [cyan]--debug-log[/cyan] for detailed build output"""
+        "title": "Running on GPUs",
+        # Content loaded from docs/documentation/running.md "Running on GPUs" section
+        "content": _generate_markdown_help("gpu"),
+        "markdown": True,
     },
     "clusters": {
         "title": "Cluster Configuration",
@@ -288,89 +291,21 @@ MFC supports GPU acceleration via OpenACC or OpenMP offloading.
     },
     "batch": {
         "title": "Batch Job Submission",
-        "content": """\
-[bold cyan]Submitting Batch Jobs[/bold cyan]
-
-Use [green]-e batch[/green] to submit jobs to a scheduler instead of running interactively.
-
-[bold]Basic Batch Submission:[/bold]
-  [green]./mfc.sh run case.py -e batch[/green]
-
-[bold]Common Options:[/bold]
-  [cyan]-N, --nodes[/cyan]           Number of nodes
-  [cyan]-n, --tasks-per-node[/cyan]  MPI ranks per node
-  [cyan]-w, --walltime[/cyan]        Time limit (HH:MM:SS)
-  [cyan]-a, --account[/cyan]         Account/allocation to charge
-  [cyan]-p, --partition[/cyan]       Queue/partition name
-  [cyan]-q, --qos[/cyan]             Quality of service
-  [cyan]-@, --email[/cyan]           Email for job notifications
-  [cyan]-#, --name[/cyan]            Job name (default: MFC)
-  [cyan]-c, --computer[/cyan]        Submission template (e.g., phoenix, frontier)
-
-[bold]Examples:[/bold]
-  [green]./mfc.sh run case.py -e batch -N 4 -n 8 -w 02:00:00[/green]
-    4 nodes, 8 ranks/node, 2 hour limit
-
-  [green]./mfc.sh run case.py -e batch -a myproject -p gpu -@ user@email.com[/green]
-    Submit to 'gpu' partition with email notifications
-
-  [green]./mfc.sh run case.py -e batch -c frontier[/green]
-    Use Frontier-specific submission template
-
-[bold]Dry Run:[/bold]
-  [green]./mfc.sh run case.py -e batch --dry-run[/green]
-  Shows the generated batch script without submitting.
-
-[bold]Wait for Completion:[/bold]
-  [green]./mfc.sh run case.py -e batch --wait[/green]
-  Blocks until the job finishes."""
+        # Content loaded from docs/documentation/running.md "Batch Execution" section
+        "content": _generate_markdown_help("batch"),
+        "markdown": True,
     },
     "debugging": {
         "title": "Debugging & Troubleshooting",
         # Content loaded from docs/documentation/troubleshooting.md
         "content": _generate_markdown_help("debugging"),
-        "markdown": True,  # Render as markdown, not Rich markup
+        "markdown": True,
     },
     "performance": {
         "title": "Performance Optimization",
-        "content": """\
-[bold cyan]Maximizing MFC Performance[/bold cyan]
-
-[bold yellow]⚡ Case Optimization (up to 10x faster!) ⚡[/bold yellow]
-
-Case optimization hard-codes your simulation parameters at compile time,
-enabling aggressive compiler optimizations. This provides major speedups
-for both CPU and GPU runs.
-
-[bold]How to use:[/bold]
-  [green]./mfc.sh run case.py --case-optimization -j 8[/green]
-
-  This automatically rebuilds MFC with your case parameters hard-coded,
-  then runs the simulation. Use [cyan]-j N[/cyan] for faster parallel builds.
-  The build is cached for repeated runs with the same parameters.
-
-[bold]For batch jobs:[/bold]
-  [green]./mfc.sh run case.py --case-optimization -j 8 -e batch -N 4 -n 8[/green]
-
-[bold]Build separately (optional):[/bold]
-  [green]./mfc.sh build -i case.py --case-optimization -j 8[/green]
-  [green]./mfc.sh run case.py[/green]
-
-[bold]When to use:[/bold]
-  ✓ Production simulations (CPU or GPU)
-  ✓ Large-scale runs where performance matters
-  ✓ Benchmarking
-
-[bold]When NOT to use:[/bold]
-  ✗ Rapid iteration/debugging (rebuilds on parameter changes)
-  ✗ Parameter sweeps with many different configurations
-
-[bold]Other Performance Tips:[/bold]
-  • Use [cyan]--gpu[/cyan] for GPU acceleration
-  • Use [cyan]-j N[/cyan] for parallel builds
-  • Use [cyan]--fastmath[/cyan] for faster (less precise) math
-  • Profile with [cyan]--ncu[/cyan] or [cyan]--nsys[/cyan] (NVIDIA)
-  • Profile with [cyan]--rcu[/cyan] or [cyan]--rsys[/cyan] (AMD)"""
+        # Content loaded from docs/documentation/expectedPerformance.md "Achieving Maximum Performance" section
+        "content": _generate_markdown_help("performance"),
+        "markdown": True,
     },
 }
 

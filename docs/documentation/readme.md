@@ -5,13 +5,13 @@ Welcome to the Multi-component Flow Code (MFC) documentation.
 ## Getting Started
 
 - @ref getting-started "Getting Started" - Installation and first steps
-- @ref running "Running" - How to run simulations
+- @ref running "Running" - How to run simulations (interactive, batch, GPU)
 - @ref case "Case Files" - Setting up input files
 - @ref testing "Testing" - Running the test suite
 
 ## Reference
 
-- @ref parameters "Case Parameters" - All ~3,300 parameters
+- @ref parameters "Case Parameters" - All ~3,400 parameters
 - @ref cli-reference "CLI Reference" - Command line options
 - @ref case_constraints "Case Creator Guide" - Feature compatibility
 
@@ -22,10 +22,10 @@ Welcome to the Multi-component Flow Code (MFC) documentation.
 
 ## Advanced Topics
 
-- @ref gpuParallelization "GPU Parallelization" - GPU offloading
+- @ref expectedPerformance "Performance" - Optimization and benchmarks
+- @ref gpuParallelization "GPU Parallelization" - GPU macro API (developer reference)
 - @ref docker "Containers" - Docker usage
-- @ref expectedPerformance "Performance" - Benchmarks
-- @ref troubleshooting "Troubleshooting" - Common issues
+- @ref troubleshooting "Troubleshooting" - Debugging and common issues
 
 ## About
 
