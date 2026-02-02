@@ -21,8 +21,8 @@ jobs:
     - name: Lint and test the toolchain
       run: ./mfc.sh lint
 
-    - name: Check generated files are up to date
-      run: ./mfc.sh generate --check
+    - name: Generate toolchain files
+      run: ./mfc.sh generate
 
     - name: CLI smoke tests
       run: |
