@@ -1366,8 +1366,6 @@ contains
             call s_read_data_files(q_cons_ts(1)%vf)
         end if
 
-        call s_mpi_global_domain_bounds()
-
         ! Populating the buffers of the grid variables using the boundary conditions
         call s_populate_grid_variables_buffers()
 

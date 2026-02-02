@@ -554,6 +554,10 @@ module m_global_parameters
     $:GPU_DECLARE(create='[tau_star,cont_damage_s,alpha_bar]')
     !> @}
 
+    !< global domain bounds
+    real(wp), allocatable, dimension(:, :) :: domain_glb
+    $:GPU_DECLARE(create='[domain_glb]')
+
 contains
 
     !> Assigns default values to the user inputs before reading
@@ -1301,6 +1305,19 @@ contains
 
         $:GPU_UPDATE(device='[relax,relax_model,palpha_eps,ptgalpha_eps]')
 
+        @:ALLOCATE(domain_glb(num_dims, 2))
+        domain_glb(1, 1) = x_domain%beg
+        domain_glb(1, 2) = x_domain%end
+        if (n > 0) then ! 2D
+            domain_glb(2, 1) = y_domain%beg
+            domain_glb(2, 2) = y_domain%end
+            if (p > 0) then ! 3D
+                domain_glb(3, 1) = z_domain%beg
+                domain_glb(3, 2) = z_domain%end
+            end if
+        end if
+        $:GPU_UPDATE(device='[domain_glb]')
+
         ! Allocating grid variables for the x-, y- and z-directions
         @:ALLOCATE(x_cb(-1 - buff_size:m + buff_size))
         @:ALLOCATE(x_cc(-buff_size:m + buff_size))
@@ -1408,6 +1425,8 @@ contains
 
         if (p == 0) return; 
         @:DEALLOCATE(z_cb, z_cc, dz)
+
+        @:DEALLOCATE(domain_glb)
 
     end subroutine s_finalize_global_parameters_module
 
