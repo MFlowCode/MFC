@@ -303,6 +303,7 @@ module m_global_parameters
     !! to the next time-step.
 
     logical :: fft_wrt
+    logical :: dummy  !< AMDFlang workaround: keep a dummy logical to avoid a compiler case-optimization bug when a parameter+GPU-kernel conditional is false
 
 contains
 
@@ -415,6 +416,7 @@ contains
         elliptic_smoothing = .false.
 
         fft_wrt = .false.
+        dummy = .false.
 
         simplex_perturb = .false.
         simplex_params%perturb_vel(:) = .false.
@@ -578,6 +580,7 @@ contains
             patch_ib(i)%angular_vel(:) = 0._wp
             patch_ib(i)%mass = dflt_real
             patch_ib(i)%moment = dflt_real
+            patch_ib(i)%centroid_offset(:) = 0._wp
 
             ! sets values of a rotation matrix which can be used when calculating rotations
             patch_ib(i)%rotation_matrix = 0._wp

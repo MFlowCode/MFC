@@ -543,6 +543,7 @@ module m_global_parameters
     $:GPU_DECLARE(create='[Bx0,powell]')
 
     logical :: fft_wrt
+    logical :: dummy  !< AMDFlang workaround: keep a dummy logical to avoid a compiler case-optimization bug when a parameter+GPU-kernel conditional is false
 
     !> @name Continuum damage model parameters
     !> @{!
@@ -761,6 +762,7 @@ contains
         #:endfor
 
         fft_wrt = .false.
+        dummy = .false.
 
         do j = 1, num_probes_max
             acoustic(j)%pulse = dflt_int
