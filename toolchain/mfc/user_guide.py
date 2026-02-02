@@ -10,6 +10,7 @@ This module provides:
 """
 
 import os
+import subprocess
 
 from rich.panel import Panel
 from rich.table import Table
@@ -564,6 +565,15 @@ def interactive_mode():
             handlers[cmd]()
 
 
+def _run_mfc_command(args: list):
+    """Run an MFC command safely using subprocess."""
+    cmd_str = " ".join(args)
+    cons.print()
+    cons.print(f"[dim]Running: {cmd_str}[/dim]")
+    cons.print()
+    subprocess.run(args, check=False)
+
+
 def _interactive_new():
     """Interactive case creation."""
     cons.print("[bold]Create a New Case[/bold]")
@@ -577,11 +587,7 @@ def _interactive_new():
     name = Prompt.ask("Case name", default="my_case")
     template = Prompt.ask("Template", default="1D_minimal")
 
-    cmd = f"./mfc.sh new {name} -t {template}"
-    cons.print()
-    cons.print(f"[dim]Running: {cmd}[/dim]")
-    cons.print()
-    os.system(cmd)
+    _run_mfc_command(["./mfc.sh", "new", name, "-t", template])
 
 
 def _interactive_validate():
@@ -591,11 +597,7 @@ def _interactive_validate():
 
     path = Prompt.ask("Path to case.py")
 
-    cmd = f"./mfc.sh validate {path}"
-    cons.print()
-    cons.print(f"[dim]Running: {cmd}[/dim]")
-    cons.print()
-    os.system(cmd)
+    _run_mfc_command(["./mfc.sh", "validate", path])
 
 
 def _interactive_build():
@@ -606,14 +608,11 @@ def _interactive_build():
     jobs = Prompt.ask("Number of parallel jobs", default="4")
     gpu = Prompt.ask("Enable GPU support?", choices=["y", "n"], default="n")
 
-    cmd = f"./mfc.sh build -j {jobs}"
+    args = ["./mfc.sh", "build", "-j", jobs]
     if gpu == "y":
-        cmd += " --gpu"
+        args.append("--gpu")
 
-    cons.print()
-    cons.print(f"[dim]Running: {cmd}[/dim]")
-    cons.print()
-    os.system(cmd)
+    _run_mfc_command(args)
 
 
 def _interactive_run():
@@ -624,12 +623,7 @@ def _interactive_run():
     path = Prompt.ask("Path to case.py")
     ranks = Prompt.ask("Number of MPI ranks", default="1")
 
-    cmd = f"./mfc.sh run {path} -n {ranks}"
-
-    cons.print()
-    cons.print(f"[dim]Running: {cmd}[/dim]")
-    cons.print()
-    os.system(cmd)
+    _run_mfc_command(["./mfc.sh", "run", path, "-n", ranks])
 
 
 def _interactive_test():
@@ -639,12 +633,7 @@ def _interactive_test():
 
     jobs = Prompt.ask("Number of parallel jobs", default="4")
 
-    cmd = f"./mfc.sh test -j {jobs}"
-
-    cons.print()
-    cons.print(f"[dim]Running: {cmd}[/dim]")
-    cons.print()
-    os.system(cmd)
+    _run_mfc_command(["./mfc.sh", "test", "-j", jobs])
 
 
 def _interactive_clean():
@@ -655,10 +644,6 @@ def _interactive_clean():
     confirm = Prompt.ask("Are you sure you want to clean all build files?", choices=["y", "n"], default="n")
 
     if confirm == "y":
-        cmd = "./mfc.sh clean"
-        cons.print()
-        cons.print(f"[dim]Running: {cmd}[/dim]")
-        cons.print()
-        os.system(cmd)
+        _run_mfc_command(["./mfc.sh", "clean"])
     else:
         cons.print("[dim]Cancelled[/dim]")

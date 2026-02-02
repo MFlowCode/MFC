@@ -145,7 +145,7 @@ MFC can be built with support for various (compile-time) features:
 | **Debug**          | `--debug`   | `--no-debug`   | Off     | Requests the compiler build MFC in debug mode.                  |
 | **GCov**           | `--gcov`    | `--no-gcov`    | Off     | Build MFC with coverage flags on.                              |
 | **Unified Memory** | `--unified` | `--no-unified` | Off     | Build MFC with unified CPU/GPU memory (GH200 superchip only)  |
-| **Single**         | `--single`  | `--no-single`  | Off     | Build MFC in single precision     
+| **Single**         | `--single`  | `--no-single`  | Off     | Build MFC in single precision                                   |
 
 _⚠️ The `--gpu` option requires a supported compiler: NVHPC for NVIDIA GPUs (OpenACC or OpenMP), Cray for AMD GPUs (OpenACC or OpenMP), or AMD compilers for AMD GPUs (OpenMP only)._
 
