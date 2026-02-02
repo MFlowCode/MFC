@@ -19,6 +19,16 @@ from .user_guide import (
 )
 
 
+def _get_command_from_args(args_list):
+    """Extract command name from args list, resolving aliases."""
+    if len(args_list) < 2:
+        return None
+    candidate = args_list[1]
+    if candidate.startswith('-'):
+        return None
+    return COMMAND_ALIASES.get(candidate, candidate)
+
+
 def _handle_enhanced_help(args_list):
     """Handle --help with enhanced output for known commands."""
     if len(args_list) >= 2 and args_list[1] in ("-h", "--help"):
@@ -56,6 +66,19 @@ def parse(config: MFCConfig):
         extra_index = sys.argv.index('--')
     except ValueError:
         extra_index = len(sys.argv)
+
+    # Patch subparser error methods to show enhanced help before errors
+    attempted_command = _get_command_from_args(sys.argv)
+    if attempted_command and attempted_command in subparser_map:
+        subparser = subparser_map[attempted_command]
+        original_error = subparser.error
+
+        def custom_error(message):
+            print_command_help(attempted_command, show_argparse=False)
+            print()  # Blank line before usage
+            original_error(message)
+
+        subparser.error = custom_error
 
     args: dict = vars(parser.parse_args(sys.argv[1:extra_index]))
     args["--"] = sys.argv[extra_index + 1:]
