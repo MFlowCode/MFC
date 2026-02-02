@@ -44,14 +44,22 @@ MFC supports GPU acceleration via OpenACC or OpenMP offloading.
   [green]./mfc.sh run case.py --gpu[/green]     Run with GPU support
   [green]./mfc.sh run case.py -g 0 1[/green]    Use specific GPU IDs
 
+[bold]GPU Profiling:[/bold]
+  [green]./mfc.sh run case.py --ncu[/green]     NVIDIA Nsight Compute
+  [green]./mfc.sh run case.py --nsys[/green]    NVIDIA Nsight Systems
+  [green]./mfc.sh run case.py --rcu[/green]     AMD ROCm rocprof-compute
+  [green]./mfc.sh run case.py --rsys[/green]    AMD ROCm rocprof-systems
+
 [bold]Environment Setup:[/bold]
   Most HPC systems require loading GPU modules first:
   [cyan]source ./mfc.sh load -c <cluster> -m g[/cyan]
 
 [bold]Supported Compilers:[/bold]
-  • NVIDIA HPC SDK (nvfortran) - OpenACC
-  • AMD ROCm (amdflang) - OpenMP offload
-  • GCC with OpenACC/OpenMP offload support
+  [yellow]NVIDIA GPUs:[/yellow]
+    • NVHPC (nvfortran) - OpenACC or OpenMP
+  [yellow]AMD GPUs:[/yellow]
+    • Cray (ftn) - OpenACC or OpenMP
+    • AMD (amdflang) - OpenMP only
 
 [bold]Troubleshooting:[/bold]
   • Ensure CUDA/ROCm toolkit is in PATH
@@ -63,32 +71,36 @@ MFC supports GPU acceleration via OpenACC or OpenMP offloading.
         "content": """\
 [bold cyan]Supported HPC Clusters[/bold cyan]
 
-MFC includes pre-configured module sets for several clusters.
+MFC includes pre-configured module sets for many clusters.
 
 [bold]Loading Cluster Modules:[/bold]
   [green]source ./mfc.sh load -c <cluster> -m <mode>[/green]
 
 [bold]Available Clusters:[/bold]
-  [cyan]p[/cyan] - Georgia Tech Phoenix
-  [cyan]f[/cyan] - OLCF Frontier (AMD MI250X)
-  [cyan]s[/cyan] - OLCF Summit (NVIDIA V100)
-  [cyan]a[/cyan] - OLCF Andes
+  [yellow]ORNL:[/yellow]      [cyan]a[/cyan]=Ascent  [cyan]f[/cyan]=Frontier  [cyan]famd[/cyan]=Frontier AMD  [cyan]s[/cyan]=Summit  [cyan]w[/cyan]=Wombat
+  [yellow]LLNL:[/yellow]      [cyan]tuo[/cyan]=Tuolumne
+  [yellow]ACCESS:[/yellow]    [cyan]b[/cyan]=Bridges2  [cyan]e[/cyan]=Expanse  [cyan]d[/cyan]=Delta  [cyan]dai[/cyan]=DeltaAI
+  [yellow]Georgia Tech:[/yellow] [cyan]p[/cyan]=Phoenix
+  [yellow]Caltech:[/yellow]   [cyan]r[/cyan]=Richardson
+  [yellow]Brown:[/yellow]     [cyan]o[/cyan]=Oscar
+  [yellow]DoD:[/yellow]       [cyan]cc[/cyan]=Carpenter Cray  [cyan]c[/cyan]=Carpenter GNU  [cyan]n[/cyan]=Nautilus
+  [yellow]Florida:[/yellow]   [cyan]h[/cyan]=HiPerGator
 
 [bold]Modes:[/bold]
-  [cyan]c[/cyan] - CPU only
-  [cyan]g[/cyan] - GPU enabled
+  [cyan]c[/cyan] or [cyan]cpu[/cyan] - CPU only
+  [cyan]g[/cyan] or [cyan]gpu[/cyan] - GPU enabled
 
 [bold]Examples:[/bold]
-  [green]source ./mfc.sh load -c p -m g[/green]   Phoenix with GPU
-  [green]source ./mfc.sh load -c f -m g[/green]   Frontier with GPU
-  [green]source ./mfc.sh load -c f -m c[/green]   Frontier CPU-only
+  [green]source ./mfc.sh load -c p -m g[/green]     Phoenix with GPU
+  [green]source ./mfc.sh load -c f -m g[/green]     Frontier with GPU (AMD MI250X)
+  [green]source ./mfc.sh load -c s -m g[/green]     Summit with GPU (NVIDIA V100)
+  [green]source ./mfc.sh load -c d -m c[/green]     Delta CPU-only
 
 [bold]Custom Clusters:[/bold]
-  For unlisted clusters, manually load required modules:
-  • Fortran compiler (gfortran, nvfortran, etc.)
-  • MPI implementation
-  • CMake 3.18+
-  • Python 3.11+"""
+  For unlisted clusters, manually load:
+  • Fortran compiler (gfortran, nvfortran, amdflang, etc.)
+  • MPI implementation (OpenMPI, MPICH, Cray-MPICH)
+  • CMake 3.18+, Python 3.11+"""
     },
     "batch": {
         "title": "Batch Job Submission",
@@ -107,13 +119,19 @@ Use [green]-e batch[/green] to submit jobs to a scheduler instead of running int
   [cyan]-a, --account[/cyan]         Account/allocation to charge
   [cyan]-p, --partition[/cyan]       Queue/partition name
   [cyan]-q, --qos[/cyan]             Quality of service
+  [cyan]-@, --email[/cyan]           Email for job notifications
+  [cyan]-#, --name[/cyan]            Job name (default: MFC)
+  [cyan]-c, --computer[/cyan]        Submission template (e.g., phoenix, frontier)
 
 [bold]Examples:[/bold]
   [green]./mfc.sh run case.py -e batch -N 4 -n 8 -w 02:00:00[/green]
     4 nodes, 8 ranks/node, 2 hour limit
 
-  [green]./mfc.sh run case.py -e batch -a myproject -p gpu[/green]
-    Submit to 'gpu' partition with account 'myproject'
+  [green]./mfc.sh run case.py -e batch -a myproject -p gpu -@ user@email.com[/green]
+    Submit to 'gpu' partition with email notifications
+
+  [green]./mfc.sh run case.py -e batch -c frontier[/green]
+    Use Frontier-specific submission template
 
 [bold]Dry Run:[/bold]
   [green]./mfc.sh run case.py -e batch --dry-run[/green]
@@ -128,14 +146,15 @@ Use [green]-e batch[/green] to submit jobs to a scheduler instead of running int
         "content": """\
 [bold cyan]Debugging MFC[/bold cyan]
 
-[bold]Debug Logging:[/bold]
-  Add [green]-d[/green] or [green]--debug-log[/green] to any command for verbose output:
-  [green]./mfc.sh build --debug-log[/green]
-  [green]./mfc.sh run case.py --debug-log[/green]
+[bold]Verbosity Levels:[/bold]
+  [green]-v[/green]       Basic verbose output
+  [green]-vv[/green]      More detailed output
+  [green]-vvv[/green]     Maximum verbosity
+  [green]-d[/green]       Debug log (writes to file)
 
 [bold]Debug Builds:[/bold]
-  [green]./mfc.sh build --debug[/green]
-  Compiles with debug symbols and reduced optimization.
+  [green]./mfc.sh build --debug[/green]     Debug symbols, reduced optimization
+  [green]./mfc.sh build --gcov[/green]      Code coverage instrumentation
 
 [bold]Validating Cases:[/bold]
   [green]./mfc.sh validate case.py[/green]
@@ -146,17 +165,22 @@ Use [green]-e batch[/green] to submit jobs to a scheduler instead of running int
   [yellow]Build fails with missing MPI:[/yellow]
     → Load cluster modules: [cyan]source ./mfc.sh load -c <cluster> -m <mode>[/cyan]
 
+  [yellow]Build fails with compiler errors:[/yellow]
+    → Try [cyan]./mfc.sh clean[/cyan] then rebuild
+    → Check compiler compatibility in docs
+
   [yellow]Tests fail with tolerance errors:[/yellow]
     → May be expected for different compilers/platforms
     → Use [cyan]--generate[/cyan] to update golden files if intentional
 
-  [yellow]Case validation errors:[/yellow]
-    → Check parameter constraints in the error message
-    → See documentation for valid parameter ranges
+  [yellow]Simulation crashes or gives wrong results:[/yellow]
+    → Validate case: [cyan]./mfc.sh validate case.py[/cyan]
+    → Build with debug: [cyan]./mfc.sh build --debug[/cyan]
+    → Check CFL condition and grid resolution
 
 [bold]Getting Help:[/bold]
-  • Check [cyan]docs/documentation/troubleshooting.md[/cyan]
-  • Report issues: [cyan]https://github.com/MFlowCode/MFC/issues[/cyan]"""
+  • Docs: [cyan]docs/documentation/[/cyan]
+  • Issues: [cyan]https://github.com/MFlowCode/MFC/issues[/cyan]"""
     },
 }
 

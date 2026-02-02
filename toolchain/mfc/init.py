@@ -492,6 +492,7 @@ def init():
 
     if not name:
         # Show full help like ./mfc.sh new -h
+        # pylint: disable=import-outside-toplevel
         import sys
         from .user_guide import print_command_help
         from .cli.commands import MFC_CLI_SCHEMA

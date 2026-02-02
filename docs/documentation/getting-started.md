@@ -141,13 +141,13 @@ MFC can be built with support for various (compile-time) features:
 | Feature            | Enable      | Disable        | Default | Description                                                     |
 | :----------------: | :---------: | :------------: | :-----: | --------------------------------------------------------------- |
 | **MPI**            | `--mpi`     | `--no-mpi`     | On      | Allows MFC to run on multiple processors (and nodes). |
-| **GPU**            | `--gpu`     | `--no-gpu`     | Off     | Enables GPU acceleration via OpenACC.                           |
+| **GPU**            | `--gpu`     | `--no-gpu`     | Off     | Enables GPU acceleration via OpenACC or OpenMP offload.         |
 | **Debug**          | `--debug`   | `--no-debug`   | Off     | Requests the compiler build MFC in debug mode.                  |
 | **GCov**           | `--gcov`    | `--no-gcov`    | Off     | Build MFC with coverage flags on.                              |
 | **Unified Memory** | `--unified` | `--no-unified` | Off     | Build MFC with unified CPU/GPU memory (GH200 superchip only)  |
 | **Single**         | `--single`  | `--no-single`  | Off     | Build MFC in single precision     
 
-_⚠️ The `--gpu` option requires that your compiler supports OpenACC for Fortran for your target GPU architecture._
+_⚠️ The `--gpu` option requires a supported compiler: NVHPC for NVIDIA GPUs (OpenACC or OpenMP), Cray for AMD GPUs (OpenACC or OpenMP), or AMD compilers for AMD GPUs (OpenMP only)._
 
 When these options are given to `mfc.sh`, they will be remembered when you issue future commands.
 You can enable and disable features anytime by passing any of the arguments above.
