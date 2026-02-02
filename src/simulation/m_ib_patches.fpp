@@ -913,11 +913,11 @@ contains
             !call s_model_write("__out__.stl", model)
             !call s_model_write("__out__.obj", model)
 
-            grid_mm(1, :) = (/minval(x_cc) - 0.e5_wp*dx, maxval(x_cc) + 0.e5_wp*dx/)
-            grid_mm(2, :) = (/minval(y_cc) - 0.e5_wp*dy, maxval(y_cc) + 0.e5_wp*dy/)
+            grid_mm(1, :) = (/minval(x_cc(0:m)) - 0.e5_wp*dx(0), maxval(x_cc(0:m)) + 0.e5_wp*dx(m)/)
+            grid_mm(2, :) = (/minval(y_cc(0:n)) - 0.e5_wp*dy(0), maxval(y_cc(0:n)) + 0.e5_wp*dy(n)/)
 
             if (p > 0) then
-                grid_mm(3, :) = (/minval(z_cc) - 0.e5_wp*dz, maxval(z_cc) + 0.e5_wp*dz/)
+                grid_mm(3, :) = (/minval(z_cc(0:p)) - 0.e5_wp*dz(0), maxval(z_cc(0:p)) + 0.e5_wp*dz(p)/)
             else
                 grid_mm(3, :) = (/0._wp, 0._wp/)
             end if
