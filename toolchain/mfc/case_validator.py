@@ -350,6 +350,7 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         n = self.get('n', 0)
         num_ibs = self.get('num_ibs', 0)
         periodic_ibs = self.get('periodic_ibs', 'F') == 'T'
+        cyl_coord = self.get('cyl_coord', 'F') == 'T'
 
         self.prohibit(ib and n <= 0,
                      "Immersed Boundaries do not work in 1D (requires n > 0)")
@@ -358,6 +359,10 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         self.prohibit(not ib and num_ibs > 0,
                      "num_ibs is set, but ib is not enabled")
         if periodic_ibs:
+            self.prohibit(not ib,
+                          "periodic_ibs is set to true but ib is not enabled")
+            self.prohibit(cyl_coord,
+                          "periodic_ibs not compatible with cyl_coords")
             for direction in ['x', 'y', 'z']:
                 for end in ['beg', 'end']:
                     bc_val = self.get(f'bc_{direction}%{end}')

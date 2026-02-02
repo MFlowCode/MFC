@@ -1928,6 +1928,9 @@ contains
 
 #ifdef MFC_MPI
         deallocate (buff_send, buff_recv)
+#ifndef MFC_POST_PROCESS
+        @:DEALLOCATE(domain_glb)
+#endif
 #endif
 
     end subroutine s_finalize_mpi_common_module

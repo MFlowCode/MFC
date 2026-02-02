@@ -24,7 +24,8 @@ module m_compute_levelset
  s_rectangle_levelset, &
  s_cuboid_levelset, &
  s_sphere_levelset, &
- s_ellipse_levelset
+ s_ellipse_levelset, &
+ s_periodic_project_center
 
 contains
 
@@ -47,21 +48,10 @@ contains
         center(1, 1) = patch_ib(ib_patch_id)%x_centroid
         center(2, 1) = patch_ib(ib_patch_id)%y_centroid
 
-        if (periodic_ibs) then ! periodically wrap spheres around domain
-            if ((center(1, 1) - domain_glb(1, 1)) <= radius) then
-                center(1, 2) = domain_glb(1, 2) + (center(1, 1) - domain_glb(1, 1))
-            else if ((domain_glb(1, 2) - center(1, 1)) <= radius) then
-                center(1, 2) = domain_glb(1, 1) - (domain_glb(1, 2) - center(1, 1))
-            else
-                center(1, 2) = center(1, 1)
-            end if
-            if ((center(2, 1) - domain_glb(2, 1)) <= radius) then
-                center(2, 2) = domain_glb(2, 2) + (center(2, 1) - domain_glb(2, 1))
-            else if ((domain_glb(2, 2) - center(2, 1)) <= radius) then
-                center(2, 2) = domain_glb(2, 1) - (domain_glb(2, 2) - center(2, 1))
-            else
-                center(2, 2) = center(2, 1)
-            end if
+        if (periodic_ibs) then ! periodically wrap circles around domain
+            do i = 1, 2
+                call s_periodic_project_center(center(i, :), domain_glb(i, :), radius)
+            end do
         end if
 
         $:GPU_PARALLEL_LOOP(private='[i,j,ix,iy,dist_vec,dist,dist_vec_temp,dist_temp]', &
@@ -71,7 +61,7 @@ contains
                 dist_vec(1) = x_cc(i) - center(1, 1)
                 dist_vec(2) = y_cc(j) - center(2, 1)
                 dist_vec(3) = 0._wp
-                dist = sqrt(sum(dist_vec**2))
+                dist = sum(dist_vec**2)
                 if (periodic_ibs) then
                     ! check all permutations of periodically projected ib to find minimum distance
                     do ix = 1, 2
@@ -79,7 +69,7 @@ contains
                             dist_vec_temp(1) = x_cc(i) - center(1, ix)
                             dist_vec_temp(2) = y_cc(j) - center(2, iy)
                             dist_vec_temp(3) = 0._wp
-                            dist_temp = sqrt(sum(dist_vec_temp**2))
+                            dist_temp = sum(dist_vec_temp**2)
                             if (dist_temp < dist) then
                                 dist = dist_temp
                                 dist_vec = dist_vec_temp
@@ -87,6 +77,7 @@ contains
                         end do
                     end do
                 end if
+                dist = sqrt(dist)
                 levelset%sf(i, j, 0, ib_patch_id) = dist - radius
                 if (f_approx_equal(dist, 0._wp)) then
                     levelset_norm%sf(i, j, 0, ib_patch_id, :) = 0
@@ -558,27 +549,9 @@ contains
         center(3, 1) = patch_ib(ib_patch_id)%z_centroid
 
         if (periodic_ibs) then ! periodically wrap spheres around domain
-            if ((center(1, 1) - domain_glb(1, 1)) <= radius) then
-                center(1, 2) = domain_glb(1, 2) + (center(1, 1) - domain_glb(1, 1))
-            else if ((domain_glb(1, 2) - center(1, 1)) <= radius) then
-                center(1, 2) = domain_glb(1, 1) - (domain_glb(1, 2) - center(1, 1))
-            else
-                center(1, 2) = center(1, 1)
-            end if
-            if ((center(2, 1) - domain_glb(2, 1)) <= radius) then
-                center(2, 2) = domain_glb(2, 2) + (center(2, 1) - domain_glb(2, 1))
-            else if ((domain_glb(2, 2) - center(2, 1)) <= radius) then
-                center(2, 2) = domain_glb(2, 1) - (domain_glb(2, 2) - center(2, 1))
-            else
-                center(2, 2) = center(2, 1)
-            end if
-            if ((center(3, 1) - domain_glb(3, 1)) <= radius) then
-                center(3, 2) = domain_glb(3, 2) + (center(3, 1) - domain_glb(3, 1))
-            else if ((domain_glb(3, 2) - center(3, 1)) <= radius) then
-                center(3, 2) = domain_glb(3, 1) - (domain_glb(3, 2) - center(3, 1))
-            else
-                center(3, 2) = center(3, 1)
-            end if
+            do i = 1, 3
+                call s_periodic_project_center(center(i, :), domain_glb(i, :), radius)
+            end do
         end if
 
         $:GPU_PARALLEL_LOOP(private='[i,j,k,ix,iy,iz,dist_vec,dist,dist_vec_temp,dist_temp]', &
@@ -589,7 +562,7 @@ contains
                     dist_vec(1) = x_cc(i) - center(1, 1)
                     dist_vec(2) = y_cc(j) - center(2, 1)
                     dist_vec(3) = z_cc(k) - center(3, 1)
-                    dist = sqrt(sum(dist_vec**2))
+                    dist = sum(dist_vec**2)
                     if (periodic_ibs) then
                         ! check all permutations of periodically projected ib to find minimum distance
                         do ix = 1, 2
@@ -598,7 +571,7 @@ contains
                                     dist_vec_temp(1) = x_cc(i) - center(1, ix)
                                     dist_vec_temp(2) = y_cc(j) - center(2, iy)
                                     dist_vec_temp(3) = z_cc(k) - center(3, iz)
-                                    dist_temp = sqrt(sum(dist_vec_temp**2))
+                                    dist_temp = sum(dist_vec_temp**2)
                                     if (dist_temp < dist) then
                                         dist = dist_temp
                                         dist_vec = dist_vec_temp
@@ -607,6 +580,7 @@ contains
                             end do
                         end do
                     end if
+                    dist = sqrt(dist)
                     levelset%sf(i, j, k, ib_patch_id) = dist - radius
                     if (f_approx_equal(dist, 0._wp)) then
                         levelset_norm%sf(i, j, k, ib_patch_id, :) = (/1, 0, 0/)
@@ -699,5 +673,20 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_cylinder_levelset
+
+    subroutine s_periodic_project_center(center, domain_glb, radius)
+        real(wp), dimension(2), intent(inout) :: center
+        real(wp), dimension(2), intent(in) :: domain_glb
+        real(wp), intent(in) :: radius
+
+        if ((center(1) - domain_glb(1)) <= radius) then
+            center(2) = domain_glb(2) + (center(1) - domain_glb(1))
+        else if ((domain_glb(2) - center(1)) <= radius) then
+            center(2) = domain_glb(1) - (domain_glb(2) - center(1))
+        else
+            center(2) = center(1)
+        end if
+
+    end subroutine s_periodic_project_center
 
 end module m_compute_levelset

@@ -166,21 +166,10 @@ contains
         ! that cell. If both queries check out, the primitive variables of
         ! the current patch are assigned to this cell.
 
-        if (periodic_ibs) then ! periodically wrap spheres around domain
-            if ((center(1, 1) - domain_glb(1, 1)) <= radius) then
-                center(1, 2) = domain_glb(1, 2) + (center(1, 1) - domain_glb(1, 1))
-            else if ((domain_glb(1, 2) - center(1, 1)) <= radius) then
-                center(1, 2) = domain_glb(1, 1) - (domain_glb(1, 2) - center(1, 1))
-            else
-                center(1, 2) = center(1, 1)
-            end if
-            if ((center(2, 1) - domain_glb(2, 1)) <= radius) then
-                center(2, 2) = domain_glb(2, 2) + (center(2, 1) - domain_glb(2, 1))
-            else if ((domain_glb(2, 2) - center(2, 1)) <= radius) then
-                center(2, 2) = domain_glb(2, 1) - (domain_glb(2, 2) - center(2, 1))
-            else
-                center(2, 2) = center(2, 1)
-            end if
+        if (periodic_ibs) then ! periodically wrap circles around domain
+            do i = 1, 2
+                call s_periodic_project_center(center(i, :), domain_glb(i, :), radius)
+            end do
 
             $:GPU_PARALLEL_LOOP(private='[i,j,ix,iy]', copy='[ib_markers_sf]',&
                       & copyin='[patch_id,center,r2]', collapse=2)
@@ -624,27 +613,9 @@ contains
         ! the current patch are assigned to this cell.
 
         if (periodic_ibs) then ! periodically wrap spheres around domain
-            if ((center(1, 1) - domain_glb(1, 1)) <= radius) then
-                center(1, 2) = domain_glb(1, 2) + (center(1, 1) - domain_glb(1, 1))
-            else if ((domain_glb(1, 2) - center(1, 1)) <= radius) then
-                center(1, 2) = domain_glb(1, 1) - (domain_glb(1, 2) - center(1, 1))
-            else
-                center(1, 2) = center(1, 1)
-            end if
-            if ((center(2, 1) - domain_glb(2, 1)) <= radius) then
-                center(2, 2) = domain_glb(2, 2) + (center(2, 1) - domain_glb(2, 1))
-            else if ((domain_glb(2, 2) - center(2, 1)) <= radius) then
-                center(2, 2) = domain_glb(2, 1) - (domain_glb(2, 2) - center(2, 1))
-            else
-                center(2, 2) = center(2, 1)
-            end if
-            if ((center(3, 1) - domain_glb(3, 1)) <= radius) then
-                center(3, 2) = domain_glb(3, 2) + (center(3, 1) - domain_glb(3, 1))
-            else if ((domain_glb(3, 2) - center(3, 1)) <= radius) then
-                center(3, 2) = domain_glb(3, 1) - (domain_glb(3, 2) - center(3, 1))
-            else
-                center(3, 2) = center(3, 1)
-            end if
+            do i = 1, 3
+                call s_periodic_project_center(center(i, :), domain_glb(i, :), radius)
+            end do
 
             $:GPU_PARALLEL_LOOP(collapse=3, private='[i,j,k,ix,iy,iz]', copy='[ib_markers_sf]', &
                               & copyin='[patch_id,center,r2]')
