@@ -366,7 +366,8 @@ for ib_id in range(1, 10+1):
                           ("theta", ParamType.REAL), ("slip", ParamType.LOG),
                           ("c", ParamType.REAL), ("p", ParamType.REAL),
                           ("t", ParamType.REAL), ("m", ParamType.REAL),
-                          ("moving_ibm", ParamType.INT), ("mass", ParamType.REAL)]:
+                          ("moving_ibm", ParamType.INT), ("mass", ParamType.REAL),
+                          ("model_filepath", ParamType.STR)]:
         SIMULATION[f"patch_ib({ib_id})%{real_attr}"] = ty
 
     for dir_id in range(1, 4):
