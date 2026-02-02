@@ -467,7 +467,7 @@ contains
         type(t_model), intent(in) :: model
         type(t_bbox) :: bbox
 
-        integer :: i, j
+        integer :: i, j, k
 
         if (size(model%trs) == 0) then
             bbox%min = 0._wp
@@ -480,8 +480,11 @@ contains
 
         do i = 1, size(model%trs)
             do j = 1, 3
-                bbox%min = min(bbox%min, model%trs(i)%v(j, :))
-                bbox%max = max(bbox%max, model%trs(i)%v(j, :))
+                print *, "min", bbox%min, "max", bbox%max, "current", model%trs(i)%v(j, :)
+                do k = 1, 3
+                    bbox%min(k) = min(bbox%min(k), model%trs(i)%v(j, k))
+                    bbox%max(k) = max(bbox%max(k), model%trs(i)%v(j, k))
+                end do
             end do
         end do
 

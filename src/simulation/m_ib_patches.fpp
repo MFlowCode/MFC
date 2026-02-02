@@ -880,7 +880,7 @@ contains
         if (p > 0) then
             call f_check_interpolation_3D(model, (/dx, dy, dz/), interpolate)
         else
-            call f_check_interpolation_2D(boundary_v, boundary_edge_count, (/dx, dy, dz/), interpolate)
+            call f_check_interpolation_2D(boundary_v, boundary_edge_count, (/minval(dx), minval(dy), 0._wp/), interpolate)
         end if
 
         ! Show the number of edges and boundary edges in 2D STL models
@@ -946,7 +946,11 @@ contains
                         point = f_convert_cyl_to_cart(point)
                     end if
 
-                    eta = f_model_is_inside(model, point, (/dx, dy, dz/), patch_ib(patch_id)%model_spc)
+                    if (p == 0) then
+                        eta = f_model_is_inside(model, point, (/dx(i), dy(j), 0._wp/), patch_ib(patch_id)%model_spc)
+                    else
+                        eta = f_model_is_inside(model, point, (/dx(i), dy(j), dz(k)/), patch_ib(patch_id)%model_spc)
+                    end if
 
                     ! Reading STL boundary vertices and compute the levelset and levelset_norm
                     if (eta > patch_ib(patch_id)%model_threshold) then
@@ -981,6 +985,7 @@ contains
                         ! Assign the levelset_norm
                         STL_levelset_norm%sf(i, j, k, patch_id, 1:3) = normals(1:3)
                     else
+                        print *, i, j, k
                         ! 2D models
                         if (interpolate) then
                             ! Get the shortest distance between the cell center and the model boundary
@@ -1012,6 +1017,7 @@ contains
 
                         ! Assign the levelset_norm
                         STL_levelset_norm%sf(i, j, k, patch_id, 1:3) = normals(1:3)
+                        print *, i, j, k, "end"
 
                     end if
                 end do; end do; end do
