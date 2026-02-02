@@ -3,7 +3,7 @@ import numpy as np
 # -----------------------------
 # User parameters
 # -----------------------------
-N = 10000                    # number of particles
+N = 1000                    # number of particles
 x_min, x_max = -0.5, 0.5   # thickness in x (m)
 y_min, y_max = -0.125, 0.125   # height in y (m)
 z_val = 0.0                  # 2D simulation

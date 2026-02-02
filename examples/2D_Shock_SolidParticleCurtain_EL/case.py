@@ -24,9 +24,9 @@ data = {
     "adap_dt" : "F", #adaptive time stepping for bubble solver
 
     "cfl_adap_dt"       : "T",
-    "cfl_target"        : 0.3,
+    "cfl_target"        : 0.4,
     "n_start"           : 0,
-    "t_stop"            : 0.002,
+    "t_stop"            : 0.003,
     "cfl_const_dt"      : "F",
     "t_save"            : 1e-5, #t_step_save,
     # Simulation Algorithm
@@ -104,15 +104,19 @@ data = {
     # "lag_params%write_bubbles_stats": "F",
 
     "particles_lagrange": "T",
-    "fd_order": 4,
-    "lag_params%solver_approach": 2,    
-    "lag_params%nParticles_glb": 100, # Number of Particles
+    "fd_order": 4, #4th order is unstable due to velocity interpolation for drag
+    "lag_params%epsilonb" : 1.,
+    "lag_params%charwidth": 0.00390625, #0.03515625, #virtual depth in 2D sims
+    "lag_params%solver_approach": 2, #1 for one way coupling, 2 for two way coupling 
+    "lag_params%nParticles_glb": 1000, # Number of Particles
     "lag_params%valmaxvoid": 0.9,
     "lag_params%vel_model": 1,
+    "lag_params%smooth_type": 1, #1 gaussian, 2 delta
     "lag_params%input_path" : 'input/lag_particles.dat',
     "lag_params%qs_drag_model" : 2, # 1 = Parmar, 2 = Osnes, 3 = Modified Parmar, 4 = Gidaspow
     "lag_params%stokes_drag" : 0, # 0 = none, 1 = free slip stokes, 2 = no slip stokes
-    "lag_params%pressure_force" : "T",
+    "lag_params%pressure_force" : "F",
+    "lag_params%gravity_force" : "F",
     "particle_pp%rho0ref_particle": 2700,
     "particle_pp%cp_particle": 1000
 }
