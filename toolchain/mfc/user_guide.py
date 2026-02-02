@@ -732,7 +732,10 @@ def _run_mfc_command(args: list):
     cons.print()
     cons.print(f"[dim]Running: {cmd_str}[/dim]")
     cons.print()
-    subprocess.run(args, check=False)
+    try:
+        subprocess.run(args, check=False)
+    except FileNotFoundError:
+        cons.print(f"[red]Command not found: {args[0]}[/red]")
 
 
 def _interactive_new():

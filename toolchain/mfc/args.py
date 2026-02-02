@@ -20,13 +20,16 @@ from .user_guide import (
 
 
 def _get_command_from_args(args_list):
-    """Extract command name from args list, resolving aliases."""
-    if len(args_list) < 2:
-        return None
-    candidate = args_list[1]
-    if candidate.startswith('-'):
-        return None
-    return COMMAND_ALIASES.get(candidate, candidate)
+    """Extract command name from args list, resolving aliases.
+
+    Scans for the first non-option token to support any top-level options
+    that may appear before the command name.
+    """
+    # Skip the program name and any leading options (starting with '-')
+    for token in args_list[1:]:
+        if not token.startswith('-'):
+            return COMMAND_ALIASES.get(token, token)
+    return None
 
 
 def _handle_enhanced_help(args_list):
