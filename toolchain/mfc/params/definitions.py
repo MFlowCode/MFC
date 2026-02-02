@@ -149,7 +149,7 @@ CONSTRAINTS = {
 DEPENDENCIES = {
     "bubbles_euler": {
         "when_true": {
-            "recommends": ["nb", "R0ref", "polytropic"],
+            "recommends": ["nb", "polytropic"],
         }
     },
     "viscous": {
