@@ -491,10 +491,18 @@ def init():
     template = ARG("template")
 
     if not name:
-        raise MFCException(
-            "Please specify a case name.\n"
-            "Usage: ./mfc.sh new <name> [--template <template>]\n"
-            "       ./mfc.sh new --list"
-        )
+        # Show full help like ./mfc.sh new -h
+        import sys
+        from .user_guide import print_command_help
+        from .cli.commands import MFC_CLI_SCHEMA
+        from .cli.argparse_gen import generate_parser
+        from .state import MFCConfig
+
+        print_command_help("new", show_argparse=False)
+        _, subparser_map = generate_parser(MFC_CLI_SCHEMA, MFCConfig())
+        subparser_map["new"].print_help()
+        sys.stdout.flush()
+        sys.stderr.write("\n./mfc.sh new: error: the following arguments are required: NAME\n")
+        sys.exit(2)
 
     create_case(name, template)
