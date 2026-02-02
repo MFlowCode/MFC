@@ -23,7 +23,7 @@ __pycache__
 toolchain/mfc/_version.py
 
 .DS_Store
-
+!examples/**/IC/*.dat
 /tests/*/**
 !/tests/*/golden.txt
 !/tests/*/golden-metadata.txt

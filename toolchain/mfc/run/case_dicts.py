@@ -105,6 +105,8 @@ PRE_PROCESS.update({
     'bubbles_lagrange': ParamType.LOG,
     'simplex_perturb': ParamType.LOG,
     'fft_wrt': ParamType.LOG,
+    'files_dir': ParamType.STR,       
+    'file_extension': ParamType.STR,
 })
 
 for var in ["R0ref", "p0ref", "rho0ref", "T0ref", "ss", "pv", "vd",
