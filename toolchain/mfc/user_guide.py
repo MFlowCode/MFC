@@ -44,6 +44,11 @@ MFC supports GPU acceleration via OpenACC or OpenMP offloading.
   [green]./mfc.sh run case.py --gpu[/green]     Run with GPU support
   [green]./mfc.sh run case.py -g 0 1[/green]    Use specific GPU IDs
 
+[bold yellow]⚡ Case Optimization (10x speedup!):[/bold yellow]
+  [green]./mfc.sh run case.py --case-optimization -j 8[/green]
+  Hard-codes parameters at compile time for maximum performance.
+  See [cyan]./mfc.sh help performance[/cyan] for details.
+
 [bold]GPU Profiling:[/bold]
   [green]./mfc.sh run case.py --ncu[/green]     NVIDIA Nsight Compute
   [green]./mfc.sh run case.py --nsys[/green]    NVIDIA Nsight Systems
@@ -181,6 +186,47 @@ Use [green]-e batch[/green] to submit jobs to a scheduler instead of running int
 [bold]Getting Help:[/bold]
   • Docs: [cyan]docs/documentation/[/cyan]
   • Issues: [cyan]https://github.com/MFlowCode/MFC/issues[/cyan]"""
+    },
+    "performance": {
+        "title": "Performance Optimization",
+        "content": """\
+[bold cyan]Maximizing MFC Performance[/bold cyan]
+
+[bold yellow]⚡ Case Optimization (up to 10x faster!) ⚡[/bold yellow]
+
+Case optimization hard-codes your simulation parameters at compile time,
+enabling aggressive compiler optimizations. This provides major speedups
+for both CPU and GPU runs.
+
+[bold]How to use:[/bold]
+  [green]./mfc.sh run case.py --case-optimization -j 8[/green]
+
+  This automatically rebuilds MFC with your case parameters hard-coded,
+  then runs the simulation. Use [cyan]-j N[/cyan] for faster parallel builds.
+  The build is cached for repeated runs with the same parameters.
+
+[bold]For batch jobs:[/bold]
+  [green]./mfc.sh run case.py --case-optimization -j 8 -e batch -N 4 -n 8[/green]
+
+[bold]Build separately (optional):[/bold]
+  [green]./mfc.sh build -i case.py --case-optimization -j 8[/green]
+  [green]./mfc.sh run case.py[/green]
+
+[bold]When to use:[/bold]
+  ✓ Production simulations (CPU or GPU)
+  ✓ Large-scale runs where performance matters
+  ✓ Benchmarking
+
+[bold]When NOT to use:[/bold]
+  ✗ Rapid iteration/debugging (rebuilds on parameter changes)
+  ✗ Parameter sweeps with many different configurations
+
+[bold]Other Performance Tips:[/bold]
+  • Use [cyan]--gpu[/cyan] for GPU acceleration
+  • Use [cyan]-j N[/cyan] for parallel builds
+  • Use [cyan]--fastmath[/cyan] for faster (less precise) math
+  • Profile with [cyan]--ncu[/cyan] or [cyan]--nsys[/cyan] (NVIDIA)
+  • Profile with [cyan]--rcu[/cyan] or [cyan]--rsys[/cyan] (AMD)"""
     },
 }
 

@@ -159,14 +159,14 @@ BUILD_COMMAND = Command(
         Example("./mfc.sh build", "Build all default targets (CPU)"),
         Example("./mfc.sh build -j 8", "Build with 8 parallel jobs"),
         Example("./mfc.sh build --gpu", "Build with GPU (OpenACC) support"),
-        Example("./mfc.sh build -t simulation", "Build only simulation target"),
+        Example("./mfc.sh build -i case.py --case-optimization -j 8", "Case optimization (10x faster!)"),
     ],
     key_options=[
         ("-j, --jobs N", "Number of parallel build jobs"),
         ("-t, --targets", "Targets: pre_process, simulation, post_process"),
         ("--gpu [acc|mp]", "Enable GPU support (OpenACC or OpenMP)"),
+        ("--case-optimization", "Hard-code case params for 10x speedup"),
         ("--debug", "Build in debug mode"),
-        ("--case-optimization", "Hard-code case parameters (with -i)"),
     ],
 )
 
@@ -344,16 +344,16 @@ RUN_COMMAND = Command(
     examples=[
         Example("./mfc.sh run case.py", "Run interactively with 1 rank"),
         Example("./mfc.sh run case.py -n 4", "Run with 4 MPI ranks"),
+        Example("./mfc.sh run case.py --case-optimization -j 8", "10x faster with case optimization!"),
         Example("./mfc.sh run case.py -e batch -N 2 -n 4", "Submit batch job: 2 nodes, 4 ranks/node"),
-        Example("./mfc.sh run case.py -e batch -a myaccount", "Submit with account"),
     ],
     key_options=[
+        ("--case-optimization", "Hard-code params for 10x speedup!"),
         ("-n, --tasks-per-node", "MPI ranks per node"),
         ("-N, --nodes", "Number of nodes (batch)"),
         ("-e, --engine", "interactive or batch"),
         ("-a, --account", "Account to charge (batch)"),
         ("-w, --walltime", "Wall time limit (batch)"),
-        ("-p, --partition", "Queue/partition (batch)"),
     ],
 )
 
@@ -682,13 +682,13 @@ HELP_COMMAND = Command(
     positionals=[
         Positional(
             name="topic",
-            help="Help topic: gpu, clusters, batch, debugging",
+            help="Help topic: gpu, clusters, batch, debugging, performance",
             nargs="?",
             default=None,
-            choices=["gpu", "clusters", "batch", "debugging"],
+            choices=["gpu", "clusters", "batch", "debugging", "performance"],
             completion=Completion(
                 type=CompletionType.CHOICES,
-                choices=["gpu", "clusters", "batch", "debugging"],
+                choices=["gpu", "clusters", "batch", "debugging", "performance"],
             ),
         ),
     ],
