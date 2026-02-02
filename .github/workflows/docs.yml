@@ -28,6 +28,22 @@ jobs:
         cmake -S ../doxygen -B ../doxygen/build -G Ninja
         sudo ninja -C ../doxygen/build install
 
+    - name: Generate Documentation Files
+      run:  |
+        pip3 install rich PyYAML
+        cd toolchain && python3 -c "
+        import sys; sys.path.insert(0, '.')
+        from mfc.cli.commands import MFC_CLI_SCHEMA
+        from mfc.cli.docs_gen import generate_cli_reference
+        from mfc.params.generators.docs_gen import generate_parameter_docs
+        from pathlib import Path
+        docs_dir = Path('../docs/documentation')
+        docs_dir.mkdir(exist_ok=True)
+        (docs_dir / 'cli-reference.md').write_text(generate_cli_reference(MFC_CLI_SCHEMA))
+        (docs_dir / 'parameters.md').write_text(generate_parameter_docs())
+        print('Generated cli-reference.md and parameters.md')
+        "
+
     - name: Build Documentation
       run:  |
         pip3 install fypp
