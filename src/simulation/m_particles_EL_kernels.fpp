@@ -4,66 +4,86 @@
 
 #:include 'macros.fpp'
 
-!> @brief This module contains kernel functions used to map the effect of the lagrangian bubbles
+!> @brief This module contains kernel functions used to map the effect of the lagrangian particles
 !!        in the Eulerian framework.
 module m_particles_EL_kernels
 
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
+  
+    use ieee_arithmetic        !< For checking NaN
 
     implicit none
 
 contains
 
     !> The purpose of this subroutine is to smear the strength of the lagrangian
-            !!      bubbles into the Eulerian framework using different approaches.
-            !! @param nBubs Number of lagrangian bubbles in the current domain
-            !! @param lbk_rad Radius of the bubbles
-            !! @param lbk_vel Interface velocity of the bubbles
-            !! @param lbk_s Computational coordinates of the bubbles
-            !! @param lbk_pos Spatial coordinates of the bubbles
+            !!      particles into the Eulerian framework using different approaches.
+            !! @param nParticles Number of lagrangian particles in the current domain
+            !! @param lbk_rad Radius of the particles
+            !! @param lbk_s Computational coordinates of the particles
+            !! @param lbk_pos Spatial coordinates of the particles
             !! @param updatedvar Eulerian variable to be updated
-    subroutine s_smoothfunction(nBubs, lbk_rad, lbk_vel, lbk_s, lbk_pos, updatedvar)
+            !! @param lbk_f_p Particle Forces on the particles
+    subroutine s_smoothfunction(nParticles, lbk_rad, lbk_s, lbk_pos, lbk_vel, lbk_velPrev, lbk_mass, updatedvar, lbk_f_p)
 
-        integer, intent(in) :: nBubs
-        real(wp), dimension(1:lag_params%nBubs_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_pos
-        real(wp), dimension(1:lag_params%nBubs_glb, 1:2), intent(in) :: lbk_rad, lbk_vel
+        integer, intent(in) :: nParticles
+        real(wp), dimension(1:lag_params%nParticles_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_pos, lbk_vel, lbk_velPrev
+        real(wp), dimension(1:lag_params%nParticles_glb, 1:2), intent(in) :: lbk_rad
         type(scalar_field), dimension(:), intent(inout) :: updatedvar
+        real(wp), dimension(1:lag_params%nParticles_glb, 1:3), intent(in) :: lbk_f_p
+        real(wp), dimension(1:lag_params%nParticles_glb), intent(in) :: lbk_mass
 
         smoothfunc:select case(lag_params%smooth_type)
         case (1)
-        call s_gaussian(nBubs, lbk_rad, lbk_vel, lbk_s, lbk_pos, updatedvar)
+        call s_gaussian(nParticles, lbk_rad, lbk_s, lbk_pos, lbk_vel, lbk_velPrev, lbk_mass, updatedvar, lbk_f_p)
         case (2)
-        call s_deltafunc(nBubs, lbk_rad, lbk_vel, lbk_s, updatedvar)
+        call s_deltafunc(nParticles, lbk_rad, lbk_s, lbk_vel, lbk_velPrev, lbk_mass, updatedvar, lbk_f_p)
         end select smoothfunc
 
     end subroutine s_smoothfunction
 
-    !> The purpose of this procedure contains the algorithm to use the delta kernel function to map the effect of the bubbles.
-            !!      The effect of the bubbles only affects the cell where the bubble is located.
-    subroutine s_deltafunc(nBubs, lbk_rad, lbk_vel, lbk_s, updatedvar)
+    !> The purpose of this procedure contains the algorithm to use the delta kernel function to map the effect of the particles.
+            !!      The effect of the particles only affects the cell where the particle is located.
+    subroutine s_deltafunc(nParticles, lbk_rad, lbk_s, lbk_vel, lbk_velPrev, lbk_mass, updatedvar, lbk_f_p)
 
-        integer, intent(in) :: nBubs
-        real(wp), dimension(1:lag_params%nBubs_glb, 1:3, 1:2), intent(in) :: lbk_s
-        real(wp), dimension(1:lag_params%nBubs_glb, 1:2), intent(in) :: lbk_rad, lbk_vel
+        integer, intent(in) :: nParticles
+        real(wp), dimension(1:lag_params%nParticles_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_vel, lbk_velPrev
+        real(wp), dimension(1:lag_params%nParticles_glb, 1:2), intent(in) :: lbk_rad
+        real(wp), dimension(1:lag_params%nParticles_glb, 1:3), intent(in) :: lbk_f_p
+        real(wp), dimension(1:lag_params%nParticles_glb), intent(in) :: lbk_mass
         type(scalar_field), dimension(:), intent(inout) :: updatedvar
 
         integer, dimension(3) :: cell
-        real(wp) :: strength_vel, strength_vol
+        real(wp) :: strength_vol
 
-        real(wp) :: addFun1, addFun2, addFun3
+        real(wp) :: addFun1, addFun2_x, addFun2_y, addFun2_z, addFun_E
         real(wp) :: volpart, Vol
         real(wp), dimension(3) :: s_coord
         integer :: l
+        real(wp) :: fp_x, fp_y, fp_z
+        real(wp) :: myfp_x, myfp_y, myfp_z, m_p
+        real(wp), dimension(3) :: vp_new, vp_old
+        
 
         $:GPU_PARALLEL_LOOP(private='[l,s_coord,cell]')
-        do l = 1, nBubs
+        do l = 1, nParticles
+
+            fp_x = lbk_f_p(l,1)
+            fp_y = lbk_f_p(l,2)
+            fp_z = lbk_f_p(l,3)
+
+            vp_new = lbk_vel(l,1:3,2)
+            vp_old = lbk_velPrev(l,1:3,2)
+            m_p = lbk_mass(l)
+            myfp_x = (m_p*(vp_new(1)-vp_old(1)))/dt
+            myfp_y = (m_p*(vp_new(2)-vp_old(2)))/dt
+            myfp_z = (m_p*(vp_new(3)-vp_old(3)))/dt
 
             volpart = 4._wp/3._wp*pi*lbk_rad(l, 2)**3._wp
             s_coord(1:3) = lbk_s(l, 1:3, 2)
             call s_get_cell(s_coord, cell)
 
             strength_vol = volpart
-            strength_vel = 4._wp*pi*lbk_rad(l, 2)**2._wp*lbk_vel(l, 2)
 
             if (num_dims == 2) then
                 Vol = dx(cell(1))*dy(cell(2))*lag_params%charwidth
@@ -77,52 +97,81 @@ contains
             $:GPU_ATOMIC(atomic='update')
             updatedvar(1)%sf(cell(1), cell(2), cell(3)) = updatedvar(1)%sf(cell(1), cell(2), cell(3)) + real(addFun1, kind=stp)
 
-            !Update time derivative of void fraction
-            addFun2 = strength_vel/Vol
+            !Update x-momentum source term
+            addFun2_x = -myfp_x/Vol
             $:GPU_ATOMIC(atomic='update')
-            updatedvar(2)%sf(cell(1), cell(2), cell(3)) = updatedvar(2)%sf(cell(1), cell(2), cell(3)) + real(addFun2, kind=stp)
+            updatedvar(2)%sf(cell(1), cell(2), cell(3)) = &
+                updatedvar(2)%sf(cell(1), cell(2), cell(3)) &
+                + real(addFun2_x, kind=stp)
 
-            !Product of two smeared functions
-            !Update void fraction * time derivative of void fraction
-            if (lag_params%cluster_type >= 4) then
-                addFun3 = (strength_vol*strength_vel)/Vol
-                $:GPU_ATOMIC(atomic='update')
-                updatedvar(5)%sf(cell(1), cell(2), cell(3)) = updatedvar(5)%sf(cell(1), cell(2), cell(3)) + real(addFun3, kind=stp)
-            end if
+            !Update y-momentum source term
+            addFun2_y = -myfp_y/Vol
+            $:GPU_ATOMIC(atomic='update')
+            updatedvar(3)%sf(cell(1), cell(2), cell(3)) = &
+                updatedvar(3)%sf(cell(1), cell(2), cell(3)) &
+                + real(addFun2_y, kind=stp)
+
+            if (num_dims == 3) then
+              !Update z-momentum source term
+              addFun2_z = -myfp_z/Vol
+              $:GPU_ATOMIC(atomic='update')
+              updatedvar(4)%sf(cell(1), cell(2), cell(3)) = &
+                  updatedvar(4)%sf(cell(1), cell(2), cell(3)) &
+                  + real(addFun2_z, kind=stp)
+              !Update energy source term
+              addFun_E = 0._wp
+              $:GPU_ATOMIC(atomic='update')
+              updatedvar(5)%sf(cell(1), cell(2), cell(3)) = &
+                  updatedvar(5)%sf(cell(1), cell(2), cell(3)) &
+                  + real(addFun_E, kind=stp)     
+            else  
+              !Update energy source term
+              addFun_E = 0._wp
+              $:GPU_ATOMIC(atomic='update')
+              updatedvar(4)%sf(cell(1), cell(2), cell(3)) = &
+                  updatedvar(4)%sf(cell(1), cell(2), cell(3)) &
+                  + real(addFun_E, kind=stp)   
+            endif         
+
         end do
         $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_deltafunc
 
-    !> The purpose of this procedure contains the algorithm to use the gaussian kernel function to map the effect of the bubbles.
-            !!      The effect of the bubbles affects the 3X3x3 cells that surround the bubble.
-    subroutine s_gaussian(nBubs, lbk_rad, lbk_vel, lbk_s, lbk_pos, updatedvar)
+    !> The purpose of this procedure contains the algorithm to use the gaussian kernel function to map the effect of the particles.
+            !!      The effect of the particles affects the 3X3x3 cells that surround the particle.
+    subroutine s_gaussian(nParticles, lbk_rad, lbk_s, lbk_pos, lbk_vel, lbk_velPrev, lbk_mass, updatedvar, lbk_f_p)
 
-        integer, intent(in) :: nBubs
-        real(wp), dimension(1:lag_params%nBubs_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_pos
-        real(wp), dimension(1:lag_params%nBubs_glb, 1:2), intent(in) :: lbk_rad, lbk_vel
+        integer, intent(in) :: nParticles
+        real(wp), dimension(1:lag_params%nParticles_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_pos, lbk_vel, lbk_velPrev
+        real(wp), dimension(1:lag_params%nParticles_glb, 1:2), intent(in) :: lbk_rad
+        real(wp), dimension(1:lag_params%nParticles_glb, 1:3), intent(in) :: lbk_f_p
+        real(wp), dimension(1:lag_params%nParticles_glb), intent(in) :: lbk_mass
         type(scalar_field), dimension(:), intent(inout) :: updatedvar
 
         real(wp), dimension(3) :: center
         integer, dimension(3) :: cell
         real(wp) :: stddsv
-        real(wp) :: strength_vel, strength_vol
+        real(wp) :: strength_vol
 
         real(wp), dimension(3) :: nodecoord
-        real(wp) :: addFun1, addFun2, addFun3
-        real(wp) :: func, func2, volpart
+        real(wp) :: addFun1, addFun2_x, addFun2_y, addFun2_z, addFun_E, func_sum
+        real(wp) :: func, volpart
         integer, dimension(3) :: cellaux
         real(wp), dimension(3) :: s_coord
         integer :: l, i, j, k
         logical :: celloutside
         integer :: smearGrid, smearGridz
+        real(wp) :: fp_x, fp_y, fp_z, func2_x_sum
+        real(wp) :: myfp_x, myfp_y, myfp_z, m_p
+        real(wp), dimension(3) :: vp_new, vp_old
 
-        smearGrid = mapCells - (-mapCells) + 1 ! Include the cell that contains the bubble (3+1+3)
+        smearGrid = mapCells - (-mapCells) + 1 ! Include the cell that contains the particle (3+1+3)
         smearGridz = smearGrid
         if (p == 0) smearGridz = 1
 
         $:GPU_PARALLEL_LOOP(private='[cellaux,nodecoord,l,s_coord,cell,center]', copyin='[smearGrid,smearGridz]')
-        do l = 1, nBubs
+        do l = 1, nParticles
             nodecoord(1:3) = 0
             center(1:3) = 0._wp
             volpart = 4._wp/3._wp*pi*lbk_rad(l, 2)**3._wp
@@ -133,8 +182,42 @@ contains
             call s_get_cell(s_coord, cell)
             call s_compute_stddsv(cell, volpart, stddsv)
             strength_vol = volpart
-            strength_vel = 4._wp*pi*lbk_rad(l, 2)**2._wp*lbk_vel(l, 2)
+            fp_x = lbk_f_p(l,1)
+            fp_y = lbk_f_p(l,2)
+            fp_z = lbk_f_p(l,3)
 
+            vp_new = lbk_vel(l,1:3,2)
+            vp_old = lbk_velPrev(l,1:3,2)
+            m_p = lbk_mass(l)
+            myfp_x = (m_p*(vp_new(1)-vp_old(1)))/dt
+            myfp_y = (m_p*(vp_new(2)-vp_old(2)))/dt
+            myfp_z = (m_p*(vp_new(3)-vp_old(3)))/dt
+
+            func_sum = 0._wp
+            do i = 1, smearGrid
+                do j = 1, smearGrid
+                    do k = 1, smearGridz
+                        cellaux(1) = cell(1) + i - (mapCells + 1)
+                        cellaux(2) = cell(2) + j - (mapCells + 1)
+                        cellaux(3) = cell(3) + k - (mapCells + 1)
+                        if (p == 0) cellaux(3) = 0
+
+                        !Check if the cells intended to smear the particles in are in the computational domain
+                        !and redefine the cells for symmetric boundary
+                        call s_check_celloutside(cellaux, celloutside)
+                        
+                        if (.not. celloutside) then
+                            nodecoord(1) = x_cc(cellaux(1))
+                            nodecoord(2) = y_cc(cellaux(2))
+                            if (p > 0) nodecoord(3) = z_cc(cellaux(3))
+                            call s_applygaussian(center, cellaux, nodecoord, stddsv, 0._wp, func)
+                            func_sum = func_sum + func
+                        end if
+                    enddo
+                enddo
+            enddo
+
+            func2_x_sum = 0._wp
             $:GPU_LOOP(collapse=3,private='[cellaux,nodecoord]')
             do i = 1, smearGrid
                 do j = 1, smearGrid
@@ -144,7 +227,7 @@ contains
                         cellaux(3) = cell(3) + k - (mapCells + 1)
                         if (p == 0) cellaux(3) = 0
 
-                        !Check if the cells intended to smear the bubbles in are in the computational domain
+                        !Check if the cells intended to smear the particles in are in the computational domain
                         !and redefine the cells for symmetric boundary
                         call s_check_celloutside(cellaux, celloutside)
 
@@ -153,9 +236,10 @@ contains
                             nodecoord(2) = y_cc(cellaux(2))
                             if (p > 0) nodecoord(3) = z_cc(cellaux(3))
                             call s_applygaussian(center, cellaux, nodecoord, stddsv, 0._wp, func)
-                            if (lag_params%cluster_type >= 4) call s_applygaussian(center, cellaux, nodecoord, stddsv, 1._wp, func2)
+                            func = func/func_sum
+                            ! call s_applygaussian_2D(center, cellaux, nodecoord, stddsv, func, cell)
 
-                            ! Relocate cells for bubbles intersecting symmetric boundaries
+                            ! Relocate cells for particles intersecting symmetric boundaries
                             if (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == BC_REFLECTIVE)) then
                                 call s_shift_cell_symmetric_bc(cellaux, cell)
                             end if
@@ -167,22 +251,42 @@ contains
                                 updatedvar(1)%sf(cellaux(1), cellaux(2), cellaux(3)) &
                                 + real(addFun1, kind=stp)
 
-                            !Update time derivative of void fraction
-                            addFun2 = func*strength_vel
+                            !Update x-momentum source term
+                            addFun2_x = -func*myfp_x
                             $:GPU_ATOMIC(atomic='update')
                             updatedvar(2)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
                                 updatedvar(2)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                + real(addFun2, kind=stp)
+                                + real(addFun2_x, kind=stp)
+                            func2_x_sum = func2_x_sum + addFun2_x
 
-                            !Product of two smeared functions
-                            !Update void fraction * time derivative of void fraction
-                            if (lag_params%cluster_type >= 4) then
-                                addFun3 = func2*strength_vol*strength_vel
-                                $:GPU_ATOMIC(atomic='update')
-                                updatedvar(5)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                                    updatedvar(5)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                    + real(addFun3, kind=stp)
-                            end if
+                            !Update y-momentum source term
+                            addFun2_y = -func*myfp_y
+                            $:GPU_ATOMIC(atomic='update')
+                            updatedvar(3)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
+                                updatedvar(3)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                                + real(addFun2_y, kind=stp)
+
+                            if (num_dims == 3) then
+                              !Update z-momentum source term
+                              addFun2_z = -func*myfp_z
+                              $:GPU_ATOMIC(atomic='update')
+                              updatedvar(4)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
+                                  updatedvar(4)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                                  + real(addFun2_z, kind=stp)
+                              !Update energy source term
+                              addFun_E = 0._wp
+                              $:GPU_ATOMIC(atomic='update')
+                              updatedvar(5)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
+                                  updatedvar(5)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                                  + real(addFun_E, kind=stp)
+                            else
+                              !Update energy source term
+                              addFun_E = 0._wp
+                              $:GPU_ATOMIC(atomic='update')
+                              updatedvar(4)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
+                                  updatedvar(4)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                                  + real(addFun_E, kind=stp)
+                            endif
                         end if
                     end do
                 end do
@@ -191,6 +295,7 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_gaussian
+
 
     !> The purpose of this subroutine is to apply the gaussian kernel function for each bubble (Maeda and Colonius, 2018)).
     subroutine s_applygaussian(center, cellaux, nodecoord, stddsv, strength_idx, func)
@@ -259,7 +364,7 @@ contains
     end subroutine s_applygaussian
 
     !> The purpose of this subroutine is to check if the current cell is outside the computational domain or not (including ghost cells).
-            !! @param cellaux Tested cell to smear the bubble effect in.
+            !! @param cellaux Tested cell to smear the particle effect in.
             !! @param celloutside If true, then cellaux is outside the computational domain.
     subroutine s_check_celloutside(cellaux, celloutside)
         $:GPU_ROUTINE(function_name='s_check_celloutside',parallelism='[seq]', &
@@ -291,8 +396,8 @@ contains
     end subroutine s_check_celloutside
 
     !> This subroutine relocates the current cell, if it intersects a symmetric boundary.
-            !! @param cell Cell of the current bubble
-            !! @param cellaux Cell to map the bubble effect in.
+            !! @param cell Cell of the current particle
+            !! @param cellaux Cell to map the particle effect in.
     subroutine s_shift_cell_symmetric_bc(cellaux, cell)
         $:GPU_ROUTINE(function_name='s_shift_cell_symmetric_bc', &
             & parallelism='[seq]', cray_inline=True)
@@ -328,9 +433,9 @@ contains
 
     end subroutine s_shift_cell_symmetric_bc
 
-    !> Calculates the standard deviation of the bubble being smeared in the Eulerian framework.
-            !! @param cell Cell where the bubble is located
-            !! @param volpart Volume of the bubble
+    !> Calculates the standard deviation of the particle being smeared in the Eulerian framework.
+            !! @param cell Cell where the particle is located
+            !! @param volpart Volume of the particle
             !! @param stddsv Standard deviaton
     subroutine s_compute_stddsv(cell, volpart, stddsv)
         $:GPU_ROUTINE(function_name='s_compute_stddsv',parallelism='[seq]', &
@@ -390,10 +495,10 @@ contains
 
     end subroutine s_get_char_vol
 
-    !> This subroutine transforms the computational coordinates of the bubble from
+    !> This subroutine transforms the computational coordinates of the particle from
             !!      real type into integer.
-            !! @param s Computational coordinates of the bubble, real type
-            !! @param get_cell Computational coordinates of the bubble, integer type
+            !! @param s Computational coordinates of the particle, real type
+            !! @param get_cell Computational coordinates of the particle, integer type
     subroutine s_get_cell(s_cell, get_cell)
         $:GPU_ROUTINE(function_name='s_get_cell',parallelism='[seq]', &
             & cray_inline=True)
@@ -410,12 +515,12 @@ contains
     end subroutine s_get_cell
 
     !! This function interpolates the velocity of Eulerian field at the position
-            !! of the bubble.
-            !! @param pos Position of the bubble in directiion i
-            !! @param cell Computational coordinates of the bubble
+            !! of the particle.
+            !! @param pos Position of the particle in directiion i
+            !! @param cell Computational coordinates of the particle
             !! @param i Direction of the velocity (1: x, 2: y, 3: z)
             !! @param q_prim_vf Eulerian field with primitive variables
-            !! @return v Interpolated velocity at the position of the bubble
+            !! @return v Interpolated velocity at the position of the particle
     function f_interpolate_velocity(pos, cell, i, q_prim_vf) result(v)
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: pos
@@ -426,7 +531,10 @@ contains
         real(wp) :: v
         real(wp), dimension(fd_order + 1) :: xi, eta, L
 
-        if (fd_order == 2) then
+        if (fd_order == 1) then
+            v = q_prim_vf(momxb+i-1)%sf(cell(1), cell(2), cell(3))
+        
+        elseif (fd_order == 2) then
             if (i == 1) then
                 xi(1) = x_cc(cell(1) - 1)
                 eta(1) = q_prim_vf(momxb)%sf(cell(1) - 1, cell(2), cell(3))
@@ -491,16 +599,17 @@ contains
                 eta(5) = q_prim_vf(momxe)%sf(cell(1), cell(2), cell(3) + 2)
             end if
 
-            L(1) = ((pos - xi(2))*(pos - xi(3))*(pos - xi(4))*(pos - xi(5)))/ &
-                   ((xi(1) - xi(2))*(xi(1) - xi(3))*(xi(1) - xi(3))*(xi(2) - xi(5)))
-            L(2) = ((pos - xi(1))*(pos - xi(3))*(pos - xi(4))*(pos - xi(5)))/ &
-                   ((xi(2) - xi(1))*(xi(2) - xi(3))*(xi(2) - xi(3))*(xi(2) - xi(5)))
-            L(3) = ((pos - xi(1))*(pos - xi(2))*(pos - xi(4))*(pos - xi(5)))/ &
-                   ((xi(3) - xi(1))*(xi(3) - xi(2))*(xi(3) - xi(4))*(xi(3) - xi(5)))
-            L(4) = ((pos - xi(1))*(pos - xi(2))*(pos - xi(3))*(pos - xi(4)))/ &
-                   ((xi(4) - xi(1))*(xi(4) - xi(2))*(xi(4) - xi(3))*(xi(4) - xi(5)))
-            L(5) = ((pos - xi(1))*(pos - xi(2))*(pos - xi(3))*(pos - xi(4)))/ &
-                   ((xi(5) - xi(1))*(xi(5) - xi(2))*(xi(5) - xi(3))*(xi(5) - xi(4)))
+            L(1) = (pos-xi(2))*(pos-xi(3))*(pos-xi(4))*(pos-xi(5)) / &
+                  ((xi(1)-xi(2))*(xi(1)-xi(3))*(xi(1)-xi(4))*(xi(1)-xi(5)))
+            L(2) = (pos-xi(1))*(pos-xi(3))*(pos-xi(4))*(pos-xi(5)) / &
+                  ((xi(2)-xi(1))*(xi(2)-xi(3))*(xi(2)-xi(4))*(xi(2)-xi(5)))
+            L(3) = (pos-xi(1))*(pos-xi(2))*(pos-xi(4))*(pos-xi(5)) / &
+                  ((xi(3)-xi(1))*(xi(3)-xi(2))*(xi(3)-xi(4))*(xi(3)-xi(5)))
+            L(4) = (pos-xi(1))*(pos-xi(2))*(pos-xi(3))*(pos-xi(5)) / &
+                  ((xi(4)-xi(1))*(xi(4)-xi(2))*(xi(4)-xi(3))*(xi(4)-xi(5)))
+            L(5) = (pos-xi(1))*(pos-xi(2))*(pos-xi(3))*(pos-xi(4)) / &
+                  ((xi(5)-xi(1))*(xi(5)-xi(2))*(xi(5)-xi(3))*(xi(5)-xi(4)))
+
 
             v = L(1)*eta(1) + L(2)*eta(2) + L(3)*eta(3) + L(4)*eta(4) + L(5)*eta(5)
         end if
@@ -510,18 +619,19 @@ contains
     !! This function calculates the force on a particle
             !!      based on the pressure gradient, velocity, and drag model.
             !! @param pos Position of the particle
-            !! @param rad Radius of the bubble
+            !! @param rad Radius of the particle
             !! @param vel_p Velocity of the particle
             !! @param mass_p Particle mass
             !! @param Re Viscosity!
             !! @param rho Density of the fluid
-            !! @param cell Computational coordinates of the bubble
+            !! @param vol_frac Particle Volume Fraction
+            !! @param cell Computational coordinates of the particle
             !! @param i Direction of the velocity (1: x, 2: y, 3: z)
             !! @param q_prim_vf Eulerian field with primitive variables
             !! @return a Acceleration of the particle in direction i
-    function f_get_particle_force(pos, rad, vel_p, mass_p, Re, rho, cell, i, q_prim_vf) result(force)
+    function f_get_particle_force(pos, rad, vel_p, mass_p, Re, rho, vol_frac, cell, i, q_prim_vf) result(force)
         $:GPU_ROUTINE(parallelism='[seq]')
-        real(wp), intent(in) :: pos, rad, mass_p, Re, rho
+        real(wp), intent(in) :: pos, rad, mass_p, Re, rho, vol_frac
         integer, dimension(3), intent(in) :: cell
         real(wp), intent(in) :: vel_p(:)
         integer, intent(in) :: i
@@ -530,8 +640,10 @@ contains
         real(wp) :: a, dp, vol, force
         real(wp) :: v_rel
         real(wp), dimension(fd_order) :: xi, eta, L
-        real(wp) :: particle_diam, volume_fraction, gas_mu, gamma, vmag, cson
+        real(wp) :: particle_diam, gas_mu, gamma, vmag, cson
         real(wp) :: slip_velocity_x, slip_velocity_y, slip_velocity_z, beta
+        real(wp), dimension(3) :: fluid_vel
+        integer :: dir
 
         if (fd_order <= 2) then
             if (i == 1) then
@@ -598,43 +710,66 @@ contains
 
         vol = (4._wp/3._wp)*pi*(rad**3._wp)
 
-        if (fd_order > 1) then
-            v_rel = vel_p(i) - f_interpolate_velocity(pos, cell, i, q_prim_vf)
-        else
-            v_rel = vel_p(i) - q_prim_vf(momxb + i - 1)%sf(cell(1), cell(2), cell(3))
-        end if
+        fluid_vel(1) = f_interpolate_velocity(pos, cell, 1, q_prim_vf)
+        fluid_vel(2) = f_interpolate_velocity(pos, cell, 2, q_prim_vf)
+        if (num_dims == 3) then
+          fluid_vel(3) = f_interpolate_velocity(pos, cell, 3, q_prim_vf)
+        endif
+
+
+        do dir = 1,3
+          if (abs(q_prim_vf(momxb+dir-1)%sf(cell(1), cell(2), cell(3))) < 1.e-8) then
+            fluid_vel(dir) = q_prim_vf(momxb+dir-1)%sf(cell(1), cell(2), cell(3)) !0th order interpolation if fluid velocity is small
+          endif
+          if (fd_order>1) then
+            if (.not. ieee_is_finite(fluid_vel(dir))) then
+              fluid_vel(dir) =  q_prim_vf(momxb+dir-1)%sf(cell(1), cell(2), cell(3))
+            endif
+          endif
+        enddo
+
+        v_rel = vel_p(i) - fluid_vel(i)
 
         !!!!!!! Quasi-steady Drag Force Paramaeters
-        particle_diam = rad*2._wp
-        slip_velocity_x = f_interpolate_velocity(pos, cell, 1, q_prim_vf) - vel_p(1)
-        slip_velocity_y = f_interpolate_velocity(pos, cell, 2, q_prim_vf) - vel_p(2)
+        slip_velocity_x = fluid_vel(1) - vel_p(1)
+        slip_velocity_y = fluid_vel(2) - vel_p(2)
         if (num_dims == 3) then
-            slip_velocity_z = f_interpolate_velocity(pos, cell, 3, q_prim_vf) - vel_p(3)
+            slip_velocity_z = fluid_vel(3) - vel_p(3)
             vmag = sqrt(slip_velocity_x*slip_velocity_x + slip_velocity_y*slip_velocity_y + &
                         slip_velocity_z*slip_velocity_z)
         elseif (num_dims == 2) then
             vmag = sqrt(slip_velocity_x*slip_velocity_x + slip_velocity_y*slip_velocity_y)
         end if
-        cson = sqrt((fluid_pp(1)%gamma*q_prim_vf(4)%sf(cell(1), cell(2), cell(3)))/rho) !gamma*P/rho
-        volume_fraction = 1.e-5_wp
+
+        particle_diam = rad*2._wp
+        cson = sqrt((fluid_pp(1)%gamma*q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3)))/rho) !gamma*P/rho
         gas_mu = Re
+
+        if (ABS(v_rel) .le. 1.e-7_wp) then
+          v_rel = 0._wp
+        endif
 
         force = 0._wp
 
         ! Step 1: Force component quasi-steady
         if (lag_params%qs_drag_model == 1) then
-            beta = QS_Parmar(rho, cson, gas_mu, fluid_pp(1)%gamma, vmag, particle_diam, volume_fraction)
+            beta = QS_Parmar(rho, cson, gas_mu, fluid_pp(1)%gamma, vmag, particle_diam, vol_frac)
             force = force - beta*v_rel
         else if (lag_params%qs_drag_model == 2) then
-            beta = QS_Osnes(rho, cson, gas_mu, fluid_pp(1)%gamma, vmag, particle_diam, volume_fraction)
+            beta = QS_Osnes(rho, cson, gas_mu, fluid_pp(1)%gamma, vmag, particle_diam, vol_frac)
             force = force - beta*v_rel
         else if (lag_params%qs_drag_model == 3) then
-            beta = QS_ModifiedParmar(rho, cson, gas_mu, fluid_pp(1)%gamma, vmag, particle_diam, volume_fraction)
+            beta = QS_ModifiedParmar(rho, cson, gas_mu, fluid_pp(1)%gamma, vmag, particle_diam, vol_frac)
             force = force - beta*v_rel
         else if (lag_params%qs_drag_model == 4) then
-            beta = QS_Gidaspow(rho, cson, gas_mu, fluid_pp(1)%gamma, vmag, particle_diam, volume_fraction)
+            beta = QS_Gidaspow(rho, cson, gas_mu, fluid_pp(1)%gamma, vmag, particle_diam, vol_frac)
             force = force - beta*v_rel
         end if
+
+        if (.not. ieee_is_finite(force)) then
+          force = 0._wp
+        endif
+
 
         ! Step 1.1: Stokes drag?
         if (lag_params%stokes_drag == 1) then ! Free slip Stokes drag
