@@ -49,6 +49,7 @@ def generate():
 
     completions_dir = Path(MFC_ROOT_DIR) / "toolchain" / "completions"
     docs_dir = Path(MFC_ROOT_DIR) / "docs" / "documentation"
+    completions_dir.mkdir(exist_ok=True)
     docs_dir.mkdir(exist_ok=True)
 
     # Generate CLI files
@@ -79,7 +80,6 @@ def generate():
     if not check_mode:
         cons.print()
         cons.print("[bold]Files regenerated from cli/commands.py and params/definitions.py[/bold]")
-        cons.print("[dim]Commit these files to keep them in sync[/dim]")
 
 
 def _generate_json_schema():
