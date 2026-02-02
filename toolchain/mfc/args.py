@@ -67,16 +67,18 @@ def parse(config: MFCConfig):
     except ValueError:
         extra_index = len(sys.argv)
 
-    # Patch subparser error methods to show enhanced help before errors
+    # Patch subparser error methods to show full help on error
     attempted_command = _get_command_from_args(sys.argv)
     if attempted_command and attempted_command in subparser_map:
         subparser = subparser_map[attempted_command]
-        original_error = subparser.error
 
         def custom_error(message):
+            # Show enhanced help + full argparse help (like -h would)
             print_command_help(attempted_command, show_argparse=False)
-            print()  # Blank line before usage
-            original_error(message)
+            subparser.print_help()
+            sys.stdout.flush()  # Ensure help prints before error
+            sys.stderr.write(f'\n{subparser.prog}: error: {message}\n')
+            sys.exit(2)
 
         subparser.error = custom_error
 
