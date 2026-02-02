@@ -11,10 +11,12 @@ This module provides:
 
 import os
 import subprocess
+import re
 
 from rich.panel import Panel
 from rich.table import Table
 from rich.prompt import Prompt
+from rich.markdown import Markdown
 from rich import box
 
 from .printer import cons
@@ -22,6 +24,213 @@ from .common import MFC_ROOT_DIR
 
 # Import command definitions from CLI schema (SINGLE SOURCE OF TRUTH)
 from .cli.commands import COMMANDS
+
+
+# =============================================================================
+# DYNAMIC CLUSTER HELP GENERATION
+# =============================================================================
+
+# Organization mapping based on system name prefixes and known clusters
+CLUSTER_ORGS = {
+    "OLCF": "ORNL",
+    "LLNL": "LLNL",
+    "PSC": "ACCESS",
+    "SDSC": "ACCESS",
+    "NCSA": "ACCESS",
+    "GT": "Georgia Tech",
+    "Brown": "Brown",
+    "DoD": "DoD",
+    "Richardson": "Caltech",
+    "hipergator": "Florida",
+    "CSCS": "CSCS",
+}
+
+# Explicit slug-to-org overrides (for cases where modules file naming is inconsistent)
+SLUG_ORG_OVERRIDE = {
+    "tuo": "LLNL",  # Tuolumne is at LLNL, not ORNL (modules file says "OLCF" incorrectly)
+}
+
+# Display name overrides for clusters
+SLUG_NAME_OVERRIDE = {
+    "h": "HiPerGator",  # Proper capitalization
+}
+
+# Display order and colors for organizations
+ORG_ORDER = ["ORNL", "LLNL", "ACCESS", "Georgia Tech", "Caltech", "Brown", "DoD", "Florida", "CSCS"]
+ORG_COLORS = {
+    "ORNL": "yellow",
+    "LLNL": "yellow",
+    "ACCESS": "yellow",
+    "Georgia Tech": "yellow",
+    "Caltech": "yellow",
+    "Brown": "yellow",
+    "DoD": "yellow",
+    "Florida": "yellow",
+}
+
+
+def _parse_modules_file():
+    """Parse the modules file to extract cluster information.
+
+    Returns a dict: {slug: {"name": full_name, "org": organization}}
+    """
+    modules_path = os.path.join(MFC_ROOT_DIR, "toolchain", "modules")
+    clusters = {}
+
+    try:
+        with open(modules_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                # Skip comments and empty lines
+                if not line or line.startswith("#"):
+                    continue
+                # Skip lines with -all, -cpu, -gpu (module definitions)
+                if "-all" in line or "-cpu" in line or "-gpu" in line:
+                    continue
+
+                # Parse cluster definition lines: "slug     System Name"
+                match = re.match(r'^(\S+)\s+(.+)$', line)
+                if match:
+                    slug = match.group(1)
+                    full_name = match.group(2).strip()
+
+                    # Check for explicit org override first
+                    if slug in SLUG_ORG_OVERRIDE:
+                        org = SLUG_ORG_OVERRIDE[slug]
+                    else:
+                        # Determine organization from name
+                        org = "Other"
+                        for prefix, org_name in CLUSTER_ORGS.items():
+                            if prefix in full_name or full_name.lower() == prefix.lower():
+                                org = org_name
+                                break
+
+                    clusters[slug] = {"name": full_name, "org": org}
+    except FileNotFoundError:
+        # Fallback if modules file not found
+        pass
+
+    return clusters
+
+
+def _get_cluster_short_name(slug, full_name):
+    """Get display name for a cluster, with overrides and prefix stripping."""
+    if slug in SLUG_NAME_OVERRIDE:
+        return SLUG_NAME_OVERRIDE[slug]
+    # Strip org prefix if present
+    for prefix in CLUSTER_ORGS:
+        if full_name.startswith(prefix + " "):
+            return full_name[len(prefix) + 1:]
+    return full_name
+
+
+def _generate_clusters_content():
+    """Generate the clusters help content dynamically from modules file."""
+    clusters = _parse_modules_file()
+
+    # Group clusters by organization
+    org_clusters = {org: [] for org in ORG_ORDER}
+    org_clusters["Other"] = []
+
+    for slug, info in clusters.items():
+        org = info["org"]
+        if org not in org_clusters:
+            org_clusters["Other"].append((slug, info["name"]))
+        else:
+            org_clusters[org].append((slug, info["name"]))
+
+    # Build the cluster list section
+    cluster_lines = []
+    for org in ORG_ORDER:
+        if not org_clusters.get(org):
+            continue
+        # Format: "  [yellow]ORG:[/yellow]  [cyan]slug[/cyan]=Name  [cyan]slug2[/cyan]=Name2"
+        entries = [
+            f"[cyan]{slug}[/cyan]={_get_cluster_short_name(slug, name)}"
+            for slug, name in org_clusters[org]
+        ]
+        color = ORG_COLORS.get(org, 'yellow')
+        cluster_lines.append(f"  [{color}]{org}:[/{color}]    " + "  ".join(entries))
+
+    # Handle "Other" if any
+    if org_clusters.get("Other"):
+        entries = [f"[cyan]{slug}[/cyan]={name}" for slug, name in org_clusters["Other"]]
+        cluster_lines.append(f"  [yellow]Other:[/yellow]    " + "  ".join(entries))
+
+    cluster_list = "\n".join(cluster_lines) if cluster_lines else "  [dim]No clusters found in modules file[/dim]"
+
+    # Return full help content with dynamic cluster list
+    return f"""\
+[bold cyan]Supported HPC Clusters[/bold cyan]
+
+MFC includes pre-configured module sets for many clusters.
+
+[bold]Loading Cluster Modules:[/bold]
+  [green]source ./mfc.sh load -c <cluster> -m <mode>[/green]
+
+[bold]Available Clusters:[/bold]
+{cluster_list}
+
+[bold]Modes:[/bold]
+  [cyan]c[/cyan] or [cyan]cpu[/cyan] - CPU only
+  [cyan]g[/cyan] or [cyan]gpu[/cyan] - GPU enabled
+
+[bold]Examples:[/bold]
+  [green]source ./mfc.sh load -c p -m g[/green]     Phoenix with GPU
+  [green]source ./mfc.sh load -c f -m g[/green]     Frontier with GPU (AMD MI250X)
+  [green]source ./mfc.sh load -c d -m c[/green]     Delta CPU-only
+
+[bold]Custom Clusters:[/bold]
+  For unlisted clusters, manually load:
+  • Fortran compiler (gfortran, nvfortran, amdflang, etc.)
+  • MPI implementation (OpenMPI, MPICH, Cray-MPICH)
+  • CMake 3.18+, Python 3.11+"""
+
+
+# =============================================================================
+# MARKDOWN-BASED HELP (Single source of truth from docs/)
+# =============================================================================
+
+# Mapping of help topics to their source markdown files
+MARKDOWN_HELP_FILES = {
+    "debugging": "docs/documentation/troubleshooting.md",
+    # "batch": "docs/documentation/running.md",  # Could enable if desired
+    # "gpu": "docs/documentation/gpuParallelization.md",  # Very technical, keep manual
+}
+
+
+def _load_markdown_help(topic: str) -> str:
+    """Load help content from a markdown file.
+
+    Strips Doxygen-specific syntax and returns clean markdown.
+    """
+    if topic not in MARKDOWN_HELP_FILES:
+        return None
+
+    filepath = os.path.join(MFC_ROOT_DIR, MARKDOWN_HELP_FILES[topic])
+
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            content = f.read()
+    except FileNotFoundError:
+        return None
+
+    # Strip Doxygen-specific syntax
+    # Remove @page directives
+    content = re.sub(r'^@page\s+\S+\s+.*$', '', content, flags=re.MULTILINE)
+    # Remove @ref, @see directives
+    content = re.sub(r'@(ref|see)\s+\S+', '', content)
+    # Clean up any resulting empty lines at the start
+    content = content.lstrip('\n')
+
+    return content
+
+
+def _generate_markdown_help(topic: str):
+    """Generate a function that loads markdown help for a topic."""
+    def loader():
+        return _load_markdown_help(topic)
+    return loader
 
 
 # =============================================================================
@@ -74,39 +283,8 @@ MFC supports GPU acceleration via OpenACC or OpenMP offloading.
     },
     "clusters": {
         "title": "Cluster Configuration",
-        "content": """\
-[bold cyan]Supported HPC Clusters[/bold cyan]
-
-MFC includes pre-configured module sets for many clusters.
-
-[bold]Loading Cluster Modules:[/bold]
-  [green]source ./mfc.sh load -c <cluster> -m <mode>[/green]
-
-[bold]Available Clusters:[/bold]
-  [yellow]ORNL:[/yellow]      [cyan]a[/cyan]=Ascent  [cyan]f[/cyan]=Frontier  [cyan]famd[/cyan]=Frontier AMD  [cyan]s[/cyan]=Summit  [cyan]w[/cyan]=Wombat
-  [yellow]LLNL:[/yellow]      [cyan]tuo[/cyan]=Tuolumne
-  [yellow]ACCESS:[/yellow]    [cyan]b[/cyan]=Bridges2  [cyan]e[/cyan]=Expanse  [cyan]d[/cyan]=Delta  [cyan]dai[/cyan]=DeltaAI
-  [yellow]Georgia Tech:[/yellow] [cyan]p[/cyan]=Phoenix
-  [yellow]Caltech:[/yellow]   [cyan]r[/cyan]=Richardson
-  [yellow]Brown:[/yellow]     [cyan]o[/cyan]=Oscar
-  [yellow]DoD:[/yellow]       [cyan]cc[/cyan]=Carpenter Cray  [cyan]c[/cyan]=Carpenter GNU  [cyan]n[/cyan]=Nautilus
-  [yellow]Florida:[/yellow]   [cyan]h[/cyan]=HiPerGator
-
-[bold]Modes:[/bold]
-  [cyan]c[/cyan] or [cyan]cpu[/cyan] - CPU only
-  [cyan]g[/cyan] or [cyan]gpu[/cyan] - GPU enabled
-
-[bold]Examples:[/bold]
-  [green]source ./mfc.sh load -c p -m g[/green]     Phoenix with GPU
-  [green]source ./mfc.sh load -c f -m g[/green]     Frontier with GPU (AMD MI250X)
-  [green]source ./mfc.sh load -c s -m g[/green]     Summit with GPU (NVIDIA V100)
-  [green]source ./mfc.sh load -c d -m c[/green]     Delta CPU-only
-
-[bold]Custom Clusters:[/bold]
-  For unlisted clusters, manually load:
-  • Fortran compiler (gfortran, nvfortran, amdflang, etc.)
-  • MPI implementation (OpenMPI, MPICH, Cray-MPICH)
-  • CMake 3.18+, Python 3.11+"""
+        # Content is generated dynamically from toolchain/modules file
+        "content": _generate_clusters_content,
     },
     "batch": {
         "title": "Batch Job Submission",
@@ -149,44 +327,9 @@ Use [green]-e batch[/green] to submit jobs to a scheduler instead of running int
     },
     "debugging": {
         "title": "Debugging & Troubleshooting",
-        "content": """\
-[bold cyan]Debugging MFC[/bold cyan]
-
-[bold]Verbosity Levels:[/bold]
-  [green]-v[/green]       Basic verbose output
-  [green]-vv[/green]      More detailed output
-  [green]-vvv[/green]     Maximum verbosity
-  [green]-d[/green]       Debug log (writes to file)
-
-[bold]Debug Builds:[/bold]
-  [green]./mfc.sh build --debug[/green]     Debug symbols, reduced optimization
-  [green]./mfc.sh build --gcov[/green]      Code coverage instrumentation
-
-[bold]Validating Cases:[/bold]
-  [green]./mfc.sh validate case.py[/green]
-  Checks case file for syntax errors and constraint violations.
-
-[bold]Common Issues:[/bold]
-
-  [yellow]Build fails with missing MPI:[/yellow]
-    → Load cluster modules: [cyan]source ./mfc.sh load -c <cluster> -m <mode>[/cyan]
-
-  [yellow]Build fails with compiler errors:[/yellow]
-    → Try [cyan]./mfc.sh clean[/cyan] then rebuild
-    → Check compiler compatibility in docs
-
-  [yellow]Tests fail with tolerance errors:[/yellow]
-    → May be expected for different compilers/platforms
-    → Use [cyan]--generate[/cyan] to update golden files if intentional
-
-  [yellow]Simulation crashes or gives wrong results:[/yellow]
-    → Validate case: [cyan]./mfc.sh validate case.py[/cyan]
-    → Build with debug: [cyan]./mfc.sh build --debug[/cyan]
-    → Check CFL condition and grid resolution
-
-[bold]Getting Help:[/bold]
-  • Docs: [cyan]docs/documentation/[/cyan]
-  • Issues: [cyan]https://github.com/MFlowCode/MFC/issues[/cyan]"""
+        # Content loaded from docs/documentation/troubleshooting.md
+        "content": _generate_markdown_help("debugging"),
+        "markdown": True,  # Render as markdown, not Rich markup
     },
     "performance": {
         "title": "Performance Optimization",
@@ -245,13 +388,31 @@ def print_topic_help(topic: str):
         return
 
     topic_info = HELP_TOPICS[topic]
+    # Support callable content for dynamic generation
+    content = topic_info["content"]
+    if callable(content):
+        content = content()
+
+    if content is None:
+        cons.print(f"[red]Could not load help for topic: {topic}[/red]")
+        return
+
     cons.print()
-    cons.raw.print(Panel(
-        topic_info["content"],
-        title=f"[bold]{topic_info['title']}[/bold]",
-        box=box.ROUNDED,
-        padding=(1, 2)
-    ))
+
+    # Check if content should be rendered as markdown
+    if topic_info.get("markdown", False):
+        # Render markdown content directly (no panel - markdown has its own formatting)
+        cons.print(f"[bold cyan]{topic_info['title']}[/bold cyan]")
+        cons.print()
+        cons.raw.print(Markdown(content))
+    else:
+        # Render as Rich markup in a panel
+        cons.raw.print(Panel(
+            content,
+            title=f"[bold]{topic_info['title']}[/bold]",
+            box=box.ROUNDED,
+            padding=(1, 2)
+        ))
     cons.print()
 
 
