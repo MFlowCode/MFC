@@ -970,6 +970,7 @@ contains
         !! @param rad Radius of each particle
         !! @param pos Position of each particle
         !! @param posPrev Previous position of each particle
+        !! @param velPrev Previous velocity of each particle
         !! @param vel Velocity of each particle
         !! @param scoord Cell index in real format of each particle
         !! @param drad DTime erivative of particles's radius
@@ -979,13 +980,13 @@ contains
         !! @param nParticles Local number of particles
     impure subroutine s_mpi_sendrecv_solid_particles(particle_R0, Rmax_stats, Rmin_stats, particle_mass, &
                                                      gas_betaT, gas_betaC, lag_id, rad, pos, &
-                                                     posPrev, vel, scoord, drad, dpos, &
+                                                     posPrev, vel, velPrev, scoord, drad, dpos, &
                                                      dvel, lag_num_ts, nParticles, dest)
 
         real(wp), dimension(:) :: particle_R0, Rmax_stats, Rmin_stats, particle_mass, gas_betaT, gas_betaC
         integer, dimension(:, :) :: lag_id
         real(wp), dimension(:, :) :: rad, drad
-        real(wp), dimension(:, :, :) :: pos, posPrev, vel, scoord, dpos, dvel
+        real(wp), dimension(:, :, :) :: pos, posPrev, vel, velPrev, scoord, dpos, dvel
         integer :: position, particle_id, lag_num_ts, tag, partner, send_tag, recv_tag, nParticles, p_recv_size, dest
 
         integer :: i, j, k, l, q, r
@@ -1086,6 +1087,7 @@ contains
                         ! call MPI_Pack(rvel(particle_id, r), 1, mpi_p, p_send_buff(send_offset), p_buff_size, position, MPI_COMM_WORLD, ierr)
                         call MPI_Pack(pos(particle_id, :, r), 3, mpi_p, p_send_buff(send_offset), p_buff_size, position, MPI_COMM_WORLD, ierr)
                         call MPI_Pack(posPrev(particle_id, :, r), 3, mpi_p, p_send_buff(send_offset), p_buff_size, position, MPI_COMM_WORLD, ierr)
+                        call MPI_Pack(velPrev(particle_id, :, r), 3, mpi_p, p_send_buff(send_offset), p_buff_size, position, MPI_COMM_WORLD, ierr)
                         call MPI_Pack(vel(particle_id, :, r), 3, mpi_p, p_send_buff(send_offset), p_buff_size, position, MPI_COMM_WORLD, ierr)
                         call MPI_Pack(scoord(particle_id, :, r), 3, mpi_p, p_send_buff(send_offset), p_buff_size, position, MPI_COMM_WORLD, ierr)
                     end do
@@ -1140,6 +1142,7 @@ contains
                         ! call MPI_Unpack(p_recv_buff(recv_offset), p_recv_size, position, rvel(particle_id, r), 1, mpi_p, MPI_COMM_WORLD, ierr)
                         call MPI_Unpack(p_recv_buff(recv_offset), p_recv_size, position, pos(particle_id, :, r), 3, mpi_p, MPI_COMM_WORLD, ierr)
                         call MPI_Unpack(p_recv_buff(recv_offset), p_recv_size, position, posPrev(particle_id, :, r), 3, mpi_p, MPI_COMM_WORLD, ierr)
+                        call MPI_Unpack(p_recv_buff(recv_offset), p_recv_size, position, velPrev(particle_id, :, r), 3, mpi_p, MPI_COMM_WORLD, ierr)
                         call MPI_Unpack(p_recv_buff(recv_offset), p_recv_size, position, vel(particle_id, :, r), 3, mpi_p, MPI_COMM_WORLD, ierr)
                         call MPI_Unpack(p_recv_buff(recv_offset), p_recv_size, position, scoord(particle_id, :, r), 3, mpi_p, MPI_COMM_WORLD, ierr)
                     end do

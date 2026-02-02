@@ -560,6 +560,10 @@ contains
                 call s_populate_variables_buffers(bc_type, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
                 call s_compute_particle_EL_dynamics(q_prim_vf, stage=s)
                 call s_update_lagrange_particles_tdv_rk(q_prim_vf, stage=s)
+                call s_compute_particles_EL_source( &
+                    q_cons_ts(1)%vf, &
+                    q_prim_vf, &
+                    rhs_vf)
             end if
 
             $:GPU_PARALLEL_LOOP(collapse=4)
