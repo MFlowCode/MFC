@@ -246,6 +246,7 @@ module m_global_parameters
     logical :: E_wrt
     logical, dimension(num_fluids_max) :: alpha_rho_e_wrt
     logical :: fft_wrt
+    logical :: dummy   !< AMDFlang workaround: keep a dummy logical to avoid a compiler case-optimization bug when a parameter+GPU-kernel conditional is false
     logical :: pres_wrt
     logical, dimension(num_fluids_max) :: alpha_wrt
     logical :: gamma_wrt
@@ -476,6 +477,7 @@ contains
         file_per_process = .false.
         E_wrt = .false.
         fft_wrt = .false.
+        dummy = .false.
         pres_wrt = .false.
         alpha_wrt = .false.
         gamma_wrt = .false.

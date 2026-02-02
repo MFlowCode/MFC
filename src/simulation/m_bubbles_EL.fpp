@@ -537,7 +537,11 @@ contains
         real(wp) :: myR, myV, myBeta_c, myBeta_t, myR0, myPbdot, myMvdot
         real(wp) :: myPinf, aux1, aux2, myCson, myRho
         real(wp) :: gamma, pi_inf, qv
-        real(wp), dimension(contxe) :: myalpha_rho, myalpha
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3) :: myalpha_rho, myalpha
+        #:else
+            real(wp), dimension(num_fluids) :: myalpha_rho, myalpha
+        #:endif
         real(wp), dimension(2) :: Re
         integer, dimension(3) :: cell
 
@@ -551,7 +555,7 @@ contains
         ! Subgrid p_inf model based on Maeda and Colonius (2018).
         if (lag_params%pressure_corrector) then
             ! Calculate velocity potentials (valid for one bubble per cell)
-            $:GPU_PARALLEL_LOOP(private='[k,cell]')
+            $:GPU_PARALLEL_LOOP(private='[k,cell,paux,preterm1,term2,Romega,myR0,myR,myV,myPb,pint,term1_fac]')
             do k = 1, nBubs
                 call s_get_pinf(k, q_prim_vf, 2, paux, cell, preterm1, term2, Romega)
                 myR0 = bub_R0(k)
@@ -573,7 +577,7 @@ contains
 
         ! Radial motion model
         adap_dt_stop_max = 0
-        $:GPU_PARALLEL_LOOP(private='[k,i,myalpha_rho,myalpha,Re,cell]', &
+        $:GPU_PARALLEL_LOOP(private='[k,i,myalpha_rho,myalpha,Re,cell,myVapFlux,preterm1, term2, paux, pint, Romega, term1_fac,myR_m, mygamma_m, myPb, myMass_n, myMass_v,myR, myV, myBeta_c, myBeta_t, myR0, myPbdot, myMvdot,myPinf, aux1, aux2, myCson, myRho,gamma,pi_inf,qv,dmalf, dmntait, dmBtait, dm_bub_adv_src, dm_divu,adap_dt_stop]', &
             & reduction='[[adap_dt_stop_max]]',reductionOp='[MAX]', &
             & copy='[adap_dt_stop_max]',copyin='[stage]')
         do k = 1, nBubs
@@ -778,9 +782,14 @@ contains
         real(wp), intent(out) :: cson
 
         real(wp) :: E, H
-        real(wp), dimension(num_dims) :: vel
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3) :: vel
+        #:else
+            real(wp), dimension(num_dims) :: vel
+        #:endif
         integer :: i
 
+        vel(:) = 0._wp
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_dims
             vel(i) = q_prim_vf(i + contxe)%sf(cell(1), cell(2), cell(3))
