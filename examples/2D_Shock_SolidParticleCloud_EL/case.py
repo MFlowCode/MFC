@@ -105,21 +105,21 @@ data = {
     # "lag_params%write_bubbles_stats": "F",
 
     "particles_lagrange": "T",
-    "fd_order": 4, #4th order is unstable due to velocity interpolation for drag
+    "fd_order": 4, #4th order can be unstable due to velocity interpolation for drag
     "lag_params%epsilonb" : 1.,
     "lag_params%charwidth": 0.00390625, #0.03515625, #virtual depth in 2D sims
     "lag_params%solver_approach": 2, #1 for one way coupling, 2 for two way coupling 
     "lag_params%nParticles_glb": 1000, # Number of Particles
     "lag_params%valmaxvoid": 0.9,
-    "lag_params%vel_model": 1,
+    "lag_params%vel_model": 1, #Set to 1 for moving particles, 0 for stationary
     "lag_params%smooth_type": 1, #1 gaussian, 2 delta
     "lag_params%input_path" : 'input/lag_particles.dat',
     "lag_params%qs_drag_model" : 2, # 1 = Parmar, 2 = Osnes, 3 = Modified Parmar, 4 = Gidaspow
     "lag_params%stokes_drag" : 0, # 0 = none, 1 = free slip stokes, 2 = no slip stokes
     "lag_params%pressure_force" : "F",
     "lag_params%gravity_force" : "F",
-    "particle_pp%rho0ref_particle": 2700,
-    "particle_pp%cp_particle": 1000
+    "particle_pp%rho0ref_particle": 2700.,
+    "particle_pp%cp_particle": 1000. #not currently used
 
 
 }

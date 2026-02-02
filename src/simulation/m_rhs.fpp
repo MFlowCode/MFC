@@ -1065,6 +1065,26 @@ contains
             end if
         end if
 
+
+        if (particles_lagrange) then
+          ! Compute particle dynamics, forces, dvdt
+          call nvtxStartRange("RHS-EL-PARTICLES-DYN")
+          call s_compute_particle_EL_dynamics( &
+              q_prim_qp%vf(1:sys_size), &
+              stage)
+          call nvtxEndRange
+
+          ! RHS additions for sub-grid particles_lagrange
+          if (lag_params%solver_approach == 2) then
+            call nvtxStartRange("RHS-EL-PARTICLES-SRC")
+            call s_compute_particles_EL_source( &
+                q_cons_qp%vf(1:sys_size), &
+                q_prim_qp%vf(1:sys_size), &
+                rhs_vf)
+            call nvtxEndRange
+          endif
+        end if
+
         if (chemistry .and. chem_params%reactions) then
             call nvtxStartRange("RHS-CHEM-REACTIONS")
             call s_compute_chemistry_reaction_flux(rhs_vf, q_cons_qp%vf, q_T_sf, q_prim_qp%vf, idwint)

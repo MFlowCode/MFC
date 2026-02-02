@@ -13,7 +13,7 @@ module m_particles_EL
 
     use m_particles_EL_kernels            !< Definitions of the kernel functions
 
-    use m_particles                       !< General bubble dynamics procedures
+    use m_particles                       !< General particle procedures
 
     use m_variables_conversion          !< State variables type conversion procedures
 
@@ -59,9 +59,8 @@ module m_particles_EL
     real(wp), allocatable, dimension(:, :, :) :: mtn_pos     !< Particle's position
     real(wp), allocatable, dimension(:, :, :) :: mtn_posPrev !< Particle's previous position
     real(wp), allocatable, dimension(:, :, :) :: mtn_vel     !< Particle's velocity
-    real(wp), allocatable, dimension(:, :, :) :: mtn_velPrev !< Particle's previous velocity
     real(wp), allocatable, dimension(:, :, :) :: mtn_s       !< Particle's computational cell position in real format
-    $:GPU_DECLARE(create='[mtn_pos, mtn_posPrev, mtn_vel, mtn_velPrev, mtn_s]')
+    $:GPU_DECLARE(create='[mtn_pos, mtn_posPrev, mtn_vel, mtn_s]')
     !(nPart, 1-> x or 2->y or 3 ->z, time-stage)
     real(wp), allocatable, dimension(:, :) :: intfc_draddt   !< Time derivative of bubble's radius
     ! real(wp), allocatable, dimension(:, :) :: intfc_dveldt   !< Time derivative of bubble's interface velocity
@@ -164,7 +163,6 @@ contains
         ! @:ALLOCATE(intfc_vel(1:nParticles_glb, 1:2))
         @:ALLOCATE(mtn_pos(1:nParticles_glb, 1:3, 1:2))
         @:ALLOCATE(mtn_posPrev(1:nParticles_glb, 1:3, 1:2))
-        @:ALLOCATE(mtn_velPrev(1:nParticles_glb, 1:3, 1:2))
         @:ALLOCATE(mtn_vel(1:nParticles_glb, 1:3, 1:2))
         @:ALLOCATE(mtn_s(1:nParticles_glb, 1:3, 1:2))
         @:ALLOCATE(intfc_draddt(1:nParticles_glb, 1:lag_num_ts))
@@ -187,14 +185,13 @@ contains
         if (lag_params%write_bubbles) call s_open_lag_bubble_evol()
         if (lag_params%write_bubbles_stats) call s_open_lag_particle_stats()
 
-        ! if (lag_params%vel_model > 0) then
-        !     moving_lag_particles = .true.
-        !     lag_pressure_force = lag_params%pressure_force
-        !     lag_gravity_force = lag_params%gravity_force
-        !     lag_vel_model = lag_params%vel_model
-        !     lag_drag_model = lag_params%drag_model
-        ! end if
-        moving_lag_particles = .true.
+        if (lag_params%vel_model > 0) then
+            moving_lag_particles = .true.
+            lag_pressure_force = lag_params%pressure_force
+            lag_gravity_force = lag_params%gravity_force
+            lag_vel_model = lag_params%vel_model
+            lag_drag_model = lag_params%drag_model
+        end if
 
         $:GPU_UPDATE(device='[moving_lag_particles, lag_pressure_force, &
             & lag_gravity_force, lag_vel_model, lag_drag_model]')
@@ -284,7 +281,7 @@ contains
 
             call s_mpi_sendrecv_solid_particles(particle_R0, Rmax_stats, Rmin_stats, particle_mass, gas_betaT, &
                                                 gas_betaC, lag_id, &
-                                                particle_rad, mtn_pos, mtn_posPrev, mtn_vel, mtn_velPrev, &
+                                                particle_rad, mtn_pos, mtn_posPrev, mtn_vel, &
                                                 mtn_s, intfc_draddt, mtn_dposdt, mtn_dveldt, lag_num_ts, n_el_particles_loc, &
                                                 dest=1)
 
@@ -300,7 +297,7 @@ contains
 
         $:GPU_UPDATE(device='[lag_id,particle_R0,Rmax_stats,Rmin_stats,particle_mass, &
             & gas_betaT,gas_betaC, &
-            & particle_rad,mtn_pos,mtn_posPrev,mtn_vel,mtn_velPrev, &
+            & particle_rad,mtn_pos,mtn_posPrev,mtn_vel, &
             & mtn_s,intfc_draddt, &
             & mtn_dposdt,mtn_dveldt,n_el_particles_loc]')
 
@@ -367,7 +364,6 @@ contains
         mtn_pos(part_id, 1:3, 1) = inputPart(1:3)
         mtn_posPrev(part_id, 1:3, 1) = mtn_pos(part_id, 1:3, 1)
         mtn_vel(part_id, 1:3, 1) = inputPart(4:6)
-        mtn_velPrev(part_id, 1:3, 1) = inputPart(4:6)
 
         !Initialize Particle Sources
         f_p(part_id,1:3) = 0._wp
@@ -657,7 +653,7 @@ contains
 
         integer :: i, j, k, l
 
-        call s_smear_particle_sources()
+        call s_smear_particle_sources() !To fill in q_particles with volume fraction and source term contributions
 
         !> Apply particle sources to the Eulerian RHS
         $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3)
@@ -712,9 +708,9 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
         call s_smoothfunction(n_el_particles_loc, particle_rad, &
-                              mtn_s, mtn_pos, mtn_vel, mtn_velPrev, particle_mass, q_particles, f_p)
+                              mtn_s, mtn_pos, q_particles, f_p)
 
-        !Store 1-beta
+        !Store 1-q_particles(1)
         $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
         do l = idwbuff(3)%beg, idwbuff(3)%end
             do k = idwbuff(2)%beg, idwbuff(2)%end
@@ -729,12 +725,12 @@ contains
         $:END_GPU_PARALLEL_LOOP()
         call nvtxEndRange
 
-        call nvtxStartRange("BUBBLES-LAGRANGE-BETA-COMM")
+        call nvtxStartRange("PARTICLES-LAGRANGE-VOID-COMM")
         if (num_procs > 1) then
             #:for DIRC, DIRI in [('x', 1), ('y', 2), ('z', 3)]
                 #:for LOCC, LOCI in [('beg', -1), ('end', 1)]
                     if (bc_${DIRC}$%${LOCC}$ >= 0) then
-                        call s_mpi_sendrecv_variables_buffers(q_particles, ${DIRI}$, ${LOCI}$, 2)
+                        call s_mpi_sendrecv_variables_buffers(q_particles, ${DIRI}$, ${LOCI}$, 1)
                     end if
                 #:endfor
             #:endfor
@@ -752,7 +748,6 @@ contains
         integer, intent(in) :: stage
 
         integer :: k
-        moving_lag_particles = .true.
 
         if (time_stepper == 1) then ! 1st order TVD RK
 
@@ -766,7 +761,6 @@ contains
                 if (moving_lag_particles) then
                     mtn_posPrev(k, 1:3, 1) = mtn_pos(k, 1:3, 1)
                     mtn_pos(k, 1:3, 1) = mtn_pos(k, 1:3, 1) + dt*mtn_dposdt(k, 1:3, 1)
-                    mtn_velPrev(k, 1:3, 1) = mtn_vel(k, 1:3, 1)
                     mtn_vel(k, 1:3, 1) = mtn_vel(k, 1:3, 1) + dt*mtn_dveldt(k, 1:3, 1)
                 end if
             end do
@@ -795,7 +789,6 @@ contains
                     if (moving_lag_particles) then
                         mtn_posPrev(k, 1:3, 2) = mtn_pos(k, 1:3, 1)
                         mtn_pos(k, 1:3, 2) = mtn_pos(k, 1:3, 1) + dt*mtn_dposdt(k, 1:3, 1)
-                        mtn_velPrev(k, 1:3, 2) = mtn_vel(k, 1:3, 1)
                         mtn_vel(k, 1:3, 2) = mtn_vel(k, 1:3, 1) + dt*mtn_dveldt(k, 1:3, 1)
                     end if
                 end do
@@ -815,7 +808,6 @@ contains
                     if (moving_lag_particles) then
                         mtn_posPrev(k, 1:3, 1) = mtn_pos(k, 1:3, 2)
                         mtn_pos(k, 1:3, 1) = mtn_pos(k, 1:3, 1) + dt*(mtn_dposdt(k, 1:3, 1) + mtn_dposdt(k, 1:3, 2))/2._wp
-                        mtn_velPrev(k, 1:3, 1) = mtn_vel(k, 1:3, 2)
                         mtn_vel(k, 1:3, 1) = mtn_vel(k, 1:3, 1) + dt*(mtn_dveldt(k, 1:3, 1) + mtn_dveldt(k, 1:3, 2))/2._wp
                     end if
 
@@ -846,7 +838,6 @@ contains
                     if (moving_lag_particles) then
                         mtn_posPrev(k, 1:3, 2) = mtn_pos(k, 1:3, 1)
                         mtn_pos(k, 1:3, 2) = mtn_pos(k, 1:3, 1) + dt*mtn_dposdt(k, 1:3, 1)
-                        mtn_velPrev(k, 1:3, 2) = mtn_vel(k, 1:3, 1)
                         mtn_vel(k, 1:3, 2) = mtn_vel(k, 1:3, 1) + dt*mtn_dveldt(k, 1:3, 1)
                     end if
                 end do
@@ -866,7 +857,6 @@ contains
                     if (moving_lag_particles) then
                         mtn_posPrev(k, 1:3, 2) = mtn_pos(k, 1:3, 2)
                         mtn_pos(k, 1:3, 2) = mtn_pos(k, 1:3, 1) + dt*(mtn_dposdt(k, 1:3, 1) + mtn_dposdt(k, 1:3, 2))/4._wp
-                        mtn_velPrev(k, 1:3, 2) = mtn_vel(k, 1:3, 2)
                         mtn_vel(k, 1:3, 2) = mtn_vel(k, 1:3, 1) + dt*(mtn_dveldt(k, 1:3, 1) + mtn_dveldt(k, 1:3, 2))/4._wp
                     end if
                 end do
@@ -886,7 +876,6 @@ contains
                     if (moving_lag_particles) then
                         mtn_posPrev(k, 1:3, 1) = mtn_pos(k, 1:3, 2)
                         mtn_pos(k, 1:3, 1) = mtn_pos(k, 1:3, 1) + (2._wp/3._wp)*dt*(mtn_dposdt(k, 1:3, 1)/4._wp + mtn_dposdt(k, 1:3, 2)/4._wp + mtn_dposdt(k, 1:3, 3))
-                        mtn_velPrev(k, 1:3, 1) = mtn_vel(k, 1:3, 2)
                         mtn_vel(k, 1:3, 1) = mtn_vel(k, 1:3, 1) + (2._wp/3._wp)*dt*(mtn_dveldt(k, 1:3, 1)/4._wp + mtn_dveldt(k, 1:3, 2)/4._wp + mtn_dveldt(k, 1:3, 3))
                     end if
 
@@ -1024,7 +1013,7 @@ contains
         call nvtxStartRange("LAG-BC-DEV2HOST")
         $:GPU_UPDATE(host='[particle_R0, Rmax_stats, Rmin_stats, particle_mass, gas_betaT, &
             & gas_betaC, lag_id, particle_rad, &
-            & mtn_pos, mtn_posPrev, mtn_vel, mtn_velPrev, mtn_s, intfc_draddt, &
+            & mtn_pos, mtn_posPrev, mtn_vel, mtn_s, intfc_draddt, &
             & mtn_dposdt, mtn_dveldt, keep_bubble, n_el_particles_loc, &
             & wrap_bubble_dir, wrap_bubble_loc]')
         call nvtxEndRange
@@ -1089,7 +1078,7 @@ contains
 
             call s_mpi_sendrecv_solid_particles(particle_R0, Rmax_stats, Rmin_stats, particle_mass, gas_betaT, &
                                                 gas_betaC, lag_id, &
-                                                particle_rad, mtn_pos, mtn_posPrev, mtn_vel, mtn_velPrev, &
+                                                particle_rad, mtn_pos, mtn_posPrev, mtn_vel, &
                                                 mtn_s, intfc_draddt, mtn_dposdt, mtn_dveldt, lag_num_ts, n_el_particles_loc, &
                                                 2)
             call nvtxEndRange
@@ -1102,7 +1091,7 @@ contains
         !     & gas_dpdt, gas_dmvdt, mtn_dposdt, mtn_dveldt, n_el_particles_loc]')
         $:GPU_UPDATE(host='[particle_R0, Rmax_stats, Rmin_stats, particle_mass, gas_betaT, &
             & gas_betaC, lag_id, particle_rad, &
-            & mtn_pos, mtn_posPrev, mtn_vel, mtn_velPrev, mtn_s, intfc_draddt, &
+            & mtn_pos, mtn_posPrev, mtn_vel, mtn_s, intfc_draddt, &
             & mtn_dposdt, mtn_dveldt, n_el_particles_loc]')
         call nvtxEndRange
         call nvtxEndRange
@@ -1188,7 +1177,6 @@ contains
             ! intfc_vel(k, 2) = intfc_vel(k, 1)
             mtn_pos(k, 1:3, 2) = mtn_pos(k, 1:3, 1)
             mtn_posPrev(k, 1:3, 2) = mtn_posPrev(k, 1:3, 1)
-            mtn_velPrev(k, 1:3, 2) = mtn_velPrev(k, 1:3, 1)
             mtn_vel(k, 1:3, 2) = mtn_vel(k, 1:3, 1)
             mtn_s(k, 1:3, 2) = mtn_s(k, 1:3, 1)
         end do
@@ -1736,7 +1724,6 @@ contains
         mtn_s(dest, 1:3, 1:2) = mtn_s(src, 1:3, 1:2)
         mtn_pos(dest, 1:3, 1:2) = mtn_pos(src, 1:3, 1:2)
         mtn_posPrev(dest, 1:3, 1:2) = mtn_posPrev(src, 1:3, 1:2)
-        mtn_velPrev(dest, 1:3, 1:2) = mtn_velPrev(src, 1:3, 1:2)
         intfc_draddt(dest, 1:lag_num_ts) = intfc_draddt(src, 1:lag_num_ts)
         ! intfc_dveldt(dest, 1:lag_num_ts) = intfc_dveldt(src, 1:lag_num_ts)
         ! gas_dpdt(dest, 1:lag_num_ts) = gas_dpdt(src, 1:lag_num_ts)
@@ -1775,7 +1762,6 @@ contains
         ! @:DEALLOCATE(intfc_vel)
         @:DEALLOCATE(mtn_pos)
         @:DEALLOCATE(mtn_posPrev)
-        @:DEALLOCATE(mtn_velPrev)
         @:DEALLOCATE(mtn_vel)
         @:DEALLOCATE(mtn_s)
         @:DEALLOCATE(intfc_draddt)

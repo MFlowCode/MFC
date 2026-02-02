@@ -23,34 +23,32 @@ contains
             !! @param lbk_s Computational coordinates of the particles
             !! @param lbk_pos Spatial coordinates of the particles
             !! @param updatedvar Eulerian variable to be updated
-            !! @param lbk_f_p Particle Forces on the particles
-    subroutine s_smoothfunction(nParticles, lbk_rad, lbk_s, lbk_pos, lbk_vel, lbk_velPrev, lbk_mass, updatedvar, lbk_f_p)
+            !! @param lbk_f_p Forces on the particles
+    subroutine s_smoothfunction(nParticles, lbk_rad, lbk_s, lbk_pos, updatedvar, lbk_f_p)
 
         integer, intent(in) :: nParticles
-        real(wp), dimension(1:lag_params%nParticles_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_pos, lbk_vel, lbk_velPrev
+        real(wp), dimension(1:lag_params%nParticles_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_pos
         real(wp), dimension(1:lag_params%nParticles_glb, 1:2), intent(in) :: lbk_rad
         type(scalar_field), dimension(:), intent(inout) :: updatedvar
         real(wp), dimension(1:lag_params%nParticles_glb, 1:3), intent(in) :: lbk_f_p
-        real(wp), dimension(1:lag_params%nParticles_glb), intent(in) :: lbk_mass
 
         smoothfunc:select case(lag_params%smooth_type)
         case (1)
-        call s_gaussian(nParticles, lbk_rad, lbk_s, lbk_pos, lbk_vel, lbk_velPrev, lbk_mass, updatedvar, lbk_f_p)
+        call s_gaussian(nParticles, lbk_rad, lbk_s, lbk_pos, updatedvar, lbk_f_p)
         case (2)
-        call s_deltafunc(nParticles, lbk_rad, lbk_s, lbk_vel, lbk_velPrev, lbk_mass, updatedvar, lbk_f_p)
+        call s_deltafunc(nParticles, lbk_rad, lbk_s, updatedvar, lbk_f_p)
         end select smoothfunc
 
     end subroutine s_smoothfunction
 
     !> The purpose of this procedure contains the algorithm to use the delta kernel function to map the effect of the particles.
             !!      The effect of the particles only affects the cell where the particle is located.
-    subroutine s_deltafunc(nParticles, lbk_rad, lbk_s, lbk_vel, lbk_velPrev, lbk_mass, updatedvar, lbk_f_p)
+    subroutine s_deltafunc(nParticles, lbk_rad, lbk_s, updatedvar, lbk_f_p)
 
         integer, intent(in) :: nParticles
-        real(wp), dimension(1:lag_params%nParticles_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_vel, lbk_velPrev
+        real(wp), dimension(1:lag_params%nParticles_glb, 1:3, 1:2), intent(in) :: lbk_s
         real(wp), dimension(1:lag_params%nParticles_glb, 1:2), intent(in) :: lbk_rad
         real(wp), dimension(1:lag_params%nParticles_glb, 1:3), intent(in) :: lbk_f_p
-        real(wp), dimension(1:lag_params%nParticles_glb), intent(in) :: lbk_mass
         type(scalar_field), dimension(:), intent(inout) :: updatedvar
 
         integer, dimension(3) :: cell
@@ -61,8 +59,6 @@ contains
         real(wp), dimension(3) :: s_coord
         integer :: l
         real(wp) :: fp_x, fp_y, fp_z
-        real(wp) :: myfp_x, myfp_y, myfp_z, m_p
-        real(wp), dimension(3) :: vp_new, vp_old
         
 
         $:GPU_PARALLEL_LOOP(private='[l,s_coord,cell]')
@@ -71,13 +67,6 @@ contains
             fp_x = lbk_f_p(l,1)
             fp_y = lbk_f_p(l,2)
             fp_z = lbk_f_p(l,3)
-
-            vp_new = lbk_vel(l,1:3,2)
-            vp_old = lbk_velPrev(l,1:3,2)
-            m_p = lbk_mass(l)
-            myfp_x = (m_p*(vp_new(1)-vp_old(1)))/dt
-            myfp_y = (m_p*(vp_new(2)-vp_old(2)))/dt
-            myfp_z = (m_p*(vp_new(3)-vp_old(3)))/dt
 
             volpart = 4._wp/3._wp*pi*lbk_rad(l, 2)**3._wp
             s_coord(1:3) = lbk_s(l, 1:3, 2)
@@ -97,15 +86,17 @@ contains
             $:GPU_ATOMIC(atomic='update')
             updatedvar(1)%sf(cell(1), cell(2), cell(3)) = updatedvar(1)%sf(cell(1), cell(2), cell(3)) + real(addFun1, kind=stp)
 
+            if (lag_params%solver_approach == 1) return
+            
             !Update x-momentum source term
-            addFun2_x = -myfp_x/Vol
+            addFun2_x = -fp_x/Vol
             $:GPU_ATOMIC(atomic='update')
             updatedvar(2)%sf(cell(1), cell(2), cell(3)) = &
                 updatedvar(2)%sf(cell(1), cell(2), cell(3)) &
                 + real(addFun2_x, kind=stp)
 
             !Update y-momentum source term
-            addFun2_y = -myfp_y/Vol
+            addFun2_y = -fp_y/Vol
             $:GPU_ATOMIC(atomic='update')
             updatedvar(3)%sf(cell(1), cell(2), cell(3)) = &
                 updatedvar(3)%sf(cell(1), cell(2), cell(3)) &
@@ -113,7 +104,7 @@ contains
 
             if (num_dims == 3) then
               !Update z-momentum source term
-              addFun2_z = -myfp_z/Vol
+              addFun2_z = -fp_z/Vol
               $:GPU_ATOMIC(atomic='update')
               updatedvar(4)%sf(cell(1), cell(2), cell(3)) = &
                   updatedvar(4)%sf(cell(1), cell(2), cell(3)) &
@@ -140,13 +131,12 @@ contains
 
     !> The purpose of this procedure contains the algorithm to use the gaussian kernel function to map the effect of the particles.
             !!      The effect of the particles affects the 3X3x3 cells that surround the particle.
-    subroutine s_gaussian(nParticles, lbk_rad, lbk_s, lbk_pos, lbk_vel, lbk_velPrev, lbk_mass, updatedvar, lbk_f_p)
+    subroutine s_gaussian(nParticles, lbk_rad, lbk_s, lbk_pos, updatedvar, lbk_f_p)
 
         integer, intent(in) :: nParticles
-        real(wp), dimension(1:lag_params%nParticles_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_pos, lbk_vel, lbk_velPrev
+        real(wp), dimension(1:lag_params%nParticles_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_pos
         real(wp), dimension(1:lag_params%nParticles_glb, 1:2), intent(in) :: lbk_rad
         real(wp), dimension(1:lag_params%nParticles_glb, 1:3), intent(in) :: lbk_f_p
-        real(wp), dimension(1:lag_params%nParticles_glb), intent(in) :: lbk_mass
         type(scalar_field), dimension(:), intent(inout) :: updatedvar
 
         real(wp), dimension(3) :: center
@@ -162,9 +152,7 @@ contains
         integer :: l, i, j, k
         logical :: celloutside
         integer :: smearGrid, smearGridz
-        real(wp) :: fp_x, fp_y, fp_z, func2_x_sum
-        real(wp) :: myfp_x, myfp_y, myfp_z, m_p
-        real(wp), dimension(3) :: vp_new, vp_old
+        real(wp) :: fp_x, fp_y, fp_z
 
         smearGrid = mapCells - (-mapCells) + 1 ! Include the cell that contains the particle (3+1+3)
         smearGridz = smearGrid
@@ -185,13 +173,6 @@ contains
             fp_x = lbk_f_p(l,1)
             fp_y = lbk_f_p(l,2)
             fp_z = lbk_f_p(l,3)
-
-            vp_new = lbk_vel(l,1:3,2)
-            vp_old = lbk_velPrev(l,1:3,2)
-            m_p = lbk_mass(l)
-            myfp_x = (m_p*(vp_new(1)-vp_old(1)))/dt
-            myfp_y = (m_p*(vp_new(2)-vp_old(2)))/dt
-            myfp_z = (m_p*(vp_new(3)-vp_old(3)))/dt
 
             func_sum = 0._wp
             do i = 1, smearGrid
@@ -217,7 +198,6 @@ contains
                 enddo
             enddo
 
-            func2_x_sum = 0._wp
             $:GPU_LOOP(collapse=3,private='[cellaux,nodecoord]')
             do i = 1, smearGrid
                 do j = 1, smearGrid
@@ -237,7 +217,6 @@ contains
                             if (p > 0) nodecoord(3) = z_cc(cellaux(3))
                             call s_applygaussian(center, cellaux, nodecoord, stddsv, 0._wp, func)
                             func = func/func_sum
-                            ! call s_applygaussian_2D(center, cellaux, nodecoord, stddsv, func, cell)
 
                             ! Relocate cells for particles intersecting symmetric boundaries
                             if (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == BC_REFLECTIVE)) then
@@ -251,16 +230,17 @@ contains
                                 updatedvar(1)%sf(cellaux(1), cellaux(2), cellaux(3)) &
                                 + real(addFun1, kind=stp)
 
+                            if (lag_params%solver_approach == 1) return
+
                             !Update x-momentum source term
-                            addFun2_x = -func*myfp_x
+                            addFun2_x = -func*fp_x
                             $:GPU_ATOMIC(atomic='update')
                             updatedvar(2)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
                                 updatedvar(2)%sf(cellaux(1), cellaux(2), cellaux(3)) &
                                 + real(addFun2_x, kind=stp)
-                            func2_x_sum = func2_x_sum + addFun2_x
 
                             !Update y-momentum source term
-                            addFun2_y = -func*myfp_y
+                            addFun2_y = -func*fp_y
                             $:GPU_ATOMIC(atomic='update')
                             updatedvar(3)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
                                 updatedvar(3)%sf(cellaux(1), cellaux(2), cellaux(3)) &
@@ -268,7 +248,7 @@ contains
 
                             if (num_dims == 3) then
                               !Update z-momentum source term
-                              addFun2_z = -func*myfp_z
+                              addFun2_z = -func*fp_z
                               $:GPU_ATOMIC(atomic='update')
                               updatedvar(4)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
                                   updatedvar(4)%sf(cellaux(1), cellaux(2), cellaux(3)) &
