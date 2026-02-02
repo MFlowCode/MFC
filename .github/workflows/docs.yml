@@ -31,7 +31,7 @@ jobs:
     - name: Build Documentation
       run:  |
         pip3 install fypp rich PyYAML
-        cmake -S . -B build -G Ninja --install-prefix=$(pwd)/build/install -D MFC_DOCUMENTATION=ON
+        cmake -S . -B build -G Ninja --install-prefix="$(pwd)/build/install" -D MFC_DOCUMENTATION=ON
         ninja -C build install
 
     - name: Upload Built Documentation Artifact

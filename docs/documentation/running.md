@@ -111,9 +111,9 @@ Run simulations with GPU support:
 ./mfc.sh run case.py --gpu
 
 # Specify GPU IDs (useful for multi-GPU nodes)
-./mfc.sh run case.py -g 0 1 2 3
+./mfc.sh run case.py --gpu -g 0 1 2 3
 
-# Run on specific number of GPUs
+# Run with 4 MPI ranks (typically one per GPU)
 ./mfc.sh run case.py -n 4 --gpu
 ```
 
@@ -348,7 +348,7 @@ If you want to restart a simulation,
 
 - Run the post_process
 	- There are several ways to do this. Keep in mind that, regardless of the .py file used, the post_process command will generate output files in the [`t_step_start`, `t_step_stop`] range, with `t_step_save` as the spacing between files.
-	- One way is to set `t_step_stop` to the restarting point $t_s$ in `case.py`. Then, run the commands below. The first command will run on timesteps $[t_i, t_s]$. The second command will run on $[t_s, t_{f2}]$. Therefore, the whole range $[t_i, t_{f2}]$ will be post processed.
+	- One way is to set `t_step_stop` to the restarting point $t_s$ in `case.py`. Then, run the commands below. The first command will run on timesteps $[t_i, t_s]$. The second command will run on $[t_s, t_{f2}]$. Therefore, the whole range $[t_i, t_{f2}]$ will be post-processed.
 
 ```shell
 ./mfc.sh run case.py -t post_process

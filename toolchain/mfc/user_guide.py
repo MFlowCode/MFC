@@ -217,9 +217,10 @@ def _extract_markdown_section(content: str, section_heading: str) -> str:
     heading_level = len(match.group(1))
     start_pos = match.end()
 
-    # Find the end: next heading of same/higher level, or ---
-    # Match ## or # (same or higher level than our heading)
-    end_pattern = rf'^(?:#{{{{1,{heading_level}}}}}\s|\-\-\-)'
+    # Find the end: horizontal rule (---) which separates major sections
+    # Note: We use --- instead of heading detection because shell comments
+    # inside code blocks (# comment) look like markdown headings to regex
+    end_pattern = r'^---'
     end_match = re.search(end_pattern, content[start_pos:], re.MULTILINE)
 
     if end_match:
