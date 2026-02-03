@@ -1218,7 +1218,7 @@ contains
         integer :: beg_end(1:2), grid_dims(1:3)
         integer :: dst_proc, src_proc, recv_tag, send_tag
 
-        logical :: beg_end_geq_0, qbmm_comm
+        logical :: beg_end_geq_0, qbmm_comm, replace_buff
 
         integer :: pack_offset, unpack_offset
 
@@ -1266,6 +1266,9 @@ contains
         if (pbc_loc == 1) then
             unpack_offset = grid_dims(mpi_dir) + 1
         end if
+
+        replace_buff = .false.
+        if (pbc_loc == 1 .and. beg_end_geq_0) replace_buff = .true.
 
         ! Pack Buffer to Send
         #:for mpi_dir in [1, 2, 3]
@@ -1367,22 +1370,26 @@ contains
         #:for mpi_dir in [1, 2, 3]
             if (mpi_dir == ${mpi_dir}$) then
                 #:if mpi_dir == 1
-                    $:GPU_PARALLEL_LOOP(collapse=4,private='[r]')
+                    $:GPU_PARALLEL_LOOP(collapse=4,private='[r]',copyin='[replace_buff]')
                     do l = 0, p
                         do k = 0, n
                             do j = -mapcells - 1, mapcells
                                 do i = 1, v_size
                                     r = (i - 1) + v_size * &
                                         ((j + mapcells + 1) + lb_size*(k + (n + 1)*l))
-                                    q_comm(beta_vars(i))%sf(j + unpack_offset, k, l) = &
-                                        q_comm(beta_vars(i))%sf(j + unpack_offset, k, l) + real(buff_recv(r), kind=stp)
+                                    if (replace_buff) then
+                                        q_comm(beta_vars(i))%sf(j + unpack_offset, k, l) = real(buff_recv(r), kind=stp)
+                                    else
+                                        q_comm(beta_vars(i))%sf(j + unpack_offset, k, l) = &
+                                            q_comm(beta_vars(i))%sf(j + unpack_offset, k, l) + real(buff_recv(r), kind=stp)
+                                    end if
                                 end do
                             end do
                         end do
                     end do
                     $:END_GPU_PARALLEL_LOOP()
                 #:elif mpi_dir == 2
-                    $:GPU_PARALLEL_LOOP(collapse=4,private='[r]')
+                    $:GPU_PARALLEL_LOOP(collapse=4,private='[r]',copyin='[replace_buff]')
                     do i = 1, v_size
                         do l = 0, p
                             do k = -mapcells - 1, mapcells
@@ -1390,15 +1397,19 @@ contains
                                     r = (i - 1) + v_size * &
                                         ((j + mapcells + 1) + (m + 2*(mapcells + 1) + 1) * &
                                         ((k + mapcells + 1) + lb_size*l))
-                                    q_comm(beta_vars(i))%sf(j, k + unpack_offset, l) = &
-                                        q_comm(beta_vars(i))%sf(j, k + unpack_offset, l) + real(buff_recv(r), kind=stp)
+                                    if (replace_buff) then
+                                        q_comm(beta_vars(i))%sf(j, k + unpack_offset, l) = real(buff_recv(r), kind=stp)
+                                    else
+                                        q_comm(beta_vars(i))%sf(j, k + unpack_offset, l) = &
+                                            q_comm(beta_vars(i))%sf(j, k + unpack_offset, l) + real(buff_recv(r), kind=stp)
+                                    end if
                                 end do
                             end do
                         end do
                     end do
                     $:END_GPU_PARALLEL_LOOP()
                 #:else
-                    $:GPU_PARALLEL_LOOP(collapse=4,private='[r]')
+                    $:GPU_PARALLEL_LOOP(collapse=4,private='[r]',copyin='[replace_buff]')
                     do i = 1, v_size
                         do l = -mapcells - 1, mapcells
                             do k = -mapcells - 1, n + mapcells + 1
@@ -1406,8 +1417,12 @@ contains
                                     r = (i - 1) + v_size * &
                                         ((j + mapcells + 1) + (m + 2*(mapcells + 1) + 1) * &
                                         ((k + mapcells + 1) + (n + 2*(mapcells + 1) + 1) * (l + mapcells + 1)))
-                                    q_comm(beta_vars(i))%sf(j, k, l + unpack_offset) = &
-                                        q_comm(beta_vars(i))%sf(j, k, l + unpack_offset) + real(buff_recv(r), kind=stp)
+                                    if (replace_buff) then
+                                        q_comm(beta_vars(i))%sf(j, k, l + unpack_offset) = real(buff_recv(r), kind=stp)
+                                    else
+                                        q_comm(beta_vars(i))%sf(j, k, l + unpack_offset) = &
+                                            q_comm(beta_vars(i))%sf(j, k, l + unpack_offset) + real(buff_recv(r), kind=stp)
+                                    end if
                                 end do
                             end do
                         end do
