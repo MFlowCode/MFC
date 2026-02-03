@@ -60,6 +60,7 @@ class ParamDef:
         case_optimization: Can be hard-coded for GPU builds
         constraints: Validation constraints (choices, min, max)
         dependencies: Related params (requires, recommends)
+        tags: Feature tags for grouping (e.g., "mhd", "bubbles", "weno")
     """
     name: str
     param_type: ParamType
@@ -68,6 +69,7 @@ class ParamDef:
     case_optimization: bool = False
     constraints: Optional[Dict[str, Any]] = None  # {"choices": [...], "min": N, "max": N}
     dependencies: Optional[Dict[str, Any]] = None  # {"requires": [...], "recommends": [...]}
+    tags: Set[str] = field(default_factory=set)  # Feature tags: "mhd", "bubbles", etc.
 
     def __post_init__(self):
         # Validate name

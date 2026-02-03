@@ -50,6 +50,7 @@ class ParamRegistry:
     Attributes:
         _params: Dictionary mapping parameter names to ParamDef instances.
         _by_stage: Dictionary mapping stages to sets of parameter names.
+        _by_tag: Dictionary mapping tags to sets of parameter names.
         _frozen: Whether the registry has been frozen (immutable).
     """
 
@@ -57,6 +58,7 @@ class ParamRegistry:
         """Initialize an empty registry."""
         self._params: Dict[str, ParamDef] = {}
         self._by_stage: Dict[Stage, Set[str]] = defaultdict(set)
+        self._by_tag: Dict[str, Set[str]] = defaultdict(set)
         self._frozen: bool = False
         self._params_proxy: Mapping[str, ParamDef] = None
 
@@ -107,13 +109,18 @@ class ParamRegistry:
             if existing.param_type != param.param_type:
                 raise ValueError(f"Type mismatch for '{param.name}'")
             existing.stages.update(param.stages)
+            existing.tags.update(param.tags)
             for stage in param.stages:
                 self._by_stage[stage].add(param.name)
+            for tag in param.tags:
+                self._by_tag[tag].add(param.name)
             return
 
         self._params[param.name] = param
         for stage in param.stages:
             self._by_stage[stage].add(param.name)
+        for tag in param.tags:
+            self._by_tag[tag].add(param.name)
 
     @property
     def all_params(self) -> Mapping[str, ParamDef]:
@@ -149,6 +156,27 @@ class ParamRegistry:
             for name in self._by_stage.get(stage, set()):
                 result[name] = self._params[name]
         return result
+
+    def get_params_by_tag(self, tag: str) -> Dict[str, ParamDef]:
+        """
+        Get parameters with a specific feature tag.
+
+        Args:
+            tag: The feature tag (e.g., "mhd", "bubbles", "weno").
+
+        Returns:
+            Dictionary mapping parameter names to their definitions.
+        """
+        return {name: self._params[name] for name in self._by_tag.get(tag, set())}
+
+    def get_all_tags(self) -> Set[str]:
+        """
+        Get all feature tags used in the registry.
+
+        Returns:
+            Set of all tag names.
+        """
+        return set(self._by_tag.keys())
 
     def get_json_schema(self, stage: Optional[Stage] = None) -> Dict[str, Any]:
         """

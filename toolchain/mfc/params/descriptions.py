@@ -630,176 +630,23 @@ def get_pattern_description(pattern_name: str) -> str:
     return desc
 
 
-# Feature groups for semantic parameter discovery
-# Keys are feature names, values are lists of parameter patterns
-# Patterns can be:
-#   - Exact names: "mhd"
-#   - Prefix patterns: "patch_icpp%B" matches patch_icpp(N)%Bx, patch_icpp(N)%By, etc.
-#   - Wildcard patterns: "bub_pp%" matches all bub_pp parameters
-FEATURE_GROUPS = {
-    "mhd": {
-        "description": "Magnetohydrodynamics parameters",
-        "params": [
-            "mhd", "Bx0", "powell",
-            "hyper_cleaning", "hyper_cleaning_speed", "hyper_cleaning_tau",
-            "patch_icpp%Bx", "patch_icpp%By", "patch_icpp%Bz",
-        ],
-    },
-    "bubbles": {
-        "description": "Bubble dynamics and cavitation",
-        "params": [
-            "bubbles_euler", "bubbles_lagrange", "bubble_model",
-            "polytropic", "polydisperse", "nb", "qbmm",
-            "R0ref", "Ca", "Web", "Re_inv",
-            "bub_pp%", "lag_params%",
-            "patch_icpp%r0", "patch_icpp%v0", "patch_icpp%p0", "patch_icpp%m0",
-        ],
-    },
-    "viscosity": {
-        "description": "Viscous flow parameters",
-        "params": [
-            "viscous", "Re_inv", "weno_Re_flux",
-            "fluid_pp%Re", "fluid_pp%mul0",
-        ],
-    },
-    "weno": {
-        "description": "WENO reconstruction scheme",
-        "params": [
-            "weno_order", "weno_eps", "mapped_weno",
-            "wenoz", "wenoz_q", "teno", "teno_CT",
-            "mp_weno", "weno_Re_flux", "weno_avg", "null_weights",
-        ],
-    },
-    "time": {
-        "description": "Time stepping and integration",
-        "params": [
-            "dt", "t_step_start", "t_step_stop", "t_step_save", "t_step_print",
-            "t_stop", "t_save", "time_stepper",
-            "cfl_adap_dt", "cfl_const_dt", "cfl_target", "cfl_max",
-            "adap_dt", "adap_dt_tol", "adap_dt_max_iters", "cfl_dt",
-        ],
-    },
-    "output": {
-        "description": "Output and visualization",
-        "params": [
-            "format", "precision", "parallel_io", "file_per_process",
-            "prim_vars_wrt", "cons_vars_wrt", "run_time_info",
-            "rho_wrt", "pres_wrt", "E_wrt", "gamma_wrt", "c_wrt",
-            "vel_wrt", "omega_wrt", "schlieren_wrt", "cf_wrt",
-            "alpha_wrt", "alpha_rho_wrt", "kappa_wrt",
-            "probe_wrt", "integral_wrt", "sim_data",
-            "schlieren_alpha",
-        ],
-    },
-    "chemistry": {
-        "description": "Chemical reactions and species transport",
-        "params": [
-            "chemistry", "cantera_file",
-            "chem_params%", "chem_wrt_Y", "chem_wrt_T",
-        ],
-    },
-    "elasticity": {
-        "description": "Elastic and hyperelastic materials",
-        "params": [
-            "hypoelasticity", "hyperelasticity",
-            "fluid_pp%G", "patch_icpp%tau_e",
-        ],
-    },
-    "acoustic": {
-        "description": "Acoustic sources and wave generation",
-        "params": [
-            "acoustic_source", "num_source", "acoustic%",
-        ],
-    },
-    "ib": {
-        "description": "Immersed boundary method",
-        "params": [
-            "ib", "num_ibs", "patch_ib%",
-        ],
-    },
-    "grid": {
-        "description": "Computational grid and domain",
-        "params": [
-            "m", "n", "p",
-            "x_domain%", "y_domain%", "z_domain%",
-            "stretch_x", "stretch_y", "stretch_z",
-            "a_x", "a_y", "a_z",
-            "x_a", "x_b", "y_a", "y_b", "z_a", "z_b",
-            "loops_x", "loops_y", "loops_z",
-            "cyl_coord",
-        ],
-    },
-    "bc": {
-        "description": "Boundary conditions",
-        "params": [
-            "bc_x%", "bc_y%", "bc_z%",
-            "num_bc_patches", "patch_bc%",
-        ],
-    },
-    "riemann": {
-        "description": "Riemann solver settings",
-        "params": [
-            "riemann_solver", "wave_speeds", "avg_state", "low_Mach",
-        ],
-    },
-    "probes": {
-        "description": "Probe points and integral regions",
-        "params": [
-            "num_probes", "probe%",
-            "num_integrals", "integral%",
-        ],
-    },
-    "surface_tension": {
-        "description": "Surface tension and interface",
-        "params": [
-            "surface_tension", "sigma",
-            "fluid_pp%ss",
-        ],
-    },
-    "relativity": {
-        "description": "Special relativity",
-        "params": ["relativity"],
-    },
+# Feature group descriptions (for display purposes)
+# The actual parameter-to-tag mapping is in definitions.py (single source of truth)
+FEATURE_DESCRIPTIONS = {
+    "mhd": "Magnetohydrodynamics parameters",
+    "bubbles": "Bubble dynamics and cavitation",
+    "viscosity": "Viscous flow parameters",
+    "weno": "WENO reconstruction scheme",
+    "time": "Time stepping and integration",
+    "output": "Output and visualization",
+    "chemistry": "Chemical reactions and species transport",
+    "elasticity": "Elastic and hyperelastic materials",
+    "acoustic": "Acoustic sources and wave generation",
+    "ib": "Immersed boundary method",
+    "grid": "Computational grid and domain",
+    "bc": "Boundary conditions",
+    "riemann": "Riemann solver settings",
+    "probes": "Probe points and integral regions",
+    "surface_tension": "Surface tension and interface",
+    "relativity": "Special relativity",
 }
-
-
-def get_feature_params(feature_name: str, all_param_names: list) -> list:
-    """
-    Get all parameter names matching a feature group.
-
-    Args:
-        feature_name: Name of the feature group (e.g., "mhd")
-        all_param_names: List of all parameter names in registry
-
-    Returns:
-        List of matching parameter names
-    """
-    if feature_name not in FEATURE_GROUPS:
-        return []
-
-    patterns = FEATURE_GROUPS[feature_name]["params"]
-    matches = []
-
-    for param_name in all_param_names:
-        for pattern in patterns:
-            if pattern.endswith("%"):
-                # Prefix pattern: match anything starting with this
-                # Strip index from param name for comparison
-                base_name = re.sub(r"\(\d+\)", "", param_name)
-                if base_name.startswith(pattern[:-1]):
-                    matches.append(param_name)
-                    break
-            elif "%" in pattern:
-                # Partial pattern like "patch_icpp%Bx"
-                # Match patch_icpp(N)%Bx
-                base_name = re.sub(r"\(\d+\)", "", param_name)
-                if base_name == pattern or base_name.startswith(pattern):
-                    matches.append(param_name)
-                    break
-            else:
-                # Exact match
-                if param_name == pattern:
-                    matches.append(param_name)
-                    break
-
-    return matches

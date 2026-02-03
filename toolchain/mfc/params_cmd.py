@@ -31,7 +31,7 @@ def params():
     if show_count:
         _show_statistics(REGISTRY)
     elif show_features:
-        _show_feature_groups()
+        _show_feature_groups(REGISTRY)
     elif feature_name:
         _show_feature_params(REGISTRY, feature_name, type_filter, limit, describe)
     elif show_families:
@@ -205,9 +205,9 @@ def _show_statistics(registry):
         cons.print(f"    {tname:15} {count:5}")
 
 
-def _show_feature_groups():
+def _show_feature_groups(registry):
     """Show available feature groups."""
-    from .params.descriptions import FEATURE_GROUPS
+    from .params.descriptions import FEATURE_DESCRIPTIONS
 
     cons.print("[bold]Feature Groups[/bold]")
     cons.print()
@@ -216,9 +216,11 @@ def _show_feature_groups():
     cons.print(f"  {'Feature':<20} {'Description'}")
     cons.print(f"  {'-'*20} {'-'*50}")
 
-    for name, info in sorted(FEATURE_GROUPS.items()):
-        desc = info["description"]
-        cons.print(f"  [cyan]{name:<20}[/cyan] {desc}")
+    # Get all tags from registry and show with descriptions
+    all_tags = registry.get_all_tags()
+    for tag in sorted(all_tags):
+        desc = FEATURE_DESCRIPTIONS.get(tag, "")
+        cons.print(f"  [cyan]{tag:<20}[/cyan] {desc}")
 
     cons.print()
     cons.print("[yellow]Example:[/yellow] ./mfc.sh params --feature mhd")
@@ -226,24 +228,24 @@ def _show_feature_groups():
 
 def _show_feature_params(registry, feature_name, type_filter, limit, describe):
     """Show all parameters for a feature group."""
-    from .params.descriptions import FEATURE_GROUPS, get_feature_params
+    from .params.descriptions import FEATURE_DESCRIPTIONS
 
-    if feature_name not in FEATURE_GROUPS:
+    # Check if feature exists in registry
+    all_tags = registry.get_all_tags()
+    if feature_name not in all_tags:
         cons.print(f"[red]Unknown feature group: '{feature_name}'[/red]")
         cons.print()
         cons.print("Available feature groups:")
-        for name in sorted(FEATURE_GROUPS.keys()):
+        for name in sorted(all_tags):
             cons.print(f"  {name}")
         return
 
-    feature_info = FEATURE_GROUPS[feature_name]
-    all_param_names = list(registry.all_params.keys())
-    matching_names = get_feature_params(feature_name, all_param_names)
+    # Get params by tag from registry (single source of truth)
+    tagged_params = registry.get_params_by_tag(feature_name)
 
     # Build matches list
     matches = []
-    for name in matching_names:
-        param = registry.all_params[name]
+    for name, param in tagged_params.items():
         # Apply type filter
         if type_filter and param.param_type.value != type_filter:
             continue
@@ -256,7 +258,8 @@ def _show_feature_params(registry, feature_name, type_filter, limit, describe):
     # Collapse indexed parameters
     collapsed = _collapse_indexed_params(matches)
 
-    cons.print(f"[bold]{feature_info['description']}[/bold] ({len(matches)} params, {len(collapsed)} unique patterns)")
+    desc = FEATURE_DESCRIPTIONS.get(feature_name, feature_name.title() + " parameters")
+    cons.print(f"[bold]{desc}[/bold] ({len(matches)} params, {len(collapsed)} unique patterns)")
     cons.print()
 
     # Show collapsed results
