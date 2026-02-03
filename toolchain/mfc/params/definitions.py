@@ -5,12 +5,281 @@ Single file containing all ~3,300 parameter definitions using loops.
 This replaces the definitions/ directory.
 """
 
+import re
 from typing import Dict, Any
 from .schema import ParamDef, ParamType
 from .registry import REGISTRY
 
 # Index limits
 NP, NF, NI, NA, NPR, NB = 10, 10, 10, 4, 10, 10  # patches, fluids, ibs, acoustic, probes, bc_patches
+
+
+# =============================================================================
+# Auto-generated Descriptions
+# =============================================================================
+# Descriptions are auto-generated from parameter names using naming conventions.
+# Override with explicit desc= parameter when auto-generation is inadequate.
+
+# Prefix descriptions for indexed parameter families
+_PREFIX_DESCS = {
+    "patch_icpp": "initial condition patch",
+    "patch_ib": "immersed boundary",
+    "patch_bc": "boundary condition patch",
+    "fluid_pp": "fluid",
+    "acoustic": "acoustic source",
+    "probe": "probe",
+    "integral": "integral region",
+}
+
+# Attribute descriptions (suffix after %)
+_ATTR_DESCS = {
+    # Geometry/position
+    "geometry": "Geometry type",
+    "x_centroid": "X-coordinate of centroid",
+    "y_centroid": "Y-coordinate of centroid",
+    "z_centroid": "Z-coordinate of centroid",
+    "length_x": "X-dimension length",
+    "length_y": "Y-dimension length",
+    "length_z": "Z-dimension length",
+    "radius": "Radius",
+    "radii": "Radii array",
+    "normal": "Normal direction",
+    "theta": "Theta angle",
+    "angles": "Orientation angles",
+    # Physics
+    "vel": "Velocity",
+    "pres": "Pressure",
+    "rho": "Density",
+    "alpha": "Volume fraction",
+    "alpha_rho": "Partial density",
+    "gamma": "Specific heat ratio",
+    "pi_inf": "Stiffness pressure",
+    "cv": "Specific heat (const. volume)",
+    "qv": "Heat of formation",
+    "qvp": "Heat of formation prime",
+    "G": "Shear modulus",
+    "Re": "Reynolds number",
+    "mul0": "Reference viscosity",
+    "ss": "Surface tension",
+    "pv": "Vapor pressure",
+    # MHD
+    "Bx": "Magnetic field (x-component)",
+    "By": "Magnetic field (y-component)",
+    "Bz": "Magnetic field (z-component)",
+    # Model/smoothing
+    "smoothen": "Enable smoothing",
+    "smooth_patch_id": "Patch ID to smooth against",
+    "smooth_coeff": "Smoothing coefficient",
+    "alter_patch": "Alter with another patch",
+    "model_filepath": "STL model file path",
+    "model_spc": "Model spacing",
+    "model_threshold": "Model threshold",
+    "model_translate": "Model translation",
+    "model_scale": "Model scale",
+    "model_rotate": "Model rotation",
+    # Bubbles
+    "r0": "Initial bubble radius",
+    "v0": "Initial bubble velocity",
+    "p0": "Initial bubble pressure",
+    "m0": "Initial bubble mass",
+    # IB specific
+    "slip": "Enable slip condition",
+    "moving_ibm": "Enable moving boundary",
+    "angular_vel": "Angular velocity",
+    "mass": "Mass",
+    # BC specific
+    "vel_in": "Inlet velocity",
+    "vel_out": "Outlet velocity",
+    "alpha_rho_in": "Inlet partial density",
+    "alpha_in": "Inlet volume fraction",
+    "pres_in": "Inlet pressure",
+    "pres_out": "Outlet pressure",
+    "grcbc_in": "Enable GRCBC inlet",
+    "grcbc_out": "Enable GRCBC outlet",
+    "grcbc_vel_out": "Enable GRCBC velocity outlet",
+    # Acoustic
+    "loc": "Location",
+    "mag": "Magnitude",
+    "pulse": "Pulse type",
+    "support": "Support type",
+    "frequency": "Frequency",
+    "wavelength": "Wavelength",
+    "length": "Length",
+    "height": "Height",
+    "delay": "Delay time",
+    "dipole": "Enable dipole",
+    "dir": "Direction",
+    # Output
+    "x": "X-coordinate",
+    "y": "Y-coordinate",
+    "z": "Z-coordinate",
+    "xmin": "X minimum",
+    "xmax": "X maximum",
+    "ymin": "Y minimum",
+    "ymax": "Y maximum",
+    "zmin": "Z minimum",
+    "zmax": "Z maximum",
+    # Chemistry
+    "Y": "Species mass fraction",
+    # Elasticity
+    "tau_e": "Elastic stress component",
+    # Misc
+    "cf_val": "Color function value",
+    "hcid": "Hard-coded ID",
+    "epsilon": "Interface thickness",
+    "beta": "Shape parameter beta",
+    "non_axis_sym": "Non-axisymmetric parameter",
+}
+
+# Simple parameter descriptions (non-indexed)
+_SIMPLE_DESCS = {
+    # Grid
+    "m": "Grid cells in x-direction",
+    "n": "Grid cells in y-direction",
+    "p": "Grid cells in z-direction",
+    "cyl_coord": "Enable cylindrical coordinates",
+    "stretch_x": "Enable grid stretching in x",
+    "stretch_y": "Enable grid stretching in y",
+    "stretch_z": "Enable grid stretching in z",
+    # Time
+    "dt": "Time step size",
+    "t_step_start": "Starting time step",
+    "t_step_stop": "Ending time step",
+    "t_step_save": "Save interval (steps)",
+    "t_step_print": "Print interval (steps)",
+    "t_stop": "Stop time",
+    "t_save": "Save interval (time)",
+    "time_stepper": "Time integration scheme (1=Euler, 2=RK2, 3=RK3)",
+    "cfl_target": "Target CFL number",
+    "cfl_max": "Maximum CFL number",
+    "cfl_adap_dt": "Enable adaptive CFL time stepping",
+    "adap_dt": "Enable adaptive time stepping",
+    # Model
+    "model_eqns": "Model equations (1=gamma, 2=5-eq, 3=6-eq, 4=4-eq)",
+    "num_fluids": "Number of fluids",
+    "num_patches": "Number of IC patches",
+    "mpp_lim": "Mixture pressure positivity limiter",
+    # WENO
+    "weno_order": "WENO reconstruction order",
+    "weno_eps": "WENO epsilon parameter",
+    "mapped_weno": "Enable mapped WENO",
+    "wenoz": "Enable WENO-Z",
+    "teno": "Enable TENO",
+    "mp_weno": "Enable monotonicity-preserving WENO",
+    # Riemann
+    "riemann_solver": "Riemann solver (1=HLL, 2=HLLC, 3=exact)",
+    "wave_speeds": "Wave speed estimate method",
+    "avg_state": "Average state (1=Roe, 2=arithmetic)",
+    # Physics toggles
+    "viscous": "Enable viscous effects",
+    "mhd": "Enable magnetohydrodynamics",
+    "hyper_cleaning": "Enable hyperbolic divergence cleaning",
+    "hyper_cleaning_speed": "Divergence cleaning wave speed",
+    "hyper_cleaning_tau": "Divergence cleaning damping time",
+    "powell": "Enable Powell source terms for MHD",
+    "bubbles_euler": "Enable Euler bubble model",
+    "bubbles_lagrange": "Enable Lagrangian bubbles",
+    "polytropic": "Enable polytropic gas",
+    "polydisperse": "Enable polydisperse bubbles",
+    "qbmm": "Enable QBMM",
+    "chemistry": "Enable chemistry",
+    "surface_tension": "Enable surface tension",
+    "hypoelasticity": "Enable hypoelastic model",
+    "hyperelasticity": "Enable hyperelastic model",
+    "relativity": "Enable special relativity",
+    "ib": "Enable immersed boundaries",
+    "acoustic_source": "Enable acoustic sources",
+    # Output
+    "parallel_io": "Enable parallel I/O",
+    "probe_wrt": "Write probe data",
+    "prim_vars_wrt": "Write primitive variables",
+    "cons_vars_wrt": "Write conservative variables",
+    "run_time_info": "Print runtime info",
+    # Misc
+    "case_dir": "Case directory path",
+    "cantera_file": "Cantera mechanism file",
+    "num_ibs": "Number of immersed boundaries",
+    "num_source": "Number of acoustic sources",
+    "num_probes": "Number of probes",
+    "num_integrals": "Number of integral regions",
+    "nb": "Number of bubble bins",
+    "R0ref": "Reference bubble radius",
+    "sigma": "Surface tension coefficient",
+    "Bx0": "Background magnetic field (x)",
+    "old_grid": "Load grid from previous simulation",
+    "old_ic": "Load initial conditions from previous",
+    "t_step_old": "Time step to restart from",
+    "fd_order": "Finite difference order",
+    "recon_type": "Reconstruction type (1=WENO, 2=MUSCL)",
+    "muscl_order": "MUSCL reconstruction order",
+    "muscl_lim": "MUSCL limiter type",
+    "low_Mach": "Low Mach number correction",
+    "bubble_model": "Bubble dynamics model",
+    "Ca": "Cavitation number",
+    "Web": "Weber number",
+    "Re_inv": "Inverse Reynolds number",
+    "format": "Output format (1=Silo, 2=binary)",
+    "precision": "Output precision (1=single, 2=double)",
+}
+
+
+def _auto_describe(name: str) -> str:
+    """Auto-generate description from parameter name."""
+    # Check simple params first
+    if name in _SIMPLE_DESCS:
+        return _SIMPLE_DESCS[name]
+
+    # Handle indexed params: prefix(N)%attr or prefix(N)%attr(M)
+    match = re.match(r"([a-z_]+)\((\d+)\)%(.+)", name)
+    if match:
+        prefix, idx, attr = match.group(1), match.group(2), match.group(3)
+        prefix_desc = _PREFIX_DESCS.get(prefix, prefix.replace("_", " "))
+
+        # Check for nested index: attr(M) or attr(M, K)
+        attr_match = re.match(r"([a-z_]+)\((\d+)(?:,\s*(\d+))?\)", attr)
+        if attr_match:
+            attr_base = attr_match.group(1)
+            idx2 = attr_match.group(2)
+            attr_desc = _ATTR_DESCS.get(attr_base, attr_base.replace("_", " "))
+            return f"{attr_desc} {idx2} for {prefix_desc} {idx}"
+
+        attr_desc = _ATTR_DESCS.get(attr, attr.replace("_", " "))
+        return f"{attr_desc} for {prefix_desc} {idx}"
+
+    # Handle bc_x%attr style (no index in prefix)
+    if "%" in name:
+        prefix, attr = name.split("%", 1)
+        # Check for indexed attr
+        attr_match = re.match(r"([a-z_]+)\((\d+)\)", attr)
+        if attr_match:
+            attr_base, idx = attr_match.group(1), attr_match.group(2)
+            attr_desc = _ATTR_DESCS.get(attr_base, attr_base.replace("_", " "))
+            return f"{attr_desc} {idx} for {prefix.replace('_', ' ')}"
+
+        attr_desc = _ATTR_DESCS.get(attr, "")
+        if attr_desc:
+            return f"{attr_desc} for {prefix.replace('_', ' ')}"
+        # Fallback: just clean up the name
+        return f"{attr.replace('_', ' ').title()} for {prefix.replace('_', ' ')}"
+
+    # Handle suffix-indexed: name(N) or name(N, M)
+    match = re.match(r"([a-z_]+)\((\d+)(?:,\s*(\d+))?\)", name)
+    if match:
+        base, idx = match.group(1), match.group(2)
+        # Handle _wrt patterns
+        if base.endswith("_wrt"):
+            field = base[:-4].replace("_", " ")
+            return f"Write {field} for component {idx}"
+        return f"{base.replace('_', ' ').title()} {idx}"
+
+    # Fallback patterns
+    if name.endswith("_wrt"):
+        return f"Write {name[:-4].replace('_', ' ')}"
+    if name.startswith("num_"):
+        return f"Number of {name[4:].replace('_', ' ')}"
+
+    # Last resort: clean up the name
+    return name.replace("_", " ").replace("%", " ")
 
 # Parameters that can be hard-coded for GPU case optimization
 CASE_OPT_PARAMS = {
@@ -189,11 +458,12 @@ DEPENDENCIES = {
     },
 }
 
-def _r(name, ptype, tags=None):
-    """Register a parameter with optional feature tags."""
+def _r(name, ptype, tags=None, desc=None):
+    """Register a parameter with optional feature tags and description."""
     REGISTRY.register(ParamDef(
         name=name,
         param_type=ptype,
+        description=desc if desc else _auto_describe(name),
         case_optimization=(name in CASE_OPT_PARAMS),
         constraints=CONSTRAINTS.get(name),
         dependencies=DEPENDENCIES.get(name),
