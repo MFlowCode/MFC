@@ -662,6 +662,11 @@ contains
                                 call s_compute_fast_magnetosonic_speed(rho_R, c_R, B%R, norm_dir, c_fast%R, H_R)
                             end if
 
+                            if (hyper_cleaning) then ! mhd
+                                c_fast%L = min(c_fast%L, -hyper_cleaning_speed)
+                                c_fast%R = max(c_fast%R, hyper_cleaning_speed)
+                            end if
+
                             if (viscous) then
                                 if (chemistry) then
                                     call compute_viscosity_and_inversion(T_L, Ys_L, T_R, Ys_R, Re_L(1), Re_R(1))
@@ -954,11 +959,20 @@ contains
                                     ! B_z d/d${XYZ}$ flux = (1 - delta(z,${XYZ}$)) * (v_${XYZ}$ * B_z - v_z * B_${XYZ}$)
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 0, 2
-                                        flux_rs${XYZ}$_vf(j, k, l, B_idx%beg + i) = (1 - dir_flg(i + 1))*( &
-                                                                                    s_M*(vel_R(dir_idx(1))*B%R(i + 1) - vel_R(i + 1)*B%R(norm_dir)) - &
-                                                                                    s_P*(vel_L(dir_idx(1))*B%L(i + 1) - vel_L(i + 1)*B%L(norm_dir)) + &
-                                                                                    s_M*s_P*(B%L(i + 1) - B%R(i + 1)))/(s_M - s_P)
+                                        flux_rs${XYZ}$_vf(j, k, l, B_idx%beg + i) = (s_M*(vel_R(dir_idx(1))*B%R(i + 1) - vel_R(i + 1)*B%R(norm_dir)) - &
+                                                                                     s_P*(vel_L(dir_idx(1))*B%L(i + 1) - vel_L(i + 1)*B%L(norm_dir)) + &
+                                                                                     s_M*s_P*(B%L(i + 1) - B%R(i + 1)))/(s_M - s_P)
                                     end do
+
+                                    if (hyper_cleaning) then
+                                        ! propagate magnetic field divergence as a wave
+                                        flux_rs${XYZ}$_vf(j, k, l, B_idx%beg + norm_dir - 1) = flux_rs${XYZ}$_vf(j, k, l, B_idx%beg + norm_dir - 1) + &
+                                                                                               (s_M*qR_prim_rs${XYZ}$_vf(j + 1, k, l, psi_idx) - s_P*qL_prim_rs${XYZ}$_vf(j, k, l, psi_idx))/(s_M - s_P)
+
+                                        flux_rs${XYZ}$_vf(j, k, l, psi_idx) = (hyper_cleaning_speed**2*(s_M*B%R(norm_dir) - s_P*B%L(norm_dir)) + s_M*s_P*(qL_prim_rs${XYZ}$_vf(j, k, l, psi_idx) - qR_prim_rs${XYZ}$_vf(j + 1, k, l, psi_idx)))/(s_M - s_P)
+                                    else
+                                        flux_rs${XYZ}$_vf(j, k, l, B_idx%beg + norm_dir - 1) = 0._wp ! Without hyperbolic cleaning, make sure flux of B_normal is identically zero
+                                    end if
                                 end if
                                 flux_src_rs${XYZ}$_vf(j, k, l, advxb) = 0._wp
                             end if
