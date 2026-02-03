@@ -175,7 +175,7 @@ In brief, you can run the latest MFC container:
 ```bash
 docker run -it --rm --entrypoint bash sbryngelson/mfc:latest-cpu
 ```
-Please refer to the [Docker](docker.md) document for more information.
+Please refer to the @ref docker "Docker" document for more information.
 
 ## Running the Test Suite
 
@@ -184,7 +184,7 @@ Run MFC's test suite with 8 threads:
 ./mfc.sh test -j 8
 ```
 
-Please refer to the [Testing](testing.md) document for more information.
+Please refer to the @ref testing "Testing" document for more information.
 
 ## Running an Example Case
 
@@ -194,7 +194,7 @@ MFC has example cases in the `examples` folder. You can run such a case interact
 ./mfc.sh run examples/2D_shockbubble/case.py -n 2
 ```
 
-Please refer to the [Running](running.md) document for more information on `case.py` files and how to run them.
+Please refer to the @ref running "Running" document for more information on `case.py` files and how to run them.
 
 ## Helpful Tools
 
