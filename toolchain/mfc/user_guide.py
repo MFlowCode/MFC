@@ -214,7 +214,6 @@ def _extract_markdown_section(content: str, section_heading: str) -> str:
     if not match:
         return None
 
-    heading_level = len(match.group(1))
     start_pos = match.end()
 
     # Find the end: horizontal rule (---) which separates major sections
