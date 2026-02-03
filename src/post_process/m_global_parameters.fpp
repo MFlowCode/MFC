@@ -117,6 +117,7 @@ module m_global_parameters
     integer :: b_size          !< Number of components in the b tensor
     integer :: tensor_size     !< Number of components in the nonsymmetric tensor
     logical :: cont_damage     !< Continuum damage modeling
+    logical :: hyper_cleaning  !< Hyperbolic cleaning for MHD
     logical :: igr             !< enable IGR
     integer :: igr_order       !< IGR reconstruction order
     logical, parameter :: chemistry = .${chemistry}$. !< Chemistry modeling
@@ -143,6 +144,7 @@ module m_global_parameters
     integer :: c_idx                               !< Index of color function
     type(int_bounds_info) :: species_idx           !< Indexes of first & last concentration eqns.
     integer :: damage_idx                          !< Index of damage state variable (D) for continuum damage model
+    integer :: psi_idx                                 !< Index of hyperbolic cleaning state variable for MHD
     !> @}
 
     ! Cell Indices for the (local) interior points (O-m, O-n, 0-p).
@@ -407,6 +409,7 @@ contains
         b_size = dflt_int
         tensor_size = dflt_int
         cont_damage = .false.
+        hyper_cleaning = .false.
         igr = .false.
 
         bc_x%beg = dflt_int; bc_x%end = dflt_int
@@ -810,6 +813,13 @@ contains
                 sys_size = damage_idx
             else
                 damage_idx = dflt_int
+            end if
+
+            if (hyper_cleaning) then
+                psi_idx = sys_size + 1
+                sys_size = psi_idx
+            else
+                psi_idx = dflt_int
             end if
 
         end if

@@ -169,6 +169,13 @@ contains
             q_prim_vf(damage_idx)%sf = 0._wp
         end if
 
+        ! Initial hyper_cleaning state is always zero
+        ! TODO more general
+        if (hyper_cleaning) then
+            q_cons_vf(psi_idx)%sf = 0._wp
+            q_prim_vf(psi_idx)%sf = 0._wp
+        end if
+
         ! Setting default values for patch identities bookkeeping variable.
         ! This is necessary to avoid any confusion in the assessment of the
         ! extent of application that the overwrite permissions give a patch

@@ -2,13 +2,6 @@
 import json
 import math
 
-# Case for smoothmagnetic vortex from:
-# Implicit hybridized discontinuous Galerkin methods for
-# compressible magnetohydrodynamics
-# C. Ciuca, P. Fernandez, A. Christophe, N.C. Nguyen, J. Peraire
-
-# A 2D magnetic vortex advects for a period of T=10 diagonally
-
 # Configuring case dictionary
 print(
     json.dumps(
@@ -16,17 +9,17 @@ print(
             # Logistics
             "run_time_info": "T",
             # Computational Domain Parameters
-            "x_domain%beg": -5.0,
-            "x_domain%end": 5.0,
-            "y_domain%beg": -5.0,
-            "y_domain%end": 5.0,
-            "m": 1024,
-            "n": 1024,
+            "x_domain%beg": 0.0,
+            "x_domain%end": 1.0,
+            "y_domain%beg": 0.0,
+            "y_domain%end": 1.0,
+            "m": 512,
+            "n": 512,
             "p": 0,
-            "dt": 1.0e-4,
+            "dt": 0.0004,
             "t_step_start": 0,
-            "t_step_stop": 100000,
-            "t_step_save": 1000,
+            "t_step_stop": 2500,
+            "t_step_save": 100,
             # Simulation Algorithm Parameters
             "num_patches": 1,
             "model_eqns": 2,
@@ -36,10 +29,11 @@ print(
             "mixture_err": "F",
             "time_stepper": 3,
             "weno_order": 5,
-            "weno_eps": 1.0e-12,
+            "mapped_weno": "T",
+            "weno_eps": 1.0e-6,
             "null_weights": "F",
             "mp_weno": "F",
-            "riemann_solver": 4,
+            "riemann_solver": 1,
             "wave_speeds": 1,
             "avg_state": 2,
             "bc_x%beg": -1,
@@ -54,12 +48,21 @@ print(
             "parallel_io": "T",
             # MHD
             "mhd": "T",
-            "patch_icpp(1)%hcid": 253,
+            "hyper_cleaning": "T",
+            "hyper_cleaning_speed": 2.5,
+            "hyper_cleaning_tau": 0.004,
+            # Patch 1 - Analytical for v and B
+            # gamma = 5/3
+            #   rho = 25/(36*pi)
+            #     p = 5/(12*pi)
+            #     v = (-sin(2*pi*y), sin(2*pi*x), 0)
+            #     B = (-sin(2*pi*y)/sqrt(4*pi), sin(4*pi*x)/sqrt(4*pi), 0)
+            "patch_icpp(1)%hcid": 250,
             "patch_icpp(1)%geometry": 3,
-            "patch_icpp(1)%x_centroid": 0.0,
-            "patch_icpp(1)%y_centroid": 0.0,
-            "patch_icpp(1)%length_x": 10.0,
-            "patch_icpp(1)%length_y": 10.0,
+            "patch_icpp(1)%x_centroid": 0.5,
+            "patch_icpp(1)%y_centroid": 0.5,
+            "patch_icpp(1)%length_x": 1.0,
+            "patch_icpp(1)%length_y": 1.0,
             "patch_icpp(1)%vel(1)": 0.0,
             "patch_icpp(1)%vel(2)": 0.0,
             "patch_icpp(1)%vel(3)": 0.0,
