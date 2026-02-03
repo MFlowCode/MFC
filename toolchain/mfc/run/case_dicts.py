@@ -69,7 +69,6 @@ def _get_validator_func():
     from ..params import REGISTRY
     return REGISTRY.get_validator()
 
-
 # Load parameter definitions from registry
 COMMON, PRE_PROCESS, SIMULATION, POST_PROCESS = _load_stage_dicts()
 

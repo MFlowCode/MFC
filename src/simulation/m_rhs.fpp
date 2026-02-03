@@ -65,8 +65,6 @@ module m_rhs
 
     use m_chemistry
 
-    use m_mhd
-
     use m_igr
 
     use m_pressure_relaxation
@@ -243,6 +241,13 @@ contains
                 q_cons_qp%vf(c_idx)%sf
             $:GPU_ENTER_DATA(copyin='[q_prim_qp%vf(c_idx)%sf]')
             $:GPU_ENTER_DATA(attach='[q_prim_qp%vf(c_idx)%sf]')
+        end if
+
+        if (hyper_cleaning) then
+            q_prim_qp%vf(psi_idx)%sf => &
+                q_cons_qp%vf(psi_idx)%sf
+            $:GPU_ENTER_DATA(copyin='[q_prim_qp%vf(psi_idx)%sf]')
+            $:GPU_ENTER_DATA(attach='[q_prim_qp%vf(psi_idx)%sf]')
         end if
 
         ! Allocation/Association of flux_n, flux_src_n, and flux_gsrc_n
@@ -980,9 +985,18 @@ contains
                 end if
                 ! END: Additional physics and source terms
 
-                call nvtxStartRange("RHS-MHD")
-                if (mhd .and. powell) call s_compute_mhd_powell_rhs(q_prim_qp%vf, rhs_vf)
-                call nvtxEndRange
+                if (hyper_cleaning) then
+                    $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                rhs_vf(psi_idx)%sf(j, k, l) = rhs_vf(psi_idx)%sf(j, k, l) - &
+                                                              q_prim_vf(psi_idx)%sf(j, k, l)/hyper_cleaning_tau
+                            end do
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+                end if
 
                 ! END: Additional physics and source terms
             end if
