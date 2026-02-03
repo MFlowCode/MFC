@@ -76,7 +76,24 @@ jobs:
           echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
           echo "SHA256: $SHA256"
 
+      - name: PR test summary
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          echo "## PR Test Mode" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Validated:" >> $GITHUB_STEP_SUMMARY
+          echo "- Version parsing: v${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- SHA256 computation: \`${{ steps.sha256.outputs.sha256 }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Skipped (secrets not available for fork PRs):" >> $GITHUB_STEP_SUMMARY
+          echo "- Checkout homebrew-mfc" >> $GITHUB_STEP_SUMMARY
+          echo "- Update formula" >> $GITHUB_STEP_SUMMARY
+          echo "- Push to tap" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The full workflow will run when a \`v*\` tag is pushed after merge." >> $GITHUB_STEP_SUMMARY
+
       - name: Checkout homebrew-mfc tap
+        if: ${{ github.event_name != 'pull_request' }}
         uses: actions/checkout@v4
         with:
           repository: MFlowCode/homebrew-mfc
@@ -84,6 +101,7 @@ jobs:
           path: homebrew-mfc
 
       - name: Update formula
+        if: ${{ github.event_name != 'pull_request' }}
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           SHA256="${{ steps.sha256.outputs.sha256 }}"
@@ -117,6 +135,7 @@ jobs:
           head -30 "$FORMULA"
 
       - name: Validate updated formula
+        if: ${{ github.event_name != 'pull_request' }}
         run: |
           cd homebrew-mfc
           echo "Checking Ruby syntax..."
@@ -147,19 +166,16 @@ jobs:
           echo "The bottle.yml workflow in homebrew-mfc will now build bottles automatically."
 
       - name: Dry run summary
-        if: ${{ github.event_name == 'pull_request' || github.event.inputs.dry_run == 'true' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true' }}
         run: |
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            echo "::notice::PR TEST MODE - skipped push to homebrew-mfc"
-          else
-            echo "::notice::DRY RUN - skipped push to homebrew-mfc"
-          fi
+          echo "::notice::DRY RUN - skipped push to homebrew-mfc"
           echo ""
           echo "Would have committed the following changes:"
           cd homebrew-mfc
           git diff Formula/mfc.rb
 
       - name: Summary
+        if: ${{ github.event_name != 'pull_request' }}
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           echo "## Homebrew Formula Updated" >> $GITHUB_STEP_SUMMARY
