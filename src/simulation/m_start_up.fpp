@@ -1388,7 +1388,7 @@ contains
         end if
 
         call s_initialize_derived_variables()
-        if (bubbles_lagrange) call s_initialize_bubbles_EL_module(q_cons_ts(1)%vf)
+        if (bubbles_lagrange) call s_initialize_bubbles_EL_module(q_cons_ts(1)%vf, bc_type)
 
         if (hypoelasticity) call s_initialize_hypoelastic_module()
         if (hyperelasticity) call s_initialize_hyperelastic_module()
