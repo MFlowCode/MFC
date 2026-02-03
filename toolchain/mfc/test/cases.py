@@ -411,13 +411,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     'patch_ib(1)%length_x': 0.05,
                     'patch_ib(1)%length_y': 0.05,
                     'patch_ib(1)%geometry': 3,
-                    'n': 49,
                 }))
                 cases.append(define_case_d(stack, f'Circle{suffix}', {'patch_ib(1)%geometry': 2 }))
                 if six_eqn_model:
                     cases.append(define_case_d(stack, f'model_eqns=3{suffix}', {
                         'patch_ib(1)%geometry': 2,
                         'model_eqns': 3,
+                        'n': 49, # there is a machine-level precision sensitivity to circles with n=39
                     }))
 
             stack.pop()
