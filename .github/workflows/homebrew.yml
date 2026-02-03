@@ -2,11 +2,9 @@ name: Homebrew Formula Test
 
 on:
   push:
-    # For testing: trigger on any push (remove path restrictions)
-    # TODO: Restore path restrictions for production:
-    # paths:
-    #   - 'packaging/homebrew/**'
-    #   - '.github/workflows/homebrew.yml'
+    paths:
+      - 'packaging/homebrew/**'
+      - '.github/workflows/homebrew.yml'
   pull_request:
     paths:
       - 'packaging/homebrew/**'
