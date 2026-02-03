@@ -145,17 +145,6 @@ if ! cmp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/pyproject.toml" > /dev/
         fi
     done
 
-    # Pre-install numpy as it's required at build time by several dependencies
-    # (pandas, cantera, matplotlib, etc.) that may need to compile from source
-    # on architectures without pre-built wheels (e.g., ARM)
-    log "(venv) Pre-installing numpy (build-time dependency)."
-    if ! PIP_DISABLE_PIP_VERSION_CHECK=1 pip3 install numpy; then
-        error "(venv) Failed to install numpy."
-        log   "(venv) Exiting the$MAGENTA Python$COLOR_RESET virtual environment."
-        deactivate
-        exit 1
-    fi
-
     if ! PIP_DISABLE_PIP_VERSION_CHECK=1 MAKEFLAGS=$nthreads pip3 install "$(pwd)/toolchain"; then
         error "(venv) Installation failed."
 

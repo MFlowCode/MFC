@@ -40,6 +40,13 @@ ENV FC=${FC_COMPILER}
 ENV PATH="${COMPILER_PATH}:$PATH"
 ENV LD_LIBRARY_PATH="${COMPILER_LD_LIBRARY_PATH}:${LD_LIBRARY_PATH:-}"
 
+# Pre-install numpy into the venv before mfc.sh runs, as it's required at
+# build time by several dependencies (pandas, cantera, matplotlib, etc.) that
+# may need to compile from source on architectures without pre-built wheels
+RUN python3 -m venv /opt/MFC/build/venv && \
+    /opt/MFC/build/venv/bin/pip install --upgrade pip && \
+    /opt/MFC/build/venv/bin/pip install numpy
+
 RUN echo "TARGET=$TARGET CC=$CC_COMPILER FC=$FC_COMPILER" && \
     cd /opt/MFC && \
     if [ "$TARGET" = "gpu" ]; then \
