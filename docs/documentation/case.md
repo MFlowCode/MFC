@@ -452,7 +452,7 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](@
 
 The table lists simulation algorithm parameters.
 The parameters are used to specify options in algorithms that are used to integrate the governing equations of the multi-component flow based on the initial condition.
-Models and assumptions that are used to formulate and discritize the governing equations are described in [Bryngelson et al. (2019)](@ref references).
+Models and assumptions that are used to formulate and discretize the governing equations are described in [Bryngelson et al. (2019)](@ref references).
 Details of the simulation algorithms and implementation of the WENO scheme can be found in [Coralic (2015)](@ref references).
 
 - `bc_[x,y,z]%[beg,end]` specifies the boundary conditions at the beginning and the end of domain boundaries in each coordinate direction by a negative integer from -1 through -16.
@@ -795,7 +795,7 @@ This table lists the sub-grid bubble model parameters, which can be utilized in 
 
 - `bub_pp` specifies simulation parameters for the EE and/or EL bubble model. 
 
-Implementation of the parameters into the model follow [Ando (2010)](@ref references).
+Implementation of the parameters into the model follows [Ando (2010)](@ref references).
 
 #### 9.1 Ensemble-Averaged Bubble Model
 
@@ -957,7 +957,7 @@ By convention, positive accelerations in the `x[y,z]` direction are in the posit
 
 - `relativity` only works for `mhd` enabled and activates relativistic MHD (RMHD) simulation.
 
-- `hyper_cleaning` [Dedner et al., 2002](@ref references.md) only works with `mhd` in 2D/3D and reduces numerical `div B` errors by propagation and damping. Currently not compatible with HLLD (`riemann_solver = 4`).
+- `hyper_cleaning` [Dedner et al., 2002](@ref references) only works with `mhd` in 2D/3D and reduces numerical `div B` errors by propagation and damping. Currently not compatible with HLLD (`riemann_solver = 4`).
 
 - `hyper_cleaning_speed` sets the propagation speed of divergence-cleaning waves.
 

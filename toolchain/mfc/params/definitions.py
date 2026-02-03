@@ -218,7 +218,7 @@ def _load():  # pylint: disable=too-many-locals,too-many-branches,too-many-state
     for n in ["cyl_coord", "mhd", "hypoelasticity", "hyperelasticity", "parallel_io",
               "polytropic", "mpp_lim", "bubbles_euler", "polydisperse", "file_per_process",
               "relax", "adv_n", "cfl_adap_dt", "cfl_const_dt", "chemistry", "relativity",
-              "cont_damage", "igr", "down_sample"]:
+              "cont_damage", "igr", "down_sample", "hyper_cleaning"]:
         _r(n, LOG, {C})
     for n in ["case_dir", "cantera_file"]:
         _r(n, STR, {C})
@@ -268,7 +268,7 @@ def _load():  # pylint: disable=too-many-locals,too-many-branches,too-many-state
         _r(n, INT, {S})
     for n in ["dt", "cfl_target", "cfl_max", "t_tol", "weno_eps", "teno_CT", "wenoz_q",
               "adap_dt_tol", "t_stop", "t_save", "tau_star", "cont_damage_s", "alpha_bar",
-              "alf_factor", "ic_eps", "ic_beta"]:
+              "alf_factor", "ic_eps", "ic_beta", "hyper_cleaning_speed", "hyper_cleaning_tau"]:
         _r(n, REAL, {S})
     for n in ["mapped_weno", "wenoz", "teno", "weno_Re_flux", "weno_avg", "mp_weno",
               "run_time_info", "prim_vars_wrt", "alt_soundspeed", "null_weights",
