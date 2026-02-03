@@ -107,6 +107,9 @@ contains
         $:GPU_ENTER_DATA(copyin='[patch_ib]')
 
         ! recompute the new ib_patch locations and broadcast them.
+        ib_markers%sf = 0._wp
+        levelset%sf = 0._wp
+        levelset_norm%sf = 0._wp
         call s_apply_ib_patches(ib_markers%sf(0:m, 0:n, 0:p), levelset, levelset_norm)
         ! Get neighboring IB variables from other processors
         call s_populate_ib_buffers()
@@ -600,6 +603,7 @@ contains
                             patch_id = ib_markers%sf(i, j, 0)
                             ghost_points_in(count)%ib_patch_id = &
                                 patch_id
+                            print *, "patch_id: ", patch_id
 
                             ghost_points_in(count)%slip = patch_ib(patch_id)%slip
                             ! ghost_points(count)%rank = proc_rank

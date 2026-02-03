@@ -852,6 +852,10 @@ contains
         params%spc = patch_ib(patch_id)%model_spc
         params%threshold = patch_ib(patch_id)%model_threshold
 
+        if (f_approx_equal(dot_product(params%scale, params%scale), 0._wp)) then
+            params%scale(:) = 1._wp
+        end if
+
         print *, patch_ib(patch_id)%model_scale(:)
         print *, patch_ib(patch_id)%model_rotate(:)
 
@@ -988,7 +992,6 @@ contains
                         ! Assign the levelset_norm
                         STL_levelset_norm%sf(i, j, k, patch_id, 1:3) = normals(1:3)
                     else
-                        print *, i, j, k
                         ! 2D models
                         if (interpolate) then
                             ! Get the shortest distance between the cell center and the model boundary
@@ -1020,7 +1023,6 @@ contains
 
                         ! Assign the levelset_norm
                         STL_levelset_norm%sf(i, j, k, patch_id, 1:3) = normals(1:3)
-                        print *, i, j, k, "end"
 
                     end if
                 end do; end do; end do
