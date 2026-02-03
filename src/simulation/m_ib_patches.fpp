@@ -852,6 +852,9 @@ contains
         params%spc = patch_ib(patch_id)%model_spc
         params%threshold = patch_ib(patch_id)%model_threshold
 
+        print *, patch_ib(patch_id)%model_scale(:)
+        print *, patch_ib(patch_id)%model_rotate(:)
+
         if (proc_rank == 0) then
             print *, " * Transforming model."
         end if

@@ -367,13 +367,17 @@ for ib_id in range(1, 10+1):
                           ("c", ParamType.REAL), ("p", ParamType.REAL),
                           ("t", ParamType.REAL), ("m", ParamType.REAL),
                           ("moving_ibm", ParamType.INT), ("mass", ParamType.REAL),
-                          ("model_filepath", ParamType.STR)]:
+                          ("model_filepath", ParamType.STR), ("model_spc", ParamType.INT),
+                          ("model_threshold", ParamType.REAL)]:
         SIMULATION[f"patch_ib({ib_id})%{real_attr}"] = ty
 
     for dir_id in range(1, 4):
         SIMULATION[f"patch_ib({ib_id})%vel({dir_id})"] = ParamType.REAL.analytic()
         SIMULATION[f"patch_ib({ib_id})%angles({dir_id})"] = ParamType.REAL
         SIMULATION[f"patch_ib({ib_id})%angular_vel({dir_id})"] = ParamType.REAL.analytic()
+        # SIMULATION[f"patch_ib({ib_id})%model_scale({dir_id})"] = ParamType.REAL
+        SIMULATION[f"patch_ib({ib_id})%model_translate({dir_id})"] = ParamType.REAL
+        SIMULATION[f"patch_ib({ib_id})%model_rotate({dir_id})"] = ParamType.REAL
 
     for cmp_id, cmp in enumerate(["x", "y", "z"]):
         cmp_id += 1
