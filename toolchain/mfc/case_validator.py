@@ -579,7 +579,8 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         self.prohibit(time_stepper is not None and (time_stepper < 1 or time_stepper > 3),
                      "time_stepper must be 1, 2, or 3")
 
-        # Variable dt modes (CFL-based or adaptive)
+        # CFL-based variable dt modes (use t_stop/t_save for termination)
+        # Note: adap_dt is NOT included here - it uses t_step_* for termination
         variable_dt = cfl_dt or cfl_adap_dt
 
         # dt validation (applies to all modes if dt is set)

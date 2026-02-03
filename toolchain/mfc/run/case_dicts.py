@@ -24,12 +24,15 @@ def _load_stage_dicts():
     Load parameter definitions from the central registry.
 
     Returns dicts mapping parameter names to their ParamType.
+    Uses caching to avoid repeated iteration over ~3300 parameters.
     """
+    from functools import lru_cache
     from ..params import REGISTRY
     from ..params.schema import Stage
 
+    @lru_cache(maxsize=8)
     def params_for_stage(stage, include_common=True):
-        """Get params for a stage as {name: ParamType} dict."""
+        """Get params for a stage as {name: ParamType} dict (cached)."""
         result = {}
         for name, param in REGISTRY.all_params.items():
             if stage in param.stages:
