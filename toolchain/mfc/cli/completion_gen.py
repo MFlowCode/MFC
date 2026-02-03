@@ -319,6 +319,16 @@ def _generate_zsh_command_args(cmd: Command, schema: CLISchema) -> List[str]:
                 "'--no-gpu[Disable GPU]'",
                 "'--debug[Enable debug mode]'",
                 "'--no-debug[Disable debug mode]'",
+                "'--gcov[Enable gcov coverage]'",
+                "'--no-gcov[Disable gcov coverage]'",
+                "'--unified[Enable unified memory]'",
+                "'--no-unified[Disable unified memory]'",
+                "'--single[Enable single precision]'",
+                "'--no-single[Disable single precision]'",
+                "'--mixed[Enable mixed precision]'",
+                "'--no-mixed[Disable mixed precision]'",
+                "'--fastmath[Enable fast math]'",
+                "'--no-fastmath[Disable fast math]'",
             ])
         else:
             for arg in common_set.arguments:
