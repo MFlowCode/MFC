@@ -412,7 +412,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     'patch_ib(1)%length_y': 0.05,
                     'patch_ib(1)%geometry': 3,
                 }))
-                cases.append(define_case_d(stack, f'Circle{suffix}', {'patch_ib(1)%geometry': 2 }))
+                cases.append(define_case_d(stack, f'Circle{suffix}', {
+                    'patch_ib(1)%geometry': 2,
+                    'n' :49 
+                }))
                 if six_eqn_model:
                     cases.append(define_case_d(stack, f'model_eqns=3{suffix}', {
                         'patch_ib(1)%geometry': 2,
@@ -917,7 +920,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             for direc in [1,2,3]:
                 stack.push('Circle' ,{
                         'patch_bc(1)%geometry': 2, 'patch_bc(1)%dir': direc,
-                        'patch_bc(1)%type': -17, 'patch_bc(1)%loc': -1
+                        'patch_bc(1)%type': -17, 'patch_bc(1)%loc': -1,
                 })
 
                 if direc==1:
