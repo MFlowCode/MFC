@@ -784,7 +784,8 @@ if (MFC_DOCUMENTATION)
 
     set(DOXYGEN_HTML_EXTRA_STYLESHEET
         "\"${theme_dirpath}/doxygen-awesome.css\"\
-         \"${theme_dirpath}/doxygen-awesome-sidebar-only.css\"")
+         \"${theme_dirpath}/doxygen-awesome-sidebar-only.css\"\
+         \"${CMAKE_CURRENT_SOURCE_DIR}/docs/custom.css\"")
 
     # > Generate Documentation & Landing Page
     GEN_DOCS(pre_process   "MFC: Pre-Process")
