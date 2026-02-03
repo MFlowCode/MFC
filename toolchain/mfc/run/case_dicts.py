@@ -44,6 +44,30 @@ def _get_validator_func():
 # Parameters to ignore during certain operations
 IGNORE = ["cantera_file", "chemistry"]
 
+# Parameters that are only valid for specific targets (not in their Fortran namelist)
+# These get excluded when generating .inp files for other targets
+_SIMULATION_ONLY = {
+    "run_time_info", "dt", "t_step_stop", "t_step_save", "t_step_print",
+    "time_stepper", "weno_eps", "teno_CT", "wenoz_q", "mapped_weno", "wenoz",
+    "teno", "mp_weno", "weno_avg", "weno_Re_flux", "riemann_solver", "wave_speeds",
+    "avg_state", "prim_vars_wrt", "alt_soundspeed", "null_weights", "mixture_err",
+    "fd_order", "num_probes", "probe_wrt", "bubble_model", "acoustic_source",
+    "num_source", "integral_wrt", "num_integrals", "rdma_mpi", "adap_dt",
+    "adap_dt_tol", "adap_dt_max_iters", "t_stop", "t_save", "cfl_target",
+    "low_Mach", "viscous", "powell", "tau_star", "cont_damage_s", "alpha_bar",
+    "num_igr_iters", "num_igr_warm_start_iters", "alf_factor", "igr_iter_solver",
+    "igr_pres_lim", "muscl_lim", "int_comp", "ic_eps", "ic_beta",
+    "nv_uvm_out_of_core", "nv_uvm_igr_temps_on_gpu", "nv_uvm_pref_gpu",
+}
+
+_POST_PROCESS_ONLY = {
+    "format", "precision_post", "coarsen_silo", "fourier_modes", "alpha_rho_wrt",
+    "rho_wrt", "mom_wrt", "vel_wrt", "flux_lim", "flux_wrt", "E_wrt", "pres_wrt",
+    "alpha_wrt", "gamma_wrt", "heat_ratio_wrt", "pi_inf_wrt", "pres_inf_wrt",
+    "cons_vars_wrt", "prim_vars_wrt_post", "c_wrt", "omega_wrt", "schlieren_wrt",
+    "schlieren_alpha", "fd_order_post", "mag_wrt", "kappa_wrt", "tensor_wrt",
+}
+
 # Combined dict of all parameters
 ALL = _load_all_params()
 
@@ -64,11 +88,20 @@ def get_input_dict_keys(target_name: str) -> list:
     Returns:
         List of parameter names valid for that target
     """
-    # All parameters are valid for all targets
-    if not ARG("case_optimization", dflt=False) or target_name != "simulation":
-        return list(ALL.keys())
+    keys = list(ALL.keys())
 
-    return [x for x in ALL.keys() if x not in CASE_OPTIMIZATION]
+    # Filter out params that don't belong to this target
+    if target_name == "pre_process":
+        keys = [k for k in keys if k not in _SIMULATION_ONLY and k not in _POST_PROCESS_ONLY]
+    elif target_name == "post_process":
+        keys = [k for k in keys if k not in _SIMULATION_ONLY]
+    # simulation gets all params
+
+    # Case optimization filtering for simulation
+    if ARG("case_optimization", dflt=False) and target_name == "simulation":
+        keys = [k for k in keys if k not in CASE_OPTIMIZATION]
+
+    return keys
 
 
 def get_validator():
