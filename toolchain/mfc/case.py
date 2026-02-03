@@ -62,7 +62,12 @@ class Case:
                     ignored.append(key)
                     continue
 
-                if not isinstance(val, str) or len(val) == 1:
+                # Convert T/F to Fortran logical syntax
+                if val == "T":
+                    dict_str += f"{key} = .true.\n"
+                elif val == "F":
+                    dict_str += f"{key} = .false.\n"
+                elif not isinstance(val, str) or len(val) == 1:
                     dict_str += f"{key} = {val}\n"
                 else:
                     dict_str += f"{key} = '{val}'\n"

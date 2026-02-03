@@ -90,8 +90,49 @@ def _generate_bash_prev_cases(cmd: Command, schema: CLISchema) -> List[str]:
                          CompletionType.FILES_PACK, CompletionType.FILES,
                          CompletionType.DIRECTORIES, CompletionType.FILES_YAML)
 
-    for arg in _collect_all_args(cmd, schema):
+    all_args = _collect_all_args(cmd, schema)
+
+    # First, handle multi-value arguments (nargs="+" or "*")
+    # These need backward scanning through COMP_WORDS
+    multivalue_args = []
+    for arg in all_args:
         if arg.completion.type not in completable_types:
+            continue
+        if arg.nargs in ("+", "*"):
+            multivalue_args.append(arg)
+
+    if multivalue_args:
+        # Generate backward-scanning logic for multi-value args
+        lines.append('            # Check for multi-value arguments by scanning backwards')
+        lines.append('            local i')
+        lines.append('            for ((i=COMP_CWORD-1; i>=2; i--)); do')
+        lines.append('                case "${COMP_WORDS[i]}" in')
+
+        for arg in multivalue_args:
+            flags = [f'-{arg.short}'] if arg.short else []
+            flags.append(f'--{arg.name}')
+            lines.append(f'                    {"|".join(flags)})')
+            comp_choices = arg.completion.choices or arg.choices
+            completion_code = _bash_completion_for_type(arg.completion.type, comp_choices)
+            if completion_code:
+                lines.append(f'                        {completion_code}')
+            lines.append('                        return 0')
+            lines.append('                        ;;')
+
+        # Stop scanning if we hit any other flag
+        lines.append('                    -*)')
+        lines.append('                        break')
+        lines.append('                        ;;')
+        lines.append('                esac')
+        lines.append('            done')
+        lines.append('')
+
+    # Then handle single-value arguments with prev-based completion
+    for arg in all_args:
+        if arg.completion.type not in completable_types:
+            continue
+        # Skip multi-value args as they're handled above
+        if arg.nargs in ("+", "*"):
             continue
 
         if not has_prev_cases:
@@ -233,18 +274,27 @@ def _zsh_completion_for_positional(pos, index: int) -> str:
 
 def _zsh_completion_for_arg(arg) -> str:
     """Generate zsh completion suffix for an argument."""
+    # For multi-value args (nargs="+" or "*"), add a label before the choices
+    is_multivalue = arg.nargs in ("+", "*")
+    label = ":value" if is_multivalue else ""
+
     if arg.completion.type == CompletionType.CHOICES:
         choices = arg.completion.choices or arg.choices or []
-        return f':({" ".join(str(c) for c in choices)})'
+        return f'{label}:({" ".join(str(c) for c in choices)})'
     if arg.completion.type == CompletionType.FILES_PY:
-        return ':_files -g "*.py"'
+        return f'{label}:_files -g "*.py"'
     if arg.completion.type == CompletionType.FILES_PACK:
-        return ':_files -g "*.pack"'
+        return f'{label}:_files -g "*.pack"'
     if arg.completion.type == CompletionType.FILES:
-        return ':_files'
+        return f'{label}:_files'
     if arg.completion.type == CompletionType.DIRECTORIES:
-        return ':_files -/'
+        return f'{label}:_files -/'
     return ""
+
+
+def _zsh_arg_prefix(arg) -> str:
+    """Return '*' prefix for multi-value args, empty string otherwise."""
+    return "*" if arg.nargs in ("+", "*") else ""
 
 
 def _generate_zsh_command_args(cmd: Command, schema: CLISchema) -> List[str]:
@@ -274,9 +324,10 @@ def _generate_zsh_command_args(cmd: Command, schema: CLISchema) -> List[str]:
             for arg in common_set.arguments:
                 desc = arg.help.replace("'", "").replace("[", "").replace("]", "")[:120]
                 completion = _zsh_completion_for_arg(arg)
+                prefix = _zsh_arg_prefix(arg)
                 if arg.short:
-                    arg_lines.append(f"'-{arg.short}[{desc}]{completion}'")
-                arg_lines.append(f"'--{arg.name}[{desc}]{completion}'")
+                    arg_lines.append(f"'{prefix}-{arg.short}[{desc}]{completion}'")
+                arg_lines.append(f"'{prefix}--{arg.name}[{desc}]{completion}'")
 
     # Command-specific arguments
     all_args = list(cmd.arguments)
@@ -286,9 +337,10 @@ def _generate_zsh_command_args(cmd: Command, schema: CLISchema) -> List[str]:
     for arg in all_args:
         desc = arg.help.replace("'", "").replace("[", "").replace("]", "")[:120]
         completion = _zsh_completion_for_arg(arg)
+        prefix = _zsh_arg_prefix(arg)
         if arg.short:
-            arg_lines.append(f"'-{arg.short}[{desc}]{completion}'")
-        arg_lines.append(f"'--{arg.name}[{desc}]{completion}'")
+            arg_lines.append(f"'{prefix}-{arg.short}[{desc}]{completion}'")
+        arg_lines.append(f"'{prefix}--{arg.name}[{desc}]{completion}'")
 
     return arg_lines
 
