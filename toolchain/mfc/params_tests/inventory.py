@@ -1,7 +1,7 @@
 """
 Parameter Inventory Export Tool.
 
-Exports all MFC parameters with their types and stages to JSON for analysis.
+Exports all MFC parameters with their types and tags to JSON for analysis.
 """
 
 import re
@@ -9,9 +9,8 @@ import json
 from pathlib import Path
 from typing import Dict, Any
 
-from ..run.case_dicts import (
-    COMMON, PRE_PROCESS, SIMULATION, POST_PROCESS, ALL
-)
+from ..run.case_dicts import ALL
+from ..params import REGISTRY
 from ..params.schema import ParamType
 
 
@@ -24,55 +23,37 @@ def get_param_type_name(param_type) -> str:
 
 def export_parameter_inventory() -> Dict[str, Any]:
     """Export complete parameter inventory with metadata."""
+    # Count by type
+    by_type = {
+        "INT": [],
+        "REAL": [],
+        "LOG": [],
+        "STR": [],
+        "ANALYTIC_INT": [],
+        "ANALYTIC_REAL": [],
+    }
+
+    # Count by tag
+    by_tag = {}
+    for tag in REGISTRY.get_all_tags():
+        by_tag[tag] = []
+
     inventory = {
         "metadata": {
             "total_parameters": len(ALL),
-            "common_count": len(COMMON),
-            "pre_process_count": len(PRE_PROCESS),
-            "simulation_count": len(SIMULATION),
-            "post_process_count": len(POST_PROCESS),
         },
         "parameters": {},
-        "by_stage": {
-            "common": [],
-            "pre_process_only": [],
-            "simulation_only": [],
-            "post_process_only": [],
-        },
-        "by_type": {
-            "INT": [],
-            "REAL": [],
-            "LOG": [],
-            "STR": [],
-            "ANALYTIC_INT": [],
-            "ANALYTIC_REAL": [],
-        }
+        "by_type": by_type,
+        "by_tag": by_tag,
     }
-
-    # Categorize parameters
-    common_keys = set(COMMON.keys())
-    pre_only = set(PRE_PROCESS.keys()) - common_keys
-    sim_only = set(SIMULATION.keys()) - common_keys
-    post_only = set(POST_PROCESS.keys()) - common_keys
 
     for param_name, param_type in sorted(ALL.items()):
         type_name = get_param_type_name(param_type)
-
-        # Determine which stages this parameter is valid for
-        stages = []
-        if param_name in COMMON:
-            stages = ["common", "pre_process", "simulation", "post_process"]
-        else:
-            if param_name in PRE_PROCESS:
-                stages.append("pre_process")
-            if param_name in SIMULATION:
-                stages.append("simulation")
-            if param_name in POST_PROCESS:
-                stages.append("post_process")
+        param = REGISTRY.all_params.get(param_name)
 
         param_info = {
             "type": type_name,
-            "stages": stages,
+            "tags": sorted(param.tags) if param else [],
         }
 
         # Detect pattern-based parameters
@@ -85,14 +66,14 @@ def export_parameter_inventory() -> Dict[str, Any]:
         inventory["parameters"][param_name] = param_info
 
         # Categorize by type
-        if type_name in inventory["by_type"]:
-            inventory["by_type"][type_name].append(param_name)
+        if type_name in by_type:
+            by_type[type_name].append(param_name)
 
-    # Categorize by stage
-    inventory["by_stage"]["common"] = sorted(common_keys)
-    inventory["by_stage"]["pre_process_only"] = sorted(pre_only)
-    inventory["by_stage"]["simulation_only"] = sorted(sim_only)
-    inventory["by_stage"]["post_process_only"] = sorted(post_only)
+        # Categorize by tag
+        if param:
+            for tag in param.tags:
+                if tag in by_tag:
+                    by_tag[tag].append(param_name)
 
     return inventory
 
@@ -147,14 +128,15 @@ def print_inventory_summary():
     print("MFC Parameter Inventory Summary")
     print("=" * 60)
     print(f"Total parameters: {inventory['metadata']['total_parameters']}")
-    print(f"  - Common:       {inventory['metadata']['common_count']}")
-    print(f"  - Pre-process:  {inventory['metadata']['pre_process_count']}")
-    print(f"  - Simulation:   {inventory['metadata']['simulation_count']}")
-    print(f"  - Post-process: {inventory['metadata']['post_process_count']}")
     print()
     print("By type:")
     for type_name, params in inventory["by_type"].items():
         print(f"  - {type_name}: {len(params)}")
+    print()
+    print("By feature tag:")
+    for tag, params in sorted(inventory["by_tag"].items()):
+        if params:
+            print(f"  - {tag}: {len(params)}")
     print()
     print(f"Dynamic parameter patterns: {len(patterns)}")
     print("Top patterns:")

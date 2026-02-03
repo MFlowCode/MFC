@@ -1,13 +1,13 @@
 """
 Unit tests for params/registry.py module.
 
-Tests registry functionality, freezing, and stage queries.
+Tests registry functionality, freezing, and tag queries.
 """
 # pylint: disable=import-outside-toplevel
 
 import unittest
 from ..params.registry import ParamRegistry, RegistryFrozenError
-from ..params.schema import ParamDef, ParamType, Stage
+from ..params.schema import ParamDef, ParamType
 
 
 class TestParamRegistry(unittest.TestCase):
@@ -16,54 +16,53 @@ class TestParamRegistry(unittest.TestCase):
     def test_register_new_param(self):
         """Registering a new param should add it to the registry."""
         reg = ParamRegistry()
-        param = ParamDef(name="test", param_type=ParamType.INT, stages={Stage.COMMON})
+        param = ParamDef(name="test", param_type=ParamType.INT)
         reg.register(param)
 
         self.assertIn("test", reg.all_params)
         self.assertEqual(reg.all_params["test"].param_type, ParamType.INT)
 
-    def test_register_merge_stages(self):
-        """Registering same param twice should merge stages."""
+    def test_register_merge_tags(self):
+        """Registering same param twice should merge tags."""
         reg = ParamRegistry()
-        reg.register(ParamDef(name="test", param_type=ParamType.INT, stages={Stage.PRE_PROCESS}))
-        reg.register(ParamDef(name="test", param_type=ParamType.INT, stages={Stage.SIMULATION}))
+        reg.register(ParamDef(name="test", param_type=ParamType.INT, tags={"mhd"}))
+        reg.register(ParamDef(name="test", param_type=ParamType.INT, tags={"physics"}))
 
         self.assertEqual(
-            reg.all_params["test"].stages,
-            {Stage.PRE_PROCESS, Stage.SIMULATION}
+            reg.all_params["test"].tags,
+            {"mhd", "physics"}
         )
 
     def test_register_type_mismatch_raises(self):
         """Registering same param with different type should raise."""
         reg = ParamRegistry()
-        reg.register(ParamDef(name="test", param_type=ParamType.INT, stages={Stage.COMMON}))
+        reg.register(ParamDef(name="test", param_type=ParamType.INT))
 
         with self.assertRaises(ValueError) as ctx:
-            reg.register(ParamDef(name="test", param_type=ParamType.REAL, stages={Stage.COMMON}))
+            reg.register(ParamDef(name="test", param_type=ParamType.REAL))
 
         self.assertIn("Type mismatch", str(ctx.exception))
 
-    def test_get_params_by_stage_common(self):
-        """get_params_by_stage should return COMMON params for any stage."""
+    def test_get_params_by_tag(self):
+        """get_params_by_tag should return params with that tag."""
         reg = ParamRegistry()
-        reg.register(ParamDef(name="common_param", param_type=ParamType.INT, stages={Stage.COMMON}))
-        reg.register(ParamDef(name="sim_param", param_type=ParamType.INT, stages={Stage.SIMULATION}))
+        reg.register(ParamDef(name="mhd_param", param_type=ParamType.INT, tags={"mhd"}))
+        reg.register(ParamDef(name="other_param", param_type=ParamType.INT, tags={"other"}))
 
-        sim_params = reg.get_params_by_stage(Stage.SIMULATION)
+        mhd_params = reg.get_params_by_tag("mhd")
 
-        self.assertIn("common_param", sim_params)
-        self.assertIn("sim_param", sim_params)
+        self.assertIn("mhd_param", mhd_params)
+        self.assertNotIn("other_param", mhd_params)
 
-    def test_get_params_by_stage_excludes_other_stages(self):
-        """get_params_by_stage should not include params from other stages."""
+    def test_get_all_tags(self):
+        """get_all_tags should return all registered tags."""
         reg = ParamRegistry()
-        reg.register(ParamDef(name="pre_param", param_type=ParamType.INT, stages={Stage.PRE_PROCESS}))
-        reg.register(ParamDef(name="sim_param", param_type=ParamType.INT, stages={Stage.SIMULATION}))
+        reg.register(ParamDef(name="p1", param_type=ParamType.INT, tags={"mhd", "physics"}))
+        reg.register(ParamDef(name="p2", param_type=ParamType.INT, tags={"bubbles"}))
 
-        sim_params = reg.get_params_by_stage(Stage.SIMULATION)
+        tags = reg.get_all_tags()
 
-        self.assertNotIn("pre_param", sim_params)
-        self.assertIn("sim_param", sim_params)
+        self.assertEqual(tags, {"mhd", "physics", "bubbles"})
 
 
 class TestRegistryFreezing(unittest.TestCase):
@@ -92,12 +91,12 @@ class TestRegistryFreezing(unittest.TestCase):
         reg.freeze()
 
         with self.assertRaises(RegistryFrozenError):
-            reg.register(ParamDef(name="test", param_type=ParamType.INT, stages={Stage.COMMON}))
+            reg.register(ParamDef(name="test", param_type=ParamType.INT))
 
     def test_all_params_readonly_after_freeze(self):
         """all_params should be read-only after freeze."""
         reg = ParamRegistry()
-        reg.register(ParamDef(name="test", param_type=ParamType.INT, stages={Stage.COMMON}))
+        reg.register(ParamDef(name="test", param_type=ParamType.INT))
         reg.freeze()
 
         params = reg.all_params
@@ -125,7 +124,7 @@ class TestGlobalRegistry(unittest.TestCase):
 
         with self.assertRaises(RegistryFrozenError):
             REGISTRY.register(
-                ParamDef(name="injected", param_type=ParamType.INT, stages={Stage.COMMON})
+                ParamDef(name="injected", param_type=ParamType.INT)
             )
 
 

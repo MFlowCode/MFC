@@ -8,15 +8,15 @@ ParamRegistry class which serves as the single source of truth for all
 Usage
 -----
 The global REGISTRY instance is populated by importing the definitions module.
-Once populated, parameters can be queried by name or by stage:
+Once populated, parameters can be queried by name or by tag:
 
     from mfc.params import REGISTRY
 
     # Get a specific parameter
     param = REGISTRY.all_params.get('m')
 
-    # Get all parameters for simulation stage
-    sim_params = REGISTRY.get_params_by_stage(Stage.SIMULATION)
+    # Get parameters by feature tag
+    mhd_params = REGISTRY.get_params_by_tag('mhd')
 
 Thread Safety
 -------------
@@ -25,12 +25,12 @@ After freezing, it is safe to read from multiple threads. Attempts to
 register new parameters after freezing will raise RuntimeError.
 """
 
-from typing import Dict, Set, Mapping, Any, Optional
+from typing import Dict, Set, Mapping, Any
 from types import MappingProxyType
 from collections import defaultdict
 from functools import lru_cache
 
-from .schema import ParamDef, Stage
+from .schema import ParamDef
 
 
 class RegistryFrozenError(RuntimeError):
@@ -42,14 +42,13 @@ class ParamRegistry:
     Central registry for MFC parameters.
 
     This class stores parameter definitions and provides lookup methods
-    for retrieving parameters by name or by execution stage.
+    for retrieving parameters by name or by feature tag.
 
     The registry can be frozen after initialization to prevent further
     modifications, ensuring thread-safety for read operations.
 
     Attributes:
         _params: Dictionary mapping parameter names to ParamDef instances.
-        _by_stage: Dictionary mapping stages to sets of parameter names.
         _by_tag: Dictionary mapping tags to sets of parameter names.
         _frozen: Whether the registry has been frozen (immutable).
     """
@@ -57,7 +56,6 @@ class ParamRegistry:
     def __init__(self):
         """Initialize an empty registry."""
         self._params: Dict[str, ParamDef] = {}
-        self._by_stage: Dict[Stage, Set[str]] = defaultdict(set)
         self._by_tag: Dict[str, Set[str]] = defaultdict(set)
         self._frozen: bool = False
         self._params_proxy: Mapping[str, ParamDef] = None
@@ -85,10 +83,9 @@ class ParamRegistry:
         """
         Register a parameter definition.
 
-        If a parameter with the same name already exists, the stages are
-        merged (i.e., the new stages are added to the existing ones).
-        This allows parameters to be defined incrementally across multiple
-        definition files.
+        If a parameter with the same name already exists, the tags are
+        merged. This allows parameters to be defined incrementally across
+        multiple definition files.
 
         Args:
             param: The parameter definition to register.
@@ -108,17 +105,12 @@ class ParamRegistry:
             existing = self._params[param.name]
             if existing.param_type != param.param_type:
                 raise ValueError(f"Type mismatch for '{param.name}'")
-            existing.stages.update(param.stages)
             existing.tags.update(param.tags)
-            for stage in param.stages:
-                self._by_stage[stage].add(param.name)
             for tag in param.tags:
                 self._by_tag[tag].add(param.name)
             return
 
         self._params[param.name] = param
-        for stage in param.stages:
-            self._by_stage[stage].add(param.name)
         for tag in param.tags:
             self._by_tag[tag].add(param.name)
 
@@ -135,27 +127,6 @@ class ParamRegistry:
         if self._frozen and self._params_proxy is not None:
             return self._params_proxy
         return self._params
-
-    def get_params_by_stage(self, stage: Stage) -> Dict[str, ParamDef]:
-        """
-        Get parameters applicable to a specific execution stage.
-
-        Parameters in Stage.COMMON are included for all stages.
-
-        Args:
-            stage: The execution stage (PRE_PROCESS, SIMULATION, or POST_PROCESS).
-
-        Returns:
-            Dictionary mapping parameter names to their definitions,
-            including both stage-specific and COMMON parameters.
-        """
-        result = {}
-        for name in self._by_stage.get(Stage.COMMON, set()):
-            result[name] = self._params[name]
-        if stage != Stage.COMMON:
-            for name in self._by_stage.get(stage, set()):
-                result[name] = self._params[name]
-        return result
 
     def get_params_by_tag(self, tag: str) -> Dict[str, ParamDef]:
         """
@@ -178,25 +149,16 @@ class ParamRegistry:
         """
         return set(self._by_tag.keys())
 
-    def get_json_schema(self, stage: Optional[Stage] = None) -> Dict[str, Any]:
+    def get_json_schema(self) -> Dict[str, Any]:
         """
         Generate JSON schema for case file validation.
-
-        Args:
-            stage: If provided, only include params for that stage.
-                   If None, include all parameters.
 
         Returns:
             JSON schema dict compatible with fastjsonschema.
         """
-        if stage is not None:
-            params = self.get_params_by_stage(stage)
-        else:
-            params = self.all_params
-
         properties = {
             name: param.param_type.json_schema
-            for name, param in params.items()
+            for name, param in self.all_params.items()
         }
 
         return {

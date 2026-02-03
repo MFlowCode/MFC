@@ -94,8 +94,7 @@ def _collapse_indexed_params(matches):  # pylint: disable=too-many-locals,too-ma
                 groups[base_pattern] = {
                     'indices': [],
                     'param_type': param.param_type,
-                    'stages': param.stages,
-                }
+                                    }
             groups[base_pattern]['indices'].append((indices_key, param))
             continue
 
@@ -117,8 +116,7 @@ def _collapse_indexed_params(matches):  # pylint: disable=too-many-locals,too-ma
                 groups[base_pattern] = {
                     'indices': [],
                     'param_type': param.param_type,
-                    'stages': param.stages,
-                }
+                                    }
             groups[base_pattern]['indices'].append((indices_key, param))
             continue
 
@@ -127,8 +125,7 @@ def _collapse_indexed_params(matches):  # pylint: disable=too-many-locals,too-ma
             groups[name] = {
                 'indices': [(None, param)],
                 'param_type': param.param_type,
-                'stages': param.stages,
-            }
+                            }
         else:
             groups[name]['indices'].append((None, param))
 

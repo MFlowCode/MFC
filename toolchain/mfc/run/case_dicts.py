@@ -1,13 +1,11 @@
 """
 MFC Case Parameter Type Definitions.
 
-This module provides backward-compatible exports from the central parameter
-registry (mfc.params). All parameter definitions are now sourced from the
-registry, eliminating the previous dual type system.
+This module provides exports from the central parameter registry (mfc.params).
+All parameter definitions are sourced from the registry.
 
 Exports:
-    COMMON, PRE_PROCESS, SIMULATION, POST_PROCESS: Stage-specific param dicts
-    ALL: Combined dict of all parameters
+    ALL: Dict of all parameters {name: ParamType}
     IGNORE: Parameters to skip during certain operations
     CASE_OPTIMIZATION: Parameters that can be hard-coded for GPU builds
     SCHEMA: JSON schema for fastjsonschema validation
@@ -17,36 +15,6 @@ Exports:
 # pylint: disable=import-outside-toplevel
 
 from ..state import ARG
-
-
-def _load_stage_dicts():
-    """
-    Load parameter definitions from the central registry.
-
-    Returns dicts mapping parameter names to their ParamType.
-    Uses caching to avoid repeated iteration over ~3300 parameters.
-    """
-    from functools import lru_cache
-    from ..params import REGISTRY
-    from ..params.schema import Stage
-
-    @lru_cache(maxsize=8)
-    def params_for_stage(stage, include_common=True):
-        """Get params for a stage as {name: ParamType} dict (cached)."""
-        result = {}
-        for name, param in REGISTRY.all_params.items():
-            if stage in param.stages:
-                result[name] = param.param_type
-            elif include_common and Stage.COMMON in param.stages:
-                result[name] = param.param_type
-        return result
-
-    common = params_for_stage(Stage.COMMON, include_common=False)
-    pre = params_for_stage(Stage.PRE_PROCESS, include_common=True)
-    sim = params_for_stage(Stage.SIMULATION, include_common=True)
-    post = params_for_stage(Stage.POST_PROCESS, include_common=True)
-
-    return common, pre, sim, post
 
 
 def _load_all_params():
@@ -72,8 +40,6 @@ def _get_validator_func():
     from ..params import REGISTRY
     return REGISTRY.get_validator()
 
-# Load parameter definitions from registry
-COMMON, PRE_PROCESS, SIMULATION, POST_PROCESS = _load_stage_dicts()
 
 # Parameters to ignore during certain operations
 IGNORE = ["cantera_file", "chemistry"]
@@ -98,16 +64,11 @@ def get_input_dict_keys(target_name: str) -> list:
     Returns:
         List of parameter names valid for that target
     """
-    result = {
-        "pre_process": PRE_PROCESS,
-        "simulation": SIMULATION,
-        "post_process": POST_PROCESS
-    }.get(target_name, {}).keys()
-
+    # All parameters are valid for all targets
     if not ARG("case_optimization") or target_name != "simulation":
-        return list(result)
+        return list(ALL.keys())
 
-    return [x for x in result if x not in CASE_OPTIMIZATION]
+    return [x for x in ALL.keys() if x not in CASE_OPTIMIZATION]
 
 
 def get_validator():

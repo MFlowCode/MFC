@@ -6,7 +6,7 @@ This replaces the definitions/ directory.
 """
 
 from typing import Dict, Any
-from .schema import ParamDef, ParamType, Stage
+from .schema import ParamDef, ParamType
 from .registry import REGISTRY
 
 # Index limits
@@ -194,7 +194,6 @@ def _r(name, ptype, tags=None):
     REGISTRY.register(ParamDef(
         name=name,
         param_type=ptype,
-        stages={Stage.COMMON},  # All params are universal
         case_optimization=(name in CASE_OPT_PARAMS),
         constraints=CONSTRAINTS.get(name),
         dependencies=DEPENDENCIES.get(name),

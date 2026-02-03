@@ -5,7 +5,7 @@ Provides ParamDef for parameter metadata, constraints, and dependencies.
 """
 
 from dataclasses import dataclass, field
-from enum import Enum, auto
+from enum import Enum
 from typing import Set, Any, Optional, Dict, List
 
 from .errors import constraint_error
@@ -39,14 +39,6 @@ class ParamType(Enum):
         return schemas[self]
 
 
-class Stage(Enum):
-    """MFC execution stages."""
-    COMMON = auto()
-    PRE_PROCESS = auto()
-    SIMULATION = auto()
-    POST_PROCESS = auto()
-
-
 @dataclass
 class ParamDef:
     """
@@ -55,7 +47,6 @@ class ParamDef:
     Attributes:
         name: Parameter name
         param_type: Type (INT, REAL, LOG, STR, ANALYTIC_*)
-        stages: Which stages this param applies to
         description: Human-readable description
         case_optimization: Can be hard-coded for GPU builds
         constraints: Validation constraints (choices, min, max)
@@ -64,7 +55,6 @@ class ParamDef:
     """
     name: str
     param_type: ParamType
-    stages: Set[Stage] = field(default_factory=lambda: {Stage.COMMON})
     description: str = ""
     case_optimization: bool = False
     constraints: Optional[Dict[str, Any]] = None  # {"choices": [...], "min": N, "max": N}
@@ -75,17 +65,6 @@ class ParamDef:
         # Validate name
         if not self.name or not isinstance(self.name, str):
             raise ValueError("ParamDef name must be a non-empty string")
-
-        # Convert stages to set if needed
-        if not isinstance(self.stages, set):
-            self.stages = set(self.stages)
-
-        # Validate stages is non-empty
-        if not self.stages:
-            raise ValueError(
-                f"ParamDef '{self.name}' must have at least one stage. "
-                "Use Stage.COMMON for parameters shared across all stages."
-            )
 
     @property
     def type_tag(self) -> str:

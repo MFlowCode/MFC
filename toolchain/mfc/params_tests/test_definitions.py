@@ -6,7 +6,7 @@ Tests parameter definitions, constraints, and dependencies.
 
 import unittest
 from ..params import REGISTRY
-from ..params.schema import ParamType, Stage
+from ..params.schema import ParamType
 from ..params.definitions import (
     CONSTRAINTS,
     DEPENDENCIES,
@@ -24,14 +24,6 @@ class TestParameterDefinitions(unittest.TestCase):
         for name, param in REGISTRY.all_params.items():
             self.assertEqual(name, param.name)
             self.assertTrue(len(name) > 0)
-
-    def test_all_params_have_stages(self):
-        """Every parameter should have at least one stage."""
-        for name, param in REGISTRY.all_params.items():
-            self.assertTrue(
-                len(param.stages) > 0,
-                f"Parameter '{name}' has no stages"
-            )
 
     def test_all_params_have_valid_type(self):
         """Every parameter should have a valid ParamType."""
@@ -182,13 +174,13 @@ class TestParameterCounts(unittest.TestCase):
         )
         self.assertGreater(log_count, 300, "Too few LOG parameters")
 
-    def test_common_stage_params(self):
-        """Should have COMMON stage parameters."""
-        common_count = sum(
-            1 for p in REGISTRY.all_params.values()
-            if Stage.COMMON in p.stages
-        )
-        self.assertGreater(common_count, 30, "Too few COMMON parameters")
+    def test_tagged_params_exist(self):
+        """Should have params with feature tags."""
+        mhd_params = REGISTRY.get_params_by_tag("mhd")
+        self.assertGreater(len(mhd_params), 5, "Too few MHD parameters")
+
+        bubbles_params = REGISTRY.get_params_by_tag("bubbles")
+        self.assertGreater(len(bubbles_params), 10, "Too few bubbles parameters")
 
 
 if __name__ == "__main__":

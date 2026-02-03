@@ -8,7 +8,7 @@ and provides correct JSON schema generation.
 
 import unittest
 from ..params import REGISTRY
-from ..params.schema import Stage, ParamType
+from ..params.schema import ParamType
 
 
 class TestParamTypeJsonSchema(unittest.TestCase):
@@ -76,17 +76,6 @@ class TestRegistryJsonSchema(unittest.TestCase):
 
         self.assertEqual(len(properties), len(REGISTRY.all_params))
 
-    def test_get_json_schema_for_stage(self):
-        """get_json_schema(stage) should only include stage params."""
-        full_schema = REGISTRY.get_json_schema()
-        sim_schema = REGISTRY.get_json_schema(stage=Stage.SIMULATION)
-
-        # Stage-specific should be subset of full
-        self.assertLessEqual(
-            len(sim_schema["properties"]),
-            len(full_schema["properties"])
-        )
-
     def test_core_params_in_schema(self):
         """Core params should be in JSON schema."""
         schema = REGISTRY.get_json_schema()
@@ -98,37 +87,35 @@ class TestRegistryJsonSchema(unittest.TestCase):
         self.assertIn("model_eqns", props)
 
 
-class TestRegistryStageQueries(unittest.TestCase):
-    """Tests for stage-based parameter queries."""
+class TestRegistryTagQueries(unittest.TestCase):
+    """Tests for tag-based parameter queries."""
 
-    def test_common_stage_params(self):
-        """Should get COMMON stage params."""
-        params = REGISTRY.get_params_by_stage(Stage.COMMON)
+    def test_get_params_by_tag(self):
+        """Should get params by feature tag."""
+        mhd_params = REGISTRY.get_params_by_tag("mhd")
 
-        self.assertIsInstance(params, dict)
-        self.assertGreater(len(params), 0)
-        self.assertIn("m", params)
+        self.assertIsInstance(mhd_params, dict)
+        self.assertGreater(len(mhd_params), 5)
+        self.assertIn("mhd", mhd_params)
 
-    def test_simulation_stage_includes_common(self):
-        """SIMULATION stage should include COMMON params."""
-        sim_params = REGISTRY.get_params_by_stage(Stage.SIMULATION)
+    def test_get_all_tags(self):
+        """Should get all registered tags."""
+        tags = REGISTRY.get_all_tags()
 
-        # m is a COMMON param, should be included
-        self.assertIn("m", sim_params)
+        self.assertIsInstance(tags, set)
+        self.assertIn("mhd", tags)
+        self.assertIn("bubbles", tags)
+        self.assertIn("weno", tags)
 
-    def test_pre_process_stage(self):
-        """Should get PRE_PROCESS stage params."""
-        params = REGISTRY.get_params_by_stage(Stage.PRE_PROCESS)
+    def test_params_have_correct_tags(self):
+        """Parameters should have their expected tags."""
+        mhd_param = REGISTRY.all_params.get("mhd")
+        self.assertIsNotNone(mhd_param)
+        self.assertIn("mhd", mhd_param.tags)
 
-        self.assertIsInstance(params, dict)
-        self.assertGreater(len(params), 100)
-
-    def test_post_process_stage(self):
-        """Should get POST_PROCESS stage params."""
-        params = REGISTRY.get_params_by_stage(Stage.POST_PROCESS)
-
-        self.assertIsInstance(params, dict)
-        self.assertGreater(len(params), 100)
+        bubbles_param = REGISTRY.all_params.get("bubbles_euler")
+        self.assertIsNotNone(bubbles_param)
+        self.assertIn("bubbles", bubbles_param.tags)
 
 
 class TestCaseDictsIntegration(unittest.TestCase):
@@ -138,11 +125,7 @@ class TestCaseDictsIntegration(unittest.TestCase):
         """case_dicts module should load successfully from registry."""
         from ..run import case_dicts
 
-        # These should all be populated
-        self.assertIsNotNone(case_dicts.COMMON)
-        self.assertIsNotNone(case_dicts.PRE_PROCESS)
-        self.assertIsNotNone(case_dicts.SIMULATION)
-        self.assertIsNotNone(case_dicts.POST_PROCESS)
+        # ALL should be populated
         self.assertIsNotNone(case_dicts.ALL)
 
     def test_case_dicts_all_contains_all_params(self):
@@ -184,6 +167,13 @@ class TestCaseDictsIntegration(unittest.TestCase):
 
         validator = case_dicts.get_validator()
         self.assertTrue(callable(validator))
+
+    def test_get_input_dict_keys(self):
+        """get_input_dict_keys should return all params."""
+        from ..run import case_dicts
+
+        keys = case_dicts.get_input_dict_keys("simulation")
+        self.assertEqual(len(keys), len(case_dicts.ALL))
 
 
 class TestValidatorIntegration(unittest.TestCase):
