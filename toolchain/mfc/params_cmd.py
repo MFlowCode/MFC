@@ -18,22 +18,32 @@ def params():
     query = ARG("query")
     type_filter = ARG("param_type")
     show_families = ARG("families")
+    show_features = ARG("features")
+    feature_name = ARG("feature")
+    names_only = ARG("names_only")
     show_count = ARG("count")
     limit = ARG("limit")
     describe = ARG("describe")
 
+    # By default, search both names and descriptions (more user-friendly)
+    search_descriptions = not names_only
+
     if show_count:
         _show_statistics(REGISTRY)
+    elif show_features:
+        _show_feature_groups()
+    elif feature_name:
+        _show_feature_params(REGISTRY, feature_name, type_filter, limit, describe)
     elif show_families:
         _show_families(REGISTRY, limit)
     elif query:
-        _search_params(REGISTRY, query, type_filter, limit, describe)
+        _search_params(REGISTRY, query, type_filter, limit, describe, search_descriptions)
     else:
         _show_statistics(REGISTRY)
         cons.print()
         cons.print("[yellow]Tip:[/yellow] Use './mfc.sh params <query>' to search for parameters")
-        cons.print("     Use './mfc.sh params -f' to see parameter families")
-        cons.print("     Use './mfc.sh params -d <query>' to see parameter descriptions")
+        cons.print("     Use './mfc.sh params --feature mhd' to see MHD parameters")
+        cons.print("     Use './mfc.sh params -F' to see all feature groups")
 
 
 def _collapse_indexed_params(matches):  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
@@ -195,6 +205,68 @@ def _show_statistics(registry):
         cons.print(f"    {tname:15} {count:5}")
 
 
+def _show_feature_groups():
+    """Show available feature groups."""
+    from .params.descriptions import FEATURE_GROUPS
+
+    cons.print("[bold]Feature Groups[/bold]")
+    cons.print()
+    cons.print("  Use './mfc.sh params --feature <name>' to see parameters for a feature.")
+    cons.print()
+    cons.print(f"  {'Feature':<20} {'Description'}")
+    cons.print(f"  {'-'*20} {'-'*50}")
+
+    for name, info in sorted(FEATURE_GROUPS.items()):
+        desc = info["description"]
+        cons.print(f"  [cyan]{name:<20}[/cyan] {desc}")
+
+    cons.print()
+    cons.print("[yellow]Example:[/yellow] ./mfc.sh params --feature mhd")
+
+
+def _show_feature_params(registry, feature_name, type_filter, limit, describe):
+    """Show all parameters for a feature group."""
+    from .params.descriptions import FEATURE_GROUPS, get_feature_params
+
+    if feature_name not in FEATURE_GROUPS:
+        cons.print(f"[red]Unknown feature group: '{feature_name}'[/red]")
+        cons.print()
+        cons.print("Available feature groups:")
+        for name in sorted(FEATURE_GROUPS.keys()):
+            cons.print(f"  {name}")
+        return
+
+    feature_info = FEATURE_GROUPS[feature_name]
+    all_param_names = list(registry.all_params.keys())
+    matching_names = get_feature_params(feature_name, all_param_names)
+
+    # Build matches list
+    matches = []
+    for name in matching_names:
+        param = registry.all_params[name]
+        # Apply type filter
+        if type_filter and param.param_type.value != type_filter:
+            continue
+        matches.append((name, param))
+
+    if not matches:
+        cons.print(f"[yellow]No parameters found for feature '{feature_name}'[/yellow]")
+        return
+
+    # Collapse indexed parameters
+    collapsed = _collapse_indexed_params(matches)
+
+    cons.print(f"[bold]{feature_info['description']}[/bold] ({len(matches)} params, {len(collapsed)} unique patterns)")
+    cons.print()
+
+    # Show collapsed results
+    _show_collapsed_results(collapsed[:limit], describe)
+
+    if len(collapsed) > limit:
+        cons.print()
+        cons.print(f"  [dim]... {len(collapsed) - limit} more patterns (use -n {len(collapsed)} to show all)[/dim]")
+
+
 def _show_families(registry, limit):
     """Show parameter families grouped by prefix."""
     families = {}
@@ -228,13 +300,26 @@ def _show_families(registry, limit):
     cons.print("[yellow]Tip:[/yellow] Use './mfc.sh params <family>' to see parameters in a family")
 
 
-def _search_params(registry, query, type_filter, limit, describe=False):
+def _search_params(registry, query, type_filter, limit, describe=False, search_descriptions=True):  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
     """Search for parameters matching a query."""
+    from .params.descriptions import get_description
+
     query_lower = query.lower()
     matches = []
+    desc_matches = set()  # Track which params matched via description
 
     for name, param in registry.all_params.items():
-        if query_lower not in name.lower():
+        name_match = query_lower in name.lower()
+        desc_match = False
+
+        if search_descriptions and not name_match:
+            # Also search in description
+            desc = get_description(name)
+            if desc and query_lower in desc.lower():
+                desc_match = True
+                desc_matches.add(name)
+
+        if not name_match and not desc_match:
             continue
 
         # Apply type filter
@@ -254,8 +339,9 @@ def _search_params(registry, query, type_filter, limit, describe=False):
     cons.print(f"[bold]Parameters matching '{query}'[/bold] ({len(matches)} params, {len(collapsed)} unique patterns)")
     cons.print()
 
-    # Show collapsed results
-    _show_collapsed_results(collapsed[:limit], describe)
+    # Show collapsed results (enable describe mode if we matched via description)
+    show_describe = describe or (search_descriptions and len(desc_matches) > 0)
+    _show_collapsed_results(collapsed[:limit], show_describe)
 
     if len(collapsed) > limit:
         cons.print()
