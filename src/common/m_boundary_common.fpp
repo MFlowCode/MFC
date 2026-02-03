@@ -33,6 +33,7 @@ module m_boundary_common
 
     private; public :: s_initialize_boundary_common_module, &
  s_populate_variables_buffers, &
+ s_populate_beta_buffers, &
  s_create_mpi_types, &
  s_populate_capillary_buffers, &
  s_populate_F_igr_buffers, &
@@ -1160,6 +1161,183 @@ contains
 
     end subroutine s_qbmm_extrapolation
 
+    impure subroutine s_populate_beta_buffers(q_beta, bc_type, nvar)
+
+        type(scalar_field), dimension(:), intent(inout) :: q_beta
+        type(integer_field), dimension(1:num_dims, 1:2), intent(in) :: bc_type
+        integer, intent(in) :: nvar
+
+        integer :: k, l
+
+        !< x-direction
+        if (bc_x%beg >= 0) then
+            call s_mpi_reduce_beta_variables_buffers(q_beta, 1, -1, nvar)
+        else
+            $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
+            do l = 0, p
+                do k = 0, n
+                    select case (bc_type(1, 1)%sf(0, k, l))
+                    case (BC_PERIODIC)
+                        call s_beta_periodic(q_beta, 1, -1, k, l, nvar)
+                    case default
+                    end select
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+
+        if (bc_x%end >= 0) then
+            call s_mpi_reduce_beta_variables_buffers(q_beta, 1, 1, nvar)
+        else
+            $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
+            do l = 0, p
+                do k = 0, n
+                    select case (bc_type(1, 2)%sf(0, k, l))
+                    case (BC_PERIODIC)
+                        call s_beta_periodic(q_beta, 1, 1, k, l, nvar)
+                    case default
+                    end select
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+
+        if (n == 0) return
+
+        !< y-direction
+        if (bc_y%beg >= 0) then
+            call s_mpi_reduce_beta_variables_buffers(q_beta, 2, -1, nvar)
+        else
+            $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
+            do l = 0, p
+                do k = -buff_size, m + buff_size
+                    select case (bc_type(2, 1)%sf(k, 0, l))
+                    case (BC_PERIODIC)
+                        call s_beta_periodic(q_beta, 2, -1, k, l, nvar)
+                    case default
+                    end select
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+
+        if (bc_y%end >= 0) then
+            call s_mpi_reduce_beta_variables_buffers(q_beta, 2, 1, nvar)
+        else
+            $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
+            do l = 0, p
+                do k = -buff_size, m + buff_size
+                    select case (bc_type(2, 2)%sf(k, 0, l))
+                    case (BC_PERIODIC)
+                        call s_beta_periodic(q_beta, 2, 1, k, l, nvar)
+                    case default
+                    end select
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+
+        if (p == 0) return
+
+        #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+            !< z-direction
+            if (bc_z%beg >= 0) then
+                call s_mpi_reduce_beta_variables_buffers(q_beta, 3, -1, nvar)
+            else
+                $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
+                do l = -buff_size, n + buff_size
+                    do k = -buff_size, m + buff_size
+                        select case (bc_type(3, 1)%sf(k, l, 0))
+                        case (BC_PERIODIC)
+                            call s_beta_periodic(q_beta, 3, -1, k, l, nvar)
+                        case default
+                        end select
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
+
+            if (bc_z%end >= 0) then
+                call s_mpi_reduce_beta_variables_buffers(q_beta, 3, 1, nvar)
+            else
+                $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
+                do l = -buff_size, n + buff_size
+                    do k = -buff_size, m + buff_size
+                        select case (bc_type(3, 2)%sf(k, l, 0))
+                        case (BC_PERIODIC)
+                            call s_beta_periodic(q_beta, 3, 1, k, l, nvar)
+                        case default
+                        end select
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
+        #:endif
+
+    end subroutine s_populate_beta_buffers
+
+    subroutine s_beta_periodic(q_beta, bc_dir, bc_loc, k, l, nvar)
+        $:GPU_ROUTINE(function_name='s_beta_periodic', &
+            & parallelism='[seq]', cray_inline=True)
+        type(scalar_field), dimension(num_dims + 1), intent(inout) :: q_beta
+        integer, intent(in) :: bc_dir, bc_loc
+        integer, intent(in) :: k, l
+        integer, intent(in) :: nvar
+
+        integer :: j, i
+
+        if (bc_dir == 1) then !< x-direction
+            if (bc_loc == -1) then !bc_x%beg
+                do i = 1, nvar
+                    do j = -mapCells - 1, mapCells
+                        q_beta(beta_vars(i))%sf(j, k, l) = q_beta(beta_vars(i))%sf(j, k, l) + &
+                            q_beta(beta_vars(i))%sf(m + j + 1, k, l)
+                    end do
+                end do
+            else !< bc_x%end
+                do i = 1, nvar
+                    do j = -mapcells, mapcells + 1
+                        q_beta(beta_vars(i))%sf(m + j, k, l) = q_beta(beta_vars(i))%sf(m + j, k, l) + &
+                            q_beta(beta_vars(i))%sf(j - 1, k, l)
+                    end do
+                end do
+            end if
+        elseif (bc_dir == 2) then !< y-direction
+            if (bc_loc == -1) then !< bc_y%beg
+                do i = 1, nvar
+                    do j = -mapcells - 1, mapcells
+                        q_beta(beta_vars(i))%sf(k, j, l) = q_beta(beta_vars(i))%sf(k, j, l) + &
+                            q_beta(beta_vars(i))%sf(k, n + j + 1, l)
+                    end do
+                end do
+            else !< bc_y%end
+                do i = 1, nvar
+                    do j = -mapcells, mapcells + 1
+                        q_beta(beta_vars(i))%sf(k, n + j, l) = q_beta(beta_vars(i))%sf(k, n + j, l) + &
+                            q_beta(beta_vars(i))%sf(k, j - 1, l)
+                    end do
+                end do
+            end if
+        elseif (bc_dir == 3) then !< z-direction
+            if (bc_loc == -1) then !< bc_z%beg
+                do i = 1, nvar
+                    do j = -mapcells - 1, mapcells
+                        q_beta(beta_vars(i))%sf(k, l, -j) = q_beta(beta_vars(i))%sf(k, l, j) + &
+                            q_beta(beta_vars(i))%sf(k, l, p + j + 1)
+                    end do
+                end do
+            else !< bc_z%end
+                do i = 1, nvar
+                    do j = -mapcells, mapcells + 1
+                        q_beta(beta_vars(i))%sf(k, l, p + j) = q_beta(beta_vars(i))%sf(k, l, p + j) + &
+                            q_beta(beta_vars(i))%sf(k, l, j - 1)
+                    end do
+                end do
+            end if
+        end if
+
+    end subroutine s_beta_periodic
+
     impure subroutine s_populate_capillary_buffers(c_divs, bc_type)
 
         type(scalar_field), dimension(num_dims + 1), intent(inout) :: c_divs
@@ -1289,6 +1467,7 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
             end if
         #:endif
+
     end subroutine s_populate_capillary_buffers
 
     subroutine s_color_function_periodic(c_divs, bc_dir, bc_loc, k, l)

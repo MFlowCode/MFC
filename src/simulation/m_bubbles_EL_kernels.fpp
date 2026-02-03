@@ -144,45 +144,39 @@ contains
                         cellaux(3) = cell(3) + k - (mapCells + 1)
                         if (p == 0) cellaux(3) = 0
 
-                        !Check if the cells intended to smear the bubbles in are in the computational domain
-                        !and redefine the cells for symmetric boundary
-                        call s_check_celloutside(cellaux, celloutside)
+                        nodecoord(1) = x_cc(cellaux(1))
+                        nodecoord(2) = y_cc(cellaux(2))
+                        if (p > 0) nodecoord(3) = z_cc(cellaux(3))
+                        call s_applygaussian(center, cellaux, nodecoord, stddsv, 0._wp, func)
+                        if (lag_params%cluster_type >= 4) call s_applygaussian(center, cellaux, nodecoord, stddsv, 1._wp, func2)
 
-                        if (.not. celloutside) then
-                            nodecoord(1) = x_cc(cellaux(1))
-                            nodecoord(2) = y_cc(cellaux(2))
-                            if (p > 0) nodecoord(3) = z_cc(cellaux(3))
-                            call s_applygaussian(center, cellaux, nodecoord, stddsv, 0._wp, func)
-                            if (lag_params%cluster_type >= 4) call s_applygaussian(center, cellaux, nodecoord, stddsv, 1._wp, func2)
+                        ! Relocate cells for bubbles intersecting symmetric boundaries
+                        if (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == BC_REFLECTIVE)) then
+                            call s_shift_cell_symmetric_bc(cellaux, cell)
+                        end if
 
-                            ! Relocate cells for bubbles intersecting symmetric boundaries
-                            if (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == BC_REFLECTIVE)) then
-                                call s_shift_cell_symmetric_bc(cellaux, cell)
-                            end if
+                        !Update void fraction field
+                        addFun1 = func*strength_vol
+                        $:GPU_ATOMIC(atomic='update')
+                        updatedvar(1)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
+                            updatedvar(1)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                            + real(addFun1, kind=stp)
 
-                            !Update void fraction field
-                            addFun1 = func*strength_vol
+                        !Update time derivative of void fraction
+                        addFun2 = func*strength_vel
+                        $:GPU_ATOMIC(atomic='update')
+                        updatedvar(2)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
+                            updatedvar(2)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                            + real(addFun2, kind=stp)
+
+                        !Product of two smeared functions
+                        !Update void fraction * time derivative of void fraction
+                        if (lag_params%cluster_type >= 4) then
+                            addFun3 = func2*strength_vol*strength_vel
                             $:GPU_ATOMIC(atomic='update')
-                            updatedvar(1)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                                updatedvar(1)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                + real(addFun1, kind=stp)
-
-                            !Update time derivative of void fraction
-                            addFun2 = func*strength_vel
-                            $:GPU_ATOMIC(atomic='update')
-                            updatedvar(2)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                                updatedvar(2)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                + real(addFun2, kind=stp)
-
-                            !Product of two smeared functions
-                            !Update void fraction * time derivative of void fraction
-                            if (lag_params%cluster_type >= 4) then
-                                addFun3 = func2*strength_vol*strength_vel
-                                $:GPU_ATOMIC(atomic='update')
-                                updatedvar(5)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                                    updatedvar(5)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                    + real(addFun3, kind=stp)
-                            end if
+                            updatedvar(5)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
+                                updatedvar(5)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                                + real(addFun3, kind=stp)
                         end if
                     end do
                 end do
@@ -246,49 +240,17 @@ contains
                 distance = sqrt((center(1) - nodecoord(1))**2._wp + (center(2) - nodecoord(2))**2._wp + Lz2)
                 func = dzp/lag_params%charwidth*exp(-0.5_wp*(distance/stddsv)**2._wp)/(sqrt(2._wp*pi)*stddsv)**3._wp
 
-                do while (Nr_count < Nr - 1._wp + ((mapCells - 1)*1._wp))
-                    Nr_count = Nr_count + 1._wp
-                    Lz2 = (center(3) - (dzp*(0.5_wp + Nr_count) - lag_params%charwidth/2._wp))**2._wp
-                    distance = sqrt((center(1) - nodecoord(1))**2._wp + (center(2) - nodecoord(2))**2._wp + Lz2)
-                    func = func + &
-                           dzp/lag_params%charwidth*exp(-0.5_wp*(distance/stddsv)**2._wp)/(sqrt(2._wp*pi)*stddsv)**(3._wp*(strength_idx + 1._wp))
-                end do
+                !do while (Nr_count < Nr - 1._wp + ((mapCells - 1)*1._wp))
+                    !Nr_count = Nr_count + 1._wp
+                    !Lz2 = (center(3) - (dzp*(0.5_wp + Nr_count) - lag_params%charwidth/2._wp))**2._wp
+                    !distance = sqrt((center(1) - nodecoord(1))**2._wp + (center(2) - nodecoord(2))**2._wp + Lz2)
+                    !func = func + &
+                           !dzp/lag_params%charwidth*exp(-0.5_wp*(distance/stddsv)**2._wp)/(sqrt(2._wp*pi)*stddsv)**(3._wp*(strength_idx + 1._wp))
+                !end do
             end if
         end if
 
     end subroutine s_applygaussian
-
-    !> The purpose of this subroutine is to check if the current cell is outside the computational domain or not (including ghost cells).
-            !! @param cellaux Tested cell to smear the bubble effect in.
-            !! @param celloutside If true, then cellaux is outside the computational domain.
-    subroutine s_check_celloutside(cellaux, celloutside)
-        $:GPU_ROUTINE(function_name='s_check_celloutside',parallelism='[seq]', &
-            & cray_inline=True)
-
-        integer, dimension(3), intent(inout) :: cellaux
-        logical, intent(out) :: celloutside
-
-        celloutside = .false.
-
-        if (num_dims == 2) then
-            if ((cellaux(1) < -buff_size) .or. (cellaux(2) < -buff_size)) then
-                celloutside = .true.
-            end if
-
-            if ((cellaux(1) > m + buff_size) .or. (cellaux(2) > n + buff_size)) then
-                celloutside = .true.
-            end if
-        else
-            if ((cellaux(1) < -buff_size) .or. (cellaux(2) < -buff_size) .or. (cellaux(3) < -buff_size)) then
-                celloutside = .true.
-            end if
-
-            if ((cellaux(1) > m + buff_size) .or. (cellaux(2) > n + buff_size) .or. (cellaux(3) > p + buff_size)) then
-                celloutside = .true.
-            end if
-        end if
-
-    end subroutine s_check_celloutside
 
     !> This subroutine relocates the current cell, if it intersects a symmetric boundary.
             !! @param cell Cell of the current bubble

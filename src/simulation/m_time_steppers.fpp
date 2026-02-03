@@ -540,7 +540,7 @@ contains
                 end if
             end if
 
-            if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(q_prim_vf, stage=s)
+            if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(q_prim_vf, bc_type, stage=s)
 
             $:GPU_PARALLEL_LOOP(collapse=4)
             do i = 1, sys_size
@@ -661,7 +661,7 @@ contains
         elseif (bubbles_lagrange) then
 
             call s_populate_variables_buffers(bc_type, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
-            call s_compute_bubble_EL_dynamics(q_prim_vf, stage)
+            call s_compute_bubble_EL_dynamics(q_prim_vf, bc_type, stage)
 
             if (stage == 3) then
                 if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()

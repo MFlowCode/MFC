@@ -1195,6 +1195,232 @@ contains
 
     end subroutine s_mpi_sendrecv_variables_buffers
 
+    !>  The goal of this procedure is to populate the buffers of
+        !!      the cell-average conservative variables by communicating
+        !!      with the neighboring processors.
+        !!  @param q_cons_vf Cell-average conservative variables
+        !!  @param mpi_dir MPI communication coordinate direction
+        !!  @param pbc_loc Processor boundary condition (PBC) location
+    subroutine s_mpi_reduce_beta_variables_buffers(q_comm, &
+                                                mpi_dir, &
+                                                pbc_loc, &
+                                                nVar)
+
+        type(scalar_field), dimension(1:), intent(inout) :: q_comm
+        integer, intent(in) :: mpi_dir, pbc_loc, nVar
+
+        integer :: i, j, k, l, r, q !< Generic loop iterators
+        integer :: lb_size
+
+        integer :: buffer_counts(1:3), buffer_count
+
+        type(int_bounds_info) :: boundary_conditions(1:3)
+        integer :: beg_end(1:2), grid_dims(1:3)
+        integer :: dst_proc, src_proc, recv_tag, send_tag
+
+        logical :: beg_end_geq_0, qbmm_comm
+
+        integer :: pack_offset, unpack_offset
+
+#ifdef MFC_MPI
+        integer :: ierr !< Generic flag used to identify and report MPI errors
+
+        call nvtxStartRange("BETA-COMM-PACKBUF")
+
+        v_size = nVar
+        lb_size = 2 * (mapcells + 1) ! Size of the buffer region for beta variables (-mapcells - 1, mapcells)
+        buffer_counts = (/ &
+                    lb_size*v_size*(n + 1)*(p + 1), &
+                    lb_size*v_size*(m + 1 + 2*(mapcells + 1))*(p + 1), &
+                    lb_size*v_size*(m + 1 + 2*(mapcells + 1))*(n + 1 + 2*(mapcells + 1)) &
+                    /)
+
+        $:GPU_UPDATE(device='[v_size]')
+
+        buffer_count = buffer_counts(mpi_dir)
+        boundary_conditions = (/bc_x, bc_y, bc_z/)
+        beg_end = (/boundary_conditions(mpi_dir)%beg, boundary_conditions(mpi_dir)%end/)
+        beg_end_geq_0 = beg_end(max(pbc_loc, 0) - pbc_loc + 1) >= 0
+
+        ! Implements:
+        ! pbc_loc  bc_x >= 0 -> [send/recv]_tag  [dst/src]_proc
+        ! -1 (=0)      0            ->     [1,0]       [0,0]      | 0 0 [1,0] [beg,beg]
+        ! -1 (=0)      1            ->     [0,0]       [1,0]      | 0 1 [0,0] [end,beg]
+        ! +1 (=1)      0            ->     [0,1]       [1,1]      | 1 0 [0,1] [end,end]
+        ! +1 (=1)      1            ->     [1,1]       [0,1]      | 1 1 [1,1] [beg,end]
+
+        send_tag = f_logical_to_int(.not. f_xor(beg_end_geq_0, pbc_loc == 1))
+        recv_tag = f_logical_to_int(pbc_loc == 1)
+
+        dst_proc = beg_end(1 + f_logical_to_int(f_xor(pbc_loc == 1, beg_end_geq_0)))
+        src_proc = beg_end(1 + f_logical_to_int(pbc_loc == 1))
+
+        grid_dims = (/m, n, p/)
+
+        pack_offset = 0
+        if (f_xor(pbc_loc == 1, beg_end_geq_0)) then
+            pack_offset = grid_dims(mpi_dir) + 1
+        end if
+
+        unpack_offset = 0
+        if (pbc_loc == 1) then
+            unpack_offset = grid_dims(mpi_dir) + 1
+        end if
+
+        ! Pack Buffer to Send
+        #:for mpi_dir in [1, 2, 3]
+            if (mpi_dir == ${mpi_dir}$) then
+                #:if mpi_dir == 1
+                    $:GPU_PARALLEL_LOOP(collapse=4,private='[r]')
+                    do l = 0, p
+                        do k = 0, n
+                            do j = -mapcells - 1, mapcells
+                                do i = 1, v_size
+                                    r = (i - 1) + v_size * &
+                                        ((j + mapcells + 1) + lb_size*(k + (n + 1)*l))
+                                    buff_send(r) = real(q_comm(beta_vars(i))%sf(j + pack_offset, k, l), kind=wp)
+                                end do
+                            end do
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+                #:elif mpi_dir == 2
+                    $:GPU_PARALLEL_LOOP(collapse=4,private='[r]')
+                    do i = 1, v_size
+                        do l = 0, p
+                            do k = -mapcells - 1, mapcells
+                                do j = -mapcells - 1, m + mapcells + 1
+                                    r = (i - 1) + v_size * &
+                                        ((j + mapcells + 1) + (m + 2*(mapcells + 1) + 1) * &
+                                        ((k + mapcells + 1) + lb_size*l))
+                                    buff_send(r) = real(q_comm(beta_vars(i))%sf(j, k + pack_offset, l), kind=wp)
+                                end do
+                            end do
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+                #:else
+                    $:GPU_PARALLEL_LOOP(collapse=4,private='[r]')
+                    do i = 1, v_size
+                        do l = -mapcells - 1, mapcells
+                            do k = -mapcells - 1, n + mapcells + 1
+                                do j = -mapcells - 1, m + mapcells + 1
+                                    r = (i - 1) + v_size * &
+                                        ((j + mapcells + 1) + (m + 2*(mapcells + 1) + 1) * &
+                                        ((k + mapcells + 1) + (n + 2*(mapcells + 1) + 1) * (l + mapcells + 1)))
+                                    buff_send(r) = real(q_comm(beta_vars(i))%sf(j, k, l + pack_offset), kind=wp)
+                                end do
+                            end do
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+                #:endif
+            end if
+        #:endfor
+        call nvtxEndRange ! Packbuf
+
+        ! Send/Recv
+#ifdef MFC_SIMULATION
+        #:for rdma_mpi in [False, True]
+            if (rdma_mpi .eqv. ${'.true.' if rdma_mpi else '.false.'}$) then
+                #:if rdma_mpi
+                    #:call GPU_HOST_DATA(use_device_addr='[buff_send, buff_recv]')
+                        call nvtxStartRange("BETA-COMM-SENDRECV-RDMA")
+
+                        call MPI_SENDRECV( &
+                            buff_send, buffer_count, mpi_p, dst_proc, send_tag, &
+                            buff_recv, buffer_count, mpi_p, src_proc, recv_tag, &
+                            MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
+                        call nvtxEndRange ! BETA-MPI-SENDRECV-(NO)-RDMA
+
+                    #:endcall GPU_HOST_DATA
+                    $:GPU_WAIT()
+                #:else
+                    call nvtxStartRange("BETA-COMM-DEV2HOST")
+                    $:GPU_UPDATE(host='[buff_send]')
+                    call nvtxEndRange
+                    call nvtxStartRange("BETA-COMM-SENDRECV-NO-RMDA")
+
+                    call MPI_SENDRECV( &
+                        buff_send, buffer_count, mpi_p, dst_proc, send_tag, &
+                        buff_recv, buffer_count, mpi_p, src_proc, recv_tag, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
+                    call nvtxEndRange ! BETA-MPI-SENDRECV-(NO)-RDMA
+
+                    call nvtxStartRange("BETA-COMM-HOST2DEV")
+                    $:GPU_UPDATE(device='[buff_recv]')
+                    call nvtxEndRange
+                #:endif
+            end if
+        #:endfor
+#else
+        call MPI_SENDRECV( &
+            buff_send, buffer_count, mpi_p, dst_proc, send_tag, &
+            buff_recv, buffer_count, mpi_p, src_proc, recv_tag, &
+            MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+#endif
+
+        ! Unpack Received Buffer
+        call nvtxStartRange("BETA-COMM-UNPACKBUF")
+        #:for mpi_dir in [1, 2, 3]
+            if (mpi_dir == ${mpi_dir}$) then
+                #:if mpi_dir == 1
+                    $:GPU_PARALLEL_LOOP(collapse=4,private='[r]')
+                    do l = 0, p
+                        do k = 0, n
+                            do j = -mapcells - 1, mapcells
+                                do i = 1, v_size
+                                    r = (i - 1) + v_size * &
+                                        ((j + mapcells + 1) + lb_size*(k + (n + 1)*l))
+                                    q_comm(beta_vars(i))%sf(j + unpack_offset, k, l) = &
+                                        q_comm(beta_vars(i))%sf(j + unpack_offset, k, l) + real(buff_recv(r), kind=stp)
+                                end do
+                            end do
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+                #:elif mpi_dir == 2
+                    $:GPU_PARALLEL_LOOP(collapse=4,private='[r]')
+                    do i = 1, v_size
+                        do l = 0, p
+                            do k = -mapcells - 1, mapcells
+                                do j = -mapcells - 1, m + mapcells + 1
+                                    r = (i - 1) + v_size * &
+                                        ((j + mapcells + 1) + (m + 2*(mapcells + 1) + 1) * &
+                                        ((k + mapcells + 1) + lb_size*l))
+                                    q_comm(beta_vars(i))%sf(j, k + unpack_offset, l) = &
+                                        q_comm(beta_vars(i))%sf(j, k + unpack_offset, l) + real(buff_recv(r), kind=stp)
+                                end do
+                            end do
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+                #:else
+                    $:GPU_PARALLEL_LOOP(collapse=4,private='[r]')
+                    do i = 1, v_size
+                        do l = -mapcells - 1, mapcells
+                            do k = -mapcells - 1, n + mapcells + 1
+                                do j = -mapcells - 1, m + mapcells + 1
+                                    r = (i - 1) + v_size * &
+                                        ((j + mapcells + 1) + (m + 2*(mapcells + 1) + 1) * &
+                                        ((k + mapcells + 1) + (n + 2*(mapcells + 1) + 1) * (l + mapcells + 1)))
+                                    q_comm(beta_vars(i))%sf(j, k, l + unpack_offset) = &
+                                        q_comm(beta_vars(i))%sf(j, k, l + unpack_offset) + real(buff_recv(r), kind=stp)
+                                end do
+                            end do
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+                #:endif
+            end if
+        #:endfor
+        call nvtxEndRange
+#endif
+
+    end subroutine s_mpi_reduce_beta_variables_buffers
+
     !>  The purpose of this procedure is to optimally decompose
         !!      the computational domain among the available processors.
         !!      This is performed by attempting to award each processor,

@@ -61,6 +61,7 @@ module m_constants
 
     ! Lagrange bubbles constants
     integer, parameter :: mapCells = 3         !< Number of cells around the bubble where the smoothening function will have effect
+    integer, parameter :: beta_vars(1:3) = [1, 2, 5] !< Indices of variables to communicate for bubble coupling
     real(wp), parameter :: R_uni = 8314._wp    !< Universal gas constant - J/kmol/K
     integer, parameter :: lag_io_vars = 21     !< Number of variables per particle for MPI_IO
 

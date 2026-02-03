@@ -500,8 +500,7 @@ contains
         !!                for communication of initial condition)
     impure subroutine s_add_particles_to_transfer_list(nBub, pos, posPrev)
 
-        real(wp), dimension(:, :) :: pos
-        real(wp), dimension(:, :), optional :: posPrev
+        real(wp), dimension(:, :) :: pos, posPrev
         integer :: bubID, nbub
         integer :: i, j, k
 
@@ -654,24 +653,16 @@ contains
                     return
                 end if
 
-                if (present(posPrev)) then
-                    f_crosses_boundary = (posPrev(particle_id, dir) > pcomm_coords(dir)%beg .and. &
-                                          pos(particle_id, dir) < pcomm_coords(dir)%beg)
-                else
-                    f_crosses_boundary = (pos(particle_id, dir) < pcomm_coords(dir)%beg)
-                end if
+                f_crosses_boundary = (posPrev(particle_id, dir) >= pcomm_coords(dir)%beg .and. &
+                                      pos(particle_id, dir) < pcomm_coords(dir)%beg)
             elseif (loc == 1) then ! End of the domain
                 if (nidx(dir)%end == 0) then
                     f_crosses_boundary = .false.
                     return
                 end if
 
-                if (present(posPrev)) then
-                    f_crosses_boundary = (posPrev(particle_id, dir) < pcomm_coords(dir)%end .and. &
-                                          pos(particle_id, dir) > pcomm_coords(dir)%end)
-                else
-                    f_crosses_boundary = (pos(particle_id, dir) > pcomm_coords(dir)%end)
-                end if
+                f_crosses_boundary = (posPrev(particle_id, dir) <= pcomm_coords(dir)%end .and. &
+                                      pos(particle_id, dir) > pcomm_coords(dir)%end)
             end if
 
         end function f_crosses_boundary
