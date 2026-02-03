@@ -899,9 +899,9 @@ PARAMS_COMMAND = Command(
         Argument(
             name="limit",
             short="n",
-            help="Maximum number of results to show.",
+            help="Maximum number of results to show (default: unlimited).",
             type=int,
-            default=25,
+            default=10000,
         ),
         Argument(
             name="describe",
