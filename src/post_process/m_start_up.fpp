@@ -112,7 +112,7 @@ contains
             relax_model, cf_wrt, sigma, adv_n, ib, num_ibs, &
             cfl_adap_dt, cfl_const_dt, t_save, t_stop, n_start, &
             cfl_target, surface_tension, bubbles_lagrange, &
-            sim_data, hyperelasticity, Bx0, relativity, cont_damage, &
+            sim_data, hyperelasticity, Bx0, relativity, cont_damage, hyper_cleaning, &
             num_bc_patches, igr, igr_order, down_sample, recon_type, &
             muscl_order, lag_header, lag_txt_wrt, lag_db_wrt, &
             lag_id_wrt, lag_pos_wrt, lag_pos_prev_wrt, lag_vel_wrt, &
@@ -595,6 +595,14 @@ contains
         if (cont_damage) then
             q_sf(:, :, :) = q_cons_vf(damage_idx)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
             write (varname, '(A)') 'damage_state'
+            call s_write_variable_to_formatted_database_file(varname, t_step)
+
+            varname(:) = ' '
+        end if
+
+        if (hyper_cleaning) then
+            q_sf = q_cons_vf(psi_idx)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
+            write (varname, '(A)') 'psi'
             call s_write_variable_to_formatted_database_file(varname, t_step)
 
             varname(:) = ' '
