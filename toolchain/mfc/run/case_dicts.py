@@ -65,7 +65,7 @@ def get_input_dict_keys(target_name: str) -> list:
         List of parameter names valid for that target
     """
     # All parameters are valid for all targets
-    if not ARG("case_optimization") or target_name != "simulation":
+    if not ARG("case_optimization", dflt=False) or target_name != "simulation":
         return list(ALL.keys())
 
     return [x for x in ALL.keys() if x not in CASE_OPTIMIZATION]
