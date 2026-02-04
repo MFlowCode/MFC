@@ -66,7 +66,7 @@
 
 - <a id="Miyoshi05">Miyoishi, T., and Kusano, K. (2005). A multi-state HLL approximate Riemann solver for ideal magnetohydrodynamics. Journal of Computational Physics, 208(1), 315-344.</a>
 
-- <a id="Powell94">Powell, K. G. (1994). An approximate Riemann solver for magnetohydrodynamics: (That works in more than one dimension). In Upwind and high-resolution schemes (pp. 570-583). Springer.</a>
+- <a id="Dedner02">Dedner, A., Kemm, F., Kröner, D., Munz, C. D., Schnitzer, T., & Wesenberg, M. (2002). Hyperbolic divergence cleaning for the MHD equations. Journal of Computational Physics, 175(2), 645-673.</a>
 
 - <a id="Cao19">Cao, S., Zhang, Y., Liao, D., Zhong, P., and Wang, K. G. (2019). Shock-induced damage and dynamic fracture in cylindrical bodies submerged in liquid. International Journal of Solids and Structures, 169:55–71. Elsevier.</a>
 

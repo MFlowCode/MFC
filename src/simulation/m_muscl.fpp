@@ -112,11 +112,11 @@ contains
 
         $:GPU_UPDATE(device='[is1_muscl,is2_muscl,is3_muscl]')
 
-        if (muscl_order /= 1) then
+        if (muscl_order /= 1 .or. dummy) then
             call s_initialize_muscl(v_vf, muscl_dir)
         end if
 
-        if (muscl_order == 1) then
+        if (muscl_order == 1 .or. dummy) then
             if (muscl_dir == 1) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
                 do i = 1, ubound(v_vf, 1)
@@ -157,8 +157,9 @@ contains
                 end do
                 $:END_GPU_PARALLEL_LOOP()
             end if
+        end if
 
-        else if (muscl_order == 2) then
+        if (muscl_order == 2 .or. dummy) then
             ! MUSCL Reconstruction
             #:for MUSCL_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
                 if (muscl_dir == ${MUSCL_DIR}$) then
