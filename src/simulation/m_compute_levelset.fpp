@@ -18,60 +18,99 @@ module m_compute_levelset
 
     implicit none
 
-    private; public :: s_cylinder_levelset, s_circle_levelset, &
- s_airfoil_levelset, &
- s_3D_airfoil_levelset, &
- s_rectangle_levelset, &
- s_cuboid_levelset, &
- s_sphere_levelset, &
- s_ellipse_levelset
+    private; public :: s_apply_levelset
 
 contains
 
-    subroutine s_circle_levelset(ib_patch_id, levelset, levelset_norm)
+impure subroutine s_apply_levelset(gps, num_gps)
 
-        type(levelset_field), intent(INOUT), optional :: levelset
-        type(levelset_norm_field), intent(INOUT), optional :: levelset_norm
-        integer, intent(IN) :: ib_patch_id
+        type(ghost_point), dimension(:) :: gps
+
+        integer :: i, patch_id, patch_geometry
+
+        !  3D Patch Geometries
+        if (p > 0) then
+
+            do i = 1, num_gps
+
+                patch_id = gps(i)%ib_patch_id
+                patch_geometry = ib_patches(patch_id)%geometry
+
+                if (patch_geometry == 8) then
+                    call s_sphere_levelset(gps(i))
+                elseif (patch_geometry == 9) then
+                    call s_cuboid_levelset(gps(i))
+                elseif (patch_geometry == 10) then
+                    call s_cylinder_levelset(gps(i))
+                elseif (patch_geometry == 11) then
+                    call s_3D_airfoil_levelset(gps(i))
+                    ! STL+IBM patch
+                elseif (patch_geometry == 12) then
+                    call s_model_levelset(gps(i))
+                end if
+            end do
+            !> @}
+
+            ! 2D Patch Geometries
+        elseif (n > 0) then
+
+            do i = 1, num_gps
+
+                patch_id = gps(i)%ib_patch_id
+                patch_geometry = ib_patches(patch_id)%geometry
+
+                if (patch_geometry == 2) then
+                    call s_circle_levelset(gps(i))
+                elseif (patch_geometry == 3) then
+                    call s_rectangle_levelset(gps(i))
+                elseif (patch_geometry == 4) then
+                    call s_airfoil_levelset(gps(i))
+                    ! STL+IBM patch
+                elseif (patch_geometry == 5) then
+                    call s_model_levelset(gps(i))
+                elseif (patch_geometry == 6) then
+                    call s_ellipse_levelset(gps(i))
+                end if
+            end do
+            !> @}
+
+        end if
+
+    end subroutine s_apply_levelset
+
+    subroutine s_circle_levelset(gp)
+
+        type(ghost_point) :: gp
 
         real(wp) :: radius, dist
         real(wp), dimension(2) :: center
         real(wp), dimension(3) :: dist_vec
 
-        integer :: i, j !< Loop index variables
+        integer :: i, j, ib_patch_id !< Loop index variables
+
+        ib_patch_id = gp%ib_patch_id
+        i = gp%loc(1)
+        j = gp%loc(2)
 
         radius = patch_ib(ib_patch_id)%radius
-        center(1) = patch_ib(ib_patch_id)%x_centroid
-        center(2) = patch_ib(ib_patch_id)%y_centroid
 
-        $:GPU_PARALLEL_LOOP(private='[i,j,dist_vec,dist]', &
-                  & copyin='[ib_patch_id,center,radius]', collapse=2)
-        do i = 0, m
-            do j = 0, n
+        dist_vec(1) = x_cc(i) - patch_ib(ib_patch_id)%x_centroid
+        dist_vec(2) = y_cc(j) - patch_ib(ib_patch_id)%y_centroid
+        dist_vec(3) = 0._wp
+        dist = sqrt(sum(dist_vec**2))
 
-                dist_vec(1) = x_cc(i) - center(1)
-                dist_vec(2) = y_cc(j) - center(2)
-                dist_vec(3) = 0._wp
-                dist = sqrt(sum(dist_vec**2))
-                levelset%sf(i, j, 0, ib_patch_id) = dist - radius
-                if (f_approx_equal(dist, 0._wp)) then
-                    levelset_norm%sf(i, j, 0, ib_patch_id, :) = 0
-                else
-                    levelset_norm%sf(i, j, 0, ib_patch_id, :) = &
-                        dist_vec(:)/dist
-                end if
-
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
+        gp%levelset = dist - radius
+        if (f_approx_equal(dist, 0._wp)) then
+            gp%levelset_norm = 0
+        else
+            gp%levelset_norm = dist_vec(:)/dist
+        end if
 
     end subroutine s_circle_levelset
 
-    subroutine s_airfoil_levelset(ib_patch_id, levelset, levelset_norm)
+    subroutine s_airfoil_levelset(gp)
 
-        type(levelset_field), intent(inout), optional :: levelset
-        type(levelset_norm_field), intent(inout), optional :: levelset_norm
-        integer, intent(in) :: ib_patch_id
+        type(ghost_point) :: gp
 
         real(wp) :: dist, global_dist
         integer :: global_id
@@ -155,11 +194,9 @@ contains
 
     end subroutine s_airfoil_levelset
 
-    subroutine s_3D_airfoil_levelset(ib_patch_id, levelset, levelset_norm)
+    subroutine s_3D_airfoil_levelset(gp)
 
-        type(levelset_field), intent(INOUT), optional :: levelset
-        type(levelset_norm_field), intent(INOUT), optional :: levelset_norm
-        integer, intent(IN) :: ib_patch_id
+        type(ghost_point) :: gp
 
         real(wp) :: dist, dist_surf, dist_side, global_dist
         integer :: global_id
@@ -265,10 +302,9 @@ contains
     end subroutine s_3D_airfoil_levelset
 
     !>  Initialize IBM module
-    subroutine s_rectangle_levelset(ib_patch_id, levelset, levelset_norm)
+    subroutine s_rectangle_levelset(gp)
 
-        type(levelset_field), intent(INOUT), optional :: levelset
-        type(levelset_norm_field), intent(INOUT), optional :: levelset_norm
+        type(ghost_point) :: gp
 
         integer, intent(in) :: ib_patch_id
         real(wp) :: top_right(2), bottom_left(2)
@@ -341,10 +377,9 @@ contains
 
     end subroutine s_rectangle_levelset
 
-    subroutine s_ellipse_levelset(ib_patch_id, levelset, levelset_norm)
+    subroutine s_ellipse_levelset(gp)
 
-        type(levelset_field), intent(INOUT), optional :: levelset
-        type(levelset_norm_field), intent(INOUT), optional :: levelset_norm
+        type(ghost_point) :: gp
 
         integer, intent(in) :: ib_patch_id
         real(wp) :: ellipse_coeffs(2) ! a and b in the ellipse equation
@@ -397,10 +432,9 @@ contains
 
     end subroutine s_ellipse_levelset
 
-    subroutine s_cuboid_levelset(ib_patch_id, levelset, levelset_norm)
+    subroutine s_cuboid_levelset(gp)
 
-        type(levelset_field), intent(INOUT), optional :: levelset
-        type(levelset_norm_field), intent(INOUT), optional :: levelset_norm
+        type(ghost_point) :: gp
 
         integer, intent(IN) :: ib_patch_id
         real(wp) :: Right, Left, Bottom, Top, Front, Back
@@ -506,11 +540,9 @@ contains
 
     end subroutine s_cuboid_levelset
 
-    subroutine s_sphere_levelset(ib_patch_id, levelset, levelset_norm)
+    subroutine s_sphere_levelset(gp)
 
-        type(levelset_field), intent(INOUT), optional :: levelset
-        type(levelset_norm_field), intent(INOUT), optional :: levelset_norm
-        integer, intent(IN) :: ib_patch_id
+        type(ghost_point) :: gp
 
         real(wp) :: radius, dist
         real(wp), dimension(3) :: dist_vec, center
@@ -544,11 +576,9 @@ contains
 
     end subroutine s_sphere_levelset
 
-    subroutine s_cylinder_levelset(ib_patch_id, levelset, levelset_norm)
+    subroutine s_cylinder_levelset(gp)
 
-        type(levelset_field), intent(INOUT), optional :: levelset
-        type(levelset_norm_field), intent(INOUT), optional :: levelset_norm
-        integer, intent(IN) :: ib_patch_id
+        type(ghost_point) :: gp
 
         real(wp) :: radius
         real(wp), dimension(3) :: dist_sides_vec, dist_surface_vec, length

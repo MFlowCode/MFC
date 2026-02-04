@@ -21,8 +21,6 @@ module m_ib_patches
 
     use m_helper
 
-    use m_compute_levelset      ! Subroutines to calculate levelsets for IBs
-
     use m_mpi_common
 
     implicit none
@@ -42,13 +40,6 @@ module m_ib_patches
     !! for additional details). They are employed as a means to more concisely
     !! perform the actions necessary to lay out a particular patch on the grid.
 
-    real(wp) :: eta
-    $:GPU_DECLARE(create='[eta]')
-    !! In the case that smoothing of patch boundaries is enabled and the boundary
-    !! between two adjacent patches is to be smeared out, this variable's purpose
-    !! is to act as a pseudo volume fraction to indicate the contribution of each
-    !! patch toward the composition of a cell's fluid state.
-
     real(wp) :: cart_x, cart_y, cart_z
     real(wp) :: sph_phi !<
     $:GPU_DECLARE(create='[cart_x, cart_y, cart_z, sph_phi]')
@@ -66,11 +57,9 @@ module m_ib_patches
 
 contains
 
-    impure subroutine s_apply_ib_patches(ib_markers_sf, levelset, levelset_norm)
+    impure subroutine s_apply_ib_patches(ib_markers_sf)
 
         integer, dimension(:, :, :), intent(inout), optional :: ib_markers_sf
-        type(levelset_field), intent(inout), optional :: levelset !< Levelset determined by models
-        type(levelset_norm_field), intent(inout), optional :: levelset_norm !< Levelset_norm determined by models
 
         integer :: i
 
@@ -84,19 +73,15 @@ contains
 
                 if (patch_ib(i)%geometry == 8) then
                     call s_ib_sphere(i, ib_markers_sf)
-                    call s_sphere_levelset(i, levelset, levelset_norm)
                 elseif (patch_ib(i)%geometry == 9) then
                     call s_ib_cuboid(i, ib_markers_sf)
-                    call s_cuboid_levelset(i, levelset, levelset_norm)
                 elseif (patch_ib(i)%geometry == 10) then
                     call s_ib_cylinder(i, ib_markers_sf)
-                    call s_cylinder_levelset(i, levelset, levelset_norm)
                 elseif (patch_ib(i)%geometry == 11) then
                     call s_ib_3D_airfoil(i, ib_markers_sf)
-                    call s_3D_airfoil_levelset(i, levelset, levelset_norm)
                     ! STL+IBM patch
                 elseif (patch_ib(i)%geometry == 12) then
-                    call s_ib_model(i, ib_markers_sf, levelset, levelset_norm)
+                    call s_ib_model(i, ib_markers_sf)
                 end if
             end do
             !> @}
@@ -109,19 +94,15 @@ contains
             do i = 1, num_ibs
                 if (patch_ib(i)%geometry == 2) then
                     call s_ib_circle(i, ib_markers_sf)
-                    call s_circle_levelset(i, levelset, levelset_norm)
                 elseif (patch_ib(i)%geometry == 3) then
                     call s_ib_rectangle(i, ib_markers_sf)
-                    call s_rectangle_levelset(i, levelset, levelset_norm)
                 elseif (patch_ib(i)%geometry == 4) then
                     call s_ib_airfoil(i, ib_markers_sf)
-                    call s_airfoil_levelset(i, levelset, levelset_norm)
                     ! STL+IBM patch
                 elseif (patch_ib(i)%geometry == 5) then
-                    call s_ib_model(i, ib_markers_sf, levelset, levelset_norm)
+                    call s_ib_model(i, ib_markers_sf)
                 elseif (patch_ib(i)%geometry == 6) then
                     call s_ib_ellipse(i, ib_markers_sf)
-                    call s_ellipse_levelset(i, levelset, levelset_norm)
                 end if
             end do
             !> @}
@@ -154,11 +135,6 @@ contains
         center(1) = patch_ib(patch_id)%x_centroid
         center(2) = patch_ib(patch_id)%y_centroid
         radius = patch_ib(patch_id)%radius
-
-        ! Initializing the pseudo volume fraction value to 1. The value will
-        ! be modified as the patch is laid out on the grid, but only in the
-        ! case that smoothing of the circular patch's boundary is enabled.
-        eta = 1._wp
 
         ! Checking whether the circle covers a particular cell in the domain
         ! and verifying whether the current patch has permission to write to
@@ -225,8 +201,6 @@ contains
 
             airfoil_grid_l(1)%x = 0._wp
             airfoil_grid_l(1)%y = 0._wp
-
-            eta = 1._wp
 
             do i = 1, Np1 + Np2 - 1
                 ! TODO :: This allocated the upper and lower airfoil arrays, and does not need to be performed each time the IB markers are updated. Place this as a separate subroutine.
@@ -519,12 +493,6 @@ contains
         length(2) = patch_ib(patch_id)%length_y
         inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
 
-        ! Since the rectangular patch does not allow for its boundaries to
-        ! be smoothed out, the pseudo volume fraction is set to 1 to ensure
-        ! that only the current patch contributes to the fluid state in the
-        ! cells that this patch covers.
-        eta = 1._wp
-
         ! Checking whether the rectangle covers a particular cell in the
         ! domain and verifying whether the current patch has the permission
         ! to write to that cell. If both queries check out, the primitive
@@ -579,11 +547,6 @@ contains
         center(2) = patch_ib(patch_id)%y_centroid
         center(3) = patch_ib(patch_id)%z_centroid
         radius = patch_ib(patch_id)%radius
-
-        ! Initializing the pseudo volume fraction value to 1. The value will
-        ! be modified as the patch is laid out on the grid, but only in the
-        ! case that smoothing of the spherical patch's boundary is enabled.
-        eta = 1._wp
 
         ! Checking whether the sphere covers a particular cell in the domain
         ! and verifying whether the current patch has permission to write to
@@ -640,12 +603,6 @@ contains
         length(2) = patch_ib(patch_id)%length_y
         length(3) = patch_ib(patch_id)%length_z
         inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
-
-        ! Since the cuboidal patch does not allow for its boundaries to get
-        ! smoothed out, the pseudo volume fraction is set to 1 to make sure
-        ! that only the current patch contributes to the fluid state in the
-        ! cells that this patch covers.
-        eta = 1._wp
 
         ! Checking whether the cuboid covers a particular cell in the domain
         ! and verifying whether the current patch has permission to write to
@@ -716,11 +673,6 @@ contains
         length(3) = patch_ib(patch_id)%length_z
         radius = patch_ib(patch_id)%radius
         inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
-
-        ! Initializing the pseudo volume fraction value to 1. The value will
-        ! be modified as the patch is laid out on the grid, but only in the
-        ! case that smearing of the cylindrical patch's boundary is enabled.
-        eta = 1._wp
 
         ! Checking whether the cylinder covers a particular cell in the
         ! domain and verifying whether the current patch has the permission
@@ -834,8 +786,8 @@ contains
         type(t_model) :: model
         type(ic_model_parameters) :: params
 
+        real(wp) :: eta
         real(wp), dimension(1:3) :: point, model_center
-
         real(wp) :: grid_mm(1:3, 1:2)
 
         integer :: cell_num
