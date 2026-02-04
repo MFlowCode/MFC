@@ -536,6 +536,11 @@ contains
 
         integer :: i, j, k, ib_patch_id !< Loop index variables
 
+        ib_patch_id = gp%ib_patch_id
+        i = gp%loc(1)
+        j = gp%loc(2)
+        k = gp%loc(3)
+
         radius = patch_ib(ib_patch_id)%radius
         center(1) = patch_ib(ib_patch_id)%x_centroid
         center(2) = patch_ib(ib_patch_id)%y_centroid

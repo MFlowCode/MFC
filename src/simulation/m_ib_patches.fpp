@@ -155,7 +155,6 @@ contains
                 end if
 
                 if (proc_rank == 0) then
-
                     print *, " * Transforming model."
                 end if
 
