@@ -15,8 +15,9 @@ echo ""
 echo "mfc: Running precheck before commit..."
 echo ""
 
-# Run precheck with parallel jobs
-if ./mfc.sh precheck -j 4; then
+# Run precheck with parallel jobs (auto-detect CPU count)
+JOBS=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
+if ./mfc.sh precheck -j "$JOBS"; then
     echo ""
     exit 0
 else
