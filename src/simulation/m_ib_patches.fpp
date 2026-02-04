@@ -138,7 +138,7 @@ contains
         real(wp), dimension(1:4, 1:4) :: transform, transform_n
 
         do patch_id = 1, num_ibs 
-            if (patch_ib(patch_id)%geometry == 6) then
+            if (patch_ib(patch_id)%geometry == 5) then
                 @:ALLOCATE(models(patch_id)%model)
 
                 print *, " * Reading model: "//trim(patch_ib(patch_id)%model_filepath)
