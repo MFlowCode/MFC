@@ -172,18 +172,18 @@ class TestCaseDictsIntegration(unittest.TestCase):
         """get_input_dict_keys should return target-specific params."""
         from ..run import case_dicts
 
-        # Each target gets a filtered subset of params
+        # Each target gets a filtered subset of params based on Fortran namelists
         pre_keys = case_dicts.get_input_dict_keys("pre_process")
         sim_keys = case_dicts.get_input_dict_keys("simulation")
         post_keys = case_dicts.get_input_dict_keys("post_process")
 
         # pre_process has most params (includes patch_icpp, patch_bc)
-        self.assertGreater(len(pre_keys), 3000)
+        self.assertGreater(len(pre_keys), 2500)
         # simulation and post_process have fewer (no patch_icpp, etc.)
-        self.assertGreater(len(sim_keys), 1000)
-        self.assertGreater(len(post_keys), 1000)
+        self.assertGreater(len(sim_keys), 500)
+        self.assertGreater(len(post_keys), 400)
 
-        # Verify target-specific filtering
+        # Verify target-specific filtering based on Fortran namelists
         self.assertIn("num_patches", pre_keys)
         self.assertNotIn("num_patches", sim_keys)
         self.assertNotIn("num_patches", post_keys)
@@ -191,6 +191,17 @@ class TestCaseDictsIntegration(unittest.TestCase):
         self.assertNotIn("run_time_info", pre_keys)
         self.assertIn("run_time_info", sim_keys)
         self.assertNotIn("run_time_info", post_keys)
+
+        # Verify indexed params are filtered correctly
+        patch_icpp_pre = [k for k in pre_keys if k.startswith("patch_icpp")]
+        patch_icpp_sim = [k for k in sim_keys if k.startswith("patch_icpp")]
+        self.assertGreater(len(patch_icpp_pre), 1000)  # Many patch_icpp params
+        self.assertEqual(len(patch_icpp_sim), 0)  # None in simulation
+
+        # Verify shared params are in all targets
+        self.assertIn("m", pre_keys)
+        self.assertIn("m", sim_keys)
+        self.assertIn("m", post_keys)
 
 
 class TestValidatorIntegration(unittest.TestCase):

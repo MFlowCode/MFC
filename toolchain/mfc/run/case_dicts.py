@@ -14,6 +14,7 @@ Exports:
 """
 # pylint: disable=import-outside-toplevel
 
+import re
 from ..state import ARG
 
 
@@ -41,121 +42,14 @@ def _get_validator_func():
     return REGISTRY.get_validator()
 
 
+def _get_target_params():
+    """Get valid params for each target by parsing Fortran namelists."""
+    from ..params.namelist_parser import get_target_params
+    return get_target_params()
+
+
 # Parameters to ignore during certain operations
 IGNORE = ["cantera_file", "chemistry"]
-
-# Parameters that are only valid for specific targets (not in their Fortran namelist)
-# These get excluded when generating .inp files for other targets
-# Derived from comparing the Fortran namelist definitions in each target's m_start_up.fpp
-
-# Params ONLY in pre_process (not in simulation or post_process)
-# These are initial condition and grid setup parameters
-_PRE_PROCESS_ONLY = {
-    # Patch/initial condition setup
-    "num_patches", "old_grid", "old_ic", "n_start_old",
-    # Grid stretching
-    "stretch_x", "stretch_y", "stretch_z", "a_x", "a_y", "a_z",
-    # Mixing layer
-    "mixlayer_vel_profile", "mixlayer_vel_coef", "mixlayer_perturb",
-    "mixlayer_perturb_nk", "mixlayer_perturb_k0",
-    # Flow perturbation
-    "perturb_flow", "perturb_flow_fluid", "perturb_flow_mag",
-    "perturb_sph", "perturb_sph_fluid", "fluid_rho",
-    # Domain loops
-    "loops_x", "loops_y", "loops_z",
-    # Bubble distribution (pre_process specific)
-    "sigV", "dist_type", "rhoRV",
-    # Hyperelasticity pre-stress
-    "pre_stress",
-    # Elliptic smoothing (grid generation)
-    "elliptic_smoothing", "elliptic_smoothing_iters",
-    # Simplex perturbation
-    "simplex_perturb", "simplex_params",
-}
-
-# Prefixes for indexed params that are pre_process-only
-# e.g., patch_icpp(1)%geometry, patch_bc(2)%vel(1)
-_PRE_PROCESS_ONLY_PREFIXES = ("patch_icpp(", "patch_bc(")
-
-# Params ONLY in simulation (not in pre_process OR post_process)
-_SIMULATION_ONLY = {
-    # Core simulation params
-    "run_time_info", "dt", "t_step_print", "time_stepper",
-    # WENO/reconstruction (not in post_process)
-    "weno_eps", "teno_CT", "wenoz_q", "mapped_weno", "wenoz", "teno",
-    "mp_weno", "weno_avg", "weno_Re_flux", "muscl_lim",
-    # Riemann solver
-    "riemann_solver", "wave_speeds", "low_Mach",
-    # Probes/integrals
-    "probe_wrt", "num_probes", "integral_wrt", "num_integrals",
-    # Physics
-    "null_weights", "bubble_model", "acoustic_source", "num_source", "acoustic",
-    # Adaptive dt
-    "adap_dt", "adap_dt_tol", "adap_dt_max_iters",
-    # MPI
-    "rdma_mpi",
-    # Damage
-    "tau_star", "cont_damage_s", "alpha_bar",
-    # MHD
-    "powell",
-    # IGR
-    "num_igr_iters", "num_igr_warm_start_iters", "alf_factor",
-    "igr_iter_solver", "igr_pres_lim",
-    # Interface compression
-    "int_comp", "ic_eps", "ic_beta",
-    # GPU memory
-    "nv_uvm_out_of_core", "nv_uvm_igr_temps_on_gpu", "nv_uvm_pref_gpu",
-    # Body forces
-    "bf_x", "bf_y", "bf_z", "k_x", "k_y", "k_z",
-    "w_x", "w_y", "w_z", "p_x", "p_y", "p_z",
-    "g_x", "g_y", "g_z",
-    # Hyper cleaning speed/tau
-    "hyper_cleaning_speed", "hyper_cleaning_tau",
-}
-
-# Prefixes for indexed params that are simulation-only
-# e.g., acoustic(1)%loc(1), probe(1)%x, integral(1)%x
-_SIMULATION_ONLY_PREFIXES = ("acoustic(", "probe(", "integral(", "lag_params%", "chem_params%")
-
-# Params in simulation AND post_process but NOT pre_process
-_SIM_AND_POST = {
-    "t_step_stop", "t_step_save", "t_stop", "t_save", "cfl_target",
-    "alt_soundspeed", "mixture_err", "fd_order", "avg_state", "prim_vars_wrt",
-}
-# Note: n_start is in ALL THREE namelists, so it's not excluded from any
-
-# Params in pre_process AND post_process but NOT simulation
-_PRE_AND_POST = {
-    "sigR",  # QBMM bubble distribution width
-}
-
-_POST_PROCESS_ONLY = {
-    # Output format
-    "format", "coarsen_silo", "fourier_modes",
-    # Field output flags (scalar versions)
-    "alpha_rho_wrt", "rho_wrt", "mom_wrt", "vel_wrt", "E_wrt", "pres_wrt",
-    "alpha_wrt", "gamma_wrt", "heat_ratio_wrt", "pi_inf_wrt", "pres_inf_wrt",
-    "cons_vars_wrt", "c_wrt", "omega_wrt", "qm_wrt", "liutex_wrt",
-    "schlieren_wrt", "schlieren_alpha", "kappa_wrt",
-    "flux_lim", "flux_wrt", "cf_wrt", "alpha_rho_e_wrt",
-    # Chemistry output
-    "chem_wrt_Y", "chem_wrt_T",
-    # Lagrange bubble output
-    "lag_header", "lag_txt_wrt", "lag_id_wrt", "lag_pos_wrt", "lag_pos_prev_wrt",
-    "lag_vel_wrt", "lag_rad_wrt", "lag_rvel_wrt", "lag_rmin_wrt", "lag_rmax_wrt",
-    "lag_pres_wrt", "lag_db_wrt", "lag_dphidt_wrt", "lag_mv_wrt", "lag_mg_wrt",
-    "lag_r0_wrt", "lag_betaT_wrt", "lag_betaC_wrt",
-    # Output domain
-    "output_partial_domain", "sim_data",
-    # Shear modulus
-    "G",
-}
-
-# Prefixes for indexed params that are post_process-only
-# e.g., omega_wrt(1), schlieren_alpha(1), x_output%beg
-_POST_PROCESS_ONLY_PREFIXES = (
-    "omega_wrt(", "schlieren_alpha(", "x_output%", "y_output%", "z_output%",
-)
 
 # Combined dict of all parameters
 ALL = _load_all_params()
@@ -167,33 +61,40 @@ CASE_OPTIMIZATION = _load_case_optimization_params()
 SCHEMA = _build_schema()
 
 
-def _is_pre_process_only(key: str) -> bool:
-    """Check if a parameter is pre_process-only (exact match or prefix match)."""
-    if key in _PRE_PROCESS_ONLY:
-        return True
-    # Check indexed params like patch_icpp(1)%geometry, patch_bc(2)%vel(1)
-    return key.startswith(_PRE_PROCESS_ONLY_PREFIXES)
+def _is_param_valid_for_target(param_name: str, target_name: str) -> bool:
+    """
+    Check if a parameter is valid for a given target.
 
+    Uses the Fortran namelist definitions as the source of truth.
+    Handles indexed params like "patch_icpp(1)%geometry" by checking base name.
 
-def _is_simulation_only(key: str) -> bool:
-    """Check if a parameter is simulation-only (exact match or prefix match)."""
-    if key in _SIMULATION_ONLY:
-        return True
-    # Check indexed params like acoustic(1)%loc(1), probe(1)%x
-    return key.startswith(_SIMULATION_ONLY_PREFIXES)
+    Args:
+        param_name: The parameter name (may include indices)
+        target_name: One of 'pre_process', 'simulation', 'post_process'
 
+    Returns:
+        True if the parameter is valid for the target
+    """
+    target_params = _get_target_params().get(target_name, set())
 
-def _is_post_process_only(key: str) -> bool:
-    """Check if a parameter is post_process-only (exact match or prefix match)."""
-    if key in _POST_PROCESS_ONLY:
-        return True
-    # Check indexed params like omega_wrt(1), schlieren_alpha(1)
-    return key.startswith(_POST_PROCESS_ONLY_PREFIXES)
+    # Extract base parameter name (before any index or attribute)
+    # e.g., "patch_icpp(1)%geometry" -> "patch_icpp"
+    # e.g., "fluid_pp(2)%gamma" -> "fluid_pp"
+    # e.g., "acoustic(1)%loc(1)" -> "acoustic"
+    match = re.match(r'^([a-zA-Z_][a-zA-Z0-9_]*)', param_name)
+    if match:
+        base_name = match.group(1)
+        return base_name in target_params
+
+    return param_name in target_params
 
 
 def get_input_dict_keys(target_name: str) -> list:
     """
     Get parameter keys for a given target.
+
+    Uses the Fortran namelist definitions as the source of truth.
+    Only returns params whose base name is in the target's namelist.
 
     Args:
         target_name: One of 'pre_process', 'simulation', 'post_process'
@@ -201,21 +102,7 @@ def get_input_dict_keys(target_name: str) -> list:
     Returns:
         List of parameter names valid for that target
     """
-    keys = list(ALL.keys())
-
-    # Filter out params that don't belong to this target's Fortran namelist
-    # Each target only accepts params in its Fortran namelist definition
-    if target_name == "pre_process":
-        # pre_process excludes simulation-only, sim+post shared, and post-only params
-        keys = [k for k in keys if not _is_simulation_only(k)
-                and k not in _SIM_AND_POST and not _is_post_process_only(k)]
-    elif target_name == "simulation":
-        # simulation excludes pre_process-only, post_process-only, and pre+post shared params
-        keys = [k for k in keys if not _is_pre_process_only(k)
-                and not _is_post_process_only(k) and k not in _PRE_AND_POST]
-    elif target_name == "post_process":
-        # post_process excludes pre_process-only and simulation-only params
-        keys = [k for k in keys if not _is_pre_process_only(k) and not _is_simulation_only(k)]
+    keys = [k for k in ALL.keys() if _is_param_valid_for_target(k, target_name)]
 
     # Case optimization filtering for simulation
     if ARG("case_optimization", dflt=False) and target_name == "simulation":
