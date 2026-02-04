@@ -15,11 +15,31 @@ show_help() {
   exit 0
 }
 
+# Cross-platform hash function (macOS uses md5, Linux uses md5sum)
+compute_hash() {
+    if command -v md5sum > /dev/null 2>&1; then
+        md5sum | cut -d' ' -f1
+    elif command -v md5 > /dev/null 2>&1; then
+        md5 -q
+    else
+        # Fallback: use cksum if neither available
+        cksum | cut -d' ' -f1
+    fi
+}
+
 JOBS=1
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -j|--jobs)
+            if [[ -z "$2" || "$2" == -* ]]; then
+                echo "Precheck: -j/--jobs requires a value."
+                exit 1
+            fi
+            if ! [[ "$2" =~ ^[0-9]+$ ]]; then
+                echo "Precheck: jobs value '$2' is not a valid number."
+                exit 1
+            fi
             JOBS="$2"
             shift
             ;;
@@ -43,15 +63,15 @@ echo ""
 # 1. Check formatting
 log "[$CYAN 1/4$COLOR_RESET] Checking$MAGENTA formatting$COLOR_RESET..."
 # Capture state before formatting
-BEFORE_HASH=$(git diff -- '*.f90' '*.fpp' '*.py' 2>/dev/null | md5sum | cut -d' ' -f1)
+BEFORE_HASH=$(git diff -- '*.f90' '*.fpp' '*.py' 2>/dev/null | compute_hash)
 if ! ./mfc.sh format -j "$JOBS" > /dev/null 2>&1; then
     error "Formatting check failed to run."
     FAILED=1
 else
     # Check if formatting changed any Fortran/Python files
-    AFTER_HASH=$(git diff -- '*.f90' '*.fpp' '*.py' 2>/dev/null | md5sum | cut -d' ' -f1)
+    AFTER_HASH=$(git diff -- '*.f90' '*.fpp' '*.py' 2>/dev/null | compute_hash)
     if [ "$BEFORE_HASH" != "$AFTER_HASH" ]; then
-        error "Code is not formatted. Run$MAGENTA ./mfc.sh format$COLOR_RESET to fix."
+        error "Code was not formatted. Files have been auto-formatted; review and stage the changes."
         echo ""
         git diff --stat -- '*.f90' '*.fpp' '*.py' 2>/dev/null || true
         echo ""
@@ -66,7 +86,7 @@ log "[$CYAN 2/4$COLOR_RESET] Running$MAGENTA spell check$COLOR_RESET..."
 if ./mfc.sh spelling > /dev/null 2>&1; then
     ok "Spell check passed."
 else
-    error "Spell check failed."
+    error "Spell check failed. Run$MAGENTA ./mfc.sh spelling$COLOR_RESET for details."
     FAILED=1
 fi
 
