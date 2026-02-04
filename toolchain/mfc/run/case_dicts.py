@@ -119,9 +119,10 @@ _SIMULATION_ONLY_PREFIXES = ("acoustic(", "probe(", "integral(", "lag_params%", 
 
 # Params in simulation AND post_process but NOT pre_process
 _SIM_AND_POST = {
-    "t_step_stop", "t_step_save", "t_stop", "t_save", "cfl_target", "n_start",
+    "t_step_stop", "t_step_save", "t_stop", "t_save", "cfl_target",
     "alt_soundspeed", "mixture_err", "fd_order", "avg_state", "prim_vars_wrt",
 }
+# Note: n_start is in ALL THREE namelists, so it's not excluded from any
 
 # Params in pre_process AND post_process but NOT simulation
 _PRE_AND_POST = {
