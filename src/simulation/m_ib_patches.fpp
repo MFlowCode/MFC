@@ -192,8 +192,8 @@ contains
         Np = Np1 + Np2 + 1
 
         if (.not. allocated(airfoil_grid_u)) then
-            allocate (airfoil_grid_u(1:Np))
-            allocate (airfoil_grid_l(1:Np))
+            @:ALLOCATE(airfoil_grid_u(1:Np))
+            @:ALLOCATE(airfoil_grid_l(1:Np))
 
             ! TODO :: The below instantiations are already handles by the loop below
             airfoil_grid_u(1)%x = 0._wp
@@ -245,6 +245,8 @@ contains
 
             airfoil_grid_l(Np)%x = ca_in
             airfoil_grid_l(Np)%y = 0._wp
+
+             $:GPU_UPDATE(device='[airfoil_grid_l,airfoil_grid_u]')
 
         end if
 

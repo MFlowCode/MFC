@@ -823,7 +823,7 @@ contains
             end if
         end do
 
-        call s_update_mib(num_ibs, levelset, levelset_norm)
+        call s_update_mib(num_ibs)
 
     end subroutine s_propagate_immersed_boundaries
 
