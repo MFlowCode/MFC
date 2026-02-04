@@ -185,13 +185,12 @@ module m_derived_types
 
     type :: t_model_array
         type(t_model), allocatable :: model
-        real(wp), allocatable, dimension(:, :, :) :: boundary_v                                                                 
-        real(wp), allocatable, dimension(:, :) :: interpolated_boundary_v                                                       
-        integer :: boundary_edge_count                                                                                          
-        integer :: total_vertices                                                                                               
-        logical :: interpolate        
+        real(wp), allocatable, dimension(:, :, :) :: boundary_v
+        real(wp), allocatable, dimension(:, :) :: interpolated_boundary_v
+        integer :: boundary_edge_count
+        integer :: total_vertices
+        logical :: interpolate
     end type t_model_array
-
 
     !> Derived type adding initial condition (ic) patch parameters as attributes
     !! NOTE: The requirements for the specification of the above parameters

@@ -281,7 +281,7 @@ contains
         dist_side = min(abs(z_cc(l) - z_min), abs(z_max - z_cc(l)))
 
         if (dist_side < dist_surf) then
-             gp%levelset = dist_side
+            gp%levelset = dist_side
             if (f_approx_equal(dist_side, abs(z_cc(l) - z_min))) then
                 gp%levelset_norm = (/0._wp, 0._wp, -1._wp/)
             else
@@ -289,7 +289,7 @@ contains
             end if
             gp%levelset_norm = matmul(rotation, gp%levelset_norm)
         else
-             gp%levelset = dist_surf
+            gp%levelset = dist_surf
             if (f_approx_equal(dist_surf, 0._wp)) then
                 gp%levelset_norm = 0._wp
             else
@@ -334,7 +334,7 @@ contains
         bottom_left(1) = -length_x/2
         bottom_left(2) = -length_y/2
 
-        ! convert grid to local coordiantes
+        ! convert grid to local coordinates
         xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]
         xy_local = matmul(inverse_rotation, xy_local)
 
@@ -616,7 +616,7 @@ contains
                         abs(boundary(2) - side_pos))
         ! get distance to curved side of cylinder
         dist_surface = norm2(xyz_local*dist_surface_vec) &
-                        - radius
+                       - radius
 
         if (dist_side < abs(dist_surface)) then
             ! if the closest edge is flat
@@ -652,7 +652,7 @@ contains
         real(wp), dimension(1:3) :: point
         real(wp) :: normals(1:3) !< Boundary normal buffer
         real(wp) :: distance
-        
+
         patch_id = gp%ib_patch_id
         i = gp%loc(1)
         j = gp%loc(2)
@@ -660,9 +660,9 @@ contains
 
         ! load in model values
         model = models(patch_id)%model
-        interpolate = models(patch_id)%interpolate                                                                            
-        boundary_edge_count = models(patch_id)%boundary_edge_count                                                                            
-        total_vertices = models(patch_id)%total_vertices                                                                            
+        interpolate = models(patch_id)%interpolate
+        boundary_edge_count = models(patch_id)%boundary_edge_count
+        total_vertices = models(patch_id)%total_vertices
         boundary_v => models(patch_id)%boundary_v
         interpolated_boundary_v => models(patch_id)%interpolated_boundary_v
 
@@ -709,9 +709,9 @@ contains
 
             ! Get the boundary normals
             call f_normals(boundary_v, &
-                            boundary_edge_count, &
-                            point, &
-                            normals)
+                           boundary_edge_count, &
+                           point, &
+                           normals)
 
             ! Assign the levelset_norm
             gp%levelset_norm = normals(1:3)

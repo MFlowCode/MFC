@@ -137,7 +137,7 @@ contains
 
         real(wp), dimension(1:4, 1:4) :: transform, transform_n
 
-        do patch_id = 1, num_ibs 
+        do patch_id = 1, num_ibs
             if (patch_ib(patch_id)%geometry == 5) then
                 @:ALLOCATE(models(patch_id)%model)
 
@@ -226,15 +226,15 @@ contains
                     write (*, "(A, 3(2X, F20.10))") "    >         Max:", grid_mm(:, 2)
                 end if
 
-                models(patch_id)%model = model                                                                                              
-                models(patch_id)%boundary_v = boundary_v                                                                                    
-                models(patch_id)%boundary_edge_count = boundary_edge_count                                                                  
-                models(patch_id)%interpolate = interpolate                                                                                  
-                if (interpolate) then                                                                                                       
-                    models(patch_id)%interpolated_boundary_v = interpolated_boundary_v                                                      
-                    models(patch_id)%total_vertices = total_vertices                                                                        
-                end if  
-                        
+                models(patch_id)%model = model
+                models(patch_id)%boundary_v = boundary_v
+                models(patch_id)%boundary_edge_count = boundary_edge_count
+                models(patch_id)%interpolate = interpolate
+                if (interpolate) then
+                    models(patch_id)%interpolated_boundary_v = interpolated_boundary_v
+                    models(patch_id)%total_vertices = total_vertices
+                end if
+
             end if
         end do
 
@@ -377,7 +377,7 @@ contains
             airfoil_grid_l(Np)%x = ca_in
             airfoil_grid_l(Np)%y = 0._wp
 
-             $:GPU_UPDATE(device='[airfoil_grid_l,airfoil_grid_u]')
+            $:GPU_UPDATE(device='[airfoil_grid_l,airfoil_grid_u]')
 
         end if
 

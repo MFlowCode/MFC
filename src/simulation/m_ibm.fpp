@@ -494,8 +494,8 @@ contains
                             print *, "Ghost Point is located at ", [x_cc(i), y_cc(j), z_cc(k)], " while moving in dimension ", dim
                             print *, "We are searching for image point at ", ghost_points_in(q)%ip_loc(:)
                             print *, "We can only support points located inside the box from ", [x_cc(-buff_size), y_cc(-buff_size), z_cc(-buff_size)]
-                            print *, "To ", [x_cc( m + buff_size - 1), y_cc(n + buff_size - 1), z_cc(p + buff_size - 1)]
-                            print *, "Image point is located approximately ", (ghost_points_in(q)%loc(dim) - ghost_points_in(q)%ip_loc(dim)) / (s_cc(1) - s_cc(0)), " grid cells away"
+                            print *, "To ", [x_cc(m + buff_size - 1), y_cc(n + buff_size - 1), z_cc(p + buff_size - 1)]
+                            print *, "Image point is located approximately ", (ghost_points_in(q)%loc(dim) - ghost_points_in(q)%ip_loc(dim))/(s_cc(1) - s_cc(0)), " grid cells away"
                             print *, "Levelset ", dist, " and Norm: ", norm(:)
                             print *, "A short term fix may include increasing buff_size further in m_helper_basic (currently set to a minimum of 10)"
                             error stop "Ghost Point and Image Point on Different Processors"
