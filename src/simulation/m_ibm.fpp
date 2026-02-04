@@ -94,6 +94,9 @@ contains
         end do
         $:GPU_ENTER_DATA(copyin='[patch_ib]')
 
+        ! allocate STL models
+        call s_instantiate_STL_models()
+
         ! recompute the new ib_patch locations and broadcast them.
         ib_markers%sf = 0._wp
         call s_apply_ib_patches(ib_markers%sf(0:m, 0:n, 0:p))

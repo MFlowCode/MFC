@@ -182,6 +182,11 @@ module m_derived_types
         type(t_triangle), allocatable :: trs(:) ! Triangles
     end type t_model
 
+    type :: t_model_array
+        type(t_model), allocatable :: model
+    end type t_model_array
+
+
     !> Derived type adding initial condition (ic) patch parameters as attributes
     !! NOTE: The requirements for the specification of the above parameters
     !! are strongly dependent on both the choice of the multicomponent flow

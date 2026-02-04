@@ -637,4 +637,77 @@ impure subroutine s_apply_levelset(gps, num_gps)
 
     end subroutine s_cylinder_levelset
 
+    !> The STL patch is a 2/3D geometry that is imported from an STL file.
+    !! @param patch_id is the patch identifier
+    !! @param STL_levelset STL levelset
+    !! @param STL_levelset_norm STL levelset normals
+    subroutine s_model_levelset(gp)
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        type(ghost_point), intent(inout) :: gp
+
+        integer :: i, j, k, patch_id
+        type(t_model) :: model
+        real(wp), dimension(1:3) :: point
+        
+        patch_id = gp%ib_patch_id
+        model = models(patch_id)%model
+
+        i = gp%loc(1)
+        j = gp%loc(2)
+        k = gp%loc(3)
+
+        point = (/x_cc(i), y_cc(j), 0._wp/)
+        if (p > 0) then
+            point(3) = z_cc(k)
+        end if
+
+        if (grid_geometry == 3) then
+            point = f_convert_cyl_to_cart(point)
+        end if
+
+        ! 3D models
+        if (p > 0) then
+
+            ! Get the boundary normals and shortest distance between the cell center and the model boundary
+            call f_distance_normals_3D(model, point, normals, distance)
+
+            ! Get the shortest distance between the cell center and the interpolated model boundary
+            if (interpolate) then
+                gp%levelset = f_interpolated_distance(interpolated_boundary_v, total_vertices, point)
+            else
+                gp%levelset = distance
+            end if
+
+            ! Correct the sign of the levelset
+            gp%levelset = -abs(gp%levelset)
+
+            ! Assign the levelset_norm
+            gp%levelset_norm = normals(1:3)
+        else
+            ! 2D models
+            if (interpolate) then
+                ! Get the shortest distance between the cell center and the model boundary
+                gp%levelset = f_interpolated_distance(interpolated_boundary_v, total_vertices, point)
+            else
+                ! Get the shortest distance between the cell center and the interpolated model boundary
+                gp%levelset = f_distance(boundary_v, boundary_edge_count, point)
+            end if
+
+            ! Correct the sign of the levelset
+            gp%levelset = -abs(gp%levelset)
+
+            ! Get the boundary normals
+            call f_normals(boundary_v, &
+                            boundary_edge_count, &
+                            point, &
+                            normals)
+
+            ! Assign the levelset_norm
+            gp%levelset_norm = normals(1:3)
+
+        end if
+
+    end subroutine s_model_levelset
+
 end module m_compute_levelset
