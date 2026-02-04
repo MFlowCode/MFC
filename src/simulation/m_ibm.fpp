@@ -69,6 +69,8 @@ contains
                 -buff_size:n+buff_size, 0:0))
         end if
 
+        @:ALLOCATE(models(num_ibs))
+
         @:ACC_SETUP_SFs(ib_markers)
 
         $:GPU_ENTER_DATA(copyin='[num_gps,num_inner_gps]')

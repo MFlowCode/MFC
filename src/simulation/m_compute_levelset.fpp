@@ -8,6 +8,10 @@
 !!              boundary methods (IBMs)
 module m_compute_levelset
 
+    use m_ib_patches           !< The IB patch parameters
+
+    use m_model                !< Subroutine(s) related to STL files
+
     use m_derived_types        !< Definitions of the derived types
 
     use m_global_parameters    !< Definitions of the global parameters
@@ -22,20 +26,21 @@ module m_compute_levelset
 
 contains
 
-impure subroutine s_apply_levelset(gps, num_gps)
+    impure subroutine s_apply_levelset(gps, num_gps)
 
         type(ghost_point), dimension(:), intent(inout) :: gps
+        integer, intent(in) :: num_gps
 
         integer :: i, patch_id, patch_geometry
 
         !  3D Patch Geometries
         if (p > 0) then
 
-            $:GPU_PARALLEL_LOOP(private='[i]', copy='[gps]', copyin='[ib_patches]')
+            $:GPU_PARALLEL_LOOP(private='[i]', copy='[gps]', copyin='[patch_ib]')
             do i = 1, num_gps
 
                 patch_id = gps(i)%ib_patch_id
-                patch_geometry = ib_patches(patch_id)%geometry
+                patch_geometry = patch_ib(patch_id)%geometry
 
                 if (patch_geometry == 8) then
                     call s_sphere_levelset(gps(i))
@@ -56,11 +61,11 @@ impure subroutine s_apply_levelset(gps, num_gps)
             ! 2D Patch Geometries
         elseif (n > 0) then
 
-            $:GPU_PARALLEL_LOOP(private='[i]', copy='[gps]', copyin='[ib_patches]')
+            $:GPU_PARALLEL_LOOP(private='[i]', copy='[gps]', copyin='[patch_ib]')
             do i = 1, num_gps
 
                 patch_id = gps(i)%ib_patch_id
-                patch_geometry = ib_patches(patch_id)%geometry
+                patch_geometry = patch_ib(patch_id)%geometry
 
                 if (patch_geometry == 2) then
                     call s_circle_levelset(gps(i))
@@ -209,7 +214,7 @@ impure subroutine s_apply_levelset(gps, num_gps)
 
         real(wp) :: length_z
 
-        integer :: i, j, k, l ib_patch_id !< Loop index variables
+        integer :: i, j, k, l, ib_patch_id !< Loop index variables
 
         ib_patch_id = gp%ib_patch_id
         i = gp%loc(1)
@@ -300,7 +305,6 @@ impure subroutine s_apply_levelset(gps, num_gps)
 
         type(ghost_point), intent(inout) :: gp
 
-        integer, intent(in) :: ib_patch_id
         real(wp) :: top_right(2), bottom_left(2)
         real(wp) :: min_dist
         real(wp) :: side_dists(4)
@@ -375,7 +379,6 @@ impure subroutine s_apply_levelset(gps, num_gps)
 
         type(ghost_point), intent(inout) :: gp
 
-        integer, intent(in) :: ib_patch_id
         real(wp) :: ellipse_coeffs(2) ! a and b in the ellipse equation
         real(wp) :: quadratic_coeffs(3) ! A, B, C in the quadratic equation to compute levelset
 
@@ -429,7 +432,6 @@ impure subroutine s_apply_levelset(gps, num_gps)
 
         type(ghost_point), intent(inout) :: gp
 
-        integer, intent(IN) :: ib_patch_id
         real(wp) :: Right, Left, Bottom, Top, Front, Back
         real(wp) :: min_dist
         real(wp) :: side_dists(6)
@@ -532,32 +534,23 @@ impure subroutine s_apply_levelset(gps, num_gps)
         real(wp) :: radius, dist
         real(wp), dimension(3) :: dist_vec, center
 
-        integer :: i, j, k !< Loop index variables
+        integer :: i, j, k, ib_patch_id !< Loop index variables
 
         radius = patch_ib(ib_patch_id)%radius
         center(1) = patch_ib(ib_patch_id)%x_centroid
         center(2) = patch_ib(ib_patch_id)%y_centroid
         center(3) = patch_ib(ib_patch_id)%z_centroid
 
-        $:GPU_PARALLEL_LOOP(private='[i,j,k,dist_vec,dist]', &
-                  & copyin='[ib_patch_id,center,radius]', collapse=3)
-        do i = 0, m
-            do j = 0, n
-                do k = 0, p
-                    dist_vec(1) = x_cc(i) - center(1)
-                    dist_vec(2) = y_cc(j) - center(2)
-                    dist_vec(3) = z_cc(k) - center(3)
-                    dist = sqrt(sum(dist_vec**2))
-                    levelset%sf(i, j, k, ib_patch_id) = dist - radius
-                    if (f_approx_equal(dist, 0._wp)) then
-                        levelset_norm%sf(i, j, k, ib_patch_id, :) = (/1, 0, 0/)
-                    else
-                        levelset_norm%sf(i, j, k, ib_patch_id, :) = dist_vec(:)/dist
-                    end if
-                end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
+        dist_vec(1) = x_cc(i) - center(1)
+        dist_vec(2) = y_cc(j) - center(2)
+        dist_vec(3) = z_cc(k) - center(3)
+        dist = sqrt(sum(dist_vec**2))
+        gp%levelset = dist - radius
+        if (f_approx_equal(dist, 0._wp)) then
+            gp%levelset_norm = (/1, 0, 0/)
+        else
+            gp%levelset_norm = dist_vec(:)/dist
+        end if
 
     end subroutine s_sphere_levelset
 
@@ -646,17 +639,29 @@ impure subroutine s_apply_levelset(gps, num_gps)
 
         type(ghost_point), intent(inout) :: gp
 
-        integer :: i, j, k, patch_id
+        integer :: i, j, k, patch_id, boundary_edge_count, total_vertices
         type(t_model) :: model
+        real(wp), pointer, dimension(:, :, :) :: boundary_v
+        real(wp), pointer, dimension(:, :) :: interpolated_boundary_v
+        logical :: interpolate
         real(wp), dimension(1:3) :: point
+        real(wp) :: normals(1:3) !< Boundary normal buffer
+        real(wp) :: distance
         
         patch_id = gp%ib_patch_id
-        model = models(patch_id)%model
-
         i = gp%loc(1)
         j = gp%loc(2)
         k = gp%loc(3)
 
+        ! load in model values
+        model = models(patch_id)%model
+        interpolate = models(patch_id)%interpolate                                                                            
+        boundary_edge_count = models(patch_id)%boundary_edge_count                                                                            
+        total_vertices = models(patch_id)%total_vertices                                                                            
+        boundary_v => models(patch_id)%boundary_v
+        interpolated_boundary_v => models(patch_id)%interpolated_boundary_v
+
+        ! determine where we are located in space
         point = (/x_cc(i), y_cc(j), 0._wp/)
         if (p > 0) then
             point(3) = z_cc(k)

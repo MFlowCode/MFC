@@ -124,15 +124,11 @@ contains
 
     !! @param q_cons_vf Conservative variables
     !! @param ib_markers track if a cell is within the immersed boundary
-    !! @param levelset closest distance from every cell to the IB
-    !! @param levelset_norm normalized vector from every cell to the closest point to the IB
     !! @param beta Eulerian void fraction from lagrangian bubbles
-    impure subroutine s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm, beta)
+    impure subroutine s_initialize_mpi_data(q_cons_vf, ib_markers, beta)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         type(integer_field), optional, intent(in) :: ib_markers
-        type(levelset_field), optional, intent(IN) :: levelset
-        type(levelset_norm_field), optional, intent(IN) :: levelset_norm
         type(scalar_field), intent(in), optional :: beta
 
         integer, dimension(num_dims) :: sizes_glb, sizes_loc

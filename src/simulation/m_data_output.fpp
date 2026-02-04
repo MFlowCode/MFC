@@ -839,7 +839,7 @@ contains
                 call s_initialize_mpi_data_ds(q_cons_temp_ds)
             else
                 if (ib) then
-                    call s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm)
+                    call s_initialize_mpi_data(q_cons_vf, ib_markers)
                 else
                     call s_initialize_mpi_data(q_cons_vf)
                 end if
@@ -932,7 +932,7 @@ contains
             ! Initialize MPI data I/O
 
             if (ib) then
-                call s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm)
+                call s_initialize_mpi_data(q_cons_vf, ib_markers)
             elseif (present(beta)) then
                 call s_initialize_mpi_data(q_cons_vf, beta=beta)
             else

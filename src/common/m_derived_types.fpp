@@ -180,10 +180,16 @@ module m_derived_types
     type :: t_model
         integer :: ntrs   ! Number of triangles
         type(t_triangle), allocatable :: trs(:) ! Triangles
+
     end type t_model
 
     type :: t_model_array
         type(t_model), allocatable :: model
+        real(wp), allocatable, dimension(:, :, :) :: boundary_v                                                                 
+        real(wp), allocatable, dimension(:, :) :: interpolated_boundary_v                                                       
+        integer :: boundary_edge_count                                                                                          
+        integer :: total_vertices                                                                                               
+        logical :: interpolate        
     end type t_model_array
 
 

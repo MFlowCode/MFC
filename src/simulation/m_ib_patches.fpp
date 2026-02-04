@@ -25,7 +25,7 @@ module m_ib_patches
 
     implicit none
 
-    private; public :: s_apply_ib_patches, s_update_ib_rotation_matrix
+    private; public :: s_apply_ib_patches, s_update_ib_rotation_matrix, s_instantiate_STL_models, models, f_convert_cyl_to_cart
 
     real(wp) :: x_centroid, y_centroid, z_centroid
     real(wp) :: length_x, length_y, length_z
@@ -55,8 +55,7 @@ module m_ib_patches
 
     character(len=5) :: istr ! string to store int to string result for error checking
 
-    type(t_model_array), allocatable :: models(:)
-    @ALLOCATE(models(num_ibs))
+    type(t_model_array), allocatable, target :: models(:)
     !! array of STL models that can be allocated and then used in IB marker and levelset compute
 
 contains
@@ -140,7 +139,7 @@ contains
 
         do patch_id = 1, num_ibs 
             if (patch_ib(patch_id)%geometry == 6) then
-                @ALLOCATE(models(patch_id)%model)
+                @:ALLOCATE(models(patch_id)%model)
 
                 print *, " * Reading model: "//trim(patch_ib(patch_id)%model_filepath)
 
@@ -156,6 +155,7 @@ contains
                 end if
 
                 if (proc_rank == 0) then
+
                     print *, " * Transforming model."
                 end if
 
@@ -213,9 +213,6 @@ contains
                     write (*, "(A, 3(2X, F20.10))") "    >         Cen:", (bbox%min(1:3) + bbox%max(1:3))/2._wp
                     write (*, "(A, 3(2X, F20.10))") "    >         Max:", bbox%max(1:3)
 
-                    !call s_model_write("__out__.stl", model)
-                    !call s_model_write("__out__.obj", model)
-
                     grid_mm(1, :) = (/minval(x_cc(0:m)) - 0.e5_wp*dx(0), maxval(x_cc(0:m)) + 0.e5_wp*dx(m)/)
                     grid_mm(2, :) = (/minval(y_cc(0:n)) - 0.e5_wp*dy(0), maxval(y_cc(0:n)) + 0.e5_wp*dy(n)/)
 
@@ -230,10 +227,19 @@ contains
                     write (*, "(A, 3(2X, F20.10))") "    >         Max:", grid_mm(:, 2)
                 end if
 
-                models(patch_id)%model = model
+                models(patch_id)%model = model                                                                                              
+                models(patch_id)%boundary_v = boundary_v                                                                                    
+                models(patch_id)%boundary_edge_count = boundary_edge_count                                                                  
+                models(patch_id)%interpolate = interpolate                                                                                  
+                if (interpolate) then                                                                                                       
+                    models(patch_id)%interpolated_boundary_v = interpolated_boundary_v                                                      
+                    models(patch_id)%total_vertices = total_vertices                                                                        
+                end if  
                         
             end if
         end do
+
+        $:GPU_UPDATE(device='[models]')
 
     end subroutine s_instantiate_STL_models
 
@@ -484,8 +490,6 @@ contains
 
             z_max = lz/2
             z_min = -lz/2
-
-            eta = 1._wp
 
             do i = 1, Np1 + Np2 - 1
                 if (i <= Np1) then
@@ -924,7 +928,9 @@ contains
         model = models(patch_id)%model
 
         ncells = (m + 1)*(n + 1)*(p + 1)
-        do i = 0, m; do j = 0, n; do k = 0, p
+        do i = 0, m
+            do j = 0, n
+                do k = 0, p
 
                     cell_num = i*(n + 1)*(p + 1) + j*(p + 1) + (k + 1)
                     if (proc_rank == 0 .and. mod(cell_num, ncells/100) == 0) then
@@ -953,7 +959,9 @@ contains
                         ib_markers_sf(i, j, k) = patch_id
                     end if
 
-                end do; end do; end do
+                end do
+            end do
+        end do
 
         if (proc_rank == 0) then
             print *, ""
