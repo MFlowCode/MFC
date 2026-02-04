@@ -1,12 +1,68 @@
 #!/usr/bin/env python3
 
-import signal, getpass, platform, itertools
+import os, signal, getpass, platform, itertools
 
 # Only import what's needed for startup - other modules are loaded lazily
 from mfc         import args, lock, state
 from mfc.state   import ARG
-from mfc.common  import MFC_LOGO, MFCException, quit, format_list_to_string, does_command_exist, setup_debug_logging
+from mfc.common  import MFC_LOGO, MFC_ROOT_DIR, MFCException, quit, format_list_to_string, does_command_exist, setup_debug_logging
 from mfc.printer import cons
+
+
+def __do_regenerate(toolchain: str):
+    """Perform the actual regeneration of completion scripts and schema."""
+    import json  # pylint: disable=import-outside-toplevel
+    from pathlib import Path  # pylint: disable=import-outside-toplevel
+    from mfc.cli.commands import MFC_CLI_SCHEMA  # pylint: disable=import-outside-toplevel
+    from mfc.cli.completion_gen import generate_bash_completion, generate_zsh_completion  # pylint: disable=import-outside-toplevel
+    from mfc.params.generators.json_schema_gen import generate_json_schema  # pylint: disable=import-outside-toplevel
+
+    cons.print("[dim]Auto-regenerating completion scripts...[/dim]")
+
+    completions_dir = Path(toolchain) / "completions"
+    completions_dir.mkdir(exist_ok=True)
+
+    # Generate completion files
+    (completions_dir / "mfc.bash").write_text(generate_bash_completion(MFC_CLI_SCHEMA))
+    (completions_dir / "_mfc").write_text(generate_zsh_completion(MFC_CLI_SCHEMA))
+
+    # Generate JSON schema
+    schema = generate_json_schema(include_descriptions=True)
+    with open(Path(toolchain) / "mfc-case-schema.json", 'w', encoding='utf-8') as f:
+        json.dump(schema, f, indent=2)
+
+
+def __ensure_generated_files():
+    """Auto-regenerate completion scripts and docs if source files have changed."""
+    toolchain = os.path.join(MFC_ROOT_DIR, "toolchain")
+
+    # Source files that trigger regeneration
+    sources = [
+        os.path.join(toolchain, "mfc", "cli", "commands.py"),
+        os.path.join(toolchain, "mfc", "cli", "completion_gen.py"),
+        os.path.join(toolchain, "mfc", "params", "definitions.py"),
+    ]
+
+    # Generated files to check
+    generated = [
+        os.path.join(toolchain, "completions", "mfc.bash"),
+        os.path.join(toolchain, "mfc-case-schema.json"),
+    ]
+
+    # Get max mtime of source files
+    try:
+        source_mtime = max(os.path.getmtime(s) for s in sources if os.path.exists(s))
+    except ValueError:
+        return  # No source files found, skip check
+
+    # Check if any generated file is missing or older than sources
+    needs_regen = any(
+        not os.path.exists(g) or os.path.getmtime(g) < source_mtime
+        for g in generated
+    )
+
+    if needs_regen:
+        __do_regenerate(toolchain)
 
 def __print_greeting():
     MFC_LOGO_LINES       = MFC_LOGO.splitlines()
@@ -109,6 +165,9 @@ if __name__ == "__main__":
         # Ensure IDE configuration is up to date (lightweight check)
         from mfc.ide import ensure_vscode_settings  # pylint: disable=import-outside-toplevel
         ensure_vscode_settings()
+
+        # Auto-regenerate completion scripts if source files changed
+        __ensure_generated_files()
 
         __print_greeting()
         __checks()
