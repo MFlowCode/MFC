@@ -46,7 +46,36 @@ IGNORE = ["cantera_file", "chemistry"]
 
 # Parameters that are only valid for specific targets (not in their Fortran namelist)
 # These get excluded when generating .inp files for other targets
-# Extracted from master branch's separate PRE_PROCESS/SIMULATION/POST_PROCESS dicts
+# Derived from comparing the Fortran namelist definitions in each target's m_start_up.fpp
+
+# Params ONLY in pre_process (not in simulation or post_process)
+# These are initial condition and grid setup parameters
+_PRE_PROCESS_ONLY = {
+    # Patch/initial condition setup
+    "num_patches", "old_grid", "old_ic", "n_start_old",
+    # Grid stretching
+    "stretch_x", "stretch_y", "stretch_z", "a_x", "a_y", "a_z",
+    # Mixing layer
+    "mixlayer_vel_profile", "mixlayer_vel_coef", "mixlayer_perturb",
+    "mixlayer_perturb_nk", "mixlayer_perturb_k0",
+    # Flow perturbation
+    "perturb_flow", "perturb_flow_fluid", "perturb_flow_mag",
+    "perturb_sph", "perturb_sph_fluid", "fluid_rho",
+    # Domain loops
+    "loops_x", "loops_y", "loops_z",
+    # Bubble distribution (pre_process specific)
+    "sigV", "dist_type", "rhoRV",
+    # Hyperelasticity pre-stress
+    "pre_stress",
+    # Elliptic smoothing (grid generation)
+    "elliptic_smoothing", "elliptic_smoothing_iters",
+    # Simplex perturbation
+    "simplex_perturb", "simplex_params",
+}
+
+# Prefixes for indexed params that are pre_process-only
+# e.g., patch_icpp(1)%geometry, patch_bc(2)%vel(1)
+_PRE_PROCESS_ONLY_PREFIXES = ("patch_icpp(", "patch_bc(")
 
 # Params ONLY in simulation (not in pre_process OR post_process)
 _SIMULATION_ONLY = {
@@ -111,6 +140,14 @@ CASE_OPTIMIZATION = _load_case_optimization_params()
 SCHEMA = _build_schema()
 
 
+def _is_pre_process_only(key: str) -> bool:
+    """Check if a parameter is pre_process-only (exact match or prefix match)."""
+    if key in _PRE_PROCESS_ONLY:
+        return True
+    # Check indexed params like patch_icpp(1)%geometry, patch_bc(2)%vel(1)
+    return key.startswith(_PRE_PROCESS_ONLY_PREFIXES)
+
+
 def get_input_dict_keys(target_name: str) -> list:
     """
     Get parameter keys for a given target.
@@ -124,14 +161,17 @@ def get_input_dict_keys(target_name: str) -> list:
     keys = list(ALL.keys())
 
     # Filter out params that don't belong to this target's Fortran namelist
+    # Each target only accepts params in its Fortran namelist definition
     if target_name == "pre_process":
         # pre_process excludes simulation-only, sim+post shared, and post-only params
         exclude = _SIMULATION_ONLY | _SIM_AND_POST | _POST_PROCESS_ONLY
         keys = [k for k in keys if k not in exclude]
+    elif target_name == "simulation":
+        # simulation excludes pre_process-only and post_process-only params
+        keys = [k for k in keys if not _is_pre_process_only(k) and k not in _POST_PROCESS_ONLY]
     elif target_name == "post_process":
-        # post_process excludes only truly simulation-only params
-        keys = [k for k in keys if k not in _SIMULATION_ONLY]
-    # simulation accepts all params
+        # post_process excludes pre_process-only and simulation-only params
+        keys = [k for k in keys if not _is_pre_process_only(k) and k not in _SIMULATION_ONLY]
 
     # Case optimization filtering for simulation
     if ARG("case_optimization", dflt=False) and target_name == "simulation":

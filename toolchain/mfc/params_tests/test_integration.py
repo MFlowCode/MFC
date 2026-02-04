@@ -169,11 +169,28 @@ class TestCaseDictsIntegration(unittest.TestCase):
         self.assertTrue(callable(validator))
 
     def test_get_input_dict_keys(self):
-        """get_input_dict_keys should return all params."""
+        """get_input_dict_keys should return target-specific params."""
         from ..run import case_dicts
 
-        keys = case_dicts.get_input_dict_keys("simulation")
-        self.assertEqual(len(keys), len(case_dicts.ALL))
+        # Each target gets a filtered subset of params
+        pre_keys = case_dicts.get_input_dict_keys("pre_process")
+        sim_keys = case_dicts.get_input_dict_keys("simulation")
+        post_keys = case_dicts.get_input_dict_keys("post_process")
+
+        # pre_process has most params (includes patch_icpp, patch_bc)
+        self.assertGreater(len(pre_keys), 3000)
+        # simulation and post_process have fewer (no patch_icpp, etc.)
+        self.assertGreater(len(sim_keys), 1000)
+        self.assertGreater(len(post_keys), 1000)
+
+        # Verify target-specific filtering
+        self.assertIn("num_patches", pre_keys)
+        self.assertNotIn("num_patches", sim_keys)
+        self.assertNotIn("num_patches", post_keys)
+
+        self.assertNotIn("run_time_info", pre_keys)
+        self.assertIn("run_time_info", sim_keys)
+        self.assertNotIn("run_time_info", post_keys)
 
 
 class TestValidatorIntegration(unittest.TestCase):
