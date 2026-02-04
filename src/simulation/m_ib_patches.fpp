@@ -901,32 +901,21 @@ contains
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: ib_markers_sf
 
-        ! Variables for IBM+STL
-        real(wp) :: normals(1:3) !< Boundary normal buffer
-        integer :: boundary_vertex_count, boundary_edge_count, total_vertices !< Boundary vertex
-        real(wp), allocatable, dimension(:, :, :) :: boundary_v !< Boundary vertex buffer
-        real(wp), allocatable, dimension(:, :) :: interpolated_boundary_v !< Interpolated vertex buffer
-        real(wp) :: distance !< Levelset distance buffer
-        logical :: interpolate !< Logical variable to determine whether or not the model should be interpolated
-
         integer :: i, j, k !< Generic loop iterators
 
-        type(t_bbox) :: bbox, bbox_old
         type(t_model) :: model
-        type(ic_model_parameters) :: params
 
         real(wp) :: eta
-        real(wp), dimension(1:3) :: point, model_center
-        real(wp) :: grid_mm(1:3, 1:2)
+        real(wp), dimension(1:3) :: point
 
         integer :: cell_num
         integer :: ncells
 
-        real(wp), dimension(1:4, 1:4) :: transform, transform_n
-
         model = models(patch_id)%model
 
         ncells = (m + 1)*(n + 1)*(p + 1)
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,point,cell_num]', copy='[ib_markers_sf]',&
+                  & copyin='[patch_id,x_cc,y_cc,ncells,model]', collapse=3)
         do i = 0, m
             do j = 0, n
                 do k = 0, p
@@ -961,13 +950,7 @@ contains
                 end do
             end do
         end do
-
-        if (proc_rank == 0) then
-            print *, ""
-            print *, " * Cleaning up."
-        end if
-
-        call s_model_free(model)
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_ib_model
 
