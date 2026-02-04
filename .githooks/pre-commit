@@ -1,0 +1,27 @@
+#!/bin/bash
+
+# MFC pre-commit hook
+# Runs ./mfc.sh precheck before allowing commits
+# Bypass with: git commit --no-verify
+
+# Only run if we're in the MFC repo root (where mfc.sh exists)
+if [ ! -f "$(git rev-parse --show-toplevel)/mfc.sh" ]; then
+    exit 0
+fi
+
+cd "$(git rev-parse --show-toplevel)"
+
+echo ""
+echo "mfc: Running precheck before commit..."
+echo ""
+
+# Run precheck with parallel jobs
+if ./mfc.sh precheck -j 4; then
+    echo ""
+    exit 0
+else
+    echo ""
+    echo "mfc: Commit blocked. Fix issues above or use 'git commit --no-verify' to bypass."
+    echo ""
+    exit 1
+fi

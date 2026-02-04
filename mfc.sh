@@ -10,6 +10,12 @@ fi
 # Load utility script
 . "$(pwd)/toolchain/util.sh"
 
+# Auto-install git pre-commit hook (once, silently)
+if [ -d "$(pwd)/.git" ] && [ ! -e "$(pwd)/.git/hooks/pre-commit" ] && [ -f "$(pwd)/.githooks/pre-commit" ]; then
+    ln -sf "$(pwd)/.githooks/pre-commit" "$(pwd)/.git/hooks/pre-commit"
+    log "Installed git pre-commit hook (runs$MAGENTA ./mfc.sh precheck$COLOR_RESET before commits)."
+fi
+
 # Handle upgrading from older MFC build systems
 if [ -d "$(pwd)/bootstrap" ] || [ -d "$(pwd)/dependencies" ] || [ -f "$(pwd)/build/mfc.lock.yaml" ]; then
     error "Please remove, if applicable, the following directories:"
