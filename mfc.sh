@@ -40,6 +40,10 @@ elif [ "$1" '==' "spelling" ]; then
     . "$(pwd)/toolchain/bootstrap/python.sh"
 
     shift; . "$(pwd)/toolchain/bootstrap/spelling.sh" $@; exit 0
+elif [ "$1" '==' "precheck" ]; then
+    . "$(pwd)/toolchain/bootstrap/python.sh"
+
+    shift; . "$(pwd)/toolchain/bootstrap/precheck.sh" $@; exit 0
 fi
 
 mkdir -p "$(pwd)/build"
