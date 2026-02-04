@@ -131,19 +131,30 @@ _PRE_AND_POST = {
 _POST_PROCESS_ONLY = {
     # Output format
     "format", "coarsen_silo", "fourier_modes",
-    # Field output flags
+    # Field output flags (scalar versions)
     "alpha_rho_wrt", "rho_wrt", "mom_wrt", "vel_wrt", "E_wrt", "pres_wrt",
     "alpha_wrt", "gamma_wrt", "heat_ratio_wrt", "pi_inf_wrt", "pres_inf_wrt",
     "cons_vars_wrt", "c_wrt", "omega_wrt", "qm_wrt", "liutex_wrt",
     "schlieren_wrt", "schlieren_alpha", "kappa_wrt",
-    "flux_lim", "flux_wrt", "cf_wrt",
+    "flux_lim", "flux_wrt", "cf_wrt", "alpha_rho_e_wrt",
+    # Chemistry output
+    "chem_wrt_Y", "chem_wrt_T",
     # Lagrange bubble output
     "lag_header", "lag_txt_wrt", "lag_id_wrt", "lag_pos_wrt", "lag_pos_prev_wrt",
     "lag_vel_wrt", "lag_rad_wrt", "lag_rvel_wrt", "lag_rmin_wrt", "lag_rmax_wrt",
     "lag_pres_wrt", "lag_db_wrt", "lag_dphidt_wrt", "lag_mv_wrt", "lag_mg_wrt",
-    # Other
+    "lag_r0_wrt", "lag_betaT_wrt", "lag_betaC_wrt",
+    # Output domain
     "output_partial_domain", "sim_data",
+    # Shear modulus
+    "G",
 }
+
+# Prefixes for indexed params that are post_process-only
+# e.g., omega_wrt(1), schlieren_alpha(1), x_output%beg
+_POST_PROCESS_ONLY_PREFIXES = (
+    "omega_wrt(", "schlieren_alpha(", "x_output%", "y_output%", "z_output%",
+)
 
 # Combined dict of all parameters
 ALL = _load_all_params()
@@ -171,6 +182,14 @@ def _is_simulation_only(key: str) -> bool:
     return key.startswith(_SIMULATION_ONLY_PREFIXES)
 
 
+def _is_post_process_only(key: str) -> bool:
+    """Check if a parameter is post_process-only (exact match or prefix match)."""
+    if key in _POST_PROCESS_ONLY:
+        return True
+    # Check indexed params like omega_wrt(1), schlieren_alpha(1)
+    return key.startswith(_POST_PROCESS_ONLY_PREFIXES)
+
+
 def get_input_dict_keys(target_name: str) -> list:
     """
     Get parameter keys for a given target.
@@ -188,11 +207,11 @@ def get_input_dict_keys(target_name: str) -> list:
     if target_name == "pre_process":
         # pre_process excludes simulation-only, sim+post shared, and post-only params
         keys = [k for k in keys if not _is_simulation_only(k)
-                and k not in _SIM_AND_POST and k not in _POST_PROCESS_ONLY]
+                and k not in _SIM_AND_POST and not _is_post_process_only(k)]
     elif target_name == "simulation":
         # simulation excludes pre_process-only, post_process-only, and pre+post shared params
         keys = [k for k in keys if not _is_pre_process_only(k)
-                and k not in _POST_PROCESS_ONLY and k not in _PRE_AND_POST]
+                and not _is_post_process_only(k) and k not in _PRE_AND_POST]
     elif target_name == "post_process":
         # post_process excludes pre_process-only and simulation-only params
         keys = [k for k in keys if not _is_pre_process_only(k) and not _is_simulation_only(k)]
