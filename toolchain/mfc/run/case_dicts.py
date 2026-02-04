@@ -89,7 +89,7 @@ _SIMULATION_ONLY = {
     # Probes/integrals
     "probe_wrt", "num_probes", "integral_wrt", "num_integrals",
     # Physics
-    "null_weights", "bubble_model", "acoustic_source", "num_source",
+    "null_weights", "bubble_model", "acoustic_source", "num_source", "acoustic",
     # Adaptive dt
     "adap_dt", "adap_dt_tol", "adap_dt_max_iters",
     # MPI
@@ -105,12 +105,27 @@ _SIMULATION_ONLY = {
     "int_comp", "ic_eps", "ic_beta",
     # GPU memory
     "nv_uvm_out_of_core", "nv_uvm_igr_temps_on_gpu", "nv_uvm_pref_gpu",
+    # Body forces
+    "bf_x", "bf_y", "bf_z", "k_x", "k_y", "k_z",
+    "w_x", "w_y", "w_z", "p_x", "p_y", "p_z",
+    "g_x", "g_y", "g_z",
+    # Hyper cleaning speed/tau
+    "hyper_cleaning_speed", "hyper_cleaning_tau",
 }
+
+# Prefixes for indexed params that are simulation-only
+# e.g., acoustic(1)%loc(1), probe(1)%x, integral(1)%x
+_SIMULATION_ONLY_PREFIXES = ("acoustic(", "probe(", "integral(", "lag_params%", "chem_params%")
 
 # Params in simulation AND post_process but NOT pre_process
 _SIM_AND_POST = {
     "t_step_stop", "t_step_save", "t_stop", "t_save", "cfl_target", "n_start",
     "alt_soundspeed", "mixture_err", "fd_order", "avg_state", "prim_vars_wrt",
+}
+
+# Params in pre_process AND post_process but NOT simulation
+_PRE_AND_POST = {
+    "sigR",  # QBMM bubble distribution width
 }
 
 _POST_PROCESS_ONLY = {
@@ -148,6 +163,14 @@ def _is_pre_process_only(key: str) -> bool:
     return key.startswith(_PRE_PROCESS_ONLY_PREFIXES)
 
 
+def _is_simulation_only(key: str) -> bool:
+    """Check if a parameter is simulation-only (exact match or prefix match)."""
+    if key in _SIMULATION_ONLY:
+        return True
+    # Check indexed params like acoustic(1)%loc(1), probe(1)%x
+    return key.startswith(_SIMULATION_ONLY_PREFIXES)
+
+
 def get_input_dict_keys(target_name: str) -> list:
     """
     Get parameter keys for a given target.
@@ -164,14 +187,15 @@ def get_input_dict_keys(target_name: str) -> list:
     # Each target only accepts params in its Fortran namelist definition
     if target_name == "pre_process":
         # pre_process excludes simulation-only, sim+post shared, and post-only params
-        exclude = _SIMULATION_ONLY | _SIM_AND_POST | _POST_PROCESS_ONLY
-        keys = [k for k in keys if k not in exclude]
+        keys = [k for k in keys if not _is_simulation_only(k)
+                and k not in _SIM_AND_POST and k not in _POST_PROCESS_ONLY]
     elif target_name == "simulation":
-        # simulation excludes pre_process-only and post_process-only params
-        keys = [k for k in keys if not _is_pre_process_only(k) and k not in _POST_PROCESS_ONLY]
+        # simulation excludes pre_process-only, post_process-only, and pre+post shared params
+        keys = [k for k in keys if not _is_pre_process_only(k)
+                and k not in _POST_PROCESS_ONLY and k not in _PRE_AND_POST]
     elif target_name == "post_process":
         # post_process excludes pre_process-only and simulation-only params
-        keys = [k for k in keys if not _is_pre_process_only(k) and k not in _SIMULATION_ONLY]
+        keys = [k for k in keys if not _is_pre_process_only(k) and not _is_simulation_only(k)]
 
     # Case optimization filtering for simulation
     if ARG("case_optimization", dflt=False) and target_name == "simulation":
