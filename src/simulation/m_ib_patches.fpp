@@ -236,22 +236,13 @@ contains
                     models(patch_id)%total_vertices = total_vertices
                 end if
 
+                ! update allocatables
+                $:GPU_UPDATE(device='[models]')
+                $:GPU_UPDATE(device='[models(patch_id)%boundary_v]')
+                $:GPU_UPDATE(device='[models(patch_id)%interpolated_boundary_v]')
+                $:GPU_UPDATE(device='[models(patch_id)%model%trs]')
             end if
         end do
-
-        ! Update nested allocatables for each patch
-        $:GPU_UPDATE(device='[models]')
-        #:for patch_id in range(1, MAX_NUM_PATCHES+1)
-            if (allocated(models(${patch_id}$)%boundary_v)) then
-                $:GPU_UPDATE(device='[models(${patch_id}$)%boundary_v]')
-            end if
-            if (allocated(models(${patch_id}$)%interpolated_boundary_v)) then
-                $:GPU_UPDATE(device='[models(${patch_id}$)%interpolated_boundary_v]')
-            end if
-            if (allocated(models(${patch_id}$)%model%trs)) then
-                $:GPU_UPDATE(device='[models(${patch_id}$)%model%trs]')
-            end if
-        #:endfor
 
     end subroutine s_instantiate_STL_models
 
