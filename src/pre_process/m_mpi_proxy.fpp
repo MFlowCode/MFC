@@ -60,7 +60,7 @@ contains
             & 'hyperelasticity', 'pre_stress', 'elliptic_smoothing', 'viscous',&
             & 'bubbles_lagrange', 'bc_io', 'mhd', 'relativity', 'cont_damage', &
             & 'igr', 'down_sample','fft_wrt', 'simplex_perturb',               &
-            & 'periodic_ibs', 'store_levelset', 'slab_domain_decomposition' ]
+            & 'periodic_ibs', 'store_levelset', 'slab_domain_decomposition', 'hyper_cleaning' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
         call MPI_BCAST(fluid_rho(1), num_fluids_max, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)

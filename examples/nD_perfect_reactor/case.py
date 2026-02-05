@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # Reference:
 # + https://doi.org/10.1063/1.1696266
-import json, argparse
+import json
+import argparse
 import cantera as ct
 
 from mfc.case_utils import *

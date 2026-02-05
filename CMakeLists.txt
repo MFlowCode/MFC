@@ -311,6 +311,7 @@ endif()
 # files that will eventually be used to compile <target>.
 
 macro(HANDLE_SOURCES target useCommon)
+
     set(${target}_DIR "${CMAKE_SOURCE_DIR}/src/${target}")
     set(common_DIR    "${CMAKE_SOURCE_DIR}/src/common")
 
@@ -371,7 +372,7 @@ macro(HANDLE_SOURCES target useCommon)
                                  -D MFC_${CMAKE_Fortran_COMPILER_ID}
                                  -D MFC_${${target}_UPPER}
                                  -D MFC_COMPILER="${CMAKE_Fortran_COMPILER_ID}"
-                                 -D MFC_CASE_OPTIMIZATION=False
+				                 -D MFC_CASE_OPTIMIZATION=False
                                  -D chemistry=False
                                  --line-numbering
                                  --no-folding
@@ -392,7 +393,6 @@ HANDLE_SOURCES(pre_process ON)
 HANDLE_SOURCES(simulation ON)
 HANDLE_SOURCES(post_process ON)
 HANDLE_SOURCES(syscheck OFF)
-
 
 # MFC_SETUP_TARGET: Given a target (herein <target>), this macro creates a new
 # executable <target> with the appropriate sources, compiler definitions, and
@@ -430,6 +430,7 @@ function(MFC_SETUP_TARGET)
 
     foreach (a_target ${IPO_TARGETS})
         set_target_properties(${a_target} PROPERTIES Fortran_PREPROCESS ON)
+	    message(STATUS ${CMAKE_Fortran_COMPILER_ID})
 
         target_include_directories(${a_target} PRIVATE
             "${CMAKE_SOURCE_DIR}/src/common"
@@ -449,9 +450,14 @@ function(MFC_SETUP_TARGET)
 
         if (MFC_MPI AND ARGS_MPI)
             find_package(MPI COMPONENTS Fortran REQUIRED)
-
+	    
             target_compile_definitions(${a_target} PRIVATE MFC_MPI)
-            target_link_libraries     (${a_target} PRIVATE MPI::MPI_Fortran)
+            if(CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
+                target_compile_options(${a_target} PRIVATE "$ENV{CRAY_MPICH_INC}")
+                target_link_libraries(${a_target} PRIVATE $ENV{CRAY_MPICH_LIB})
+            else() 
+                target_link_libraries(${a_target} PRIVATE MPI::MPI_Fortran)
+            endif()
         endif()
 
         if (ARGS_SILO)
@@ -469,9 +475,11 @@ function(MFC_SETUP_TARGET)
                 if (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
                     find_package(CUDAToolkit REQUIRED)
                     target_link_libraries(${a_target} PRIVATE CUDA::cudart CUDA::cufft)
-                else()
+                elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
+                    target_link_libraries(${a_target} PRIVATE $ENV{CRAY_HIPFORT_LIB})
+                else() 
                     find_package(hipfort COMPONENTS hipfft CONFIG REQUIRED)
-                    target_link_libraries(${a_target} PRIVATE hipfort::hipfft)
+                    target_link_libraries(${a_target} PRIVATE hipfort::hipfft)                    
                 endif()
             else()
                 find_package(FFTW REQUIRED)
@@ -584,7 +592,7 @@ function(MFC_SETUP_TARGET)
                         PRIVATE -DFRONTIER_UNIFIED)
                 endif()
 
-    		find_package(hipfort COMPONENTS hip CONFIG REQUIRED)
+                find_package(hipfort COMPONENTS hip CONFIG REQUIRED)
                 target_link_libraries(${a_target} PRIVATE hipfort::hip hipfort::hipfort-amdgcn flang_rt.hostdevice)
             endif()
         elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
@@ -664,6 +672,28 @@ if (MFC_DOCUMENTATION)
         VERBATIM
     )
 
+    # Generate cli-reference.md from cli/commands.py
+    add_custom_command(
+        OUTPUT  "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/cli-reference.md"
+        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/mfc/cli/commands.py"
+                "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/mfc/cli/docs_gen.py"
+        COMMAND "bash" "${CMAKE_CURRENT_SOURCE_DIR}/docs/gen_cli_reference.sh"
+                       "${CMAKE_CURRENT_SOURCE_DIR}"
+        COMMENT "Generating cli-reference.md"
+        VERBATIM
+    )
+
+    # Generate parameters.md from parameter registry
+    file(GLOB_RECURSE params_SRCs CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/mfc/params/*.py")
+    add_custom_command(
+        OUTPUT  "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/parameters.md"
+        DEPENDS "${params_SRCs}"
+        COMMAND "bash" "${CMAKE_CURRENT_SOURCE_DIR}/docs/gen_parameters.sh"
+                       "${CMAKE_CURRENT_SOURCE_DIR}"
+        COMMENT "Generating parameters.md"
+        VERBATIM
+    )
+
     file(GLOB common_DOCs CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/docs/*")
 
     # GEN_DOCS: Given a target name (herein <target>), this macro sets up a
@@ -698,9 +728,13 @@ if (MFC_DOCUMENTATION)
 
         set(opt_example_dependency "")
         set(opt_constraints_dependency "")
+        set(opt_cli_reference_dependency "")
+        set(opt_parameters_dependency "")
         if (${target} STREQUAL documentation)
             set(opt_example_dependency "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/examples.md")
             set(opt_constraints_dependency "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/case_constraints.md")
+            set(opt_cli_reference_dependency "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/cli-reference.md")
+            set(opt_parameters_dependency "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/parameters.md")
         endif()
 
         file(GLOB_RECURSE ${target}_DOCs CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/docs/${target}/*")
@@ -711,6 +745,8 @@ if (MFC_DOCUMENTATION)
             DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/${target}-Doxyfile"
                     "${opt_example_dependency}"
                     "${opt_constraints_dependency}"
+                    "${opt_cli_reference_dependency}"
+                    "${opt_parameters_dependency}"
                     "${${target}_SRCs}" "${${target}_DOCs}"
             COMMAND "${DOXYGEN_EXECUTABLE}" "${target}-Doxyfile"
             WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
@@ -737,7 +773,7 @@ if (MFC_DOCUMENTATION)
     ExternalProject_Add(doxygen-awesome-css
         PREFIX            doxygen-awesome-css
         GIT_REPOSITORY    "https://github.com/jothepro/doxygen-awesome-css"
-        GIT_TAG           "df88fe4fdd97714fadfd3ef17de0b4401f804052"
+        GIT_TAG           "v2.4.1"
         CONFIGURE_COMMAND ""
         BUILD_COMMAND     ""
         INSTALL_COMMAND   ""
@@ -748,7 +784,8 @@ if (MFC_DOCUMENTATION)
 
     set(DOXYGEN_HTML_EXTRA_STYLESHEET
         "\"${theme_dirpath}/doxygen-awesome.css\"\
-         \"${theme_dirpath}/doxygen-awesome-sidebar-only.css\"")
+         \"${theme_dirpath}/doxygen-awesome-sidebar-only.css\"\
+         \"${CMAKE_CURRENT_SOURCE_DIR}/docs/custom.css\"")
 
     # > Generate Documentation & Landing Page
     GEN_DOCS(pre_process   "MFC: Pre-Process")

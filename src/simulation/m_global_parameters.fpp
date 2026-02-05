@@ -188,6 +188,7 @@ module m_global_parameters
     logical :: shear_stress  !< Shear stresses
     logical :: bulk_stress   !< Bulk stresses
     logical :: cont_damage   !< Continuum damage modeling
+    logical :: hyper_cleaning !< Hyperbolic cleaning for MHD for divB=0
     integer :: num_igr_iters !< number of iterations for elliptic solve
     integer :: num_igr_warm_start_iters !< number of warm start iterations for elliptic solve
     real(wp) :: alf_factor  !< alpha factor for IGR
@@ -217,7 +218,7 @@ module m_global_parameters
     $:GPU_DECLARE(create='[mpp_lim,model_eqns,mixture_err,alt_soundspeed]')
     $:GPU_DECLARE(create='[avg_state,mp_weno,weno_eps,teno_CT,hypoelasticity]')
     $:GPU_DECLARE(create='[hyperelasticity,hyper_model,elasticity,low_Mach]')
-    $:GPU_DECLARE(create='[shear_stress,bulk_stress,cont_damage]')
+    $:GPU_DECLARE(create='[shear_stress,bulk_stress,cont_damage,hyper_cleaning]')
 
     logical :: relax          !< activate phase change
     integer :: relax_model    !< Relaxation model
@@ -291,6 +292,7 @@ module m_global_parameters
     integer :: c_idx                                   !< Index of color function
     integer :: damage_idx                              !< Index of damage state variable (D) for continuum damage model
     type(volume_filter_params) :: volume_filter_dt     !< Size and starting indices of volume filtered quantities
+    integer :: psi_idx                                 !< Index of hyperbolic cleaning state variable for MHD
     !> @}
     $:GPU_DECLARE(create='[sys_size,E_idx,n_idx,bub_idx,alf_idx,gamma_idx]')
     $:GPU_DECLARE(create='[pi_inf_idx,B_idx,stress_idx,xi_idx,b_size]')
@@ -540,10 +542,10 @@ module m_global_parameters
     !> @}
 
     real(wp) :: Bx0 !< Constant magnetic field in the x-direction (1D)
-    logical :: powell !< Powell‐correction for div B = 0
-    $:GPU_DECLARE(create='[Bx0,powell]')
+    $:GPU_DECLARE(create='[Bx0]')
 
     logical :: fft_wrt
+    logical :: dummy  !< AMDFlang workaround: keep a dummy logical to avoid a compiler case-optimization bug when a parameter+GPU-kernel conditional is false
 
     !> @name Continuum damage model parameters
     !> @{!
@@ -572,6 +574,12 @@ module m_global_parameters
     logical :: q_filtered_wrt
 
     $:GPU_DECLARE(create='[u_inf_ref, rho_inf_ref, P_inf_ref, mom_f_idx, forcing_window, forcing_dt, fluid_volume_fraction, filter_width]')
+    !> @name MHD Hyperbolic cleaning parameters
+    !> @{!
+    real(wp) :: hyper_cleaning_speed    !< Hyperbolic cleaning wave speed (c_h)
+    real(wp) :: hyper_cleaning_tau      !< Hyperbolic cleaning tau
+    $:GPU_DECLARE(create='[hyper_cleaning_speed, hyper_cleaning_tau]')
+    !> @}
 
 contains
 
@@ -651,6 +659,7 @@ contains
         shear_stress = .false.
         bulk_stress = .false.
         cont_damage = .false.
+        hyper_cleaning = .false.
         num_igr_iters = dflt_num_igr_iters
         num_igr_warm_start_iters = dflt_num_igr_warm_start_iters
         alf_factor = dflt_alf_factor
@@ -782,6 +791,7 @@ contains
         #:endfor
 
         fft_wrt = .false.
+        dummy = .false.
 
         do j = 1, num_probes_max
             acoustic(j)%pulse = dflt_int
@@ -862,7 +872,8 @@ contains
 
         ! MHD
         Bx0 = dflt_real
-        powell = .false.
+        hyper_cleaning_speed = dflt_real
+        hyper_cleaning_tau = dflt_real
 
         #:if not MFC_CASE_OPTIMIZATION
             mhd = .false.
@@ -1190,6 +1201,11 @@ contains
                 sys_size = damage_idx
             end if
 
+            if (hyper_cleaning) then
+                psi_idx = sys_size + 1
+                sys_size = psi_idx
+            end if
+
         end if
 
         ! END: Volume Fraction Model
@@ -1337,11 +1353,13 @@ contains
             & teno_CT,hyperelasticity,hyper_model,elasticity,xi_idx, &
             & B_idx,low_Mach]')
 
-        $:GPU_UPDATE(device='[Bx0, powell]')
+        $:GPU_UPDATE(device='[Bx0]')
 
         $:GPU_UPDATE(device='[chem_params]')
 
         $:GPU_UPDATE(device='[cont_damage,tau_star,cont_damage_s,alpha_bar]')
+
+        $:GPU_UPDATE(device='[hyper_cleaning, hyper_cleaning_speed, hyper_cleaning_tau]')
 
         #:if not MFC_CASE_OPTIMIZATION
             $:GPU_UPDATE(device='[wenojs,mapped_weno,wenoz,teno]')

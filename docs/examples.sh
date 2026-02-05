@@ -7,7 +7,7 @@ set -e -x
 examples_md="$1/docs/documentation/examples.md" 
 rm "$examples_md" || true
 
-echo -e "# Example Cases\n" > "$examples_md"
+echo -e "@page examples Example Cases\n\n# Example Cases\n" > "$examples_md"
 
 for casedir in $(find "$1/examples/" -mindepth 1 -maxdepth 1 -type d); do
     casename="$(basename "$casedir")"

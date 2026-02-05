@@ -146,7 +146,11 @@ contains
         integer, intent(in) :: j, k, l
 
         real(wp) :: pres_relax, f_pres, df_pres
-        real(wp), dimension(num_fluids) :: pres_K_init, rho_K_s
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3) :: pres_K_init, rho_K_s
+        #:else
+            real(wp), dimension(num_fluids) :: pres_K_init, rho_K_s
+        #:endif
         integer, parameter :: MAX_ITER = 50
         real(wp), parameter :: TOLERANCE = 1.e-10_wp
         integer :: iter, i
@@ -213,8 +217,11 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         integer, intent(in) :: j, k, l
-
-        real(wp), dimension(num_fluids) :: alpha_rho, alpha
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(2) :: alpha_rho, alpha
+        #:else
+            real(wp), dimension(num_fluids) :: alpha_rho, alpha
+        #:endif
         real(wp) :: rho, dyn_pres, gamma, pi_inf, pres_relax, sum_alpha
         real(wp), dimension(2) :: Re
         integer :: i, q

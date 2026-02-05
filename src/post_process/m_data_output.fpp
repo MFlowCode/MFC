@@ -363,6 +363,9 @@ contains
             ! Damage state variable
             if (cont_damage) dbvars = dbvars + 1
 
+            ! Hyperbolic cleaning for MHD
+            if (hyper_cleaning) dbvars = dbvars + 1
+
             ! Magnetic field
             if (mhd) then
                 if (n == 0) then

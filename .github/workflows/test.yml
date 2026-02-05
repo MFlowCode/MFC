@@ -1,8 +1,50 @@
 name: 'Test Suite'
 
 on: [push, pull_request, workflow_dispatch]
-    
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  lint-gate:
+    name: Lint Gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Initialize MFC
+        run: ./mfc.sh init
+
+      - name: Check Formatting
+        run: |
+          ./mfc.sh format -j $(nproc)
+          git diff --exit-code || (echo "::error::Code is not formatted. Run './mfc.sh format' locally." && exit 1)
+
+      - name: Spell Check
+        run: ./mfc.sh spelling
+
+      - name: Lint Toolchain
+        run: ./mfc.sh lint
+
+      - name: Lint Source - No Raw Directives
+        run: |
+          ! grep -iR '!\$acc\|!\$omp' --exclude="parallel_macros.fpp" --exclude="acc_macros.fpp" --exclude="omp_macros.fpp" --exclude="shared_parallel_macros.fpp" --exclude="syscheck.fpp" ./src/*
+
+      - name: Lint Source - No Double Precision Intrinsics
+        run: |
+          ! grep -iR 'double_precision\|dsqrt\|dexp\|dlog\|dble\|dabs\|double\ precision\|real(8)\|real(4)\|dprod\|dmin\|dmax\|dfloat\|dreal\|dcos\|dsin\|dtan\|dsign\|dtanh\|dsinh\|dcosh\|d0' --exclude-dir=syscheck --exclude="*nvtx*" --exclude="*precision_select*" ./src/*
+
+      - name: Lint Source - No Junk Code
+        run: |
+          ! grep -iR -e '\.\.\.' -e '\-\-\-' -e '===' ./src/*
+
   file-changes:
     name: Detect File Changes
     runs-on: 'ubuntu-latest'
@@ -21,7 +63,7 @@ jobs:
   github:
     name: Github
     if: needs.file-changes.outputs.checkall == 'true'
-    needs: file-changes
+    needs: [lint-gate, file-changes]
     strategy:
       matrix:
         os:    ['ubuntu', 'macos']
@@ -95,7 +137,7 @@ jobs:
   self:
     name: "${{ matrix.cluster_name }} (${{ matrix.device }}${{ matrix.interface != 'none' && format('-{0}', matrix.interface) || '' }})"
     if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true'
-    needs: file-changes
+    needs: [lint-gate, file-changes]
     continue-on-error: false
     timeout-minutes: 480
     strategy:
@@ -103,28 +145,44 @@ jobs:
         include:
           # Phoenix (GT)
           - lbl: 'gt'
+            lbl_comp: 'gt'
             cluster_name: 'Georgia Tech | Phoenix'
             device: 'gpu'
             interface: 'acc'
           - lbl: 'gt'
+            lbl_comp: 'gt'
             cluster_name: 'Georgia Tech | Phoenix'
             device: 'gpu'
             interface: 'omp'
           - lbl: 'gt'
+            lbl_comp: 'gt'
             cluster_name: 'Georgia Tech | Phoenix'
             device: 'cpu'
             interface: 'none'
           # Frontier (ORNL)
           - lbl: 'frontier'
+            lbl_comp: 'frontier'
             cluster_name: 'Oak Ridge | Frontier'
             device: 'gpu'
             interface: 'acc'
           - lbl: 'frontier'
+            lbl_comp: 'frontier'
             cluster_name: 'Oak Ridge | Frontier'
             device: 'gpu'
             interface: 'omp'
           - lbl: 'frontier'
+            lbl_comp: 'frontier'
             cluster_name: 'Oak Ridge | Frontier'
+            device: 'cpu'
+            interface: 'none'
+          - lbl: 'frontier'
+            lbl_comp: 'frontier_amd'
+            cluster_name: 'Oak Ridge | Frontier (AMD)'
+            device: 'gpu'
+            interface: 'omp'
+          - lbl: 'frontier'
+            lbl_comp: 'frontier_amd'
+            cluster_name: 'Oak Ridge | Frontier (AMD)'
             device: 'cpu'
             interface: 'none'
     runs-on:
@@ -139,16 +197,24 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build & Test
-        if:   matrix.lbl == 'gt'
+        if:   matrix.lbl_comp == 'gt'
         run:  bash .github/workflows/phoenix/submit.sh .github/workflows/phoenix/test.sh ${{ matrix.device }} ${{ matrix.interface }}
 
       - name: Build
-        if:   matrix.lbl == 'frontier'
+        if:   matrix.lbl_comp == 'frontier'
         run:  bash .github/workflows/frontier/build.sh ${{ matrix.device }} ${{ matrix.interface }}
 
       - name: Test
-        if:   matrix.lbl == 'frontier'
+        if:   matrix.lbl_comp == 'frontier'
         run:  bash .github/workflows/frontier/submit.sh .github/workflows/frontier/test.sh ${{matrix.device}} ${{ matrix.interface }}
+
+      - name: Build
+        if:   matrix.lbl_comp == 'frontier_amd'
+        run:  bash .github/workflows/frontier_amd/build.sh ${{ matrix.device }} ${{ matrix.interface }}
+
+      - name: Test
+        if:   matrix.lbl_comp == 'frontier_amd'
+        run:  bash .github/workflows/frontier_amd/submit.sh .github/workflows/frontier_amd/test.sh ${{matrix.device}} ${{ matrix.interface }}  
 
       - name: Print Logs
         if:   always()
@@ -156,7 +222,14 @@ jobs:
 
       - name: Archive Logs
         uses: actions/upload-artifact@v4
-        if:   matrix.lbl == 'frontier'
+        if:   matrix.lbl_comp == 'frontier'
+        with:
+          name: logs-${{ strategy.job-index }}-${{ matrix.device }}-${{ matrix.interface }}
+          path: test-${{ matrix.device }}-${{ matrix.interface }}.out
+
+      - name: Archive Logs
+        uses: actions/upload-artifact@v4
+        if:   matrix.lbl_comp == 'frontier_amd'
         with:
           name: logs-${{ strategy.job-index }}-${{ matrix.device }}-${{ matrix.interface }}
           path: test-${{ matrix.device }}-${{ matrix.interface }}.out

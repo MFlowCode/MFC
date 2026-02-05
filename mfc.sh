@@ -10,6 +10,42 @@ fi
 # Load utility script
 . "$(pwd)/toolchain/util.sh"
 
+# Auto-install git pre-commit hook (once, silently)
+if [ -d "$(pwd)/.git" ] && [ ! -e "$(pwd)/.git/hooks/pre-commit" ] && [ -f "$(pwd)/.githooks/pre-commit" ]; then
+    ln -sf "$(pwd)/.githooks/pre-commit" "$(pwd)/.git/hooks/pre-commit"
+    log "Installed git pre-commit hook (runs$MAGENTA ./mfc.sh precheck$COLOR_RESET before commits)."
+fi
+
+# Auto-install shell completions (once)
+COMPLETION_DIR="$HOME/.local/share/mfc/completions"
+if [ ! -d "$COMPLETION_DIR" ]; then
+    mkdir -p "$COMPLETION_DIR"
+    cp "$(pwd)/toolchain/completions/mfc.bash" "$COMPLETION_DIR/"
+    cp "$(pwd)/toolchain/completions/_mfc" "$COMPLETION_DIR/"
+
+    # Add to shell rc file based on current shell
+    if [[ "$SHELL" == *"zsh"* ]]; then
+        RC_FILE="$HOME/.zshrc"
+        RC_LINE="fpath=(\"$COMPLETION_DIR\" \$fpath)"
+        SOURCE_CMD="source $COMPLETION_DIR/_mfc"
+    else
+        RC_FILE="$HOME/.bashrc"
+        RC_LINE="[ -f \"$COMPLETION_DIR/mfc.bash\" ] && source \"$COMPLETION_DIR/mfc.bash\""
+        SOURCE_CMD="source $COMPLETION_DIR/mfc.bash"
+    fi
+
+    if [ -f "$RC_FILE" ] && ! grep -q "$COMPLETION_DIR" "$RC_FILE" 2>/dev/null; then
+        echo "" >> "$RC_FILE"
+        echo "# MFC shell completion" >> "$RC_FILE"
+        echo "$RC_LINE" >> "$RC_FILE"
+    fi
+
+    log "Installed tab completions. Restart shell or run:$MAGENTA $SOURCE_CMD$COLOR_RESET"
+fi
+
+# Print startup message immediately for user feedback
+log "Starting..."
+
 # Handle upgrading from older MFC build systems
 if [ -d "$(pwd)/bootstrap" ] || [ -d "$(pwd)/dependencies" ] || [ -f "$(pwd)/build/mfc.lock.yaml" ]; then
     error "Please remove, if applicable, the following directories:"
@@ -22,24 +58,41 @@ if [ -d "$(pwd)/bootstrap" ] || [ -d "$(pwd)/dependencies" ] || [ -f "$(pwd)/bui
 fi
 
 # If the user wishes to run the "load" script
-if [ "$1" '==' 'load' ]; then
+if [ "$1" '==' 'load' ] && [ "$2" != "--help" ] && [ "$2" != "-h" ]; then
+    # Check if the script is being sourced (required for load to work)
+    if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+        echo ""
+        echo "mfc: ERROR > The 'load' command must be run with 'source' to set environment variables."
+        echo ""
+        echo "  Instead of:  ./mfc.sh load ..."
+        echo "  Please use:  source ./mfc.sh load ..."
+        echo "          or:  . ./mfc.sh load ..."
+        echo ""
+        echo "  Example:     source ./mfc.sh load -c p -m g"
+        echo ""
+        exit 1
+    fi
     shift; . "$(pwd)/toolchain/bootstrap/modules.sh" $@; return
-elif [ "$1" '==' "lint" ]; then
+elif [ "$1" '==' "lint" ] && [ "$2" != "--help" ] && [ "$2" != "-h" ]; then
     . "$(pwd)/toolchain/bootstrap/python.sh"
 
     shift; . "$(pwd)/toolchain/bootstrap/lint.sh"    $@; exit 0
-elif [ "$1" '==' "format" ]; then
+elif [ "$1" '==' "format" ] && [ "$2" != "--help" ] && [ "$2" != "-h" ]; then
     . "$(pwd)/toolchain/bootstrap/python.sh"
 
     shift; . "$(pwd)/toolchain/bootstrap/format.sh"  $@; exit 0
 elif [ "$1" '==' "venv" ]; then
     shift; . "$(pwd)/toolchain/bootstrap/python.sh"  $@; return
-elif [ "$1" '==' "clean" ]; then
+elif [ "$1" '==' "clean" ] && [ "$2" != "--help" ] && [ "$2" != "-h" ]; then
     rm -rf "$(pwd)/build"; exit 0
-elif [ "$1" '==' "spelling" ]; then
+elif [ "$1" '==' "spelling" ] && [ "$2" != "--help" ] && [ "$2" != "-h" ]; then
     . "$(pwd)/toolchain/bootstrap/python.sh"
 
     shift; . "$(pwd)/toolchain/bootstrap/spelling.sh" $@; exit 0
+elif [ "$1" '==' "precheck" ]; then
+    . "$(pwd)/toolchain/bootstrap/python.sh"
+
+    shift; . "$(pwd)/toolchain/bootstrap/precheck.sh" $@; exit 0
 fi
 
 mkdir -p "$(pwd)/build"
@@ -47,6 +100,7 @@ mkdir -p "$(pwd)/build"
 . "$(pwd)/toolchain/bootstrap/cmake.sh"
 . "$(pwd)/toolchain/bootstrap/python.sh"
 
+# init command: just bootstrap the environment and exit (no Python command)
 if [ "$1" '==' 'init' ]; then
     exit 0
 fi

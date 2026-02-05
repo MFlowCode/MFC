@@ -105,7 +105,7 @@ contains
         #:endfor
 
         #:for VAR in [ 'run_time_info','cyl_coord', 'mpp_lim',     &
-            &  'mp_weno', 'rdma_mpi', 'powell', 'cont_damage', 'bc_io', &
+            &  'mp_weno', 'rdma_mpi', 'cont_damage', 'bc_io', &
             & 'weno_Re_flux', 'alt_soundspeed', 'null_weights', 'mixture_err',   &
             & 'parallel_io', 'hypoelasticity', 'bubbles_euler', 'polytropic',    &
             & 'polydisperse', 'qbmm', 'acoustic_source', 'probe_wrt', 'integral_wrt',   &
@@ -119,7 +119,7 @@ contains
             & 'hyperelasticity', 'down_sample', 'int_comp','fft_wrt',           &
             & 'periodic_ibs', 'compute_particle_drag', 'periodic_forcing',      &
             & 'forcing_wrt', 'volume_filter_momentum_eqn', 'store_levelset', &
-            & 'slab_domain_decomposition', 'q_filtered_wrt' ]
+            & 'slab_domain_decomposition', 'q_filtered_wrt', 'hyper_cleaning' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -159,7 +159,8 @@ contains
             & 'z_b', 't_stop', 't_save', 'cfl_target', 'Bx0', 'alf_factor',  &
             & 'tau_star', 'cont_damage_s', 'alpha_bar', 'adap_dt_tol', &
             & 'ic_eps', 'ic_beta', 'u_inf_ref', 'rho_inf_ref', 'P_inf_ref',      &
-            & 'filter_width', 'forcing_dt', 'fluid_volume_fraction' ]
+            & 'filter_width', 'forcing_dt', 'fluid_volume_fraction',             &
+            & 'hyper_cleaning_speed', 'hyper_cleaning_tau' ]
             call MPI_BCAST(${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
