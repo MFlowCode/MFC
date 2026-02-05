@@ -85,7 +85,7 @@ COMMON_VERBOSE = CommonArgumentSet(
         Argument(
             name="verbose",
             short="v",
-            help="Increase verbosity level. Use -v, -vv, or -vvv for more detail.",
+            help="Increase output verbosity (-v, -vv, -vvv for more detail).",
             action=ArgAction.COUNT,
             default=0,
         ),
@@ -98,7 +98,7 @@ COMMON_DEBUG_LOG = CommonArgumentSet(
         Argument(
             name="debug-log",
             short="d",
-            help="Enable debug logging for troubleshooting.",
+            help="Enable Python toolchain debug logging (not MFC code).",
             action=ArgAction.STORE_TRUE,
             dest="debug_log",
         ),
@@ -519,10 +519,10 @@ VALIDATE_COMMAND = Command(
     ],
     examples=[
         Example("./mfc.sh validate case.py", "Check syntax and constraints"),
-        Example("./mfc.sh validate case.py -d", "Validate with debug output"),
+        Example("./mfc.sh validate case.py -d", "Validate with toolchain debug output"),
     ],
     key_options=[
-        ("-d, --debug-log", "Enable debug logging"),
+        ("-d, --debug-log", "Enable toolchain debug logging"),
     ],
 )
 

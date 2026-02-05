@@ -83,7 +83,7 @@ def _generate_options_table(cmd: Command, schema: CLISchema) -> List[str]:
         if "mfc_config" in cmd.include_common:
             lines.append("| `--mpi`, `--no-mpi` | Enable/disable MPI | `true` |")
             lines.append("| `--gpu [acc/mp]`, `--no-gpu` | Enable GPU (OpenACC/OpenMP) | `no` |")
-            lines.append("| `--debug`, `--no-debug` | Enable debug mode | `false` |")
+            lines.append("| `--debug`, `--no-debug` | Build with debug compiler flags | `false` |")
 
         lines.append("")
 
@@ -270,16 +270,23 @@ def generate_cli_reference(schema: CLISchema) -> str:
         "|------|-------------|",
         "| `--mpi` / `--no-mpi` | Enable/disable MPI support |",
         "| `--gpu [acc/mp]` / `--no-gpu` | Enable GPU with OpenACC or OpenMP |",
-        "| `--debug` / `--no-debug` | Enable debug build |",
+        "| `--debug` / `--no-debug` | Build with debug compiler flags |",
         "| `--gcov` / `--no-gcov` | Enable code coverage |",
         "| `--single` / `--no-single` | Single precision |",
         "| `--mixed` / `--no-mixed` | Mixed precision |",
         "",
         "### Verbosity (`-v, --verbose`)",
         "",
+        "Controls output verbosity level:",
+        "",
         "- `-v` - Basic verbose output",
         "- `-vv` - Show build commands",
-        "- `-vvv` - Full debug output including CMake debug",
+        "- `-vvv` - Full verbose output including CMake details",
+        "",
+        "### Debug Logging (`-d, --debug-log`)",
+        "",
+        "Enables debug logging for the Python toolchain (mfc.sh internals).",
+        "This is for troubleshooting the build system, not the MFC simulation code.",
         "",
     ])
 
