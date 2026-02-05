@@ -650,11 +650,11 @@ contains
         type(ghost_point), intent(inout) :: gp
 
         integer :: i, j, k, patch_id, boundary_edge_count, total_vertices
-        type(t_model) :: model
         logical :: interpolate
         real(wp), dimension(1:3) :: center, xyz_local
         real(wp) :: normals(1:3) !< Boundary normal buffer
         real(wp) :: distance
+        real(wp), dimension(1:3, 1:3) :: inverse_rotation, rotation
 
         patch_id = gp%ib_patch_id
         i = gp%loc(1)
@@ -662,7 +662,6 @@ contains
         k = gp%loc(3)
 
         ! load in model values
-        model = models(patch_id)%model
         interpolate = models(patch_id)%interpolate
         boundary_edge_count = models(patch_id)%boundary_edge_count
         total_vertices = models(patch_id)%total_vertices
@@ -672,6 +671,8 @@ contains
         if (p > 0) then
             center(3) = patch_ib(patch_id)%z_centroid
         end if
+        inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
+        rotation(:, :) = patch_ib(patch_id)%rotation_matrix(:, :)
 
         ! determine where we are located in space
         xyz_local = (/x_cc(i) - patch_ib(patch_id)%x_centroid, y_cc(j) - patch_ib(patch_id)%y_centroid, 0._wp/)
@@ -688,7 +689,7 @@ contains
         if (p > 0) then
 
             ! Get the boundary normals and shortest distance between the cell center and the model boundary
-            call f_distance_normals_3D(model, xyz_local, normals, distance)
+            call f_distance_normals_3D(models(patch_id)%model, xyz_local, normals, distance)
 
             ! Get the shortest distance between the cell center and the interpolated model boundary
             if (interpolate) then
@@ -706,10 +707,10 @@ contains
             ! 2D models
             if (interpolate) then
                 ! Get the shortest distance between the cell center and the model boundary
-                gp%levelset = f_interpolated_distance(models(patch_id)%interpolated_boundary_v, total_vertices, point)
+                gp%levelset = f_interpolated_distance(models(patch_id)%interpolated_boundary_v, total_vertices, xyz_local)
             else
                 ! Get the shortest distance between the cell center and the interpolated model boundary
-                gp%levelset = f_distance(models(patch_id)%boundary_v, boundary_edge_count, point)
+                gp%levelset = f_distance(models(patch_id)%boundary_v, boundary_edge_count, xyz_local)
             end if
 
             ! Correct the sign of the levelset
@@ -718,11 +719,11 @@ contains
             ! Get the boundary normals
             call f_normals(models(patch_id)%boundary_v, &
                            boundary_edge_count, &
-                           point, &
+                           xyz_local, &
                            normals)
 
             ! Assign the levelset_norm
-            gp%levelset_norm = normals(1:3)
+            gp%levelset_norm = matmul(rotation, normals(1:3))
 
         end if
 

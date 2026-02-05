@@ -902,7 +902,6 @@ contains
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: ib_markers_sf
-        real(wp), dimension(1:3) :: center, xyz_local
 
         integer :: i, j, k !< Generic loop iterators
 
@@ -910,6 +909,8 @@ contains
 
         real(wp) :: eta
         real(wp), dimension(1:3) :: point, local_point
+        real(wp), dimension(1:3) :: center, xyz_local
+        real(wp), dimension(1:3, 1:3) :: inverse_rotation
 
         model => models(patch_id)%model
         center(1) = patch_ib(patch_id)%x_centroid
@@ -917,6 +918,7 @@ contains
         if (p > 0) then
             center(3) = patch_ib(patch_id)%z_centroid
         end if
+        inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
 
         ! TODO :: f_model_is_inside requires the non-GPU-compatible random_number() subroutine which causes build failure. This must be resolved in a future PR. Macro calls are left commented to make returning to this feature easier.
         ! $:GPU_PARALLEL_LOOP(private='[i,j,k,point]', copy='[ib_markers_sf]', copyin='[patch_id,x_cc,y_cc,model]', collapse=3)
