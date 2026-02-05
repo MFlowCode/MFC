@@ -85,10 +85,14 @@ echo
 
 # Run the main.py bootstrap script
 # If only flags given (no command), show help without passing flags
-if [ -z "$1" ] || [[ "$1" == -* ]]; then
-    python3 "$(pwd)/toolchain/main.py"
-else
+has_command=false
+for arg in "$@"; do
+    case "$arg" in -*) ;; *) has_command=true; break ;; esac
+done
+if [ "$has_command" = true ]; then
     python3 "$(pwd)/toolchain/main.py" "$@"
+else
+    python3 "$(pwd)/toolchain/main.py"
 fi
 code=$?
 
