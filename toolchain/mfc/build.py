@@ -266,21 +266,16 @@ def _show_build_error(result: subprocess.CompletedProcess, stage: str):
     # Show stdout if available (often contains the actual error for CMake)
     if result.stdout:
         stdout_text = result.stdout if isinstance(result.stdout, str) else result.stdout.decode('utf-8', errors='replace')
-        stdout_lines = stdout_text.strip().split('\n')
-        # Show last 40 lines to capture the relevant error
-        if len(stdout_lines) > 40:
-            stdout_lines = ['... (truncated) ...'] + stdout_lines[-40:]
-        if stdout_lines and stdout_lines != ['']:
-            cons.raw.print(Panel('\n'.join(stdout_lines), title="Output", border_style="yellow"))
+        stdout_text = stdout_text.strip()
+        if stdout_text:
+            cons.raw.print(Panel(stdout_text, title="Output", border_style="yellow"))
 
     # Show stderr if available
     if result.stderr:
         stderr_text = result.stderr if isinstance(result.stderr, str) else result.stderr.decode('utf-8', errors='replace')
-        stderr_lines = stderr_text.strip().split('\n')
-        if len(stderr_lines) > 40:
-            stderr_lines = ['... (truncated) ...'] + stderr_lines[-40:]
-        if stderr_lines and stderr_lines != ['']:
-            cons.raw.print(Panel('\n'.join(stderr_lines), title="Errors", border_style="red"))
+        stderr_text = stderr_text.strip()
+        if stderr_text:
+            cons.raw.print(Panel(stderr_text, title="Errors", border_style="red"))
 
     cons.print()
 
