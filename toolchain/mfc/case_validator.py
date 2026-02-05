@@ -1699,8 +1699,6 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         self.check_stiffened_eos()
         self.check_surface_tension()
         self.check_mhd()
-        self.check_periodic_forcing()
-        self.check_volume_filtering()
 
     def validate_simulation(self):
         """Validate simulation-specific parameters"""
@@ -1723,6 +1721,8 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         self.check_continuum_damage()
         self.check_grcbc()
         self.check_probe_integral_output()
+        self.check_periodic_forcing()
+        self.check_volume_filtering()
 
     def validate_pre_process(self):
         """Validate pre-process-specific parameters"""

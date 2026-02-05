@@ -620,6 +620,15 @@ contains
                     call s_propagate_immersed_boundaries(s)
                 end if
 
+                if (moving_immersed_boundary_flag .and. periodic_ibs .and. s == nstage) then
+                    do i = 1, num_ibs
+                        patch_ib(i)%x_centroid = domain_glb(1, 1) + modulo(patch_ib(i)%x_centroid - domain_glb(1, 1), domain_glb(1, 2) - domain_glb(1, 1))
+                        patch_ib(i)%y_centroid = domain_glb(2, 1) + modulo(patch_ib(i)%y_centroid - domain_glb(2, 1), domain_glb(2, 2) - domain_glb(2, 1))
+                        patch_ib(i)%z_centroid = domain_glb(3, 1) + modulo(patch_ib(i)%z_centroid - domain_glb(3, 1), domain_glb(3, 2) - domain_glb(3, 1))
+                    end do
+                    call s_update_mib(num_ibs, levelset, levelset_norm)
+                end if
+
                 ! update the ghost fluid properties point values based on IB state
                 if (qbmm .and. .not. polytropic) then
                     call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)

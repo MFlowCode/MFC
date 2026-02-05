@@ -79,10 +79,9 @@ contains
     end subroutine s_initialize_additional_forcing_module
 
     !< compute the space and time average of quantities, compute the periodic forcing terms described in Khalloufi and Capecelatro
-    subroutine s_compute_periodic_forcing(rhs_vf, q_cons_vf, q_prim_vf, t_step)
+    subroutine s_compute_periodic_forcing(rhs_vf, q_cons_vf, t_step)
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
-        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         integer, intent(in) :: t_step
         real(wp) :: spatial_rho_glb, spatial_u_glb, spatial_eps_glb
         real(wp) :: dVol, rho
@@ -131,7 +130,7 @@ contains
         spatial_eps_glb = spatial_eps_glb*avg_coeff
 
         ! update time average window location
-        window_loc = 1 + mod(t_step - 1, forcing_window)
+        window_loc = 1 + mod(t_step, forcing_window)
 
         ! update time average sum
         sum_rho = sum_rho - rho_window(window_loc) + spatial_rho_glb

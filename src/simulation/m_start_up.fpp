@@ -1345,7 +1345,7 @@ contains
             call s_write_restart_lag_bubbles(save_count) !parallel
             if (lag_params%write_bubbles_stats) call s_write_lag_bubble_stats()
         else if (q_filtered_wrt .and. (t_step == 0 .or. t_step == t_step_stop)) then
-            call s_write_data_files(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, save_count, bc_type, &
+            call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count, bc_type, &
                                     filtered_fluid_indicator_function=filtered_fluid_indicator_function, &
                                     stat_q_cons_filtered=stat_q_cons_filtered, stat_filtered_pressure=stat_filtered_pressure, &
                                     stat_reynolds_stress=stat_reynolds_stress, stat_eff_visc=stat_eff_visc, stat_int_mom_exch=stat_int_mom_exch)
