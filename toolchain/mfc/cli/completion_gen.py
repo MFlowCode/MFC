@@ -245,10 +245,11 @@ def generate_bash_completion(schema: CLISchema) -> str:
         '    return 0',
         '}',
         '',
-        '# Note: -o nospace prevents trailing space; we only use -o filenames when actually completing files',
-        'complete -F _mfc_completions ./mfc.sh',
-        'complete -F _mfc_completions mfc.sh',
-        'complete -F _mfc_completions mfc',
+        '# -o filenames: handle escaping/slashes for file completions',
+        '# Removed -o bashdefault to prevent unwanted directory fallback',
+        'complete -o filenames -F _mfc_completions ./mfc.sh',
+        'complete -o filenames -F _mfc_completions mfc.sh',
+        'complete -o filenames -F _mfc_completions mfc',
     ])
 
     return '\n'.join(lines)
