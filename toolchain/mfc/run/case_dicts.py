@@ -377,7 +377,7 @@ for ib_id in range(1, 10+1):
         SIMULATION[f"patch_ib({ib_id})%vel({dir_id})"] = ParamType.REAL.analytic()
         SIMULATION[f"patch_ib({ib_id})%angles({dir_id})"] = ParamType.REAL
         SIMULATION[f"patch_ib({ib_id})%angular_vel({dir_id})"] = ParamType.REAL.analytic()
-        # SIMULATION[f"patch_ib({ib_id})%model_scale({dir_id})"] = ParamType.REAL
+        SIMULATION[f"patch_ib({ib_id})%model_scale({dir_id})"] = ParamType.REAL
         SIMULATION[f"patch_ib({ib_id})%model_translate({dir_id})"] = ParamType.REAL
         SIMULATION[f"patch_ib({ib_id})%model_rotate({dir_id})"] = ParamType.REAL
 
