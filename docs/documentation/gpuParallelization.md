@@ -1,3 +1,5 @@
+@page gpuParallelization GPU Parallelization
+
 # GPU Parallelization
 
 MFC compiles GPU code via OpenACC and in the future OpenMP as well.

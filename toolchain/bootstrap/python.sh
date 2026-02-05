@@ -129,7 +129,12 @@ ok "(venv) Entered the $MAGENTA$(python3 --version)$COLOR_RESET virtual environm
 # (or)
 # - The pyproject.toml file has changed
 if ! cmp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/pyproject.toml" > /dev/null 2>&1; then
-    log "(venv) (Re)Installing mfc.sh's Python dependencies (via Pip)."
+    # Check if this is a fresh install (no previous pyproject.toml in build/)
+    if [ ! -f "$(pwd)/build/pyproject.toml" ]; then
+        log "(venv) Installing$MAGENTA Python packages$COLOR_RESET..."
+    else
+        log "(venv) Updating Python dependencies..."
+    fi
 
     next_arg=0
     nthreads=1
@@ -145,17 +150,243 @@ if ! cmp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/pyproject.toml" > /dev/
         fi
     done
 
-    if ! PIP_DISABLE_PIP_VERSION_CHECK=1 MAKEFLAGS=$nthreads pip3 install "$(pwd)/toolchain"; then
-        error "(venv) Installation failed."
+    # Run package installer and show progress
+    PIP_LOG="$(pwd)/build/.pip_install.log"
+
+    # Bootstrap uv if not available (uv is 10-100x faster than pip)
+    # Installing uv itself is quick (~2-3 seconds) and pays off immediately
+    if ! command -v uv > /dev/null 2>&1; then
+        log "(venv) Installing$MAGENTA uv$COLOR_RESET package manager for fast installation..."
+        if PIP_DISABLE_PIP_VERSION_CHECK=1 pip3 install uv > "$PIP_LOG" 2>&1; then
+            ok "(venv) Installed$MAGENTA uv$COLOR_RESET."
+        else
+            # uv install failed, fall back to pip for everything
+            warn "(venv) Could not install uv, falling back to pip (slower)."
+        fi
+    fi
+
+    # Now check if uv is available (either was already installed or we just installed it)
+    USE_UV=0
+    if command -v uv > /dev/null 2>&1; then
+        USE_UV=1
+    fi
+
+    # Use uv if available, otherwise fall back to pip
+    if [ "$USE_UV" = "1" ]; then
+        # uv is much faster and has its own progress display - show it
+        # UV_LINK_MODE=copy avoids slow hardlink failures on cross-filesystem installs (common on HPC)
+        export UV_LINK_MODE=copy
+        log "(venv) Using$MAGENTA uv$COLOR_RESET for fast installation..."
+        if [ -t 1 ]; then
+            # Interactive terminal: show uv's native progress
+            if uv pip install "$(pwd)/toolchain"; then
+                ok "(venv) Installation succeeded."
+                cp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/"
+            else
+                error "(venv) Installation failed."
+                log "(venv) Exiting the$MAGENTA Python$COLOR_RESET virtual environment."
+                deactivate
+                exit 1
+            fi
+        else
+            # Non-interactive: capture output for logging
+            if uv pip install "$(pwd)/toolchain" > "$PIP_LOG" 2>&1; then
+                rm -f "$PIP_LOG"
+                ok "(venv) Installation succeeded."
+                cp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/"
+            else
+                error "(venv) Installation failed. See output below:"
+                echo ""
+                cat "$PIP_LOG"
+                echo ""
+                log "(venv) Exiting the$MAGENTA Python$COLOR_RESET virtual environment."
+                deactivate
+                rm -f "$PIP_LOG"
+                exit 1
+            fi
+        fi
+    else
+        # Fall back to pip (slower, show progress bar)
+        PIP_DISABLE_PIP_VERSION_CHECK=1 MAKEFLAGS=$nthreads pip3 install "$(pwd)/toolchain" > "$PIP_LOG" 2>&1 &
+        PIP_PID=$!
+    fi
+
+    # Only run progress bar for pip (uv handles its own output and already completed above)
+    if [ "$USE_UV" = "0" ]; then
+
+    # Check if we're in an interactive terminal
+    if [ -t 1 ]; then
+        IS_TTY=1
+    else
+        IS_TTY=0
+    fi
+
+    # Progress bar configuration
+    # Two phases: Collecting (60%) and Installing (40%)
+    TOTAL_PKGS=70  # Initial estimate, adjusts dynamically
+    BAR_WIDTH=30
+    LAST_MILESTONE=0
+    LAST_PHASE=""
+    START_TIME=$SECONDS
+    FIRST_PRINT=1
+
+    while kill -0 $PIP_PID 2>/dev/null; do
+        # Determine current phase and count from log
+        PHASE="resolving"
+        COUNT=0
+        BUILD_COUNT=0
+        CURRENT_PKG=""
+
+        if [ -f "$PIP_LOG" ]; then
+            # Count packages being collected (dependency resolution)
+            COUNT=$(grep -c "^Collecting" "$PIP_LOG" 2>/dev/null | tr -d '[:space:]')
+            COUNT=${COUNT:-0}
+            if ! [[ "$COUNT" =~ ^[0-9]+$ ]]; then
+                COUNT=0
+            fi
+
+            # Count wheels being built
+            BUILD_COUNT=$(grep -c "Building wheel" "$PIP_LOG" 2>/dev/null | tr -d '[:space:]')
+            BUILD_COUNT=${BUILD_COUNT:-0}
+            if ! [[ "$BUILD_COUNT" =~ ^[0-9]+$ ]]; then
+                BUILD_COUNT=0
+            fi
+
+            # Check if we're in the installing phase
+            if grep -q "Installing collected packages" "$PIP_LOG" 2>/dev/null; then
+                PHASE="installing"
+            elif [ "$BUILD_COUNT" -gt 0 ]; then
+                PHASE="building"
+            fi
+
+            # Extract the current package being processed
+            CURRENT_LINE=$(grep -E "^Collecting |^  Downloading |^  Building wheel for " "$PIP_LOG" 2>/dev/null | tail -1)
+            if [[ "$CURRENT_LINE" == Collecting* ]]; then
+                # "Collecting numpy>=1.21.0" -> "numpy"
+                CURRENT_PKG=$(echo "$CURRENT_LINE" | sed 's/^Collecting //; s/[<>=\[( ].*//; s/\[.*//')
+            elif [[ "$CURRENT_LINE" == *Downloading* ]]; then
+                # "  Downloading numpy-1.24.0-cp312..." -> "numpy"
+                CURRENT_PKG=$(echo "$CURRENT_LINE" | sed 's/.*Downloading //; s/-[0-9].*//')
+            elif [[ "$CURRENT_LINE" == *"Building wheel"* ]]; then
+                # "  Building wheel for numpy (pyproject.toml)" -> "numpy"
+                CURRENT_PKG=$(echo "$CURRENT_LINE" | sed 's/.*Building wheel for //; s/ .*//')
+            fi
+        fi
+
+        ELAPSED=$((SECONDS - START_TIME))
+
+        if [ "$IS_TTY" = "1" ]; then
+            # Calculate progress based on phase
+            # Phase 1 (0-60%): Collecting dependencies
+            # Phase 2 (60-80%): Building wheels
+            # Phase 3 (80-100%): Installing
+
+            if [ "$COUNT" -gt "$TOTAL_PKGS" ]; then
+                TOTAL_PKGS=$COUNT
+            fi
+
+            if [ "$PHASE" = "installing" ]; then
+                PERCENT=90
+                STATUS="Installing..."
+            elif [ "$PHASE" = "building" ]; then
+                # During building, progress from 60-80%
+                PERCENT=$((60 + BUILD_COUNT * 2))
+                if [ "$PERCENT" -gt 80 ]; then
+                    PERCENT=80
+                fi
+                STATUS="Building ($BUILD_COUNT wheels)"
+            else
+                # During collecting, progress from 0-60%
+                PERCENT=$((COUNT * 60 / TOTAL_PKGS))
+                STATUS="$COUNT packages"
+            fi
+
+            FILLED=$((PERCENT * BAR_WIDTH / 100))
+            EMPTY=$((BAR_WIDTH - FILLED))
+
+            # Build the bar with Unicode blocks
+            BAR=""
+            for ((i=0; i<FILLED; i++)); do BAR="${BAR}█"; done
+            for ((i=0; i<EMPTY; i++)); do BAR="${BAR}░"; done
+
+            # Format time
+            MINS=$((ELAPSED / 60))
+            SECS=$((ELAPSED % 60))
+            if [ "$MINS" -gt 0 ]; then
+                TIME_STR="${MINS}m${SECS}s"
+            else
+                TIME_STR="${SECS}s"
+            fi
+
+            # Truncate package name if too long
+            if [ ${#CURRENT_PKG} -gt 40 ]; then
+                CURRENT_PKG="${CURRENT_PKG:0:37}..."
+            fi
+
+            # Print progress bar and current package on two lines
+            # First time: just print. After that: move up one line first
+            if [ "$FIRST_PRINT" = "1" ]; then
+                FIRST_PRINT=0
+            else
+                printf "\033[1A"  # Move cursor up one line
+            fi
+            printf "\r  ${CYAN}│${BAR}│${COLOR_RESET} %3d%% (%s, %s)            \n" "$PERCENT" "$STATUS" "$TIME_STR"
+            printf "  ${MAGENTA}→${COLOR_RESET} %-45s\r" "${CURRENT_PKG:-starting...}"
+        else
+            # Non-interactive: print milestone updates and phase changes
+            if [ "$PHASE" != "$LAST_PHASE" ]; then
+                case "$PHASE" in
+                    "building")
+                        log "(venv) Building wheels..."
+                        ;;
+                    "installing")
+                        log "(venv) Installing packages..."
+                        ;;
+                esac
+                LAST_PHASE="$PHASE"
+            fi
+
+            if [ "$PHASE" = "resolving" ]; then
+                MILESTONE=$((COUNT / 20 * 20))
+                if [ "$MILESTONE" -gt "$LAST_MILESTONE" ] && [ "$MILESTONE" -gt 0 ]; then
+                    LAST_MILESTONE=$MILESTONE
+                    log "(venv) Resolving: ~$COUNT packages..."
+                fi
+            fi
+        fi
+
+        sleep 0.3
+    done
+
+    # Wait for pip to finish and get exit code
+    wait $PIP_PID
+    PIP_EXIT=$?
+
+    # Clear the progress lines if in terminal (2 lines: progress bar + current package)
+    if [ "$IS_TTY" = "1" ]; then
+        printf "\033[1A"           # Move up one line
+        printf "\r%60s\n" " "      # Clear progress bar line
+        printf "\r%60s\r" " "      # Clear current package line
+        printf "\033[1A"           # Move back up
+    fi
+
+    if [ $PIP_EXIT -ne 0 ]; then
+        error "(venv) Installation failed. See output below:"
+        echo ""
+        cat "$PIP_LOG"
+        echo ""
 
         log   "(venv) Exiting the$MAGENTA Python$COLOR_RESET virtual environment."
         deactivate
-
+        rm -f "$PIP_LOG"
         exit 1
     fi
 
+    rm -f "$PIP_LOG"
     ok "(venv) Installation succeeded."
 
     # Save the new/current pyproject.toml
     cp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/"
+
+    fi  # end of USE_UV=0 (pip) block
 fi

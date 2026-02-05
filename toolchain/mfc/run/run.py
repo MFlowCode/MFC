@@ -144,7 +144,18 @@ def __execute_job_script(qsystem: queues.QueueSystem):
     # in the correct directory.
     cmd = qsystem.gen_submit_cmd(__job_script_filepath())
 
-    if system(cmd, cwd=os.path.dirname(ARG("input"))).returncode != 0:
+    verbosity = ARG('verbose')
+
+    # At verbosity >= 1, show the command being executed
+    if verbosity >= 1:
+        cons.print(f"  [dim]$ {' '.join(str(c) for c in cmd)}[/dim]")
+        cons.print()
+
+    # Execute the job script with appropriate output handling
+    # At verbosity >= 2, show print_cmd=True for system() calls
+    print_cmd = verbosity >= 2
+
+    if system(cmd, cwd=os.path.dirname(ARG("input")), print_cmd=print_cmd).returncode != 0:
         raise MFCException(f"Submitting batch file for {qsystem.name} failed. It can be found here: {__job_script_filepath()}. Please check the file for errors.")
 
 
@@ -153,6 +164,8 @@ def run(targets = None, case = None):
     case    = case or input.load(ARG("input"), ARG("--"))
 
     build(targets)
+
+    verbosity = ARG('verbose')
 
     cons.print("[bold]Run[/bold]")
     cons.indent()
@@ -166,9 +179,19 @@ def run(targets = None, case = None):
     qsystem = queues.get_system()
     cons.print(f"Using queue system [magenta]{qsystem.name}[/magenta].")
 
+    # At verbosity >= 1, show more details about what's happening
+    if verbosity >= 1:
+        cons.print(f"  [dim]Targets: {', '.join(t.name for t in targets)}[/dim]")
+        cons.print(f"  [dim]Input file: {ARG('input')}[/dim]")
+        if ARG("nodes") > 1 or ARG("tasks_per_node") > 1:
+            cons.print(f"  [dim]MPI: {ARG('nodes')} nodes × {ARG('tasks_per_node')} tasks/node = {ARG('nodes') * ARG('tasks_per_node')} total ranks[/dim]")
+
     __generate_job_script(targets, case)
     __validate_job_options()
     __generate_input_files(targets, case)
+
+    if verbosity >= 2:
+        cons.print(f"  [dim]Job script: {__job_script_filepath()}[/dim]")
 
     if not ARG("dry_run"):
         if ARG("output_summary") is not None:
@@ -176,4 +199,9 @@ def run(targets = None, case = None):
                 "invocation": sys.argv[1:],
                 "lock":       dataclasses.asdict(CFG())
             })
+
+        if verbosity >= 1:
+            cons.print()
+            cons.print("[bold]Executing simulation...[/bold]")
+
         __execute_job_script(qsystem)

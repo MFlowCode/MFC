@@ -646,6 +646,7 @@ def render_markdown(rules: Iterable[Rule]) -> str:  # pylint: disable=too-many-l
 
     lines: List[str] = []
 
+    lines.append("@page case_constraints Case Creator Guide\n")
     lines.append("# Case Creator Guide\n")
     lines.append(
         "> **Quick reference** for building MFC cases: working examples, compatibility rules, "

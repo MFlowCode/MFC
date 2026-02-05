@@ -14,9 +14,29 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: '3.14'
-    
+
     - name: Initialize MFC
       run: ./mfc.sh init
 
-    - name: Lint the toolchain
+    - name: Lint and test the toolchain
       run: ./mfc.sh lint
+
+    - name: Generate toolchain files
+      run: ./mfc.sh generate
+
+    - name: CLI smoke tests
+      run: |
+        ./mfc.sh --help
+        ./mfc.sh build --help
+        ./mfc.sh run --help
+        ./mfc.sh test --help
+        ./mfc.sh params --count
+        ./mfc.sh new --list
+
+    - name: Bash completion syntax check
+      run: bash -n toolchain/completions/mfc.bash
+
+    - name: Validate example cases
+      run: |
+        ./mfc.sh validate examples/1D_sodshocktube/case.py
+        ./mfc.sh validate examples/2D_shockbubble/case.py

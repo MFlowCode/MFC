@@ -1,3 +1,5 @@
+@page papers Papers
+
 # Papers
 
 MFC 5.0: An exascale many-physics flow solver. [<b>Wilfong, B., Le Berre, H., Radhakrishnan, A.,</b> Gupta, A., Vaca-Revelo, D., Adam , D., Yu, H., Lee, H., Chreim, J. R., Carcana Barbosa, M., Zhang, Y., Cisneros-Garibay, E., Gnanaskandan, A., Rodriguez Jr., M., Budiardja, R. D., Abbott, S., Colonius, T., & Bryngelson, S. H. (2025) MFC 5.0: An exascale many-physics flow solver. arXiv:2503.07953. <b>Equal contribution.</b>](https://doi.org/10.48550/arXiv.2503.07953)

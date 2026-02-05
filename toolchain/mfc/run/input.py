@@ -1,10 +1,11 @@
 import os, json, glob, typing, dataclasses
 
-import pyrometheus as pyro
-import cantera     as ct
+# Note: pyrometheus and cantera are imported lazily in the methods that need them
+# to avoid slow startup times for commands that don't use chemistry features
+# Note: build is imported lazily to avoid circular import with build.py
 
 from ..printer import cons
-from ..        import common, build
+from ..        import common
 from ..state   import ARGS, ARG, gpuConfigOptions
 from ..case    import Case
 from ..        import case_validator
@@ -20,6 +21,7 @@ class MFCInputFile(Case):
         self.dirpath  = dirpath
 
     def generate_inp(self, target) -> None:
+        from .. import build  # pylint: disable=import-outside-toplevel
         target = build.get_target(target)
 
         # Save .inp input file
@@ -34,7 +36,10 @@ class MFCInputFile(Case):
         cons.print("Writing a (new) custom case.fpp file.")
         common.file_write(fpp_path, contents, True)
 
-    def get_cantera_solution(self) -> ct.Solution:
+    def get_cantera_solution(self):
+        # Lazy import to avoid slow startup for commands that don't need chemistry
+        import cantera as ct  # pylint: disable=import-outside-toplevel
+
         if self.params.get("chemistry", 'F') == 'T':
             cantera_file = self.params["cantera_file"]
 
@@ -58,6 +63,9 @@ class MFCInputFile(Case):
         raise common.MFCException(f"Cantera file '{cantera_file}' not found. Searched: {', '.join(candidates)}.")
 
     def generate_fpp(self, target) -> None:
+        # Lazy import to avoid slow startup for commands that don't need chemistry
+        import pyrometheus as pyro  # pylint: disable=import-outside-toplevel
+
         if target.isDependency:
             return
 
@@ -97,6 +105,7 @@ class MFCInputFile(Case):
 
     def validate_constraints(self, target) -> None:
         """Validate case parameter constraints for a given target stage"""
+        from .. import build  # pylint: disable=import-outside-toplevel
         target_obj = build.get_target(target)
         stage = target_obj.name
 
@@ -114,6 +123,7 @@ class MFCInputFile(Case):
         self.generate_fpp(target)
 
     def clean(self, _targets) -> None:
+        from .. import build  # pylint: disable=import-outside-toplevel
         targets = [build.get_target(target) for target in _targets]
 
         files = set()
@@ -181,8 +191,13 @@ def load(filepath: str = None, args: typing.List[str] = None, empty_data: dict =
             raise common.MFCException(f"Input file {filename} terminated with a non-zero exit code. Please make sure running the file doesn't produce any errors.")
     elif filename.endswith(".json"):
         json_str = common.file_read(filename)
+    elif filename.endswith((".yaml", ".yml")):
+        import yaml  # pylint: disable=import-outside-toplevel
+        with open(filename, 'r') as f:
+            dictionary = yaml.safe_load(f)
+        json_str = json.dumps(dictionary)
     else:
-        raise common.MFCException("Unrecognized input file format. Only .py and .json files are supported. Please check the README and sample cases in the examples directory.")
+        raise common.MFCException("Unrecognized input file format. Supported: .py, .json, .yaml, .yml. Please check the README and sample cases in the examples directory.")
 
     try:
         dictionary = json.loads(json_str)

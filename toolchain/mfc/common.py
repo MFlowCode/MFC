@@ -1,8 +1,33 @@
-import os, yaml, typing, shutil, subprocess
+import os, yaml, typing, shutil, subprocess, logging
 
 from os.path import join, abspath, normpath, dirname, realpath
 
 from .printer import cons
+
+
+# Debug logging infrastructure
+_debug_logger = None
+
+def setup_debug_logging(enabled: bool = False):
+    """Setup debug logging for troubleshooting."""
+    global _debug_logger  # pylint: disable=global-statement
+    if enabled:
+        logging.basicConfig(
+            level=logging.DEBUG,
+            format='[DEBUG %(asctime)s] %(message)s',
+            datefmt='%H:%M:%S'
+        )
+        _debug_logger = logging.getLogger('mfc')
+        _debug_logger.setLevel(logging.DEBUG)
+        cons.print("[dim]Debug logging enabled[/dim]")
+    else:
+        _debug_logger = None
+
+def debug(msg: str):
+    """Log a debug message if debug logging is enabled."""
+    if _debug_logger:
+        _debug_logger.debug(msg)
+        cons.print(f"[dim][DEBUG][/dim] {msg}")
 
 
 MFC_ROOT_DIR       = abspath(normpath(f"{dirname(realpath(__file__))}/../.."))

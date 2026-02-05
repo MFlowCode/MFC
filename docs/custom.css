@@ -1,0 +1,133 @@
+/**
+ * MFC Documentation Custom Styles
+ * Overrides for doxygen-awesome theme
+ */
+
+/* Fix inline code visibility in colored admonition blocks (warning, attention, important, note, etc.) */
+
+/* Warning/Attention/Important blocks (red/pink background) */
+dl.warning .tt, dl.attention .tt, dl.important .tt,
+dl.warning code, dl.attention code, dl.important code {
+    background-color: rgba(255, 255, 255, 0.5);
+    color: #5a0a0f;
+    border-color: rgba(0, 0, 0, 0.15);
+}
+
+/* Note/Remark blocks (yellow/blue background) */
+dl.note .tt, dl.remark .tt,
+dl.note code, dl.remark code {
+    background-color: rgba(255, 255, 255, 0.5);
+    color: #3a3000;
+    border-color: rgba(0, 0, 0, 0.15);
+}
+
+/* Todo blocks (purple background) */
+dl.todo .tt, dl.todo code {
+    background-color: rgba(255, 255, 255, 0.5);
+    color: #2a1050;
+    border-color: rgba(0, 0, 0, 0.15);
+}
+
+/* Bug blocks */
+dl.bug .tt, dl.bug code {
+    background-color: rgba(255, 255, 255, 0.5);
+    color: #5a0a0f;
+    border-color: rgba(0, 0, 0, 0.15);
+}
+
+/* Deprecated blocks */
+dl.deprecated .tt, dl.deprecated code {
+    background-color: rgba(255, 255, 255, 0.5);
+    color: #333;
+    border-color: rgba(0, 0, 0, 0.15);
+}
+
+/* Invariant/Pre/Post blocks */
+dl.invariant .tt, dl.pre .tt, dl.post .tt,
+dl.invariant code, dl.pre code, dl.post code {
+    background-color: rgba(255, 255, 255, 0.5);
+    color: #0a3a5a;
+    border-color: rgba(0, 0, 0, 0.15);
+}
+
+/* Dark mode overrides */
+@media (prefers-color-scheme: dark) {
+    dl.warning .tt, dl.attention .tt, dl.important .tt,
+    dl.warning code, dl.attention code, dl.important code {
+        background-color: rgba(0, 0, 0, 0.3);
+        color: #ffcccc;
+        border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    dl.note .tt, dl.remark .tt,
+    dl.note code, dl.remark code {
+        background-color: rgba(0, 0, 0, 0.3);
+        color: #cce5ff;
+        border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    dl.todo .tt, dl.todo code {
+        background-color: rgba(0, 0, 0, 0.3);
+        color: #e0d0ff;
+        border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    dl.bug .tt, dl.bug code {
+        background-color: rgba(0, 0, 0, 0.3);
+        color: #ffcccc;
+        border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    dl.deprecated .tt, dl.deprecated code {
+        background-color: rgba(0, 0, 0, 0.3);
+        color: #d0d0d0;
+        border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    dl.invariant .tt, dl.pre .tt, dl.post .tt,
+    dl.invariant code, dl.pre code, dl.post code {
+        background-color: rgba(0, 0, 0, 0.3);
+        color: #cce5ff;
+        border-color: rgba(255, 255, 255, 0.15);
+    }
+}
+
+/* doxygen-awesome dark mode class-based detection */
+html.dark-mode dl.warning .tt, html.dark-mode dl.attention .tt, html.dark-mode dl.important .tt,
+html.dark-mode dl.warning code, html.dark-mode dl.attention code, html.dark-mode dl.important code {
+    background-color: rgba(0, 0, 0, 0.3);
+    color: #ffcccc;
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+html.dark-mode dl.note .tt, html.dark-mode dl.remark .tt,
+html.dark-mode dl.note code, html.dark-mode dl.remark code {
+    background-color: rgba(0, 0, 0, 0.3);
+    color: #cce5ff;
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+html.dark-mode dl.todo .tt, html.dark-mode dl.todo code {
+    background-color: rgba(0, 0, 0, 0.3);
+    color: #e0d0ff;
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+html.dark-mode dl.bug .tt, html.dark-mode dl.bug code {
+    background-color: rgba(0, 0, 0, 0.3);
+    color: #ffcccc;
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+html.dark-mode dl.deprecated .tt, html.dark-mode dl.deprecated code {
+    background-color: rgba(0, 0, 0, 0.3);
+    color: #d0d0d0;
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+html.dark-mode dl.invariant .tt, html.dark-mode dl.pre .tt, html.dark-mode dl.post .tt,
+html.dark-mode dl.invariant code, html.dark-mode dl.pre code, html.dark-mode dl.post code {
+    background-color: rgba(0, 0, 0, 0.3);
+    color: #cce5ff;
+    border-color: rgba(255, 255, 255, 0.15);
+}

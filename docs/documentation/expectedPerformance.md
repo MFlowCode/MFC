@@ -1,9 +1,95 @@
+@page expectedPerformance Performance
+
 # Performance
 
-MFC has been benchmarked on several CPUs and GPU devices.
-This page is a summary of these results.
+This page covers how to achieve maximum performance with MFC, including optimization techniques and benchmark results across various hardware platforms.
 
-## Figure of merit: Grind time performance
+---
+
+## Achieving Maximum Performance
+
+### Case Optimization (Recommended)
+
+The single most impactful optimization is **case optimization**, which can provide **up to 10x speedup** for both CPU and GPU runs.
+
+Case optimization works by hard-coding your simulation parameters at compile time, enabling aggressive compiler optimizations (loop unrolling, constant propagation, dead code elimination).
+
+**Basic usage:**
+```shell
+./mfc.sh run case.py --case-optimization -j 8
+```
+
+This automatically:
+1. Generates optimized source code with your parameters hard-coded
+2. Builds an optimized binary for your specific case
+3. Runs the simulation with the optimized binary
+4. Caches the build for repeated runs with the same parameters
+
+**For batch jobs:**
+```shell
+./mfc.sh run case.py --case-optimization -j 8 -e batch -N 4 -n 8
+```
+
+**Build separately (optional):**
+```shell
+./mfc.sh build -i case.py --case-optimization -j 8
+./mfc.sh run case.py
+```
+
+#### When to use case optimization
+
+| Use Case | Recommended? |
+|----------|--------------|
+| Production simulations | **Yes** |
+| Large-scale HPC runs | **Yes** |
+| Benchmarking | **Yes** |
+| Rapid iteration/debugging | No (rebuilds on parameter changes) |
+| Parameter sweeps | No (many different configurations) |
+
+### Other Optimization Flags
+
+| Flag | Description |
+|------|-------------|
+| `--gpu` | Enable GPU acceleration |
+| `-j N` | Parallel build with N threads |
+| `--fastmath` | Faster (less precise) floating-point math |
+
+### Profiling for Optimization
+
+Use profiling tools to identify bottlenecks:
+
+**NVIDIA GPUs:**
+```shell
+./mfc.sh run case.py --nsys    # Timeline profiling (Nsight Systems)
+./mfc.sh run case.py --ncu     # Kernel profiling (Nsight Compute)
+```
+
+**AMD GPUs:**
+```shell
+./mfc.sh run case.py --rsys    # Timeline profiling (rocprof-systems)
+./mfc.sh run case.py --rcu     # Kernel profiling (rocprof-compute)
+```
+
+See @ref running "Running" for detailed profiling instructions.
+
+### Performance Checklist
+
+Before running large simulations:
+
+1. **Build with optimization:** Use `--case-optimization` for production runs
+2. **Use GPU acceleration:** Build with `--gpu` on GPU systems
+3. **Match ranks to hardware:** One MPI rank per GPU, or match CPU cores
+4. **Verify GPU usage:** Check with `nvidia-smi` or `rocm-smi` during runs
+5. **Profile first:** Run a short simulation with profiling to identify issues
+
+---
+
+## Benchmark Results
+
+MFC has been benchmarked on several CPUs and GPU devices.
+This section summarizes these results.
+
+### Figure of merit: Grind time performance
 
 The following table outlines observed performance as nanoseconds per grid point (ns/gp) per equation (eq) per right-hand side (rhs) evaluation (lower is better), also known as the grind time.
 We solve an example 3D, inviscid, 5-equation model problem with two advected species (8 PDEs) and 8M grid points (158-cubed uniform grid).

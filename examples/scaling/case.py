@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-import sys, json, math, typing, argparse
+import sys
+import json
+import math
+import typing
+import argparse
 
 parser = argparse.ArgumentParser(
     prog="scaling_and_perf",
@@ -104,14 +108,14 @@ D0 = 1.0e-3
 # the droplet is about D0/8
 ISD = 5.0 / 8 * D0
 
-## pre-shock properties - AIR
+# pre-shock properties - AIR
 p0a = patm  # pressure - Pa
 rho0a = 1.204  # density - kg/m3
 gama = 1.40  # gamma
 pia = 0  # pi infinity - Pa
 c_a = math.sqrt(gama * (p0a + pia) / rho0a)  # speed of sound - M/s
 
-## Droplet - WATER
+# Droplet - WATER
 rho0w = 1000  # density - kg/m3
 p0w = patm  # pressure - Pa
 gamw = 6.12  # gamma

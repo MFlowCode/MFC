@@ -672,6 +672,28 @@ if (MFC_DOCUMENTATION)
         VERBATIM
     )
 
+    # Generate cli-reference.md from cli/commands.py
+    add_custom_command(
+        OUTPUT  "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/cli-reference.md"
+        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/mfc/cli/commands.py"
+                "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/mfc/cli/docs_gen.py"
+        COMMAND "bash" "${CMAKE_CURRENT_SOURCE_DIR}/docs/gen_cli_reference.sh"
+                       "${CMAKE_CURRENT_SOURCE_DIR}"
+        COMMENT "Generating cli-reference.md"
+        VERBATIM
+    )
+
+    # Generate parameters.md from parameter registry
+    file(GLOB_RECURSE params_SRCs CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/mfc/params/*.py")
+    add_custom_command(
+        OUTPUT  "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/parameters.md"
+        DEPENDS "${params_SRCs}"
+        COMMAND "bash" "${CMAKE_CURRENT_SOURCE_DIR}/docs/gen_parameters.sh"
+                       "${CMAKE_CURRENT_SOURCE_DIR}"
+        COMMENT "Generating parameters.md"
+        VERBATIM
+    )
+
     file(GLOB common_DOCs CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/docs/*")
 
     # GEN_DOCS: Given a target name (herein <target>), this macro sets up a
@@ -706,9 +728,13 @@ if (MFC_DOCUMENTATION)
 
         set(opt_example_dependency "")
         set(opt_constraints_dependency "")
+        set(opt_cli_reference_dependency "")
+        set(opt_parameters_dependency "")
         if (${target} STREQUAL documentation)
             set(opt_example_dependency "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/examples.md")
             set(opt_constraints_dependency "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/case_constraints.md")
+            set(opt_cli_reference_dependency "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/cli-reference.md")
+            set(opt_parameters_dependency "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/parameters.md")
         endif()
 
         file(GLOB_RECURSE ${target}_DOCs CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/docs/${target}/*")
@@ -719,6 +745,8 @@ if (MFC_DOCUMENTATION)
             DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/${target}-Doxyfile"
                     "${opt_example_dependency}"
                     "${opt_constraints_dependency}"
+                    "${opt_cli_reference_dependency}"
+                    "${opt_parameters_dependency}"
                     "${${target}_SRCs}" "${${target}_DOCs}"
             COMMAND "${DOXYGEN_EXECUTABLE}" "${target}-Doxyfile"
             WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
@@ -745,7 +773,7 @@ if (MFC_DOCUMENTATION)
     ExternalProject_Add(doxygen-awesome-css
         PREFIX            doxygen-awesome-css
         GIT_REPOSITORY    "https://github.com/jothepro/doxygen-awesome-css"
-        GIT_TAG           "df88fe4fdd97714fadfd3ef17de0b4401f804052"
+        GIT_TAG           "v2.4.1"
         CONFIGURE_COMMAND ""
         BUILD_COMMAND     ""
         INSTALL_COMMAND   ""
@@ -756,7 +784,8 @@ if (MFC_DOCUMENTATION)
 
     set(DOXYGEN_HTML_EXTRA_STYLESHEET
         "\"${theme_dirpath}/doxygen-awesome.css\"\
-         \"${theme_dirpath}/doxygen-awesome-sidebar-only.css\"")
+         \"${theme_dirpath}/doxygen-awesome-sidebar-only.css\"\
+         \"${CMAKE_CURRENT_SOURCE_DIR}/docs/custom.css\"")
 
     # > Generate Documentation & Landing Page
     GEN_DOCS(pre_process   "MFC: Pre-Process")

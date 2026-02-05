@@ -1,3 +1,5 @@
+@page references References
+
 # References
 
 - <a id="Allaire02">Allaire, G., Clerc, S., and Kokh, S. (2002). A five-equation model for the simulation of interfaces between compressible fluids. Journal of Computational Physics, 181(2):577–616.</a>

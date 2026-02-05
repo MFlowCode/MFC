@@ -24,9 +24,9 @@
     // Disable the extension entirely at workspace level
     "extensions.ignoreRecommendations": true,
     "extensions.autoCheckUpdates": false,
-    
+
     "fortran.preferredCase": "lowercase",
-    
+
     // Disable built-in linter completely but enable fortls
     "fortran.disabled": false,
     "fortran.linter.enabled": false,
@@ -45,18 +45,18 @@
     "fortran.validation.diagnostics": false,
     "fortran.symbols": false,
     "fortran.hover": false,
-    
+
     // Enable ONLY fortls language server
     "fortran.enableLanguageServer": true,
     "fortran.languageServer": "fortls",
     "fortran.fortls.disabled": true,
     "fortran.fortls.path": "fortls",
-    
+
     // Try to disable any built-in language features
     "editor.semanticHighlighting.enabled": false,
     "editor.suggest.showWords": false,
     "editor.suggest.showSnippets": false,
-    
+
     "[fortran]": {
         "editor.tabSize": 2,
         "editor.semanticHighlighting.enabled": false
@@ -69,7 +69,7 @@
         "editor.tabSize": 2,
         "editor.semanticHighlighting.enabled": false
     },
-    
+
     // File exclusions - multiple layers of exclusion
     "files.watcherExclude": {
         "**/misc/**": true,
@@ -80,7 +80,7 @@
         "**/m_nvtx*": true,
         "**/syscheck.fpp": true
     },
-    
+
     "search.exclude": {
         "**/misc/**": true,
         "**/benchmarks/**": true,
@@ -88,8 +88,20 @@
         "**/tests/**": true,
         "**/build/**": true
     },
-    
+
     // Keep problems panel available
     "problems.showOn": "toggle",
-    "problems.defaultViewMode": "list"
+    "problems.defaultViewMode": "list",
+
+    // MFC-SCHEMA-CONFIG-BEGIN (auto-generated, do not edit)
+    "json.schemas": [
+        {
+            "fileMatch": ["**/case.json", "**/input.json", "**/mfc-case.json", "**/mfc.json"],
+            "url": "./toolchain/mfc-case-schema.json"
+        }
+    ],
+    "yaml.schemas": {
+        "./toolchain/mfc-case-schema.json": ["**/case.yaml", "**/case.yml", "**/input.yaml", "**/input.yml", "**/mfc-case.yaml", "**/mfc.yaml"]
+    }
+    // MFC-SCHEMA-CONFIG-END
 }

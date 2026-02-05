@@ -1,11 +1,16 @@
-import re, json, math, copy, dataclasses, fastjsonschema
+# pylint: disable=import-outside-toplevel
+import re, json, math, copy, dataclasses, difflib, fastjsonschema
 
 from . import common
-from . import build
 from .printer import cons
 
 from .state import ARG
 from .run   import case_dicts
+
+
+def _suggest_similar_params(unknown_key: str, valid_keys: list, n: int = 3) -> list:
+    """Find similar parameter names for typo suggestions."""
+    return difflib.get_close_matches(unknown_key, valid_keys, n=n, cutoff=0.6)
 
 QPVF_IDX_VARS = {
     'alpha_rho': 'contxb', 'vel'  : 'momxb',         'pres': 'E_idx', 
@@ -38,6 +43,7 @@ class Case:
         return json.dumps(self.params, indent=4)
 
     def get_inp(self, _target) -> str:
+        from . import build  # pylint: disable=import-outside-toplevel
         target = build.get_target(_target)
 
         cons.print(f"Generating [magenta]{target.name}.inp[/magenta]:")
@@ -64,7 +70,9 @@ class Case:
                 ignored.append(key)
 
             if key not in case_dicts.ALL:
-                raise common.MFCException(f"MFCInputFile::dump: Case parameter '{key}' is not used by any MFC code. Please check your spelling or add it as a new parameter.")
+                suggestions = _suggest_similar_params(key, list(case_dicts.ALL.keys()))
+                hint = f" Did you mean: {', '.join(suggestions)}?" if suggestions else ""
+                raise common.MFCException(f"Unknown parameter '{key}'.{hint}")
 
         cons.print(f"[yellow]INFO:[/yellow] Forwarded {len(self.params)-len(ignored)}/{len(self.params)} parameters.")
         cons.unindent()
@@ -72,16 +80,36 @@ class Case:
         return f"&user_inputs\n{dict_str}&end/\n"
 
     def validate_params(self, origin_txt: str = None):
-        '''Typechecks parameters read from case file. If a parameter
-        is assigned a vlaie of the wrong type, this method throws an exception
-        highlighting the violating parameter and specifying what it expects.'''
+        '''Validates parameters read from case file:
+        1. Type checking via JSON schema
+        2. Constraint validation (valid values, ranges)
+        3. Dependency checking (required/recommended params)
+        '''
+        # Type checking
         try:
             case_dicts.get_validator()(self.params)
         except fastjsonschema.JsonSchemaException as e:
             if origin_txt:
                 raise common.MFCException(f"{origin_txt}: {e}")
-
             raise common.MFCException(f"{e}")
+
+        # Constraint and dependency validation
+        from .params.validate import validate_case
+
+        errors, warnings = validate_case(self.params)
+
+        # Show warnings (non-fatal)
+        if warnings:
+            cons.print()
+            for w in warnings:
+                cons.print(f"[yellow]Warning:[/yellow] {w}")
+
+        # Raise errors (fatal)
+        if errors:
+            error_msg = "\n".join(f"  - {e}" for e in errors)
+            if origin_txt:
+                raise common.MFCException(f"{origin_txt}:\n{error_msg}")
+            raise common.MFCException(f"Validation errors:\n{error_msg}")
 
     def __get_ndims(self) -> int:
         return 1 + min(int(self.params.get("n", 0)), 1) + min(int(self.params.get("p", 0)), 1)
@@ -358,6 +386,8 @@ class Case:
         return out
 
     def get_fpp(self, target, print = True) -> str:
+        from . import build  # pylint: disable=import-outside-toplevel
+
         def _prepend() -> str:
             return f"""\
 #:set chemistry             = {self.params.get("chemistry", 'F') == 'T'}

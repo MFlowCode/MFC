@@ -6,7 +6,9 @@
 # - weno_order : 3
 # - riemann_solver : 2
 
-import json, math, argparse
+import json
+import math
+import argparse
 
 parser = argparse.ArgumentParser(prog="Benchmarking Case 1", description="This MFC case was created for the purposes of benchmarking MFC.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
@@ -40,7 +42,7 @@ ecc = 0.564
 # the droplet is about D0/8
 ISD = 5.0 / 8 * D0
 
-## pre-shock properties - AIR
+# pre-shock properties - AIR
 
 # pressure - Pa
 p0a = patm
@@ -57,7 +59,7 @@ pia = 0
 # speed of sound - M/s
 c_a = math.sqrt(gama * (p0a + pia) / rho0a)
 
-## Droplet - WATER
+# Droplet - WATER
 
 # surface tension - N / m
 st = 0.00e0
@@ -84,7 +86,7 @@ c_w = math.sqrt(gamw * (p0w + piw) / rho0w)
 # Min or psOp0a. Just comment/uncomment appropriately
 Min = 2.4
 
-## Pos to pre shock ratios - AIR
+# Pos to pre shock ratios - AIR
 
 # pressure
 psOp0a = (Min**2 - 1) * 2 * gama / (gama + 1) + 1
@@ -99,7 +101,7 @@ Ms = math.sqrt((gama + 1.0) / (2.0 * gama) * (psOp0a - 1.0) * (p0a / (p0a + pia)
 # shock speed of sound - m/s
 ss = Ms * c_a
 
-## post-shock - AIR
+# post-shock - AIR
 
 # pressure - Pa
 ps = psOp0a * p0a
@@ -113,7 +115,7 @@ c_s = math.sqrt(gama * (ps + pia) / rhos)
 # velocity at the post shock - m/s
 vel = c_a / gama * (psOp0a - 1.0) * p0a / (p0a + pia) / Ms
 
-## Domain boundaries - m
+# Domain boundaries - m
 
 # x direction
 xb = -8.4707 * D0
@@ -156,7 +158,7 @@ dt = dx * cfl / ss
 # Save Frequency. Note that the number of autosaves will be SF + 1, as th IC (0.dat) is also saved
 SF = 400
 
-## making Nt divisible by SF
+# making Nt divisible by SF
 # 1 - ensure NtA goes slightly beyond tendA
 NtA = int(tendA // dt + 1)
 

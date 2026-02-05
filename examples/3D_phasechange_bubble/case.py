@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
-import math, json, argparse
+import math
+import json
+import argparse
 
 parser = argparse.ArgumentParser(prog="phasechange", description="phase change considering both 5 and 6 equation models.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("--mfc", type=json.loads, default="{}", metavar="DICT", help="MFC's toolchain's internal state.")
 parser.add_argument("-me", "--model_eqns", type=int, metavar="MODEL EQN", choices=[2, 3], default=3, help="choose `2' for 5-equation model or `3' for 6-equation model.")
 args = parser.parse_args()
 
-## 1 FOR BACKGROUND, 2 FOR BUBBLE
+# 1 FOR BACKGROUND, 2 FOR BUBBLE
 # Pressure [Pa]
 p01 = 5e6
 p02 = 3550
@@ -95,7 +97,7 @@ rho0a2 = (p02 + pia) / ((gama - 1) * cva * T02)
 c_a1 = math.sqrt(gama * (p01 + pia) / rho0a1)
 c_a2 = math.sqrt(gama * (p02 + pia) / rho0a2)
 
-## SHOCK RELATIONS
+# SHOCK RELATIONS
 p02Op01 = p02 / p01
 
 # Mach number of the shocked region - this should agree with Min, if everything is correct
@@ -117,7 +119,7 @@ awv2 = 1 / ((1 - C0) / C0 * rho0wv2 / rho0a2 + 1)
 aa1 = 1.0 - awl1 - awv1
 aa2 = 1.0 - awl2 - awv2
 
-## SIMULATION PARAMETERS
+# SIMULATION PARAMETERS
 
 # CFL
 cfl = 0.50
