@@ -111,6 +111,8 @@ contains
         call s_find_num_ghost_points(num_gps, num_inner_gps)
         call s_mpi_allreduce_integer_sum(num_gps, max_num_gps)
         call s_mpi_allreduce_integer_sum(num_inner_gps, max_num_inner_gps)
+        max_num_gps = min(max_num_gps, (m + 1)*(n + 1)*(p + 1)/2)
+        max_num_gps = min(max_num_inner_gps, (m + 1)*(n + 1)*(p + 1)/2)
 
         ! set the size of the ghost point arrays to be the amount of points total, plus a factor of 2 buffer
         $:GPU_UPDATE(device='[num_gps, num_inner_gps]')
