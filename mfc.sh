@@ -50,11 +50,11 @@ if [ "$1" '==' 'load' ] && [ "$2" != "--help" ] && [ "$2" != "-h" ]; then
     fi
     shift; . "$(pwd)/toolchain/bootstrap/modules.sh" $@; return
 elif [ "$1" '==' "lint" ] && [ "$2" != "--help" ] && [ "$2" != "-h" ]; then
-    . "$(pwd)/toolchain/bootstrap/python.sh"
+    . "$(pwd)/toolchain/bootstrap/python.sh" "$@"
 
     shift; . "$(pwd)/toolchain/bootstrap/lint.sh"    $@; exit 0
 elif [ "$1" '==' "format" ] && [ "$2" != "--help" ] && [ "$2" != "-h" ]; then
-    . "$(pwd)/toolchain/bootstrap/python.sh"
+    . "$(pwd)/toolchain/bootstrap/python.sh" "$@"
 
     shift; . "$(pwd)/toolchain/bootstrap/format.sh"  $@; exit 0
 elif [ "$1" '==' "venv" ]; then
@@ -62,11 +62,11 @@ elif [ "$1" '==' "venv" ]; then
 elif [ "$1" '==' "clean" ] && [ "$2" != "--help" ] && [ "$2" != "-h" ]; then
     rm -rf "$(pwd)/build"; exit 0
 elif [ "$1" '==' "spelling" ] && [ "$2" != "--help" ] && [ "$2" != "-h" ]; then
-    . "$(pwd)/toolchain/bootstrap/python.sh"
+    . "$(pwd)/toolchain/bootstrap/python.sh" "$@"
 
     shift; . "$(pwd)/toolchain/bootstrap/spelling.sh" $@; exit 0
 elif [ "$1" '==' "precheck" ]; then
-    . "$(pwd)/toolchain/bootstrap/python.sh"
+    . "$(pwd)/toolchain/bootstrap/python.sh" "$@"
 
     shift; . "$(pwd)/toolchain/bootstrap/precheck.sh" $@; exit 0
 fi
@@ -74,7 +74,7 @@ fi
 mkdir -p "$(pwd)/build"
 
 . "$(pwd)/toolchain/bootstrap/cmake.sh"
-. "$(pwd)/toolchain/bootstrap/python.sh"
+. "$(pwd)/toolchain/bootstrap/python.sh" "$@"
 
 # init command: just bootstrap the environment and exit (no Python command)
 if [ "$1" '==' 'init' ]; then
