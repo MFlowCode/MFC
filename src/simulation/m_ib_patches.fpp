@@ -910,7 +910,7 @@ contains
 
         model => models(patch_id)%model
 
-        ! TODO :: f_model_is_inside requries the non-GPU-compatible random_number() subroutine which causes build failure. This must be resolved in a future PR. Macro calls are left commented to make returning to this feature easier.
+        ! TODO :: f_model_is_inside requires the non-GPU-compatible random_number() subroutine which causes build failure. This must be resolved in a future PR. Macro calls are left commented to make returning to this feature easier.
         ! $:GPU_PARALLEL_LOOP(private='[i,j,k,point]', copy='[ib_markers_sf]', copyin='[patch_id,x_cc,y_cc,model]', collapse=3)
         do i = 0, m
             do j = 0, n
