@@ -902,15 +902,21 @@ contains
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: ib_markers_sf
+        real(wp), dimension(1:3) :: center
 
         integer :: i, j, k !< Generic loop iterators
 
         type(t_model), pointer :: model
 
         real(wp) :: eta
-        real(wp), dimension(1:3) :: point
+        real(wp), dimension(1:3) :: point, local_point
 
         model => models(patch_id)%model
+        center(1) = patch_ib(patch_id)%x_centroid
+        center(2) = patch_ib(patch_id)%y_centroid
+        if (p > 0) then
+          center(3) = patch_ib(patch_id)%z_centroid
+        end if
 
         ! TODO :: f_model_is_inside requires the non-GPU-compatible random_number() subroutine which causes build failure. This must be resolved in a future PR. Macro calls are left commented to make returning to this feature easier.
         ! $:GPU_PARALLEL_LOOP(private='[i,j,k,point]', copy='[ib_markers_sf]', copyin='[patch_id,x_cc,y_cc,model]', collapse=3)
@@ -918,19 +924,20 @@ contains
             do j = 0, n
                 do k = 0, p
 
-                    point = (/x_cc(i), y_cc(j), 0._wp/)
+                    xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]
                     if (p > 0) then
-                        point(3) = z_cc(k)
+                      xy_local(3) = z_cc(k) - center(3)
                     end if
+                    xy_local = matmul(inverse_rotation, xy_local)
 
                     if (grid_geometry == 3) then
-                        point = f_convert_cyl_to_cart(point)
+                        xy_local = f_convert_cyl_to_cart(xy_local)
                     end if
 
                     if (p == 0) then
-                        eta = f_model_is_inside(model, point, (/dx(i), dy(j), 0._wp/), patch_ib(patch_id)%model_spc)
+                        eta = f_model_is_inside(model, xy_local, (/dx(i), dy(j), 0._wp/), patch_ib(patch_id)%model_spc)
                     else
-                        eta = f_model_is_inside(model, point, (/dx(i), dy(j), dz(k)/), patch_ib(patch_id)%model_spc)
+                        eta = f_model_is_inside(model, xy_local, (/dx(i), dy(j), dz(k)/), patch_ib(patch_id)%model_spc)
                     end if
 
                     ! Reading STL boundary vertices and compute the levelset and levelset_norm

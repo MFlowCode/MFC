@@ -501,6 +501,15 @@ contains
 
         real(wp), dimension(1:spc, 1:3) :: ray_origins, ray_dirs
 
+        ! TODO :: The random number generation prohibits GPU compute due to the subroutine not being able to be called in kernels
+        ! This should be swapped out with something. I recommend the fibonacci sphere:
+        ! do i = 1, spc
+        !   phi = acos(1.0 - 2.0*(i-1.0)/(spc-1.0))
+        !   theta = pi * (1.0 + sqrt(5.0)) * (i-1.0)
+        !   ray_dirs(i,:) = [cos(theta)*sin(phi), sin(theta)*sin(phi), cos(phi)]
+        !   ray_origins(i,:) = point
+        ! end do
+
         do i = 1, spc
             call random_number(ray_origins(i, :))
             ray_origins(i, :) = point + (ray_origins(i, :) - 0.5_wp)*spacing(:)
