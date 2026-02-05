@@ -16,54 +16,8 @@ if [ -d "$(pwd)/.git" ] && [ ! -e "$(pwd)/.git/hooks/pre-commit" ] && [ -f "$(pw
     log "Installed git pre-commit hook (runs$MAGENTA ./mfc.sh precheck$COLOR_RESET before commits)."
 fi
 
-# Shell completions setup
-COMPLETION_DIR="$HOME/.local/share/mfc/completions"
-COMPLETION_SRC="$(pwd)/toolchain/completions"
-if [[ "$SHELL" == *"zsh"* ]]; then
-    COMPLETION_FILE="$COMPLETION_DIR/_mfc"
-    SOURCE_FILE="$COMPLETION_SRC/_mfc"
-    RC_FILE="$HOME/.zshrc"
-    RC_LINE="fpath=(\"$COMPLETION_DIR\" \$fpath)"
-    SOURCE_CMD="source $COMPLETION_DIR/_mfc"
-else
-    COMPLETION_FILE="$COMPLETION_DIR/mfc.bash"
-    SOURCE_FILE="$COMPLETION_SRC/mfc.bash"
-    RC_FILE="$HOME/.bashrc"
-    RC_LINE="[ -f \"$COMPLETION_DIR/mfc.bash\" ] && source \"$COMPLETION_DIR/mfc.bash\""
-    SOURCE_CMD="source $COMPLETION_DIR/mfc.bash"
-fi
-
-# Install or update completions
-COMPLETIONS_CHANGED=false
-if [ ! -f "$COMPLETION_FILE" ]; then
-    # Fresh install
-    mkdir -p "$COMPLETION_DIR"
-    cp "$COMPLETION_SRC/mfc.bash" "$COMPLETION_DIR/"
-    cp "$COMPLETION_SRC/_mfc" "$COMPLETION_DIR/"
-    COMPLETIONS_CHANGED=true
-
-    if [ -f "$RC_FILE" ] && ! grep -q "$COMPLETION_DIR" "$RC_FILE" 2>/dev/null; then
-        echo "" >> "$RC_FILE"
-        echo "# MFC shell completion" >> "$RC_FILE"
-        echo "$RC_LINE" >> "$RC_FILE"
-    fi
-elif [ "$SOURCE_FILE" -nt "$COMPLETION_FILE" ]; then
-    # Update outdated completions
-    cp "$COMPLETION_SRC/mfc.bash" "$COMPLETION_DIR/"
-    cp "$COMPLETION_SRC/_mfc" "$COMPLETION_DIR/"
-    COMPLETIONS_CHANGED=true
-fi
-
-# If sourced (not executed), we can activate completions in the current shell
-if [ "$COMPLETIONS_CHANGED" = true ]; then
-    if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
-        # Script is being sourced - activate completions now
-        source "$COMPLETION_FILE" 2>/dev/null && log "Tab completions activated."
-    else
-        # Script is being executed - can't modify parent shell
-        log "Tab completions updated. Run:$MAGENTA $SOURCE_CMD$COLOR_RESET"
-    fi
-fi
+# Shell completions auto-install/update
+. "$(pwd)/toolchain/bootstrap/completions.sh" "$(pwd)"
 
 # Print startup message immediately for user feedback
 log "Starting..."
