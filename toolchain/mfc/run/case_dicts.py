@@ -1,6 +1,20 @@
-import fastjsonschema
+"""
+MFC Case Parameter Type Definitions.
 
-from enum import Enum
+This module provides exports from the central parameter registry (mfc.params).
+All parameter definitions are sourced from the registry.
+
+Exports:
+    ALL: Dict of all parameters {name: ParamType}
+    IGNORE: Parameters to skip during certain operations
+    CASE_OPTIMIZATION: Parameters that can be hard-coded for GPU builds
+    SCHEMA: JSON schema for fastjsonschema validation
+    get_validator(): Returns compiled JSON schema validator
+    get_input_dict_keys(): Get parameter keys for a target
+"""
+# pylint: disable=import-outside-toplevel
+
+import re
 from ..state import ARG
 from functools import cache
 
@@ -549,39 +563,100 @@ for fl_id in range(1,10+1):
     for real_attr in ["gamma", "pi_inf", "G", "cv", "qv", "qvp" ]:
         POST_PROCESS[f"fluid_pp({fl_id})%{real_attr}"] = ParamType.REAL
 
+
+def _load_all_params():
+    """Load all parameters as {name: ParamType} dict."""
+    from ..params import REGISTRY
+    return {name: param.param_type for name, param in REGISTRY.all_params.items()}
+
+
+def _load_case_optimization_params():
+    """Get params that can be hard-coded for GPU optimization."""
+    from ..params import REGISTRY
+    return [name for name, param in REGISTRY.all_params.items() if param.case_optimization]
+
+
+def _build_schema():
+    """Build JSON schema from registry."""
+    from ..params import REGISTRY
+    return REGISTRY.get_json_schema()
+
+
+def _get_validator_func():
+    """Get the cached validator from registry."""
+    from ..params import REGISTRY
+    return REGISTRY.get_validator()
+
+
+def _get_target_params():
+    """Get valid params for each target by parsing Fortran namelists."""
+    from ..params.namelist_parser import get_target_params
+    return get_target_params()
+
+
+# Parameters to ignore during certain operations
 IGNORE = ["cantera_file", "chemistry"]
 
-ALL = COMMON.copy()
-ALL.update(PRE_PROCESS)
-ALL.update(SIMULATION)
-ALL.update(POST_PROCESS)
+# Combined dict of all parameters
+ALL = _load_all_params()
 
-CASE_OPTIMIZATION = [ "mapped_weno", "wenoz", "teno", "wenoz_q", "nb", "weno_order",
-                     "num_fluids", "mhd", "relativity", "igr_order", "viscous",
-                     "igr_iter_solver", "igr", "igr_pres_lim", "recon_type", "muscl_order", "muscl_lim" ]
+# Parameters that can be hard-coded for GPU case optimization
+CASE_OPTIMIZATION = _load_case_optimization_params()
 
-_properties = { k: v.value for k, v in ALL.items() }
+# JSON schema for validation
+SCHEMA = _build_schema()
 
-SCHEMA = {
-    "type": "object",
-    "properties": _properties,
-    "additionalProperties": False
-}
+
+def _is_param_valid_for_target(param_name: str, target_name: str) -> bool:
+    """
+    Check if a parameter is valid for a given target.
+
+    Uses the Fortran namelist definitions as the source of truth.
+    Handles indexed params like "patch_icpp(1)%geometry" by checking base name.
+
+    Args:
+        param_name: The parameter name (may include indices)
+        target_name: One of 'pre_process', 'simulation', 'post_process'
+
+    Returns:
+        True if the parameter is valid for the target
+    """
+    target_params = _get_target_params().get(target_name, set())
+
+    # Extract base parameter name (before any index or attribute)
+    # e.g., "patch_icpp(1)%geometry" -> "patch_icpp"
+    # e.g., "fluid_pp(2)%gamma" -> "fluid_pp"
+    # e.g., "acoustic(1)%loc(1)" -> "acoustic"
+    match = re.match(r'^([a-zA-Z_][a-zA-Z0-9_]*)', param_name)
+    if match:
+        base_name = match.group(1)
+        return base_name in target_params
+
+    return param_name in target_params
 
 
 def get_input_dict_keys(target_name: str) -> list:
-    result = {
-        "pre_process"  : PRE_PROCESS,
-        "simulation"   : SIMULATION,
-        "post_process" : POST_PROCESS
-    }.get(target_name, {}).keys()
+    """
+    Get parameter keys for a given target.
 
-    if not ARG("case_optimization") or target_name != "simulation":
-        return result
+    Uses the Fortran namelist definitions as the source of truth.
+    Only returns params whose base name is in the target's namelist.
 
-    return [ x for x in result if x not in CASE_OPTIMIZATION ]
+    Args:
+        target_name: One of 'pre_process', 'simulation', 'post_process'
+
+    Returns:
+        List of parameter names valid for that target
+    """
+    keys = [k for k in ALL.keys() if _is_param_valid_for_target(k, target_name)]
+
+    # Case optimization filtering for simulation
+    if ARG("case_optimization", dflt=False) and target_name == "simulation":
+        keys = [k for k in keys if k not in CASE_OPTIMIZATION]
+
+    return keys
 
 
-@cache
 def get_validator():
-    return fastjsonschema.compile(SCHEMA)
+    """Get the cached JSON schema validator."""
+    return _get_validator_func()

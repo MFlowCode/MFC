@@ -8,7 +8,9 @@
 # - bubble_model : 3
 # - acoustic_source : T
 
-import json, math, argparse
+import json
+import math
+import argparse
 
 parser = argparse.ArgumentParser(prog="Benchmarking Case 2", description="This MFC case was created for the purposes of benchmarking MFC.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
