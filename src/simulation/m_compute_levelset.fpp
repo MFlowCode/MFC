@@ -666,7 +666,7 @@ contains
         if (.not. f_is_default(patch_ib(patch_id)%x_centroid)) center(1) = patch_ib(patch_id)%x_centroid
         if (.not. f_is_default(patch_ib(patch_id)%y_centroid)) center(2) = patch_ib(patch_id)%y_centroid
         if (p > 0) then
-          if (.not. f_is_default(patch_ib(patch_id)%z_centroid)) center(3) = patch_ib(patch_id)%z_centroid
+            if (.not. f_is_default(patch_ib(patch_id)%z_centroid)) center(3) = patch_ib(patch_id)%z_centroid
         end if
         inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
         rotation(:, :) = patch_ib(patch_id)%rotation_matrix(:, :)
