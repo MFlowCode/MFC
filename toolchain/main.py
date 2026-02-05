@@ -48,6 +48,31 @@ def __do_regenerate(toolchain: str):
                 cons.print(f"[dim]Tab completions updated. Run: source {install_dir}/mfc.bash[/dim]")
 
 
+def __update_installed_completions(toolchain: str):
+    """Update installed completions if they're older than the generated ones."""
+    import shutil  # pylint: disable=import-outside-toplevel
+    from pathlib import Path  # pylint: disable=import-outside-toplevel
+
+    completions_dir = Path(toolchain) / "completions"
+    install_dir = Path.home() / ".local" / "share" / "mfc" / "completions"
+
+    if not install_dir.exists():
+        return
+
+    updated = []
+    for src_name, dst_name in [("mfc.bash", "mfc.bash"), ("_mfc", "_mfc")]:
+        src, dst = completions_dir / src_name, install_dir / dst_name
+        if src.exists() and dst.exists() and os.path.getmtime(src) > os.path.getmtime(dst):
+            shutil.copy2(src, dst)
+            updated.append(("bash" if src_name == "mfc.bash" else "zsh", dst))
+
+    if updated:
+        if "zsh" in os.environ.get("SHELL", "") and any(s[0] == "zsh" for s in updated):
+            cons.print(f"[dim]Tab completions updated. Run: source {install_dir}/_mfc[/dim]")
+        elif any(s[0] == "bash" for s in updated):
+            cons.print(f"[dim]Tab completions updated. Run: source {install_dir}/mfc.bash[/dim]")
+
+
 def __ensure_generated_files():
     """Auto-regenerate completion scripts and docs if source files have changed."""
     toolchain = os.path.join(MFC_ROOT_DIR, "toolchain")
@@ -79,6 +104,10 @@ def __ensure_generated_files():
 
     if needs_regen:
         __do_regenerate(toolchain)
+    else:
+        # Even if we didn't regenerate, check if installed completions need updating
+        # (e.g., after git pull with new generated files)
+        __update_installed_completions(toolchain)
 
 def __print_greeting():
     MFC_LOGO_LINES       = MFC_LOGO.splitlines()
