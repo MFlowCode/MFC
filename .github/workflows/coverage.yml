@@ -39,10 +39,10 @@ jobs:
                 libfftw3-dev libhdf5-dev libblas-dev liblapack-dev
 
       - name: Build
-        run: /bin/bash mfc.sh build -j $(nproc) --gcov
+        run: /bin/bash mfc.sh build -v -j $(nproc) --gcov
 
       - name: Test
-        run: /bin/bash mfc.sh test -a -j $(nproc)
+        run: /bin/bash mfc.sh test -v -a -j $(nproc)
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v4

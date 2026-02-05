@@ -125,11 +125,11 @@ jobs:
 
       - name: Build
         run:  |
-          /bin/bash mfc.sh test --dry-run -j $(nproc) --${{ matrix.debug }} --${{ matrix.mpi }} --${{ matrix.precision }} 
+          /bin/bash mfc.sh test -v --dry-run -j $(nproc) --${{ matrix.debug }} --${{ matrix.mpi }} --${{ matrix.precision }}
 
       - name: Test
         run:  |
-          /bin/bash mfc.sh test --max-attempts 3 -j $(nproc) $OPT1 $OPT2
+          /bin/bash mfc.sh test -v --max-attempts 3 -j $(nproc) $OPT1 $OPT2
         env:
           OPT1: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
           OPT2: ${{ matrix.debug == 'debug' && '-% 20' || '' }}
