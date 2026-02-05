@@ -1,3 +1,5 @@
+@page running Running
+
 # Running
 
 MFC can be run using `mfc.sh`'s `run` command.
@@ -41,6 +43,8 @@ mfc <path/to/case.py> -n 2
 
 Please refer to `./mfc.sh run -h` for a complete list of arguments and options, along with their defaults.
 
+---
+
 ## Interactive Execution
 
 To run all stages of MFC, that is [pre_process](https://github.com/MFlowCode/MFC/tree/master/src/pre_process/), [simulation](https://github.com/MFlowCode/MFC/tree/master/src/simulation/), and [post_process](https://github.com/MFlowCode/MFC/tree/master/src/post_process/) on the sample case [2D_shockbubble](https://github.com/MFlowCode/MFC/tree/master/examples/2D_shockbubble/),
@@ -69,69 +73,225 @@ using 4 cores:
 ./mfc.sh run examples/2D_shockbubble/case.py -t simulation post_process -n 4
 ```
 
-## Batch Execution
+---
 
-The MFC detects which scheduler your system is using and handles the creation and execution of batch scripts.
-The batch engine is requested via the `-e batch` option.
-The number of nodes can be specified with the `-N` (i.e., `--nodes`) option.
+## Running on GPUs
 
-We provide a list of (baked-in) submission batch scripts in the `toolchain/templates` folder.
+MFC supports GPU acceleration via OpenACC (default) or OpenMP offloading.
+This section covers how to build and run MFC on GPU systems.
+
+### Building with GPU Support
+
+First, build MFC with GPU support enabled:
 
 ```shell
-./mfc.sh run examples/2D_shockbubble/case.py -e batch -N 2 -n 4 -t simulation -c <computer name>
+# Using OpenACC (default, recommended for NVIDIA)
+./mfc.sh build --gpu
+
+# Explicitly specify OpenACC
+./mfc.sh build --gpu acc
+
+# Using OpenMP offloading (alternative)
+./mfc.sh build --gpu mp
 ```
 
-Other useful arguments include:
+On HPC clusters, load the appropriate modules first:
 
-- `-# <job name>` to name your job. (i.e., `--name`)
-- `-@ sample@example.com` to receive emails from the scheduler. (i.e., `--email`)
-- `-w hh:mm:ss` to specify the job's maximum allowed walltime. (i.e., `--walltime`)
-- `-a <account name>` to identify the account to be charged for the job. (i.e., `--account`)
-- `-p <partition name>` to select the job's partition. (i.e., `--partition`)
+```shell
+source ./mfc.sh load -c <cluster> -m g   # 'g' for GPU mode
+./mfc.sh build --gpu -j $(nproc)
+```
 
-As an example, one might request GPUs on a SLURM system using the following:
+### Running on GPUs
 
-**Disclaimer**: IBM's JSRUN on LSF-managed computers does not use the traditional node-based approach to
-allocate resources. Therefore, the MFC constructs equivalent resource sets in the task and GPU count.
+Run simulations with GPU support:
 
-### GPU Profiling 
+```shell
+# Basic GPU run
+./mfc.sh run case.py --gpu
+
+# Specify GPU IDs (useful for multi-GPU nodes)
+./mfc.sh run case.py --gpu -g 0 1 2 3
+
+# Run with 4 MPI ranks (typically one per GPU)
+./mfc.sh run case.py -n 4 --gpu
+```
+
+### Supported Compilers
+
+| Vendor | Compiler | OpenACC | OpenMP |
+|--------|----------|---------|--------|
+| NVIDIA | NVHPC (nvfortran) | Yes | Yes |
+| AMD | Cray (ftn) | Yes | Yes |
+| AMD | AMD (amdflang) | No | Yes |
+
+### Environment Setup
+
+Most HPC systems require loading GPU-specific modules:
+
+**NVIDIA systems:**
+```shell
+module load nvhpc cuda
+# Or use MFC's module loader:
+source ./mfc.sh load -c phoenix -m g
+```
+
+**AMD systems:**
+```shell
+module load rocm amdflang
+# Or use MFC's module loader:
+source ./mfc.sh load -c frontier -m g
+```
+
+### Verifying GPU Detection
+
+Check that GPUs are visible before running:
+
+```shell
+# NVIDIA
+nvidia-smi
+
+# AMD
+rocm-smi
+```
+
+To force GPU usage (fails fast if no GPU available):
+```shell
+export OMP_TARGET_OFFLOAD=MANDATORY
+./mfc.sh run case.py --gpu
+```
+
+### GPU Profiling
+
+MFC integrates with vendor profiling tools for performance analysis.
 
 #### NVIDIA GPUs
 
-MFC provides two different arguments to facilitate profiling with NVIDIA Nsight.
-**Please ensure the used argument is placed at the end so their respective flags can be appended.**
-- Nsight Systems (Nsys): `./mfc.sh run ... -t simulation --nsys [nsys flags]` allows one to visualize MFC's system-wide performance with [NVIDIA Nsight Systems](https://developer.nvidia.com/nsight-systems).
-NSys is best for understanding the order and execution times of major subroutines (WENO, Riemann, etc.) in MFC.
-When used, `--nsys` will run the simulation and generate `.nsys-rep` files in the case directory for all targets.
-These files can then be imported into Nsight System's GUI, which can be downloaded [here](https://developer.nvidia.com/nsight-systems/get-started#latest-Platforms). To keep the report files small, it is best to run case files with a few timesteps. Learn more about NVIDIA Nsight Systems [here](https://docs.nvidia.com/nsight-systems/UserGuide/index.html).
-- Nsight Compute (NCU): `./mfc.sh run ... -t simulation --ncu [ncu flags]` allows one to conduct kernel-level profiling with [NVIDIA Nsight Compute](https://developer.nvidia.com/nsight-compute).
-NCU provides profiling information for every subroutine called and is more detailed than NSys.
-When used, `--ncu` will output profiling information for all subroutines, including elapsed clock cycles, memory used, and more after the simulation is run.
-Adding this argument will significantly slow the simulation and should only be used on case files with a few timesteps.
-Learn more about NVIDIA Nsight Compute [here](https://docs.nvidia.com/nsight-compute/NsightCompute/index.html).
+**Nsight Systems** (timeline/system-level profiling):
+```shell
+./mfc.sh run case.py -t simulation --nsys [nsys flags]
+```
+- Best for understanding execution order and timing of major subroutines (WENO, Riemann, etc.)
+- Generates `.nsys-rep` files in the case directory
+- Open with [NVIDIA Nsight Systems GUI](https://developer.nvidia.com/nsight-systems/get-started)
+- Use few timesteps to keep report files small
 
+**Nsight Compute** (kernel-level profiling):
+```shell
+./mfc.sh run case.py -t simulation --ncu [ncu flags]
+```
+- Detailed per-kernel metrics: cycles, memory usage, occupancy
+- Significantly slower than normal execution
+- Use only with few timesteps
 
 #### AMD GPUs
-- Rocprof Systems (RSYS): `./mfc.sh run ... -t simulation --rsys --hip-trace [rocprof flags]` allows one to visualize MFC's system-wide performance with [Perfetto UI](https://ui.perfetto.dev/).
-When used, `--roc` will run the simulation and generate files in the case directory for all targets.
-`results.json` can then be imported in [Perfetto's UI](https://ui.perfetto.dev/).
-Learn more about AMD Rocprof [here](https://rocm.docs.amd.com/projects/rocprofiler/en/docs-5.5.1/rocprof.html)
-It is best to run case files with few timesteps to keep the report file sizes manageable.
-- Rocprof Compute (RCU): `./mfc.sh run ... -t simulation --rcu -n <name> [rocprof-compute flags]` allows one to conduct kernel-level profiling with [ROCm Compute Profiler](https://rocm.docs.amd.com/projects/rocprofiler-compute/en/latest/what-is-rocprof-compute.html).
-When used, `--rcu` will output profiling information for all subroutines, including rooflines, cache usage, register usage, and more, after the simulation is run.
-Adding this argument will moderately slow down the simulation and run the MFC executable several times.
-For this reason, it should only be used with case files with few timesteps.
+
+**rocprof-systems** (timeline profiling):
+```shell
+./mfc.sh run case.py -t simulation --rsys --hip-trace [rocprof flags]
+```
+- Generates files viewable in [Perfetto UI](https://ui.perfetto.dev/)
+- Use few timesteps for manageable file sizes
+
+**rocprof-compute** (kernel-level profiling):
+```shell
+./mfc.sh run case.py -t simulation --rcu -n <name> [rocprof-compute flags]
+```
+- Provides rooflines, cache usage, register usage
+- Runs the executable multiple times (moderately slower)
+
+> [!NOTE]
+> Place profiling arguments at the end of the command so their flags can be appended.
+
+---
+
+## Batch Execution
+
+The MFC detects which scheduler your system is using and handles the creation and execution of batch scripts.
+Use batch mode for running on HPC clusters with job schedulers (SLURM, PBS, LSF).
+
+### Basic Usage
+
+```shell
+./mfc.sh run case.py -e batch -N 2 -n 4 -c <computer>
+```
+
+### Batch Options
+
+| Option | Long Form | Description |
+|--------|-----------|-------------|
+| `-e batch` | `--engine batch` | Enable batch submission (required) |
+| `-N` | `--nodes` | Number of nodes to request |
+| `-n` | `--tasks-per-node` | MPI ranks per node |
+| `-w` | `--walltime` | Maximum job time (HH:MM:SS) |
+| `-a` | `--account` | Account/allocation to charge |
+| `-p` | `--partition` | Queue/partition name |
+| `-q` | `--qos` | Quality of service level |
+| `-@` | `--email` | Email for job notifications |
+| `-#` | `--name` | Job name (default: MFC) |
+| `-c` | `--computer` | Submission template to use |
+
+### Examples
+
+**Basic 4-node job:**
+```shell
+./mfc.sh run case.py -e batch -N 4 -n 8 -w 02:00:00
+```
+
+**Job with account and email:**
+```shell
+./mfc.sh run case.py -e batch -N 2 -a myproject -@ user@example.com
+```
+
+**GPU job on Frontier:**
+```shell
+./mfc.sh run case.py -e batch -N 4 -n 8 -c frontier --gpu -w 01:00:00
+```
+
+**Dry run (preview script without submitting):**
+```shell
+./mfc.sh run case.py -e batch -N 2 --dry-run
+```
+
+**Wait for job completion:**
+```shell
+./mfc.sh run case.py -e batch -N 2 --wait
+```
+
+### Computer Templates
+
+MFC includes pre-configured templates in `toolchain/templates/` for many clusters.
+Use `-c <name>` to select one:
+
+```shell
+./mfc.sh run case.py -e batch -c phoenix   # Georgia Tech Phoenix
+./mfc.sh run case.py -e batch -c frontier  # OLCF Frontier
+./mfc.sh run case.py -e batch -c delta     # NCSA Delta
+```
+
+If no template exists for your cluster, use `-c default` and customize as needed,
+or contribute a new template.
+
+### Scheduler Notes
+
+**SLURM systems:**
+Most clusters use SLURM. MFC automatically generates appropriate `sbatch` scripts.
+
+**LSF systems (e.g., Summit):**
+IBM's JSRUN does not use the traditional node-based approach. MFC constructs equivalent resource sets for task and GPU counts.
+
+---
 
 <a name="restarting-cases"></a>
-### Restarting Cases
+## Restarting Cases
 
 When running a simulation, MFC generates a `./restart_data` folder in the case directory that contains `lustre_*.dat` files that can be used to restart a simulation from saved timesteps.
 This allows a user to simulate some timestep $X$, then continue it to run to another timestep $Y$, where $Y > X$.
 The user can also choose to add new patches at the intermediate timestep.
 
-If you want to restart a simulation, 
+If you want to restart a simulation,
 
-- For a simulation that uses a constant time step set up the initial case file with: 
+- For a simulation that uses a constant time step set up the initial case file with:
     - `t_step_start` : $t_i$
     - `t_step_stop`  : $t_f$
     - `t_step_save`  : $SF$ in which $t_i$ is the starting time, $t_f$ is the final time, and $SF$ is the saving frequency time.
@@ -146,7 +306,7 @@ If you want to restart a simulation,
 - When the simulation stops, choose any Lustre file as the restarting point (lustre_ $t_s$.dat)
 - Create a new duplicate input file (e.g., `restart_case.py`), which should have:
 
-1. For the Computational Domain Parameters 
+1. For the Computational Domain Parameters
     - Have the following removed __except__ `m`, `n`, and `p`:
 		- All domain/mesh information
 			- `(xyz)_domain%beg`
@@ -178,22 +338,22 @@ If you want to restart a simulation,
 		- `patch_icpp(2)%all variables`
 		- `patch_icpp(num_patches)%all variables`
 	- Add information about new patches that will be introduced, if any. The parameter num_patches should reflect this addition.
-		- e.g. `patch_icpp(1)%some variables of interest`	
+		- e.g. `patch_icpp(1)%some variables of interest`
 
-4. For Fluid properties	
+4. For Fluid properties
 	- Keep information about the fluid properties
 
 - Run pre-process and simulation on `restart_case.py`
     - `./mfc.sh run restart_case.py -t pre_process simulation `
-	
+
 - Run the post_process
 	- There are several ways to do this. Keep in mind that, regardless of the .py file used, the post_process command will generate output files in the [`t_step_start`, `t_step_stop`] range, with `t_step_save` as the spacing between files.
-	- One way is to set `t_step_stop` to the restarting point $t_s$ in `case.py`. Then, run the commands below. The first command will run on timesteps $[t_i, t_s]$. The second command will run on $[t_s, t_{f2}]$. Therefore, the whole range $[t_i, t_{f2}]$ will be post processed.
+	- One way is to set `t_step_stop` to the restarting point $t_s$ in `case.py`. Then, run the commands below. The first command will run on timesteps $[t_i, t_s]$. The second command will run on $[t_s, t_{f2}]$. Therefore, the whole range $[t_i, t_{f2}]$ will be post-processed.
 
 ```shell
 ./mfc.sh run case.py -t post_process
 ./mfc.sh run restart_case.py -t post_process
-```	
+```
 
 We have provided an example, `case.py` and `restart_case.py` in `/examples/1D_vacuum_restart/`. This simulation is a duplicate of the `1D_vacuum` case. It demonstrates stopping at timestep 7000, adding a new patch, and restarting the simulation. To test this code, run:
 
@@ -204,7 +364,9 @@ We have provided an example, `case.py` and `restart_case.py` in `/examples/1D_va
 ./mfc.sh run examples/1D_vacuum_restart/restart_case.py -t post_process
 ```
 
-### Example Runs
+---
+
+## Example Runs
 
 - Oak Ridge National Laboratory's [Summit](https://www.olcf.ornl.gov/summit/):
 

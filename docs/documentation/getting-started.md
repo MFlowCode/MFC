@@ -1,3 +1,5 @@
+@page getting-started Getting Started
+
 # Getting Started
 
 ## Fetching MFC
@@ -139,13 +141,13 @@ MFC can be built with support for various (compile-time) features:
 | Feature            | Enable      | Disable        | Default | Description                                                     |
 | :----------------: | :---------: | :------------: | :-----: | --------------------------------------------------------------- |
 | **MPI**            | `--mpi`     | `--no-mpi`     | On      | Allows MFC to run on multiple processors (and nodes). |
-| **GPU**            | `--gpu`     | `--no-gpu`     | Off     | Enables GPU acceleration via OpenACC.                           |
+| **GPU**            | `--gpu`     | `--no-gpu`     | Off     | Enables GPU acceleration via OpenACC or OpenMP offload.         |
 | **Debug**          | `--debug`   | `--no-debug`   | Off     | Requests the compiler build MFC in debug mode.                  |
 | **GCov**           | `--gcov`    | `--no-gcov`    | Off     | Build MFC with coverage flags on.                              |
 | **Unified Memory** | `--unified` | `--no-unified` | Off     | Build MFC with unified CPU/GPU memory (GH200 superchip only)  |
-| **Single**         | `--single`  | `--no-single`  | Off     | Build MFC in single precision     
+| **Single**         | `--single`  | `--no-single`  | Off     | Build MFC in single precision                                   |
 
-_⚠️ The `--gpu` option requires that your compiler supports OpenACC for Fortran for your target GPU architecture._
+_⚠️ The `--gpu` option requires a supported compiler: NVHPC for NVIDIA GPUs (OpenACC or OpenMP), Cray for AMD GPUs (OpenACC or OpenMP), or AMD compilers for AMD GPUs (OpenMP only)._
 
 When these options are given to `mfc.sh`, they will be remembered when you issue future commands.
 You can enable and disable features anytime by passing any of the arguments above.
@@ -173,7 +175,7 @@ In brief, you can run the latest MFC container:
 ```bash
 docker run -it --rm --entrypoint bash sbryngelson/mfc:latest-cpu
 ```
-Please refer to the [Docker](docker.md) document for more information.
+Please refer to the @ref docker "Docker" document for more information.
 
 ## Running the Test Suite
 
@@ -182,7 +184,7 @@ Run MFC's test suite with 8 threads:
 ./mfc.sh test -j 8
 ```
 
-Please refer to the [Testing](testing.md) document for more information.
+Please refer to the @ref testing "Testing" document for more information.
 
 ## Running an Example Case
 
@@ -192,4 +194,42 @@ MFC has example cases in the `examples` folder. You can run such a case interact
 ./mfc.sh run examples/2D_shockbubble/case.py -n 2
 ```
 
-Please refer to the [Running](running.md) document for more information on `case.py` files and how to run them.
+Please refer to the @ref running "Running" document for more information on `case.py` files and how to run them.
+
+## Helpful Tools
+
+### Parameter Lookup
+
+MFC has over 3,000 case parameters. Use the `params` command to search and explore them:
+
+```shell
+./mfc.sh params dt          # Search for parameters matching "dt"
+./mfc.sh params -d dt       # Show parameter with description
+./mfc.sh params patch       # Find all patch-related parameters
+./mfc.sh params --family    # List all parameter families
+```
+
+### Creating a New Case
+
+Generate a case file template to get started quickly:
+
+```shell
+./mfc.sh new my_case.py     # Create a new case file from template
+```
+
+### Shell Completion
+
+Enable tab-completion for `./mfc.sh` commands:
+
+**Bash** (add to `~/.bashrc`):
+```bash
+source /path/to/MFC/toolchain/completions/mfc.bash
+```
+
+**Zsh** (add to `~/.zshrc`):
+```zsh
+fpath=(/path/to/MFC/toolchain/completions $fpath)
+autoload -Uz compinit && compinit
+```
+
+After reloading your shell, press Tab to complete commands and options.

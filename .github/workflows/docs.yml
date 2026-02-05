@@ -23,15 +23,15 @@ jobs:
         sudo apt install -y cmake ninja-build graphviz graphviz
         git clone https://github.com/doxygen/doxygen.git ../doxygen
         cd ../doxygen
-        git checkout 26b5403
+        git checkout Release_1_16_1
         cd -
         cmake -S ../doxygen -B ../doxygen/build -G Ninja
         sudo ninja -C ../doxygen/build install
 
     - name: Build Documentation
       run:  |
-        pip3 install fypp
-        cmake -S . -B build -G Ninja --install-prefix=$(pwd)/build/install -D MFC_DOCUMENTATION=ON
+        pip3 install fypp rich PyYAML
+        cmake -S . -B build -G Ninja --install-prefix="$(pwd)/build/install" -D MFC_DOCUMENTATION=ON
         ninja -C build install
 
     - name: Upload Built Documentation Artifact
