@@ -410,22 +410,18 @@ contains
         xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]
         xy_local = matmul(inverse_rotation, xy_local)
 
-        ! we will get NaNs in the levelset if we compute this outside the ellipse
-        if ((xy_local(1)/ellipse_coeffs(1))**2 + (xy_local(2)/ellipse_coeffs(2))**2 <= 1._wp) then
+        normal_vector = xy_local
+        normal_vector(2) = normal_vector(2)*(ellipse_coeffs(1)/ellipse_coeffs(2))**2._wp ! get the normal direction via the coordinate transformation method
+        normal_vector = normal_vector/sqrt(dot_product(normal_vector, normal_vector)) ! normalize the vector
+        gp%levelset_norm = matmul(rotation, normal_vector) ! save after rotating the vector to the global frame
 
-            normal_vector = xy_local
-            normal_vector(2) = normal_vector(2)*(ellipse_coeffs(1)/ellipse_coeffs(2))**2._wp ! get the normal direction via the coordinate transformation method
-            normal_vector = normal_vector/sqrt(dot_product(normal_vector, normal_vector)) ! normalize the vector
-            gp%levelset_norm = matmul(rotation, normal_vector) ! save after rotating the vector to the global frame
+        ! use the normal vector to set up the quadratic equation for the levelset, using A, B, and C in indices 1, 2, and 3
+        quadratic_coeffs(1) = (normal_vector(1)/ellipse_coeffs(1))**2 + (normal_vector(2)/ellipse_coeffs(2))**2
+        quadratic_coeffs(2) = 2._wp*((xy_local(1)*normal_vector(1)/(ellipse_coeffs(1)**2)) + (xy_local(2)*normal_vector(2)/(ellipse_coeffs(2)**2)))
+        quadratic_coeffs(3) = (xy_local(1)/ellipse_coeffs(1))**2._wp + (xy_local(2)/ellipse_coeffs(2))**2._wp - 1._wp
 
-            ! use the normal vector to set up the quadratic equation for the levelset, using A, B, and C in indices 1, 2, and 3
-            quadratic_coeffs(1) = (normal_vector(1)/ellipse_coeffs(1))**2 + (normal_vector(2)/ellipse_coeffs(2))**2
-            quadratic_coeffs(2) = 2._wp*((xy_local(1)*normal_vector(1)/(ellipse_coeffs(1)**2)) + (xy_local(2)*normal_vector(2)/(ellipse_coeffs(2)**2)))
-            quadratic_coeffs(3) = (xy_local(1)/ellipse_coeffs(1))**2._wp + (xy_local(2)/ellipse_coeffs(2))**2._wp - 1._wp
-
-            ! compute the levelset with the quadratic equation [ -B + sqrt(B^2 - 4AC) ] / 2A
-            gp%levelset = -0.5_wp*(-quadratic_coeffs(2) + sqrt(quadratic_coeffs(2)**2._wp - 4._wp*quadratic_coeffs(1)*quadratic_coeffs(3)))/quadratic_coeffs(1)
-        end if
+        ! compute the levelset with the quadratic equation [ -B + sqrt(B^2 - 4AC) ] / 2A
+        gp%levelset = -0.5_wp*(-quadratic_coeffs(2) + sqrt(quadratic_coeffs(2)**2._wp - 4._wp*quadratic_coeffs(1)*quadratic_coeffs(3)))/quadratic_coeffs(1)
 
     end subroutine s_ellipse_levelset
 
