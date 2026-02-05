@@ -502,7 +502,7 @@ contains
         real(wp), dimension(1:spc, 1:3) :: ray_origins, ray_dirs
 
         ! TODO :: The random number generation prohibits GPU compute due to the subroutine not being able to be called in kernels
-        ! This should be swapped out with something. I recommend the fibonacci sphere:
+        ! This should be swapped out with something that allows GPU compute. I recommend the fibonacci sphere:
         ! do i = 1, spc
         !   phi = acos(1.0 - 2.0*(i-1.0)/(spc-1.0))
         !   theta = pi * (1.0 + sqrt(5.0)) * (i-1.0)

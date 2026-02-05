@@ -652,7 +652,7 @@ contains
         integer :: i, j, k, patch_id, boundary_edge_count, total_vertices
         type(t_model) :: model
         logical :: interpolate
-        real(wp), dimension(1:3) :: point
+        real(wp), dimension(1:3) :: center, xyz_local
         real(wp) :: normals(1:3) !< Boundary normal buffer
         real(wp) :: distance
 
@@ -667,25 +667,32 @@ contains
         boundary_edge_count = models(patch_id)%boundary_edge_count
         total_vertices = models(patch_id)%total_vertices
 
-        ! determine where we are located in space
-        point = (/x_cc(i), y_cc(j), 0._wp/)
+        center(1) = patch_ib(patch_id)%x_centroid
+        center(2) = patch_ib(patch_id)%y_centroid
         if (p > 0) then
-            point(3) = z_cc(k)
+            center(3) = patch_ib(patch_id)%z_centroid
         end if
 
+        ! determine where we are located in space
+        xyz_local = (/x_cc(i) - patch_ib(patch_id)%x_centroid, y_cc(j) - patch_ib(patch_id)%y_centroid, 0._wp/)
+        if (p > 0) then
+            xyz_local(3) = z_cc(k) - patch_ib(patch_id)%z_centroid
+        end if
+        xyz_local = matmul(inverse_rotation, xyz_local)
+
         if (grid_geometry == 3) then
-            point = f_convert_cyl_to_cart(point)
+            xyz_local = f_convert_cyl_to_cart(xyz_local)
         end if
 
         ! 3D models
         if (p > 0) then
 
             ! Get the boundary normals and shortest distance between the cell center and the model boundary
-            call f_distance_normals_3D(model, point, normals, distance)
+            call f_distance_normals_3D(model, xyz_local, normals, distance)
 
             ! Get the shortest distance between the cell center and the interpolated model boundary
             if (interpolate) then
-                gp%levelset = f_interpolated_distance(models(patch_id)%interpolated_boundary_v, total_vertices, point)
+                gp%levelset = f_interpolated_distance(models(patch_id)%interpolated_boundary_v, total_vertices, xyz_local)
             else
                 gp%levelset = distance
             end if
