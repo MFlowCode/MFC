@@ -34,24 +34,35 @@ else
 fi
 
 # Install or update completions
+COMPLETIONS_CHANGED=false
 if [ ! -f "$COMPLETION_FILE" ]; then
     # Fresh install
     mkdir -p "$COMPLETION_DIR"
     cp "$COMPLETION_SRC/mfc.bash" "$COMPLETION_DIR/"
     cp "$COMPLETION_SRC/_mfc" "$COMPLETION_DIR/"
+    COMPLETIONS_CHANGED=true
 
     if [ -f "$RC_FILE" ] && ! grep -q "$COMPLETION_DIR" "$RC_FILE" 2>/dev/null; then
         echo "" >> "$RC_FILE"
         echo "# MFC shell completion" >> "$RC_FILE"
         echo "$RC_LINE" >> "$RC_FILE"
     fi
-
-    log "Installed tab completions. Restart shell or run:$MAGENTA $SOURCE_CMD$COLOR_RESET"
 elif [ "$SOURCE_FILE" -nt "$COMPLETION_FILE" ]; then
     # Update outdated completions
     cp "$COMPLETION_SRC/mfc.bash" "$COMPLETION_DIR/"
     cp "$COMPLETION_SRC/_mfc" "$COMPLETION_DIR/"
-    log "Updated tab completions. Run:$MAGENTA $SOURCE_CMD$COLOR_RESET"
+    COMPLETIONS_CHANGED=true
+fi
+
+# If sourced (not executed), we can activate completions in the current shell
+if [ "$COMPLETIONS_CHANGED" = true ]; then
+    if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+        # Script is being sourced - activate completions now
+        source "$COMPLETION_FILE" 2>/dev/null && log "Tab completions activated."
+    else
+        # Script is being executed - can't modify parent shell
+        log "Tab completions updated. Run:$MAGENTA $SOURCE_CMD$COLOR_RESET"
+    fi
 fi
 
 # Print startup message immediately for user feedback
