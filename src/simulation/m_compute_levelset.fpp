@@ -239,7 +239,7 @@ contains
         xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordinates
         xyz_local = xyz_local - offset ! airfoils are a patch that require a centroid offset
 
-        if (xyz_local(2) >= center(2)) then
+        if (xyz_local(2) >= 0._wp) then
             do k = 1, Np
                 dist_vec(1) = xyz_local(1) - airfoil_grid_u(k)%x
                 dist_vec(2) = xyz_local(2) - airfoil_grid_u(k)%y
