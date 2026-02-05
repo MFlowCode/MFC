@@ -573,7 +573,7 @@ contains
         real(wp), dimension(3) :: dist_sides_vec, dist_surface_vec, length
         real(wp), dimension(2) :: boundary
         real(wp) :: dist_side, dist_surface, side_pos
-        integer :: i, j, k, ii, jj !< Loop index variables
+        integer :: i, j, k !< Loop index variables
         integer :: ib_patch_id !< patch ID
 
         real(wp), dimension(1:3) :: xyz_local, center !< x and y coordinates in local IB frame
@@ -651,8 +651,6 @@ contains
 
         integer :: i, j, k, patch_id, boundary_edge_count, total_vertices
         type(t_model) :: model
-        ! real(wp), allocatable, dimension(:, :, :) :: boundary_v
-        ! real(wp), allocatable, dimension(:, :) :: interpolated_boundary_v
         logical :: interpolate
         real(wp), dimension(1:3) :: point
         real(wp) :: normals(1:3) !< Boundary normal buffer
@@ -668,8 +666,6 @@ contains
         interpolate = models(patch_id)%interpolate
         boundary_edge_count = models(patch_id)%boundary_edge_count
         total_vertices = models(patch_id)%total_vertices
-        ! boundary_v = models(patch_id)%boundary_v
-        ! interpolated_boundary_v = models(patch_id)%interpolated_boundary_v
 
         ! determine where we are located in space
         point = (/x_cc(i), y_cc(j), 0._wp/)
