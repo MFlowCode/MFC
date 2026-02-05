@@ -342,38 +342,34 @@ contains
         xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]
         xy_local = matmul(inverse_rotation, xy_local)
 
-        if ((xy_local(1) > bottom_left(1) .and. xy_local(1) < top_right(1)) .or. &
-            (xy_local(2) > bottom_left(2) .and. xy_local(2) < top_right(2))) then
+        side_dists(1) = bottom_left(1) - xy_local(1)
+        side_dists(2) = top_right(1) - xy_local(1)
+        side_dists(3) = bottom_left(2) - xy_local(2)
+        side_dists(4) = top_right(2) - xy_local(2)
+        min_dist = side_dists(1)
+        idx = 1
 
-            side_dists(1) = bottom_left(1) - xy_local(1)
-            side_dists(2) = top_right(1) - xy_local(1)
-            side_dists(3) = bottom_left(2) - xy_local(2)
-            side_dists(4) = top_right(2) - xy_local(2)
-            min_dist = side_dists(1)
-            idx = 1
-
-            do k = 2, 4
-                if (abs(side_dists(k)) < abs(min_dist)) then
-                    idx = k
-                    min_dist = side_dists(idx)
-                end if
-            end do
-
-            gp%levelset = side_dists(idx)
-            dist_vec = 0._wp
-            if (.not. f_approx_equal(side_dists(idx), 0._wp)) then
-                if (idx == 1 .or. idx == 2) then
-                    ! vector points along the x axis
-                    dist_vec(1) = side_dists(idx)/abs(side_dists(idx))
-                else
-                    ! vector points along the y axis
-                    dist_vec(2) = side_dists(idx)/abs(side_dists(idx))
-                end if
-                ! convert the normal vector back into the global coordinate system
-                gp%levelset_norm = matmul(rotation, dist_vec)
-            else
-                gp%levelset_norm = 0._wp
+        do k = 2, 4
+            if (abs(side_dists(k)) < abs(min_dist)) then
+                idx = k
+                min_dist = side_dists(idx)
             end if
+        end do
+
+        gp%levelset = side_dists(idx)
+        dist_vec = 0._wp
+        if (.not. f_approx_equal(side_dists(idx), 0._wp)) then
+            if (idx == 1 .or. idx == 2) then
+                ! vector points along the x axis
+                dist_vec(1) = side_dists(idx)/abs(side_dists(idx))
+            else
+                ! vector points along the y axis
+                dist_vec(2) = side_dists(idx)/abs(side_dists(idx))
+            end if
+            ! convert the normal vector back into the global coordinate system
+            gp%levelset_norm = matmul(rotation, dist_vec)
+        else
+            gp%levelset_norm = 0._wp
         end if
 
     end subroutine s_rectangle_levelset
