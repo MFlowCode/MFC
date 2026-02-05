@@ -1118,7 +1118,8 @@ contains
         $:GPU_ROUTINE(parallelism='[seq]')
 
         integer, intent(in) :: boundary_edge_count
-        real(wp), intent(in), dimension(1:boundary_edge_count, 1:3, 1:2) :: boundary_v
+        real(wp), intent(in), dimension(:, :, :) :: boundary_v
+        ! real(wp), intent(in), dimension(1:boundary_edge_count, 1:3, 1:2) :: boundary_v
         real(wp), dimension(1:3), intent(in) :: point
 
         integer :: i
@@ -1151,7 +1152,7 @@ contains
         $:GPU_ROUTINE(parallelism='[seq]')
 
         integer, intent(in) :: boundary_edge_count
-        real(wp), intent(in), dimension(1:boundary_edge_count, 1:3, 1:2) :: boundary_v
+        real(wp), intent(in), dimension(:, :, :) :: boundary_v
         real(wp), dimension(1:3), intent(in) :: point
         real(wp), dimension(1:3), intent(out) :: normals
 
@@ -1213,7 +1214,7 @@ contains
         $:GPU_ROUTINE(parallelism='[seq]')
 
         integer, intent(in) :: total_vertices
-        real(wp), intent(in), dimension(1:total_vertices, 1:3) :: interpolated_boundary_v
+        real(wp), intent(in), dimension(:, :) :: interpolated_boundary_v
         real(wp), dimension(1:3), intent(in) :: point
 
         integer :: i !< Loop iterator

@@ -56,6 +56,7 @@ module m_ib_patches
     character(len=5) :: istr ! string to store int to string result for error checking
 
     type(t_model_array), allocatable, target :: models(:)
+    $:GPU_DECLARE(create='[models]')
     !! array of STL models that can be allocated and then used in IB marker and levelset compute
 
 contains
@@ -321,6 +322,7 @@ contains
         Np2 = int(((ca_in - pa*ca_in)/dx(0))*20)
 #endif
         Np = Np1 + Np2 + 1
+        $:GPU_UPDATE(device='[Np]')
 
         if (.not. allocated(airfoil_grid_u)) then
             @:ALLOCATE(airfoil_grid_u(1:Np))

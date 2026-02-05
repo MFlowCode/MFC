@@ -36,7 +36,7 @@ contains
         !  3D Patch Geometries
         if (p > 0) then
 
-            $:GPU_PARALLEL_LOOP(private='[i]', copy='[gps]', copyin='[patch_ib,airfoil_grid_u,airfoil_grid_l]')
+            $:GPU_PARALLEL_LOOP(private='[i]', copy='[gps]', copyin='[patch_ib,Np]')
             do i = 1, num_gps
 
                 patch_id = gps(i)%ib_patch_id
@@ -61,7 +61,7 @@ contains
             ! 2D Patch Geometries
         elseif (n > 0) then
 
-            $:GPU_PARALLEL_LOOP(private='[i]', copy='[gps]', copyin='[patch_ib]')
+            $:GPU_PARALLEL_LOOP(private='[i]', copy='[gps]', copyin='[patch_ib, Np]')
             do i = 1, num_gps
 
                 patch_id = gps(i)%ib_patch_id
@@ -243,7 +243,7 @@ contains
             do k = 1, Np
                 dist_vec(1) = xyz_local(1) - airfoil_grid_u(k)%x
                 dist_vec(2) = xyz_local(2) - airfoil_grid_u(k)%y
-                dist_vec(3) = 0
+                dist_vec(3) = 0._wp
                 dist_surf = sqrt(sum(dist_vec**2))
                 if (k == 1) then
                     global_dist = dist_surf
@@ -573,7 +573,7 @@ contains
         real(wp), dimension(3) :: dist_sides_vec, dist_surface_vec, length
         real(wp), dimension(2) :: boundary
         real(wp) :: dist_side, dist_surface, side_pos
-        integer :: i, j, k !< Loop index variables
+        integer :: i, j, k, ii, jj !< Loop index variables
         integer :: ib_patch_id !< patch ID
 
         real(wp), dimension(1:3) :: xyz_local, center !< x and y coordinates in local IB frame
@@ -592,8 +592,15 @@ contains
         length(2) = patch_ib(ib_patch_id)%length_y
         length(3) = patch_ib(ib_patch_id)%length_z
 
-        inverse_rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:, :)
-        rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix(:, :)
+        ! inverse_rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:, :)
+        ! rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix(:, :)
+        ! Copy matrices element by element
+        do ii = 1, 3
+          do jj = 1, 3
+              inverse_rotation(ii, jj) = patch_ib(ib_patch_id)%rotation_matrix_inverse(ii, jj)
+              rotation(ii, jj) = patch_ib(ib_patch_id)%rotation_matrix(ii, jj)
+          end do
+      end do
 
         if (.not. f_approx_equal(length(1), 0._wp)) then
             boundary(1) = -0.5_wp*length(1)
@@ -650,9 +657,9 @@ contains
         type(ghost_point), intent(inout) :: gp
 
         integer :: i, j, k, patch_id, boundary_edge_count, total_vertices
-        type(t_model), pointer :: model
-        real(wp), pointer, dimension(:, :, :) :: boundary_v
-        real(wp), pointer, dimension(:, :) :: interpolated_boundary_v
+        type(t_model) :: model
+        ! real(wp), allocatable, dimension(:, :, :) :: boundary_v
+        ! real(wp), allocatable, dimension(:, :) :: interpolated_boundary_v
         logical :: interpolate
         real(wp), dimension(1:3) :: point
         real(wp) :: normals(1:3) !< Boundary normal buffer
@@ -664,12 +671,12 @@ contains
         k = gp%loc(3)
 
         ! load in model values
-        model => models(patch_id)%model
+        model = models(patch_id)%model
         interpolate = models(patch_id)%interpolate
         boundary_edge_count = models(patch_id)%boundary_edge_count
         total_vertices = models(patch_id)%total_vertices
-        boundary_v => models(patch_id)%boundary_v
-        interpolated_boundary_v => models(patch_id)%interpolated_boundary_v
+        ! boundary_v = models(patch_id)%boundary_v
+        ! interpolated_boundary_v = models(patch_id)%interpolated_boundary_v
 
         ! determine where we are located in space
         point = (/x_cc(i), y_cc(j), 0._wp/)
@@ -689,7 +696,7 @@ contains
 
             ! Get the shortest distance between the cell center and the interpolated model boundary
             if (interpolate) then
-                gp%levelset = f_interpolated_distance(interpolated_boundary_v, total_vertices, point)
+                gp%levelset = f_interpolated_distance(models(patch_id)%interpolated_boundary_v, total_vertices, point)
             else
                 gp%levelset = distance
             end if
@@ -703,17 +710,17 @@ contains
             ! 2D models
             if (interpolate) then
                 ! Get the shortest distance between the cell center and the model boundary
-                gp%levelset = f_interpolated_distance(interpolated_boundary_v, total_vertices, point)
+                gp%levelset = f_interpolated_distance(models(patch_id)%interpolated_boundary_v, total_vertices, point)
             else
                 ! Get the shortest distance between the cell center and the interpolated model boundary
-                gp%levelset = f_distance(boundary_v, boundary_edge_count, point)
+                gp%levelset = f_distance(models(patch_id)%boundary_v, boundary_edge_count, point)
             end if
 
             ! Correct the sign of the levelset
             gp%levelset = -abs(gp%levelset)
 
             ! Get the boundary normals
-            call f_normals(boundary_v, &
+            call f_normals(models(patch_id)%boundary_v, &
                            boundary_edge_count, &
                            point, &
                            normals)
