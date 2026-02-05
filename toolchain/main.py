@@ -32,38 +32,29 @@ def __do_regenerate(toolchain: str):
 
 
 def __update_installed_completions(toolchain: str):
-    """Install or update shell completions automatically."""
+    """Update installed shell completions if they're older than generated ones."""
     import shutil  # pylint: disable=import-outside-toplevel
     from pathlib import Path  # pylint: disable=import-outside-toplevel
 
-    completions_dir = Path(toolchain) / "completions"
-    install_dir = Path.home() / ".local" / "share" / "mfc" / "completions"
+    src_dir = Path(toolchain) / "completions"
+    dst_dir = Path.home() / ".local" / "share" / "mfc" / "completions"
 
-    # Auto-install if not installed yet
-    if not install_dir.exists():
-        install_dir.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(completions_dir / "mfc.bash", install_dir / "mfc.bash")
-        shutil.copy2(completions_dir / "_mfc", install_dir / "_mfc")
-        user_shell = os.environ.get("SHELL", "")
-        if "zsh" in user_shell:
-            cons.print(f"[dim]Tab completions installed. Run: source {install_dir}/_mfc[/dim]")
-        else:
-            cons.print(f"[dim]Tab completions installed. Run: source {install_dir}/mfc.bash[/dim]")
+    # Only update if already installed (mfc.sh handles initial install)
+    if not dst_dir.exists():
         return
 
     # Update if installed but older than generated
-    updated = []
-    for src_name, dst_name in [("mfc.bash", "mfc.bash"), ("_mfc", "_mfc")]:
-        src, dst = completions_dir / src_name, install_dir / dst_name
-        if src.exists() and dst.exists() and os.path.getmtime(src) > os.path.getmtime(dst):
-            shutil.copy2(src, dst)
-            updated.append(("bash" if src_name == "mfc.bash" else "zsh", dst))
+    updated = False
+    for name in ["mfc.bash", "_mfc"]:
+        if (src_dir / name).exists() and (dst_dir / name).exists():
+            if os.path.getmtime(src_dir / name) > os.path.getmtime(dst_dir / name):
+                shutil.copy2(src_dir / name, dst_dir / name)
+                updated = True
 
     if updated:
-        if "zsh" in os.environ.get("SHELL", "") and any(s[0] == "zsh" for s in updated):
-            cons.print(f"[dim]Tab completions updated. Run: source {install_dir}/_mfc[/dim]")
-        elif any(s[0] == "bash" for s in updated):
-            cons.print(f"[dim]Tab completions updated. Run: source {install_dir}/mfc.bash[/dim]")
+        is_zsh = "zsh" in os.environ.get("SHELL", "")
+        src_cmd = f"source {dst_dir}/_mfc" if is_zsh else f"source {dst_dir}/mfc.bash"
+        cons.print(f"[dim]Tab completions updated. Run: {src_cmd}[/dim]")
 
 
 def __ensure_generated_files():
