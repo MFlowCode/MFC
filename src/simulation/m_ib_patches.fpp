@@ -138,7 +138,7 @@ contains
         real(wp), dimension(1:4, 1:4) :: transform, transform_n
 
         do patch_id = 1, num_ibs
-            if (patch_ib(patch_id)%geometry == 5) then
+            if (patch_ib(patch_id)%geometry == 5 .or. patch_ib(patch_id)%geometry == 12) then
                 @:ALLOCATE(models(patch_id)%model)
 
                 print *, " * Reading model: "//trim(patch_ib(patch_id)%model_filepath)
@@ -908,24 +908,13 @@ contains
         real(wp) :: eta
         real(wp), dimension(1:3) :: point
 
-        integer :: cell_num
-        integer :: ncells
-
         model = models(patch_id)%model
 
-        ncells = (m + 1)*(n + 1)*(p + 1)
-        $:GPU_PARALLEL_LOOP(private='[i,j,k,point,cell_num]', copy='[ib_markers_sf]',&
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,point]', copy='[ib_markers_sf]',&
                   & copyin='[patch_id,x_cc,y_cc,ncells,model]', collapse=3)
         do i = 0, m
             do j = 0, n
                 do k = 0, p
-
-                    cell_num = i*(n + 1)*(p + 1) + j*(p + 1) + (k + 1)
-                    if (proc_rank == 0 .and. mod(cell_num, ncells/100) == 0) then
-                        write (*, "(A, I3, A)", advance="no") &
-                            char(13)//"  * Generating grid: ", &
-                            nint(100*real(cell_num)/ncells), "%"
-                    end if
 
                     point = (/x_cc(i), y_cc(j), 0._wp/)
                     if (p > 0) then
