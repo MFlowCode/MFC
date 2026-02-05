@@ -165,9 +165,14 @@ contains
         real(wp) :: rddot
         real(wp) :: pb_local, mv_local, vflux, pbdot
         real(wp) :: n_tait, B_tait
-        real(wp), dimension(nb) :: Rtmp, Vtmp
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3) :: Rtmp, Vtmp
+            real(wp), dimension(3) :: myalpha, myalpha_rho
+        #:else
+            real(wp), dimension(nb) :: Rtmp, Vtmp
+            real(wp), dimension(num_fluids) :: myalpha, myalpha_rho
+        #:endif
         real(wp) :: myR, myV, alf, myP, myRho, R2Vav, R3
-        real(wp), dimension(num_fluids) :: myalpha, myalpha_rho
         real(wp) :: nbub !< Bubble number density
         real(wp) :: my_divu
 

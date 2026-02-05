@@ -939,22 +939,25 @@ By convention, positive accelerations in the `x[y,z]` direction are in the posit
 
 ### 14. Magnetohydrodynamics (MHD)
 
-| Parameter         | Type    | Description                                         |
-| ---:              | :---:   | :---                                                |
-| `mhd`             | Logical | Enable ideal MHD simulation                         |
-| `relativity`      | Logical | Enable relativistic MHD simulation                  |
-| `powell`          | Logical | Enable Powell's method for solenoidal constraint    |
-| `fd_order`        | Integer | Finite difference order for Powell's method         |
-| `Bx[y,z]`         | Real    | Initial magnetic field in the x[y,z] direction      |
-| `Bx0`             | Real    | Constant magnetic field in the x direction (1D only)|
+| Parameter                | Type    | Description                                              |
+| ---:                     | :---:   | :---                                                     |
+| `mhd`                    | Logical | Enable ideal MHD simulation                              |
+| `relativity`             | Logical | Enable relativistic MHD simulation                       |
+| `hyper_cleaning`         | Logical | Enable hyperbolic (GLM) divergence cleaning for `div B`  |
+| `hyper_cleaning_speed`   | Real    | Cleaning wave speed `c_h`                                |
+| `hyper_cleaning_tau`     | Real    | Cleaning damping timescale `tau`                         |
+| `Bx[y,z]`                | Real    | Initial magnetic field in the x[y,z] direction           |
+| `Bx0`                    | Real    | Constant magnetic field in the x direction (1D only)     |
 
 - `mhd` is currently only available for single-component flows and 5-equation model. Its compatibility with most other features is work in progress.
 
 - `relativity` only works for `mhd` enabled and activates relativistic MHD (RMHD) simulation.
 
-- `powell` activates Powell's eight-wave method to impose the solenoidal constraint in the MHD simulation [Powell (1994)](references.md). It should not be used in conjunction with HLLD (`riemann_solver = 4`).
+- `hyper_cleaning` [Dedner et al., 2002](references.md) only works with `mhd` in 2D/3D and reduces numerical `div B` errors by propagation and damping. Currently not compatible with HLLD (`riemann_solver = 4`).
 
-- `fd_order` specifies the finite difference order for computing the RHS of the Powell's method. `fd_order = 1`, `2`, and `4` are allowed.
+- `hyper_cleaning_speed` sets the propagation speed of divergence-cleaning waves.
+
+- `hyper_cleaning_tau` sets the decay timescale for divergence-cleaning.
 
 - `Bx0` is only used in 1D simulations to specify the constant magnetic field in the x direction. It must be specified in 1D simulations. `Bx` must not be used in 1D simulations.
 

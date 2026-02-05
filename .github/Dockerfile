@@ -15,17 +15,17 @@ RUN apt-get update -y && \
     if [ "$TARGET" != "gpu" ]; then \
         apt-get install -y \
             build-essential git make cmake gcc g++ gfortran bc \
-            python3.11 python3.11-venv python3-pip \
+            python3.12 python3.12-venv python3-pip \
             openmpi-bin libopenmpi-dev libfftw3-dev \
             mpich libmpich-dev; \
     else \
         apt-get install -y \
             build-essential git make cmake bc \
-            python3.11 python3.11-venv python3-pip \
+            python3.12 python3.12-venv python3-pip \
             libfftw3-dev \
             openmpi-bin libopenmpi-dev; \
     fi && \
-    update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 2 && \
+    update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 2 && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 ENV OMPI_ALLOW_RUN_AS_ROOT=1
@@ -39,6 +39,13 @@ ENV CXX=${CXX_COMPILER}
 ENV FC=${FC_COMPILER}
 ENV PATH="${COMPILER_PATH}:$PATH"
 ENV LD_LIBRARY_PATH="${COMPILER_LD_LIBRARY_PATH}:${LD_LIBRARY_PATH:-}"
+
+# Pre-install numpy into the venv before mfc.sh runs, as it's required at
+# build time by several dependencies (pandas, cantera, matplotlib, etc.) that
+# may need to compile from source on architectures without pre-built wheels
+RUN python3.12 -m venv /opt/MFC/build/venv && \
+    /opt/MFC/build/venv/bin/pip install --upgrade pip && \
+    /opt/MFC/build/venv/bin/pip install numpy
 
 RUN echo "TARGET=$TARGET CC=$CC_COMPILER FC=$FC_COMPILER" && \
     cd /opt/MFC && \

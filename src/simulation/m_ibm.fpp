@@ -177,15 +177,23 @@ contains
         real(wp), dimension(2) :: Re_K
         real(wp) :: G_K
         real(wp) :: qv_K
-        real(wp), dimension(num_fluids) :: Gs
 
         real(wp) :: pres_IP
         real(wp), dimension(3) :: vel_IP, vel_norm_IP
         real(wp) :: c_IP
-        real(wp), dimension(num_fluids) :: alpha_rho_IP, alpha_IP
-        real(wp), dimension(nb) :: r_IP, v_IP, pb_IP, mv_IP
-        real(wp), dimension(nb*nmom) :: nmom_IP
-        real(wp), dimension(nb*nnode) :: presb_IP, massv_IP
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3) :: Gs
+            real(wp), dimension(3) :: alpha_rho_IP, alpha_IP
+            real(wp), dimension(3) :: r_IP, v_IP, pb_IP, mv_IP
+            real(wp), dimension(18) :: nmom_IP
+            real(wp), dimension(12) :: presb_IP, massv_IP
+        #:else
+            real(wp), dimension(num_fluids) :: Gs
+            real(wp), dimension(num_fluids) :: alpha_rho_IP, alpha_IP
+            real(wp), dimension(nb) :: r_IP, v_IP, pb_IP, mv_IP
+            real(wp), dimension(nb*nmom) :: nmom_IP
+            real(wp), dimension(nb*nnode) :: presb_IP, massv_IP
+        #:endif
         !! Primitive variables at the image point associated with a ghost point,
         !! interpolated from surrounding fluid cells.
 
@@ -856,7 +864,11 @@ contains
         real(wp), intent(INOUT) :: pres_IP
         real(wp), dimension(3), intent(INOUT) :: vel_IP
         real(wp), intent(INOUT) :: c_IP
-        real(wp), dimension(num_fluids), intent(INOUT) :: alpha_IP, alpha_rho_IP
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3), intent(INOUT) :: alpha_IP, alpha_rho_IP
+        #:else
+            real(wp), dimension(num_fluids), intent(INOUT) :: alpha_IP, alpha_rho_IP
+        #:endif
         real(wp), optional, dimension(:), intent(INOUT) :: r_IP, v_IP, pb_IP, mv_IP
         real(wp), optional, dimension(:), intent(INOUT) :: nmom_IP
         real(wp), optional, dimension(:), intent(INOUT) :: presb_IP, massv_IP
@@ -1027,8 +1039,11 @@ contains
         real(wp), dimension(1:3, 1:3) :: viscous_stress_div, viscous_stress_div_1, viscous_stress_div_2, viscous_cross_1, viscous_cross_2 ! viscous stress tensor with temp vectors to hold divergence calculations
         real(wp), dimension(1:3) :: local_force_contribution, radial_vector, local_torque_contribution, vel
         real(wp) :: cell_volume, dx, dy, dz, dynamic_viscosity
-        real(wp), dimension(1:num_fluids) :: dynamic_viscosities
-
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3) :: dynamic_viscosities
+        #:else
+            real(wp), dimension(num_fluids) :: dynamic_viscosities
+        #:endif
         forces = 0._wp
         torques = 0._wp
 

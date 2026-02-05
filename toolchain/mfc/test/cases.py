@@ -967,7 +967,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             ("1D -> RMHD",          "examples/1D_brio_wu_rmhd/case.py",         params['1D']),
             ("2D -> MHD -> HLL",    "examples/2D_orszag_tang/case.py",          params['2D']),
             ("2D -> MHD -> HLLD",   "examples/2D_orszag_tang/case.py",          {**params['2D'], 'riemann_solver': 4}),
-            ("2D -> MHD -> Powell", "examples/2D_orszag_tang_powell/case.py",   params['2D']),
+            ("2D -> MHD -> hyper_cleaning", "examples/2D_orszag_tang_hyper_cleaning/case.py",   params['2D']),
             ("2D -> RMHD",          "examples/2D_shock_cloud_rmhd/case.py",     params['2D']),
             ("3D -> MHD",           "examples/3D_brio_wu/case.py",              params['3D']),
             ("3D -> RMHD",          "examples/3D_brio_wu/case.py",              {**params['3D'], 'relativity': 'T'}),

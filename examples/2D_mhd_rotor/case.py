@@ -13,13 +13,13 @@ print(
             "x_domain%end": 1.0,
             "y_domain%beg": 0.0,
             "y_domain%end": 1.0,
-            "m": 512,
-            "n": 512,
+            "m": 399,
+            "n": 399,
             "p": 0,
-            "dt": 0.0005,
+            "dt": 0.0004,
             "t_step_start": 0,
-            "t_step_stop": 2000,
-            "t_step_save": 100,
+            "t_step_stop": 375,
+            "t_step_save": 5,
             # Simulation Algorithm Parameters
             "num_patches": 1,
             "model_eqns": 2,
@@ -28,7 +28,8 @@ print(
             "mpp_lim": "F",
             "mixture_err": "F",
             "time_stepper": 3,
-            "weno_order": 1,
+            "weno_order": 5,
+            "mapped_weno": "T",
             "weno_eps": 1.0e-6,
             "null_weights": "F",
             "mp_weno": "F",
@@ -47,15 +48,20 @@ print(
             "parallel_io": "T",
             # MHD
             "mhd": "T",
-            "powell": "T",
-            "fd_order": 2,
-            # Patch 1 - Analytical for v and B
-            # gamma = 5/3
-            #   rho = 25/(36*pi)
-            #     p = 5/(12*pi)
-            #     v = (-sin(2*pi*y), sin(2*pi*x), 0)
-            #     B = (-sin(2*pi*y)/sqrt(4*pi), sin(4*pi*x)/sqrt(4*pi), 0)
-            "patch_icpp(1)%hcid": 250,
+            "hyper_cleaning": "T",
+            "hyper_cleaning_speed": 2.5,
+            "hyper_cleaning_tau": 0.004,
+            # Patch 1 - 2D MHD Rotor Problem
+            # gamma = 1.4
+            # Ambient medium (r > 0.1):
+            #   rho = 1
+            #   p = 1
+            #   v = (0, 0, 0)
+            #   B = (1, 0, 0)
+            # Rotor (r <= 0.1):
+            #   rho = 10
+            #   v has angular velocity of 20
+            "patch_icpp(1)%hcid": 252,
             "patch_icpp(1)%geometry": 3,
             "patch_icpp(1)%x_centroid": 0.5,
             "patch_icpp(1)%y_centroid": 0.5,
@@ -64,14 +70,14 @@ print(
             "patch_icpp(1)%vel(1)": 0.0,
             "patch_icpp(1)%vel(2)": 0.0,
             "patch_icpp(1)%vel(3)": 0.0,
-            "patch_icpp(1)%pres": 5.0 / (12 * math.pi),
-            "patch_icpp(1)%Bx": 0.0,
+            "patch_icpp(1)%pres": 1.0,
+            "patch_icpp(1)%Bx": 5.0 / math.sqrt(math.pi * 4.0),
             "patch_icpp(1)%By": 0.0,
             "patch_icpp(1)%Bz": 0.0,
-            "patch_icpp(1)%alpha_rho(1)": 25.0 / (36.0 * math.pi),
+            "patch_icpp(1)%alpha_rho(1)": 1.0,
             "patch_icpp(1)%alpha(1)": 1.0,
             # Fluids Physical Parameters
-            "fluid_pp(1)%gamma": 1.0e00 / (5.0 / 3.0 - 1.0e00),
+            "fluid_pp(1)%gamma": 1.0e00 / (1.4e00 - 1.0e00),
             "fluid_pp(1)%pi_inf": 0.0,
         }
     )

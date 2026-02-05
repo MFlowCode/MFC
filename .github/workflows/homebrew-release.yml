@@ -1,0 +1,187 @@
+name: Update Homebrew Formula on Release
+
+# Triggers when a new version tag is pushed
+on:
+  push:
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [master]
+    paths:
+      - '.github/workflows/homebrew-release.yml'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (without v prefix, e.g., 5.2.0)'
+        required: true
+        type: string
+      dry_run:
+        description: 'Dry run (skip push to homebrew-mfc)'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  update-homebrew-tap:
+    name: Update homebrew-mfc tap
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Determine version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ inputs.version }}"
+          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            # Use existing version for PR testing
+            VERSION="5.2.0"
+            echo "::notice::PR test mode - using version $VERSION"
+          else
+            # Extract version from tag (remove 'v' prefix)
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          fi
+
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Invalid version format: $VERSION (expected X.Y.Z)"
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Version: $VERSION"
+
+      - name: Compute SHA256 of release tarball
+        id: sha256
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          URL="https://github.com/MFlowCode/MFC/archive/refs/tags/v${VERSION}.tar.gz"
+
+          echo "Downloading tarball from: $URL"
+
+          # Verify URL is reachable
+          HTTP_CODE=$(curl -sI -w "%{http_code}" -o /dev/null "$URL")
+          if [[ "$HTTP_CODE" != "200" && "$HTTP_CODE" != "302" ]]; then
+            echo "::error::Release tarball not found at $URL (HTTP $HTTP_CODE)"
+            echo "::error::Make sure the tag v${VERSION} exists and the release is published"
+            exit 1
+          fi
+
+          # Compute SHA256
+          SHA256=$(curl -sL "$URL" | sha256sum | awk '{print $1}')
+
+          if [[ -z "$SHA256" || "$SHA256" == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" ]]; then
+            echo "::error::Failed to compute SHA256 (empty file or download failed)"
+            exit 1
+          fi
+
+          echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
+          echo "SHA256: $SHA256"
+
+      - name: PR test summary
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          echo "## PR Test Mode" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Validated:" >> $GITHUB_STEP_SUMMARY
+          echo "- Version parsing: v${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- SHA256 computation: \`${{ steps.sha256.outputs.sha256 }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Skipped (secrets not available for fork PRs):" >> $GITHUB_STEP_SUMMARY
+          echo "- Checkout homebrew-mfc" >> $GITHUB_STEP_SUMMARY
+          echo "- Update formula" >> $GITHUB_STEP_SUMMARY
+          echo "- Push to tap" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The full workflow will run when a \`v*\` tag is pushed after merge." >> $GITHUB_STEP_SUMMARY
+
+      - name: Checkout homebrew-mfc tap
+        if: ${{ github.event_name != 'pull_request' }}
+        uses: actions/checkout@v4
+        with:
+          repository: MFlowCode/homebrew-mfc
+          token: ${{ secrets.TAP_REPO_TOKEN }}
+          path: homebrew-mfc
+
+      - name: Update formula
+        if: ${{ github.event_name != 'pull_request' }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          SHA256="${{ steps.sha256.outputs.sha256 }}"
+          FORMULA="homebrew-mfc/Formula/mfc.rb"
+
+          echo "Updating formula to v${VERSION}..."
+
+          # Update URL
+          sed -i "s|url \"https://github.com/MFlowCode/MFC/archive/refs/tags/v[^\"]*\.tar\.gz\"|url \"https://github.com/MFlowCode/MFC/archive/refs/tags/v${VERSION}.tar.gz\"|" "$FORMULA"
+
+          # Update SHA256 (the one right after url, not bottle SHAs)
+          # This uses awk to only update the first sha256 after the url line
+          awk -v newsha="$SHA256" '
+            /^  url "https:\/\/github.com\/MFlowCode\/MFC/ { found_url=1 }
+            found_url && /^  sha256 "/ && !updated {
+              sub(/sha256 "[^"]*"/, "sha256 \"" newsha "\"")
+              updated=1
+            }
+            { print }
+          ' "$FORMULA" > "$FORMULA.tmp" && mv "$FORMULA.tmp" "$FORMULA"
+
+          # Remove existing bottle block (new bottles will be built by bottle.yml)
+          # This removes everything between "bottle do" and the matching "end"
+          awk '
+            /^  bottle do/ { in_bottle=1; next }
+            in_bottle && /^  end/ { in_bottle=0; next }
+            !in_bottle { print }
+          ' "$FORMULA" > "$FORMULA.tmp" && mv "$FORMULA.tmp" "$FORMULA"
+
+          echo "Updated formula:"
+          head -30 "$FORMULA"
+
+      - name: Validate updated formula
+        if: ${{ github.event_name != 'pull_request' }}
+        run: |
+          cd homebrew-mfc
+          echo "Checking Ruby syntax..."
+          ruby -c Formula/mfc.rb
+
+          echo "Verifying URL and SHA256 were updated..."
+          grep -q "v${{ steps.version.outputs.version }}.tar.gz" Formula/mfc.rb || (echo "::error::URL not updated"; exit 1)
+          grep -q "${{ steps.sha256.outputs.sha256 }}" Formula/mfc.rb || (echo "::error::SHA256 not updated"; exit 1)
+
+          echo "Formula validation passed!"
+
+      - name: Commit and push to homebrew-mfc
+        if: ${{ github.event_name != 'pull_request' && github.event.inputs.dry_run != 'true' }}
+        run: |
+          cd homebrew-mfc
+          VERSION="${{ steps.version.outputs.version }}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add Formula/mfc.rb
+          git commit -m "Update MFC to v${VERSION}"
+
+          echo "Pushing to homebrew-mfc..."
+          git push origin main
+
+          echo "Successfully pushed formula update!"
+          echo "The bottle.yml workflow in homebrew-mfc will now build bottles automatically."
+
+      - name: Dry run summary
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true' }}
+        run: |
+          echo "::notice::DRY RUN - skipped push to homebrew-mfc"
+          echo ""
+          echo "Would have committed the following changes:"
+          cd homebrew-mfc
+          git diff Formula/mfc.rb
+
+      - name: Summary
+        if: ${{ github.event_name != 'pull_request' }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          echo "## Homebrew Formula Updated" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** v${VERSION}" >> $GITHUB_STEP_SUMMARY
+          echo "- **SHA256:** \`${{ steps.sha256.outputs.sha256 }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tap:** [MFlowCode/homebrew-mfc](https://github.com/MFlowCode/homebrew-mfc)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The [bottle.yml](https://github.com/MFlowCode/homebrew-mfc/actions/workflows/bottle.yml) workflow will now build bottles for this release." >> $GITHUB_STEP_SUMMARY

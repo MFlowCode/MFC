@@ -97,14 +97,22 @@ contains
             & cray_inline=True)
 
         type(scalar_field), intent(in), dimension(sys_size) :: q_prim_vf
-        real(wp), intent(inout), dimension(num_fluids) :: alpha
-        real(wp), intent(inout), dimension(num_vels) :: vel
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), intent(inout), dimension(3) :: alpha
+            real(wp), intent(inout), dimension(3) :: vel
+        #:else
+            real(wp), intent(inout), dimension(num_fluids) :: alpha
+            real(wp), intent(inout), dimension(num_vels) :: vel
+        #:endif
         real(wp), intent(inout) :: rho, gamma, pi_inf, vel_sum, H, pres
         real(wp), intent(out) :: qv
         integer, intent(in) :: j, k, l
         real(wp), dimension(2), intent(inout) :: Re
-
-        real(wp), dimension(num_fluids) :: alpha_rho, Gs
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3) :: alpha_rho, Gs
+        #:else
+            real(wp), dimension(num_fluids) :: alpha_rho, Gs
+        #:endif
         real(wp) :: E, G_local
 
         integer :: i

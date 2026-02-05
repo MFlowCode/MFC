@@ -54,7 +54,7 @@ print(
             "parallel_io": "T",
             # MHD
             "mhd": "T",
-            "patch_icpp(1)%hcid": 252,
+            "patch_icpp(1)%hcid": 253,
             "patch_icpp(1)%geometry": 3,
             "patch_icpp(1)%x_centroid": 0.0,
             "patch_icpp(1)%y_centroid": 0.0,

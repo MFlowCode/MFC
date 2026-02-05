@@ -24,6 +24,7 @@ scripts: &scripts
 yml: &yml
   - '.github/workflows/phoenix/**'
   - '.github/workflows/frontier/**'
+  - '.github/workflows/frontier_amd/**'
   - '.github/workflows/bench.yml'
   - '.github/workflows/test.yml'
   - '.github/workflows/formatting.yml'

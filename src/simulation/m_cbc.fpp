@@ -37,9 +37,9 @@ module m_cbc
         molecular_weights, get_species_specific_heats_r, &
         get_mole_fractions, get_species_specific_heats_r
 
-    #:block DEF_AMD
+    #:if USING_AMD
         use m_chemistry, only: molecular_weights_nonparameter
-    #:endblock DEF_AMD
+    #:endif
     implicit none
 
     private; public :: s_initialize_cbc_module, s_cbc, s_finalize_cbc_module
@@ -644,25 +644,35 @@ contains
         integer, intent(in) :: cbc_dir_norm, cbc_loc_norm
 
         type(int_bounds_info), intent(in) :: ix, iy, iz
-
-        ! First-order time derivatives of the partial densities, density,
-        ! velocity, pressure, advection variables, and the specific heat
-        ! ratio and liquid stiffness functions
-
-        real(wp), dimension(num_fluids) :: dalpha_rho_dt
         real(wp) :: drho_dt
-        real(wp), dimension(num_dims) :: dvel_dt
         real(wp) :: dpres_dt
-        real(wp), dimension(num_fluids) :: dadv_dt
         real(wp) :: dgamma_dt
         real(wp) :: dpi_inf_dt
         real(wp) :: dqv_dt
         real(wp) :: dpres_ds
-        real(wp), dimension(contxe) :: alpha_rho, dalpha_rho_ds, mf
+        #:if USING_AMD
+            real(wp), dimension(20) :: L
+        #:else
+            real(wp), dimension(sys_size) :: L
+        #:endif
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3) :: alpha_rho, dalpha_rho_ds, mf
+            real(wp), dimension(3) :: vel, dvel_ds
+            real(wp), dimension(3) :: adv_local, dadv_ds
+            real(wp), dimension(3) :: dadv_dt
+            real(wp), dimension(3) :: dvel_dt
+            real(wp), dimension(3) :: dalpha_rho_dt
+            real(wp), dimension(10) :: Ys, h_k, dYs_dt, dYs_ds, Xs, Gamma_i, Cp_i
+        #:else
+            real(wp), dimension(num_fluids) :: alpha_rho, dalpha_rho_ds, mf
+            real(wp), dimension(num_vels) :: vel, dvel_ds
+            real(wp), dimension(num_fluids) :: adv_local, dadv_ds
+            real(wp), dimension(num_fluids) :: dadv_dt
+            real(wp), dimension(num_dims) :: dvel_dt
+            real(wp), dimension(num_fluids) :: dalpha_rho_dt
+            real(wp), dimension(num_species) :: Ys, h_k, dYs_dt, dYs_ds, Xs, Gamma_i, Cp_i
+        #:endif
         real(wp), dimension(2) :: Re_cbc
-        real(wp), dimension(num_vels) :: vel, dvel_ds
-        real(wp), dimension(num_fluids) :: adv_local, dadv_ds
-        real(wp), dimension(sys_size) :: L
         real(wp), dimension(3) :: lambda
 
         real(wp) :: rho         !< Cell averaged density
@@ -676,7 +686,6 @@ contains
         real(wp) :: Ma
         real(wp) :: T, sum_Enthalpies
         real(wp) :: Cv, Cp, e_mix, Mw, R_gas
-        real(wp), dimension(num_species) :: Ys, h_k, dYs_dt, dYs_ds, Xs, Gamma_i, Cp_i
 
         real(wp) :: vel_K_sum, vel_dv_dt_sum
 
@@ -700,7 +709,7 @@ contains
             if (cbc_dir == ${CBC_DIR}$ .and. recon_type == WENO_TYPE) then
 
                 ! PI2 of flux_rs_vf and flux_src_rs_vf at j = 1/2
-                if (weno_order == 3) then
+                if (weno_order == 3 .or. dummy) then
 
                     call s_convert_primitive_to_flux_variables(q_prim_rs${XYZ}$_vf, &
                                                                F_rs${XYZ}$_vf, &
@@ -732,9 +741,10 @@ contains
                         end do
                     end do
                     $:END_GPU_PARALLEL_LOOP()
+                end if
 
-                    ! PI4 of flux_rs_vf and flux_src_rs_vf at j = 1/2, 3/2
-                else
+                ! PI4 of flux_rs_vf and flux_src_rs_vf at j = 1/2, 3/2
+                if (weno_order == 5 .or. dummy) then
                     call s_convert_primitive_to_flux_variables(q_prim_rs${XYZ}$_vf, &
                                                                F_rs${XYZ}$_vf, &
                                                                F_src_rs${XYZ}$_vf, &
@@ -1059,15 +1069,14 @@ contains
                             sum_Enthalpies = 0._wp
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_species
-                                #:block UNDEF_AMD
-                                    h_k(i) = h_k(i)*gas_constant/molecular_weights(i)*T
-                                    sum_Enthalpies = sum_Enthalpies + (rho*h_k(i) - pres*Mw/molecular_weights(i)*Cp/R_gas)*dYs_dt(i)
-                                #:endblock UNDEF_AMD
 
-                                #:block DEF_AMD
+                                #:if USING_AMD
                                     h_k(i) = h_k(i)*gas_constant/molecular_weights_nonparameter(i)*T
                                     sum_Enthalpies = sum_Enthalpies + (rho*h_k(i) - pres*Mw/molecular_weights_nonparameter(i)*Cp/R_gas)*dYs_dt(i)
-                                #:endblock DEF_AMD
+                                #:else
+                                    h_k(i) = h_k(i)*gas_constant/molecular_weights(i)*T
+                                    sum_Enthalpies = sum_Enthalpies + (rho*h_k(i) - pres*Mw/molecular_weights(i)*Cp/R_gas)*dYs_dt(i)
+                                #:endif
                             end do
                             flux_rs${XYZ}$_vf_l(-1, k, r, E_idx) = flux_rs${XYZ}$_vf_l(0, k, r, E_idx) &
                                                                    + ds(0)*((E/rho + pres/rho)*drho_dt + rho*vel_dv_dt_sum + Cp*T*L(2)/(c*c) + sum_Enthalpies)

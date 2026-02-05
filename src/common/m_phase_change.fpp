@@ -1,6 +1,6 @@
 !> energies (6-eqn to 4-eqn) equilibrium through an infinitely fast (algebraic)
 !> procedure.
-
+#:include 'case.fpp'
 #:include 'macros.fpp'
 
 module m_phase_change
@@ -91,15 +91,18 @@ contains
 
         ! $:GPU_DECLARE(create='[pS,pSOV,pSSL,TS,TSOV,TSSL,TSatOV,TSatSL]')
         ! $:GPU_DECLARE(create='[rhoe,dynE,rhos,rho,rM,m1,m2,MCT,TvF]')
-
-        real(wp), dimension(num_fluids) :: p_infOV, p_infpT, p_infSL, sk, hk, gk, ek, rhok
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3) :: p_infOV, p_infpT, p_infSL, sk, hk, gk, ek, rhok
+        #:else
+            real(wp), dimension(num_fluids) :: p_infOV, p_infpT, p_infSL, sk, hk, gk, ek, rhok
+        #:endif
         ! $:GPU_DECLARE(create='[p_infOV,p_infpT,p_infSL,sk,hk,gk,ek,rhok]')
 
         !< Generic loop iterators
         integer :: i, j, k, l
 
         ! starting equilibrium solver
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[j,k,l,p_infOV, p_infpT, p_infSL, sk, hk, gk, ek, rhok,pS, pSOV, pSSL, TS, TSOV, TSatOV, TSatSL, TSSL, rhoe, dynE, rhos, rho, rM, m1, m2, MCT, TvF]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[i,j,k,l,p_infOV, p_infpT, p_infSL, sk, hk, gk, ek, rhok,pS, pSOV, pSSL, TS, TSOV, TSatOV, TSatSL, TSSL, rhoe, dynE, rhos, rho, rM, m1, m2, MCT, TvF]')
         do j = 0, m
             do k = 0, n
                 do l = 0, p
@@ -231,25 +234,28 @@ contains
 
                     ! Calculations AFTER equilibrium
 
-                    ! entropy
-                    sk(1:num_fluids) = cvs(1:num_fluids)*log((TS**gs_min(1:num_fluids)) &
-                                                             /((pS + ps_inf(1:num_fluids))**(gs_min(1:num_fluids) - 1.0_wp))) + qvps(1:num_fluids)
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do i = 1, num_fluids
+                        ! entropy
+                        sk(i) = cvs(i)*log((TS**gs_min(i)) &
+                                           /((pS + ps_inf(i))**(gs_min(i) - 1.0_wp))) + qvps(i)
 
-                    ! enthalpy
-                    hk(1:num_fluids) = gs_min(1:num_fluids)*cvs(1:num_fluids)*TS &
-                                       + qvs(1:num_fluids)
+                        ! enthalpy
+                        hk(i) = gs_min(i)*cvs(i)*TS &
+                                + qvs(i)
 
-                    ! Gibbs-free energy
-                    gk(1:num_fluids) = hk(1:num_fluids) - TS*sk(1:num_fluids)
+                        ! Gibbs-free energy
+                        gk(i) = hk(i) - TS*sk(i)
 
-                    ! densities
-                    rhok(1:num_fluids) = (pS + ps_inf(1:num_fluids)) &
-                                         /((gs_min(1:num_fluids) - 1)*cvs(1:num_fluids)*TS)
+                        ! densities
+                        rhok(i) = (pS + ps_inf(i)) &
+                                  /((gs_min(i) - 1)*cvs(i)*TS)
 
-                    ! internal energy
-                    ek(1:num_fluids) = (pS + gs_min(1:num_fluids) &
-                                        *ps_inf(1:num_fluids))/(pS + ps_inf(1:num_fluids)) &
-                                       *cvs(1:num_fluids)*TS + qvs(1:num_fluids)
+                        ! internal energy
+                        ek(i) = (pS + gs_min(i) &
+                                 *ps_inf(i))/(pS + ps_inf(i)) &
+                                *cvs(i)*TS + qvs(i)
+                    end do
 
                     ! calculating volume fractions, internal energies, and total entropy
                     rhos = 0.0_wp
@@ -293,16 +299,22 @@ contains
         ! initializing variables
         integer, intent(in) :: j, k, l, MFL
         real(wp), intent(out) :: pS
-        real(wp), dimension(num_fluids), intent(out) :: p_infpT
+        real(wp), dimension(1:), intent(out) :: p_infpT
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         real(wp), intent(in) :: rhoe
         real(wp), intent(out) :: TS
         real(wp) :: gp, gpp, hp, pO, mCP, mQ !< variables for the Newton Solver
+        real(wp) :: p_infpT_sum
 
         integer :: i, ns !< generic loop iterators
 
         ! auxiliary variables for the pT-equilibrium solver
-        mCP = 0.0_wp; mQ = 0.0_wp; p_infpT = ps_inf; 
+        mCP = 0.0_wp; mQ = 0.0_wp; p_infpT_sum = 0._wp
+        $:GPU_LOOP(parallelism='[seq]')
+        do i = 1, num_fluids
+            p_infpT(i) = ps_inf(i)
+            p_infpT_sum = p_infpT_sum + abs(p_infpT(i))
+        end do
         ! Performing tests before initializing the pT-equilibrium
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_fluids
@@ -314,6 +326,15 @@ contains
             mQ = mQ + q_cons_vf(i + contxb - 1)%sf(j, k, l)*qvs(i)
 
         end do
+
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            if (num_fluids < 3) then
+                $:GPU_LOOP(parallelism='[seq]')
+                do i = num_fluids + 1, 3
+                    p_infpT(i) = p_infpT_sum
+                end do
+            end if
+        #:endif
 
         ! Checking energy constraint
         if ((rhoe - mQ - minval(p_infpT)) < 0.0_wp) then
@@ -392,16 +413,20 @@ contains
 
         integer, intent(in) :: j, k, l
         real(wp), intent(inout) :: pS
-        real(wp), dimension(num_fluids), intent(in) :: p_infpT
+        real(wp), dimension(1:), intent(in) :: p_infpT
         real(wp), intent(in) :: rhoe
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         real(wp), intent(inout) :: TS
-
-        real(wp), dimension(num_fluids) :: p_infpTg !< stiffness for the participating fluids for pTg-equilibrium
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3) :: p_infpTg !< stiffness for the participating fluids for pTg-equilibrium
+        #:else
+            real(wp), dimension(num_fluids) :: p_infpTg !< stiffness for the participating fluids for pTg-equilibrium
+        #:endif
         real(wp), dimension(2, 2) :: Jac, InvJac, TJac !< matrices for the Newton Solver
         real(wp), dimension(2) :: R2D, DeltamP !< residual and correction array
         real(wp) :: Om ! underrelaxation factor
         real(wp) :: mCP, mCPD, mCVGP, mCVGP2, mQ, mQD ! auxiliary variables for the pTg-solver
+        real(wp) :: ml, mT, dFdT, dTdm, dTdp
 
         !< Generic loop iterators
         integer :: i, ns
@@ -474,10 +499,85 @@ contains
             end do
 
             ! calculating the (2D) Jacobian Matrix used in the solution of the pTg-quilibrium model
-            call s_compute_jacobian_matrix(InvJac, j, Jac, k, l, mCPD, mCVGP, mCVGP2, pS, q_cons_vf, TJac)
+
+            ! mass of the reacting liquid
+            ml = q_cons_vf(lp + contxb - 1)%sf(j, k, l)
+
+            ! mass of the two participating fluids
+            mT = q_cons_vf(lp + contxb - 1)%sf(j, k, l) &
+                 + q_cons_vf(vp + contxb - 1)%sf(j, k, l)
+
+            TS = 1/(mT*cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp)) &
+                    + ml*(cvs(lp)*(gs_min(lp) - 1)/(pS + ps_inf(lp)) &
+                          - cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp))) &
+                    + mCVGP)
+
+            dFdT = &
+                -(cvs(lp)*gs_min(lp) - cvs(vp)*gs_min(vp))*log(TS) &
+                - (qvps(lp) - qvps(vp)) &
+                + cvs(lp)*(gs_min(lp) - 1)*log(pS + ps_inf(lp)) &
+                - cvs(vp)*(gs_min(vp) - 1)*log(pS + ps_inf(vp))
+
+            dTdm = -(cvs(lp)*(gs_min(lp) - 1)/(pS + ps_inf(lp)) &
+                     - cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp)))*TS**2
+
+            dTdp = (mT*cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp))**2 &
+                    + ml*(cvs(lp)*(gs_min(lp) - 1)/(pS + ps_inf(lp))**2 &
+                          - cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp))**2) &
+                    + mCVGP2)*TS**2
+
+            ! F = (F1,F2) is the function whose roots we are looking for
+            ! x = (m1, p) are the independent variables. m1 = mass of the first participant fluid, p = pressure
+            ! F1 = 0 is the Gibbs free energy quality
+            ! F2 = 0 is the enforcement of the thermodynamic (total - kinectic) energy
+            ! dF1dm
+            Jac(1, 1) = dFdT*dTdm
+
+            ! dF1dp
+            Jac(1, 2) = dFdT*dTdp + TS &
+                        *(cvs(lp)*(gs_min(lp) - 1)/(pS + ps_inf(lp)) &
+                          - cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp)))
+
+            ! dF2dm
+            Jac(2, 1) = (qvs(vp) - qvs(lp) &
+                         + (cvs(vp)*gs_min(vp) - cvs(lp)*gs_min(lp)) &
+                         /(ml*(cvs(lp)*(gs_min(lp) - 1)/(pS + ps_inf(lp)) &
+                               - cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp))) &
+                           + mT*cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp)) + mCVGP) &
+                         - (ml*(cvs(vp)*gs_min(vp) - cvs(lp)*gs_min(lp)) &
+                            - mT*cvs(vp)*gs_min(vp) - mCPD) &
+                         *(cvs(lp)*(gs_min(lp) - 1)/(pS + ps_inf(lp)) &
+                           - cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp))) &
+                         /((ml*(cvs(lp)*(gs_min(lp) - 1)/(pS + ps_inf(lp)) &
+                                - cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp))) &
+                            + mT*cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp)) + mCVGP)**2))/1
+            ! dF2dp
+            Jac(2, 2) = (1 + (ml*(cvs(vp)*gs_min(vp) - cvs(lp)*gs_min(lp)) &
+                              - mT*cvs(vp)*gs_min(vp) - mCPD) &
+                         *(ml*(cvs(lp)*(gs_min(lp) - 1)/(pS + ps_inf(lp))**2 &
+                               - cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp))**2) &
+                           + mT*cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp))**2 + mCVGP2) &
+                         /(ml*(cvs(lp)*(gs_min(lp) - 1)/(pS + ps_inf(lp)) &
+                               - cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp))) &
+                           + mT*cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp)) + mCVGP)**2)/1
+
+            ! intermediate elements of J^{-1}
+            InvJac(1, 1) = Jac(2, 2)
+            InvJac(1, 2) = -1.0_wp*Jac(1, 2)
+            InvJac(2, 1) = -1.0_wp*Jac(2, 1)
+            InvJac(2, 2) = Jac(1, 1)
+
+            ! elements of J^{T}
+            TJac(1, 1) = Jac(1, 1)
+            TJac(1, 2) = Jac(2, 1)
+            TJac(2, 1) = Jac(1, 2)
+            TJac(2, 2) = Jac(2, 2)
+
+            ! dividing by det(J)
+            InvJac = InvJac/(Jac(1, 1)*Jac(2, 2) - Jac(1, 2)*Jac(2, 1))
 
             ! calculating correction array for Newton's method
-            DeltamP = -1.0_wp*matmul(InvJac, R2D)
+            DeltamP = -1.0_wp*(matmul(InvJac, R2D))
 
             ! updating two reacting 'masses'. Recall that inert 'masses' do not change during the phase change
             ! liquid
@@ -491,7 +591,34 @@ contains
 
             ! calculating residuals, which are (i) the difference between the Gibbs Free energy of the gas and the liquid
             ! and (ii) the energy before and after the phase-change process.
-            call s_compute_pTg_residue(j, k, l, mCPD, mCVGP, mQD, q_cons_vf, pS, rhoe, R2D)
+
+            ! mass of the reacting liquid
+            ml = q_cons_vf(lp + contxb - 1)%sf(j, k, l)
+
+            ! mass of the two participating fluids
+            mT = q_cons_vf(lp + contxb - 1)%sf(j, k, l) &
+                 + q_cons_vf(vp + contxb - 1)%sf(j, k, l)
+
+            TS = 1/(mT*cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp)) &
+                    + ml*(cvs(lp)*(gs_min(lp) - 1)/(pS + ps_inf(lp)) &
+                          - cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp))) &
+                    + mCVGP)
+
+            ! Gibbs Free Energy Equality condition (DG)
+            R2D(1) = TS*((cvs(lp)*gs_min(lp) - cvs(vp)*gs_min(vp)) &
+                         *(1 - log(TS)) - (qvps(lp) - qvps(vp)) &
+                         + cvs(lp)*(gs_min(lp) - 1)*log(pS + ps_inf(lp)) &
+                         - cvs(vp)*(gs_min(vp) - 1)*log(pS + ps_inf(vp))) &
+                     + qvs(lp) - qvs(vp)
+
+            ! Constant Energy Process condition (DE)
+            R2D(2) = (rhoe + pS &
+                      + ml*(qvs(vp) - qvs(lp)) - mT*qvs(vp) - mQD &
+                      + (ml*(gs_min(vp)*cvs(vp) - gs_min(lp)*cvs(lp)) &
+                         - mT*gs_min(vp)*cvs(vp) - mCPD) &
+                      /(ml*(cvs(lp)*(gs_min(lp) - 1)/(pS + ps_inf(lp)) &
+                            - cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp))) &
+                        + mT*cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp)) + mCVGP))/1
 
         end do
 
@@ -552,164 +679,6 @@ contains
 
         end if
     end subroutine s_correct_partial_densities
-
-    !>  This auxiliary subroutine calculates the 2 x 2 Jacobian and, its inverse and transpose
-        !!      to be used in the pTg-equilibirium procedure
-        !!  @param InvJac Inverse of the Jacobian Matrix
-        !!  @param j generic loop iterator for x direction
-        !!  @param Jac Jacobian Matrix
-        !!  @param k generic loop iterator for y direction
-        !!  @param l generic loop iterator for z direction
-        !!  @param mCPD  sum of the total alpha*rho*cp
-        !!  @param mCVGP auxiliary variable for the calculation of the matrices: alpha*rho*cv*(g-1)/press
-        !!  @param mCVGP2 auxiliary variable for the calculation of the matrices: alpha*rho*cv*(g-1)/press^2
-        !!  @param pS equilibrium pressure at the interface
-        !!  @param q_cons_vf Cell-average conservative variables
-        !!  @param TJac Transpose of the Jacobian Matrix
-    subroutine s_compute_jacobian_matrix(InvJac, j, Jac, k, l, mCPD, mCVGP, mCVGP2, pS, q_cons_vf, TJac)
-        $:GPU_ROUTINE(function_name='s_compute_jacobian_matrix', &
-            & parallelism='[seq]', cray_inline=True)
-
-        real(wp), dimension(2, 2), intent(out) :: InvJac
-        integer, intent(in) :: j
-        real(wp), dimension(2, 2), intent(out) :: Jac
-        integer, intent(in) :: k, l
-        real(wp), intent(in) :: mCPD, mCVGP, mCVGP2, pS
-        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
-        real(wp), dimension(2, 2), intent(out) :: TJac
-
-        real(wp) :: ml, mT, TS, dFdT, dTdm, dTdp ! mass of the reacting fluid, total reacting mass, and auxiliary variables
-
-        ! mass of the reacting liquid
-        ml = q_cons_vf(lp + contxb - 1)%sf(j, k, l)
-
-        ! mass of the two participating fluids
-        mT = q_cons_vf(lp + contxb - 1)%sf(j, k, l) &
-             + q_cons_vf(vp + contxb - 1)%sf(j, k, l)
-
-        TS = 1/(mT*cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp)) &
-                + ml*(cvs(lp)*(gs_min(lp) - 1)/(pS + ps_inf(lp)) &
-                      - cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp))) &
-                + mCVGP)
-
-        dFdT = &
-            -(cvs(lp)*gs_min(lp) - cvs(vp)*gs_min(vp))*log(TS) &
-            - (qvps(lp) - qvps(vp)) &
-            + cvs(lp)*(gs_min(lp) - 1)*log(pS + ps_inf(lp)) &
-            - cvs(vp)*(gs_min(vp) - 1)*log(pS + ps_inf(vp))
-
-        dTdm = -(cvs(lp)*(gs_min(lp) - 1)/(pS + ps_inf(lp)) &
-                 - cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp)))*TS**2
-
-        dTdp = (mT*cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp))**2 &
-                + ml*(cvs(lp)*(gs_min(lp) - 1)/(pS + ps_inf(lp))**2 &
-                      - cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp))**2) &
-                + mCVGP2)*TS**2
-
-        ! F = (F1,F2) is the function whose roots we are looking for
-        ! x = (m1, p) are the independent variables. m1 = mass of the first participant fluid, p = pressure
-        ! F1 = 0 is the Gibbs free energy quality
-        ! F2 = 0 is the enforcement of the thermodynamic (total - kinectic) energy
-        ! dF1dm
-        Jac(1, 1) = dFdT*dTdm
-
-        ! dF1dp
-        Jac(1, 2) = dFdT*dTdp + TS &
-                    *(cvs(lp)*(gs_min(lp) - 1)/(pS + ps_inf(lp)) &
-                      - cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp)))
-
-        ! dF2dm
-        Jac(2, 1) = (qvs(vp) - qvs(lp) &
-                     + (cvs(vp)*gs_min(vp) - cvs(lp)*gs_min(lp)) &
-                     /(ml*(cvs(lp)*(gs_min(lp) - 1)/(pS + ps_inf(lp)) &
-                           - cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp))) &
-                       + mT*cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp)) + mCVGP) &
-                     - (ml*(cvs(vp)*gs_min(vp) - cvs(lp)*gs_min(lp)) &
-                        - mT*cvs(vp)*gs_min(vp) - mCPD) &
-                     *(cvs(lp)*(gs_min(lp) - 1)/(pS + ps_inf(lp)) &
-                       - cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp))) &
-                     /((ml*(cvs(lp)*(gs_min(lp) - 1)/(pS + ps_inf(lp)) &
-                            - cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp))) &
-                        + mT*cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp)) + mCVGP)**2))/1
-        ! dF2dp
-        Jac(2, 2) = (1 + (ml*(cvs(vp)*gs_min(vp) - cvs(lp)*gs_min(lp)) &
-                          - mT*cvs(vp)*gs_min(vp) - mCPD) &
-                     *(ml*(cvs(lp)*(gs_min(lp) - 1)/(pS + ps_inf(lp))**2 &
-                           - cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp))**2) &
-                       + mT*cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp))**2 + mCVGP2) &
-                     /(ml*(cvs(lp)*(gs_min(lp) - 1)/(pS + ps_inf(lp)) &
-                           - cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp))) &
-                       + mT*cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp)) + mCVGP)**2)/1
-
-        ! intermediate elements of J^{-1}
-        InvJac(1, 1) = Jac(2, 2)
-        InvJac(1, 2) = -1.0_wp*Jac(1, 2)
-        InvJac(2, 1) = -1.0_wp*Jac(2, 1)
-        InvJac(2, 2) = Jac(1, 1)
-
-        ! elements of J^{T}
-        TJac(1, 1) = Jac(1, 1)
-        TJac(1, 2) = Jac(2, 1)
-        TJac(2, 1) = Jac(1, 2)
-        TJac(2, 2) = Jac(2, 2)
-
-        ! dividing by det(J)
-        InvJac = InvJac/(Jac(1, 1)*Jac(2, 2) - Jac(1, 2)*Jac(2, 1))
-
-    end subroutine s_compute_jacobian_matrix
-
-    !>  This auxiliary subroutine computes the residue of the pTg-equilibrium procedure
-        !!  @param j generic loop iterator for x direction
-        !!  @param k generic loop iterator for y direction
-        !!  @param l generic loop iterator for z direction
-        !!  @param mCPD  sum of the total alpha*rho*cp
-        !!  @param mCVGP auxiliary variable for the calculation of the matrices: alpha*rho*cv*(g-1)/press
-        !!  @param mQD sum of the total alpha*rho*qv
-        !!  @param q_cons_vf Cell-average conservative variables
-        !!  @param pS equilibrium pressure at the interface
-        !!  @param rhoe mixture energy
-        !!  @param R2D (2D) residue array
-    subroutine s_compute_pTg_residue(j, k, l, mCPD, mCVGP, mQD, q_cons_vf, pS, rhoe, R2D)
-        $:GPU_ROUTINE(function_name='s_compute_pTg_residue', &
-            & parallelism='[seq]', cray_inline=True)
-
-        integer, intent(in) :: j, k, l
-        real(wp), intent(in) :: mCPD, mCVGP, mQD
-        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
-        real(wp), intent(in) :: pS, rhoe
-        real(wp), dimension(2), intent(out) :: R2D
-
-        real(wp) :: ml, mT, TS !< mass of the reacting liquid, total reacting mass, equilibrium temperature
-
-        ! mass of the reacting liquid
-        ml = q_cons_vf(lp + contxb - 1)%sf(j, k, l)
-
-        ! mass of the two participating fluids
-        mT = q_cons_vf(lp + contxb - 1)%sf(j, k, l) &
-             + q_cons_vf(vp + contxb - 1)%sf(j, k, l)
-
-        TS = 1/(mT*cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp)) &
-                + ml*(cvs(lp)*(gs_min(lp) - 1)/(pS + ps_inf(lp)) &
-                      - cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp))) &
-                + mCVGP)
-
-        ! Gibbs Free Energy Equality condition (DG)
-        R2D(1) = TS*((cvs(lp)*gs_min(lp) - cvs(vp)*gs_min(vp)) &
-                     *(1 - log(TS)) - (qvps(lp) - qvps(vp)) &
-                     + cvs(lp)*(gs_min(lp) - 1)*log(pS + ps_inf(lp)) &
-                     - cvs(vp)*(gs_min(vp) - 1)*log(pS + ps_inf(vp))) &
-                 + qvs(lp) - qvs(vp)
-
-        ! Constant Energy Process condition (DE)
-        R2D(2) = (rhoe + pS &
-                  + ml*(qvs(vp) - qvs(lp)) - mT*qvs(vp) - mQD &
-                  + (ml*(gs_min(vp)*cvs(vp) - gs_min(lp)*cvs(lp)) &
-                     - mT*gs_min(vp)*cvs(vp) - mCPD) &
-                  /(ml*(cvs(lp)*(gs_min(lp) - 1)/(pS + ps_inf(lp)) &
-                        - cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp))) &
-                    + mT*cvs(vp)*(gs_min(vp) - 1)/(pS + ps_inf(vp)) + mCVGP))/1
-
-    end subroutine s_compute_pTg_residue
 
     !>  This auxiliary subroutine finds the Saturation temperature for a given
         !!      saturation pressure through a newton solver

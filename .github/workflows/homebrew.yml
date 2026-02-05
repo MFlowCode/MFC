@@ -209,51 +209,57 @@ jobs:
       - name: Test MFC installation
         run: |
           echo "=== Testing MFC Installation ==="
-          
+
+          # Use the full tap-qualified name since we installed from mflowcode/test
+          MFC_PREFIX="$(brew --prefix mflowcode/test/mfc)"
+          echo "MFC prefix: $MFC_PREFIX"
+
           echo "1. Checking binaries exist and are executable..."
           test -f $(brew --prefix)/bin/mfc && test -x $(brew --prefix)/bin/mfc
           test -f $(brew --prefix)/bin/pre_process && test -x $(brew --prefix)/bin/pre_process
           test -f $(brew --prefix)/bin/simulation && test -x $(brew --prefix)/bin/simulation
           test -f $(brew --prefix)/bin/post_process && test -x $(brew --prefix)/bin/post_process
           echo "  ✓ All binaries exist and are executable"
-          
+
           echo "2. Verifying installation structure..."
-          test -f $(brew --prefix mfc)/libexec/mfc.sh
-          test -d $(brew --prefix mfc)/toolchain
+          test -f "$MFC_PREFIX/libexec/mfc.sh"
+          test -d "$MFC_PREFIX/toolchain"
           echo "  ✓ Installation structure verified"
-          
+
           echo "3. Checking Python venv..."
-          test -d $(brew --prefix mfc)/libexec/venv
-          test -f $(brew --prefix mfc)/libexec/venv/bin/python
-          test -f $(brew --prefix mfc)/libexec/venv/bin/pip
+          test -d "$MFC_PREFIX/libexec/venv"
+          test -f "$MFC_PREFIX/libexec/venv/bin/python"
+          test -f "$MFC_PREFIX/libexec/venv/bin/pip"
           echo "  ✓ Python venv exists"
-          
+
           echo "4. Checking examples..."
-          test -d $(brew --prefix mfc)/examples
-          test -f $(brew --prefix mfc)/examples/1D_sodshocktube/case.py
+          test -d "$MFC_PREFIX/examples"
+          test -f "$MFC_PREFIX/examples/1D_sodshocktube/case.py"
           echo "  ✓ Examples installed"
-          
+
           echo "5. Testing mfc wrapper..."
           mfc --help
           echo "  ✓ mfc --help succeeded"
-          
+
           echo "=== All tests passed! ==="
       
       - name: Run MFC test case
         run: |
           echo "Running a simple test case (1D Sod shock tube)..."
+          MFC_PREFIX="$(brew --prefix mflowcode/test/mfc)"
           TESTDIR=$(mktemp -d)
-          cp $(brew --prefix mfc)/examples/1D_sodshocktube/case.py "$TESTDIR/"
-          
+          cp "$MFC_PREFIX/examples/1D_sodshocktube/case.py" "$TESTDIR/"
+
           echo "Running with $(sysctl -n hw.ncpu) processors..."
           # Use absolute path and shorthand syntax (mfc auto-detects and prepends 'run')
           mfc "$TESTDIR/case.py" -j $(sysctl -n hw.ncpu)
-          
+
           echo "Test case completed successfully!"
       
       - name: Uninstall and cleanup
         if: always()
         run: |
           echo "Cleaning up..."
-          brew uninstall mfc || true
+          brew uninstall mflowcode/test/mfc || true
+          brew untap mflowcode/test || true
           brew cleanup

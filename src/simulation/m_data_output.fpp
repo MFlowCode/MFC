@@ -2,6 +2,7 @@
 !! @brief Contains module m_data_output
 
 #:include 'macros.fpp'
+#:include 'case.fpp'
 
 !> @brief The primary purpose of this module is to output the grid and the
 !!              conservative variables data at the chosen time-step interval. In
@@ -260,10 +261,15 @@ contains
         integer, intent(in) :: t_step
 
         real(wp) :: rho        !< Cell-avg. density
-        real(wp), dimension(num_vels) :: vel        !< Cell-avg. velocity
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3) :: alpha      !< Cell-avg. volume fraction
+            real(wp), dimension(3) :: vel        !< Cell-avg. velocity
+        #:else
+            real(wp), dimension(num_fluids) :: alpha      !< Cell-avg. volume fraction
+            real(wp), dimension(num_vels) :: vel        !< Cell-avg. velocity
+        #:endif
         real(wp) :: vel_sum    !< Cell-avg. velocity sum
         real(wp) :: pres       !< Cell-avg. pressure
-        real(wp), dimension(num_fluids) :: alpha      !< Cell-avg. volume fraction
         real(wp) :: gamma      !< Cell-avg. sp. heat ratio
         real(wp) :: pi_inf     !< Cell-avg. liquid stiffness function
         real(wp) :: qv         !< Cell-avg. internal energy reference value
@@ -303,7 +309,6 @@ contains
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
-
         ! end: Computing Stability Criteria at Current Time-step
 
         ! Determining global stability criteria extrema at current time-step
@@ -1558,28 +1563,32 @@ contains
                     end if
                 elseif (p == 0) then
                     if (bubbles_euler) then
-                        write (i + 30, '(6X,10F24.8)') &
-                            nondim_time, &
-                            rho, &
-                            vel(1), &
-                            vel(2), &
-                            pres, &
-                            alf, &
-                            nR(1), &
-                            nRdot(1), &
-                            R(1), &
-                            Rdot(1)
+                        #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
+                            write (i + 30, '(6X,10F24.8)') &
+                                nondim_time, &
+                                rho, &
+                                vel(1), &
+                                vel(2), &
+                                pres, &
+                                alf, &
+                                nR(1), &
+                                nRdot(1), &
+                                R(1), &
+                                Rdot(1)
+                        #:endif
                     else if (elasticity) then
-                        write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
-                               'F24.8,F24.8,F24.8)') &
-                            nondim_time, &
-                            rho, &
-                            vel(1), &
-                            vel(2), &
-                            pres, &
-                            tau_e(1), &
-                            tau_e(2), &
-                            tau_e(3)
+                        #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
+                            write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
+                                   'F24.8,F24.8,F24.8)') &
+                                nondim_time, &
+                                rho, &
+                                vel(1), &
+                                vel(2), &
+                                pres, &
+                                tau_e(1), &
+                                tau_e(2), &
+                                tau_e(3)
+                        #:endif
                     else
                         write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8)') &
                             nondim_time, &
@@ -1589,20 +1598,22 @@ contains
                         print *, 'time =', nondim_time, 'rho =', rho, 'pres =', pres
                     end if
                 else
-                    write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
-                           'F24.8,F24.8,F24.8,F24.8,F24.8,'// &
-                           'F24.8)') &
-                        nondim_time, &
-                        rho, &
-                        vel(1), &
-                        vel(2), &
-                        vel(3), &
-                        pres, &
-                        gamma, &
-                        pi_inf, &
-                        qv, &
-                        c, &
-                        accel
+                    #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                        write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8,'// &
+                               'F24.8,F24.8,F24.8,F24.8,F24.8,'// &
+                               'F24.8)') &
+                            nondim_time, &
+                            rho, &
+                            vel(1), &
+                            vel(2), &
+                            vel(3), &
+                            pres, &
+                            gamma, &
+                            pi_inf, &
+                            qv, &
+                            c, &
+                            accel
+                    #:endif
                 end if
             end if
         end do
