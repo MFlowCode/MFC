@@ -36,7 +36,7 @@ contains
         !  3D Patch Geometries
         if (p > 0) then
 
-            $:GPU_PARALLEL_LOOP(private='[i]', copy='[gps]', copyin='[patch_ib]')
+            $:GPU_PARALLEL_LOOP(private='[i]', copy='[gps]', copyin='[patch_ib,airfoil_grid_u,airfoil_grid_l]')
             do i = 1, num_gps
 
                 patch_id = gps(i)%ib_patch_id
@@ -49,7 +49,7 @@ contains
                 elseif (patch_geometry == 10) then
                     call s_cylinder_levelset(gps(i))
                 elseif (patch_geometry == 11) then
-                    call s_3D_airfoil_levelset(gps(i))
+                    call s_3d_airfoil_levelset(gps(i))
                     ! STL+IBM patch
                 elseif (patch_geometry == 12) then
                     call s_model_levelset(gps(i))
@@ -88,6 +88,7 @@ contains
     end subroutine s_apply_levelset
 
     subroutine s_circle_levelset(gp)
+
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(ghost_point), intent(inout) :: gp
@@ -119,6 +120,7 @@ contains
     end subroutine s_circle_levelset
 
     subroutine s_airfoil_levelset(gp)
+
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(ghost_point), intent(inout) :: gp
@@ -199,7 +201,8 @@ contains
 
     end subroutine s_airfoil_levelset
 
-    subroutine s_3D_airfoil_levelset(gp)
+    subroutine s_3d_airfoil_levelset(gp)
+
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(ghost_point), intent(inout) :: gp
@@ -297,10 +300,11 @@ contains
             end if
         end if
 
-    end subroutine s_3D_airfoil_levelset
+    end subroutine s_3d_airfoil_levelset
 
     !>  Initialize IBM module
     subroutine s_rectangle_levelset(gp)
+
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(ghost_point), intent(inout) :: gp
@@ -375,6 +379,7 @@ contains
     end subroutine s_rectangle_levelset
 
     subroutine s_ellipse_levelset(gp)
+
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(ghost_point), intent(inout) :: gp
@@ -428,6 +433,7 @@ contains
     end subroutine s_ellipse_levelset
 
     subroutine s_cuboid_levelset(gp)
+
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(ghost_point), intent(inout) :: gp
@@ -527,6 +533,7 @@ contains
     end subroutine s_cuboid_levelset
 
     subroutine s_sphere_levelset(gp)
+
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(ghost_point), intent(inout) :: gp
@@ -560,6 +567,7 @@ contains
     end subroutine s_sphere_levelset
 
     subroutine s_cylinder_levelset(gp)
+
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(ghost_point), intent(inout) :: gp

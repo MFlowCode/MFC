@@ -487,6 +487,8 @@ contains
     !! @return True if the point is inside the octree, false otherwise.
     impure function f_model_is_inside(model, point, spacing, spc) result(fraction)
 
+        ! $:GPU_ROUTINE(parallelism='[seq]')
+
         type(t_model), intent(in) :: model
         real(wp), dimension(1:3), intent(in) :: point
         real(wp), dimension(1:3), intent(in) :: spacing
@@ -1048,6 +1050,8 @@ contains
     !! @param distance     The output levelset distance
     subroutine f_distance_normals_3D(model, point, normals, distance)
 
+        $:GPU_ROUTINE(parallelism='[seq]')
+
         type(t_model), intent(IN) :: model
         real(wp), dimension(1:3), intent(in) :: point
         real(wp), dimension(1:3), intent(out) :: normals
@@ -1111,6 +1115,8 @@ contains
     !! @return                             Distance which the levelset distance without interpolation
     function f_distance(boundary_v, boundary_edge_count, point) result(distance)
 
+        $:GPU_ROUTINE(parallelism='[seq]')
+
         integer, intent(in) :: boundary_edge_count
         real(wp), intent(in), dimension(1:boundary_edge_count, 1:3, 1:2) :: boundary_v
         real(wp), dimension(1:3), intent(in) :: point
@@ -1141,6 +1147,8 @@ contains
     !! @param point                        The cell centers of the current levelset cell
     !! @param normals                      Output levelset normals without interpolation
     subroutine f_normals(boundary_v, boundary_edge_count, point, normals)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
 
         integer, intent(in) :: boundary_edge_count
         real(wp), intent(in), dimension(1:boundary_edge_count, 1:3, 1:2) :: boundary_v
@@ -1201,6 +1209,8 @@ contains
     !! @param point                        The cell centers of the current levelset cell
     !! @return                             Distance which the levelset distance without interpolation
     function f_interpolated_distance(interpolated_boundary_v, total_vertices, point) result(distance)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
 
         integer, intent(in) :: total_vertices
         real(wp), intent(in), dimension(1:total_vertices, 1:3) :: interpolated_boundary_v
