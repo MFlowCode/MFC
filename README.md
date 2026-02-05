@@ -199,6 +199,52 @@ then you can build MFC and run the test suite!
 ```
 And... you're done!
 
+## Toolchain Features
+
+The `mfc.sh` script provides a comprehensive toolchain for building, running, and testing MFC:
+
+| Command | Description |
+|---------|-------------|
+| `./mfc.sh build` | Build MFC and its dependencies |
+| `./mfc.sh run case.py` | Run a simulation case |
+| `./mfc.sh test` | Run the test suite |
+| `./mfc.sh validate case.py` | Check a case file for errors before running |
+| `./mfc.sh init my_case` | Create a new case from a template |
+| `./mfc.sh clean` | Remove build artifacts |
+| `./mfc.sh interactive` | Launch interactive menu-driven interface |
+
+### Quick Start Workflow
+
+```bash
+./mfc.sh init my_first_case           # Create a new case from template
+./mfc.sh validate my_first_case/case.py  # Validate the case file
+./mfc.sh build -j $(nproc)            # Build MFC
+./mfc.sh run my_first_case/case.py    # Run the simulation
+```
+
+### Case Templates
+
+Create new cases quickly with built-in templates:
+
+```bash
+./mfc.sh init --list                  # List available templates
+./mfc.sh init my_case -t 2D_minimal   # Create 2D case
+./mfc.sh init my_case -t example:1D_sodshocktube  # Copy from examples
+```
+
+### Shell Completion
+
+Enable tab completion for commands and options:
+
+```bash
+# Bash
+source toolchain/completions/mfc.bash
+
+# Zsh (add to fpath)
+fpath=(path/to/MFC/toolchain/completions $fpath)
+autoload -Uz compinit && compinit
+```
+
 You can learn more about MFC's capabilities [via its documentation](https://mflowcode.github.io/documentation/index.html) or play with the examples located in the `examples/` directory (some are [shown here](https://mflowcode.github.io/documentation/md_examples.html))!
 
 The shock-droplet interaction case above was run via
