@@ -86,43 +86,44 @@ contains
             $:GPU_ATOMIC(atomic='update')
             updatedvar(1)%sf(cell(1), cell(2), cell(3)) = updatedvar(1)%sf(cell(1), cell(2), cell(3)) + real(addFun1, kind=stp)
 
-            if (lag_params%solver_approach == 1) return
+            if (lag_params%solver_approach == 2) then
             
-            !Update x-momentum source term
-            addFun2_x = -fp_x/Vol
-            $:GPU_ATOMIC(atomic='update')
-            updatedvar(2)%sf(cell(1), cell(2), cell(3)) = &
-                updatedvar(2)%sf(cell(1), cell(2), cell(3)) &
-                + real(addFun2_x, kind=stp)
+              !Update x-momentum source term
+              addFun2_x = -fp_x/Vol
+              $:GPU_ATOMIC(atomic='update')
+              updatedvar(2)%sf(cell(1), cell(2), cell(3)) = &
+                  updatedvar(2)%sf(cell(1), cell(2), cell(3)) &
+                  + real(addFun2_x, kind=stp)
 
-            !Update y-momentum source term
-            addFun2_y = -fp_y/Vol
-            $:GPU_ATOMIC(atomic='update')
-            updatedvar(3)%sf(cell(1), cell(2), cell(3)) = &
-                updatedvar(3)%sf(cell(1), cell(2), cell(3)) &
-                + real(addFun2_y, kind=stp)
+              !Update y-momentum source term
+              addFun2_y = -fp_y/Vol
+              $:GPU_ATOMIC(atomic='update')
+              updatedvar(3)%sf(cell(1), cell(2), cell(3)) = &
+                  updatedvar(3)%sf(cell(1), cell(2), cell(3)) &
+                  + real(addFun2_y, kind=stp)
 
-            if (num_dims == 3) then
-              !Update z-momentum source term
-              addFun2_z = -fp_z/Vol
-              $:GPU_ATOMIC(atomic='update')
-              updatedvar(4)%sf(cell(1), cell(2), cell(3)) = &
-                  updatedvar(4)%sf(cell(1), cell(2), cell(3)) &
-                  + real(addFun2_z, kind=stp)
-              !Update energy source term
-              addFun_E = 0._wp
-              $:GPU_ATOMIC(atomic='update')
-              updatedvar(5)%sf(cell(1), cell(2), cell(3)) = &
-                  updatedvar(5)%sf(cell(1), cell(2), cell(3)) &
-                  + real(addFun_E, kind=stp)     
-            else  
-              !Update energy source term
-              addFun_E = 0._wp
-              $:GPU_ATOMIC(atomic='update')
-              updatedvar(4)%sf(cell(1), cell(2), cell(3)) = &
-                  updatedvar(4)%sf(cell(1), cell(2), cell(3)) &
-                  + real(addFun_E, kind=stp)   
-            endif         
+              if (num_dims == 3) then
+                !Update z-momentum source term
+                addFun2_z = -fp_z/Vol
+                $:GPU_ATOMIC(atomic='update')
+                updatedvar(4)%sf(cell(1), cell(2), cell(3)) = &
+                    updatedvar(4)%sf(cell(1), cell(2), cell(3)) &
+                    + real(addFun2_z, kind=stp)
+                !Update energy source term
+                addFun_E = 0._wp
+                $:GPU_ATOMIC(atomic='update')
+                updatedvar(5)%sf(cell(1), cell(2), cell(3)) = &
+                    updatedvar(5)%sf(cell(1), cell(2), cell(3)) &
+                    + real(addFun_E, kind=stp)     
+              else  
+                !Update energy source term
+                addFun_E = 0._wp
+                $:GPU_ATOMIC(atomic='update')
+                updatedvar(4)%sf(cell(1), cell(2), cell(3)) = &
+                    updatedvar(4)%sf(cell(1), cell(2), cell(3)) &
+                    + real(addFun_E, kind=stp)   
+              endif
+            endif        
 
         end do
         $:END_GPU_PARALLEL_LOOP()
@@ -230,44 +231,45 @@ contains
                                 updatedvar(1)%sf(cellaux(1), cellaux(2), cellaux(3)) &
                                 + real(addFun1, kind=stp)
 
-                            if (lag_params%solver_approach == 1) return
+                            if (lag_params%solver_approach == 2) then
 
-                            !Update x-momentum source term
-                            addFun2_x = -func*fp_x
-                            $:GPU_ATOMIC(atomic='update')
-                            updatedvar(2)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                                updatedvar(2)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                + real(addFun2_x, kind=stp)
+                              !Update x-momentum source term
+                              addFun2_x = -func*fp_x
+                              $:GPU_ATOMIC(atomic='update')
+                              updatedvar(2)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
+                                  updatedvar(2)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                                  + real(addFun2_x, kind=stp)
 
-                            !Update y-momentum source term
-                            addFun2_y = -func*fp_y
-                            $:GPU_ATOMIC(atomic='update')
-                            updatedvar(3)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                                updatedvar(3)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                + real(addFun2_y, kind=stp)
+                              !Update y-momentum source term
+                              addFun2_y = -func*fp_y
+                              $:GPU_ATOMIC(atomic='update')
+                              updatedvar(3)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
+                                  updatedvar(3)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                                  + real(addFun2_y, kind=stp)
 
-                            if (num_dims == 3) then
-                              !Update z-momentum source term
-                              addFun2_z = -func*fp_z
-                              $:GPU_ATOMIC(atomic='update')
-                              updatedvar(4)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                                  updatedvar(4)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                  + real(addFun2_z, kind=stp)
-                              !Update energy source term
-                              addFun_E = 0._wp
-                              $:GPU_ATOMIC(atomic='update')
-                              updatedvar(5)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                                  updatedvar(5)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                  + real(addFun_E, kind=stp)
-                            else
-                              !Update energy source term
-                              addFun_E = 0._wp
-                              $:GPU_ATOMIC(atomic='update')
-                              updatedvar(4)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                                  updatedvar(4)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                  + real(addFun_E, kind=stp)
+                              if (num_dims == 3) then
+                                !Update z-momentum source term
+                                addFun2_z = -func*fp_z
+                                $:GPU_ATOMIC(atomic='update')
+                                updatedvar(4)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
+                                    updatedvar(4)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                                    + real(addFun2_z, kind=stp)
+                                !Update energy source term
+                                addFun_E = 0._wp
+                                $:GPU_ATOMIC(atomic='update')
+                                updatedvar(5)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
+                                    updatedvar(5)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                                    + real(addFun_E, kind=stp)
+                              else
+                                !Update energy source term
+                                addFun_E = 0._wp
+                                $:GPU_ATOMIC(atomic='update')
+                                updatedvar(4)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
+                                    updatedvar(4)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                                    + real(addFun_E, kind=stp)
+                              endif
                             endif
-                        end if
+                        endif
                     end do
                 end do
             end do
@@ -609,9 +611,9 @@ contains
             !! @param i Direction of the velocity (1: x, 2: y, 3: z)
             !! @param q_prim_vf Eulerian field with primitive variables
             !! @return a Acceleration of the particle in direction i
-    function f_get_particle_force(pos, rad, vel_p, mass_p, Re, rho, vol_frac, cell, i, q_prim_vf) result(force)
+    function f_get_particle_force(pos, rad, vel_p, mass_p, Re, gamm, rho, vol_frac, cell, i, q_prim_vf) result(force)
         $:GPU_ROUTINE(parallelism='[seq]')
-        real(wp), intent(in) :: pos, rad, mass_p, Re, rho, vol_frac
+        real(wp), intent(in) :: pos, rad, mass_p, Re, gamm, rho, vol_frac
         integer, dimension(3), intent(in) :: cell
         real(wp), intent(in) :: vel_p(:)
         integer, intent(in) :: i
@@ -620,7 +622,7 @@ contains
         real(wp) :: a, dp, vol, force
         real(wp) :: v_rel
         real(wp), dimension(fd_order) :: xi, eta, L
-        real(wp) :: particle_diam, gas_mu, gamma, vmag, cson
+        real(wp) :: particle_diam, gas_mu, vmag, cson
         real(wp) :: slip_velocity_x, slip_velocity_y, slip_velocity_z, beta
         real(wp), dimension(3) :: fluid_vel
         integer :: dir
@@ -710,6 +712,7 @@ contains
 
         v_rel = vel_p(i) - fluid_vel(i)
 
+
         !!!!!!! Quasi-steady Drag Force Paramaeters
         slip_velocity_x = fluid_vel(1) - vel_p(1)
         slip_velocity_y = fluid_vel(2) - vel_p(2)
@@ -722,7 +725,7 @@ contains
         end if
 
         particle_diam = rad*2._wp
-        cson = sqrt((fluid_pp(1)%gamma*q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3)))/rho) !gamma*P/rho
+        cson = sqrt((gamm*q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3)))/rho) !gamma*P/rho
         gas_mu = Re
 
         if (ABS(v_rel) .le. 1.e-7_wp) then
@@ -733,16 +736,16 @@ contains
 
         ! Step 1: Force component quasi-steady
         if (lag_params%qs_drag_model == 1) then
-            beta = QS_Parmar(rho, cson, gas_mu, fluid_pp(1)%gamma, vmag, particle_diam, vol_frac)
+            beta = QS_Parmar(rho, cson, gas_mu, gamm, vmag, particle_diam, vol_frac)
             force = force - beta*v_rel
         else if (lag_params%qs_drag_model == 2) then
-            beta = QS_Osnes(rho, cson, gas_mu, fluid_pp(1)%gamma, vmag, particle_diam, vol_frac)
+            beta = QS_Osnes(rho, cson, gas_mu, gamm, vmag, particle_diam, vol_frac)
             force = force - beta*v_rel
         else if (lag_params%qs_drag_model == 3) then
-            beta = QS_ModifiedParmar(rho, cson, gas_mu, fluid_pp(1)%gamma, vmag, particle_diam, vol_frac)
+            beta = QS_ModifiedParmar(rho, cson, gas_mu, gamm, vmag, particle_diam, vol_frac)
             force = force - beta*v_rel
         else if (lag_params%qs_drag_model == 4) then
-            beta = QS_Gidaspow(rho, cson, gas_mu, fluid_pp(1)%gamma, vmag, particle_diam, vol_frac)
+            beta = QS_Gidaspow(rho, cson, gas_mu, gamm, vmag, particle_diam, vol_frac)
             force = force - beta*v_rel
         end if
 

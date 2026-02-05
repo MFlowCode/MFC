@@ -1280,9 +1280,9 @@ contains
             if (lag_params%write_bubbles_stats) call s_write_lag_bubble_stats()
 
         elseif (particles_lagrange) then
-            $:GPU_UPDATE(host='[lag_id, mtn_pos, mtn_posPrev, mtn_vel, particle_rad, &
-                & particle_R0, Rmax_stats, Rmin_stats, &
-                & particle_mass, gas_betaT, gas_betaC]')
+            $:GPU_UPDATE(host='[lag_part_id, particle_pos, particle_posPrev, particle_vel, particle_rad, &
+                & particle_R0, Rmax_stats_part, Rmin_stats_part, &
+                & particle_mass]')
             ! do i = 1, n_el_particles_loc
             !     if (ieee_is_nan(particle_rad(i, 1)) .or. particle_rad(i, 1) <= 0._wp) then
             !         call s_mpi_abort("Particle radius is negative or NaN, please reduce dt.")
@@ -1291,7 +1291,7 @@ contains
 
             $:GPU_UPDATE(host='[q_particles(1)%sf]')
             call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count, bc_type, q_particles(1))
-            $:GPU_UPDATE(host='[Rmax_stats,Rmin_stats,gas_p,gas_mv,intfc_vel]')
+            $:GPU_UPDATE(host='[Rmax_stats_part,Rmin_stats_part]')
             call s_write_restart_lag_particles(save_count) !parallel
             if (lag_params%write_bubbles_stats) call s_write_lag_particle_stats()
 

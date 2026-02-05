@@ -558,7 +558,7 @@ module m_global_parameters
     logical :: lag_gravity_force
     integer :: lag_vel_model, lag_drag_model
     $:GPU_DECLARE(create='[bubbles_lagrange,lag_params,n_el_bubs_loc,n_el_bubs_glb]')
-    $:GPU_DECLARE(create='[particles_lagrange,lag_params,n_el_particles_loc,n_el_particles_glb]')
+    $:GPU_DECLARE(create='[particles_lagrange,n_el_particles_loc,n_el_particles_glb]')
     $:GPU_DECLARE(create='[moving_lag_particles]')
     $:GPU_DECLARE(create='[moving_lag_bubbles, lag_vel_model, lag_drag_model]')
     $:GPU_DECLARE(create='[lag_pressure_force,lag_gravity_force]')

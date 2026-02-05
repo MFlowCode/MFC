@@ -964,6 +964,7 @@ contains
         !! @param Rmax_stats Maximum radius of each particle
         !! @param Rmin_stats Minimum radius of each particle
         !! @param particle_mass Mass of gas in each particle
+        !! @param f_p Force on each particle
         !! @param gas_betaT Heat flux model coefficient for each particle
         !! @param gas_betaC mass flux model coefficient for each particle
         !! @param lag_id Global and local ID of each particle
@@ -977,12 +978,13 @@ contains
         !! @param dvel Time derivative of velocity of each particle
         !! @param lag_num_ts Number of stages in time-stepping scheme
         !! @param nParticles Local number of particles
-    impure subroutine s_mpi_sendrecv_solid_particles(particle_R0, Rmax_stats, Rmin_stats, particle_mass, &
-                                                     gas_betaT, gas_betaC, lag_id, rad, pos, &
+    impure subroutine s_mpi_sendrecv_solid_particles(particle_R0, Rmax_stats, Rmin_stats, particle_mass, f_p, &
+                                                     lag_id, rad, pos, &
                                                      posPrev, vel, scoord, drad, dpos, &
                                                      dvel, lag_num_ts, nParticles, dest)
 
-        real(wp), dimension(:) :: particle_R0, Rmax_stats, Rmin_stats, particle_mass, gas_betaT, gas_betaC
+        real(wp), dimension(:) :: particle_R0, Rmax_stats, Rmin_stats, particle_mass
+        real(wp), dimension(:, :) :: f_p
         integer, dimension(:, :) :: lag_id
         real(wp), dimension(:, :) :: rad, drad
         real(wp), dimension(:, :, :) :: pos, posPrev, vel, scoord, dpos, dvel
@@ -1076,8 +1078,9 @@ contains
                     call MPI_Pack(Rmax_stats(particle_id), 1, mpi_p, p_send_buff(send_offset), p_buff_size, position, MPI_COMM_WORLD, ierr)
                     call MPI_Pack(Rmin_stats(particle_id), 1, mpi_p, p_send_buff(send_offset), p_buff_size, position, MPI_COMM_WORLD, ierr)
                     call MPI_Pack(particle_mass(particle_id), 1, mpi_p, p_send_buff(send_offset), p_buff_size, position, MPI_COMM_WORLD, ierr)
-                    call MPI_Pack(gas_betaT(particle_id), 1, mpi_p, p_send_buff(send_offset), p_buff_size, position, MPI_COMM_WORLD, ierr)
-                    call MPI_Pack(gas_betaC(particle_id), 1, mpi_p, p_send_buff(send_offset), p_buff_size, position, MPI_COMM_WORLD, ierr)
+                    call MPI_Pack(f_p(particle_id), 1, mpi_p, p_send_buff(send_offset), p_buff_size, position, MPI_COMM_WORLD, ierr)
+                    ! call MPI_Pack(gas_betaT(particle_id), 1, mpi_p, p_send_buff(send_offset), p_buff_size, position, MPI_COMM_WORLD, ierr)
+                    ! call MPI_Pack(gas_betaC(particle_id), 1, mpi_p, p_send_buff(send_offset), p_buff_size, position, MPI_COMM_WORLD, ierr)
                     ! call MPI_Pack(bub_dphidt(particle_id), 1, mpi_p, p_send_buff(send_offset), p_buff_size, position, MPI_COMM_WORLD, ierr)
                     do r = 1, 2
                         ! call MPI_Pack(gas_p(particle_id, r), 1, mpi_p, p_send_buff(send_offset), p_buff_size, position, MPI_COMM_WORLD, ierr)
@@ -1130,8 +1133,9 @@ contains
                     call MPI_Unpack(p_recv_buff(recv_offset), p_recv_size, position, Rmax_stats(particle_id), 1, mpi_p, MPI_COMM_WORLD, ierr)
                     call MPI_Unpack(p_recv_buff(recv_offset), p_recv_size, position, Rmin_stats(particle_id), 1, mpi_p, MPI_COMM_WORLD, ierr)
                     call MPI_Unpack(p_recv_buff(recv_offset), p_recv_size, position, particle_mass(particle_id), 1, mpi_p, MPI_COMM_WORLD, ierr)
-                    call MPI_Unpack(p_recv_buff(recv_offset), p_recv_size, position, gas_betaT(particle_id), 1, mpi_p, MPI_COMM_WORLD, ierr)
-                    call MPI_Unpack(p_recv_buff(recv_offset), p_recv_size, position, gas_betaC(particle_id), 1, mpi_p, MPI_COMM_WORLD, ierr)
+                    call MPI_Unpack(p_recv_buff(recv_offset), p_recv_size, position, f_p(particle_id), 1, mpi_p, MPI_COMM_WORLD, ierr)
+                    ! call MPI_Unpack(p_recv_buff(recv_offset), p_recv_size, position, gas_betaT(particle_id), 1, mpi_p, MPI_COMM_WORLD, ierr)
+                    ! call MPI_Unpack(p_recv_buff(recv_offset), p_recv_size, position, gas_betaC(particle_id), 1, mpi_p, MPI_COMM_WORLD, ierr)
                     ! call MPI_Unpack(p_recv_buff(recv_offset), p_recv_size, position, bub_dphidt(particle_id), 1, mpi_p, MPI_COMM_WORLD, ierr)
                     do r = 1, 2
                         ! call MPI_Unpack(p_recv_buff(recv_offset), p_recv_size, position, gas_p(particle_id, r), 1, mpi_p, MPI_COMM_WORLD, ierr)
