@@ -911,7 +911,7 @@ contains
         model => models(patch_id)%model
 
         $:GPU_PARALLEL_LOOP(private='[i,j,k,point]', copy='[ib_markers_sf]',&
-                  & copyin='[patch_id,x_cc,y_cc,ncells,model]', collapse=3)
+                  & copyin='[patch_id,x_cc,y_cc,model]', collapse=3)
         do i = 0, m
             do j = 0, n
                 do k = 0, p
