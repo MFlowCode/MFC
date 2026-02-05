@@ -212,7 +212,7 @@ contains
         real(wp) :: lz, z_max, z_min
         real(wp), dimension(3) :: dist_vec
 
-        real(wp), dimension(1:3) :: xyz_local, center, offset !< x, y, z coordinates in local IB frame
+        real(wp), dimension(1:3) :: xyz_local, center, offset, normal !< x, y, z coordinates in local IB frame
         real(wp), dimension(1:3, 1:3) :: rotation, inverse_rotation
 
         real(wp) :: length_z
@@ -281,16 +281,17 @@ contains
             dist_surf = global_dist
         end if
 
-        dist_side = min(abs(z_cc(l) - z_min), abs(z_max - z_cc(l)))
+        dist_side = min(abs(xyz_local(3) - z_min), abs(z_max - xyz_local(3)))
 
         if (dist_side < dist_surf) then
             gp%levelset = dist_side
-            if (f_approx_equal(dist_side, abs(z_cc(l) - z_min))) then
-                gp%levelset_norm = (/0._wp, 0._wp, -1._wp/)
+            normal = 0._wp
+            if (f_approx_equal(dist_side, abs(xyz_local(3) - z_min))) then
+                normal(3) = -1._wp
             else
-                gp%levelset_norm = (/0._wp, 0._wp, 1._wp/)
+                normal(3) = 1._wp
             end if
-            gp%levelset_norm = matmul(rotation, gp%levelset_norm)
+            gp%levelset_norm = matmul(rotation, normal)
         else
             gp%levelset = dist_surf
             if (f_approx_equal(dist_surf, 0._wp)) then
