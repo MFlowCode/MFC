@@ -14,6 +14,7 @@ dependencies = [
     "argparse",
     "dataclasses",
     "fastjsonschema",
+    "rapidfuzz",  # For "did you mean?" typo suggestions
 
     # Build System
     "fypp",
@@ -25,7 +26,7 @@ dependencies = [
     "typos",
     "pylint",
     "fprettify",
-    "black",
+    "autopep8",   # Python formatter (black has issues with Python 3.12.5)
     "ansi2txt",
 
     # Profiling

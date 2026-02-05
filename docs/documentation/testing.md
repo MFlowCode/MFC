@@ -1,3 +1,5 @@
+@page testing Testing
+
 ## Testing
 
 To run MFC's test suite, run
