@@ -751,6 +751,27 @@ SPELLING_COMMAND = Command(
     ],
 )
 
+PRECHECK_COMMAND = Command(
+    name="precheck",
+    help="Run CI lint checks locally before committing.",
+    description="Run the same fast checks that CI runs before expensive tests start. Use this locally before pushing to catch issues early.",
+    arguments=[
+        Argument(
+            name="jobs",
+            short="j",
+            help="Number of parallel jobs for formatting.",
+            metavar="N",
+        ),
+    ],
+    examples=[
+        Example("./mfc.sh precheck", "Run all lint checks"),
+        Example("./mfc.sh precheck -j 8", "Run with 8 parallel jobs"),
+    ],
+    key_options=[
+        ("-j, --jobs N", "Number of parallel jobs for formatting"),
+    ],
+)
+
 INTERACTIVE_COMMAND = Command(
     name="interactive",
     help="Launch interactive menu-driven interface.",
@@ -990,6 +1011,7 @@ started, run `./mfc.sh build -h`.""",
         LINT_COMMAND,
         FORMAT_COMMAND,
         SPELLING_COMMAND,
+        PRECHECK_COMMAND,
         INTERACTIVE_COMMAND,
         BENCH_COMMAND,
         BENCH_DIFF_COMMAND,
