@@ -592,15 +592,8 @@ contains
         length(2) = patch_ib(ib_patch_id)%length_y
         length(3) = patch_ib(ib_patch_id)%length_z
 
-        ! inverse_rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:, :)
-        ! rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix(:, :)
-        ! Copy matrices element by element
-        do ii = 1, 3
-          do jj = 1, 3
-              inverse_rotation(ii, jj) = patch_ib(ib_patch_id)%rotation_matrix_inverse(ii, jj)
-              rotation(ii, jj) = patch_ib(ib_patch_id)%rotation_matrix(ii, jj)
-          end do
-      end do
+        inverse_rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:, :)
+        rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix(:, :)
 
         if (.not. f_approx_equal(length(1), 0._wp)) then
             boundary(1) = -0.5_wp*length(1)
