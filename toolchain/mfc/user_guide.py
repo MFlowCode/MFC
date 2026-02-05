@@ -380,66 +380,48 @@ def print_help_topics():
 # =============================================================================
 
 def print_help():
-    """Print enhanced, colorized help overview."""
+    """Print compact, colorized help overview."""
 
-    # Header
+    # Header (no box)
     cons.print()
-    cons.raw.print(Panel(
-        "[bold cyan]MFC[/bold cyan] - [dim]Multi-component Flow Code[/dim]\n"
-        "[dim]Exascale CFD solver for compressible multi-phase flows[/dim]",
-        box=box.ROUNDED,
-        padding=(0, 2)
-    ))
+    cons.print("[bold cyan]MFC[/bold cyan] - Multi-component Flow Code")
+    cons.print("[dim]Exascale CFD solver for compressible multi-phase flows[/dim]")
     cons.print()
 
-    # Commands table
-    table = Table(
-        title="[bold]Commands[/bold]",
-        box=box.SIMPLE,
-        show_header=True,
-        header_style="bold cyan",
-        title_justify="left",
-        padding=(0, 2)
-    )
-    table.add_column("Command", style="green", no_wrap=True)
-    table.add_column("Alias", style="dim", no_wrap=True)
-    table.add_column("Description", style="white")
+    # Commands section - compact format
+    cons.print("[bold]Commands:[/bold]")
 
-    # Primary commands with aliases
-    for cmd in ["build", "run", "test", "validate", "new", "clean"]:
-        alias = COMMANDS[cmd].get("alias", "")
-        alias_str = alias if alias else ""
-        table.add_row(cmd, alias_str, COMMANDS[cmd]["description"])
+    # Primary commands with inline aliases and short descriptions
+    commands_primary = [
+        ("build", "b", "Build MFC targets with optional GPU support"),
+        ("run", "r", "Run simulation interactively or as batch job"),
+        ("test", "t", "Run test suite"),
+        ("validate", "v", "Check case file for errors"),
+        ("new", "", "Create new case from template"),
+        ("clean", "c", "Remove build artifacts"),
+    ]
 
-    table.add_row("", "", "")  # Spacer
+    for cmd, alias, desc in commands_primary:
+        alias_str = f" ({alias})" if alias else "    "
+        cons.print(f"  [green]{cmd:9}[/green][dim]{alias_str:4}[/dim] {desc}")
 
-    # Secondary commands
-    for cmd in ["params", "count", "packer", "load"]:
-        table.add_row(f"[dim]{cmd}[/dim]", "", f"[dim]{COMMANDS[cmd]['description']}[/dim]")
+    # Secondary commands (dimmed)
+    commands_secondary = [
+        ("params", "Search ~3,300 case parameters"),
+        ("load", "Load environment modules (use with source)"),
+        ("help", "Topic help (gpu, clusters, batch, debugging)"),
+    ]
 
-    table.add_row("", "", "")  # Spacer
-    table.add_row("[dim]help[/dim]", "", "[dim]Show help on a topic (gpu, clusters, batch, debugging)[/dim]")
+    for cmd, desc in commands_secondary:
+        cons.print(f"  [dim]{cmd:13} {desc}[/dim]")
 
-    cons.raw.print(table)
     cons.print()
 
-    # Quick start
-    cons.raw.print(Panel(
-        "[bold]Quick Start[/bold]\n\n"
-        "  [green]1.[/green] [cyan]./mfc.sh new my_case[/cyan]            Create a new case\n"
-        "  [green]2.[/green] [cyan]vim my_case/case.py[/cyan]             Edit parameters\n"
-        "  [green]3.[/green] [cyan]./mfc.sh validate my_case/case.py[/cyan]  Check for errors\n"
-        "  [green]4.[/green] [cyan]./mfc.sh build -j $(nproc)[/cyan]      Build MFC\n"
-        "  [green]5.[/green] [cyan]./mfc.sh run my_case/case.py[/cyan]    Run simulation",
-        box=box.ROUNDED,
-        border_style="green",
-        padding=(1, 2)
-    ))
-    cons.print()
+    # Quick start - single line
+    cons.print("[bold]Quick start:[/bold] [cyan]./mfc.sh new my_case[/cyan] → edit case.py → [cyan]./mfc.sh build[/cyan] → [cyan]./mfc.sh run[/cyan]")
 
     # Footer
-    cons.print("[dim]Run [cyan]./mfc.sh <command> --help[/cyan] for detailed options[/dim]")
-    cons.print("[dim]Run [cyan]./mfc.sh help <topic>[/cyan] for topic help (gpu, clusters, batch, debugging)[/dim]")
+    cons.print("[dim]Run ./mfc.sh <command> --help for options[/dim]")
     cons.print()
 
 
