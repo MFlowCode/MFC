@@ -645,7 +645,7 @@ contains
         type(ghost_point), intent(inout) :: gp
 
         integer :: i, j, k, patch_id, boundary_edge_count, total_vertices
-        type(t_model) :: model
+        type(t_model), pointer :: model
         real(wp), pointer, dimension(:, :, :) :: boundary_v
         real(wp), pointer, dimension(:, :) :: interpolated_boundary_v
         logical :: interpolate
@@ -659,7 +659,7 @@ contains
         k = gp%loc(3)
 
         ! load in model values
-        model = models(patch_id)%model
+        model => models(patch_id)%model
         interpolate = models(patch_id)%interpolate
         boundary_edge_count = models(patch_id)%boundary_edge_count
         total_vertices = models(patch_id)%total_vertices

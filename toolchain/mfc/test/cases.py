@@ -414,7 +414,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 }))
                 cases.append(define_case_d(stack, f'Circle{suffix}', {
                     'patch_ib(1)%geometry': 2,
-                    'n' :49 
+                    'n': 49 
                 }))
                 if six_eqn_model:
                     cases.append(define_case_d(stack, f'model_eqns=3{suffix}', {

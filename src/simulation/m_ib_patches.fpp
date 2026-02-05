@@ -903,12 +903,12 @@ contains
 
         integer :: i, j, k !< Generic loop iterators
 
-        type(t_model) :: model
+        type(t_model), pointer :: model
 
         real(wp) :: eta
         real(wp), dimension(1:3) :: point
 
-        model = models(patch_id)%model
+        model => models(patch_id)%model
 
         $:GPU_PARALLEL_LOOP(private='[i,j,k,point]', copy='[ib_markers_sf]',&
                   & copyin='[patch_id,x_cc,y_cc,ncells,model]', collapse=3)
