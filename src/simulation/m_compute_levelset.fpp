@@ -662,18 +662,19 @@ contains
         boundary_edge_count = models(patch_id)%boundary_edge_count
         total_vertices = models(patch_id)%total_vertices
 
-        center(1) = patch_ib(patch_id)%x_centroid
-        center(2) = patch_ib(patch_id)%y_centroid
+        center = 0._wp
+        if (.not. f_is_default(patch_ib(patch_id)%x_centroid)) center(1) = patch_ib(patch_id)%x_centroid
+        if (.not. f_is_default(patch_ib(patch_id)%y_centroid)) center(2) = patch_ib(patch_id)%y_centroid
         if (p > 0) then
-            center(3) = patch_ib(patch_id)%z_centroid
+          if (.not. f_is_default(patch_ib(patch_id)%z_centroid)) center(3) = patch_ib(patch_id)%z_centroid
         end if
         inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
         rotation(:, :) = patch_ib(patch_id)%rotation_matrix(:, :)
 
         ! determine where we are located in space
-        xyz_local = (/x_cc(i) - patch_ib(patch_id)%x_centroid, y_cc(j) - patch_ib(patch_id)%y_centroid, 0._wp/)
+        xyz_local = (/x_cc(i) - center(1), y_cc(j) - center(2), 0._wp/)
         if (p > 0) then
-            xyz_local(3) = z_cc(k) - patch_ib(patch_id)%z_centroid
+            xyz_local(3) = z_cc(k) - center(3)
         end if
         xyz_local = matmul(inverse_rotation, xyz_local)
 
@@ -698,7 +699,7 @@ contains
             gp%levelset = -abs(gp%levelset)
 
             ! Assign the levelset_norm
-            gp%levelset_norm = normals(1:3)
+            gp%levelset_norm = matmul(rotation, normals(1:3))
         else
             ! 2D models
             if (interpolate) then
