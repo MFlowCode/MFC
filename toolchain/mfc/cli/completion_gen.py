@@ -245,9 +245,10 @@ def generate_bash_completion(schema: CLISchema) -> str:
         '    return 0',
         '}',
         '',
-        'complete -o filenames -o bashdefault -F _mfc_completions ./mfc.sh',
-        'complete -o filenames -o bashdefault -F _mfc_completions mfc.sh',
-        'complete -o filenames -o bashdefault -F _mfc_completions mfc',
+        '# Note: -o nospace prevents trailing space; we only use -o filenames when actually completing files',
+        'complete -F _mfc_completions ./mfc.sh',
+        'complete -F _mfc_completions mfc.sh',
+        'complete -F _mfc_completions mfc',
     ])
 
     return '\n'.join(lines)
@@ -401,6 +402,9 @@ def generate_zsh_completion(schema: CLISchema) -> str:
             if arg_lines:
                 lines.append('                    _arguments \\')
                 lines.append('                        ' + ' \\\n                        '.join(arg_lines))
+            else:
+                # Explicitly disable default completion for commands with no args
+                lines.append('                    :')
             lines.append('                    ;;')
 
     lines.extend([
