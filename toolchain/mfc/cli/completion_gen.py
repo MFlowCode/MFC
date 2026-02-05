@@ -245,9 +245,11 @@ def generate_bash_completion(schema: CLISchema) -> str:
         '    return 0',
         '}',
         '',
-        'complete -o filenames -o bashdefault -F _mfc_completions ./mfc.sh',
-        'complete -o filenames -o bashdefault -F _mfc_completions mfc.sh',
-        'complete -o filenames -o bashdefault -F _mfc_completions mfc',
+        '# -o filenames: handle escaping/slashes for file completions',
+        '# Removed -o bashdefault to prevent unwanted directory fallback',
+        'complete -o filenames -F _mfc_completions ./mfc.sh',
+        'complete -o filenames -F _mfc_completions mfc.sh',
+        'complete -o filenames -F _mfc_completions mfc',
     ])
 
     return '\n'.join(lines)
@@ -317,8 +319,8 @@ def _generate_zsh_command_args(cmd: Command, schema: CLISchema) -> List[str]:
                 "'--no-mpi[Disable MPI]'",
                 "'--gpu[Enable GPU]:mode:(acc mp)'",
                 "'--no-gpu[Disable GPU]'",
-                "'--debug[Enable debug mode]'",
-                "'--no-debug[Disable debug mode]'",
+                "'--debug[Build with debug compiler flags (for MFC code)]'",
+                "'--no-debug[Build without debug flags]'",
                 "'--gcov[Enable gcov coverage]'",
                 "'--no-gcov[Disable gcov coverage]'",
                 "'--unified[Enable unified memory]'",
@@ -401,6 +403,9 @@ def generate_zsh_completion(schema: CLISchema) -> str:
             if arg_lines:
                 lines.append('                    _arguments \\')
                 lines.append('                        ' + ' \\\n                        '.join(arg_lines))
+            else:
+                # Explicitly disable default completion for commands with no args
+                lines.append('                    :')
             lines.append('                    ;;')
 
     lines.extend([

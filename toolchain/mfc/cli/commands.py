@@ -85,7 +85,7 @@ COMMON_VERBOSE = CommonArgumentSet(
         Argument(
             name="verbose",
             short="v",
-            help="Increase verbosity level. Use -v, -vv, or -vvv for more detail.",
+            help="Increase output verbosity (-v, -vv, -vvv for more detail).",
             action=ArgAction.COUNT,
             default=0,
         ),
@@ -98,7 +98,7 @@ COMMON_DEBUG_LOG = CommonArgumentSet(
         Argument(
             name="debug-log",
             short="d",
-            help="Enable debug logging for troubleshooting.",
+            help="Enable Python toolchain debug logging (not MFC code).",
             action=ArgAction.STORE_TRUE,
             dest="debug_log",
         ),
@@ -519,10 +519,10 @@ VALIDATE_COMMAND = Command(
     ],
     examples=[
         Example("./mfc.sh validate case.py", "Check syntax and constraints"),
-        Example("./mfc.sh validate case.py -d", "Validate with debug output"),
+        Example("./mfc.sh validate case.py -d", "Validate with toolchain debug output"),
     ],
     key_options=[
-        ("-d, --debug-log", "Enable debug logging"),
+        ("-d, --debug-log", "Enable toolchain debug logging"),
     ],
 )
 
@@ -748,6 +748,27 @@ SPELLING_COMMAND = Command(
     description="Check spelling in the codebase.",
     examples=[
         Example("./mfc.sh spelling", "Run spell checker"),
+    ],
+)
+
+PRECHECK_COMMAND = Command(
+    name="precheck",
+    help="Run CI lint checks locally before committing.",
+    description="Run the same fast checks that CI runs before expensive tests start. Use this locally before pushing to catch issues early.",
+    arguments=[
+        Argument(
+            name="jobs",
+            short="j",
+            help="Number of parallel jobs for formatting.",
+            metavar="N",
+        ),
+    ],
+    examples=[
+        Example("./mfc.sh precheck", "Run all lint checks"),
+        Example("./mfc.sh precheck -j 8", "Run with 8 parallel jobs"),
+    ],
+    key_options=[
+        ("-j, --jobs N", "Number of parallel jobs for formatting"),
     ],
 )
 
@@ -990,6 +1011,7 @@ started, run `./mfc.sh build -h`.""",
         LINT_COMMAND,
         FORMAT_COMMAND,
         SPELLING_COMMAND,
+        PRECHECK_COMMAND,
         INTERACTIVE_COMMAND,
         BENCH_COMMAND,
         BENCH_DIFF_COMMAND,

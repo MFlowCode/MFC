@@ -22,14 +22,39 @@ def __do_regenerate(toolchain: str):
     completions_dir = Path(toolchain) / "completions"
     completions_dir.mkdir(exist_ok=True)
 
-    # Generate completion files
+    # Generate and write completion files directly
     (completions_dir / "mfc.bash").write_text(generate_bash_completion(MFC_CLI_SCHEMA))
     (completions_dir / "_mfc").write_text(generate_zsh_completion(MFC_CLI_SCHEMA))
 
     # Generate JSON schema
-    schema = generate_json_schema(include_descriptions=True)
     with open(Path(toolchain) / "mfc-case-schema.json", 'w', encoding='utf-8') as f:
-        json.dump(schema, f, indent=2)
+        json.dump(generate_json_schema(include_descriptions=True), f, indent=2)
+
+
+def __update_installed_completions(toolchain: str):
+    """Update installed shell completions if they're older than generated ones."""
+    import shutil  # pylint: disable=import-outside-toplevel
+    from pathlib import Path  # pylint: disable=import-outside-toplevel
+
+    src_dir = Path(toolchain) / "completions"
+    dst_dir = Path.home() / ".local" / "share" / "mfc" / "completions"
+
+    # Only update if already installed (mfc.sh handles initial install)
+    if not dst_dir.exists():
+        return
+
+    # Update if installed but older than generated
+    updated = False
+    for name in ["mfc.bash", "_mfc"]:
+        if (src_dir / name).exists() and (dst_dir / name).exists():
+            if os.path.getmtime(src_dir / name) > os.path.getmtime(dst_dir / name):
+                shutil.copy2(src_dir / name, dst_dir / name)
+                updated = True
+
+    if updated:
+        is_zsh = "zsh" in os.environ.get("SHELL", "")
+        src_cmd = f"source {dst_dir}/_mfc" if is_zsh else f"source {dst_dir}/mfc.bash"
+        cons.print(f"[dim]Tab completions updated. Run: {src_cmd}[/dim]")
 
 
 def __ensure_generated_files():
@@ -63,6 +88,9 @@ def __ensure_generated_files():
 
     if needs_regen:
         __do_regenerate(toolchain)
+
+    # Always check if completions need to be installed or updated
+    __update_installed_completions(toolchain)
 
 def __print_greeting():
     MFC_LOGO_LINES       = MFC_LOGO.splitlines()
