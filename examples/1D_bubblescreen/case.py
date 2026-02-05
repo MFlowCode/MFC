@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-import math, json
+import math
+import json
 
 # FLUID PROPERTIES
 R_uni = 8314.0  # [J/kmol/K]
