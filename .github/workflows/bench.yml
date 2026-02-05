@@ -48,7 +48,10 @@ jobs:
             PR_NUMBER="${{ github.event.workflow_run.pull_requests[0].number }}"
             if [ -n "$PR_NUMBER" ]; then
               echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
-              echo "author=${{ github.event.workflow_run.actor.login }}" >> $GITHUB_OUTPUT
+
+              # Fetch actual PR author from API (workflow_run.actor is the re-runner, not PR author)
+              PR_AUTHOR=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER --jq '.user.login')
+              echo "author=$PR_AUTHOR" >> $GITHUB_OUTPUT
 
               # Check if PR is approved
               APPROVED=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER/reviews \
