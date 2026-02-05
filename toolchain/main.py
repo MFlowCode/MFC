@@ -12,6 +12,7 @@ from mfc.printer import cons
 def __do_regenerate(toolchain: str):
     """Perform the actual regeneration of completion scripts and schema."""
     import json  # pylint: disable=import-outside-toplevel
+    import shutil  # pylint: disable=import-outside-toplevel
     from pathlib import Path  # pylint: disable=import-outside-toplevel
     from mfc.cli.commands import MFC_CLI_SCHEMA  # pylint: disable=import-outside-toplevel
     from mfc.cli.completion_gen import generate_bash_completion, generate_zsh_completion  # pylint: disable=import-outside-toplevel
@@ -23,13 +24,23 @@ def __do_regenerate(toolchain: str):
     completions_dir.mkdir(exist_ok=True)
 
     # Generate completion files
-    (completions_dir / "mfc.bash").write_text(generate_bash_completion(MFC_CLI_SCHEMA))
-    (completions_dir / "_mfc").write_text(generate_zsh_completion(MFC_CLI_SCHEMA))
+    bash_content = generate_bash_completion(MFC_CLI_SCHEMA)
+    zsh_content = generate_zsh_completion(MFC_CLI_SCHEMA)
+    (completions_dir / "mfc.bash").write_text(bash_content)
+    (completions_dir / "_mfc").write_text(zsh_content)
 
     # Generate JSON schema
     schema = generate_json_schema(include_descriptions=True)
     with open(Path(toolchain) / "mfc-case-schema.json", 'w', encoding='utf-8') as f:
         json.dump(schema, f, indent=2)
+
+    # Also update installed completions if they exist
+    install_dir = Path.home() / ".local" / "share" / "mfc" / "completions"
+    if install_dir.exists():
+        if (install_dir / "mfc.bash").exists():
+            shutil.copy2(completions_dir / "mfc.bash", install_dir / "mfc.bash")
+        if (install_dir / "_mfc").exists():
+            shutil.copy2(completions_dir / "_mfc", install_dir / "_mfc")
 
 
 def __ensure_generated_files():
