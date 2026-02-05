@@ -379,6 +379,13 @@ def print_help_topics():
 # ENHANCED HELP OUTPUT
 # =============================================================================
 
+def _truncate_desc(desc: str, max_len: int = 50) -> str:
+    """Truncate description to fit compact display."""
+    if len(desc) <= max_len:
+        return desc
+    return desc[:max_len-3] + "..."
+
+
 def print_help():
     """Print compact, colorized help overview."""
 
@@ -388,31 +395,26 @@ def print_help():
     cons.print("[dim]Exascale CFD solver for compressible multi-phase flows[/dim]")
     cons.print()
 
-    # Commands section - compact format
+    # Commands section - compact format (using COMMANDS as source of truth)
     cons.print("[bold]Commands:[/bold]")
 
-    # Primary commands with inline aliases and short descriptions
-    commands_primary = [
-        ("build", "b", "Build MFC targets with optional GPU support"),
-        ("run", "r", "Run simulation interactively or as batch job"),
-        ("test", "t", "Run test suite"),
-        ("validate", "v", "Check case file for errors"),
-        ("new", "", "Create new case from template"),
-        ("clean", "c", "Remove build artifacts"),
-    ]
-
-    for cmd, alias, desc in commands_primary:
+    # Primary commands (shown prominently with aliases)
+    primary = ["build", "run", "test", "validate", "new", "clean"]
+    for cmd in primary:
+        if cmd not in COMMANDS:
+            continue
+        info = COMMANDS[cmd]
+        alias = info.get("alias") or ""
         alias_str = f" ({alias})" if alias else "    "
+        desc = _truncate_desc(info["description"])
         cons.print(f"  [green]{cmd:9}[/green][dim]{alias_str:4}[/dim] {desc}")
 
     # Secondary commands (dimmed)
-    commands_secondary = [
-        ("params", "Search ~3,300 case parameters"),
-        ("load", "Load environment modules (use with source)"),
-        ("help", "Topic help (gpu, clusters, batch, debugging)"),
-    ]
-
-    for cmd, desc in commands_secondary:
+    secondary = ["params", "load", "help"]
+    for cmd in secondary:
+        if cmd not in COMMANDS:
+            continue
+        desc = _truncate_desc(COMMANDS[cmd]["description"])
         cons.print(f"  [dim]{cmd:13} {desc}[/dim]")
 
     cons.print()
