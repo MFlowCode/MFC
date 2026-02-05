@@ -143,8 +143,11 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
 
         integer, intent(in) :: t_step
-
-        real(wp), dimension(num_fluids) :: myalpha, myalpha_rho
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3) :: myalpha, myalpha_rho
+        #:else
+            real(wp), dimension(num_fluids) :: myalpha, myalpha_rho
+        #:endif
         real(wp) :: myRho, B_tait
         real(wp) :: sim_time, c, small_gamma
         real(wp) :: frequency_local, gauss_sigma_time_local

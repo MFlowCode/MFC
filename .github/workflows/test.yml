@@ -103,28 +103,44 @@ jobs:
         include:
           # Phoenix (GT)
           - lbl: 'gt'
+            lbl_comp: 'gt'
             cluster_name: 'Georgia Tech | Phoenix'
             device: 'gpu'
             interface: 'acc'
           - lbl: 'gt'
+            lbl_comp: 'gt'
             cluster_name: 'Georgia Tech | Phoenix'
             device: 'gpu'
             interface: 'omp'
           - lbl: 'gt'
+            lbl_comp: 'gt'
             cluster_name: 'Georgia Tech | Phoenix'
             device: 'cpu'
             interface: 'none'
           # Frontier (ORNL)
           - lbl: 'frontier'
+            lbl_comp: 'frontier'
             cluster_name: 'Oak Ridge | Frontier'
             device: 'gpu'
             interface: 'acc'
           - lbl: 'frontier'
+            lbl_comp: 'frontier'
             cluster_name: 'Oak Ridge | Frontier'
             device: 'gpu'
             interface: 'omp'
           - lbl: 'frontier'
+            lbl_comp: 'frontier'
             cluster_name: 'Oak Ridge | Frontier'
+            device: 'cpu'
+            interface: 'none'
+          - lbl: 'frontier'
+            lbl_comp: 'frontier_amd'
+            cluster_name: 'Oak Ridge | Frontier (AMD)'
+            device: 'gpu'
+            interface: 'omp'
+          - lbl: 'frontier'
+            lbl_comp: 'frontier_amd'
+            cluster_name: 'Oak Ridge | Frontier (AMD)'
             device: 'cpu'
             interface: 'none'
     runs-on:
@@ -139,16 +155,24 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build & Test
-        if:   matrix.lbl == 'gt'
+        if:   matrix.lbl_comp == 'gt'
         run:  bash .github/workflows/phoenix/submit.sh .github/workflows/phoenix/test.sh ${{ matrix.device }} ${{ matrix.interface }}
 
       - name: Build
-        if:   matrix.lbl == 'frontier'
+        if:   matrix.lbl_comp == 'frontier'
         run:  bash .github/workflows/frontier/build.sh ${{ matrix.device }} ${{ matrix.interface }}
 
       - name: Test
-        if:   matrix.lbl == 'frontier'
+        if:   matrix.lbl_comp == 'frontier'
         run:  bash .github/workflows/frontier/submit.sh .github/workflows/frontier/test.sh ${{matrix.device}} ${{ matrix.interface }}
+
+      - name: Build
+        if:   matrix.lbl_comp == 'frontier_amd'
+        run:  bash .github/workflows/frontier_amd/build.sh ${{ matrix.device }} ${{ matrix.interface }}
+
+      - name: Test
+        if:   matrix.lbl_comp == 'frontier_amd'
+        run:  bash .github/workflows/frontier_amd/submit.sh .github/workflows/frontier_amd/test.sh ${{matrix.device}} ${{ matrix.interface }}  
 
       - name: Print Logs
         if:   always()
@@ -156,7 +180,14 @@ jobs:
 
       - name: Archive Logs
         uses: actions/upload-artifact@v4
-        if:   matrix.lbl == 'frontier'
+        if:   matrix.lbl_comp == 'frontier'
+        with:
+          name: logs-${{ strategy.job-index }}-${{ matrix.device }}-${{ matrix.interface }}
+          path: test-${{ matrix.device }}-${{ matrix.interface }}.out
+
+      - name: Archive Logs
+        uses: actions/upload-artifact@v4
+        if:   matrix.lbl_comp == 'frontier_amd'
         with:
           name: logs-${{ strategy.job-index }}-${{ matrix.device }}-${{ matrix.interface }}
           path: test-${{ matrix.device }}-${{ matrix.interface }}.out

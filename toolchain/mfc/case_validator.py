@@ -676,9 +676,8 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         mhd = self.get('mhd', 'F') == 'T'
         riemann_solver = self.get('riemann_solver')
         relativity = self.get('relativity', 'F') == 'T'
-        powell = self.get('powell', 'F') == 'T'
+        hyper_cleaning = self.get('hyper_cleaning', 'F') == 'T'
         n = self.get('n', 0)
-        fd_order = self.get('fd_order')
 
         self.prohibit(mhd and riemann_solver is not None and riemann_solver not in [1, 4],
                      "MHD simulations require riemann_solver = 1 (HLL) or riemann_solver = 4 (HLLD)")
@@ -686,12 +685,10 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
                      "HLLD (riemann_solver = 4) is only available for MHD simulations")
         self.prohibit(riemann_solver == 4 and relativity,
                      "HLLD is not available for RMHD (relativity)")
-        self.prohibit(powell and not mhd,
-                     "Powell's method requires mhd to be enabled")
-        self.prohibit(powell and n is not None and n == 0,
-                     "Powell's method is not supported for 1D simulations")
-        self.prohibit(powell and fd_order is None,
-                     "fd_order must be set if Powell's method is enabled")
+        self.prohibit(hyper_cleaning and not mhd,
+                     "Hyperbolic cleaning requires mhd to be enabled")
+        self.prohibit(hyper_cleaning and n is not None and n == 0,
+                     "Hyperbolic cleaning is not supported for 1D simulations")
 
 
     def check_igr_simulation(self):  # pylint: disable=too-many-locals

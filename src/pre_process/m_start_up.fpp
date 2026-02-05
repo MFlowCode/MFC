@@ -150,12 +150,12 @@ contains
             sigma, adv_n, cfl_adap_dt, cfl_const_dt, n_start, &
             n_start_old, surface_tension, hyperelasticity, pre_stress, &
             elliptic_smoothing, elliptic_smoothing_iters, &
-            viscous, bubbles_lagrange, bc_x, bc_y, bc_z, num_bc_patches, &
+            viscous, bubbles_lagrange, num_bc_patches, &
             patch_bc, Bx0, relativity, cont_damage, igr, igr_order, &
             down_sample, recon_type, muscl_order, fft_wrt, &
             fd_order, lag_params, simplex_perturb, simplex_params, &
             interface_file, normFac, normMag, &
-            g0_ic, p0_ic
+            g0_ic, p0_ic, hyper_cleaning
 
         ! Inquiring the status of the pre_process.inp file
         file_loc = 'pre_process.inp'
@@ -828,6 +828,8 @@ contains
 
         real(wp), intent(inout) :: start, finish
 
+        integer :: j, k
+
         ! Setting up the grid and the initial condition. If the grid is read in from
         ! preexisting grid data files, it is checked for consistency. If the grid is
         ! not read in, it is generated from scratch according to the inputs provided
@@ -843,6 +845,16 @@ contains
         if (old_ic) call s_read_ic_data_files(q_cons_vf, ib_markers)
 
         call s_generate_initial_condition()
+
+        ! hard-coded psi
+        if (hyper_cleaning) then
+            do j = 0, m
+                do k = 0, n
+                    q_cons_vf(psi_idx)%sf(j, k, 0) = 1d-2*exp(-(x_cc(j)**2 + y_cc(k)**2)/(2.0*0.05**2))
+                    q_prim_vf(psi_idx)%sf(j, k, 0) = q_cons_vf(psi_idx)%sf(j, k, 0)
+                end do
+            end do
+        end if
 
         if (relax) then
             if (proc_rank == 0) then
