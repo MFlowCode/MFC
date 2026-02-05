@@ -481,7 +481,7 @@ class Tips:
         cons.print()
         cons.raw.print(Panel(
             "[bold yellow]Troubleshooting Tips[/bold yellow]\n\n"
-            "  [cyan]1.[/cyan] Run with [green]--debug-log[/green] to see detailed output\n"
+            "  [cyan]1.[/cyan] Rebuild with [green]--debug[/green] for debug compiler flags and verbose output\n"
             "  [cyan]2.[/cyan] Check [green]docs/documentation/troubleshooting.md[/green]\n"
             "  [cyan]3.[/cyan] Ensure required modules are loaded: [green]source ./mfc.sh load -c <cluster> -m <mode>[/green]\n"
             "  [cyan]4.[/cyan] Try [green]./mfc.sh clean[/green] and rebuild",
@@ -529,7 +529,7 @@ class Tips:
             "[bold yellow]Troubleshooting Tips[/bold yellow]\n\n"
             "  [cyan]1.[/cyan] Validate your case: [green]./mfc.sh validate case.py[/green]\n"
             "  [cyan]2.[/cyan] Check the output in [green]<case_dir>/[/green]\n"
-            "  [cyan]3.[/cyan] Run with [green]--debug-log[/green] for more details\n"
+            "  [cyan]3.[/cyan] Rebuild with [green]--debug[/green] for debug compiler flags\n"
             "  [cyan]4.[/cyan] Check MFC documentation: [green]docs/[/green]",
             box=box.ROUNDED,
             border_style="yellow",
