@@ -84,7 +84,12 @@ fi
 echo
 
 # Run the main.py bootstrap script
-python3 "$(pwd)/toolchain/main.py" "$@"
+# If only flags given (no command), show help without passing flags
+if [ -z "$1" ] || [[ "$1" == -* ]]; then
+    python3 "$(pwd)/toolchain/main.py"
+else
+    python3 "$(pwd)/toolchain/main.py" "$@"
+fi
 code=$?
 
 echo
