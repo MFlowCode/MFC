@@ -16,24 +16,29 @@ if [ -d "$(pwd)/.git" ] && [ ! -e "$(pwd)/.git/hooks/pre-commit" ] && [ -f "$(pw
     log "Installed git pre-commit hook (runs$MAGENTA ./mfc.sh precheck$COLOR_RESET before commits)."
 fi
 
-# Auto-install shell completions (once)
+# Shell completions setup
 COMPLETION_DIR="$HOME/.local/share/mfc/completions"
+COMPLETION_SRC="$(pwd)/toolchain/completions"
 if [[ "$SHELL" == *"zsh"* ]]; then
     COMPLETION_FILE="$COMPLETION_DIR/_mfc"
+    SOURCE_FILE="$COMPLETION_SRC/_mfc"
     RC_FILE="$HOME/.zshrc"
     RC_LINE="fpath=(\"$COMPLETION_DIR\" \$fpath)"
     SOURCE_CMD="source $COMPLETION_DIR/_mfc"
 else
     COMPLETION_FILE="$COMPLETION_DIR/mfc.bash"
+    SOURCE_FILE="$COMPLETION_SRC/mfc.bash"
     RC_FILE="$HOME/.bashrc"
     RC_LINE="[ -f \"$COMPLETION_DIR/mfc.bash\" ] && source \"$COMPLETION_DIR/mfc.bash\""
     SOURCE_CMD="source $COMPLETION_DIR/mfc.bash"
 fi
 
+# Install or update completions
 if [ ! -f "$COMPLETION_FILE" ]; then
+    # Fresh install
     mkdir -p "$COMPLETION_DIR"
-    cp "$(pwd)/toolchain/completions/mfc.bash" "$COMPLETION_DIR/"
-    cp "$(pwd)/toolchain/completions/_mfc" "$COMPLETION_DIR/"
+    cp "$COMPLETION_SRC/mfc.bash" "$COMPLETION_DIR/"
+    cp "$COMPLETION_SRC/_mfc" "$COMPLETION_DIR/"
 
     if [ -f "$RC_FILE" ] && ! grep -q "$COMPLETION_DIR" "$RC_FILE" 2>/dev/null; then
         echo "" >> "$RC_FILE"
@@ -42,6 +47,11 @@ if [ ! -f "$COMPLETION_FILE" ]; then
     fi
 
     log "Installed tab completions. Restart shell or run:$MAGENTA $SOURCE_CMD$COLOR_RESET"
+elif [ "$SOURCE_FILE" -nt "$COMPLETION_FILE" ]; then
+    # Update outdated completions
+    cp "$COMPLETION_SRC/mfc.bash" "$COMPLETION_DIR/"
+    cp "$COMPLETION_SRC/_mfc" "$COMPLETION_DIR/"
+    log "Updated tab completions. Run:$MAGENTA $SOURCE_CMD$COLOR_RESET"
 fi
 
 # Print startup message immediately for user feedback
