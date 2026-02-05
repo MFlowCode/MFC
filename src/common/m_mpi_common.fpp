@@ -1202,9 +1202,9 @@ contains
         !!  @param mpi_dir MPI communication coordinate direction
         !!  @param pbc_loc Processor boundary condition (PBC) location
     subroutine s_mpi_reduce_beta_variables_buffers(q_comm, &
-                                                mpi_dir, &
-                                                pbc_loc, &
-                                                nVar)
+                                                   mpi_dir, &
+                                                   pbc_loc, &
+                                                   nVar)
 
         type(scalar_field), dimension(1:), intent(inout) :: q_comm
         integer, intent(in) :: mpi_dir, pbc_loc, nVar
@@ -1222,18 +1222,35 @@ contains
 
         integer :: pack_offset, unpack_offset
 
+        type(int_bounds_info) :: comm_coords(3)
+        integer :: comm_size(3)
+
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
 
         call nvtxStartRange("BETA-COMM-PACKBUF")
 
+        ! Set bounds for each dimension
+        comm_coords(1)%beg = merge(-mapcells - 1, 0, bc_x%beg >= 0)
+        comm_coords(1)%end = merge(m + mapcells + 1, m, bc_x%end >= 0)
+        comm_coords(2)%beg = merge(-mapcells - 1, 0, bc_y%beg >= 0)
+        comm_coords(2)%end = merge(n + mapcells + 1, n, bc_y%end >= 0)
+        comm_coords(3)%beg = merge(-mapcells - 1, 0, (bc_z%beg >= 0 .and. p > 0))
+        comm_coords(3)%end = merge(p + mapcells + 1, p, (bc_z%end >= 0 .and. p > 0))
+
+        ! Compute sizes
+        comm_size(1) = comm_coords(1)%end - comm_coords(1)%beg + 1
+        comm_size(2) = comm_coords(2)%end - comm_coords(2)%beg + 1
+        comm_size(3) = comm_coords(3)%end - comm_coords(3)%beg + 1
+
+        ! Buffer counts using the conditional sizes
         v_size = nVar
-        lb_size = 2 * (mapcells + 1) ! Size of the buffer region for beta variables (-mapcells - 1, mapcells)
+        lb_size = 2*(mapcells + 1) ! Size of the buffer region for beta variables (-mapcells - 1, mapcells)
         buffer_counts = (/ &
-                    lb_size*v_size*(n + 1)*(p + 1), &
-                    lb_size*v_size*(m + 1 + 2*(mapcells + 1))*(p + 1), &
-                    lb_size*v_size*(m + 1 + 2*(mapcells + 1))*(n + 1 + 2*(mapcells + 1)) &
-                    /)
+                        lb_size*v_size*comm_size(2)*comm_size(3), &  ! mpi_dir=1
+                        lb_size*v_size*comm_size(1)*comm_size(3), &  ! mpi_dir=2
+                        lb_size*v_size*comm_size(1)*comm_size(2) &   ! mpi_dir=3
+                        /)
 
         $:GPU_UPDATE(device='[v_size]')
 
@@ -1275,12 +1292,14 @@ contains
             if (mpi_dir == ${mpi_dir}$) then
                 #:if mpi_dir == 1
                     $:GPU_PARALLEL_LOOP(collapse=4,private='[r]')
-                    do l = 0, p
-                        do k = 0, n
+                    do l = comm_coords(3)%beg, comm_coords(3)%end
+                        do k = comm_coords(2)%beg, comm_coords(2)%end
                             do j = -mapcells - 1, mapcells
                                 do i = 1, v_size
-                                    r = (i - 1) + v_size * &
-                                        ((j + mapcells + 1) + lb_size*(k + (n + 1)*l))
+                                    r = (i - 1) + v_size*( &
+                                        (j + mapcells + 1) + lb_size*( &
+                                        (k - comm_coords(2)%beg) + comm_size(2)* &
+                                        (l - comm_coords(3)%beg)))
                                     buff_send(r) = real(q_comm(beta_vars(i))%sf(j + pack_offset, k, l), kind=wp)
                                 end do
                             end do
@@ -1290,12 +1309,13 @@ contains
                 #:elif mpi_dir == 2
                     $:GPU_PARALLEL_LOOP(collapse=4,private='[r]')
                     do i = 1, v_size
-                        do l = 0, p
+                        do l = comm_coords(3)%beg, comm_coords(3)%end
                             do k = -mapcells - 1, mapcells
-                                do j = -mapcells - 1, m + mapcells + 1
-                                    r = (i - 1) + v_size * &
-                                        ((j + mapcells + 1) + (m + 2*(mapcells + 1) + 1) * &
-                                        ((k + mapcells + 1) + lb_size*l))
+                                do j = comm_coords(1)%beg, comm_coords(1)%end
+                                    r = (i - 1) + v_size*( &
+                                        (j - comm_coords(1)%beg) + comm_size(1)*( &
+                                        (k + mapcells + 1) + lb_size* &
+                                        (l - comm_coords(3)%beg)))
                                     buff_send(r) = real(q_comm(beta_vars(i))%sf(j, k + pack_offset, l), kind=wp)
                                 end do
                             end do
@@ -1306,11 +1326,12 @@ contains
                     $:GPU_PARALLEL_LOOP(collapse=4,private='[r]')
                     do i = 1, v_size
                         do l = -mapcells - 1, mapcells
-                            do k = -mapcells - 1, n + mapcells + 1
-                                do j = -mapcells - 1, m + mapcells + 1
-                                    r = (i - 1) + v_size * &
-                                        ((j + mapcells + 1) + (m + 2*(mapcells + 1) + 1) * &
-                                        ((k + mapcells + 1) + (n + 2*(mapcells + 1) + 1) * (l + mapcells + 1)))
+                            do k = comm_coords(2)%beg, comm_coords(2)%end
+                                do j = comm_coords(1)%beg, comm_coords(1)%end
+                                    r = (i - 1) + v_size*( &
+                                        (j - comm_coords(1)%beg) + comm_size(1)*( &
+                                        (k - comm_coords(2)%beg) + comm_size(2)* &
+                                        (l + mapcells + 1)))
                                     buff_send(r) = real(q_comm(beta_vars(i))%sf(j, k, l + pack_offset), kind=wp)
                                 end do
                             end do
@@ -1371,12 +1392,14 @@ contains
             if (mpi_dir == ${mpi_dir}$) then
                 #:if mpi_dir == 1
                     $:GPU_PARALLEL_LOOP(collapse=4,private='[r]',copyin='[replace_buff]')
-                    do l = 0, p
-                        do k = 0, n
+                    do l = comm_coords(3)%beg, comm_coords(3)%end
+                        do k = comm_coords(2)%beg, comm_coords(2)%end
                             do j = -mapcells - 1, mapcells
                                 do i = 1, v_size
-                                    r = (i - 1) + v_size * &
-                                        ((j + mapcells + 1) + lb_size*(k + (n + 1)*l))
+                                    r = (i - 1) + v_size*( &
+                                        (j + mapcells + 1) + lb_size*( &
+                                        (k - comm_coords(2)%beg) + comm_size(2)* &
+                                        (l - comm_coords(3)%beg)))
                                     if (replace_buff) then
                                         q_comm(beta_vars(i))%sf(j + unpack_offset, k, l) = real(buff_recv(r), kind=stp)
                                     else
@@ -1391,12 +1414,13 @@ contains
                 #:elif mpi_dir == 2
                     $:GPU_PARALLEL_LOOP(collapse=4,private='[r]',copyin='[replace_buff]')
                     do i = 1, v_size
-                        do l = 0, p
+                        do l = comm_coords(3)%beg, comm_coords(3)%end
                             do k = -mapcells - 1, mapcells
-                                do j = -mapcells - 1, m + mapcells + 1
-                                    r = (i - 1) + v_size * &
-                                        ((j + mapcells + 1) + (m + 2*(mapcells + 1) + 1) * &
-                                        ((k + mapcells + 1) + lb_size*l))
+                                do j = comm_coords(1)%beg, comm_coords(1)%end
+                                    r = (i - 1) + v_size*( &
+                                        (j - comm_coords(1)%beg) + comm_size(1)*( &
+                                        (k + mapcells + 1) + lb_size* &
+                                        (l - comm_coords(3)%beg)))
                                     if (replace_buff) then
                                         q_comm(beta_vars(i))%sf(j, k + unpack_offset, l) = real(buff_recv(r), kind=stp)
                                     else
@@ -1412,11 +1436,12 @@ contains
                     $:GPU_PARALLEL_LOOP(collapse=4,private='[r]',copyin='[replace_buff]')
                     do i = 1, v_size
                         do l = -mapcells - 1, mapcells
-                            do k = -mapcells - 1, n + mapcells + 1
-                                do j = -mapcells - 1, m + mapcells + 1
-                                    r = (i - 1) + v_size * &
-                                        ((j + mapcells + 1) + (m + 2*(mapcells + 1) + 1) * &
-                                        ((k + mapcells + 1) + (n + 2*(mapcells + 1) + 1) * (l + mapcells + 1)))
+                            do k = comm_coords(2)%beg, comm_coords(2)%end
+                                do j = comm_coords(1)%beg, comm_coords(1)%end
+                                    r = (i - 1) + v_size*( &
+                                        (j - comm_coords(1)%beg) + comm_size(1)*( &
+                                        (k - comm_coords(2)%beg) + comm_size(2)* &
+                                        (l + mapcells + 1)))
                                     if (replace_buff) then
                                         q_comm(beta_vars(i))%sf(j, k, l + unpack_offset) = real(buff_recv(r), kind=stp)
                                     else
