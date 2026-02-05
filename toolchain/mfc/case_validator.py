@@ -1072,7 +1072,6 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         if not adap_dt:
             return
 
-        time_stepper = self.get('time_stepper')
         model_eqns = self.get('model_eqns')
         polytropic = self.get('polytropic', 'F') == 'T'
         bubbles_lagrange = self.get('bubbles_lagrange', 'F') == 'T'

@@ -455,7 +455,7 @@ CONSTRAINTS = {
     "model_eqns": {"choices": [1, 2, 3, 4]},  # gamma-law, 5-eq, 6-eq, 4-eq
 
     # Bubbles
-    "bubble_model": {"choices": [1, 2, 3]},  # Gilmore, Keller-Miksis, RP
+    "bubble_model": {"choices": [0, 1, 2, 3]},  # Particle, Gilmore, Keller-Miksis, RP
 
     # Output
     "format": {"choices": [1, 2]},  # Silo, binary
@@ -831,12 +831,15 @@ def _load():  # pylint: disable=too-many-locals,too-many-statements
 
     # --- lag_params (Lagrangian bubbles) ---
     for a in ["heatTransfer_model", "massTransfer_model", "pressure_corrector",
-              "write_bubbles", "write_bubbles_stats"]:
+              "write_bubbles", "write_bubbles_stats", "pressure_force", "gravity_force",
+              "write_void_evol" ]:
         _r(f"lag_params%{a}", LOG, {"bubbles"})
-    for a in ["solver_approach", "cluster_type", "smooth_type", "nBubs_glb"]:
+    for a in ["solver_approach", "cluster_type", "smooth_type", "nBubs_glb", "drag_model",
+              "vel_model"]:
         _r(f"lag_params%{a}", INT, {"bubbles"})
     for a in ["epsilonb", "valmaxvoid", "charwidth", "c0", "rho0", "T0", "x0", "Thost"]:
         _r(f"lag_params%{a}", REAL, {"bubbles"})
+    _r(f"lag_params%input_path", STR, {"bubbles"})
 
     # --- chem_params ---
     for a in ["diffusion", "reactions"]:
