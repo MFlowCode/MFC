@@ -481,7 +481,7 @@ contains
         dist_front = xyz_local(3) - Front
 
         min_dist = min(abs(dist_left), abs(dist_right), abs(dist_bottom), &
-                      abs(dist_top), abs(dist_back), abs(dist_front))
+                       abs(dist_top), abs(dist_back), abs(dist_front))
 
         ! TODO :: The way that this is written, it looks like we will
         ! trigger at the first size that is close to the minimum distance,
