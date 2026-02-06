@@ -131,7 +131,6 @@ contains
 
         call s_apply_levelset(ghost_points, num_gps)
         $:GPU_UPDATE(device='[ghost_points]')
-        print *, "Exiting apply levelset"
 
         call s_compute_image_points(ghost_points)
         $:GPU_UPDATE(device='[ghost_points]')
