@@ -437,7 +437,7 @@ contains
 
         real(wp) :: Right, Left, Bottom, Top, Front, Back
         real(wp) :: min_dist
-        real(wp) :: side_dists(6)
+        real(wp) :: dist_left, dist_right, dist_bottom, dist_top, dist_back, dist_front
 
         real(wp), dimension(3) :: center
         real(wp) :: length_x, length_y, length_z
@@ -473,13 +473,15 @@ contains
         xyz_local = [x_cc(i), y_cc(j), z_cc(k)] - center ! get coordinate frame centered on IB
         xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordinate
 
-        side_dists(1) = Left - xyz_local(1)
-        side_dists(2) = xyz_local(1) - Right
-        side_dists(3) = Bottom - xyz_local(2)
-        side_dists(4) = xyz_local(2) - Top
-        side_dists(5) = Back - xyz_local(3)
-        side_dists(6) = xyz_local(3) - Front
-        min_dist = minval(abs(side_dists))
+        dist_left = Left - xyz_local(1)
+        dist_right = xyz_local(1) - Right
+        dist_bottom = Bottom - xyz_local(2)
+        dist_top = xyz_local(2) - Top
+        dist_back = Back - xyz_local(3)
+        dist_front = xyz_local(3) - Front
+
+        min_dist = min(abs(dist_left), abs(dist_right), abs(dist_bottom), &
+                      abs(dist_top), abs(dist_back), abs(dist_front))
 
         ! TODO :: The way that this is written, it looks like we will
         ! trigger at the first size that is close to the minimum distance,
@@ -488,43 +490,41 @@ contains
         ! leading to undesired behavior. This should be resolved
         ! and this code should be cleaned up. It also means that
         ! rotating the box 90 degrees will cause tests to fail.
+
         dist_vec = 0._wp
-        if (f_approx_equal(min_dist, abs(side_dists(1)))) then
-            gp%levelset = side_dists(1)
-            if (.not. f_approx_equal(side_dists(1), 0._wp)) then
-                dist_vec(1) = side_dists(1)/abs(side_dists(1))
-            end if
 
-        else if (f_approx_equal(min_dist, abs(side_dists(2)))) then
-            gp%levelset = side_dists(2)
-            if (.not. f_approx_equal(side_dists(2), 0._wp)) then
-                dist_vec(1) = -side_dists(2)/abs(side_dists(2))
+        if (f_approx_equal(min_dist, abs(dist_left))) then
+            gp%levelset = dist_left
+            if (.not. f_approx_equal(dist_left, 0._wp)) then
+                dist_vec(1) = dist_left/abs(dist_left)
             end if
-
-        else if (f_approx_equal(min_dist, abs(side_dists(3)))) then
-            gp%levelset = side_dists(3)
-            if (.not. f_approx_equal(side_dists(3), 0._wp)) then
-                dist_vec(2) = side_dists(3)/abs(side_dists(3))
+        else if (f_approx_equal(min_dist, abs(dist_right))) then
+            gp%levelset = dist_right
+            if (.not. f_approx_equal(dist_right, 0._wp)) then
+                dist_vec(1) = -dist_right/abs(dist_right)
             end if
-
-        else if (f_approx_equal(min_dist, abs(side_dists(4)))) then
-            gp%levelset = side_dists(4)
-            if (.not. f_approx_equal(side_dists(4), 0._wp)) then
-                dist_vec(2) = -side_dists(4)/abs(side_dists(4))
+        else if (f_approx_equal(min_dist, abs(dist_bottom))) then
+            gp%levelset = dist_bottom
+            if (.not. f_approx_equal(dist_bottom, 0._wp)) then
+                dist_vec(2) = dist_bottom/abs(dist_bottom)
             end if
-
-        else if (f_approx_equal(min_dist, abs(side_dists(5)))) then
-            gp%levelset = side_dists(5)
-            if (.not. f_approx_equal(side_dists(5), 0._wp)) then
-                dist_vec(3) = side_dists(5)/abs(side_dists(5))
+        else if (f_approx_equal(min_dist, abs(dist_top))) then
+            gp%levelset = dist_top
+            if (.not. f_approx_equal(dist_top, 0._wp)) then
+                dist_vec(2) = -dist_top/abs(dist_top)
             end if
-
-        else if (f_approx_equal(min_dist, abs(side_dists(6)))) then
-            gp%levelset = side_dists(6)
-            if (.not. f_approx_equal(side_dists(6), 0._wp)) then
-                dist_vec(3) = -side_dists(6)/abs(side_dists(6))
+        else if (f_approx_equal(min_dist, abs(dist_back))) then
+            gp%levelset = dist_back
+            if (.not. f_approx_equal(dist_back, 0._wp)) then
+                dist_vec(3) = dist_back/abs(dist_back)
+            end if
+        else if (f_approx_equal(min_dist, abs(dist_front))) then
+            gp%levelset = dist_front
+            if (.not. f_approx_equal(dist_front, 0._wp)) then
+                dist_vec(3) = -dist_front/abs(dist_front)
             end if
         end if
+
         gp%levelset_norm = matmul(rotation, dist_vec)
 
     end subroutine s_cuboid_levelset
