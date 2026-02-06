@@ -38,6 +38,12 @@ module m_mpi_common
     !! average primitive variables, for a single computational domain boundary
     !! at the time, from the relevant neighboring processor.
 
+    type(int_bounds_info) :: comm_coords(3)
+    integer :: comm_size(3)
+    $:GPU_DECLARE(create='[comm_coords, comm_size]')
+    !! Variables for EL bubbles communication
+
+
 #ifndef __NVCOMPILER_GPU_UNIFIED_MEM
     $:GPU_DECLARE(create='[buff_send, buff_recv]')
 #endif
@@ -1222,9 +1228,6 @@ contains
 
         integer :: pack_offset, unpack_offset
 
-        type(int_bounds_info) :: comm_coords(3)
-        integer :: comm_size(3)
-
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
 
@@ -1252,7 +1255,7 @@ contains
                         lb_size*v_size*comm_size(1)*comm_size(2) &   ! mpi_dir=3
                         /)
 
-        $:GPU_UPDATE(device='[v_size]')
+        $:GPU_UPDATE(device='[v_size, comm_coords, comm_size]')
 
         buffer_count = buffer_counts(mpi_dir)
         boundary_conditions = (/bc_x, bc_y, bc_z/)

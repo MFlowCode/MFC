@@ -272,12 +272,6 @@ contains
             & mtn_s,intfc_draddt,intfc_dveldt,gas_dpdt,gas_dmvdt, &
             & mtn_dposdt,mtn_dveldt,n_el_bubs_loc]')
 
-        $:GPU_PARALLEL_LOOP(private='[cell]')
-        do i = 1, n_el_bubs_loc
-            cell = fd_number - buff_size
-            call s_locate_cell(mtn_pos(i, 1:3, 1), cell, mtn_s(i, 1:3, 1))
-        end do
-
         Rmax_glb = min(dflt_real, -dflt_real)
         Rmin_glb = max(dflt_real, -dflt_real)
         $:GPU_UPDATE(device='[Rmax_glb, Rmin_glb]')
@@ -645,7 +639,7 @@ contains
 
         ! Radial motion model
         adap_dt_stop_sum = 0
-        $:GPU_PARALLEL_LOOP(private='[k,i,myalpha_rho,myalpha,Re,cell,myVapFlux,preterm1, term2, paux, pint, Romega,term1_fac,myR_m, mygamma_m, myPb, myMass_n, myMass_v,myR, myV, myBeta_c, myBeta_t, myR0, myPbdot, myMvdot,myPinf, aux1,aux2, myCson, myRho,gamma,pi_inf,qv,dmalf, dmntait, dmBtait, dm_bub_adv_src, dm_divu,adap_dt_stop,myPos,myVel]', &
+        $:GPU_PARALLEL_LOOP(private='[k,myalpha_rho,myalpha,Re,cell,myVapFlux,preterm1, term2, paux, pint, Romega,term1_fac,myR_m, mygamma_m, myPb, myMass_n, myMass_v,myR, myV, myBeta_c, myBeta_t, myR0, myPbdot, myMvdot,myPinf, aux1,aux2, myCson, myRho,gamma,pi_inf,qv,dmalf, dmntait, dmBtait, dm_bub_adv_src, dm_divu,adap_dt_stop,myPos,myVel]', &
             & copy='[adap_dt_stop_sum]',copyin='[stage]')
         do k = 1, n_el_bubs_loc
             ! Keller-Miksis model
