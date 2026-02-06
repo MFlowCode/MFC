@@ -62,7 +62,7 @@ contains
 
         model%ntrs = nTriangles
 
-        @:ALLOCATE(model%trs(model%ntrs))
+        allocate(model%trs(model%ntrs))
 
         do i = 1, model%ntrs
             read (iunit) normal(:), v(1, :), v(2, :), v(3, :), attribute

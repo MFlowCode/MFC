@@ -238,9 +238,11 @@ contains
 
                 ! update allocatables
                 $:GPU_UPDATE(device='[models]')
-                $:GPU_UPDATE(device='[models(patch_id)%boundary_v]')
-                $:GPU_UPDATE(device='[models(patch_id)%interpolated_boundary_v]')
-                $:GPU_UPDATE(device='[models(patch_id)%model%trs]')
+                $:GPU_ENTER_DATA(copyin='[models(patch_id)%boundary_v]')
+                $:GPU_ENTER_DATA(copyin='[models(patch_id)%model%trs]')
+                if (interpolate) then
+                    $:GPU_ENTER_DATA(copyin='[models(patch_id)%interpolated_boundary_v]')
+                end if
             end if
         end do
 
