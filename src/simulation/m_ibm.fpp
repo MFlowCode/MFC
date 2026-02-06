@@ -94,7 +94,8 @@ contains
             call s_update_ib_rotation_matrix(i)
             call s_compute_centroid_offset(i)
         end do
-        $:GPU_ENTER_DATA(copyin='[patch_ib]')
+        ! $:GPU_ENTER_DATA(copyin='[patch_ib(1:num_ibs)]')
+        $:GPU_UPDATE(device='[patch_ib(1:num_ibs)]')
 
         ! GPU routines require updated cell centers
         $:GPU_UPDATE(device='[x_cc, y_cc]')
@@ -130,6 +131,7 @@ contains
 
         call s_apply_levelset(ghost_points, num_gps)
         $:GPU_UPDATE(device='[ghost_points]')
+        print *, "Exiting apply levelset"
 
         call s_compute_image_points(ghost_points)
         $:GPU_UPDATE(device='[ghost_points]')
@@ -547,7 +549,6 @@ contains
             do j = 0, n
                 if (p == 0) then
                     if (ib_markers%sf(i, j, 0) /= 0) then
-                      print *, i, j, ib_markers%sf(i, j, 0)
                         subsection_2D = ib_markers%sf( &
                                         i - gp_layers:i + gp_layers, &
                                         j - gp_layers:j + gp_layers, 0)
@@ -606,7 +607,6 @@ contains
                             patch_id = ib_markers%sf(i, j, 0)
                             ghost_points_in(count)%ib_patch_id = &
                                 patch_id
-                            print *, "patch_id: ", patch_id
 
                             ghost_points_in(count)%slip = patch_ib(patch_id)%slip
                             ! ghost_points(count)%rank = proc_rank
