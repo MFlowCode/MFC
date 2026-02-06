@@ -33,6 +33,8 @@ contains
 
         integer :: i, patch_id, patch_geometry
 
+        ! $:GPU_UPDATE(device='[gps(1:num_gps)]')
+
         !  3D Patch Geometries
         if (p > 0) then
 
@@ -68,7 +70,7 @@ contains
                 patch_geometry = patch_ib(patch_id)%geometry
 
                 if (patch_geometry == 2) then
-                    call s_circle_levelset(gps(i))
+                    call s_circle_levelset(gps, i)
                 elseif (patch_geometry == 3) then
                     call s_rectangle_levelset(gps(i))
                 elseif (patch_geometry == 4) then
@@ -85,23 +87,25 @@ contains
 
         end if
 
+        ! $:GPU_UPDATE(host='[gps(1:num_gps)]')
+
     end subroutine s_apply_levelset
 
-    subroutine s_circle_levelset(gp)
+    subroutine s_circle_levelset(gps, idx)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
-        type(ghost_point), intent(inout) :: gp
+        type(ghost_point), dimension(:), intent(inout) :: gps
+        integer, intent(in) :: idx
 
         real(wp) :: radius, dist
-        real(wp), dimension(2) :: center
         real(wp), dimension(3) :: dist_vec
 
         integer :: i, j, ib_patch_id !< Loop index variables
 
-        ib_patch_id = gp%ib_patch_id
-        i = gp%loc(1)
-        j = gp%loc(2)
+        ib_patch_id = gps(idx)%ib_patch_id
+        i = gps(idx)%loc(1)
+        j = gps(idx)%loc(2)
 
         radius = patch_ib(ib_patch_id)%radius
 
@@ -110,11 +114,11 @@ contains
         dist_vec(3) = 0._wp
         dist = sqrt(sum(dist_vec**2))
 
-        gp%levelset = dist - radius
+        gps(idx)%levelset = dist - radius
         if (f_approx_equal(dist, 0._wp)) then
-            gp%levelset_norm = 0
+          gps(idx)%levelset_norm = 0
         else
-            gp%levelset_norm = dist_vec(:)/dist
+          gps(idx)%levelset_norm = dist_vec(:)/dist
         end if
 
     end subroutine s_circle_levelset

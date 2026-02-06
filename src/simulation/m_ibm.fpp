@@ -96,15 +96,19 @@ contains
         end do
         $:GPU_ENTER_DATA(copyin='[patch_ib]')
 
+        ! GPU routines require updated cell centers
+        $:GPU_UPDATE(device='[x_cc, y_cc]')
+        if (p /= 0) then
+            $:GPU_UPDATE(device='[z_cc]')
+        end if
+
         ! allocate STL models
         call s_instantiate_STL_models()
 
         ! recompute the new ib_patch locations and broadcast them.
         ib_markers%sf = 0._wp
         call s_apply_ib_patches(ib_markers%sf(0:m, 0:n, 0:p))
-        ! Get neighboring IB variables from other processors
         call s_populate_ib_buffers()
-
         $:GPU_UPDATE(device='[ib_markers%sf]')
 
         ! find the number of ghost points and set them to be the maximum total across ranks
@@ -543,6 +547,7 @@ contains
             do j = 0, n
                 if (p == 0) then
                     if (ib_markers%sf(i, j, 0) /= 0) then
+                      print *, i, j, ib_markers%sf(i, j, 0)
                         subsection_2D = ib_markers%sf( &
                                         i - gp_layers:i + gp_layers, &
                                         j - gp_layers:j + gp_layers, 0)
