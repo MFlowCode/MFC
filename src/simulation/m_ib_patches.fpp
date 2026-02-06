@@ -140,8 +140,7 @@ contains
 
         do patch_id = 1, num_ibs
             if (patch_ib(patch_id)%geometry == 5 .or. patch_ib(patch_id)%geometry == 12) then
-                @:ALLOCATE(models(patch_id)%model)
-
+                allocate(models(patch_id)%model)
                 print *, " * Reading model: "//trim(patch_ib(patch_id)%model_filepath)
 
                 model = f_model_read(patch_ib(patch_id)%model_filepath)
@@ -237,7 +236,7 @@ contains
                 end if
 
                 ! update allocatables
-                $:GPU_UPDATE(device='[models]')
+                $:GPU_ENTER_DATA(copyin='[models(patch_id)]')
                 $:GPU_ENTER_DATA(copyin='[models(patch_id)%boundary_v]')
                 $:GPU_ENTER_DATA(copyin='[models(patch_id)%model%trs]')
                 if (interpolate) then
