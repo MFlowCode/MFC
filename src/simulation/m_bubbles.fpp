@@ -47,7 +47,7 @@ contains
         real(wp), intent(in) :: fCson
 
         real(wp) :: fCpbw, fCpinf, fCpinf_dot, fH, fHdot, c_gas, c_liquid
-        real(wp) :: f_rddot
+        real(wp) :: f_rddot, abc
 
         if (bubble_model == 1) then
             ! Gilmore bubbles
