@@ -9,7 +9,7 @@
 module m_particles_EL_kernels
 
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
-  
+
     use ieee_arithmetic        !< For checking NaN
 
     implicit none
@@ -59,14 +59,13 @@ contains
         real(wp), dimension(3) :: s_coord
         integer :: l
         real(wp) :: fp_x, fp_y, fp_z
-        
 
         $:GPU_PARALLEL_LOOP(private='[l,s_coord,cell]')
         do l = 1, nParticles
 
-            fp_x = lbk_f_p(l,1)
-            fp_y = lbk_f_p(l,2)
-            fp_z = lbk_f_p(l,3)
+            fp_x = lbk_f_p(l, 1)
+            fp_y = lbk_f_p(l, 2)
+            fp_z = lbk_f_p(l, 3)
 
             volpart = 4._wp/3._wp*pi*lbk_rad(l, 2)**3._wp
             s_coord(1:3) = lbk_s(l, 1:3, 2)
@@ -87,43 +86,43 @@ contains
             updatedvar(1)%sf(cell(1), cell(2), cell(3)) = updatedvar(1)%sf(cell(1), cell(2), cell(3)) + real(addFun1, kind=stp)
 
             if (lag_params%solver_approach == 2) then
-            
-              !Update x-momentum source term
-              addFun2_x = -fp_x/Vol
-              $:GPU_ATOMIC(atomic='update')
-              updatedvar(2)%sf(cell(1), cell(2), cell(3)) = &
-                  updatedvar(2)%sf(cell(1), cell(2), cell(3)) &
-                  + real(addFun2_x, kind=stp)
 
-              !Update y-momentum source term
-              addFun2_y = -fp_y/Vol
-              $:GPU_ATOMIC(atomic='update')
-              updatedvar(3)%sf(cell(1), cell(2), cell(3)) = &
-                  updatedvar(3)%sf(cell(1), cell(2), cell(3)) &
-                  + real(addFun2_y, kind=stp)
+                !Update x-momentum source term
+                addFun2_x = -fp_x/Vol
+                $:GPU_ATOMIC(atomic='update')
+                updatedvar(2)%sf(cell(1), cell(2), cell(3)) = &
+                    updatedvar(2)%sf(cell(1), cell(2), cell(3)) &
+                    + real(addFun2_x, kind=stp)
 
-              if (num_dims == 3) then
-                !Update z-momentum source term
-                addFun2_z = -fp_z/Vol
+                !Update y-momentum source term
+                addFun2_y = -fp_y/Vol
                 $:GPU_ATOMIC(atomic='update')
-                updatedvar(4)%sf(cell(1), cell(2), cell(3)) = &
-                    updatedvar(4)%sf(cell(1), cell(2), cell(3)) &
-                    + real(addFun2_z, kind=stp)
-                !Update energy source term
-                addFun_E = 0._wp
-                $:GPU_ATOMIC(atomic='update')
-                updatedvar(5)%sf(cell(1), cell(2), cell(3)) = &
-                    updatedvar(5)%sf(cell(1), cell(2), cell(3)) &
-                    + real(addFun_E, kind=stp)     
-              else  
-                !Update energy source term
-                addFun_E = 0._wp
-                $:GPU_ATOMIC(atomic='update')
-                updatedvar(4)%sf(cell(1), cell(2), cell(3)) = &
-                    updatedvar(4)%sf(cell(1), cell(2), cell(3)) &
-                    + real(addFun_E, kind=stp)   
-              endif
-            endif        
+                updatedvar(3)%sf(cell(1), cell(2), cell(3)) = &
+                    updatedvar(3)%sf(cell(1), cell(2), cell(3)) &
+                    + real(addFun2_y, kind=stp)
+
+                if (num_dims == 3) then
+                    !Update z-momentum source term
+                    addFun2_z = -fp_z/Vol
+                    $:GPU_ATOMIC(atomic='update')
+                    updatedvar(4)%sf(cell(1), cell(2), cell(3)) = &
+                        updatedvar(4)%sf(cell(1), cell(2), cell(3)) &
+                        + real(addFun2_z, kind=stp)
+                    !Update energy source term
+                    addFun_E = 0._wp
+                    $:GPU_ATOMIC(atomic='update')
+                    updatedvar(5)%sf(cell(1), cell(2), cell(3)) = &
+                        updatedvar(5)%sf(cell(1), cell(2), cell(3)) &
+                        + real(addFun_E, kind=stp)
+                else
+                    !Update energy source term
+                    addFun_E = 0._wp
+                    $:GPU_ATOMIC(atomic='update')
+                    updatedvar(4)%sf(cell(1), cell(2), cell(3)) = &
+                        updatedvar(4)%sf(cell(1), cell(2), cell(3)) &
+                        + real(addFun_E, kind=stp)
+                end if
+            end if
 
         end do
         $:END_GPU_PARALLEL_LOOP()
@@ -171,9 +170,9 @@ contains
             call s_get_cell(s_coord, cell)
             call s_compute_stddsv(cell, volpart, stddsv)
             strength_vol = volpart
-            fp_x = lbk_f_p(l,1)
-            fp_y = lbk_f_p(l,2)
-            fp_z = lbk_f_p(l,3)
+            fp_x = lbk_f_p(l, 1)
+            fp_y = lbk_f_p(l, 2)
+            fp_z = lbk_f_p(l, 3)
 
             func_sum = 0._wp
             do i = 1, smearGrid
@@ -187,7 +186,7 @@ contains
                         !Check if the cells intended to smear the particles in are in the computational domain
                         !and redefine the cells for symmetric boundary
                         call s_check_celloutside(cellaux, celloutside)
-                        
+
                         if (.not. celloutside) then
                             nodecoord(1) = x_cc(cellaux(1))
                             nodecoord(2) = y_cc(cellaux(2))
@@ -195,9 +194,9 @@ contains
                             call s_applygaussian(center, cellaux, nodecoord, stddsv, 0._wp, func)
                             func_sum = func_sum + func
                         end if
-                    enddo
-                enddo
-            enddo
+                    end do
+                end do
+            end do
 
             $:GPU_LOOP(collapse=3,private='[cellaux,nodecoord]')
             do i = 1, smearGrid
@@ -233,43 +232,43 @@ contains
 
                             if (lag_params%solver_approach == 2) then
 
-                              !Update x-momentum source term
-                              addFun2_x = -func*fp_x
-                              $:GPU_ATOMIC(atomic='update')
-                              updatedvar(2)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                                  updatedvar(2)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                  + real(addFun2_x, kind=stp)
+                                !Update x-momentum source term
+                                addFun2_x = -func*fp_x
+                                $:GPU_ATOMIC(atomic='update')
+                                updatedvar(2)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
+                                    updatedvar(2)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                                    + real(addFun2_x, kind=stp)
 
-                              !Update y-momentum source term
-                              addFun2_y = -func*fp_y
-                              $:GPU_ATOMIC(atomic='update')
-                              updatedvar(3)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                                  updatedvar(3)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                  + real(addFun2_y, kind=stp)
+                                !Update y-momentum source term
+                                addFun2_y = -func*fp_y
+                                $:GPU_ATOMIC(atomic='update')
+                                updatedvar(3)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
+                                    updatedvar(3)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                                    + real(addFun2_y, kind=stp)
 
-                              if (num_dims == 3) then
-                                !Update z-momentum source term
-                                addFun2_z = -func*fp_z
-                                $:GPU_ATOMIC(atomic='update')
-                                updatedvar(4)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                                    updatedvar(4)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                    + real(addFun2_z, kind=stp)
-                                !Update energy source term
-                                addFun_E = 0._wp
-                                $:GPU_ATOMIC(atomic='update')
-                                updatedvar(5)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                                    updatedvar(5)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                    + real(addFun_E, kind=stp)
-                              else
-                                !Update energy source term
-                                addFun_E = 0._wp
-                                $:GPU_ATOMIC(atomic='update')
-                                updatedvar(4)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                                    updatedvar(4)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                    + real(addFun_E, kind=stp)
-                              endif
-                            endif
-                        endif
+                                if (num_dims == 3) then
+                                    !Update z-momentum source term
+                                    addFun2_z = -func*fp_z
+                                    $:GPU_ATOMIC(atomic='update')
+                                    updatedvar(4)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
+                                        updatedvar(4)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                                        + real(addFun2_z, kind=stp)
+                                    !Update energy source term
+                                    addFun_E = 0._wp
+                                    $:GPU_ATOMIC(atomic='update')
+                                    updatedvar(5)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
+                                        updatedvar(5)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                                        + real(addFun_E, kind=stp)
+                                else
+                                    !Update energy source term
+                                    addFun_E = 0._wp
+                                    $:GPU_ATOMIC(atomic='update')
+                                    updatedvar(4)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
+                                        updatedvar(4)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                                        + real(addFun_E, kind=stp)
+                                end if
+                            end if
+                        end if
                     end do
                 end do
             end do
@@ -277,7 +276,6 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_gaussian
-
 
     !> The purpose of this subroutine is to apply the gaussian kernel function for each bubble (Maeda and Colonius, 2018)).
     subroutine s_applygaussian(center, cellaux, nodecoord, stddsv, strength_idx, func)
@@ -514,8 +512,8 @@ contains
         real(wp), dimension(fd_order + 1) :: xi, eta, L
 
         if (fd_order == 1) then
-            v = q_prim_vf(momxb+i-1)%sf(cell(1), cell(2), cell(3))
-        
+            v = q_prim_vf(momxb + i - 1)%sf(cell(1), cell(2), cell(3))
+
         elseif (fd_order == 2) then
             if (i == 1) then
                 xi(1) = x_cc(cell(1) - 1)
@@ -581,17 +579,16 @@ contains
                 eta(5) = q_prim_vf(momxe)%sf(cell(1), cell(2), cell(3) + 2)
             end if
 
-            L(1) = (pos-xi(2))*(pos-xi(3))*(pos-xi(4))*(pos-xi(5)) / &
-                  ((xi(1)-xi(2))*(xi(1)-xi(3))*(xi(1)-xi(4))*(xi(1)-xi(5)))
-            L(2) = (pos-xi(1))*(pos-xi(3))*(pos-xi(4))*(pos-xi(5)) / &
-                  ((xi(2)-xi(1))*(xi(2)-xi(3))*(xi(2)-xi(4))*(xi(2)-xi(5)))
-            L(3) = (pos-xi(1))*(pos-xi(2))*(pos-xi(4))*(pos-xi(5)) / &
-                  ((xi(3)-xi(1))*(xi(3)-xi(2))*(xi(3)-xi(4))*(xi(3)-xi(5)))
-            L(4) = (pos-xi(1))*(pos-xi(2))*(pos-xi(3))*(pos-xi(5)) / &
-                  ((xi(4)-xi(1))*(xi(4)-xi(2))*(xi(4)-xi(3))*(xi(4)-xi(5)))
-            L(5) = (pos-xi(1))*(pos-xi(2))*(pos-xi(3))*(pos-xi(4)) / &
-                  ((xi(5)-xi(1))*(xi(5)-xi(2))*(xi(5)-xi(3))*(xi(5)-xi(4)))
-
+            L(1) = (pos - xi(2))*(pos - xi(3))*(pos - xi(4))*(pos - xi(5))/ &
+                   ((xi(1) - xi(2))*(xi(1) - xi(3))*(xi(1) - xi(4))*(xi(1) - xi(5)))
+            L(2) = (pos - xi(1))*(pos - xi(3))*(pos - xi(4))*(pos - xi(5))/ &
+                   ((xi(2) - xi(1))*(xi(2) - xi(3))*(xi(2) - xi(4))*(xi(2) - xi(5)))
+            L(3) = (pos - xi(1))*(pos - xi(2))*(pos - xi(4))*(pos - xi(5))/ &
+                   ((xi(3) - xi(1))*(xi(3) - xi(2))*(xi(3) - xi(4))*(xi(3) - xi(5)))
+            L(4) = (pos - xi(1))*(pos - xi(2))*(pos - xi(3))*(pos - xi(5))/ &
+                   ((xi(4) - xi(1))*(xi(4) - xi(2))*(xi(4) - xi(3))*(xi(4) - xi(5)))
+            L(5) = (pos - xi(1))*(pos - xi(2))*(pos - xi(3))*(pos - xi(4))/ &
+                   ((xi(5) - xi(1))*(xi(5) - xi(2))*(xi(5) - xi(3))*(xi(5) - xi(4)))
 
             v = L(1)*eta(1) + L(2)*eta(2) + L(3)*eta(3) + L(4)*eta(4) + L(5)*eta(5)
         end if
@@ -695,25 +692,23 @@ contains
         fluid_vel(1) = f_interpolate_velocity(pos, cell, 1, q_prim_vf)
         fluid_vel(2) = f_interpolate_velocity(pos, cell, 2, q_prim_vf)
         if (num_dims == 3) then
-          fluid_vel(3) = f_interpolate_velocity(pos, cell, 3, q_prim_vf)
-        endif
+            fluid_vel(3) = f_interpolate_velocity(pos, cell, 3, q_prim_vf)
+        end if
 
-
-        do dir = 1,3
-          if (abs(q_prim_vf(momxb+dir-1)%sf(cell(1), cell(2), cell(3))) < 1.e-8) then
-            fluid_vel(dir) = q_prim_vf(momxb+dir-1)%sf(cell(1), cell(2), cell(3)) !0th order interpolation if fluid velocity is small
-          endif
-          if (fd_order>1) then
-            if (.not. ieee_is_finite(fluid_vel(dir))) then
-              fluid_vel(dir) =  q_prim_vf(momxb+dir-1)%sf(cell(1), cell(2), cell(3))
-            endif
-          endif
-        enddo
+        do dir = 1, 3
+            if (abs(q_prim_vf(momxb + dir - 1)%sf(cell(1), cell(2), cell(3))) < 1.e-8) then
+                fluid_vel(dir) = q_prim_vf(momxb + dir - 1)%sf(cell(1), cell(2), cell(3)) !0th order interpolation if fluid velocity is small
+            end if
+            if (fd_order > 1) then
+                if (.not. ieee_is_finite(fluid_vel(dir))) then
+                    fluid_vel(dir) = q_prim_vf(momxb + dir - 1)%sf(cell(1), cell(2), cell(3))
+                end if
+            end if
+        end do
 
         v_rel = vel_p(i) - fluid_vel(i)
 
-
-        !!!!!!! Quasi-steady Drag Force Paramaeters
+        !!!!!!! Quasi-steady Drag Force Parameters
         slip_velocity_x = fluid_vel(1) - vel_p(1)
         slip_velocity_y = fluid_vel(2) - vel_p(2)
         if (num_dims == 3) then
@@ -728,9 +723,9 @@ contains
         cson = sqrt((gamm*q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3)))/rho) !gamma*P/rho
         gas_mu = Re
 
-        if (ABS(v_rel) .le. 1.e-7_wp) then
-          v_rel = 0._wp
-        endif
+        if (abs(v_rel) <= 1.e-7_wp) then
+            v_rel = 0._wp
+        end if
 
         force = 0._wp
 
@@ -750,9 +745,8 @@ contains
         end if
 
         if (.not. ieee_is_finite(force)) then
-          force = 0._wp
-        endif
-
+            force = 0._wp
+        end if
 
         ! Step 1.1: Stokes drag?
         if (lag_params%stokes_drag == 1) then ! Free slip Stokes drag
@@ -775,8 +769,7 @@ contains
 
     end function f_get_particle_force
 
-
-     ! Quasi-steady force (Re_p and Ma_p corrections):
+    ! Quasi-steady force (Re_p and Ma_p corrections):
     !   Improved Drag Correlation for Spheres and Application
     !   to Shock-Tube Experiments
     !   - Parmar et al. (2010)
@@ -952,7 +945,7 @@ contains
         b2 = ((1.0 - phi)**2)*(phi**3)* &
              re*(0.95 + 0.61*(phi**3)/((1.0 - phi)*2))
 
-        b3 = dmin1(sqrt(20.0_wp*mp), 1.0_wp)* &
+        b3 = min(sqrt(20.0_wp*mp), 1.0_wp)* &
              (5.65*phi - 22.0*(phi**2) + 23.4*(phi**3))* &
              (1 + tanh((mp - (0.65 - 0.24*phi))/0.35))
 
@@ -979,7 +972,7 @@ contains
     ! AIAA Journal, Vol. 59(8), pp. 3261-3274, (2021).
     ! doi: https://doi.org/10.2514/1.J060153.
     !
-    ! NOTE: Re<45 Rarified fomu_fluidla of Loth et al has been redefined by Balachandar
+    ! NOTE: Re<45 Rarefied fomu_fluidla of Loth et al has been redefined by Balachandar
     ! to avoid singularity as Ma -> 0.
     function QS_Osnes(rho, cson, mu_fluid, gamma, vmag, dp, volume_fraction) result(beta)
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -1060,7 +1053,7 @@ contains
         b2 = ((1.0_wp - phi)**2)*(phi**3)* &
              re*(0.95 + 0.61*(phi**3)/((1.0 - phi)*2))
 
-        b3 = dmin1(sqrt(20.0_wp*mp), 1.0_wp)* &
+        b3 = min(sqrt(20.0_wp*mp), 1.0_wp)* &
              (5.65*phi - 22.0*(phi**2) + 23.4*(phi**3))* &
              (1 + tanh((mp - (0.65 - 0.24*phi))/0.35))
 
@@ -1105,7 +1098,6 @@ contains
 
         beta = beta*(pi*dp**3)/(6.0*phi)
 
-    end function QS_Gidaspow   
-
+    end function QS_Gidaspow
 
 end module m_particles_EL_kernels

@@ -496,7 +496,7 @@ module m_global_parameters
     $:GPU_DECLARE(create='[R0ref, p0ref, rho0ref, T0ref, ss, pv, vd, mu_l, mu_v, mu_g, &
         gam_v, gam_g, M_v, M_g, cp_v, cp_g, R_v, R_g]')
 
-    !Solid particle physical paramters
+    !Solid particle physical parameters
     real(wp) :: cp_particle, rho0ref_particle
     $:GPU_DECLARE(create='[rho0ref_particle, cp_particle]')
 

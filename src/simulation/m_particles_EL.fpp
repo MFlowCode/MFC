@@ -82,7 +82,7 @@ module m_particles_EL
     $:GPU_DECLARE(create='[Rmax_glb,Rmin_glb,q_particles,q_particles_idx]')
 
     !Particle Source terms for fluid coupling
-    real(wp), allocatable, dimension (:,:) :: f_p !< force on each particle
+    real(wp), allocatable, dimension(:, :) :: f_p !< force on each particle
     $:GPU_DECLARE(create='[f_p]')
 
     integer, parameter :: LAG_EVOL_ID = 11 ! File id for lag_bubbles_evol_*.dat
@@ -171,7 +171,7 @@ contains
         ! @:ALLOCATE(gas_dmvdt(1:nParticles_glb, 1:lag_num_ts))
         @:ALLOCATE(particle_dposdt(1:nParticles_glb, 1:3, 1:lag_num_ts))
         @:ALLOCATE(particle_dveldt(1:nParticles_glb, 1:3, 1:lag_num_ts))
-        @:ALLOCATE(f_p(1:nParticles_glb, 1:3)) 
+        @:ALLOCATE(f_p(1:nParticles_glb, 1:3))
 
         @:ALLOCATE(keep_bubble(1:nParticles_glb))
         @:ALLOCATE(wrap_bubble_loc(1:nParticles_glb, 1:num_dims), wrap_bubble_dir(1:nParticles_glb, 1:num_dims))
@@ -364,11 +364,11 @@ contains
         particle_vel(part_id, 1:3, 1) = inputPart(4:6)
 
         !Initialize Particle Sources
-        f_p(part_id,1:3) = 0._wp
+        f_p(part_id, 1:3) = 0._wp
 
         if (cyl_coord .and. p == 0) then
             particle_pos(part_id, 2, 1) = sqrt(particle_pos(part_id, 2, 1)**2._wp + &
-                                          particle_pos(part_id, 3, 1)**2._wp)
+                                               particle_pos(part_id, 3, 1)**2._wp)
             !Storing azimuthal angle (-Pi to Pi)) into the third coordinate variable
             particle_pos(part_id, 3, 1) = atan2(inputPart(3), inputPart(2))
             particle_posPrev(part_id, 1:3, 1) = particle_pos(part_id, 1:3, 1)
@@ -410,7 +410,6 @@ contains
             call s_mpi_abort("The initial particle mass is negative. Check the initial conditions.")
         end if
         totalmass = particle_mass(part_id) !+ gas_mv(particle_id, 1) ! totalmass
-
 
     end subroutine s_add_particles
 
@@ -624,9 +623,9 @@ contains
             rho_fluid = q_prim_vf(1)%sf(cell(1), cell(2), cell(3))
 
             do l = 1, num_dims
-                f_p(k,l) = f_get_particle_force(myPos(l), myR, myVel, myMass, myRe, myGamma, rho_fluid, myVolumeFrac, cell, l, q_prim_vf)
+                f_p(k, l) = f_get_particle_force(myPos(l), myR, myVel, myMass, myRe, myGamma, rho_fluid, myVolumeFrac, cell, l, q_prim_vf)
                 particle_dposdt(k, l, stage) = myVel(l)
-                particle_dveldt(k, l, stage) = f_p(k,l)/myMass
+                particle_dveldt(k, l, stage) = f_p(k, l)/myMass
                 particle_draddt(k, stage) = 0._wp
             end do
 
@@ -638,7 +637,6 @@ contains
         call nvtxStartRange("DYNAMICS-DEV2HOST")
         $:GPU_UPDATE(host='[f_p, particle_dposdt, particle_dveldt, particle_draddt]')
         call nvtxEndRange
-
 
     end subroutine s_compute_particle_EL_dynamics
 
@@ -662,26 +660,26 @@ contains
         do k = idwint(3)%beg, idwint(3)%end
             do j = idwint(2)%beg, idwint(2)%end
                 do i = idwint(1)%beg, idwint(1)%end
-                    if (q_particles(1)%sf(i,j,k) > (1._wp - lag_params%valmaxvoid)) then
+                    if (q_particles(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
 
-                      rhs_vf(momxb)%sf(i,j,k) = rhs_vf(momxb)%sf(i,j,k) + q_particles(2)%sf(i,j,k)
-                      rhs_vf(momxb+1)%sf(i,j,k) = rhs_vf(momxb+1)%sf(i,j,k) + q_particles(3)%sf(i,j,k)
+                        rhs_vf(momxb)%sf(i, j, k) = rhs_vf(momxb)%sf(i, j, k) + q_particles(2)%sf(i, j, k)
+                        rhs_vf(momxb + 1)%sf(i, j, k) = rhs_vf(momxb + 1)%sf(i, j, k) + q_particles(3)%sf(i, j, k)
 
-                      if (num_dims == 3) then
-                        rhs_vf(momxb+2)%sf(i,j,k) = rhs_vf(momxb+2)%sf(i,j,k) + q_particles(4)%sf(i,j,k)
-                        ! Energy source
-                        rhs_vf(E_idx)%sf(i,j,k) = rhs_vf(E_idx)%sf(i,j,k) &
-                                              + q_particles(2)%sf(i,j,k) * q_prim_vf(momxb)%sf(i,j,k) &
-                                              + q_particles(3)%sf(i,j,k) * q_prim_vf(momxb+1)%sf(i,j,k) &
-                                              + q_particles(4)%sf(i,j,k) * q_prim_vf(momxb+2)%sf(i,j,k) &
-                                              + q_particles(5)%sf(i,j,k)
-                      else
-                        ! Energy source
-                        rhs_vf(E_idx)%sf(i,j,k) = rhs_vf(E_idx)%sf(i,j,k) &
-                                              + q_particles(2)%sf(i,j,k) * q_prim_vf(momxb)%sf(i,j,k) &
-                                              + q_particles(3)%sf(i,j,k) * q_prim_vf(momxb+1)%sf(i,j,k) &
-                                              + q_particles(4)%sf(i,j,k)
-                      end if
+                        if (num_dims == 3) then
+                            rhs_vf(momxb + 2)%sf(i, j, k) = rhs_vf(momxb + 2)%sf(i, j, k) + q_particles(4)%sf(i, j, k)
+                            ! Energy source
+                            rhs_vf(E_idx)%sf(i, j, k) = rhs_vf(E_idx)%sf(i, j, k) &
+                                                        + q_particles(2)%sf(i, j, k)*q_prim_vf(momxb)%sf(i, j, k) &
+                                                        + q_particles(3)%sf(i, j, k)*q_prim_vf(momxb + 1)%sf(i, j, k) &
+                                                        + q_particles(4)%sf(i, j, k)*q_prim_vf(momxb + 2)%sf(i, j, k) &
+                                                        + q_particles(5)%sf(i, j, k)
+                        else
+                            ! Energy source
+                            rhs_vf(E_idx)%sf(i, j, k) = rhs_vf(E_idx)%sf(i, j, k) &
+                                                        + q_particles(2)%sf(i, j, k)*q_prim_vf(momxb)%sf(i, j, k) &
+                                                        + q_particles(3)%sf(i, j, k)*q_prim_vf(momxb + 1)%sf(i, j, k) &
+                                                        + q_particles(4)%sf(i, j, k)
+                        end if
                     end if
                 end do
             end do
@@ -689,7 +687,6 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_compute_particles_EL_source
-    
 
     !>  The purpose of this subroutine is to smear the effect of the particles in the Eulerian framework
     subroutine s_smear_particle_sources()
@@ -720,7 +717,7 @@ contains
                     q_particles(1)%sf(j, k, l) = 1._wp - q_particles(1)%sf(j, k, l)
                     ! Limiting void fraction given max value
                     q_particles(1)%sf(j, k, l) = max(q_particles(1)%sf(j, k, l), &
-                                                1._wp - lag_params%valmaxvoid)
+                                                     1._wp - lag_params%valmaxvoid)
                 end do
             end do
         end do
@@ -750,7 +747,6 @@ contains
         integer, intent(in) :: stage
 
         integer :: k
-
 
         if (time_stepper == 1) then ! 1st order TVD RK
 
@@ -1000,8 +996,8 @@ contains
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, num_dims
                             particle_pos(k, i, 2) = particle_pos(k, i, 2) - &
-                                               levelset_norm%sf(cell(1), cell(2), cell(3), patch_id, i) &
-                                               *levelset%sf(cell(1), cell(2), cell(3), patch_id)
+                                                    levelset_norm%sf(cell(1), cell(2), cell(3), patch_id, i) &
+                                                    *levelset%sf(cell(1), cell(2), cell(3), patch_id)
                         end do
 
                         cell = fd_number - buff_size
@@ -1020,7 +1016,7 @@ contains
             & particle_dposdt, particle_dveldt, keep_bubble, n_el_particles_loc, &
             & wrap_bubble_dir, wrap_bubble_loc]')
         call nvtxEndRange
-        
+
         if (n_el_particles_loc > 0) then
 
             newBubs = 0
@@ -1029,8 +1025,8 @@ contains
                     newBubs = newBubs + 1
                     if (newBubs /= k) then
                         call s_copy_lag_particle(newBubs, k)
-                        wrap_bubble_dir(newBubs,:) = wrap_bubble_dir(k,:)
-                        wrap_bubble_loc(newBubs,:) = wrap_bubble_loc(k,:)
+                        wrap_bubble_dir(newBubs, :) = wrap_bubble_dir(k, :)
+                        wrap_bubble_loc(newBubs, :) = wrap_bubble_loc(k, :)
                     end if
                 end if
             end do
