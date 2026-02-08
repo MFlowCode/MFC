@@ -467,14 +467,12 @@ contains
         offset(:) = patch_ib(patch_id)%centroid_offset(:)
 
         ! rank(dx) is not consistent between pre_process and simulation. This IFDEF prevents compilation errors
-#ifdef MFC_PRE_PROCESS
-        Np1 = int((pa*ca_in/dx)*20)
-        Np2 = int(((ca_in - pa*ca_in)/dx)*20)
-#else
         Np1 = int((pa*ca_in/dx(0))*20)
         Np2 = int(((ca_in - pa*ca_in)/dx(0))*20)
-#endif
         Np = Np1 + Np2 + 1
+
+        z_max = lz/2
+        z_min = -lz/2
 
         if (.not. allocated(airfoil_grid_u)) then
             allocate (airfoil_grid_u(1:Np))
@@ -485,9 +483,6 @@ contains
 
             airfoil_grid_l(1)%x = 0._wp
             airfoil_grid_l(1)%y = 0._wp
-
-            z_max = lz/2
-            z_min = -lz/2
 
             do i = 1, Np1 + Np2 - 1
                 if (i <= Np1) then
