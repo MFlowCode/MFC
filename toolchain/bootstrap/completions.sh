@@ -17,8 +17,8 @@ _mfc_setup_completions() {
     local COMPLETION_SRC="$MFC_ROOT/toolchain/completions"
     local COMPLETION_FILE SOURCE_FILE RC_FILE RC_LINE SOURCE_CMD
 
-    # Detect zsh: prefer current shell (ZSH_VERSION) but also fall back to login shell ($SHELL)
-    if [ -n "${ZSH_VERSION-}" ] || [[ "${SHELL-}" == *"zsh" ]]; then
+    # Detect zsh: prefer current shell (ZSH_VERSION), fall back to $SHELL only if not in bash
+    if [ -n "${ZSH_VERSION-}" ] || { [ -z "${BASH_VERSION-}" ] && [[ "${SHELL-}" == *"zsh" ]]; }; then
         COMPLETION_FILE="$COMPLETION_DIR/_mfc"
         SOURCE_FILE="$COMPLETION_SRC/_mfc"
         RC_FILE="$HOME/.zshrc"
