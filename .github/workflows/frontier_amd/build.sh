@@ -15,12 +15,38 @@ fi
 
 . ./mfc.sh load -c famd -m g
 
-if [ "$run_bench" == "bench" ]; then
-    for dir in benchmarks/*/; do
-        dirname=$(basename "$dir")
-        ./mfc.sh run "$dir/case.py" --case-optimization -j 8 --dry-run $build_opts
-    done
-else
-    ./mfc.sh test -a --dry-run -j 8 $build_opts
-fi
+max_attempts=3
+attempt=1
+while [ $attempt -le $max_attempts ]; do
+    echo "Build attempt $attempt of $max_attempts..."
+    if [ "$run_bench" == "bench" ]; then
+        build_cmd_ok=true
+        for dir in benchmarks/*/; do
+            dirname=$(basename "$dir")
+            if ! ./mfc.sh run "$dir/case.py" --case-optimization -j 8 --dry-run $build_opts; then
+                build_cmd_ok=false
+                break
+            fi
+        done
+    else
+        if ./mfc.sh test -a --dry-run -j 8 $build_opts; then
+            build_cmd_ok=true
+        else
+            build_cmd_ok=false
+        fi
+    fi
 
+    if [ "$build_cmd_ok" = true ]; then
+        echo "Build succeeded on attempt $attempt."
+        exit 0
+    fi
+
+    if [ $attempt -lt $max_attempts ]; then
+        echo "Build failed on attempt $attempt. Retrying in 30s..."
+        sleep 30
+    fi
+    attempt=$((attempt + 1))
+done
+
+echo "Build failed after $max_attempts attempts."
+exit 1
