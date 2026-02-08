@@ -52,9 +52,6 @@ contains
                     call s_cylinder_levelset(gps(i))
                 elseif (patch_geometry == 11) then
                     call s_3d_airfoil_levelset(gps(i))
-                    ! STL+IBM patch
-                elseif (patch_geometry == 12) then
-                    call s_model_levelset(gps(i))
                 end if
             end do
             $:END_GPU_PARALLEL_LOOP()
@@ -75,9 +72,6 @@ contains
                     call s_rectangle_levelset(gps(i))
                 elseif (patch_geometry == 4) then
                     call s_airfoil_levelset(gps(i))
-                    ! STL+IBM patch
-                elseif (patch_geometry == 5) then
-                    call s_model_levelset(gps(i))
                 elseif (patch_geometry == 6) then
                     call s_ellipse_levelset(gps(i))
                 end if
@@ -86,6 +80,17 @@ contains
             !> @}
 
         end if
+
+        ! STL models computed on the CPU for now
+        do i = 1, num_gps
+            patch_id = gps(i)%ib_patch_id
+            patch_geometry = patch_ib(patch_id)%geometry
+
+            if (patch_geometry == 5 .or. patch_geometry == 12) then
+                call s_model_levelset(gps(i))
+                $:GPU_UPDATE(device='[gps(i)]')
+            end if
+        end do
 
         $:GPU_UPDATE(host='[gps(1:num_gps)]')
 
