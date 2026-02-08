@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Ignore SIGHUP to survive login node session drops
+trap '' HUP
+
 job_device=$1
 job_interface=$2
 run_bench=$3
