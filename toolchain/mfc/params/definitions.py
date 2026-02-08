@@ -762,8 +762,8 @@ def _load():  # pylint: disable=too-many-locals,too-many-statements
             for j in range(1, 4):
                 _r(f"{px}model_{t}({j})", REAL, {"ib"})
         for j in range(1, 4):
-            _r(f"{px}vel({j})", REAL, {"ib"})
-            _r(f"{px}angular_vel({j})", REAL, {"ib"})
+            _r(f"{px}vel({j})", A_REAL, {"ib"})
+            _r(f"{px}angular_vel({j})", A_REAL, {"ib"})
 
     # --- acoustic sources (4 sources) ---
     for i in range(1, NA + 1):
