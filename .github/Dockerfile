@@ -50,16 +50,16 @@ RUN python3.12 -m venv /opt/MFC/build/venv && \
 RUN echo "TARGET=$TARGET CC=$CC_COMPILER FC=$FC_COMPILER" && \
     cd /opt/MFC && \
     if [ "$TARGET" = "gpu" ]; then \
-      ./mfc.sh build -v --gpu -j $(nproc); \
+      ./mfc.sh build --gpu -j $(nproc); \
     else \
-      ./mfc.sh build -v -j $(nproc); \
+      ./mfc.sh build -j $(nproc); \
     fi
 
 RUN cd /opt/MFC && \
     if [ "$TARGET" = "gpu" ]; then \
-      ./mfc.sh test -v -a --dry-run --gpu -j $(nproc); \
+      ./mfc.sh test -a --dry-run --gpu -j $(nproc); \
     else \
-      ./mfc.sh test -v -a --dry-run -j $(nproc); \
+      ./mfc.sh test -a --dry-run -j $(nproc); \
     fi
 
 WORKDIR /opt/MFC

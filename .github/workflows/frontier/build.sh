@@ -18,9 +18,9 @@ fi
 if [ "$run_bench" == "bench" ]; then
     for dir in benchmarks/*/; do
         dirname=$(basename "$dir")
-        ./mfc.sh run -v "$dir/case.py" --case-optimization -j 8 --dry-run $build_opts
+        ./mfc.sh run "$dir/case.py" --case-optimization -j 8 --dry-run $build_opts
     done
 else
-    ./mfc.sh test -v -a --dry-run --rdma-mpi -j 8 $build_opts
+    ./mfc.sh test -a --dry-run --rdma-mpi -j 8 $build_opts
 fi
 
