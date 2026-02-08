@@ -589,6 +589,10 @@ def _load():  # pylint: disable=too-many-locals,too-many-statements
     for n in ["polytropic", "bubbles_euler", "polydisperse", "qbmm", "bubbles_lagrange"]:
         _r(n, LOG, {"bubbles"})
 
+    # --- Particles ---
+    for n in ["particles_lagrange"]:
+        _r(n, LOG, {"particles"})
+
     # --- Viscosity ---
     _r("viscous", LOG, {"viscosity"})
 
@@ -743,6 +747,10 @@ def _load():  # pylint: disable=too-many-locals,too-many-statements
               "M_v", "M_g", "k_v", "k_g", "cp_v", "cp_g", "R_v", "R_g"]:
         _r(f"bub_pp%{a}", REAL, {"bubbles"})
 
+    # --- particle_pp (particle properties) ---
+    for a in ["rho0ref_particle", "cp_particle"]:
+        _r(f"particle_pp%{a}", REAL, {"particles"})
+
     # --- patch_ib (10 immersed boundaries) ---
     for i in range(1, NI + 1):
         px = f"patch_ib({i})%"
@@ -840,6 +848,10 @@ def _load():  # pylint: disable=too-many-locals,too-many-statements
     for a in ["epsilonb", "valmaxvoid", "charwidth", "c0", "rho0", "T0", "x0", "Thost"]:
         _r(f"lag_params%{a}", REAL, {"bubbles"})
     _r(f"lag_params%input_path", STR, {"bubbles"})
+
+    # --- lag_params (Lagrangian particles) ---
+    for a in ["nParticles_glb", "stokes_drag", "qs_drag_model"]:
+      _r(f"lag_params%{a}", INT, {'particles'})
 
     # --- chem_params ---
     for a in ["diffusion", "reactions"]:

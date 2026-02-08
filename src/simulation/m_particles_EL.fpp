@@ -271,7 +271,7 @@ contains
         end if
 
         if (num_procs > 1) then
-            call s_add_particles_to_transfer_list(n_el_particles_loc, particle_pos(:, :, 1))
+            call s_add_particles_to_transfer_list(n_el_particles_loc, particle_pos(:, :, 1), particle_posPrev(:, :, 1))
             ! call s_mpi_sendrecv_particles(bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, &
             !                               gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, &
             !                               intfc_rad, intfc_vel, mtn_pos, mtn_posPrev, mtn_vel, &
