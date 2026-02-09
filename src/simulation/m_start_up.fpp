@@ -720,61 +720,6 @@ contains
 
         end if
 
-        if (ib) then
-
-            do j = 1, num_ibs
-                if (patch_ib(j)%c > 0) then
-
-                    allocate (airfoil_grid_u(1:Np))
-                    allocate (airfoil_grid_l(1:Np))
-
-                    write (file_loc, '(A)') 'airfoil_l.dat'
-                    file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
-                    inquire (FILE=trim(file_loc), EXIST=file_exist)
-                    if (file_exist) then
-
-                        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
-
-                        ! Initial displacement to skip at beginning of file
-                        disp = 0
-
-                        call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_airfoil_IB_DATA%view(1), &
-                                               'native', mpi_info_int, ierr)
-                        call MPI_FILE_READ(ifile, MPI_IO_airfoil_IB_DATA%var(1:Np), 3*Np*mpi_io_type, &
-                                           mpi_io_p, status, ierr)
-
-                    end if
-
-                    write (file_loc, '(A)') 'airfoil_u.dat'
-                    file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
-                    inquire (FILE=trim(file_loc), EXIST=file_exist)
-                    if (file_exist) then
-
-                        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
-
-                        ! Initial displacement to skip at beginning of file
-                        disp = 0
-
-                        call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_airfoil_IB_DATA%view(2), &
-                                               'native', mpi_info_int, ierr)
-                        call MPI_FILE_READ(ifile, MPI_IO_airfoil_IB_DATA%var(Np + 1:2*Np), 3*Np*mpi_io_type, &
-                                           mpi_io_p, status, ierr)
-                    end if
-
-                    do i = 1, Np
-                        airfoil_grid_l(i)%x = MPI_IO_airfoil_IB_DATA%var(i)%x
-                        airfoil_grid_l(i)%y = MPI_IO_airfoil_IB_DATA%var(i)%y
-                    end do
-
-                    do i = 1, Np
-                        airfoil_grid_u(i)%x = MPI_IO_airfoil_IB_DATA%var(Np + i)%x
-                        airfoil_grid_u(i)%y = MPI_IO_airfoil_IB_DATA%var(Np + i)%y
-                    end do
-
-                end if
-            end do
-        end if
-
         deallocate (x_cb_glb, y_cb_glb, z_cb_glb)
 
         if (bc_io) then

@@ -310,14 +310,8 @@ contains
         inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
         offset(:) = patch_ib(patch_id)%centroid_offset(:)
 
-        ! rank(dx) is not consistent between pre_process and simulation. This IFDEF prevents compilation errors
-#ifdef MFC_PRE_PROCESS
-        Np1 = int((pa*ca_in/dx)*20)
-        Np2 = int(((ca_in - pa*ca_in)/dx)*20)
-#else
         Np1 = int((pa*ca_in/dx(0))*20)
         Np2 = int(((ca_in - pa*ca_in)/dx(0))*20)
-#endif
         Np = Np1 + Np2 + 1
         $:GPU_UPDATE(device='[Np]')
 
@@ -466,17 +460,18 @@ contains
         inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
         offset(:) = patch_ib(patch_id)%centroid_offset(:)
 
-        ! rank(dx) is not consistent between pre_process and simulation. This IFDEF prevents compilation errors
-        Np1 = int((pa*ca_in/dx(0))*20)
-        Np2 = int(((ca_in - pa*ca_in)/dx(0))*20)
-        Np = Np1 + Np2 + 1
-
         z_max = lz/2
         z_min = -lz/2
 
+        Np1 = int((pa*ca_in/dx(0))*20)
+        Np2 = int(((ca_in - pa*ca_in)/dx(0))*20)
+        Np = Np1 + Np2 + 1
+        $:GPU_UPDATE(device='[Np]')
+
         if (.not. allocated(airfoil_grid_u)) then
-            allocate (airfoil_grid_u(1:Np))
-            allocate (airfoil_grid_l(1:Np))
+
+            @:ALLOCATE(airfoil_grid_u(1:Np))
+            @:ALLOCATE(airfoil_grid_l(1:Np))
 
             airfoil_grid_u(1)%x = 0._wp
             airfoil_grid_u(1)%y = 0._wp
@@ -526,10 +521,12 @@ contains
 
             airfoil_grid_l(Np)%x = ca_in
             airfoil_grid_l(Np)%y = 0._wp
+
+            $:GPU_UPDATE(device='[airfoil_grid_l,airfoil_grid_u]')
         end if
 
         $:GPU_PARALLEL_LOOP(private='[i,j,l,xyz_local,k,f]', copy='[ib_markers_sf]',&
-                  & copyin='[patch_id,center,inverse_rotation,offset,ma,ca_in,airfoil_grid_u,airfoil_grid_l]', collapse=3)
+                  & copyin='[patch_id,center,inverse_rotation,offset,ma,ca_in,airfoil_grid_u,airfoil_grid_l,z_min,z_max]', collapse=3)
         do l = 0, p
             do j = 0, n
                 do i = 0, m
@@ -547,7 +544,7 @@ contains
                                 end do
                                 if (f_approx_equal(airfoil_grid_u(k)%x, xyz_local(1))) then
                                     if (xyz_local(2) <= airfoil_grid_u(k)%y) then
-                                        !!IB
+                                        !IB
                                         ib_markers_sf(i, j, l) = patch_id
                                     end if
                                 else
@@ -570,10 +567,10 @@ contains
                                 else
                                     f = (airfoil_grid_l(k)%x - xyz_local(1))/(airfoil_grid_l(k)%x - airfoil_grid_l(k - 1)%x)
 
-                                    if (xyz_local(2) >= ((1._wp - f)*airfoil_grid_l(k)%y + f*airfoil_grid_l(k - 1)%y)) then
-                                        !!IB
-                                        ib_markers_sf(i, j, l) = patch_id
-                                    end if
+                                    ! if (xyz_local(2) >= ((1._wp - f)*airfoil_grid_l(k)%y + f*airfoil_grid_l(k - 1)%y)) then
+                                    !     !!IB
+                                    !     ib_markers_sf(i, j, l) = patch_id
+                                    ! end if
                                 end if
                             end if
                         end if

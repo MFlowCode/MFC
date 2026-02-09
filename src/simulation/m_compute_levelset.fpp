@@ -38,7 +38,7 @@ contains
         !  3D Patch Geometries
         if (p > 0) then
 
-            $:GPU_PARALLEL_LOOP(private='[i,patch_id,patch_geometry]', copy='[gps]', copyin='[patch_ib,Np]')
+            $:GPU_PARALLEL_LOOP(private='[i,patch_id,patch_geometry]', copy='[gps]', copyin='[patch_ib(1:num_ibs),Np]')
             do i = 1, num_gps
 
                 patch_id = gps(i)%ib_patch_id
@@ -241,10 +241,10 @@ contains
         rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix(:, :)
         offset(:) = patch_ib(ib_patch_id)%centroid_offset(:)
 
-        z_max = center(3) + lz/2
-        z_min = center(3) - lz/2
+        z_max = lz/2
+        z_min = -lz/2
 
-        xyz_local = [x_cc(i) - center(1), y_cc(j) - center(2), z_cc(l) - center(3)] ! get coordinate frame centered on IB
+        xyz_local = [x_cc(i), y_cc(j), z_cc(l)] - center
         xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordinates
         xyz_local = xyz_local - offset ! airfoils are a patch that require a centroid offset
 
@@ -266,7 +266,7 @@ contains
             end do
             dist_vec(1) = xyz_local(1) - airfoil_grid_u(global_id)%x
             dist_vec(2) = xyz_local(2) - airfoil_grid_u(global_id)%y
-            dist_vec(3) = 0
+            dist_vec(3) = 0._wp
             dist_surf = global_dist
         else
             do k = 1, Np
@@ -286,7 +286,7 @@ contains
             end do
             dist_vec(1) = xyz_local(1) - airfoil_grid_l(global_id)%x
             dist_vec(2) = xyz_local(2) - airfoil_grid_l(global_id)%y
-            dist_vec(3) = 0
+            dist_vec(3) = 0._wp
             dist_surf = global_dist
         end if
 
