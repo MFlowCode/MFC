@@ -675,6 +675,12 @@ def _load():  # pylint: disable=too-many-locals,too-many-statements
             _r(f"{v}_{d}", REAL)
         _r(f"bf_{d}", LOG)
 
+    _r("normMag", REAL)
+    _r("p0_ic", REAL)
+    _r("g0_ic", REAL)
+    _r("normFac", REAL)
+    _r("interface_file", STR)
+
     # ==========================================================================
     # INDEXED PARAMETERS
     # ==========================================================================

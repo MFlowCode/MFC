@@ -98,7 +98,7 @@ contains
         call MPI_Pack_size(1, mpi_p, MPI_COMM_WORLD, real_size, ierr)
         call MPI_Pack_size(1, MPI_INTEGER, MPI_COMM_WORLD, int_size, ierr)
         nReal = 7 + 16*2 + 10*lag_num_ts
-        p_var_size = 20*(nReal*real_size + int_size)
+        p_var_size = nReal*real_size + int_size
         p_buff_size = lag_params%nBubs_glb*p_var_size
         @:ALLOCATE(p_send_buff(0:p_buff_size), p_recv_buff(0:p_buff_size))
         @:ALLOCATE(p_send_ids(nidx(1)%beg:nidx(1)%end, nidx(2)%beg:nidx(2)%end, nidx(3)%beg:nidx(3)%end, 0:lag_params%nBubs_glb))

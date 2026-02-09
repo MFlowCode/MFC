@@ -13,7 +13,7 @@
     real(wp), dimension(0:n, 0:p) :: rcut_arr
     integer :: l, q, s ! Iterators for reading input files
     integer :: start, end ! Ints to keep track of position in file
-    character(len=1000) :: line ! String to store line in ile
+    character(len=100000) :: line ! String to store line in ile
     character(len=25) :: value ! String to store value in line
     integer :: NJet ! Number of jets
 
