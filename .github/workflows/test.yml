@@ -129,7 +129,9 @@ jobs:
 
       - name: Build
         run:  |
-          /bin/bash mfc.sh test -v --dry-run -j $(nproc) --${{ matrix.debug }} --${{ matrix.mpi }} --${{ matrix.precision }}
+          /bin/bash mfc.sh test -v --dry-run -j $(nproc) --${{ matrix.debug }} --${{ matrix.mpi }} --${{ matrix.precision }} $OPT1
+        env:
+          OPT1: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
 
       - name: Test
         run:  |
