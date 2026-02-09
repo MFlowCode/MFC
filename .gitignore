@@ -8,6 +8,8 @@ yarn.lock
 src/*/include/case.fpp
 src/*/autogen/
 
+jose-sims
+
 *.swo
 *.swp
 

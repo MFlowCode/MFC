@@ -180,7 +180,7 @@ contains
 
         if (num_procs > 1) call s_initialize_solid_particles_mpi(lag_num_ts)
 
-        ! Starting bubbles
+        ! Starting particles
         if (lag_params%write_void_evol) call s_open_void_evol
         if (lag_params%write_bubbles) call s_open_lag_bubble_evol()
         if (lag_params%write_bubbles_stats) call s_open_lag_particle_stats()
@@ -621,6 +621,11 @@ contains
             myVel = particle_vel(k, :, 2)
             myVolumeFrac = 1._wp - q_particles(1)%sf(cell(1), cell(2), cell(3))
             rho_fluid = q_prim_vf(1)%sf(cell(1), cell(2), cell(3))
+
+            f_p(k, :) = 0._wp
+            particle_dposdt(k, :, stage) = 0._wp
+            particle_dveldt(k, :, stage) = 0._wp
+            particle_draddt(k, stage) = 0._wp
 
             do l = 1, num_dims
                 f_p(k, l) = f_get_particle_force(myPos(l), myR, myVel, myMass, myRe, myGamma, rho_fluid, myVolumeFrac, cell, l, q_prim_vf)
@@ -1339,8 +1344,8 @@ contains
         if (.not. file_exist) then
             open (LAG_EVOL_ID, FILE=trim(file_loc), FORM='formatted', position='rewind')
             write (LAG_EVOL_ID, FMT) 'currentTime', 'particleID', 'x', 'y', 'z', &
-                'coreVaporMass', 'coreVaporConcentration', 'radius', 'interfaceVelocity', &
-                'corePressure'
+                'Vx', 'Vy', 'Vz', 'Fp_x', 'Fp_y', 'Fp_z', &
+                'radius'
         else
             open (LAG_EVOL_ID, FILE=trim(file_loc), FORM='formatted', position='append')
         end if
@@ -1359,9 +1364,11 @@ contains
         logical :: file_exist
 
         if (precision == 1) then
-            FMT = "(F16.8,I14,8F16.8)"
+            ! FMT = "(F16.8,I14,8F16.8)"
+            FMT = "(F16.8,I14,10F16.8)"
         else
-            FMT = "(F24.16,I14,8F24.16)"
+            ! FMT = "(F24.16,I14,8F24.16)"
+            FMT = "(F24.16,I14,10F24.16)"
         end if
 
         ! Cycle through list
@@ -1372,6 +1379,12 @@ contains
                 particle_pos(k, 1, 1), &
                 particle_pos(k, 2, 1), &
                 particle_pos(k, 3, 1), &
+                particle_vel(k, 1, 1), &
+                particle_vel(k, 2, 1), &
+                particle_vel(k, 3, 1), &
+                f_p(k, 1), &
+                f_p(k, 2), &
+                f_p(k, 3), &
                 ! gas_mv(k, 1), &
                 ! gas_mv(k, 1)/(gas_mv(k, 1) + gas_mg(k)), &
                 particle_rad(k, 1)

@@ -1202,108 +1202,108 @@ contains
 
         integer :: k, l
 
-        !< x-direction
-        if (bc_x%beg >= 0) then
-            call s_mpi_reduce_beta_variables_buffers(q_beta, 1, -1, nvar)
-        else
-            $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
-            do l = beta_bc_bounds(3)%beg, beta_bc_bounds(3)%end
-                do k = beta_bc_bounds(2)%beg, beta_bc_bounds(2)%end
-                    select case (bc_x%beg)
-                    case (BC_PERIODIC)
-                        call s_beta_periodic(q_beta, 1, -1, k, l, nvar)
-                    case default
-                    end select
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        end if
+        !     !< x-direction
+        !     if (bc_x%beg >= 0) then
+        !         call s_mpi_reduce_beta_variables_buffers(q_beta, 1, -1, nvar)
+        !     else
+        !         $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
+        !         do l = beta_bc_bounds(3)%beg, beta_bc_bounds(3)%end
+        !             do k = beta_bc_bounds(2)%beg, beta_bc_bounds(2)%end
+        !                 select case (bc_x%beg)
+        !                 case (BC_PERIODIC)
+        !                     call s_beta_periodic(q_beta, 1, -1, k, l, nvar)
+        !                 case default
+        !                 end select
+        !             end do
+        !         end do
+        !         $:END_GPU_PARALLEL_LOOP()
+        !     end if
 
-        if (bc_x%end >= 0) then
-            call s_mpi_reduce_beta_variables_buffers(q_beta, 1, 1, nvar)
-        else
-            $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
-            do l = beta_bc_bounds(3)%beg, beta_bc_bounds(3)%end
-                do k = beta_bc_bounds(2)%beg, beta_bc_bounds(2)%end
-                    select case (bc_x%end)
-                    case (BC_PERIODIC)
-                        call s_beta_periodic(q_beta, 1, 1, k, l, nvar)
-                    case default
-                    end select
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        end if
+        !     if (bc_x%end >= 0) then
+        !         call s_mpi_reduce_beta_variables_buffers(q_beta, 1, 1, nvar)
+        !     else
+        !         $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
+        !         do l = beta_bc_bounds(3)%beg, beta_bc_bounds(3)%end
+        !             do k = beta_bc_bounds(2)%beg, beta_bc_bounds(2)%end
+        !                 select case (bc_x%end)
+        !                 case (BC_PERIODIC)
+        !                     call s_beta_periodic(q_beta, 1, 1, k, l, nvar)
+        !                 case default
+        !                 end select
+        !             end do
+        !         end do
+        !         $:END_GPU_PARALLEL_LOOP()
+        !     end if
 
-        !< y-direction
-        if (bc_y%beg >= 0) then
-            call s_mpi_reduce_beta_variables_buffers(q_beta, 2, -1, nvar)
-        else
-            $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
-            do l = beta_bc_bounds(3)%beg, beta_bc_bounds(3)%end
-                do k = beta_bc_bounds(1)%beg, beta_bc_bounds(1)%end
-                    select case (bc_y%beg)
-                    case (BC_PERIODIC)
-                        call s_beta_periodic(q_beta, 2, -1, k, l, nvar)
-                    case default
-                    end select
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        end if
+        !     !< y-direction
+        !     if (bc_y%beg >= 0) then
+        !         call s_mpi_reduce_beta_variables_buffers(q_beta, 2, -1, nvar)
+        !     else
+        !         $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
+        !         do l = beta_bc_bounds(3)%beg, beta_bc_bounds(3)%end
+        !             do k = beta_bc_bounds(1)%beg, beta_bc_bounds(1)%end
+        !                 select case (bc_y%beg)
+        !                 case (BC_PERIODIC)
+        !                     call s_beta_periodic(q_beta, 2, -1, k, l, nvar)
+        !                 case default
+        !                 end select
+        !             end do
+        !         end do
+        !         $:END_GPU_PARALLEL_LOOP()
+        !     end if
 
-        #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
-            !< z-direction
-            if (bc_z%beg >= 0) then
-                call s_mpi_reduce_beta_variables_buffers(q_beta, 3, -1, nvar)
-            else
-                $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
-                do l = beta_bc_bounds(2)%beg, beta_bc_bounds(2)%end
-                    do k = beta_bc_bounds(1)%beg, beta_bc_bounds(1)%end
-                        select case (bc_type(3, 1)%sf(k, l, 0))
-                        case (BC_PERIODIC)
-                            call s_beta_periodic(q_beta, 3, -1, k, l, nvar)
-                        case default
-                        end select
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            end if
-        #:endif
+        !     #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+        !         !< z-direction
+        !         if (bc_z%beg >= 0) then
+        !             call s_mpi_reduce_beta_variables_buffers(q_beta, 3, -1, nvar)
+        !         else
+        !             $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
+        !             do l = beta_bc_bounds(2)%beg, beta_bc_bounds(2)%end
+        !                 do k = beta_bc_bounds(1)%beg, beta_bc_bounds(1)%end
+        !                     select case (bc_type(3, 1)%sf(k, l, 0))
+        !                     case (BC_PERIODIC)
+        !                         call s_beta_periodic(q_beta, 3, -1, k, l, nvar)
+        !                     case default
+        !                     end select
+        !                 end do
+        !             end do
+        !             $:END_GPU_PARALLEL_LOOP()
+        !         end if
+        !     #:endif
 
-        if (bc_y%end >= 0) then
-            call s_mpi_reduce_beta_variables_buffers(q_beta, 2, 1, nvar)
-        else
-            $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
-            do l = beta_bc_bounds(3)%beg, beta_bc_bounds(3)%end
-                do k = beta_bc_bounds(1)%beg, beta_bc_bounds(1)%end
-                    select case (bc_y%end)
-                    case (BC_PERIODIC)
-                        call s_beta_periodic(q_beta, 2, 1, k, l, nvar)
-                    case default
-                    end select
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        end if
+        !     if (bc_y%end >= 0) then
+        !         call s_mpi_reduce_beta_variables_buffers(q_beta, 2, 1, nvar)
+        !     else
+        !         $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
+        !         do l = beta_bc_bounds(3)%beg, beta_bc_bounds(3)%end
+        !             do k = beta_bc_bounds(1)%beg, beta_bc_bounds(1)%end
+        !                 select case (bc_y%end)
+        !                 case (BC_PERIODIC)
+        !                     call s_beta_periodic(q_beta, 2, 1, k, l, nvar)
+        !                 case default
+        !                 end select
+        !             end do
+        !         end do
+        !         $:END_GPU_PARALLEL_LOOP()
+        !     end if
 
-        #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
-            if (bc_z%end >= 0) then
-                call s_mpi_reduce_beta_variables_buffers(q_beta, 3, 1, nvar)
-            else
-                $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
-                do l = beta_bc_bounds(2)%beg, beta_bc_bounds(2)%end
-                    do k = beta_bc_bounds(1)%beg, beta_bc_bounds(1)%end
-                        select case (bc_type(3, 2)%sf(k, l, 0))
-                        case (BC_PERIODIC)
-                            call s_beta_periodic(q_beta, 3, 1, k, l, nvar)
-                        case default
-                        end select
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            end if
-        #:endif
+        !     #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+        !         if (bc_z%end >= 0) then
+        !             call s_mpi_reduce_beta_variables_buffers(q_beta, 3, 1, nvar)
+        !         else
+        !             $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
+        !             do l = beta_bc_bounds(2)%beg, beta_bc_bounds(2)%end
+        !                 do k = beta_bc_bounds(1)%beg, beta_bc_bounds(1)%end
+        !                     select case (bc_type(3, 2)%sf(k, l, 0))
+        !                     case (BC_PERIODIC)
+        !                         call s_beta_periodic(q_beta, 3, 1, k, l, nvar)
+        !                     case default
+        !                     end select
+        !                 end do
+        !             end do
+        !             $:END_GPU_PARALLEL_LOOP()
+        !         end if
+        !     #:endif
 
     end subroutine s_populate_beta_buffers
 
@@ -1317,52 +1317,52 @@ contains
 
         integer :: j, i
 
-        if (bc_dir == 1) then !< x-direction
-            if (bc_loc == -1) then !bc_x%beg
-                do i = 1, nvar
-                    do j = -mapCells - 1, mapCells
-                        q_beta(beta_vars(i))%sf(j, k, l) = q_beta(beta_vars(i))%sf(j, k, l) + &
-                                                           q_beta(beta_vars(i))%sf(m + j + 1, k, l)
-                    end do
-                end do
-            else !< bc_x%end
-                do i = 1, nvar
-                    do j = -mapcells, mapcells + 1
-                        q_beta(beta_vars(i))%sf(m + j, k, l) = q_beta(beta_vars(i))%sf(j - 1, k, l)
-                    end do
-                end do
-            end if
-        elseif (bc_dir == 2) then !< y-direction
-            if (bc_loc == -1) then !< bc_y%beg
-                do i = 1, nvar
-                    do j = -mapcells - 1, mapcells
-                        q_beta(beta_vars(i))%sf(k, j, l) = q_beta(beta_vars(i))%sf(k, j, l) + &
-                                                           q_beta(beta_vars(i))%sf(k, n + j + 1, l)
-                    end do
-                end do
-            else !< bc_y%end
-                do i = 1, nvar
-                    do j = -mapcells, mapcells + 1
-                        q_beta(beta_vars(i))%sf(k, n + j, l) = q_beta(beta_vars(i))%sf(k, j - 1, l)
-                    end do
-                end do
-            end if
-        elseif (bc_dir == 3) then !< z-direction
-            if (bc_loc == -1) then !< bc_z%beg
-                do i = 1, nvar
-                    do j = -mapcells - 1, mapcells
-                        q_beta(beta_vars(i))%sf(k, l, j) = q_beta(beta_vars(i))%sf(k, l, j) + &
-                                                           q_beta(beta_vars(i))%sf(k, l, p + j + 1)
-                    end do
-                end do
-            else !< bc_z%end
-                do i = 1, nvar
-                    do j = -mapcells, mapcells + 1
-                        q_beta(beta_vars(i))%sf(k, l, p + j) = q_beta(beta_vars(i))%sf(k, l, j - 1)
-                    end do
-                end do
-            end if
-        end if
+        !     if (bc_dir == 1) then !< x-direction
+        !         if (bc_loc == -1) then !bc_x%beg
+        !             do i = 1, nvar
+        !                 do j = -mapCells - 1, mapCells
+        !                     q_beta(beta_vars(i))%sf(j, k, l) = q_beta(beta_vars(i))%sf(j, k, l) + &
+        !                                                        q_beta(beta_vars(i))%sf(m + j + 1, k, l)
+        !                 end do
+        !             end do
+        !         else !< bc_x%end
+        !             do i = 1, nvar
+        !                 do j = -mapcells, mapcells + 1
+        !                     q_beta(beta_vars(i))%sf(m + j, k, l) = q_beta(beta_vars(i))%sf(j - 1, k, l)
+        !                 end do
+        !             end do
+        !         end if
+        !     elseif (bc_dir == 2) then !< y-direction
+        !         if (bc_loc == -1) then !< bc_y%beg
+        !             do i = 1, nvar
+        !                 do j = -mapcells - 1, mapcells
+        !                     q_beta(beta_vars(i))%sf(k, j, l) = q_beta(beta_vars(i))%sf(k, j, l) + &
+        !                                                        q_beta(beta_vars(i))%sf(k, n + j + 1, l)
+        !                 end do
+        !             end do
+        !         else !< bc_y%end
+        !             do i = 1, nvar
+        !                 do j = -mapcells, mapcells + 1
+        !                     q_beta(beta_vars(i))%sf(k, n + j, l) = q_beta(beta_vars(i))%sf(k, j - 1, l)
+        !                 end do
+        !             end do
+        !         end if
+        !     elseif (bc_dir == 3) then !< z-direction
+        !         if (bc_loc == -1) then !< bc_z%beg
+        !             do i = 1, nvar
+        !                 do j = -mapcells - 1, mapcells
+        !                     q_beta(beta_vars(i))%sf(k, l, j) = q_beta(beta_vars(i))%sf(k, l, j) + &
+        !                                                        q_beta(beta_vars(i))%sf(k, l, p + j + 1)
+        !                 end do
+        !             end do
+        !         else !< bc_z%end
+        !             do i = 1, nvar
+        !                 do j = -mapcells, mapcells + 1
+        !                     q_beta(beta_vars(i))%sf(k, l, p + j) = q_beta(beta_vars(i))%sf(k, l, j - 1)
+        !                 end do
+        !             end do
+        !         end if
+        !     end if
 
     end subroutine s_beta_periodic
 
@@ -1376,51 +1376,51 @@ contains
 
         integer :: j, i
 
-        ! Set beta in buffer regions equal to zero
+        !     ! Set beta in buffer regions equal to zero
 
-        if (bc_dir == 1) then !< x-direction
-            if (bc_loc == -1) then !bc_x%beg
-                do i = 1, nvar
-                    do j = 1, buff_size
-                        q_beta(beta_vars(i))%sf(-j, k, l) = 0._wp
-                    end do
-                end do
-            else !< bc_x%end
-                do i = 1, nvar
-                    do j = 1, buff_size
-                        q_beta(beta_vars(i))%sf(m + j, k, l) = 0._wp
-                    end do
-                end do
-            end if
-        elseif (bc_dir == 2) then !< y-direction
-            if (bc_loc == -1) then !< bc_y%beg
-                do i = 1, nvar
-                    do j = 1, buff_size
-                        q_beta(beta_vars(i))%sf(k, -j, l) = 0._wp
-                    end do
-                end do
-            else !< bc_y%end
-                do i = 1, nvar
-                    do j = 1, buff_size
-                        q_beta(beta_vars(i))%sf(k, n + j, l) = 0._wp
-                    end do
-                end do
-            end if
-        elseif (bc_dir == 3) then !< z-direction
-            if (bc_loc == -1) then !< bc_z%beg
-                do i = 1, nvar
-                    do j = 1, buff_size
-                        q_beta(beta_vars(i))%sf(k, l, -j) = 0._wp
-                    end do
-                end do
-            else !< bc_z%end
-                do i = 1, nvar
-                    do j = 1, buff_size
-                        q_beta(beta_vars(i))%sf(k, l, p + j) = 0._wp
-                    end do
-                end do
-            end if
-        end if
+        !     if (bc_dir == 1) then !< x-direction
+        !         if (bc_loc == -1) then !bc_x%beg
+        !             do i = 1, nvar
+        !                 do j = 1, buff_size
+        !                     q_beta(beta_vars(i))%sf(-j, k, l) = 0._wp
+        !                 end do
+        !             end do
+        !         else !< bc_x%end
+        !             do i = 1, nvar
+        !                 do j = 1, buff_size
+        !                     q_beta(beta_vars(i))%sf(m + j, k, l) = 0._wp
+        !                 end do
+        !             end do
+        !         end if
+        !     elseif (bc_dir == 2) then !< y-direction
+        !         if (bc_loc == -1) then !< bc_y%beg
+        !             do i = 1, nvar
+        !                 do j = 1, buff_size
+        !                     q_beta(beta_vars(i))%sf(k, -j, l) = 0._wp
+        !                 end do
+        !             end do
+        !         else !< bc_y%end
+        !             do i = 1, nvar
+        !                 do j = 1, buff_size
+        !                     q_beta(beta_vars(i))%sf(k, n + j, l) = 0._wp
+        !                 end do
+        !             end do
+        !         end if
+        !     elseif (bc_dir == 3) then !< z-direction
+        !         if (bc_loc == -1) then !< bc_z%beg
+        !             do i = 1, nvar
+        !                 do j = 1, buff_size
+        !                     q_beta(beta_vars(i))%sf(k, l, -j) = 0._wp
+        !                 end do
+        !             end do
+        !         else !< bc_z%end
+        !             do i = 1, nvar
+        !                 do j = 1, buff_size
+        !                     q_beta(beta_vars(i))%sf(k, l, p + j) = 0._wp
+        !                 end do
+        !             end do
+        !         end if
+        !     end if
 
     end subroutine s_beta_extrapolation
 
