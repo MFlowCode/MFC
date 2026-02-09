@@ -341,13 +341,3 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
-  cancel-on-bench-failure:
-    name: Cancel on Bench Failure
-    needs: [bench]
-    if: failure()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Cancel Workflow Run
-        run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
-        env:
-          GH_TOKEN: ${{ github.token }}
