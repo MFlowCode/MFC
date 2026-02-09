@@ -2,6 +2,9 @@
 
 set -e
 
+# Ignore SIGHUP to survive login node session drops
+trap '' HUP
+
 usage() {
     echo "Usage: $0 [script.sh] [cpu|gpu]"
 }
@@ -26,17 +29,17 @@ fi
 
 
 job_slug="`basename "$1" | sed 's/\.sh$//' | sed 's/[^a-zA-Z0-9]/-/g'`-$2-$3"
+output_file="$job_slug.out"
 
-sbatch <<EOT
+submit_output=$(sbatch <<EOT
 #!/bin/bash
 #SBATCH -J MFC-$job_slug            # Job name
-#SBATCH -A CFD154                  # charge account
+#SBATCH -A ENG160                  # charge account
 #SBATCH -N 1                       # Number of nodes required
 $sbatch_device_opts
 #SBATCH -t 05:59:00                # Duration of the job (Ex: 15 mins)
-#SBATCH -o$job_slug.out            # Combined output and error messages file
+#SBATCH -o$output_file             # Combined output and error messages file
 #SBATCH -p extended                # Extended partition for shorter queues
-#SBATCH -W                         # Do not exit until the submitted job terminates.
 
 set -e
 set -x
@@ -53,4 +56,17 @@ job_interface="$3"
 $sbatch_script_contents
 
 EOT
+)
 
+job_id=$(echo "$submit_output" | grep -oE '[0-9]+')
+if [ -z "$job_id" ]; then
+    echo "ERROR: Failed to submit job. sbatch output:"
+    echo "$submit_output"
+    exit 1
+fi
+
+echo "Submitted batch job $job_id"
+
+# Use resilient monitoring instead of sbatch -W
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+bash "$SCRIPT_DIR/../../scripts/monitor_slurm_job.sh" "$job_id" "$output_file"
