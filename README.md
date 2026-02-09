@@ -208,7 +208,7 @@ And... you're done!
 | Command | Description |
 |---------|-------------|
 | `./mfc.sh build` | Build MFC and its dependencies |
-| `./mfc.sh run case.py` | Run a simulation case (interactive or batch/SLURM) |
+| `./mfc.sh run case.py` | Run a simulation case (interactive or batch: SLURM/PBS/LSF) |
 | `./mfc.sh test` | Run the test suite |
 | `./mfc.sh validate case.py` | Check a case file for errors before running |
 | `./mfc.sh init my_case` | Create a new case from a template |
