@@ -26,13 +26,13 @@ while [ $attempt -le $max_attempts ]; do
         build_cmd_ok=true
         for dir in benchmarks/*/; do
             dirname=$(basename "$dir")
-            if ! ./mfc.sh run "$dir/case.py" --case-optimization -j 8 --dry-run $build_opts; then
+            if ! ./mfc.sh run -v "$dir/case.py" --case-optimization -j 8 --dry-run $build_opts; then
                 build_cmd_ok=false
                 break
             fi
         done
     else
-        if ./mfc.sh test -a --dry-run -j 8 $build_opts; then
+        if ./mfc.sh test -v -a --dry-run -j 8 $build_opts; then
             build_cmd_ok=true
         else
             build_cmd_ok=false
