@@ -322,7 +322,7 @@ contains
         end if
 
         !< Compute Standard deviaton
-        if ((volpart/charvol) > 0.5_wp*lag_params%valmaxvoid) then
+        if ((volpart/charvol) > 0.5_wp*lag_params%valmaxvoid .or. (lag_params%smooth_type == 1)) then
             rad = (3._wp*volpart/(4._wp*pi))**(1._wp/3._wp)
             stddsv = 1._wp*lag_params%epsilonb*max(chardist, rad)
         else
