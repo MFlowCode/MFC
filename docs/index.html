@@ -42,11 +42,11 @@
             document.getElementById("ft-sim").innerHTML = sims.map(s => `
                 <div class="flex flex-col text-white rounded bg-slate-900 rounded-b-lg">
                     <div class="flex-1 grid bg-white pb-2">
-                        <img class="place-self-center" src="${s.image}">
+                        <img class="place-self-center" src="${s.image}" alt="${s.name}">
                     </div>
                     <div class="flex flex-row items-center">
                         <div class="flex flex-col h-full bg-white justify-center">
-                            <img class="h-10" src="res/logo.png">
+                            <img class="h-10" src="res/logo.png" alt="">
                         </div>
                         <div class="flex-1 p-2 font-semibold text-center">${s.name}</div>
                         <a class="w-10 text-center" href="${s.source}">
@@ -73,7 +73,7 @@
             document.getElementById("ft-scaling").innerHTML = scalings.map(s => `
                 <div class="flex md:w-2/6 flex-col text-white rounded bg-slate-900 rounded-b-lg">
                     <div class="flex-1 grid bg-white pb-2">
-                        <img class="place-self-center" src="${s.image}">
+                        <img class="place-self-center" src="${s.image}" alt="${s.label}">
                     </div>
                     <div class="flex-1 p-2 font-semibold text-center">${s.label}</div>
                 </div>
@@ -81,17 +81,27 @@
 
             fetch("https://api.github.com/repos/MFlowCode/MFC/releases/latest")
                 .then(r => r.json())
-                .then(r => { document.getElementById("release-ver").innerText = r.tag_name; });
+                .then(r => { document.getElementById("release-ver").innerText = r.tag_name; })
+                .catch(() => {});
 
             fetch("https://api.github.com/repos/MFlowCode/MFC/contributors")
                 .then(r => r.json())
                 .then(contributors => {
-                    document.getElementById("ft-contrib").innerHTML = contributors.map(c => `
-                        <a class="w-12 h-12 float-left" href="${c.html_url}">
-                            <div class="w-12 h-12 bg-cover" style="background-image: url('${c.avatar_url}')"></div>
-                        </a>
-                    `).join("");
-                });
+                    const container = document.getElementById("ft-contrib");
+                    for (const c of contributors) {
+                        const a = document.createElement("a");
+                        a.className = "w-12 h-12 float-left";
+                        a.href = c.html_url;
+
+                        const div = document.createElement("div");
+                        div.className = "w-12 h-12 bg-cover";
+                        div.style.backgroundImage = `url('${c.avatar_url}')`;
+
+                        a.appendChild(div);
+                        container.appendChild(a);
+                    }
+                })
+                .catch(() => {});
         });
     </script>
 </head>
