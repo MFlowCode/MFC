@@ -10,7 +10,25 @@ if [ "$job_device" = "gpu" ]; then
     fi
 fi
 
-./mfc.sh test -v --dry-run -j 8 $build_opts
+max_attempts=3
+attempt=1
+while [ $attempt -le $max_attempts ]; do
+    echo "Build attempt $attempt of $max_attempts..."
+    if ./mfc.sh test -v --dry-run -j 8 $build_opts; then
+        echo "Build succeeded on attempt $attempt."
+        break
+    fi
+
+    if [ $attempt -lt $max_attempts ]; then
+        echo "Build failed on attempt $attempt. Cleaning and retrying in 30s..."
+        ./mfc.sh clean
+        sleep 30
+    else
+        echo "Build failed after $max_attempts attempts."
+        exit 1
+    fi
+    attempt=$((attempt + 1))
+done
 
 n_test_threads=8
 
