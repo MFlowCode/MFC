@@ -31,6 +31,5 @@ for cfg in "${bench_configs[@]}"; do
         exit 1
     fi
 
-    (cd pr && . ./mfc.sh load -c "$flag" -m g)
-    (cd pr && ./mfc.sh bench_diff "../$master_yaml" "../$pr_yaml")
+    (cd pr && . ./mfc.sh load -c "$flag" -m g && ./mfc.sh bench_diff "../$master_yaml" "../$pr_yaml")
 done

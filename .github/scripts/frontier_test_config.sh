@@ -25,10 +25,9 @@ rdma=""
 [ "$cluster" = "frontier" ] && [ "$device" = "gpu" ] && rdma="--rdma-mpi"
 
 # Test
-gpus=$(rocm-smi --showid | awk '{print $1}' | grep -Eo '[0-9]+' | uniq | tr '\n' ' ')
-ngpus=$(echo "$gpus" | wc -w)
-
 if [ "$device" = "gpu" ]; then
+    gpus=$(rocm-smi --showid | awk '{print $1}' | grep -Eo '[0-9]+' | uniq | tr '\n' ' ')
+    ngpus=$(echo "$gpus" | wc -w)
     ./mfc.sh test -v -a $rdma --max-attempts 3 -j $ngpus $device_opts -- -c "$cluster"
 else
     ./mfc.sh test -v -a --max-attempts 3 -j 32 --no-gpu -- -c "$cluster"
