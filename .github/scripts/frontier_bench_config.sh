@@ -9,8 +9,9 @@ set -x
 cluster=$1; device=$2; interface=$3
 
 flag="f"; [ "$cluster" = "frontier_amd" ] && flag="famd"
+mode="g"; [ "$device" = "cpu" ] && mode="c"
 
-. ./mfc.sh load -c "$flag" -m g
+. ./mfc.sh load -c "$flag" -m "$mode"
 
 # Benchmark
 job_slug="bench-${device}-${interface}"

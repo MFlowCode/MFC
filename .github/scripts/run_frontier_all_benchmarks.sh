@@ -137,7 +137,7 @@ exit $overall_exit
 OUTER
 )
 
-job_id=$(echo "$submit_output" | grep -oE '[0-9]+')
+job_id=$(echo "$submit_output" | awk '/Submitted batch job/ {print $4}')
 if [ -z "$job_id" ]; then
     echo "ERROR: Failed to submit job. sbatch output:"
     echo "$submit_output"
