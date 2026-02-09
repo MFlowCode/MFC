@@ -45,7 +45,8 @@ while [ $attempt -le $max_attempts ]; do
     fi
 
     if [ $attempt -lt $max_attempts ]; then
-        echo "Build failed on attempt $attempt. Retrying in 30s..."
+        echo "Build failed on attempt $attempt. Cleaning and retrying in 30s..."
+        ./mfc.sh clean
         sleep 30
     fi
     attempt=$((attempt + 1))
