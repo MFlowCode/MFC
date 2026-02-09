@@ -220,3 +220,134 @@ jobs:
         with:
           name: logs-${{ strategy.job-index }}-${{ matrix.device }}-${{ matrix.interface }}
           path: test-${{ matrix.device }}-${{ matrix.interface }}.out
+
+  bench:
+    name: "Benchmark | ${{ matrix.name }} (${{ matrix.device }}${{ matrix.interface != 'none' && format('-{0}', matrix.interface) || '' }})"
+    if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true'
+    needs: [lint-gate, file-changes]
+    continue-on-error: false
+    timeout-minutes: 480
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - cluster: phoenix
+            name: Georgia Tech | Phoenix (NVHPC)
+            group: phoenix
+            labels: gt
+            flag: p
+            device: cpu
+            interface: none
+            build_script: ""
+          - cluster: phoenix
+            name: Georgia Tech | Phoenix (NVHPC)
+            group: phoenix
+            labels: gt
+            flag: p
+            device: gpu
+            interface: acc
+            build_script: ""
+          - cluster: phoenix
+            name: Georgia Tech | Phoenix (NVHPC)
+            group: phoenix
+            labels: gt
+            flag: p
+            device: gpu
+            interface: omp
+            build_script: ""
+          - cluster: frontier
+            name: Oak Ridge | Frontier (CCE)
+            group: phoenix
+            labels: frontier
+            flag: f
+            device: gpu
+            interface: acc
+            build_script: "bash .github/workflows/frontier/build.sh gpu acc bench"
+          - cluster: frontier
+            name: Oak Ridge | Frontier (CCE)
+            group: phoenix
+            labels: frontier
+            flag: f
+            device: gpu
+            interface: omp
+            build_script: "bash .github/workflows/frontier/build.sh gpu omp bench"
+          - cluster: frontier_amd
+            name: Oak Ridge | Frontier (AMD)
+            group: phoenix
+            labels: frontier
+            flag: famd
+            device: gpu
+            interface: omp
+            build_script: "bash .github/workflows/frontier_amd/build.sh gpu omp bench"
+    runs-on:
+      group: ${{ matrix.group }}
+      labels: ${{ matrix.labels }}
+    env:
+      ACTIONS_RUNNER_FORCE_ACTIONS_NODE_VERSION: node16
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+    steps:
+      - name: Clone - PR
+        uses: actions/checkout@v4
+        with:
+          path: pr
+
+      - name: Clone - Master
+        uses: actions/checkout@v4
+        with:
+          repository: MFlowCode/MFC
+          ref: master
+          path: master
+
+      - name: Setup & Build
+        if: matrix.build_script != ''
+        run: |
+          (cd pr     && ${{ matrix.build_script }}) &
+          (cd master && ${{ matrix.build_script }}) &
+          wait %1 && wait %2
+
+      - name: Bench (Master v. PR)
+        run: bash pr/.github/scripts/run_parallel_benchmarks.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }}
+
+      - name: Generate & Post Comment
+        run: |
+          (cd pr && . ./mfc.sh load -c ${{ matrix.flag }} -m g)
+          (cd pr && ./mfc.sh bench_diff ../master/bench-${{ matrix.device }}-${{ matrix.interface }}.yaml ../pr/bench-${{ matrix.device }}-${{ matrix.interface }}.yaml)
+
+      - name: Print Logs
+        if: always()
+        run: |
+          cat pr/bench-${{ matrix.device }}-${{ matrix.interface }}.* 2>/dev/null || true
+          cat master/bench-${{ matrix.device }}-${{ matrix.interface }}.* 2>/dev/null || true
+
+      - name: Archive Logs
+        if: always() && matrix.cluster != 'phoenix'
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-${{ matrix.cluster }}-${{ matrix.device }}-${{ matrix.interface }}
+          path: |
+            pr/bench-${{ matrix.device }}-${{ matrix.interface }}.*
+            pr/build/benchmarks/*
+            master/bench-${{ matrix.device }}-${{ matrix.interface }}.*
+            master/build/benchmarks/*
+
+  cancel-on-test-failure:
+    name: Cancel on Test Failure
+    needs: [self]
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cancel Workflow Run
+        run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  cancel-on-bench-failure:
+    name: Cancel on Bench Failure
+    needs: [bench]
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cancel Workflow Run
+        run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
+        env:
+          GH_TOKEN: ${{ github.token }}
