@@ -79,8 +79,8 @@ MFC conducted the largest known CFD simulation at <a href="https://arxiv.org/abs
 MFC is a 2025 Gordon Bell Prize Finalist.
 
 <p align="center">
-<a href="https://doi.org/10.48550/arXiv.2503.07953" target="_blank">
-    <img src="https://img.shields.io/badge/DOI-10.48550/arXiv.2503.07953-thistle.svg"/>
+<a href="https://doi.org/10.1016/j.cpc.2026.110055" target="_blank">
+    <img src="https://img.shields.io/badge/DOI-10.1016/j.cpc.2026.110055-thistle.svg"/>
 </a>
 <a href="https://doi.org/10.5281/zenodo.17049757" target="_blank">
     <img src="https://zenodo.org/badge/DOI/10.5281/zenodo.17049757.svg"/>
@@ -94,12 +94,14 @@ Is MFC useful for you? Consider citing it or giving a star!
 </p>
 
 ```bibtex
-@article{Wilfong_2025,
-  author = {Wilfong, Benjamin and {Le Berre}, Henry and Radhakrishnan, Anand and Gupta, Ansh and Vaca-Revelo, Diego and Adam, Dimitrios and Yu, Haocheng and Lee, Hyeoksu and Chreim, Jose Rodolfo and {Carcana Barbosa}, Mirelys and Zhang, Yanjun and Cisneros-Garibay, Esteban and Gnanaskandan, Aswin and {Rodriguez Jr.}, Mauro and Budiardja, Reuben D. and Abbott, Stephen and Colonius, Tim and Bryngelson, Spencer H.},
-  title = {{MFC 5.0: A}n exascale many-physics flow solver},
-  journal = {arXiv preprint arXiv:2503.07953},
-  year = {2025},
-  doi = {10.48550/arXiv.2503.07953}
+@article{wilfong26,
+  Author = {Benjamin Wilfong and Henry {Le Berre} and Anand Radhakrishnan and Ansh Gupta and Daniel J. Vickers and Diego Vaca-Revelo and Dimitrios Adam and Haocheng Yu and Hyeoksu Lee and Jose Rodolfo Chreim and Mirelys {Carcana Barbosa} and Yanjun Zhang and Esteban Cisneros-Garibay and Aswin Gnanaskandan and Mauro {Rodriguez Jr.} and Reuben D. Budiardja and Stephen Abbott and Tim Colonius and Spencer H. Bryngelson},
+  Title = {{MFC 5.0: A}n exascale many-physics flow solver},
+  journal = {Computer Physics Communications},
+  year = {2026},
+  volume = {322},
+  pages = {110055},
+  doi = {10.1016/j.cpc.2026.110055},
 }
 ```
 
@@ -319,12 +321,14 @@ If referencing MFC's (GPU) performance, consider citing ref. 1 and 2, which desc
 The original open-source release of MFC is ref. 3, which should be cited for provenance as appropriate.
 
 ```bibtex
-@article{Wilfong_2025,
-  author = {Wilfong, Benjamin and {Le Berre}, Henry and Radhakrishnan, Anand and Gupta, Ansh and Vaca-Revelo, Diego and Adam, Dimitrios and Yu, Haocheng and Lee, Hyeoksu and Chreim, Jose Rodolfo and {Carcana Barbosa}, Mirelys and Zhang, Yanjun and Cisneros-Garibay, Esteban and Gnanaskandan, Aswin and {Rodriguez Jr.}, Mauro and Budiardja, Reuben D. and Abbott, Stephen and Colonius, Tim and Bryngelson, Spencer H.},
-  title = {{MFC 5.0: A}n exascale many-physics flow solver},
-  journal = {arXiv preprint arXiv:2503.07953},
-  year = {2025},
-  doi = {10.48550/arXiv.2503.07953}
+@article{wilfong26,
+  Author = {Benjamin Wilfong and Henry {Le Berre} and Anand Radhakrishnan and Ansh Gupta and Daniel J. Vickers and Diego Vaca-Revelo and Dimitrios Adam and Haocheng Yu and Hyeoksu Lee and Jose Rodolfo Chreim and Mirelys {Carcana Barbosa} and Yanjun Zhang and Esteban Cisneros-Garibay and Aswin Gnanaskandan and Mauro {Rodriguez Jr.} and Reuben D. Budiardja and Stephen Abbott and Tim Colonius and Spencer H. Bryngelson},
+  Title = {{MFC 5.0: A}n exascale many-physics flow solver},
+  journal = {Computer Physics Communications},
+  year = {2026},
+  volume = {322},
+  pages = {110055},
+  doi = {10.1016/j.cpc.2026.110055},
 }
 
 @article{Radhakrishnan_2024,
