@@ -46,7 +46,11 @@
 
 <p align="center">
   <a href="https://star-history.com/#MFlowCode/MFC&Date">
-    <img src="https://api.star-history.com/svg?repos=MFlowCode/MFC&type=Date&theme=dark" alt="Star History Chart" width="600"/>
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=MFlowCode/MFC&type=Date&theme=dark" />
+      <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=MFlowCode/MFC&type=Date" />
+      <img src="https://api.star-history.com/svg?repos=MFlowCode/MFC&type=Date&theme=dark" alt="Star History Chart" width="600"/>
+    </picture>
   </a>
 </p>
 
@@ -70,7 +74,7 @@ MFC runs at exascale on the world's fastest supercomputers:
 
 **Welcome!**
 MFC simulates compressible multi-phase flows, [among other things](#what-else-can-this-thing-do). 
-It uses metaprogramming and is short (20K lines) and portable.
+It uses metaprogramming and is short (~40K lines of Fortran) and portable.
 MFC conducted the largest known CFD simulation at <a href="https://arxiv.org/abs/2505.07392" target="_blank">200 trillion grid points</a>, and 1 quadrillion degrees of freedom (as of September 2025).
 MFC is a 2025 Gordon Bell Prize Finalist.
 
@@ -199,53 +203,19 @@ then you can build MFC and run the test suite!
 ```
 And... you're done!
 
-## Toolchain Features
-
-The `mfc.sh` script provides a comprehensive toolchain for building, running, and testing MFC:
+## Toolchain
 
 | Command | Description |
 |---------|-------------|
 | `./mfc.sh build` | Build MFC and its dependencies |
-| `./mfc.sh run case.py` | Run a simulation case |
+| `./mfc.sh run case.py` | Run a simulation case (interactive or batch: SLURM/PBS/LSF) |
 | `./mfc.sh test` | Run the test suite |
 | `./mfc.sh validate case.py` | Check a case file for errors before running |
 | `./mfc.sh init my_case` | Create a new case from a template |
 | `./mfc.sh clean` | Remove build artifacts |
 | `./mfc.sh interactive` | Launch interactive menu-driven interface |
 
-### Quick Start Workflow
-
-```bash
-./mfc.sh init my_first_case           # Create a new case from template
-./mfc.sh validate my_first_case/case.py  # Validate the case file
-./mfc.sh build -j $(nproc)            # Build MFC
-./mfc.sh run my_first_case/case.py    # Run the simulation
-```
-
-### Case Templates
-
-Create new cases quickly with built-in templates:
-
-```bash
-./mfc.sh init --list                  # List available templates
-./mfc.sh init my_case -t 2D_minimal   # Create 2D case
-./mfc.sh init my_case -t example:1D_sodshocktube  # Copy from examples
-```
-
-### Shell Completion
-
-Enable tab completion for commands and options:
-
-```bash
-# Bash
-source toolchain/completions/mfc.bash
-
-# Zsh (add to fpath)
-fpath=(path/to/MFC/toolchain/completions $fpath)
-autoload -Uz compinit && compinit
-```
-
-You can learn more about MFC's capabilities [via its documentation](https://mflowcode.github.io/documentation/index.html) or play with the examples located in the `examples/` directory (some are [shown here](https://mflowcode.github.io/documentation/md_examples.html))!
+Run `./mfc.sh <command> --help` for detailed options, or see the [full documentation](https://mflowcode.github.io/documentation/index.html). Tab completion for bash and zsh is auto-installed after you have run `./mfc.sh generate` (or any non-`init` command) at least once. Play with the examples in `examples/` ([showcased here](https://mflowcode.github.io/documentation/md_examples.html)).
 
 The shock-droplet interaction case above was run via
 ```shell
@@ -282,13 +252,16 @@ We also scale ideally to >98% of LLNL El Capitan.
 	* Complex/arbitrary geometries via immersed boundary method
 	* STL geometry files supported
 * Surface tension for multiphase cases
-* Sub-grid dynamics
-	* Euler-Euler particle models for bubble dynamics and similar
-	* Euler-Lagrange bubble dynamics
+* Sub-grid bubble dynamics
+	* Euler-Euler volume-averaged bubble models
+	* Euler-Lagrange particle tracking
+	* Quadrature-based moment methods (QBMM)
 * Viscous effects (high-order accurate representations)
+* Hypoelastic and hyperelastic material models
 * Ideal and stiffened gas equations of state
 * Body forces
 * Acoustic wave generation (one- and two-way sound sources)
+* Chemistry and multi-species transport via [Pyrometheus](https://github.com/pyrometheus/pyrometheus)
 * Magnetohydrodynamics (MHD)
 * Relativistic Magnetohydrodynamics (RMHD)
 
@@ -323,7 +296,9 @@ We also scale ideally to >98% of LLNL El Capitan.
 	* \>33K AMD GPUs (MI250X) on [OLCF Frontier](https://www.olcf.ornl.gov/frontier/) 
 	* \>10K NVIDIA GPUs (V100) on [OLCF Summit](https://www.olcf.ornl.gov/summit/) 
 * Near compute roofline behavior
+* Compile-time case optimization (hard-codes parameters for significant speedup)
 * RDMA (remote data memory access; GPU-GPU direct communication) via GPU-aware MPI on NVIDIA (CUDA-aware MPI) and AMD GPU systems
+* Built-in profiling support (NVIDIA Nsight Compute/Systems, AMD rocprof)
 * Optional single-precision computation and storage
 
 ### Software robustness and other features
