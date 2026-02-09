@@ -215,7 +215,7 @@ And... you're done!
 | `./mfc.sh clean` | Remove build artifacts |
 | `./mfc.sh interactive` | Launch interactive menu-driven interface |
 
-Run `./mfc.sh <command> --help` for detailed options, or see the [full documentation](https://mflowcode.github.io/documentation/index.html). Tab completion is auto-installed for bash and zsh. Play with the examples in `examples/` ([showcased here](https://mflowcode.github.io/documentation/md_examples.html)).
+Run `./mfc.sh <command> --help` for detailed options, or see the [full documentation](https://mflowcode.github.io/documentation/index.html). Tab completion for bash and zsh is auto-installed after you have run `./mfc.sh generate` (or any non-`init` command) at least once. Play with the examples in `examples/` ([showcased here](https://mflowcode.github.io/documentation/md_examples.html)).
 
 The shock-droplet interaction case above was run via
 ```shell
