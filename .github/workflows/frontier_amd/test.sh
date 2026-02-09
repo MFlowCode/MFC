@@ -14,7 +14,7 @@ if [ "$job_device" = "gpu" ]; then
 fi
 
 if [ "$job_device" = "gpu" ]; then
-    ./mfc.sh test -a  --max-attempts 3 -j $ngpus $device_opts -- -c frontier_amd
+    ./mfc.sh test -v -a --max-attempts 3 -j $ngpus $device_opts -- -c frontier_amd
 else
-    ./mfc.sh test -a --max-attempts 3 -j 32 --no-gpu -- -c frontier_amd
+    ./mfc.sh test -v -a --max-attempts 3 -j 32 --no-gpu -- -c frontier_amd
 fi
