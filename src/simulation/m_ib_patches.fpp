@@ -567,10 +567,10 @@ contains
                                 else
                                     f = (airfoil_grid_l(k)%x - xyz_local(1))/(airfoil_grid_l(k)%x - airfoil_grid_l(k - 1)%x)
 
-                                    ! if (xyz_local(2) >= ((1._wp - f)*airfoil_grid_l(k)%y + f*airfoil_grid_l(k - 1)%y)) then
-                                    !     !!IB
-                                    !     ib_markers_sf(i, j, l) = patch_id
-                                    ! end if
+                                    if (xyz_local(2) >= ((1._wp - f)*airfoil_grid_l(k)%y + f*airfoil_grid_l(k - 1)%y)) then
+                                        !!IB
+                                        ib_markers_sf(i, j, l) = patch_id
+                                    end if
                                 end if
                             end if
                         end if
