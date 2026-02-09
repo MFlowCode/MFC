@@ -379,67 +379,51 @@ def print_help_topics():
 # ENHANCED HELP OUTPUT
 # =============================================================================
 
+def _truncate_desc(desc: str, max_len: int = 50) -> str:
+    """Truncate description to fit compact display."""
+    if len(desc) <= max_len:
+        return desc
+    return desc[:max_len-3] + "..."
+
+
 def print_help():
-    """Print enhanced, colorized help overview."""
+    """Print compact, colorized help overview."""
 
-    # Header
+    # Header (no box)
     cons.print()
-    cons.raw.print(Panel(
-        "[bold cyan]MFC[/bold cyan] - [dim]Multi-component Flow Code[/dim]\n"
-        "[dim]Exascale CFD solver for compressible multi-phase flows[/dim]",
-        box=box.ROUNDED,
-        padding=(0, 2)
-    ))
+    cons.print("[bold cyan]MFC[/bold cyan] - Multi-component Flow Code")
+    cons.print("[dim]Exascale CFD solver for compressible multi-phase flows[/dim]")
     cons.print()
 
-    # Commands table
-    table = Table(
-        title="[bold]Commands[/bold]",
-        box=box.SIMPLE,
-        show_header=True,
-        header_style="bold cyan",
-        title_justify="left",
-        padding=(0, 2)
-    )
-    table.add_column("Command", style="green", no_wrap=True)
-    table.add_column("Alias", style="dim", no_wrap=True)
-    table.add_column("Description", style="white")
+    # Commands section - compact format (using COMMANDS as source of truth)
+    cons.print("[bold]Commands:[/bold]")
 
-    # Primary commands with aliases
-    for cmd in ["build", "run", "test", "validate", "new", "clean"]:
-        alias = COMMANDS[cmd].get("alias", "")
-        alias_str = alias if alias else ""
-        table.add_row(cmd, alias_str, COMMANDS[cmd]["description"])
+    # Primary commands (shown prominently with aliases)
+    primary = ["build", "run", "test", "validate", "new", "clean"]
+    for cmd in primary:
+        if cmd not in COMMANDS:
+            continue
+        info = COMMANDS[cmd]
+        alias = info.get("alias") or ""
+        alias_str = f" ({alias})" if alias else "    "
+        desc = _truncate_desc(info["description"])
+        cons.print(f"  [green]{cmd:9}[/green][dim]{alias_str:4}[/dim] {desc}")
 
-    table.add_row("", "", "")  # Spacer
+    # Secondary commands (dimmed)
+    secondary = ["params", "load", "help"]
+    for cmd in secondary:
+        if cmd not in COMMANDS:
+            continue
+        desc = _truncate_desc(COMMANDS[cmd]["description"])
+        cons.print(f"  [dim]{cmd:13} {desc}[/dim]")
 
-    # Secondary commands
-    for cmd in ["params", "count", "packer", "load"]:
-        table.add_row(f"[dim]{cmd}[/dim]", "", f"[dim]{COMMANDS[cmd]['description']}[/dim]")
-
-    table.add_row("", "", "")  # Spacer
-    table.add_row("[dim]help[/dim]", "", "[dim]Show help on a topic (gpu, clusters, batch, debugging)[/dim]")
-
-    cons.raw.print(table)
     cons.print()
 
-    # Quick start
-    cons.raw.print(Panel(
-        "[bold]Quick Start[/bold]\n\n"
-        "  [green]1.[/green] [cyan]./mfc.sh new my_case[/cyan]            Create a new case\n"
-        "  [green]2.[/green] [cyan]vim my_case/case.py[/cyan]             Edit parameters\n"
-        "  [green]3.[/green] [cyan]./mfc.sh validate my_case/case.py[/cyan]  Check for errors\n"
-        "  [green]4.[/green] [cyan]./mfc.sh build -j $(nproc)[/cyan]      Build MFC\n"
-        "  [green]5.[/green] [cyan]./mfc.sh run my_case/case.py[/cyan]    Run simulation",
-        box=box.ROUNDED,
-        border_style="green",
-        padding=(1, 2)
-    ))
-    cons.print()
+    # Quick start - single line
+    cons.print("[bold]Quick start:[/bold] [cyan]./mfc.sh new my_case[/cyan] → edit case.py → [cyan]./mfc.sh build[/cyan] → [cyan]./mfc.sh run[/cyan]")
 
     # Footer
-    cons.print("[dim]Run [cyan]./mfc.sh <command> --help[/cyan] for detailed options[/dim]")
-    cons.print("[dim]Run [cyan]./mfc.sh help <topic>[/cyan] for topic help (gpu, clusters, batch, debugging)[/dim]")
+    cons.print("[dim]Run ./mfc.sh <command> --help for options[/dim]")
     cons.print()
 
 
@@ -497,7 +481,7 @@ class Tips:
         cons.print()
         cons.raw.print(Panel(
             "[bold yellow]Troubleshooting Tips[/bold yellow]\n\n"
-            "  [cyan]1.[/cyan] Run with [green]--debug-log[/green] to see detailed output\n"
+            "  [cyan]1.[/cyan] Rebuild with [green]--debug[/green] for debug compiler flags and verbose output\n"
             "  [cyan]2.[/cyan] Check [green]docs/documentation/troubleshooting.md[/green]\n"
             "  [cyan]3.[/cyan] Ensure required modules are loaded: [green]source ./mfc.sh load -c <cluster> -m <mode>[/green]\n"
             "  [cyan]4.[/cyan] Try [green]./mfc.sh clean[/green] and rebuild",
@@ -545,7 +529,7 @@ class Tips:
             "[bold yellow]Troubleshooting Tips[/bold yellow]\n\n"
             "  [cyan]1.[/cyan] Validate your case: [green]./mfc.sh validate case.py[/green]\n"
             "  [cyan]2.[/cyan] Check the output in [green]<case_dir>/[/green]\n"
-            "  [cyan]3.[/cyan] Run with [green]--debug-log[/green] for more details\n"
+            "  [cyan]3.[/cyan] Rebuild with [green]--debug[/green] for debug compiler flags\n"
             "  [cyan]4.[/cyan] Check MFC documentation: [green]docs/[/green]",
             box=box.ROUNDED,
             border_style="yellow",

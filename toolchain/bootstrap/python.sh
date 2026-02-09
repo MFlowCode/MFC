@@ -1,7 +1,7 @@
 #!/bin/bash
 
 MFC_PYTHON_MIN_MAJOR=3
-MFC_PYTHON_MIN_MINOR=11
+MFC_PYTHON_MIN_MINOR=10
 MFC_PYTHON_MIN_STR="$MFC_PYTHON_MIN_MAJOR.$MFC_PYTHON_MIN_MINOR"
 
 is_python_compatible() {
@@ -138,6 +138,7 @@ if ! cmp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/pyproject.toml" > /dev/
 
     next_arg=0
     nthreads=1
+    verbose=0
     for arg in "$@"; do
         if [ "$arg" == "-j" ] || [ "$arg" == "--jobs" ]; then
             next_arg=1
@@ -147,6 +148,10 @@ if ! cmp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/pyproject.toml" > /dev/
             next_arg=0
             nthreads=$arg
             continue
+        fi
+        # Check for verbosity flags
+        if [ "$arg" == "-v" ] || [ "$arg" == "-vv" ] || [ "$arg" == "-vvv" ] || [ "$arg" == "--verbose" ]; then
+            verbose=1
         fi
     done
 
@@ -173,12 +178,12 @@ if ! cmp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/pyproject.toml" > /dev/
 
     # Use uv if available, otherwise fall back to pip
     if [ "$USE_UV" = "1" ]; then
-        # uv is much faster and has its own progress display - show it
         # UV_LINK_MODE=copy avoids slow hardlink failures on cross-filesystem installs (common on HPC)
         export UV_LINK_MODE=copy
         log "(venv) Using$MAGENTA uv$COLOR_RESET for fast installation..."
-        if [ -t 1 ]; then
-            # Interactive terminal: show uv's native progress
+
+        if [ "$verbose" = "1" ]; then
+            # Verbose mode: show full uv output
             if uv pip install "$(pwd)/toolchain"; then
                 ok "(venv) Installation succeeded."
                 cp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/"
@@ -189,13 +194,18 @@ if ! cmp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/pyproject.toml" > /dev/
                 exit 1
             fi
         else
-            # Non-interactive: capture output for logging
-            if uv pip install "$(pwd)/toolchain" > "$PIP_LOG" 2>&1; then
+            # Default: show progress but filter out individual package lines (+ pkg==ver)
+            uv pip install "$(pwd)/toolchain" > "$PIP_LOG" 2>&1
+            UV_EXIT=$?
+            # Show filtered output (progress info without package list)
+            # Filter out lines like " + pkg==1.0", " - pkg==1.0", " ~ pkg==1.0"
+            grep -v '^ [+~-] ' "$PIP_LOG" || true
+            if [ $UV_EXIT -eq 0 ]; then
                 rm -f "$PIP_LOG"
                 ok "(venv) Installation succeeded."
                 cp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/"
             else
-                error "(venv) Installation failed. See output below:"
+                error "(venv) Installation failed. Full output:"
                 echo ""
                 cat "$PIP_LOG"
                 echo ""
