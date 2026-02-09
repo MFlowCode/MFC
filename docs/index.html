@@ -81,7 +81,7 @@
 
             fetch("https://api.github.com/repos/MFlowCode/MFC/releases/latest")
                 .then(r => r.json())
-                .then(r => { document.getElementById("release-ver").innerText = r.tag_name; })
+                .then(r => { if (r.tag_name) document.getElementById("release-ver").innerText = r.tag_name; })
                 .catch(() => {});
 
             fetch("https://api.github.com/repos/MFlowCode/MFC/contributors")
