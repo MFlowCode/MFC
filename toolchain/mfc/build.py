@@ -46,21 +46,20 @@ def _run_build_with_progress(command: typing.List[str], target_name: str, stream
     all_stdout = []
     all_stderr = []
 
-    # Start the process (can't use 'with' since process is used in multiple branches)
-    process = subprocess.Popen(  # pylint: disable=consider-using-with
-        cmd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        bufsize=1  # Line buffered
-    )
-
     if streaming:
-        # Streaming mode (-v): print build progress lines as they happen
+        # Streaming mode (-v): merge stderr into stdout to avoid pipe deadlock
+        process = subprocess.Popen(  # pylint: disable=consider-using-with
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1  # Line buffered
+        )
+
         cons.print(f"  [bold blue]Building[/bold blue] [magenta]{target_name}[/magenta] [dim](-v)[/dim]...")
         start_time = time.time()
 
-        # Read stdout and print matching lines
+        # Read merged stdout+stderr and print matching lines
         for line in iter(process.stdout.readline, ''):
             all_stdout.append(line)
             stripped = line.strip()
@@ -95,16 +94,22 @@ def _run_build_with_progress(command: typing.List[str], target_name: str, stream
                         filename = filename[:37] + "..."
                     cons.print(f"  [dim][{percent:>3}%][/dim] {filename}")
 
-        # Read any remaining stderr
-        stderr = process.stderr.read()
-        all_stderr.append(stderr)
         process.wait()
 
         elapsed = time.time() - start_time
         if elapsed > 5:
             cons.print(f"  [dim](build took {elapsed:.1f}s)[/dim]")
 
-        return subprocess.CompletedProcess(cmd, process.returncode, ''.join(all_stdout), ''.join(all_stderr))
+        return subprocess.CompletedProcess(cmd, process.returncode, ''.join(all_stdout), '')
+
+    # Start the process for non-streaming modes
+    process = subprocess.Popen(  # pylint: disable=consider-using-with
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        bufsize=1  # Line buffered
+    )
 
     if not is_tty:
         # Non-interactive, non-streaming: show message with elapsed time
