@@ -40,7 +40,7 @@ dependencies = [
     # Chemistry
     "cantera>=3.1.0",
     #"pyrometheus == 1.0.5",
-    "pyrometheus @ git+https://github.com/pyrometheus/pyrometheus.git@49833404f91dd80e598902cdf68dbcc1f6e9bd16",
+    "pyrometheus @ git+https://github.com/pyrometheus/pyrometheus.git",
 
     # Frontier Profiling
     "astunparse==1.6.2",
