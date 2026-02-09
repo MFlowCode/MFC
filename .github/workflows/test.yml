@@ -6,10 +6,6 @@ on:
   pull_request:
   workflow_dispatch:
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   lint-gate:
     name: Lint Gate
@@ -68,6 +64,9 @@ jobs:
     name: Github
     if: needs.file-changes.outputs.checkall == 'true'
     needs: [lint-gate, file-changes]
+    concurrency:
+      group: github-${{ github.ref }}-${{ matrix.os }}-${{ matrix.mpi }}-${{ matrix.debug }}-${{ matrix.intel }}
+      cancel-in-progress: true
     strategy:
       matrix:
         os:    ['ubuntu', 'macos']
@@ -144,6 +143,9 @@ jobs:
     name: "${{ matrix.cluster_name }} (${{ matrix.device }}${{ matrix.interface != 'none' && format('-{0}', matrix.interface) || '' }})"
     if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true'
     needs: [lint-gate, file-changes]
+    concurrency:
+      group: self-${{ github.ref }}-${{ matrix.cluster }}-${{ matrix.device }}-${{ matrix.interface }}
+      cancel-in-progress: true
     continue-on-error: false
     timeout-minutes: 480
     strategy:
@@ -210,6 +212,9 @@ jobs:
     name: "Benchmark | ${{ matrix.name }} (${{ matrix.device }}${{ matrix.interface != 'none' && format('-{0}', matrix.interface) || '' }})"
     if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true'
     needs: [lint-gate, file-changes]
+    concurrency:
+      group: bench-${{ github.ref }}-${{ matrix.cluster }}-${{ matrix.device }}-${{ matrix.interface }}
+      cancel-in-progress: true
     continue-on-error: false
     timeout-minutes: 480
     strategy:
