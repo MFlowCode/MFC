@@ -25,16 +25,18 @@ echo "Frontier consolidated tests: $num_nodes configs"
 echo "=========================================="
 
 # --- Phase 1: Create per-config source copies ---
+# Build exclude list to prevent copying into self
+excludes=""
+for cfg in "${configs[@]}"; do
+    read -r cluster device interface <<< "$cfg"
+    excludes+=" --exclude=test-${cluster}-${device}-${interface}"
+done
+
 for cfg in "${configs[@]}"; do
     read -r cluster device interface <<< "$cfg"
     dir="test-${cluster}-${device}-${interface}"
     echo "Creating source copy: $dir"
-    cp -al . "$dir" 2>/dev/null || cp -r . "$dir"
-    # Remove nested copies to avoid bloat
-    for nested_cfg in "${configs[@]}"; do
-        read -r nc nd ni <<< "$nested_cfg"
-        rm -rf "$dir/test-${nc}-${nd}-${ni}" 2>/dev/null || true
-    done
+    rsync -a --link-dest="$(pwd)" $excludes ./ "$dir/"
 done
 
 # --- Phase 2: Build each config on login node ---
