@@ -165,33 +165,12 @@ jobs:
             cluster_name: 'Georgia Tech | Phoenix'
             device: 'cpu'
             interface: 'none'
-          # Frontier (ORNL) — build on login node, test via SLURM
+          # Frontier (ORNL) — all configs consolidated into one 5-node SLURM job
           - runner:       'frontier'
-            cluster:      'frontier'
+            cluster:      'frontier_all'
             cluster_name: 'Oak Ridge | Frontier'
-            device: 'gpu'
-            interface: 'acc'
-          - runner:       'frontier'
-            cluster:      'frontier'
-            cluster_name: 'Oak Ridge | Frontier'
-            device: 'gpu'
-            interface: 'omp'
-          - runner:       'frontier'
-            cluster:      'frontier'
-            cluster_name: 'Oak Ridge | Frontier'
-            device: 'cpu'
-            interface: 'none'
-          # Frontier AMD — build on login node, test via SLURM
-          - runner:       'frontier'
-            cluster:      'frontier_amd'
-            cluster_name: 'Oak Ridge | Frontier (AMD)'
-            device: 'gpu'
-            interface: 'omp'
-          - runner:       'frontier'
-            cluster:      'frontier_amd'
-            cluster_name: 'Oak Ridge | Frontier (AMD)'
-            device: 'cpu'
-            interface: 'none'
+            device: 'all'
+            interface: 'configs'
     runs-on:
       group:  phoenix
       labels: ${{ matrix.runner }}
@@ -204,22 +183,28 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build
-        if:   matrix.cluster != 'phoenix'
-        run:  bash .github/workflows/${{ matrix.cluster }}/build.sh ${{ matrix.device }} ${{ matrix.interface }}
+        if: matrix.cluster != 'phoenix' && matrix.cluster != 'frontier_all'
+        run: bash .github/workflows/${{ matrix.cluster }}/build.sh ${{ matrix.device }} ${{ matrix.interface }}
 
       - name: Test
-        run:  bash .github/workflows/${{ matrix.cluster }}/submit.sh .github/workflows/${{ matrix.cluster }}/test.sh ${{ matrix.device }} ${{ matrix.interface }}
+        if: matrix.cluster != 'frontier_all'
+        run: bash .github/workflows/${{ matrix.cluster }}/submit.sh .github/workflows/${{ matrix.cluster }}/test.sh ${{ matrix.device }} ${{ matrix.interface }}
+
+      - name: Build & Test (Frontier All Configs)
+        if: matrix.cluster == 'frontier_all'
+        run: bash .github/scripts/run_frontier_all_tests.sh
 
       - name: Print Logs
-        if:   always()
-        run:  cat test-${{ matrix.device }}-${{ matrix.interface }}.out
+        if: always()
+        run: |
+          cat test-*.out 2>/dev/null || true
 
       - name: Archive Logs
         uses: actions/upload-artifact@v4
-        if:   matrix.cluster != 'phoenix'
+        if: always() && matrix.cluster != 'phoenix'
         with:
-          name: logs-${{ strategy.job-index }}-${{ matrix.device }}-${{ matrix.interface }}
-          path: test-${{ matrix.device }}-${{ matrix.interface }}.out
+          name: logs-${{ matrix.cluster }}
+          path: test-*.out
 
   bench:
     name: "Benchmark | ${{ matrix.name }} (${{ matrix.device }}${{ matrix.interface != 'none' && format('-{0}', matrix.interface) || '' }})"
@@ -255,30 +240,14 @@ jobs:
             device: gpu
             interface: omp
             build_script: ""
-          - cluster: frontier
-            name: Oak Ridge | Frontier (CCE)
+          # Frontier — all configs consolidated into one 6-node SLURM job
+          - cluster: frontier_all
+            name: Oak Ridge | Frontier
             group: phoenix
             labels: frontier
-            flag: f
-            device: gpu
-            interface: acc
-            build_script: "bash .github/workflows/frontier/build.sh gpu acc bench"
-          - cluster: frontier
-            name: Oak Ridge | Frontier (CCE)
-            group: phoenix
-            labels: frontier
-            flag: f
-            device: gpu
-            interface: omp
-            build_script: "bash .github/workflows/frontier/build.sh gpu omp bench"
-          - cluster: frontier_amd
-            name: Oak Ridge | Frontier (AMD)
-            group: phoenix
-            labels: frontier
-            flag: famd
-            device: gpu
-            interface: omp
-            build_script: "bash .github/workflows/frontier_amd/build.sh gpu omp bench"
+            device: all
+            interface: configs
+            build_script: ""
     runs-on:
       group: ${{ matrix.group }}
       labels: ${{ matrix.labels }}
@@ -299,36 +268,44 @@ jobs:
           path: master
 
       - name: Setup & Build
-        if: matrix.build_script != ''
+        if: matrix.build_script != '' && matrix.cluster != 'frontier_all'
         run: |
           (cd pr     && ${{ matrix.build_script }}) &
           (cd master && ${{ matrix.build_script }}) &
           wait %1 && wait %2
 
       - name: Bench (Master v. PR)
+        if: matrix.cluster != 'frontier_all'
         run: bash pr/.github/scripts/run_parallel_benchmarks.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }}
 
+      - name: Bench All Configs (Frontier)
+        if: matrix.cluster == 'frontier_all'
+        run: bash pr/.github/scripts/run_frontier_all_benchmarks.sh
+
       - name: Generate & Post Comment
+        if: matrix.cluster != 'frontier_all'
         run: |
           (cd pr && . ./mfc.sh load -c ${{ matrix.flag }} -m g)
           (cd pr && ./mfc.sh bench_diff ../master/bench-${{ matrix.device }}-${{ matrix.interface }}.yaml ../pr/bench-${{ matrix.device }}-${{ matrix.interface }}.yaml)
 
+      - name: Generate & Post Comments (Frontier)
+        if: matrix.cluster == 'frontier_all'
+        run: bash pr/.github/scripts/frontier_bench_post.sh
+
       - name: Print Logs
         if: always()
         run: |
-          cat pr/bench-${{ matrix.device }}-${{ matrix.interface }}.* 2>/dev/null || true
-          cat master/bench-${{ matrix.device }}-${{ matrix.interface }}.* 2>/dev/null || true
+          cat pr/bench-*.* master/bench-*.* 2>/dev/null || true
+          cat pr-*/bench-*.* master-*/bench-*.* 2>/dev/null || true
 
       - name: Archive Logs
         if: always() && matrix.cluster != 'phoenix'
         uses: actions/upload-artifact@v4
         with:
-          name: bench-${{ matrix.cluster }}-${{ matrix.device }}-${{ matrix.interface }}
+          name: bench-${{ matrix.cluster }}
           path: |
-            pr/bench-${{ matrix.device }}-${{ matrix.interface }}.*
-            pr/build/benchmarks/*
-            master/bench-${{ matrix.device }}-${{ matrix.interface }}.*
-            master/build/benchmarks/*
+            pr*/bench-*.*
+            master*/bench-*.*
 
   cancel-on-test-failure:
     name: Cancel on Test Failure
