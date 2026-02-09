@@ -91,8 +91,6 @@ module m_start_up
 
     use m_sim_helpers
 
-    use m_mhd
-
     use m_igr
 
     implicit none
@@ -183,8 +181,9 @@ contains
             g_x, g_y, g_z, n_start, t_save, t_stop, &
             cfl_adap_dt, cfl_const_dt, cfl_target, &
             surface_tension, bubbles_lagrange, lag_params, &
-            hyperelasticity, R0ref, num_bc_patches, Bx0, powell, &
+            hyperelasticity, R0ref, num_bc_patches, Bx0, &
             cont_damage, tau_star, cont_damage_s, alpha_bar, &
+            hyper_cleaning, hyper_cleaning_speed, hyper_cleaning_tau, &
             alf_factor, num_igr_iters, num_igr_warm_start_iters, &
             int_comp, ic_eps, ic_beta, nv_uvm_out_of_core, &
             nv_uvm_igr_temps_on_gpu, nv_uvm_pref_gpu, down_sample, fft_wrt
@@ -1301,6 +1300,12 @@ contains
         real(wp) :: temp1, temp2, temp3, temp4
 
         call s_initialize_global_parameters_module()
+        #:if USING_AMD
+            #:for BC in {-5, -6, -7, -8, -9, -10, -11, -12, -13}
+                @:PROHIBIT(any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == ${BC}$) .and. adv_idx%end > 20 .and. (.not. chemistry), "CBC module with AMD compiler requires adv_idx%end <= 20 when case optimization is turned off")
+                @:PROHIBIT(any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == ${BC}$) .and. sys_size > 20 .and. (chemistry), "CBC module with AMD compiler and chemistry requires sys_size <= 20 when case optimization is turned off")
+            #:endfor
+        #:endif
         if (bubbles_euler .or. bubbles_lagrange) then
             call s_initialize_bubbles_model()
         end if
@@ -1373,9 +1378,10 @@ contains
         ! Computation of parameters, allocation of memory, association of pointers,
         ! and/or execution of any other tasks that are needed to properly configure
         ! the modules. The preparations below DO DEPEND on the grid being complete.
-        if (igr) then
+        if (igr .or. dummy) then
             call s_initialize_igr_module()
-        else
+        end if
+        if (.not. igr .or. dummy) then
             if (recon_type == WENO_TYPE) then
                 call s_initialize_weno_module()
             elseif (recon_type == MUSCL_TYPE) then
@@ -1390,8 +1396,6 @@ contains
 
         if (hypoelasticity) call s_initialize_hypoelastic_module()
         if (hyperelasticity) call s_initialize_hyperelastic_module()
-
-        if (mhd .and. powell) call s_initialize_mhd_powell_module
 
     end subroutine s_initialize_modules
 
@@ -1534,14 +1538,14 @@ contains
         #:if not MFC_CASE_OPTIMIZATION
             $:GPU_UPDATE(device='[igr,nb,igr_order]')
         #:endif
-        #:block DEF_AMD
+        #:if USING_AMD
             block
                 use m_thermochem, only: molecular_weights
                 use m_chemistry, only: molecular_weights_nonparameter
                 molecular_weights_nonparameter(:) = molecular_weights(:)
                 $:GPU_UPDATE(device='[molecular_weights_nonparameter]')
             end block
-        #:endblock
+        #:endif
 
     end subroutine s_initialize_gpu_vars
 
@@ -1578,7 +1582,6 @@ contains
 
         if (surface_tension) call s_finalize_surface_tension_module()
         if (bodyForces) call s_finalize_body_forces_module()
-        if (mhd .and. powell) call s_finalize_mhd_powell_module
 
         ! Terminating MPI execution environment
         call s_mpi_finalize()

@@ -1,7 +1,7 @@
 !>
 !! @file m_compute_cbc.f90
 !! @brief CBC computation module
-
+#:include 'case.fpp'
 #:include 'macros.fpp'
 
 module m_compute_cbc
@@ -23,7 +23,11 @@ contains
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), dimension(3), intent(in) :: lambda
         real(wp), intent(in) :: rho, c, dpres_ds
-        real(wp), dimension(num_dims), intent(in) :: dvel_ds
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3), intent(in) :: dvel_ds
+        #:else
+            real(wp), dimension(num_dims), intent(in) :: dvel_ds
+        #:endif
         real(wp) :: L1
         L1 = lambda(1)*(dpres_ds - rho*c*dvel_ds(dir_idx(1)))
     end function f_base_L1
@@ -31,9 +35,17 @@ contains
     !> Fill density L variables
     subroutine s_fill_density_L(L, lambda_factor, lambda2, c, mf, dalpha_rho_ds, dpres_ds)
         $:GPU_ROUTINE(parallelism='[seq]')
-        real(wp), dimension(sys_size), intent(inout) :: L
+        #:if USING_AMD
+            real(wp), dimension(20), intent(inout) :: L
+        #:else
+            real(wp), dimension(sys_size), intent(inout) :: L
+        #:endif
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3), intent(in) :: mf, dalpha_rho_ds
+        #:else
+            real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
+        #:endif
         real(wp), intent(in) :: lambda_factor, lambda2, c
-        real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
         real(wp), intent(in) :: dpres_ds
         integer :: i
 
@@ -46,9 +58,17 @@ contains
     !> Fill velocity L variables
     subroutine s_fill_velocity_L(L, lambda_factor, lambda2, dvel_ds)
         $:GPU_ROUTINE(parallelism='[seq]')
-        real(wp), dimension(sys_size), intent(inout) :: L
+        #:if USING_AMD
+            real(wp), dimension(20), intent(inout) :: L
+        #:else
+            real(wp), dimension(sys_size), intent(inout) :: L
+        #:endif
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3), intent(in) :: dvel_ds
+        #:else
+            real(wp), dimension(num_dims), intent(in) :: dvel_ds
+        #:endif
         real(wp), intent(in) :: lambda_factor, lambda2
-        real(wp), dimension(num_dims), intent(in) :: dvel_ds
         integer :: i
 
         ! $:GPU_LOOP(parallelism='[seq]')
@@ -60,9 +80,17 @@ contains
     !> Fill advection L variables
     subroutine s_fill_advection_L(L, lambda_factor, lambda2, dadv_ds)
         $:GPU_ROUTINE(parallelism='[seq]')
-        real(wp), dimension(sys_size), intent(inout) :: L
+        #:if USING_AMD
+            real(wp), dimension(20), intent(inout) :: L
+        #:else
+            real(wp), dimension(sys_size), intent(inout) :: L
+        #:endif
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3), intent(in) :: dadv_ds
+        #:else
+            real(wp), dimension(num_fluids), intent(in) :: dadv_ds
+        #:endif
         real(wp), intent(in) :: lambda_factor, lambda2
-        real(wp), dimension(num_fluids), intent(in) :: dadv_ds
         integer :: i
 
         ! $:GPU_LOOP(parallelism='[seq]')
@@ -74,9 +102,17 @@ contains
     !> Fill chemistry L variables
     subroutine s_fill_chemistry_L(L, lambda_factor, lambda2, dYs_ds)
         $:GPU_ROUTINE(parallelism='[seq]')
-        real(wp), dimension(sys_size), intent(inout) :: L
+        #:if USING_AMD
+            real(wp), dimension(20), intent(inout) :: L
+        #:else
+            real(wp), dimension(sys_size), intent(inout) :: L
+        #:endif
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(10), intent(in) :: dYs_ds
+        #:else
+            real(wp), dimension(num_species), intent(in) :: dYs_ds
+        #:endif
         real(wp), intent(in) :: lambda_factor, lambda2
-        real(wp), dimension(num_species), intent(in) :: dYs_ds
         integer :: i
 
         if (.not. chemistry) return
@@ -93,9 +129,17 @@ contains
             & cray_inline=True)
 
         real(wp), dimension(3), intent(in) :: lambda
-        real(wp), dimension(sys_size), intent(inout) :: L
+        #:if USING_AMD
+            real(wp), dimension(20), intent(inout) :: L
+        #:else
+            real(wp), dimension(sys_size), intent(inout) :: L
+        #:endif
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3), intent(in) :: dvel_ds
+        #:else
+            real(wp), dimension(num_dims), intent(in) :: dvel_ds
+        #:endif
         real(wp), intent(in) :: rho, c, dpres_ds
-        real(wp), dimension(num_dims), intent(in) :: dvel_ds
         integer :: i
 
         L(1) = f_base_L1(lambda, rho, c, dpres_ds, dvel_ds)
@@ -109,13 +153,25 @@ contains
             & parallelism='[seq]', cray_inline=True)
 
         real(wp), dimension(3), intent(in) :: lambda
-        real(wp), dimension(sys_size), intent(inout) :: L
+        #:if USING_AMD
+            real(wp), dimension(20), intent(inout) :: L
+        #:else
+            real(wp), dimension(sys_size), intent(inout) :: L
+        #:endif
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3), intent(in) :: mf, dalpha_rho_ds
+            real(wp), dimension(3), intent(in) :: dvel_ds
+            real(wp), dimension(3), intent(in) :: dadv_ds
+            real(wp), dimension(10), intent(in) :: dYs_ds
+        #:else
+            real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
+            real(wp), dimension(num_dims), intent(in) :: dvel_ds
+            real(wp), dimension(num_fluids), intent(in) :: dadv_ds
+            real(wp), dimension(num_species), intent(in) :: dYs_ds
+        #:endif
         real(wp), intent(in) :: rho, c
-        real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
         real(wp), intent(in) :: dpres_ds
-        real(wp), dimension(num_dims), intent(in) :: dvel_ds
-        real(wp), dimension(num_fluids), intent(in) :: dadv_ds
-        real(wp), dimension(num_species), intent(in) :: dYs_ds
+
         real(wp) :: lambda_factor
 
         lambda_factor = (5.e-1_wp - 5.e-1_wp*sign(1._wp, lambda(1)))
@@ -137,9 +193,17 @@ contains
             & parallelism='[seq]', cray_inline=True)
 
         real(wp), dimension(3), intent(in) :: lambda
-        real(wp), dimension(sys_size), intent(inout) :: L
+        #:if USING_AMD
+            real(wp), dimension(20), intent(inout) :: L
+        #:else
+            real(wp), dimension(sys_size), intent(inout) :: L
+        #:endif
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3), intent(in) :: dvel_ds
+        #:else
+            real(wp), dimension(num_dims), intent(in) :: dvel_ds
+        #:endif
         real(wp), intent(in) :: rho, c, dpres_ds
-        real(wp), dimension(num_dims), intent(in) :: dvel_ds
 
         L(1) = f_base_L1(lambda, rho, c, dpres_ds, dvel_ds)
         L(2:advxe) = 0._wp
@@ -152,13 +216,24 @@ contains
             & parallelism='[seq]', cray_inline=True)
 
         real(wp), dimension(3), intent(in) :: lambda
-        real(wp), dimension(sys_size), intent(inout) :: L
+        #:if USING_AMD
+            real(wp), dimension(20), intent(inout) :: L
+        #:else
+            real(wp), dimension(sys_size), intent(inout) :: L
+        #:endif
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3), intent(in) :: mf, dalpha_rho_ds
+            real(wp), dimension(3), intent(in) :: dvel_ds
+            real(wp), dimension(3), intent(in) :: dadv_ds
+            real(wp), dimension(10), intent(in) :: dYs_ds
+        #:else
+            real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
+            real(wp), dimension(num_dims), intent(in) :: dvel_ds
+            real(wp), dimension(num_fluids), intent(in) :: dadv_ds
+            real(wp), dimension(num_species), intent(in) :: dYs_ds
+        #:endif
         real(wp), intent(in) :: rho, c
-        real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
         real(wp), intent(in) :: dpres_ds
-        real(wp), dimension(num_dims), intent(in) :: dvel_ds
-        real(wp), dimension(num_fluids), intent(in) :: dadv_ds
-        real(wp), dimension(num_species), intent(in) :: dYs_ds
 
         L(1) = f_base_L1(lambda, rho, c, dpres_ds, dvel_ds)
         call s_fill_density_L(L, 1._wp, lambda(2), c, mf, dalpha_rho_ds, dpres_ds)
@@ -174,12 +249,22 @@ contains
             & parallelism='[seq]', cray_inline=True)
 
         real(wp), dimension(3), intent(in) :: lambda
-        real(wp), dimension(sys_size), intent(inout) :: L
+        #:if USING_AMD
+            real(wp), dimension(20), intent(inout) :: L
+        #:else
+            real(wp), dimension(sys_size), intent(inout) :: L
+        #:endif
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3), intent(in) :: mf, dalpha_rho_ds
+            real(wp), dimension(3), intent(in) :: dvel_ds
+            real(wp), dimension(3), intent(in) :: dadv_ds
+        #:else
+            real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
+            real(wp), dimension(num_dims), intent(in) :: dvel_ds
+            real(wp), dimension(num_fluids), intent(in) :: dadv_ds
+        #:endif
         real(wp), intent(in) :: rho, c
-        real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
         real(wp), intent(in) :: dpres_ds
-        real(wp), dimension(num_dims), intent(in) :: dvel_ds
-        real(wp), dimension(num_fluids), intent(in) :: dadv_ds
 
         L(1) = f_base_L1(lambda, rho, c, dpres_ds, dvel_ds)
         call s_fill_density_L(L, 1._wp, lambda(2), c, mf, dalpha_rho_ds, dpres_ds)
@@ -194,12 +279,22 @@ contains
             & parallelism='[seq]', cray_inline=True)
 
         real(wp), dimension(3), intent(in) :: lambda
-        real(wp), dimension(sys_size), intent(inout) :: L
+        #:if USING_AMD
+            real(wp), dimension(20), intent(inout) :: L
+        #:else
+            real(wp), dimension(sys_size), intent(inout) :: L
+        #:endif
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3), intent(in) :: mf, dalpha_rho_ds
+            real(wp), dimension(3), intent(in) :: dvel_ds
+            real(wp), dimension(3), intent(in) :: dadv_ds
+        #:else
+            real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
+            real(wp), dimension(num_dims), intent(in) :: dvel_ds
+            real(wp), dimension(num_fluids), intent(in) :: dadv_ds
+        #:endif
         real(wp), intent(in) :: rho, c
-        real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
         real(wp), intent(in) :: dpres_ds
-        real(wp), dimension(num_dims), intent(in) :: dvel_ds
-        real(wp), dimension(num_fluids), intent(in) :: dadv_ds
 
         L(1) = f_base_L1(lambda, rho, c, dpres_ds, dvel_ds)
         call s_fill_density_L(L, 1._wp, lambda(2), c, mf, dalpha_rho_ds, dpres_ds)
@@ -212,8 +307,11 @@ contains
     subroutine s_compute_supersonic_inflow_L(L)
         $:GPU_ROUTINE(function_name='s_compute_supersonic_inflow_L', &
             & parallelism='[seq]', cray_inline=True)
-
-        real(wp), dimension(sys_size), intent(inout) :: L
+        #:if USING_AMD
+            real(wp), dimension(20), intent(inout) :: L
+        #:else
+            real(wp), dimension(sys_size), intent(inout) :: L
+        #:endif
         L(1:advxe) = 0._wp
         if (chemistry) L(chemxb:chemxe) = 0._wp
     end subroutine s_compute_supersonic_inflow_L
@@ -224,13 +322,24 @@ contains
             & parallelism='[seq]', cray_inline=True)
 
         real(wp), dimension(3), intent(in) :: lambda
-        real(wp), dimension(sys_size), intent(inout) :: L
+        #:if USING_AMD
+            real(wp), dimension(20), intent(inout) :: L
+        #:else
+            real(wp), dimension(sys_size), intent(inout) :: L
+        #:endif
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3), intent(in) :: mf, dalpha_rho_ds
+            real(wp), dimension(3), intent(in) :: dvel_ds
+            real(wp), dimension(3), intent(in) :: dadv_ds
+            real(wp), dimension(10), intent(in) :: dYs_ds
+        #:else
+            real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
+            real(wp), dimension(num_dims), intent(in) :: dvel_ds
+            real(wp), dimension(num_fluids), intent(in) :: dadv_ds
+            real(wp), dimension(num_species), intent(in) :: dYs_ds
+        #:endif
         real(wp), intent(in) :: rho, c
-        real(wp), dimension(num_fluids), intent(in) :: mf, dalpha_rho_ds
         real(wp), intent(in) :: dpres_ds
-        real(wp), dimension(num_dims), intent(in) :: dvel_ds
-        real(wp), dimension(num_fluids), intent(in) :: dadv_ds
-        real(wp), dimension(num_species), intent(in) :: dYs_ds
 
         L(1) = f_base_L1(lambda, rho, c, dpres_ds, dvel_ds)
         call s_fill_density_L(L, 1._wp, lambda(2), c, mf, dalpha_rho_ds, dpres_ds)

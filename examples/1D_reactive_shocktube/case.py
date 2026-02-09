@@ -3,7 +3,8 @@
 # + https://doi.org/10.1016/j.ijhydene.2023.03.190:  Verification of numerical method
 # + https://doi.org/10.1016/j.compfluid.2013.10.014: 4.7. Multi-species reactive shock tube
 
-import json, argparse
+import json
+import argparse
 import cantera as ct
 
 parser = argparse.ArgumentParser(prog="1D_reactive_shocktube", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
