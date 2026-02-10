@@ -45,13 +45,27 @@ module m_mpi_common
     integer(kind=8) :: halo_size
     $:GPU_DECLARE(create='[halo_size]')
 
+    real(wp), private, allocatable, dimension(:), target :: buff_send_scalarfield
+    !! This variable is utilized to pack and send the buffer of any scalar field to neighboring processors
+
+    real(wp), private, allocatable, dimension(:), target :: buff_recv_scalarfield
+    !! This variable is utilized to receive and unpack the buffer of any scalar field from neighboring processors
+
+#ifndef __NVCOMPILER_GPU_UNIFIED_MEM
+    $:GPU_DECLARE(create='[buff_send_scalarfield, buff_recv_scalarfield]')
+#endif
+
+    real(wp), allocatable, dimension(:, :), public :: domain_glb
+    $:GPU_DECLARE(create='[domain_glb]')
+    !! This variables holds the physical locations of the global domain bounds
+
 contains
 
     !> The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any
         !!      other procedures that are necessary to setup the module.
     impure subroutine s_initialize_mpi_common_module
-
+        integer :: halo_size_sf
 #ifdef MFC_MPI
         ! Allocating buff_send/recv and. Please note that for the sake of
         ! simplicity, both variables are provided sufficient storage to hold
@@ -86,6 +100,23 @@ contains
         allocate (buff_send(0:halo_size), buff_recv(0:halo_size))
         $:GPU_ENTER_DATA(create='[capture:buff_send]')
         $:GPU_ENTER_DATA(create='[capture:buff_recv]')
+#endif
+
+#ifdef MFC_SIMULATION
+        if (volume_filter_momentum_eqn) then
+            halo_size_sf = nint(-1._wp + 1._wp*buff_size* &
+                                           & (m + 2*buff_size + 1)* &
+                                           & (n + 2*buff_size + 1)* &
+                                           & (p + 2*buff_size + 1)/ &
+                                           & (cells_bounds%mnp_min + 2*buff_size + 1))
+#ifndef __NVCOMPILER_GPU_UNIFIED_MEM
+            @:ALLOCATE(buff_send_scalarfield(0:halo_size_sf), buff_recv_scalarfield(0:halo_size_sf))
+#else
+            allocate (buff_send_scalarfield(0:halo_size_sf), buff_recv_scalarfield(0:halo_size_sf))
+            $:GPU_ENTER_DATA(create='[capture:buff_send_scalarfield]')
+            $:GPU_ENTER_DATA(create='[capture:buff_recv_scalarfield]')
+#endif
+        end if
 #endif
 #endif
 
@@ -207,14 +238,18 @@ contains
 
 #ifdef MFC_PRE_PROCESS
             MPI_IO_IB_DATA%var%sf => ib_markers%sf
-            MPI_IO_levelset_DATA%var%sf => levelset%sf
-            MPI_IO_levelsetnorm_DATA%var%sf => levelset_norm%sf
+            if (store_levelset) then
+                MPI_IO_levelset_DATA%var%sf => levelset%sf
+                MPI_IO_levelsetnorm_DATA%var%sf => levelset_norm%sf
+            end if
 #else
             MPI_IO_IB_DATA%var%sf => ib_markers%sf(0:m, 0:n, 0:p)
 
 #ifndef MFC_POST_PROCESS
-            MPI_IO_levelset_DATA%var%sf => levelset%sf(0:m, 0:n, 0:p, 1:num_ibs)
-            MPI_IO_levelsetnorm_DATA%var%sf => levelset_norm%sf(0:m, 0:n, 0:p, 1:num_ibs, 1:3)
+            if (store_levelset) then
+                MPI_IO_levelset_DATA%var%sf => levelset%sf(0:m, 0:n, 0:p, 1:num_ibs)
+                MPI_IO_levelsetnorm_DATA%var%sf => levelset_norm%sf(0:m, 0:n, 0:p, 1:num_ibs, 1:3)
+            end if
 #endif
 
 #endif
@@ -223,13 +258,15 @@ contains
             call MPI_TYPE_COMMIT(MPI_IO_IB_DATA%view, ierr)
 
 #ifndef MFC_POST_PROCESS
-            call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, &
-                                          MPI_ORDER_FORTRAN, mpi_p, MPI_IO_levelset_DATA%view, ierr)
-            call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, &
-                                          MPI_ORDER_FORTRAN, mpi_p, MPI_IO_levelsetnorm_DATA%view, ierr)
+            if (store_levelset) then
+                call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, &
+                                              MPI_ORDER_FORTRAN, mpi_p, MPI_IO_levelset_DATA%view, ierr)
+                call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, &
+                                              MPI_ORDER_FORTRAN, mpi_p, MPI_IO_levelsetnorm_DATA%view, ierr)
 
-            call MPI_TYPE_COMMIT(MPI_IO_levelset_DATA%view, ierr)
-            call MPI_TYPE_COMMIT(MPI_IO_levelsetnorm_DATA%view, ierr)
+                call MPI_TYPE_COMMIT(MPI_IO_levelset_DATA%view, ierr)
+                call MPI_TYPE_COMMIT(MPI_IO_levelsetnorm_DATA%view, ierr)
+            end if
 #endif
         end if
 
@@ -276,6 +313,87 @@ contains
 #endif
 
     end subroutine s_initialize_mpi_data
+
+    !! @param filtered_fluid_indicator_function volume filtered fluid indicator function
+    !! @param stat_q_cons_filtered 1-4 order statistical moments of volume filtered conservative variables
+    !! @param stat_filtered_pressure 1-4 order statistical moments of volume filtered pressure
+    !! @param stat_reynolds_stress 1-4 order statistics of reynolds stress tensor
+    !! @param stat_eff_visc 1-4 order statistics of unclosed effective viscosity tensor
+    !! @param stat_int_mom_exch 1-4 order statistics of interphase momentum exchange vector
+    impure subroutine s_initialize_mpi_data_filtered(filtered_fluid_indicator_function, &
+                                                     stat_q_cons_filtered, stat_filtered_pressure, &
+                                                     stat_reynolds_stress, stat_eff_visc, stat_int_mom_exch)
+
+        type(scalar_field), intent(in) :: filtered_fluid_indicator_function
+        type(vector_field), dimension(E_idx), intent(in) :: stat_q_cons_filtered
+        type(scalar_field), dimension(4), intent(in) :: stat_filtered_pressure
+        type(vector_field), dimension(num_dims, num_dims), intent(in) :: stat_reynolds_stress
+        type(vector_field), dimension(num_dims, num_dims), intent(in) :: stat_eff_visc
+        type(vector_field), dimension(num_dims), intent(in) :: stat_int_mom_exch
+
+        integer, dimension(num_dims) :: sizes_glb, sizes_loc
+
+#ifdef MFC_MPI
+#ifndef MFC_PRE_PROCESS
+
+        ! Generic loop iterator
+        integer :: i, j, k
+        integer :: ierr !< Generic flag used to identify and report MPI errors
+
+        !total system size
+        integer :: alt_sys
+
+        alt_sys = sys_size + volume_filter_dt%stat_size
+
+        MPI_IO_DATA%var(sys_size + volume_filter_dt%stat_fluid_idx)%sf => filtered_fluid_indicator_function%sf(0:m, 0:n, 0:p)
+        do i = 1, num_dims
+            do j = 1, num_dims
+                do k = 1, 4
+                    MPI_IO_DATA%var(sys_size + volume_filter_dt%stat_re_idx + (i - 1)*4*num_dims + (j - 1)*4 + (k - 1))%sf => stat_reynolds_stress(i, j)%vf(k)%sf(0:m, 0:n, 0:p)
+                end do
+            end do
+        end do
+        do i = 1, num_dims
+            do j = 1, num_dims
+                do k = 1, 4
+                    MPI_IO_DATA%var(sys_size + volume_filter_dt%stat_visc_idx + (i - 1)*4*num_dims + (j - 1)*4 + (k - 1))%sf => stat_eff_visc(i, j)%vf(k)%sf(0:m, 0:n, 0:p)
+                end do
+            end do
+        end do
+        do i = 1, num_dims
+            do j = 1, 4
+                MPI_IO_DATA%var(sys_size + volume_filter_dt%stat_mom_exch_idx + (i - 1)*4 + (j - 1))%sf => stat_int_mom_exch(i)%vf(j)%sf(0:m, 0:n, 0:p)
+            end do
+        end do
+        do i = 1, E_idx
+            do j = 1, 4
+                MPI_IO_DATA%var(sys_size + volume_filter_dt%stat_cons_idx + (i - 1)*4 + (j - 1))%sf => stat_q_cons_filtered(i)%vf(j)%sf(0:m, 0:n, 0:p)
+            end do
+        end do
+        do i = 1, 4
+            MPI_IO_DATA%var(sys_size + volume_filter_dt%stat_pres_idx + (i - 1))%sf => stat_filtered_pressure(i)%sf(0:m, 0:n, 0:p)
+        end do
+
+        ! Define global(g) and local(l) sizes for flow variables
+        sizes_glb(1) = m_glb + 1; sizes_loc(1) = m + 1
+        if (n > 0) then
+            sizes_glb(2) = n_glb + 1; sizes_loc(2) = n + 1
+            if (p > 0) then
+                sizes_glb(3) = p_glb + 1; sizes_loc(3) = p + 1
+            end if
+        end if
+
+        ! Define the view for each variable
+        do i = sys_size + 1, alt_sys
+            call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, &
+                                          MPI_ORDER_FORTRAN, mpi_p, MPI_IO_DATA%view(i), ierr)
+            call MPI_TYPE_COMMIT(MPI_IO_DATA%view(i), ierr)
+        end do
+
+#endif
+#endif
+
+    end subroutine s_initialize_mpi_data_filtered
 
     !! @param q_cons_vf Conservative variables
     subroutine s_initialize_mpi_data_ds(q_cons_vf)
@@ -1163,6 +1281,231 @@ contains
 
     end subroutine s_mpi_sendrecv_variables_buffers
 
+    !>  The goal of this procedure is to populate the buffers of
+        !!      any scalarfield variable by communicating
+        !!      with the neighboring processors.
+        !!  @param q_comm scalarfield variable
+        !!  @param mpi_dir MPI communication coordinate direction
+        !!  @param pbc_loc Processor boundary condition (PBC) location
+    subroutine s_mpi_sendrecv_variables_buffers_scalarfield(q_comm, &
+                                                            mpi_dir, &
+                                                            pbc_loc)
+
+        type(scalar_field), intent(inout) :: q_comm
+        integer, intent(in) :: mpi_dir, pbc_loc
+
+        integer :: i, j, k, l, r, q !< Generic loop iterators
+
+        integer :: buffer_counts(1:3), buffer_count
+
+        type(int_bounds_info) :: boundary_conditions(1:3)
+        integer :: beg_end(1:2), grid_dims(1:3)
+        integer :: dst_proc, src_proc, recv_tag, send_tag
+
+        logical :: beg_end_geq_0
+
+        integer :: pack_offset, unpack_offset
+
+#ifdef MFC_MPI
+        integer :: ierr !< Generic flag used to identify and report MPI errors
+
+        call nvtxStartRange("RHS-COMM-PACKBUF")
+
+        buffer_counts = (/ &
+                        buff_size*(n + 1)*(p + 1), &
+                        buff_size*(m + 2*buff_size + 1)*(p + 1), &
+                        buff_size*(m + 2*buff_size + 1)*(n + 2*buff_size + 1) &
+                        /)
+
+        buffer_count = buffer_counts(mpi_dir)
+        boundary_conditions = (/bc_x, bc_y, bc_z/)
+        beg_end = (/boundary_conditions(mpi_dir)%beg, boundary_conditions(mpi_dir)%end/)
+        beg_end_geq_0 = beg_end(max(pbc_loc, 0) - pbc_loc + 1) >= 0
+
+        ! Implements:
+        ! pbc_loc  bc_x >= 0 -> [send/recv]_tag  [dst/src]_proc
+        ! -1 (=0)      0            ->     [1,0]       [0,0]      | 0 0 [1,0] [beg,beg]
+        ! -1 (=0)      1            ->     [0,0]       [1,0]      | 0 1 [0,0] [end,beg]
+        ! +1 (=1)      0            ->     [0,1]       [1,1]      | 1 0 [0,1] [end,end]
+        ! +1 (=1)      1            ->     [1,1]       [0,1]      | 1 1 [1,1] [beg,end]
+
+        send_tag = f_logical_to_int(.not. f_xor(beg_end_geq_0, pbc_loc == 1))
+        recv_tag = f_logical_to_int(pbc_loc == 1)
+
+        dst_proc = beg_end(1 + f_logical_to_int(f_xor(pbc_loc == 1, beg_end_geq_0)))
+        src_proc = beg_end(1 + f_logical_to_int(pbc_loc == 1))
+
+        grid_dims = (/m, n, p/)
+
+        pack_offset = 0
+        if (f_xor(pbc_loc == 1, beg_end_geq_0)) then
+            pack_offset = grid_dims(mpi_dir) - buff_size + 1
+        end if
+
+        unpack_offset = 0
+        if (pbc_loc == 1) then
+            unpack_offset = grid_dims(mpi_dir) + buff_size + 1
+        end if
+
+        ! Pack Buffer to Send
+        #:for mpi_dir in [1, 2, 3]
+            if (mpi_dir == ${mpi_dir}$) then
+                #:if mpi_dir == 1
+                    $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, buff_size - 1
+                                r = (j + buff_size*(k + (n + 1)*l))
+                                buff_send_scalarfield(r) = q_comm%sf(j + pack_offset, k, l)
+                            end do
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+
+                #:elif mpi_dir == 2
+                    $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
+                    do l = 0, p
+                        do k = 0, buff_size - 1
+                            do j = -buff_size, m + buff_size
+                                r = ((j + buff_size) + (m + 2*buff_size + 1)* &
+                                     (k + buff_size*l))
+                                buff_send_scalarfield(r) = q_comm%sf(j, k + pack_offset, l)
+                            end do
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+
+                #:else
+                    $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
+                    do l = 0, buff_size - 1
+                        do k = -buff_size, n + buff_size
+                            do j = -buff_size, m + buff_size
+                                r = ((j + buff_size) + (m + 2*buff_size + 1)* &
+                                     ((k + buff_size) + (n + 2*buff_size + 1)*l))
+                                buff_send_scalarfield(r) = q_comm%sf(j, k, l + pack_offset)
+                            end do
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+
+                #:endif
+            end if
+        #:endfor
+        call nvtxEndRange ! Packbuf
+
+        ! Send/Recv
+#ifdef MFC_SIMULATION
+        #:for rdma_mpi in [False, True]
+            if (rdma_mpi .eqv. ${'.true.' if rdma_mpi else '.false.'}$) then
+                #:if rdma_mpi
+                    #:call GPU_HOST_DATA(use_device_addr='[buff_send_scalarfield, buff_recv_scalarfield]')
+                        call nvtxStartRange("RHS-COMM-SENDRECV-RDMA")
+
+                        call MPI_SENDRECV( &
+                            buff_send_scalarfield, buffer_count, mpi_p, dst_proc, send_tag, &
+                            buff_recv_scalarfield, buffer_count, mpi_p, src_proc, recv_tag, &
+                            MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
+                        call nvtxEndRange ! RHS-MPI-SENDRECV-(NO)-RDMA
+
+                    #:endcall GPU_HOST_DATA
+                    $:GPU_WAIT()
+                #:else
+                    call nvtxStartRange("RHS-COMM-DEV2HOST")
+                    $:GPU_UPDATE(host='[buff_send_scalarfield]')
+                    call nvtxEndRange
+                    call nvtxStartRange("RHS-COMM-SENDRECV-NO-RMDA")
+
+                    call MPI_SENDRECV( &
+                        buff_send_scalarfield, buffer_count, mpi_p, dst_proc, send_tag, &
+                        buff_recv_scalarfield, buffer_count, mpi_p, src_proc, recv_tag, &
+                        MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
+                    call nvtxEndRange ! RHS-MPI-SENDRECV-(NO)-RDMA
+
+                    call nvtxStartRange("RHS-COMM-HOST2DEV")
+                    $:GPU_UPDATE(device='[buff_recv_scalarfield]')
+                    call nvtxEndRange
+                #:endif
+            end if
+        #:endfor
+#else
+        call MPI_SENDRECV( &
+            buff_send_scalarfield, buffer_count, mpi_p, dst_proc, send_tag, &
+            buff_recv_scalarfield, buffer_count, mpi_p, src_proc, recv_tag, &
+            MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+#endif
+
+        ! Unpack Received Buffer
+        call nvtxStartRange("RHS-COMM-UNPACKBUF")
+        #:for mpi_dir in [1, 2, 3]
+            if (mpi_dir == ${mpi_dir}$) then
+                #:if mpi_dir == 1
+                    $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
+                    do l = 0, p
+                        do k = 0, n
+                            do j = -buff_size, -1
+                                r = (j + buff_size*((k + 1) + (n + 1)*l))
+                                q_comm%sf(j + unpack_offset, k, l) = buff_recv_scalarfield(r)
+#if defined(__INTEL_COMPILER)
+                                if (ieee_is_nan(q_comm%sf(j, k, l))) then
+                                    print *, "Error", j, k, l
+                                    error stop "NaN(s) in recv"
+                                end if
+#endif
+                            end do
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+
+                #:elif mpi_dir == 2
+                    $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
+                    do l = 0, p
+                        do k = -buff_size, -1
+                            do j = -buff_size, m + buff_size
+                                r = ((j + buff_size) + (m + 2*buff_size + 1)* &
+                                     ((k + buff_size) + buff_size*l))
+                                q_comm%sf(j, k + unpack_offset, l) = buff_recv_scalarfield(r)
+#if defined(__INTEL_COMPILER)
+                                if (ieee_is_nan(q_comm%sf(j, k, l))) then
+                                    print *, "Error", j, k, l
+                                    error stop "NaN(s) in recv"
+                                end if
+#endif
+                            end do
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+
+                #:else
+                    ! Unpacking buffer from bc_z%beg
+                    $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
+                    do l = -buff_size, -1
+                        do k = -buff_size, n + buff_size
+                            do j = -buff_size, m + buff_size
+                                r = ((j + buff_size) + (m + 2*buff_size + 1)* &
+                                     ((k + buff_size) + (n + 2*buff_size + 1)* &
+                                      (l + buff_size)))
+                                q_comm%sf(j, k, l + unpack_offset) = buff_recv_scalarfield(r)
+#if defined(__INTEL_COMPILER)
+                                if (ieee_is_nan(q_comm%sf(j, k, l))) then
+                                    print *, "Error", j, k, l
+                                    error stop "NaN(s) in recv"
+                                end if
+#endif
+                            end do
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+
+                #:endif
+            end if
+        #:endfor
+        call nvtxEndRange
+#endif
+
+    end subroutine s_mpi_sendrecv_variables_buffers_scalarfield
+
     !>  The purpose of this procedure is to optimally decompose
         !!      the computational domain among the available processors.
         !!      This is performed by attempting to award each processor,
@@ -1260,6 +1603,16 @@ contains
                         end if
 
                     end do
+
+                    ! Decompose domain into z-slabs
+                else if (slab_domain_decomposition) then
+                    num_procs_x = 1
+                    num_procs_y = 1
+                    num_procs_z = num_procs
+                    ierr = -1
+                    if (mod((p + 1), num_procs_z) == 0) then
+                        ierr = 0
+                    end if
                 else
 
                     if (cyl_coord .and. p > 0) then
@@ -1888,13 +2241,51 @@ contains
     end subroutine s_mpi_sendrecv_grid_variables_buffers
 #endif
 
+    !> The goal of this subroutine is to get the physical global domain bounds
+#ifndef MFC_POST_PROCESS
+    impure subroutine s_mpi_global_domain_bounds
+        @:ALLOCATE(domain_glb(num_dims, 2))
+#ifdef MFC_MPI
+        call s_mpi_allreduce_min(x_domain%beg, domain_glb(1, 1))
+        call s_mpi_allreduce_max(x_domain%end, domain_glb(1, 2))
+        if (n > 0) then
+            call s_mpi_allreduce_min(y_domain%beg, domain_glb(2, 1))
+            call s_mpi_allreduce_max(y_domain%end, domain_glb(2, 2))
+            if (p > 0) then
+                call s_mpi_allreduce_min(z_domain%beg, domain_glb(3, 1))
+                call s_mpi_allreduce_max(z_domain%end, domain_glb(3, 2))
+            end if
+        end if
+#else
+        domain_glb(1, 1) = x_domain%beg
+        domain_glb(1, 2) = x_domain%end
+        if (n > 0) then
+            domain_glb(2, 1) = y_domain%beg
+            domain_glb(2, 2) = y_domain%end
+            if (p > 0) then
+                domain_glb(3, 1) = z_domain%beg
+                domain_glb(3, 2) = z_domain%end
+            end if
+        end if
+#endif
+    end subroutine s_mpi_global_domain_bounds
+#endif
+
     !> Module deallocation and/or disassociation procedures
     impure subroutine s_finalize_mpi_common_module
 
 #ifdef MFC_MPI
         deallocate (buff_send, buff_recv)
+#ifdef MFC_SIMULATION
+        if (volume_filter_momentum_eqn) then
+            @:DEALLOCATE(buff_send_scalarfield)
+            @:DEALLOCATE(buff_recv_scalarfield)
+        end if
 #endif
-
+#endif
+#ifndef MFC_POST_PROCESS
+        @:DEALLOCATE(domain_glb)
+#endif
     end subroutine s_finalize_mpi_common_module
 
 end module m_mpi_common

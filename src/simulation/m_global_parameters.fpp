@@ -291,6 +291,7 @@ module m_global_parameters
     type(int_bounds_info) :: species_idx               !< Indexes of first & last concentration eqns.
     integer :: c_idx                                   !< Index of color function
     integer :: damage_idx                              !< Index of damage state variable (D) for continuum damage model
+    type(volume_filter_params) :: volume_filter_dt     !< Size and starting indices of volume filtered quantities
     integer :: psi_idx                                 !< Index of hyperbolic cleaning state variable for MHD
     !> @}
     $:GPU_DECLARE(create='[sys_size,E_idx,n_idx,bub_idx,alf_idx,gamma_idx]')
@@ -554,6 +555,25 @@ module m_global_parameters
     $:GPU_DECLARE(create='[tau_star,cont_damage_s,alpha_bar]')
     !> @}
 
+    logical :: periodic_ibs
+    logical :: compute_particle_drag
+    real(wp) :: u_inf_ref !< reference freestream velocity
+    real(wp) :: rho_inf_ref !< reference freestream density
+    real(wp) :: P_inf_ref !< reference freestream temperature
+    logical :: periodic_forcing
+    integer :: mom_f_idx
+    integer :: forcing_window
+    real(wp) :: forcing_dt
+    logical :: forcing_wrt
+    real(wp) :: fluid_volume_fraction
+    logical :: volume_filter_momentum_eqn
+    logical :: store_levelset
+    logical :: slab_domain_decomposition
+    integer :: t_step_start_stats
+    real(wp) :: filter_width
+    logical :: q_filtered_wrt
+
+    $:GPU_DECLARE(create='[u_inf_ref, rho_inf_ref, P_inf_ref, mom_f_idx, forcing_window, forcing_dt, fluid_volume_fraction, filter_width]')
     !> @name MHD Hyperbolic cleaning parameters
     !> @{!
     real(wp) :: hyper_cleaning_speed    !< Hyperbolic cleaning wave speed (c_h)
@@ -859,6 +879,24 @@ contains
             mhd = .false.
             relativity = .false.
         #:endif
+
+        periodic_ibs = .false.
+        compute_particle_drag = .false.
+        u_inf_ref = dflt_real
+        rho_inf_ref = dflt_real
+        P_inf_ref = dflt_real
+        periodic_forcing = .false.
+        mom_f_idx = dflt_int
+        forcing_window = dflt_int
+        forcing_dt = dflt_real
+        forcing_wrt = .false.
+        fluid_volume_fraction = dflt_real
+        volume_filter_momentum_eqn = .false.
+        store_levelset = .true.
+        slab_domain_decomposition = .false.
+        t_step_start_stats = dflt_int
+        filter_width = dflt_real
+        q_filtered_wrt = .false.
 
     end subroutine s_assign_default_values_to_user_inputs
 
@@ -1178,12 +1216,27 @@ contains
             sys_size = species_idx%end
         end if
 
+        if (q_filtered_wrt) then
+            ! statistics of unclosed terms size for data output
+            volume_filter_dt%stat_size = 1 + 4*(2*num_dims**2 + num_dims + E_idx + 1)
+            ! starting indices for statistics
+            volume_filter_dt%stat_fluid_idx = 1
+            volume_filter_dt%stat_re_idx = 2
+            volume_filter_dt%stat_visc_idx = 2 + 4*num_dims**2
+            volume_filter_dt%stat_mom_exch_idx = 2 + 4*(2*num_dims**2)
+            volume_filter_dt%stat_cons_idx = 2 + 4*(2*num_dims**2 + num_dims)
+            volume_filter_dt%stat_pres_idx = 2 + 4*(2*num_dims**2 + num_dims + E_idx)
+        end if
+
         if (bubbles_euler .and. qbmm .and. .not. polytropic) then
             allocate (MPI_IO_DATA%view(1:sys_size + 2*nb*4))
             allocate (MPI_IO_DATA%var(1:sys_size + 2*nb*4))
         elseif (bubbles_lagrange) then
             allocate (MPI_IO_DATA%view(1:sys_size + 1))
             allocate (MPI_IO_DATA%var(1:sys_size + 1))
+        else if (q_filtered_wrt) then
+            allocate (MPI_IO_DATA%view(1:sys_size + volume_filter_dt%stat_size))
+            allocate (MPI_IO_DATA%var(1:sys_size + volume_filter_dt%stat_size))
         else
             allocate (MPI_IO_DATA%view(1:sys_size))
             allocate (MPI_IO_DATA%var(1:sys_size))
@@ -1202,6 +1255,11 @@ contains
             end do
         elseif (bubbles_lagrange) then
             do i = 1, sys_size + 1
+                allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
+                MPI_IO_DATA%var(i)%sf => null()
+            end do
+        else if (q_filtered_wrt) then
+            do i = sys_size + 1, sys_size + volume_filter_dt%stat_size
                 allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
                 MPI_IO_DATA%var(i)%sf => null()
             end do
@@ -1401,6 +1459,10 @@ contains
 
             if (bubbles_lagrange) then
                 do i = 1, sys_size + 1
+                    MPI_IO_DATA%var(i)%sf => null()
+                end do
+            else if (q_filtered_wrt) then
+                do i = 1, sys_size + volume_filter_dt%stat_size
                     MPI_IO_DATA%var(i)%sf => null()
                 end do
             else

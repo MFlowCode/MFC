@@ -121,6 +121,7 @@ module m_global_parameters
     logical :: igr             !< enable IGR
     integer :: igr_order       !< IGR reconstruction order
     logical, parameter :: chemistry = .${chemistry}$. !< Chemistry modeling
+    type(volume_filter_params) :: volume_filter_dt !< Size and starting indices of volume filtered quantities
     !> @}
 
     integer :: avg_state       !< Average state evaluation method
@@ -357,6 +358,10 @@ module m_global_parameters
     real(wp) :: Bx0 !< Constant magnetic field in the x-direction (1D)
 
     real(wp) :: wall_time, wall_time_avg !< Wall time measurements
+    logical :: periodic_ibs !< Periodic immersed boundaries
+    logical :: store_levelset !< Store immersed boundary levelset info
+    logical :: slab_domain_decomposition !< MPI domain decomposition into slabs
+    logical :: q_filtered_wrt !< write FFT filtered quantities
 
 contains
 
@@ -553,6 +558,11 @@ contains
 
         ! MHD
         Bx0 = dflt_real
+
+        periodic_ibs = .false.
+        store_levelset = .true.
+        slab_domain_decomposition = .false.
+        q_filtered_wrt = .false.
 
     end subroutine s_assign_default_values_to_user_inputs
 
@@ -842,6 +852,18 @@ contains
             z_output_idx%end = 0
         end if
 
+        if (q_filtered_wrt) then
+            ! statistics of unclosed terms size for data output
+            volume_filter_dt%stat_size = 1 + 4*(2*num_dims**2 + num_dims + E_idx + 1)
+            ! starting indices for statistics
+            volume_filter_dt%stat_fluid_idx = 1
+            volume_filter_dt%stat_re_idx = 2
+            volume_filter_dt%stat_visc_idx = 2 + 4*num_dims**2
+            volume_filter_dt%stat_mom_exch_idx = 2 + 4*(2*num_dims**2)
+            volume_filter_dt%stat_cons_idx = 2 + 4*(2*num_dims**2 + num_dims)
+            volume_filter_dt%stat_pres_idx = 2 + 4*(2*num_dims**2 + num_dims + E_idx)
+        end if
+
         momxb = mom_idx%beg
         momxe = mom_idx%end
         advxb = adv_idx%beg
@@ -860,16 +882,25 @@ contains
         chemxe = species_idx%end
 
 #ifdef MFC_MPI
-        allocate (MPI_IO_DATA%view(1:sys_size))
-        allocate (MPI_IO_DATA%var(1:sys_size))
-        do i = 1, sys_size
-            if (down_sample) then
-                allocate (MPI_IO_DATA%var(i)%sf(-1:m + 1, -1:n + 1, -1:p + 1))
-            else
+        if (q_filtered_wrt) then
+            allocate (MPI_IO_DATA%view(1:sys_size + volume_filter_dt%stat_size))
+            allocate (MPI_IO_DATA%var(1:sys_size + volume_filter_dt%stat_size))
+            do i = 1, sys_size + volume_filter_dt%stat_size
                 allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
-            end if
-            MPI_IO_DATA%var(i)%sf => null()
-        end do
+                MPI_IO_DATA%var(i)%sf => null()
+            end do
+        else
+            allocate (MPI_IO_DATA%view(1:sys_size))
+            allocate (MPI_IO_DATA%var(1:sys_size))
+            do i = 1, sys_size
+                if (down_sample) then
+                    allocate (MPI_IO_DATA%var(i)%sf(-1:m + 1, -1:n + 1, -1:p + 1))
+                else
+                    allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
+                end if
+                MPI_IO_DATA%var(i)%sf => null()
+            end do
+        end if
 
         if (ib) allocate (MPI_IO_IB_DATA%var%sf(0:m, 0:n, 0:p))
 #endif
@@ -1043,6 +1074,12 @@ contains
             do i = 1, sys_size
                 MPI_IO_DATA%var(i)%sf => null()
             end do
+
+            if (q_filtered_wrt) then
+                do i = sys_size + 1, sys_size + volume_filter_dt%stat_size
+                    MPI_IO_DATA%var(i)%sf => null()
+                end do
+            end if
 
             deallocate (MPI_IO_DATA%var)
             deallocate (MPI_IO_DATA%view)

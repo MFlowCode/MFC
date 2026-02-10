@@ -496,5 +496,14 @@ module m_derived_types
         real(wp), dimension(1:num_fluids_max, 3) :: perturb_dens_offset
     end type
 
-end module m_derived_types
+    type volume_filter_params
+        integer :: stat_size           !< total size of data output
+        integer :: stat_fluid_idx      !< filtered fluid indicator function
+        integer :: stat_re_idx         !< reynolds stress
+        integer :: stat_visc_idx       !< viscous closure
+        integer :: stat_mom_exch_idx   !< interphase momentum exchange
+        integer :: stat_cons_idx       !< filtered conservative variables
+        integer :: stat_pres_idx       !< filtered pressure
+    end type volume_filter_params
 
+end module m_derived_types

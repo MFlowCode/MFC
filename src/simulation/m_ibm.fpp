@@ -67,10 +67,12 @@ contains
         if (p > 0) then
             @:ALLOCATE(ib_markers%sf(-buff_size:m+buff_size, &
                 -buff_size:n+buff_size, -buff_size:p+buff_size))
-            @:ALLOCATE(levelset%sf(-buff_size:m+buff_size, &
-                -buff_size:n+buff_size, -buff_size:p+buff_size, 1:num_ibs))
-            @:ALLOCATE(levelset_norm%sf(-buff_size:m+buff_size, &
-                -buff_size:n+buff_size, -buff_size:p+buff_size, 1:num_ibs, 1:3))
+            if (store_levelset) then
+                @:ALLOCATE(levelset%sf(-buff_size:m+buff_size, &
+                    -buff_size:n+buff_size, -buff_size:p+buff_size, 1:num_ibs))
+                @:ALLOCATE(levelset_norm%sf(-buff_size:m+buff_size, &
+                    -buff_size:n+buff_size, -buff_size:p+buff_size, 1:num_ibs, 1:3))
+            end if
         else
             @:ALLOCATE(ib_markers%sf(-buff_size:m+buff_size, &
                 -buff_size:n+buff_size, 0:0))
@@ -81,8 +83,10 @@ contains
         end if
 
         @:ACC_SETUP_SFs(ib_markers)
-        @:ACC_SETUP_SFs(levelset)
-        @:ACC_SETUP_SFs(levelset_norm)
+        if (store_levelset) then
+            @:ACC_SETUP_SFs(levelset)
+            @:ACC_SETUP_SFs(levelset_norm)
+        end if
 
         $:GPU_ENTER_DATA(copyin='[num_gps,num_inner_gps]')
 
@@ -143,6 +147,7 @@ contains
     end subroutine s_ibm_setup
 
     subroutine s_populate_ib_buffers()
+        integer :: j, k, l
 
         #:for DIRC, DIRI in [('x', 1), ('y', 2), ('z', 3)]
             #:for LOCC, LOCI in [('beg', -1), ('end', 1)]
@@ -151,6 +156,83 @@ contains
                 end if
             #:endfor
         #:endfor
+
+        if (periodic_ibs) then
+            ! Population of Buffers in x-direction
+            if (bc_x%beg == BC_PERIODIC) then
+                $:GPU_PARALLEL_LOOP(collapse=3)
+                do l = 0, p
+                    do k = 0, n
+                        do j = 1, buff_size
+                            ib_markers%sf(-j, k, l) = &
+                                ib_markers%sf(m - (j - 1), k, l)
+                        end do
+                    end do
+                end do
+            end if
+
+            if (bc_x%end == BC_PERIODIC) then
+                $:GPU_PARALLEL_LOOP(collapse=3)
+                do l = 0, p
+                    do k = 0, n
+                        do j = 1, buff_size
+                            ib_markers%sf(m + j, k, l) = &
+                                ib_markers%sf(j - 1, k, l)
+                        end do
+                    end do
+                end do
+            end if
+
+            ! Population of Buffers in y-direction
+            if (bc_y%beg == BC_PERIODIC) then
+                $:GPU_PARALLEL_LOOP(collapse=3)
+                do l = 0, p
+                    do k = -buff_size, m + buff_size
+                        do j = 1, buff_size
+                            ib_markers%sf(k, -j, l) = &
+                                ib_markers%sf(k, n - (j - 1), l)
+                        end do
+                    end do
+                end do
+            end if
+
+            if (bc_y%end == BC_PERIODIC) then
+                $:GPU_PARALLEL_LOOP(collapse=3)
+                do l = 0, p
+                    do k = -buff_size, m + buff_size
+                        do j = 1, buff_size
+                            ib_markers%sf(k, n + j, l) = &
+                                ib_markers%sf(k, j - 1, l)
+                        end do
+                    end do
+                end do
+            end if
+
+            ! Population of Buffers in z-direction
+            if (bc_z%beg == BC_PERIODIC) then
+                $:GPU_PARALLEL_LOOP(collapse=3)
+                do l = -buff_size, n + buff_size
+                    do k = -buff_size, m + buff_size
+                        do j = 1, buff_size
+                            ib_markers%sf(k, l, -j) = &
+                                ib_markers%sf(k, l, p - (j - 1))
+                        end do
+                    end do
+                end do
+            end if
+
+            if (bc_z%end == BC_PERIODIC) then
+                $:GPU_PARALLEL_LOOP(collapse=3)
+                do l = -buff_size, n + buff_size
+                    do k = -buff_size, m + buff_size
+                        do j = 1, buff_size
+                            ib_markers%sf(k, l, p + j) = &
+                                ib_markers%sf(k, l, j - 1)
+                        end do
+                    end do
+                end do
+            end if
+        end if
 
     end subroutine s_populate_ib_buffers
 
@@ -461,6 +543,13 @@ contains
         integer :: dir
         integer :: index
 
+        real(wp) :: radius
+        real(wp), dimension(3, 2) :: center
+        real(wp) :: dist_calc, dist_temp
+        real(wp), dimension(3) :: dist_vec
+        real(wp), dimension(3) :: dist_vec_temp
+        integer :: ix, iy, iz
+
         do q = 1, num_gps
             gp = ghost_points_in(q)
             i = gp%loc(1)
@@ -476,8 +565,67 @@ contains
 
             ! Calculate and store the precise location of the image point
             patch_id = gp%ib_patch_id
-            dist = abs(real(levelset_in%sf(i, j, k, patch_id), kind=wp))
-            norm(:) = levelset_norm_in%sf(i, j, k, patch_id, :)
+            if (store_levelset) then
+                dist = abs(real(levelset_in%sf(i, j, k, patch_id), kind=wp))
+                norm(:) = levelset_norm_in%sf(i, j, k, patch_id, :)
+            else ! compute levelset and levelset_norm on the fly (SPHERE ONLY)
+                if (patch_ib(patch_id)%geometry /= 8) then
+                    call s_mpi_abort('store_levelset=F requires all ib geometries to be spherical (geometry=8)')
+                end if
+                radius = patch_ib(patch_id)%radius
+                center(1, 1) = patch_ib(patch_id)%x_centroid
+                center(2, 1) = patch_ib(patch_id)%y_centroid
+                center(3, 1) = patch_ib(patch_id)%z_centroid
+                dist_vec(1) = x_cc(i) - center(1, 1)
+                dist_vec(2) = y_cc(j) - center(2, 1)
+                dist_vec(3) = z_cc(k) - center(3, 1)
+                dist_calc = sqrt(sum(dist_vec**2))
+                ! all permutations of periodically projected ib
+                if (periodic_ibs) then
+                    if ((center(1, 1) - domain_glb(1, 1)) <= radius) then
+                        center(1, 2) = domain_glb(1, 2) + (center(1, 1) - domain_glb(1, 1))
+                    else if ((domain_glb(1, 2) - center(1, 1)) <= radius) then
+                        center(1, 2) = domain_glb(1, 1) - (domain_glb(1, 2) - center(1, 1))
+                    else
+                        center(1, 2) = center(1, 1)
+                    end if
+                    if ((center(2, 1) - domain_glb(2, 1)) <= radius) then
+                        center(2, 2) = domain_glb(2, 2) + (center(2, 1) - domain_glb(2, 1))
+                    else if ((domain_glb(2, 2) - center(2, 1)) <= radius) then
+                        center(2, 2) = domain_glb(2, 1) - (domain_glb(2, 2) - center(2, 1))
+                    else
+                        center(2, 2) = center(2, 1)
+                    end if
+                    if ((center(3, 1) - domain_glb(3, 1)) <= radius) then
+                        center(3, 2) = domain_glb(3, 2) + (center(3, 1) - domain_glb(3, 1))
+                    else if ((domain_glb(3, 2) - center(3, 1)) <= radius) then
+                        center(3, 2) = domain_glb(3, 1) - (domain_glb(3, 2) - center(3, 1))
+                    else
+                        center(3, 2) = center(3, 1)
+                    end if
+                    do ix = 1, 2
+                        do iy = 1, 2
+                            do iz = 1, 2
+                                dist_vec_temp(1) = x_cc(i) - center(1, ix)
+                                dist_vec_temp(2) = y_cc(j) - center(2, iy)
+                                dist_vec_temp(3) = z_cc(k) - center(3, iz)
+                                dist_temp = sqrt(sum(dist_vec_temp**2))
+                                if (dist_temp < dist_calc) then
+                                    dist_calc = dist_temp
+                                    dist_vec = dist_vec_temp
+                                end if
+                            end do
+                        end do
+                    end do
+                end if
+                dist = abs(dist_calc - radius)
+                if (dist_calc == 0) then
+                    norm(:) = (/1, 0, 0/)
+                else
+                    norm(:) = dist_vec(:)/dist_calc
+                end if
+            end if ! end store_levelset if statement
+
             ghost_points_in(q)%ip_loc(:) = physical_loc(:) + 2*dist*norm(:)
 
             ! Find the closest grid point to the image point
@@ -486,13 +634,13 @@ contains
                 ! s_cc points to the dim array we need
                 if (dim == 1) then
                     s_cc => x_cc
-                    bound = m + buff_size - 1
+                    bound = m + buff_size
                 elseif (dim == 2) then
                     s_cc => y_cc
-                    bound = n + buff_size - 1
+                    bound = n + buff_size
                 else
                     s_cc => z_cc
-                    bound = p + buff_size - 1
+                    bound = p + buff_size
                 end if
 
                 if (f_approx_equal(norm(dim), 0._wp)) then
@@ -511,7 +659,7 @@ contains
                                .or. temp_loc > s_cc(index + 1)))
                         index = index + dir
                         if (index < -buff_size .or. index > bound) then
-                            print *, "temp_loc=", temp_loc, " s_cc(index)=", s_cc(index), " s_cc(index+1)=", s_cc(index + 1)
+                            print *, "proc_rank=", proc_rank, "temp_loc=", temp_loc, " index=", index, "ib=", patch_id, "dim", dim, "dir", dir, "i, j, k", i, j, k
                             print *, "Increase buff_size further in m_helper_basic (currently set to a minimum of 10)"
                             error stop "Increase buff_size"
                         end if
@@ -539,6 +687,9 @@ contains
             :: subsection_2D
         integer, dimension(2*gp_layers + 1, 2*gp_layers + 1, 2*gp_layers + 1) &
             :: subsection_3D
+        integer, dimension(2*gp_layers + 1) :: subsection_x
+        integer, dimension(2*gp_layers + 1) :: subsection_y
+        integer, dimension(2*gp_layers + 1) :: subsection_z
         integer :: i, j, k!< Iterator variables
 
         num_gps_out = 0
@@ -569,6 +720,17 @@ contains
                             else
                                 num_inner_gps_out = num_inner_gps_out + 1
                             end if
+
+                            ! subsection_x = ib_markers%sf(i - gp_layers:i + gp_layers, j, k)
+                            ! subsection_y = ib_markers%sf(i, j - gp_layers:j + gp_layers, k)
+                            ! subsection_z = ib_markers%sf(i, j, k - gp_layers:k + gp_layers)
+                            ! if (any(subsection_x == 0) .or. &
+                            !     any(subsection_y == 0) .or. &
+                            !     any(subsection_z == 0)) then
+                            !     num_gps_out = num_gps_out + 1
+                            ! else
+                            !     num_inner_gps_out = num_inner_gps_out + 1
+                            ! end if
                         end if
                     end do
                 end if
@@ -586,6 +748,9 @@ contains
             :: subsection_2D
         integer, dimension(2*gp_layers + 1, 2*gp_layers + 1, 2*gp_layers + 1) &
             :: subsection_3D
+        integer, dimension(2*gp_layers + 1) :: subsection_x
+        integer, dimension(2*gp_layers + 1) :: subsection_y
+        integer, dimension(2*gp_layers + 1) :: subsection_z
         integer :: i, j, k !< Iterator variables
         integer :: count, count_i
         integer :: patch_id
@@ -647,6 +812,14 @@ contains
                                             j - gp_layers:j + gp_layers, &
                                             k - gp_layers:k + gp_layers)
                             if (any(subsection_3D == 0)) then
+
+                                ! subsection_x = ib_markers%sf(i - gp_layers:i + gp_layers, j, k)
+                                ! subsection_y = ib_markers%sf(i, j - gp_layers:j + gp_layers, k)
+                                ! subsection_z = ib_markers%sf(i, j, k - gp_layers:k + gp_layers)
+                                ! if (any(subsection_x == 0) .or. &
+                                !     any(subsection_y == 0) .or. &
+                                !     any(subsection_z == 0)) then
+
                                 ghost_points_in(count)%loc = [i, j, k]
                                 patch_id = ib_markers%sf(i, j, k)
                                 ghost_points_in(count)%ib_patch_id = &
@@ -1180,8 +1353,10 @@ contains
     impure subroutine s_finalize_ibm_module()
 
         @:DEALLOCATE(ib_markers%sf)
-        @:DEALLOCATE(levelset%sf)
-        @:DEALLOCATE(levelset_norm%sf)
+        if (store_levelset) then
+            @:DEALLOCATE(levelset%sf)
+            @:DEALLOCATE(levelset_norm%sf)
+        end if
 
     end subroutine s_finalize_ibm_module
 

@@ -69,6 +69,8 @@ module m_rhs
 
     use m_pressure_relaxation
 
+    use m_additional_forcing
+
     implicit none
 
     private; public :: s_initialize_rhs_module, &
@@ -1066,6 +1068,12 @@ contains
         end if
 
         if (cont_damage) call s_compute_damage_state(q_cons_qp%vf, rhs_vf)
+
+        if (periodic_forcing) then
+            call nvtxStartRange("COMPUTE-PERIODIC-FORCING")
+            call s_compute_periodic_forcing(rhs_vf, q_cons_vf, t_step)
+            call nvtxEndRange
+        end if
 
         ! END: Additional pphysics and source terms
 

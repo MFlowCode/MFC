@@ -153,7 +153,8 @@ contains
             viscous, bubbles_lagrange, num_bc_patches, &
             patch_bc, Bx0, relativity, cont_damage, igr, igr_order, &
             down_sample, recon_type, muscl_order, hyper_cleaning, &
-            simplex_perturb, simplex_params, fft_wrt
+            simplex_perturb, simplex_params, fft_wrt, &
+            periodic_ibs, store_levelset, slab_domain_decomposition
 
         ! Inquiring the status of the pre_process.inp file
         file_loc = 'pre_process.inp'
@@ -819,6 +820,8 @@ contains
                 call s_check_grid_data_files()
             end if
         end if
+
+        call s_mpi_global_domain_bounds()
 
     end subroutine s_read_grid
 

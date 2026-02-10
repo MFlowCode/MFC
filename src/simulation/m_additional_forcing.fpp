@@ -1,0 +1,218 @@
+#:include 'macros.fpp'
+
+module m_additional_forcing
+    use m_derived_types
+
+    use m_global_parameters
+
+    use m_ibm
+
+    use m_mpi_proxy
+
+    implicit none
+
+    private; public :: s_initialize_additional_forcing_module, &
+ s_finalize_additional_forcing_module, s_compute_periodic_forcing
+
+    type(scalar_field), allocatable, dimension(:) :: q_periodic_force
+    real(wp) :: volfrac_phi
+    real(wp) :: avg_coeff
+    real(wp) :: spatial_rho, spatial_u, spatial_eps
+    real(wp), allocatable, dimension(:) :: rho_window, u_window, eps_window
+    real(wp) :: sum_rho, sum_u, sum_eps
+    real(wp) :: phase_rho, phase_u, phase_eps
+    integer :: window_loc, window_fill
+
+    $:GPU_DECLARE(create='[q_periodic_force, avg_coeff]')
+    $:GPU_DECLARE(create='[spatial_rho, spatial_u, spatial_eps, phase_rho, phase_u, phase_eps]')
+
+contains
+
+    subroutine s_initialize_additional_forcing_module
+        integer :: i
+        real(wp) :: domain_vol
+
+        @:ALLOCATE(q_periodic_force(1:3))
+        do i = 1, 3
+            @:ALLOCATE(q_periodic_force(i)%sf(0:m, 0:n, 0:p))
+            @:ACC_SETUP_SFs(q_periodic_force(i))
+        end do
+
+        ! particle volume fraction
+        if (ib) then
+            volfrac_phi = 1._wp - fluid_volume_fraction
+        else
+            volfrac_phi = 0._wp
+        end if
+
+        ! total cartesian domain volume
+        domain_vol = (domain_glb(1, 2) - domain_glb(1, 1))*(domain_glb(2, 2) - domain_glb(2, 1))*(domain_glb(3, 2) - domain_glb(3, 1))
+
+        ! coefficient used for phase averages
+        avg_coeff = 1._wp/(domain_vol*(1._wp - volfrac_phi))
+        $:GPU_UPDATE(device='[avg_coeff]')
+
+        ! initialization of parameters
+        window_loc = 0
+        window_fill = 0
+
+        @:ALLOCATE(rho_window(forcing_window))
+        @:ALLOCATE(u_window(forcing_window))
+        @:ALLOCATE(eps_window(forcing_window))
+
+        rho_window = 0.0_wp
+        u_window = 0.0_wp
+        eps_window = 0.0_wp
+
+        sum_rho = 0.0_wp
+        sum_u = 0.0_wp
+        sum_eps = 0.0_wp
+
+        phase_rho = 0._wp
+        phase_u = 0._wp
+        phase_eps = 0._wp
+
+        if (forcing_wrt .and. proc_rank == 0) then
+            open (unit=102, file='forcing.bin', status='replace', form='unformatted', access='stream', action='write')
+        end if
+
+    end subroutine s_initialize_additional_forcing_module
+
+    !< compute the space and time average of quantities, compute the periodic forcing terms described in Khalloufi and Capecelatro
+    subroutine s_compute_periodic_forcing(rhs_vf, q_cons_vf, t_step)
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        integer, intent(in) :: t_step
+        real(wp) :: spatial_rho_glb, spatial_u_glb, spatial_eps_glb
+        real(wp) :: dVol, rho
+        integer :: i, j, k, l
+
+        ! zero spatial averages
+        spatial_rho = 0._wp
+        spatial_u = 0._wp
+        spatial_eps = 0._wp
+
+        $:GPU_UPDATE(device='[spatial_rho, spatial_u, spatial_eps]')
+
+        ! compute spatial averages
+        $:GPU_PARALLEL_LOOP(collapse=3, reduction='[[spatial_rho, spatial_u, spatial_eps]]', reductionOp='[+]', private='[rho, dVol]')
+        do i = 0, m
+            do j = 0, n
+                do k = 0, p
+                    if (ib_markers%sf(i, j, k) == 0) then
+                        rho = 0._wp
+                        do l = 1, num_fluids
+                            rho = rho + q_cons_vf(contxb + l - 1)%sf(i, j, k)
+                        end do
+                        dVol = dx(i)*dy(j)*dz(k)
+                        spatial_rho = spatial_rho + (rho*dVol) ! rho
+                        spatial_u = spatial_u + (q_cons_vf(contxe + mom_f_idx)%sf(i, j, k)*dVol) ! rho*u
+                        spatial_eps = spatial_eps + ((q_cons_vf(E_idx)%sf(i, j, k) - 0.5_wp*( &
+                                                      q_cons_vf(momxb)%sf(i, j, k)**2 + &
+                                                      q_cons_vf(momxb + 1)%sf(i, j, k)**2 + &
+                                                      q_cons_vf(momxb + 2)%sf(i, j, k)**2)/ &
+                                                      rho)*dVol) ! rho*e
+                    end if
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        $:GPU_UPDATE(host='[spatial_rho, spatial_u, spatial_eps]')
+
+        ! reduction sum across entire domain
+        call s_mpi_allreduce_sum(spatial_rho, spatial_rho_glb)
+        call s_mpi_allreduce_sum(spatial_u, spatial_u_glb)
+        call s_mpi_allreduce_sum(spatial_eps, spatial_eps_glb)
+
+        spatial_rho_glb = spatial_rho_glb*avg_coeff
+        spatial_u_glb = spatial_u_glb*avg_coeff
+        spatial_eps_glb = spatial_eps_glb*avg_coeff
+
+        ! update time average window location
+        window_loc = 1 + mod(t_step, forcing_window)
+
+        ! update time average sum
+        sum_rho = sum_rho - rho_window(window_loc) + spatial_rho_glb
+        sum_u = sum_u - u_window(window_loc) + spatial_u_glb
+        sum_eps = sum_eps - eps_window(window_loc) + spatial_eps_glb
+
+        ! update window arrays
+        rho_window(window_loc) = spatial_rho_glb
+        u_window(window_loc) = spatial_u_glb
+        eps_window(window_loc) = spatial_eps_glb
+
+        ! update number of time samples
+        if (window_fill < forcing_window) window_fill = window_fill + 1
+
+        ! compute phase averages
+        phase_rho = sum_rho/real(window_fill, wp)
+        phase_u = sum_u/real(window_fill, wp)
+        phase_eps = sum_eps/real(window_fill, wp)
+        $:GPU_UPDATE(device='[phase_rho, phase_u, phase_eps]')
+
+        ! compute periodic forcing terms for mass, momentum, energy
+        $:GPU_PARALLEL_LOOP(collapse=3)
+        do i = 0, m
+            do j = 0, n
+                do k = 0, p
+                    rho = 0._wp
+                    do l = 1, num_fluids
+                        rho = rho + q_cons_vf(contxb + l - 1)%sf(i, j, k)
+                    end do
+                    ! f_rho
+                    q_periodic_force(1)%sf(i, j, k) = (rho_inf_ref - phase_rho)*forcing_dt
+
+                    ! f_u
+                    q_periodic_force(2)%sf(i, j, k) = (rho_inf_ref*u_inf_ref - phase_u)*forcing_dt
+
+                    ! f_E
+                    q_periodic_force(3)%sf(i, j, k) = (P_inf_ref*gammas(1) - phase_eps)*forcing_dt &
+                                                      + q_cons_vf(contxe + mom_f_idx)%sf(i, j, k)*q_periodic_force(2)%sf(i, j, k)/rho
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        ! add the forcing terms to the RHS
+        $:GPU_PARALLEL_LOOP(collapse=3)
+        do i = 0, m
+            do j = 0, n
+                do k = 0, p
+                    if (ib_markers%sf(i, j, k) == 0) then
+                        do l = 1, num_fluids
+                            rhs_vf(contxb + l - 1)%sf(i, j, k) = rhs_vf(contxb + l - 1)%sf(i, j, k) + q_periodic_force(1)%sf(i, j, k) ! continuity
+                        end do
+                        rhs_vf(contxe + mom_f_idx)%sf(i, j, k) = rhs_vf(contxe + mom_f_idx)%sf(i, j, k) + q_periodic_force(2)%sf(i, j, k) ! momentum
+                        rhs_vf(E_idx)%sf(i, j, k) = rhs_vf(E_idx)%sf(i, j, k) + q_periodic_force(3)%sf(i, j, k) ! energy
+                    end if
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        if (forcing_wrt .and. proc_rank == 0) then
+            print *, spatial_rho_glb, spatial_u_glb, spatial_eps_glb
+            write (102) spatial_rho_glb, spatial_u_glb, spatial_eps_glb
+            flush (102)
+        end if
+
+    end subroutine s_compute_periodic_forcing
+
+    subroutine s_finalize_additional_forcing_module
+        integer :: i
+        do i = 1, 3
+            @:DEALLOCATE(q_periodic_force(i)%sf)
+        end do
+        @:DEALLOCATE(q_periodic_force)
+
+        @:DEALLOCATE(rho_window)
+        @:DEALLOCATE(u_window)
+        @:DEALLOCATE(eps_window)
+
+        if (forcing_wrt .and. proc_rank == 0) then
+            close (102)
+        end if
+    end subroutine s_finalize_additional_forcing_module
+
+end module m_additional_forcing

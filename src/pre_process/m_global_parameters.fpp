@@ -302,6 +302,9 @@ module m_global_parameters
     !! to the next time-step.
 
     logical :: fft_wrt
+    logical :: periodic_ibs
+    logical :: store_levelset
+    logical :: slab_domain_decomposition
     logical :: dummy  !< AMDFlang workaround: keep a dummy logical to avoid a compiler case-optimization bug when a parameter+GPU-kernel conditional is false
 
 contains
@@ -601,6 +604,10 @@ contains
         end do
 
         Bx0 = dflt_real
+
+        periodic_ibs = .false.
+        store_levelset = .true.
+        slab_domain_decomposition = .false.
 
         ! Subgrid bubble parameters
         bub_pp%R0ref = dflt_real; R0ref = dflt_real
@@ -952,8 +959,10 @@ contains
 
         if (ib) then
             allocate (MPI_IO_IB_DATA%var%sf(0:m, 0:n, 0:p))
-            allocate (MPI_IO_levelset_DATA%var%sf(0:m, 0:n, 0:p, 1:num_ibs))
-            allocate (MPI_IO_levelsetnorm_DATA%var%sf(0:m, 0:n, 0:p, 1:num_ibs, 1:3))
+            if (store_levelset) then
+                allocate (MPI_IO_levelset_DATA%var%sf(0:m, 0:n, 0:p, 1:num_ibs))
+                allocate (MPI_IO_levelsetnorm_DATA%var%sf(0:m, 0:n, 0:p, 1:num_ibs, 1:3))
+            end if
         end if
 #endif
 

@@ -11,7 +11,7 @@ from .schema import ParamDef, ParamType
 from .registry import REGISTRY
 
 # Index limits
-NP, NF, NI, NA, NPR, NB = 10, 10, 10, 4, 10, 10  # patches, fluids, ibs, acoustic, probes, bc_patches
+NP, NF, NI, NA, NPR, NB = 10, 10, 1000, 4, 10, 10  # patches, fluids, ibs, acoustic, probes, bc_patches
 
 
 # =============================================================================
@@ -464,7 +464,7 @@ CONSTRAINTS = {
     # Counts (must be positive)
     "num_fluids": {"min": 1, "max": 10},
     "num_patches": {"min": 0, "max": 10},
-    "num_ibs": {"min": 0, "max": 10},
+    "num_ibs": {"min": 0, "max": 1000},
     "m": {"min": 0},
     "n": {"min": 0},
     "p": {"min": 0},
@@ -674,6 +674,17 @@ def _load():  # pylint: disable=too-many-locals,too-many-statements
         for v in ["k", "w", "p", "g"]:
             _r(f"{v}_{d}", REAL)
         _r(f"bf_{d}", LOG)
+
+    # new
+    for n in ["periodic_forcing", "periodic_ibs", "volume_filter_momentum_eqn", 
+              "compute_particle_drag", "store_levelset", "slab_domain_decomposition",
+              "q_filtered_wrt"]:
+        _r(n, LOG)
+    for n in ["mom_f_idx", "forcing_window", "t_step_start_stats"]:
+        _r(n, INT)
+    for n in ["u_inf_ref", "rho_inf_ref", "P_inf_ref", "forcing_dt", 
+              "fluid_volume_fraction", "filter_width"]:
+        _r(n, REAL)
 
     # ==========================================================================
     # INDEXED PARAMETERS
