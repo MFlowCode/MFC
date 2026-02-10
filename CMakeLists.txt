@@ -665,6 +665,7 @@ if (MFC_DOCUMENTATION)
         OUTPUT  "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/case_constraints.md"
         DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/mfc/gen_case_constraints_docs.py"
                 "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/mfc/case_validator.py"
+                "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/mfc/params/definitions.py"
                 "${examples_DOCs}"
         COMMAND "bash" "${CMAKE_CURRENT_SOURCE_DIR}/docs/gen_constraints.sh"
                        "${CMAKE_CURRENT_SOURCE_DIR}"

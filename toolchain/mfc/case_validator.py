@@ -17,6 +17,7 @@ Based on the constraints enforced in:
 from typing import Dict, Any, List, Set
 from functools import lru_cache
 from .common import MFCException
+from .params.definitions import CONSTRAINTS
 
 
 @lru_cache(maxsize=1)
@@ -1911,14 +1912,27 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
             err_lower = err.lower()
             if "must be positive" in err_lower or "must be set" in err_lower:
                 lines.append("     [dim]Check that this required parameter is defined in your case file[/dim]")
-            elif "weno_order" in err_lower:
-                lines.append("     [dim]Valid values: 1, 3, 5, or 7[/dim]")
-            elif "riemann_solver" in err_lower:
-                lines.append("     [dim]Valid values: 1 (HLL), 2 (HLLC), 3 (Exact), etc.[/dim]")
-            elif "model_eqns" in err_lower:
-                lines.append("     [dim]Valid values: 1, 2 (5-eq), 3 (6-eq), or 4[/dim]")
-            elif "boundary" in err_lower or "bc_" in err_lower:
+                continue
+            if "boundary" in err_lower or "bc_" in err_lower:
                 lines.append("     [dim]Common BC values: -1 (periodic), -2 (reflective), -3 (extrapolation)[/dim]")
+                continue
+
+            # Auto-generate hints from CONSTRAINTS with value_labels
+            for param_name, constraint in CONSTRAINTS.items():
+                if param_name not in err_lower:
+                    continue
+                choices = constraint.get("choices")
+                if not choices:
+                    continue
+                labels = constraint.get("value_labels", {})
+                if labels:
+                    items = [f"{v} ({labels[v]})" if v in labels else str(v)
+                             for v in choices]
+                    hint = f"Valid values: {', '.join(items)}"
+                else:
+                    hint = f"Valid values: {choices}"
+                lines.append(f"     [dim]{hint}[/dim]")
+                break
 
         lines.append("")
         lines.append("[dim]Tip: Run './mfc.sh validate case.py' for detailed validation[/dim]")
