@@ -12,18 +12,17 @@ import re
 from ..schema import ParamType
 from ..registry import REGISTRY
 from ..descriptions import get_description
-from ..definitions import CONSTRAINTS, DEPENDENCIES, get_value_label
+from ..definitions import DEPENDENCIES, get_value_label
 from .. import definitions  # noqa: F401  pylint: disable=unused-import
 
 
 def _get_family(name: str) -> str:
     """Extract family name from parameter (e.g., 'patch_icpp' from 'patch_icpp(1)%vel(1)')."""
     # Handle indexed parameters
-    match = re.match(r'^([a-z_]+)', name)
+    match = re.match(r'^([a-zA-Z_]+)', name)
     if match:
         base = match.group(1)
-        # Check if it's a known family pattern
-        if any(name.startswith(f"{base}(") or name.startswith(f"{base}%") for _ in [1]):
+        if name.startswith(f"{base}(") or name.startswith(f"{base}%"):
             return base
     return "general"
 
@@ -104,20 +103,14 @@ def _type_to_str(param_type: ParamType) -> str:
 
 
 def _format_constraints(param) -> str:
-    """Format constraints as readable string, using value_labels when available."""
+    """Format constraints as readable string, skipping choices already shown via value_labels."""
     if not param.constraints:
         return ""
 
     parts = []
     c = param.constraints
-    if "choices" in c:
-        labels = c.get("value_labels", {})
-        if labels:
-            items = [f"{v}={labels[v]}" if v in labels else str(v)
-                     for v in c["choices"]]
-            parts.append(f"Values: [{', '.join(items)}]")
-        else:
-            parts.append(f"Values: {c['choices']}")
+    if "choices" in c and "value_labels" not in c:
+        parts.append(f"Values: {c['choices']}")
     if "min" in c:
         parts.append(f"Min: {c['min']}")
     if "max" in c:

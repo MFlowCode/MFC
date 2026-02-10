@@ -6,7 +6,7 @@ Parses toolchain/mfc/case_validator.py, extracts all `self.prohibit(...)` rules,
 maps them to parameters and stages, and emits Markdown to stdout.
 
 Also generates case design playbook from curated working examples.
-"""
+"""  # pylint: disable=too-many-lines
 
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ _toolchain_dir = str(HERE.parent)
 if _toolchain_dir not in sys.path:
     sys.path.insert(0, _toolchain_dir)
 
-from mfc.params import REGISTRY, CONSTRAINTS, DEPENDENCIES, get_value_label  # noqa: E402
+from mfc.params import CONSTRAINTS, DEPENDENCIES, get_value_label  # noqa: E402  pylint: disable=wrong-import-position
 
 
 # ---------------------------------------------------------------------------
@@ -813,10 +813,10 @@ def render_markdown(rules: Iterable[Rule]) -> str:  # pylint: disable=too-many-l
     }
 
     # Auto-populate requirements from schema
-    for _val in _model_notes:
+    for _val, _note in _model_notes.items():
         _auto_reqs = _format_model_requirements(_val)
         if _auto_reqs:
-            _model_notes[_val]["requirements"] = _auto_reqs
+            _note["requirements"] = _auto_reqs
 
     model_constraint = CONSTRAINTS["model_eqns"]
     for val in model_constraint["choices"]:

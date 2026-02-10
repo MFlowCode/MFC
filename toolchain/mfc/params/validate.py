@@ -96,7 +96,7 @@ def validate_constraints(params: Dict[str, Any]) -> List[str]:
     return errors
 
 
-def _check_condition(  # pylint: disable=too-many-arguments
+def _check_condition(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     name: str,
     condition: Dict[str, Any],
     condition_label: Optional[str],

@@ -3,7 +3,7 @@ MFC Parameter Definitions (Compact).
 
 Single file containing all ~3,300 parameter definitions using loops.
 This replaces the definitions/ directory.
-"""
+"""  # pylint: disable=too-many-lines
 
 import re
 from typing import Dict, Any
@@ -582,7 +582,7 @@ DEPENDENCIES = {
     },
     "polydisperse": {
         "when_true": {
-            "requires": ["nb"],
+            "requires": ["nb", "poly_sigma"],
         }
     },
     "chemistry": {
@@ -607,7 +607,82 @@ DEPENDENCIES = {
     },
     "probe_wrt": {
         "when_true": {
-            "requires": ["num_probes"],
+            "requires": ["num_probes", "fd_order"],
+        }
+    },
+    "stretch_x": {
+        "when_true": {
+            "requires": ["a_x", "x_a", "x_b"],
+        }
+    },
+    "stretch_y": {
+        "when_true": {
+            "requires": ["a_y", "y_a", "y_b"],
+        }
+    },
+    "stretch_z": {
+        "when_true": {
+            "requires": ["a_z", "z_a", "z_b"],
+        }
+    },
+    "bf_x": {
+        "when_true": {
+            "requires": ["k_x", "w_x", "p_x", "g_x"],
+        }
+    },
+    "bf_y": {
+        "when_true": {
+            "requires": ["k_y", "w_y", "p_y", "g_y"],
+        }
+    },
+    "bf_z": {
+        "when_true": {
+            "requires": ["k_z", "w_z", "p_z", "g_z"],
+        }
+    },
+    "teno": {
+        "when_true": {
+            "requires": ["teno_CT"],
+        }
+    },
+    "recon_type": {
+        "when_value": {
+            2: {"recommends": ["muscl_order", "muscl_lim"]},
+        }
+    },
+    "surface_tension": {
+        "when_true": {
+            "requires": ["sigma"],
+        }
+    },
+    "mhd": {
+        "when_true": {
+            "recommends": ["hyper_cleaning"],
+        }
+    },
+    "relativity": {
+        "when_true": {
+            "requires": ["mhd"],
+        }
+    },
+    "schlieren_wrt": {
+        "when_true": {
+            "requires": ["fd_order"],
+        }
+    },
+    "cfl_adap_dt": {
+        "when_true": {
+            "recommends": ["cfl_target"],
+        }
+    },
+    "cfl_dt": {
+        "when_true": {
+            "recommends": ["cfl_target"],
+        }
+    },
+    "integral_wrt": {
+        "when_true": {
+            "requires": ["fd_order"],
         }
     },
 }
