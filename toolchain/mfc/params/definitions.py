@@ -408,7 +408,7 @@ def _validate_dependency(param_name: str, dependency: Dict[str, Any]) -> None:
             )
         )
 
-    def _validate_condition(cond_label, condition):
+    def _validate_condition(cond_label: str, condition: Any) -> None:
         """Validate a condition dict (shared by when_true, when_set, when_value entries)."""
         if not isinstance(condition, dict):
             raise ValueError(

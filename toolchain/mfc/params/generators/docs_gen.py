@@ -126,7 +126,7 @@ def _format_constraints(param) -> str:
     return ", ".join(parts)
 
 
-def _format_requires_value(rv: dict) -> str:
+def _format_requires_value(rv: Dict[str, list]) -> str:
     """Format a requires_value dict with human-readable labels."""
     items = []
     for param, vals in rv.items():
@@ -136,7 +136,7 @@ def _format_requires_value(rv: dict) -> str:
     return ", ".join(items)
 
 
-def _format_condition(trigger: str, condition: dict) -> list:
+def _format_condition(trigger: str, condition: Dict[str, Any]) -> List[str]:
     """Format a single condition dict into a list of description strings."""
     parts = []
     if "requires" in condition:

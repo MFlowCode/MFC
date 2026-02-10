@@ -27,7 +27,7 @@ Typical usage:
     3. Physics validation (via case_validator.py)
 """
 
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Optional, Tuple
 from .registry import REGISTRY
 from .errors import (
     dependency_error,
@@ -99,7 +99,7 @@ def validate_constraints(params: Dict[str, Any]) -> List[str]:
 def _check_condition(  # pylint: disable=too-many-arguments
     name: str,
     condition: Dict[str, Any],
-    condition_label: str,
+    condition_label: Optional[str],
     params: Dict[str, Any],
     errors: List[str],
     warnings: List[str],
