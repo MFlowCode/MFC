@@ -21,229 +21,87 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="icon" type="image/x-icon" href="res/icon.ico">
     <script>
-        async function ghapi(url) {
-            return fetch(url).then((r) => r.json());
-        }
-
-        let htmlLoaded = false;
-        window.addEventListener("DOMContentLoaded", () => { htmlLoaded = true; });
-
-        function onHTML(func) {
-            window.addEventListener("DOMContentLoaded", func);
-
-            if (htmlLoaded) {
-                func();
-            }
-        }
-
-        ghapi("https://api.github.com/repos/MFlowCode/MFC/releases/latest").then((r) => {
-            onHTML(() => {
-                document.getElementById("release-ver").innerText = r["tag_name"];
-            })
-        });
-
-        ghapi("https://api.github.com/repos/MFlowCode/MFC/contributors").then((r) => {
-            onHTML(() => {
-                let container = document.getElementById("ft-contrib");
-
-                for (let contrib of r) {
-                    let lnk = document.createElement("a");
-                    lnk.classList.add("w-12", "h-12", "float-left");
-                    lnk.href = contrib.html_url;
-
-                    let img = document.createElement("div");
-                    img.classList.add("w-12", "h-12", "bg-cover");
-
-                    img.style.backgroundImage = `url('${contrib.avatar_url}')`;
-
-                    lnk.appendChild(img);
-                    container.appendChild(lnk);
-                }
-            });
-        });
-
-        class FS {
-            constructor(name, image, computer, accelerators, walltime, source) {
-                this.name         = name;
-                this.image        = image;
-                this.computer     = computer;
-                this.accelerators = accelerators;
-                this.walltime     = walltime;
-                this.source       = source;
-            }
-        };
-
         const sims = [
-            new FS("Viscous Taylor-Green vortex","res/simulations/h.png","Delta", "128 A100s", "17h" , "https://vimeo.com/1019922003?share=copy"),
-            new FS("Shedding water droplet", "res/simulations/a.png", "Summit", "960 V100s", "4h", "https://player.vimeo.com/video/905208069"),
-            new FS("Flow over an airfoil (vorticity)", "res/simulations/g.png", "Delta", "128 A100s", "19h", "https://vimeo.com/917305340/c05fd414c8?share=copy"),
-            new FS("Cavitation fragments kidney stone", "res/simulations/d.png", "Summit", "576 V100s", "30 min", "https://doi.org/10.48550/arXiv.2305.09163"),
-            new FS("Breakup of vibrated interface", "res/simulations/f.png", "Summit", "128 V100s", "4h","https://player.vimeo.com/video/922022757"),
-            new FS("Mach 2 flow over a sphere", "res/simulations/i.png", "Phoenix", "36 V100s", "30m", "https://vimeo.com/1020775531?share=copy"),
-            new FS("Mach 2 shear layer", "res/simulations/j.png", "Phoenix", "32 V100s", "15m", "https://vimeo.com/1020775541?share=copy"),
-            new FS("Collapsing bubbles (pressure)", "res/simulations/b.png", "Summit", "216 V100s", "3h", "https://doi.org/10.48550/arXiv.2305.09163"),
-            new FS("Collapsing bubbles (streamlines)", "res/simulations/c.png", "Summit", "216 V100s", "3h", "https://doi.org/10.48550/arXiv.2305.09163"),
+            { name: "Viscous Taylor-Green vortex",       image: "res/simulations/h.png", computer: "Delta",   accelerators: "128 A100s", walltime: "17h",     source: "https://vimeo.com/1019922003?share=copy" },
+            { name: "Shedding water droplet",            image: "res/simulations/a.png", computer: "Summit",  accelerators: "960 V100s", walltime: "4h",      source: "https://player.vimeo.com/video/905208069" },
+            { name: "Flow over an airfoil (vorticity)",  image: "res/simulations/g.png", computer: "Delta",   accelerators: "128 A100s", walltime: "19h",     source: "https://vimeo.com/917305340/c05fd414c8?share=copy" },
+            { name: "Cavitation fragments kidney stone", image: "res/simulations/d.png", computer: "Summit",  accelerators: "576 V100s", walltime: "30 min",  source: "https://doi.org/10.48550/arXiv.2305.09163" },
+            { name: "Breakup of vibrated interface",     image: "res/simulations/f.png", computer: "Summit",  accelerators: "128 V100s", walltime: "4h",      source: "https://player.vimeo.com/video/922022757" },
+            { name: "Mach 2 flow over a sphere",         image: "res/simulations/i.png", computer: "Phoenix", accelerators: "36 V100s",  walltime: "30m",     source: "https://vimeo.com/1020775531?share=copy" },
+            { name: "Mach 2 shear layer",                image: "res/simulations/j.png", computer: "Phoenix", accelerators: "32 V100s",  walltime: "15m",     source: "https://vimeo.com/1020775541?share=copy" },
+            { name: "Collapsing bubbles (pressure)",     image: "res/simulations/b.png", computer: "Summit",  accelerators: "216 V100s", walltime: "3h",      source: "https://doi.org/10.48550/arXiv.2305.09163" },
+            { name: "Collapsing bubbles (streamlines)",  image: "res/simulations/c.png", computer: "Summit",  accelerators: "216 V100s", walltime: "3h",      source: "https://doi.org/10.48550/arXiv.2305.09163" },
         ];
 
-        /*
-        <div class="flex flex-col text-white rounded bg-slate-900 rounded-b-lg">
-            <div class="flex-1 grid bg-white pb-2">
-                <img class="place-self-center" src="res/simulations/a.png">
-            </div>
-            <div class="flex flex-row items-center">
-                <img class="h-10 bg-white" src="res/logo.png" />
-                <div class="flex-1 font-semibold text-center">
-                    Bubble collapse from acoustic source
-                </div>
-                <a class="w-10 text-center" href="#">
-                    <i class="fa-solid fa-arrow-up-right-from-square"></i>
-                </a>
-            </div>
-            <div class="grid grid-cols-3 gap-4 px-4 py-2">
-                <div class="flex flex-row items-center">
-                    <div><i class="fa-solid fa-server"></i></div>
-                    <div class="flex-1 text-center">Summit</div>
-                </div>
-                <div class="flex flex-row items-center">
-                    <div><i class="fa-solid fa-microchip"></i></div>
-                    <div class="flex-1 text-center">10k A100</div>
-                </div>
-                <div class="flex flex-row items-center">
-                    <div><i class="fa-solid fa-clock"></i></div>
-                    <div class="flex-1 text-center">10h</div>
-                </div>
-            </div>
-        </div>
-        */
-
-        onHTML(() => {
-            for (let sim of sims) {
-                let container = document.createElement("div");
-                container.classList.add("flex", "flex-col", "text-white", "rounded", "bg-slate-900", "rounded-b-lg");
-
-                let topdiv = document.createElement("div");
-                topdiv.classList.add("flex-1", "grid", "bg-white", "pb-2");
-
-                let img = document.createElement("img");
-                img.src = sim.image;
-                img.classList.add("place-self-center");
-
-                topdiv.appendChild(img);
-                container.appendChild(topdiv);
-
-                let middiv = document.createElement("div");
-                middiv.classList.add("flex", "flex-row", "items-center");
-
-                let logoDiv = document.createElement("div");
-                logoDiv.classList.add("flex", "flex-col", "h-full", "bg-white", "justify-center");
-
-                let logo = document.createElement("img");
-                logo.src = "res/logo.png";
-                logo.classList.add("h-10");
-
-                logoDiv.appendChild(logo);
-                middiv.appendChild(logoDiv);
-
-                let title = document.createElement("div");
-                title.classList.add("flex-1", "p-2", "font-semibold", "text-center");
-                title.innerText = sim.name;
-
-                middiv.appendChild(title);
-
-                let lnk = document.createElement("a");
-                lnk.href = sim.source;
-                lnk.classList.add("w-10", "text-center");
-
-                let icon = document.createElement("i");
-                icon.classList.add("fa-solid", "fa-arrow-up-right-from-square");
-
-                lnk.appendChild(icon);
-                middiv.appendChild(lnk);
-                container.appendChild(middiv);
-
-                let botdiv = document.createElement("div");
-                botdiv.classList.add("grid", "grid-cols-3", "gap-4", "px-4", "py-2");
-
-                const items = [
-                    ["fa-server",    sim.computer    ],
-                    ["fa-microchip", sim.accelerators],
-                    ["fa-clock",     sim.walltime    ]
-                ];
-
-                for (let r in items) {
-                    let div = document.createElement("div");
-                    div.classList.add("flex", "flex-row", "items-center");
-
-                    let iconDiv = document.createElement("div");
-                    iconDiv.classList.add("pr-2");
-
-                    let icon = document.createElement("i");
-                    icon.classList.add("fa-solid", items[r][0]);
-                    iconDiv.appendChild(icon);
-                    div.appendChild(iconDiv);
-
-                    let text = document.createElement("div");
-                    text.classList.add("flex-1", "text-center");
-                    text.innerText = items[r][1];
-
-                    div.appendChild(text);
-                    botdiv.appendChild(div);
-                }
-
-                container.appendChild(botdiv);
-
-                document.getElementById("ft-sim").appendChild(container);
-            }
-        });
-
-         class FScale {
-            constructor(image, computer) {
-                this.image        = image;
-                this.computer     = computer;
-            }
-        };
-
-        scalings = [
-            new FScale("res/weakScaling/frontier.svg", "Oak Ridge Frontier (AMD MI250X GPUs)"),
-            new FScale("res/weakScaling/summit.svg", "Oak Ridge Summit (NVIDIA V100 GPUs)")
+        const scalings = [
+            { image: "res/weakScaling/frontier.svg", label: "Oak Ridge Frontier (AMD MI250X GPUs)" },
+            { image: "res/weakScaling/summit.svg",   label: "Oak Ridge Summit (NVIDIA V100 GPUs)" },
         ];
 
-        onHTML(() => {
-            for (let scl of scalings) {
-                let container = document.createElement("div");
-                container.classList.add("flex", "md:w-2/6", "flex-col", "text-white", "rounded", "bg-slate-900", "rounded-b-lg");
+        document.addEventListener("DOMContentLoaded", () => {
+            document.getElementById("ft-sim").innerHTML = sims.map(s => `
+                <div class="flex flex-col text-white rounded bg-slate-900 rounded-b-lg">
+                    <div class="flex-1 grid bg-white pb-2">
+                        <img class="place-self-center" src="${s.image}" alt="${s.name}">
+                    </div>
+                    <div class="flex flex-row items-center">
+                        <div class="flex flex-col h-full bg-white justify-center">
+                            <img class="h-10" src="res/logo.png" alt="">
+                        </div>
+                        <div class="flex-1 p-2 font-semibold text-center">${s.name}</div>
+                        <a class="w-10 text-center" href="${s.source}">
+                            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                        </a>
+                    </div>
+                    <div class="grid grid-cols-3 gap-4 px-4 py-2">
+                        <div class="flex flex-row items-center">
+                            <div class="pr-2"><i class="fa-solid fa-server"></i></div>
+                            <div class="flex-1 text-center">${s.computer}</div>
+                        </div>
+                        <div class="flex flex-row items-center">
+                            <div class="pr-2"><i class="fa-solid fa-microchip"></i></div>
+                            <div class="flex-1 text-center">${s.accelerators}</div>
+                        </div>
+                        <div class="flex flex-row items-center">
+                            <div class="pr-2"><i class="fa-solid fa-clock"></i></div>
+                            <div class="flex-1 text-center">${s.walltime}</div>
+                        </div>
+                    </div>
+                </div>
+            `).join("");
 
-                let topdiv = document.createElement("div");
-                topdiv.classList.add("flex-1", "grid", "bg-white", "pb-2");
+            document.getElementById("ft-scaling").innerHTML = scalings.map(s => `
+                <div class="flex md:w-2/6 flex-col text-white rounded bg-slate-900 rounded-b-lg">
+                    <div class="flex-1 grid bg-white pb-2">
+                        <img class="place-self-center" src="${s.image}" alt="${s.label}">
+                    </div>
+                    <div class="flex-1 p-2 font-semibold text-center">${s.label}</div>
+                </div>
+            `).join("");
 
-                let img = document.createElement("img");
-                img.src = scl.image;
-                img.classList.add("place-self-center");
+            fetch("https://api.github.com/repos/MFlowCode/MFC/releases/latest")
+                .then(r => r.json())
+                .then(r => { if (r.tag_name) document.getElementById("release-ver").innerText = r.tag_name; })
+                .catch(() => {});
 
-                topdiv.appendChild(img);
-                container.appendChild(topdiv);
+            fetch("https://api.github.com/repos/MFlowCode/MFC/contributors")
+                .then(r => r.json())
+                .then(contributors => {
+                    const container = document.getElementById("ft-contrib");
+                    for (const c of contributors) {
+                        const a = document.createElement("a");
+                        a.className = "w-12 h-12 float-left";
+                        a.href = c.html_url;
 
-                let middiv = document.createElement("div");
-                middiv.classList.add("flex", "flex-row", "items-center");
+                        const div = document.createElement("div");
+                        div.className = "w-12 h-12 bg-cover";
+                        div.style.backgroundImage = `url('${c.avatar_url}')`;
 
-                let logoDiv = document.createElement("div");
-                logoDiv.classList.add("flex", "flex-col", "h-full", "bg-white", "justify-center");
-
-
-                let title = document.createElement("div");
-                title.classList.add("flex-1", "p-2", "font-semibold", "text-center");
-                title.innerText = scl.computer;
-
-                middiv.appendChild(title);
-
-                let botdiv = document.createElement("div");
-                botdiv.classList.add("flex-1","p-2","font-semibold","text-center");
-                botdiv.innerText=scl.computer;
-
-                container.appendChild(botdiv);
-
-                document.getElementById("ft-scaling").appendChild(container);
-            }
+                        a.appendChild(div);
+                        container.appendChild(a);
+                    }
+                })
+                .catch(() => {});
         });
     </script>
 </head>
