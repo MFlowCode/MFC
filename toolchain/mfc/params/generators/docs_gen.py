@@ -12,6 +12,7 @@ import re
 from ..schema import ParamType
 from ..registry import REGISTRY
 from ..descriptions import get_description
+from ..definitions import CONSTRAINTS, DEPENDENCIES, get_value_label
 from .. import definitions  # noqa: F401  pylint: disable=unused-import
 
 
@@ -103,20 +104,69 @@ def _type_to_str(param_type: ParamType) -> str:
 
 
 def _format_constraints(param) -> str:
-    """Format constraints as readable string."""
+    """Format constraints as readable string, using value_labels when available."""
     if not param.constraints:
         return ""
 
     parts = []
     c = param.constraints
     if "choices" in c:
-        parts.append(f"Values: {c['choices']}")
+        labels = c.get("value_labels", {})
+        if labels:
+            items = [f"{v}={labels[v]}" if v in labels else str(v)
+                     for v in c["choices"]]
+            parts.append(f"Values: [{', '.join(items)}]")
+        else:
+            parts.append(f"Values: {c['choices']}")
     if "min" in c:
         parts.append(f"Min: {c['min']}")
     if "max" in c:
         parts.append(f"Max: {c['max']}")
 
     return ", ".join(parts)
+
+
+def _format_requires_value(rv: dict) -> str:
+    """Format a requires_value dict with human-readable labels."""
+    items = []
+    for param, vals in rv.items():
+        labeled = [f"{v} ({get_value_label(param, v)})" if get_value_label(param, v) != str(v) else str(v)
+                   for v in vals]
+        items.append(f"{param} = {' or '.join(labeled)}")
+    return ", ".join(items)
+
+
+def _format_condition(trigger: str, condition: dict) -> list:
+    """Format a single condition dict into a list of description strings."""
+    parts = []
+    if "requires" in condition:
+        parts.append(f"When {trigger}, requires: {', '.join(condition['requires'])}")
+    if "requires_value" in condition:
+        parts.append(f"When {trigger}, requires {_format_requires_value(condition['requires_value'])}")
+    if "recommends" in condition:
+        parts.append(f"When {trigger}, recommends: {', '.join(condition['recommends'])}")
+    return parts
+
+
+def _format_dependencies(param_name: str) -> str:
+    """Format dependency info as a readable string."""
+    dep = DEPENDENCIES.get(param_name)
+    if not dep:
+        return ""
+
+    parts = []
+    for condition_key in ["when_true", "when_set"]:
+        condition = dep.get(condition_key)
+        if not condition:
+            continue
+        trigger = "enabled" if condition_key == "when_true" else "set"
+        parts.extend(_format_condition(trigger, condition))
+
+    if "when_value" in dep:
+        for val, condition in dep["when_value"].items():
+            parts.extend(_format_condition(f"= {val}", condition))
+
+    return "; ".join(parts)
 
 
 def generate_parameter_docs() -> str:  # pylint: disable=too-many-locals,too-many-statements
@@ -225,10 +275,25 @@ def generate_parameter_docs() -> str:  # pylint: disable=too-many-locals,too-man
         # Use pattern view if it reduces rows, otherwise show full table
         if len(patterns) < len(params):
             # Pattern view - shows collapsed patterns
+            # Check if any member of a pattern has constraints
+            pattern_has_constraints = False
+            for _pattern, examples in patterns.items():
+                for ex in examples:
+                    p = REGISTRY.all_params[ex]
+                    if p.constraints or ex in DEPENDENCIES:
+                        pattern_has_constraints = True
+                        break
+                if pattern_has_constraints:
+                    break
+
             lines.append("### Patterns")
             lines.append("")
-            lines.append("| Pattern | Example | Description |")
-            lines.append("|---------|---------|-------------|")
+            if pattern_has_constraints:
+                lines.append("| Pattern | Example | Description | Constraints |")
+                lines.append("|---------|---------|-------------|-------------|")
+            else:
+                lines.append("| Pattern | Example | Description |")
+                lines.append("|---------|---------|-------------|")
 
             for pattern, examples in sorted(patterns.items()):
                 example = examples[0]
@@ -239,7 +304,14 @@ def generate_parameter_docs() -> str:  # pylint: disable=too-many-locals,too-man
                 # Escape % for Doxygen
                 pattern_escaped = _escape_percent(pattern)
                 example_escaped = _escape_percent(example)
-                lines.append(f"| `{pattern_escaped}` | `{example_escaped}` | {desc} |")
+                if pattern_has_constraints:
+                    p = REGISTRY.all_params[example]
+                    constraints = _format_constraints(p)
+                    deps = _format_dependencies(example)
+                    extra = "; ".join(filter(None, [constraints, deps]))
+                    lines.append(f"| `{pattern_escaped}` | `{example_escaped}` | {desc} | {extra} |")
+                else:
+                    lines.append(f"| `{pattern_escaped}` | `{example_escaped}` | {desc} |")
 
             lines.append("")
         else:
@@ -251,11 +323,13 @@ def generate_parameter_docs() -> str:  # pylint: disable=too-many-locals,too-man
                 type_str = _type_to_str(param.param_type)
                 desc = get_description(name) or ""
                 constraints = _format_constraints(param)
-                if constraints:
-                    desc = f"{desc} ({constraints})" if desc else constraints
+                deps = _format_dependencies(name)
+                extra = "; ".join(filter(None, [constraints, deps]))
+                if extra:
+                    desc = f"{desc} ({extra})" if desc else extra
                 # Truncate long descriptions
-                if len(desc) > 80:
-                    desc = desc[:77] + "..."
+                if len(desc) > 120:
+                    desc = desc[:117] + "..."
                 # Escape % for Doxygen
                 name_escaped = _escape_percent(name)
                 lines.append(f"| `{name_escaped}` | {type_str} | {desc} |")

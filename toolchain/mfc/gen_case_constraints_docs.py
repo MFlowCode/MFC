@@ -24,6 +24,13 @@ CASE_VALIDATOR_PATH = HERE / "case_validator.py"
 REPO_ROOT = HERE.parent.parent
 EXAMPLES_DIR = REPO_ROOT / "examples"
 
+# Make the params package importable
+_toolchain_dir = str(HERE.parent)
+if _toolchain_dir not in sys.path:
+    sys.path.insert(0, _toolchain_dir)
+
+from mfc.params import REGISTRY, CONSTRAINTS, DEPENDENCIES, get_value_label  # noqa: E402
+
 
 # ---------------------------------------------------------------------------
 # Data structures
@@ -463,36 +470,24 @@ def summarize_case_params(params: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def get_model_name(model_eqns: int | None) -> str:
-    """Get human-friendly model name"""
-    models = {
-        1: "π-γ (Compressible Euler)",
-        2: "5-Equation (Multiphase)",
-        3: "6-Equation (Phase Change)",
-        4: "4-Equation (Single Component)"
-    }
-    return models.get(model_eqns, "Not specified")
+    """Get human-friendly model name from schema."""
+    if model_eqns is None:
+        return "Not specified"
+    return get_value_label("model_eqns", model_eqns) or "Not specified"
 
 
 def get_riemann_solver_name(solver: int | None) -> str:
-    """Get Riemann solver name"""
-    solvers = {
-        1: "HLL",
-        2: "HLLC",
-        3: "Exact",
-        4: "HLLD",
-        5: "Lax-Friedrichs"
-    }
-    return solvers.get(solver, "Not specified")
+    """Get Riemann solver name from schema."""
+    if solver is None:
+        return "Not specified"
+    return get_value_label("riemann_solver", solver) or "Not specified"
 
 
 def get_time_stepper_name(stepper: int | None) -> str:
-    """Get time stepper name"""
-    steppers = {
-        1: "RK1 (Forward Euler)",
-        2: "RK2",
-        3: "RK3 (SSP)"
-    }
-    return steppers.get(stepper, "Not specified")
+    """Get time stepper name from schema."""
+    if stepper is None:
+        return "Not specified"
+    return get_value_label("time_stepper", stepper) or "Not specified"
 
 
 def render_playbook_card(entry: PlaybookEntry, summary: Dict[str, Any]) -> str:  # pylint: disable=too-many-branches,too-many-statements
@@ -778,67 +773,120 @@ def render_markdown(rules: Iterable[Rule]) -> str:  # pylint: disable=too-many-l
 
         lines.append("")
 
-    # 3. Model Equations
+    # 3. Model Equations (data-driven from schema)
     lines.append("## 🔢 Model Equations\n")
     lines.append("Choose your governing equations:\n")
     lines.append("")
 
-    lines.append("<details>")
-    lines.append("<summary><b>Model 1: π-γ (Compressible Euler)</b></summary>\n")
-    lines.append("- **Use for:** Single-fluid compressible flow")
-    lines.append("- **Value:** `model_eqns = 1`")
-    lines.append("- **Note:** Cannot use `num_fluids`, bubbles, or certain WENO variants")
-    lines.append("</details>\n")
+    def _format_model_requirements(val: int) -> str:
+        """Auto-generate requirements string from DEPENDENCIES['model_eqns']['when_value']."""
+        me_dep = DEPENDENCIES.get("model_eqns", {})
+        wv = me_dep.get("when_value", {}).get(val, {})
+        if not wv:
+            return ""
+        parts = []
+        if "requires" in wv:
+            parts.extend(f"Set `{r}`" for r in wv["requires"])
+        if "requires_value" in wv:
+            for rv_param, rv_vals in wv["requires_value"].items():
+                labeled = [f"`{v}` ({get_value_label(rv_param, v)})" for v in rv_vals]
+                parts.append(f"`{rv_param}` = {' or '.join(labeled)}")
+        return ", ".join(parts)
 
-    lines.append("<details>")
-    lines.append("<summary><b>Model 2: 5-Equation (Most versatile)</b></summary>\n")
-    lines.append("- **Use for:** Multiphase, bubbles, elastic materials, MHD")
-    lines.append("- **Value:** `model_eqns = 2`")
-    lines.append("- **Requirements:** Set `num_fluids`")
-    lines.append("- **Compatible with:** Most physics models")
-    lines.append("</details>\n")
+    # Curated editorial notes keyed by model_eqns value
+    _model_notes = {
+        1: {
+            "use_for": "Single-fluid compressible flow",
+            "note": "Cannot use `num_fluids`, bubbles, or certain WENO variants",
+        },
+        2: {
+            "use_for": "Multiphase, bubbles, elastic materials, MHD",
+            "note": "Compatible with most physics models",
+        },
+        3: {
+            "use_for": "Phase change, cavitation",
+            "note": "Not compatible with bubbles or 3D cylindrical",
+        },
+        4: {
+            "use_for": "Single-component flows with bubbles",
+        },
+    }
 
-    lines.append("<details>")
-    lines.append("<summary><b>Model 3: 6-Equation (Phase change)</b></summary>\n")
-    lines.append("- **Use for:** Phase change, cavitation")
-    lines.append("- **Value:** `model_eqns = 3`")
-    lines.append("- **Requirements:** `riemann_solver = 2` (HLLC), `avg_state = 2`, `wave_speeds = 1`")
-    lines.append("- **Note:** Not compatible with bubbles or 3D cylindrical")
-    lines.append("</details>\n")
+    # Auto-populate requirements from schema
+    for _val in _model_notes:
+        _auto_reqs = _format_model_requirements(_val)
+        if _auto_reqs:
+            _model_notes[_val]["requirements"] = _auto_reqs
 
-    lines.append("<details>")
-    lines.append("<summary><b>Model 4: 4-Equation (Single component)</b></summary>\n")
-    lines.append("- **Use for:** Single-component flows with bubbles")
-    lines.append("- **Value:** `model_eqns = 4`")
-    lines.append("- **Requirements:** `num_fluids = 1`, set `rhoref` and `pref`")
-    lines.append("</details>\n")
+    model_constraint = CONSTRAINTS["model_eqns"]
+    for val in model_constraint["choices"]:
+        label = get_value_label("model_eqns", val)
+        notes = _model_notes.get(val, {})
+        lines.append("<details>")
+        lines.append(f"<summary><b>Model {val}: {label}</b></summary>\n")
+        if "use_for" in notes:
+            lines.append(f"- **Use for:** {notes['use_for']}")
+        lines.append(f"- **Value:** `model_eqns = {val}`")
+        if "requirements" in notes:
+            lines.append(f"- **Requirements:** {notes['requirements']}")
+        if "note" in notes:
+            lines.append(f"- **Note:** {notes['note']}")
+        lines.append("</details>\n")
 
-    # 4. Riemann Solvers (simplified)
+    # 4. Riemann Solvers (data-driven from schema)
+    # Curated editorial notes keyed by riemann_solver value
+    _solver_notes = {
+        1: {"best_for": "MHD, elastic materials", "requirements": "—"},
+        2: {"best_for": "Bubbles, phase change, multiphase", "requirements": "`avg_state=2` for bubbles"},
+        3: {"best_for": "High accuracy (expensive)", "requirements": "—"},
+        4: {"best_for": "MHD (advanced)", "requirements": "MHD only, no relativity"},
+        5: {"best_for": "Robust fallback", "requirements": "Not with cylindrical+viscous"},
+    }
+
     lines.append("## ⚙️ Riemann Solvers\n")
     lines.append("| Solver | `riemann_solver` | Best For | Requirements |")
     lines.append("|--------|-----------------|----------|-------------|")
-    lines.append("| **HLL** | `1` | MHD, elastic materials | — |")
-    lines.append("| **HLLC** | `2` | Bubbles, phase change, multiphase | `avg_state=2` for bubbles |")
-    lines.append("| **Exact** | `3` | High accuracy (expensive) | — |")
-    lines.append("| **HLLD** | `4` | MHD (advanced) | MHD only, no relativity |")
-    lines.append("| **Lax-Friedrichs** | `5` | Robust fallback | Not with cylindrical+viscous |")
+
+    solver_constraint = CONSTRAINTS["riemann_solver"]
+    for val in solver_constraint["choices"]:
+        label = get_value_label("riemann_solver", val)
+        notes = _solver_notes.get(val, {})
+        best = notes.get("best_for", "—")
+        reqs = notes.get("requirements", "—")
+        lines.append(f"| **{label}** | `{val}` | {best} | {reqs} |")
+
     lines.append("")
 
-    # 5. Bubble Models (enhanced with collapsible)
+    # 5. Bubble Models (data-driven from schema dependencies + curated notes)
     if "bubbles_euler" in by_param or "bubbles_lagrange" in by_param:
         lines.append("## 💧 Bubble Models\n")
         lines.append("")
 
+        # Euler-Euler: inject schema dependency info (data-driven)
         lines.append("<details>")
         lines.append("<summary><b>Euler-Euler (`bubbles_euler`)</b></summary>\n")
         lines.append("**Requirements:**")
-        lines.append("- `model_eqns = 2` or `4`")
-        lines.append("- `riemann_solver = 2` (HLLC)")
-        lines.append("- `avg_state = 2`")
-        lines.append("- Set `nb` (number of bins) ≥ 1\n")
+        be_dep = DEPENDENCIES.get("bubbles_euler", {})
+        be_when_true = be_dep.get("when_true", {})
+        be_rv = be_when_true.get("requires_value", {})
+        for rv_param, rv_vals in be_rv.items():
+            labeled = [f"`{v}` ({get_value_label(rv_param, v)})" for v in rv_vals]
+            lines.append(f"- `{rv_param}` = {' or '.join(labeled)}")
+        be_recs = be_when_true.get("recommends", [])
+        if be_recs:
+            lines.append(f"- Recommended to also set: {', '.join(f'`{r}`' for r in be_recs)}")
+        lines.append("")
         lines.append("**Extensions:**")
-        lines.append("- `polydisperse = T`: Multiple bubble sizes (requires odd `nb > 1`)")
-        lines.append("- `qbmm = T`: Quadrature method (requires `nnode = 4`)")
+        # Inject polydisperse dependency
+        pd_dep = DEPENDENCIES.get("polydisperse", {})
+        pd_reqs = pd_dep.get("when_true", {}).get("requires", [])
+        pd_req_str = f" (requires {', '.join(f'`{r}`' for r in pd_reqs)})" if pd_reqs else ""
+        lines.append(f"- `polydisperse = T`: Multiple bubble sizes{pd_req_str}, odd `nb > 1`")
+        # Inject qbmm dependency
+        qb_dep = DEPENDENCIES.get("qbmm", {})
+        qb_recs = qb_dep.get("when_true", {}).get("recommends", [])
+        qb_rec_str = f" (recommends {', '.join(f'`{r}`' for r in qb_recs)})" if qb_recs else ""
+        lines.append(f"- `qbmm = T`: Quadrature method{qb_rec_str}, requires `nnode = 4`")
         lines.append("- `adv_n = T`: Number density advection (requires `num_fluids = 1`)")
         lines.append("</details>\n")
 
@@ -851,37 +899,30 @@ def render_markdown(rules: Iterable[Rule]) -> str:  # pylint: disable=too-many-l
         lines.append("**Note:** Tracks individual bubbles")
         lines.append("</details>\n")
 
-    # 6. Condensed Parameter Reference
+    # 6. Condensed Parameter Reference (auto-collected from schema)
     lines.append("## 📖 Quick Parameter Reference\n")
     lines.append("Key parameters and their constraints:\n")
 
-    # Highlight only the most important parameters in collapsible sections
-    important_params = {
-        "MHD": "mhd",
-        "Surface Tension": "surface_tension",
-        "Viscosity": "viscous",
-        "Number of Fluids": "num_fluids",
-        "Cylindrical Coordinates": "cyl_coord",
-        "Immersed Boundaries": "ib",
-    }
+    # Auto-collect all params that have CONSTRAINTS or DEPENDENCIES entries
+    quick_ref_params = sorted(set(CONSTRAINTS.keys()) | set(DEPENDENCIES.keys()))
 
-    for title, param in important_params.items():
-        if param not in by_param:
-            continue
+    for param in quick_ref_params:
+        title = feature_title(param)
 
-        rules_for_param = by_param[param]
+        # Gather schema info
+        constraint = CONSTRAINTS.get(param, {})
+        dep = DEPENDENCIES.get(param, {})
 
-        # Get key info
+        # Gather AST-extracted rules
+        rules_for_param = by_param.get(param, [])
         requirements = []
         incompatibilities = []
         ranges = []
 
         for rule in rules_for_param:
             msg = rule.message
-            # Skip IGR-related messages
             if "IGR" in msg:
                 continue
-
             kind = classify_message(msg)
             if kind == "requirement":
                 requirements.append(msg)
@@ -890,11 +931,64 @@ def render_markdown(rules: Iterable[Rule]) -> str:  # pylint: disable=too-many-l
             elif kind == "range":
                 ranges.append(msg)
 
-        if not (requirements or incompatibilities or ranges):
+        # Build schema constraint summary
+        schema_parts = []
+        if "choices" in constraint:
+            labels = constraint.get("value_labels", {})
+            if labels:
+                items = [f"`{v}` = {labels[v]}" for v in constraint["choices"] if v in labels]
+                schema_parts.append("Choices: " + ", ".join(items))
+            else:
+                schema_parts.append(f"Choices: {constraint['choices']}")
+        if "min" in constraint:
+            schema_parts.append(f"Min: {constraint['min']}")
+        if "max" in constraint:
+            schema_parts.append(f"Max: {constraint['max']}")
+
+        # Build dependency summary
+        dep_parts = []
+
+        def _render_cond_parts(trigger_str, cond_dict):
+            """Render a condition dict into dep_parts entries."""
+            if "requires" in cond_dict:
+                dep_parts.append(f"When {trigger_str}, requires: {', '.join(f'`{r}`' for r in cond_dict['requires'])}")
+            if "requires_value" in cond_dict:
+                rv_items = []
+                for rv_p, rv_vs in cond_dict["requires_value"].items():
+                    labeled = [f"`{v}` ({get_value_label(rv_p, v)})" for v in rv_vs]
+                    rv_items.append(f"`{rv_p}` = {' or '.join(labeled)}")
+                dep_parts.append(f"When {trigger_str}, requires {', '.join(rv_items)}")
+            if "recommends" in cond_dict:
+                dep_parts.append(f"When {trigger_str}, recommends: {', '.join(f'`{r}`' for r in cond_dict['recommends'])}")
+
+        for cond_key in ["when_true", "when_set"]:
+            cond = dep.get(cond_key, {})
+            if cond:
+                trigger = "enabled" if cond_key == "when_true" else "set"
+                _render_cond_parts(trigger, cond)
+
+        if "when_value" in dep:
+            for wv_val, wv_cond in dep["when_value"].items():
+                _render_cond_parts(f"= {wv_val}", wv_cond)
+
+        # Skip if nothing to show
+        if not (schema_parts or dep_parts or requirements or incompatibilities or ranges):
             continue
 
         lines.append(f"\n<details>")
         lines.append(f"<summary><b>{title}</b> (`{param}`)</summary>\n")
+
+        if schema_parts:
+            lines.append("**Schema constraints:**")
+            for sp in schema_parts:
+                lines.append(f"- {sp}")
+            lines.append("")
+
+        if dep_parts:
+            lines.append("**Dependencies:**")
+            for dp in dep_parts:
+                lines.append(f"- {dp}")
+            lines.append("")
 
         if requirements:
             lines.append("**Requirements:**")
