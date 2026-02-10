@@ -12,7 +12,7 @@ import re
 from ..schema import ParamType
 from ..registry import REGISTRY
 from ..descriptions import get_description
-from ..definitions import DEPENDENCIES, get_value_label
+from ..ast_analyzer import analyze_case_validator, classify_message
 from .. import definitions  # noqa: F401  pylint: disable=unused-import
 
 
@@ -119,58 +119,97 @@ def _format_constraints(param) -> str:
     return ", ".join(parts)
 
 
-def _backtick_list(names: list) -> str:
-    """Format a list of parameter names with backticks."""
-    return ", ".join(f"`{n}`" for n in names)
+def _build_param_name_pattern():
+    """Build a regex pattern that matches known parameter names at word boundaries.
+
+    Uses longest-match-first to avoid partial matches (e.g., 'model_eqns' before 'model').
+    Only matches names that look like identifiers (avoids matching 'm' inside 'must').
+    """
+    all_names = sorted(REGISTRY.all_params.keys(), key=len, reverse=True)
+    # Only include names >= 2 chars to avoid false positives with single-letter params
+    # and names that are simple identifiers (no % or parens, which need escaping)
+    safe_names = [n for n in all_names if len(n) >= 2 and re.match(r'^[a-zA-Z_]\w*$', n)]
+    if not safe_names:
+        return None
+    pattern = r'\b(' + '|'.join(re.escape(n) for n in safe_names) + r')\b'
+    return re.compile(pattern)
 
 
-def _format_requires_value(rv: Dict[str, list]) -> str:
-    """Format a requires_value dict with human-readable labels."""
-    items = []
-    for param, vals in rv.items():
-        labeled = [f"{v} ({get_value_label(param, v)})" if get_value_label(param, v) != str(v) else str(v)
-                   for v in vals]
-        items.append(f"`{param}` = {' or '.join(labeled)}")
-    return ", ".join(items)
+def _backtick_params(msg: str, pattern) -> str:
+    """Wrap known parameter names in backticks for markdown rendering."""
+    if pattern is None:
+        return msg
+    return pattern.sub(r'`\1`', msg)
 
 
-def _format_condition(trigger: str, condition: Dict[str, Any]) -> List[str]:
-    """Format a single condition dict into a list of description strings."""
-    parts = []
-    if "requires" in condition:
-        parts.append(f"Requires {_backtick_list(condition['requires'])} when {trigger}")
-    if "requires_value" in condition:
-        parts.append(f"Requires {_format_requires_value(condition['requires_value'])} when {trigger}")
-    if "recommends" in condition:
-        parts.append(f"Recommends {_backtick_list(condition['recommends'])} when {trigger}")
-    return parts
+# Lazily initialized at module level on first use
+_PARAM_PATTERN = None
 
 
-def _format_dependencies(param_name: str) -> str:
-    """Format dependency info as a readable string."""
-    dep = DEPENDENCIES.get(param_name)
-    if not dep:
+def _get_param_pattern():
+    global _PARAM_PATTERN  # noqa: PLW0603  pylint: disable=global-statement
+    if _PARAM_PATTERN is None:
+        _PARAM_PATTERN = _build_param_name_pattern()
+    return _PARAM_PATTERN
+
+
+def _format_validator_rules(param_name: str, by_trigger: Dict[str, list]) -> str:  # pylint: disable=too-many-locals
+    """Format AST-extracted validator rules for a parameter's Constraints column.
+
+    Gets rules where this param is the trigger, classifies each, and
+    returns a concise summary suitable for a markdown table cell.
+    """
+    rules = by_trigger.get(param_name, [])
+    if not rules:
         return ""
 
-    parts = []
-    for condition_key in ["when_true", "when_set"]:
-        condition = dep.get(condition_key)
-        if not condition:
-            continue
-        trigger = "enabled" if condition_key == "when_true" else "set"
-        parts.extend(_format_condition(trigger, condition))
+    pattern = _get_param_pattern()
 
-    if "when_value" in dep:
-        for val, condition in dep["when_value"].items():
-            label = get_value_label(param_name, val)
-            val_str = f"{val} ({label})" if label != str(val) else str(val)
-            parts.extend(_format_condition(f"= {val_str}", condition))
+    # Deduplicate messages (same message can appear from multiple loop iterations)
+    seen = set()
+    unique_rules = []
+    for r in rules:
+        if r.message not in seen:
+            seen.add(r.message)
+            unique_rules.append(r)
+
+    # Classify and pick representative messages
+    requirements = []
+    incompatibilities = []
+    ranges = []
+    others = []
+
+    for r in unique_rules:
+        kind = classify_message(r.message)
+        msg = _backtick_params(r.message, pattern)
+        if kind == "requirement":
+            requirements.append(msg)
+        elif kind == "incompatibility":
+            incompatibilities.append(msg)
+        elif kind == "range":
+            ranges.append(msg)
+        else:
+            others.append(msg)
+
+    # Build concise output - show up to 3 rules total, prioritized
+    parts = []
+    budget = 3
+    for group in [requirements, incompatibilities, ranges, others]:
+        for msg in group:
+            if budget <= 0:
+                break
+            parts.append(msg)
+            budget -= 1
 
     return "; ".join(parts)
 
 
 def generate_parameter_docs() -> str:  # pylint: disable=too-many-locals,too-many-statements
     """Generate markdown documentation for all parameters."""
+    # AST-extract rules from case_validator.py
+    analysis = analyze_case_validator()
+    by_trigger = analysis["by_trigger"]
+
     lines = [
         "@page parameters Case Parameters Reference",
         "",
@@ -280,7 +319,7 @@ def generate_parameter_docs() -> str:  # pylint: disable=too-many-locals,too-man
             for _pattern, examples in patterns.items():
                 for ex in examples:
                     p = REGISTRY.all_params[ex]
-                    if p.constraints or ex in DEPENDENCIES:
+                    if p.constraints or ex in by_trigger:
                         pattern_has_constraints = True
                         break
                 if pattern_has_constraints:
@@ -307,7 +346,7 @@ def generate_parameter_docs() -> str:  # pylint: disable=too-many-locals,too-man
                 if pattern_has_constraints:
                     p = REGISTRY.all_params[example]
                     constraints = _format_constraints(p)
-                    deps = _format_dependencies(example)
+                    deps = _format_validator_rules(example, by_trigger)
                     extra = "; ".join(filter(None, [constraints, deps]))
                     lines.append(f"| `{pattern_escaped}` | `{example_escaped}` | {desc} | {extra} |")
                 else:
@@ -326,7 +365,7 @@ def generate_parameter_docs() -> str:  # pylint: disable=too-many-locals,too-man
                 if len(desc) > 80:
                     desc = desc[:77] + "..."
                 constraints = _format_constraints(param)
-                deps = _format_dependencies(name)
+                deps = _format_validator_rules(name, by_trigger)
                 extra = "; ".join(filter(None, [constraints, deps]))
                 # Escape % for Doxygen
                 name_escaped = _escape_percent(name)
