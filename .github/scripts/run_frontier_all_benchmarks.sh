@@ -1,6 +1,6 @@
 #!/bin/bash
 # Orchestrate all Frontier benchmark configs in one multi-node SLURM allocation.
-# 1. Builds all configs on the login node (PR and master, sequentially)
+# 1. Builds all configs on the login node (PR and master, in parallel)
 # 2. Submits a single 6-node SLURM job running benchmarks in parallel via ssh
 
 set -euo pipefail
@@ -34,19 +34,58 @@ for cfg in "${configs[@]}"; do
     cp -al "$version" "$dir" 2>/dev/null || cp -r "$version" "$dir"
 done
 
-# --- Phase 2: Build each config on login node ---
+# --- Phase 2: Build all configs on login node in parallel ---
+echo ""
+echo "=========================================="
+echo "Starting parallel builds (${num_nodes} configs)..."
+echo "=========================================="
+
+build_pids=()
 for cfg in "${configs[@]}"; do
     read -r version cluster device interface <<< "$cfg"
     dir="${version}-${cluster}-${device}-${interface}"
-    echo ""
-    echo "=========================================="
-    echo "Building: $version $cluster $device $interface (in $dir)"
-    echo "=========================================="
+    log="build-${version}-${cluster}-${device}-${interface}.log"
+    echo "  Starting: $version $cluster $device $interface"
     (
         cd "$dir"
         bash .github/workflows/${cluster}/build.sh "$device" "$interface" bench
-    )
+    ) > "$log" 2>&1 &
+    build_pids+=($!)
 done
+
+# Wait for all builds and report results
+build_failed=0
+build_exits=()
+for i in "${!build_pids[@]}"; do
+    read -r version cluster device interface <<< "${configs[$i]}"
+    if wait "${build_pids[$i]}"; then
+        echo "  Build PASSED: $version $cluster $device $interface"
+        build_exits+=(0)
+    else
+        code=$?
+        echo "  Build FAILED: $version $cluster $device $interface (exit $code)"
+        build_exits+=($code)
+        build_failed=1
+    fi
+done
+
+# On failure, print logs for failed builds and abort
+if [ "$build_failed" -ne 0 ]; then
+    echo ""
+    echo "=========================================="
+    echo "Build failures detected. Printing failed logs:"
+    echo "=========================================="
+    for i in "${!configs[@]}"; do
+        if [ "${build_exits[$i]}" -ne 0 ]; then
+            read -r version cluster device interface <<< "${configs[$i]}"
+            log="build-${version}-${cluster}-${device}-${interface}.log"
+            echo "--- $log ---"
+            cat "$log"
+            echo "--- end $log ---"
+        fi
+    done
+    exit 1
+fi
 
 echo ""
 echo "=========================================="
