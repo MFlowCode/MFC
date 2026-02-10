@@ -53,37 +53,68 @@ for cfg in "${configs[@]}"; do
     build_pids+=($!)
 done
 
+# Periodic heartbeat while builds run
+(
+    while true; do
+        sleep 120
+        alive=0
+        for pid in "${build_pids[@]}"; do
+            kill -0 "$pid" 2>/dev/null && alive=$((alive + 1))
+        done
+        [ "$alive" -eq 0 ] && break
+        echo "--- Build heartbeat ($(date +%H:%M:%S)): $alive/${#build_pids[@]} running ---"
+        for i in "${!configs[@]}"; do
+            read -r version cluster device interface <<< "${configs[$i]}"
+            log="build-${version}-${cluster}-${device}-${interface}.log"
+            if kill -0 "${build_pids[$i]}" 2>/dev/null; then
+                size=$(stat -c%s "$log" 2>/dev/null || echo 0)
+                last=$(tail -n 1 "$log" 2>/dev/null | head -c 120 || echo "")
+                echo "  $version $cluster $device $interface: running (${size} bytes) $last"
+            fi
+        done
+    done
+) &
+heartbeat_pid=$!
+
 # Wait for all builds and report results
 build_failed=0
 build_exits=()
 for i in "${!build_pids[@]}"; do
     read -r version cluster device interface <<< "${configs[$i]}"
     if wait "${build_pids[$i]}"; then
-        echo "  Build PASSED: $version $cluster $device $interface"
         build_exits+=(0)
     else
         code=$?
-        echo "  Build FAILED: $version $cluster $device $interface (exit $code)"
         build_exits+=($code)
         build_failed=1
     fi
 done
 
-# On failure, print logs for failed builds and abort
+# Stop heartbeat
+kill "$heartbeat_pid" 2>/dev/null; wait "$heartbeat_pid" 2>/dev/null || true
+
+# Print build logs: passed builds collapsed, failed builds in full
+for i in "${!configs[@]}"; do
+    read -r version cluster device interface <<< "${configs[$i]}"
+    log="build-${version}-${cluster}-${device}-${interface}.log"
+    if [ "${build_exits[$i]}" -eq 0 ]; then
+        echo "::group::Build PASSED: $version $cluster $device $interface"
+        cat "$log"
+        echo "::endgroup::"
+    else
+        echo "=========================================="
+        echo "Build FAILED: $version $cluster $device $interface (exit ${build_exits[$i]})"
+        echo "=========================================="
+        cat "$log"
+    fi
+done
+
+# Abort on failure
 if [ "$build_failed" -ne 0 ]; then
     echo ""
     echo "=========================================="
-    echo "Build failures detected. Printing failed logs:"
+    echo "Build failures detected — see logs above."
     echo "=========================================="
-    for i in "${!configs[@]}"; do
-        if [ "${build_exits[$i]}" -ne 0 ]; then
-            read -r version cluster device interface <<< "${configs[$i]}"
-            log="build-${version}-${cluster}-${device}-${interface}.log"
-            echo "--- $log ---"
-            cat "$log"
-            echo "--- end $log ---"
-        fi
-    done
     exit 1
 fi
 
