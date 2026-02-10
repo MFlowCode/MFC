@@ -20,6 +20,13 @@ device_opts=""
 if [ "$device" = "gpu" ]; then
     gpus=$(rocm-smi --showid | awk '{print $1}' | grep -Eo '[0-9]+' | uniq | tr '\n' ' ')
     n_ranks=$(echo "$gpus" | wc -w)
+    if [ "$n_ranks" -lt 1 ] || [ "$n_ranks" -gt 16 ]; then
+        echo "ERROR: Unexpected GPU count ($n_ranks). Expected 1-16 for Frontier MI250X."
+        echo "rocm-smi output:"
+        rocm-smi --showid
+        exit 1
+    fi
+    echo "Detected $n_ranks GPUs: $gpus"
     gpu_ids=$(echo "$gpus" | tr ' ' '\n' | tr '\n' ' ' | sed 's/ $//')
     device_opts="--gpu"
     [ "$interface" = "acc" ] && device_opts+=" acc"

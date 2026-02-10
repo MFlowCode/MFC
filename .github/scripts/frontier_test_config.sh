@@ -28,6 +28,13 @@ rdma=""
 if [ "$device" = "gpu" ]; then
     gpus=$(rocm-smi --showid | awk '{print $1}' | grep -Eo '[0-9]+' | uniq | tr '\n' ' ')
     ngpus=$(echo "$gpus" | wc -w)
+    if [ "$ngpus" -lt 1 ] || [ "$ngpus" -gt 16 ]; then
+        echo "ERROR: Unexpected GPU count ($ngpus). Expected 1-16 for Frontier MI250X."
+        echo "rocm-smi output:"
+        rocm-smi --showid
+        exit 1
+    fi
+    echo "Detected $ngpus GPUs: $gpus"
     ./mfc.sh test -v -a $rdma --max-attempts 3 -j $ngpus $device_opts -- -c "$cluster"
 else
     ./mfc.sh test -v -a --max-attempts 3 -j 32 --no-gpu -- -c "$cluster"
