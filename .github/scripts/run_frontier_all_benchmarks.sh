@@ -1,7 +1,7 @@
 #!/bin/bash
 # Orchestrate all Frontier benchmark configs in one multi-node SLURM allocation.
 # 1. Builds all configs on the login node (PR and master, in parallel)
-# 2. Submits a single 6-node SLURM job running benchmarks in parallel via ssh
+# 2. Submits a single SLURM job running benchmarks in parallel via ssh
 
 set -euo pipefail
 
@@ -9,6 +9,12 @@ set -euo pipefail
 trap '' HUP
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# SLURM parameters
+SLURM_ACCOUNT="ENG160"
+SLURM_PARTITION="extended"
+SLURM_WALLTIME="05:59:00"
+CONFIG_TIMEOUT=7200  # 120 min per config
 
 # Benchmark configs: version cluster device interface
 # 6 total: 3 configs x 2 versions (PR + master)
@@ -25,6 +31,10 @@ num_nodes=${#configs[@]}
 echo "=========================================="
 echo "Frontier consolidated benchmarks: $num_nodes configs on $num_nodes nodes"
 echo "=========================================="
+
+# Write config file for sbatch to read (single source of truth)
+config_file="frontier-bench-configs.txt"
+printf '%s\n' "${configs[@]}" > "$config_file"
 
 # --- Phase 1: Create per-config source copies ---
 for cfg in "${configs[@]}"; do
@@ -127,63 +137,65 @@ echo "=========================================="
 # --- Phase 3: Submit one sbatch job with N nodes ---
 output_file="bench-frontier-all.out"
 
-submit_output=$(sbatch <<'OUTER'
+submit_output=$(sbatch <<OUTER
 #!/bin/bash
 #SBATCH -J MFC-frontier-all-bench
-#SBATCH -A ENG160
-#SBATCH -N 6
-#SBATCH -t 05:59:00
-#SBATCH -obench-frontier-all.out
-#SBATCH -p extended
+#SBATCH -A $SLURM_ACCOUNT
+#SBATCH -N $num_nodes
+#SBATCH -t $SLURM_WALLTIME
+#SBATCH -o$output_file
+#SBATCH -p $SLURM_PARTITION
 
 set -x
 
-cd "$SLURM_SUBMIT_DIR"
-echo "Running in $(pwd)"
-echo "Allocated nodes: $SLURM_NODELIST"
+cd "\$SLURM_SUBMIT_DIR"
+echo "Running in \$(pwd)"
+echo "Allocated nodes: \$SLURM_NODELIST"
 
 # Get list of individual node hostnames
-mapfile -t nodes < <(scontrol show hostnames "$SLURM_NODELIST")
-echo "Nodes: ${nodes[*]}"
+mapfile -t nodes < <(scontrol show hostnames "\$SLURM_NODELIST")
+echo "Nodes: \${nodes[*]}"
 
-# Config table (must match the outer script)
-configs=(
-    "pr     frontier     gpu acc"
-    "pr     frontier     gpu omp"
-    "pr     frontier_amd gpu omp"
-    "master frontier     gpu acc"
-    "master frontier     gpu omp"
-    "master frontier_amd gpu omp"
-)
+# Read config table from file (written by outer script, avoids duplication)
+mapfile -t configs < "$config_file"
 
 pids=()
 
-for i in "${!configs[@]}"; do
-    read -r version cluster device interface <<< "${configs[$i]}"
-    node="${nodes[$i]}"
-    dir="${version}-${cluster}-${device}-${interface}"
-    outfile="${dir}/bench-${device}-${interface}.out"
+cleanup() {
+    echo "Cleaning up — killing all remote processes..."
+    for pid in "\${pids[@]}"; do
+        kill "\$pid" 2>/dev/null
+    done
+    wait
+}
+trap cleanup EXIT
 
-    echo "[$node] Starting bench: $version $cluster $device $interface in $dir"
+for i in "\${!configs[@]}"; do
+    read -r version cluster device interface <<< "\${configs[\$i]}"
+    node="\${nodes[\$i]}"
+    dir="\${version}-\${cluster}-\${device}-\${interface}"
+    outfile="\${dir}/bench-\${device}-\${interface}.out"
 
-    ssh -q -o StrictHostKeyChecking=no "$node" \
-        "cd $SLURM_SUBMIT_DIR/$dir && bash .github/scripts/frontier_bench_config.sh $cluster $device $interface" \
-        > "$outfile" 2>&1 &
-    pids+=($!)
+    echo "[\$node] Starting bench: \$version \$cluster \$device \$interface in \$dir"
+
+    timeout $CONFIG_TIMEOUT ssh -q -o StrictHostKeyChecking=no "\$node" \
+        "cd \$SLURM_SUBMIT_DIR/\$dir && bash .github/scripts/frontier_bench_config.sh \$cluster \$device \$interface" \
+        > "\$outfile" 2>&1 &
+    pids+=(\$!)
 done
 
 echo "All bench configs launched, waiting for completion..."
 
 # Wait for all and collect exit codes
 overall_exit=0
-for i in "${!pids[@]}"; do
-    read -r version cluster device interface <<< "${configs[$i]}"
-    pid=${pids[$i]}
-    if wait "$pid"; then
-        echo "PASSED: $version $cluster $device $interface (PID $pid)"
+for i in "\${!pids[@]}"; do
+    read -r version cluster device interface <<< "\${configs[\$i]}"
+    pid=\${pids[\$i]}
+    if wait "\$pid"; then
+        echo "PASSED: \$version \$cluster \$device \$interface (PID \$pid)"
     else
-        code=$?
-        echo "FAILED: $version $cluster $device $interface (PID $pid, exit code $code)"
+        code=\$?
+        echo "FAILED: \$version \$cluster \$device \$interface (PID \$pid, exit code \$code)"
         overall_exit=1
     fi
 done
@@ -192,19 +204,19 @@ done
 echo ""
 echo "=========================================="
 echo "Benchmark summary:"
-for cfg in "${configs[@]}"; do
-    read -r version cluster device interface <<< "$cfg"
-    dir="${version}-${cluster}-${device}-${interface}"
-    yaml="${dir}/bench-${device}-${interface}.yaml"
-    if [ -f "$yaml" ]; then
-        echo "  $version $cluster $device $interface: OK ($(stat -c%s "$yaml" 2>/dev/null) bytes)"
+for cfg in "\${configs[@]}"; do
+    read -r version cluster device interface <<< "\$cfg"
+    dir="\${version}-\${cluster}-\${device}-\${interface}"
+    yaml="\${dir}/bench-\${device}-\${interface}.yaml"
+    if [ -f "\$yaml" ]; then
+        echo "  \$version \$cluster \$device \$interface: OK (\$(stat -c%s "\$yaml" 2>/dev/null) bytes)"
     else
-        echo "  $version $cluster $device $interface: MISSING YAML"
+        echo "  \$version \$cluster \$device \$interface: MISSING YAML"
     fi
 done
 echo "=========================================="
 
-exit $overall_exit
+exit \$overall_exit
 OUTER
 )
 
