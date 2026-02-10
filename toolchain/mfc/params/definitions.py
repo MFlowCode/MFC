@@ -547,10 +547,30 @@ CONSTRAINTS = {
         "value_labels": {1: "single", 2: "double"},
     },
 
+    # Time stepping (must be positive)
+    "dt": {"min": 0},
+    "t_stop": {"min": 0},
+    "t_save": {"min": 0},
+    "t_step_save": {"min": 1},
+    "t_step_print": {"min": 1},
+    "cfl_target": {"min": 0},
+    "cfl_max": {"min": 0},
+
+    # WENO
+    "weno_eps": {"min": 0},
+
+    # Physics (must be non-negative)
+    "R0ref": {"min": 0},
+    "sigma": {"min": 0},
+
     # Counts (must be positive)
     "num_fluids": {"min": 1, "max": 10},
     "num_patches": {"min": 0, "max": 10},
     "num_ibs": {"min": 0, "max": 10},
+    "num_source": {"min": 1},
+    "num_probes": {"min": 1},
+    "num_integrals": {"min": 1},
+    "nb": {"min": 1},
     "m": {"min": 0},
     "n": {"min": 0},
     "p": {"min": 0},

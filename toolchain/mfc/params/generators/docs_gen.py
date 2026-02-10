@@ -119,13 +119,18 @@ def _format_constraints(param) -> str:
     return ", ".join(parts)
 
 
+def _backtick_list(names: list) -> str:
+    """Format a list of parameter names with backticks."""
+    return ", ".join(f"`{n}`" for n in names)
+
+
 def _format_requires_value(rv: Dict[str, list]) -> str:
     """Format a requires_value dict with human-readable labels."""
     items = []
     for param, vals in rv.items():
         labeled = [f"{v} ({get_value_label(param, v)})" if get_value_label(param, v) != str(v) else str(v)
                    for v in vals]
-        items.append(f"{param} = {' or '.join(labeled)}")
+        items.append(f"`{param}` = {' or '.join(labeled)}")
     return ", ".join(items)
 
 
@@ -133,11 +138,11 @@ def _format_condition(trigger: str, condition: Dict[str, Any]) -> List[str]:
     """Format a single condition dict into a list of description strings."""
     parts = []
     if "requires" in condition:
-        parts.append(f"When {trigger}, requires: {', '.join(condition['requires'])}")
+        parts.append(f"Requires {_backtick_list(condition['requires'])} when {trigger}")
     if "requires_value" in condition:
-        parts.append(f"When {trigger}, requires {_format_requires_value(condition['requires_value'])}")
+        parts.append(f"Requires {_format_requires_value(condition['requires_value'])} when {trigger}")
     if "recommends" in condition:
-        parts.append(f"When {trigger}, recommends: {', '.join(condition['recommends'])}")
+        parts.append(f"Recommends {_backtick_list(condition['recommends'])} when {trigger}")
     return parts
 
 
@@ -157,7 +162,9 @@ def _format_dependencies(param_name: str) -> str:
 
     if "when_value" in dep:
         for val, condition in dep["when_value"].items():
-            parts.extend(_format_condition(f"= {val}", condition))
+            label = get_value_label(param_name, val)
+            val_str = f"{val} ({label})" if label != str(val) else str(val)
+            parts.extend(_format_condition(f"= {val_str}", condition))
 
     return "; ".join(parts)
 
@@ -309,23 +316,21 @@ def generate_parameter_docs() -> str:  # pylint: disable=too-many-locals,too-man
             lines.append("")
         else:
             # Full table - no patterns to collapse
-            lines.append("| Parameter | Type | Description |")
-            lines.append("|-----------|------|-------------|")
+            lines.append("| Parameter | Type | Description | Constraints |")
+            lines.append("|-----------|------|-------------|-------------|")
 
             for name, param in params:
                 type_str = _type_to_str(param.param_type)
                 desc = get_description(name) or ""
+                # Truncate long descriptions
+                if len(desc) > 80:
+                    desc = desc[:77] + "..."
                 constraints = _format_constraints(param)
                 deps = _format_dependencies(name)
                 extra = "; ".join(filter(None, [constraints, deps]))
-                if extra:
-                    desc = f"{desc} ({extra})" if desc else extra
-                # Truncate long descriptions
-                if len(desc) > 120:
-                    desc = desc[:117] + "..."
                 # Escape % for Doxygen
                 name_escaped = _escape_percent(name)
-                lines.append(f"| `{name_escaped}` | {type_str} | {desc} |")
+                lines.append(f"| `{name_escaped}` | {type_str} | {desc} | {extra} |")
 
             lines.append("")
 
