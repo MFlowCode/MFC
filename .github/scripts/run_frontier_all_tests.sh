@@ -36,6 +36,7 @@ for cfg in "${configs[@]}"; do
     read -r cluster device interface <<< "$cfg"
     dir="test-${cluster}-${device}-${interface}"
     echo "Creating source copy: $dir"
+    rm -rf "$dir"
     rsync -a --link-dest="$(pwd)" $excludes ./ "$dir/"
 done
 

@@ -31,6 +31,7 @@ for cfg in "${configs[@]}"; do
     read -r version cluster device interface <<< "$cfg"
     dir="${version}-${cluster}-${device}-${interface}"
     echo "Creating source copy: $dir from $version/"
+    rm -rf "$dir"
     cp -al "$version" "$dir" 2>/dev/null || cp -r "$version" "$dir"
 done
 
