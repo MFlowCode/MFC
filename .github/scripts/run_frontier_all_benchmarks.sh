@@ -91,7 +91,7 @@ for i in "${!build_pids[@]}"; do
 done
 
 # Stop heartbeat
-kill "$heartbeat_pid" 2>/dev/null; wait "$heartbeat_pid" 2>/dev/null || true
+kill "$heartbeat_pid" 2>/dev/null || true; wait "$heartbeat_pid" 2>/dev/null || true
 
 # Print build logs: passed builds collapsed, failed builds in full
 for i in "${!configs[@]}"; do

@@ -96,7 +96,7 @@ for i in "${!build_pids[@]}"; do
 done
 
 # Stop heartbeat
-kill "$heartbeat_pid" 2>/dev/null; wait "$heartbeat_pid" 2>/dev/null || true
+kill "$heartbeat_pid" 2>/dev/null || true; wait "$heartbeat_pid" 2>/dev/null || true
 
 # Print build logs: passed builds collapsed, failed builds in full
 for i in "${!configs[@]}"; do
@@ -125,7 +125,7 @@ fi
 
 echo ""
 echo "=========================================="
-echo "All builds complete. Submitting 5-node SLURM job..."
+echo "All builds complete. Submitting ${num_nodes}-node SLURM job..."
 echo "=========================================="
 
 # --- Phase 3: Submit one sbatch job with N nodes ---
