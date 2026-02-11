@@ -496,24 +496,27 @@ PATTERNS = [
 
 
 def get_description(param_name: str) -> str:
-    """Get description for a parameter from registry or fallback sources."""
-    # Primary source: ParamDef.description from registry
-    from . import REGISTRY  # pylint: disable=import-outside-toplevel
-    param = REGISTRY.all_params.get(param_name)
-    if param and param.description:
-        return param.description
+    """Get description for a parameter from hand-curated or auto-generated sources.
 
-    # Fallback 1: manual descriptions dict (legacy, will be removed)
+    Priority: hand-curated DESCRIPTIONS > PATTERNS > auto-generated param.description.
+    """
+    # 1. Hand-curated descriptions (highest quality)
     if param_name in DESCRIPTIONS:
         return DESCRIPTIONS[param_name]
 
-    # Fallback 2: pattern matching for indexed params
+    # 2. Pattern matching for indexed params (hand-curated templates)
     for pattern, template in PATTERNS:
         match = re.fullmatch(pattern, param_name)
         if match:
             return template.format(*match.groups())
 
-    # Fallback 3: naming convention inference
+    # 3. Auto-generated description from registry (set by _auto_describe at registration)
+    from . import REGISTRY  # pylint: disable=import-outside-toplevel
+    param = REGISTRY.all_params.get(param_name)
+    if param and param.description:
+        return param.description
+
+    # 4. Last resort: naming convention inference
     return _infer_from_naming(param_name)
 
 

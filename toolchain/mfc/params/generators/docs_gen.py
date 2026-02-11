@@ -135,11 +135,43 @@ def _build_param_name_pattern():
     return re.compile(pattern)
 
 
+# Matches compound param names like bub_pp%mu_g, fluid_pp(1)%Re(1), x_output%beg
+_COMPOUND_NAME_RE = re.compile(r'\b\w+(?:\([^)]*\))?(?:%\w+(?:\([^)]*\))?)+')
+
+
 def _backtick_params(msg: str, pattern) -> str:
-    """Wrap known parameter names in backticks for markdown rendering."""
-    if pattern is None:
-        return msg
-    return pattern.sub(r'`\1`', msg)
+    """Wrap parameter names in backticks for markdown rendering.
+
+    Handles three cases in order:
+    1. Compound names with % (e.g. bub_pp%mu_g, x_output%beg)
+    2. Known registry param names (e.g. model_eqns, weno_order)
+    3. Snake_case identifiers not in registry (e.g. cluster_type, smooth_type)
+    """
+    # 1. Wrap compound names (word%word patterns) — must come first
+    msg = _COMPOUND_NAME_RE.sub(lambda m: f'`{m.group(0)}`', msg)
+
+    # 2. Wrap known simple param names, only outside existing backtick spans
+    if pattern is not None:
+        parts = msg.split('`')
+        for i in range(0, len(parts), 2):
+            parts[i] = pattern.sub(r'`\1`', parts[i])
+        msg = '`'.join(parts)
+
+    # 3. Wrap remaining snake_case identifiers (at least one underscore)
+    parts = msg.split('`')
+    for i in range(0, len(parts), 2):
+        parts[i] = re.sub(r'\b([a-z]\w*_\w+)\b', r'`\1`', parts[i])
+    msg = '`'.join(parts)
+
+    return msg
+
+
+def _escape_pct_outside_backticks(text: str) -> str:
+    """Escape % as %% for Doxygen, but not inside backtick code spans."""
+    parts = text.split('`')
+    for i in range(0, len(parts), 2):
+        parts[i] = parts[i].replace('%', '%%')
+    return '`'.join(parts)
 
 
 # Lazily initialized at module level on first use
@@ -153,13 +185,50 @@ def _get_param_pattern():
     return _PARAM_PATTERN
 
 
-def _format_validator_rules(param_name: str, by_trigger: Dict[str, list]) -> str:  # pylint: disable=too-many-locals
+def _format_tag_annotation(_param_name: str, param) -> str:
+    """
+    Return a short annotation for params with no schema constraints and no AST rules.
+
+    Uses DEPENDENCIES info (highest value) and tag-based output flag labels.
+    """
+    # 1. DEPENDENCIES info
+    if param.dependencies:
+        dep = param.dependencies
+        if "when_true" in dep:
+            wt = dep["when_true"]
+            if "requires" in wt:
+                req = ", ".join(f"`{r}`" for r in wt["requires"])
+                return f"Requires {req} when enabled"
+            if "requires_value" in wt:
+                parts = []
+                for k, vals in wt["requires_value"].items():
+                    parts.append(f"`{k}` in {vals}")
+                return "Requires " + ", ".join(parts)
+            if "recommends" in wt:
+                rec = ", ".join(f"`{r}`" for r in wt["recommends"])
+                return f"Recommends {rec}"
+
+    # 2. Tag-based output flag label
+    if "output" in param.tags and param.param_type == ParamType.LOG:
+        if "bubbles" in param.tags:
+            return "Lagrangian output flag"
+        if "chemistry" in param.tags:
+            return "Chemistry output flag"
+        return "Post-processing output flag"
+
+    return ""
+
+
+def _format_validator_rules(param_name: str, by_trigger: Dict[str, list],  # pylint: disable=too-many-locals
+                            by_param: Dict[str, list] | None = None) -> str:
     """Format AST-extracted validator rules for a parameter's Constraints column.
 
-    Gets rules where this param is the trigger, classifies each, and
-    returns a concise summary suitable for a markdown table cell.
+    Gets rules where this param is the trigger.  Falls back to by_param
+    (rules that mention this param) when no trigger rules exist.
     """
     rules = by_trigger.get(param_name, [])
+    if not rules and by_param:
+        rules = by_param.get(param_name, [])
     if not rules:
         return ""
 
@@ -209,6 +278,7 @@ def generate_parameter_docs() -> str:  # pylint: disable=too-many-locals,too-man
     # AST-extract rules from case_validator.py
     analysis = analyze_case_validator()
     by_trigger = analysis["by_trigger"]
+    by_param = analysis["by_param"]
 
     lines = [
         "@page parameters Case Parameters Reference",
@@ -319,7 +389,7 @@ def generate_parameter_docs() -> str:  # pylint: disable=too-many-locals,too-man
             for _pattern, examples in patterns.items():
                 for ex in examples:
                     p = REGISTRY.all_params[ex]
-                    if p.constraints or ex in by_trigger:
+                    if p.constraints or ex in by_trigger or ex in by_param:
                         pattern_has_constraints = True
                         break
                 if pattern_has_constraints:
@@ -340,14 +410,18 @@ def generate_parameter_docs() -> str:  # pylint: disable=too-many-locals,too-man
                 # Truncate long descriptions
                 if len(desc) > 60:
                     desc = desc[:57] + "..."
-                # Escape % for Doxygen
+                # Escape % for Doxygen (even inside backtick code spans)
                 pattern_escaped = _escape_percent(pattern)
                 example_escaped = _escape_percent(example)
+                desc = _escape_percent(desc)
                 if pattern_has_constraints:
                     p = REGISTRY.all_params[example]
                     constraints = _format_constraints(p)
-                    deps = _format_validator_rules(example, by_trigger)
+                    deps = _format_validator_rules(example, by_trigger, by_param)
                     extra = "; ".join(filter(None, [constraints, deps]))
+                    if not extra:
+                        extra = _format_tag_annotation(example, p)
+                    extra = _escape_pct_outside_backticks(extra)
                     lines.append(f"| `{pattern_escaped}` | `{example_escaped}` | {desc} | {extra} |")
                 else:
                     lines.append(f"| `{pattern_escaped}` | `{example_escaped}` | {desc} |")
@@ -365,10 +439,14 @@ def generate_parameter_docs() -> str:  # pylint: disable=too-many-locals,too-man
                 if len(desc) > 80:
                     desc = desc[:77] + "..."
                 constraints = _format_constraints(param)
-                deps = _format_validator_rules(name, by_trigger)
+                deps = _format_validator_rules(name, by_trigger, by_param)
                 extra = "; ".join(filter(None, [constraints, deps]))
-                # Escape % for Doxygen
+                if not extra:
+                    extra = _format_tag_annotation(name, param)
+                extra = _escape_pct_outside_backticks(extra)
+                # Escape % for Doxygen (even inside backtick code spans)
                 name_escaped = _escape_percent(name)
+                desc = _escape_percent(desc)
                 lines.append(f"| `{name_escaped}` | {type_str} | {desc} | {extra} |")
 
             lines.append("")
