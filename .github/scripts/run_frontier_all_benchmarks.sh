@@ -46,6 +46,9 @@ for cfg in "${configs[@]}"; do
 done
 
 # --- Phase 2: Build all configs on login node in parallel ---
+# Avoid setuptools_scm git conflicts in hardlink copies (shared .git/index)
+export SETUPTOOLS_SCM_PRETEND_VERSION=0.0.0
+
 MAX_PARALLEL=2
 
 echo ""
