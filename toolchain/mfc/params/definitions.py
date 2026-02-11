@@ -440,11 +440,15 @@ def _lookup_hint(name):
     family = re.sub(r'[_(].*', '', prefix)
     if family not in HINTS:
         # Fallback: keep underscores — "patch_bc" → "patch_bc", "simplex_params" → "simplex_params"
-        family = re.match(r'^[a-zA-Z_]+', prefix).group(0)
+        m = re.match(r'^[a-zA-Z_]+', prefix)
+        family = m.group(0) if m else ""
     if family not in HINTS:
         return ""
     # Strip index from attr: "vel_in(1)" → "vel_in"
-    attr = re.match(r'^[a-zA-Z_0-9]+', attr_full).group(0)
+    m = re.match(r'^[a-zA-Z_0-9]+', attr_full)
+    if not m:
+        return ""
+    attr = m.group(0)
     return HINTS[family].get(attr, "")
 
 

@@ -390,13 +390,6 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         self.prohibit(qbmm and nnode is not None and nnode != 4,
                      "QBMM requires nnode = 4")
 
-        sigR = self.get('sigR')
-        sigV = self.get('sigV')
-        self.prohibit(sigR is not None and sigR != 0 and not qbmm,
-                     "sigR requires qbmm to be enabled")
-        self.prohibit(sigV is not None and sigV != 0 and not qbmm,
-                     "sigV requires qbmm to be enabled")
-
     def check_adv_n(self):
         """Checks constraints on adv_n flag"""
         adv_n = self.get('adv_n', 'F') == 'T'
@@ -1938,7 +1931,7 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
 
             # Auto-generate hints from CONSTRAINTS with value_labels
             for param_name, constraint in CONSTRAINTS.items():
-                if not re.search(r'\b' + re.escape(param_name) + r'\b', err_lower):
+                if not re.search(r'\b' + re.escape(param_name.lower()) + r'\b', err_lower):
                     continue
                 choices = constraint.get("choices")
                 if not choices:
