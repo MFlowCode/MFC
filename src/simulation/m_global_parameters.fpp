@@ -558,7 +558,7 @@ module m_global_parameters
     !< global domain bounds
     real(wp), allocatable, dimension(:, :) :: domain_glb
     $:GPU_DECLARE(create='[domain_glb]')
-    
+
     !> @name MHD Hyperbolic cleaning parameters
     !> @{!
     real(wp) :: hyper_cleaning_speed    !< Hyperbolic cleaning wave speed (c_h)
@@ -1434,6 +1434,8 @@ contains
 
         if (ib) MPI_IO_IB_DATA%var%sf => null()
 
+        @:DEALLOCATE(domain_glb)
+
         ! Deallocating grid variables for the x-, y- and z-directions
         @:DEALLOCATE(x_cb, x_cc, dx)
 
@@ -1442,8 +1444,6 @@ contains
 
         if (p == 0) return; 
         @:DEALLOCATE(z_cb, z_cc, dz)
-
-        @:DEALLOCATE(domain_glb)
 
     end subroutine s_finalize_global_parameters_module
 

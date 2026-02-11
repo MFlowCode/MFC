@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-import math, json, argparse
+import math
+import json
+import argparse
 
 parser = argparse.ArgumentParser(prog="phasechange", description="phase change considering both 5 and 6 equation models.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("--mfc", type=json.loads, default="{}", metavar="DICT", help="MFC's toolchain's internal state.")

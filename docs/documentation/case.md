@@ -1,3 +1,5 @@
+@page case Case Files
+
 # Case Files
 
 Example Python case files, also referred to as *input files*, can be found in the [examples/](https://github.com/MFlowCode/MFC/tree/master/examples) directory. They print a Python dictionary containing input parameters for MFC. Their contents, and a guide to filling them out, are documented in the user manual. A commented, tutorial script
@@ -70,12 +72,14 @@ For example, to run the `scaling` case in "weak-scaling" mode:
 
 ## Feature Compatibility
 
-Before diving into parameter details, check the **[Feature Compatibility Guide](case_constraints.md)** to understand:
+Before diving into parameter details, check the **@ref case_constraints "Feature Compatibility Guide"** to understand:
 - Which features work together (MHD, bubbles, phase change, etc.)
 - Common configuration patterns with copy-paste examples
 - Requirements for each model equation and Riemann solver
 
-💡 **Tip:** If you get a validation error, the compatibility guide explains what each parameter requires.
+**Parameter Lookup:**
+- CLI search: `./mfc.sh params <query>` - Search ~3,300 parameters from the command line
+- Full reference: **@ref parameters "Case Parameters"** - Complete parameter documentation
 
 There are multiple sets of parameters that must be specified in the python input file:
 1. [Runtime Parameters](#1-runtime)
@@ -377,7 +381,7 @@ The parameters define material's property of compressible fluids that are used i
 - `fluid_pp(i)%%Re(1)` and `fluid_pp(i)%%Re(2)` define the shear and volume viscosities of $i$-th fluid, respectively.
 
 When these parameters are undefined, fluids are treated as inviscid.
-Details of implementation of viscosity in MFC can be found in [Coralic (2015)](references.md).
+Details of implementation of viscosity in MFC can be found in [Coralic (2015)](@ref references).
 
 - `fluid_pp(i)%%cv`, `fluid_pp(i)%%qv`, and `fluid_pp(i)%%qvp` define $c_v$, $q$, and $q'$ as parameters of $i$-th fluid that are used in stiffened gas equation of state.
 
@@ -434,7 +438,7 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 | `surface_tension`          | Logical | Activate surface tension |
 | `viscous`                  | Logical | Activate viscosity |
 | `hypoelasticity`           | Logical | Activate hypoelasticity* |
-| `igr`                      | Logical | Enable solution via information geometric regularization (IGR) [Cao (2024)](references.md) |
+| `igr`                      | Logical | Enable solution via information geometric regularization (IGR) [Cao (2024)](@ref references) |
 | `igr_order`                | Integer | Order of reconstruction for IGR [3,5] |
 | `alf_factor`               | Real    | Alpha factor for IGR entropic pressure (default 10) |
 | `igr_pres_lim`             | Logical | Limit IGR pressure to avoid negative values (default F) |
@@ -448,8 +452,8 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](r
 
 The table lists simulation algorithm parameters.
 The parameters are used to specify options in algorithms that are used to integrate the governing equations of the multi-component flow based on the initial condition.
-Models and assumptions that are used to formulate and discritize the governing equations are described in [Bryngelson et al. (2019)](references.md).
-Details of the simulation algorithms and implementation of the WENO scheme can be found in [Coralic (2015)](references.md).
+Models and assumptions that are used to formulate and discretize the governing equations are described in [Bryngelson et al. (2019)](@ref references).
+Details of the simulation algorithms and implementation of the WENO scheme can be found in [Coralic (2015)](@ref references).
 
 - `bc_[x,y,z]%[beg,end]` specifies the boundary conditions at the beginning and the end of domain boundaries in each coordinate direction by a negative integer from -1 through -16.
 See table [Boundary Conditions](#boundary-conditions) for details.
@@ -463,12 +467,12 @@ Tangential velocities require viscosity, `weno_avg = T`, and `bc_[x,y,z]%%beg = 
 Tangential velocities require viscosity, `weno_avg = T`, and `bc_[x,y,z]%%end = 16` to work properly. Normal velocities require `bc_[x,y,z]%%end = -15` or `\bc_[x,y,z]%%end = -16` to work properly.
 
 - `model_eqns` specifies the choice of the multi-component model that is used to formulate the dynamics of the flow using integers from 1 through 3.
-`model_eqns = 1`, `2`, and `3` correspond to $\Gamma$-$\Pi_\infty$ model ([Johnsen, 2008](references.md)), 5-equation model ([Allaire et al., 2002](references.md)), and 6-equation model ([Saurel et al., 2009](references.md)), respectively.
-The difference of the two models is assessed by ([Schmidmayer et al., 2019](references.md)).
+`model_eqns = 1`, `2`, and `3` correspond to $\Gamma$-$\Pi_\infty$ model ([Johnsen, 2008](@ref references)), 5-equation model ([Allaire et al., 2002](@ref references)), and 6-equation model ([Saurel et al., 2009](@ref references)), respectively.
+The difference of the two models is assessed by ([Schmidmayer et al., 2019](@ref references)).
 Note that some code parameters are only compatible with 5-equation model.
 
 - `alt_soundspeed` activates the source term in the advection equations for the volume fractions, $K\nabla\cdot \underline{u}$, that regularizes the speed of sound in the mixture region when the 5-equation model is used.
-The effect and use of the source term are assessed by [Schmidmayer et al., 2019](references.md).
+The effect and use of the source term are assessed by [Schmidmayer et al., 2019](@ref references).
 
 - `adv_n` activates the direct computation of number density by the Riemann solver instead of computing number density from the void fraction in the method of classes.
 
@@ -477,7 +481,7 @@ The effect and use of the source term are assessed by [Schmidmayer et al., 2019]
 - `mixture_err` activates correction of solutions to avoid imaginary speed of sound at each grid cell.
 
 - `time_stepper` specifies the order of the Runge-Kutta (RK) time integration scheme that is used for temporal integration in simulation, from the 1st to 5th order by corresponding integer.
-Note that `time_stepper = 3` specifies the total variation diminishing (TVD), third order RK scheme ([Gottlieb and Shu, 1998](references.md)).
+Note that `time_stepper = 3` specifies the total variation diminishing (TVD), third order RK scheme ([Gottlieb and Shu, 1998](@ref references)).
 
 - `adap_dt` activates the Strang operator splitting scheme which splits flux and source terms in time marching, and an adaptive time stepping strategy is implemented for the source term. It requires ``bubbles_euler = 'T'``, ``polytropic = 'T'``, ``adv_n = 'T'`` and `time_stepper = 3`. Additionally, it can be used with ``bubbles_lagrange = 'T'`` and `time_stepper = 3`. `adap_dt_tol` and `adap_dt_max_iters` are 1e-4 and 100, respectively, by default.
 
@@ -486,19 +490,19 @@ Note that `time_stepper = 3` specifies the total variation diminishing (TVD), th
 - `weno_eps` specifies the lower bound of the WENO nonlinear weights.
 It is recommended to set `weno_eps` to $10^{-6}$ for WENO-JS, and to $10^{-40}$ for other WENO variants.
 
-- `mapped_weno` activates the WENO-M scheme in place of the default WENO-JS scheme ([Henrick et al., 2005](references.md)). WENO-M a variant of the WENO scheme that remaps the nonlinear WENO-JS weights by assigning larger weights to non-smooth stencils, reducing dissipation compared to the default WENO-JS scheme, at the expense of higher computational cost. Only one of `mapped_weno`, `wenoz`, and `teno` can be activated.
+- `mapped_weno` activates the WENO-M scheme in place of the default WENO-JS scheme ([Henrick et al., 2005](@ref references)). WENO-M a variant of the WENO scheme that remaps the nonlinear WENO-JS weights by assigning larger weights to non-smooth stencils, reducing dissipation compared to the default WENO-JS scheme, at the expense of higher computational cost. Only one of `mapped_weno`, `wenoz`, and `teno` can be activated.
 
-- `wenoz` activates the WENO-Z scheme in place of the default WENO-JS scheme ([Borges et al., 2008](references.md)). WENO-Z is a variant of the WENO scheme that further reduces the dissipation compared to the WENO-M scheme. It has similar computational cost to the WENO-JS scheme.
+- `wenoz` activates the WENO-Z scheme in place of the default WENO-JS scheme ([Borges et al., 2008](@ref references)). WENO-Z is a variant of the WENO scheme that further reduces the dissipation compared to the WENO-M scheme. It has similar computational cost to the WENO-JS scheme.
 
 - `wenoz_q` specifies the power parameter `q` used in the WENO-Z scheme. It controls how aggressively the smoothness coefficients scale the weights. A higher value of `wenoz_q` increases the sensitivity to smoothness, improving stability but worsening numerical dissipation. For WENO3 and WENO5, `q=1` is fixed, so `wenoz_q` must not be set. For WENO7, `wenoz_q` can be set to 2, 3, or 4.
 
-- `teno` activates the TENO scheme in place of the default WENO-JS scheme ([Fu et al., 2016](references.md)). TENO is a variant of the ENO scheme that is the least dissipative, but could be less robust for extreme cases. It uses a threshold to identify smooth and non-smooth stencils, and applies optimal weights to the smooth stencils. Only available for `weno_order = 5` and `7`. Requires `teno_CT` to be set. Does not support grid stretching.
+- `teno` activates the TENO scheme in place of the default WENO-JS scheme ([Fu et al., 2016](@ref references)). TENO is a variant of the ENO scheme that is the least dissipative, but could be less robust for extreme cases. It uses a threshold to identify smooth and non-smooth stencils, and applies optimal weights to the smooth stencils. Only available for `weno_order = 5` and `7`. Requires `teno_CT` to be set. Does not support grid stretching.
 
 - `teno_CT` specifies the threshold for the TENO scheme. This dimensionless constant, also known as $C_T$, sets a threshold to identify smooth and non-smooth stencils. Larger values make the scheme more robust but also more dissipative. A recommended value for teno_CT is `1e-6`. When adjusting this parameter, it is recommended to try values like `1e-5` or `1e-7` for TENO5. A smaller value can be used for TENO7.
 
 - `null_weights` activates nullification of the nonlinear WENO weights at the buffer regions outside the domain boundaries when the Riemann extrapolation boundary condition is specified (`bc_[x,y,z]%%beg[end]} = -4`).
 
-- `mp_weno` activates monotonicity preservation in the WENO reconstruction (MPWENO) such that the values of reconstructed variables do not reside outside the range spanned by WENO stencil ([Balsara and Shu, 2000](references.md); [Suresh and Huynh, 1997](references.md)).
+- `mp_weno` activates monotonicity preservation in the WENO reconstruction (MPWENO) such that the values of reconstructed variables do not reside outside the range spanned by WENO stencil ([Balsara and Shu, 2000](@ref references); [Suresh and Huynh, 1997](@ref references)).
 
 - `muscl_order` specifies the order of the MUSCL scheme that is used for spatial reconstruction of variables by an integer of 1, or 2, that corresponds to the 1st, and 2nd order respectively. When using `muscl_order = 2`, `muscl_lim` must be defined.
 
@@ -508,16 +512,16 @@ It is recommended to set `weno_eps` to $10^{-6}$ for WENO-JS, and to $10^{-40}$ 
 - `int_comp` activates interface compression using THINC used in MUSCL Reconstruction, with control parameters (`ic_eps`, and `ic_beta`).
 
 - `riemann_solver` specifies the choice of the Riemann solver that is used in simulation by an integer from 1 through 4.
-`riemann_solver = 1`, `2`, and `3` correspond to HLL, HLLC, and Exact Riemann solver, respectively ([Toro, 2013](references.md)).
-`riemann_solver = 4` is only for MHD simulations. It resolves 5 of the full seven-wave structure of the MHD equations ([Miyoshi and Kusano, 2005](references.md)).
+`riemann_solver = 1`, `2`, and `3` correspond to HLL, HLLC, and Exact Riemann solver, respectively ([Toro, 2013](@ref references)).
+`riemann_solver = 4` is only for MHD simulations. It resolves 5 of the full seven-wave structure of the MHD equations ([Miyoshi and Kusano, 2005](@ref references)).
 
-- `low_Mach` specifies the choice of the low Mach number correction scheme for the HLLC Riemann solver. `low_Mach = 0` is default value and does not apply any correction scheme. `low_Mach = 1` and `2` apply the anti-dissipation pressure correction method ([Chen et al., 2022](references.md)) and the improved velocity reconstruction method ([Thornber et al., 2008](references.md)). This feature requires `model_eqns = 2` or `3`. `low_Mach = 1` works for `riemann_solver = 1` and `2`, but `low_Mach = 2` only works for `riemann_solver = 2`.
+- `low_Mach` specifies the choice of the low Mach number correction scheme for the HLLC Riemann solver. `low_Mach = 0` is default value and does not apply any correction scheme. `low_Mach = 1` and `2` apply the anti-dissipation pressure correction method ([Chen et al., 2022](@ref references)) and the improved velocity reconstruction method ([Thornber et al., 2008](@ref references)). This feature requires `model_eqns = 2` or `3`. `low_Mach = 1` works for `riemann_solver = 1` and `2`, but `low_Mach = 2` only works for `riemann_solver = 2`.
 
 - `avg_state` specifies the choice of the method to compute averaged variables at the cell-boundaries from the left and the right states in the Riemann solver by an integer of 1 or 2.
 `avg_state = 1` and `2` correspond to Roe- and arithmetic averages, respectively.
 
 - `wave_speeds` specifies the choice of the method to compute the left, right, and middle wave speeds in the Riemann solver by an integer of 1 and 2.
-`wave_speeds = 1` and `2` correspond to the direct method ([Batten et al., 1997](references.md)), and indirect method that approximates the pressures and velocity ([Toro, 2013](references.md)), respectively.
+`wave_speeds = 1` and `2` correspond to the direct method ([Batten et al., 1997](@ref references)), and indirect method that approximates the pressures and velocity ([Toro, 2013](@ref references)), respectively.
 
 - `weno_Re_flux` activates the scalar divergence theorem in computing the velocity gradients using WENO-reconstructed cell boundary values.
 If this option is false, velocity gradient is computed using finite difference scheme of order 2 which is independent of the WENO order.
@@ -563,7 +567,7 @@ The value of `dt` needs to be sufficiently small to satisfy the Courant-Friedric
 
 `t_step_save` is the time step interval for data output during simulation.
 To newly start the simulation, set `t_step_start = 0`.
-To restart the simulation from $k$-th time step, set `t_step_start = k`; see [Restarting Cases](running.md).
+To restart the simulation from $k$-th time step, set `t_step_start = k`; see @ref running "Restarting Cases".
 
 ##### Adaptive Time-Stepping
 
@@ -580,7 +584,7 @@ To restart the simulation from $k$-th time step, set `t_step_start = k`; see [Re
 - `t_stop` specifies at what time the simulation should stop
 
 To newly start the simulation, set `n_start = 0`.
-To restart the simulation from $k$-th time step, see [Restarting Cases](running.md).
+To restart the simulation from $k$-th time step, see @ref running "Restarting Cases".
 
 ### 7. Formatted Output
 
@@ -698,7 +702,7 @@ It also cannot be enabled with `flux_wrt`, `heat_ratio_wrt`, `pres_inf_wrt`, `c_
 | `acoustic(i)%%bb_bandwidth`           | Real    | The bandwidth of each frequency in the broadband wave |
 | `acoustic(i)%%bb_lowest_freq`         | Real    | The lower frequency bound of the broadband wave |
 
-Details of the transducer acoustic source model can be found in [Maeda and Colonius (2017)](references.md).
+Details of the transducer acoustic source model can be found in [Maeda and Colonius (2017)](@ref references).
 
 - `acoustic_source` activates the acoustic source module.
 
@@ -710,7 +714,7 @@ Details of the transducer acoustic source model can be found in [Maeda and Colon
 
 - `%%loc(j)` specifies the location of the acoustic source in the $j$-th coordinate direction. For planer support, the location defines midpoint of the source plane. For transducer arrays, the location defines the center of the transducer or transducer array (not the focal point; for 3D it's the tip of the spherical cap, for 2D it's the tip of the arc).
 
-- `%%pulse` specifies the acoustic wave form. `%%pulse = 1`, `2`, `3` and `4` correspond to sinusoidal wave, Gaussian wave, square wave and broadband wave, respectively. The implementation of the broadband wave is based on [Tam (2005)](references.md)
+- `%%pulse` specifies the acoustic wave form. `%%pulse = 1`, `2`, `3` and `4` correspond to sinusoidal wave, Gaussian wave, square wave and broadband wave, respectively. The implementation of the broadband wave is based on [Tam (2005)](@ref references)
 
 - `%%npulse` specifies the number of cycles of the acoustic wave generated. Only applies to `%%pulse = 1 and 3` (sine and square waves), and must be an integer for non-planar waves.
 
@@ -791,7 +795,7 @@ This table lists the sub-grid bubble model parameters, which can be utilized in 
 
 - `bub_pp` specifies simulation parameters for the EE and/or EL bubble model. 
 
-Implementation of the parameters into the model follow [Ando (2010)](references.md).
+Implementation of the parameters into the model follows [Ando (2010)](@ref references).
 
 #### 9.1 Ensemble-Averaged Bubble Model
 
@@ -812,10 +816,10 @@ Implementation of the parameters into the model follow [Ando (2010)](references.
 This table lists the ensemble-averaged bubble model parameters.
 
 - `polytropic` activates polytropic gas compression in the bubble.
-When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due to heat and mass transfer across the bubble wall with constant heat and mass transfer coefficients based on ([Preston et al., 2007](references.md)).
+When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due to heat and mass transfer across the bubble wall with constant heat and mass transfer coefficients based on ([Preston et al., 2007](@ref references)).
 
 - `thermal` specifies a model for heat transfer across the bubble interface by an integer from 1 through 3.
-`thermal = 1`, `2`, and `3` correspond to no heat transfer (adiabatic gas compression), isothermal heat transfer, and heat transfer with a constant heat transfer coefficient based on [Preston et al., 2007](references.md), respectively.
+`thermal = 1`, `2`, and `3` correspond to no heat transfer (adiabatic gas compression), isothermal heat transfer, and heat transfer with a constant heat transfer coefficient based on [Preston et al., 2007](@ref references), respectively.
 
 - `polydisperse` activates polydispersity in the bubble model through a probability density function (PDF) of the equilibrium bubble radius. Simpson's rule is used for integrating the log-normal PDF of equilibrium bubble radius for polydisperse populations.
 
@@ -853,15 +857,15 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 
 - `nBubs_glb` Total number of bubbles. Their initial conditions need to be specified in the ./input/lag_bubbles.dat file. See the example cases for additional information.
 
-- `solver_approach` Specifies the Euler-Lagrange coupling method: [1] enables a one-way coupling approach, where the bubbles do not influence the Eulerian field. [2] activates the two-way coupling approach based on [Maeda and Colonius (2018)](references.md), where the effect of the bubbles is added in the Eulerian field as source terms.
+- `solver_approach` Specifies the Euler-Lagrange coupling method: [1] enables a one-way coupling approach, where the bubbles do not influence the Eulerian field. [2] activates the two-way coupling approach based on [Maeda and Colonius (2018)](@ref references), where the effect of the bubbles is added in the Eulerian field as source terms.
 
-- `cluster_type` Specifies method to find p_inf (pressure that drives the bubble dynamics): [1] activates the bilinear interpolation of the pressure field, while [2] enables the bubble dynamic closure based on [Maeda and Colonius (2018)](references.md), the full model is obtained when `pressure_corrector` is true.
+- `cluster_type` Specifies method to find p_inf (pressure that drives the bubble dynamics): [1] activates the bilinear interpolation of the pressure field, while [2] enables the bubble dynamic closure based on [Maeda and Colonius (2018)](@ref references), the full model is obtained when `pressure_corrector` is true.
 
-- `smooth_type` Specifies the smoothening method of projecting the lagrangian bubbles in the Eulerian field: [1] activates the gaussian kernel function described in  [Maeda and Colonius (2018)](references.md), while [2] activates the delta kernel function where the effect of the bubble is only seen in the specific bubble location cell.
+- `smooth_type` Specifies the smoothening method of projecting the lagrangian bubbles in the Eulerian field: [1] activates the gaussian kernel function described in  [Maeda and Colonius (2018)](@ref references), while [2] activates the delta kernel function where the effect of the bubble is only seen in the specific bubble location cell.
 
-- `heatTransfer_model` Activates the heat transfer model at the bubble's interface based on ([Preston et al., 2007](references.md)).
+- `heatTransfer_model` Activates the heat transfer model at the bubble's interface based on ([Preston et al., 2007](@ref references)).
 
-- `massTransfer_model` Activates the mass transfer model at the bubble's interface based on ([Preston et al., 2007](references.md)).
+- `massTransfer_model` Activates the mass transfer model at the bubble's interface based on ([Preston et al., 2007](@ref references)).
 
 ### 10. Velocity Field Setup
 
@@ -953,7 +957,7 @@ By convention, positive accelerations in the `x[y,z]` direction are in the posit
 
 - `relativity` only works for `mhd` enabled and activates relativistic MHD (RMHD) simulation.
 
-- `hyper_cleaning` [Dedner et al., 2002](references.md) only works with `mhd` in 2D/3D and reduces numerical `div B` errors by propagation and damping. Currently not compatible with HLLD (`riemann_solver = 4`).
+- `hyper_cleaning` [Dedner et al., 2002](@ref references) only works with `mhd` in 2D/3D and reduces numerical `div B` errors by propagation and damping. Currently not compatible with HLLD (`riemann_solver = 4`).
 
 - `hyper_cleaning_speed` sets the propagation speed of divergence-cleaning waves.
 
@@ -978,7 +982,7 @@ Note: For relativistic flow, the conservative and primitive densities are differ
 | `cont_damage_s`   | Real    | Power `s` for continuum damage model                |
 | `alpha_bar`       | Real    | Damage factor (rate) for continuum damage model     |
 
-- `cont_damage` activates continuum damage model for solid materials. Requires `tau_star`, `cont_damage_s`, and `alpha_bar` to be set (empirically determined) ([Cao et al., 2019](references.md)).
+- `cont_damage` activates continuum damage model for solid materials. Requires `tau_star`, `cont_damage_s`, and `alpha_bar` to be set (empirically determined) ([Cao et al., 2019](@ref references)).
 
 ### 16. Cylindrical Coordinates
 
@@ -1038,7 +1042,7 @@ When ``cyl_coord = 'T'`` is set in 2D the following constraints must be met:
 
 The boundary condition supported by the MFC are listed in table [Boundary Conditions](#boundary-conditions).
 Their number (`#`) corresponds to the input value in `input.py` labeled `bc_[x,y,z]%[beg,end]` (see table [Simulation Algorithm Parameters](#5-simulation-algorithm)).
-The entries labeled "Characteristic." are characteristic boundary conditions based on [Thompson (1987)](references.md) and [Thompson (1990)](references.md).
+The entries labeled "Characteristic." are characteristic boundary conditions based on [Thompson (1987)](@ref references) and [Thompson (1990)](@ref references).
 
 ### Generalized Characteristic Boundary conditions
 
@@ -1054,7 +1058,7 @@ The entries labeled "Characteristic." are characteristic boundary conditions bas
 | `bc_[x,y,z]%alpha_rho_in`     | Real Array | Inflow density |
 | `bc_[x,y,z]%alpha_in`         | Real Array | Inflow void fraction |
 
-This boundary condition can be used for subsonic inflow (`bc_[x,y,z]%[beg,end]` = -7) and subsonic outflow (`bc_[x,y,z]%[beg,end]` = -8) characteristic boundary conditions. These are based on [Pirozzoli (2013)](references.md). This enables to provide inflow and outflow conditions outside the computational domain.
+This boundary condition can be used for subsonic inflow (`bc_[x,y,z]%[beg,end]` = -7) and subsonic outflow (`bc_[x,y,z]%[beg,end]` = -8) characteristic boundary conditions. These are based on [Pirozzoli (2013)](@ref references). This enables to provide inflow and outflow conditions outside the computational domain.
 
 ### Patch types
 
@@ -1138,7 +1142,7 @@ The midplane location is [`%%loc(1)`, `%%loc(2)`] and the normal vector is [$\ma
 - `%%support = 3` specifies a semi-infinite source plane in 3D simulation.
 The midplane location is [`%%loc(1)`, `%%loc(2)`] and the normal vector is [$\mathrm{cos}$(`%%dir`), $\mathrm{sin}$(`%%dir`)]. The length of the source plane is `%%length`, and the plane is perpendicular to the direction of wave propagation (defined by `%%dir`). Note that the plane is infinite in the $z$-direction, so `%%loc(3)` is not required.
 
-- `%%support = 5` specifies a circular transducer in 2D simulation. The transducer is centered at [`%%loc(1)`, `%%loc(2)`] with a focal length of `%%foc_length` and an aperture of `%%aperture`. The center location is not the focal point; it is the tip of the circular arc (intersection of the arc and the x-axis). The aperture is the length of the projection of the circular arc onto the y-axis. If a semi-circle is desired, set the aperture to double the focal length. Note that this is physically a cylindrical transducer, and due to the complexity of Green's function for 2D wave, no closed-form solution is available for the 2D circular transducer, and an approximate is used (see [Maeda and Colonius (2017)](references.md) for details). For the mass source term correction factor, the theoretical approximation factor of -0.5 in ($r_{foc}^{-0.5}$) is replaced by an empirically determined factor of -0.85.
+- `%%support = 5` specifies a circular transducer in 2D simulation. The transducer is centered at [`%%loc(1)`, `%%loc(2)`] with a focal length of `%%foc_length` and an aperture of `%%aperture`. The center location is not the focal point; it is the tip of the circular arc (intersection of the arc and the x-axis). The aperture is the length of the projection of the circular arc onto the y-axis. If a semi-circle is desired, set the aperture to double the focal length. Note that this is physically a cylindrical transducer, and due to the complexity of Green's function for 2D wave, no closed-form solution is available for the 2D circular transducer, and an approximate is used (see [Maeda and Colonius (2017)](@ref references) for details). For the mass source term correction factor, the theoretical approximation factor of -0.5 in ($r_{foc}^{-0.5}$) is replaced by an empirically determined factor of -0.85.
 
 - `%%support = 6` specifies a spherical transducer in 2D axisymmetric simulation. It is identical to `%%support = 5` in terms of simulation parameters. Note that this is physically a spherical 3D transducer, so the equation is exact.
 
