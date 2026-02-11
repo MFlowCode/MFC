@@ -103,14 +103,20 @@ def _type_to_str(param_type: ParamType) -> str:
 
 
 def _format_constraints(param) -> str:
-    """Format constraints as readable string, skipping choices already shown via value_labels."""
+    """Format constraints as readable string with value labels when available."""
     if not param.constraints:
         return ""
 
     parts = []
     c = param.constraints
-    if "choices" in c and "value_labels" not in c:
-        parts.append(f"Values: {c['choices']}")
+    if "choices" in c:
+        labels = c.get("value_labels", {})
+        if labels:
+            items = [f"{v}={labels[v]}" if v in labels else str(v)
+                     for v in c["choices"]]
+            parts.append(", ".join(items))
+        else:
+            parts.append(f"Values: {c['choices']}")
     if "min" in c:
         parts.append(f"Min: {c['min']}")
     if "max" in c:

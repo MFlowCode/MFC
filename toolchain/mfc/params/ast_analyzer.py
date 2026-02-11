@@ -9,6 +9,7 @@ for both doc generators (parameters.md and case_constraints.md).
 from __future__ import annotations
 
 import ast
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Set
@@ -675,7 +676,7 @@ def classify_message(msg: str) -> str:
         or "must be >=" in text
         or "must be odd" in text
         or "divisible by" in text
-        or "must be 1" in text
+        or re.search(r"must be 1\b", text) is not None
         or "must be 'T' or 'F'" in text
     ):
         return "range"

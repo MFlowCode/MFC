@@ -14,6 +14,7 @@ Based on the constraints enforced in:
 # pylint: disable=too-many-lines
 # Justification: Comprehensive validator covering all MFC parameter constraints
 
+import re
 from typing import Dict, Any, List, Set
 from functools import lru_cache
 from .common import MFCException
@@ -1937,7 +1938,7 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
 
             # Auto-generate hints from CONSTRAINTS with value_labels
             for param_name, constraint in CONSTRAINTS.items():
-                if param_name not in err_lower:
+                if not re.search(r'\b' + re.escape(param_name) + r'\b', err_lower):
                     continue
                 choices = constraint.get("choices")
                 if not choices:

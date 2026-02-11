@@ -436,10 +436,10 @@ def _lookup_hint(name):
         return ""
     # Compound name: extract family and attribute
     prefix, attr_full = name.split('%', 1)
-    # Normalize family: "bc_x" → "bc", "patch_bc(1)" → "patch_bc"
-    family = re.sub(r'[_(].*', '', prefix)  # "bc_x" → "bc", "patch_bc" stays
+    # Normalize family: "bc_x" → "bc", "patch_bc(1)" → "patch"
+    family = re.sub(r'[_(].*', '', prefix)
     if family not in HINTS:
-        # Try with underscore-joined prefix: "simplex_params" stays
+        # Fallback: keep underscores — "patch_bc" → "patch_bc", "simplex_params" → "simplex_params"
         family = re.match(r'^[a-zA-Z_]+', prefix).group(0)
     if family not in HINTS:
         return ""
