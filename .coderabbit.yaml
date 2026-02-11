@@ -7,12 +7,12 @@ reviews:
     - path: "src/**/*.fpp"
       instructions: |
         Fortran source (Fypp-preprocessed). Follow the coding standards in
-        .github/copilot-instructions.md. Pay attention to naming conventions,
-        GPU compatibility (OpenACC), and error handling (s_mpi_abort, not stop).
+        docs/documentation/contributing.md and the GPU macro API in
+        docs/documentation/gpuParallelization.md.
     - path: "src/**/*.f90"
       instructions: |
         Fortran source. Follow the coding standards in
-        .github/copilot-instructions.md.
+        docs/documentation/contributing.md.
     - path: "toolchain/**/*.py"
       instructions: |
         Python toolchain code. Follow PEP 8.
@@ -21,5 +21,6 @@ knowledge_base:
   code_guidelines:
     enabled: true
     filePatterns:
-      - ".github/copilot-instructions.md"
       - "docs/documentation/contributing.md"
+      - "docs/documentation/gpuParallelization.md"
+      - ".github/copilot-instructions.md"
