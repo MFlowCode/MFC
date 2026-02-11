@@ -27,6 +27,10 @@ Welcome to the Multi-component Flow Code (MFC) documentation.
 - @ref docker "Containers" - Docker usage
 - @ref troubleshooting "Troubleshooting" - Debugging and common issues
 
+## Development
+
+- @ref contributing "Contributing" - Developer guide and coding standards
+
 ## About
 
 - @ref papers "Papers" - Publications using MFC

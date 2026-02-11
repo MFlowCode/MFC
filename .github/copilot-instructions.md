@@ -35,30 +35,34 @@ Copilot, when reviewing:
 | Modules | m_<feature> (e.g. m_transport). |
 | Public subroutines | s_<verb>_<noun> (s_compute_flux). |
 | Public functions | f_<verb>_<noun>. |
-| Routine size | subroutine ≤ 500 lines, helper ≤ 150, function ≤ 100, file ≤ 1000. |
-| Arguments | ≤ 6; else use a derived-type params struct. |
+| Routine size | Prefer subroutine ≤ 500 lines, helper ≤ 150, function ≤ 100, file ≤ 1000. |
+| Arguments | Prefer ≤ 6; consider a derived-type params struct for more. |
 | Forbidden | goto (except legacy), COMMON, save globals. |
 | Variables | Every arg has explicit intent; use dimension/allocatable/pointer as appropriate. |
 | Errors | Call s_mpi_abort(<msg>), never stop or error stop. |
 
+> **Note:** Size and argument limits are soft guidelines for new code. Existing code may exceed them. Enforce strictly for naming, formatting, forbidden constructs, and error handling.
+
 Copilot, when reviewing:
-* Flag violations of any cell above.
-* Suggest refactors when size or argument limits are exceeded.
+* Flag violations of hard rules (naming, formatting, forbidden constructs, error handling).
+* Suggest refactors when size or argument limits are exceeded in new or modified code.
 * Ensure private helpers stay inside their defining module and avoid nested procedures.
 
 ---
 
-## 4  OpenACC Guidelines (for GPU kernels)
+## 4  GPU Guidelines
 
-Wrap tight loops:
+**Do not use raw OpenACC/OpenMP pragmas.** Use the project's Fypp GPU macros instead:
 
-```fortran
-!$acc parallel loop gang vector default(present) reduction(...)
-```
+* `@:GPU_PARALLEL_LOOP()` for parallel loops
+* `@:ALLOCATE()` / `@:DEALLOCATE()` for memory management
+* `@:GPU_ENTER_DATA()` / `@:GPU_EXIT_DATA()` for data regions
 
+See `src/common/include/macros.fpp` and `src/common/include/parallel_macros.fpp` for the full macro API.
+
+Additional rules:
 * Add collapse(n) when safe.
 * Declare loop-local variables with private(...).
-* Allocate large arrays with managed or move them into a persistent !$acc enter data region at start-up.
 * Avoid stop/error stop inside device code.
 * Code must compile with Cray ftn, NVIDIA nvfortran, GNU gfortran, and Intel ifx/ifort.
 

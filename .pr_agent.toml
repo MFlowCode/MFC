@@ -7,7 +7,9 @@ pr_commands = ["/describe", "/review", "/improve"]
 num_max_findings        = 10  # how many items to surface
 require_tests_review    = true
 extra_instructions = """
-Focus on duplicate code, the possibility of bugs, and if the PR added appropriate tests if it added a simulation feature.
+Follow the coding standards in .github/copilot-instructions.md.
+Focus on: duplicate code, potential bugs, missing tests for simulation features,
+and GPU compatibility (OpenACC directives, no stop/error stop in device code).
 """
 
 [pr_code_suggestions]
