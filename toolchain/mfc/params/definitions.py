@@ -346,6 +346,108 @@ CASE_OPT_PARAMS = {
 }
 
 
+# =============================================================================
+# Data-driven Annotations for Doc Generation
+# =============================================================================
+# These dicts are the single source of truth for parameter hints in the docs.
+# To annotate a new param, add an entry here instead of editing docs_gen.py.
+
+HINTS = {
+    "bc": {
+        "grcbc_in": "Enables GRCBC subsonic inflow (bc type -7)",
+        "grcbc_out": "Enables GRCBC subsonic outflow (bc type -8)",
+        "grcbc_vel_out": "GRCBC velocity outlet (requires `grcbc_out`)",
+        "vel_in": "Inlet velocity component (used with `grcbc_in`)",
+        "vel_out": "Outlet velocity component (used with `grcbc_vel_out`)",
+        "pres_in": "Inlet pressure (used with `grcbc_in`)",
+        "pres_out": "Outlet pressure (used with `grcbc_out`)",
+        "alpha_rho_in": "Inlet partial density per fluid (used with `grcbc_in`)",
+        "alpha_in": "Inlet volume fraction per fluid (used with `grcbc_in`)",
+        "vb1": "Boundary velocity component 1 at domain begin",
+        "vb2": "Boundary velocity component 2 at domain begin",
+        "vb3": "Boundary velocity component 3 at domain begin",
+        "ve1": "Boundary velocity component 1 at domain end",
+        "ve2": "Boundary velocity component 2 at domain end",
+        "ve3": "Boundary velocity component 3 at domain end",
+    },
+    "patch_bc": {
+        "geometry": "Patch shape: 1=line, 2=circle, 3=rectangle",
+        "type": "BC type applied within patch region",
+        "dir": "Patch normal direction (1=x, 2=y, 3=z)",
+        "loc": "Domain boundary (-1=begin, 1=end)",
+        "centroid": "Patch center coordinate",
+        "length": "Patch dimension",
+        "radius": "Patch radius (geometry=2)",
+    },
+    "simplex_params": {
+        "perturb_dens": "Enable simplex density perturbation",
+        "perturb_dens_freq": "Density perturbation frequency",
+        "perturb_dens_scale": "Density perturbation amplitude",
+        "perturb_dens_offset": "Density perturbation offset seed",
+        "perturb_vel": "Enable simplex velocity perturbation",
+        "perturb_vel_freq": "Velocity perturbation frequency",
+        "perturb_vel_scale": "Velocity perturbation amplitude",
+        "perturb_vel_offset": "Velocity perturbation offset seed",
+    },
+    "fluid_pp": {
+        "gamma": "Specific heat ratio (EOS)",
+        "pi_inf": "Stiffness pressure (EOS)",
+        "cv": "Specific heat at constant volume",
+        "qv": "Heat of formation",
+        "qvp": "Heat of formation derivative",
+    },
+}
+
+# Tag → display name for docs. Dict order = priority when a param has multiple tags.
+TAG_DISPLAY_NAMES = {
+    "bubbles": "Bubble model",
+    "mhd": "MHD",
+    "chemistry": "Chemistry",
+    "time": "Time-stepping",
+    "grid": "Grid",
+    "weno": "WENO",
+    "viscosity": "Viscosity",
+    "elasticity": "Elasticity",
+    "surface_tension": "Surface tension",
+    "acoustic": "Acoustic",
+    "ib": "Immersed boundary",
+    "probes": "Probe/integral",
+    "riemann": "Riemann solver",
+    "relativity": "Relativity",
+    "output": "Output",
+    "bc": "Boundary condition",
+}
+
+# Prefix → hint for untagged simple params
+PREFIX_HINTS = {
+    "mixlayer_": "Mixing layer parameter",
+    "nv_uvm_": "GPU memory management",
+    "ic_": "Initial condition parameter",
+}
+
+
+def _lookup_hint(name):
+    """Auto-derive constraint hint from HINTS dict using family+attribute matching."""
+    if '%' not in name:
+        # Check PREFIX_HINTS for simple params
+        for prefix, label in PREFIX_HINTS.items():
+            if name.startswith(prefix):
+                return label
+        return ""
+    # Compound name: extract family and attribute
+    prefix, attr_full = name.split('%', 1)
+    # Normalize family: "bc_x" → "bc", "patch_bc(1)" → "patch_bc"
+    family = re.sub(r'[_(].*', '', prefix)  # "bc_x" → "bc", "patch_bc" stays
+    if family not in HINTS:
+        # Try with underscore-joined prefix: "simplex_params" stays
+        family = re.match(r'^[a-zA-Z_]+', prefix).group(0)
+    if family not in HINTS:
+        return ""
+    # Strip index from attr: "vel_in(1)" → "vel_in"
+    attr = re.match(r'^[a-zA-Z_0-9]+', attr_full).group(0)
+    return HINTS[family].get(attr, "")
+
+
 # ============================================================================
 # Schema Validation for Constraints and Dependencies
 # ============================================================================
@@ -707,8 +809,10 @@ DEPENDENCIES = {
     },
 }
 
-def _r(name, ptype, tags=None, desc=None):
+def _r(name, ptype, tags=None, desc=None, hint=None):
     """Register a parameter with optional feature tags and description."""
+    if hint is None:
+        hint = _lookup_hint(name)
     description = desc if desc else _auto_describe(name)
     constraint = CONSTRAINTS.get(name)
     if constraint and "value_labels" in constraint:
@@ -723,6 +827,7 @@ def _r(name, ptype, tags=None, desc=None):
         constraints=constraint,
         dependencies=DEPENDENCIES.get(name),
         tags=tags if tags else set(),
+        hint=hint,
     ))
 
 

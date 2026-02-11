@@ -215,109 +215,6 @@ def _get_reverse_deps():
     return _REVERSE_DEPS
 
 
-# Feature tag → human-readable label, in priority order
-_TAG_LABELS = [
-    ("bubbles", "Bubble model parameter"),
-    ("mhd", "MHD parameter"),
-    ("chemistry", "Chemistry parameter"),
-    ("time", "Time-stepping parameter"),
-    ("grid", "Grid parameter"),
-    ("weno", "WENO parameter"),
-    ("viscosity", "Viscosity parameter"),
-    ("elasticity", "Elasticity parameter"),
-    ("surface_tension", "Surface tension parameter"),
-    ("acoustic", "Acoustic parameter"),
-    ("ib", "Immersed boundary parameter"),
-    ("probes", "Probe/integral parameter"),
-    ("riemann", "Riemann solver parameter"),
-    ("relativity", "Relativity parameter"),
-    ("output", "Output parameter"),
-]
-
-# Prefix → label for untagged params
-_PREFIX_LABELS = [
-    ("mixlayer_", "Mixing layer parameter"),
-    ("nv_uvm_", "GPU memory management"),
-    ("ic_", "Initial condition parameter"),
-]
-
-# BC sub-parameter attribute → usage annotation
-# Keyed by the attribute name after % (without index suffix)
-_BC_ATTR_ANNOTATIONS = {
-    "grcbc_in": "Enables GRCBC subsonic inflow (bc type -7)",
-    "grcbc_out": "Enables GRCBC subsonic outflow (bc type -8)",
-    "grcbc_vel_out": "GRCBC velocity outlet (requires `grcbc_out`)",
-    "vel_in": "Inlet velocity component (used with `grcbc_in`)",
-    "vel_out": "Outlet velocity component (used with `grcbc_vel_out`)",
-    "pres_in": "Inlet pressure (used with `grcbc_in`)",
-    "pres_out": "Outlet pressure (used with `grcbc_out`)",
-    "alpha_rho_in": "Inlet partial density per fluid (used with `grcbc_in`)",
-    "alpha_in": "Inlet volume fraction per fluid (used with `grcbc_in`)",
-    "vb1": "Boundary velocity component 1 at domain begin",
-    "vb2": "Boundary velocity component 2 at domain begin",
-    "vb3": "Boundary velocity component 3 at domain begin",
-    "ve1": "Boundary velocity component 1 at domain end",
-    "ve2": "Boundary velocity component 2 at domain end",
-    "ve3": "Boundary velocity component 3 at domain end",
-}
-
-# patch_bc attribute → usage annotation
-_PATCH_BC_ANNOTATIONS = {
-    "geometry": "Patch shape: 1=line, 2=circle, 3=rectangle",
-    "type": "BC type applied within patch region",
-    "dir": "Patch normal direction (1=x, 2=y, 3=z)",
-    "loc": "Domain boundary (-1=begin, 1=end)",
-    "centroid": "Patch center coordinate",
-    "length": "Patch dimension",
-    "radius": "Patch radius (geometry=2)",
-}
-
-# simplex_params attribute → usage annotation
-_SIMPLEX_ANNOTATIONS = {
-    "perturb_dens": "Enable simplex density perturbation",
-    "perturb_dens_freq": "Density perturbation frequency",
-    "perturb_dens_scale": "Density perturbation amplitude",
-    "perturb_dens_offset": "Density perturbation offset seed",
-    "perturb_vel": "Enable simplex velocity perturbation",
-    "perturb_vel_freq": "Velocity perturbation frequency",
-    "perturb_vel_scale": "Velocity perturbation amplitude",
-    "perturb_vel_offset": "Velocity perturbation offset seed",
-}
-
-# fluid_pp attribute → usage annotation (EOS params only)
-_FLUID_PP_ANNOTATIONS = {
-    "gamma": "Specific heat ratio (EOS)",
-    "pi_inf": "Stiffness pressure (EOS)",
-    "cv": "Specific heat at constant volume",
-    "qv": "Heat of formation",
-    "qvp": "Heat of formation derivative",
-}
-
-
-def _get_attr_annotation(param_name: str) -> str:
-    """Look up annotation for compound param names (e.g. bc_x%vel_in(1) → 'Inlet velocity')."""
-    if '%' not in param_name:
-        return ""
-    # Extract attribute after last %: "bc_x%vel_in(1)" → "vel_in(1)"
-    attr_full = param_name.split('%')[-1]
-    # Strip index suffix: "vel_in(1)" → "vel_in", "centroid(2)" → "centroid"
-    attr_base = re.match(r'^([a-zA-Z_0-9]+)', attr_full)
-    if not attr_base:
-        return ""
-    attr_key = attr_base.group(1)
-    # Determine family prefix: "bc_x%..." → "bc_", "patch_bc(1)%..." → "patch_bc"
-    prefix = param_name.split('%')[0]
-    if re.match(r'bc_[xyz]', prefix):
-        return _BC_ATTR_ANNOTATIONS.get(attr_key, "")
-    if prefix.startswith("patch_bc"):
-        return _PATCH_BC_ANNOTATIONS.get(attr_key, "")
-    if prefix.startswith("simplex_params"):
-        return _SIMPLEX_ANNOTATIONS.get(attr_key, "")
-    if prefix.startswith("fluid_pp"):
-        return _FLUID_PP_ANNOTATIONS.get(attr_key, "")
-    return ""
-
-
 def _format_tag_annotation(param_name: str, param) -> str:  # pylint: disable=too-many-locals
     """
     Return a short annotation for params with no schema constraints and no AST rules.
@@ -360,20 +257,15 @@ def _format_tag_annotation(param_name: str, param) -> str:  # pylint: disable=to
                          else f"Recommended for `{source}`")
         return "; ".join(parts)
 
-    # 4. Feature tag labels (broader tag-based annotation)
-    for tag, label in _TAG_LABELS:
+    # 4. ParamDef hint (data-driven from definitions.py)
+    if param.hint:
+        return param.hint
+
+    # 5. Tag-based label (from TAG_DISPLAY_NAMES in definitions.py)
+    from ..definitions import TAG_DISPLAY_NAMES  # pylint: disable=import-outside-toplevel
+    for tag, display_name in TAG_DISPLAY_NAMES.items():
         if tag in param.tags:
-            return label
-
-    # 5. Prefix group labels (for untagged params with common prefixes)
-    for prefix, label in _PREFIX_LABELS:
-        if param_name.startswith(prefix):
-            return label
-
-    # 6. Compound-name attribute annotations (bc_x%vel_in, patch_bc%geometry, etc.)
-    attr_ann = _get_attr_annotation(param_name)
-    if attr_ann:
-        return attr_ann
+            return f"{display_name} parameter"
 
     return ""
 

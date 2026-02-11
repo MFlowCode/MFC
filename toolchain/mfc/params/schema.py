@@ -40,7 +40,7 @@ class ParamType(Enum):
 
 
 @dataclass
-class ParamDef:
+class ParamDef:  # pylint: disable=too-many-instance-attributes
     """
     Definition of a single MFC parameter.
 
@@ -60,6 +60,7 @@ class ParamDef:
     constraints: Optional[Dict[str, Any]] = None  # {"choices": [...], "min": N, "max": N}
     dependencies: Optional[Dict[str, Any]] = None  # {"requires": [...], "recommends": [...]}
     tags: Set[str] = field(default_factory=set)  # Feature tags: "mhd", "bubbles", etc.
+    hint: str = ""  # Constraint/usage hint for docs (e.g. "Used with grcbc_in")
 
     def __post_init__(self):
         # Validate name
