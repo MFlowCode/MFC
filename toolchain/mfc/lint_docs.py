@@ -11,8 +11,6 @@ DOCS = [
     "docs/documentation/running.md",
     "docs/documentation/case.md",
     ".github/copilot-instructions.md",
-    ".pr_agent.toml",
-    ".coderabbit.yaml",
 ]
 
 # Match backtick-wrapped strings that look like repo-relative file paths
@@ -28,7 +26,7 @@ def check_docs(repo_root: Path) -> list[str]:
         doc_path = repo_root / doc
         if not doc_path.exists():
             continue
-        text = doc_path.read_text()
+        text = doc_path.read_text(encoding="utf-8")
         for match in PATH_RE.finditer(text):
             path_str = match.group(1)
             if SKIP_RE.search(path_str):

@@ -132,6 +132,7 @@ log "[$CYAN 5/5$COLOR_RESET] Checking$MAGENTA doc references$COLOR_RESET..."
 if python3 toolchain/mfc/lint_docs.py 2>&1; then
     ok "Doc references are valid."
 else
+    error "Doc reference check failed. Run$MAGENTA python3 toolchain/mfc/lint_docs.py$COLOR_RESET for details."
     FAILED=1
 fi
 

@@ -1,5 +1,5 @@
 # yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
-language: en-us
+language: en-US
 
 reviews:
   profile: chill
@@ -15,7 +15,8 @@ reviews:
         docs/documentation/contributing.md.
     - path: "toolchain/**/*.py"
       instructions: |
-        Python toolchain code. Follow PEP 8.
+        Python toolchain code. Follow PEP 8. Requires Python 3.10+;
+        do not suggest __future__ imports or backwards-compatibility shims.
 
 knowledge_base:
   code_guidelines:

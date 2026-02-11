@@ -19,6 +19,7 @@ Formatting and linting are enforced by pre-commit hooks. Focus review effort on 
 * Only `simulation` (plus its `common` dependencies) is GPU-accelerated via **OpenACC**.
 * Code must compile with **GNU gfortran**, **NVIDIA nvfortran**, **Cray ftn**, and **Intel ifx**.
 * Precision modes: double (default), single, and mixed (`wp` = working precision, `stp` = storage precision).
+* **Python toolchain** requires **Python 3.10+** — do not suggest `from __future__` imports or other backwards-compatibility shims.
 
 ---
 

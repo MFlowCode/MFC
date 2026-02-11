@@ -2,7 +2,7 @@
 
 We welcome contributions of all kinds -- bug fixes, new features, documentation, tests, and issue triage.
 
-**Full developer guide:** [mflowcode.github.io/documentation/md_contributing.html](https://mflowcode.github.io/documentation/contributing.html)
+**Full developer guide:** [mflowcode.github.io/documentation/contributing.html](https://mflowcode.github.io/documentation/contributing.html)
 
 ## Quick Reference
 

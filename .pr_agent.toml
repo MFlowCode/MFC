@@ -19,6 +19,8 @@ correctness (pack/unpack offsets, GPU data coherence), precision mixing
 consistency (pressure formula must match model_eqns), missing case_validator.py
 constraints for new parameters, and compiler portability across all four
 supported compilers.
+Python toolchain requires Python 3.10+; do not suggest __future__ imports
+or other backwards-compatibility shims.
 """
 
 [pr_code_suggestions]
