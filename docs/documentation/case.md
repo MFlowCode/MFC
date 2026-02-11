@@ -236,9 +236,9 @@ end if
 
 Some patch configurations are not adequately handled with the above analytic variable definitions.
 In this case, a hard coded patch can be used.
-Hard coded patches can be added by adding additional hard coded patch identifiers to `src/pre_process/include/1[2,3]dHardcodedIC.fpp`.
+Hard coded patches can be added by adding additional hard coded patch identifiers to `src/common/include/1[2,3]dHardcodedIC.fpp`.
 When using a hard coded patch, the `patch_icpp(patch_id)%%hcid` must be set to the hard-coded patch id.
-For example, to add a 2D Hardcoded patch with an id of 200, one would add the following to `src/pre_process/include/2dHardcodedIC.fpp`
+For example, to add a 2D Hardcoded patch with an id of 200, one would add the following to `src/common/include/2dHardcodedIC.fpp`
 
 ```f90
     case(200)
@@ -256,7 +256,7 @@ The code provides three pre-built patches for dimensional extrusion of initial c
 - `case(370)`: Extrude 2D data to 3D domain
 
 Setup: Only requires specifying `init_dir` and filename pattern via `zeros_default`. Grid dimensions are automatically detected from the data files.
-Implementation: All variables and file handling are managed in `src/pre_process/include/ExtrusionHardcodedIC.fpp` with no manual grid configuration needed.
+Implementation: All variables and file handling are managed in `src/common/include/ExtrusionHardcodedIC.fpp` with no manual grid configuration needed.
 Usage: Ideal for initializing simulations from lower-dimensional solutions, enabling users to add perturbations or modifications to the base extruded fields for flow instability studies.
 
 #### Parameter Descriptions
