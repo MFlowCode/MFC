@@ -1,0 +1,27 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: en-US
+
+reviews:
+  profile: chill
+  path_instructions:
+    - path: "src/**/*.fpp"
+      instructions: |
+        Fortran source (Fypp-preprocessed). Follow the coding standards in
+        docs/documentation/contributing.md and the GPU macro API in
+        docs/documentation/gpuParallelization.md.
+    - path: "src/**/*.f90"
+      instructions: |
+        Fortran source. Follow the coding standards in
+        docs/documentation/contributing.md.
+    - path: "toolchain/**/*.py"
+      instructions: |
+        Python toolchain code. Follow PEP 8. Requires Python 3.10+;
+        do not suggest __future__ imports or backwards-compatibility shims.
+
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "docs/documentation/contributing.md"
+      - "docs/documentation/gpuParallelization.md"
+      - ".github/copilot-instructions.md"

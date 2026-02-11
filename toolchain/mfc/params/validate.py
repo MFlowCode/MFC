@@ -27,11 +27,12 @@ Typical usage:
     3. Physics validation (via case_validator.py)
 """
 
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Optional, Tuple
 from .registry import REGISTRY
 from .errors import (
     dependency_error,
     dependency_recommendation,
+    dependency_value_error,
     format_error_list,
     unknown_param_error,
 )
@@ -95,6 +96,37 @@ def validate_constraints(params: Dict[str, Any]) -> List[str]:
     return errors
 
 
+def _check_condition(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    name: str,
+    condition: Dict[str, Any],
+    condition_label: Optional[str],
+    params: Dict[str, Any],
+    errors: List[str],
+    warnings: List[str],
+) -> None:
+    """Check a single condition dict (requires, recommends, requires_value)."""
+    if "requires" in condition:
+        for req in condition["requires"]:
+            if req not in params:
+                errors.append(dependency_error(name, req, condition_label))
+
+    if "recommends" in condition:
+        for rec in condition["recommends"]:
+            if rec not in params:
+                warnings.append(dependency_recommendation(name, rec, condition_label))
+
+    if "requires_value" in condition:
+        for req_param, expected_vals in condition["requires_value"].items():
+            if req_param not in params:
+                errors.append(dependency_error(name, req_param, condition_label))
+            else:
+                got = params[req_param]
+                if got not in expected_vals:
+                    errors.append(dependency_value_error(
+                        name, condition_label, req_param, expected_vals, got,
+                    ))
+
+
 def check_dependencies(params: Dict[str, Any]) -> Tuple[List[str], List[str]]:  # pylint: disable=too-many-branches
     """
     Check parameter dependencies.
@@ -119,33 +151,19 @@ def check_dependencies(params: Dict[str, Any]) -> Tuple[List[str], List[str]]:  
 
         # Check "when_true" dependencies (for LOG params set to "T")
         if "when_true" in deps and value == "T":
-            when_true = deps["when_true"]
-
-            # Required params
-            if "requires" in when_true:
-                for req in when_true["requires"]:
-                    if req not in params:
-                        errors.append(dependency_error(name, req, "=T"))
-
-            # Recommended params
-            if "recommends" in when_true:
-                for rec in when_true["recommends"]:
-                    if rec not in params:
-                        warnings.append(dependency_recommendation(name, rec, "=T"))
+            _check_condition(name, deps["when_true"], "=T", params, errors, warnings)
 
         # Check "when_set" dependencies (for any param that's set)
         if "when_set" in deps:
-            when_set = deps["when_set"]
+            _check_condition(name, deps["when_set"], None, params, errors, warnings)
 
-            if "requires" in when_set:
-                for req in when_set["requires"]:
-                    if req not in params:
-                        errors.append(dependency_error(name, req))
-
-            if "recommends" in when_set:
-                for rec in when_set["recommends"]:
-                    if rec not in params:
-                        warnings.append(dependency_recommendation(name, rec))
+        # Check "when_value" dependencies (value-specific conditions)
+        if "when_value" in deps:
+            for trigger_val, condition in deps["when_value"].items():
+                if value == trigger_val:
+                    _check_condition(
+                        name, condition, f"={trigger_val}", params, errors, warnings,
+                    )
 
     return errors, warnings
 
