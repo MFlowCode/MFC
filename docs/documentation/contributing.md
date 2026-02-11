@@ -22,6 +22,62 @@ This guide covers everything you need to get started and get your changes merged
    ./mfc.sh test -j $(nproc)
    ```
 
+## Architecture Overview
+
+Understanding MFC's structure helps you know where to make changes and what they affect.
+
+### Three-Phase Pipeline
+
+MFC runs simulations in three phases, each a separate Fortran executable:
+
+1. **pre_process** — Reads case parameters, generates initial conditions (patch geometries, flow states), writes binary grid and flow data to disk.
+2. **simulation** — Reads the initial state, advances the solution in time via TVD Runge-Kutta integration, writes solution snapshots at specified intervals.
+3. **post_process** — Reads simulation snapshots, computes derived quantities (vorticity, Schlieren, sound speed, etc.), writes Silo/HDF5 output for visualization.
+
+All three share code in `src/common/`. Only `simulation` is GPU-accelerated.
+
+### Directory Layout
+
+| Directory | Contents |
+|-----------|----------|
+| `src/simulation/` | Time-stepping, RHS, Riemann solvers, WENO, physics models (GPU-accelerated) |
+| `src/pre_process/` | Initial condition generation |
+| `src/post_process/` | Derived variable computation and formatted output |
+| `src/common/` | Derived types, global parameters, MPI, precision, I/O — shared by all three executables |
+| `toolchain/` | Python CLI, parameter system, case validation, build orchestration |
+| `tests/` | Golden files for 500+ regression tests |
+| `examples/` | Sample case files |
+| `docs/` | Doxygen documentation source |
+
+### Simulation Data Flow
+
+Each time step, `simulation` computes the right-hand side through this pipeline:
+
+```
+q_cons_vf (conservative variables: density, momentum, energy, volume fractions)
+    → convert to primitive (density, velocity, pressure)
+    → WENO reconstruction (left/right states at cell faces)
+    → Riemann solve (numerical fluxes)
+    → flux divergence + source terms (viscous, surface tension, body forces)
+    → RHS assembly
+    → Runge-Kutta update → q_cons_vf (next stage/step)
+```
+
+Key data structures (defined in `src/common/m_derived_types.fpp`):
+- `scalar_field` — wraps a 3D `real(stp)` array (`%sf(i,j,k)`)
+- `vector_field` — array of `scalar_field` (`%vf(1:sys_size)`)
+- `q_cons_vf` / `q_prim_vf` — conservative and primitive state vectors
+
+### Build Toolchain
+
+`./mfc.sh` is a shell wrapper that invokes the Python toolchain (`toolchain/main.py`), which orchestrates:
+
+1. **CMake** configures the build (compiler detection, dependencies, GPU backend)
+2. **Fypp** preprocesses `.fpp` files into `.f90` (expands GPU macros, code generation)
+3. **Fortran compiler** builds three executables from the generated `.f90` files
+
+See @ref parameters for the full list of ~3,400 simulation parameters. See @ref case_constraints for feature compatibility and example configurations.
+
 ## Development Workflow
 
 | Step | Command / Action |
@@ -81,7 +137,6 @@ Both human reviewers and AI code reviewers reference this section.
 ### Array Bounds and Indexing
 
 - MFC uses **non-unity lower bounds** (e.g., `idwbuff(1)%beg:idwbuff(1)%end` with negative ghost-cell indices). Always verify loop bounds match array declarations.
-- **Domain transposition:** In Y/Z sweeps, array index order is transposed (X: `i,j,k`, Y: `j,i,k`, Z: `k,j,i`). Loop bounds must match the transposed ordering.
 - **Riemann solver indexing:** Left states at `j`, right states at `j+1`. Off-by-one here corrupts fluxes.
 
 ### Precision and Type Safety
@@ -150,7 +205,7 @@ Step-by-step recipes for common development tasks.
 
 ### How to Add a New Simulation Parameter
 
-Adding a parameter touches both the Python toolchain and Fortran source. Follow these steps in order:
+Adding a parameter touches both the Python toolchain and Fortran source. Follow these steps in order. See @ref parameters for the full list of existing parameters and @ref case_constraints for feature compatibility.
 
 **Step 1: Register in Python** (`toolchain/mfc/params/definitions.py`)
 
@@ -583,30 +638,9 @@ Checklist:
 - Check that new `use` statements don't create circular dependencies
 - New modules need `implicit none` and explicit `intent` on all arguments
 
-### Debugging on GPU
+### Debugging
 
-Set environment variables before running to get diagnostic output:
-
-**NVIDIA (nvfortran):**
-
-| Variable | Effect |
-|----------|--------|
-| `NVCOMPILER_ACC_TIME=1` | Print kernel timing summary |
-| `NVCOMPILER_ACC_NOTIFY=1` | Log kernel launches (2 = + data copies, 3 = both) |
-
-**Cray (ftn):**
-
-| Variable | Effect |
-|----------|--------|
-| `CRAY_ACC_DEBUG=1` | Runtime debug logging (0-3, higher = more verbose) |
-
-**OpenMP offload:**
-
-| Variable | Effect |
-|----------|--------|
-| `OMP_TARGET_OFFLOAD=DISABLED` | Run on CPU only (useful for isolating GPU bugs) |
-
-See @ref gpuParallelization for the full debugging reference.
+See @ref troubleshooting for debugging workflows, profiling tools, GPU diagnostic environment variables, common build/runtime errors, and fixes.
 
 ## Testing
 
@@ -616,6 +650,44 @@ MFC has 500+ regression tests. See @ref testing for the full guide.
 - Use `./mfc.sh test --generate` to create golden files for new cases
 - Keep tests fast: use small grids and short runtimes
 - Test with `-a` to include post-processing validation
+
+## CI Pipeline
+
+Every push to a PR triggers CI. Understanding the pipeline helps you fix failures quickly.
+
+### Lint Gate (runs first, blocks all other jobs)
+
+All four checks must pass before any builds start:
+
+1. **Formatting** — `./mfc.sh format` (auto-handled by pre-commit hook)
+2. **Spelling** — `./mfc.sh spelling`
+3. **Toolchain lint** — `./mfc.sh lint` (Python code quality)
+4. **Source lint** — checks for:
+   - Raw `!$acc` or `!$omp` directives (must use Fypp GPU macros)
+   - Double-precision intrinsics (`dsqrt`, `dexp`, `dble`, etc.)
+
+### Build and Test Matrix
+
+After the lint gate passes:
+
+- **Platforms:** Ubuntu and macOS
+- **Compilers:** GNU (both), Intel OneAPI (Ubuntu only)
+- **Modes:** debug + release, MPI + no-MPI, double + single precision
+- **HPC runners:** Phoenix (NVIDIA/nvfortran), Frontier (AMD/Cray ftn) — both OpenACC and OpenMP backends
+- **Retries:** Tests retry up to 3 times before failing
+- **Cleanliness check:** Compiler warnings are tracked — your PR cannot increase the warning count
+
+### Common CI Failures
+
+| Failure | Fix |
+|---------|-----|
+| Formatting check | Pre-commit hook handles this; if you bypassed it, run `./mfc.sh format` |
+| Raw pragma detected | Replace `!$acc`/`!$omp` with Fypp GPU macros (see @ref gpuParallelization) |
+| Double-precision intrinsic | Use generic intrinsic with `wp` kind (e.g., `sqrt` not `dsqrt`) |
+| Golden file mismatch | If intentional: `./mfc.sh test --generate --only <UUID>` |
+| Warnings increased | Fix the new compiler warnings before merging |
+
+See @ref troubleshooting for detailed debugging workflows.
 
 ## Documentation
 
