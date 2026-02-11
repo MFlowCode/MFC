@@ -138,6 +138,8 @@ contains
 
         real(wp), dimension(1:4, 1:4) :: transform, transform_n
 
+        call random_seed()
+
         do patch_id = 1, num_ibs
             if (patch_ib(patch_id)%geometry == 5 .or. patch_ib(patch_id)%geometry == 12) then
                 allocate (models(patch_id)%model)
