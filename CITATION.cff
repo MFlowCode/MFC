@@ -9,9 +9,11 @@ url: "https://github.com/MFlowCode/MFC"
 preferred-citation:
   type: article
   title: "MFC 5.0: An exascale many-physics flow solver"
-  journal: "arXiv preprint arXiv.2503.07953"
-  doi: "10.48550/arXiv.2503.07953"
-  year: 2025
+  journal: "Computer Physics Communications"
+  doi: "10.1016/j.cpc.2026.110055"
+  year: 2026
+  volume: 322
+  start: 110055
   authors:
     - given-names: Benjamin
       family-names: Wilfong
@@ -21,6 +23,8 @@ preferred-citation:
       family-names: Radhakrishnan
     - given-names: Ansh
       family-names: Gupta
+    - given-names: Daniel J.
+      family-names: Vickers
     - given-names: Diego
       family-names: Vaca-Revelo
     - given-names: Dimitrios

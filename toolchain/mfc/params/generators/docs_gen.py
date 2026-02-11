@@ -12,17 +12,17 @@ import re
 from ..schema import ParamType
 from ..registry import REGISTRY
 from ..descriptions import get_description
+from ..ast_analyzer import analyze_case_validator, classify_message
 from .. import definitions  # noqa: F401  pylint: disable=unused-import
 
 
 def _get_family(name: str) -> str:
     """Extract family name from parameter (e.g., 'patch_icpp' from 'patch_icpp(1)%vel(1)')."""
     # Handle indexed parameters
-    match = re.match(r'^([a-z_]+)', name)
+    match = re.match(r'^([a-zA-Z_]+)', name)
     if match:
         base = match.group(1)
-        # Check if it's a known family pattern
-        if any(name.startswith(f"{base}(") or name.startswith(f"{base}%") for _ in [1]):
+        if name.startswith(f"{base}(") or name.startswith(f"{base}%"):
             return base
     return "general"
 
@@ -103,14 +103,20 @@ def _type_to_str(param_type: ParamType) -> str:
 
 
 def _format_constraints(param) -> str:
-    """Format constraints as readable string."""
+    """Format constraints as readable string with value labels when available."""
     if not param.constraints:
         return ""
 
     parts = []
     c = param.constraints
     if "choices" in c:
-        parts.append(f"Values: {c['choices']}")
+        labels = c.get("value_labels", {})
+        if labels:
+            items = [f"{v}={labels[v]}" if v in labels else str(v)
+                     for v in c["choices"]]
+            parts.append(", ".join(items))
+        else:
+            parts.append(f"Values: {c['choices']}")
     if "min" in c:
         parts.append(f"Min: {c['min']}")
     if "max" in c:
@@ -119,8 +125,218 @@ def _format_constraints(param) -> str:
     return ", ".join(parts)
 
 
+def _build_param_name_pattern():
+    """Build a regex pattern that matches known parameter names at word boundaries.
+
+    Uses longest-match-first to avoid partial matches (e.g., 'model_eqns' before 'model').
+    Only matches names that look like identifiers (avoids matching 'm' inside 'must').
+    """
+    all_names = sorted(REGISTRY.all_params.keys(), key=len, reverse=True)
+    # Only include names >= 2 chars to avoid false positives with single-letter params
+    # and names that are simple identifiers (no % or parens, which need escaping)
+    safe_names = [n for n in all_names if len(n) >= 2 and re.match(r'^[a-zA-Z_]\w*$', n)]
+    if not safe_names:
+        return None
+    pattern = r'\b(' + '|'.join(re.escape(n) for n in safe_names) + r')\b'
+    return re.compile(pattern)
+
+
+# Matches compound param names like bub_pp%mu_g, fluid_pp(1)%Re(1), x_output%beg
+_COMPOUND_NAME_RE = re.compile(r'\b\w+(?:\([^)]*\))?(?:%\w+(?:\([^)]*\))?)+')
+
+
+def _backtick_params(msg: str, pattern) -> str:
+    """Wrap parameter names in backticks for markdown rendering.
+
+    Handles three cases in order:
+    1. Compound names with % (e.g. bub_pp%mu_g, x_output%beg)
+    2. Known registry param names (e.g. model_eqns, weno_order)
+    3. Snake_case identifiers not in registry (e.g. cluster_type, smooth_type)
+    """
+    # 1. Wrap compound names (word%word patterns) — must come first
+    msg = _COMPOUND_NAME_RE.sub(lambda m: f'`{m.group(0)}`', msg)
+
+    # 2. Wrap known simple param names, only outside existing backtick spans
+    if pattern is not None:
+        parts = msg.split('`')
+        for i in range(0, len(parts), 2):
+            parts[i] = pattern.sub(r'`\1`', parts[i])
+        msg = '`'.join(parts)
+
+    # 3. Wrap remaining snake_case identifiers (at least one underscore)
+    parts = msg.split('`')
+    for i in range(0, len(parts), 2):
+        parts[i] = re.sub(r'\b([a-z]\w*_\w+)\b', r'`\1`', parts[i])
+    msg = '`'.join(parts)
+
+    return msg
+
+
+def _escape_pct_outside_backticks(text: str) -> str:
+    """Escape % as %% for Doxygen, but not inside backtick code spans."""
+    parts = text.split('`')
+    for i in range(0, len(parts), 2):
+        parts[i] = parts[i].replace('%', '%%')
+    return '`'.join(parts)
+
+
+# Lazily initialized at module level on first use
+_PARAM_PATTERN = None
+
+
+def _get_param_pattern():
+    global _PARAM_PATTERN  # noqa: PLW0603  pylint: disable=global-statement
+    if _PARAM_PATTERN is None:
+        _PARAM_PATTERN = _build_param_name_pattern()
+    return _PARAM_PATTERN
+
+
+def _build_reverse_dep_map() -> Dict[str, List[Tuple[str, str]]]:
+    """Build map from target param -> [(relation, source_param), ...] from DEPENDENCIES."""
+    from ..definitions import DEPENDENCIES  # pylint: disable=import-outside-toplevel
+    reverse: Dict[str, List[Tuple[str, str]]] = {}
+    for param, dep in DEPENDENCIES.items():
+        if "when_true" in dep:
+            wt = dep["when_true"]
+            for r in wt.get("requires", []):
+                reverse.setdefault(r, []).append(("required by", param))
+            for r in wt.get("recommends", []):
+                reverse.setdefault(r, []).append(("recommended for", param))
+        if "when_value" in dep:
+            for val, subspec in dep["when_value"].items():
+                for r in subspec.get("requires", []):
+                    reverse.setdefault(r, []).append(("required by", f"{param}={val}"))
+                for r in subspec.get("recommends", []):
+                    reverse.setdefault(r, []).append(("recommended for", f"{param}={val}"))
+    return reverse
+
+
+_REVERSE_DEPS = None
+
+
+def _get_reverse_deps():
+    global _REVERSE_DEPS  # noqa: PLW0603  pylint: disable=global-statement
+    if _REVERSE_DEPS is None:
+        _REVERSE_DEPS = _build_reverse_dep_map()
+    return _REVERSE_DEPS
+
+
+def _format_tag_annotation(param_name: str, param) -> str:  # pylint: disable=too-many-locals
+    """
+    Return a short annotation for params with no schema constraints and no AST rules.
+
+    Checks (in order): own DEPENDENCIES, output flag tags, reverse dependencies,
+    feature tag labels, prefix-group labels, and compound-name attribute annotations.
+    """
+    # 1. Own DEPENDENCIES info
+    if param.dependencies:
+        dep = param.dependencies
+        if "when_true" in dep:
+            wt = dep["when_true"]
+            if "requires" in wt:
+                req = ", ".join(f"`{r}`" for r in wt["requires"])
+                return f"Requires {req} when enabled"
+            if "requires_value" in wt:
+                parts = []
+                for k, vals in wt["requires_value"].items():
+                    parts.append(f"`{k}` in {vals}")
+                return "Requires " + ", ".join(parts)
+            if "recommends" in wt:
+                rec = ", ".join(f"`{r}`" for r in wt["recommends"])
+                return f"Recommends {rec}"
+
+    # 2. Tag-based output flag label (specific labels for LOG output params)
+    if "output" in param.tags and param.param_type == ParamType.LOG:
+        if "bubbles" in param.tags:
+            return "Lagrangian output flag"
+        if "chemistry" in param.tags:
+            return "Chemistry output flag"
+        return "Post-processing output flag"
+
+    # 3. Reverse dependencies (params required/recommended by other features)
+    reverse = _get_reverse_deps()
+    if param_name in reverse:
+        entries = reverse[param_name]
+        parts = []
+        for relation, source in entries[:2]:
+            parts.append(f"Required by `{source}`" if relation == "required by"
+                         else f"Recommended for `{source}`")
+        return "; ".join(parts)
+
+    # 4. ParamDef hint (data-driven from definitions.py)
+    if param.hint:
+        return param.hint
+
+    # 5. Tag-based label (from TAG_DISPLAY_NAMES in definitions.py)
+    from ..definitions import TAG_DISPLAY_NAMES  # pylint: disable=import-outside-toplevel
+    for tag, display_name in TAG_DISPLAY_NAMES.items():
+        if tag in param.tags:
+            return f"{display_name} parameter"
+
+    return ""
+
+
+def _format_validator_rules(param_name: str, by_trigger: Dict[str, list],  # pylint: disable=too-many-locals
+                            by_param: Dict[str, list] | None = None) -> str:
+    """Format AST-extracted validator rules for a parameter's Constraints column.
+
+    Gets rules where this param is the trigger.  Falls back to by_param
+    (rules that mention this param) when no trigger rules exist.
+    """
+    rules = by_trigger.get(param_name, [])
+    if not rules and by_param:
+        rules = by_param.get(param_name, [])
+    if not rules:
+        return ""
+
+    pattern = _get_param_pattern()
+
+    # Deduplicate messages (same message can appear from multiple loop iterations)
+    seen = set()
+    unique_rules = []
+    for r in rules:
+        if r.message not in seen:
+            seen.add(r.message)
+            unique_rules.append(r)
+
+    # Classify and pick representative messages
+    requirements = []
+    incompatibilities = []
+    ranges = []
+    others = []
+
+    for r in unique_rules:
+        kind = classify_message(r.message)
+        msg = _backtick_params(r.message, pattern)
+        if kind == "requirement":
+            requirements.append(msg)
+        elif kind == "incompatibility":
+            incompatibilities.append(msg)
+        elif kind == "range":
+            ranges.append(msg)
+        else:
+            others.append(msg)
+
+    # Build concise output - show up to 3 rules total, prioritized
+    parts = []
+    budget = 3
+    for group in [requirements, incompatibilities, ranges, others]:
+        for msg in group:
+            if budget <= 0:
+                break
+            parts.append(msg)
+            budget -= 1
+
+    return "; ".join(parts)
+
+
 def generate_parameter_docs() -> str:  # pylint: disable=too-many-locals,too-many-statements
     """Generate markdown documentation for all parameters."""
+    # AST-extract rules from case_validator.py
+    analysis = analyze_case_validator()
+    by_trigger = analysis["by_trigger"]
+    by_param = analysis["by_param"]
+
     lines = [
         "@page parameters Case Parameters Reference",
         "",
@@ -225,10 +441,25 @@ def generate_parameter_docs() -> str:  # pylint: disable=too-many-locals,too-man
         # Use pattern view if it reduces rows, otherwise show full table
         if len(patterns) < len(params):
             # Pattern view - shows collapsed patterns
+            # Check if any member of a pattern has constraints
+            pattern_has_constraints = False
+            for _pattern, examples in patterns.items():
+                for ex in examples:
+                    p = REGISTRY.all_params[ex]
+                    if p.constraints or ex in by_trigger or ex in by_param:
+                        pattern_has_constraints = True
+                        break
+                if pattern_has_constraints:
+                    break
+
             lines.append("### Patterns")
             lines.append("")
-            lines.append("| Pattern | Example | Description |")
-            lines.append("|---------|---------|-------------|")
+            if pattern_has_constraints:
+                lines.append("| Pattern | Example | Description | Constraints |")
+                lines.append("|---------|---------|-------------|-------------|")
+            else:
+                lines.append("| Pattern | Example | Description |")
+                lines.append("|---------|---------|-------------|")
 
             for pattern, examples in sorted(patterns.items()):
                 example = examples[0]
@@ -236,29 +467,44 @@ def generate_parameter_docs() -> str:  # pylint: disable=too-many-locals,too-man
                 # Truncate long descriptions
                 if len(desc) > 60:
                     desc = desc[:57] + "..."
-                # Escape % for Doxygen
+                # Escape % for Doxygen (even inside backtick code spans)
                 pattern_escaped = _escape_percent(pattern)
                 example_escaped = _escape_percent(example)
-                lines.append(f"| `{pattern_escaped}` | `{example_escaped}` | {desc} |")
+                desc = _escape_percent(desc)
+                if pattern_has_constraints:
+                    p = REGISTRY.all_params[example]
+                    constraints = _format_constraints(p)
+                    deps = _format_validator_rules(example, by_trigger, by_param)
+                    extra = "; ".join(filter(None, [constraints, deps]))
+                    if not extra:
+                        extra = _format_tag_annotation(example, p)
+                    extra = _escape_pct_outside_backticks(extra)
+                    lines.append(f"| `{pattern_escaped}` | `{example_escaped}` | {desc} | {extra} |")
+                else:
+                    lines.append(f"| `{pattern_escaped}` | `{example_escaped}` | {desc} |")
 
             lines.append("")
         else:
             # Full table - no patterns to collapse
-            lines.append("| Parameter | Type | Description |")
-            lines.append("|-----------|------|-------------|")
+            lines.append("| Parameter | Type | Description | Constraints |")
+            lines.append("|-----------|------|-------------|-------------|")
 
             for name, param in params:
                 type_str = _type_to_str(param.param_type)
                 desc = get_description(name) or ""
-                constraints = _format_constraints(param)
-                if constraints:
-                    desc = f"{desc} ({constraints})" if desc else constraints
                 # Truncate long descriptions
                 if len(desc) > 80:
                     desc = desc[:77] + "..."
-                # Escape % for Doxygen
+                constraints = _format_constraints(param)
+                deps = _format_validator_rules(name, by_trigger, by_param)
+                extra = "; ".join(filter(None, [constraints, deps]))
+                if not extra:
+                    extra = _format_tag_annotation(name, param)
+                extra = _escape_pct_outside_backticks(extra)
+                # Escape % for Doxygen (even inside backtick code spans)
                 name_escaped = _escape_percent(name)
-                lines.append(f"| `{name_escaped}` | {type_str} | {desc} |")
+                desc = _escape_percent(desc)
+                lines.append(f"| `{name_escaped}` | {type_str} | {desc} | {extra} |")
 
             lines.append("")
 
