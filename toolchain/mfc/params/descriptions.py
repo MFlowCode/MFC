@@ -44,7 +44,7 @@ DESCRIPTIONS = {
     "t_step_print": "Time step interval for printing info",
     "t_stop": "Simulation stop time",
     "t_save": "Time interval for saving data",
-    "time_stepper": "Time integration scheme (1=Euler, 2=TVD-RK2, 3=TVD-RK3)",
+    "time_stepper": "Time integration scheme",
     "cfl_adap_dt": "Enable adaptive time stepping based on CFL",
     "cfl_const_dt": "Use constant CFL for time stepping",
     "cfl_target": "Target CFL number for adaptive time stepping",
@@ -54,7 +54,7 @@ DESCRIPTIONS = {
     "adap_dt_max_iters": "Maximum iterations for adaptive time stepping",
 
     # Model equations
-    "model_eqns": "Model equations (1=gamma-law, 2=5-eq, 3=6-eq, 4=4-eq)",
+    "model_eqns": "Model equations",
     "num_fluids": "Number of fluid components",
     "num_patches": "Number of initial condition patches",
     "mpp_lim": "Enable mixture pressure positivity limiter",
@@ -62,7 +62,7 @@ DESCRIPTIONS = {
     "alt_soundspeed": "Use alternative sound speed formulation",
 
     # WENO reconstruction
-    "weno_order": "Order of WENO reconstruction (1, 3, 5, or 7)",
+    "weno_order": "Order of WENO reconstruction",
     "weno_eps": "WENO epsilon parameter for smoothness",
     "mapped_weno": "Enable mapped WENO scheme",
     "wenoz": "Enable WENO-Z scheme",
@@ -75,14 +75,14 @@ DESCRIPTIONS = {
     "null_weights": "Allow null WENO weights",
 
     # MUSCL reconstruction
-    "recon_type": "Reconstruction type (1=WENO, 2=MUSCL)",
+    "recon_type": "Reconstruction type",
     "muscl_order": "Order of MUSCL reconstruction",
     "muscl_lim": "MUSCL limiter type",
 
     # Riemann solver
-    "riemann_solver": "Riemann solver (1=HLL, 2=HLLC, 3=exact)",
-    "wave_speeds": "Wave speed estimates (1=direct, 2=pressure)",
-    "avg_state": "Average state for Riemann solver (1=Roe, 2=arithmetic)",
+    "riemann_solver": "Riemann solver",
+    "wave_speeds": "Wave speed estimates",
+    "avg_state": "Average state for Riemann solver",
     "low_Mach": "Low Mach number correction",
 
     # Boundary conditions
@@ -97,7 +97,7 @@ DESCRIPTIONS = {
     # Physics models
     "bubbles_euler": "Enable Euler-Euler bubble model",
     "bubbles_lagrange": "Enable Lagrangian bubble tracking",
-    "bubble_model": "Bubble dynamics model (1=Gilmore, 2=Keller-Miksis, 3=Rayleigh-Plesset)",
+    "bubble_model": "Bubble dynamics model",
     "polytropic": "Enable polytropic gas behavior for bubbles",
     "polydisperse": "Enable polydisperse bubble distribution",
     "nb": "Number of bubble bins for polydisperse model",
@@ -125,8 +125,8 @@ DESCRIPTIONS = {
     "integral_wrt": "Write integral data",
     "parallel_io": "Enable parallel I/O",
     "file_per_process": "Write separate file per MPI process",
-    "format": "Output format (1=Silo, 2=binary)",
-    "precision": "Output precision (1=single, 2=double)",
+    "format": "Output format",
+    "precision": "Output precision",
     "schlieren_wrt": "Write schlieren images",
     "rho_wrt": "Write density field",
     "pres_wrt": "Write pressure field",
@@ -496,24 +496,27 @@ PATTERNS = [
 
 
 def get_description(param_name: str) -> str:
-    """Get description for a parameter from registry or fallback sources."""
-    # Primary source: ParamDef.description from registry
-    from . import REGISTRY  # pylint: disable=import-outside-toplevel
-    param = REGISTRY.all_params.get(param_name)
-    if param and param.description:
-        return param.description
+    """Get description for a parameter from hand-curated or auto-generated sources.
 
-    # Fallback 1: manual descriptions dict (legacy, will be removed)
+    Priority: hand-curated DESCRIPTIONS > PATTERNS > auto-generated param.description.
+    """
+    # 1. Hand-curated descriptions (highest quality)
     if param_name in DESCRIPTIONS:
         return DESCRIPTIONS[param_name]
 
-    # Fallback 2: pattern matching for indexed params
+    # 2. Pattern matching for indexed params (hand-curated templates)
     for pattern, template in PATTERNS:
         match = re.fullmatch(pattern, param_name)
         if match:
             return template.format(*match.groups())
 
-    # Fallback 3: naming convention inference
+    # 3. Auto-generated description from registry (set by _auto_describe at registration)
+    from . import REGISTRY  # pylint: disable=import-outside-toplevel
+    param = REGISTRY.all_params.get(param_name)
+    if param and param.description:
+        return param.description
+
+    # 4. Last resort: naming convention inference
     return _infer_from_naming(param_name)
 
 

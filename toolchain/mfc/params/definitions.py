@@ -3,7 +3,7 @@ MFC Parameter Definitions (Compact).
 
 Single file containing all ~3,300 parameter definitions using loops.
 This replaces the definitions/ directory.
-"""
+"""  # pylint: disable=too-many-lines
 
 import re
 from typing import Dict, Any
@@ -163,7 +163,7 @@ _SIMPLE_DESCS = {
     "t_step_print": "Print interval (steps)",
     "t_stop": "Stop time",
     "t_save": "Save interval (time)",
-    "time_stepper": "Time integration scheme (1=Euler, 2=RK2, 3=RK3)",
+    "time_stepper": "Time integration scheme",
     "cfl_target": "Target CFL number",
     "cfl_max": "Maximum CFL number",
     "cfl_adap_dt": "Enable adaptive CFL time stepping",
@@ -174,7 +174,7 @@ _SIMPLE_DESCS = {
     "adap_dt_max_iters": "Max iterations for adaptive dt",
     "t_tol": "Time tolerance",
     # Model
-    "model_eqns": "Model equations (1=gamma, 2=5-eq, 3=6-eq, 4=4-eq)",
+    "model_eqns": "Model equations",
     "num_fluids": "Number of fluids",
     "num_patches": "Number of IC patches",
     "mpp_lim": "Mixture pressure positivity limiter",
@@ -186,9 +186,9 @@ _SIMPLE_DESCS = {
     "teno": "Enable TENO",
     "mp_weno": "Enable monotonicity-preserving WENO",
     # Riemann
-    "riemann_solver": "Riemann solver (1=HLL, 2=HLLC, 3=exact)",
+    "riemann_solver": "Riemann solver",
     "wave_speeds": "Wave speed estimate method",
-    "avg_state": "Average state (1=Roe, 2=arithmetic)",
+    "avg_state": "Average state",
     # Physics toggles
     "viscous": "Enable viscous effects",
     "mhd": "Enable magnetohydrodynamics",
@@ -229,7 +229,7 @@ _SIMPLE_DESCS = {
     "old_ic": "Load initial conditions from previous",
     "t_step_old": "Time step to restart from",
     "fd_order": "Finite difference order",
-    "recon_type": "Reconstruction type (1=WENO, 2=MUSCL)",
+    "recon_type": "Reconstruction type",
     "muscl_order": "MUSCL reconstruction order",
     "muscl_lim": "MUSCL limiter type",
     "low_Mach": "Low Mach number correction",
@@ -237,8 +237,8 @@ _SIMPLE_DESCS = {
     "Ca": "Cavitation number",
     "Web": "Weber number",
     "Re_inv": "Inverse Reynolds number",
-    "format": "Output format (1=Silo, 2=binary)",
-    "precision": "Output precision (1=single, 2=double)",
+    "format": "Output format",
+    "precision": "Output precision",
     # Body forces
     "bf_x": "Enable body force in x",
     "bf_y": "Enable body force in y",
@@ -346,14 +346,120 @@ CASE_OPT_PARAMS = {
 }
 
 
+# =============================================================================
+# Data-driven Annotations for Doc Generation
+# =============================================================================
+# These dicts are the single source of truth for parameter hints in the docs.
+# To annotate a new param, add an entry here instead of editing docs_gen.py.
+
+HINTS = {
+    "bc": {
+        "grcbc_in": "Enables GRCBC subsonic inflow (bc type -7)",
+        "grcbc_out": "Enables GRCBC subsonic outflow (bc type -8)",
+        "grcbc_vel_out": "GRCBC velocity outlet (requires `grcbc_out`)",
+        "vel_in": "Inlet velocity component (used with `grcbc_in`)",
+        "vel_out": "Outlet velocity component (used with `grcbc_vel_out`)",
+        "pres_in": "Inlet pressure (used with `grcbc_in`)",
+        "pres_out": "Outlet pressure (used with `grcbc_out`)",
+        "alpha_rho_in": "Inlet partial density per fluid (used with `grcbc_in`)",
+        "alpha_in": "Inlet volume fraction per fluid (used with `grcbc_in`)",
+        "vb1": "Boundary velocity component 1 at domain begin",
+        "vb2": "Boundary velocity component 2 at domain begin",
+        "vb3": "Boundary velocity component 3 at domain begin",
+        "ve1": "Boundary velocity component 1 at domain end",
+        "ve2": "Boundary velocity component 2 at domain end",
+        "ve3": "Boundary velocity component 3 at domain end",
+    },
+    "patch_bc": {
+        "geometry": "Patch shape: 1=line, 2=circle, 3=rectangle",
+        "type": "BC type applied within patch region",
+        "dir": "Patch normal direction (1=x, 2=y, 3=z)",
+        "loc": "Domain boundary (-1=begin, 1=end)",
+        "centroid": "Patch center coordinate",
+        "length": "Patch dimension",
+        "radius": "Patch radius (geometry=2)",
+    },
+    "simplex_params": {
+        "perturb_dens": "Enable simplex density perturbation",
+        "perturb_dens_freq": "Density perturbation frequency",
+        "perturb_dens_scale": "Density perturbation amplitude",
+        "perturb_dens_offset": "Density perturbation offset seed",
+        "perturb_vel": "Enable simplex velocity perturbation",
+        "perturb_vel_freq": "Velocity perturbation frequency",
+        "perturb_vel_scale": "Velocity perturbation amplitude",
+        "perturb_vel_offset": "Velocity perturbation offset seed",
+    },
+    "fluid_pp": {
+        "gamma": "Specific heat ratio (EOS)",
+        "pi_inf": "Stiffness pressure (EOS)",
+        "cv": "Specific heat at constant volume",
+        "qv": "Heat of formation",
+        "qvp": "Heat of formation derivative",
+    },
+}
+
+# Tag → display name for docs. Dict order = priority when a param has multiple tags.
+TAG_DISPLAY_NAMES = {
+    "bubbles": "Bubble model",
+    "mhd": "MHD",
+    "chemistry": "Chemistry",
+    "time": "Time-stepping",
+    "grid": "Grid",
+    "weno": "WENO",
+    "viscosity": "Viscosity",
+    "elasticity": "Elasticity",
+    "surface_tension": "Surface tension",
+    "acoustic": "Acoustic",
+    "ib": "Immersed boundary",
+    "probes": "Probe/integral",
+    "riemann": "Riemann solver",
+    "relativity": "Relativity",
+    "output": "Output",
+    "bc": "Boundary condition",
+}
+
+# Prefix → hint for untagged simple params
+PREFIX_HINTS = {
+    "mixlayer_": "Mixing layer parameter",
+    "nv_uvm_": "GPU memory management",
+    "ic_": "Initial condition parameter",
+}
+
+
+def _lookup_hint(name):
+    """Auto-derive constraint hint from HINTS dict using family+attribute matching."""
+    if '%' not in name:
+        # Check PREFIX_HINTS for simple params
+        for prefix, label in PREFIX_HINTS.items():
+            if name.startswith(prefix):
+                return label
+        return ""
+    # Compound name: extract family and attribute
+    prefix, attr_full = name.split('%', 1)
+    # Normalize family: "bc_x" → "bc", "patch_bc(1)" → "patch"
+    family = re.sub(r'[_(].*', '', prefix)
+    if family not in HINTS:
+        # Fallback: keep underscores — "patch_bc" → "patch_bc", "simplex_params" → "simplex_params"
+        m = re.match(r'^[a-zA-Z_]+', prefix)
+        family = m.group(0) if m else ""
+    if family not in HINTS:
+        return ""
+    # Strip index from attr: "vel_in(1)" → "vel_in"
+    m = re.match(r'^[a-zA-Z_0-9]+', attr_full)
+    if not m:
+        return ""
+    attr = m.group(0)
+    return HINTS[family].get(attr, "")
+
+
 # ============================================================================
 # Schema Validation for Constraints and Dependencies
 # ============================================================================
 # Uses rapidfuzz for "did you mean?" suggestions when typos are detected
 
-_VALID_CONSTRAINT_KEYS = {"choices", "min", "max"}
-_VALID_DEPENDENCY_KEYS = {"when_true", "when_set"}
-_VALID_CONDITION_KEYS = {"requires", "recommends"}
+_VALID_CONSTRAINT_KEYS = {"choices", "min", "max", "value_labels"}
+_VALID_DEPENDENCY_KEYS = {"when_true", "when_set", "when_value"}
+_VALID_CONDITION_KEYS = {"requires", "recommends", "requires_value"}
 
 
 def _validate_constraint(param_name: str, constraint: Dict[str, Any]) -> None:
@@ -380,6 +486,16 @@ def _validate_constraint(param_name: str, constraint: Dict[str, Any]) -> None:
         raise ValueError(f"Constraint 'min' for '{param_name}' must be a number")
     if "max" in constraint and not isinstance(constraint["max"], (int, float)):
         raise ValueError(f"Constraint 'max' for '{param_name}' must be a number")
+    if "value_labels" in constraint:
+        if not isinstance(constraint["value_labels"], dict):
+            raise ValueError(f"Constraint 'value_labels' for '{param_name}' must be a dict")
+        if "choices" in constraint:
+            for key in constraint["value_labels"]:
+                if key not in constraint["choices"]:
+                    raise ValueError(
+                        f"value_labels key {key!r} for '{param_name}' "
+                        f"not in choices {constraint['choices']}"
+                    )
 
 
 def _validate_dependency(param_name: str, dependency: Dict[str, Any]) -> None:
@@ -398,29 +514,54 @@ def _validate_dependency(param_name: str, dependency: Dict[str, Any]) -> None:
             )
         )
 
+    def _validate_condition(cond_label: str, condition: Any) -> None:
+        """Validate a condition dict (shared by when_true, when_set, when_value entries)."""
+        if not isinstance(condition, dict):
+            raise ValueError(
+                f"Dependency '{cond_label}' for '{param_name}' must be a dict"
+            )
+        invalid_cond_keys = set(condition.keys()) - _VALID_CONDITION_KEYS
+        if invalid_cond_keys:
+            first_invalid = next(iter(invalid_cond_keys))
+            raise ValueError(
+                invalid_key_error(
+                    f"condition in '{cond_label}' for '{param_name}'",
+                    first_invalid,
+                    _VALID_CONDITION_KEYS
+                )
+            )
+        for req_key in ["requires", "recommends"]:
+            if req_key in condition and not isinstance(condition[req_key], list):
+                raise ValueError(
+                    f"Dependency '{cond_label}/{req_key}' for '{param_name}' "
+                    "must be a list"
+                )
+        if "requires_value" in condition:
+            rv = condition["requires_value"]
+            if not isinstance(rv, dict):
+                raise ValueError(
+                    f"Dependency '{cond_label}/requires_value' for '{param_name}' "
+                    "must be a dict"
+                )
+            for rv_param, rv_vals in rv.items():
+                if not isinstance(rv_vals, list):
+                    raise ValueError(
+                        f"Dependency '{cond_label}/requires_value/{rv_param}' "
+                        f"for '{param_name}' must be a list"
+                    )
+
     for condition_key in ["when_true", "when_set"]:
         if condition_key in dependency:
-            condition = dependency[condition_key]
-            if not isinstance(condition, dict):
-                raise ValueError(
-                    f"Dependency '{condition_key}' for '{param_name}' must be a dict"
-                )
-            invalid_cond_keys = set(condition.keys()) - _VALID_CONDITION_KEYS
-            if invalid_cond_keys:
-                first_invalid = next(iter(invalid_cond_keys))
-                raise ValueError(
-                    invalid_key_error(
-                        f"condition in '{condition_key}' for '{param_name}'",
-                        first_invalid,
-                        _VALID_CONDITION_KEYS
-                    )
-                )
-            for req_key in ["requires", "recommends"]:
-                if req_key in condition and not isinstance(condition[req_key], list):
-                    raise ValueError(
-                        f"Dependency '{condition_key}/{req_key}' for '{param_name}' "
-                        "must be a list"
-                    )
+            _validate_condition(condition_key, dependency[condition_key])
+
+    if "when_value" in dependency:
+        wv = dependency["when_value"]
+        if not isinstance(wv, dict):
+            raise ValueError(
+                f"Dependency 'when_value' for '{param_name}' must be a dict"
+            )
+        for val, condition in wv.items():
+            _validate_condition(f"when_value/{val}", condition)
 
 
 def _validate_all_constraints(constraints: Dict[str, Dict]) -> None:
@@ -435,36 +576,107 @@ def _validate_all_dependencies(dependencies: Dict[str, Dict]) -> None:
         _validate_dependency(param_name, dependency)
 
 
+def get_value_label(param_name: str, value: int) -> str:
+    """Look up the human-readable label for a parameter's integer code.
+
+    Returns the label string, or ``str(value)`` when no label is defined.
+    This is the single source of truth for value ↔ label mappings.
+    """
+    constraint = CONSTRAINTS.get(param_name)
+    if constraint is None:
+        return str(value)
+    labels = constraint.get("value_labels")
+    if labels is None:
+        return str(value)
+    return labels.get(value, str(value))
+
+
 # Parameter constraints (choices, min, max)
 CONSTRAINTS = {
     # Reconstruction
-    "weno_order": {"choices": [0, 1, 3, 5, 7]},  # 0 for MUSCL mode
-    "recon_type": {"choices": [1, 2]},  # 1=WENO, 2=MUSCL
-    "muscl_order": {"choices": [1, 2]},
-    "muscl_lim": {"choices": [1, 2, 3, 4, 5]},  # minmod, MC, Van Albada, Van Leer, SUPERBEE
+    "weno_order": {
+        "choices": [0, 1, 3, 5, 7],
+        "value_labels": {0: "MUSCL mode", 1: "1st order", 3: "WENO3", 5: "WENO5", 7: "WENO7"},
+    },
+    "recon_type": {
+        "choices": [1, 2],
+        "value_labels": {1: "WENO", 2: "MUSCL"},
+    },
+    "muscl_order": {
+        "choices": [1, 2],
+        "value_labels": {1: "1st order", 2: "2nd order"},
+    },
+    "muscl_lim": {
+        "choices": [1, 2, 3, 4, 5],
+        "value_labels": {1: "minmod", 2: "MC", 3: "Van Albada", 4: "Van Leer", 5: "SUPERBEE"},
+    },
 
     # Time stepping
-    "time_stepper": {"choices": [1, 2, 3]},  # 1=Euler, 2=TVD-RK2, 3=TVD-RK3
+    "time_stepper": {
+        "choices": [1, 2, 3],
+        "value_labels": {1: "RK1 (Forward Euler)", 2: "RK2", 3: "RK3 (SSP)"},
+    },
 
     # Riemann solver
-    "riemann_solver": {"choices": [1, 2, 3, 4, 5]},  # HLL, HLLC, Exact, HLLD, LF
-    "wave_speeds": {"choices": [1, 2]},  # direct, pressure
-    "avg_state": {"choices": [1, 2]},  # Roe, arithmetic
+    "riemann_solver": {
+        "choices": [1, 2, 3, 4, 5],
+        "value_labels": {1: "HLL", 2: "HLLC", 3: "Exact", 4: "HLLD", 5: "Lax-Friedrichs"},
+    },
+    "wave_speeds": {
+        "choices": [1, 2],
+        "value_labels": {1: "direct", 2: "pressure"},
+    },
+    "avg_state": {
+        "choices": [1, 2],
+        "value_labels": {1: "Roe", 2: "arithmetic"},
+    },
 
     # Model equations
-    "model_eqns": {"choices": [1, 2, 3, 4]},  # gamma-law, 5-eq, 6-eq, 4-eq
+    "model_eqns": {
+        "choices": [1, 2, 3, 4],
+        "value_labels": {1: "Gamma-law", 2: "5-Equation", 3: "6-Equation", 4: "4-Equation"},
+    },
 
     # Bubbles
-    "bubble_model": {"choices": [1, 2, 3]},  # Gilmore, Keller-Miksis, RP
+    "bubble_model": {
+        "choices": [1, 2, 3],
+        "value_labels": {1: "Gilmore", 2: "Keller-Miksis", 3: "Rayleigh-Plesset"},
+    },
 
     # Output
-    "format": {"choices": [1, 2]},  # Silo, binary
-    "precision": {"choices": [1, 2]},  # single, double
+    "format": {
+        "choices": [1, 2],
+        "value_labels": {1: "Silo", 2: "binary"},
+    },
+    "precision": {
+        "choices": [1, 2],
+        "value_labels": {1: "single", 2: "double"},
+    },
+
+    # Time stepping (must be positive)
+    "dt": {"min": 0},
+    "t_stop": {"min": 0},
+    "t_save": {"min": 0},
+    "t_step_save": {"min": 1},
+    "t_step_print": {"min": 1},
+    "cfl_target": {"min": 0},
+    "cfl_max": {"min": 0},
+
+    # WENO
+    "weno_eps": {"min": 0},
+
+    # Physics (must be non-negative)
+    "R0ref": {"min": 0},
+    "sigma": {"min": 0},
 
     # Counts (must be positive)
     "num_fluids": {"min": 1, "max": 10},
     "num_patches": {"min": 0, "max": 10},
     "num_ibs": {"min": 0, "max": 10},
+    "num_source": {"min": 1},
+    "num_probes": {"min": 1},
+    "num_integrals": {"min": 1},
+    "nb": {"min": 1},
     "m": {"min": 0},
     "n": {"min": 0},
     "p": {"min": 0},
@@ -475,6 +687,18 @@ DEPENDENCIES = {
     "bubbles_euler": {
         "when_true": {
             "recommends": ["nb", "polytropic"],
+            "requires_value": {
+                "model_eqns": [2, 4],
+                "riemann_solver": [2],
+                "avg_state": [2],
+            },
+        }
+    },
+    "model_eqns": {
+        "when_value": {
+            2: {"requires": ["num_fluids"]},
+            3: {"requires_value": {"riemann_solver": [2], "avg_state": [2], "wave_speeds": [1]}},
+            4: {"requires": ["rhoref", "pref"], "requires_value": {"num_fluids": [1]}},
         }
     },
     "viscous": {
@@ -484,7 +708,7 @@ DEPENDENCIES = {
     },
     "polydisperse": {
         "when_true": {
-            "requires": ["nb"],
+            "requires": ["nb", "poly_sigma"],
         }
     },
     "chemistry": {
@@ -509,21 +733,105 @@ DEPENDENCIES = {
     },
     "probe_wrt": {
         "when_true": {
-            "requires": ["num_probes"],
+            "requires": ["num_probes", "fd_order"],
+        }
+    },
+    "stretch_x": {
+        "when_true": {
+            "requires": ["a_x", "x_a", "x_b"],
+        }
+    },
+    "stretch_y": {
+        "when_true": {
+            "requires": ["a_y", "y_a", "y_b"],
+        }
+    },
+    "stretch_z": {
+        "when_true": {
+            "requires": ["a_z", "z_a", "z_b"],
+        }
+    },
+    "bf_x": {
+        "when_true": {
+            "requires": ["k_x", "w_x", "p_x", "g_x"],
+        }
+    },
+    "bf_y": {
+        "when_true": {
+            "requires": ["k_y", "w_y", "p_y", "g_y"],
+        }
+    },
+    "bf_z": {
+        "when_true": {
+            "requires": ["k_z", "w_z", "p_z", "g_z"],
+        }
+    },
+    "teno": {
+        "when_true": {
+            "requires": ["teno_CT"],
+        }
+    },
+    "recon_type": {
+        "when_value": {
+            2: {"recommends": ["muscl_order", "muscl_lim"]},
+        }
+    },
+    "surface_tension": {
+        "when_true": {
+            "requires": ["sigma"],
+        }
+    },
+    "mhd": {
+        "when_true": {
+            "recommends": ["hyper_cleaning"],
+        }
+    },
+    "relativity": {
+        "when_true": {
+            "requires": ["mhd"],
+        }
+    },
+    "schlieren_wrt": {
+        "when_true": {
+            "requires": ["fd_order"],
+        }
+    },
+    "cfl_adap_dt": {
+        "when_true": {
+            "recommends": ["cfl_target"],
+        }
+    },
+    "cfl_dt": {
+        "when_true": {
+            "recommends": ["cfl_target"],
+        }
+    },
+    "integral_wrt": {
+        "when_true": {
+            "requires": ["fd_order"],
         }
     },
 }
 
-def _r(name, ptype, tags=None, desc=None):
+def _r(name, ptype, tags=None, desc=None, hint=None):
     """Register a parameter with optional feature tags and description."""
+    if hint is None:
+        hint = _lookup_hint(name)
+    description = desc if desc else _auto_describe(name)
+    constraint = CONSTRAINTS.get(name)
+    if constraint and "value_labels" in constraint:
+        labels = constraint["value_labels"]
+        suffix = ", ".join(f"{v}={labels[v]}" for v in sorted(labels))
+        description = f"{description} ({suffix})"
     REGISTRY.register(ParamDef(
         name=name,
         param_type=ptype,
-        description=desc if desc else _auto_describe(name),
+        description=description,
         case_optimization=(name in CASE_OPT_PARAMS),
-        constraints=CONSTRAINTS.get(name),
+        constraints=constraint,
         dependencies=DEPENDENCIES.get(name),
         tags=tags if tags else set(),
+        hint=hint,
     ))
 
 
