@@ -46,14 +46,26 @@ for cfg in "${configs[@]}"; do
 done
 
 # --- Phase 2: Build all configs on login node in parallel ---
+MAX_PARALLEL=2
+
 echo ""
 echo "=========================================="
-echo "Starting parallel builds (${num_nodes} configs)..."
+echo "Starting parallel builds (${num_nodes} configs, max $MAX_PARALLEL concurrent)..."
 echo "=========================================="
-
 build_pids=()
-for cfg in "${configs[@]}"; do
-    read -r version cluster device interface <<< "$cfg"
+running=()
+for i in "${!configs[@]}"; do
+    # Wait until a build slot is available
+    while [ ${#running[@]} -ge $MAX_PARALLEL ]; do
+        sleep 2
+        still_running=()
+        for pid in "${running[@]}"; do
+            kill -0 "$pid" 2>/dev/null && still_running+=("$pid")
+        done
+        running=("${still_running[@]}")
+    done
+
+    read -r version cluster device interface <<< "${configs[$i]}"
     dir="${version}-${cluster}-${device}-${interface}"
     log="build-${version}-${cluster}-${device}-${interface}.log"
     echo "  Starting: $version $cluster $device $interface"
@@ -61,7 +73,8 @@ for cfg in "${configs[@]}"; do
         cd "$dir"
         bash .github/workflows/${cluster}/build.sh "$device" "$interface" bench
     ) > "$log" 2>&1 &
-    build_pids+=($!)
+    build_pids[$i]=$!
+    running+=($!)
 done
 
 # Periodic heartbeat while builds run
