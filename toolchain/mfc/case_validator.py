@@ -145,6 +145,10 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
     def check_igr(self):
         """Checks constraints regarding IGR order"""
         igr = self.get('igr', 'F') == 'T'
+        igr_pres_lim = self.get('igr_pres_lim', 'F') == 'T'
+
+        self.prohibit(igr_pres_lim and not igr,
+                     "igr_pres_lim requires igr to be enabled")
 
         if not igr:
             return
@@ -153,7 +157,6 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         m = self.get('m', 0)
         n = self.get('n', 0)
         p = self.get('p', 0)
-
         self.prohibit(igr_order not in [None, 3, 5],
                      "igr_order must be 3 or 5")
         if igr_order:
@@ -192,6 +195,10 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
     def check_muscl(self):
         """Check constraints regarding MUSCL order"""
         recon_type = self.get('recon_type', 1)
+        int_comp = self.get('int_comp', 'F') == 'T'
+
+        self.prohibit(int_comp and recon_type != 2,
+                     "int_comp (THINC interface compression) requires recon_type = 2 (MUSCL)")
 
         # MUSCL_TYPE = 2
         if recon_type != 2:
@@ -381,6 +388,13 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
                      "QBMM requires the bubbles_euler flag to be set")
         self.prohibit(qbmm and nnode is not None and nnode != 4,
                      "QBMM requires nnode = 4")
+
+        sigR = self.get('sigR')
+        sigV = self.get('sigV')
+        self.prohibit(sigR is not None and sigR != 0 and not qbmm,
+                     "sigR requires qbmm to be enabled")
+        self.prohibit(sigV is not None and sigV != 0 and not qbmm,
+                     "sigV requires qbmm to be enabled")
 
     def check_adv_n(self):
         """Checks constraints on adv_n flag"""
@@ -1202,6 +1216,10 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
     def check_hyperelasticity(self):
         """Checks hyperelasticity constraints"""
         hyperelasticity = self.get('hyperelasticity', 'F') == 'T'
+        pre_stress = self.get('pre_stress', 'F') == 'T'
+
+        self.prohibit(pre_stress and not hyperelasticity,
+                     "pre_stress requires hyperelasticity to be enabled")
 
         if not hyperelasticity:
             return

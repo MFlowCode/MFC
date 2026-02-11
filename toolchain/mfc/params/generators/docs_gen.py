@@ -185,13 +185,71 @@ def _get_param_pattern():
     return _PARAM_PATTERN
 
 
-def _format_tag_annotation(_param_name: str, param) -> str:
+def _build_reverse_dep_map() -> Dict[str, List[Tuple[str, str]]]:
+    """Build map from target param -> [(relation, source_param), ...] from DEPENDENCIES."""
+    from ..definitions import DEPENDENCIES  # pylint: disable=import-outside-toplevel
+    reverse: Dict[str, List[Tuple[str, str]]] = {}
+    for param, dep in DEPENDENCIES.items():
+        if "when_true" in dep:
+            wt = dep["when_true"]
+            for r in wt.get("requires", []):
+                reverse.setdefault(r, []).append(("required by", param))
+            for r in wt.get("recommends", []):
+                reverse.setdefault(r, []).append(("recommended for", param))
+        if "when_value" in dep:
+            for val, subspec in dep["when_value"].items():
+                for r in subspec.get("requires", []):
+                    reverse.setdefault(r, []).append(("required by", f"{param}={val}"))
+                for r in subspec.get("recommends", []):
+                    reverse.setdefault(r, []).append(("recommended for", f"{param}={val}"))
+    return reverse
+
+
+_REVERSE_DEPS = None
+
+
+def _get_reverse_deps():
+    global _REVERSE_DEPS  # noqa: PLW0603  pylint: disable=global-statement
+    if _REVERSE_DEPS is None:
+        _REVERSE_DEPS = _build_reverse_dep_map()
+    return _REVERSE_DEPS
+
+
+# Feature tag → human-readable label, in priority order
+_TAG_LABELS = [
+    ("bubbles", "Bubble model parameter"),
+    ("mhd", "MHD parameter"),
+    ("chemistry", "Chemistry parameter"),
+    ("time", "Time-stepping parameter"),
+    ("grid", "Grid parameter"),
+    ("weno", "WENO parameter"),
+    ("viscosity", "Viscosity parameter"),
+    ("elasticity", "Elasticity parameter"),
+    ("surface_tension", "Surface tension parameter"),
+    ("acoustic", "Acoustic parameter"),
+    ("ib", "Immersed boundary parameter"),
+    ("probes", "Probe/integral parameter"),
+    ("riemann", "Riemann solver parameter"),
+    ("relativity", "Relativity parameter"),
+    ("output", "Output parameter"),
+]
+
+# Prefix → label for untagged params
+_PREFIX_LABELS = [
+    ("mixlayer_", "Mixing layer parameter"),
+    ("nv_uvm_", "GPU memory management"),
+    ("ic_", "Initial condition parameter"),
+]
+
+
+def _format_tag_annotation(param_name: str, param) -> str:  # pylint: disable=too-many-locals
     """
     Return a short annotation for params with no schema constraints and no AST rules.
 
-    Uses DEPENDENCIES info (highest value) and tag-based output flag labels.
+    Checks (in order): own DEPENDENCIES, output flag tags, reverse dependencies,
+    feature tag labels, and prefix-group labels.
     """
-    # 1. DEPENDENCIES info
+    # 1. Own DEPENDENCIES info
     if param.dependencies:
         dep = param.dependencies
         if "when_true" in dep:
@@ -208,13 +266,33 @@ def _format_tag_annotation(_param_name: str, param) -> str:
                 rec = ", ".join(f"`{r}`" for r in wt["recommends"])
                 return f"Recommends {rec}"
 
-    # 2. Tag-based output flag label
+    # 2. Tag-based output flag label (specific labels for LOG output params)
     if "output" in param.tags and param.param_type == ParamType.LOG:
         if "bubbles" in param.tags:
             return "Lagrangian output flag"
         if "chemistry" in param.tags:
             return "Chemistry output flag"
         return "Post-processing output flag"
+
+    # 3. Reverse dependencies (params required/recommended by other features)
+    reverse = _get_reverse_deps()
+    if param_name in reverse:
+        entries = reverse[param_name]
+        parts = []
+        for relation, source in entries[:2]:
+            parts.append(f"Required by `{source}`" if relation == "required by"
+                         else f"Recommended for `{source}`")
+        return "; ".join(parts)
+
+    # 4. Feature tag labels (broader tag-based annotation)
+    for tag, label in _TAG_LABELS:
+        if tag in param.tags:
+            return label
+
+    # 5. Prefix group labels (for untagged params with common prefixes)
+    for prefix, label in _PREFIX_LABELS:
+        if param_name.startswith(prefix):
+            return label
 
     return ""
 
