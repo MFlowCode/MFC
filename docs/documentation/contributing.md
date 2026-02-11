@@ -615,7 +615,7 @@ MFC has 500+ regression tests. See @ref testing for the full guide.
 - **Add tests** for any new feature or bug fix
 - Use `./mfc.sh test --generate` to create golden files for new cases
 - Keep tests fast: use small grids and short runtimes
-- Test with `--test-all` to include post-processing validation
+- Test with `-a` to include post-processing validation
 
 ## Documentation
 
