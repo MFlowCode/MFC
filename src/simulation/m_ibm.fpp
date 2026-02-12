@@ -92,9 +92,7 @@ contains
                 moving_immersed_boundary_flag = .true.
             end if
             call s_update_ib_rotation_matrix(i)
-            call s_compute_centroid_offset(i)
         end do
-        ! $:GPU_ENTER_DATA(copyin='[patch_ib(1:num_ibs)]')
         $:GPU_UPDATE(device='[patch_ib(1:num_ibs)]')
 
         ! GPU routines require updated cell centers
@@ -109,8 +107,12 @@ contains
         ! recompute the new ib_patch locations and broadcast them.
         ib_markers%sf = 0._wp
         call s_apply_ib_patches(ib_markers%sf(0:m, 0:n, 0:p))
-        call s_populate_ib_buffers()
         $:GPU_UPDATE(device='[ib_markers%sf]')
+        call s_populate_ib_buffers()
+        $:GPU_UPDATE(host='[ib_markers%sf]')
+        do i = 1, num_ibs
+            if (patch_ib(i)%moving_ibm /= 0) call s_compute_centroid_offset(i) ! offsets are computed after IB markers are generated
+        end do
 
         ! find the number of ghost points and set them to be the maximum total across ranks
         call s_find_num_ghost_points(num_gps, num_inner_gps)

@@ -899,18 +899,17 @@ contains
         type(t_model), pointer :: model
 
         real(wp) :: eta
-        real(wp), dimension(1:3) :: point, local_point
+        real(wp), dimension(1:3) :: point, local_point, offset
         real(wp), dimension(1:3) :: center, xyz_local
         real(wp), dimension(1:3, 1:3) :: inverse_rotation
 
         model => models(patch_id)%model
         center = 0._wp
-        if (.not. f_is_default(patch_ib(patch_id)%x_centroid)) center(1) = patch_ib(patch_id)%x_centroid
-        if (.not. f_is_default(patch_ib(patch_id)%y_centroid)) center(2) = patch_ib(patch_id)%y_centroid
-        if (p > 0) then
-            if (.not. f_is_default(patch_ib(patch_id)%z_centroid)) center(3) = patch_ib(patch_id)%z_centroid
-        end if
+        center(1) = patch_ib(patch_id)%x_centroid
+        center(2) = patch_ib(patch_id)%y_centroid
+        if (p > 0) center(3) = patch_ib(patch_id)%z_centroid
         inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
+        offset(:) = patch_ib(patch_id)%centroid_offset(:)
 
         do i = 0, m
             do j = 0, n
@@ -921,6 +920,7 @@ contains
                         xyz_local(3) = z_cc(k) - center(3)
                     end if
                     xyz_local = matmul(inverse_rotation, xyz_local)
+                    xyz_local = xyz_local - offset
 
                     if (grid_geometry == 3) then
                         xyz_local = f_convert_cyl_to_cart(xyz_local)
