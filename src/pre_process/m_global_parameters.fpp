@@ -477,6 +477,7 @@ contains
         lag_params%nParticles_glb = dflt_int
         lag_params%qs_drag_model = dflt_int
         lag_params%stokes_drag = dflt_int
+        lag_params%added_mass_model = dflt_int
 
         do i = 1, num_patches_max
             patch_icpp(i)%geometry = dflt_int

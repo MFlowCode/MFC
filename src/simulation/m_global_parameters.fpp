@@ -882,6 +882,7 @@ contains
         lag_params%nParticles_glb = dflt_int
         lag_params%qs_drag_model = dflt_int
         lag_params%stokes_drag = dflt_int
+        lag_params%added_mass_model = dflt_int
 
         moving_lag_bubbles = .false.
         lag_vel_model = dflt_int

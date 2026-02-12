@@ -595,6 +595,41 @@ contains
 
     end function f_interpolate_velocity
 
+    function f_interp_prim_trilinear(pos, cell, field_vf, field_index) result(val)
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), dimension(3), intent(in) :: pos      ! particle position
+        integer, dimension(3), intent(in) :: cell     ! left/lower cell index
+        type(scalar_field), dimension(:), intent(in) :: field_vf
+        integer, intent(in) :: field_index
+
+        real(wp) :: val
+        real(wp) :: wx, wy, wz
+        real(wp) :: fx0, fx1, fy0, fy1
+
+        integer :: i, j, k
+
+        i = cell(1)
+        j = cell(2)
+        k = cell(3)
+
+        wx = (pos(1) - x_cc(i))/(x_cc(i + 1) - x_cc(i))
+        wy = (pos(2) - y_cc(j))/(y_cc(j + 1) - y_cc(j))
+        wz = (pos(3) - z_cc(k))/(z_cc(k + 1) - z_cc(k))
+
+        fx0 = (1 - wx)*field_vf(field_index)%sf(i, j, k) + wx*field_vf(field_index)%sf(i + 1, j, k)
+        fx1 = (1 - wx)*field_vf(field_index)%sf(i, j + 1, k) + wx*field_vf(field_index)%sf(i + 1, j + 1, k)
+
+        fy0 = (1 - wy)*fx0 + wy*fx1
+
+        fx0 = (1 - wx)*field_vf(field_index)%sf(i, j, k + 1) + wx*field_vf(field_index)%sf(i + 1, j, k + 1)
+        fx1 = (1 - wx)*field_vf(field_index)%sf(i, j + 1, k + 1) + wx*field_vf(field_index)%sf(i + 1, j + 1, k + 1)
+
+        fy1 = (1 - wy)*fx0 + wy*fx1
+
+        val = (1 - wz)*fy0 + wz*fy1
+    end function f_interp_prim_trilinear
+
     !! This function calculates the force on a particle
             !!      based on the pressure gradient, velocity, and drag model.
             !! @param pos Position of the particle
@@ -605,150 +640,122 @@ contains
             !! @param rho Density of the fluid
             !! @param vol_frac Particle Volume Fraction
             !! @param cell Computational coordinates of the particle
-            !! @param i Direction of the velocity (1: x, 2: y, 3: z)
             !! @param q_prim_vf Eulerian field with primitive variables
             !! @return a Acceleration of the particle in direction i
-    function f_get_particle_force(pos, rad, vel_p, mass_p, Re, gamm, rho, vol_frac, cell, i, q_prim_vf) result(force)
+    subroutine f_get_particle_force(pos, rad, vel_p, mass_p, Re, gamm, vol_frac, cell, &
+                                    q_prim_vf, fieldvars, force, rmass_add)
         $:GPU_ROUTINE(parallelism='[seq]')
-        real(wp), intent(in) :: pos, rad, mass_p, Re, gamm, rho, vol_frac
+        real(wp), intent(in) :: rad, mass_p, Re, gamm, vol_frac
+        real(wp), dimension(3), intent(in) :: pos
         integer, dimension(3), intent(in) :: cell
-        real(wp), intent(in) :: vel_p(:)
-        integer, intent(in) :: i
+        real(wp), dimension(3), intent(in) :: vel_p
+        ! real(stp), intent(in) :: pressure_gradient(:,:,:,:)
+        ! real(stp), intent(in) :: density_gradient(:,:,:,:)
+        type(scalar_field), dimension(:), intent(in) :: fieldvars
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
 
-        real(wp) :: a, dp, vol, force
-        real(wp) :: v_rel
+        real(wp), dimension(3), intent(out) :: force
+        real(wp), intent(out) :: rmass_add
+
+        real(wp) :: a, vol, rho_fluid, pressure_fluid
+        real(wp), dimension(3) :: v_rel, dp
         real(wp), dimension(fd_order) :: xi, eta, L
         real(wp) :: particle_diam, gas_mu, vmag, cson
         real(wp) :: slip_velocity_x, slip_velocity_y, slip_velocity_z, beta
         real(wp), dimension(3) :: fluid_vel
         integer :: dir
 
-        if (fd_order <= 2) then
-            if (i == 1) then
-                dp = (q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2), cell(3)) - &
-                      q_prim_vf(E_idx)%sf(cell(1) - 1, cell(2), cell(3)))/ &
-                     (x_cc(cell(1) + 1) - x_cc(cell(1) - 1))
-            elseif (i == 2) then
-                dp = (q_prim_vf(E_idx)%sf(cell(1), cell(2) + 1, cell(3)) - &
-                      q_prim_vf(E_idx)%sf(cell(1), cell(2) - 1, cell(3)))/ &
-                     (y_cc(cell(2) + 1) - y_cc(cell(2) - 1))
-            elseif (i == 3) then
-                dp = (q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3) + 1) - &
-                      q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3) - 1))/ &
-                     (z_cc(cell(3) + 1) - z_cc(cell(3) - 1))
-            end if
-        elseif (fd_order == 4) then
-            if (i == 1) then
-                xi(1) = x_cc(cell(1) - 1)
-                eta(1) = (q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3)) - &
-                          q_prim_vf(E_idx)%sf(cell(1) - 2, cell(2), cell(3)))/ &
-                         (x_cc(cell(1)) - x_cc(cell(1) - 2))
-                xi(2) = x_cc(cell(1))
-                eta(2) = (q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2), cell(3)) - &
-                          q_prim_vf(E_idx)%sf(cell(1) - 1, cell(2), cell(3)))/ &
-                         (x_cc(cell(1) + 1) - x_cc(cell(1) - 1))
-                xi(3) = x_cc(cell(1) + 1)
-                eta(3) = (q_prim_vf(E_idx)%sf(cell(1) + 2, cell(2), cell(3)) - &
-                          q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3)))/ &
-                         (x_cc(cell(1) + 2) - x_cc(cell(1)))
-            elseif (i == 2) then
-                xi(1) = y_cc(cell(2) - 1)
-                eta(1) = (q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3)) - &
-                          q_prim_vf(E_idx)%sf(cell(1), cell(2) - 2, cell(3)))/ &
-                         (y_cc(cell(2)) - y_cc(cell(2) - 2))
-                xi(2) = y_cc(cell(2))
-                eta(2) = (q_prim_vf(E_idx)%sf(cell(1), cell(2) + 1, cell(3)) - &
-                          q_prim_vf(E_idx)%sf(cell(1), cell(2) - 1, cell(3)))/ &
-                         (y_cc(cell(2) + 1) - y_cc(cell(2) - 1))
-                xi(3) = y_cc(cell(2) + 1)
-                eta(3) = (q_prim_vf(E_idx)%sf(cell(1), cell(2) + 2, cell(3)) - &
-                          q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3)))/ &
-                         (y_cc(cell(2) + 2) - y_cc(cell(2)))
-            elseif (i == 3) then
-                xi(1) = z_cc(cell(3) - 1)
-                eta(1) = (q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3)) - &
-                          q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3) - 2))/ &
-                         (z_cc(cell(3)) - z_cc(cell(3) - 2))
-                xi(2) = z_cc(cell(3))
-                eta(2) = (q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3) + 1) - &
-                          q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3) - 1))/ &
-                         (z_cc(cell(3) + 1) - z_cc(cell(3) - 1))
-                xi(3) = z_cc(cell(3) + 1)
-                eta(3) = (q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3) + 2) - &
-                          q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3)))/ &
-                         (z_cc(cell(3) + 2) - z_cc(cell(3)))
-            end if
-
-            L(1) = ((pos - xi(2))*(pos - xi(3)))/((xi(1) - xi(2))*(xi(1) - xi(3)))
-            L(2) = ((pos - xi(1))*(pos - xi(3)))/((xi(2) - xi(1))*(xi(2) - xi(3)))
-            L(3) = ((pos - xi(1))*(pos - xi(2)))/((xi(3) - xi(1))*(xi(3) - xi(2)))
-
-            dp = L(1)*eta(1) + L(2)*eta(2) + L(3)*eta(3)
-        end if
-
-        vol = (4._wp/3._wp)*pi*(rad**3._wp)
-
-        fluid_vel(1) = f_interpolate_velocity(pos, cell, 1, q_prim_vf)
-        fluid_vel(2) = f_interpolate_velocity(pos, cell, 2, q_prim_vf)
-        if (num_dims == 3) then
-            fluid_vel(3) = f_interpolate_velocity(pos, cell, 3, q_prim_vf)
-        end if
-
-        do dir = 1, 3
-            if (abs(q_prim_vf(momxb + dir - 1)%sf(cell(1), cell(2), cell(3))) < 1.e-8) then
-                fluid_vel(dir) = q_prim_vf(momxb + dir - 1)%sf(cell(1), cell(2), cell(3)) !0th order interpolation if fluid velocity is small
-            end if
-            if (fd_order > 1) then
-                if (.not. ieee_is_finite(fluid_vel(dir))) then
-                    fluid_vel(dir) = q_prim_vf(momxb + dir - 1)%sf(cell(1), cell(2), cell(3))
-                end if
-            end if
-        end do
-
-        v_rel = vel_p(i) - fluid_vel(i)
-
-        !!!!!!! Quasi-steady Drag Force Parameters
-        slip_velocity_x = fluid_vel(1) - vel_p(1)
-        slip_velocity_y = fluid_vel(2) - vel_p(2)
-        if (num_dims == 3) then
-            slip_velocity_z = fluid_vel(3) - vel_p(3)
-            vmag = sqrt(slip_velocity_x*slip_velocity_x + slip_velocity_y*slip_velocity_y + &
-                        slip_velocity_z*slip_velocity_z)
-        elseif (num_dims == 2) then
-            vmag = sqrt(slip_velocity_x*slip_velocity_x + slip_velocity_y*slip_velocity_y)
-        end if
-
-        particle_diam = rad*2._wp
-        cson = sqrt((gamm*q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3)))/rho) !gamma*P/rho
-        gas_mu = Re
-
-        if (abs(v_rel) <= 1.e-7_wp) then
-            v_rel = 0._wp
-        end if
+        !Added pass params
+        real(wp) :: mach, Cam, udot_grad_rho, flux_f, flux_b, div_rhou, SDrho, vgradrho, drhodt
+        real(wp), dimension(3) :: rhoDuDt, grad_rho, fam
+        integer, dimension(3) :: p1
 
         force = 0._wp
+        dp = 0._wp
+        grad_rho = 0._wp
+        drhodt = 0._wp
+        fam = 0._wp
+        fluid_vel = 0._wp
+        v_rel = 0._wp
+        rhoDuDt = 0._wp
+
+        !!Interpolation - either tri-linear or 0th order
+        if (fd_order > 1) then
+            rho_fluid = f_interp_prim_trilinear(pos, cell, q_prim_vf, 1)
+            pressure_fluid = f_interp_prim_trilinear(pos, cell, q_prim_vf, E_idx)
+            do dir = 1, num_dims
+                if (lag_params%pressure_force) then
+                    dp(dir) = f_interp_prim_trilinear(pos, cell, fieldvars, dir)
+                end if
+                if (lag_params%added_mass_model > 0) then
+                    dp(dir) = f_interp_prim_trilinear(pos, cell, fieldvars, dir)
+                    grad_rho(dir) = f_interp_prim_trilinear(pos, cell, fieldvars, 3 + dir)
+                    drhodt = drhodt + f_interp_prim_trilinear(pos, cell, fieldvars, 6 + dir)
+                end if
+                fluid_vel(dir) = f_interp_prim_trilinear(pos, cell, q_prim_vf, momxb + dir - 1)
+            end do
+        else
+            rho_fluid = q_prim_vf(1)%sf(cell(1), cell(2), cell(3))
+            pressure_fluid = q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3))
+            do dir = 1, num_dims
+                if (lag_params%pressure_force) then
+                    dp(dir) = fieldvars(dir)%sf(cell(1), cell(2), cell(3))
+                end if
+                if (lag_params%added_mass_model > 0) then
+                    dp(dir) = fieldvars(dir)%sf(cell(1), cell(2), cell(3))
+                    grad_rho(dir) = fieldvars(3 + dir)%sf(cell(1), cell(2), cell(3))
+                    drhodt = drhodt + fieldvars(6 + dir)%sf(cell(1), cell(2), cell(3))
+                end if
+                fluid_vel(dir) = q_prim_vf(momxb + dir - 1)%sf(cell(1), cell(2), cell(3))
+            end do
+        end if
+
+        drhodt = -drhodt
+
+        v_rel = vel_p - fluid_vel
+
+        if (lag_params%qs_drag_model > 0 .or. lag_params%added_mass_model > 0) then
+            ! Quasi-steady Drag Force Parameters
+            slip_velocity_x = fluid_vel(1) - vel_p(1)
+            slip_velocity_y = fluid_vel(2) - vel_p(2)
+            if (num_dims == 3) then
+                slip_velocity_z = fluid_vel(3) - vel_p(3)
+                vmag = sqrt(slip_velocity_x*slip_velocity_x + slip_velocity_y*slip_velocity_y + &
+                            slip_velocity_z*slip_velocity_z)
+            elseif (num_dims == 2) then
+                vmag = sqrt(slip_velocity_x*slip_velocity_x + slip_velocity_y*slip_velocity_y)
+            end if
+            particle_diam = rad*2._wp
+            cson = sqrt((gamm*pressure_fluid)/rho_fluid) !gamma*P/rho
+            gas_mu = Re
+        end if
+
+        if (lag_params%added_mass_model > 0) then
+            rhoDuDt = -dp
+            udot_grad_rho = dot_product(fluid_vel, grad_rho)
+            vgradrho = dot_product(vel_p, grad_rho)
+            SDrho = (drhodt + udot_grad_rho)/(1._wp - vol_frac)
+            mach = vmag/cson
+        end if
 
         ! Step 1: Force component quasi-steady
         if (lag_params%qs_drag_model == 1) then
-            beta = QS_Parmar(rho, cson, gas_mu, gamm, vmag, particle_diam, vol_frac)
+            beta = QS_Parmar(rho_fluid, cson, gas_mu, gamm, vmag, particle_diam, vol_frac)
             force = force - beta*v_rel
         else if (lag_params%qs_drag_model == 2) then
-            beta = QS_Osnes(rho, cson, gas_mu, gamm, vmag, particle_diam, vol_frac)
+            beta = QS_Osnes(rho_fluid, cson, gas_mu, gamm, vmag, particle_diam, vol_frac)
             force = force - beta*v_rel
         else if (lag_params%qs_drag_model == 3) then
-            beta = QS_ModifiedParmar(rho, cson, gas_mu, gamm, vmag, particle_diam, vol_frac)
+            beta = QS_ModifiedParmar(rho_fluid, cson, gas_mu, gamm, vmag, particle_diam, vol_frac)
             force = force - beta*v_rel
         else if (lag_params%qs_drag_model == 4) then
-            beta = QS_Gidaspow(rho, cson, gas_mu, gamm, vmag, particle_diam, vol_frac)
+            beta = QS_Gidaspow(rho_fluid, cson, gas_mu, gamm, vmag, particle_diam, vol_frac)
             force = force - beta*v_rel
+        else
+            !No Quasi-Steady drag
         end if
 
-        if (.not. ieee_is_finite(force)) then
-            force = 0._wp
-        end if
-
-        ! Step 1.1: Stokes drag?
+        ! Step 1.1: Stokes drag
         if (lag_params%stokes_drag == 1) then ! Free slip Stokes drag
             force = force - 4._wp*pi*gas_mu*rad*v_rel
         elseif (lag_params%stokes_drag == 2) then ! No slip Stokes drag
@@ -759,15 +766,44 @@ contains
 
         ! Step 2: Pressure Gradient Force
         if (lag_params%pressure_force) then
+            vol = (4._wp/3._wp)*pi*(rad**3._wp)
             force = force - vol*dp
         end if
 
         ! Step 3: Gravitational Force
         if (lag_params%gravity_force) then
-            force = force + (mass_p)*accel_bf(i)
+            force = force + (mass_p)*accel_bf
         end if
 
-    end function f_get_particle_force
+        ! Step 4: Added Mass Force
+        if (lag_params%added_mass_model == 1) then
+            vol = (4._wp/3._wp)*pi*(rad**3._wp)
+            if (mach > 0.6_wp) then
+                Cam = 1._wp + 1.8_wp*(0.6_wp**2) + 7.6_wp* &
+                      (0.6_wp**4)
+            else
+                Cam = 1._wp + 1.8_wp*mach**2 + 7.6_wp*mach**4
+            end if
+
+            Cam = 0.5_wp*Cam*(1._wp + 0.68_wp*vol_frac**2)
+            rmass_add = rho_fluid*vol*Cam
+
+            fam = Cam*vol*(vel_p*SDrho + rhoDuDt + &
+                           fluid_vel*(vgradrho))
+
+            do dir = 1, num_dims
+                if (.not. ieee_is_finite(fam(dir))) then
+                    fam(dir) = 0._wp
+                    rmass_add = 0._wp
+                end if
+            end do
+
+            force = force + fam
+        else
+            rmass_add = 0._wp
+        end if
+
+    end subroutine f_get_particle_force
 
     ! Quasi-steady force (Re_p and Ma_p corrections):
     !   Improved Drag Correlation for Spheres and Application

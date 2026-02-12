@@ -240,7 +240,7 @@ contains
             #:endfor
 
             #:for VAR in ['solver_approach', 'cluster_type', 'smooth_type', 'nParticles_glb', 'vel_model', &
-                & 'drag_model', 'qs_drag_model', 'stokes_drag']
+                & 'drag_model', 'qs_drag_model', 'stokes_drag', 'added_mass_model']
                 call MPI_BCAST(lag_params%${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 

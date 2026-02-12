@@ -1070,7 +1070,7 @@ contains
             call nvtxStartRange("RHS-EL-PARTICLES-DYN")
             call s_compute_particle_EL_dynamics( &
                 q_prim_qp%vf(1:sys_size), &
-                stage)
+                stage, q_cons_qp%vf(1:sys_size))
             call nvtxEndRange
 
             ! RHS additions for sub-grid particles_lagrange

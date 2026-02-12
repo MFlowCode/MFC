@@ -486,6 +486,7 @@ module m_derived_types
         logical :: gravity_force            !< Include gravity force in translational motion
         integer :: qs_drag_model            !< Particle QS drag model
         integer :: stokes_drag              !< Particle stokes drag
+        integer :: added_mass_model              !< Particle added mass model
 
         character(LEN=pathlen_max) :: input_path !< Path to lag_bubbles.dat
         real(wp) :: epsilonb         !< Standard deviation scaling for the gaussian function
