@@ -121,7 +121,7 @@ contains
 
         gp%levelset = dist - radius
         if (f_approx_equal(dist, 0._wp)) then
-            gp%levelset_norm = 0
+            gp%levelset_norm = 0._wp
         else
             gp%levelset_norm = dist_vec(:)/dist
         end if
@@ -312,7 +312,7 @@ contains
 
     end subroutine s_3d_airfoil_levelset
 
-    !>  Initialize IBM module
+    !>  Subroutine for computing the levelset values at a ghost point belonging to the rectangle IB
     subroutine s_rectangle_levelset(gp)
 
         $:GPU_ROUTINE(parallelism='[seq]')
