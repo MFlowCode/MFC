@@ -178,8 +178,13 @@ jobs:
       ACTIONS_RUNNER_FORCE_ACTIONS_NODE_VERSION: node16
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
     steps:
+      - name: Clean workspace
+        run: rm -rf "$GITHUB_WORKSPACE"/* "$GITHUB_WORKSPACE"/.[!.]* 2>/dev/null || true
+
       - name: Clone
         uses: actions/checkout@v4
+        with:
+          clean: false
 
       - name: Build
         if: matrix.cluster != 'phoenix' && matrix.cluster != 'frontier_all'
@@ -254,10 +259,14 @@ jobs:
       ACTIONS_RUNNER_FORCE_ACTIONS_NODE_VERSION: node16
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
     steps:
+      - name: Clean workspace
+        run: rm -rf "$GITHUB_WORKSPACE"/* "$GITHUB_WORKSPACE"/.[!.]* 2>/dev/null || true
+
       - name: Clone - PR
         uses: actions/checkout@v4
         with:
           path: pr
+          clean: false
 
       - name: Clone - Master
         uses: actions/checkout@v4
@@ -265,6 +274,7 @@ jobs:
           repository: MFlowCode/MFC
           ref: master
           path: master
+          clean: false
 
       - name: Setup & Build
         if: matrix.build_script != '' && matrix.cluster != 'frontier_all'
