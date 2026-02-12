@@ -421,7 +421,7 @@ Details of implementation of viscosity in MFC can be found in \cite Coralic15.
 | `riemann_solver`           | Integer | Riemann solver algorithm: [1] HLL*; [2] HLLC; [3] Exact*; [4] HLLD	(only for MHD) |
 | `low_Mach`                 | Integer | Low Mach number correction for HLLC Riemann solver: [0] None; [1] Pressure (\cite Chen22); [2] Velocity (\cite Thornber08)	 |
 | `avg_state`	               | Integer | Averaged state evaluation method: [1] Roe average*; [2] Arithmetic mean  |
-| `wave_speeds`              | Integer | Wave-speed estimation: [1] Direct (\cite Batten97); [2] Pressure-velocity* (\cite Toro13)	 |
+| `wave_speeds`              | Integer | Wave-speed estimation: [1] Direct (\cite Batten97); [2] Pressure-velocity* (\cite Toro09)	 |
 | `weno_Re_flux`             | Logical | Compute velocity gradient using scalar divergence theorem	 |
 | `weno_avg`          	     | Logical | Arithmetic mean of left and right, WENO-reconstructed, cell-boundary values |
 | `dt`                       | Real    | Time step size |
@@ -452,7 +452,7 @@ Details of implementation of viscosity in MFC can be found in \cite Coralic15.
 
 The table lists simulation algorithm parameters.
 The parameters are used to specify options in algorithms that are used to integrate the governing equations of the multi-component flow based on the initial condition.
-Models and assumptions that are used to formulate and discretize the governing equations are described in \cite Bryngelson19.
+Models and assumptions that are used to formulate and discretize the governing equations are described in \cite Wilfong26 and \cite Bryngelson21.
 Details of the simulation algorithms and implementation of the WENO scheme can be found in \cite Coralic15.
 
 - `bc_[x,y,z]%[beg,end]` specifies the boundary conditions at the beginning and the end of domain boundaries in each coordinate direction by a negative integer from -1 through -16.
@@ -468,11 +468,11 @@ Tangential velocities require viscosity, `weno_avg = T`, and `bc_[x,y,z]%%end = 
 
 - `model_eqns` specifies the choice of the multi-component model that is used to formulate the dynamics of the flow using integers from 1 through 3.
 `model_eqns = 1`, `2`, and `3` correspond to $\Gamma$-$\Pi_\infty$ model (\cite Johnsen08), 5-equation model (\cite Allaire02), and 6-equation model (\cite Saurel09), respectively.
-The difference of the two models is assessed by (\cite Schmidmayer19).
+The difference of the two models is assessed by (\cite Schmidmayer20).
 Note that some code parameters are only compatible with 5-equation model.
 
 - `alt_soundspeed` activates the source term in the advection equations for the volume fractions, $K\nabla\cdot \underline{u}$, that regularizes the speed of sound in the mixture region when the 5-equation model is used.
-The effect and use of the source term are assessed by \cite Schmidmayer19.
+The effect and use of the source term are assessed by \cite Schmidmayer20.
 
 - `adv_n` activates the direct computation of number density by the Riemann solver instead of computing number density from the void fraction in the method of classes.
 
@@ -512,7 +512,7 @@ It is recommended to set `weno_eps` to $10^{-6}$ for WENO-JS, and to $10^{-40}$ 
 - `int_comp` activates interface compression using THINC used in MUSCL Reconstruction, with control parameters (`ic_eps`, and `ic_beta`).
 
 - `riemann_solver` specifies the choice of the Riemann solver that is used in simulation by an integer from 1 through 4.
-`riemann_solver = 1`, `2`, and `3` correspond to HLL, HLLC, and Exact Riemann solver, respectively (\cite Toro13).
+`riemann_solver = 1`, `2`, and `3` correspond to HLL, HLLC, and Exact Riemann solver, respectively (\cite Toro09).
 `riemann_solver = 4` is only for MHD simulations. It resolves 5 of the full seven-wave structure of the MHD equations (\cite Miyoshi05).
 
 - `low_Mach` specifies the choice of the low Mach number correction scheme for the HLLC Riemann solver. `low_Mach = 0` is default value and does not apply any correction scheme. `low_Mach = 1` and `2` apply the anti-dissipation pressure correction method (\cite Chen22) and the improved velocity reconstruction method (\cite Thornber08). This feature requires `model_eqns = 2` or `3`. `low_Mach = 1` works for `riemann_solver = 1` and `2`, but `low_Mach = 2` only works for `riemann_solver = 2`.
@@ -521,7 +521,7 @@ It is recommended to set `weno_eps` to $10^{-6}$ for WENO-JS, and to $10^{-40}$ 
 `avg_state = 1` and `2` correspond to Roe- and arithmetic averages, respectively.
 
 - `wave_speeds` specifies the choice of the method to compute the left, right, and middle wave speeds in the Riemann solver by an integer of 1 and 2.
-`wave_speeds = 1` and `2` correspond to the direct method (\cite Batten97), and indirect method that approximates the pressures and velocity (\cite Toro13), respectively.
+`wave_speeds = 1` and `2` correspond to the direct method (\cite Batten97), and indirect method that approximates the pressures and velocity (\cite Toro09), respectively.
 
 - `weno_Re_flux` activates the scalar divergence theorem in computing the velocity gradients using WENO-reconstructed cell boundary values.
 If this option is false, velocity gradient is computed using finite difference scheme of order 2 which is independent of the WENO order.

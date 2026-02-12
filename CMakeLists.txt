@@ -753,6 +753,8 @@ if (MFC_DOCUMENTATION)
                     "${opt_parameters_dependency}"
                     "${${target}_SRCs}" "${${target}_DOCs}"
             COMMAND "${DOXYGEN_EXECUTABLE}" "${target}-Doxyfile"
+            COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/docs/postprocess_citations.py"
+                    "${CMAKE_CURRENT_BINARY_DIR}/${target}"
             WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
             COMMENT "${target}: Generating documentation"
         )
@@ -772,6 +774,7 @@ if (MFC_DOCUMENTATION)
     add_custom_target(documentation)
 
     find_package(Doxygen REQUIRED dot REQUIRED)
+    find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
     # > Fetch CSS Theme
     ExternalProject_Add(doxygen-awesome-css

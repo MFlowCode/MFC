@@ -781,11 +781,7 @@ DEPENDENCIES = {
             "requires": ["sigma"],
         }
     },
-    "mhd": {
-        "when_true": {
-            "recommends": ["hyper_cleaning"],
-        }
-    },
+    "mhd": {},
     "relativity": {
         "when_true": {
             "requires": ["mhd"],

@@ -5,7 +5,7 @@
 This document catalogs every equation solved by MFC, organized by physical model.
 Each section notes the input parameter(s) that activate the corresponding physics module and cross-references the relevant source files.
 
-For full citations of MFC papers, see @ref papers. Foundational references for each model are cited inline; see the \ref citelist "Bibliography" for full details.
+The models and algorithms described here are detailed in \cite Wilfong26 (MFC 5.0) and \cite Bryngelson21. Foundational references for each model are cited inline; see the \ref citelist "Bibliography" for full details.
 
 ---
 
@@ -31,7 +31,7 @@ The parameter `model_eqns` (1, 2, 3, or 4) selects the governing equation set.
 
 ### 2.1 Five-Equation Model (`model_eqns = 2`)
 
-The primary workhorse model (\cite Allaire02). The state vector is:
+The primary workhorse model (\cite Allaire02; \cite Wilfong26 Sec. 2.1). The state vector is:
 
 \f[\mathbf{q} = \bigl(\alpha_1 \rho_1,\;\alpha_2 \rho_2,\;\ldots,\;\rho u_1,\;\rho u_2,\;\rho u_3,\;\rho E,\;\alpha_1,\;\alpha_2,\;\ldots\bigr)^T\f]
 
@@ -63,7 +63,7 @@ Setting `alt_soundspeed = .true.` enables the \f$K\f$ correction (\cite Kapila01
 
 ### 2.2 Six-Equation Model (`model_eqns = 3`)
 
-Allows pressure disequilibrium between phases (\cite Saurel09).
+Allows pressure disequilibrium between phases (\cite Saurel09; \cite Wilfong26 Sec. 2.1).
 
 **Continuity and momentum:** Same as the five-equation model.
 
@@ -101,7 +101,7 @@ See Section 8 (Phase Change) below for details.
 
 ## 3. Equations of State
 
-### 3.1 Stiffened Gas EOS (\cite Menikoff89; \cite LeMetayer04)
+### 3.1 Stiffened Gas EOS (\cite Menikoff89; \cite LeMetayer04; \cite Wilfong26 Sec. 2.2)
 
 The primary closure for each phase:
 
@@ -151,7 +151,7 @@ Temperature is obtained from the internal energy by Newton iteration:
 
 \f[e_m(T) = \frac{\hat{h}_m(T) - R_u\,T}{W_m}\f]
 
-**NASA polynomial enthalpies** (\cite McBride93)**:**
+**NASA polynomial enthalpies** (\cite McBride93):
 
 \f[\frac{\hat{h}_m}{R_u\,T} = \frac{C_0}{T} + \sum_{r=1}^{5} \frac{C_r\,T^{r-1}}{r}\f]
 
@@ -185,7 +185,7 @@ Input parameters: `Re_inv` (shear and volume Reynolds numbers per fluid).
 
 ---
 
-## 5. Cylindrical Coordinates (`cyl_coord = .true.`)
+## 5. Cylindrical Coordinates (`cyl_coord = .true.`) (\cite Wilfong26 Sec. 2.3)
 
 Additional geometric source terms appear with \f$1/r\f$ factors in the continuity, momentum, and energy equations. Key modifications:
 
@@ -198,7 +198,7 @@ Additional geometric source terms appear with \f$1/r\f$ factors in the continuit
 
 ---
 
-## 6. Sub-Grid Bubble Dynamics
+## 6. Sub-Grid Bubble Dynamics (\cite Wilfong26 Sec. 4.1)
 
 ### 6.1 Euler-Euler Bubbles (`bubbles_euler = .true.`)
 
@@ -262,7 +262,7 @@ and the local liquid sound speed:
 
 \f[\dot{m}_v = \frac{D\,\rho_{bw}}{1 - \chi_{vw}}\left.\frac{\partial \chi_v}{\partial r}\right|_R\f]
 
-#### 6.1.6 QBMM Moment Transport (`qbmm = .true.`) (\cite Bryngelson23)
+#### 6.1.6 QBMM Moment Transport (`qbmm = .true.`) (\cite Bryngelson20)
 
 **Population balance equation:**
 
@@ -314,7 +314,7 @@ Each bubble is tracked individually with Keller-Miksis dynamics and 4th-order ad
 
 ## 7. Fluid-Structure Interaction
 
-### 7.1 Hypoelastic Model (`hypoelasticity = .true.`) (\cite Rodriguez19)
+### 7.1 Hypoelastic Model (`hypoelasticity = .true.`) (\cite Rodriguez19; \cite Wilfong26 Sec. 4.1.6)
 
 **Source:** `src/simulation/m_hypoelastic.fpp`
 
@@ -342,7 +342,7 @@ where \f$\mathbf{l} = \nabla \mathbf{u}\f$ is the velocity gradient and \f$\math
 
 This adds 6 additional transport equations in 3D (symmetric stress tensor: \f$\tau_{xx}^e, \tau_{xy}^e, \tau_{yy}^e, \tau_{xz}^e, \tau_{yz}^e, \tau_{zz}^e\f$).
 
-### 7.2 Hyperelastic Model (`hyperelasticity = .true.`) (\cite Kamrin12)
+### 7.2 Hyperelastic Model (`hyperelasticity = .true.`) (\cite Kamrin12; \cite Wilfong26 Sec. 4.1.6)
 
 **Source:** `src/simulation/m_hyperelastic.fpp`
 
@@ -370,7 +370,7 @@ where \f$J = \det(\mathbf{F})\f$.
 
 ---
 
-## 8. Phase Change (`relax = .true.`)
+## 8. Phase Change (`relax = .true.`) (\cite Wilfong26 Sec. 4.1.3)
 
 **Source:** `src/common/m_phase_change.fpp`
 
@@ -408,7 +408,7 @@ Solved via 2D Newton-Raphson.
 
 ---
 
-## 9. Chemistry and Combustion (`chemistry = .true.`)
+## 9. Chemistry and Combustion (`chemistry = .true.`) (\cite Wilfong26 Sec. 4.1.7)
 
 **Source:** `src/common/m_chemistry.fpp`
 
@@ -436,11 +436,11 @@ Enthalpy flux with diffusion:
 
 \f[q_\text{diff} = \lambda\,\frac{\partial T}{\partial x} + \sum_k h_k\,\dot{m}_k\f]
 
-Reaction mechanisms are code-generated via Pyrometheus (\cite Cisneros25), which provides symbolic abstractions for thermochemistry that enable portable GPU computation and automatic differentiation of chemical source terms.
+Reaction mechanisms are code-generated via Pyrometheus (\cite Cisneros26), which provides symbolic abstractions for thermochemistry that enable portable GPU computation and automatic differentiation of chemical source terms.
 
 ---
 
-## 10. Surface Tension (`surface_tension = .true.`) (\cite Schmidmayer17)
+## 10. Surface Tension (`surface_tension = .true.`) (\cite Schmidmayer17; \cite Wilfong26 Sec. 4.1.8)
 
 **Source:** `src/simulation/m_surface_tension.fpp`, `src/simulation/include/inline_capillary.fpp`
 
@@ -468,7 +468,7 @@ The capillary stress divergence is added to the momentum and energy equations. T
 
 ## 11. Magnetohydrodynamics
 
-### 11.1 Ideal MHD (`mhd = .true.`)
+### 11.1 Ideal MHD (`mhd = .true.`) (\cite Wilfong26 Sec. 4.1.9)
 
 **Continuity:**
 
@@ -498,9 +498,9 @@ The capillary stress divergence is added to the momentum and energy equations. T
 
 \f[v_A = \sqrt{\frac{|\mathbf{B}|^2}{\rho}}\f]
 
-Uses the HLLD Riemann solver (`riemann_solver = 3`). Hyperbolic divergence cleaning (`hyper_cleaning = .true.`) via the GLM method (\cite Dedner02).
+Uses the HLLD Riemann solver (`riemann_solver = 4`). Hyperbolic divergence cleaning (`hyper_cleaning = .true.`) via the GLM method (\cite Dedner02).
 
-### 11.2 Relativistic MHD (`relativity = .true.`)
+### 11.2 Relativistic MHD (`relativity = .true.`) (\cite Wilfong26 Sec. 4.1.10)
 
 **Conserved variables:**
 
@@ -542,7 +542,7 @@ Uses Lax-Friedrichs flux (replaces WENO + Riemann solver).
 
 ---
 
-## 13. Body Forces (`bodyforces = .true.`)
+## 13. Body Forces (`bf_x`, `bf_y`, `bf_z`)
 
 **Source:** `src/simulation/m_body_forces.fpp`
 
@@ -641,7 +641,7 @@ where \f$a\f$ and \f$b\f$ are the left and right slope differences.
 
 \f[q_\text{THINC} = q_\min + \frac{q_\max}{2}\left(1 + \text{sign}(s)\,\frac{\tanh(\beta) + A}{1 + A\,\tanh(\beta)}\right)\f]
 
-where \f$A = \exp(\text{sign}(s)\,\beta\,(2C - 1)) / \cosh(\beta) - 1) / \tanh(\beta)\f$ and \f$\beta\f$ controls compression steepness.
+where \f$A = \frac{\exp(\text{sign}(s)\,\beta\,(2C - 1))\,/\,\cosh(\beta) - 1}{\tanh(\beta)}\f$ and \f$\beta\f$ controls compression steepness.
 
 #### IGR Reconstruction
 
@@ -667,7 +667,11 @@ Four-state solver resolving the contact discontinuity. Star-state satisfies:
 
 \f[p_L^* = p_R^* = p^*, \qquad u_L^* = u_R^* = u^*\f]
 
-#### HLLD (`riemann_solver = 3`, MHD only)
+#### Exact (`riemann_solver = 3`)
+
+Iterative exact Riemann solver.
+
+#### HLLD (`riemann_solver = 4`, MHD only)
 
 Seven-state solver for ideal MHD resolving fast magnetosonic, Alfven, and contact waves (\cite Miyoshi05). The Riemann fan is divided by outer wave speeds \f$S_L\f$, \f$S_R\f$, Alfven speeds \f$S_L^*\f$, \f$S_R^*\f$, and a middle contact \f$S_M\f$:
 
@@ -676,10 +680,6 @@ Seven-state solver for ideal MHD resolving fast magnetosonic, Alfven, and contac
 \f[S_L^* = S_M - \frac{|B_x|}{\sqrt{\rho_L^*}}, \qquad S_R^* = S_M + \frac{|B_x|}{\sqrt{\rho_R^*}}\f]
 
 where \f$p_T = p + |\mathbf{B}|^2/2\f$ is the total (thermal + magnetic) pressure. Continuity of normal velocity and total pressure is enforced across the Riemann fan.
-
-#### Exact (`riemann_solver = 4`)
-
-Iterative exact Riemann solver.
 
 ### 15.3 Time Integration
 
@@ -705,7 +705,7 @@ Iterative exact Riemann solver.
 
 \f[\mathbf{q}^{n+1} = \frac{1}{3}\mathbf{q}^n + \frac{2}{3}\mathbf{q}^{(2)} + \frac{2}{3}\Delta t\,\mathbf{L}(\mathbf{q}^{(2)})\f]
 
-#### Adaptive Time Stepping (`adapt_dt = .true.`)
+#### Adaptive Time Stepping (`adap_dt = .true.`)
 
 Embedded RK pairs for error estimation with Hairer-Norsett-Wanner algorithm for initial step size.
 
@@ -783,7 +783,7 @@ Used for viscous fluxes and velocity gradients.
 
 **Characteristic amplitudes** \f$\mathcal{L}_1\f$ through \f$\mathcal{L}_5\f$ define wave interactions at boundaries:
 
-\f[\mathcal{L}_1 = (u - c)\left(\frac{\partial p}{\partial x} - \rho\,c\,\frac{\partial u}{\partial x}\right), \qquad \mathcal{L}_2 = a\left(\frac{\partial \rho}{\partial x} + \frac{2}{\partial x}\frac{\partial p}{\partial x}\right)\f]
+\f[\mathcal{L}_1 = (u - c)\left(\frac{\partial p}{\partial x} - \rho\,c\,\frac{\partial u}{\partial x}\right), \qquad \mathcal{L}_2 = u\left(c^2\,\frac{\partial \rho}{\partial x} - \frac{\partial p}{\partial x}\right)\f]
 
 \f[\mathcal{L}_3 = u\,\frac{\partial v}{\partial x}, \qquad \mathcal{L}_4 = u\,\frac{\partial w}{\partial x}, \qquad \mathcal{L}_5 = (u + c)\left(\frac{\partial p}{\partial x} + \rho\,c\,\frac{\partial u}{\partial x}\right)\f]
 
@@ -795,7 +795,7 @@ For non-reflecting boundaries, the incoming wave amplitudes are set to zero.
 
 **8 types:** slip wall (`-5`), non-reflecting buffer (`-6`), non-reflecting sub. inflow (`-7`), non-reflecting sub. outflow (`-8`), force-free sub. outflow (`-9`), constant-pressure sub. outflow (`-10`), supersonic inflow (`-11`), supersonic outflow (`-12`).
 
-### 16.3 Immersed Boundary Method (`ib = .true.`) (\cite Tseng03; \cite Mittal05)
+### 16.3 Immersed Boundary Method (`ib = .true.`) (\cite Tseng03; \cite Mittal05; \cite Wilfong26 Sec. 4.1.1)
 
 **Source:** `src/simulation/m_ibm.fpp`
 
@@ -815,7 +815,7 @@ Supports STL/OBJ geometry import with ray tracing for inside/outside determinati
 
 ---
 
-## 17. Low Mach Number Corrections
+## 17. Low Mach Number Corrections (\cite Wilfong26 Sec. 4.2.4)
 
 **Thornber correction** (`low_Mach = 1`, \cite Thornber08): modifies the reconstructed velocities at cell interfaces:
 
