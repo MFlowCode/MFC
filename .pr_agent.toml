@@ -1,15 +1,12 @@
 # .pr_agent.toml
 [github_app]
 pr_commands = [
-pr_commands = [
   "/review",
   "/improve",
 ]
 
 handle_push_trigger = true
-push_commands = [
-  "/improve",
-]
+push_commands = ["/improve"]
 
 [pr_reviewer]                # (all fields optional)
 num_max_findings        = 10  # how many items to surface
