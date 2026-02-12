@@ -5,7 +5,7 @@
 This document catalogs every equation solved by MFC, organized by physical model.
 Each section notes the input parameter(s) that activate the corresponding physics module and cross-references the relevant source files.
 
-For full citations, see @ref papers.
+For full citations of MFC papers, see @ref papers. Foundational references for each model are cited inline; see the \ref citelist "Bibliography" for full details.
 
 ---
 
@@ -31,7 +31,7 @@ The parameter `model_eqns` (1, 2, 3, or 4) selects the governing equation set.
 
 ### 2.1 Five-Equation Model (`model_eqns = 2`)
 
-The primary workhorse model (Allaire et al., 2002). The state vector is:
+The primary workhorse model (\cite Allaire02). The state vector is:
 
 \f[\mathbf{q} = \bigl(\alpha_1 \rho_1,\;\alpha_2 \rho_2,\;\ldots,\;\rho u_1,\;\rho u_2,\;\rho u_3,\;\rho E,\;\alpha_1,\;\alpha_2,\;\ldots\bigr)^T\f]
 
@@ -53,9 +53,9 @@ The primary workhorse model (Allaire et al., 2002). The state vector is:
 
 where the \f$K\f$ term enforces interface conditions via the Wood sound speed:
 
-\f[K = \frac{\rho_2 c_2^2 - \rho_1 c_1^2}{\dfrac{\rho_1 c_1^2}{\alpha_1} + \dfrac{\rho_2 c_2^2}{\alpha_2}}\f]
+\f[K = \frac{\rho_2 c_2^2 - \rho_1 c_1^2}{\displaystyle\frac{\rho_1 c_1^2}{\alpha_1} + \displaystyle\frac{\rho_2 c_2^2}{\alpha_2}}\f]
 
-Setting `alt_soundspeed = .true.` enables the \f$K\f$ correction (Kapila model with Wood sound speed). Setting `alt_soundspeed = .false.` uses the Allaire variant without the \f$K\f$ correction, which is conservative but does not strictly obey the second law of thermodynamics.
+Setting `alt_soundspeed = .true.` enables the \f$K\f$ correction (\cite Kapila01, with Wood sound speed). Setting `alt_soundspeed = .false.` uses the Allaire variant without the \f$K\f$ correction, which is conservative but does not strictly obey the second law of thermodynamics.
 
 **Mixture rules:**
 
@@ -63,7 +63,7 @@ Setting `alt_soundspeed = .true.` enables the \f$K\f$ correction (Kapila model w
 
 ### 2.2 Six-Equation Model (`model_eqns = 3`)
 
-Allows pressure disequilibrium between phases (Saurel et al., 2009).
+Allows pressure disequilibrium between phases (\cite Saurel09).
 
 **Continuity and momentum:** Same as the five-equation model.
 
@@ -94,14 +94,14 @@ See Section 8 (Phase Change) below for details.
 
 ### 2.3 Other Model Variants
 
-- `model_eqns = 1`: **Gamma/pi_inf model** — simplified single-fluid formulation using mixture \f$\gamma\f$ and \f$\pi_\infty\f$ directly without tracking individual volume fractions (Johnsen, 2008).
+- `model_eqns = 1`: **Gamma/pi_inf model** — simplified single-fluid formulation using mixture \f$\gamma\f$ and \f$\pi_\infty\f$ directly without tracking individual volume fractions (\cite Johnsen08).
 - `model_eqns = 4`: **Four-equation model** — reduced model from the six-equation system after full pressure-temperature equilibrium relaxation (Tait-like compressible liquid).
 
 ---
 
 ## 3. Equations of State
 
-### 3.1 Stiffened Gas EOS
+### 3.1 Stiffened Gas EOS (\cite Menikoff89; \cite LeMetayer04)
 
 The primary closure for each phase:
 
@@ -151,7 +151,7 @@ Temperature is obtained from the internal energy by Newton iteration:
 
 \f[e_m(T) = \frac{\hat{h}_m(T) - R_u\,T}{W_m}\f]
 
-**NASA polynomial enthalpies:**
+**NASA polynomial enthalpies** (\cite McBride93)**:**
 
 \f[\frac{\hat{h}_m}{R_u\,T} = \frac{C_0}{T} + \sum_{r=1}^{5} \frac{C_r\,T^{r-1}}{r}\f]
 
@@ -204,7 +204,7 @@ Additional geometric source terms appear with \f$1/r\f$ factors in the continuit
 
 **Source:** `src/simulation/m_bubbles_EE.fpp`, `src/simulation/m_bubbles.fpp`
 
-#### 6.1.1 Method of Classes
+#### 6.1.1 Method of Classes (\cite Commander89; \cite Ando11)
 
 **Modified mixture pressure:**
 
@@ -230,15 +230,15 @@ where \f$n = \frac{3}{4\pi}\,\frac{\alpha}{\bar{R}^3}\f$.
 
 **Polydispersity** (`polydisperse = .true.`): Log-normal PDF discretized into \f$N_\text{bin}\f$ equilibrium radii with standard deviation `poly_sigma`, integrated via Simpson's rule.
 
-#### 6.1.2 Rayleigh-Plesset (`bubble_model = 3`)
+#### 6.1.2 Rayleigh-Plesset (`bubble_model = 3`) (\cite Rayleigh17; \cite Plesset49)
 
 \f[R\,\ddot{R} + \frac{3}{2}\,\dot{R}^2 = \frac{p_{bw} - p_\infty}{\rho_l}\f]
 
-#### 6.1.3 Keller-Miksis (`bubble_model = 2`)
+#### 6.1.3 Keller-Miksis (`bubble_model = 2`) (\cite Keller80)
 
 \f[R\,\ddot{R}\left(1 - \frac{\dot{R}}{c}\right) + \frac{3}{2}\,\dot{R}^2\left(1 - \frac{\dot{R}}{3c}\right) = \frac{p_{bw} - p_\infty}{\rho_l}\left(1 + \frac{\dot{R}}{c}\right) + \frac{R\,\dot{p}_{bw}}{\rho_l\,c}\f]
 
-#### 6.1.4 Gilmore (`bubble_model = 1`)
+#### 6.1.4 Gilmore (`bubble_model = 1`) (\cite Gilmore52)
 
 Enthalpy-based formulation with compressibility corrections via the Tait EOS:
 
@@ -252,7 +252,7 @@ and the local liquid sound speed:
 
 \f[C = \sqrt{n_\text{tait}(1+B)\left(\frac{p_\infty}{1+B} + 1\right)^{(n_\text{tait}-1)/n_\text{tait}} + (n_\text{tait} - 1)\,H}\f]
 
-#### 6.1.5 Non-Polytropic Thermal Model (`polytropic = .false.`)
+#### 6.1.5 Non-Polytropic Thermal Model (`polytropic = .false.`) (\cite Preston07)
 
 **Internal bubble pressure ODE:**
 
@@ -262,7 +262,7 @@ and the local liquid sound speed:
 
 \f[\dot{m}_v = \frac{D\,\rho_{bw}}{1 - \chi_{vw}}\left.\frac{\partial \chi_v}{\partial r}\right|_R\f]
 
-#### 6.1.6 QBMM Moment Transport (`qbmm = .true.`)
+#### 6.1.6 QBMM Moment Transport (`qbmm = .true.`) (\cite Bryngelson23)
 
 **Population balance equation:**
 
@@ -278,7 +278,7 @@ where moments \f$\mu_{i_1,i_2} = \int R^{i_1}\,\dot{R}^{i_2}\,f\,dR\,d\dot{R}\f$
 
 \f[\bar{u} = \frac{\mu_{10}}{\mu_{00}}, \quad \bar{v} = \frac{\mu_{01}}{\mu_{00}}, \quad c_{20} = \frac{\mu_{20}}{\mu_{00}} - \bar{u}^2, \quad c_{11} = \frac{\mu_{11}}{\mu_{00}} - \bar{u}\bar{v}, \quad c_{02} = \frac{\mu_{02}}{\mu_{00}} - \bar{v}^2\f]
 
-### 6.2 Euler-Lagrange Bubbles (`bubbles_lagrange = .true.`)
+### 6.2 Euler-Lagrange Bubbles (`bubbles_lagrange = .true.`) (\cite Maeda18)
 
 **Source:** `src/simulation/m_bubbles_EL.fpp`
 
@@ -314,7 +314,7 @@ Each bubble is tracked individually with Keller-Miksis dynamics and 4th-order ad
 
 ## 7. Fluid-Structure Interaction
 
-### 7.1 Hypoelastic Model (`hypoelasticity = .true.`)
+### 7.1 Hypoelastic Model (`hypoelasticity = .true.`) (\cite Rodriguez19)
 
 **Source:** `src/simulation/m_hypoelastic.fpp`
 
@@ -342,7 +342,7 @@ where \f$\mathbf{l} = \nabla \mathbf{u}\f$ is the velocity gradient and \f$\math
 
 This adds 6 additional transport equations in 3D (symmetric stress tensor: \f$\tau_{xx}^e, \tau_{xy}^e, \tau_{yy}^e, \tau_{xz}^e, \tau_{yz}^e, \tau_{zz}^e\f$).
 
-### 7.2 Hyperelastic Model (`hyperelasticity = .true.`)
+### 7.2 Hyperelastic Model (`hyperelasticity = .true.`) (\cite Kamrin12)
 
 **Source:** `src/simulation/m_hyperelastic.fpp`
 
@@ -374,7 +374,7 @@ where \f$J = \det(\mathbf{F})\f$.
 
 **Source:** `src/common/m_phase_change.fpp`
 
-### 8.1 pT-Relaxation (`relax_model = 5`)
+### 8.1 pT-Relaxation (`relax_model = 5`) (\cite Saurel08)
 
 \f$N\f$-fluid pressure-temperature equilibrium. The equilibrium condition is:
 
@@ -390,7 +390,7 @@ where \f$J = \det(\mathbf{F})\f$.
 
 Solved via Newton's method for the equilibrium pressure.
 
-### 8.2 pTg-Relaxation (`relax_model = 6`)
+### 8.2 pTg-Relaxation (`relax_model = 6`) (\cite Zein10)
 
 Two coupled equations for \f$(\alpha_1 \rho_1,\;p)\f$:
 
@@ -436,11 +436,11 @@ Enthalpy flux with diffusion:
 
 \f[q_\text{diff} = \lambda\,\frac{\partial T}{\partial x} + \sum_k h_k\,\dot{m}_k\f]
 
-Reaction mechanisms are code-generated via Pyrometheus, which provides symbolic abstractions for thermochemistry that enable portable GPU computation and automatic differentiation of chemical source terms.
+Reaction mechanisms are code-generated via Pyrometheus (\cite Cisneros25), which provides symbolic abstractions for thermochemistry that enable portable GPU computation and automatic differentiation of chemical source terms.
 
 ---
 
-## 10. Surface Tension (`surface_tension = .true.`)
+## 10. Surface Tension (`surface_tension = .true.`) (\cite Schmidmayer17)
 
 **Source:** `src/simulation/m_surface_tension.fpp`, `src/simulation/include/inline_capillary.fpp`
 
@@ -498,7 +498,7 @@ The capillary stress divergence is added to the momentum and energy equations. T
 
 \f[v_A = \sqrt{\frac{|\mathbf{B}|^2}{\rho}}\f]
 
-Uses the HLLD Riemann solver (`riemann_solver = 3`). Hyperbolic divergence cleaning (`hyper_cleaning = .true.`) via the GLM method (Dedner et al., 2002).
+Uses the HLLD Riemann solver (`riemann_solver = 3`). Hyperbolic divergence cleaning (`hyper_cleaning = .true.`) via the GLM method (\cite Dedner02).
 
 ### 11.2 Relativistic MHD (`relativity = .true.`)
 
@@ -516,7 +516,7 @@ Primitive recovery uses Newton-Raphson on the nonlinear conserved-to-primitive r
 
 ---
 
-## 12. Information Geometric Regularization (`igr = .true.`)
+## 12. Information Geometric Regularization (`igr = .true.`) (\cite Wilfong25a)
 
 **Source:** `src/simulation/m_igr.fpp`
 
@@ -566,6 +566,8 @@ Uses Lax-Friedrichs flux (replaces WENO + Riemann solver).
 
 Source terms added to the RHS of the governing equations.
 
+Formulation follows \cite Maeda17.
+
 **Discrete delta function (spatial support):**
 
 \f[\delta_h(r) = \frac{1}{(2\pi\sigma^2)^{d/2}}\exp\!\left(-\frac{r^2}{2\sigma^2}\right)\f]
@@ -576,7 +578,7 @@ Source terms added to the RHS of the governing equations.
 
 **Temporal profiles:**
 - **Sine** (`pulse = 1`): \f$S(t) = M\sin(\omega(t - t_\text{delay}))\f$
-- **Gaussian** (`pulse = 2`): \f$S(t) = M\exp\!\bigl(-\tfrac{1}{2}((t - t_\text{delay})/\sigma_t)^2\bigr)\f$
+- **Gaussian** (`pulse = 2`): \f$S(t) = M\exp\!\bigl(-\frac{1}{2}((t - t_\text{delay})/\sigma_t)^2\bigr)\f$
 - **Square** (`pulse = 3`): \f$S(t) = M\,\text{sign}(\sin(\omega(t - t_\text{delay})))\f$
 - **Broadband** (`pulse = 4`): superposition of multiple frequencies across a bandwidth
 
@@ -596,23 +598,23 @@ Weighted sum of candidate polynomials at cell interfaces:
 
 \f[f_{i+1/2} = \sum_r \omega_r\,f_{i+1/2}^{(r)}\f]
 
-**WENO-JS** (default):
+**WENO-JS** (\cite Jiang96, default):
 
 \f[\alpha_r = \frac{d_r}{(\beta_r + \varepsilon)^2}, \qquad \omega_r = \frac{\alpha_r}{\sum_s \alpha_s}\f]
 
 where \f$d_r\f$ are ideal weights, \f$\beta_r\f$ are smoothness indicators, and \f$\varepsilon\f$ is a small regularization parameter (`weno_eps`).
 
-**WENO-M** (`mapped_weno = .true.`): Henrick et al. (2005) mapped weights for improved accuracy at critical points:
+**WENO-M** (`mapped_weno = .true.`): \cite Henrick05 mapped weights for improved accuracy at critical points:
 
 \f[\omega_M^{(r)} = \frac{d_r\bigl(1 + d_r - 3\omega_0^{(r)} + (\omega_0^{(r)})^2\bigr)\,\omega_0^{(r)}}{d_r^2 + \omega_0^{(r)}(1 - 2d_r)}, \qquad \omega^{(r)} = \frac{\omega_M^{(r)}}{\sum_s \omega_M^{(s)}}\f]
 
-**WENO-Z** (`wenoz = .true.`): Borges et al. (2008) improved weights with global smoothness measure:
+**WENO-Z** (`wenoz = .true.`): \cite Borges08 improved weights with global smoothness measure:
 
 \f[\alpha_r = d_r\left(1 + \left(\frac{\tau}{\beta_r + \varepsilon}\right)^q\right), \qquad \tau = |\beta_0 - \beta_{k-1}|\f]
 
 The parameter \f$q\f$ controls the convergence rate at critical points (typically \f$q = 1\f$ for fifth-order reconstruction, as used in MFC).
 
-**TENO** (`teno = .true.`): Fu et al. (2016) targeted ENO with smoothness threshold \f$C_T\f$ (`teno_CT`):
+**TENO** (`teno = .true.`): \cite Fu16 targeted ENO with smoothness threshold \f$C_T\f$ (`teno_CT`):
 
 \f[\gamma_r = 1 + \frac{\tau}{\beta_r}, \qquad \xi_r = \frac{\gamma_r}{\sum_s \gamma_s}\f]
 
@@ -628,7 +630,7 @@ Primitive variable reconstruction is used to avoid spurious oscillations at inte
 
 **Five slope limiters** (`muscl_lim`):
 1. **Minmod:** \f$\phi = \text{sign}(a)\,\min(|a|,\;|b|)\f$ if \f$ab > 0\f$, else \f$0\f$
-2. **MC (Monotonized Central):** \f$\phi = \text{sign}(a)\,\min(2|a|,\;2|b|,\;\tfrac{1}{2}(|a|+|b|))\f$ if \f$ab > 0\f$
+2. **MC (Monotonized Central):** \f$\phi = \text{sign}(a)\,\min(2|a|,\;2|b|,\;\frac{1}{2}(|a|+|b|))\f$ if \f$ab > 0\f$
 3. **OSPRE (Van Albada):** \f$\phi = (a^2 b + a b^2)/(a^2 + b^2)\f$
 4. **Van Leer:** \f$\phi = 2ab/(a + b)\f$ if \f$ab > 0\f$
 5. **Superbee:** \f$\phi = \max(\min(2|a|,|b|),\;\min(|a|,2|b|))\f$ if \f$ab > 0\f$
@@ -653,13 +655,13 @@ where \f$A = \exp(\text{sign}(s)\,\beta\,(2C - 1)) / \cosh(\beta) - 1) / \tanh(\
 
 **Source:** `src/simulation/m_riemann_solvers.fpp`
 
-#### HLL (`riemann_solver = 1`)
+#### HLL (`riemann_solver = 1`) (\cite Harten83)
 
 \f[\mathbf{F}^\text{HLL} = \frac{S_R\,\mathbf{F}_L - S_L\,\mathbf{F}_R + S_L\,S_R\,(\mathbf{q}_R - \mathbf{q}_L)}{S_R - S_L}\f]
 
 with wave speed estimates \f$S_L = \min(u_L - c_L,\;u_R - c_R)\f$, \f$S_R = \max(u_R + c_R,\;u_L + c_L)\f$.
 
-#### HLLC (`riemann_solver = 2`)
+#### HLLC (`riemann_solver = 2`) (\cite Toro94)
 
 Four-state solver resolving the contact discontinuity. Star-state satisfies:
 
@@ -667,7 +669,7 @@ Four-state solver resolving the contact discontinuity. Star-state satisfies:
 
 #### HLLD (`riemann_solver = 3`, MHD only)
 
-Seven-state solver for ideal MHD resolving fast magnetosonic, Alfven, and contact waves (Miyoshi and Kusano, 2005). The Riemann fan is divided by outer wave speeds \f$S_L\f$, \f$S_R\f$, Alfven speeds \f$S_L^*\f$, \f$S_R^*\f$, and a middle contact \f$S_M\f$:
+Seven-state solver for ideal MHD resolving fast magnetosonic, Alfven, and contact waves (\cite Miyoshi05). The Riemann fan is divided by outer wave speeds \f$S_L\f$, \f$S_R\f$, Alfven speeds \f$S_L^*\f$, \f$S_R^*\f$, and a middle contact \f$S_M\f$:
 
 \f[S_M = \frac{(S_R - u_R)\rho_R u_R - (S_L - u_L)\rho_L u_L - p_{T,R} + p_{T,L}}{(S_R - u_R)\rho_R - (S_L - u_L)\rho_L}\f]
 
@@ -683,7 +685,7 @@ Iterative exact Riemann solver.
 
 **Source:** `src/simulation/m_time_steppers.fpp`
 
-#### TVD Runge-Kutta (`time_stepper = 1, 2, 3`)
+#### TVD Runge-Kutta (`time_stepper = 1, 2, 3`) (\cite Gottlieb98)
 
 **RK1 (Forward Euler):**
 
@@ -707,7 +709,7 @@ Iterative exact Riemann solver.
 
 Embedded RK pairs for error estimation with Hairer-Norsett-Wanner algorithm for initial step size.
 
-#### Strang Splitting (for stiff bubble dynamics)
+#### Strang Splitting (\cite Strang68) (for stiff bubble dynamics)
 
 For equations of the form \f$\partial \mathbf{q}/\partial t = -\nabla \cdot \mathbf{F}(\mathbf{q}) + \mathbf{s}(\mathbf{q})\f$, the Strang splitting scheme integrates three sub-equations per time step:
 
@@ -773,7 +775,7 @@ Used for viscous fluxes and velocity gradients.
 | `-15` | Slip wall |
 | `-16` | No-slip wall |
 
-### 16.2 Characteristic BCs (Thompson/LODI, `bc_x%beg = -5` to `-12`)
+### 16.2 Characteristic BCs (\cite Thompson87, \cite Thompson90; `bc_x%beg = -5` to `-12`)
 
 **Characteristic decomposition:**
 
@@ -793,7 +795,7 @@ For non-reflecting boundaries, the incoming wave amplitudes are set to zero.
 
 **8 types:** slip wall (`-5`), non-reflecting buffer (`-6`), non-reflecting sub. inflow (`-7`), non-reflecting sub. outflow (`-8`), force-free sub. outflow (`-9`), constant-pressure sub. outflow (`-10`), supersonic inflow (`-11`), supersonic outflow (`-12`).
 
-### 16.3 Immersed Boundary Method (`ib = .true.`)
+### 16.3 Immersed Boundary Method (`ib = .true.`) (\cite Tseng03; \cite Mittal05)
 
 **Source:** `src/simulation/m_ibm.fpp`
 
@@ -815,7 +817,7 @@ Supports STL/OBJ geometry import with ray tracing for inside/outside determinati
 
 ## 17. Low Mach Number Corrections
 
-**Thornber correction** (`low_Mach = 1`): modifies the reconstructed velocities at cell interfaces:
+**Thornber correction** (`low_Mach = 1`, \cite Thornber08): modifies the reconstructed velocities at cell interfaces:
 
 \f[u'_L = \frac{u_L + u_R}{2} + z\,\frac{u_L - u_R}{2}, \qquad u'_R = \frac{u_L + u_R}{2} - z\,\frac{u_L - u_R}{2}\f]
 
@@ -823,7 +825,7 @@ Supports STL/OBJ geometry import with ray tracing for inside/outside determinati
 
 This reduces numerical dissipation at low Mach numbers while recovering the standard scheme at high Mach numbers.
 
-**Chen correction** (`low_Mach = 2`): anti-dissipation pressure correction (APC) added to the HLLC flux:
+**Chen correction** (`low_Mach = 2`, \cite Chen22): anti-dissipation pressure correction (APC) added to the HLLC flux:
 
 \f[p_d = \frac{\rho_L\,\rho_R\,(S_R - u_R)(S_L - u_L)}{\rho_R(S_R - u_R) - \rho_L(S_L - u_L)}\f]
 
@@ -842,3 +844,4 @@ Additionally, the **artificial Mach number** technique (`pi_fac`) modifies \f$\p
 \f[\alpha_k \leftarrow \frac{\alpha_k}{\sum_j \alpha_j}\f]
 
 **Advective flux limiting** based on local volume fraction gradient \f$\chi\f$ to prevent spurious oscillations near material interfaces.
+

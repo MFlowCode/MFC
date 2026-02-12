@@ -720,6 +720,7 @@ if (MFC_DOCUMENTATION)
         set(DOXYGEN_HTML_OUTPUT      "\"${CMAKE_CURRENT_BINARY_DIR}/${target}\"")
         set(DOXYGEN_MATHJAX_CODEFILE "\"${CMAKE_CURRENT_SOURCE_DIR}/docs/config.js\"")
         set(DOXYGEN_PROJECT_LOGO     "\"${CMAKE_CURRENT_SOURCE_DIR}/docs/res/icon.ico\"")
+        set(DOXYGEN_CITE_BIB_FILES   "\"${CMAKE_CURRENT_SOURCE_DIR}/docs/references.bib\"")
         set(DOXYGEN_IMAGE_PATH       "\"${CMAKE_CURRENT_SOURCE_DIR}/docs/res\"\
                                       \"${CMAKE_CURRENT_SOURCE_DIR}/docs/${target}\"")
 

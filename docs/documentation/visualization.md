@@ -40,7 +40,7 @@ For many cases, this step will require resizing the render view window.
 VisIt is an alternative open-source interactive parallel visualization and graphical analysis tool for viewing scientific data.
 Versions of VisIt after 2.6.0 have been confirmed to work with the MFC databases for some parallel environments.
 Nevertheless, installation and configuration of VisIt can be environment-dependent and are left to the user.
-Further remarks on parallel flow visualization, analysis, and processing of the MFC database using VisIt can also be found in [Coralic (2015)](@ref references) and [Meng (2016)](@ref references).
+Further remarks on parallel flow visualization, analysis, and processing of the MFC database using VisIt can also be found in \cite Coralic15 and \cite Meng16.
 
 The user can launch VisIt and open the index files under `/silo_hdf5/root`.
 Once the database is loaded, flow field variables contained in the database can be added to the plot.
