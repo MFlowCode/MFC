@@ -637,7 +637,7 @@ Primitive variable reconstruction is used to avoid spurious oscillations at inte
 
 where \f$a\f$ and \f$b\f$ are the left and right slope differences.
 
-**THINC interface compression** (`interface_compression > 0`): applies hyperbolic tangent compression near material interfaces:
+**THINC interface compression** (`int_comp = .true.`): applies hyperbolic tangent compression near material interfaces:
 
 \f[q_\text{THINC} = q_\min + \frac{q_\max}{2}\left(1 + \text{sign}(s)\,\frac{\tanh(\beta) + A}{1 + A\,\tanh(\beta)}\right)\f]
 
@@ -817,21 +817,21 @@ Supports STL/OBJ geometry import with ray tracing for inside/outside determinati
 
 ## 17. Low Mach Number Corrections (\cite Wilfong26 Sec. 4.2.4)
 
-**Thornber correction** (`low_Mach = 1`, \cite Thornber08): modifies the reconstructed velocities at cell interfaces:
-
-\f[u'_L = \frac{u_L + u_R}{2} + z\,\frac{u_L - u_R}{2}, \qquad u'_R = \frac{u_L + u_R}{2} - z\,\frac{u_L - u_R}{2}\f]
-
-\f[z = \min\!\left(\max\!\left(\frac{|u_L|}{c_L},\;\frac{|u_R|}{c_R}\right),\;1\right)\f]
-
-This reduces numerical dissipation at low Mach numbers while recovering the standard scheme at high Mach numbers.
-
-**Chen correction** (`low_Mach = 2`, \cite Chen22): anti-dissipation pressure correction (APC) added to the HLLC flux:
+**Chen correction** (`low_Mach = 1`, \cite Chen22): anti-dissipation pressure correction (APC) added to the HLLC flux:
 
 \f[p_d = \frac{\rho_L\,\rho_R\,(S_R - u_R)(S_L - u_L)}{\rho_R(S_R - u_R) - \rho_L(S_L - u_L)}\f]
 
 \f[\text{APC}_{p\mathbf{u}} = (z - 1)\,p_d\,\hat{\mathbf{n}}, \qquad \text{APC}_{pE} = (z - 1)\,p_d\,S_*\f]
 
 The corrected HLLC flux in the star region becomes \f$\mathbf{F}^{*} + \text{APC}\f$.
+
+**Thornber correction** (`low_Mach = 2`, \cite Thornber08): modifies the reconstructed velocities at cell interfaces:
+
+\f[u'_L = \frac{u_L + u_R}{2} + z\,\frac{u_L - u_R}{2}, \qquad u'_R = \frac{u_L + u_R}{2} - z\,\frac{u_L - u_R}{2}\f]
+
+\f[z = \min\!\left(\max\!\left(\frac{|u_L|}{c_L},\;\frac{|u_R|}{c_R}\right),\;1\right)\f]
+
+This reduces numerical dissipation at low Mach numbers while recovering the standard scheme at high Mach numbers.
 
 Additionally, the **artificial Mach number** technique (`pi_fac`) modifies \f$\pi_\infty\f$ to artificially increase the local Mach number.
 

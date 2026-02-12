@@ -20,7 +20,7 @@ def parse_bib_authors(bib_path: Path) -> dict[str, tuple[str, int, str | None]]:
         (first_author_surname, author_count, second_author_surname | None)
     """
     text = bib_path.read_text(encoding="utf-8")
-    entries: dict[str, tuple[str, int]] = {}
+    entries: dict[str, tuple[str, int, str | None]] = {}
 
     # Find all bib entries: @type{Key,
     for m in re.finditer(r"@\w+\{(\w+),", text):
@@ -154,7 +154,7 @@ def check_bare_citations(html_dir: Path, authors: dict) -> list[str]:
                 continue
             # Check if an author name precedes the link
             before = text[max(0, m.start() - 60):m.start()].rstrip()
-            surname, count, second_surname = authors[key]
+            surname, _count, second_surname = authors[key]
             has_prefix = (
                 before.endswith(surname) or
                 "et al." in before[-20:] or

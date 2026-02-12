@@ -781,7 +781,6 @@ DEPENDENCIES = {
             "requires": ["sigma"],
         }
     },
-    "mhd": {},
     "relativity": {
         "when_true": {
             "requires": ["mhd"],

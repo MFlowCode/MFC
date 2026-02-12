@@ -23,8 +23,8 @@ SKIP_RE = re.compile(r"[<>*()\[\]{}]|/\.\.\.|%|\$")
 # Match \cite Key references in markdown (Doxygen-style)
 CITE_RE = re.compile(r"\\cite\s+(\w+)")
 
-# Match backtick-quoted parameter assignments like `param = value` or `param`
-PARAM_RE = re.compile(r"`([a-z_][a-z0-9_%]*?)(?:\s*=\s*[^`]*)?\s*`")
+# Match backtick-quoted parameter names like `param = value`, `param > 0`, or `param`
+PARAM_RE = re.compile(r"`([a-z_][a-z0-9_%]*)(?:\s*[=><][^`]*)?\s*`")
 
 # Parameter-like names to skip (not actual MFC parameters)
 PARAM_SKIP = re.compile(
