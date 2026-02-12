@@ -42,14 +42,14 @@ for cfg in "${configs[@]}"; do
     dir="${version}-${cluster}-${device}-${interface}"
     echo "Creating source copy: $dir from $version/"
     rm -rf "$dir"
-    cp -al "$version" "$dir" 2>/dev/null || cp -r "$version" "$dir"
+    cp -r "$version" "$dir"
 done
 
 # --- Phase 2: Build all configs on login node in parallel ---
 # Avoid setuptools_scm git conflicts in hardlink copies (shared .git/index)
 export SETUPTOOLS_SCM_PRETEND_VERSION=0.0.0
 
-MAX_PARALLEL=2
+MAX_PARALLEL=3
 
 echo ""
 echo "=========================================="
