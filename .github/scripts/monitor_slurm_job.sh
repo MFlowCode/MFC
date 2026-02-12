@@ -64,7 +64,7 @@ while true; do
   # Try to read from tail output (non-blocking via timeout)
   # Read multiple lines if available to avoid falling behind
   lines_read=0
-  while IFS= read -r -t 0.1 line <&3 2>/dev/null; do
+  while IFS= read -r -t 1 line <&3 2>/dev/null; do
     echo "$line"
     lines_read=$((lines_read + 1))
     last_heartbeat=$(date +%s)
@@ -115,7 +115,7 @@ done
 # Drain any remaining output from tail after job completes
 echo "Draining remaining output..."
 drain_count=0
-while IFS= read -r -t 0.5 line <&3 2>/dev/null; do
+while IFS= read -r -t 1 line <&3 2>/dev/null; do
   echo "$line"
   drain_count=$((drain_count + 1))
   # Safety limit to avoid infinite loop
