@@ -59,13 +59,26 @@ build_pids=()
 running=()
 for i in "${!configs[@]}"; do
     # Wait until a build slot is available
+    throttle_timer=0
     while [ ${#running[@]} -ge $MAX_PARALLEL ]; do
-        sleep 2
+        sleep 5
+        throttle_timer=$((throttle_timer + 5))
         still_running=()
         for pid in "${running[@]}"; do
             kill -0 "$pid" 2>/dev/null && still_running+=("$pid")
         done
         running=("${still_running[@]}")
+        if [ $throttle_timer -ge 120 ]; then
+            throttle_timer=0
+            echo "--- Build heartbeat ($(date +%H:%M:%S)) ---"
+            for j in $(seq 0 $((i - 1))); do
+                read -r v c d iface <<< "${configs[$j]}"
+                if kill -0 "${build_pids[$j]}" 2>/dev/null; then
+                    last=$(tail -n 1 "build-${v}-${c}-${d}-${iface}.log" 2>/dev/null | head -c 120 || echo "")
+                    echo "  $v $c $d $iface: $last"
+                fi
+            done
+        fi
     done
 
     read -r version cluster device interface <<< "${configs[$i]}"
