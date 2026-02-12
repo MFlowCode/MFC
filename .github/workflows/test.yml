@@ -135,7 +135,8 @@ jobs:
 
       - name: Test
         run: |
-          /bin/bash mfc.sh test -v --max-attempts 3 -j $(nproc) $TEST_ALL $TEST_PCT || true
+          TEST_EXIT=0
+          /bin/bash mfc.sh test -v --max-attempts 3 -j $(nproc) $TEST_ALL $TEST_PCT || TEST_EXIT=$?
 
           # Retry only if a small number of tests failed (sporadic failures)
           if [ -f tests/failed_uuids.txt ]; then
@@ -150,6 +151,8 @@ jobs:
               echo "Too many failures ($NUM_FAILED) to retry — likely a real issue."
               exit 1
             fi
+          elif [ "$TEST_EXIT" -ne 0 ]; then
+            exit $TEST_EXIT
           fi
         env:
           TEST_ALL: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
