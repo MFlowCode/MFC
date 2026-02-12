@@ -206,6 +206,15 @@ def test():
     # Build the summary report
     _print_test_summary(nPASS, nFAIL, nSKIP, minutes, seconds, failed_tests, skipped_cases)
 
+    # Write failed UUIDs to file for CI retry logic
+    failed_uuids_path = os.path.join(common.MFC_TEST_DIR, "failed_uuids.txt")
+    if failed_tests:
+        with open(failed_uuids_path, "w") as f:
+            for test_info in failed_tests:
+                f.write(test_info['uuid'] + "\n")
+    elif os.path.exists(failed_uuids_path):
+        os.remove(failed_uuids_path)
+
     exit(nFAIL)
 
 

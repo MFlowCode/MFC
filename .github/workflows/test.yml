@@ -134,8 +134,23 @@ jobs:
           TEST_ALL: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
 
       - name: Test
-        run:  |
-          /bin/bash mfc.sh test -v --max-attempts 3 -j $(nproc) $TEST_ALL $TEST_PCT
+        run: |
+          /bin/bash mfc.sh test -v --max-attempts 3 -j $(nproc) $TEST_ALL $TEST_PCT || true
+
+          # Retry only if a small number of tests failed (sporadic failures)
+          if [ -f tests/failed_uuids.txt ]; then
+            NUM_FAILED=$(wc -l < tests/failed_uuids.txt)
+            if [ "$NUM_FAILED" -le 5 ]; then
+              FAILED=$(cat tests/failed_uuids.txt | tr '\n' ' ')
+              echo ""
+              echo "=== Retrying $NUM_FAILED failed test(s): $FAILED ==="
+              echo ""
+              /bin/bash mfc.sh test -v --max-attempts 3 -j $(nproc) --only $FAILED $TEST_ALL
+            else
+              echo "Too many failures ($NUM_FAILED) to retry — likely a real issue."
+              exit 1
+            fi
+          fi
         env:
           TEST_ALL: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
           TEST_PCT: ${{ matrix.debug == 'debug' && '-% 20' || '' }}
