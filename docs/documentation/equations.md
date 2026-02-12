@@ -1,3 +1,5 @@
+@page equations Equations
+
 # MFC: Comprehensive Equations Reference
 
 This document catalogs every equation solved by MFC, organized by physical model.
