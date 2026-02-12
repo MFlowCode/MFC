@@ -1,7 +1,15 @@
 # .pr_agent.toml
 [github_app]
-# Run these tools automatically on every new PR:
-pr_commands = ["/describe", "/review", "/improve"]
+pr_commands = [
+pr_commands = [
+  "/review",
+  "/improve",
+]
+
+handle_push_trigger = true
+push_commands = [
+  "/improve",
+]
 
 [pr_reviewer]                # (all fields optional)
 num_max_findings        = 10  # how many items to surface
