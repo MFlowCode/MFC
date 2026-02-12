@@ -112,6 +112,7 @@ contains
         $:GPU_UPDATE(host='[ib_markers%sf]')
         do i = 1, num_ibs
             if (patch_ib(i)%moving_ibm /= 0) call s_compute_centroid_offset(i) ! offsets are computed after IB markers are generated
+            $:GPU_UPDATE(device='[patch_ib(i)]')
         end do
 
         ! find the number of ghost points and set them to be the maximum total across ranks
@@ -1002,8 +1003,9 @@ contains
 
         ! recompute the new ib_patch locations and broadcast them.
         call s_apply_ib_patches(ib_markers%sf(0:m, 0:n, 0:p))
-        call s_populate_ib_buffers() ! transmits the new IB markers via MPI
         $:GPU_UPDATE(device='[ib_markers%sf]')
+        call s_populate_ib_buffers()
+        $:GPU_UPDATE(host='[ib_markers%sf]')
 
         ! recalculate the ghost point locations and coefficients
         call s_find_num_ghost_points(num_gps, num_inner_gps)
