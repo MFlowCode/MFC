@@ -1,6 +1,6 @@
 !>
-!!
-!! module m_boundary_conditions
+!! @file
+!! @brief Contains module m_boundary_conditions
 
 !> @brief This module contains
 module m_boundary_conditions
@@ -34,7 +34,7 @@ contains
 
         integer :: j
 
-        ! is a vertical line at x_beg or x_end
+        ! Patch is a vertical line at x_beg or x_end
         if (patch_bc(patch_id)%dir == 1) then
             y_centroid = patch_bc(patch_id)%centroid(2)
             length_y = patch_bc(patch_id)%length(2)
@@ -42,7 +42,7 @@ contains
             y_boundary%beg = y_centroid - 0.5_wp*length_y
             y_boundary%end = y_centroid + 0.5_wp*length_y
 
-            ! is a vertical line at x_beg and x_beg is a domain boundary
+            ! Patch is a vertical line at x_beg and x_beg is a domain boundary
             #:for BOUND, X, LOC, IDX in [('beg', '-i', -1, 1), ('end', 'm+i', 1, 2)]
                 if (patch_bc(patch_id)%loc == ${LOC}$ .and. bc_x%${BOUND}$ < 0) then
                     do j = 0, n
@@ -54,7 +54,7 @@ contains
             #:endfor
         end if
 
-        ! is a vertical line at y_beg or y_end
+        ! Patch is a vertical line at y_beg or y_end
         if (patch_bc(patch_id)%dir == 2) then
             x_centroid = patch_bc(patch_id)%centroid(1)
             length_x = patch_bc(patch_id)%length(1)
@@ -62,7 +62,7 @@ contains
             x_boundary%beg = x_centroid - 0.5_wp*length_x
             x_boundary%end = x_centroid + 0.5_wp*length_x
 
-            ! is a vertical line at x_beg and x_beg is a domain boundary
+            ! Patch is a vertical line at x_beg and x_beg is a domain boundary
             #:for BOUND, Y, LOC, IDX in [('beg', '-i', -1, 1), ('end', 'n+i', 1, 2)]
                 if (patch_bc(patch_id)%loc == ${LOC}$ .and. bc_y%${BOUND}$ < 0) then
                     do j = 0, m
@@ -87,7 +87,7 @@ contains
             y_centroid = patch_bc(patch_id)%centroid(2)
             z_centroid = patch_bc(patch_id)%centroid(3)
             radius = patch_bc(patch_id)%radius
-            ! is a circle at x_beg and x_beg is a domain boundary
+            ! Patch is a circle at x_beg and x_beg is a domain boundary
             #:for BOUND, X, LOC, IDX in [('beg', '-i', -1, 1), ('end', 'm+i', 1, 2)]
                 if (patch_bc(patch_id)%loc == ${LOC}$ .and. bc_x%${BOUND}$ < 0) then
                     do k = 0, p
@@ -105,7 +105,7 @@ contains
             x_centroid = patch_bc(patch_id)%centroid(1)
             z_centroid = patch_bc(patch_id)%centroid(3)
             radius = patch_bc(patch_id)%radius
-            ! is a circle at y_beg and y_beg is a domain boundary
+            ! Patch is a circle at y_beg and y_beg is a domain boundary
             #:for BOUND, Y, LOC, IDX in [('beg', '-i', -1, 1), ('end', 'n+i', 1, 2)]
                 if (patch_bc(patch_id)%loc == ${LOC}$ .and. bc_y%${BOUND}$ < 0) then
                     do k = 0, p
@@ -156,7 +156,7 @@ contains
 
             z_boundary%beg = z_centroid - 0.5_wp*length_z
             z_boundary%end = z_centroid + 0.5_wp*length_z
-            ! is a circle at x_beg and x_beg is a domain boundary
+            ! Patch is a circle at x_beg and x_beg is a domain boundary
             #:for BOUND, X, LOC, IDX in [('beg', '-i', -1, 1), ('end', 'm+i', 1, 2)]
                 if (patch_bc(patch_id)%loc == ${LOC}$ .and. bc_x%${BOUND}$ < 0) then
                     do k = 0, p
@@ -183,7 +183,7 @@ contains
 
             z_boundary%beg = z_centroid - 0.5_wp*length_z
             z_boundary%end = z_centroid + 0.5_wp*length_z
-            ! is a circle at y_beg and y_beg is a domain boundary
+            ! Patch is a circle at y_beg and y_beg is a domain boundary
             #:for BOUND, Y, LOC, IDX in [('beg', '-i', -1, 1), ('end', 'n+i', 1, 2)]
                 if (patch_bc(patch_id)%loc == ${LOC}$ .and. bc_y%${BOUND}$ < 0) then
                     do k = 0, p

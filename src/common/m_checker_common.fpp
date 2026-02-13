@@ -6,7 +6,7 @@
 #:include 'macros.fpp'
 
 !> @brief The purpose of the module is to check for compatible input files for.
-!! to pre-processing, post-processing and simulation
+!!              inputs common to pre-processing, post-processing and simulation
 module m_checker_common
 
     use m_global_parameters    !< Definitions of the global parameters
@@ -24,7 +24,7 @@ module m_checker_common
 contains
 
     !> Checks compatibility of parameters in the input file.
-        !! all three stages
+        !! Used by all three stages
     impure subroutine s_check_inputs_common
 
 #ifndef MFC_SIMULATION

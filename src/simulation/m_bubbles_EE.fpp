@@ -1,6 +1,6 @@
 !>
-!!
-!! module m_bubbles_EE
+!! @file
+!! @brief Contains module m_bubbles_EE
 
 #:include 'macros.fpp'
 
@@ -68,8 +68,8 @@ contains
 
     end subroutine s_initialize_bubbles_EE_module
 
-    ! the bubble volume fraction alpha from the bubble number density n
-        !! is the conservative variable
+    ! Compute the bubble volume fraction alpha from the bubble number density n
+        !! @param q_cons_vf is the conservative variable
     subroutine s_comp_alpha_from_n(q_cons_vf)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         real(wp) :: nR3bar
@@ -92,15 +92,11 @@ contains
 
     end subroutine s_comp_alpha_from_n
 
-    !> Computes one directional component of velocity divergence for bubble dynamics.
-    !! @param[in] idir Spatial direction (1=x, 2=y, 3=z).
-    !! @param[in] q_prim_vf Primitive variables containing velocity components.
-    !! @param[inout] divu_in Velocity divergence field, accumulated across directions.
     subroutine s_compute_bubbles_EE_rhs(idir, q_prim_vf, divu_in)
 
         integer, intent(in) :: idir
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
-        type(scalar_field), intent(inout) :: divu_in
+        type(scalar_field), intent(inout) :: divu_in !< matrix for div(u)
 
         integer :: j, k, l
 
@@ -157,16 +153,14 @@ contains
     end subroutine s_compute_bubbles_EE_rhs
 
     !>  The purpose of this procedure is to compute the source terms
-        !! needed for the bubble modeling.
-        !! @param[inout] q_cons_vf Conservative variables.
-        !! @param[in] q_prim_vf Primitive variables.
-        !! @param[inout] rhs_vf Right-hand side source terms.
-        !! @param[in] divu_in Velocity divergence field.
+        !!      that are needed for the bubble modeling
+        !!  @param q_prim_vf Primitive variables
+        !!  @param q_cons_vf Conservative variables
     impure subroutine s_compute_bubble_EE_source(q_cons_vf, q_prim_vf, rhs_vf, divu_in)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
-        type(scalar_field), intent(in) :: divu_in
+        type(scalar_field), intent(in) :: divu_in !< matrix for div(u)
 
         real(wp) :: rddot
         real(wp) :: pb_local, mv_local, vflux, pbdot
@@ -299,7 +293,7 @@ contains
                                 pb_local = 0._wp; mv_local = 0._wp; vflux = 0._wp; pbdot = 0._wp
                             end if
 
-                            ! time stepping
+                            ! Adaptive time stepping
                             if (adap_dt) then
                                 adap_dt_stop = 0
 

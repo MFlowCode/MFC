@@ -1,22 +1,22 @@
 !>
-!!
-!! module m_start_up
+!! @file
+!! @brief Contains module m_start_up
 
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
 !> @brief The purpose of the module is primarily to read in the files that
-!! inputs, the initial condition data and the grid data
-!! provided by the user. The module is additionally tasked
-!! the consistency of the user inputs and completing
-!! variablesThe purpose of the module is primarily to read
-!! files that
-!! inputs, the initial condition data and the grid data
-!! provided by the user. The module is additionally tasked
-!! the consistency of the user inputs and completing
-!! variables. This module also also allocating, initializing
-!! deallocating the relevant variables on both cpus and gpus as well as
-!! the time stepping, domain decomposition and I/O procedures.
+!!              contain the inputs, the initial condition data and the grid data
+!!              that are provided by the user. The module is additionally tasked
+!!              with verifying the consistency of the user inputs and completing
+!!              the grid variablesThe purpose of the module is primarily to read
+!!              in the files that
+!!              contain the inputs, the initial condition data and the grid data
+!!              that are provided by the user. The module is additionally tasked
+!!              with verifying the consistency of the user inputs and completing
+!!              the grid variables. This module also also allocating, initializing
+!!              I/O, and deallocating the relevant variables on both cpus and gpus as well as
+!!              setting up the time stepping, domain decomposition and I/O procedures.
 module m_start_up
 
     use m_derived_types        !< Definitions of the derived types
@@ -30,10 +30,10 @@ module m_start_up
     use m_variables_conversion !< State variables type conversion procedures
 
     use m_weno                 !< Weighted and essentially non-oscillatory (WENO)
-                               !! spatial reconstruction of variables
+                               !! schemes for spatial reconstruction of variables
 
     use m_muscl                !< Monotonic Upstream-centered (MUSCL)
-                               !! convservation laws
+                               !! schemes for convservation laws
 
     use m_riemann_solvers      !< Exact and approximate Riemann problem solvers
 
@@ -54,7 +54,7 @@ module m_start_up
     use m_qbmm                 !< Quadrature MOM
 
     use m_derived_variables     !< Procedures used to compute quantities derived
-                                !! conservative and primitive variables
+                                !! from the conservative and primitive variables
     use m_hypoelastic
 
     use m_hyperelastic
@@ -113,7 +113,7 @@ module m_start_up
 contains
 
     !> Read data files. Dispatch subroutine that replaces procedure pointer.
-        !! Conservative variables
+        !! @param q_cons_vf Conservative variables
     impure subroutine s_read_data_files(q_cons_vf)
 
         type(scalar_field), &
@@ -129,22 +129,22 @@ contains
     end subroutine s_read_data_files
 
     !>  The purpose of this procedure is to first verify that an
-        !! has been made available by the user. Provided
-        !! is so, the input file is then read in.
+        !!      input file has been made available by the user. Provided
+        !!      that this is so, the input file is then read in.
     impure subroutine s_read_input_file
 
-        ! path to the input file provided by the user
+        ! Relative path to the input file provided by the user
         character(LEN=name_len), parameter :: file_path = './simulation.inp'
 
         logical :: file_exist !<
-            !! to check the existence of the input file
+            !! Logical used to check the existence of the input file
 
         integer :: iostatus
-            !! check iostat of file read
+            !! Integer to check iostat of file read
 
         character(len=1000) :: line
 
-        ! of the global parameters which may be specified by user
+        ! Namelist of the global parameters which may be specified by user
         namelist /user_inputs/ case_dir, run_time_info, m, n, p, dt, &
             t_step_start, t_step_stop, t_step_save, t_step_print, &
             model_eqns, mpp_lim, time_stepper, weno_eps, &
@@ -188,8 +188,8 @@ contains
             int_comp, ic_eps, ic_beta, nv_uvm_out_of_core, &
             nv_uvm_igr_temps_on_gpu, nv_uvm_pref_gpu, down_sample, fft_wrt
 
-        ! that an input file has been provided by the user. If it
-        ! then the input file is read in, otherwise, simulation exits.
+        ! Checking that an input file has been provided by the user. If it
+        ! has, then the input file is read in, otherwise, simulation exits.
         inquire (FILE=trim(file_path), EXIST=file_exist)
 
         if (file_exist) then
@@ -213,7 +213,7 @@ contains
                 bodyForces = .true.
             end if
 
-            ! m,n,p into global m,n,p
+            ! Store m,n,p into global m,n,p
             m_glb = m
             n_glb = n
             p_glb = p
@@ -234,17 +234,17 @@ contains
     end subroutine s_read_input_file
 
     !> The goal of this procedure is to verify that each of the
-    !! inputs is valid and that their combination
-    !! meaningful configuration for the simulation.
+    !!      user provided inputs is valid and that their combination
+    !!      constitutes a meaningful configuration for the simulation.
     impure subroutine s_check_input_file
 
-        ! path to the current directory file in the case directory
+        ! Relative path to the current directory file in the case directory
         character(LEN=path_len) :: file_path
 
-        ! used to check the existence of the current directory file
+        ! Logical used to check the existence of the current directory file
         logical :: file_exist
 
-        !
+        ! Logistics
         file_path = trim(case_dir)//'/.'
 
         call my_inquire(file_path, file_exist)
@@ -258,29 +258,29 @@ contains
 
     end subroutine s_check_input_file
 
-        !! and grid data files. The cell-average
-        !! constitute the former, while the
-        !! in x-, y- and z-directions make
-        !! latter. This procedure also calculates the cell-
-        !! from the cell-boundary locations.
-        !! Cell-averaged conservative variables
+        !!              initial condition and grid data files. The cell-average
+        !!              conservative variables constitute the former, while the
+        !!              cell-boundary locations in x-, y- and z-directions make
+        !!              up the latter. This procedure also calculates the cell-
+        !!              width distributions from the cell-boundary locations.
+        !! @param q_cons_vf Cell-averaged conservative variables
     impure subroutine s_read_serial_data_files(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(INOUT) :: q_cons_vf
 
         character(LEN=path_len + 2*name_len) :: t_step_dir !<
-            !! to the starting time-step directory
+            !! Relative path to the starting time-step directory
 
         character(LEN=path_len + 3*name_len) :: file_path !<
-            !! to the grid and conservative variables data files
+            !! Relative path to the grid and conservative variables data files
 
         logical :: file_exist !<
-        ! used to check the existence of the data files
+        ! Logical used to check the existence of the data files
 
         integer :: i, r !< Generic loop iterator
 
-        ! that the directory from which the initial condition and
-        ! grid data files are to be read in exists and exiting otherwise
+        ! Confirming that the directory from which the initial condition and
+        ! the grid data files are to be read in exists and exiting otherwise
         if (cfl_dt) then
             write (t_step_dir, '(A,I0,A,I0)') &
                 trim(case_dir)//'/p_all/p', proc_rank, '/', n_start
@@ -302,7 +302,7 @@ contains
             call s_assign_default_bc_type(bc_type)
         end if
 
-        ! Locations in x-direction
+        ! Cell-boundary Locations in x-direction
         file_path = trim(t_step_dir)//'/x_cb.dat'
 
         inquire (FILE=trim(file_path), EXIST=file_exist)
@@ -328,7 +328,7 @@ contains
             end do
         end if
 
-        ! Locations in y-direction
+        ! Cell-boundary Locations in y-direction
         if (n > 0) then
 
             file_path = trim(t_step_dir)//'/y_cb.dat'
@@ -350,7 +350,7 @@ contains
 
         end if
 
-        ! Locations in z-direction
+        ! Cell-boundary Locations in z-direction
         if (p > 0) then
 
             file_path = trim(t_step_dir)//'/z_cb.dat'
@@ -388,7 +388,7 @@ contains
         end do
 
         if (bubbles_euler .or. elasticity) then
-            ! pb and mv for non-polytropic qbmm
+            ! Read pb and mv for non-polytropic qbmm
             if (qbmm .and. .not. polytropic) then
                 do i = 1, nb
                     do r = 1, nnode
@@ -425,9 +425,9 @@ contains
             end if
         end if
 
-        ! IBM Data
+        ! Read IBM Data
         if (ib) then
-            ! IB markers
+            ! Read IB markers
             write (file_path, '(A,I0,A)') &
                 trim(t_step_dir)//'/ib.dat'
             inquire (FILE=trim(file_path), EXIST=file_exist)
@@ -441,7 +441,7 @@ contains
                 call s_mpi_abort(trim(file_path)//' is missing. Exiting.')
             end if
 
-            ! Levelset
+            ! Read Levelset
             write (file_path, '(A)') &
                 trim(t_step_dir)//'/levelset.dat'
             inquire (FILE=trim(file_path), EXIST=file_exist)
@@ -451,12 +451,12 @@ contains
                       ACTION='read', &
                       STATUS='old')
                 read (2) levelset%sf(0:m, 0:n, 0:p, 1:num_ibs); close (2)
-                ! 'check', STL_levelset(106, 50, 0, 1)
+                ! print*, 'check', STL_levelset(106, 50, 0, 1)
             else
                 call s_mpi_abort(trim(file_path)//' is missing. Exiting.')
             end if
 
-            ! Levelset Norm
+            ! Read Levelset Norm
             write (file_path, '(A)') &
                 trim(t_step_dir)//'/levelset_norm.dat'
             inquire (FILE=trim(file_path), EXIST=file_exist)
@@ -507,7 +507,7 @@ contains
 
     end subroutine s_read_serial_data_files
 
-        !! Conservative variables
+        !! @param q_cons_vf Conservative variables
     impure subroutine s_read_parallel_data_files(q_cons_vf)
 
         type(scalar_field), &
@@ -533,7 +533,7 @@ contains
 
         integer :: i, j
 
-        ! data variables
+        ! Downsampled data variables
         integer :: m_ds, n_ds, p_ds
         integer :: m_glb_ds, n_glb_ds, p_glb_ds
         integer :: m_glb_read, n_glb_read, p_glb_read ! data size of read
@@ -542,7 +542,7 @@ contains
         allocate (y_cb_glb(-1:n_glb))
         allocate (z_cb_glb(-1:p_glb))
 
-        ! in cell boundary locations in x-direction
+        ! Read in cell boundary locations in x-direction
         file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//'x_cb.dat'
         inquire (FILE=trim(file_loc), EXIST=file_exist)
 
@@ -565,11 +565,11 @@ contains
             call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
         end if
 
-        ! local cell boundary locations
+        ! Assigning local cell boundary locations
         x_cb(-1:m) = x_cb_glb((start_idx(1) - 1):(start_idx(1) + m))
-        ! the cell width distribution
+        ! Computing the cell width distribution
         dx(0:m) = x_cb(0:m) - x_cb(-1:m - 1)
-        ! the cell center locations
+        ! Computing the cell center locations
         x_cc(0:m) = x_cb(-1:m - 1) + dx(0:m)/2._wp
 
         if (ib) then
@@ -582,7 +582,7 @@ contains
         end if
 
         if (n > 0) then
-            ! in cell boundary locations in y-direction
+            ! Read in cell boundary locations in y-direction
             file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//'y_cb.dat'
             inquire (FILE=trim(file_loc), EXIST=file_exist)
 
@@ -595,15 +595,15 @@ contains
                 call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
             end if
 
-            ! local cell boundary locations
+            ! Assigning local cell boundary locations
             y_cb(-1:n) = y_cb_glb((start_idx(2) - 1):(start_idx(2) + n))
-            ! the cell width distribution
+            ! Computing the cell width distribution
             dy(0:n) = y_cb(0:n) - y_cb(-1:n - 1)
-            ! the cell center locations
+            ! Computing the cell center locations
             y_cc(0:n) = y_cb(-1:n - 1) + dy(0:n)/2._wp
 
             if (p > 0) then
-                ! in cell boundary locations in z-direction
+                ! Read in cell boundary locations in z-direction
                 file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//'z_cb.dat'
                 inquire (FILE=trim(file_loc), EXIST=file_exist)
 
@@ -616,11 +616,11 @@ contains
                     call s_mpi_abort('File '//trim(file_loc)//'is missing. Exiting.')
                 end if
 
-                ! local cell boundary locations
+                ! Assigning local cell boundary locations
                 z_cb(-1:p) = z_cb_glb((start_idx(3) - 1):(start_idx(3) + p))
-                ! the cell width distribution
+                ! Computing the cell width distribution
                 dz(0:p) = z_cb(0:p) - z_cb(-1:p - 1)
-                ! the cell center locations
+                ! Computing the cell center locations
                 z_cc(0:p) = z_cb(-1:p - 1) + dz(0:p)/2._wp
 
             end if
@@ -640,7 +640,7 @@ contains
             if (file_exist) then
                 call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
-                ! MPI data I/O
+                ! Initialize MPI data I/O
                 if (down_sample) then
                     call s_initialize_mpi_data_ds(q_cons_vf)
                 else
@@ -653,20 +653,20 @@ contains
                 end if
 
                 if (down_sample) then
-                    ! of local arrays
+                    ! Size of local arrays
                     data_size = (m_ds + 3)*(n_ds + 3)*(p_ds + 3)
                     m_glb_read = m_glb_ds + 1
                     n_glb_read = n_glb_ds + 1
                     p_glb_read = p_glb_ds + 1
                 else
-                    ! of local arrays
+                    ! Size of local arrays
                     data_size = (m + 1)*(n + 1)*(p + 1)
                     m_glb_read = m_glb + 1
                     n_glb_read = n_glb + 1
                     p_glb_read = p_glb + 1
                 end if
 
-                ! some integers so MPI can read even the biggest file
+                ! Resize some integers so MPI can read even the biggest file
                 m_MOK = int(m_glb_read + 1, MPI_OFFSET_KIND)
                 n_MOK = int(m_glb_read + 1, MPI_OFFSET_KIND)
                 p_MOK = int(m_glb_read + 1, MPI_OFFSET_KIND)
@@ -675,7 +675,7 @@ contains
                 str_MOK = int(name_len, MPI_OFFSET_KIND)
                 NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
-                ! the data for each variable
+                ! Read the data for each variable
                 if (bubbles_euler .or. elasticity) then
                     do i = 1, sys_size!adv_idx%end
                         var_MOK = int(i, MPI_OFFSET_KIND)
@@ -715,7 +715,7 @@ contains
                 call MPI_FILE_CLOSE(ifile, ierr)
 
                 if (ib) then
-                    ! IB Markers
+                    ! Read IB Markers
                     write (file_loc, '(A)') 'ib.dat'
                     file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
                     inquire (FILE=trim(file_loc), EXIST=file_exist)
@@ -735,7 +735,7 @@ contains
                         call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
                     end if
 
-                    ! Levelset
+                    ! Read Levelset
                     write (file_loc, '(A)') 'levelset.dat'
                     file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
                     inquire (FILE=trim(file_loc), EXIST=file_exist)
@@ -755,7 +755,7 @@ contains
                         call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
                     end if
 
-                    ! Levelset Norm
+                    ! Read Levelset Norm
                     write (file_loc, '(A)') 'levelset_norm.dat'
                     file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
                     inquire (FILE=trim(file_loc), EXIST=file_exist)
@@ -781,7 +781,7 @@ contains
                 call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
             end if
         else
-            ! the file to read conservative variables
+            ! Open the file to read conservative variables
             if (cfl_dt) then
                 write (file_loc, '(I0,A)') n_start, '.dat'
             else
@@ -793,7 +793,7 @@ contains
             if (file_exist) then
                 call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
-                ! MPI data I/O
+                ! Initialize MPI data I/O
 
                 if (ib) then
                     call s_initialize_mpi_data(q_cons_vf, ib_markers, &
@@ -804,10 +804,10 @@ contains
 
                 end if
 
-                ! of local arrays
+                ! Size of local arrays
                 data_size = (m + 1)*(n + 1)*(p + 1)
 
-                ! some integers so MPI can read even the biggest file
+                ! Resize some integers so MPI can read even the biggest file
                 m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
                 n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
                 p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
@@ -816,11 +816,11 @@ contains
                 str_MOK = int(name_len, MPI_OFFSET_KIND)
                 NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
-                ! the data for each variable
+                ! Read the data for each variable
                 if (bubbles_euler .or. elasticity) then
                     do i = 1, sys_size !adv_idx%end
                         var_MOK = int(i, MPI_OFFSET_KIND)
-                        ! displacement to skip at beginning of file
+                        ! Initial displacement to skip at beginning of file
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
                         call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_DATA%view(i), &
@@ -832,7 +832,7 @@ contains
                     if (qbmm .and. .not. polytropic) then
                         do i = sys_size + 1, sys_size + 2*nb*nnode
                             var_MOK = int(i, MPI_OFFSET_KIND)
-                            ! displacement to skip at beginning of file
+                            ! Initial displacement to skip at beginning of file
                             disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
                             call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_DATA%view(i), &
@@ -845,7 +845,7 @@ contains
                     do i = 1, sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
-                        ! displacement to skip at beginning of file
+                        ! Initial displacement to skip at beginning of file
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
                         call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_DATA%view(i), &
@@ -861,7 +861,7 @@ contains
 
                 if (ib) then
 
-                    ! IB Markers
+                    ! Read IB Markers
                     write (file_loc, '(A)') 'ib.dat'
                     file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
                     inquire (FILE=trim(file_loc), EXIST=file_exist)
@@ -881,7 +881,7 @@ contains
                         call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
                     end if
 
-                    ! Levelset
+                    ! Read Levelset
                     write (file_loc, '(A)') 'levelset.dat'
                     file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
                     inquire (FILE=trim(file_loc), EXIST=file_exist)
@@ -901,7 +901,7 @@ contains
                         call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
                     end if
 
-                    ! Levelset Norm
+                    ! Read Levelset Norm
                     write (file_loc, '(A)') 'levelset_norm.dat'
                     file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
                     inquire (FILE=trim(file_loc), EXIST=file_exist)
@@ -944,7 +944,7 @@ contains
 
                         call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
-                        ! displacement to skip at beginning of file
+                        ! Initial displacement to skip at beginning of file
                         disp = 0
 
                         call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_airfoil_IB_DATA%view(1), &
@@ -961,7 +961,7 @@ contains
 
                         call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
-                        ! displacement to skip at beginning of file
+                        ! Initial displacement to skip at beginning of file
                         disp = 0
 
                         call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_airfoil_IB_DATA%view(2), &
@@ -997,10 +997,10 @@ contains
     end subroutine s_read_parallel_data_files
 
     !> The purpose of this procedure is to initialize the
-        !! the internal-energy equations of each phase
-        !! mass of each phase, the mixture momentum and
-        !!
-        !! conservative variables
+        !!      values of the internal-energy equations of each phase
+        !!      from the mass of each phase, the mixture momentum and
+        !!      mixture-total-energy equations.
+        !! @param v_vf conservative variables
     subroutine s_initialize_internal_energy_equations(v_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: v_vf
@@ -1124,14 +1124,14 @@ contains
 
         mytime = mytime + dt
 
-        ! (TVD) Runge-Kutta (RK) time-steppers
+        ! Total-variation-diminishing (TVD) Runge-Kutta (RK) time-steppers
         if (any(time_stepper == (/1, 2, 3/))) then
             call s_tvd_rk(t_step, time_avg, time_stepper)
         end if
 
         if (relax) call s_infinite_relaxation_k(q_cons_ts(1)%vf)
 
-        ! loop controls
+        ! Time-stepping loop controls
         t_step = t_step + 1
 
     end subroutine s_perform_time_step
@@ -1349,7 +1349,7 @@ contains
             end do
         end if
 
-        ! in the user provided initial condition and grid data
+        ! Reading in the user provided initial condition and grid data
         if (down_sample) then
             call s_read_data_files(q_cons_temp)
             call s_upsample_data(q_cons_ts(1)%vf, q_cons_temp)
@@ -1364,7 +1364,7 @@ contains
             call s_read_data_files(q_cons_ts(1)%vf)
         end if
 
-        ! the buffers of the grid variables using the boundary conditions
+        ! Populating the buffers of the grid variables using the boundary conditions
         call s_populate_grid_variables_buffers()
 
         if (model_eqns == 3) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
@@ -1372,12 +1372,12 @@ contains
         if (bodyForces) call s_initialize_body_forces_module()
         if (acoustic_source) call s_precalculate_acoustic_spatial_sources()
 
-        ! the Temperature cache.
+        ! Initialize the Temperature cache.
         if (chemistry) call s_compute_q_T_sf(q_T_sf, q_cons_ts(1)%vf, idwint)
 
-        ! of parameters, allocation of memory, association of pointers,
-        ! execution of any other tasks that are needed to properly configure
-        ! modules. The preparations below DO DEPEND on the grid being complete.
+        ! Computation of parameters, allocation of memory, association of pointers,
+        ! and/or execution of any other tasks that are needed to properly configure
+        ! the modules. The preparations below DO DEPEND on the grid being complete.
         if (igr .or. dummy) then
             call s_initialize_igr_module()
         end if
@@ -1413,11 +1413,11 @@ contains
 #endif
 #endif
 
-        ! MPI execution environment
+        ! Initializing MPI execution environment
 
         call s_mpi_initialize()
 
-        ! GPUs if OpenACC is enabled
+        ! Bind GPUs if OpenACC is enabled
 #ifdef MFC_GPU
 #ifndef MFC_MPI
         local_size = 1
@@ -1441,10 +1441,10 @@ contains
 #endif
 #endif
 
-        ! rank 0 processor assigns default values to the user inputs prior to
-        ! them in from the input file. Next, the user inputs are read and
-        ! consistency is checked. The identification of any inconsistencies
-        ! result in the termination of the simulation.
+        ! The rank 0 processor assigns default values to the user inputs prior to
+        ! reading them in from the input file. Next, the user inputs are read and
+        ! their consistency is checked. The identification of any inconsistencies
+        ! will result in the termination of the simulation.
         if (proc_rank == 0) then
             call s_assign_default_values_to_user_inputs()
             call s_read_input_file()
@@ -1466,9 +1466,9 @@ contains
 #endif
         end if
 
-        ! the user inputs to all of the processors and performing the
-        ! computational domain decomposition. Neither procedure has to be
-        ! out if the simulation is in fact not truly executed in parallel.
+        ! Broadcasting the user inputs to all of the processors and performing the
+        ! parallel computational domain decomposition. Neither procedure has to be
+        ! carried out if the simulation is in fact not truly executed in parallel.
 
         call s_mpi_bcast_user_inputs()
 
@@ -1583,7 +1583,7 @@ contains
         if (surface_tension) call s_finalize_surface_tension_module()
         if (bodyForces) call s_finalize_body_forces_module()
 
-        ! MPI execution environment
+        ! Terminating MPI execution environment
         call s_mpi_finalize()
     end subroutine s_finalize_modules
 

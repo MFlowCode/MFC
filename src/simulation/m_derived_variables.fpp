@@ -1,12 +1,12 @@
 !>
-!!
-!! module m_derived_variables
+!! @file
+!! @brief Contains module m_derived_variables
 
 !> @brief This module features subroutines that allow for the derivation of
-!! variables from the conservative and primitive ones.
-!! available derived variables include the unadvected
-!! specific heat ratio, liquid stiffness, speed of
-!! and the numerical Schlieren function.
+!!              numerous flow variables from the conservative and primitive ones.
+!!              Currently, the available derived variables include the unadvected
+!!              volume fraction, specific heat ratio, liquid stiffness, speed of
+!!              sound, vorticity and the numerical Schlieren function.
 #:include 'macros.fpp'
 
 module m_derived_variables
@@ -33,10 +33,10 @@ module m_derived_variables
  s_finalize_derived_variables_module
 
     !> @name Finite-difference coefficients
-    !! coefficients in x-, y- and z-coordinate directions.
-    !! because sufficient boundary information is available for all the
-    !! directions, the centered family of the finite-difference
-    !! used.
+    !! Finite-difference (fd) coefficients in x-, y- and z-coordinate directions.
+    !! Note that because sufficient boundary information is available for all the
+    !! active coordinate directions, the centered family of the finite-difference
+    !! schemes is used.
     !> @{
     real(wp), public, allocatable, dimension(:, :) :: fd_coeff_x
     real(wp), public, allocatable, dimension(:, :) :: fd_coeff_y
@@ -45,7 +45,7 @@ module m_derived_variables
 
     $:GPU_DECLARE(create='[fd_coeff_x,fd_coeff_y,fd_coeff_z]')
 
-    ! Variables for computing acceleration
+    ! @name Variables for computing acceleration
     !> @{
     real(wp), public, allocatable, dimension(:, :, :) :: accel_mag
     real(wp), public, allocatable, dimension(:, :, :) :: x_accel, y_accel, z_accel
@@ -55,18 +55,18 @@ module m_derived_variables
 contains
 
     !>  Computation of parameters, allocation procedures, and/or
-        !! tasks needed to properly setup the module
+        !!      any other tasks needed to properly setup the module
     impure subroutine s_initialize_derived_variables_module
 
-        ! the variables which will store the coefficients of the
-        ! family of finite-difference schemes. Note that sufficient
-        ! is allocated so that the coefficients up to any chosen order
-        ! accuracy may be bookkept. However, if higher than fourth-order
-        ! coefficients are wanted, the formulae required to compute
-        ! coefficients will have to be implemented in the subroutine
-        !
+        ! Allocating the variables which will store the coefficients of the
+        ! centered family of finite-difference schemes. Note that sufficient
+        ! space is allocated so that the coefficients up to any chosen order
+        ! of accuracy may be bookkept. However, if higher than fourth-order
+        ! accuracy coefficients are wanted, the formulae required to compute
+        ! these coefficients will have to be implemented in the subroutine
+        ! s_compute_finite_difference_coefficients.
 
-        ! centered finite-difference coefficients
+        ! Allocating centered finite-difference coefficients
         if (probe_wrt) then
             @:ALLOCATE(fd_coeff_x(-fd_number:fd_number, 0:m))
             if (n > 0) then
@@ -92,12 +92,12 @@ contains
     impure subroutine s_initialize_derived_variables
 
         if (probe_wrt) then
-            ! and writing header of flow probe files
+            ! Opening and writing header of flow probe files
             if (proc_rank == 0) then
                 call s_open_probe_files()
                 call s_open_com_files()
             end if
-            ! centered finite difference coefficients
+            ! Computing centered finite difference coefficients
             call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x, buff_size, &
                                                           fd_number, fd_order)
             $:GPU_UPDATE(device='[fd_coeff_x]')
@@ -117,7 +117,7 @@ contains
     end subroutine s_initialize_derived_variables
 
     !> Writes coherent body information, communication files, and probes.
-        !! Current time-step
+        !!  @param t_step Current time-step
     subroutine s_compute_derived_variables(t_step, q_cons_vf, q_prim_ts1, q_prim_ts2)
 
         integer, intent(in) :: t_step
@@ -177,17 +177,17 @@ contains
     end subroutine s_compute_derived_variables
 
     !> This subroutine receives as inputs the indicator of the
-        !! the acceleration that should be outputted and
-        !! variables. From those inputs, it proceeds
-        !! values of the desired acceleration component,
-        !! subsequently stored in derived flow quantity
-        !! q_sf.
-        !! Acceleration component indicator
-        !! Primitive variables
-        !! Primitive variables
-        !! Primitive variables
-        !! Primitive variables
-        !! Acceleration component
+        !!      component of the acceleration that should be outputted and
+        !!      the primitive variables. From those inputs, it proceeds
+        !!      to calculate values of the desired acceleration component,
+        !!      which are subsequently stored in derived flow quantity
+        !!      storage variable, q_sf.
+        !!  @param i Acceleration component indicator
+        !!  @param q_prim_vf0 Primitive variables
+        !!  @param q_prim_vf1 Primitive variables
+        !!  @param q_prim_vf2 Primitive variables
+        !!  @param q_prim_vf3 Primitive variables
+        !!  @param q_sf Acceleration component
     subroutine s_derive_acceleration_component(i, q_prim_vf0, q_prim_vf1, &
                                                q_prim_vf2, q_prim_vf3, q_sf)
 
@@ -202,7 +202,7 @@ contains
 
         integer :: j, k, l, r !< Generic loop iterators
 
-        ! the acceleration component in the x-coordinate direction
+        ! Computing the acceleration component in the x-coordinate direction
         if (i == 1) then
             $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
             do l = 0, p
@@ -286,7 +286,7 @@ contains
                     $:END_GPU_PARALLEL_LOOP()
                 end if
             end if
-            ! the acceleration component in the y-coordinate direction
+            ! Computing the acceleration component in the y-coordinate direction
         elseif (i == 2) then
             $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
             do l = 0, p
@@ -357,7 +357,7 @@ contains
                     $:END_GPU_PARALLEL_LOOP()
                 end if
             end if
-            ! the acceleration component in the z-coordinate direction
+            ! Computing the acceleration component in the z-coordinate direction
         else
             $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
             do l = 0, p
@@ -416,12 +416,12 @@ contains
     end subroutine s_derive_acceleration_component
 
     !> This subroutine is used together with the volume fraction
-    !! when called upon, it computes the location of
-    !! center of mass for each fluid from the inputted
-    !! q_prim_vf. The computed location
-    !! written to a formatted data file by the root process.
-    !! Primitive variables
-    !! Mass,x-location,y-location,z-location
+    !!      model and when called upon, it computes the location of
+    !!      of the center of mass for each fluid from the inputted
+    !!      primitive variables, q_prim_vf. The computed location
+    !!      is then written to a formatted data file by the root process.
+    !!  @param q_prim_vf Primitive variables
+    !!  @param c_m Mass,x-location,y-location,z-location
     impure subroutine s_derive_center_of_mass(q_vf, c_m)
         type(scalar_field), dimension(sys_size), intent(IN) :: q_vf
         real(wp), dimension(1:num_fluids, 1:5), intent(INOUT) :: c_m
@@ -447,13 +447,13 @@ contains
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, num_fluids !Loop over individual fluids
                             dV = dx(j)
-                            !
+                            ! Mass
                             $:GPU_ATOMIC(atomic='update')
                             c_m(i, 1) = c_m(i, 1) + q_vf(i)%sf(j, k, l)*dV
-                            ! weighted
+                            ! x-location weighted
                             $:GPU_ATOMIC(atomic='update')
                             c_m(i, 2) = c_m(i, 2) + q_vf(i)%sf(j, k, l)*dV*x_cc(j)
-                            ! fraction
+                            ! Volume fraction
                             $:GPU_ATOMIC(atomic='update')
                             c_m(i, 5) = c_m(i, 5) + q_vf(i + advxb - 1)%sf(j, k, l)*dV
                         end do
@@ -469,16 +469,16 @@ contains
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, num_fluids !Loop over individual fluids
                             dV = dx(j)*dy(k)
-                            !
+                            ! Mass
                             $:GPU_ATOMIC(atomic='update')
                             c_m(i, 1) = c_m(i, 1) + q_vf(i)%sf(j, k, l)*dV
-                            ! weighted
+                            ! x-location weighted
                             $:GPU_ATOMIC(atomic='update')
                             c_m(i, 2) = c_m(i, 2) + q_vf(i)%sf(j, k, l)*dV*x_cc(j)
-                            ! weighted
+                            ! y-location weighted
                             $:GPU_ATOMIC(atomic='update')
                             c_m(i, 3) = c_m(i, 3) + q_vf(i)%sf(j, k, l)*dV*y_cc(k)
-                            ! fraction
+                            ! Volume fraction
                             $:GPU_ATOMIC(atomic='update')
                             c_m(i, 5) = c_m(i, 5) + q_vf(i + advxb - 1)%sf(j, k, l)*dV
                         end do
@@ -495,19 +495,19 @@ contains
                         do i = 1, num_fluids !Loop over individual fluids
 
                             dV = dx(j)*dy(k)*dz(l)
-                            !
+                            ! Mass
                             $:GPU_ATOMIC(atomic='update')
                             c_m(i, 1) = c_m(i, 1) + q_vf(i)%sf(j, k, l)*dV
-                            ! weighted
+                            ! x-location weighted
                             $:GPU_ATOMIC(atomic='update')
                             c_m(i, 2) = c_m(i, 2) + q_vf(i)%sf(j, k, l)*dV*x_cc(j)
-                            ! weighted
+                            ! y-location weighted
                             $:GPU_ATOMIC(atomic='update')
                             c_m(i, 3) = c_m(i, 3) + q_vf(i)%sf(j, k, l)*dV*y_cc(k)
-                            ! weighted
+                            ! z-location weighted
                             $:GPU_ATOMIC(atomic='update')
                             c_m(i, 4) = c_m(i, 4) + q_vf(i)%sf(j, k, l)*dV*z_cc(l)
-                            ! fraction
+                            ! Volume fraction
                             $:GPU_ATOMIC(atomic='update')
                             c_m(i, 5) = c_m(i, 5) + q_vf(i + advxb - 1)%sf(j, k, l)*dV
                         end do
@@ -521,7 +521,7 @@ contains
 
         if (n == 0) then !1D simulation
             do i = 1, num_fluids !Loop over individual fluids
-                ! all components across all processors using MPI_ALLREDUCE
+                ! Sum all components across all processors using MPI_ALLREDUCE
                 if (num_procs > 1) then
                     tmp = c_m(i, 1)
                     call s_mpi_allreduce_sum(tmp, tmp_out)
@@ -533,12 +533,12 @@ contains
                     call s_mpi_allreduce_sum(tmp, tmp_out)
                     c_m(i, 5) = tmp_out
                 end if
-                ! quotients
+                ! Compute quotients
                 c_m(i, 2) = c_m(i, 2)/c_m(i, 1)
             end do
         elseif (p == 0) then !2D simulation
             do i = 1, num_fluids !Loop over individual fluids
-                ! all components across all processors using MPI_ALLREDUCE
+                ! Sum all components across all processors using MPI_ALLREDUCE
                 if (num_procs > 1) then
                     tmp = c_m(i, 1)
                     call s_mpi_allreduce_sum(tmp, tmp_out)
@@ -553,13 +553,13 @@ contains
                     call s_mpi_allreduce_sum(tmp, tmp_out)
                     c_m(i, 5) = tmp_out
                 end if
-                ! quotients
+                ! Compute quotients
                 c_m(i, 2) = c_m(i, 2)/c_m(i, 1)
                 c_m(i, 3) = c_m(i, 3)/c_m(i, 1)
             end do
         else !3D simulation
             do i = 1, num_fluids !Loop over individual fluids
-                ! all components across all processors using MPI_ALLREDUCE
+                ! Sum all components across all processors using MPI_ALLREDUCE
                 if (num_procs > 1) then
                     tmp = c_m(i, 1)
                     call s_mpi_allreduce_sum(tmp, tmp_out)
@@ -577,7 +577,7 @@ contains
                     call s_mpi_allreduce_sum(tmp, tmp_out)
                     c_m(i, 5) = tmp_out
                 end if
-                ! quotients
+                ! Compute quotients
                 c_m(i, 2) = c_m(i, 2)/c_m(i, 1)
                 c_m(i, 3) = c_m(i, 3)/c_m(i, 1)
                 c_m(i, 4) = c_m(i, 4)/c_m(i, 1)
@@ -589,7 +589,7 @@ contains
     !> Deallocation procedures for the module
     impure subroutine s_finalize_derived_variables_module
 
-        ! CoM and flow probe files
+        ! Closing CoM and flow probe files
         if (proc_rank == 0) then
             call s_close_com_files()
             if (probe_wrt) then
@@ -607,8 +607,8 @@ contains
             end if
         end if
 
-        ! the variables that might have been used to bookkeep
-        ! finite-difference coefficients in the x-, y- and z-directions
+        ! Deallocating the variables that might have been used to bookkeep
+        ! the finite-difference coefficients in the x-, y- and z-directions
         if (allocated(fd_coeff_x)) deallocate (fd_coeff_x)
         if (allocated(fd_coeff_y)) deallocate (fd_coeff_y)
         if (allocated(fd_coeff_z)) deallocate (fd_coeff_z)

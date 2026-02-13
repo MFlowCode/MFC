@@ -27,12 +27,12 @@ module m_muscl
     $:GPU_DECLARE(create='[is1_muscl,is2_muscl,is3_muscl]')
 
     !> @name The cell-average variables that will be MUSCL-reconstructed. Formerly, they
-    !! in v_vf. However, they are transferred to v_rs_wsL and v_rs_wsR
-    !! be reshaped (RS) and/or characteristically decomposed. The reshaping
-    !! muscl procedure to be independent of the coordinate direction of
-    !! Lastly, notice that the left (L) and right (R) results
-    !! characteristic decomposition are stored in custom-constructed muscl-
-    !! that are annexed to each position of a given scalar field.
+    !! are stored in v_vf. However, they are transferred to v_rs_wsL and v_rs_wsR
+    !! as to be reshaped (RS) and/or characteristically decomposed. The reshaping
+    !! allows the muscl procedure to be independent of the coordinate direction of
+    !! the reconstruction. Lastly, notice that the left (L) and right (R) results
+    !! of the characteristic decomposition are stored in custom-constructed muscl-
+    !! stencils (WS) that are annexed to each position of a given scalar field.
     !> @{
     real(wp), allocatable, dimension(:, :, :, :) :: v_rs_ws_x_muscl, v_rs_ws_y_muscl, v_rs_ws_z_muscl
     !> @}
@@ -42,7 +42,7 @@ contains
 
     subroutine s_initialize_muscl_module()
 
-        ! in x-direction
+        ! Initializing in x-direction
         is1_muscl%beg = -buff_size; is1_muscl%end = m - is1_muscl%beg
         if (n == 0) then
             is2_muscl%beg = 0
@@ -65,7 +65,7 @@ contains
 
         if (n == 0) return
 
-        ! in y-direction
+        ! initializing in y-direction
         is2_muscl%beg = -buff_size; is2_muscl%end = n - is2_muscl%beg
         is1_muscl%beg = -buff_size; is1_muscl%end = m - is1_muscl%beg
 
@@ -82,7 +82,7 @@ contains
 
         if (p == 0) return
 
-        ! in z-direction
+        ! initializing in z-direction
         is2_muscl%beg = -buff_size; is2_muscl%end = n - is2_muscl%beg
         is1_muscl%beg = -buff_size; is1_muscl%end = m - is1_muscl%beg
         is3_muscl%beg = -buff_size; is3_muscl%end = p - is3_muscl%beg
@@ -160,7 +160,7 @@ contains
         end if
 
         if (muscl_order == 2 .or. dummy) then
-            ! Reconstruction
+            ! MUSCL Reconstruction
             #:for MUSCL_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
                 if (muscl_dir == ${MUSCL_DIR}$) then
                     $:GPU_PARALLEL_LOOP(collapse=4,private='[i,j,k,l,slopeL,slopeR,slope]')
@@ -201,11 +201,11 @@ contains
                                         end if
                                     end if
 
-                                    ! from left side
+                                    ! reconstruct from left side
                                     vL_rs_vf_${XYZ}$ (j, k, l, i) = &
                                         v_rs_ws_${XYZ}$_muscl(j, k, l, i) - (5.e-1_wp*slope)
 
-                                    ! from the right side
+                                    ! reconstruct from the right side
                                     vR_rs_vf_${XYZ}$ (j, k, l, i) = &
                                         v_rs_ws_${XYZ}$_muscl(j, k, l, i) + (5.e-1_wp*slope)
 
@@ -270,7 +270,7 @@ contains
                                 B = exp(sign*ic_beta*(2._wp*C - 1._wp))
                                 A = (B/cosh(ic_beta) - 1._wp)/tanh(ic_beta)
 
-                                ! reconstruction
+                                ! Left reconstruction
                                 aTHINC = qmin + 5e-1_wp*qmax*(1._wp + sign*A)
                                 if (aTHINC < ic_eps) aTHINC = ic_eps
                                 if (aTHINC > 1 - ic_eps) aTHINC = 1 - ic_eps
@@ -281,7 +281,7 @@ contains
                                 vL_rs_vf_${XYZ}$ (j, k, l, advxb) = aTHINC
                                 vL_rs_vf_${XYZ}$ (j, k, l, advxe) = 1 - aTHINC
 
-                                ! reconstruction
+                                ! Right reconstruction
                                 aTHINC = qmin + 5e-1_wp*qmax*(1._wp + sign*(tanh(ic_beta) + A)/(1._wp + A*tanh(ic_beta)))
                                 if (aTHINC < ic_eps) aTHINC = ic_eps
                                 if (aTHINC > 1 - ic_eps) aTHINC = 1 - ic_eps
@@ -310,11 +310,11 @@ contains
 
         integer :: j, k, l, q !< Generic loop iterators
 
-        ! the number of cell-average variables which will be
-        ! and mapping their indical bounds in the x-,
-        ! and z-directions to those in the s1-, s2- and s3-directions
-        ! to reshape the inputted data in the coordinate direction of
-        ! muscl reconstruction
+        ! Determining the number of cell-average variables which will be
+        ! muscl-reconstructed and mapping their indical bounds in the x-,
+        ! y- and z-directions to those in the s1-, s2- and s3-directions
+        ! as to reshape the inputted data in the coordinate direction of
+        ! the muscl reconstruction
         v_size = ubound(v_vf, 1)
         $:GPU_UPDATE(device='[v_size]')
 
@@ -332,7 +332,7 @@ contains
             $:END_GPU_PARALLEL_LOOP()
         end if
 
-        ! onto Characteristic Fields in y-direction
+        ! Reshaping/Projecting onto Characteristic Fields in y-direction
         if (n == 0) return
 
         if (muscl_dir == 2) then
@@ -349,7 +349,7 @@ contains
             $:END_GPU_PARALLEL_LOOP()
         end if
 
-        ! onto Characteristic Fields in z-direction
+        ! Reshaping/Projecting onto Characteristic Fields in z-direction
         if (p == 0) return
         if (muscl_dir == 3) then
             $:GPU_PARALLEL_LOOP(private='[j,k,l,q]', collapse=4)

@@ -1,14 +1,14 @@
 !>
-!!
-!! module m_pressure_relaxation
+!! @file
+!! @brief Contains module m_pressure_relaxation
 
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
 !> @brief The module contains the subroutines used to perform pressure relaxation
-!! flows using the 6-equation model. This includes
-!! correction, Newton-Raphson pressure equilibration, and
-!! correction to maintain thermodynamic consistency.
+!!        for multi-component flows using the 6-equation model. This includes
+!!        volume fraction correction, Newton-Raphson pressure equilibration, and
+!!        internal energy correction to maintain thermodynamic consistency.
 module m_pressure_relaxation
 
     use m_derived_types        !< Definitions of the derived types
@@ -52,7 +52,7 @@ contains
     end subroutine s_finalize_pressure_relaxation_module
 
     !> The main pressure relaxation procedure
-    !! Cell-average conservative variables
+    !! @param q_cons_vf Cell-average conservative variables
     subroutine s_pressure_relaxation_procedure(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
@@ -77,15 +77,15 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         integer, intent(in) :: j, k, l
 
-        ! fraction correction
+        ! Volume fraction correction
         if (mpp_lim) call s_correct_volume_fractions(q_cons_vf, j, k, l)
 
-        ! equilibration
+        ! Pressure equilibration
         if (s_needs_pressure_relaxation(q_cons_vf, j, k, l)) then
             call s_equilibrate_pressure(q_cons_vf, j, k, l)
         end if
 
-        ! energy correction
+        ! Internal energy correction
         call s_correct_internal_energies(q_cons_vf, j, k, l)
 
     end subroutine s_relax_cell_pressure
@@ -155,7 +155,7 @@ contains
         real(wp), parameter :: TOLERANCE = 1.e-10_wp
         integer :: iter, i
 
-        ! pressures
+        ! Initialize pressures
         pres_relax = 0._wp
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_fluids
@@ -170,7 +170,7 @@ contains
             pres_relax = pres_relax + q_cons_vf(i + advxb - 1)%sf(j, k, l)*pres_K_init(i)
         end do
 
-        ! iteration
+        ! Newton-Raphson iteration
         f_pres = 1.e-9_wp
         df_pres = 1.e9_wp
         $:GPU_LOOP(parallelism='[seq]')
@@ -178,13 +178,13 @@ contains
             if (abs(f_pres) > TOLERANCE) then
                 pres_relax = pres_relax - f_pres/df_pres
 
-                ! pressure bounds
+                ! Enforce pressure bounds
                 do i = 1, num_fluids
                     if (pres_relax <= -(1._wp - 1.e-8_wp)*ps_inf(i) + 1.e-8_wp) &
                         pres_relax = -(1._wp - 1.e-8_wp)*ps_inf(i) + 1.e-8_wp
                 end do
 
-                ! step
+                ! Newton-Raphson step
                 f_pres = -1._wp
                 df_pres = 0._wp
                 $:GPU_LOOP(parallelism='[seq]')
@@ -202,7 +202,7 @@ contains
             end if
         end do
 
-        ! volume fractions
+        ! Update volume fractions
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_fluids
             if (q_cons_vf(i + advxb - 1)%sf(j, k, l) > sgm_eps) &
@@ -232,7 +232,7 @@ contains
             alpha(i) = q_cons_vf(E_idx + i)%sf(j, k, l)
         end do
 
-        ! mixture properties (combined bubble and standard logic)
+        ! Compute mixture properties (combined bubble and standard logic)
         rho = 0._wp
         gamma = 0._wp
         pi_inf = 0._wp
@@ -290,7 +290,7 @@ contains
             end if
         end if
 
-        ! dynamic pressure and update internal energies
+        ! Compute dynamic pressure and update internal energies
         dyn_pres = 0._wp
         $:GPU_LOOP(parallelism='[seq]')
         do i = momxb, momxe

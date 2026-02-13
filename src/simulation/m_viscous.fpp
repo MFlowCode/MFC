@@ -1,6 +1,6 @@
 !>
-!!
-!! module m_viscous
+!! @file
+!! @brief Contains module m_viscous
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
@@ -14,7 +14,7 @@ module m_viscous
     use m_weno
 
     use m_muscl                !< Monotonic Upstream-centered (MUSCL)
-                               !! conservation laws
+                               !! schemes for conservation laws
 
     use m_helper
 
@@ -53,14 +53,14 @@ contains
     end subroutine s_initialize_viscous_module
 
     !> The purpose of this subroutine is to compute the viscous
-    !      tensor for the cells directly next to the axis in
-    !      coordinates. This is necessary to avoid the
-    !      singularity that arises at the cell boundary coinciding
-    !      the axis, i.e., y_cb(-1) = 0.
-    !  q_prim_vf Cell-average primitive variables
-    !  grad_x_vf Cell-average primitive variable derivatives, x-dir
-    !  grad_y_vf Cell-average primitive variable derivatives, y-dir
-    !  grad_z_vf Cell-average primitive variable derivatives, z-dir
+    !      stress tensor for the cells directly next to the axis in
+    !      cylindrical coordinates. This is necessary to avoid the
+    !      1/r singularity that arises at the cell boundary coinciding
+    !      with the axis, i.e., y_cb(-1) = 0.
+    !  @param q_prim_vf Cell-average primitive variables
+    !  @param grad_x_vf Cell-average primitive variable derivatives, x-dir
+    !  @param grad_y_vf Cell-average primitive variable derivatives, y-dir
+    !  @param grad_z_vf Cell-average primitive variable derivatives, z-dir
     subroutine s_compute_viscous_stress_cylindrical_boundary(q_prim_vf, grad_x_vf, grad_y_vf, grad_z_vf, &
                                                              tau_Re_vf, &
                                                              ix, iy, iz)
@@ -530,9 +530,9 @@ contains
     end subroutine s_compute_viscous_stress_cylindrical_boundary
 
     !>  Computes viscous terms
-    !! Cell-averaged conservative variables
-    !! Cell-averaged primitive variables
-    !! Cell-averaged RHS variables
+    !!  @param q_cons_vf Cell-averaged conservative variables
+    !!  @param q_prim_vf Cell-averaged primitive variables
+    !!  @param rhs_vf Cell-averaged RHS variables
     subroutine s_get_viscous(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, &
                              dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n, &
                              qL_prim, &
@@ -577,8 +577,8 @@ contains
         end do
 
         if (weno_Re_flux) then
-            ! velocity gradient at cell centers using scalar
-            ! theorem
+            ! Compute velocity gradient at cell centers using scalar
+            ! divergence theorem
             do i = 1, num_dims
                 if (i == 1) then
                     call s_apply_scalar_divergence_theorem( &
@@ -1021,7 +1021,7 @@ contains
 
         #:for SCHEME, TYPE in [('weno','WENO_TYPE'), ('muscl','MUSCL_TYPE')]
             if (recon_type == ${TYPE}$ .or. dummy) then
-                ! in s1-direction
+                ! Reconstruction in s1-direction
 
                 if (norm_dir == 1) then
                     is1_viscous = ix; is2_viscous = iy; is3_viscous = iz
@@ -1123,7 +1123,7 @@ contains
         integer :: i, j, k, l
         #:for SCHEME, TYPE in [('weno','WENO_TYPE'), ('muscl','MUSCL_TYPE')]
             if (recon_type == ${TYPE}$) then
-                ! in s1-direction
+                ! Reconstruction in s1-direction
 
                 if (norm_dir == 1) then
                     is1_viscous = ix; is2_viscous = iy; is3_viscous = iz
@@ -1213,21 +1213,21 @@ contains
     end subroutine s_reconstruct_cell_boundary_values_visc_deriv
 
     !>  The purpose of this subroutine is to employ the inputted
-        !! right cell-boundary integral-averaged variables
-        !! the relevant cell-average first-order spatial
-        !! the x-, y- or z-direction by means of the
-        !! theorem.
-        !! Left cell-boundary integral averages
-        !! Right cell-boundary integral averages
-        !! Cell-average first-order spatial derivatives
-        !! Splitting coordinate direction
+        !!      left and right cell-boundary integral-averaged variables
+        !!      to compute the relevant cell-average first-order spatial
+        !!      derivatives in the x-, y- or z-direction by means of the
+        !!      scalar divergence theorem.
+        !!  @param vL_vf Left cell-boundary integral averages
+        !!  @param vR_vf Right cell-boundary integral averages
+        !!  @param dv_ds_vf Cell-average first-order spatial derivatives
+        !!  @param norm_dir Splitting coordinate direction
     subroutine s_apply_scalar_divergence_theorem(vL_vf, vR_vf, &
                                                  dv_ds_vf, &
                                                  norm_dir, &
                                                  ix, iy, iz, iv_in, &
                                                  dL, dim, buff_size_in)
 
-        ! of cell widths
+        ! arrays of cell widths
         type(scalar_field), &
             dimension(iv%beg:iv%end), &
             intent(in) :: vL_vf, vR_vf
@@ -1250,14 +1250,14 @@ contains
 
         $:GPU_UPDATE(device='[is1_viscous, is2_viscous, is3_viscous, iv]')
 
-        ! Spatial Derivatives in x-direction
+        ! First-Order Spatial Derivatives in x-direction
         if (norm_dir == 1) then
 
-            ! general application of the scalar divergence theorem that
-            ! the left and right cell-boundary integral-averages,
-            ! each cell, or an arithmetic mean of these two at the
-            ! to calculate the cell-averaged first-order
-            ! derivatives inside the cell.
+            ! A general application of the scalar divergence theorem that
+            ! utilizes the left and right cell-boundary integral-averages,
+            ! inside each cell, or an arithmetic mean of these two at the
+            ! cell-boundaries, to calculate the cell-averaged first-order
+            ! spatial derivatives inside the cell.
 
             $:GPU_PARALLEL_LOOP(collapse=3)
             do l = is3_viscous%beg, is3_viscous%end
@@ -1277,16 +1277,16 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
 
-            ! First-Order Spatial Derivatives in x-direction
+            ! END: First-Order Spatial Derivatives in x-direction
 
-            ! Spatial Derivatives in y-direction
+            ! First-Order Spatial Derivatives in y-direction
         elseif (norm_dir == 2) then
 
-            ! general application of the scalar divergence theorem that
-            ! the left and right cell-boundary integral-averages,
-            ! each cell, or an arithmetic mean of these two at the
-            ! to calculate the cell-averaged first-order
-            ! derivatives inside the cell.
+            ! A general application of the scalar divergence theorem that
+            ! utilizes the left and right cell-boundary integral-averages,
+            ! inside each cell, or an arithmetic mean of these two at the
+            ! cell-boundaries, to calculate the cell-averaged first-order
+            ! spatial derivatives inside the cell.
 
             $:GPU_PARALLEL_LOOP(collapse=3)
             do l = is3_viscous%beg, is3_viscous%end
@@ -1306,16 +1306,16 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
 
-            ! First-Order Spatial Derivatives in y-direction
+            ! END: First-Order Spatial Derivatives in y-direction
 
-            ! Spatial Derivatives in z-direction
+            ! First-Order Spatial Derivatives in z-direction
         else
 
-            ! general application of the scalar divergence theorem that
-            ! the left and right cell-boundary integral-averages,
-            ! each cell, or an arithmetic mean of these two at the
-            ! to calculate the cell-averaged first-order
-            ! derivatives inside the cell.
+            ! A general application of the scalar divergence theorem that
+            ! utilizes the left and right cell-boundary integral-averages,
+            ! inside each cell, or an arithmetic mean of these two at the
+            ! cell-boundaries, to calculate the cell-averaged first-order
+            ! spatial derivatives inside the cell.
 
             $:GPU_PARALLEL_LOOP(collapse=3)
             do l = is3_viscous%beg + 1, is3_viscous%end - 1
@@ -1336,16 +1336,16 @@ contains
             $:END_GPU_PARALLEL_LOOP()
 
         end if
-        ! First-Order Spatial Derivatives in z-direction
+        ! END: First-Order Spatial Derivatives in z-direction
 
     end subroutine s_apply_scalar_divergence_theorem
 
     !>  Computes the scalar gradient fields via finite differences
-        !! Variable to compute derivative of
-        !! First coordinate direction component of the derivative
-        !! Second coordinate direction component of the derivative
-        !! Third coordinate direction component of the derivative
-        !! Norm of the gradient vector
+        !!  @param var Variable to compute derivative of
+        !!  @param grad_x First coordinate direction component of the derivative
+        !!  @param grad_y Second coordinate direction component of the derivative
+        !!  @param grad_z Third coordinate direction component of the derivative
+        !!  @param norm Norm of the gradient vector
     subroutine s_compute_fd_gradient(var, grad_x, grad_y, grad_z)
 
         type(scalar_field), intent(in) :: var
@@ -1523,7 +1523,7 @@ contains
 
     end subroutine s_compute_fd_gradient
 
-    ! the viscous stress tensor at a particule i, j, k element
+    ! computes the viscous stress tensor at a particule i, j, k element
     subroutine s_compute_viscous_stress_tensor(viscous_stress_tensor, q_prim_vf, dynamic_viscosity, i, j, k)
         $:GPU_ROUTINE(parallelism='[seq]')
 
@@ -1537,19 +1537,19 @@ contains
         real(wp) :: divergence
         integer :: l, q ! iterators
 
-        ! the viscous stress, collection of velocity diriviatives, and spacial finite differences
+        ! zero the viscous stress, collection of velocity diriviatives, and spacial finite differences
         viscous_stress_tensor = 0._wp
         velocity_gradient_tensor = 0._wp
         dx = 0._wp
 
-        ! the change in x used in the finite difference equaiont
+        ! get the change in x used in the finite difference equaiont
         dx(1) = 0.5_wp*(x_cc(i + 1) - x_cc(i - 1))
         dx(2) = 0.5_wp*(y_cc(j + 1) - y_cc(j - 1))
         if (num_dims == 3) then
             dx(3) = 0.5_wp*(z_cc(k + 1) - z_cc(k - 1))
         end if
 
-        ! the velocity gradient tensor
+        ! compute the velocity gradient tensor
         do l = 1, num_dims
             velocity_gradient_tensor(l, 1) = (q_prim_vf(momxb + l - 1)%sf(i + 1, j, k) - q_prim_vf(momxb + l - 1)%sf(i - 1, j, k))/(2._wp*dx(1))
             velocity_gradient_tensor(l, 2) = (q_prim_vf(momxb + l - 1)%sf(i, j + 1, k) - q_prim_vf(momxb + l - 1)%sf(i, j - 1, k))/(2._wp*dx(2))
@@ -1558,20 +1558,20 @@ contains
             end if
         end do
 
-        ! divergence
+        ! compute divergence
         divergence = 0._wp
         do l = 1, num_dims
             divergence = divergence + velocity_gradient_tensor(l, l)
         end do
 
-        ! up the shear stress tensor
+        ! set up the shear stress tensor
         do l = 1, num_dims
             do q = 1, num_dims
                 viscous_stress_tensor(l, q) = dynamic_viscosity*(velocity_gradient_tensor(l, q) + velocity_gradient_tensor(q, l))
             end do
         end do
 
-        ! the viscous_stress_tensor
+        ! populate the viscous_stress_tensor
         do l = 1, num_dims
             viscous_stress_tensor(l, l) = viscous_stress_tensor(l, l) - 2._wp*divergence*dynamic_viscosity/3._wp
         end do

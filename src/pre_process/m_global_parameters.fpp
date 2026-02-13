@@ -1,12 +1,12 @@
 !>
-!!
-!! module m_global_parameters
+!! @file
+!! @brief Contains module m_global_parameters
 
 #:include 'case.fpp'
 
 !> @brief This module contains all of the parameters characterizing the
-!! simulation algorithm, initial condition
-!! stiffened equation of state.
+!!              computational domain, simulation algorithm, initial condition
+!!              and the stiffened equation of state.
 module m_global_parameters
 
 #ifdef MFC_MPI
@@ -21,7 +21,7 @@ module m_global_parameters
 
     implicit none
 
-    !
+    ! Logistics
     integer :: num_procs            !< Number of processors
     character(LEN=path_len) :: case_dir             !< Case folder location
     logical :: old_grid             !< Use existing grid data
@@ -31,11 +31,11 @@ module m_global_parameters
     logical :: cfl_adap_dt, cfl_const_dt, cfl_dt
     integer :: n_start, n_start_old
 
-    ! Domain Parameters
+    ! Computational Domain Parameters
 
     integer :: proc_rank !< Rank of the local processor
 
-    !! cells in the x-, y- and z-coordinate directions
+    !! Number of cells in the x-, y- and z-coordinate directions
     integer :: m
     integer :: n
     integer :: p
@@ -54,30 +54,30 @@ module m_global_parameters
     integer :: grid_geometry !< Cylindrical coordinates (either axisymmetric or full 3D)
 
     real(wp), allocatable, dimension(:) :: x_cc, y_cc, z_cc !<
-    !! cell-centers (cc) in x-, y- and z-directions, respectively
+    !! Locations of cell-centers (cc) in x-, y- and z-directions, respectively
 
     real(wp), allocatable, dimension(:) :: x_cb, y_cb, z_cb !<
-    !! cell-boundaries (cb) in x-, y- and z-directions, respectively
+    !! Locations of cell-boundaries (cb) in x-, y- and z-directions, respectively
 
     real(wp) :: dx, dy, dz !<
-    !! in the x-, y- and z-coordinate directions
+    !! Minimum cell-widths in the x-, y- and z-coordinate directions
 
     type(bounds_info) :: x_domain, y_domain, z_domain !<
-    !! the domain bounds in the x-, y- and z-coordinate directions
+    !! Locations of the domain bounds in the x-, y- and z-coordinate directions
 
     logical :: stretch_x, stretch_y, stretch_z !<
-    !! flags for the x-, y- and z-coordinate directions
+    !! Grid stretching flags for the x-, y- and z-coordinate directions
 
-    ! of the grid stretching function for the x-, y- and z-coordinate
-    ! The "a" parameters are a measure of the rate at which the grid
-    ! stretched while the remaining parameters are indicative of the location
-    ! the grid at which the stretching begins.
+    ! Parameters of the grid stretching function for the x-, y- and z-coordinate
+    ! directions. The "a" parameters are a measure of the rate at which the grid
+    ! is stretched while the remaining parameters are indicative of the location
+    ! on the grid at which the stretching begins.
     real(wp) :: a_x, a_y, a_z
     integer :: loops_x, loops_y, loops_z
     real(wp) :: x_a, y_a, z_a
     real(wp) :: x_b, y_b, z_b
 
-    ! Algorithm Parameters
+    ! Simulation Algorithm Parameters
     integer :: model_eqns            !< Multicomponent flow model
     logical :: relax                 !< activate phase change
     integer :: relax_model           !< Relax Model
@@ -105,7 +105,7 @@ module m_global_parameters
     integer :: igr_order             !< IGR reconstruction order
     logical, parameter :: chemistry = .${chemistry}$. !< Chemistry modeling
 
-    ! of the structure, i.e. the organization, of the state vectors
+    ! Annotations of the structure, i.e. the organization, of the state vectors
     type(int_bounds_info) :: cont_idx              !< Indexes of first & last continuity eqns.
     type(int_bounds_info) :: mom_idx               !< Indexes of first & last momentum eqns.
     integer :: E_idx                               !< Index of total energy equation
@@ -124,26 +124,26 @@ module m_global_parameters
     integer :: damage_idx                          !< Index of damage state variable (D) for continuum damage model
     integer :: psi_idx                             !< Index of hyperbolic cleaning state variable for MHD
 
-    ! Indices for the (local) interior points (O-m, O-n, 0-p).
-    ! for "InDices With BUFFer".
+    ! Cell Indices for the (local) interior points (O-m, O-n, 0-p).
+    ! Stands for "InDices With BUFFer".
     type(int_bounds_info) :: idwint(1:3)
 
-    ! Indices for the entire (local) domain. In simulation and post_process,
-    ! includes the buffer region. idwbuff and idwint are the same otherwise.
-    ! for "InDices With BUFFer".
+    ! Cell Indices for the entire (local) domain. In simulation and post_process,
+    ! this includes the buffer region. idwbuff and idwint are the same otherwise.
+    ! Stands for "InDices With BUFFer".
     type(int_bounds_info) :: idwbuff(1:3)
 
     type(int_bounds_info) :: bc_x, bc_y, bc_z !<
-    !! in the x-, y- and z-coordinate directions
+    !! Boundary conditions in the x-, y- and z-coordinate directions
 
     integer :: shear_num !! Number of shear stress components
     integer, dimension(3) :: shear_indices !<
-    !! the stress components that represent shear stress
+    !! Indices of the stress components that represent shear stress
     integer :: shear_BC_flip_num !<
-    !! shear stress components to reflect for boundary conditions
+    !! Number of shear stress components to reflect for boundary conditions
     integer, dimension(3, 2) :: shear_BC_flip_indices !<
-    !! shear stress components to reflect for boundary conditions.
-    !! 1:shear_BC_flip_num) for (x/y/z, [indices])
+    !! Indices of shear stress components to reflect for boundary conditions.
+    !! Size: (1:3, 1:shear_BC_flip_num) for (x/y/z, [indices])
 
     logical :: parallel_io !< Format of the data files
     logical :: file_per_process !< type of data output
@@ -155,8 +155,8 @@ module m_global_parameters
     logical :: mixlayer_perturb !< Superimpose instability waves to surrounding fluid flow
     integer :: mixlayer_perturb_nk  !< Number of Fourier modes for perturbation with mixlayer_perturb flag
     real(wp) :: mixlayer_perturb_k0  !< Peak wavenumber of prescribed energy spectra with mixlayer_perturb flag
-                                     !! (k0 = 0.4446) is most unstable mode obtained from linear stability analysis
-                                     !! (1964, JFM) for details
+                                     !! Default value (k0 = 0.4446) is most unstable mode obtained from linear stability analysis
+                                     !! See Michalke (1964, JFM) for details
     logical :: simplex_perturb
     type(simplex_noise_params) :: simplex_params
 
@@ -165,7 +165,7 @@ module m_global_parameters
     logical :: viscous
     logical :: bubbles_lagrange
 
-    ! density of surrounding air so as to break symmetry of grid
+    ! Perturb density of surrounding air so as to break symmetry of grid
     logical :: perturb_flow
     integer :: perturb_flow_fluid   !< Fluid to be perturbed with perturb_flow flag
     real(wp) :: perturb_flow_mag   !< Magnitude of perturbation with perturb_flow flag
@@ -177,10 +177,10 @@ module m_global_parameters
     integer :: elliptic_smoothing_iters
 
     integer, allocatable, dimension(:) :: proc_coords !<
-    !! in MPI_CART_COMM
+    !! Processor coordinates in MPI_CART_COMM
 
     integer, allocatable, dimension(:) :: start_idx !<
-    !! index of local processor in global grid
+    !! Starting cell-center index of local processor in global grid
 
 #ifdef MFC_MPI
 
@@ -192,32 +192,32 @@ module m_global_parameters
 
     character(LEN=name_len) :: mpiiofs
     integer :: mpi_info_int !<
-    !! for parallel IO with Lustre file systems
+    !! MPI info for parallel IO with Lustre file systems
 
 #endif
 
-    ! Condition Parameters
+    ! Initial Condition Parameters
     integer :: num_patches     !< Number of patches composing initial condition
 
     type(ic_patch_parameters), dimension(num_patches_max) :: patch_icpp !<
-    !! the initial condition patch parameters (icpp) for each of the
-    !! in the configuration of the initial condition. Note that
-    !! allowable number of patches, num_patches_max, may be changed
-    !! module m_derived_types.f90.
+    !! Database of the initial condition patch parameters (icpp) for each of the
+    !! patches employed in the configuration of the initial condition. Note that
+    !! the maximum allowable number of patches, num_patches_max, may be changed
+    !! in the module m_derived_types.f90.
 
     integer :: num_bc_patches  !< Number of boundary condition patches
     logical :: bc_io !< whether or not to save BC data
     type(bc_patch_parameters), dimension(num_bc_patches_max) :: patch_bc
-    !! the boundary condition patch parameters for each of the patches
-    !! the configuration of the boundary conditions
+    !! Database of the boundary condition patch parameters for each of the patches
+    !! employed in the configuration of the boundary conditions
 
-    ! Physical Parameters
+    ! Fluids Physical Parameters
     type(physical_parameters), dimension(num_fluids_max) :: fluid_pp !<
-    !! the physical parameters of each of the fluids that is present
-    !! flow. These include the stiffened gas equation of state parameters,
-    !! Reynolds numbers.
+    !! Database of the physical parameters of each of the fluids that is present
+    !! in the flow. These include the stiffened gas equation of state parameters,
+    !! and the Reynolds numbers.
 
-    ! Bubble Parameters
+    ! Subgrid Bubble Parameters
     type(subgrid_bubble_physical_parameters) :: bub_pp
 
     real(wp) :: rhoref, pref !< Reference parameters for Tait EOS
@@ -244,10 +244,10 @@ module m_global_parameters
     type(ib_patch_parameters), dimension(num_patches_max) :: patch_ib
 
     type(vec3_dt), allocatable, dimension(:) :: airfoil_grid_u, airfoil_grid_l
-    !! the immersed boundary patch parameters for each of the
-    !! in the configuration of the initial condition. Note that
-    !! allowable number of patches, num_patches_max, may be changed
-    !! module m_derived_types.f90.
+    !! Database of the immersed boundary patch parameters for each of the
+    !! patches employed in the configuration of the initial condition. Note that
+    !! the maximum allowable number of patches, num_patches_max, may be changed
+    !! in the module m_derived_types.f90.
 
     !> @}
 
@@ -297,9 +297,9 @@ module m_global_parameters
     real(wp) :: Bx0 !< Constant magnetic field in the x-direction (1D)
 
     integer :: buff_size !<
-    !! of cells that are necessary to be able to store enough boundary
-    !! to march the solution in the physical computational domain
-    !! next time-step.
+    !! The number of cells that are necessary to be able to store enough boundary
+    !! conditions data to march the solution in the physical computational domain
+    !! to the next time-step.
 
     logical :: fft_wrt
     logical :: dummy  !< AMDFlang workaround: keep a dummy logical to avoid a compiler case-optimization bug when a parameter+GPU-kernel conditional is false
@@ -307,13 +307,13 @@ module m_global_parameters
 contains
 
     !>  Assigns default values to user inputs prior to reading
-        !! This allows for an easier consistency check of
-        !! once they are read from the input file.
+        !!              them in. This allows for an easier consistency check of
+        !!              these parameters once they are read from the input file.
     impure subroutine s_assign_default_values_to_user_inputs
 
         integer :: i !< Generic loop operator
 
-        !
+        ! Logistics
         case_dir = '.'
         old_grid = .false.
         old_ic = .false.
@@ -325,7 +325,7 @@ contains
         cfl_dt = .false.
         n_start = dflt_int
 
-        ! domain parameters
+        ! Computational domain parameters
         m = dflt_int; n = 0; p = 0
 
         call s_update_cell_bounds(cells_bounds, m, n, p)
@@ -356,7 +356,7 @@ contains
         z_a = dflt_real
         z_b = dflt_real
 
-        ! algorithm parameters
+        ! Simulation algorithm parameters
         model_eqns = dflt_int
         relax = .false.
         relax_model = dflt_int
@@ -425,7 +425,7 @@ contains
         simplex_params%perturb_dens_scale(:) = dflt_real
         simplex_params%perturb_dens_offset(:, :) = dflt_real
 
-        ! condition parameters
+        ! Initial condition parameters
         num_patches = dflt_int
 
         do i = 1, num_patches_max
@@ -502,11 +502,11 @@ contains
             patch_bc(i)%radius = dflt_real
         end do
 
-        ! EOS
+        ! Tait EOS
         rhoref = dflt_real
         pref = dflt_real
 
-        ! modeling
+        ! Bubble modeling
         bubbles_euler = .false.
         polytropic = .true.
         polydisperse = .false.
@@ -538,11 +538,11 @@ contains
         Pe_c = dflt_real
         Tw = dflt_real
 
-        ! tension modeling
+        ! surface tension modeling
         sigma = dflt_real
         pi_fac = 1._wp
 
-        ! Boundaries
+        ! Immersed Boundaries
         ib = .false.
         num_ibs = dflt_int
 
@@ -562,7 +562,7 @@ contains
             patch_ib(i)%p = dflt_real
             patch_ib(i)%slip = .false.
 
-            ! default values for translating STL models
+            ! Proper default values for translating STL models
             patch_ib(i)%model_scale(:) = 1._wp
             patch_ib(i)%model_translate(:) = 0._wp
             patch_ib(i)%model_rotate(:) = 0._wp
@@ -570,7 +570,7 @@ contains
             patch_ib(i)%model_spc = num_ray
             patch_ib(i)%model_threshold = ray_tracing_threshold
 
-            ! to handle moving imersed boundaries, defaulting to no movement
+            ! Variables to handle moving imersed boundaries, defaulting to no movement
             patch_ib(i)%moving_ibm = 0
             patch_ib(i)%vel(:) = 0._wp
             patch_ib(i)%angles(:) = 0._wp
@@ -579,7 +579,7 @@ contains
             patch_ib(i)%moment = dflt_real
             patch_ib(i)%centroid_offset(:) = 0._wp
 
-            ! values of a rotation matrix which can be used when calculating rotations
+            ! sets values of a rotation matrix which can be used when calculating rotations
             patch_ib(i)%rotation_matrix = 0._wp
             patch_ib(i)%rotation_matrix(1, 1) = 1._wp
             patch_ib(i)%rotation_matrix(2, 2) = 1._wp
@@ -590,7 +590,7 @@ contains
         chem_params%gamma_method = 1
         chem_params%transport_model = 1
 
-        ! physical parameters
+        ! Fluids physical parameters
         do i = 1, num_fluids_max
             fluid_pp(i)%gamma = dflt_real
             fluid_pp(i)%pi_inf = dflt_real
@@ -602,7 +602,7 @@ contains
 
         Bx0 = dflt_real
 
-        ! bubble parameters
+        ! Subgrid bubble parameters
         bub_pp%R0ref = dflt_real; R0ref = dflt_real
         bub_pp%p0ref = dflt_real; p0ref = dflt_real
         bub_pp%rho0ref = dflt_real; rho0ref = dflt_real
@@ -627,7 +627,7 @@ contains
     end subroutine s_assign_default_values_to_user_inputs
 
     !> Computation of parameters, allocation procedures, and/or
-        !! tasks needed to properly setup the module
+        !! any other tasks needed to properly setup the module
     impure subroutine s_initialize_global_parameters_module
 
         integer :: i, j, fac
@@ -638,19 +638,19 @@ contains
             muscl_polyn = muscl_order
         end if
 
-        ! the layout of the state vectors and overall size of
-        ! system of equations, given the dimensionality and choice of
-        ! equations of motion
+        ! Determining the layout of the state vectors and overall size of
+        ! the system of equations, given the dimensionality and choice of
+        ! the equations of motion
 
-        ! Model
+        ! Gamma/Pi_inf Model
         if (model_eqns == 1) then
 
-            ! number of fluids
+            ! Setting number of fluids
             num_fluids = 1
 
-            ! structure of the state and flux vectors belonging
-            ! the system of equations defined by the selected number of
-            ! dimensions and the gamma/pi_inf model
+            ! Annotating structure of the state and flux vectors belonging
+            ! to the system of equations defined by the selected number of
+            ! spatial dimensions and the gamma/pi_inf model
             cont_idx%beg = 1
             cont_idx%end = cont_idx%beg
             mom_idx%beg = cont_idx%end + 1
@@ -662,12 +662,12 @@ contains
             pi_inf_idx = adv_idx%end
             sys_size = adv_idx%end
 
-            ! Fraction Model (5-equation model)
+            ! Volume Fraction Model (5-equation model)
         else if (model_eqns == 2) then
 
-            ! structure of the state and flux vectors belonging
-            ! the system of equations defined by the selected number of
-            ! dimensions and the volume fraction model
+            ! Annotating structure of the state and flux vectors belonging
+            ! to the system of equations defined by the selected number of
+            ! spatial dimensions and the volume fraction model
             cont_idx%beg = 1
             cont_idx%end = num_fluids
             mom_idx%beg = cont_idx%end + 1
@@ -675,17 +675,17 @@ contains
             E_idx = mom_idx%end + 1
 
             if (igr) then
-                ! fractions are stored in the indices immediately following
-                ! energy equation. IGR tracks a total of (N-1) volume fractions
-                ! N fluids, hence the "-1" in adv_idx%end. If num_fluids = 1
-                ! adv_idx%end < adv_idx%beg, which skips all loops over the
-                ! fractions since there is no volume fraction to track
+                ! Volume fractions are stored in the indices immediately following
+                ! the energy equation. IGR tracks a total of (N-1) volume fractions
+                ! for N fluids, hence the "-1" in adv_idx%end. If num_fluids = 1
+                ! then adv_idx%end < adv_idx%beg, which skips all loops over the
+                ! volume fractions since there is no volume fraction to track
                 adv_idx%beg = E_idx + 1
                 adv_idx%end = E_idx + num_fluids - 1
             else
-                ! fractions are stored in the indices immediately following
-                ! energy equation. WENO/MUSCL + Riemann tracks a total of (N)
-                ! fractions for N fluids, hence the lack of  "-1" in adv_idx%end
+                ! Volume fractions are stored in the indices immediately following
+                ! the energy equation. WENO/MUSCL + Riemann tracks a total of (N)
+                ! volume fractions for N fluids, hence the lack of  "-1" in adv_idx%end
                 adv_idx%beg = E_idx + 1
                 adv_idx%end = E_idx + num_fluids
             end if
@@ -767,12 +767,12 @@ contains
                 sys_size = B_idx%end
             end if
 
-            ! Fraction Model (6-equation model)
+            ! Volume Fraction Model (6-equation model)
         else if (model_eqns == 3) then
 
-            ! structure of the state and flux vectors belonging
-            ! the system of equations defined by the selected number of
-            ! dimensions and the volume fraction model
+            ! Annotating structure of the state and flux vectors belonging
+            ! to the system of equations defined by the selected number of
+            ! spatial dimensions and the volume fraction model
             cont_idx%beg = 1
             cont_idx%end = num_fluids
             mom_idx%beg = cont_idx%end + 1
@@ -785,7 +785,7 @@ contains
             sys_size = internalEnergies_idx%end
 
         else if (model_eqns == 4) then
-            ! equation model with subgrid bubbles_euler
+            ! 4 equation model with subgrid bubbles_euler
             cont_idx%beg = 1 ! one continuity equation
             cont_idx%end = 1 ! num_fluids
             mom_idx%beg = cont_idx%end + 1 ! one momentum equation in each direction
@@ -846,10 +846,10 @@ contains
                 stress_idx%beg = sys_size + 1
                 stress_idx%end = sys_size + (num_dims*(num_dims + 1))/2
                 if (cyl_coord) stress_idx%end = stress_idx%end + 1
-                ! of stresses is 1 in 1D, 3 in 2D, 4 in 2D-Axisym, 6 in 3D
+                ! number of stresses is 1 in 1D, 3 in 2D, 4 in 2D-Axisym, 6 in 3D
                 sys_size = stress_idx%end
 
-                ! stress index is 2 for 2D and 2,4,5 for 3D
+                ! shear stress index is 2 for 2D and 2,4,5 for 3D
                 if (num_dims == 1) then
                     shear_num = 0
                 else if (num_dims == 2) then
@@ -857,7 +857,7 @@ contains
                     shear_indices(1) = stress_idx%beg - 1 + 2
                     shear_BC_flip_num = 1
                     shear_BC_flip_indices(1:2, 1) = shear_indices(1)
-                    ! x-dir and y-dir: flip tau_xy only
+                    ! Both x-dir and y-dir: flip tau_xy only
                 else if (num_dims == 3) then
                     shear_num = 3
                     shear_indices(1:3) = stress_idx%beg - 1 + (/2, 4, 5/)
@@ -865,19 +865,19 @@ contains
                     shear_BC_flip_indices(1, 1:2) = shear_indices((/1, 2/))
                     shear_BC_flip_indices(2, 1:2) = shear_indices((/1, 3/))
                     shear_BC_flip_indices(3, 1:2) = shear_indices((/2, 3/))
-                    ! flip tau_xy and tau_xz
-                    ! flip tau_xy and tau_yz
-                    ! flip tau_xz and tau_yz
+                    ! x-dir: flip tau_xy and tau_xz
+                    ! y-dir: flip tau_xy and tau_yz
+                    ! z-dir: flip tau_xz and tau_yz
                 end if
             end if
 
             if (hyperelasticity) then
-                ! of entries in the symmetric btensor plus the jacobian
+                ! number of entries in the symmetric btensor plus the jacobian
                 b_size = (num_dims*(num_dims + 1))/2 + 1
                 tensor_size = num_dims**2 + 1
                 xi_idx%beg = sys_size + 1
                 xi_idx%end = sys_size + num_dims
-                ! three more equations for the \xi field and the elastic energy
+                ! adding three more equations for the \xi field and the elastic energy
                 sys_size = xi_idx%end + 1
             end if
 
@@ -957,9 +957,9 @@ contains
         end if
 #endif
 
-        ! grid variables for the x-direction
+        ! Allocating grid variables for the x-direction
         allocate (x_cc(0:m), x_cb(-1:m))
-        ! grid variables for the y- and z-directions
+        ! Allocating grid variables for the y- and z-directions
         if (n > 0) then
             allocate (y_cc(0:n), y_cb(-1:n))
             if (p > 0) then
@@ -1001,16 +1001,16 @@ contains
 
 #ifdef MFC_MPI
 
-        ! for Lustre file system (Darter/Comet/Stampede)
+        ! Option for Lustre file system (Darter/Comet/Stampede)
         write (mpiiofs, '(A)') '/lustre_'
         mpiiofs = trim(mpiiofs)
         call MPI_INFO_CREATE(mpi_info_int, ierr)
         call MPI_INFO_SET(mpi_info_int, 'romio_ds_write', 'disable', ierr)
 
-        ! for UNIX file system (Hooke/Thomson)
-        ! '(A)') '/ufs_'
-        ! = TRIM(mpiiofs)
-        ! = MPI_INFO_NULL
+        ! Option for UNIX file system (Hooke/Thomson)
+        ! WRITE(mpiiofs, '(A)') '/ufs_'
+        ! mpiiofs = TRIM(mpiiofs)
+        ! mpi_info_int = MPI_INFO_NULL
 
         allocate (start_idx(1:num_dims))
 
@@ -1022,9 +1022,9 @@ contains
 
         integer :: i
 
-        ! grid variables for the x-direction
+        ! Deallocating grid variables for the x-direction
         deallocate (x_cc, x_cb)
-        ! grid variables for the y- and z-directions
+        ! Deallocating grid variables for the y- and z-directions
         if (n > 0) then
             deallocate (y_cc, y_cb)
             if (p > 0) then

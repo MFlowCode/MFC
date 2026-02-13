@@ -1,37 +1,37 @@
 #:def Hardcoded1DVariables()
-    ! any declaration of intermediate variables here
+    ! Place any declaration of intermediate variables here
     real(wp) :: x_mid_diffu, width_sq, profile_shape, temp, molar_mass_inv, y1, y2, y3, y4
 #:enddef
 
 #:def Hardcoded1D()
     select case (patch_icpp(patch_id)%hcid)
     case (150) ! 1D Smooth Alfven Case for MHD
-        !
+        ! velocity
         q_prim_vf(momxb + 1)%sf(i, 0, 0) = 0.1_wp*sin(2._wp*pi*x_cc(i))
         q_prim_vf(momxb + 2)%sf(i, 0, 0) = 0.1_wp*cos(2._wp*pi*x_cc(i))
 
-        ! field
+        ! magnetic field
         q_prim_vf(B_idx%end - 1)%sf(i, 0, 0) = 0.1_wp*sin(2._wp*pi*x_cc(i))
         q_prim_vf(B_idx%end)%sf(i, 0, 0) = 0.1_wp*cos(2._wp*pi*x_cc(i))
 
     case (170)
-        ! hardcoded case can be used to start a simulation with initial conditions given from a known 1D profile (e.g. Cantera, SDtoolbox)
+        ! This hardcoded case can be used to start a simulation with initial conditions given from a known 1D profile (e.g. Cantera, SDtoolbox)
         @: HardcodedReadValues()
 
     case (180)
-        ! is patch is hard-coded for test suite optimization used in the
-        ! cases: "patch_icpp(2)%alpha_rho(1)": "1 + 0.2*sin(5*x)"
+        ! This is patch is hard-coded for test suite optimization used in the
+        ! 1D_shuoser cases: "patch_icpp(2)%alpha_rho(1)": "1 + 0.2*sin(5*x)"
         if (patch_id == 2) then
             q_prim_vf(contxb + 0)%sf(i, 0, 0) = 1 + 0.2*sin(5*x_cc(i))
         end if
 
     case (181)
-        ! is patch is hard-coded for test suite optimization used in the
-        ! cases: "patch_icpp(2)%alpha_rho(1)": "1 + 0.1*sin(20*x*pi)"
+        ! This is patch is hard-coded for test suite optimization used in the
+        ! 1D_titarevtorro cases: "patch_icpp(2)%alpha_rho(1)": "1 + 0.1*sin(20*x*pi)"
         q_prim_vf(contxb + 0)%sf(i, 0, 0) = 1 + 0.1*sin(20*x_cc(i)*pi)
 
     case (182)
-        ! patch is a hard-coded for test suite optimization (multiple component diffusion)
+        ! This patch is a hard-coded for test suite optimization (multiple component diffusion)
         x_mid_diffu = 0.05_wp/2.0_wp
         width_sq = (2.5_wp*10.0_wp**(-3.0_wp))**2
         profile_shape = 1.0_wp - 0.5_wp*exp(-(x_cc(i) - x_mid_diffu)**2/width_sq)

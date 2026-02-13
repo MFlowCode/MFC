@@ -1,11 +1,11 @@
 !>
-!!
-!! module m_bubbles_EL_kernels
+!! @file
+!! @brief Contains module m_bubbles_EL_kernels
 
 #:include 'macros.fpp'
 
 !> @brief This module contains kernel functions used to map the effect of the lagrangian bubbles
-!! Eulerian framework.
+!!        in the Eulerian framework.
 module m_bubbles_EL_kernels
 
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
@@ -15,13 +15,13 @@ module m_bubbles_EL_kernels
 contains
 
     !> The purpose of this subroutine is to smear the strength of the lagrangian
-            !! the Eulerian framework using different approaches.
-            !! Number of lagrangian bubbles in the current domain
-            !! Radius of the bubbles
-            !! Interface velocity of the bubbles
-            !! Computational coordinates of the bubbles
-            !! Spatial coordinates of the bubbles
-            !! Eulerian variable to be updated
+            !!      bubbles into the Eulerian framework using different approaches.
+            !! @param nBubs Number of lagrangian bubbles in the current domain
+            !! @param lbk_rad Radius of the bubbles
+            !! @param lbk_vel Interface velocity of the bubbles
+            !! @param lbk_s Computational coordinates of the bubbles
+            !! @param lbk_pos Spatial coordinates of the bubbles
+            !! @param updatedvar Eulerian variable to be updated
     subroutine s_smoothfunction(nBubs, lbk_rad, lbk_vel, lbk_s, lbk_pos, updatedvar)
 
         integer, intent(in) :: nBubs
@@ -39,7 +39,7 @@ contains
     end subroutine s_smoothfunction
 
     !> The purpose of this procedure contains the algorithm to use the delta kernel function to map the effect of the bubbles.
-            !! of the bubbles only affects the cell where the bubble is located.
+            !!      The effect of the bubbles only affects the cell where the bubble is located.
     subroutine s_deltafunc(nBubs, lbk_rad, lbk_vel, lbk_s, updatedvar)
 
         integer, intent(in) :: nBubs
@@ -95,7 +95,7 @@ contains
     end subroutine s_deltafunc
 
     !> The purpose of this procedure contains the algorithm to use the gaussian kernel function to map the effect of the bubbles.
-            !! of the bubbles affects the 3X3x3 cells that surround the bubble.
+            !!      The effect of the bubbles affects the 3X3x3 cells that surround the bubble.
     subroutine s_gaussian(nBubs, lbk_rad, lbk_vel, lbk_s, lbk_pos, updatedvar)
 
         integer, intent(in) :: nBubs
@@ -156,7 +156,7 @@ contains
                             call s_applygaussian(center, cellaux, nodecoord, stddsv, 0._wp, func)
                             if (lag_params%cluster_type >= 4) call s_applygaussian(center, cellaux, nodecoord, stddsv, 1._wp, func2)
 
-                            ! cells for bubbles intersecting symmetric boundaries
+                            ! Relocate cells for bubbles intersecting symmetric boundaries
                             if (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == BC_REFLECTIVE)) then
                                 call s_shift_cell_symmetric_bc(cellaux, cell)
                             end if
@@ -224,29 +224,29 @@ contains
         else
             if (cyl_coord) then
                 !< 2D cylindrical function:
-                ! smear particles in the azimuthal direction for given r
+                ! We smear particles in the azimuthal direction for given r
                 theta = 0._wp
                 Nr = ceiling(2._wp*pi*nodecoord(2)/(y_cb(cellaux(2)) - y_cb(cellaux(2) - 1)))
                 dtheta = 2._wp*pi/Nr
                 L2 = center(2)**2._wp + nodecoord(2)**2._wp - 2._wp*center(2)*nodecoord(2)*cos(theta)
                 distance = sqrt((center(1) - nodecoord(1))**2._wp + L2)
-                ! 2._wp is for symmetry (upper half of the 2D field (+r) is considered)
+                ! Factor 2._wp is for symmetry (upper half of the 2D field (+r) is considered)
                 func = dtheta/2._wp/pi*exp(-0.5_wp*(distance/stddsv)**2._wp)/(sqrt(2._wp*pi)*stddsv)**3._wp
                 Nr_count = 0._wp
                 do while (Nr_count < Nr - 1._wp)
                     Nr_count = Nr_count + 1._wp
                     theta = Nr_count*dtheta
-                    ! relation
+                    ! trigonometric relation
                     L2 = center(2)**2._wp + nodecoord(2)**2._wp - 2._wp*center(2)*nodecoord(2)*cos(theta)
                     distance = sqrt((center(1) - nodecoord(1))**2._wp + L2)
-                    ! is the azimuthal width of the cell
+                    ! nodecoord(2)*dtheta is the azimuthal width of the cell
                     func = func + &
                            dtheta/2._wp/pi*exp(-0.5_wp*(distance/stddsv)**2._wp)/(sqrt(2._wp*pi)*stddsv)**(3._wp*(strength_idx + 1._wp))
                 end do
             else
 
                 !< 2D cartesian function:
-                ! smear particles considering a virtual depth (lag_params%charwidth)
+                ! We smear particles considering a virtual depth (lag_params%charwidth)
                 theta = 0._wp
                 Nr = ceiling(lag_params%charwidth/(y_cb(cellaux(2)) - y_cb(cellaux(2) - 1)))
                 Nr_count = 1._wp - mapCells*1._wp
@@ -267,8 +267,8 @@ contains
     end subroutine s_applygaussian
 
     !> The purpose of this subroutine is to check if the current cell is outside the computational domain or not (including ghost cells).
-            !! Tested cell to smear the bubble effect in.
-            !! If true, then cellaux is outside the computational domain.
+            !! @param cellaux Tested cell to smear the bubble effect in.
+            !! @param celloutside If true, then cellaux is outside the computational domain.
     subroutine s_check_celloutside(cellaux, celloutside)
         $:GPU_ROUTINE(function_name='s_check_celloutside',parallelism='[seq]', &
             & cray_inline=True)
@@ -301,8 +301,8 @@ contains
     end subroutine s_check_celloutside
 
     !> This subroutine relocates the current cell, if it intersects a symmetric boundary.
-            !! Cell of the current bubble
-            !! Cell to map the bubble effect in.
+            !! @param cell Cell of the current bubble
+            !! @param cellaux Cell to map the bubble effect in.
     subroutine s_shift_cell_symmetric_bc(cellaux, cell)
         $:GPU_ROUTINE(function_name='s_shift_cell_symmetric_bc', &
             & parallelism='[seq]', cray_inline=True)
@@ -310,7 +310,7 @@ contains
         integer, dimension(3), intent(inout) :: cellaux
         integer, dimension(3), intent(in) :: cell
 
-        !
+        ! x-dir
         if (bc_x%beg == BC_REFLECTIVE .and. (cell(1) <= mapCells - 1)) then
             cellaux(1) = abs(cellaux(1)) - 1
         end if
@@ -339,9 +339,9 @@ contains
     end subroutine s_shift_cell_symmetric_bc
 
     !> Calculates the standard deviation of the bubble being smeared in the Eulerian framework.
-            !! Cell where the bubble is located
-            !! Volume of the bubble
-            !! Standard deviaton
+            !! @param cell Cell where the bubble is located
+            !! @param volpart Volume of the bubble
+            !! @param stddsv Standard deviaton
     subroutine s_compute_stddsv(cell, volpart, stddsv)
         $:GPU_ROUTINE(function_name='s_compute_stddsv',parallelism='[seq]', &
             & cray_inline=True)
@@ -379,8 +379,8 @@ contains
     end subroutine s_compute_stddsv
 
     !> The purpose of this procedure is to calculate the characteristic cell volume
-            !! Computational coordinates (x, y, z)
-            !! Characteristic volume
+            !! @param cell Computational coordinates (x, y, z)
+            !! @param Charvol Characteristic volume
     subroutine s_get_char_vol(cellx, celly, cellz, Charvol)
         $:GPU_ROUTINE(function_name='s_get_char_vol',parallelism='[seq]', &
             & cray_inline=True)
@@ -401,9 +401,9 @@ contains
     end subroutine s_get_char_vol
 
     !> This subroutine transforms the computational coordinates of the bubble from
-            !! into integer.
-            !! Computational coordinates of the bubble, real type
-            !! Computational coordinates of the bubble, integer type
+            !!      real type into integer.
+            !! @param s Computational coordinates of the bubble, real type
+            !! @param get_cell Computational coordinates of the bubble, integer type
     subroutine s_get_cell(s_cell, get_cell)
         $:GPU_ROUTINE(function_name='s_get_cell',parallelism='[seq]', &
             & cray_inline=True)

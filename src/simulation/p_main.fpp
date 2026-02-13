@@ -1,17 +1,17 @@
 !>
-!!
-!! program p_main
+!! @file
+!! @brief Contains program p_main
 
 !> @brief  Quasi-conservative, shock- and interface- capturing finite-volume
-!! the multicomponent Navier-Stokes equations. The system
-!! with the relevant advection equations to capture the
-!! and closed by the stiffened equation of state
-!! as any required mixture relations. The effects of surface
-!! included and modeled through a volume force that acts
-!! diffuse material interface regions. The implementation
-!! surface tension may be found in the work by Perigaud
-!! (2005). Note that both viscous and capillarity effects
-!! available in the volume fraction model.
+!!              scheme for the multicomponent Navier-Stokes equations. The system
+!!              is augmented with the relevant advection equations to capture the
+!!              material interfaces and closed by the stiffened equation of state
+!!              as well as any required mixture relations. The effects of surface
+!!              tension are included and modeled through a volume force that acts
+!!              across the diffuse material interface regions. The implementation
+!!              specifics of surface tension may be found in the work by Perigaud
+!!              and Saurel (2005). Note that both viscous and capillarity effects
+!!              are only available in the volume fraction model.
 program p_main
 
     use m_global_parameters    !< Definitions of the global parameters
@@ -54,7 +54,7 @@ program p_main
     call s_initialize_gpu_vars()
     call nvtxEndRange
 
-    ! the time-step iterator to the first time-step
+    ! Setting the time-step iterator to the first time-step
     if (cfl_dt) then
         t_step = 0
         mytime = t_save*n_start
@@ -71,7 +71,7 @@ program p_main
     call nvtxEndRange ! INIT
 
     call nvtxStartRange("SIMULATION-TIME-MARCH")
-    ! Loop
+    ! Time-stepping Loop
     do
 
         if (cfl_dt) then

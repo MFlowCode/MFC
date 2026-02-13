@@ -22,7 +22,7 @@ module m_checker
 contains
 
     !> Checks compatibility of parameters in the input file.
-        !! the pre_process stage
+        !! Used by the pre_process stage
     impure subroutine s_check_inputs
 
         call s_check_parallel_io

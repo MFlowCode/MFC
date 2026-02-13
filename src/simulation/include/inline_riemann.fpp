@@ -55,11 +55,11 @@
         T_avg = (sqrt(rho_L)*T_L + sqrt(rho_R)*T_R)/(sqrt(rho_L) + sqrt(rho_R))
         #:if USING_AMD
             if (abs(T_L - T_R) < eps) then
-                ! when T_L and T_R are very close
+                ! Case when T_L and T_R are very close
                 Cp_avg = sum(Yi_avg(:)*(0.5_wp*Cp_iL(:) + 0.5_wp*Cp_iR(:))*gas_constant/molecular_weights_nonparameter(:))
                 Cv_avg = sum(Yi_avg(:)*((0.5_wp*Cp_iL(:) + 0.5_wp*Cp_iR(:))*gas_constant/molecular_weights_nonparameter(:) - gas_constant/molecular_weights_nonparameter(:)))
             else
-                ! calculation when T_L and T_R are sufficiently different
+                ! Normal calculation when T_L and T_R are sufficiently different
                 Cp_avg = sum(Yi_avg(:)*(h_iR(:) - h_iL(:))/(T_R - T_L))
                 Cv_avg = sum(Yi_avg(:)*((h_iR(:) - h_iL(:))/(T_R - T_L) - gas_constant/molecular_weights_nonparameter(:)))
             end if
@@ -69,11 +69,11 @@
             c_sum_Yi_Phi = sum(Yi_avg(:)*Phi_avg(:))
         #:else
             if (abs(T_L - T_R) < eps) then
-                ! when T_L and T_R are very close
+                ! Case when T_L and T_R are very close
                 Cp_avg = sum(Yi_avg(:)*(0.5_wp*Cp_iL(:) + 0.5_wp*Cp_iR(:))*gas_constant/molecular_weights(:))
                 Cv_avg = sum(Yi_avg(:)*((0.5_wp*Cp_iL(:) + 0.5_wp*Cp_iR(:))*gas_constant/molecular_weights(:) - gas_constant/molecular_weights(:)))
             else
-                ! calculation when T_L and T_R are sufficiently different
+                ! Normal calculation when T_L and T_R are sufficiently different
                 Cp_avg = sum(Yi_avg(:)*(h_iR(:) - h_iL(:))/(T_R - T_L))
                 Cv_avg = sum(Yi_avg(:)*((h_iR(:) - h_iL(:))/(T_R - T_L) - gas_constant/molecular_weights(:)))
             end if

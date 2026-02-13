@@ -1,22 +1,22 @@
 !>
-!!
-!! module m_weno
+!! @file
+!! @brief Contains module m_weno
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
 !> @brief  Weighted essentially non-oscillatory (WENO) reconstruction scheme
-!! supplemented with monotonicity preserving bounds (MPWENO)
-!! mapping function that boosts the accuracy of the non-linear
-!! MPWENO, see Balsara and Shu (2000), prevents the
-!! to lay outside the range set by the stencil,
-!! see Henrick et al. (2005), recovers the formal order
-!! of the reconstruction at critical points. Please note
-!! basic WENO approach is implemented according to the work
-!! and Shu (1996). WENO-Z, which is less dissipative than
-!! WENO-M, is implemented according to the work of
-!! al. (2008). TENO, which is even less dissipative than
-!! is less robust, is implemented according to the work
-!! et al. (2016).
+!!              that is supplemented with monotonicity preserving bounds (MPWENO)
+!!              and a mapping function that boosts the accuracy of the non-linear
+!!              weights (WENOM). MPWENO, see Balsara and Shu (2000), prevents the
+!!              reconstructed values to lay outside the range set by the stencil,
+!!              while WENOM, see Henrick et al. (2005), recovers the formal order
+!!              of accuracy of the reconstruction at critical points. Please note
+!!              that the basic WENO approach is implemented according to the work
+!!              of Jiang and Shu (1996). WENO-Z, which is less dissipative than
+!!              WENO-JS and WENO-M, is implemented according to the work of
+!!              Borges, et al. (2008). TENO, which is even less dissipative than
+!!              WENO-Z but is less robust, is implemented according to the work
+!!              of Fu et al. (2016).
 module m_weno
 
     use m_derived_types        !< Definitions of the derived types
@@ -25,7 +25,7 @@ module m_weno
 
     use m_variables_conversion !< State variables type conversion procedures
 
-    !
+    ! $:USE_GPU_MODULE()
 
     use m_mpi_proxy
 
@@ -34,24 +34,24 @@ module m_weno
     private; public :: s_initialize_weno_module, s_initialize_weno, s_finalize_weno_module, s_weno
 
     !> @name The cell-average variables that will be WENO-reconstructed. Formerly, they
-    !! in v_vf. However, they are transferred to v_rs_wsL and v_rs_wsR
-    !! be reshaped (RS) and/or characteristically decomposed. The reshaping
-    !! WENO procedure to be independent of the coordinate direction of
-    !! Lastly, notice that the left (L) and right (R) results
-    !! characteristic decomposition are stored in custom-constructed WENO-
-    !! that are annexed to each position of a given scalar field.
+    !! are stored in v_vf. However, they are transferred to v_rs_wsL and v_rs_wsR
+    !! as to be reshaped (RS) and/or characteristically decomposed. The reshaping
+    !! allows the WENO procedure to be independent of the coordinate direction of
+    !! the reconstruction. Lastly, notice that the left (L) and right (R) results
+    !! of the characteristic decomposition are stored in custom-constructed WENO-
+    !! stencils (WS) that are annexed to each position of a given scalar field.
     !> @{
     real(wp), allocatable, dimension(:, :, :, :) :: v_rs_ws_x, v_rs_ws_y, v_rs_ws_z
     !> @}
     $:GPU_DECLARE(create='[v_rs_ws_x,v_rs_ws_y,v_rs_ws_z]')
 
-    ! Coefficients
+    ! WENO Coefficients
 
     !> @name Polynomial coefficients at the left and right cell-boundaries (CB) and at
-    !! and right quadrature points (QP), in the x-, y- and z-directions.
-    !! the first dimension of the array identifies the polynomial, the
-    !! identifies the position of its coefficients and the last
-    !! the cell-location in the relevant coordinate direction.
+    !! the left and right quadrature points (QP), in the x-, y- and z-directions.
+    !! Note that the first dimension of the array identifies the polynomial, the
+    !! second dimension identifies the position of its coefficients and the last
+    !! dimension denotes the cell-location in the relevant coordinate direction.
     !> @{
     real(wp), target, allocatable, dimension(:, :, :) :: poly_coef_cbL_x
     real(wp), target, allocatable, dimension(:, :, :) :: poly_coef_cbL_y
@@ -64,9 +64,9 @@ module m_weno
     $:GPU_DECLARE(create='[poly_coef_cbR_x,poly_coef_cbR_y,poly_coef_cbR_z]')
 
     !> @name The ideal weights at the left and the right cell-boundaries and at the
-    !! the right quadrature points, in x-, y- and z-directions. Note
-    !! first dimension of the array identifies the weight, while the
-    !! the cell-location in the relevant coordinate direction.
+    !! left and the right quadrature points, in x-, y- and z-directions. Note
+    !! that the first dimension of the array identifies the weight, while the
+    !! last denotes the cell-location in the relevant coordinate direction.
     !> @{
     real(wp), target, allocatable, dimension(:, :) :: d_cbL_x
     real(wp), target, allocatable, dimension(:, :) :: d_cbL_y
@@ -79,9 +79,9 @@ module m_weno
     $:GPU_DECLARE(create='[d_cbL_x,d_cbL_y,d_cbL_z,d_cbR_x,d_cbR_y,d_cbR_z]')
 
     !> @name Smoothness indicator coefficients in the x-, y-, and z-directions. Note
-    !! first array dimension identifies the smoothness indicator, the
-    !! the position of its coefficients and the last denotes
-    !! in the relevant coordinate direction.
+    !! that the first array dimension identifies the smoothness indicator, the
+    !! second identifies the position of its coefficients and the last denotes
+    !! the cell-location in the relevant coordinate direction.
     !> @{
     real(wp), target, allocatable, dimension(:, :, :) :: beta_coef_x
     real(wp), target, allocatable, dimension(:, :, :) :: beta_coef_y
@@ -89,7 +89,7 @@ module m_weno
     !> @}
     $:GPU_DECLARE(create='[beta_coef_x,beta_coef_y,beta_coef_z]')
 
-    ! WENO Coefficients
+    ! END: WENO Coefficients
 
     integer :: v_size !< Number of WENO-reconstructed cell-average variables
     $:GPU_DECLARE(create='[v_size]')
@@ -106,13 +106,13 @@ module m_weno
 contains
 
     !>  The computation of parameters, the allocation of memory,
-        !! of pointers and/or the execution of any
-        !! that are necessary to setup the module.
+        !!      the association of pointers and/or the execution of any
+        !!      other procedures that are necessary to setup the module.
     impure subroutine s_initialize_weno_module
 
         if (weno_order == 1) return
 
-        ! WENO Coefficients in x-direction
+        ! Allocating/Computing WENO Coefficients in x-direction
         is1_weno%beg = -buff_size; is1_weno%end = m - is1_weno%beg
         if (n == 0) then
             is2_weno%beg = 0
@@ -140,15 +140,15 @@ contains
 
         @:ALLOCATE(beta_coef_x(is1_weno%beg + weno_polyn:is1_weno%end - weno_polyn, 0:weno_polyn, &
             0:weno_polyn*(weno_polyn + 1)/2 - 1))
-        ! of cross terms for dvd = (k-1)(k-1+1)/2, where weno_polyn = k-1
-        ! k-1 not k because we are using value differences (dvd) not the values themselves
+        ! Number of cross terms for dvd = (k-1)(k-1+1)/2, where weno_polyn = k-1
+        ! Note: k-1 not k because we are using value differences (dvd) not the values themselves
 
         call s_compute_weno_coefficients(1, is1_weno)
 
         @:ALLOCATE(v_rs_ws_x(is1_weno%beg:is1_weno%end, &
             is2_weno%beg:is2_weno%end, is3_weno%beg:is3_weno%end, 1:sys_size))
 
-        ! WENO Coefficients in y-direction
+        ! Allocating/Computing WENO Coefficients in y-direction
         if (n == 0) return
 
         is2_weno%beg = -buff_size; is2_weno%end = n - is2_weno%beg
@@ -178,7 +178,7 @@ contains
         @:ALLOCATE(v_rs_ws_y(is2_weno%beg:is2_weno%end, &
             is1_weno%beg:is1_weno%end, is3_weno%beg:is3_weno%end, 1:sys_size))
 
-        ! WENO Coefficients in z-direction
+        ! Allocating/Computing WENO Coefficients in z-direction
         if (p == 0) return
 
         is2_weno%beg = -buff_size; is2_weno%end = n - is2_weno%beg
@@ -204,12 +204,12 @@ contains
     end subroutine s_initialize_weno_module
 
     !>  The purpose of this subroutine is to compute the grid
-        !! of the WENO polynomials, ideal
-        !! smoothness indicators, provided the order,
-        !! direction and the location of the WENO
-        !!
-        !! Coordinate direction of the WENO reconstruction
-        !! Index bounds in the s-direction
+        !!      dependent coefficients of the WENO polynomials, ideal
+        !!      weights and smoothness indicators, provided the order,
+        !!      the coordinate direction and the location of the WENO
+        !!      reconstruction.
+        !! @param weno_dir Coordinate direction of the WENO reconstruction
+        !! @param is Index bounds in the s-direction
     subroutine s_compute_weno_coefficients(weno_dir, is)
 
         integer, intent(in) :: weno_dir
@@ -217,7 +217,7 @@ contains
         integer :: s
 
         real(wp), pointer, dimension(:) :: s_cb => null() !<
-            !! in the s-direction
+            !! Cell-boundary locations in the s-direction
 
         type(int_bounds_info) :: bc_s !< Boundary conditions (BC) in the s-direction
 
@@ -226,9 +226,9 @@ contains
         real(wp) :: w(1:8) ! Intermediate var for ideal weights: s_cb across overall stencil
         real(wp) :: y(1:4) ! Intermediate var for poly & beta: diff(s_cb) across sub-stencil
 
-        ! the number of cells, the cell-boundary locations and
-        ! boundary conditions in the coordinate direction selected for
-        ! WENO reconstruction
+        ! Determining the number of cells, the cell-boundary locations and
+        ! the boundary conditions in the coordinate direction selected for
+        ! the WENO reconstruction
         if (weno_dir == 1) then
             s = m; s_cb => x_cb; bc_s = bc_x
         elseif (weno_dir == 2) then
@@ -238,7 +238,7 @@ contains
         end if
 
         #:for WENO_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
-            ! WENO3 Coefficients
+            ! Computing WENO3 Coefficients
             if (weno_dir == ${WENO_DIR}$) then
                 if (weno_order == 3) then
                     do i = is%beg - 1 + weno_polyn, is%end - 1 - weno_polyn
@@ -266,10 +266,10 @@ contains
 
                     end do
 
-                    ! the ideal weights coefficients in the neighborhood
-                    ! beginning and end Riemann state extrapolation BC to avoid
-                    ! contributions from outside of the physical domain during
-                    ! WENO reconstruction
+                    ! Modifying the ideal weights coefficients in the neighborhood
+                    ! of beginning and end Riemann state extrapolation BC to avoid
+                    ! any contributions from outside of the physical domain during
+                    ! the WENO reconstruction
                     if (null_weights) then
                         if (bc_s%beg == BC_RIEMANN_EXTRAP) then
                             d_cbR_${XYZ}$ (1, 0) = 0._wp; d_cbR_${XYZ}$ (0, 0) = 1._wp
@@ -281,9 +281,9 @@ contains
                             d_cbL_${XYZ}$ (0, s) = 0._wp; d_cbL_${XYZ}$ (1, s) = 1._wp
                         end if
                     end if
-                    ! Computing WENO3 Coefficients
+                    ! END: Computing WENO3 Coefficients
 
-                    ! WENO5 Coefficients
+                    ! Computing WENO5 Coefficients
                 elseif (weno_order == 5) then
 
                     do i = is%beg - 1 + weno_polyn, is%end - 1 - weno_polyn
@@ -412,10 +412,10 @@ contains
 
                     end do
 
-                    ! the ideal weights coefficients in the neighborhood
-                    ! beginning and end Riemann state extrapolation BC to avoid
-                    ! contributions from outside of the physical domain during
-                    ! WENO reconstruction
+                    ! Modifying the ideal weights coefficients in the neighborhood
+                    ! of beginning and end Riemann state extrapolation BC to avoid
+                    ! any contributions from outside of the physical domain during
+                    ! the WENO reconstruction
                     if (null_weights) then
                         if (bc_s%beg == BC_RIEMANN_EXTRAP) then
                             d_cbR_${XYZ}$ (1:2, 0) = 0._wp; d_cbR_${XYZ}$ (0, 0) = 1._wp
@@ -438,16 +438,16 @@ contains
 
                         do i = is%beg - 1 + weno_polyn, is%end - 1 - weno_polyn
 
-                            ! Shu (1997) "Essentially Non-Oscillatory and Weighted Essentially Non-Oscillatory Schemes for Hyperbolic Conservation Laws"
-                            ! 2.20: Polynomial Coefficients (poly_coef_cb)
-                            ! 2.61: Smoothness Indicators (beta_coef)
-                            ! reduce computational cost, we leverage the fact that all polynomial coefficients in a stencil sum to 1
-                            ! compute the polynomial coefficients (poly_coef_cb) for the cell value differences (dvd) instead of the values themselves.
-                            ! computation of coefficients is further simplified by using grid spacing (y or w) rather than the grid locations (s_cb) directly.
-                            ! weights (d_cb) are obtained by comparing the grid location coefficients of the polynomial coefficients.
-                            ! smoothness indicators (beta_coef) are calculated through numerical differentiation and integration of each cross term of the polynomial coefficients,
-                            ! the cell value differences (dvd) instead of the values themselves.
-                            ! the polynomial coefficients sum to 1, the derivative of 1 is 0, which means it does not create additional cross terms in the smoothness indicators.
+                            ! Reference: Shu (1997) "Essentially Non-Oscillatory and Weighted Essentially Non-Oscillatory Schemes for Hyperbolic Conservation Laws"
+                            ! Equation 2.20: Polynomial Coefficients (poly_coef_cb)
+                            ! Equation 2.61: Smoothness Indicators (beta_coef)
+                            ! To reduce computational cost, we leverage the fact that all polynomial coefficients in a stencil sum to 1
+                            ! and compute the polynomial coefficients (poly_coef_cb) for the cell value differences (dvd) instead of the values themselves.
+                            ! The computation of coefficients is further simplified by using grid spacing (y or w) rather than the grid locations (s_cb) directly.
+                            ! Ideal weights (d_cb) are obtained by comparing the grid location coefficients of the polynomial coefficients.
+                            ! The smoothness indicators (beta_coef) are calculated through numerical differentiation and integration of each cross term of the polynomial coefficients,
+                            ! using the cell value differences (dvd) instead of the values themselves.
+                            ! While the polynomial coefficients sum to 1, the derivative of 1 is 0, which means it does not create additional cross terms in the smoothness indicators.
 
                             w = s_cb(i - 3:i + 4) - s_cb(i) ! Offset using s_cb(i) to reduce floating point error
                             d_cbR_${XYZ}$ (0, i + 1) = ((w(5) - w(6))*(w(5) - w(7))*(w(5) - w(8)))/((w(1) - w(6))*(w(1) - w(7))*(w(1) - w(8))) !&
@@ -460,7 +460,7 @@ contains
                             d_cbL_${XYZ}$ (1, i + 1) = ((w(1) - w(5))*(w(2) - w(5))*(w(5) - w(8))*(w(1)*w(2) + w(1)*w(3) + w(2)*w(3) - w(1)*w(7) - w(1)*w(8) - w(2)*w(7) - w(2)*w(8) - w(3)*w(7) - w(3)*w(8) + w(7)*w(8) + w(7)**2 + w(8)**2))/((w(1) - w(7))*(w(1) - w(8))*(w(2) - w(7))*(w(2) - w(8))*(w(3) - w(8))) !&
                             d_cbL_${XYZ}$ (2, i + 1) = ((w(1) - w(5))*(w(5) - w(7))*(w(5) - w(8))*(w(1)*w(2) - w(1)*w(6) - w(1)*w(7) - w(2)*w(6) - w(1)*w(8) - w(2)*w(7) - w(2)*w(8) + w(6)*w(7) + w(6)*w(8) + w(7)*w(8) + w(1)**2 + w(2)**2))/((w(1) - w(6))*(w(1) - w(7))*(w(1) - w(8))*(w(2) - w(7))*(w(2) - w(8))) !&
                             d_cbL_${XYZ}$ (3, i + 1) = ((w(5) - w(6))*(w(5) - w(7))*(w(5) - w(8)))/((w(1) - w(6))*(w(1) - w(7))*(w(1) - w(8))) !&
-                            ! Left has the reversed order of both points and coefficients compared to the right
+                            ! Note: Left has the reversed order of both points and coefficients compared to the right
 
                             y = s_cb(i + 1:i + 4) - s_cb(i:i + 3)
                             poly_coef_cbR_${XYZ}$ (i + 1, 0, 0) = (y(1)*y(2)*(y(2) + y(3)))/((y(3) + y(4))*(y(2) + y(3) + y(4))*(y(1) + y(2) + y(3) + y(4))) !&
@@ -503,7 +503,7 @@ contains
                             poly_coef_cbL_${XYZ}$ (i + 1, 0, 0) = (y(4)*(y(3) + y(4))*(y(2) + y(3) + y(4)))/((y(1) + y(2))*(y(1) + y(2) + y(3))*(y(1) + y(2) + y(3) + y(4))) !&
 
                             poly_coef_cbL_${XYZ}$ (i + 1, :, :) = -poly_coef_cbL_${XYZ}$ (i + 1, :, :)
-                            ! negative sign as the direction of taking the difference (dvd) is reversed
+                            ! Note: negative sign as the direction of taking the difference (dvd) is reversed
 
                             y = s_cb(i - 2:i + 1) - s_cb(i - 3:i)
                             beta_coef_${XYZ}$ (i + 1, 3, 0) = (4*y(4)**2*(5*y(1)**2*y(2)**2 + 20*y(1)**2*y(2)*y(3) + 15*y(1)**2*y(2)*y(4) + 20*y(1)**2*y(3)**2 + 30*y(1)**2*y(3)*y(4) + 60*y(1)**2*y(4)**2 + 10*y(1)*y(2)**3 + 60*y(1)*y(2)**2*y(3) + 45*y(1)*y(2)**2*y(4) + 110*y(1)*y(2)*y(3)**2 + 165*y(1)*y(2)*y(3)*y(4) & !&
@@ -604,7 +604,7 @@ contains
                         end do
 
                     else ! TENO (only supports uniform grid)
-                        ! et al., 2016) Table 2 (for right flux)
+                        ! (Fu, et al., 2016) Table 2 (for right flux)
                         d_cbL_${XYZ}$ (0, :) = 18._wp/35._wp
                         d_cbL_${XYZ}$ (1, :) = 3._wp/35._wp
                         d_cbL_${XYZ}$ (2, :) = 9._wp/35._wp
@@ -631,7 +631,7 @@ contains
             $:GPU_UPDATE(device='[poly_coef_cbL_z,poly_coef_cbR_z,d_cbL_z,d_cbR_z,beta_coef_z]')
         end if
 
-        ! WENO coefficients and cell-boundary locations pointers
+        ! Nullifying WENO coefficients and cell-boundary locations pointers
 
         nullify (s_cb)
 
@@ -728,7 +728,7 @@ contains
                         do k = is2_weno%beg, is2_weno%end
                             do j = is1_weno%beg, is1_weno%end
                                 do i = 1, v_size
-                                    ! from left side
+                                    ! reconstruct from left side
 
                                     alpha(:) = 0._wp
                                     omega(:) = 0._wp
@@ -759,7 +759,7 @@ contains
                                                                      *(omega(0:weno_num_stencils)/(d_cbL_${XYZ}$ (0:weno_num_stencils, j)**2._wp + omega(0:weno_num_stencils)*(1._wp - 2._wp*d_cbL_${XYZ}$ (0:weno_num_stencils, j))))
 
                                     elseif (wenoz) then
-                                        ! et al. (2008)
+                                        ! Borges, et al. (2008)
 
                                         tau = abs(beta(1) - beta(0))
                                         alpha(0:weno_num_stencils) = d_cbL_${XYZ}$ (0:weno_num_stencils, j)*(1._wp + tau/beta(0:weno_num_stencils))
@@ -770,7 +770,7 @@ contains
 
                                     vL_rs_vf_${XYZ}$ (j, k, l, i) = omega(0)*poly(0) + omega(1)*poly(1)
 
-                                    ! from right side
+                                    ! reconstruct from right side
 
                                     poly(0) = v_rs_ws_${XYZ}$ (j, k, l, i) &
                                               + poly_coef_cbR_${XYZ}$ (j, 0, 0)*dvd(0)
@@ -814,7 +814,7 @@ contains
                                 do j = is1_weno%beg, is1_weno%end
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, v_size
-                                        ! from left side
+                                        ! reconstruct from left side
 
                                         alpha(:) = 0._wp
                                         omega(:) = 0._wp
@@ -864,7 +864,7 @@ contains
 
                                         elseif (wenoz) then
 
-                                            ! et al. (2008)
+                                            ! Borges, et al. (2008)
 
                                             tau = abs(beta(2) - beta(0))                   ! Equation 25
                                             $:GPU_LOOP(parallelism='[seq]')
@@ -873,8 +873,8 @@ contains
                                             end do
 
                                         elseif (teno) then
-                                            ! et al. (2016)
-                                            ! code: https://dx.doi.org/10.13140/RG.2.2.36250.34247
+                                            ! Fu, et al. (2016)
+                                            ! Fu''s code: https://dx.doi.org/10.13140/RG.2.2.36250.34247
                                             tau = abs(beta(2) - beta(0))
                                             $:GPU_LOOP(parallelism='[seq]')
                                             do q = 0, weno_num_stencils
@@ -898,7 +898,7 @@ contains
 
                                         vL_rs_vf_${XYZ}$ (j, k, l, i) = omega(0)*poly(0) + omega(1)*poly(1) + omega(2)*poly(2)
 
-                                        ! from right side
+                                        ! reconstruct from right side
 
                                         poly(0) = v_rs_ws_${XYZ}$ (j, k, l, i) &
                                                   + poly_coef_cbR_${XYZ}$ (j, 0, 0)*dvd(1) &
@@ -1002,11 +1002,11 @@ contains
 
                                         else
                                             #:if not MFC_CASE_OPTIMIZATION or weno_num_stencils > 3
-                                                ! et al., 2016) Table 1
-                                                ! Unlike TENO5, TENO7 stencils differ from WENO7 stencils
-                                                ! Figure 2 (right) for right-sided flux (at i+1/2)
-                                                ! we need the left-sided flux, so we flip the weights with respect to the x=i point
-                                                ! we need to keep the stencil order to reuse the beta coefficients
+                                                ! (Fu, et al., 2016) Table 1
+                                                ! Note: Unlike TENO5, TENO7 stencils differ from WENO7 stencils
+                                                ! See Figure 2 (right) for right-sided flux (at i+1/2)
+                                                ! Here we need the left-sided flux, so we flip the weights with respect to the x=i point
+                                                ! But we need to keep the stencil order to reuse the beta coefficients
                                                 poly(0) = ( 2._wp*v(-1) +  5._wp*v( 0) -  1._wp*v( 1)) / 6._wp !&
                                                 poly(1) = (11._wp*v( 0) -  7._wp*v( 1) +  2._wp*v( 2)) / 6._wp !&
                                                 poly(2) = (-1._wp*v(-2) +  5._wp*v(-1) +  2._wp*v( 0)) / 6._wp !&
@@ -1051,7 +1051,7 @@ contains
 
                                         else ! TENO
                                             #:if not MFC_CASE_OPTIMIZATION or weno_num_stencils > 3
-                                                ! Low-Dissipation Targeted ENO Schemes for Ideal Magnetohydrodynamics (Fu & Tang, 2019) Section 3.2
+                                                ! High-Order Low-Dissipation Targeted ENO Schemes for Ideal Magnetohydrodynamics (Fu & Tang, 2019) Section 3.2
                                                 beta(0) = 13._wp/12._wp*(v(-1) - 2._wp*v( 0) + v( 1))**2._wp + ((    v(-1)             -     v( 1))**2._wp)/4._wp + weno_eps !&
                                                 beta(1) = 13._wp/12._wp*(v( 0) - 2._wp*v( 1) + v( 2))**2._wp + ((3._wp*v( 0) - 4._wp*v( 1) +     v( 2))**2._wp)/4._wp + weno_eps !&
                                                 beta(2) = 13._wp/12._wp*(v(-2) - 2._wp*v(-1) + v( 0))**2._wp + ((    v(-2) - 4._wp*v(-1) + 3._wp*v( 0))**2._wp)/4._wp + weno_eps !&
@@ -1080,8 +1080,8 @@ contains
                                                                          *(omega(0:weno_num_stencils)/(d_cbL_${XYZ}$ (0:weno_num_stencils, j)**2._wp + omega(0:weno_num_stencils)*(1._wp - 2._wp*d_cbL_${XYZ}$ (0:weno_num_stencils, j))))
 
                                         elseif (wenoz) then
-                                            ! et al. (2010)
-                                            ! & Borges (2013) also helps
+                                            ! Castro, et al. (2010)
+                                            ! Don & Borges (2013) also helps
                                             tau = abs(beta(3) - beta(0)) ! Equation 50
                                             $:GPU_LOOP(parallelism='[seq]')
                                             do q = 0, weno_num_stencils
@@ -1196,17 +1196,17 @@ contains
     end subroutine s_weno
 
     !> The computation of parameters, the allocation of memory,
-        !! of pointers and/or the execution of any
-        !! that are required for the setup of the
-        !!
-        !! Cell-averaged variables
-        !! Left WENO reconstructed cell-boundary values
-        !! Right WENO reconstructed cell-boundary values
-        !! Characteristic decommposition coordinate direction
-        !! Coordinate direction of the WENO reconstruction
-        !! Index bounds in first coordinate direction
-        !! Index bounds in second coordinate direction
-        !! Index bounds in third coordinate direction
+        !!      the association of pointers and/or the execution of any
+        !!      other procedures that are required for the setup of the
+        !!      WENO reconstruction.
+        !! @param v_vf Cell-averaged variables
+        !! @param vL_vf Left WENO reconstructed cell-boundary values
+        !! @param vR_vf Right WENO reconstructed cell-boundary values
+        !! @param norm_dir Characteristic decommposition coordinate direction
+        !! @param weno_dir Coordinate direction of the WENO reconstruction
+        !! @param is1_weno Index bounds in first coordinate direction
+        !! @param is2_weno Index bounds in second coordinate direction
+        !! @param is3_weno Index bounds in third coordinate direction
     subroutine s_initialize_weno(v_vf, &
                                  weno_dir)
 
@@ -1216,11 +1216,11 @@ contains
 
         integer :: j, k, l, q
 
-        ! the number of cell-average variables which will be
-        ! and mapping their indical bounds in the x-,
-        ! and z-directions to those in the s1-, s2- and s3-directions
-        ! to reshape the inputted data in the coordinate direction of
-        ! WENO reconstruction
+        ! Determining the number of cell-average variables which will be
+        ! WENO-reconstructed and mapping their indical bounds in the x-,
+        ! y- and z-directions to those in the s1-, s2- and s3-directions
+        ! as to reshape the inputted data in the coordinate direction of
+        ! the WENO reconstruction
         v_size = ubound(v_vf, 1)
         $:GPU_UPDATE(device='[v_size]')
 
@@ -1238,7 +1238,7 @@ contains
             $:END_GPU_PARALLEL_LOOP()
         end if
 
-        ! onto Characteristic Fields in y-direction
+        ! Reshaping/Projecting onto Characteristic Fields in y-direction
         if (n == 0) return
 
         if (weno_dir == 2) then
@@ -1255,7 +1255,7 @@ contains
             $:END_GPU_PARALLEL_LOOP()
         end if
 
-        ! onto Characteristic Fields in z-direction
+        ! Reshaping/Projecting onto Characteristic Fields in z-direction
         if (p == 0) return
 
         if (weno_dir == 3) then
@@ -1275,16 +1275,16 @@ contains
     end subroutine s_initialize_weno
 
     !>  The goal of this subroutine is to ensure that the WENO
-        !! monotonic. The latter is achieved by
-        !! preserving bounds of Suresh and
-        !! The resulting MPWENO reconstruction, see
-        !! Shu (2000), ensures that the reconstructed
-        !! not reside outside the range spanned by WENO
-        !!
-        !! Equation number
-        !! First-coordinate cell index
-        !! Secone-coordinate cell index
-        !! Thire-coordinate cell index
+        !!      reconstruction is monotonic. The latter is achieved by
+        !!      enforcing monotonicity preserving bounds of Suresh and
+        !!      Huynh (1997). The resulting MPWENO reconstruction, see
+        !!      Balsara and Shu (2000), ensures that the reconstructed
+        !!      values do not reside outside the range spanned by WENO
+        !!      stencil.
+        !!  @param i Equation number
+        !!  @param j First-coordinate cell index
+        !!  @param k Secone-coordinate cell index
+        !!  @param l Thire-coordinate cell index
     subroutine s_preserve_monotonicity(v_rs_ws, vL_rs_vf, vR_rs_vf)
 
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(IN) :: v_rs_ws
@@ -1295,11 +1295,11 @@ contains
         real(wp), dimension(-1:1) :: d !< Curvature measures at the zone centers
 
         real(wp) :: d_MD, d_LC !<
-            !! curvature and large curvature (LC) measures
+            !! Median (md) curvature and large curvature (LC) measures
 
-        ! left and right upper bounds (UL), medians, large curvatures,
-        ! and maxima of the WENO-reconstructed values of the cell-
-        ! variables.
+        ! The left and right upper bounds (UL), medians, large curvatures,
+        ! minima, and maxima of the WENO-reconstructed values of the cell-
+        ! average variables.
         real(wp) :: vL_UL, vR_UL
         real(wp) :: vL_MD, vR_MD
         real(wp) :: vL_LC, vR_LC
@@ -1307,14 +1307,14 @@ contains
         real(wp) :: vL_max, vR_max
 
         real(wp), parameter :: alpha = 2._wp !>
-            !! maximum Courant–Friedrichs–Lewy (CFL) number that
-            !! utilized with the scheme. In theory, for stability, a CFL
-            !! than 1/(1+alpha) is necessary. The default value for
-            !! 2.
+            !! Determines the maximum Courant–Friedrichs–Lewy (CFL) number that
+            !! may be utilized with the scheme. In theory, for stability, a CFL
+            !! number less than 1/(1+alpha) is necessary. The default value for
+            !! alpha is 2.
 
         real(wp), parameter :: beta = 4._wp/3._wp !<
-            !! amount of freedom available from utilizing a large
-            !! the local curvature. The default value for beta is 4/3.
+            !! Determines the amount of freedom available from utilizing a large
+            !! value for the local curvature. The default value for beta is 4/3.
 
         real(wp), parameter :: alpha_mp = 2._wp
         real(wp), parameter :: beta_mp = 4._wp/3._wp
@@ -1380,9 +1380,9 @@ contains
                                                   + sign(5.e-1_wp, vL_max - vL_rs_vf(j, k, l, i))) &
                                                *min(abs(vL_min - vL_rs_vf(j, k, l, i)), &
                                                     abs(vL_max - vL_rs_vf(j, k, l, i)))
-                        ! Left Monotonicity Preserving Bound
+                        ! END: Left Monotonicity Preserving Bound
 
-                        ! Monotonicity Preserving Bound
+                        ! Right Monotonicity Preserving Bound
                         d(-1) = v_rs_ws(j, k, l, i) &
                                 + v_rs_ws(j - 2, k, l, i) &
                                 - v_rs_ws(j - 1, k, l, i) &
@@ -1439,7 +1439,7 @@ contains
                                                   + sign(5.e-1_wp, vR_max - vR_rs_vf(j, k, l, i))) &
                                                *min(abs(vR_min - vR_rs_vf(j, k, l, i)), &
                                                     abs(vR_max - vR_rs_vf(j, k, l, i)))
-                        ! Right Monotonicity Preserving Bound
+                        ! END: Right Monotonicity Preserving Bound
                     end do
                 end do
             end do
@@ -1453,17 +1453,17 @@ contains
 
         if (weno_order == 1) return
 
-        ! the WENO-stencil of the WENO-reconstructed variables
+        ! Deallocating the WENO-stencil of the WENO-reconstructed variables
 
         !deallocate(vL_rs_vf_x, vR_rs_vf_x)
         @:DEALLOCATE(v_rs_ws_x)
 
-        ! WENO coefficients in x-direction
+        ! Deallocating WENO coefficients in x-direction
         @:DEALLOCATE(poly_coef_cbL_x, poly_coef_cbR_x)
         @:DEALLOCATE(d_cbL_x, d_cbR_x)
         @:DEALLOCATE(beta_coef_x)
 
-        ! WENO coefficients in y-direction
+        ! Deallocating WENO coefficients in y-direction
         if (n == 0) return
 
         !deallocate(vL_rs_vf_y, vR_rs_vf_y)
@@ -1473,7 +1473,7 @@ contains
         @:DEALLOCATE(d_cbL_y, d_cbR_y)
         @:DEALLOCATE(beta_coef_y)
 
-        ! WENO coefficients in z-direction
+        ! Deallocating WENO coefficients in z-direction
         if (p == 0) return
 
         !deallocate(vL_rs_vf_z, vR_rs_vf_z)

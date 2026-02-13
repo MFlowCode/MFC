@@ -33,8 +33,8 @@ module m_igr
     real(wp), allocatable, dimension(:, :, :), pinned, target :: jac_old_host
 #else
 !> @endcond
-    real(wp), allocatable, target, dimension(:, :, :) :: jac !< IGR Jacobian field
-    real(wp), allocatable, dimension(:, :, :) :: jac_rhs, jac_old !< IGR RHS and previous Jacobian
+    real(wp), allocatable, target, dimension(:, :, :) :: jac
+    real(wp), allocatable, dimension(:, :, :) :: jac_rhs, jac_old
     $:GPU_DECLARE(create='[jac, jac_rhs, jac_old]')
 !> @cond
 #endif
@@ -156,7 +156,7 @@ contains
                 idwbuff(3)%beg:idwbuff(3)%end))
         end if
 #else
-        ! map
+        ! create map
         nv_uvm_temp_on_gpu(1:3) = 0
         nv_uvm_temp_on_gpu(1:nv_uvm_igr_temps_on_gpu) = 1
 

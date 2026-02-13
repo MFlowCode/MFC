@@ -16,7 +16,7 @@ module m_surface_tension
     use m_weno
 
     use m_muscl                !< Monotonic Upstream-centered (MUSCL)
-                               !! conservation laws
+                               !! schemes for conservation laws
 
     use m_helper
 
@@ -248,7 +248,7 @@ contains
 
         isx%end = m; isy%end = n; isz%end = p
 
-        ! gradient components
+        ! compute gradient components
         $:GPU_PARALLEL_LOOP(collapse=3)
         do l = 0, p
             do k = 0, n
@@ -308,7 +308,7 @@ contains
 
         iv%beg = 1; iv%end = num_dims + 1
 
-        ! gradient components at cell boundaries
+        ! reconstruct gradient components at cell boundaries
         do i = 1, num_dims
             call s_reconstruct_cell_boundary_values_capillary(c_divs, gL_x, gL_y, gL_z, gR_x, gR_y, gR_z, i)
         end do
@@ -329,7 +329,7 @@ contains
 
         #:for SCHEME, TYPE in [('weno', 'WENO_TYPE'),('muscl', 'MUSCL_TYPE')]
             if (recon_type == ${TYPE}$ .or. dummy) then
-                ! in s1-direction
+                ! Reconstruction in s1-direction
 
                 if (norm_dir == 1) then
                     is1 = idwbuff(1); is2 = idwbuff(2); is3 = idwbuff(3)

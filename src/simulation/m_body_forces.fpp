@@ -10,7 +10,7 @@ module m_body_forces
 
     use m_nvtx
 
-!
+! $:USE_GPU_MODULE()
 
     implicit none
 
@@ -25,23 +25,23 @@ module m_body_forces
 contains
 
     !> This subroutine initializes the module global array of mixture
-    !! each grid cell
+    !! densities in each grid cell
     impure subroutine s_initialize_body_forces_module
 
-        ! is at least 2D
+        ! Simulation is at least 2D
         if (n > 0) then
-            ! is 3D
+            ! Simulation is 3D
             if (p > 0) then
                 @:ALLOCATE (rhoM(-buff_size:buff_size + m, &
                     -buff_size:buff_size + n, &
                     -buff_size:buff_size + p))
-                ! is 2D
+                ! Simulation is 2D
             else
                 @:ALLOCATE (rhoM(-buff_size:buff_size + m, &
                     -buff_size:buff_size + n, &
                     0:0))
             end if
-            ! is 1D
+            ! Simulation is 1D
         else
             @:ALLOCATE (rhoM(-buff_size:buff_size + m, &
                 0:0, &
@@ -66,8 +66,8 @@ contains
     end subroutine s_compute_acceleration
 
     !> This subroutine calculates the mixture density at each cell
-    !!
-    !! Conservative variable
+    !! center
+    !! param q_cons_vf Conservative variable
     subroutine s_compute_mixture_density(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
@@ -90,9 +90,9 @@ contains
     end subroutine s_compute_mixture_density
 
     !> This subroutine calculates the source term due to body forces
-    !! system can be advanced in time
-    !! Conservative variables
-    !! Primitive variables
+    !! so the system can be advanced in time
+    !! @param q_cons_vf Conservative variables
+    !! @param q_prim_vf Primitive variables
     subroutine s_compute_body_forces_rhs(q_prim_vf, q_cons_vf, rhs_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf

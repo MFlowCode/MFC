@@ -1,12 +1,12 @@
 !>
-!!
-!! module m_mpi_proxy
+!! @file
+!! @brief Contains module m_mpi_proxy
 
 !> @brief This module serves as a proxy to the parameters and subroutines
-!! the MPI implementation's MPI module. Specifically,
-!! of the proxy is to harness basic MPI commands into more
-!! as to achieve the required pre-processing
-!!
+!!              available in the MPI implementation's MPI module. Specifically,
+!!              the role of the proxy is to harness basic MPI commands into more
+!!              complex procedures as to achieve the required pre-processing
+!!              communication goals.
 module m_mpi_proxy
 
 #ifdef MFC_MPI
@@ -25,20 +25,20 @@ module m_mpi_proxy
 
 contains
     !> Since only processor with rank 0 is in charge of reading
-            !! the consistency of the user provided inputs,
-            !! not available to the remaining processors. This
-            !! then in charge of broadcasting the required
-            !!
+            !!       and checking the consistency of the user provided inputs,
+            !!       these are not available to the remaining processors. This
+            !!       subroutine is then in charge of broadcasting the required
+            !!       information.
     impure subroutine s_mpi_bcast_user_inputs
 
 #ifdef MFC_MPI
 
-        ! loop iterator
+        ! Generic loop iterator
         integer :: i, j
-        ! flag used to identify and report MPI errors
+        ! Generic flag used to identify and report MPI errors
         integer :: ierr
 
-        !
+        ! Logistics
         call MPI_BCAST(case_dir, len(case_dir), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
 
         #:for VAR in ['t_step_old', 't_step_start', 'm', 'n', 'p', 'm_glb', 'n_glb', 'p_glb',  &
@@ -124,7 +124,7 @@ contains
             if (chemistry) then
                 call MPI_BCAST(patch_icpp(i)%Y, size(patch_icpp(i)%Y), mpi_p, 0, MPI_COMM_WORLD, ierr)
             end if
-            ! IB variables
+            ! Broadcast IB variables
             call MPI_BCAST(patch_ib(i)%geometry, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(patch_ib(i)%model_filepath, len(patch_ib(i)%model_filepath), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(patch_ib(i)%model_threshold, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
@@ -141,7 +141,7 @@ contains
             #:endfor
         end do
 
-        ! noise  and fluid physical parameters
+        ! Simplex noise  and fluid physical parameters
         do i = 1, num_fluids_max
             #:for VAR in [ 'gamma','pi_inf', 'G', 'cv', 'qv', 'qvp' ]
                 call MPI_BCAST(fluid_pp(i)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
@@ -156,7 +156,7 @@ contains
             end do
         end do
 
-        ! bubble parameters
+        ! Subgrid bubble parameters
         if (bubbles_euler .or. bubbles_lagrange) then
             #:for VAR in [ 'R0ref','p0ref','rho0ref','T0ref', &
                 'ss','pv','vd','mu_l','mu_v','mu_g','gam_v','gam_g', &

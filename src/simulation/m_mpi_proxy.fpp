@@ -1,15 +1,15 @@
 !>
-!!
-!! module m_mpi_proxy
+!! @file
+!! @brief Contains module m_mpi_proxy
 
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
 !> @brief The module serves as a proxy to the parameters and subroutines
-!! the MPI implementation's MPI module. Specifically,
-!! of the proxy is to harness basic MPI commands into
-!! procedures as to accomplish the communication
-!! the simulation.
+!!          available in the MPI implementation's MPI module. Specifically,
+!!          the purpose of the proxy is to harness basic MPI commands into
+!!          more complicated procedures as to accomplish the communication
+!!          goals for the simulation.
 module m_mpi_proxy
 
 #ifdef MFC_MPI
@@ -33,14 +33,14 @@ module m_mpi_proxy
     implicit none
 
     integer, private, allocatable, dimension(:) :: ib_buff_send !<
-    !! is utilized to pack and send the buffer of the immersed
-    !! for a single computational domain boundary at the
-    !! the relevant neighboring processor.
+    !! This variable is utilized to pack and send the buffer of the immersed
+    !! boundary markers, for a single computational domain boundary at the
+    !! time, to the relevant neighboring processor.
 
     integer, private, allocatable, dimension(:) :: ib_buff_recv !<
-    !! utilized to receive and unpack the buffer of the
-    !! markers, for a single computational domain boundary
-    !! time, from the relevant neighboring processor.
+    !! q_cons_buff_recv is utilized to receive and unpack the buffer of the
+    !! immersed boundary markers, for a single computational domain boundary
+    !! at the time, from the relevant neighboring processor.
 
     integer :: i_halo_size
     $:GPU_DECLARE(create='[i_halo_size]')
@@ -74,10 +74,10 @@ contains
     end subroutine s_initialize_mpi_proxy_module
 
     !>  Since only the processor with rank 0 reads and verifies
-        !! of user inputs, these are initially not
-        !! the other processors. Then, the purpose of
-        !! is to distribute the user inputs to the
-        !! in the communicator.
+        !!      the consistency of user inputs, these are initially not
+        !!      available to the other processors. Then, the purpose of
+        !!      this subroutine is to distribute the user inputs to the
+        !!      remaining processors in the communicator.
     impure subroutine s_mpi_bcast_user_inputs()
 
 #ifdef MFC_MPI
@@ -249,7 +249,7 @@ contains
             #:endfor
         end do
 
-        ! UVM variables
+        ! NVIDIA UVM variables
         call MPI_BCAST(nv_uvm_out_of_core, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(nv_uvm_igr_temps_on_gpu, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(nv_uvm_pref_gpu, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
@@ -292,12 +292,12 @@ contains
         beg_end = (/boundary_conditions(mpi_dir)%beg, boundary_conditions(mpi_dir)%end/)
         beg_end_geq_0 = beg_end(max(pbc_loc, 0) - pbc_loc + 1) >= 0
 
-        !
-        !  bc_x >= 0 -> [send/recv]_tag  [dst/src]_proc
-        ! (=0)      0            ->     [1,0]       [0,0]      | 0 0 [1,0] [beg,beg]
-        ! (=0)      1            ->     [0,0]       [1,0]      | 0 1 [0,0] [end,beg]
-        ! (=1)      0            ->     [0,1]       [1,1]      | 1 0 [0,1] [end,end]
-        ! (=1)      1            ->     [1,1]       [0,1]      | 1 1 [1,1] [beg,end]
+        ! Implements:
+        ! pbc_loc  bc_x >= 0 -> [send/recv]_tag  [dst/src]_proc
+        ! -1 (=0)      0            ->     [1,0]       [0,0]      | 0 0 [1,0] [beg,beg]
+        ! -1 (=0)      1            ->     [0,0]       [1,0]      | 0 1 [0,0] [end,beg]
+        ! +1 (=1)      0            ->     [0,1]       [1,1]      | 1 0 [0,1] [end,end]
+        ! +1 (=1)      1            ->     [1,1]       [0,1]      | 1 1 [1,1] [beg,end]
 
         send_tag = f_logical_to_int(.not. f_xor(beg_end_geq_0, pbc_loc == 1))
         recv_tag = f_logical_to_int(pbc_loc == 1)
@@ -317,7 +317,7 @@ contains
             unpack_offset = grid_dims(mpi_dir) + buff_size + 1
         end if
 
-        ! Buffer to Send
+        ! Pack Buffer to Send
         #:for mpi_dir in [1, 2, 3]
             if (mpi_dir == ${mpi_dir}$) then
                 #:if mpi_dir == 1
@@ -393,7 +393,7 @@ contains
             end if
         #:endfor
 
-        ! Received Buffer
+        ! Unpack Received Buffer
         call nvtxStartRange("IB-MARKER-COMM-UNPACKBUF")
         #:for mpi_dir in [1, 2, 3]
             if (mpi_dir == ${mpi_dir}$) then
@@ -421,7 +421,7 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
                 #:else
-                    ! buffer from bc_z%beg
+                    ! Unpacking buffer from bc_z%beg
                     $:GPU_PARALLEL_LOOP(collapse=3,private='[j,k,l,r]')
                     do l = -buff_size, -1
                         do k = -buff_size, n + buff_size

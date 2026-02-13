@@ -117,4 +117,4 @@
     #:endif
     $:extraArgs_val
 #:enddef
-! line at end of file is required for FYPP
+! New line at end of file is required for FYPP

@@ -1,22 +1,22 @@
 !>
-!!
-!! module m_cbc
+!! @file
+!! @brief Contains module m_cbc
 
 !> @brief The module features a large database of characteristic boundary
-!! for the Euler system of equations. This system
-!! by the appropriate advection equations utilized to
-!! material interfaces. The closure is achieved by the
-!! of state and mixture relations. At this time,
-!! CBC are available:
-!! Wall
-!! Subsonic Buffer
-!! Subsonic Inflow
-!! Subsonic Outflow
-!! Subsonic Outflow
-!! Pressure Subsonic Outflow
-!! Inflow
-!! Outflow
-!! to Thompson (1987, 1990) for detailed descriptions.
+!!              conditions (CBC) for the Euler system of equations. This system
+!!              is augmented by the appropriate advection equations utilized to
+!!              capture the material interfaces. The closure is achieved by the
+!!              stiffened equation of state and mixture relations. At this time,
+!!              the following CBC are available:
+!!                           1) Slip Wall
+!!                           2) Nonreflecting Subsonic Buffer
+!!                           3) Nonreflecting Subsonic Inflow
+!!                           4) Nonreflecting Subsonic Outflow
+!!                           5) Force-Free Subsonic Outflow
+!!                           6) Constant Pressure Subsonic Outflow
+!!                           7) Supersonic Inflow
+!!                           8) Supersonic Outflow
+!!              Please refer to Thompson (1987, 1990) for detailed descriptions.
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
@@ -44,28 +44,28 @@ module m_cbc
 
     private; public :: s_initialize_cbc_module, s_cbc, s_finalize_cbc_module
 
-    !! primitive variables. They are obtained by reshaping (RS)
-    !! the coordinate direction normal to the domain boundary along
-    !! CBC is applied.
+    !! The cell-average primitive variables. They are obtained by reshaping (RS)
+    !! q_prim_vf in the coordinate direction normal to the domain boundary along
+    !! which the CBC is applied.
 
     real(wp), allocatable, dimension(:, :, :, :) :: q_prim_rsx_vf
     real(wp), allocatable, dimension(:, :, :, :) :: q_prim_rsy_vf
     real(wp), allocatable, dimension(:, :, :, :) :: q_prim_rsz_vf
     $:GPU_DECLARE(create='[q_prim_rsx_vf,q_prim_rsy_vf,q_prim_rsz_vf]')
 
-    !! (src - source). These are directly determined from the
-    !! variables, q_prims_rs_vf, and not a Riemann solver.
+    !! Cell-average fluxes (src - source). These are directly determined from the
+    !! cell-average primitive variables, q_prims_rs_vf, and not a Riemann solver.
 
     real(wp), allocatable, dimension(:, :, :, :) :: F_rsx_vf, F_src_rsx_vf !<
     real(wp), allocatable, dimension(:, :, :, :) :: F_rsy_vf, F_src_rsy_vf !<
     real(wp), allocatable, dimension(:, :, :, :) :: F_rsz_vf, F_src_rsz_vf !<
     $:GPU_DECLARE(create='[F_rsx_vf,F_src_rsx_vf,F_rsy_vf,F_src_rsy_vf,F_rsz_vf,F_src_rsz_vf]')
 
-    !! a CCE bug that is causing some subset of these variables to interfere
-    !! of the same name in m_riemann_solvers.fpp, and giving this versions
-    !! names works around the bug. Other private module allocatable arrays
-    !! declare create` clauses don't have this problem, so we still need to
-    !! bug.
+    !! There is a CCE bug that is causing some subset of these variables to interfere
+    !! with variables of the same name in m_riemann_solvers.fpp, and giving this versions
+    !! unique "_l" names works around the bug. Other private module allocatable arrays
+    !! in `acc declare create` clauses don't have this problem, so we still need to
+    !! isolate this bug.
 
     real(wp), allocatable, dimension(:, :, :, :) :: flux_rsx_vf_l, flux_src_rsx_vf_l !<
     real(wp), allocatable, dimension(:, :, :, :) :: flux_rsy_vf_l, flux_src_rsy_vf_l
@@ -74,17 +74,17 @@ module m_cbc
 
     real(wp), allocatable, dimension(:) :: ds !< Cell-width distribution in the s-direction
 
-    ! Coefficients
+    ! CBC Coefficients
 
     real(wp), allocatable, dimension(:, :) :: fd_coef_x !< Finite diff. coefficients x-dir
     real(wp), allocatable, dimension(:, :) :: fd_coef_y !< Finite diff. coefficients y-dir
     real(wp), allocatable, dimension(:, :) :: fd_coef_z !< Finite diff. coefficients z-dir
 
-    !! dimension identifies the location of a coefficient in the FD
-    !! the last dimension denotes the location of the CBC.
+    !! The first dimension identifies the location of a coefficient in the FD
+    !! formula, while the last dimension denotes the location of the CBC.
 
-    ! with NVHPC when using nullified pointers in a declare create
-    !    pointer, dimension(:, :) :: fd_coef => null()
+    ! Bug with NVHPC when using nullified pointers in a declare create
+    !    real(wp), pointer, dimension(:, :) :: fd_coef => null()
 
     real(wp), allocatable, dimension(:, :, :) :: pi_coef_x !< Polynomial interpolant coefficients in x-dir
     real(wp), allocatable, dimension(:, :, :) :: pi_coef_y !< Polynomial interpolant coefficients in y-dir
@@ -92,9 +92,9 @@ module m_cbc
 
     $:GPU_DECLARE(create='[ds,fd_coef_x,fd_coef_y,fd_coef_z,pi_coef_x,pi_coef_y,pi_coef_z]')
 
-    !! dimension of the array identifies the polynomial, the
-    !! identifies the position of its coefficients and the last
-    !! the location of the CBC.
+    !! The first dimension of the array identifies the polynomial, the
+    !! second dimension identifies the position of its coefficients and the last
+    !! dimension denotes the location of the CBC.
 
     type(int_bounds_info) :: is1, is2, is3 !< Indical bounds in the s1-, s2- and s3-directions
     $:GPU_DECLARE(create='[is1,is2,is3]')
@@ -106,9 +106,9 @@ module m_cbc
     $:GPU_DECLARE(create='[dj,bcxb,bcxe,bcyb,bcye,bczb,bcze]')
     $:GPU_DECLARE(create='[cbc_dir, cbc_loc,flux_cbc_index]')
 
-    !! for subsonic inflow and outflow conditions consisting of
-    !! pressure, density and void fraction as well as
-    !! and pressure
+    !! GRCBC inputs for subsonic inflow and outflow conditions consisting of
+    !! inflow velocities, pressure, density and void fraction as well as
+    !! outflow velocities and pressure
 
     real(wp), allocatable, dimension(:) :: pres_in, pres_out, Del_in, Del_out
     real(wp), allocatable, dimension(:, :) :: vel_in, vel_out
@@ -120,8 +120,8 @@ module m_cbc
 contains
 
     !>  The computation of parameters, the allocation of memory,
-        !! of pointers and/or the execution of any
-        !! that are necessary to setup the module.
+        !!      the association of pointers and/or the execution of any
+        !!      other procedures that are necessary to setup the module.
     impure subroutine s_initialize_cbc_module
 
         integer :: i
@@ -270,7 +270,7 @@ contains
 
         end if
 
-        ! the cell-width distribution in the s-direction
+        ! Allocating the cell-width distribution in the s-direction
         @:ALLOCATE(ds(0:buff_size))
 
         if (recon_type == WENO_TYPE) then
@@ -284,7 +284,7 @@ contains
             idx2%beg = 0
             idx2%end = muscl_order - 1
         end if
-        ! CBC Coefficients in x-direction
+        ! Allocating/Computing CBC Coefficients in x-direction
         if (all((/bc_x%beg, bc_x%end/) <= -5) .and. all((/bc_x%beg, bc_x%end/) >= -13)) then
 
             @:ALLOCATE(fd_coef_x(0:buff_size, -1:1))
@@ -318,7 +318,7 @@ contains
 
         end if
 
-        ! CBC Coefficients in y-direction
+        ! Allocating/Computing CBC Coefficients in y-direction
         if (n > 0) then
 
             if (all((/bc_y%beg, bc_y%end/) <= -5) .and. all((/bc_y%beg, bc_y%end/) >= -13)) then
@@ -356,7 +356,7 @@ contains
 
         end if
 
-        ! CBC Coefficients in z-direction
+        ! Allocating/Computing CBC Coefficients in z-direction
         if (p > 0) then
 
             if (all((/bc_z%beg, bc_z%end/) <= -5) .and. all((/bc_z%beg, bc_z%end/) >= -13)) then
@@ -397,8 +397,8 @@ contains
         $:GPU_UPDATE(device='[fd_coef_x,fd_coef_y,fd_coef_z, &
             & pi_coef_x,pi_coef_y,pi_coef_z]')
 
-        ! the procedural pointer to the appropriate subroutine
-        ! will be utilized in the conversion to the mixture variables
+        ! Associating the procedural pointer to the appropriate subroutine
+        ! that will be utilized in the conversion to the mixture variables
 
         bcxb = bc_x%beg
         bcxe = bc_x%end
@@ -419,13 +419,13 @@ contains
             $:GPU_UPDATE(device='[bczb, bcze]')
         end if
 
-        ! GRCBC inputs
+        ! Allocate GRCBC inputs
         @:ALLOCATE(pres_in(1:num_dims), pres_out(1:num_dims))
         @:ALLOCATE(Del_in(1:num_dims), Del_out(1:num_dims))
         @:ALLOCATE(vel_in(1:num_dims, 1:num_dims), vel_out(1:num_dims, 1:num_dims))
         @:ALLOCATE(alpha_rho_in(1:num_fluids, 1:num_dims), alpha_in(1:num_fluids, 1:num_dims))
 
-        ! and update GRCBC inputs
+        ! Assign and update GRCBC inputs
         #:for CBC_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (${CBC_DIR}$ <= num_dims) then
                 vel_in(${CBC_DIR}$, 1) = bc_${XYZ}$%vel_in(1)
@@ -453,33 +453,33 @@ contains
     end subroutine s_initialize_cbc_module
 
     !>  Compute CBC coefficients
-        !! CBC coordinate direction
-        !! CBC coordinate location
+        !!  @param cbc_dir_in CBC coordinate direction
+        !!  @param cbc_loc_in CBC coordinate location
     subroutine s_compute_cbc_coefficients(cbc_dir_in, cbc_loc_in)
-        ! The purpose of this subroutine is to compute the grid
-        !              FD and PI coefficients, or CBC coefficients,
-        !              the CBC coordinate direction and location.
+        ! Description: The purpose of this subroutine is to compute the grid
+        !              dependent FD and PI coefficients, or CBC coefficients,
+        !              provided the CBC coordinate direction and location.
 
-        ! coordinate direction and location
+        ! CBC coordinate direction and location
         integer, intent(in) :: cbc_dir_in, cbc_loc_in
 
-        ! locations in the s-direction
+        ! Cell-boundary locations in the s-direction
         real(wp), dimension(0:buff_size + 1) :: s_cb
 
-        ! loop iterator
+        ! Generic loop iterator
         integer :: i
 
-        ! CBC coefficients pointers
+        ! Associating CBC coefficients pointers
         call s_associate_cbc_coefficients_pointers(cbc_dir_in, cbc_loc_in)
 
-        ! the cell-boundary locations in the s-direction
+        ! Determining the cell-boundary locations in the s-direction
         s_cb(0) = 0._wp
 
         do i = 0, buff_size
             s_cb(i + 1) = s_cb(i) + ds(i)
         end do
 
-        ! CBC1 Coefficients
+        ! Computing CBC1 Coefficients
         #:for CBC_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (cbc_dir_in == ${CBC_DIR}$ .and. recon_type == WENO_TYPE) then
                 if (weno_order == 1) then
@@ -488,7 +488,7 @@ contains
                     fd_coef_${XYZ}$ (0, cbc_loc_in) = -2._wp/(ds(0) + ds(1))
                     fd_coef_${XYZ}$ (1, cbc_loc_in) = -fd_coef_${XYZ}$ (0, cbc_loc_in)
 
-                    ! CBC2 Coefficients
+                    ! Computing CBC2 Coefficients
                 elseif (weno_order == 3) then
 
                     fd_coef_${XYZ}$ (:, cbc_loc_in) = 0._wp
@@ -498,7 +498,7 @@ contains
 
                     pi_coef_${XYZ}$ (0, 0, cbc_loc_in) = (s_cb(0) - s_cb(1))/(s_cb(0) - s_cb(2))
 
-                    ! CBC4 Coefficients
+                    ! Computing CBC4 Coefficients
                 else
 
                     fd_coef_${XYZ}$ (:, cbc_loc_in) = 0._wp
@@ -547,25 +547,25 @@ contains
             end if
         #:endfor
 
-        ! Computing CBC4 Coefficients
+        ! END: Computing CBC4 Coefficients
 
-        ! CBC coefficients
+        ! Nullifying CBC coefficients
 
     end subroutine s_compute_cbc_coefficients
 
-    !! of the procedure is to associate the FD and PI
-    !! CBC coefficients, with the appropriate
-    !! on the coordinate direction and location
-    !! CBC.
-    !! CBC coordinate direction
-    !! CBC coordinate location
+    !!  The goal of the procedure is to associate the FD and PI
+    !!      coefficients, or CBC coefficients, with the appropriate
+    !!      targets, based on the coordinate direction and location
+    !!      of the CBC.
+    !!  @param cbc_dir_in CBC coordinate direction
+    !!  @param cbc_loc_in CBC coordinate location
     subroutine s_associate_cbc_coefficients_pointers(cbc_dir_in, cbc_loc_in)
 
         integer, intent(in) :: cbc_dir_in, cbc_loc_in
 
         integer :: i !< Generic loop iterator
 
-        ! CBC Coefficients in x-direction
+        ! Associating CBC Coefficients in x-direction
         if (cbc_dir_in == 1) then
 
             !fd_coef => fd_coef_x; if (weno_order > 1) pi_coef => pi_coef_x
@@ -580,7 +580,7 @@ contains
                 end do
             end if
 
-            ! CBC Coefficients in y-direction
+            ! Associating CBC Coefficients in y-direction
         elseif (cbc_dir_in == 2) then
 
             !fd_coef => fd_coef_y; if (weno_order > 1) pi_coef => pi_coef_y
@@ -595,7 +595,7 @@ contains
                 end do
             end if
 
-            ! CBC Coefficients in z-direction
+            ! Associating CBC Coefficients in z-direction
         else
 
             !fd_coef => fd_coef_z; if (weno_order > 1) pi_coef => pi_coef_z
@@ -617,18 +617,18 @@ contains
     end subroutine s_associate_cbc_coefficients_pointers
 
     !>  The following is the implementation of the CBC based on
-        !! of Thompson (1987, 1990) on hyperbolic systems.
-        !! is indirectly applied in the computation of the
-        !! near the relevant domain boundary
-        !! modification of the fluxes.
-        !! Cell-average primitive variables
-        !! Cell-boundary-average fluxes
-        !! Cell-boundary-average flux sources
-        !! CBC coordinate direction
-        !! CBC coordinate location
-        !! Index bound in the first coordinate direction
-        !! Index bound in the second coordinate direction
-        !! Index bound in the third coordinate direction
+        !!      the work of Thompson (1987, 1990) on hyperbolic systems.
+        !!      The CBC is indirectly applied in the computation of the
+        !!      right-hand-side (RHS) near the relevant domain boundary
+        !!      through the modification of the fluxes.
+        !!  @param q_prim_vf Cell-average primitive variables
+        !!  @param flux_vf Cell-boundary-average fluxes
+        !!  @param flux_src_vf Cell-boundary-average flux sources
+        !!  @param cbc_dir_norm CBC coordinate direction
+        !!  @param cbc_loc_norm CBC coordinate location
+        !!  @param ix Index bound in the first coordinate direction
+        !!  @param iy Index bound in the second coordinate direction
+        !!  @param iz Index bound in the third coordinate direction
     subroutine s_cbc(q_prim_vf, flux_vf, flux_src_vf, &
                      cbc_dir_norm, cbc_loc_norm, &
                      ix, iy, iz)
@@ -691,9 +691,9 @@ contains
 
         integer :: i, j, k, r !< Generic loop iterators
 
-        ! of inputted data and association of the FD and PI
-        ! or CBC coefficients, respectively, hinging on
-        ! CBC coordinate direction
+        ! Reshaping of inputted data and association of the FD and PI
+        ! coefficients, or CBC coefficients, respectively, hinging on
+        ! selected CBC coordinate direction
 
         cbc_dir = cbc_dir_norm
         cbc_loc = cbc_loc_norm
@@ -708,7 +708,7 @@ contains
         #:for CBC_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (cbc_dir == ${CBC_DIR}$ .and. recon_type == WENO_TYPE) then
 
-                ! of flux_rs_vf and flux_src_rs_vf at j = 1/2
+                ! PI2 of flux_rs_vf and flux_src_rs_vf at j = 1/2
                 if (weno_order == 3 .or. dummy) then
 
                     call s_convert_primitive_to_flux_variables(q_prim_rs${XYZ}$_vf, &
@@ -743,7 +743,7 @@ contains
                     $:END_GPU_PARALLEL_LOOP()
                 end if
 
-                ! of flux_rs_vf and flux_src_rs_vf at j = 1/2, 3/2
+                ! PI4 of flux_rs_vf and flux_src_rs_vf at j = 1/2, 3/2
                 if (weno_order == 5 .or. dummy) then
                     call s_convert_primitive_to_flux_variables(q_prim_rs${XYZ}$_vf, &
                                                                F_rs${XYZ}$_vf, &
@@ -794,12 +794,12 @@ contains
 
                 end if
 
-                ! or FD4 of RHS at j = 0
+                ! FD2 or FD4 of RHS at j = 0
                 $:GPU_PARALLEL_LOOP(collapse=2, private='[r,k,alpha_rho, vel, adv_local, mf, dvel_ds, dadv_ds, Re_cbc, dalpha_rho_ds, dpres_ds, dvel_dt, dadv_dt, dalpha_rho_dt, L, lambda, Ys, dYs_dt, dYs_ds, h_k, Cp_i, Gamma_i, Xs, drho_dt, dpres_dt, dpi_inf_dt, dqv_dt, dgamma_dt, rho, pres, E, H, gamma, pi_inf, qv, c, Ma, T, sum_Enthalpies, Cv, Cp, e_mix, Mw, R_gas, vel_K_sum, vel_dv_dt_sum, i, j]', copyin='[dir_idx]')
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
 
-                        ! the Primitive Variables
+                        ! Transferring the Primitive Variables
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, contxe
                             alpha_rho(i) = q_prim_rs${XYZ}$_vf(0, k, r, i)
@@ -859,10 +859,10 @@ contains
 
                         H = (E + pres)/rho
 
-                        ! mixture sound speed
+                        ! Compute mixture sound speed
                         call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv_local, vel_K_sum, 0._wp, c, qv)
 
-                        ! Spatial Derivatives of Primitive Variables
+                        ! First-Order Spatial Derivatives of Primitive Variables
 
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, contxe
@@ -923,7 +923,7 @@ contains
                             end if
                         end do
 
-                        ! Temporal Derivatives of Primitive Variables
+                        ! First-Order Temporal Derivatives of Primitive Variables
                         lambda(1) = vel(dir_idx(1)) - c
                         lambda(2) = vel(dir_idx(1))
                         lambda(3) = vel(dir_idx(1)) + c
@@ -939,7 +939,7 @@ contains
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_NR_SUB_INFLOW) .or. &
                                  (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_NR_SUB_INFLOW)) then
                             call s_compute_nonreflecting_subsonic_inflow_L(lambda, L, rho, c, dpres_ds, dvel_ds)
-                            ! GRCBC for Subsonic Inflow
+                            ! Add GRCBC for Subsonic Inflow
                             if (bc_${XYZ}$%grcbc_in) then
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 2, momxb
@@ -960,11 +960,11 @@ contains
                         else if ((cbc_loc == -1 .and. bc${XYZ}$b == BC_CHAR_NR_SUB_OUTFLOW) .or. &
                                  (cbc_loc == 1 .and. bc${XYZ}$e == BC_CHAR_NR_SUB_OUTFLOW)) then
                             call s_compute_nonreflecting_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds, dYs_ds)
-                            ! GRCBC for Subsonic Outflow (Pressure)
+                            ! Add GRCBC for Subsonic Outflow (Pressure)
                             if (bc_${XYZ}$%grcbc_out) then
                                 L(advxe) = c*(1._wp - Ma)*(pres - pres_out(${CBC_DIR}$))/Del_out(${CBC_DIR}$)
 
-                                ! GRCBC for Subsonic Outflow (Normal Velocity)
+                                ! Add GRCBC for Subsonic Outflow (Normal Velocity)
                                 if (bc_${XYZ}$%grcbc_vel_out) then
                                     L(advxe) = L(advxe) + rho*c**2._wp*(1._wp - Ma)*(vel(dir_idx(1)) + vel_out(${CBC_DIR}$, dir_idx(1))*sign(1, cbc_loc))/Del_out(${CBC_DIR}$)
                                 end if
@@ -983,7 +983,7 @@ contains
                             call s_compute_supersonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds, dYs_ds)
                         end if
 
-                        ! careful about the cylindrical coordinate!
+                        ! Be careful about the cylindrical coordinate!
                         if (cyl_coord .and. cbc_dir == 2 .and. cbc_loc == 1) then
                             dpres_dt = -5.e-1_wp*(L(advxe) + L(1)) + rho*c*c*vel(dir_idx(1)) &
                                        /y_cc(n)
@@ -1018,7 +1018,7 @@ contains
                             end do
                         end if
 
-                        ! treatment of void fraction source is unclear
+                        ! The treatment of void fraction source is unclear
                         if (cyl_coord .and. cbc_dir == 2 .and. cbc_loc == 1) then
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, advxe - E_idx
@@ -1049,7 +1049,7 @@ contains
                             end do
                         end if
 
-                        ! and flux_src_rs_vf_l at j = -1/2
+                        ! flux_rs_vf_l and flux_src_rs_vf_l at j = -1/2
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, contxe
                             flux_rs${XYZ}$_vf_l(-1, k, r, i) = flux_rs${XYZ}$_vf_l(0, k, r, i) &
@@ -1064,7 +1064,7 @@ contains
                         end do
 
                         if (chemistry) then
-                            ! of LODI equation of energy for real gases adjusted to perfect gas, doi:10.1006/jcph.2002.6990
+                            ! Evolution of LODI equation of energy for real gases adjusted to perfect gas, doi:10.1006/jcph.2002.6990
                             call get_species_enthalpies_rt(T, h_k)
                             sum_Enthalpies = 0._wp
                             $:GPU_LOOP(parallelism='[seq]')
@@ -1126,7 +1126,7 @@ contains
                             end do
 
                         end if
-                        ! flux_rs_vf_l and flux_src_rs_vf_l at j = -1/2
+                        ! END: flux_rs_vf_l and flux_src_rs_vf_l at j = -1/2
 
                     end do
                 end do
@@ -1134,24 +1134,24 @@ contains
             end if
         #:endfor
 
-        ! FD2 or FD4 of RHS at j = 0
+        ! END: FD2 or FD4 of RHS at j = 0
 
-        ! reshaping of outputted data and disssociation of the FD and PI
-        ! or CBC coefficients, respectively, based on selected
-        ! coordinate direction.
+        ! The reshaping of outputted data and disssociation of the FD and PI
+        ! coefficients, or CBC coefficients, respectively, based on selected
+        ! CBC coordinate direction.
         call s_finalize_cbc(flux_vf, flux_src_vf)
     end subroutine s_cbc
 
     !>  The computation of parameters, the allocation of memory,
-        !! of pointers and/or the execution of any
-        !! that are required for the setup of the
-        !!
-        !! Cell-average primitive variables
-        !! Cell-boundary-average fluxes
-        !! Cell-boundary-average flux sources
-        !! Index bound in the first coordinate direction
-        !! Index bound in the second coordinate direction
-        !! Index bound in the third coordinate direction
+        !!      the association of pointers and/or the execution of any
+        !!      other procedures that are required for the setup of the
+        !!      selected CBC.
+        !!  @param q_prim_vf Cell-average primitive variables
+        !!  @param flux_vf Cell-boundary-average fluxes
+        !!  @param flux_src_vf Cell-boundary-average flux sources
+        !!  @param ix Index bound in the first coordinate direction
+        !!  @param iy Index bound in the second coordinate direction
+        !!  @param iz Index bound in the third coordinate direction
     subroutine s_initialize_cbc(q_prim_vf, flux_vf, flux_src_vf, &
                                 ix, iy, iz)
 
@@ -1167,11 +1167,11 @@ contains
 
         integer :: i, j, k, r !< Generic loop iterators
 
-        ! the coordinate direction indexes and flags
+        ! Configuring the coordinate direction indexes and flags
 
-        ! the indicial shift based on CBC location
+        ! Determining the indicial shift based on CBC location
 
-        ! Allocation/Association of Primitive and Flux Variables
+        ! END: Allocation/Association of Primitive and Flux Variables
 
         if (cbc_dir == 1) then
             is1%beg = 0; is1%end = buff_size; is2 = iy; is3 = iz
@@ -1188,7 +1188,7 @@ contains
         $:GPU_UPDATE(device='[is1,is2,is3,dj]')
         $:GPU_UPDATE(device='[dir_idx,dir_flg]')
 
-        ! Inputted Data in x-direction
+        ! Reshaping Inputted Data in x-direction
         if (cbc_dir == 1) then
 
             $:GPU_PARALLEL_LOOP(private='[i,j,k,r]', collapse=4)
@@ -1268,9 +1268,9 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
             end if
 
-            ! Reshaping Inputted Data in x-direction
+            ! END: Reshaping Inputted Data in x-direction
 
-            ! Inputted Data in y-direction
+            ! Reshaping Inputted Data in y-direction
         elseif (cbc_dir == 2) then
 
             $:GPU_PARALLEL_LOOP(private='[i,j,k,r]', collapse=4)
@@ -1350,9 +1350,9 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
             end if
 
-            ! Reshaping Inputted Data in y-direction
+            ! END: Reshaping Inputted Data in y-direction
 
-            ! Inputted Data in z-direction
+            ! Reshaping Inputted Data in z-direction
         else
 
             $:GPU_PARALLEL_LOOP(private='[i,j,k,r]', collapse=4)
@@ -1433,17 +1433,17 @@ contains
             end if
 
         end if
-        ! Reshaping Inputted Data in z-direction
+        ! END: Reshaping Inputted Data in z-direction
 
-        ! of the procedural pointer to the appropriate procedure
-        ! will be utilized in the evaluation of L variables for the CBC
+        ! Association of the procedural pointer to the appropriate procedure
+        ! that will be utilized in the evaluation of L variables for the CBC
 
     end subroutine s_initialize_cbc
 
     !>  Deallocation and/or the disassociation procedures that
-        !! in order to finalize the CBC application
-        !! Cell-boundary-average fluxes
-        !! Cell-boundary-average flux sources
+        !!      are necessary in order to finalize the CBC application
+        !!  @param flux_vf Cell-boundary-average fluxes
+        !!  @param flux_src_vf Cell-boundary-average flux sources
     subroutine s_finalize_cbc(flux_vf, flux_src_vf)
 
         type(scalar_field), &
@@ -1452,11 +1452,11 @@ contains
 
         integer :: i, j, k, r !< Generic loop iterators
 
-        ! the indicial shift based on CBC location
+        ! Determining the indicial shift based on CBC location
         dj = max(0, cbc_loc)
         $:GPU_UPDATE(device='[dj]')
 
-        ! Outputted Data in x-direction
+        ! Reshaping Outputted Data in x-direction
         if (cbc_dir == 1) then
 
             $:GPU_PARALLEL_LOOP(private='[i,j,k,r]', collapse=4)
@@ -1509,9 +1509,9 @@ contains
                 end do
                 $:END_GPU_PARALLEL_LOOP()
             end if
-            ! Reshaping Outputted Data in x-direction
+            ! END: Reshaping Outputted Data in x-direction
 
-            ! Outputted Data in y-direction
+            ! Reshaping Outputted Data in y-direction
         elseif (cbc_dir == 2) then
 
             $:GPU_PARALLEL_LOOP(private='[i,j,k,r]', collapse=4)
@@ -1566,9 +1566,9 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
             end if
 
-            ! Reshaping Outputted Data in y-direction
+            ! END: Reshaping Outputted Data in y-direction
 
-            ! Outputted Data in z-direction
+            ! Reshaping Outputted Data in z-direction
         else
 
             $:GPU_PARALLEL_LOOP(private='[i,j,k,r]', collapse=4)
@@ -1624,11 +1624,11 @@ contains
             end if
 
         end if
-        ! Reshaping Outputted Data in z-direction
+        ! END: Reshaping Outputted Data in z-direction
 
     end subroutine s_finalize_cbc
 
-    ! if the problem has any characteristic boundary conditions
+    ! Detext if the problem has any characteristic boundary conditions
     elemental subroutine s_any_cbc_boundaries(toggle)
 
         logical, intent(inout) :: toggle
@@ -1652,7 +1652,7 @@ contains
 
         if (is_cbc .eqv. .false.) return
 
-        ! the cell-average primitive variables
+        ! Deallocating the cell-average primitive variables
         @:DEALLOCATE(q_prim_rsx_vf)
         if (weno_order > 1 .or. muscl_order > 1) then
             @:DEALLOCATE(F_rsx_vf, F_src_rsx_vf)
@@ -1674,13 +1674,13 @@ contains
             @:DEALLOCATE(flux_rsz_vf_l, flux_src_rsz_vf_l)
         end if
 
-        ! the cell-width distribution in the s-direction
+        ! Deallocating the cell-width distribution in the s-direction
         @:DEALLOCATE(ds)
 
-        ! GRCBC inputs
+        ! Deallocating GRCBC inputs
         @:DEALLOCATE(vel_in, vel_out, pres_in, pres_out, Del_in, Del_out, alpha_rho_in, alpha_in)
 
-        ! CBC Coefficients in x-direction
+        ! Deallocating CBC Coefficients in x-direction
         if (all((/bc_x%beg, bc_x%end/) <= -5) .and. all((/bc_x%beg, bc_x%end/) >= -13) .or. &
             bc_x%beg <= -5 .and. bc_x%beg >= -13 .or. &
             bc_x%end <= -5 .and. bc_x%end >= -13) then
@@ -1690,7 +1690,7 @@ contains
             end if
         end if
 
-        ! CBC Coefficients in y-direction
+        ! Deallocating CBC Coefficients in y-direction
         if (n > 0) then
             if (all((/bc_y%beg, bc_y%end/) <= -5) .and. all((/bc_y%beg, bc_y%end/) >= -13) .or. &
                 bc_y%beg <= -5 .and. bc_y%beg >= -13 .or. &
@@ -1702,7 +1702,7 @@ contains
             end if
         end if
 
-        ! CBC Coefficients in z-direction
+        ! Deallocating CBC Coefficients in z-direction
         if (p > 0) then
             if (all((/bc_z%beg, bc_z%end/) <= -5) .and. all((/bc_z%beg, bc_z%end/) >= -13) .or. &
                 bc_z%beg <= -5 .and. bc_z%beg >= -13 .or. &

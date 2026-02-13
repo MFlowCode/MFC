@@ -1,5 +1,5 @@
 !>
-!! @file m_data_input.f90
+!! @file
 !> @brief Contains module m_data_input
 
 !> @brief This module features procedures, which for a specific time-step,
@@ -145,7 +145,6 @@ contains
 
     !> Helper subroutine to read IB data files
     !!  @param file_loc_base Base file location for IB data
-    !!  @param t_step Optional time step index for restart data
     impure subroutine s_read_ib_data_files(file_loc_base, t_step)
 
         character(len=*), intent(in) :: file_loc_base

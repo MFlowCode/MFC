@@ -1,12 +1,12 @@
 !>
-!!
-!! module m_data_output
+!! @file
+!! @brief Contains module m_data_output
 
 !> @brief This module takes care of writing the grid and initial condition
-!! into the "0" time-step directory located in the folder
-!! the rank of the local processor, which is a sub-
-!! the case folder specified by the user in the input
-!!
+!!              data files into the "0" time-step directory located in the folder
+!!              associated with the rank of the local processor, which is a sub-
+!!              directory of the case folder specified by the user in the input
+!!              file pre_process.inp.
 module m_data_output
 
     use m_derived_types         !< Definitions of the derived types
@@ -51,16 +51,16 @@ module m_data_output
     abstract interface
 
         !>  Interface for the conservative data
-        !! Conservative variables
-        !! track if a cell is within the immersed boundary
-        !! closest distance from every cell to the IB
-        !! normalized vector from every cell to the closest point to the IB
+        !! @param q_cons_vf Conservative variables
+        !! @param ib_markers track if a cell is within the immersed boundary
+        !! @param levelset closest distance from every cell to the IB
+        !! @param levelset_norm normalized vector from every cell to the closest point to the IB
         impure subroutine s_write_abstract_data_files(q_cons_vf, q_prim_vf, bc_type, ib_markers, levelset, levelset_norm)
 
             import :: scalar_field, integer_field, sys_size, m, n, p, &
                 pres_field, levelset_field, levelset_norm_field, num_dims
 
-            ! variables
+            ! Conservative variables
             type(scalar_field), &
                 dimension(sys_size), &
                 intent(inout) :: q_cons_vf, q_prim_vf
@@ -69,15 +69,15 @@ module m_data_output
                 dimension(1:num_dims, -1:1), &
                 intent(in) :: bc_type
 
-            ! markers
+            ! IB markers
             type(integer_field), &
                 intent(in), optional :: ib_markers
 
-            !
+            ! Levelset
             type(levelset_field), &
                 intent(IN), optional :: levelset
 
-            ! Norm
+            ! Levelset Norm
             type(levelset_norm_field), &
                 intent(IN), optional :: levelset_norm
 
@@ -85,40 +85,40 @@ module m_data_output
     end interface
 
     character(LEN=path_len + 2*name_len), private :: t_step_dir !<
-    !! into which grid and initial condition data will be placed
+    !! Time-step folder into which grid and initial condition data will be placed
 
     character(LEN=path_len + 2*name_len), public :: restart_dir !<
-    !! folder
+    !! Restart data folder
 
     procedure(s_write_abstract_data_files), pointer :: s_write_data_files => null()
 
 contains
 
     !>  Writes grid and initial condition data files to the "0"
-        !! in the local processor rank folder
-        !! Conservative variables
-        !! track if a cell is within the immersed boundary
-        !! closest distance from every cell to the IB
-        !! normalized vector from every cell to the closest point to the IB
+        !!  time-step directory in the local processor rank folder
+        !! @param q_cons_vf Conservative variables
+        !! @param ib_markers track if a cell is within the immersed boundary
+        !! @param levelset closest distance from every cell to the IB
+        !! @param levelset_norm normalized vector from every cell to the closest point to the IB
     impure subroutine s_write_serial_data_files(q_cons_vf, q_prim_vf, bc_type, ib_markers, levelset, levelset_norm)
         type(scalar_field), &
             dimension(sys_size), &
             intent(inout) :: q_cons_vf, q_prim_vf
 
-        ! types
+        ! BC types
         type(integer_field), &
             dimension(1:num_dims, -1:1), &
             intent(in) :: bc_type
 
-        ! markers
+        ! IB markers
         type(integer_field), &
             intent(in), optional :: ib_markers
 
-        !
+        ! Levelset
         type(levelset_field), &
             intent(IN), optional :: levelset
 
-        ! Norm
+        ! Levelset Norm
         type(levelset_norm_field), &
             intent(IN), optional :: levelset_norm
 
@@ -129,11 +129,11 @@ contains
 
         character(LEN= &
                   int(floor(log10(real(sys_size, wp)))) + 1) :: file_num !< Used to store
-            !! in character form, of the currently
-            !! variable data file
+            !! the number, in character form, of the currently
+            !! manipulated conservative variable data file
 
         character(LEN=len_trim(t_step_dir) + name_len) :: file_loc !<
-            !! used to store the address of a particular file
+            !! Generic string used to store the address of a particular file
 
         integer :: i, j, k, l, r, c !< Generic loop iterator
         integer :: t_step
@@ -154,7 +154,7 @@ contains
 
         t_step = 0
 
-        ! the Locations of the Cell-boundaries
+        ! Outputting the Locations of the Cell-boundaries
 
         if (old_grid) then
             status = 'old'
@@ -170,22 +170,22 @@ contains
             end if
         end if
 
-        ! direction
+        ! x-coordinate direction
         file_loc = trim(t_step_dir)//'/x_cb.dat'
         open (1, FILE=trim(file_loc), FORM='unformatted', STATUS=status)
         write (1) x_cb(-1:m)
         close (1)
 
-        ! and z-coordinate directions
+        ! y- and z-coordinate directions
         if (n > 0) then
-            ! direction
+            ! y-coordinate direction
             file_loc = trim(t_step_dir)//'/y_cb.dat'
             open (1, FILE=trim(file_loc), FORM='unformatted', &
                   STATUS=status)
             write (1) y_cb(-1:n)
             close (1)
 
-            ! direction
+            ! z-coordinate direction
             if (p > 0) then
                 file_loc = trim(t_step_dir)//'/z_cb.dat'
                 open (1, FILE=trim(file_loc), FORM='unformatted', &
@@ -197,7 +197,7 @@ contains
 
         if (ib) then
 
-            ! IB Markers
+            ! Outputting IB Markers
             file_loc = trim(t_step_dir)//'/ib.dat'
 
             open (1, FILE=trim(file_loc), FORM='unformatted', STATUS=status)
@@ -221,7 +221,7 @@ contains
                 end if
             end do
 
-            ! Levelset Info
+            ! Outtputting Levelset Info
             file_loc = trim(t_step_dir)//'/levelset.dat'
 
             open (1, FILE=trim(file_loc), FORM='unformatted', STATUS=status)
@@ -235,7 +235,7 @@ contains
             close (1)
         end if
 
-        ! Conservative Variables
+        ! Outputting Conservative Variables
         do i = 1, sys_size
             write (file_num, '(I0)') i
             file_loc = trim(t_step_dir)//'/q_cons_vf'//trim(file_num) &
@@ -414,7 +414,7 @@ contains
             FMT = "(3F40.14)"
         end if
 
-        !
+        ! 2D
         if ((n > 0) .and. (p == 0)) then
             do i = 1, sys_size
                 write (file_loc, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/cons.', i, '.', proc_rank, '.', t_step, '.dat'
@@ -464,7 +464,7 @@ contains
             FMT = "(4F40.14)"
         end if
 
-        !
+        ! 3D
         if (p > 0) then
             do i = 1, sys_size
                 write (file_loc, '(A,I0,A,I2.2,A,I6.6,A)') trim(t_step_dir)//'/cons.', i, '.', proc_rank, '.', t_step, '.dat'
@@ -517,7 +517,7 @@ contains
 
         if (ib) then
 
-            ! IB Markers
+            ! Write IB Markers
             write (file_loc, '(A,I2.2,A)') trim(t_step_dir)//'/ib_markers.', proc_rank, '.dat'
             open (2, FILE=trim(file_loc))
             do j = 0, m
@@ -557,14 +557,14 @@ contains
     end subroutine s_write_serial_data_files
 
     !> Writes grid and initial condition data files in parallel to the "0"
-        !! in the local processor rank folder
-        !! Conservative variables
-        !! track if a cell is within the immersed boundary
-        !! closest distance from every cell to the IB
-        !! normalized vector from every cell to the closest point to the IB
+        !!  time-step directory in the local processor rank folder
+        !! @param q_cons_vf Conservative variables
+        !! @param ib_markers track if a cell is within the immersed boundary
+        !! @param levelset closest distance from every cell to the IB
+        !! @param levelset_norm normalized vector from every cell to the closest point to the IB
     impure subroutine s_write_parallel_data_files(q_cons_vf, q_prim_vf, bc_type, ib_markers, levelset, levelset_norm)
 
-        ! variables
+        ! Conservative variables
         type(scalar_field), &
             dimension(sys_size), &
             intent(inout) :: q_cons_vf, q_prim_vf
@@ -573,15 +573,15 @@ contains
             dimension(1:num_dims, -1:1), &
             intent(in) :: bc_type
 
-        ! markers
+        ! IB markers
         type(integer_field), &
             intent(in), optional :: ib_markers
 
-        !
+        ! Levelset
         type(levelset_field), &
             intent(IN), optional :: levelset
 
-        ! Norm
+        ! Levelset Norm
         type(levelset_norm_field), &
             intent(IN), optional :: levelset_norm
 
@@ -598,11 +598,11 @@ contains
         character(LEN=path_len + 2*name_len) :: file_loc
         logical :: file_exist, dir_check
 
-        ! loop iterators
+        ! Generic loop iterators
         integer :: i, j, k, l
         real(wp) :: loc_violations, glb_violations
 
-        ! variables
+        ! Downsample variables
         integer :: m_ds, n_ds, p_ds
         integer :: m_glb_ds, n_glb_ds, p_glb_ds
         integer :: m_glb_save, n_glb_save, p_glb_save ! Size of array being saved
@@ -633,7 +633,7 @@ contains
             call s_mpi_barrier()
             call DelayFileAccess(proc_rank)
 
-            ! MPI data I/O
+            ! Initialize MPI data I/O
             if (down_sample) then
                 call s_initialize_mpi_data_ds(q_cons_temp)
             else
@@ -645,7 +645,7 @@ contains
                 end if
             end if
 
-            ! the file to write all flow variables
+            ! Open the file to write all flow variables
             if (cfl_dt) then
                 write (file_loc, '(I0,A,i7.7,A)') n_start, '_', proc_rank, '.dat'
             else
@@ -661,20 +661,20 @@ contains
                                mpi_info_int, ifile, ierr)
 
             if (down_sample) then
-                ! of local arrays
+                ! Size of local arrays
                 data_size = (m_ds + 3)*(n_ds + 3)*(p_ds + 3)
                 m_glb_save = m_glb_ds + 3
                 n_glb_save = n_glb_ds + 3
                 p_glb_save = p_glb_ds + 3
             else
-                ! of local arrays
+                ! Size of local arrays
                 data_size = (m + 1)*(n + 1)*(p + 1)
                 m_glb_save = m_glb + 1
                 n_glb_save = n_glb + 1
                 p_glb_save = p_glb + 1
             end if
 
-            ! some integers so MPI can write even the biggest files
+            ! Resize some integers so MPI can write even the biggest files
             m_MOK = int(m_glb_save, MPI_OFFSET_KIND)
             n_MOK = int(n_glb_save, MPI_OFFSET_KIND)
             p_MOK = int(p_glb_save, MPI_OFFSET_KIND)
@@ -683,7 +683,7 @@ contains
             str_MOK = int(name_len, MPI_OFFSET_KIND)
             NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
-            ! the data for each variable
+            ! Write the data for each variable
             if (bubbles_euler) then
                 do i = 1, sys_size! adv_idx%end
                     var_MOK = int(i, MPI_OFFSET_KIND)
@@ -721,7 +721,7 @@ contains
             call MPI_FILE_CLOSE(ifile, ierr)
 
         else
-            ! MPI data I/O
+            ! Initialize MPI data I/O
             if (ib) then
                 call s_initialize_mpi_data(q_cons_vf, ib_markers, &
                                            levelset, levelset_norm)
@@ -729,7 +729,7 @@ contains
                 call s_initialize_mpi_data(q_cons_vf)
             end if
 
-            ! the file to write all flow variables
+            ! Open the file to write all flow variables
             if (cfl_dt) then
                 write (file_loc, '(I0,A)') n_start, '.dat'
             else
@@ -743,10 +743,10 @@ contains
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
                                mpi_info_int, ifile, ierr)
 
-            ! of local arrays
+            ! Size of local arrays
             data_size = (m + 1)*(n + 1)*(p + 1)
 
-            ! some integers so MPI can write even the biggest files
+            ! Resize some integers so MPI can write even the biggest files
             m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
             n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
             p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
@@ -755,12 +755,12 @@ contains
             str_MOK = int(name_len, MPI_OFFSET_KIND)
             NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
 
-            ! the data for each variable
+            ! Write the data for each variable
             if (bubbles_euler) then
                 do i = 1, sys_size! adv_idx%end
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
-                    ! displacement to skip at beginning of file
+                    ! Initial displacement to skip at beginning of file
                     disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
                     call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_DATA%view(i), &
@@ -773,7 +773,7 @@ contains
                     do i = sys_size + 1, sys_size + 2*nb*nnode
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
-                        ! displacement to skip at beginning of file
+                        ! Initial displacement to skip at beginning of file
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
                         call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_DATA%view(i), &
@@ -784,10 +784,10 @@ contains
                 end if
             else
                 do i = 1, sys_size !TODO: check if this is right
-                    !            i = 1, adv_idx%end
+                    !            do i = 1, adv_idx%end
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
-                    ! displacement to skip at beginning of file
+                    ! Initial displacement to skip at beginning of file
                     disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
                     call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_DATA%view(i), &
@@ -801,7 +801,7 @@ contains
             call MPI_FILE_CLOSE(ifile, ierr)
         end if
 
-        ! Markers
+        ! IB Markers
         if (ib) then
 
             write (file_loc, '(A)') 'ib.dat'
@@ -813,7 +813,7 @@ contains
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
                                mpi_info_int, ifile, ierr)
 
-            ! displacement to skip at beginning of file
+            ! Initial displacement to skip at beginning of file
             disp = 0
 
             call MPI_FILE_SET_VIEW(ifile, disp, MPI_INTEGER, MPI_IO_IB_DATA%view, &
@@ -823,7 +823,7 @@ contains
 
             call MPI_FILE_CLOSE(ifile, ierr)
 
-            !
+            ! Levelset
             write (file_loc, '(A)') 'levelset.dat'
             file_loc = trim(restart_dir)//trim(mpiiofs)//trim(file_loc)
             inquire (FILE=trim(file_loc), EXIST=file_exist)
@@ -833,7 +833,7 @@ contains
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
                                mpi_info_int, ifile, ierr)
 
-            ! displacement to skip at beginning of file
+            ! Initial displacement to skip at beginning of file
             disp = 0
 
             call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_levelset_DATA%view, &
@@ -843,7 +843,7 @@ contains
 
             call MPI_FILE_CLOSE(ifile, ierr)
 
-            ! Norm
+            ! Levelset Norm
             write (file_loc, '(A)') 'levelset_norm.dat'
             file_loc = trim(restart_dir)//trim(mpiiofs)//trim(file_loc)
             inquire (FILE=trim(file_loc), EXIST=file_exist)
@@ -853,7 +853,7 @@ contains
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
                                mpi_info_int, ifile, ierr)
 
-            ! displacement to skip at beginning of file
+            ! Initial displacement to skip at beginning of file
             disp = 0
 
             call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_levelsetnorm_DATA%view, &
@@ -879,7 +879,7 @@ contains
                     call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
                                        mpi_info_int, ifile, ierr)
 
-                    ! displacement to skip at beginning of file
+                    ! Initial displacement to skip at beginning of file
                     disp = 0
 
                     call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_airfoil_IB_DATA%view(1), &
@@ -898,7 +898,7 @@ contains
                     call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
                                        mpi_info_int, ifile, ierr)
 
-                    ! displacement to skip at beginning of file
+                    ! Initial displacement to skip at beginning of file
                     disp = 0
 
                     call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_airfoil_IB_DATA%view(2), &
@@ -924,29 +924,29 @@ contains
     end subroutine s_write_parallel_data_files
 
     !> Computation of parameters, allocation procedures, and/or
-        !! tasks needed to properly setup the module
+        !!              any other tasks needed to properly setup the module
     impure subroutine s_initialize_data_output_module
-        ! string used to store the address of a particular file
+        ! Generic string used to store the address of a particular file
         character(LEN=len_trim(case_dir) + 2*name_len) :: file_loc
         character(len=15) :: temp
         character(LEN=1), dimension(3), parameter :: coord = (/'x', 'y', 'z'/)
 
-        ! logical used to check the existence of directories
+        ! Generic logical used to check the existence of directories
         logical :: dir_check
         integer :: i
 
         integer :: m_ds, n_ds, p_ds !< down sample dimensions
 
         if (parallel_io .neqv. .true.) then
-            ! the address of the time-step directory
+            ! Setting the address of the time-step directory
             write (t_step_dir, '(A,I0,A)') '/p_all/p', proc_rank, '/0'
             t_step_dir = trim(case_dir)//trim(t_step_dir)
 
-            ! the existence of the time-step directory, removing it, if
-            ! exists, and creating a new copy. Note that if preexisting grid
-            ! initial condition data are to be read in from the very same
-            ! then the above described steps are not executed here but
-            ! in the module m_start_up.f90.
+            ! Checking the existence of the time-step directory, removing it, if
+            ! it exists, and creating a new copy. Note that if preexisting grid
+            ! and/or initial condition data are to be read in from the very same
+            ! location, then the above described steps are not executed here but
+            ! rather in the module m_start_up.f90.
             if (old_grid .neqv. .true.) then
 
                 file_loc = trim(t_step_dir)//'/'

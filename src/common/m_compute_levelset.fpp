@@ -1,11 +1,11 @@
 !>
-!!
-!! module m_compute_levelset
+!! @file
+!! @brief Contains module m_compute_levelset
 
 #:include 'macros.fpp'
 
 !> @brief This module is used to handle all operations related to immersed
-!! (IBMs)
+!!              boundary methods (IBMs)
 module m_compute_levelset
 
     use m_derived_types        !< Definitions of the derived types
@@ -97,7 +97,7 @@ contains
                 xy_local = xy_local - patch_ib(ib_patch_id)%centroid_offset ! airfoils are a patch that require a centroid offset
 
                 if (xy_local(2) >= 0._wp) then
-                    ! the location on the airfoil grid with the minimum distance (closest)
+                    ! finds the location on the airfoil grid with the minimum distance (closest)
                     do k = 1, Np
                         dist_vec(1) = xy_local(1) - airfoil_grid_u(k)%x
                         dist_vec(2) = xy_local(2) - airfoil_grid_u(k)%y
@@ -118,7 +118,7 @@ contains
                     dist_vec(3) = 0
                     dist = global_dist
                 else
-                    ! :: This looks identical to the above code but using the lower array. Refactor this.
+                    ! TODO :: This looks identical to the above code but using the lower array. Refactor this.
                     do k = 1, Np
                         dist_vec(1) = xy_local(1) - airfoil_grid_l(k)%x
                         dist_vec(2) = xy_local(2) - airfoil_grid_l(k)%y
@@ -321,13 +321,13 @@ contains
                     dist_vec = 0._wp
                     if (.not. f_approx_equal(side_dists(idx), 0._wp)) then
                         if (idx == 1 .or. idx == 2) then
-                            ! points along the x axis
+                            ! vector points along the x axis
                             dist_vec(1) = side_dists(idx)/abs(side_dists(idx))
                         else
-                            ! points along the y axis
+                            ! vector points along the y axis
                             dist_vec(2) = side_dists(idx)/abs(side_dists(idx))
                         end if
-                        ! the normal vector back into the global coordinate system
+                        ! convert the normal vector back into the global coordinate system
                         levelset_norm%sf(i, j, 0, ib_patch_id, :) = matmul(rotation, dist_vec)
                     else
                         levelset_norm%sf(i, j, 0, ib_patch_id, :) = 0._wp
@@ -373,7 +373,7 @@ contains
                 xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]
                 xy_local = matmul(inverse_rotation, xy_local)
 
-                ! will get NaNs in the levelset if we compute this outside the ellipse
+                ! we will get NaNs in the levelset if we compute this outside the ellipse
                 if ((xy_local(1)/ellipse_coeffs(1))**2 + (xy_local(2)/ellipse_coeffs(2))**2 <= 1._wp) then
 
                     normal_vector = xy_local
@@ -381,12 +381,12 @@ contains
                     normal_vector = normal_vector/sqrt(dot_product(normal_vector, normal_vector)) ! normalize the vector
                     levelset_norm%sf(i, j, 0, ib_patch_id, :) = matmul(rotation, normal_vector) ! save after rotating the vector to the global frame
 
-                    ! the normal vector to set up the quadratic equation for the levelset, using A, B, and C in indices 1, 2, and 3
+                    ! use the normal vector to set up the quadratic equation for the levelset, using A, B, and C in indices 1, 2, and 3
                     quadratic_coeffs(1) = (normal_vector(1)/ellipse_coeffs(1))**2 + (normal_vector(2)/ellipse_coeffs(2))**2
                     quadratic_coeffs(2) = 2._wp*((xy_local(1)*normal_vector(1)/(ellipse_coeffs(1)**2)) + (xy_local(2)*normal_vector(2)/(ellipse_coeffs(2)**2)))
                     quadratic_coeffs(3) = (xy_local(1)/ellipse_coeffs(1))**2._wp + (xy_local(2)/ellipse_coeffs(2))**2._wp - 1._wp
 
-                    ! the levelset with the quadratic equation [ -B + sqrt(B^2 - 4AC) ] / 2A
+                    ! compute the levelset with the quadratic equation [ -B + sqrt(B^2 - 4AC) ] / 2A
                     levelset%sf(i, j, 0, ib_patch_id) = -0.5_wp*(-quadratic_coeffs(2) + sqrt(quadratic_coeffs(2)**2._wp - 4._wp*quadratic_coeffs(1)*quadratic_coeffs(3)))/quadratic_coeffs(1)
                 end if
             end do
@@ -451,13 +451,13 @@ contains
                         side_dists(6) = xyz_local(3) - Front
                         min_dist = minval(abs(side_dists))
 
-                        ! :: The way that this is written, it looks like we will
-                        ! at the first size that is close to the minimum distance,
-                        ! corners where side_dists are the same will
-                        ! on what may not actually be the minimum,
-                        ! to undesired behavior. This should be resolved
-                        ! this code should be cleaned up. It also means that
-                        ! the box 90 degrees will cause tests to fail.
+                        ! TODO :: The way that this is written, it looks like we will
+                        ! trigger at the first size that is close to the minimum distance,
+                        ! meaning corners where side_dists are the same will
+                        ! trigger on what may not actually be the minimum,
+                        ! leading to undesired behavior. This should be resolved
+                        ! and this code should be cleaned up. It also means that
+                        ! rotating the box 90 degrees will cause tests to fail.
                         dist_vec = 0._wp
                         if (f_approx_equal(min_dist, abs(side_dists(1)))) then
                             levelset%sf(i, j, k, ib_patch_id) = side_dists(1)
@@ -593,16 +593,16 @@ contains
                     xyz_local = [x_cc(i), y_cc(j), z_cc(k)] - center ! get coordinate frame centered on IB
                     xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordinates
 
-                    ! distance to flat edge of cylinder
+                    ! get distance to flat edge of cylinder
                     side_pos = dot_product(xyz_local, dist_sides_vec)
                     dist_side = min(abs(side_pos - boundary(1)), &
                                     abs(boundary(2) - side_pos))
-                    ! distance to curved side of cylinder
+                    ! get distance to curved side of cylinder
                     dist_surface = norm2(xyz_local*dist_surface_vec) &
                                    - radius
 
                     if (dist_side < abs(dist_surface)) then
-                        ! the closest edge is flat
+                        ! if the closest edge is flat
                         levelset%sf(i, j, k, ib_patch_id) = -dist_side
                         if (f_approx_equal(dist_side, abs(side_pos - boundary(1)))) then
                             levelset_norm%sf(i, j, k, ib_patch_id, :) = matmul(rotation, -dist_sides_vec)

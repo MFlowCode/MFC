@@ -1,19 +1,19 @@
 !>
-!!
-!! module m_initial_condition
+!! @file
+!! @brief Contains module m_initial_condition
 
 !> @brief This module provides a platform that is analogous to constructive
-!! techniques and in this way allows for the creation
-!! wide variety of initial conditions. Several 1D, 2D and 3D
-!! are included that may further be combined
-!! complex shapes. This is achieved by carefully setting
-!! order in which the patches are laid out in the domain and
-!! priority that each patch has over the preceding
-!! resulting shapes may be identified both by the values
-!! primitive variables and the associated patch identities.
-!! the user may choose to read in and modify a preexisting
-!! The module m_start_up.f90 is responsible for
-!! the relevant data files.
+!!              solid geometry techniques and in this way allows for the creation
+!!              of a wide variety of initial conditions. Several 1D, 2D and 3D
+!!              fundamental geometries are included that may further be combined
+!!              into more complex shapes. This is achieved by carefully setting
+!!              up the order in which the patches are laid out in the domain and
+!!              specifying the priority that each patch has over the preceding
+!!              ones. The resulting shapes may be identified both by the values
+!!              of their primitive variables and the associated patch identities.
+!!              Note that the user may choose to read in and modify a preexisting
+!!              initial condition. The module m_start_up.f90 is responsible for
+!!             reading in the relevant data files.
 module m_initial_condition
 
     use m_derived_types         ! Definitions of the derived types
@@ -25,7 +25,7 @@ module m_initial_condition
     use m_helper
 
     use m_variables_conversion  ! Subroutines to change the state variables from
-    ! form to another
+    ! one form to another
 
     use m_ib_patches
 
@@ -41,10 +41,10 @@ module m_initial_condition
 
     implicit none
 
-    ! The abstract interface allows for the declaration of a pointer to
-    ! procedure such that the choice of the model equations does not have to
-    ! queried every time the patch primitive variables are to be assigned in
-    ! cell in the computational domain.
+    ! NOTE: The abstract interface allows for the declaration of a pointer to
+    ! a procedure such that the choice of the model equations does not have to
+    ! be queried every time the patch primitive variables are to be assigned in
+    ! a cell in the computational domain.
     type(scalar_field), allocatable, dimension(:) :: q_prim_vf !< primitive variables
 
     type(scalar_field), allocatable, dimension(:) :: q_cons_vf !< conservative variables
@@ -58,18 +58,19 @@ module m_initial_condition
     integer(kind=1), allocatable, dimension(:, :, :) :: patch_id_fp
 #else
 !> @endcond
-    integer, allocatable, dimension(:, :, :) :: patch_id_fp !<
-    !! Bookkeeping variable used to track the patch identities (id) associated
-    !! with each of the cells in the computational domain. Note that only one
-    !! patch identity may be associated with any one cell.
+    integer, allocatable, dimension(:, :, :) :: patch_id_fp
 !> @cond
 #endif
 !> @endcond
 
+    !! Bookkepping variable used to track the patch identities (id) associated
+    !! with each of the cells in the computational domain. Note that only one
+    !! patch identity may be associated with any one cell.
+
     type(integer_field) :: ib_markers !<
-    !! used to track whether a given cell is within an
-    !! The default is 0, otherwise the value is assigned
-    !! patch ID of the immersed boundary.
+    !! Bookkepping variable used to track whether a given cell is within an
+    !! immersed boundary. The default is 0, otherwise the value is assigned
+    !! to the patch ID of the immersed boundary.
 
     type(levelset_field) :: levelset
     type(levelset_norm_field) :: levelset_norm
@@ -77,12 +78,12 @@ module m_initial_condition
 contains
 
     !> Computation of parameters, allocation procedures, and/or
-        !! tasks needed to properly setup the module
+        !!              any other tasks needed to properly setup the module
     impure subroutine s_initialize_initial_condition_module
 
         integer :: i, j, k, l !< generic loop iterators
 
-        ! the primitive and conservative variables
+        ! Allocating the primitive and conservative variables
         allocate (q_prim_vf(1:sys_size))
         allocate (q_cons_vf(1:sys_size))
 
@@ -99,7 +100,7 @@ contains
             allocate (q_T_sf%sf(0:m, 0:n, 0:p))
         end if
 
-        ! the patch identities bookkeeping variable
+        ! Allocating the patch identities bookkeeping variable
         allocate (patch_id_fp(0:m, 0:n, 0:p))
 
         if (ib) then
@@ -119,17 +120,17 @@ contains
                             0:p, 1:nnode, 1:nb))
         end if
 
-        ! default values for conservative and primitive variables so
-        ! in the case that the initial condition is wrongly laid out on
-        ! grid the simulation component will catch the problem on start-
-        ! The conservative variables do not need to be similarly treated
-        ! they are computed directly from the primitive variables.
+        ! Setting default values for conservative and primitive variables so
+        ! that in the case that the initial condition is wrongly laid out on
+        ! the grid the simulation component will catch the problem on start-
+        ! up. The conservative variables do not need to be similarly treated
+        ! since they are computed directly from the primitive variables.
         do i = 1, sys_size
             q_cons_vf(i)%sf = -1.e-6_stp ! real(dflt_real, kind=stp) ! TODO :: remove this magic number
             q_prim_vf(i)%sf = -1.e-6_stp ! real(dflt_real, kind=stp)
         end do
 
-        ! arrays to store the bc types
+        ! Allocating arrays to store the bc types
         allocate (bc_type(1:num_dims, 1:2))
 
         allocate (bc_type(1, 1)%sf(0:0, 0:n, 0:p))
@@ -166,39 +167,39 @@ contains
             end if
         end if
 
-        ! damage state is always zero
+        ! Initial damage state is always zero
         if (cont_damage) then
             q_cons_vf(damage_idx)%sf = 0._wp
             q_prim_vf(damage_idx)%sf = 0._wp
         end if
 
-        ! hyper_cleaning state is always zero
-        ! more general
+        ! Initial hyper_cleaning state is always zero
+        ! TODO more general
         if (hyper_cleaning) then
             q_cons_vf(psi_idx)%sf = 0._wp
             q_prim_vf(psi_idx)%sf = 0._wp
         end if
 
-        ! default values for patch identities bookkeeping variable.
-        ! is necessary to avoid any confusion in the assessment of the
-        ! of application that the overwrite permissions give a patch
-        ! it is being applied in the domain.
+        ! Setting default values for patch identities bookkeeping variable.
+        ! This is necessary to avoid any confusion in the assessment of the
+        ! extent of application that the overwrite permissions give a patch
+        ! when it is being applied in the domain.
         patch_id_fp = 0
 
     end subroutine s_initialize_initial_condition_module
 
     !>  This subroutine peruses the patches and depending on the
-        !! geometry associated with a particular patch, it
-        !! related subroutine to setup the said geometry
-        !! grid using the primitive variables included with
-        !! parameters. The subroutine is complete once the
-        !! are converted to conservative ones.
+        !!              type of geometry associated with a particular patch, it
+        !!              calls the related subroutine to setup the said geometry
+        !!              on the grid using the primitive variables included with
+        !!              the patch parameters. The subroutine is complete once the
+        !!              primitive variables are converted to conservative ones.
     impure subroutine s_generate_initial_condition
 
         integer :: i
 
-        ! the conservative variables to the primitive ones given
-        ! initial condition data files were read in on start-up
+        ! Converting the conservative variables to the primitive ones given
+        ! preexisting initial condition data files were read in on start-up
         if (old_ic) then
             call s_convert_conservative_to_primitive_variables(q_cons_vf, &
                                                                q_T_sf, &
@@ -222,7 +223,7 @@ contains
         if (simplex_perturb) call s_perturb_simplex(q_prim_vf)
         if (elliptic_smoothing) call s_elliptic_smoothing(q_prim_vf, bc_type)
 
-        ! the primitive variables to the conservative ones
+        ! Converting the primitive variables to the conservative ones
         call s_convert_primitive_to_conservative_variables(q_prim_vf, q_cons_vf)
 
         if (chemistry) call s_compute_T_from_primitives(q_T_sf, q_prim_vf, idwint)
@@ -240,7 +241,7 @@ contains
 
         integer :: i !< Generic loop iterator
 
-        ! the primitive and conservative variables
+        ! Dellocating the primitive and conservative variables
         do i = 1, sys_size
             deallocate (q_prim_vf(i)%sf)
             deallocate (q_cons_vf(i)%sf)
@@ -253,7 +254,7 @@ contains
             deallocate (q_T_sf%sf)
         end if
 
-        ! the patch identities bookkeeping variable
+        ! Deallocating the patch identities bookkeeping variable
         deallocate (patch_id_fp)
 
         if (ib) then
