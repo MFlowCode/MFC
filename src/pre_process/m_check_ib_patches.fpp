@@ -37,6 +37,9 @@ contains
 
         integer :: i
 
+        @:PROHIBIT(igr .and. any(patch_ib(:)%moving_ibm > 0), "Cannot use &
+            moving immersed boundary with IGR. All patch_ib(:)%moving_ibm must be 0.")
+
         do i = 1, num_patches_max
             if (i <= num_ibs) then
                 ! call s_check_patch_geometry(i)

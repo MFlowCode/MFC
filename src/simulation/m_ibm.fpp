@@ -38,6 +38,7 @@ module m_ibm
     ; public :: s_initialize_ibm_module, &
  s_ibm_setup, &
  s_ibm_correct_state, &
+ s_interpolate_sigma_igr, &
  s_finalize_ibm_module
 
     integer, allocatable, dimension(:, :, :) :: patch_id_fp
@@ -154,6 +155,51 @@ contains
 
     end subroutine s_populate_ib_buffers
 
+    !>  Interpolates sigma from the m_igr module at all ghost points
+        !!  @param jac: Sigma, Entropic pressure
+    subroutine s_interpolate_sigma_igr(jac)
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:), intent(inout) :: jac
+        integer :: j, k, l, r, s, t, i
+        integer :: j1, j2, k1, k2, l1, l2
+        real(wp) :: coeff, jac_IP
+        type(ghost_point) :: gp
+
+        ! At all ghost points, use its image point to interpolate sigma
+        if (num_gps > 0) then
+            $:GPU_PARALLEL_LOOP(private='[i, j, k, l, j1, j2, k1, k2, l1, l2, r, s, t, gp, coeff, jac_IP]')
+            do i = 1, num_gps
+                jac_IP = 0._wp
+                gp = ghost_points(i)
+                r = gp%loc(1)
+                s = gp%loc(2)
+                t = gp%loc(3)
+
+                j1 = gp%ip_grid(1); j2 = j1 + 1
+                k1 = gp%ip_grid(2); k2 = k1 + 1
+                l1 = gp%ip_grid(3); l2 = l1 + 1
+
+                if (p == 0) then
+                    l1 = 0
+                    l2 = 0
+                end if
+
+                $:GPU_LOOP(parallelism='[seq]')
+                do l = l1, l2
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do k = k1, k2
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do j = j1, j2
+                            coeff = gp%interp_coeffs(j - j1 + 1, k - k1 + 1, l - l1 + 1)
+                            jac_IP = jac_IP + coeff*jac(j, k, l)
+                        end do
+                    end do
+                end do
+                jac(r, s, t) = jac_IP
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+    end subroutine s_interpolate_sigma_igr
+
     !>  Subroutine that updates the conservative variables at the ghost points
         !!  @param q_cons_vf Conservative Variables
         !!  @param q_prim_vf Primitive variables
@@ -163,7 +209,7 @@ contains
 
         type(scalar_field), &
             dimension(sys_size), &
-            intent(INOUT) :: q_cons_vf !< Primitive Variables
+            intent(INOUT) :: q_cons_vf !< Conservative Variables
 
         type(scalar_field), &
             dimension(sys_size), &
@@ -208,31 +254,33 @@ contains
         type(ghost_point) :: gp
         type(ghost_point) :: innerp
 
-        ! set the Moving IBM interior Pressure Values
-        $:GPU_PARALLEL_LOOP(private='[i,j,k,patch_id,rho]', copyin='[E_idx,momxb]', collapse=3)
-        do l = 0, p
-            do k = 0, n
-                do j = 0, m
-                    patch_id = ib_markers%sf(j, k, l)
-                    if (patch_id /= 0) then
-                        q_prim_vf(E_idx)%sf(j, k, l) = 1._wp
-                        if (patch_ib(patch_id)%moving_ibm > 0) then
-                            rho = 0._wp
-                            do i = 1, num_fluids
-                                rho = rho + q_prim_vf(contxb + i - 1)%sf(j, k, l)
-                            end do
+        if (.not. igr) then
+            ! set the Moving IBM interior Pressure Values
+            $:GPU_PARALLEL_LOOP(private='[i,j,k,patch_id,rho]', copyin='[E_idx,momxb]', collapse=3)
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        patch_id = ib_markers%sf(j, k, l)
+                        if (patch_id /= 0) then
+                            q_prim_vf(E_idx)%sf(j, k, l) = 1._wp
+                            if (patch_ib(patch_id)%moving_ibm > 0) then
+                                rho = 0._wp
+                                do i = 1, num_fluids
+                                    rho = rho + q_prim_vf(contxb + i - 1)%sf(j, k, l)
+                                end do
 
-                            ! Sets the momentum
-                            do i = 1, num_dims
-                                q_cons_vf(momxb + i - 1)%sf(j, k, l) = patch_ib(patch_id)%vel(i)*rho
-                                q_prim_vf(momxb + i - 1)%sf(j, k, l) = patch_ib(patch_id)%vel(i)
-                            end do
+                                ! Sets the momentum
+                                do i = 1, num_dims
+                                    q_cons_vf(momxb + i - 1)%sf(j, k, l) = patch_ib(patch_id)%vel(i)*rho
+                                    q_prim_vf(momxb + i - 1)%sf(j, k, l) = patch_ib(patch_id)%vel(i)
+                                end do
+                            end if
                         end if
-                    end if
+                    end do
                 end do
             end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
+            $:END_GPU_PARALLEL_LOOP()
+        end if
 
         if (num_gps > 0) then
             $:GPU_PARALLEL_LOOP(private='[i,physical_loc,dyn_pres,alpha_rho_IP, alpha_IP,pres_IP,vel_IP,vel_g,vel_norm_IP,r_IP, v_IP,pb_IP,mv_IP,nmom_IP,presb_IP,massv_IP,rho, gamma,pi_inf,Re_K,G_K,Gs,gp,innerp,norm,buf, radial_vector, rotation_velocity, j,k,l,q,qv_K,c_IP,nbub,patch_id]')
@@ -264,34 +312,52 @@ contains
                     call s_interpolate_image_point(q_prim_vf, gp, &
                                                    alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, &
                                                    r_IP, v_IP, pb_IP, mv_IP, nmom_IP, pb_in, mv_in, presb_IP, massv_IP)
+                else if (igr) then
+                    call s_interpolate_image_point(q_prim_vf, gp, &
+                                                   alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, q_cons_vf=q_cons_vf, G_K=G_K, Gs=Gs)
                 else
                     call s_interpolate_image_point(q_prim_vf, gp, &
                                                    alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP)
                 end if
 
                 dyn_pres = 0._wp
-
-                ! Set q_prim_vf params at GP so that mixture vars calculated properly
-                $:GPU_LOOP(parallelism='[seq]')
-                do q = 1, num_fluids
-                    q_prim_vf(q)%sf(j, k, l) = alpha_rho_IP(q)
-                    q_prim_vf(advxb + q - 1)%sf(j, k, l) = alpha_IP(q)
-                end do
+                if (igr) then
+                    if (num_fluids == 1) then
+                        q_cons_vf(1)%sf(j, k, l) = alpha_rho_IP(1)
+                    else
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do q = 1, num_fluids - 1
+                            q_cons_vf(q)%sf(j, k, l) = alpha_rho_IP(q)
+                            q_cons_vf(E_idx + q)%sf(j, k, l) = alpha_IP(q)
+                        end do
+                        q_cons_vf(num_fluids)%sf(j, k, l) = alpha_rho_IP(num_fluids)
+                    end if
+                else
+                    ! Set q_prim_vf params at GP so that mixture vars calculated properly
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do q = 1, num_fluids
+                        q_prim_vf(q)%sf(j, k, l) = alpha_rho_IP(q)
+                        q_prim_vf(advxb + q - 1)%sf(j, k, l) = alpha_IP(q)
+                    end do
+                end if
 
                 if (surface_tension) then
                     q_prim_vf(c_idx)%sf(j, k, l) = c_IP
                 end if
 
                 ! set the pressure
-                if (patch_ib(patch_id)%moving_ibm <= 1) then
-                    q_prim_vf(E_idx)%sf(j, k, l) = pres_IP
-                else
-                    q_prim_vf(E_idx)%sf(j, k, l) = 0._wp
-                    $:GPU_LOOP(parallelism='[seq]')
-                    do q = 1, num_fluids
-                        ! Se the pressure inside a moving immersed boundary based upon the pressure of the image point. acceleration, and normal vector direction
-                        q_prim_vf(E_idx)%sf(j, k, l) = q_prim_vf(E_idx)%sf(j, k, l) + pres_IP/(1._wp - 2._wp*abs(levelset%sf(j, k, l, patch_id)*alpha_rho_IP(q)/pres_IP)*dot_product(patch_ib(patch_id)%force/patch_ib(patch_id)%mass, levelset_norm%sf(j, k, l, patch_id, :)))
-                    end do
+                ! !TEMPORARY, NEED TO FIX FOR MOVING IGR
+                if (.not. igr) then
+                    if (patch_ib(patch_id)%moving_ibm <= 1) then
+                        q_prim_vf(E_idx)%sf(j, k, l) = pres_IP
+                    else
+                        q_prim_vf(E_idx)%sf(j, k, l) = 0._wp
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do q = 1, num_fluids
+                            ! Se the pressure inside a moving immersed boundary based upon the pressure of the image point. acceleration, and normal vector direction
+                            q_prim_vf(E_idx)%sf(j, k, l) = q_prim_vf(E_idx)%sf(j, k, l) + pres_IP/(1._wp - 2._wp*abs(levelset%sf(j, k, l, patch_id)*alpha_rho_IP(q)/pres_IP)*dot_product(patch_ib(patch_id)%force/patch_ib(patch_id)%mass, levelset_norm%sf(j, k, l, patch_id, :)))
+                        end do
+                    end if
                 end if
 
                 if (model_eqns /= 4) then
@@ -347,12 +413,14 @@ contains
                                vel_g(q - momxb + 1)/2._wp
                 end do
 
-                ! Set continuity and adv vars
-                $:GPU_LOOP(parallelism='[seq]')
-                do q = 1, num_fluids
-                    q_cons_vf(q)%sf(j, k, l) = alpha_rho_IP(q)
-                    q_cons_vf(advxb + q - 1)%sf(j, k, l) = alpha_IP(q)
-                end do
+                if (.not. igr) then
+                    ! Set continuity and adv vars
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do q = 1, num_fluids
+                        q_cons_vf(q)%sf(j, k, l) = alpha_rho_IP(q)
+                        q_cons_vf(advxb + q - 1)%sf(j, k, l) = alpha_IP(q)
+                    end do
+                end if
 
                 ! Set color function
                 if (surface_tension) then
@@ -365,6 +433,7 @@ contains
                 else
                     q_cons_vf(E_idx)%sf(j, k, l) = gamma*pres_IP + pi_inf + dyn_pres
                 end if
+
                 ! Set bubble vars
                 if (bubbles_euler .and. .not. qbmm) then
                     call s_comp_n_from_prim(alpha_IP(1), r_IP, nbub, weight)
@@ -852,15 +921,21 @@ contains
     !! at the cell centers in order to estimate the state at the image point
     subroutine s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, &
                                          pres_IP, vel_IP, c_IP, r_IP, v_IP, pb_IP, &
-                                         mv_IP, nmom_IP, pb_in, mv_in, presb_IP, massv_IP)
+                                         mv_IP, nmom_IP, pb_in, mv_in, presb_IP, massv_IP, q_cons_vf, G_K, Gs)
         $:GPU_ROUTINE(parallelism='[seq]')
         type(scalar_field), &
             dimension(sys_size), &
             intent(IN) :: q_prim_vf !< Primitive Variables
+        type(scalar_field), optional, &
+            dimension(sys_size), &
+            intent(IN) :: q_cons_vf !< Conservative Variables
 
         real(stp), optional, dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(IN) :: pb_in, mv_in
 
         type(ghost_point), intent(IN) :: gp
+        real(wp), optional, intent(INOUT) :: G_K
+        real(wp), optional, dimension(num_fluids), intent(IN) :: Gs
+
         real(wp), intent(INOUT) :: pres_IP
         real(wp), dimension(3), intent(INOUT) :: vel_IP
         real(wp), intent(INOUT) :: c_IP
@@ -876,6 +951,12 @@ contains
         integer :: i, j, k, l, q !< Iterator variables
         integer :: i1, i2, j1, j2, k1, k2 !< Iterator variables
         real(wp) :: coeff
+        real(wp) :: alpha_sum
+        real(wp) :: pres, dyn_pres, pres_mag, T
+        real(wp) :: rhoYks(1:num_species)
+        real(wp) :: rho_K, gamma_K, pi_inf_K, qv_K
+        real(wp), dimension(num_fluids) :: alpha_K, alpha_rho_K
+        real(wp), dimension(2) :: Re_K
 
         i1 = gp%ip_grid(1); i2 = i1 + 1
         j1 = gp%ip_grid(2); j2 = j1 + 1
@@ -890,6 +971,7 @@ contains
         alpha_IP = 0._wp
         pres_IP = 0._wp
         vel_IP = 0._wp
+        pres = 0._wp
 
         if (surface_tension) c_IP = 0._wp
 
@@ -916,31 +998,100 @@ contains
             do j = j1, j2
                 $:GPU_LOOP(parallelism='[seq]')
                 do k = k1, k2
-
                     coeff = gp%interp_coeffs(i - i1 + 1, j - j1 + 1, k - k1 + 1)
 
-                    pres_IP = pres_IP + coeff* &
-                              q_prim_vf(E_idx)%sf(i, j, k)
+                    if (igr) then
+                        ! For IGR, we will need to perform operations on
+                        ! the conservative variables instead
+                        alpha_sum = 0._wp
+                        dyn_pres = 0._wp
+                        if (num_fluids == 1) then
+                            alpha_rho_K(1) = q_cons_vf(1)%sf(i, j, k)
+                            alpha_K(1) = 1._wp
+                        else
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do l = 1, num_fluids - 1
+                                alpha_rho_K(l) = q_cons_vf(l)%sf(i, j, k)
+                                alpha_K(l) = q_cons_vf(E_idx + l)%sf(i, j, k)
+                            end do
+                            alpha_rho_K(num_fluids) = q_cons_vf(num_fluids)%sf(i, j, k)
+                            alpha_K(num_fluids) = 1._wp - sum(alpha_K(1:num_fluids - 1))
+                        end if
+                        if (model_eqns /= 4) then
+                            if (elasticity) then
+                                ! NOTE: NEED TO VERIFY ELASTICITY W/ IGR
+                                call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
+                                                                                alpha_rho_K, Re_K, G_K, Gs)
+                            else
+                                call s_convert_species_to_mixture_variables_acc(rho_K, gamma_K, pi_inf_K, qv_K, &
+                                                                                alpha_K, alpha_rho_K, Re_K)
+                            end if
+                        end if
 
-                    $:GPU_LOOP(parallelism='[seq]')
-                    do q = momxb, momxe
-                        vel_IP(q + 1 - momxb) = vel_IP(q + 1 - momxb) + coeff* &
-                                                q_prim_vf(q)%sf(i, j, k)
-                    end do
+                        rho_K = max(rho_K, sgm_eps)
 
-                    $:GPU_LOOP(parallelism='[seq]')
-                    do l = contxb, contxe
-                        alpha_rho_IP(l) = alpha_rho_IP(l) + coeff* &
-                                          q_prim_vf(l)%sf(i, j, k)
-                        alpha_IP(l) = alpha_IP(l) + coeff* &
-                                      q_prim_vf(advxb + l - 1)%sf(i, j, k)
-                    end do
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do l = momxb, momxe
+                            if (model_eqns /= 4) then
+                                dyn_pres = dyn_pres + 5.e-1_wp*q_cons_vf(l)%sf(i, j, k) &
+                                           *q_cons_vf(l)%sf(i, j, k)/rho_K
+                            end if
+                        end do
+                        pres_mag = 0._wp
+                        T = 0._wp
+                        rhoYks = 0._wp
 
-                    if (surface_tension) then
+                        call s_compute_pressure(q_cons_vf(E_idx)%sf(i, j, k), &
+                                                q_cons_vf(alf_idx)%sf(i, j, k), &
+                                                dyn_pres, pi_inf_K, gamma_K, rho_K, &
+                                                qv_K, rhoYks, pres, T, pres_mag=pres_mag)
+
+                        pres_IP = pres_IP + coeff*pres
+
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do q = momxb, momxe
+                            vel_IP(q + 1 - momxb) = vel_IP(q + 1 - momxb) + coeff* &
+                                                    q_cons_vf(q)%sf(i, j, k)/rho_K
+                        end do
+
+                        if (num_fluids == 1) then
+                            alpha_rho_IP(1) = alpha_rho_IP(1) + coeff*q_cons_vf(contxb)%sf(i, j, k)
+                            alpha_IP(1) = alpha_IP(1) + coeff*1._wp
+                        else
+                            alpha_sum = 0._wp
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do l = 1, num_fluids - 1
+                                alpha_rho_IP(l) = alpha_rho_IP(l) + coeff*q_cons_vf(l)%sf(i, j, k)
+                                alpha_IP(l) = alpha_IP(l) + coeff*q_cons_vf(E_idx + l)%sf(i, j, k)
+                                alpha_sum = alpha_sum + coeff*q_cons_vf(E_idx + l)%sf(i, j, k)
+                            end do
+                            alpha_rho_IP(num_fluids) = alpha_rho_IP(num_fluids) + coeff*q_cons_vf(num_fluids)%sf(i, j, k)
+                            alpha_IP(num_fluids) = alpha_IP(num_fluids) + (coeff*1._wp - alpha_sum)
+                        end if
+                    else
+                        pres_IP = pres_IP + coeff* &
+                                  q_prim_vf(E_idx)%sf(i, j, k)
+
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do q = momxb, momxe
+                            vel_IP(q + 1 - momxb) = vel_IP(q + 1 - momxb) + coeff* &
+                                                    q_prim_vf(q)%sf(i, j, k)
+                        end do
+
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do l = contxb, contxe
+                            alpha_rho_IP(l) = alpha_rho_IP(l) + coeff* &
+                                              q_prim_vf(l)%sf(i, j, k)
+                            alpha_IP(l) = alpha_IP(l) + coeff* &
+                                          q_prim_vf(advxb + l - 1)%sf(i, j, k)
+                        end do
+                    end if
+
+                    if (surface_tension .and. .not. igr) then
                         c_IP = c_IP + coeff*q_prim_vf(c_idx)%sf(i, j, k)
                     end if
 
-                    if (bubbles_euler .and. .not. qbmm) then
+                    if (bubbles_euler .and. .not. qbmm .and. .not. igr) then
                         $:GPU_LOOP(parallelism='[seq]')
                         do l = 1, nb
                             if (polytropic) then
@@ -955,7 +1106,7 @@ contains
                         end do
                     end if
 
-                    if (qbmm) then
+                    if (qbmm .and. .not. igr) then
                         do l = 1, nb*nmom
                             nmom_IP(l) = nmom_IP(l) + coeff*q_prim_vf(bubxb - 1 + l)%sf(i, j, k)
                         end do
@@ -969,9 +1120,7 @@ contains
                                 end do
                             end do
                         end if
-
                     end if
-
                 end do
             end do
         end do

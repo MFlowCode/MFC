@@ -824,7 +824,6 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         igr_iter_solver = self.get('igr_iter_solver')
         alf_factor = self.get('alf_factor')
         model_eqns = self.get('model_eqns')
-        ib = self.get('ib', 'F') == 'T'
         bubbles_euler = self.get('bubbles_euler', 'F') == 'T'
         bubbles_lagrange = self.get('bubbles_lagrange', 'F') == 'T'
         alt_soundspeed = self.get('alt_soundspeed', 'F') == 'T'
@@ -836,6 +835,7 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         hyperelasticity = self.get('hyperelasticity', 'F') == 'T'
         cyl_coord = self.get('cyl_coord', 'F') == 'T'
         probe_wrt = self.get('probe_wrt', 'F') == 'T'
+        chemistry = self.get('chemistry', 'F') == 'T'
 
         self.prohibit(num_igr_iters is not None and num_igr_iters < 0,
                      "num_igr_iters must be greater than or equal to 0")
@@ -847,8 +847,6 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
                      "alf_factor must be non-negative")
         self.prohibit(model_eqns is not None and model_eqns != 2,
                      "IGR only supports model_eqns = 2")
-        self.prohibit(ib,
-                     "IGR does not support the immersed boundary method")
         self.prohibit(bubbles_euler,
                      "IGR does not support Euler-Euler bubble models")
         self.prohibit(bubbles_lagrange,
@@ -871,6 +869,9 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
                      "IGR does not support cylindrical or axisymmetric coordinates")
         self.prohibit(probe_wrt,
                      "IGR does not support probe writes")
+        self.prohibit(chemistry,
+                     "IGR does not support chemistry")
+
 
         # Check BCs - IGR does not support characteristic BCs
         # Characteristic BCs are BC_CHAR_SLIP_WALL (-5) through BC_CHAR_SUP_OUTFLOW (-12)

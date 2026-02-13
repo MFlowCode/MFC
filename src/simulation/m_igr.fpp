@@ -15,6 +15,8 @@ module m_igr
 
     use m_boundary_common
 
+    use m_ibm, only: ib_markers, s_interpolate_sigma_igr
+
     implicit none
 
     private; public :: s_initialize_igr_module, &
@@ -365,7 +367,32 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
             end if
         end do
-
+        if (ib) then
+            $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        if (ib_markers%sf(j, k, l) /= 0) then
+                            jac(j, k, l) = 0._wp
+                        end if
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+            call s_interpolate_sigma_igr(jac)
+            ! If using Jacobi Iter, we need to update jac_old again
+            if (igr_iter_solver == 1) then
+                $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
+                do l = idwbuff(3)%beg, idwbuff(3)%end
+                    do k = idwbuff(2)%beg, idwbuff(2)%end
+                        do j = idwbuff(1)%beg, idwbuff(1)%end
+                            jac_old(j, k, l) = jac(j, k, l)
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
+        end if
     end subroutine s_igr_iterative_solve
 
     subroutine s_igr_sigma_x(q_cons_vf, rhs_vf)
