@@ -1,5 +1,5 @@
 !>
-!! @file   m_model.fpp
+!! @file
 !! @author Henry Le Berre <hberre3@gatech.edu>
 !! @brief  Contains module m_model
 

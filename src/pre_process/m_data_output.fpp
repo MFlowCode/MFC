@@ -1,5 +1,5 @@
 !>
-!! @file m_data_output.f90
+!! @file
 !! @brief Contains module m_data_output
 
 !> @brief This module takes care of writing the grid and initial condition

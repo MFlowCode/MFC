@@ -1,5 +1,5 @@
 !>
-!! @file m_mpi_proxy.f90
+!! @file
 !! @brief Contains module m_mpi_proxy
 
 !> @brief This module serves as a proxy to the parameters and subroutines

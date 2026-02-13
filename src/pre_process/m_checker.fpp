@@ -1,5 +1,5 @@
 !>
-!!@file m_checker.f90
+!!@file
 !!@brief Contains module m_checker
 
 #:include 'macros.fpp'

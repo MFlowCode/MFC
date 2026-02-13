@@ -1,5 +1,5 @@
 !>
-!!@file m_checker_common.f90
+!!@file
 !!@brief Contains module m_checker_common
 
 #:include 'case.fpp'

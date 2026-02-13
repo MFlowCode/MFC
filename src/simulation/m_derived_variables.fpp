@@ -1,5 +1,5 @@
 !>
-!! @file m_derived_variables.f90
+!! @file
 !! @brief Contains module m_derived_variables
 
 !> @brief This module features subroutines that allow for the derivation of

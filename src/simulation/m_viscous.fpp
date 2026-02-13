@@ -1,5 +1,5 @@
 !>
-!! @file m_viscous.f90
+!! @file
 !! @brief Contains module m_viscous
 #:include 'case.fpp'
 #:include 'macros.fpp'

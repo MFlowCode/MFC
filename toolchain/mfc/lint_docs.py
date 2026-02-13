@@ -1,4 +1,4 @@
-"""Check that file paths, cite keys, and parameters in docs still exist."""
+"""Check that file paths, cite keys, parameters, and @ref targets in docs still exist."""
 
 import re
 import sys
@@ -34,6 +34,28 @@ PARAM_SKIP = re.compile(
     r"|^[A-Z]"                  # constants/types (uppercase start)
 )
 
+# Backtick tokens in case.md that are not real parameters (analytical shorthands,
+# stress tensor component names, prose identifiers, hardcoded constants)
+CASE_MD_SKIP = {
+    # Analytical shorthand variables (stretching formulas, "Analytical Definition" table)
+    "eps", "lx", "ly", "lz", "xc", "yc", "zc", "x_cb",
+    # Stress tensor component names (descriptive, not params)
+    "tau_xx", "tau_xy", "tau_xz", "tau_yy", "tau_yz", "tau_zz",
+    # Prose identifiers (example names, math symbols)
+    "scaling", "c_h", "thickness",
+    # Hardcoded Fortran constants (not case-file params)
+    "init_dir", "zeros_default",
+}
+
+# Docs to check for parameter references, with per-file skip sets
+PARAM_DOCS = {
+    "docs/documentation/equations.md": set(),
+    "docs/documentation/case.md": CASE_MD_SKIP,
+}
+
+# Match @ref page_id patterns
+REF_RE = re.compile(r"@ref\s+(\w+)")
+
 
 def check_docs(repo_root: Path) -> list[str]:
     """Check that file paths referenced in documentation still exist."""
@@ -50,7 +72,10 @@ def check_docs(repo_root: Path) -> list[str]:
             # Strip trailing punctuation that may have leaked in
             path_str = path_str.rstrip(".,;:!?")
             if not (repo_root / path_str).exists():
-                errors.append(f"  {doc} references '{path_str}' but it does not exist")
+                errors.append(
+                    f"  {doc} references '{path_str}' but it does not exist."
+                    " Fix: update the path or remove the reference"
+                )
     return errors
 
 
@@ -79,17 +104,53 @@ def check_cite_keys(repo_root: Path) -> list[str]:
         for match in CITE_RE.finditer(text):
             key = match.group(1)
             if key.lower() not in valid_keys:
-                errors.append(f"  {rel} uses \\cite {key} but no bib entry found")
+                errors.append(
+                    f"  {rel} uses \\cite {key} but no bib entry found."
+                    " Fix: add entry to docs/references.bib or fix the key"
+                )
 
     return errors
 
 
-def check_param_refs(repo_root: Path) -> list[str]:
-    """Check that parameter names in equations.md exist in the MFC registry."""
-    eq_path = repo_root / "docs" / "documentation" / "equations.md"
-    if not eq_path.exists():
-        return []
+def _strip_code_blocks(text: str) -> str:
+    """Remove fenced code blocks (``` ... ```) from markdown text."""
+    lines = text.split("\n")
+    result = []
+    in_block = False
+    for line in lines:
+        if line.strip().startswith("```"):
+            in_block = not in_block
+            continue
+        if not in_block:
+            result.append(line)
+    return "\n".join(result)
 
+
+def _is_valid_param(param: str, valid_params: set, sub_params: set) -> bool:
+    """Check if a param name (possibly with %) is valid against REGISTRY."""
+    if "(" in param or ")" in param:
+        return True  # Skip indexed refs like patch_icpp(i)%vel(j)
+
+    base = param.split("%")[0] if "%" in param else param
+
+    if base in valid_params or base in sub_params:
+        return True
+
+    # Compound params (with %): validate both family prefix and attribute
+    if "%" in param:
+        sub = param.split("%")[-1]
+        family_ok = any(p.startswith(base + "%") for p in valid_params)
+        return family_ok and sub in sub_params
+
+    # Simple params: family prefix check at structural boundaries
+    if any(p.startswith(base + b) for b in ("(", "%", "_") for p in valid_params):
+        return True
+
+    return False
+
+
+def check_param_refs(repo_root: Path) -> list[str]:  # pylint: disable=too-many-locals
+    """Check that parameter names in documentation exist in the MFC registry."""
     # Import REGISTRY from the toolchain
     toolchain_dir = str(repo_root / "toolchain")
     if toolchain_dir not in sys.path:
@@ -101,36 +162,184 @@ def check_param_refs(repo_root: Path) -> list[str]:
         return []
 
     valid_params = set(REGISTRY.all_params.keys())
-    # Build set of sub-parameter suffixes (the part after %)
-    sub_params = {p.split("%")[-1] for p in valid_params if "%" in p}
-    text = eq_path.read_text(encoding="utf-8")
+    # Build set of sub-parameter base names (strip trailing (N) indexes)
+    _sub_raw = {p.split("%")[-1] for p in valid_params if "%" in p}
+    sub_params = set()
+    for s in _sub_raw:
+        sub_params.add(s)
+        base = re.sub(r"\(\d+(?:,\s*\d+)*\)$", "", s)
+        if base != s:
+            sub_params.add(base)
+
     errors = []
-    seen = set()
 
-    for match in PARAM_RE.finditer(text):
-        param = match.group(1)
-        if param in seen:
-            continue
-        seen.add(param)
-
-        # Skip non-parameter identifiers
-        if PARAM_SKIP.search(param):
-            continue
-        # Skip single-character names (too ambiguous: m, n, p are grid dims)
-        if len(param) <= 1:
-            continue
-        # Skip names containing % (struct members like x_domain%beg are valid
-        # but the base name before % is what matters)
-        base = param.split("%")[0] if "%" in param else param
-        # Check for indexed parameters: strip trailing _N (e.g., patch_icpp(1)%alpha(1))
-        # In docs these appear as e.g. `patch_icpp(i)%vel(j)` — skip indexed refs
-        if "(" in param or ")" in param:
+    for doc_rel, extra_skip in PARAM_DOCS.items():
+        doc_path = repo_root / doc_rel
+        if not doc_path.exists():
             continue
 
-        if base not in valid_params and base not in sub_params:
-            # Check if it's a known parameter family prefix
-            if not any(p.startswith(base) for p in valid_params):
-                errors.append(f"  equations.md references parameter '{param}' not in REGISTRY")
+        text = _strip_code_blocks(doc_path.read_text(encoding="utf-8"))
+        seen = set()
+
+        # Check plain params
+        for match in PARAM_RE.finditer(text):
+            param = match.group(1)
+            if param in seen:
+                continue
+            seen.add(param)
+
+            if PARAM_SKIP.search(param):
+                continue
+            if len(param) <= 1:
+                continue
+            if param in extra_skip:
+                continue
+            if "(" in param or ")" in param:
+                continue
+            if "[" in param:
+                continue  # Bracket shorthand (e.g., x[y,z]_domain%%beg[end])
+
+            # Normalize %% to % for lookup
+            normalized = param.replace("%%", "%")
+            if not _is_valid_param(normalized, valid_params, sub_params):
+                errors.append(
+                    f"  {doc_rel} references parameter '{param}' not in REGISTRY."
+                    " Fix: check spelling or add to definitions.py"
+                )
+
+    return errors
+
+
+def check_math_syntax(repo_root: Path) -> list[str]:
+    """Check that docs use Doxygen math syntax (\\f$, \\f[) not raw $$/$."""
+    doc_dir = repo_root / "docs" / "documentation"
+    if not doc_dir.exists():
+        return []
+
+    errors = []
+    for md_file in sorted(doc_dir.glob("*.md")):
+        text = md_file.read_text(encoding="utf-8")
+        rel = md_file.relative_to(repo_root)
+        in_code = False
+
+        for i, line in enumerate(text.split("\n"), 1):
+            if line.strip().startswith("```"):
+                in_code = not in_code
+                continue
+            if in_code:
+                continue
+
+            # Strip inline code and Doxygen math before checking
+            cleaned = re.sub(r"`[^`\n]+`", "", line)
+            cleaned = re.sub(r"\\f\$.*?\\f\$", "", cleaned)
+            cleaned = re.sub(r"\\f\[.*?\\f\]", "", cleaned)
+
+            if "$$" in cleaned:
+                errors.append(
+                    f"  {rel}:{i} uses $$...$$ display math."
+                    " Fix: replace $$ with \\f[ and \\f]"
+                )
+                continue
+
+            for m in re.finditer(r"\$([^$\n]+?)\$", cleaned):
+                if re.search(r"\\[a-zA-Z]", m.group(1)):
+                    errors.append(
+                        f"  {rel}:{i} uses $...$ with LaTeX commands."
+                        " Fix: replace $ delimiters with \\f$ and \\f$"
+                    )
+                    break  # one error per line
+
+    return errors
+
+
+def _gitignored_docs(repo_root: Path) -> set[str]:
+    """Return set of gitignored doc file basenames."""
+    import subprocess  # pylint: disable=import-outside-toplevel
+
+    doc_dir = repo_root / "docs" / "documentation"
+    try:
+        result = subprocess.run(
+            ["git", "ls-files", "--ignored", "--exclude-standard", "-o"],
+            capture_output=True, text=True, cwd=repo_root, check=False,
+        )
+        return {
+            Path(f).name for f in result.stdout.splitlines()
+            if f.startswith(str(doc_dir.relative_to(repo_root)))
+        }
+    except FileNotFoundError:
+        return set()
+
+
+def check_section_anchors(repo_root: Path) -> list[str]:
+    """Check that markdown ](#id) links have matching {#id} definitions."""
+    doc_dir = repo_root / "docs" / "documentation"
+    if not doc_dir.exists():
+        return []
+
+    ignored = _gitignored_docs(repo_root)
+
+    errors = []
+    for md_file in sorted(doc_dir.glob("*.md")):
+        if md_file.name in ignored:
+            continue
+        text = md_file.read_text(encoding="utf-8")
+        rel = md_file.relative_to(repo_root)
+
+        # Collect all {#id} anchors (outside code blocks)
+        anchors = set()
+        in_code = False
+        for line in text.split("\n"):
+            if line.strip().startswith("```"):
+                in_code = not in_code
+                continue
+            if not in_code:
+                anchors.update(re.findall(r"\{#([\w-]+)\}", line))
+
+        # Check all ](#id) links
+        in_code = False
+        for i, line in enumerate(text.split("\n"), 1):
+            if line.strip().startswith("```"):
+                in_code = not in_code
+                continue
+            if in_code:
+                continue
+            for m in re.finditer(r"\]\(#([\w-]+)\)", line):
+                if m.group(1) not in anchors:
+                    errors.append(
+                        f"  {rel}:{i} links to #{m.group(1)}"
+                        f" but no {{#{m.group(1)}}} anchor exists."
+                        f" Fix: add {{#{m.group(1)}}} to the target"
+                        " section header"
+                    )
+
+    return errors
+
+
+def check_page_refs(repo_root: Path) -> list[str]:
+    """Check that @ref targets in docs reference existing page identifiers."""
+    doc_dir = repo_root / "docs" / "documentation"
+    if not doc_dir.exists():
+        return []
+
+    # Collect all @page identifiers
+    page_ids = {"citelist"}  # Doxygen built-in
+    for md_file in doc_dir.glob("*.md"):
+        text = md_file.read_text(encoding="utf-8")
+        m = re.search(r"^\s*@page\s+(\w+)", text, flags=re.MULTILINE)
+        if m:
+            page_ids.add(m.group(1))
+
+    errors = []
+    for md_file in sorted(doc_dir.glob("*.md")):
+        text = _strip_code_blocks(md_file.read_text(encoding="utf-8"))
+        rel = md_file.relative_to(repo_root)
+        for match in REF_RE.finditer(text):
+            ref_target = match.group(1)
+            if ref_target not in page_ids:
+                errors.append(
+                    f"  {rel} uses @ref {ref_target} but no @page with that ID exists."
+                    " Fix: check the page ID or add @page declaration"
+                )
 
     return errors
 
@@ -142,6 +351,9 @@ def main():
     all_errors.extend(check_docs(repo_root))
     all_errors.extend(check_cite_keys(repo_root))
     all_errors.extend(check_param_refs(repo_root))
+    all_errors.extend(check_page_refs(repo_root))
+    all_errors.extend(check_math_syntax(repo_root))
+    all_errors.extend(check_section_anchors(repo_root))
 
     if all_errors:
         print("Doc reference check failed:")

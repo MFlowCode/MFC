@@ -1,5 +1,5 @@
 !>
-!! @file m_initial_condition.f90
+!! @file
 !! @brief Contains module m_initial_condition
 
 !> @brief This module provides a platform that is analogous to constructive
@@ -53,11 +53,15 @@ module m_initial_condition
 
     type(integer_field), dimension(:, :), allocatable :: bc_type !< bc_type fields
 
+!> @cond
 #ifdef MFC_MIXED_PRECISION
     integer(kind=1), allocatable, dimension(:, :, :) :: patch_id_fp
 #else
+!> @endcond
     integer, allocatable, dimension(:, :, :) :: patch_id_fp
+!> @cond
 #endif
+!> @endcond
 
     !! Bookkepping variable used to track the patch identities (id) associated
     !! with each of the cells in the computational domain. Note that only one
