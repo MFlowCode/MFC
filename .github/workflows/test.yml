@@ -135,6 +135,7 @@ jobs:
 
       - name: Test
         run: |
+          rm -f tests/failed_uuids.txt
           TEST_EXIT=0
           /bin/bash mfc.sh test -v --max-attempts 3 -j $(nproc) $TEST_ALL $TEST_PCT || TEST_EXIT=$?
 
