@@ -16,7 +16,7 @@ def parse_bib_authors(bib_path: Path) -> dict[str, tuple[str, int, str | None]]:
     """Parse references.bib to extract first-author surname and author count.
 
     Returns:
-        Dict mapping lowercase bib key ->
+        Dict mapping bib key ->
         (first_author_surname, author_count, second_author_surname | None)
     """
     text = bib_path.read_text(encoding="utf-8")
@@ -49,7 +49,7 @@ def parse_bib_authors(bib_path: Path) -> dict[str, tuple[str, int, str | None]]:
         if count == 2:
             second_surname = _extract_surname(authors[1].strip())
 
-        entries[key.lower()] = (surname, count, second_surname)
+        entries[key] = (surname, count, second_surname)
 
     return entries
 
