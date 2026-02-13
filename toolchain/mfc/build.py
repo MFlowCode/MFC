@@ -569,7 +569,7 @@ def __build_target(target: typing.Union[MFCTarget, str], case: input.MFCInputFil
     # Dependencies are pinned to fixed versions. If already configured
     # (built & installed by a prior --deps-only step), skip entirely
     # to avoid re-entering the superbuild (which may access the network).
-    if target.isDependency and target.is_configured(case):
+    if target.isDependency and target.is_configured(case) and os.path.isdir(target.get_install_dirpath(case)):
         return
 
     for dep in target.requires.compute():
