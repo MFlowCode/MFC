@@ -212,10 +212,27 @@ Adding a parameter touches both the Python toolchain and Fortran source. Follow 
 Add a call to `_r()` inside the `_load()` function:
 
 ```python
-_r("my_param", REAL, {"my_feature_tag"})
+_r("my_param", REAL, {"my_feature_tag"},
+   desc="Description of the parameter",
+   math=r"\f$\xi\f$")
 ```
 
-The arguments are: name, type (`INT`, `REAL`, `LOG`, `STR`), and a set of feature tags. You can add an explicit description with `desc="..."`, otherwise one is auto-generated from `_SIMPLE_DESCS` or `_ATTR_DESCS`.
+The arguments are:
+- **name**: parameter name (must match the Fortran namelist variable)
+- **type**: `INT`, `REAL`, `LOG`, `STR`, or `A_REAL` (analytic expression)
+- **tags**: set of feature tags for grouping (e.g. `{"bubbles"}`, `{"mhd"}`)
+- **desc**: human-readable description (optional; auto-generated from `_SIMPLE_DESCS` or `_ATTR_DESCS` if omitted)
+- **math**: LaTeX math symbol in Doxygen format (optional; shown in the Symbol column of @ref parameters)
+
+For indexed families like `fluid_pp`, put the symbol next to its attribute name using tuples:
+
+```python
+for f in range(1, NF + 1):
+    px = f"fluid_pp({f})%"
+    for a, sym in [("gamma", r"\f$\gamma_k\f$"),
+                   ("my_attr", r"\f$\xi_k\f$")]:  # <-- add here
+        _r(f"{px}{a}", REAL, math=sym)
+```
 
 **Step 2: Add constraints** (same file, `CONSTRAINTS` dict)
 

@@ -388,7 +388,9 @@ Details of implementation of viscosity in MFC can be found in \cite Coralic15.
 - `fluid_pp(i)%%G` is required for `hypoelasticity`.
 
 ### 6. Simulation Algorithm
-  
+
+See @ref equations "Equations" for the mathematical models these parameters control.
+
 | Parameter                  | Type    | Description                                    |
 | ---:                       | :----:  |          :---                                  |
 | `bc_[x,y,z]%%beg[end]`     | Integer | Beginning [ending] boundary condition in the $[x,y,z]$-direction (negative integer, see table [Boundary Conditions](#boundary-conditions)) |
@@ -545,7 +547,7 @@ This option requires `weno_Re_flux` to be true because cell boundary values are 
 | `type`*                | Integer | The geometry of the patch. [1]: Line [2]: Circle [3]: Rectangle |
 | `x[y,z]_centroid`*     | Real    | Centroid of the boundary patch in the x[y,z]-direction          |
 | `length_x[y,z]`*       | Real    | Length of the boundary patch in the x[y,z]-direction            |
-| `radiue`*              | Real    | Radius of the boundary patch                                    |
+| `radius`*              | Real    | Radius of the boundary patch                                    |
 *: These parameters should be prepended with `patch_bc(j)%` where $j$ is the patch index.
 
 Boundary condition patches can be used with the following boundary condition types:
@@ -563,7 +565,7 @@ Squares and circles on each face are supported for 3D simulations.
 - `dt` specifies the constant time step size used in the simulation.
 The value of `dt` needs to be sufficiently small to satisfy the Courant-Friedrichs-Lewy (CFL) condition.
 
-- `t_step_start` and `t_step_end` define the time steps at which the simulation starts and ends.
+- `t_step_start` and `t_step_stop` define the time steps at which the simulation starts and ends.
 
 `t_step_save` is the time step interval for data output during simulation.
 To newly start the simulation, set `t_step_start = 0`.
@@ -612,7 +614,6 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 | `schlieren_wrt`         | Logical | Add the numerical schlieren to the database|
 | `qm_wrt`                | Logical | Add the Q-criterion to the database|
 | `liutex_wrt`            | Logical | Add the Liutex to the database|
-| `tau_wrt`               | Logical | Add the elastic stress components to the database|
 | `fd_order`              | Integer | Order of finite differences for computing the vorticity and the numerical Schlieren function [1,2,4] |
 | `schlieren_alpha(i)`    | Real    | Intensity of the numerical Schlieren computed via `alpha(i)` |
 | `probe_wrt`             | Logical | Write the flow chosen probes data files for each time step	|
@@ -796,6 +797,8 @@ This table lists the sub-grid bubble model parameters, which can be utilized in 
 - `bub_pp` specifies simulation parameters for the EE and/or EL bubble model. 
 
 Implementation of the parameters into the model follows \cite Ando10.
+
+See @ref equations "Equations" Section 9 for the bubble dynamics equations.
 
 #### 9.1 Ensemble-Averaged Bubble Model
 
