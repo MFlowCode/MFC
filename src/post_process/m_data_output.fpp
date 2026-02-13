@@ -11,7 +11,7 @@ module m_data_output
 
     use m_derived_types         ! Definitions of the derived types
 
-    use m_global_parameters     ! Global parameters for the code
+    use m_global_parameters     ! Global parameters
 
     use m_derived_variables     !< Procedures used to compute quantities derived
 
