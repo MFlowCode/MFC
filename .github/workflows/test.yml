@@ -149,7 +149,7 @@ jobs:
     strategy:
       matrix:
         include:
-          # Phoenix (GT) — build+test combined in SLURM job
+          # Phoenix (GT) — deps on login node, build+test in SLURM job
           - runner:       'gt'
             cluster:      'phoenix'
             cluster_name: 'Georgia Tech | Phoenix'
@@ -165,7 +165,7 @@ jobs:
             cluster_name: 'Georgia Tech | Phoenix'
             device: 'cpu'
             interface: 'none'
-          # Frontier (ORNL) — build on login node, test via SLURM
+          # Frontier (ORNL) — deps on login node, build+test via SLURM
           - runner:       'frontier'
             cluster:      'frontier'
             cluster_name: 'Oak Ridge | Frontier'
@@ -181,7 +181,7 @@ jobs:
             cluster_name: 'Oak Ridge | Frontier'
             device: 'cpu'
             interface: 'none'
-          # Frontier AMD — build on login node, test via SLURM
+          # Frontier AMD — deps on login node, build+test via SLURM
           - runner:       'frontier'
             cluster:      'frontier_amd'
             cluster_name: 'Oak Ridge | Frontier (AMD)'
@@ -203,11 +203,10 @@ jobs:
       - name: Clone
         uses: actions/checkout@v4
 
-      - name: Build
-        if:   matrix.cluster != 'phoenix'
+      - name: Fetch Dependencies
         run:  bash .github/workflows/${{ matrix.cluster }}/build.sh ${{ matrix.device }} ${{ matrix.interface }}
 
-      - name: Test
+      - name: Build & Test
         run:  bash .github/workflows/${{ matrix.cluster }}/submit.sh .github/workflows/${{ matrix.cluster }}/test.sh ${{ matrix.device }} ${{ matrix.interface }}
 
       - name: Print Logs

@@ -91,7 +91,7 @@ jobs:
             flag: p
             device: cpu
             interface: none
-            build_script: ""
+            build_script: "bash .github/workflows/phoenix/build.sh cpu none"
           - cluster: phoenix
             name: Georgia Tech | Phoenix (NVHPC)
             group: phoenix
@@ -99,7 +99,7 @@ jobs:
             flag: p
             device: gpu
             interface: acc
-            build_script: ""
+            build_script: "bash .github/workflows/phoenix/build.sh gpu acc"
           - cluster: phoenix
             name: Georgia Tech | Phoenix (NVHPC)
             group: phoenix
@@ -107,7 +107,7 @@ jobs:
             flag: p
             device: gpu
             interface: omp
-            build_script: ""
+            build_script: "bash .github/workflows/phoenix/build.sh gpu omp"
           - cluster: frontier
             name: Oak Ridge | Frontier (CCE)
             group: phoenix
@@ -115,7 +115,7 @@ jobs:
             flag: f
             device: gpu
             interface: acc
-            build_script: "bash .github/workflows/frontier/build.sh gpu acc bench"
+            build_script: "bash .github/workflows/frontier/build.sh gpu acc"
           - cluster: frontier
             name: Oak Ridge | Frontier (CCE)
             group: phoenix
@@ -123,7 +123,7 @@ jobs:
             flag: f
             device: gpu
             interface: omp
-            build_script: "bash .github/workflows/frontier/build.sh gpu omp bench"
+            build_script: "bash .github/workflows/frontier/build.sh gpu omp"
           - cluster: frontier_amd
             name: Oak Ridge | Frontier (AMD)
             group: phoenix
@@ -131,7 +131,7 @@ jobs:
             flag: famd
             device: gpu
             interface: omp
-            build_script: "bash .github/workflows/frontier_amd/build.sh gpu omp bench"
+            build_script: "bash .github/workflows/frontier_amd/build.sh gpu omp"
     runs-on:
       group: ${{ matrix.group }}
       labels: ${{ matrix.labels }}
@@ -153,9 +153,8 @@ jobs:
           ref: master
           path: master
 
-      - name: Setup & Build
-        if: matrix.build_script != ''
-        run: | 
+      - name: Fetch Dependencies
+        run: |
           (cd pr     && ${{ matrix.build_script }}) &
           (cd master && ${{ matrix.build_script }}) &
           wait %1 && wait %2
