@@ -720,6 +720,7 @@ if (MFC_DOCUMENTATION)
         set(DOXYGEN_HTML_OUTPUT      "\"${CMAKE_CURRENT_BINARY_DIR}/${target}\"")
         set(DOXYGEN_MATHJAX_CODEFILE "\"${CMAKE_CURRENT_SOURCE_DIR}/docs/config.js\"")
         set(DOXYGEN_PROJECT_LOGO     "\"${CMAKE_CURRENT_SOURCE_DIR}/docs/res/icon.ico\"")
+        set(DOXYGEN_CITE_BIB_FILES   "\"${CMAKE_CURRENT_SOURCE_DIR}/docs/references.bib\"")
         set(DOXYGEN_IMAGE_PATH       "\"${CMAKE_CURRENT_SOURCE_DIR}/docs/res\"\
                                       \"${CMAKE_CURRENT_SOURCE_DIR}/docs/${target}\"")
 
@@ -752,6 +753,8 @@ if (MFC_DOCUMENTATION)
                     "${opt_parameters_dependency}"
                     "${${target}_SRCs}" "${${target}_DOCs}"
             COMMAND "${DOXYGEN_EXECUTABLE}" "${target}-Doxyfile"
+            COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/docs/postprocess_citations.py"
+                    "${CMAKE_CURRENT_BINARY_DIR}/${target}"
             WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
             COMMENT "${target}: Generating documentation"
         )
@@ -771,6 +774,7 @@ if (MFC_DOCUMENTATION)
     add_custom_target(documentation)
 
     find_package(Doxygen REQUIRED dot REQUIRED)
+    find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
     # > Fetch CSS Theme
     ExternalProject_Add(doxygen-awesome-css
