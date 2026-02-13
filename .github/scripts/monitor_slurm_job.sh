@@ -45,7 +45,7 @@ get_job_state() {
 
   # Fallback to sacct (works for completed/historical jobs)
   if command -v sacct >/dev/null 2>&1; then
-    state=$(sacct -j "$jid" --format=State --noheader 2>/dev/null | head -n1 | awk '{print $1}')
+    state=$(sacct -j "$jid" -n -X -P -o State 2>/dev/null | head -n1 | cut -d'|' -f1)
     if [ -n "$state" ]; then
       echo "$state"
       return
