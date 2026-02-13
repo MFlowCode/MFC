@@ -232,4 +232,4 @@
 
 #:set USING_NVHPC = (MFC_COMPILER == NVIDIA_COMPILER_ID or MFC_COMPILER == PGI_COMPILER_ID)
 #:set USING_CCE = (MFC_COMPILER == CCE_COMPILER_ID)
-! New line at end of file is required for FYPP
+! line at end of file is required for FYPP

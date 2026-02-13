@@ -1,6 +1,6 @@
 
-!! @file m_helper_basic.f90
-!! @brief Contains module m_helper_basic
+!!
+!! module m_helper_basic
 
 #:include 'macros.fpp'
 
@@ -22,10 +22,10 @@ module m_helper_basic
 contains
 
     !> This procedure checks if two floating point numbers of wp are within tolerance.
-    !! @param a First number.
-    !! @param b Second number.
-    !! @param tol_input Relative error (default = 1.e-10_wp).
-    !! @return Result of the comparison.
+    !! First number.
+    !! Second number.
+    !! Relative error (default = 1.e-10_wp).
+    !! of the comparison.
     logical elemental function f_approx_equal(a, b, tol_input) result(res)
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: a, b
@@ -48,10 +48,10 @@ contains
     end function f_approx_equal
 
     !> This procedure checks if the point numbers of wp belongs to another array are within tolerance.
-    !! @param a First number.
-    !! @param b Array that contains several point numbers.
-    !! @param tol_input Relative error (default = 1e-10_wp).
-    !! @return Result of the comparison.
+    !! First number.
+    !! Array that contains several point numbers.
+    !! Relative error (default = 1e-10_wp).
+    !! of the comparison.
     logical function f_approx_in_array(a, b, tol_input) result(res)
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: a
@@ -77,7 +77,7 @@ contains
     end function f_approx_in_array
 
     !> Checks if a real(wp) variable is of default value.
-    !! @param var Variable to check.
+    !! Variable to check.
     logical elemental function f_is_default(var) result(res)
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: var
@@ -86,7 +86,7 @@ contains
     end function f_is_default
 
     !> Checks if ALL elements of a real(wp) array are of default value.
-    !! @param var_array Array to check.
+    !! Array to check.
     logical function f_all_default(var_array) result(res)
         real(wp), intent(in) :: var_array(:)
 
@@ -95,15 +95,15 @@ contains
         !logical :: res_array(size(var_array))
         !integer :: i
 
-        ! do i = 1, size(var_array)
-        !     res_array(i) = f_is_default(var_array(i))
-        ! end do
+        ! i = 1, size(var_array)
+        !     = f_is_default(var_array(i))
+        ! do
 
-        ! res = all(res_array)
+        ! = all(res_array)
     end function f_all_default
 
     !> Checks if a real(wp) variable is an integer.
-    !! @param var Variable to check.
+    !! Variable to check.
     logical elemental function f_is_integer(var) result(res)
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: var
@@ -123,10 +123,10 @@ contains
         logical, intent(in) :: igr
         logical, intent(in) :: ib
 
-        ! Determining the number of cells that are needed in order to store
-        ! sufficient boundary conditions data as to iterate the solution in
-        ! the physical computational domain from one time-step iteration to
-        ! the next one
+        ! the number of cells that are needed in order to store
+        ! boundary conditions data as to iterate the solution in
+        ! physical computational domain from one time-step iteration to
+        ! next one
         if (igr) then
             buff_size = (igr_order - 1)/2 + 2
         elseif (recon_type == WENO_TYPE) then
@@ -139,7 +139,7 @@ contains
             buff_size = muscl_polyn + 2
         end if
 
-        ! Correction for smearing function in the lagrangian subgrid bubble model
+        ! for smearing function in the lagrangian subgrid bubble model
         if (bubbles_lagrange) then
             buff_size = max(buff_size, 6)
         end if
@@ -148,7 +148,7 @@ contains
             buff_size = max(buff_size, 10)
         end if
 
-        ! Configuring Coordinate Direction Indexes
+        ! Coordinate Direction Indexes
         idwint(1)%beg = 0; idwint(2)%beg = 0; idwint(3)%beg = 0
         idwint(1)%end = m; idwint(2)%end = n; idwint(3)%end = p
 
@@ -163,10 +163,10 @@ contains
     end subroutine s_configure_coordinate_bounds
 
     !> Updates the min and max number of cells in each set of axes
-    !! @param bounds Min ans max values to update
-    !! @param m Number of cells in x-axis
-    !! @param n Number of cells in y-axis
-    !! @param p Number of cells in z-axis
+    !! Min ans max values to update
+    !! Number of cells in x-axis
+    !! Number of cells in y-axis
+    !! Number of cells in z-axis
     elemental subroutine s_update_cell_bounds(bounds, m, n, p)
         type(cell_num_bounds), intent(out) :: bounds
         integer, intent(in) :: m, n, p

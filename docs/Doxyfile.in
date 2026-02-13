@@ -35,7 +35,7 @@ DOXYFILE_ENCODING      = UTF-8
 # title of most generated pages and in a few other places.
 # The default value is: My Project.
 
-PROJECT_NAME           = "@DOXYGEN_PROJECT_NAME@"
+PROJECT_NAME           = @DOXYGEN_PROJECT_NAME@
 
 # The PROJECT_NUMBER tag can be used to enter a project or revision number. This
 # could be handy for archiving the generated documentation or if some version
@@ -970,7 +970,7 @@ FILTER_SOURCE_PATTERNS =
 # (index.html). This can be useful if you have a project on for instance GitHub
 # and want to reuse the introduction page also for the doxygen output.
 
-USE_MDFILE_AS_MAINPAGE = readme.md
+USE_MDFILE_AS_MAINPAGE =
 
 #---------------------------------------------------------------------------
 # Configuration options related to source browsing
@@ -1205,14 +1205,6 @@ HTML_COLORSTYLE_SAT    = 255
 
 HTML_COLORSTYLE_GAMMA  = 113
 
-# If the HTML_TIMESTAMP tag is set to YES then the footer of each generated HTML
-# page will contain the date and time when the page was generated. Setting this
-# to YES can help to show when doxygen was last run and thus if the
-# documentation is up to date.
-# The default value is: NO.
-# This tag requires that the tag GENERATE_HTML is set to YES.
-
-HTML_TIMESTAMP         = NO
 
 # If the HTML_DYNAMIC_MENUS tag is set to YES then the generated HTML
 # documentation will contain a main index with vertical navigation menus that
@@ -1801,13 +1793,6 @@ LATEX_HIDE_INDICES     = NO
 
 LATEX_BIB_STYLE        = plain
 
-# If the LATEX_TIMESTAMP tag is set to YES then the footer of each generated
-# page will contain the date and time when the page was generated. Setting this
-# to NO can help when comparing the output of multiple runs.
-# The default value is: NO.
-# This tag requires that the tag GENERATE_LATEX is set to YES.
-
-LATEX_TIMESTAMP        = NO
 
 # The LATEX_EMOJI_DIRECTORY tag is used to specify the (relative or absolute)
 # path from which the emoji images will be read. If a relative path is entered,

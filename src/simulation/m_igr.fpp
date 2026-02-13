@@ -24,6 +24,7 @@ module m_igr
  s_igr_flux_add, &
  s_finalize_igr_module
 
+!> @cond
 #ifdef __NVCOMPILER_GPU_UNIFIED_MEM
     integer, dimension(3) :: nv_uvm_temp_on_gpu
     real(wp), pointer, contiguous, dimension(:, :, :) :: jac, jac_rhs, jac_old
@@ -31,10 +32,13 @@ module m_igr
     real(wp), allocatable, dimension(:, :, :), pinned, target :: jac_rhs_host
     real(wp), allocatable, dimension(:, :, :), pinned, target :: jac_old_host
 #else
-    real(wp), allocatable, target, dimension(:, :, :) :: jac
-    real(wp), allocatable, dimension(:, :, :) :: jac_rhs, jac_old
+!> @endcond
+    real(wp), allocatable, target, dimension(:, :, :) :: jac !< IGR Jacobian field
+    real(wp), allocatable, dimension(:, :, :) :: jac_rhs, jac_old !< IGR RHS and previous Jacobian
     $:GPU_DECLARE(create='[jac, jac_rhs, jac_old]')
+!> @cond
 #endif
+!> @endcond
     type(scalar_field), dimension(1) :: jac_sf
     $:GPU_DECLARE(create='[jac_sf]')
 
@@ -152,7 +156,7 @@ contains
                 idwbuff(3)%beg:idwbuff(3)%end))
         end if
 #else
-        ! create map
+        ! map
         nv_uvm_temp_on_gpu(1:3) = 0
         nv_uvm_temp_on_gpu(1:nv_uvm_igr_temps_on_gpu) = 1
 

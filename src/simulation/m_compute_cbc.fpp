@@ -1,6 +1,6 @@
 !>
-!! @file m_compute_cbc.f90
-!! @brief CBC computation module
+!!
+!! computation module
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
@@ -49,7 +49,7 @@ contains
         real(wp), intent(in) :: dpres_ds
         integer :: i
 
-        ! $:GPU_LOOP(parallelism='[seq]')
+        !
         do i = 2, momxb
             L(i) = lambda_factor*lambda2*(c*c*dalpha_rho_ds(i - 1) - mf(i - 1)*dpres_ds)
         end do
@@ -71,7 +71,7 @@ contains
         real(wp), intent(in) :: lambda_factor, lambda2
         integer :: i
 
-        ! $:GPU_LOOP(parallelism='[seq]')
+        !
         do i = momxb + 1, momxe
             L(i) = lambda_factor*lambda2*dvel_ds(dir_idx(i - contxe))
         end do
@@ -93,7 +93,7 @@ contains
         real(wp), intent(in) :: lambda_factor, lambda2
         integer :: i
 
-        ! $:GPU_LOOP(parallelism='[seq]')
+        !
         do i = E_idx, advxe - 1
             L(i) = lambda_factor*lambda2*dadv_ds(i - momxe)
         end do
@@ -117,7 +117,7 @@ contains
 
         if (.not. chemistry) return
 
-        ! $:GPU_LOOP(parallelism='[seq]')
+        !
         do i = chemxb, chemxe
             L(i) = lambda_factor*lambda2*dYs_ds(i - chemxb + 1)
         end do

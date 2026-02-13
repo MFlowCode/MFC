@@ -1,12 +1,12 @@
 !>
-!! @file m_derived_variables.f90
-!! @brief Contains module m_derived_variables
+!!
+!! module m_derived_variables
 
 !> @brief This module features subroutines that allow for the derivation of
-!!      numerous flow variables from the conservative and primitive ones.
-!!      Currently, the available derived variables include the unadvected
-!!      volume fraction, specific heat ratio, liquid stiffness, speed of
-!!      sound, vorticity and the numerical Schlieren function.
+!! variables from the conservative and primitive ones.
+!! available derived variables include the unadvected
+!! specific heat ratio, liquid stiffness, speed of
+!! and the numerical Schlieren function.
 
 module m_derived_variables
 
@@ -35,14 +35,14 @@ module m_derived_variables
  s_finalize_derived_variables_module
 
     real(wp), allocatable, dimension(:, :, :) :: gm_rho_sf !<
-    !! Gradient magnitude (gm) of the density for each cell of the computational
-    !! sub-domain. This variable is employed in the calculation of the numerical
-    !! Schlieren function.
+    !! (gm) of the density for each cell of the computational
+    !! variable is employed in the calculation of the numerical
+    !!
 
     !> @name Finite-difference (fd) coefficients in x-, y- and z-coordinate directions.
-    !! Note that because sufficient boundary information is available for all the
-    !! active coordinate directions, the centered family of the finite-difference
-    !! schemes is used.
+    !! because sufficient boundary information is available for all the
+    !! directions, the centered family of the finite-difference
+    !! used.
     !> @{
     real(wp), allocatable, dimension(:, :), public :: fd_coeff_x
     real(wp), allocatable, dimension(:, :), public :: fd_coeff_y
@@ -50,43 +50,43 @@ module m_derived_variables
     !> @}
 
     integer, private :: flg  !<
-    !! Flagging (flg) variable used to annotate the dimensionality of the dataset
-    !! that is undergoing the post-process. A flag value of 1 indicates that the
-    !! dataset is 3D, while a flag value of 0 indicates that it is not. This flg
-    !! variable is necessary to avoid cycling through the third dimension of the
-    !! flow variable(s) when the simulation is not 3D and the size of the buffer
-    !! is non-zero. Note that a similar procedure does not have to be applied to
-    !! the second dimension since in 1D, the buffer size is always zero.
+    !! variable used to annotate the dimensionality of the dataset
+    !! undergoing the post-process. A flag value of 1 indicates that the
+    !! 3D, while a flag value of 0 indicates that it is not. This flg
+    !! necessary to avoid cycling through the third dimension of the
+    !! when the simulation is not 3D and the size of the buffer
+    !! Note that a similar procedure does not have to be applied to
+    !! dimension since in 1D, the buffer size is always zero.
 
 contains
 
     !>  Computation of parameters, allocation procedures, and/or
-        !!      any other tasks needed to properly setup the module
+        !! tasks needed to properly setup the module
     impure subroutine s_initialize_derived_variables_module
 
-        ! Allocating the gradient magnitude of the density variable provided
-        ! that numerical Schlieren function is outputted during post-process
+        ! the gradient magnitude of the density variable provided
+        ! numerical Schlieren function is outputted during post-process
         if (schlieren_wrt) then
             allocate (gm_rho_sf(-offset_x%beg:m + offset_x%end, &
                                 -offset_y%beg:n + offset_y%end, &
                                 -offset_z%beg:p + offset_z%end))
         end if
 
-        ! Allocating the variables which will store the coefficients of the
-        ! centered family of finite-difference schemes. Note that sufficient
-        ! space is allocated so that the coefficients up to any chosen order
-        ! of accuracy may be bookkept. However, if higher than fourth-order
-        ! accuracy coefficients are wanted, the formulae required to compute
-        ! these coefficients will have to be implemented in the subroutine
-        ! s_compute_finite_difference_coefficients.
+        ! the variables which will store the coefficients of the
+        ! family of finite-difference schemes. Note that sufficient
+        ! is allocated so that the coefficients up to any chosen order
+        ! accuracy may be bookkept. However, if higher than fourth-order
+        ! coefficients are wanted, the formulae required to compute
+        ! coefficients will have to be implemented in the subroutine
+        !
 
-        ! Allocating centered finite-difference coefficients in x-direction
+        ! centered finite-difference coefficients in x-direction
         if (omega_wrt(2) .or. omega_wrt(3) .or. schlieren_wrt .or. liutex_wrt) then
             allocate (fd_coeff_x(-fd_number:fd_number, &
                                  -offset_x%beg:m + offset_x%end))
         end if
 
-        ! Allocating centered finite-difference coefficients in y-direction
+        ! centered finite-difference coefficients in y-direction
         if (omega_wrt(1) .or. omega_wrt(3) .or. liutex_wrt &
             .or. &
             (n > 0 .and. schlieren_wrt)) then
@@ -94,7 +94,7 @@ contains
                                  -offset_y%beg:n + offset_y%end))
         end if
 
-        ! Allocating centered finite-difference coefficients in z-direction
+        ! centered finite-difference coefficients in z-direction
         if (omega_wrt(1) .or. omega_wrt(2) .or. liutex_wrt &
             .or. &
             (p > 0 .and. schlieren_wrt)) then
@@ -102,9 +102,9 @@ contains
                                  -offset_z%beg:p + offset_z%end))
         end if
 
-        ! Annotating the dimensionality of the dataset undergoing the post-
-        ! process. A flag value of 1 indicates that the dataset is 3D, while
-        ! a flag value of 0 indicates that it is not.
+        ! the dimensionality of the dataset undergoing the post-
+        ! A flag value of 1 indicates that the dataset is 3D, while
+        ! flag value of 0 indicates that it is not.
         if (p > 0) then
             flg = 1
         else
@@ -114,10 +114,10 @@ contains
     end subroutine s_initialize_derived_variables_module
 
     !>  This subroutine receives as input the specific heat ratio
-        !!      function, gamma_sf, and derives from it the specific heat
-        !!      ratio. The latter is stored in the derived flow quantity
-        !!      storage variable, q_sf.
-        !!  @param q_sf Specific heat ratio
+        !! and derives from it the specific heat
+        !! latter is stored in the derived flow quantity
+        !! q_sf.
+        !! Specific heat ratio
     subroutine s_derive_specific_heat_ratio(q_sf)
 
         real(wp), &
@@ -128,7 +128,7 @@ contains
 
         integer :: i, j, k !< Generic loop iterators
 
-        ! Computing specific heat ratio from specific heat ratio function
+        ! specific heat ratio from specific heat ratio function
         do k = -offset_z%beg, p + offset_z%end
             do j = -offset_y%beg, n + offset_y%end
                 do i = -offset_x%beg, m + offset_x%end
@@ -140,11 +140,11 @@ contains
     end subroutine s_derive_specific_heat_ratio
 
     !>  This subroutine admits as inputs the specific heat ratio
-        !!      function and the liquid stiffness function, gamma_sf and
-        !!      pi_inf_sf, respectively. These are used to calculate the
-        !!      values of the liquid stiffness, which are stored in the
-        !!      derived flow quantity storage variable, q_sf.
-        !!  @param q_sf Liquid stiffness
+        !! the liquid stiffness function, gamma_sf and
+        !! These are used to calculate the
+        !! the liquid stiffness, which are stored in the
+        !! quantity storage variable, q_sf.
+        !! Liquid stiffness
     subroutine s_derive_liquid_stiffness(q_sf)
 
         real(wp), &
@@ -155,8 +155,8 @@ contains
 
         integer :: i, j, k !< Generic loop iterators
 
-        ! Calculating the values of the liquid stiffness from those of the
-        ! specific heat ratio function and the liquid stiffness function
+        ! the values of the liquid stiffness from those of the
+        ! heat ratio function and the liquid stiffness function
         do k = -offset_z%beg, p + offset_z%end
             do j = -offset_y%beg, n + offset_y%end
                 do i = -offset_x%beg, m + offset_x%end
@@ -168,12 +168,12 @@ contains
     end subroutine s_derive_liquid_stiffness
 
     !> This subroutine admits as inputs the primitive variables,
-        !!      the density, the specific heat ratio function and liquid
-        !!      stiffness function. It then computes from those variables
-        !!      the values of the speed of sound, which are stored in the
-        !!      derived flow quantity storage variable, q_sf.
-        !! @param q_prim_vf Primitive variables
-        !! @param q_sf Speed of sound
+        !! the specific heat ratio function and liquid
+        !! It then computes from those variables
+        !! of the speed of sound, which are stored in the
+        !! quantity storage variable, q_sf.
+        !! Primitive variables
+        !! Speed of sound
     subroutine s_derive_sound_speed(q_prim_vf, q_sf)
 
         type(scalar_field), &
@@ -188,16 +188,16 @@ contains
 
         integer :: i, j, k !< Generic loop iterators
 
-        ! Fluid bulk modulus for alternate sound speed
+        ! bulk modulus for alternate sound speed
         real(wp) :: blkmod1, blkmod2
 
-        ! Computing speed of sound values from those of pressure, density,
-        ! specific heat ratio function and the liquid stiffness function
+        ! speed of sound values from those of pressure, density,
+        ! heat ratio function and the liquid stiffness function
         do k = -offset_z%beg, p + offset_z%end
             do j = -offset_y%beg, n + offset_y%end
                 do i = -offset_x%beg, m + offset_x%end
 
-                    ! Compute mixture sound speed
+                    ! mixture sound speed
                     if (alt_soundspeed .neqv. .true.) then
                         q_sf(i, j, k) = (((gamma_sf(i, j, k) + 1._wp)* &
                                           q_prim_vf(E_idx)%sf(i, j, k) + &
@@ -224,13 +224,13 @@ contains
     end subroutine s_derive_sound_speed
 
     !>  This subroutine derives the flux_limiter at cell boundary
-        !!      i+1/2. This is an approximation because the velocity used
-        !!      to determine the upwind direction is the velocity at the
-        !!      cell center i instead of the contact velocity at the cell
-        !!      boundary from the Riemann solver.
-        !!  @param i Component indicator
-        !!  @param q_prim_vf Primitive variables
-        !!  @param q_sf Flux limiter
+        !! is an approximation because the velocity used
+        !! the upwind direction is the velocity at the
+        !! i instead of the contact velocity at the cell
+        !! the Riemann solver.
+        !! Component indicator
+        !! Primitive variables
+        !! Flux limiter
     subroutine s_derive_flux_limiter(i, q_prim_vf, q_sf)
 
         integer, intent(in) :: i
@@ -291,15 +291,15 @@ contains
 
                     if (f_approx_equal(top, bottom)) then
                         slope = 1._wp
-                        !       ELSEIF((top == 0._wp .AND. bottom /= 0._wp) &
-                        !               .OR.            &
-                        !           (bottom == 0._wp .AND. top /= 0._wp)) THEN
-                        !           slope = 0._wp
+                        !       == 0._wp .AND. bottom /= 0._wp) &
+                        !                          &
+                        !           == 0._wp .AND. top /= 0._wp)) THEN
+                        !           = 0._wp
                     else
                         slope = (top*bottom)/(bottom**2._wp + 1.e-16_wp)
                     end if
 
-                    ! Flux limiter function
+                    ! limiter function
                     if (flux_lim == 1) then ! MINMOD (MM)
                         q_sf(j, k, l) = max(0._wp, min(1._wp, slope))
                     elseif (flux_lim == 2) then ! MUSCL (MC)
@@ -321,10 +321,10 @@ contains
     end subroutine s_derive_flux_limiter
 
     !>  Computes the solution to the linear system Ax=b w/ sol = x
-        !!  @param A Input matrix
-        !!  @param b right-hane-side
-        !!  @param sol Solution
-        !!  @param ndim Problem size
+        !! Input matrix
+        !! right-hane-side
+        !! Solution
+        !! Problem size
     subroutine s_solve_linear_system(A, b, sol, ndim)
 
         integer, intent(in) :: ndim
@@ -336,10 +336,10 @@ contains
 
         integer :: i, j, k
 
-        ! Solve linear system using own linear solver (Thomson/Darter/Comet/Stampede)
-        ! Forward elimination
+        ! linear system using own linear solver (Thomson/Darter/Comet/Stampede)
+        ! elimination
         do i = 1, ndim
-            ! Pivoting
+            !
             j = i - 1 + maxloc(abs(A(i:ndim, i)), 1)
             sol = A(i, :)
             A(i, :) = A(j, :)
@@ -347,7 +347,7 @@ contains
             sol(1) = b(i)
             b(i) = b(j)
             b(j) = sol(1)
-            ! Elimination
+            !
             b(i) = b(i)/A(i, i)
             A(i, :) = A(i, :)/A(i, i)
             do k = i + 1, ndim
@@ -356,7 +356,7 @@ contains
             end do
         end do
 
-        ! Backward substitution
+        ! substitution
         do i = ndim, 1, -1
             sol(i) = b(i)
             do k = i + 1, ndim
@@ -367,14 +367,14 @@ contains
     end subroutine s_solve_linear_system
 
     !>  This subroutine receives as inputs the indicator of the
-        !!      component of the vorticity that should be outputted and
-        !!      the primitive variables. From those inputs, it proceeds
-        !!      to calculate values of the desired vorticity component,
-        !!      which are subsequently stored in derived flow quantity
-        !!      storage variable, q_sf.
-        !!  @param i Vorticity component indicator
-        !!  @param q_prim_vf Primitive variables
-        !!  @param q_sf Vorticity component
+        !! the vorticity that should be outputted and
+        !! variables. From those inputs, it proceeds
+        !! values of the desired vorticity component,
+        !! subsequently stored in derived flow quantity
+        !! q_sf.
+        !! Vorticity component indicator
+        !! Primitive variables
+        !! Vorticity component
     subroutine s_derive_vorticity_component(i, q_prim_vf, q_sf)
 
         integer, intent(in) :: i
@@ -391,7 +391,7 @@ contains
 
         integer :: j, k, l, r !< Generic loop iterators
 
-        ! Computing the vorticity component in the x-coordinate direction
+        ! the vorticity component in the x-coordinate direction
         if (i == 1) then
             do l = -offset_z%beg, p + offset_z%end
                 do k = -offset_y%beg, n + offset_y%end
@@ -420,7 +420,7 @@ contains
                 end do
             end do
 
-            ! Computing the vorticity component in the y-coordinate direction
+            ! the vorticity component in the y-coordinate direction
         elseif (i == 2) then
             do l = -offset_z%beg, p + offset_z%end
                 do k = -offset_y%beg, n + offset_y%end
@@ -448,7 +448,7 @@ contains
                 end do
             end do
 
-            ! Computing the vorticity component in the z-coordinate direction
+            ! the vorticity component in the z-coordinate direction
         else
             do l = -offset_z%beg, p + offset_z%end
                 do k = -offset_y%beg, n + offset_y%end
@@ -472,11 +472,11 @@ contains
     end subroutine s_derive_vorticity_component
 
     !> This subroutine gets as inputs the primitive variables. From those
-        !!      inputs, it proceeds to calculate the value of the Q_M
-        !!      function, which are subsequently stored in the derived flow
-        !!      quantity storage variable, q_sf.
-        !!  @param q_prim_vf Primitive variables
-        !!  @param q_sf Q_M
+        !! proceeds to calculate the value of the Q_M
+        !! are subsequently stored in the derived flow
+        !! variable, q_sf.
+        !! Primitive variables
+        !! Q_M
     subroutine s_derive_qm(q_prim_vf, q_sf)
         type(scalar_field), &
             dimension(sys_size), &
@@ -498,22 +498,22 @@ contains
             do k = -offset_y%beg, n + offset_y%end
                 do j = -offset_x%beg, m + offset_x%end
 
-                    ! Get velocity gradient tensor
+                    ! velocity gradient tensor
                     q_jacobian_sf(:, :) = 0._wp
 
                     do r = -fd_number, fd_number
                         do jj = 1, 3
-                            ! d()/dx
+                            !
                             q_jacobian_sf(jj, 1) = &
                                 q_jacobian_sf(jj, 1) + &
                                 fd_coeff_x(r, j)* &
                                 q_prim_vf(mom_idx%beg + jj - 1)%sf(r + j, k, l)
-                            ! d()/dy
+                            !
                             q_jacobian_sf(jj, 2) = &
                                 q_jacobian_sf(jj, 2) + &
                                 fd_coeff_y(r, k)* &
                                 q_prim_vf(mom_idx%beg + jj - 1)%sf(j, r + k, l)
-                            ! d()/dz
+                            !
                             q_jacobian_sf(jj, 3) = &
                                 q_jacobian_sf(jj, 3) + &
                                 fd_coeff_z(r, l)* &
@@ -521,7 +521,7 @@ contains
                         end do
                     end do
 
-                    ! Decompose J into asymmetric matrix, S, and a skew-symmetric matrix, O
+                    ! J into asymmetric matrix, S, and a skew-symmetric matrix, O
                     do jj = 1, 3
                         do kk = 1, 3
                             S(jj, kk) = 0.5_wp* &
@@ -531,7 +531,7 @@ contains
                         end do
                     end do
 
-                    ! Compute S2 = S*S'
+                    ! S2 = S*S'
                     do jj = 1, 3
                         do kk = 1, 3
                             O2(jj, kk) = O(jj, 1)*O(kk, 1) + &
@@ -543,7 +543,7 @@ contains
                         end do
                     end do
 
-                    ! Compute Q
+                    ! Q
                     Q = 0.5_wp*((O2(1, 1) + O2(2, 2) + O2(3, 3)) - &
                                 (S2(1, 1) + S2(2, 2) + S2(3, 3)))
                     trS = S(1, 1) + S(2, 2) + S(3, 3)
@@ -558,11 +558,11 @@ contains
     end subroutine s_derive_qm
 
     !> This subroutine gets as inputs the primitive variables. From those
-        !!      inputs, it proceeds to calculate the Liutex vector and its
-        !!      magnitude based on Xu et al. (2019).
-        !!  @param q_prim_vf Primitive variables
-        !!  @param liutex_mag Liutex magnitude
-        !!  @param liutex_axis Liutex axis
+        !! proceeds to calculate the Liutex vector and its
+        !! on Xu et al. (2019).
+        !! @param[in] q_prim_vf Primitive variables
+        !! @param[out] liutex_mag Liutex magnitude
+        !! @param[out] liutex_axis Liutex rotation axis (3D vector field)
     impure subroutine s_derive_liutex(q_prim_vf, liutex_mag, liutex_axis)
         integer, parameter :: nm = 3
         type(scalar_field), &
@@ -573,13 +573,13 @@ contains
             dimension(-offset_x%beg:m + offset_x%end, &
                       -offset_y%beg:n + offset_y%end, &
                       -offset_z%beg:p + offset_z%end), &
-            intent(out) :: liutex_mag !< Liutex magnitude
+            intent(out) :: liutex_mag
 
         real(wp), &
             dimension(-offset_x%beg:m + offset_x%end, &
                       -offset_y%beg:n + offset_y%end, &
                       -offset_z%beg:p + offset_z%end, nm), &
-            intent(out) :: liutex_axis !< Liutex rigid rotation axis
+            intent(out) :: liutex_axis
 
         character, parameter :: ivl = 'N' !< compute left eigenvectors
         character, parameter :: ivr = 'V' !< compute right eigenvectors
@@ -603,22 +603,22 @@ contains
             do k = -offset_y%beg, n + offset_y%end
                 do j = -offset_x%beg, m + offset_x%end
 
-                    ! Get velocity gradient tensor (VGT)
+                    ! velocity gradient tensor (VGT)
                     vgt(:, :) = 0._wp
 
                     do r = -fd_number, fd_number
                         do i = 1, 3
-                            ! d()/dx
+                            !
                             vgt(i, 1) = &
                                 vgt(i, 1) + &
                                 fd_coeff_x(r, j)* &
                                 q_prim_vf(mom_idx%beg + i - 1)%sf(r + j, k, l)
-                            ! d()/dy
+                            !
                             vgt(i, 2) = &
                                 vgt(i, 2) + &
                                 fd_coeff_y(r, k)* &
                                 q_prim_vf(mom_idx%beg + i - 1)%sf(j, r + k, l)
-                            ! d()/dz
+                            !
                             vgt(i, 3) = &
                                 vgt(i, 3) + &
                                 fd_coeff_z(r, l)* &
@@ -626,14 +626,14 @@ contains
                         end do
                     end do
 
-                    ! Call appropriate LAPACK routine based on precision
+                    ! appropriate LAPACK routine based on precision
 #ifdef MFC_SINGLE_PRECISION
                     call sgeev(ivl, ivr, nm, vgt, nm, lr, li, vl, nm, vr, nm, work, lwork, info)
 #else
                     call dgeev(ivl, ivr, nm, vgt, nm, lr, li, vl, nm, vr, nm, work, lwork, info)
 #endif
 
-                    ! Find real eigenvector
+                    ! real eigenvector
                     idx = 1
                     do r = 2, 3
                         if (abs(li(r)) < abs(li(idx))) then
@@ -642,7 +642,7 @@ contains
                     end do
                     eigvec = vr(:, idx)
 
-                    ! Normalize real eigenvector if it is effectively non-zero
+                    ! real eigenvector if it is effectively non-zero
                     eigvec_mag = sqrt(eigvec(1)**2._wp &
                                       + eigvec(2)**2._wp &
                                       + eigvec(3)**2._wp)
@@ -652,22 +652,22 @@ contains
                         eigvec = 0._wp
                     end if
 
-                    ! Compute vorticity projected on the eigenvector
+                    ! vorticity projected on the eigenvector
                     omega_proj = (vgt(3, 2) - vgt(2, 3))*eigvec(1) &
                                  + (vgt(1, 3) - vgt(3, 1))*eigvec(2) &
                                  + (vgt(2, 1) - vgt(1, 2))*eigvec(3)
 
-                    ! As eigenvector can have +/- signs, we can choose the sign
-                    ! so that omega_proj is positive
+                    ! eigenvector can have +/- signs, we can choose the sign
+                    ! that omega_proj is positive
                     if (omega_proj < 0._wp) then
                         eigvec = -eigvec
                         omega_proj = -omega_proj
                     end if
 
-                    ! Find imaginary part of complex eigenvalue
+                    ! imaginary part of complex eigenvalue
                     lci = li(mod(idx, 3) + 1)
 
-                    ! Compute Liutex magnitude
+                    ! Liutex magnitude
                     alpha = omega_proj**2._wp - 4._wp*lci**2._wp ! (2*alpha)^2
                     if (alpha > 0._wp) then
                         liutex_mag(j, k, l) = omega_proj - sqrt(alpha)
@@ -675,7 +675,7 @@ contains
                         liutex_mag(j, k, l) = omega_proj
                     end if
 
-                    ! Compute Liutex axis
+                    ! Liutex axis
                     liutex_axis(j, k, l, 1) = eigvec(1)
                     liutex_axis(j, k, l, 2) = eigvec(2)
                     liutex_axis(j, k, l, 3) = eigvec(3)
@@ -687,12 +687,12 @@ contains
     end subroutine s_derive_liutex
 
     !>  This subroutine gets as inputs the conservative variables
-        !!      and density. From those inputs, it proceeds to calculate
-        !!      the values of the numerical Schlieren function, which are
-        !!      subsequently stored in the derived flow quantity storage
-        !!      variable, q_sf.
-        !!  @param q_cons_vf Conservative variables
-        !!  @param q_sf Numerical Schlieren function
+        !! From those inputs, it proceeds to calculate
+        !! of the numerical Schlieren function, which are
+        !! in the derived flow quantity storage
+        !!
+        !! Conservative variables
+        !! Numerical Schlieren function
     impure subroutine s_derive_numerical_schlieren_function(q_cons_vf, q_sf)
 
         type(scalar_field), &
@@ -706,19 +706,19 @@ contains
             intent(inout) :: q_sf
 
         real(wp) :: drho_dx, drho_dy, drho_dz !<
-            !! Spatial derivatives of the density in the x-, y- and z-directions
+            !! of the density in the x-, y- and z-directions
 
         real(wp), dimension(2) :: gm_rho_max !<
-            !! Maximum value of the gradient magnitude (gm) of the density field
-            !! in entire computational domain and not just the local sub-domain.
-            !! The first position in the variable contains the maximum value and
-            !! the second contains the rank of the processor on which it occurred.
+            !! of the gradient magnitude (gm) of the density field
+            !! computational domain and not just the local sub-domain.
+            !! position in the variable contains the maximum value and
+            !! contains the rank of the processor on which it occurred.
 
         integer :: i, j, k, l !< Generic loop iterators
 
-        ! Computing Gradient Magnitude of Density
+        ! Gradient Magnitude of Density
 
-        ! Contributions from the x- and y-coordinate directions
+        ! from the x- and y-coordinate directions
         do l = -offset_z%beg, p + offset_z%end
             do k = -offset_y%beg, n + offset_y%end
                 do j = -offset_x%beg, m + offset_x%end
@@ -737,7 +737,7 @@ contains
             end do
         end do
 
-        ! Contribution from the z-coordinate direction
+        ! from the z-coordinate direction
         if (p > 0) then
             do l = -offset_z%beg, p + offset_z%end
                 do k = -offset_y%beg, n + offset_y%end
@@ -763,31 +763,31 @@ contains
             end do
         end if
 
-        ! Up until now, only the dot product of the gradient of the density
-        ! field has been calculated and stored in the gradient magnitude of
-        ! density variable. So now we proceed to take the square-root as to
-        ! complete the desired calculation.
+        ! until now, only the dot product of the gradient of the density
+        ! has been calculated and stored in the gradient magnitude of
+        ! variable. So now we proceed to take the square-root as to
+        ! the desired calculation.
         gm_rho_sf = sqrt(gm_rho_sf)
 
-        ! Determining the local maximum of the gradient magnitude of density
-        ! and bookkeeping the result, along with rank of the local processor
+        ! the local maximum of the gradient magnitude of density
+        ! bookkeeping the result, along with rank of the local processor
         gm_rho_max = (/maxval(gm_rho_sf), real(proc_rank, wp)/)
 
-        ! Comparing the local maximum gradient magnitude of the density on
-        ! this processor to the those computed on the remaining processors.
-        ! This allows for the global maximum to be computed and the rank of
-        ! the processor on which it has occurred to be recorded.
+        ! the local maximum gradient magnitude of the density on
+        ! processor to the those computed on the remaining processors.
+        ! allows for the global maximum to be computed and the rank of
+        ! processor on which it has occurred to be recorded.
         if (num_procs > 1) call s_mpi_reduce_maxloc(gm_rho_max)
 
-        ! Computing Numerical Schlieren Function
+        ! Numerical Schlieren Function
 
-        ! The form of the numerical Schlieren function depends on the choice
-        ! of the multicomponent flow model. For the gamma/pi_inf model, the
-        ! exponential of the negative, normalized, gradient magnitude of the
-        ! density is computed. For the volume fraction model, the amplitude
-        ! of the exponential's inside is also modulated with respect to the
-        ! identity of the fluid in which the function is evaluated. For more
-        ! information, refer to Marquina and Mulet (2003).
+        ! form of the numerical Schlieren function depends on the choice
+        ! the multicomponent flow model. For the gamma/pi_inf model, the
+        ! of the negative, normalized, gradient magnitude of the
+        ! is computed. For the volume fraction model, the amplitude
+        ! the exponential's inside is also modulated with respect to the
+        ! of the fluid in which the function is evaluated. For more
+        ! refer to Marquina and Mulet (2003).
 
         if (model_eqns == 1) then                    ! Gamma/pi_inf model
             q_sf = -gm_rho_sf/gm_rho_max(1)
@@ -810,9 +810,9 @@ contains
             end do
         end if
 
-        ! Up until now, only the inside of the exponential of the numerical
-        ! Schlieren function has been evaluated and stored. Then, to finish
-        ! the computation, the exponential of the inside quantity is taken.
+        ! until now, only the inside of the exponential of the numerical
+        ! function has been evaluated and stored. Then, to finish
+        ! computation, the exponential of the inside quantity is taken.
         q_sf = exp(q_sf)
 
     end subroutine s_derive_numerical_schlieren_function
@@ -820,13 +820,13 @@ contains
     !>  Deallocation procedures for the module
     impure subroutine s_finalize_derived_variables_module
 
-        ! Deallocating the variable containing the gradient magnitude of the
-        ! density field provided that the numerical Schlieren function was
-        ! was outputted during the post-process
+        ! the variable containing the gradient magnitude of the
+        ! field provided that the numerical Schlieren function was
+        ! outputted during the post-process
         if (schlieren_wrt) deallocate (gm_rho_sf)
 
-        ! Deallocating the variables that might have been used to bookkeep
-        ! the finite-difference coefficients in the x-, y- and z-directions
+        ! the variables that might have been used to bookkeep
+        ! finite-difference coefficients in the x-, y- and z-directions
         if (allocated(fd_coeff_x)) deallocate (fd_coeff_x)
         if (allocated(fd_coeff_y)) deallocate (fd_coeff_y)
         if (allocated(fd_coeff_z)) deallocate (fd_coeff_z)

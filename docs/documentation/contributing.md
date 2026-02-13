@@ -148,7 +148,7 @@ Both human reviewers and AI code reviewers reference this section.
 ### Memory and Allocation
 
 - **ALLOCATE/DEALLOCATE pairing:** Every `@:ALLOCATE()` must have a matching `@:DEALLOCATE()`. Missing deallocations leak GPU memory.
-- **@:ACC_SETUP_VFs / @:ACC_SETUP_SFs:** Vector/scalar fields must have GPU pointer setup before use in kernels.
+- **`@:ACC_SETUP_VFs` / `@:ACC_SETUP_SFs`:** Vector/scalar fields must have GPU pointer setup before use in kernels.
 - **Conditional allocation:** If an array is allocated inside an `if` block, its deallocation must follow the same condition.
 - **Out-of-bounds access:** Fortran is permissive with assumed-shape arrays. Check that index arithmetic stays within declared bounds.
 

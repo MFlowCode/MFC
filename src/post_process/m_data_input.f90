@@ -145,6 +145,7 @@ contains
 
     !> Helper subroutine to read IB data files
     !!  @param file_loc_base Base file location for IB data
+    !!  @param t_step Optional time step index for restart data
     impure subroutine s_read_ib_data_files(file_loc_base, t_step)
 
         character(len=*), intent(in) :: file_loc_base
@@ -211,8 +212,10 @@ contains
     end subroutine s_read_ib_data_files
 
     !> Helper subroutine to allocate field arrays for given dimensionality
-    !!  @param start_idx Starting index for allocation
-    !!  @param end_x, end_y, end_z End indices for each dimension
+    !!  @param local_start_idx Starting index for allocation
+    !!  @param end_x End index for x dimension
+    !!  @param end_y End index for y dimension
+    !!  @param end_z End index for z dimension
     impure subroutine s_allocate_field_arrays(local_start_idx, end_x, end_y, end_z)
 
         integer, intent(in) :: local_start_idx, end_x, end_y, end_z

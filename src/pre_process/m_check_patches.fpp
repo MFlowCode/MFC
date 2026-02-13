@@ -1,13 +1,13 @@
 #:include 'macros.fpp'
 
 !> @brief This module contains subroutines that read, and check consistency
-!!              of, the user provided inputs and data.
+!! user provided inputs and data.
 
 #:include 'macros.fpp'
 
 module m_check_patches
 
-    ! Dependencies
+    !
     use m_derived_types          !< Definitions of the derived types
 
     use m_global_parameters      !< Global parameters for the code
@@ -15,7 +15,7 @@ module m_check_patches
     use m_mpi_proxy              !< Message passing interface (MPI) module proxy
 
     use m_data_output            !< Procedures to write the grid data and the
-                                 !! conservative variables to files
+                                 !! to files
 
 #ifdef MFC_MPI
     use mpi                      !< Message passing interface (MPI) module
@@ -44,7 +44,7 @@ contains
 
         do i = 1, num_patches_max
             if (i <= num_patches) then
-                ! call s_check_patch_geometry(i)
+                ! s_check_patch_geometry(i)
                 call s_int_to_str(i, iStr)
                 @:PROHIBIT(patch_icpp(i)%geometry == 6, "Invalid patch geometry number. "// &
                     "patch_icpp("//trim(iStr)//")%geometry is deprecated.")
@@ -57,7 +57,7 @@ contains
                 @:PROHIBIT(patch_icpp(i)%geometry == dflt_int, "Invalid patch geometry number. "// &
                     "patch_icpp("//trim(iStr)//")%geometry must be set.")
 
-                ! Constraints on the geometric initial condition patch parameters
+                ! on the geometric initial condition patch parameters
                 if (patch_icpp(i)%geometry == 1) then
                     call s_check_line_segment_patch_geometry(i)
                 elseif (patch_icpp(i)%geometry == 2) then
@@ -96,7 +96,7 @@ contains
             end if
         end do
 
-        ! Constraints on overwrite rights initial condition patch parameters
+        ! on overwrite rights initial condition patch parameters
         do i = 1, num_patches
             if (i <= num_patches) then
                 call s_check_active_patch_alteration_rights(i)
@@ -105,7 +105,7 @@ contains
             end if
         end do
 
-        ! Constraints on smoothing initial condition patch parameters
+        ! on smoothing initial condition patch parameters
         do i = 1, num_patches
             if (i > 1 .and. (patch_icpp(i)%geometry == 2 .or. &
                              patch_icpp(i)%geometry == 3 .or. &
@@ -125,7 +125,7 @@ contains
             end if
         end do
 
-        ! Constraints on flow variables initial condition patch parameters
+        ! on flow variables initial condition patch parameters
         do i = 1, num_patches
             if (i <= num_patches) then
                 call s_check_active_patch_primitive_variables(i)
@@ -137,7 +137,7 @@ contains
     end subroutine s_check_patches
 
     !> This subroutine checks the line segment patch input
-        !!  @param patch_id Patch identifier
+        !! Patch identifier
     impure subroutine s_check_line_segment_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
@@ -151,7 +151,7 @@ contains
     end subroutine s_check_line_segment_patch_geometry
 
     !>  This subroutine checks the circle patch input
-        !!  @param patch_id Patch identifier
+        !! Patch identifier
     impure subroutine s_check_circle_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
@@ -166,7 +166,7 @@ contains
     end subroutine s_check_circle_patch_geometry
 
     !>  This subroutine checks the rectangle patch input
-        !!  @param patch_id Patch identifier
+        !! Patch identifier
     impure subroutine s_check_rectangle_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
@@ -182,7 +182,7 @@ contains
     end subroutine s_check_rectangle_patch_geometry
 
     !> This subroutine checks the line sweep patch input
-        !!  @param patch_id Patch identifier
+        !! Patch identifier
     impure subroutine s_check_line_sweep_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
@@ -199,7 +199,7 @@ contains
     end subroutine s_check_line_sweep_patch_geometry
 
     !>  This subroutine checks the ellipse patch input
-        !!  @param patch_id Patch identifier
+        !! Patch identifier
     impure subroutine s_check_ellipse_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
@@ -216,7 +216,7 @@ contains
     end subroutine s_check_ellipse_patch_geometry
 
     !>  This subroutine checks the model patch input
-        !!  @param patch_id Patch identifier
+        !! Patch identifier
     impure subroutine s_check_2D_TaylorGreen_vortex_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
@@ -233,7 +233,7 @@ contains
     end subroutine s_check_2D_TaylorGreen_vortex_patch_geometry
 
     !> This subroutine checks the model patch input
-        !!  @param patch_id Patch identifier
+        !! Patch identifier
     impure subroutine s_check_sphere_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
@@ -248,7 +248,7 @@ contains
     end subroutine s_check_sphere_patch_geometry
 
     !>  This subroutine checks the model patch input
-        !!  @param patch_id Patch identifier
+        !! Patch identifier
     impure subroutine s_check_spherical_harmonic_patch_geometry(patch_id)
         integer, intent(in) :: patch_id
 
@@ -269,10 +269,10 @@ contains
     end subroutine s_check_spherical_harmonic_patch_geometry
 
     !>  This subroutine checks the model patch input
-        !!  @param patch_id Patch identifier
+        !! Patch identifier
     impure subroutine s_check_cuboid_patch_geometry(patch_id)
 
-        ! Patch identifier
+        ! identifier
         integer, intent(in) :: patch_id
         call s_int_to_str(patch_id, iStr)
 
@@ -287,10 +287,10 @@ contains
     end subroutine s_check_cuboid_patch_geometry
 
     !>  This subroutine checks the model patch input
-        !!  @param patch_id Patch identifier
+        !! Patch identifier
     impure subroutine s_check_cylinder_patch_geometry(patch_id)
 
-        ! Patch identifier
+        ! identifier
         integer, intent(in) :: patch_id
         call s_int_to_str(patch_id, iStr)
 
@@ -300,14 +300,14 @@ contains
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%z_centroid), "Cylinder patch "//trim(iStr)//": z_centroid must be set")
         @:PROHIBIT(patch_icpp(patch_id)%radius <= 0._wp, "Cylinder patch "//trim(iStr)//": radius must be greater than zero")
 
-        ! Check if exactly one length is defined
+        ! if exactly one length is defined
         @:PROHIBIT(count([ &
             patch_icpp(patch_id)%length_x > 0._wp, &
             patch_icpp(patch_id)%length_y > 0._wp, &
             patch_icpp(patch_id)%length_z > 0._wp &
             ]) /= 1, "Cylinder patch "//trim(iStr)//": Exactly one of length_x, length_y, or length_z must be defined and positive")
 
-        ! Ensure the defined length is positive
+        ! the defined length is positive
         @:PROHIBIT( &
             (.not. f_is_default(patch_icpp(patch_id)%length_x) .and. patch_icpp(patch_id)%length_x <= 0._wp) .or. &
             (.not. f_is_default(patch_icpp(patch_id)%length_y) .and. patch_icpp(patch_id)%length_y <= 0._wp) .or. &
@@ -317,10 +317,10 @@ contains
     end subroutine s_check_cylinder_patch_geometry
 
     !>  This subroutine checks the model patch input
-        !!  @param patch_id Patch identifier
+        !! Patch identifier
     impure subroutine s_check_plane_sweep_patch_geometry(patch_id)
 
-        ! Patch identifier
+        ! identifier
         integer, intent(in) :: patch_id
         call s_int_to_str(patch_id, iStr)
 
@@ -335,7 +335,7 @@ contains
     end subroutine s_check_plane_sweep_patch_geometry
 
     !> This subroutine checks the model patch input
-        !!  @param patch_id Patch identifier
+        !! Patch identifier
     impure subroutine s_check_ellipsoid_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
@@ -352,8 +352,8 @@ contains
     end subroutine s_check_ellipsoid_patch_geometry
 
     !!>  This subroutine verifies that the geometric parameters of
-        !!      the inactive patch remain unaltered by the user inputs.
-        !!  @param patch_id Patch identifier
+        !! patch remain unaltered by the user inputs.
+        !! Patch identifier
     impure subroutine s_check_inactive_patch_geometry(patch_id)
 
         integer, intent(in) :: patch_id
@@ -378,7 +378,7 @@ contains
     end subroutine s_check_inactive_patch_geometry
 
     !>  This subroutine verifies the active patch's right to overwrite the preceding patches
-        !!  @param patch_id Patch identifier
+        !! Patch identifier
     impure subroutine s_check_active_patch_alteration_rights(patch_id)
 
         integer, intent(in) :: patch_id
@@ -391,10 +391,10 @@ contains
     end subroutine s_check_active_patch_alteration_rights
 
     !>  This subroutine verifies that inactive patches cannot overwrite other patches
-        !!  @param patch_id Patch identifier
+        !! Patch identifier
     impure subroutine s_check_inactive_patch_alteration_rights(patch_id)
 
-        ! Patch identifier
+        ! identifier
         integer, intent(in) :: patch_id
         call s_int_to_str(patch_id, iStr)
 
@@ -404,7 +404,7 @@ contains
     end subroutine s_check_inactive_patch_alteration_rights
 
     !> This subroutine checks the smoothing parameters
-        !!  @param patch_id Patch identifier
+        !! Patch identifier
     impure subroutine s_check_supported_patch_smoothing(patch_id)
 
         integer, intent(in) :: patch_id
@@ -427,10 +427,10 @@ contains
     end subroutine s_check_supported_patch_smoothing
 
     !> This subroutine verifies that inactive patches cannot be smoothed
-        !!  @param patch_id Patch identifier
+        !! Patch identifier
     impure subroutine s_check_unsupported_patch_smoothing(patch_id)
 
-        ! Patch identifier
+        ! identifier
         integer, intent(in) :: patch_id
         call s_int_to_str(patch_id, iStr)
 
@@ -444,7 +444,7 @@ contains
     end subroutine s_check_unsupported_patch_smoothing
 
     !>  This subroutine checks the primitive variables
-        !!  @param patch_id Patch identifier
+        !! Patch identifier
     impure subroutine s_check_active_patch_primitive_variables(patch_id)
 
         integer, intent(in) :: patch_id
@@ -503,9 +503,9 @@ contains
     end subroutine s_check_active_patch_primitive_variables
 
     !>  This subroutine verifies that the primitive variables
-        !!      associated with the given inactive patch remain unaltered
-        !!      by the user inputs.
-        !!  @param patch_id Patch identifier
+        !! the given inactive patch remain unaltered
+        !! user inputs.
+        !! Patch identifier
     impure subroutine s_check_inactive_patch_primitive_variables(patch_id)
 
         integer, intent(in) :: patch_id

@@ -1,9 +1,9 @@
 !>
-!! @file m_boundary_conditions_common.fpp
-!! @brief Contains module m_boundary_conditions_common
+!!
+!! module m_boundary_conditions_common
 
 !> @brief The purpose of the module is to apply noncharacteristic and processor
-!! boundary conditions
+!!
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
@@ -84,8 +84,8 @@ contains
     end subroutine s_initialize_boundary_common_module
 
     !>  The purpose of this procedure is to populate the buffers
-    !!      of the primitive variables, depending on the selected
-    !!      boundary conditions.
+    !! primitive variables, depending on the selected
+    !!
     impure subroutine s_populate_variables_buffers(bc_type, q_prim_vf, pb_in, mv_in)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
@@ -94,7 +94,7 @@ contains
 
         integer :: k, l
 
-        ! Population of Buffers in x-direction
+        ! of Buffers in x-direction
         if (bc_x%beg >= 0) then
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, 1, -1, sys_size, pb_in, mv_in)
         else
@@ -155,7 +155,7 @@ contains
             $:END_GPU_PARALLEL_LOOP()
         end if
 
-        ! Population of Buffers in y-direction
+        ! of Buffers in y-direction
 
         if (n == 0) return
 
@@ -226,7 +226,7 @@ contains
 
         #:endif
 
-        ! Population of Buffers in z-direction
+        ! of Buffers in z-direction
 
         if (p == 0) return
 
@@ -292,7 +292,7 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
             end if
         #:endif
-        ! END: Population of Buffers in z-direction
+        ! Population of Buffers in z-direction
 
     end subroutine s_populate_variables_buffers
 
@@ -1784,7 +1784,7 @@ contains
 
         offset = 0
 
-        ! Write bc_types
+        ! bc_types
         do dir = 1, num_dims
             do loc = 1, 2
 #ifdef MFC_MIXED_PRECISION
@@ -1797,7 +1797,7 @@ contains
             end do
         end do
 
-        ! Write bc_buffers
+        ! bc_buffers
         do dir = 1, num_dims
             do loc = 1, 2
                 nelements = sizeof(bc_buffers(dir, loc)%sf)*mpi_io_type/stp
@@ -1822,7 +1822,7 @@ contains
 
         character(len=10) :: status
 
-        ! Read bc_types
+        ! bc_types
         file_path = trim(step_dirpath)//'/bc_type.dat'
         inquire (FILE=trim(file_path), EXIST=file_exist)
         if (.not. file_exist) then
@@ -1838,7 +1838,7 @@ contains
         end do
         close (1)
 
-        ! Read bc_buffers
+        ! bc_buffers
         file_path = trim(step_dirpath)//'/bc_buffers.dat'
         inquire (FILE=trim(file_path), EXIST=file_exist)
         if (.not. file_exist) then
@@ -1894,7 +1894,7 @@ contains
 
         offset = 0
 
-        ! Read bc_types
+        ! bc_types
         do dir = 1, num_dims
             do loc = 1, 2
 #ifdef MFC_MIXED_PRECISION
@@ -1908,7 +1908,7 @@ contains
             end do
         end do
 
-        ! Read bc_buffers
+        ! bc_buffers
         do dir = 1, num_dims
             do loc = 1, 2
                 nelements = sizeof(bc_buffers(dir, loc)%sf)*mpi_io_type/stp
@@ -1994,15 +1994,15 @@ contains
     end subroutine s_assign_default_bc_type
 
     !> The purpose of this subroutine is to populate the buffers
-        !!          of the grid variables, which are constituted of the cell-
-        !!          boundary locations and cell-width distributions, based on
-        !!          the boundary conditions.
+        !! grid variables, which are constituted of the cell-
+        !! and cell-width distributions, based on
+        !! conditions.
     subroutine s_populate_grid_variables_buffers
 
         integer :: i !< Generic loop iterator
 
 #ifdef MFC_SIMULATION
-        ! Required for compatibility between codes
+        ! for compatibility between codes
         type(int_bounds_info) :: offset_x, offset_y, offset_z
         offset_x%beg = buff_size; offset_x%end = buff_size
         offset_y%beg = buff_size; offset_y%end = buff_size
@@ -2010,9 +2010,9 @@ contains
 #endif
 
 #ifndef MFC_PRE_PROCESS
-        ! Population of Buffers in x-direction
+        ! of Buffers in x-direction
 
-        ! Populating cell-width distribution buffer at bc_x%beg
+        ! cell-width distribution buffer at bc_x%beg
         if (bc_x%beg >= 0) then
             call s_mpi_sendrecv_grid_variables_buffers(1, -1)
         elseif (bc_x%beg <= BC_GHOST_EXTRAP) then
@@ -2029,7 +2029,7 @@ contains
             end do
         end if
 
-        ! Computing the cell-boundary and center locations buffer at bc_x%beg
+        ! the cell-boundary and center locations buffer at bc_x%beg
         do i = 1, offset_x%beg
             x_cb(-1 - i) = x_cb(-i) - dx(-i)
         end do
@@ -2038,7 +2038,7 @@ contains
             x_cc(-i) = x_cc(1 - i) - (dx(1 - i) + dx(-i))/2._wp
         end do
 
-        ! Populating the cell-width distribution buffer at bc_x%end
+        ! the cell-width distribution buffer at bc_x%end
         if (bc_x%end >= 0) then
             call s_mpi_sendrecv_grid_variables_buffers(1, 1)
         elseif (bc_x%end <= BC_GHOST_EXTRAP) then
@@ -2055,7 +2055,7 @@ contains
             end do
         end if
 
-        ! Populating the cell-boundary and center locations buffer at bc_x%end
+        ! the cell-boundary and center locations buffer at bc_x%end
         do i = 1, offset_x%end
             x_cb(m + i) = x_cb(m + (i - 1)) + dx(m + i)
         end do
@@ -2063,11 +2063,11 @@ contains
         do i = 1, buff_size
             x_cc(m + i) = x_cc(m + (i - 1)) + (dx(m + (i - 1)) + dx(m + i))/2._wp
         end do
-        ! END: Population of Buffers in x-direction
+        ! Population of Buffers in x-direction
 
-        ! Population of Buffers in y-direction
+        ! of Buffers in y-direction
 
-        ! Populating cell-width distribution buffer at bc_y%beg
+        ! cell-width distribution buffer at bc_y%beg
         if (n == 0) then
             return
         elseif (bc_y%beg >= 0) then
@@ -2086,7 +2086,7 @@ contains
             end do
         end if
 
-        ! Computing the cell-boundary and center locations buffer at bc_y%beg
+        ! the cell-boundary and center locations buffer at bc_y%beg
         do i = 1, offset_y%beg
             y_cb(-1 - i) = y_cb(-i) - dy(-i)
         end do
@@ -2095,7 +2095,7 @@ contains
             y_cc(-i) = y_cc(1 - i) - (dy(1 - i) + dy(-i))/2._wp
         end do
 
-        ! Populating the cell-width distribution buffer at bc_y%end
+        ! the cell-width distribution buffer at bc_y%end
         if (bc_y%end >= 0) then
             call s_mpi_sendrecv_grid_variables_buffers(2, 1)
         elseif (bc_y%end <= BC_GHOST_EXTRAP) then
@@ -2112,7 +2112,7 @@ contains
             end do
         end if
 
-        ! Populating the cell-boundary and center locations buffer at bc_y%end
+        ! the cell-boundary and center locations buffer at bc_y%end
         do i = 1, offset_y%end
             y_cb(n + i) = y_cb(n + (i - 1)) + dy(n + i)
         end do
@@ -2120,11 +2120,11 @@ contains
         do i = 1, buff_size
             y_cc(n + i) = y_cc(n + (i - 1)) + (dy(n + (i - 1)) + dy(n + i))/2._wp
         end do
-        ! END: Population of Buffers in y-direction
+        ! Population of Buffers in y-direction
 
-        ! Population of Buffers in z-direction
+        ! of Buffers in z-direction
 
-        ! Populating cell-width distribution buffer at bc_z%beg
+        ! cell-width distribution buffer at bc_z%beg
         if (p == 0) then
             return
         elseif (Bc_z%beg >= 0) then
@@ -2143,7 +2143,7 @@ contains
             end do
         end if
 
-        ! Computing the cell-boundary and center locations buffer at bc_z%beg
+        ! the cell-boundary and center locations buffer at bc_z%beg
         do i = 1, offset_z%beg
             z_cb(-1 - i) = z_cb(-i) - dz(-i)
         end do
@@ -2152,7 +2152,7 @@ contains
             z_cc(-i) = z_cc(1 - i) - (dz(1 - i) + dz(-i))/2._wp
         end do
 
-        ! Populating the cell-width distribution buffer at bc_z%end
+        ! the cell-width distribution buffer at bc_z%end
         if (bc_z%end >= 0) then
             call s_mpi_sendrecv_grid_variables_buffers(3, 1)
         elseif (bc_z%end <= BC_GHOST_EXTRAP) then
@@ -2169,7 +2169,7 @@ contains
             end do
         end if
 
-        ! Populating the cell-boundary and center locations buffer at bc_z%end
+        ! the cell-boundary and center locations buffer at bc_z%end
         do i = 1, offset_z%end
             z_cb(p + i) = z_cb(p + (i - 1)) + dz(p + i)
         end do
@@ -2177,7 +2177,7 @@ contains
         do i = 1, buff_size
             z_cc(p + i) = z_cc(p + (i - 1)) + (dz(p + (i - 1)) + dz(p + i))/2._wp
         end do
-        ! END: Population of Buffers in z-direction
+        ! Population of Buffers in z-direction
 
 #endif
 

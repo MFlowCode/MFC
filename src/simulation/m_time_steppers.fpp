@@ -1,16 +1,16 @@
 !>
-!! @file m_time_steppers.f90
-!! @brief Contains module m_time_steppers
+!!
+!! module m_time_steppers
 
 #:include 'macros.fpp'
 #:include 'case.fpp'
 
 !> @brief The following module features a variety of time-stepping schemes.
-!!              Currently, it includes the following Runge-Kutta (RK) algorithms:
-!!                   1) 1st Order TVD RK
-!!                   2) 2nd Order TVD RK
-!!                   3) 3rd Order TVD RK
-!!              where TVD designates a total-variation-diminishing time-stepper.
+!! includes the following Runge-Kutta (RK) algorithms:
+!! Order TVD RK
+!! Order TVD RK
+!! Order TVD RK
+!! designates a total-variation-diminishing time-stepper.
 module m_time_steppers
 
     use m_derived_types        !< Definitions of the derived types
@@ -52,31 +52,31 @@ module m_time_steppers
     implicit none
 
     type(vector_field), allocatable, dimension(:) :: q_cons_ts !<
-    !! Cell-average conservative variables at each time-stage (TS)
+    !! variables at each time-stage (TS)
 
     type(scalar_field), allocatable, dimension(:) :: q_prim_vf !<
-    !! Cell-average primitive variables at the current time-stage
+    !! variables at the current time-stage
 
     type(scalar_field), allocatable, dimension(:) :: rhs_vf !<
-    !! Cell-average RHS variables at the current time-stage
+    !! variables at the current time-stage
 
     type(integer_field), allocatable, dimension(:, :) :: bc_type !<
-    !! Boundary condition identifiers
+    !! identifiers
 
     type(vector_field), allocatable, dimension(:) :: q_prim_ts1, q_prim_ts2 !<
-    !! Cell-average primitive variables at consecutive TIMESTEPS
+    !! variables at consecutive TIMESTEPS
 
     real(wp), allocatable, dimension(:, :, :, :, :) :: rhs_pb
 
     type(scalar_field) :: q_T_sf !<
-    !! Cell-average temperature variables at the current time-stage
+    !! variables at the current time-stage
 
     real(wp), allocatable, dimension(:, :, :, :, :) :: rhs_mv
 
     real(wp), allocatable, dimension(:, :, :) :: max_dt
 
     integer, private :: num_ts !<
-    !! Number of time stages in the time-stepping scheme
+    !! time stages in the time-stepping scheme
 
     integer :: stor !< storage index
     real(wp), allocatable, dimension(:, :) :: rk_coef
@@ -84,6 +84,7 @@ module m_time_steppers
 
     $:GPU_DECLARE(create='[q_cons_ts,q_prim_vf,q_T_sf,rhs_vf,q_prim_ts1,q_prim_ts2,rhs_mv,rhs_pb,max_dt,rk_coef,stor,bc_type]')
 
+!> @cond
 #if defined(__NVCOMPILER_GPU_UNIFIED_MEM)
     real(stp), allocatable, dimension(:, :, :, :), pinned, target :: q_cons_ts_pool_host
 #elif defined(FRONTIER_UNIFIED)
@@ -92,12 +93,13 @@ module m_time_steppers
     integer(kind=8) :: pool_size
     type(c_ptr) :: cptr_host, cptr_device
 #endif
+!> @endcond
 
 contains
 
     !> The computation of parameters, the allocation of memory,
-        !!      the association of pointers and/or the execution of any
-        !!      other procedures that are necessary to setup the module.
+        !! of pointers and/or the execution of any
+        !! that are necessary to setup the module.
     impure subroutine s_initialize_time_steppers_module
 #ifdef FRONTIER_UNIFIED
         use hipfort
@@ -109,7 +111,7 @@ contains
 #endif
         integer :: i, j !< Generic loop iterators
 
-        ! Setting number of time-stages for selected time-stepping scheme
+        ! number of time-stages for selected time-stepping scheme
         if (time_stepper == 1) then
             num_ts = 1
         elseif (any(time_stepper == (/2, 3/))) then
@@ -120,7 +122,7 @@ contains
             num_probe_ts = 2
         end if
 
-        ! Allocating the cell-average conservative variables
+        ! the cell-average conservative variables
         @:ALLOCATE(q_cons_ts(1:num_ts))
         @:PREFER_GPU(q_cons_ts)
 
@@ -131,7 +133,7 @@ contains
 
 #if defined(__NVCOMPILER_GPU_UNIFIED_MEM)
         if (num_ts == 2 .and. nv_uvm_out_of_core) then
-            ! host allocation for q_cons_ts(2)%vf(j)%sf for all j
+            ! allocation for q_cons_ts(2)%vf(j)%sf for all j
             allocate (q_cons_ts_pool_host(idwbuff(1)%beg:idwbuff(1)%end, &
                                           idwbuff(2)%beg:idwbuff(2)%end, &
                                           idwbuff(3)%beg:idwbuff(3)%end, &
@@ -139,14 +141,14 @@ contains
         end if
 
         do j = 1, sys_size
-            ! q_cons_ts(1) lives on the device
+            ! lives on the device
             @:ALLOCATE(q_cons_ts(1)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                 idwbuff(2)%beg:idwbuff(2)%end, &
                 idwbuff(3)%beg:idwbuff(3)%end))
             @:PREFER_GPU(q_cons_ts(1)%vf(j)%sf)
             if (num_ts == 2) then
                 if (nv_uvm_out_of_core) then
-                    ! q_cons_ts(2) lives on the host
+                    ! lives on the host
                     q_cons_ts(2)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                                           idwbuff(2)%beg:idwbuff(2)%end, &
                                           idwbuff(3)%beg:idwbuff(3)%end) => q_cons_ts_pool_host(:, :, :, j)
@@ -163,8 +165,8 @@ contains
             @:ACC_SETUP_VFs(q_cons_ts(i))
         end do
 #elif defined(FRONTIER_UNIFIED)
-        ! Allocate to memory regions using hip calls
-        ! that we will attach pointers to
+        ! to memory regions using hip calls
+        ! we will attach pointers to
         do i = 1, 3
             pool_dims(i) = idwbuff(i)%end - idwbuff(i)%beg + 1
             pool_starts(i) = idwbuff(i)%beg
@@ -181,15 +183,15 @@ contains
         call c_f_pointer(cptr_host, q_cons_ts_pool_host, shape=pool_dims)
         q_cons_ts_pool_host(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:) => q_cons_ts_pool_host
 #else
-        ! Doing hipMalloc then mapping should be most performant
+        ! hipMalloc then mapping should be most performant
         call hipCheck(hipMalloc(q_cons_ts_pool_device, dims8=pool_dims, lbounds8=pool_starts))
-        ! Without this map CCE will still create a device copy, because it's silly like that
+        ! this map CCE will still create a device copy, because it's silly like that
 #if defined(MFC_OpenACC)
         call acc_map_data(q_cons_ts_pool_device, c_loc(q_cons_ts_pool_device), c_sizeof(q_cons_ts_pool_device))
 #endif
-        ! CCE see it can access this and will leave it on the host. It will stay on the host so long as HSA_XNACK=1
-        ! NOTE: WE CANNOT DO ATOMICS INTO THIS MEMORY. We have to change a property to use atomics here
-        ! Otherwise leaving this as fine-grained will actually help performance since it can't be cached in GPU L2
+        ! see it can access this and will leave it on the host. It will stay on the host so long as HSA_XNACK=1
+        ! WE CANNOT DO ATOMICS INTO THIS MEMORY. We have to change a property to use atomics here
+        ! leaving this as fine-grained will actually help performance since it can't be cached in GPU L2
         if (num_ts == 2) then
             call hipCheck(hipMallocManaged(q_cons_ts_pool_host, dims8=pool_dims, lbounds8=pool_starts, flags=hipMemAttachGlobal))
 #if defined(MFC_OpenMP)
@@ -199,12 +201,12 @@ contains
 #endif
 
         do j = 1, sys_size
-            ! q_cons_ts(1) lives on the device
+            ! lives on the device
             q_cons_ts(1)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                                   idwbuff(2)%beg:idwbuff(2)%end, &
                                   idwbuff(3)%beg:idwbuff(3)%end) => q_cons_ts_pool_device(:, :, :, j)
             if (num_ts == 2) then
-                ! q_cons_ts(2) lives on the host
+                ! lives on the host
                 q_cons_ts(2)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                                       idwbuff(2)%beg:idwbuff(2)%end, &
                                       idwbuff(3)%beg:idwbuff(3)%end) => q_cons_ts_pool_host(:, :, :, j)
@@ -228,7 +230,7 @@ contains
         end do
 #endif
 
-        ! Allocating the cell-average primitive ts variables
+        ! the cell-average primitive ts variables
         if (probe_wrt) then
             @:ALLOCATE(q_prim_ts1(1:num_probe_ts))
 
@@ -261,7 +263,7 @@ contains
             end do
         end if
 
-        ! Allocating the cell-average primitive variables
+        ! the cell-average primitive variables
         @:ALLOCATE(q_prim_vf(1:sys_size))
 
         if (.not. igr) then
@@ -440,7 +442,7 @@ contains
             @:ALLOCATE(rhs_mv(0,0,0,0,0))
         end if
 
-        ! Allocating the cell-average RHS variables
+        ! the cell-average RHS variables
         @:ALLOCATE(rhs_vf(1:sys_size))
         @:PREFER_GPU(rhs_vf)
 
@@ -457,7 +459,7 @@ contains
             end do
         end if
 
-        ! Opening and writing the header of the run-time information file
+        ! and writing the header of the run-time information file
         if (proc_rank == 0 .and. run_time_info) then
             call s_open_run_time_information_file()
         end if
@@ -466,7 +468,7 @@ contains
             @:ALLOCATE(max_dt(0:m, 0:n, 0:p))
         end if
 
-        ! Allocating arrays to store the bc types
+        ! arrays to store the bc types
         @:ALLOCATE(bc_type(1:num_dims,1:2))
 
         @:ALLOCATE(bc_type(1,1)%sf(0:0,0:n,0:p))
@@ -491,14 +493,14 @@ contains
         end do
 
         if (any(time_stepper == (/1, 2, 3/))) then
-            ! temporary array index for TVD RK
+            ! array index for TVD RK
             if (time_stepper == 1) then
                 stor = 1
             else
                 stor = 2
             end if
 
-            ! TVD RK coefficients
+            ! RK coefficients
             @:ALLOCATE (rk_coef(time_stepper, 4))
             if (time_stepper == 1) then
                 rk_coef(1, :) = (/1._wp, 0._wp, 1._wp, 1._wp/)
@@ -530,7 +532,7 @@ contains
         call cpu_time(start)
         call nvtxStartRange("TIMESTEP")
 
-        ! Adaptive dt: initial stage
+        ! dt: initial stage
         if (adap_dt) call s_adaptive_dt_bubble(1)
 
         do s = 1, nstage
@@ -625,12 +627,12 @@ contains
             if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
 
             if (ib) then
-                ! check if any IBMS are moving, and if so, update the markers, ghost points, levelsets, and levelset norms
+                ! if any IBMS are moving, and if so, update the markers, ghost points, levelsets, and levelset norms
                 if (moving_immersed_boundary_flag) then
                     call s_propagate_immersed_boundaries(s)
                 end if
 
-                ! update the ghost fluid properties point values based on IB state
+                ! the ghost fluid properties point values based on IB state
                 if (qbmm .and. .not. polytropic) then
                     call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
                 else
@@ -640,7 +642,7 @@ contains
 
         end do
 
-        ! Adaptive dt: final stage
+        ! dt: final stage
         if (adap_dt) call s_adaptive_dt_bubble(3)
 
         call nvtxEndRange
@@ -657,7 +659,7 @@ contains
     end subroutine s_tvd_rk
 
     !> Bubble source part in Strang operator splitting scheme
-        !! @param t_step Current time-step
+        !! Current time-step
     impure subroutine s_adaptive_dt_bubble(stage)
 
         integer, intent(in) :: stage
@@ -735,7 +737,7 @@ contains
                         call s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, j, k, l)
                     end if
 
-                    ! Compute mixture sound speed
+                    ! mixture sound speed
                     call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, 0._wp, c, qv)
 
                     call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, j, k, l)
@@ -758,15 +760,18 @@ contains
 
     end subroutine s_compute_dt
 
-    !> This subroutine applies the body forces source term at each
-        !! Runge-Kutta stage
+    !> This subroutine applies the body forces source term at each Runge-Kutta stage.
+        !! @param[inout] q_cons_vf Conservative variables to update.
+        !! @param[in] q_prim_vf_in Primitive variables for computing source terms.
+        !! @param[inout] rhs_vf_in Right-hand side vector for body force terms.
+        !! @param[in] ldt Local time step size.
     subroutine s_apply_bodyforces(q_cons_vf, q_prim_vf_in, rhs_vf_in, ldt)
 
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_cons_vf
         type(scalar_field), dimension(1:sys_size), intent(in) :: q_prim_vf_in
         type(scalar_field), dimension(1:sys_size), intent(inout) :: rhs_vf_in
 
-        real(wp), intent(in) :: ldt !< local dt
+        real(wp), intent(in) :: ldt
 
         integer :: i, j, k, l
 
@@ -813,28 +818,28 @@ contains
                 patch_ib(i)%angular_vel = (rk_coef(s, 1)*patch_ib(i)%step_angular_vel + rk_coef(s, 2)*patch_ib(i)%angular_vel)/rk_coef(s, 4)
 
                 if (patch_ib(i)%moving_ibm == 1) then
-                    ! plug in analytic velocities for 1-way coupling, if it exists
+                    ! in analytic velocities for 1-way coupling, if it exists
                     @:mib_analytical()
                 else if (patch_ib(i)%moving_ibm == 2) then ! if we are using two-way coupling, apply force and torque
-                    ! compute the force and torque on the IB from the fluid
+                    ! the force and torque on the IB from the fluid
                     if (.not. forces_computed) then
                         call s_compute_ib_forces(q_prim_vf, fluid_pp)
                         forces_computed = .true.
                     end if
 
-                    ! update the velocity from the force value
+                    ! the velocity from the force value
                     patch_ib(i)%vel = patch_ib(i)%vel + rk_coef(s, 3)*dt*(patch_ib(i)%force/patch_ib(i)%mass)/rk_coef(s, 4)
 
-                    ! update the angular velocity with the torque value
+                    ! the angular velocity with the torque value
                     patch_ib(i)%angular_vel = (patch_ib(i)%angular_vel*patch_ib(i)%moment) + (rk_coef(s, 3)*dt*patch_ib(i)%torque/rk_coef(s, 4)) ! add the torque to the angular momentum
                     call s_compute_moment_of_inertia(i, patch_ib(i)%angular_vel) ! update the moment of inertia to be based on the direction of the angular momentum
                     patch_ib(i)%angular_vel = patch_ib(i)%angular_vel/patch_ib(i)%moment ! convert back to angular velocity with the new moment of inertia
                 end if
 
-                ! Update the angle of the IB
+                ! the angle of the IB
                 patch_ib(i)%angles = (rk_coef(s, 1)*patch_ib(i)%step_angles + rk_coef(s, 2)*patch_ib(i)%angles + rk_coef(s, 3)*patch_ib(i)%angular_vel*dt)/rk_coef(s, 4)
 
-                ! Update the position of the IB
+                ! the position of the IB
                 patch_ib(i)%x_centroid = (rk_coef(s, 1)*patch_ib(i)%step_x_centroid + rk_coef(s, 2)*patch_ib(i)%x_centroid + rk_coef(s, 3)*patch_ib(i)%vel(1)*dt)/rk_coef(s, 4)
                 patch_ib(i)%y_centroid = (rk_coef(s, 1)*patch_ib(i)%step_y_centroid + rk_coef(s, 2)*patch_ib(i)%y_centroid + rk_coef(s, 3)*patch_ib(i)%vel(2)*dt)/rk_coef(s, 4)
                 patch_ib(i)%z_centroid = (rk_coef(s, 1)*patch_ib(i)%step_z_centroid + rk_coef(s, 2)*patch_ib(i)%z_centroid + rk_coef(s, 3)*patch_ib(i)%vel(3)*dt)/rk_coef(s, 4)
@@ -846,8 +851,8 @@ contains
     end subroutine s_propagate_immersed_boundaries
 
     !> This subroutine saves the temporary q_prim_vf vector
-        !!      into the q_prim_ts vector that is then used in p_main
-        !! @param t_step current time-step
+        !! q_prim_ts vector that is then used in p_main
+        !! current time-step
     subroutine s_time_step_cycling(t_step)
 
         integer, intent(in) :: t_step
@@ -930,7 +935,7 @@ contains
 #endif
         integer :: i, j !< Generic loop iterators
 
-        ! Deallocating the cell-average conservative variables
+        ! the cell-average conservative variables
 #if defined(__NVCOMPILER_GPU_UNIFIED_MEM)
         do j = 1, sys_size
             @:DEALLOCATE(q_cons_ts(1)%vf(j)%sf)
@@ -973,7 +978,7 @@ contains
 
         @:DEALLOCATE(q_cons_ts)
 
-        ! Deallocating the cell-average primitive ts variables
+        ! the cell-average primitive ts variables
         if (probe_wrt) then
             do i = 1, num_probe_ts
                 do j = 1, sys_size
@@ -985,7 +990,7 @@ contains
         end if
 
         if (.not. igr) then
-            ! Deallocating the cell-average primitive variables
+            ! the cell-average primitive variables
             do i = 1, adv_idx%end
                 @:DEALLOCATE(q_prim_vf(i)%sf)
             end do
@@ -1031,14 +1036,14 @@ contains
 
         @:DEALLOCATE(q_prim_vf)
 
-        ! Deallocating the cell-average RHS variables
+        ! the cell-average RHS variables
         do i = 1, sys_size
             @:DEALLOCATE(rhs_vf(i)%sf)
         end do
 
         @:DEALLOCATE(rhs_vf)
 
-        ! Writing the footer of and closing the run-time information file
+        ! the footer of and closing the run-time information file
         if (proc_rank == 0 .and. run_time_info) then
             call s_close_run_time_information_file()
         end if

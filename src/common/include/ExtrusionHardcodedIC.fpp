@@ -63,13 +63,13 @@
             fileNames(f) = trim(init_dir)//"prim."//trim(file_num_str)//".00."//zeros_default//".dat"
         end do
 
-        ! Common file reading setup
+        ! file reading setup
         open (newunit=unit2, file=trim(fileNames(1)), status='old', action='read', iostat=ios2)
         if (ios2 /= 0) call s_mpi_abort("Error opening file: "//trim(fileNames(1)))
 
         select case (num_dims)
         case (1, 2)  ! 1D and 2D cases are similar
-            ! Count lines
+            ! lines
             line_count = 0
             do
                 read (unit2, *, iostat=ios2) dummy_x, dummy_y
@@ -84,7 +84,7 @@
             if (num_dims == 2) index_x = i
             @:ALLOCATE (x_coords(xRows), stored_values(xRows, 1, sys_size))
 
-            ! Read data from all files
+            ! data from all files
             do f = 1, max_files
                 open (newunit=unit, file=trim(fileNames(f)), status='old', action='read', iostat=ios)
                 if (ios /= 0) call s_mpi_abort("Error opening file: "//trim(fileNames(f)))
@@ -96,7 +96,7 @@
                 close (unit)
             end do
 
-            ! Calculate offsets
+            ! offsets
             domain_xstart = x_coords(1)
             x_step = x_cc(1) - x_cc(0)
             delta_x = merge(x_cc(0) - domain_xstart + x_step/2.0, &
@@ -104,7 +104,7 @@
             global_offset_x = nint(abs(delta_x)/x_step)
 
         case (3)  ! 3D case - determine grid structure
-            ! Find yRows by counting rows with same x
+            ! yRows by counting rows with same x
             read (unit2, *, iostat=ios2) x0, y0, dummy_z
             if (ios2 /= 0) call s_mpi_abort("Error reading first line")
 
@@ -120,7 +120,7 @@
             end do
             close (unit2)
 
-            ! Count total rows
+            ! total rows
             open (newunit=unit2, file=trim(fileNames(1)), status='old', action='read', iostat=ios2)
             nrows = 0
             do
@@ -135,7 +135,7 @@
             index_x = i
             index_y = j
 
-            ! Read all files
+            ! all files
             do f = 1, max_files
                 open (newunit=unit, file=trim(fileNames(f)), status='old', action='read', iostat=ios)
                 if (ios /= 0) then
@@ -158,7 +158,7 @@
                 close (unit)
             end do
 
-            ! Calculate offsets
+            ! offsets
             x_step = x_cc(1) - x_cc(0)
             y_step = y_cc(1) - y_cc(0)
             delta_x = x_cc(index_x) - x_coords(1) + x_step/2.0_wp
@@ -170,7 +170,7 @@
         files_loaded = .true.
     end if
 
-    ! Data assignment
+    ! assignment
     select case (num_dims)
     case (1)
         idx = i + 1 + global_offset_x

@@ -2,8 +2,8 @@
 #:include 'macros.fpp'
 
 !>
-!! @file m_helper.f90
-!! @brief Contains module m_helper
+!!
+!! module m_helper
 
 module m_helper
 
@@ -46,9 +46,9 @@ module m_helper
 contains
 
     !> Computes the bubble number density n from the primitive variables
-        !! @param vftmp is the void fraction
-        !! @param Rtmp is the  bubble radii
-        !! @param ntmp is the output number bubble density
+        !! is the void fraction
+        !! is the  bubble radii
+        !! is the output number bubble density
     subroutine s_comp_n_from_prim(vftmp, Rtmp, ntmp, weights)
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: vftmp
@@ -108,12 +108,12 @@ contains
     end subroutine s_print_2D_array
 
     !>
-          !! bubbles_euler + polytropic
-          !! bubbles_euler + non-polytropic
-          !! bubbles_lagrange + non-polytropic
+          !! polytropic
+          !! non-polytropic
+          !! non-polytropic
     impure subroutine s_initialize_bubbles_model()
 
-        ! Allocate memory
+        ! memory
         if (bubbles_euler) then
             @:ALLOCATE(weight(nb), R0(nb))
             if (.not. polytropic) then
@@ -123,7 +123,7 @@ contains
                 @:ALLOCATE(pb0(nb))
             end if
 
-            ! Compute quadrature weights and nodes for polydisperse simulations
+            ! quadrature weights and nodes for polydisperse simulations
             if (nb > 1) then
                 call s_simpson(weight, R0)
             else if (nb == 1) then
@@ -135,7 +135,7 @@ contains
             R0 = R0*bub_pp%R0ref
         end if
 
-        ! Initialize bubble variables
+        ! bubble variables
         call s_initialize_bubble_vars()
 
     end subroutine s_initialize_bubbles_model
@@ -161,7 +161,7 @@ contains
             k_vl = bub_pp%k_v; k_gl = bub_pp%k_g
         end if
 
-        ! Input quantities
+        ! quantities
         if (bubbles_euler .and. (.not. polytropic)) then
             if (thermal == 2) then
                 gam_m = 1._wp
@@ -170,7 +170,7 @@ contains
             end if
         end if
 
-        ! Nondimensional numbers
+        ! numbers
         Eu = p0ref
         Ca = Eu - pv
         if (.not. f_is_default(bub_pp%ss)) Web = 1._wp/ss
@@ -178,11 +178,11 @@ contains
         if (.not. polytropic) Pe_c = 1._wp/vd
 
         if (bubbles_euler) then
-            ! Initialize variables for non-polytropic (Preston) model
+            ! variables for non-polytropic (Preston) model
             if (.not. polytropic) then
                 call s_initialize_nonpoly()
             end if
-            ! Initialize pb based on surface tension for qbmm (polytropic)
+            ! pb based on surface tension for qbmm (polytropic)
             if (qbmm .and. polytropic) then
                 pb0 = Eu
                 if (.not. f_is_default(Web)) then
@@ -199,44 +199,44 @@ contains
         real(wp), dimension(nb) :: chi_vw0, cp_m0, k_m0, rho_m0, x_vw, omegaN, rhol0
 
         real(wp), parameter :: k_poly = 1._wp !<
-            !! polytropic index used to compute isothermal natural frequency
+            !! used to compute isothermal natural frequency
 
-        ! phi_vg & phi_gv (phi_gg = phi_vv = 1) (Eq. 2.22 in Ando 2010)
+        ! & phi_gv (phi_gg = phi_vv = 1) (Eq. 2.22 in Ando 2010)
         phi_vg = (1._wp + sqrt(mu_v/mu_g)*(M_g/M_v)**(0.25_wp))**2 &
                  /(sqrt(8._wp)*sqrt(1._wp + M_v/M_g))
         phi_gv = (1._wp + sqrt(mu_g/mu_v)*(M_v/M_g)**(0.25_wp))**2 &
                  /(sqrt(8._wp)*sqrt(1._wp + M_g/M_v))
 
-        ! internal bubble pressure
+        ! bubble pressure
         pb0 = Eu + 2._wp/Web/R0
 
-        ! mass fraction of vapor (Eq. 2.19 in Ando 2010)
+        ! fraction of vapor (Eq. 2.19 in Ando 2010)
         chi_vw0 = 1._wp/(1._wp + R_v/R_g*(pb0/pv - 1._wp))
 
-        ! specific heat for gas/vapor mixture
+        ! heat for gas/vapor mixture
         cp_m0 = chi_vw0*R_v*gam_v/(gam_v - 1._wp) &
                 + (1._wp - chi_vw0)*R_g*gam_g/(gam_g - 1._wp)
 
-        ! mole fraction of vapor (Eq. 2.23 in Ando 2010)
+        ! fraction of vapor (Eq. 2.23 in Ando 2010)
         x_vw = M_g*chi_vw0/(M_v + (M_g - M_v)*chi_vw0)
 
-        ! thermal conductivity for gas/vapor mixture (Eq. 2.21 in Ando 2010)
+        ! conductivity for gas/vapor mixture (Eq. 2.21 in Ando 2010)
         k_m0 = x_vw*k_v/(x_vw + (1._wp - x_vw)*phi_vg) &
                + (1._wp - x_vw)*k_g/(x_vw*phi_gv + 1._wp - x_vw)
         k_g(:) = k_g(:)/k_m0(:)
         k_v(:) = k_v(:)/k_m0(:)
 
-        ! mixture density (Eq. 2.20 in Ando 2010)
+        ! density (Eq. 2.20 in Ando 2010)
         rho_m0 = pv/(chi_vw0*R_v*Tw)
 
-        ! mass of gas/vapor
+        ! of gas/vapor
         mass_g0(:) = (4._wp*pi/3._wp)*(pb0(:) - pv)/(R_g*Tw)*R0(:)**3
         mass_v0(:) = (4._wp*pi/3._wp)*pv/(R_v*Tw)*R0(:)**3
 
-        ! Peclet numbers
+        ! numbers
         Pe_T(:) = rho_m0*cp_m0(:)/k_m0(:)
 
-        ! natural frequencies (Eq. B.1)
+        ! frequencies (Eq. B.1)
         omegaN(:) = sqrt(3._wp*k_poly*Ca + 2._wp*(3._wp*k_poly - 1._wp)/(Web*R0))/R0/sqrt(rho0ref)
         do ir = 1, nb
             call s_transcoeff(omegaN(ir)*R0(ir), Pe_T(ir)*R0(ir), &
@@ -249,10 +249,10 @@ contains
     end subroutine s_initialize_nonpoly
 
     !> Computes the transfer coefficient for the non-polytropic bubble compression process
-        !! @param omega natural frequencies
-        !! @param peclet Peclet number
-        !! @param Re_trans Real part of the transport coefficients
-        !! @param Im_trans Imaginary part of the transport coefficients
+        !! natural frequencies
+        !! Peclet number
+        !! Real part of the transport coefficients
+        !! Imaginary part of the transport coefficients
     elemental subroutine s_transcoeff(omega, peclet, Re_trans, Im_trans)
 
         real(wp), intent(in) :: omega, peclet
@@ -294,7 +294,7 @@ contains
         R0mn = 0.8_wp*exp(-2.8_wp*sd)
         R0mx = 0.2_wp*exp(9.5_wp*sd) + 1._wp
 
-        ! phi = ln( R0 ) & return R0
+        ! = ln( R0 ) & return R0
         do ir = 1, nb
             phi(ir) = log(R0mn) &
                       + (ir - 1._wp)*log(R0mx/R0mn)/(nb - 1._wp)
@@ -305,9 +305,9 @@ contains
             dphi = phi(2) - phi(1)
         #:endif
 
-        ! weights for quadrature using Simpson's rule
+        ! for quadrature using Simpson's rule
         do ir = 2, nb - 1
-            ! Gaussian
+            !
             tmp = exp(-0.5_wp*(phi(ir)/sd)**2)/sqrt(2._wp*pi)/sd
             if (mod(ir, 2) == 0) then
                 local_weight(ir) = tmp*4._wp*dphi/3._wp
@@ -323,9 +323,9 @@ contains
     end subroutine s_simpson
 
     !> This procedure computes the cross product of two vectors.
-    !! @param a First vector.
-    !! @param b Second vector.
-    !! @return The cross product of the two vectors.
+    !! First vector.
+    !! Second vector.
+    !! cross product of the two vectors.
     pure function f_cross(a, b) result(c)
 
         real(wp), dimension(3), intent(in) :: a, b
@@ -337,8 +337,8 @@ contains
     end function f_cross
 
     !> This procedure swaps two real numbers.
-    !! @param lhs Left-hand side.
-    !! @param rhs Right-hand side.
+    !! Left-hand side.
+    !! Right-hand side.
     elemental subroutine s_swap(lhs, rhs)
 
         real(wp), intent(inout) :: lhs, rhs
@@ -350,8 +350,8 @@ contains
     end subroutine s_swap
 
     !> This procedure creates a transformation matrix.
-    !! @param  p Parameters for the transformation.
-    !! @return Transformation matrix.
+    !! Parameters for the transformation.
+    !! matrix.
     function f_create_transform_matrix(param, center) result(out_matrix)
 
         type(ic_model_parameters), intent(in) :: param
@@ -389,14 +389,14 @@ contains
                                0._wp, 0._wp, 0._wp, 1._wp], shape(tr)))
 
         if (present(center)) then
-            ! Translation matrix to move center to the origin
+            ! matrix to move center to the origin
             t_to_origin = transpose(reshape([ &
                                             1._wp, 0._wp, 0._wp, -center(1), &
                                             0._wp, 1._wp, 0._wp, -center(2), &
                                             0._wp, 0._wp, 1._wp, -center(3), &
                                             0._wp, 0._wp, 0._wp, 1._wp], shape(tr)))
 
-            ! Translation matrix to move center back to original position
+            ! matrix to move center back to original position
             t_back = transpose(reshape([ &
                                        1._wp, 0._wp, 0._wp, center(1), &
                                        0._wp, 1._wp, 0._wp, center(2), &
@@ -411,8 +411,8 @@ contains
     end function f_create_transform_matrix
 
     !> This procedure transforms a vector by a matrix.
-    !! @param vec Vector to transform.
-    !! @param matrix Transformation matrix.
+    !! Vector to transform.
+    !! Transformation matrix.
     subroutine s_transform_vec(vec, matrix)
 
         real(wp), dimension(1:3), intent(inout) :: vec
@@ -426,8 +426,8 @@ contains
     end subroutine s_transform_vec
 
     !> This procedure transforms a triangle by a matrix, one vertex at a time.
-    !! @param triangle Triangle to transform.
-    !! @param matrix   Transformation matrix.
+    !! Triangle to transform.
+    !!   Transformation matrix.
     subroutine s_transform_triangle(triangle, matrix, matrix_n)
 
         type(t_triangle), intent(inout) :: triangle
@@ -444,8 +444,8 @@ contains
     end subroutine s_transform_triangle
 
     !> This procedure transforms a model by a matrix, one triangle at a time.
-    !! @param model  Model to transform.
-    !! @param matrix Transformation matrix.
+    !!  Model to transform.
+    !! Transformation matrix.
     subroutine s_transform_model(model, matrix, matrix_n)
 
         type(t_model), intent(inout) :: model
@@ -460,8 +460,8 @@ contains
     end subroutine s_transform_model
 
     !> This procedure creates a bounding box for a model.
-    !! @param model Model to create bounding box for.
-    !! @return Bounding box.
+    !! Model to create bounding box for.
+    !! box.
     function f_create_bbox(model) result(bbox)
 
         type(t_model), intent(in) :: model
@@ -488,9 +488,9 @@ contains
     end function f_create_bbox
 
     !> This procedure performs xor on lhs and rhs.
-    !! @param lhs logical input.
-    !! @param rhs other logical input.
-    !! @return xored result.
+    !! logical input.
+    !! other logical input.
+    !! result.
     elemental function f_xor(lhs, rhs) result(res)
 
         logical, intent(in) :: lhs, rhs
@@ -500,8 +500,8 @@ contains
     end function f_xor
 
     !> This procedure converts logical to 1 or 0.
-    !! @param perdicate A Logical argument.
-    !! @return 1 if .true., 0 if .false..
+    !! A Logical argument.
+    !! if .true., 0 if .false..
     elemental function f_logical_to_int(predicate) result(int)
 
         logical, intent(in) :: predicate
@@ -515,9 +515,9 @@ contains
     end function f_logical_to_int
 
     !> This function generates the unassociated legendre poynomials
-    !! @param x is the input value
-    !! @param l is the degree
-    !! @return P is the unassociated legendre polynomial evaluated at x
+    !! is the input value
+    !! is the degree
+    !! is the unassociated legendre polynomial evaluated at x
     recursive function unassociated_legendre(x, l) result(result_P)
 
         integer, intent(in) :: l
@@ -535,11 +535,11 @@ contains
     end function unassociated_legendre
 
     !> This function calculates the spherical harmonic function evaluated at x and phi
-    !! @param x is the x coordinate
-    !! @param phi is the phi coordinate
-    !! @param l is the degree
-    !! @param m_order is the order
-    !! @return Y is the spherical harmonic function evaluated at x and phi
+    !! is the x coordinate
+    !! is the phi coordinate
+    !! is the degree
+    !! is the order
+    !! is the spherical harmonic function evaluated at x and phi
     recursive function spherical_harmonic_func(x, phi, l, m_order) result(Y)
 
         integer, intent(in) :: l, m_order
@@ -557,11 +557,11 @@ contains
     end function spherical_harmonic_func
 
     !> This function generates the associated legendre polynomials evaluated
-    !! at x with inputs l and m
-    !! @param x is the input value
-    !! @param l is the degree
-    !! @param m_order is the order
-    !! @return P is the associated legendre polynomial evaluated at x
+    !! with inputs l and m
+    !! is the input value
+    !! is the degree
+    !! is the order
+    !! is the associated legendre polynomial evaluated at x
     recursive function associated_legendre(x, l, m_order) result(result_P)
 
         integer, intent(in) :: l, m_order
@@ -585,8 +585,8 @@ contains
     end function associated_legendre
 
     !> This function calculates the double factorial value of an integer
-    !! @param n_in is the input integer
-    !! @return R is the double factorial value of n
+    !! is the input integer
+    !! is the double factorial value of n
     elemental function double_factorial(n_in) result(R_result)
 
         integer, intent(in) :: n_in
@@ -599,8 +599,8 @@ contains
     end function double_factorial
 
     !> The following function calculates the factorial value of an integer
-    !! @param n_in is the input integer
-    !! @return R is the factorial value of n
+    !! is the input integer
+    !! is the factorial value of n
     elemental function factorial(n_in) result(R_result)
 
         integer, intent(in) :: n_in
@@ -614,11 +614,11 @@ contains
     end function factorial
 
     !> This function calculates a smooth cut-on function that is zero for x values
-    !! smaller than zero and goes to one. It can be used for generating smooth
-    !! initial conditions
-    !! @param x is the input value
-    !! @param eps is the smoothing parameter
-    !! @return fx is the cut-on function evaluated at x
+    !! zero and goes to one. It can be used for generating smooth
+    !!
+    !! is the input value
+    !! is the smoothing parameter
+    !! is the cut-on function evaluated at x
     function f_cut_on(x, eps) result(fx)
 
         real(wp), intent(in) :: x, eps
@@ -629,11 +629,11 @@ contains
     end function f_cut_on
 
     !> This function calculates a smooth cut-off function that is one for x values
-    !! smaller than zero and goes to zero. It can be used for generating smooth
-    !! initial conditions
-    !! @param x is the input value
-    !! @param eps is the smoothing parameter
-    !! @return fx is the cut-ff function evaluated at x
+    !! zero and goes to zero. It can be used for generating smooth
+    !!
+    !! is the input value
+    !! is the smoothing parameter
+    !! is the cut-ff function evaluated at x
     function f_cut_off(x, eps) result(fx)
 
         real(wp), intent(in) :: x, eps
@@ -644,8 +644,8 @@ contains
     end function f_cut_off
 
     !> This function is a helper function for the functions f_cut_on and f_cut_off
-    !! @param x is the input value
-    !! @return gx is the result
+    !! is the input value
+    !! is the result
     function f_gx(x) result(gx)
 
         real(wp), intent(in) :: x
@@ -663,7 +663,7 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf, q_cons_temp
 
-        ! Down sampling variables
+        ! sampling variables
         integer :: i, j, k, l
         integer :: ix, iy, iz, x_id, y_id, z_id
         integer, intent(inout) :: m_ds, n_ds, p_ds, m_glb_ds, n_glb_ds, p_glb_ds

@@ -1,9 +1,9 @@
 !>
-!! @file m_perturbation.fpp
-!! @brief Contains module m_perturbation
+!!
+!! module m_perturbation
 
 !> @brief This module contains subroutines that compute perturbations to the
-!!              initial mean flow fields.
+!! flow fields.
 module m_perturbation
 
     use m_derived_types         ! Definitions of the derived types
@@ -50,11 +50,11 @@ contains
 
                     perturb_alpha = q_prim_vf(E_idx + perturb_sph_fluid)%sf(i, j, k)
 
-                    ! Perturb partial density fields to match perturbed volume fraction fields
-                    !    IF ((perturb_alpha >= 25e-2_wp) .AND. (perturb_alpha <= 75e-2_wp)) THEN
+                    ! partial density fields to match perturbed volume fraction fields
+                    !    ((perturb_alpha >= 25e-2_wp) .AND. (perturb_alpha <= 75e-2_wp)) THEN
                     if ((.not. f_approx_equal(perturb_alpha, 0._wp)) .and. (.not. f_approx_equal(perturb_alpha, 1._wp))) then
 
-                        ! Derive new partial densities
+                        ! new partial densities
                         do l = 1, num_fluids
                             q_prim_vf(l)%sf(i, j, k) = q_prim_vf(E_idx + l)%sf(i, j, k)*fluid_rho(l)
                         end do
@@ -74,7 +74,7 @@ contains
         real(wp) :: rand_real
         call random_seed()
 
-        ! Perturb partial density or velocity of surrounding flow by some random small amount of noise
+        ! partial density or velocity of surrounding flow by some random small amount of noise
         do k = 0, p
             do j = 0, n
                 do i = 0, m
@@ -99,10 +99,10 @@ contains
 
         do q = 1, elliptic_smoothing_iters
 
-            ! Communication of buffer regions and apply boundary conditions
+            ! of buffer regions and apply boundary conditions
             call s_populate_variables_buffers(bc_type, q_prim_vf, pb%sf, mv%sf)
 
-            ! Perform smoothing and store in temp array
+            ! smoothing and store in temp array
             if (n == 0) then
                 do j = 0, m
                     do i = 1, sys_size
@@ -138,7 +138,7 @@ contains
                 end do
             end if
 
-            ! Copy smoothed data back to array of scalar fields
+            ! smoothed data back to array of scalar fields
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -166,14 +166,14 @@ contains
 
         allocate (ofs(nOffsets, num_dims))
 
-        ! Store offsets
+        ! offsets
         do i = 1, num_dims
             do j = 1, num_dims
                 ofs(j, i) = simplex_params%perturb_vel_offset(j, i)
             end do
         end do
 
-        ! Perturb velocities
+        ! velocities
         do i = 1, num_dims
             if (simplex_params%perturb_vel(i)) then
                 freq = simplex_params%perturb_vel_freq(i)
@@ -204,14 +204,14 @@ contains
             end if
         end do
 
-        ! Store offsets
+        ! offsets
         do i = 1, num_dims
             do j = 1, num_fluids
                 ofs(j, i) = simplex_params%perturb_dens_offset(j, i)
             end do
         end do
 
-        ! Perturb densities
+        ! densities
         do i = 1, num_fluids
             if (simplex_params%perturb_dens(i)) then
                 freq = simplex_params%perturb_dens_freq(i)
@@ -240,10 +240,10 @@ contains
     end subroutine s_perturb_simplex
 
     !>  This subroutine computes velocity perturbations for a temporal mixing
-        !!              layer with a hyperbolic tangent mean streamwise velocity
-        !!              profile, using an inverter version of the spectrum-based
-        !!              synthetic turbulence generation method proposed by
-        !!              Guo et al. (2023, JFM).
+        !! a hyperbolic tangent mean streamwise velocity
+        !! an inverter version of the spectrum-based
+        !! generation method proposed by
+        !! al. (2023, JFM).
     subroutine s_perturb_mixlayer(q_prim_vf)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         real(wp), dimension(mixlayer_perturb_nk) :: k, Ek
@@ -252,10 +252,10 @@ contains
         real(wp) :: dk, alpha, Eksum, q, uu0, phi
         integer :: i, j, l, r, ierr
 
-        ! Initialize parameters
+        ! parameters
         dk = 1._wp/mixlayer_perturb_nk
 
-        ! Compute prescribed energy spectra
+        ! prescribed energy spectra
         Eksum = 0._wp
         do i = 1, mixlayer_perturb_nk
             k(i) = dk*i
@@ -263,10 +263,10 @@ contains
             Eksum = Eksum + Ek(i)
         end do
 
-        ! Main loop
+        ! loop
         do r = 0, n
-            ! Compute prescribed Reynolds stress tensor with about half
-            ! magnitude of its self-similar value
+            ! prescribed Reynolds stress tensor with about half
+            ! of its self-similar value
             Rij(:, :) = 0._wp
             uu0 = patch_icpp(1)%vel(1)**2._wp &
                   *(1._wp - tanh(y_cc(r)*mixlayer_vel_coef)**2._wp)
@@ -276,7 +276,7 @@ contains
             Rij(1, 2) = -0.02_wp*uu0
             Rij(2, 1) = Rij(1, 2)
 
-            ! Cholesky decomposition for inhomogeneity and anisotropy
+            ! decomposition for inhomogeneity and anisotropy
             Lmat = 0._wp
             Lmat(1, 1) = sqrt(Rij(1, 1))
             if (abs(Lmat(1, 1)) < sgm_eps) Lmat(1, 1) = sgm_eps
@@ -287,10 +287,10 @@ contains
             Lmat(3, 2) = (Rij(3, 2) - Lmat(3, 1)*Lmat(2, 1))/Lmat(2, 2)
             Lmat(3, 3) = sqrt(Rij(3, 3) - Lmat(3, 1)**2._wp - Lmat(3, 2)**2._wp)
 
-            ! Compute perturbation for each Fourier component
+            ! perturbation for each Fourier component
             do i = 1, mixlayer_perturb_nk
-                ! Generate random numbers for unit wavevector khat,
-                ! random unit vector xi, and random mode phase phi
+                ! random numbers for unit wavevector khat,
+                ! unit vector xi, and random mode phase phi
                 if (proc_rank == 0) then
                     call s_generate_random_perturbation(khat, xi, phi, i, y_cc(r))
                 end if
@@ -301,12 +301,12 @@ contains
                 call MPI_BCAST(phi, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
 #endif
 
-                ! Compute mode direction by two-time cross product
+                ! mode direction by two-time cross product
                 sig_tmp = f_cross(xi, khat)
                 sig_tmp = sig_tmp/sqrt(sum(sig_tmp**2._wp))
                 sig = f_cross(khat, sig_tmp)
 
-                ! Compute perturbation for each grid
+                ! perturbation for each grid
                 do l = 0, p
                     do j = 0, m
                         q = sqrt(Ek(i)/Eksum)
@@ -347,7 +347,7 @@ contains
 
     end subroutine s_generate_random_perturbation
 
-    ! Generate a random unit vector (spherical distribution)
+    ! a random unit vector (spherical distribution)
     function f_unit_vector(theta, eta) result(vec)
         real(wp), intent(in) :: theta, eta
         real(wp) :: zeta, xi
@@ -362,7 +362,7 @@ contains
     end function f_unit_vector
 
     !>  This function generates a pseudo-random number between 0 and 1 based on
-    !!  linear congruential generator.
+    !! generator.
     subroutine s_prng(var, seed)
         integer, intent(inout) :: seed
         real(wp), intent(out) :: var

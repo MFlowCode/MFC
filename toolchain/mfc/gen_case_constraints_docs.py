@@ -282,22 +282,22 @@ def render_playbook_card(entry: PlaybookEntry, summary: Dict[str, Any]) -> str: 
 
     # Links
     lines.append("\n**Related Documentation:**")
-    lines.append(f"- [Model Equations (model_eqns = {summary['model_eqns']})](#-model-equations)")
+    lines.append(f"- [Model Equations (model_eqns = {summary['model_eqns']})](#model-equations)")
 
     if summary['riemann_solver']:
-        lines.append("- [Riemann Solvers](#️-riemann-solvers)")
+        lines.append("- [Riemann Solvers](#riemann-solvers)")
 
     if summary['bubbles_euler'] or summary['bubbles_lagrange']:
-        lines.append("- [Bubble Models](#-bubble-models)")
+        lines.append("- [Bubble Models](#bubble-models)")
 
     if summary['mhd']:
-        lines.append("- [MHD](#magnetohydrodynamics-mhd-mhd)")
+        lines.append("- [MHD](#compat-physics-models)")
 
     if summary['ib']:
-        lines.append("- [Immersed Boundaries](#immersed-boundaries-ib)")
+        lines.append("- [Immersed Boundaries](#compat-geometry)")
 
     if summary['viscous']:
-        lines.append("- [Viscosity](#viscosity-viscous)")
+        lines.append("- [Viscosity](#compat-physics-models)")
 
     lines.append("\n</details>\n")
     return "\n".join(lines)
@@ -310,7 +310,7 @@ def generate_playbook() -> str:
     # Validate examples - will exit(1) if any are missing
     validate_playbook_examples()
 
-    lines.append("## 🧩 Case Design Playbook\n")
+    lines.append("## 🧩 Case Design Playbook {#case-design-playbook}\n")
     lines.append(
         "> **Learn by example:** The cases below are curated from MFC's `examples/` "
         "directory and are validated, working configurations. "
@@ -382,7 +382,7 @@ def render_markdown(rules: Iterable[Rule]) -> str:  # pylint: disable=too-many-l
     }
 
     # 1. Quick Start: Common Configurations
-    lines.append("## 🚀 Common Configuration Patterns\n")
+    lines.append("## 🚀 Common Configuration Patterns {#common-configuration-patterns}\n")
     lines.append("Start with these proven combinations:\n")
     lines.append("")
     lines.append("<details open>")
@@ -426,11 +426,12 @@ def render_markdown(rules: Iterable[Rule]) -> str:  # pylint: disable=too-many-l
     lines.append("</details>\n")
 
     # 2. Feature Compatibility Matrix (simplified, no IGR column)
-    lines.append("## 📊 Feature Compatibility\n")
+    lines.append("## 📊 Feature Compatibility {#feature-compatibility}\n")
     lines.append("What works together:\n")
 
     for category, features in major_features.items():  # pylint: disable=too-many-nested-blocks
-        lines.append(f"\n### {category}\n")
+        cat_id = "compat-" + category.lower().replace(" ", "-")
+        lines.append(f"\n### {category} {{#{cat_id}}}\n")
 
         # Build compatibility info (exclude IGR from incompatibilities)
         compat_info = {}
@@ -492,7 +493,7 @@ def render_markdown(rules: Iterable[Rule]) -> str:  # pylint: disable=too-many-l
         lines.append("")
 
     # 3. Model Equations (data-driven from schema)
-    lines.append("## 🔢 Model Equations\n")
+    lines.append("## 🔢 Model Equations {#model-equations}\n")
     lines.append("Choose your governing equations:\n")
     lines.append("")
 
@@ -561,7 +562,7 @@ def render_markdown(rules: Iterable[Rule]) -> str:  # pylint: disable=too-many-l
         5: {"best_for": "Robust fallback", "requirements": "Not with cylindrical+viscous"},
     }
 
-    lines.append("## ⚙️ Riemann Solvers\n")
+    lines.append("## ⚙️ Riemann Solvers {#riemann-solvers}\n")
     lines.append("| Solver | `riemann_solver` | Best For | Requirements |")
     lines.append("|--------|-----------------|----------|-------------|")
 
@@ -577,7 +578,7 @@ def render_markdown(rules: Iterable[Rule]) -> str:  # pylint: disable=too-many-l
 
     # 5. Bubble Models (data-driven from schema dependencies + curated notes)
     if "bubbles_euler" in by_param or "bubbles_lagrange" in by_param:
-        lines.append("## 💧 Bubble Models\n")
+        lines.append("## 💧 Bubble Models {#bubble-models}\n")
         lines.append("")
 
         # Euler-Euler: inject schema dependency info (data-driven)
@@ -618,7 +619,7 @@ def render_markdown(rules: Iterable[Rule]) -> str:  # pylint: disable=too-many-l
         lines.append("</details>\n")
 
     # 6. Condensed Parameter Reference (auto-collected from schema)
-    lines.append("## 📖 Quick Parameter Reference\n")
+    lines.append("## 📖 Quick Parameter Reference {#quick-parameter-reference}\n")
     lines.append("Key parameters and their constraints:\n")
 
     # Auto-collect all params that have CONSTRAINTS or DEPENDENCIES entries

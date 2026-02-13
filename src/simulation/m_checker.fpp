@@ -1,5 +1,5 @@
 !>
-!!@file m_start_up.f90
+!!@file
 !!@brief Contains module m_checker
 
 #:include 'macros.fpp'
@@ -23,7 +23,7 @@ module m_checker
 contains
 
     !> Checks compatibility of parameters in the input file.
-        !! Used by the simulation stage
+        !! the simulation stage
     impure subroutine s_check_inputs
 
         call s_check_inputs_compilers
@@ -77,7 +77,7 @@ contains
 
     !> Checks constraints on geometry and precision
     impure subroutine s_check_inputs_geometry_precision
-        ! Prevent spherical geometry in single precision
+        ! spherical geometry in single precision
 #ifdef MFC_SINGLE_PRECISION
         @:PROHIBIT(.not. (cyl_coord .neqv. .true. .or. (cyl_coord .and. p == 0)), "Fully 3D cylindrical grid (geometry = 3) is not supported in single precision.")
 #endif

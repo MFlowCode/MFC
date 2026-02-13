@@ -373,4 +373,4 @@
         $:code
     #:endif
 #:enddef
-! New line at end of file is required for FYPP
+! line at end of file is required for FYPP

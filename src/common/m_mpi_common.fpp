@@ -2,10 +2,10 @@
 #:include 'macros.fpp'
 
 !> @brief The module serves as a proxy to the parameters and subroutines
-!!          available in the MPI implementation's MPI module. Specifically,
-!!          the purpose of the proxy is to harness basic MPI commands into
-!!          more complicated procedures as to accomplish the communication
-!!          goals for the simulation.
+!! the MPI implementation's MPI module. Specifically,
+!! of the proxy is to harness basic MPI commands into
+!! procedures as to accomplish the communication
+!! the simulation.
 module m_mpi_common
 
 #ifdef MFC_MPI
@@ -26,17 +26,17 @@ module m_mpi_common
 
     integer, private :: v_size
     $:GPU_DECLARE(create='[v_size]')
-    !! Generic flags used to identify and report MPI errors
+    !! used to identify and report MPI errors
 
     real(wp), private, allocatable, dimension(:) :: buff_send !<
-    !! This variable is utilized to pack and send the buffer of the cell-average
-    !! primitive variables, for a single computational domain boundary at the
-    !! time, to the relevant neighboring processor.
+    !! is utilized to pack and send the buffer of the cell-average
+    !! for a single computational domain boundary at the
+    !! the relevant neighboring processor.
 
     real(wp), private, allocatable, dimension(:) :: buff_recv !<
-    !! buff_recv is utilized to receive and unpack the buffer of the cell-
-    !! average primitive variables, for a single computational domain boundary
-    !! at the time, from the relevant neighboring processor.
+    !! utilized to receive and unpack the buffer of the cell-
+    !! variables, for a single computational domain boundary
+    !! time, from the relevant neighboring processor.
 
 #ifndef __NVCOMPILER_GPU_UNIFIED_MEM
     $:GPU_DECLARE(create='[buff_send, buff_recv]')
@@ -48,14 +48,14 @@ module m_mpi_common
 contains
 
     !> The computation of parameters, the allocation of memory,
-        !!      the association of pointers and/or the execution of any
-        !!      other procedures that are necessary to setup the module.
+        !! of pointers and/or the execution of any
+        !! that are necessary to setup the module.
     impure subroutine s_initialize_mpi_common_module
 
 #ifdef MFC_MPI
-        ! Allocating buff_send/recv and. Please note that for the sake of
-        ! simplicity, both variables are provided sufficient storage to hold
-        ! the largest buffer in the computational domain.
+        ! buff_send/recv and. Please note that for the sake of
+        ! both variables are provided sufficient storage to hold
+        ! largest buffer in the computational domain.
 
         if (qbmm .and. .not. polytropic) then
             v_size = sys_size + 2*nb*4
@@ -92,41 +92,41 @@ contains
     end subroutine s_initialize_mpi_common_module
 
     !> The subroutine initializes the MPI execution environment
-        !!      and queries both the number of processors which will be
-        !!      available for the job and the local processor rank.
+        !! both the number of processors which will be
+        !! the job and the local processor rank.
     impure subroutine s_mpi_initialize
 
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
 
-        ! Initializing the MPI environment
+        ! the MPI environment
         call MPI_INIT(ierr)
 
-        ! Checking whether the MPI environment has been properly initialized
+        ! whether the MPI environment has been properly initialized
         if (ierr /= MPI_SUCCESS) then
             print '(A)', 'Unable to initialize MPI environment. Exiting.'
             call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
         end if
 
-        ! Querying the number of processors available for the job
+        ! the number of processors available for the job
         call MPI_COMM_SIZE(MPI_COMM_WORLD, num_procs, ierr)
 
-        ! Querying the rank of the local processor
+        ! the rank of the local processor
         call MPI_COMM_RANK(MPI_COMM_WORLD, proc_rank, ierr)
 #else
-        ! Serial run only has 1 processor
+        ! run only has 1 processor
         num_procs = 1
-        ! Local processor rank is 0
+        ! processor rank is 0
         proc_rank = 0
 #endif
 
     end subroutine s_mpi_initialize
 
-    !! @param q_cons_vf Conservative variables
-    !! @param ib_markers track if a cell is within the immersed boundary
-    !! @param levelset closest distance from every cell to the IB
-    !! @param levelset_norm normalized vector from every cell to the closest point to the IB
-    !! @param beta Eulerian void fraction from lagrangian bubbles
+    !! Conservative variables
+    !! track if a cell is within the immersed boundary
+    !! closest distance from every cell to the IB
+    !! normalized vector from every cell to the closest point to the IB
+    !! Eulerian void fraction from lagrangian bubbles
     impure subroutine s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm, beta)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
@@ -140,7 +140,7 @@ contains
 
 #ifdef MFC_MPI
 
-        ! Generic loop iterator
+        ! loop iterator
         integer :: i, j
         integer :: ierr !< Generic flag used to identify and report MPI errors
 
@@ -176,7 +176,7 @@ contains
             end do
         end if
 
-        ! Define global(g) and local(l) sizes for flow variables
+        ! global(g) and local(l) sizes for flow variables
         sizes_glb(1) = m_glb + 1; sizes_loc(1) = m + 1
         if (n > 0) then
             sizes_glb(2) = n_glb + 1; sizes_loc(2) = n + 1
@@ -185,7 +185,7 @@ contains
             end if
         end if
 
-        ! Define the view for each variable
+        ! the view for each variable
         do i = 1, alt_sys
             call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, &
                                           MPI_ORDER_FORTRAN, mpi_p, MPI_IO_DATA%view(i), ierr)
@@ -277,7 +277,7 @@ contains
 
     end subroutine s_initialize_mpi_data
 
-    !! @param q_cons_vf Conservative variables
+    !! Conservative variables
     subroutine s_initialize_mpi_data_ds(q_cons_vf)
 
         type(scalar_field), &
@@ -289,7 +289,7 @@ contains
 
 #ifdef MFC_MPI
 
-        ! Generic loop iterator
+        ! loop iterator
         integer :: i, j, q, k, l, m_ds, n_ds, p_ds, ierr
 
         sf_start_idx = (/0, 0, 0/)
@@ -309,7 +309,7 @@ contains
             MPI_IO_DATA%var(i)%sf => q_cons_vf(i)%sf(-1:m_ds + 1, -1:n_ds + 1, -1:p_ds + 1)
         end do
 #endif
-        ! Define global(g) and local(l) sizes for flow variables
+        ! global(g) and local(l) sizes for flow variables
         sizes_loc(1) = m_ds + 3
         if (n > 0) then
             sizes_loc(2) = n_ds + 3
@@ -318,7 +318,7 @@ contains
             end if
         end if
 
-        ! Define the view for each variable
+        ! the view for each variable
         do i = 1, sys_size
             call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_loc, sizes_loc, sf_start_idx, &
                                           MPI_ORDER_FORTRAN, mpi_p, MPI_IO_DATA%view(i), ierr)
@@ -388,19 +388,19 @@ contains
     end subroutine s_prohibit_abort
 
     !>  The goal of this subroutine is to determine the global
-        !!      extrema of the stability criteria in the computational
-        !!      domain. This is performed by sifting through the local
-        !!      extrema of each stability criterion. Note that each of
-        !!      the local extrema is from a single process, within its
-        !!      assigned section of the computational domain. Finally,
-        !!      note that the global extrema values are only bookkeept
-        !!      on the rank 0 processor.
-        !!  @param icfl_max_loc Local maximum ICFL stability criterion
-        !!  @param vcfl_max_loc Local maximum VCFL stability criterion
-        !!  @param Rc_min_loc Local minimum Rc stability criterion
-        !!  @param icfl_max_glb Global maximum ICFL stability criterion
-        !!  @param vcfl_max_glb Global maximum VCFL stability criterion
-        !!  @param Rc_min_glb Global minimum Rc stability criterion
+        !! the stability criteria in the computational
+        !! is performed by sifting through the local
+        !! each stability criterion. Note that each of
+        !! extrema is from a single process, within its
+        !! of the computational domain. Finally,
+        !! the global extrema values are only bookkeept
+        !! rank 0 processor.
+        !! Local maximum ICFL stability criterion
+        !! Local maximum VCFL stability criterion
+        !! Local minimum Rc stability criterion
+        !! Global maximum ICFL stability criterion
+        !! Global maximum VCFL stability criterion
+        !! Global minimum Rc stability criterion
     impure subroutine s_mpi_reduce_stability_criteria_extrema(icfl_max_loc, &
                                                               vcfl_max_loc, &
                                                               Rc_min_loc, &
@@ -420,8 +420,8 @@ contains
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
 
-        ! Reducing local extrema of ICFL, VCFL, CCFL and Rc numbers to their
-        ! global extrema and bookkeeping the results on the rank 0 processor
+        ! local extrema of ICFL, VCFL, CCFL and Rc numbers to their
+        ! extrema and bookkeeping the results on the rank 0 processor
         call MPI_REDUCE(icfl_max_loc, icfl_max_glb, 1, &
                         mpi_p, MPI_MAX, 0, &
                         MPI_COMM_WORLD, ierr)
@@ -450,12 +450,12 @@ contains
     end subroutine s_mpi_reduce_stability_criteria_extrema
 
     !>  The following subroutine takes the input local variable
-        !!      from all processors and reduces to the sum of all
-        !!      values. The reduced variable is recorded back onto the
-        !!      original local variable on each processor.
-        !!  @param var_loc Some variable containing the local value which should be
-        !!  reduced amongst all the processors in the communicator.
-        !!  @param var_glb The globally reduced value
+        !! processors and reduces to the sum of all
+        !! reduced variable is recorded back onto the
+        !! variable on each processor.
+        !! Some variable containing the local value which should be
+        !! all the processors in the communicator.
+        !! The globally reduced value
     impure subroutine s_mpi_allreduce_sum(var_loc, var_glb)
 
         real(wp), intent(in) :: var_loc
@@ -464,7 +464,7 @@ contains
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
 
-        ! Performing the reduction procedure
+        ! the reduction procedure
         call MPI_ALLREDUCE(var_loc, var_glb, 1, mpi_p, &
                            MPI_SUM, MPI_COMM_WORLD, ierr)
 
@@ -483,7 +483,7 @@ contains
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
 
-        ! Performing the reduction procedure
+        ! the reduction procedure
         if (loc(var_loc) == loc(var_glb)) then
             call MPI_Allreduce(MPI_IN_PLACE, var_glb, num_vectors*vector_length, &
                                mpi_p, MPI_SUM, MPI_COMM_WORLD, ierr)
@@ -499,12 +499,12 @@ contains
     end subroutine s_mpi_allreduce_vectors_sum
 
     !>  The following subroutine takes the input local variable
-        !!      from all processors and reduces to the sum of all
-        !!      values. The reduced variable is recorded back onto the
-        !!      original local variable on each processor.
-        !!  @param var_loc Some variable containing the local value which should be
-        !!  reduced amongst all the processors in the communicator.
-        !!  @param var_glb The globally reduced value
+        !! processors and reduces to the sum of all
+        !! reduced variable is recorded back onto the
+        !! variable on each processor.
+        !! Some variable containing the local value which should be
+        !! all the processors in the communicator.
+        !! The globally reduced value
     impure subroutine s_mpi_allreduce_integer_sum(var_loc, var_glb)
 
         integer, intent(in) :: var_loc
@@ -513,7 +513,7 @@ contains
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
 
-        ! Performing the reduction procedure
+        ! the reduction procedure
         call MPI_ALLREDUCE(var_loc, var_glb, 1, MPI_INTEGER, &
                            MPI_SUM, MPI_COMM_WORLD, ierr)
 #else
@@ -523,12 +523,12 @@ contains
     end subroutine s_mpi_allreduce_integer_sum
 
     !>  The following subroutine takes the input local variable
-        !!      from all processors and reduces to the minimum of all
-        !!      values. The reduced variable is recorded back onto the
-        !!      original local variable on each processor.
-        !!  @param var_loc Some variable containing the local value which should be
-        !!  reduced amongst all the processors in the communicator.
-        !!  @param var_glb The globally reduced value
+        !! processors and reduces to the minimum of all
+        !! reduced variable is recorded back onto the
+        !! variable on each processor.
+        !! Some variable containing the local value which should be
+        !! all the processors in the communicator.
+        !! The globally reduced value
     impure subroutine s_mpi_allreduce_min(var_loc, var_glb)
 
         real(wp), intent(in) :: var_loc
@@ -537,7 +537,7 @@ contains
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
 
-        ! Performing the reduction procedure
+        ! the reduction procedure
         call MPI_ALLREDUCE(var_loc, var_glb, 1, mpi_p, &
                            MPI_MIN, MPI_COMM_WORLD, ierr)
 
@@ -546,12 +546,12 @@ contains
     end subroutine s_mpi_allreduce_min
 
     !>  The following subroutine takes the input local variable
-        !!      from all processors and reduces to the maximum of all
-        !!      values. The reduced variable is recorded back onto the
-        !!      original local variable on each processor.
-        !!  @param var_loc Some variable containing the local value which should be
-        !!  reduced amongst all the processors in the communicator.
-        !!  @param var_glb The globally reduced value
+        !! processors and reduces to the maximum of all
+        !! reduced variable is recorded back onto the
+        !! variable on each processor.
+        !! Some variable containing the local value which should be
+        !! all the processors in the communicator.
+        !! The globally reduced value
     impure subroutine s_mpi_allreduce_max(var_loc, var_glb)
 
         real(wp), intent(in) :: var_loc
@@ -560,7 +560,7 @@ contains
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
 
-        ! Performing the reduction procedure
+        ! the reduction procedure
         call MPI_ALLREDUCE(var_loc, var_glb, 1, mpi_p, &
                            MPI_MAX, MPI_COMM_WORLD, ierr)
 
@@ -569,11 +569,11 @@ contains
     end subroutine s_mpi_allreduce_max
 
     !>  The following subroutine takes the inputted variable and
-        !!      determines its minimum value on the entire computational
-        !!      domain. The result is stored back into inputted variable.
-        !!  @param var_loc holds the local value to be reduced among
-        !!      all the processors in communicator. On output, the variable holds
-        !!      the minimum value, reduced amongst all of the local values.
+        !! minimum value on the entire computational
+        !! result is stored back into inputted variable.
+        !! holds the local value to be reduced among
+        !! processors in communicator. On output, the variable holds
+        !! value, reduced amongst all of the local values.
     impure subroutine s_mpi_reduce_min(var_loc)
 
         real(wp), intent(inout) :: var_loc
@@ -581,11 +581,11 @@ contains
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
 
-        ! Temporary storage variable that holds the reduced minimum value
+        ! storage variable that holds the reduced minimum value
         real(wp) :: var_glb
 
-        ! Performing reduction procedure and eventually storing its result
-        ! into the variable that was initially inputted into the subroutine
+        ! reduction procedure and eventually storing its result
+        ! the variable that was initially inputted into the subroutine
         call MPI_REDUCE(var_loc, var_glb, 1, mpi_p, &
                         MPI_MIN, 0, MPI_COMM_WORLD, ierr)
 
@@ -599,17 +599,17 @@ contains
     end subroutine s_mpi_reduce_min
 
     !>  The following subroutine takes the first element of the
-        !!      2-element inputted variable and determines its maximum
-        !!      value on the entire computational domain. The result is
-        !!      stored back into the first element of the variable while
-        !!      the rank of the processor that is in charge of the sub-
-        !!      domain containing the maximum is stored into the second
-        !!      element of the variable.
-        !!  @param var_loc On input, this variable holds the local value and processor rank,
-        !!  which are to be reduced among all the processors in communicator.
-        !!  On output, this variable holds the maximum value, reduced amongst
-        !!  all of the local values, and the process rank to which the value
-        !!  belongs.
+        !! variable and determines its maximum
+        !! the entire computational domain. The result is
+        !! into the first element of the variable while
+        !! of the processor that is in charge of the sub-
+        !! the maximum is stored into the second
+        !! the variable.
+        !! On input, this variable holds the local value and processor rank,
+        !! to be reduced among all the processors in communicator.
+        !! this variable holds the maximum value, reduced amongst
+        !! the local values, and the process rank to which the value
+        !!
     impure subroutine s_mpi_reduce_maxloc(var_loc)
 
         real(wp), dimension(2), intent(inout) :: var_loc
@@ -618,11 +618,11 @@ contains
         integer :: ierr !< Generic flag used to identify and report MPI errors
 
         real(wp), dimension(2) :: var_glb  !<
-            !! Temporary storage variable that holds the reduced maximum value
-            !! and the rank of the processor with which the value is associated
+            !! variable that holds the reduced maximum value
+            !! rank of the processor with which the value is associated
 
-        ! Performing reduction procedure and eventually storing its result
-        ! into the variable that was initially inputted into the subroutine
+        ! reduction procedure and eventually storing its result
+        ! the variable that was initially inputted into the subroutine
         call MPI_REDUCE(var_loc, var_glb, 1, mpi_2p, &
                         MPI_MAXLOC, 0, MPI_COMM_WORLD, ierr)
 
@@ -636,7 +636,7 @@ contains
     end subroutine s_mpi_reduce_maxloc
 
     !> The subroutine terminates the MPI execution environment.
-        !! @param prnt error message to be printed
+        !! error message to be printed
     impure subroutine s_mpi_abort(prnt, code)
 
         character(len=*), intent(in), optional :: prnt
@@ -659,7 +659,7 @@ contains
             stop 1
         end if
 #else
-        ! Terminating the MPI environment
+        ! the MPI environment
         if (present(code)) then
             call MPI_ABORT(MPI_COMM_WORLD, code, ierr)
         else
@@ -675,7 +675,7 @@ contains
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
 
-        ! Calling MPI_BARRIER
+        ! MPI_BARRIER
         call MPI_BARRIER(MPI_COMM_WORLD, ierr)
 
 #endif
@@ -688,7 +688,7 @@ contains
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
 
-        ! Finalizing the MPI environment
+        ! the MPI environment
         call MPI_FINALIZE(ierr)
 
 #endif
@@ -696,11 +696,11 @@ contains
     end subroutine s_mpi_finalize
 
     !>  The goal of this procedure is to populate the buffers of
-        !!      the cell-average conservative variables by communicating
-        !!      with the neighboring processors.
-        !!  @param q_cons_vf Cell-average conservative variables
-        !!  @param mpi_dir MPI communication coordinate direction
-        !!  @param pbc_loc Processor boundary condition (PBC) location
+        !! conservative variables by communicating
+        !! neighboring processors.
+        !! Cell-average conservative variables
+        !! MPI communication coordinate direction
+        !! Processor boundary condition (PBC) location
     subroutine s_mpi_sendrecv_variables_buffers(q_comm, &
                                                 mpi_dir, &
                                                 pbc_loc, &
@@ -754,12 +754,12 @@ contains
         beg_end = (/boundary_conditions(mpi_dir)%beg, boundary_conditions(mpi_dir)%end/)
         beg_end_geq_0 = beg_end(max(pbc_loc, 0) - pbc_loc + 1) >= 0
 
-        ! Implements:
-        ! pbc_loc  bc_x >= 0 -> [send/recv]_tag  [dst/src]_proc
-        ! -1 (=0)      0            ->     [1,0]       [0,0]      | 0 0 [1,0] [beg,beg]
-        ! -1 (=0)      1            ->     [0,0]       [1,0]      | 0 1 [0,0] [end,beg]
-        ! +1 (=1)      0            ->     [0,1]       [1,1]      | 1 0 [0,1] [end,end]
-        ! +1 (=1)      1            ->     [1,1]       [0,1]      | 1 1 [1,1] [beg,end]
+        !
+        !  bc_x >= 0 -> [send/recv]_tag  [dst/src]_proc
+        ! (=0)      0            ->     [1,0]       [0,0]      | 0 0 [1,0] [beg,beg]
+        ! (=0)      1            ->     [0,0]       [1,0]      | 0 1 [0,0] [end,beg]
+        ! (=1)      0            ->     [0,1]       [1,1]      | 1 0 [0,1] [end,end]
+        ! (=1)      1            ->     [1,1]       [0,1]      | 1 1 [1,1] [beg,end]
 
         send_tag = f_logical_to_int(.not. f_xor(beg_end_geq_0, pbc_loc == 1))
         recv_tag = f_logical_to_int(pbc_loc == 1)
@@ -779,7 +779,7 @@ contains
             unpack_offset = grid_dims(mpi_dir) + buff_size + 1
         end if
 
-        ! Pack Buffer to Send
+        ! Buffer to Send
         #:for mpi_dir in [1, 2, 3]
             if (mpi_dir == ${mpi_dir}$) then
                 #:if mpi_dir == 1
@@ -936,7 +936,7 @@ contains
         #:endfor
         call nvtxEndRange ! Packbuf
 
-        ! Send/Recv
+        !
 #ifdef MFC_SIMULATION
         #:for rdma_mpi in [False, True]
             if (rdma_mpi .eqv. ${'.true.' if rdma_mpi else '.false.'}$) then
@@ -979,7 +979,7 @@ contains
             MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 #endif
 
-        ! Unpack Received Buffer
+        ! Received Buffer
         call nvtxStartRange("RHS-COMM-UNPACKBUF")
         #:for mpi_dir in [1, 2, 3]
             if (mpi_dir == ${mpi_dir}$) then
@@ -1095,7 +1095,7 @@ contains
                         $:END_GPU_PARALLEL_LOOP()
                     end if
                 #:else
-                    ! Unpacking buffer from bc_z%beg
+                    ! buffer from bc_z%beg
                     $:GPU_PARALLEL_LOOP(collapse=4,private='[r]')
                     do i = 1, nVar
                         do l = -buff_size, -1
@@ -1164,33 +1164,33 @@ contains
     end subroutine s_mpi_sendrecv_variables_buffers
 
     !>  The purpose of this procedure is to optimally decompose
-        !!      the computational domain among the available processors.
-        !!      This is performed by attempting to award each processor,
-        !!      in each of the coordinate directions, approximately the
-        !!      same number of cells, and then recomputing the affected
-        !!      global parameters.
+        !! domain among the available processors.
+        !! performed by attempting to award each processor,
+        !! of the coordinate directions, approximately the
+        !! of cells, and then recomputing the affected
+        !!
     subroutine s_mpi_decompose_computational_domain
 
 #ifdef MFC_MPI
 
         integer :: num_procs_x, num_procs_y, num_procs_z !<
-            !! Optimal number of processors in the x-, y- and z-directions
+            !! of processors in the x-, y- and z-directions
 
         real(wp) :: tmp_num_procs_x, tmp_num_procs_y, tmp_num_procs_z !<
-            !! Non-optimal number of processors in the x-, y- and z-directions
+            !! of processors in the x-, y- and z-directions
 
         real(wp) :: fct_min !<
-            !! Processor factorization (fct) minimization parameter
+            !! (fct) minimization parameter
 
         integer :: MPI_COMM_CART !<
-            !! Cartesian processor topology communicator
+            !! topology communicator
 
         integer :: rem_cells !<
-            !! Remaining number of cells, in a particular coordinate direction,
-            !! after the majority is divided up among the available processors
+            !! of cells, in a particular coordinate direction,
+            !! majority is divided up among the available processors
 
         integer :: recon_order !<
-            !! WENO or MUSCL reconstruction order
+            !! MUSCL reconstruction order
 
         integer :: i, j !< Generic loop iterators
         integer :: ierr !< Generic flag used to identify and report MPI errors
@@ -1214,25 +1214,25 @@ contains
             recon_order = weno_order
         end if
 
-        ! 3D Cartesian Processor Topology
+        ! Cartesian Processor Topology
         if (n > 0) then
 
             if (p > 0) then
                 if (fft_wrt) then
 
-                    ! Initial estimate of optimal processor topology
+                    ! estimate of optimal processor topology
                     num_procs_x = 1
                     num_procs_y = 1
                     num_procs_z = num_procs
                     ierr = -1
 
-                    ! Benchmarking the quality of this initial guess
+                    ! the quality of this initial guess
                     tmp_num_procs_y = num_procs_y
                     tmp_num_procs_z = num_procs_z
                     fct_min = 10._wp*abs((n + 1)/tmp_num_procs_y &
                                          - (p + 1)/tmp_num_procs_z)
 
-                    ! Optimization of the initial processor topology
+                    ! of the initial processor topology
                     do i = 1, num_procs
 
                         if (mod(num_procs, i) == 0 &
@@ -1263,24 +1263,24 @@ contains
                 else
 
                     if (cyl_coord .and. p > 0) then
-                        ! Implement pencil processor blocking if using cylindrical coordinates so
-                        ! that all cells in azimuthal direction are stored on a single processor.
-                        ! This is necessary for efficient application of Fourier filter near axis.
+                        ! pencil processor blocking if using cylindrical coordinates so
+                        ! all cells in azimuthal direction are stored on a single processor.
+                        ! is necessary for efficient application of Fourier filter near axis.
 
-                        ! Initial values of the processor factorization optimization
+                        ! values of the processor factorization optimization
                         num_procs_x = 1
                         num_procs_y = num_procs
                         num_procs_z = 1
                         ierr = -1
 
-                        ! Computing minimization variable for these initial values
+                        ! minimization variable for these initial values
                         tmp_num_procs_x = num_procs_x
                         tmp_num_procs_y = num_procs_y
                         tmp_num_procs_z = num_procs_z
                         fct_min = 10._wp*abs((m + 1)/tmp_num_procs_x &
                                              - (n + 1)/tmp_num_procs_y)
 
-                        ! Searching for optimal computational domain distribution
+                        ! for optimal computational domain distribution
                         do i = 1, num_procs
 
                             if (mod(num_procs, i) == 0 &
@@ -1311,13 +1311,13 @@ contains
 
                     else
 
-                        ! Initial estimate of optimal processor topology
+                        ! estimate of optimal processor topology
                         num_procs_x = 1
                         num_procs_y = 1
                         num_procs_z = num_procs
                         ierr = -1
 
-                        ! Benchmarking the quality of this initial guess
+                        ! the quality of this initial guess
                         tmp_num_procs_x = num_procs_x
                         tmp_num_procs_y = num_procs_y
                         tmp_num_procs_z = num_procs_z
@@ -1326,7 +1326,7 @@ contains
                                   + 10._wp*abs((n + 1)/tmp_num_procs_y &
                                                - (p + 1)/tmp_num_procs_z)
 
-                        ! Optimization of the initial processor topology
+                        ! of the initial processor topology
                         do i = 1, num_procs
 
                             if (mod(num_procs, i) == 0 &
@@ -1375,41 +1375,41 @@ contains
                     end if
                 end if
 
-                ! Verifying that a valid decomposition of the computational
-                ! domain has been established. If not, the simulation exits.
+                ! that a valid decomposition of the computational
+                ! has been established. If not, the simulation exits.
                 if (proc_rank == 0 .and. ierr == -1) then
                     call s_mpi_abort('Unsupported combination of values '// &
                                      'of num_procs, m, n, p and '// &
                                      'weno/muscl/igr_order. Exiting.')
                 end if
 
-                ! Creating new communicator using the Cartesian topology
+                ! new communicator using the Cartesian topology
                 call MPI_CART_CREATE(MPI_COMM_WORLD, 3, (/num_procs_x, &
                                                           num_procs_y, num_procs_z/), &
                                      (/.true., .true., .true./), &
                                      .false., MPI_COMM_CART, ierr)
 
-                ! Finding the Cartesian coordinates of the local process
+                ! the Cartesian coordinates of the local process
                 call MPI_CART_COORDS(MPI_COMM_CART, proc_rank, 3, &
                                      proc_coords, ierr)
-                ! END: 3D Cartesian Processor Topology
+                ! 3D Cartesian Processor Topology
 
-                ! Global Parameters for z-direction
+                ! Parameters for z-direction
 
-                ! Number of remaining cells
+                ! of remaining cells
                 rem_cells = mod(p + 1, num_procs_z)
 
-                ! Optimal number of cells per processor
+                ! number of cells per processor
                 p = (p + 1)/num_procs_z - 1
 
-                ! Distributing the remaining cells
+                ! the remaining cells
                 do i = 1, rem_cells
                     if (proc_coords(3) == i - 1) then
                         p = p + 1; exit
                     end if
                 end do
 
-                ! Boundary condition at the beginning
+                ! condition at the beginning
                 if (proc_coords(3) > 0 .or. (bc_z%beg == BC_PERIODIC .and. num_procs_z > 1)) then
                     proc_coords(3) = proc_coords(3) - 1
                     call MPI_CART_RANK(MPI_COMM_CART, proc_coords, &
@@ -1417,7 +1417,7 @@ contains
                     proc_coords(3) = proc_coords(3) + 1
                 end if
 
-                ! Boundary condition at the end
+                ! condition at the end
                 if (proc_coords(3) < num_procs_z - 1 .or. (bc_z%end == BC_PERIODIC .and. num_procs_z > 1)) then
                     proc_coords(3) = proc_coords(3) + 1
                     call MPI_CART_RANK(MPI_COMM_CART, proc_coords, &
@@ -1426,14 +1426,14 @@ contains
                 end if
 
 #ifdef MFC_POST_PROCESS
-                ! Ghost zone at the beginning
+                ! zone at the beginning
                 if (proc_coords(3) > 0 .and. format == 1) then
                     offset_z%beg = 2
                 else
                     offset_z%beg = 0
                 end if
 
-                ! Ghost zone at the end
+                ! zone at the end
                 if (proc_coords(3) < num_procs_z - 1 .and. format == 1) then
                     offset_z%end = 2
                 else
@@ -1441,7 +1441,7 @@ contains
                 end if
 #endif
 
-                ! Beginning and end sub-domain boundary locations
+                ! and end sub-domain boundary locations
                 if (parallel_io) then
                     if (proc_coords(3) < rem_cells) then
                         start_idx(3) = (p + 1)*proc_coords(3)
@@ -1469,21 +1469,21 @@ contains
 #endif
                 end if
 
-                ! 2D Cartesian Processor Topology
+                ! Cartesian Processor Topology
             else
 
-                ! Initial estimate of optimal processor topology
+                ! estimate of optimal processor topology
                 num_procs_x = 1
                 num_procs_y = num_procs
                 ierr = -1
 
-                ! Benchmarking the quality of this initial guess
+                ! the quality of this initial guess
                 tmp_num_procs_x = num_procs_x
                 tmp_num_procs_y = num_procs_y
                 fct_min = 10._wp*abs((m + 1)/tmp_num_procs_x &
                                      - (n + 1)/tmp_num_procs_y)
 
-                ! Optimization of the initial processor topology
+                ! of the initial processor topology
                 do i = 1, num_procs
 
                     if (mod(num_procs, i) == 0 &
@@ -1512,43 +1512,43 @@ contains
 
                 end do
 
-                ! Verifying that a valid decomposition of the computational
-                ! domain has been established. If not, the simulation exits.
+                ! that a valid decomposition of the computational
+                ! has been established. If not, the simulation exits.
                 if (proc_rank == 0 .and. ierr == -1) then
                     call s_mpi_abort('Unsupported combination of values '// &
                                      'of num_procs, m, n and '// &
                                      'weno/muscl/igr_order. Exiting.')
                 end if
 
-                ! Creating new communicator using the Cartesian topology
+                ! new communicator using the Cartesian topology
                 call MPI_CART_CREATE(MPI_COMM_WORLD, 2, (/num_procs_x, &
                                                           num_procs_y/), (/.true., &
                                                                            .true./), .false., MPI_COMM_CART, &
                                      ierr)
 
-                ! Finding the Cartesian coordinates of the local process
+                ! the Cartesian coordinates of the local process
                 call MPI_CART_COORDS(MPI_COMM_CART, proc_rank, 2, &
                                      proc_coords, ierr)
 
             end if
-            ! END: 2D Cartesian Processor Topology
+            ! 2D Cartesian Processor Topology
 
-            ! Global Parameters for y-direction
+            ! Parameters for y-direction
 
-            ! Number of remaining cells
+            ! of remaining cells
             rem_cells = mod(n + 1, num_procs_y)
 
-            ! Optimal number of cells per processor
+            ! number of cells per processor
             n = (n + 1)/num_procs_y - 1
 
-            ! Distributing the remaining cells
+            ! the remaining cells
             do i = 1, rem_cells
                 if (proc_coords(2) == i - 1) then
                     n = n + 1; exit
                 end if
             end do
 
-            ! Boundary condition at the beginning
+            ! condition at the beginning
             if (proc_coords(2) > 0 .or. (bc_y%beg == BC_PERIODIC .and. num_procs_y > 1)) then
                 proc_coords(2) = proc_coords(2) - 1
                 call MPI_CART_RANK(MPI_COMM_CART, proc_coords, &
@@ -1556,7 +1556,7 @@ contains
                 proc_coords(2) = proc_coords(2) + 1
             end if
 
-            ! Boundary condition at the end
+            ! condition at the end
             if (proc_coords(2) < num_procs_y - 1 .or. (bc_y%end == BC_PERIODIC .and. num_procs_y > 1)) then
                 proc_coords(2) = proc_coords(2) + 1
                 call MPI_CART_RANK(MPI_COMM_CART, proc_coords, &
@@ -1565,14 +1565,14 @@ contains
             end if
 
 #ifdef MFC_POST_PROCESS
-            ! Ghost zone at the beginning
+            ! zone at the beginning
             if (proc_coords(2) > 0 .and. format == 1) then
                 offset_y%beg = 2
             else
                 offset_y%beg = 0
             end if
 
-            ! Ghost zone at the end
+            ! zone at the end
             if (proc_coords(2) < num_procs_y - 1 .and. format == 1) then
                 offset_y%end = 2
             else
@@ -1580,7 +1580,7 @@ contains
             end if
 #endif
 
-            ! Beginning and end sub-domain boundary locations
+            ! and end sub-domain boundary locations
             if (parallel_io) then
                 if (proc_coords(2) < rem_cells) then
                     start_idx(2) = (n + 1)*proc_coords(2)
@@ -1608,32 +1608,32 @@ contains
 #endif
             end if
 
-            ! 1D Cartesian Processor Topology
+            ! Cartesian Processor Topology
         else
 
-            ! Optimal processor topology
+            ! processor topology
             num_procs_x = num_procs
 
-            ! Creating new communicator using the Cartesian topology
+            ! new communicator using the Cartesian topology
             call MPI_CART_CREATE(MPI_COMM_WORLD, 1, (/num_procs_x/), &
                                  (/.true./), .false., MPI_COMM_CART, &
                                  ierr)
 
-            ! Finding the Cartesian coordinates of the local process
+            ! the Cartesian coordinates of the local process
             call MPI_CART_COORDS(MPI_COMM_CART, proc_rank, 1, &
                                  proc_coords, ierr)
 
         end if
 
-        ! Global Parameters for x-direction
+        ! Parameters for x-direction
 
-        ! Number of remaining cells
+        ! of remaining cells
         rem_cells = mod(m + 1, num_procs_x)
 
-        ! Optimal number of cells per processor
+        ! number of cells per processor
         m = (m + 1)/num_procs_x - 1
 
-        ! Distributing the remaining cells
+        ! the remaining cells
         do i = 1, rem_cells
             if (proc_coords(1) == i - 1) then
                 m = m + 1; exit
@@ -1642,14 +1642,14 @@ contains
 
         call s_update_cell_bounds(cells_bounds, m, n, p)
 
-        ! Boundary condition at the beginning
+        ! condition at the beginning
         if (proc_coords(1) > 0 .or. (bc_x%beg == BC_PERIODIC .and. num_procs_x > 1)) then
             proc_coords(1) = proc_coords(1) - 1
             call MPI_CART_RANK(MPI_COMM_CART, proc_coords, bc_x%beg, ierr)
             proc_coords(1) = proc_coords(1) + 1
         end if
 
-        ! Boundary condition at the end
+        ! condition at the end
         if (proc_coords(1) < num_procs_x - 1 .or. (bc_x%end == BC_PERIODIC .and. num_procs_x > 1)) then
             proc_coords(1) = proc_coords(1) + 1
             call MPI_CART_RANK(MPI_COMM_CART, proc_coords, bc_x%end, ierr)
@@ -1657,14 +1657,14 @@ contains
         end if
 
 #ifdef MFC_POST_PROCESS
-        ! Ghost zone at the beginning
+        ! zone at the beginning
         if (proc_coords(1) > 0 .and. format == 1) then
             offset_x%beg = 2
         else
             offset_x%beg = 0
         end if
 
-        ! Ghost zone at the end
+        ! zone at the end
         if (proc_coords(1) < num_procs_x - 1 .and. format == 1) then
             offset_x%end = 2
         else
@@ -1672,7 +1672,7 @@ contains
         end if
 #endif
 
-        ! Beginning and end sub-domain boundary locations
+        ! and end sub-domain boundary locations
         if (parallel_io) then
             if (proc_coords(1) < rem_cells) then
                 start_idx(1) = (m + 1)*proc_coords(1)
@@ -1704,13 +1704,13 @@ contains
     end subroutine s_mpi_decompose_computational_domain
 
     !>  The goal of this procedure is to populate the buffers of
-        !!      the grid variables by communicating with the neighboring
-        !!      processors. Note that only the buffers of the cell-width
-        !!      distributions are handled in such a way. This is because
-        !!      the buffers of cell-boundary locations may be calculated
-        !!      directly from those of the cell-width distributions.
-        !!  @param mpi_dir MPI communication coordinate direction
-        !!  @param pbc_loc Processor boundary condition (PBC) location
+        !! variables by communicating with the neighboring
+        !! that only the buffers of the cell-width
+        !! handled in such a way. This is because
+        !! of cell-boundary locations may be calculated
+        !! those of the cell-width distributions.
+        !! MPI communication coordinate direction
+        !! Processor boundary condition (PBC) location
 #ifndef MFC_PRE_PROCESS
     subroutine s_mpi_sendrecv_grid_variables_buffers(mpi_dir, pbc_loc)
 
@@ -1720,14 +1720,14 @@ contains
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
 
-        ! MPI Communication in x-direction
+        ! Communication in x-direction
         if (mpi_dir == 1) then
 
             if (pbc_loc == -1) then      ! PBC at the beginning
 
                 if (bc_x%end >= 0) then      ! PBC at the beginning and end
 
-                    ! Send/receive buffer to/from bc_x%end/bc_x%beg
+                    ! buffer to/from bc_x%end/bc_x%beg
                     call MPI_SENDRECV( &
                         dx(m - buff_size + 1), buff_size, &
                         mpi_p, bc_x%end, 0, &
@@ -1737,7 +1737,7 @@ contains
 
                 else                        ! PBC at the beginning only
 
-                    ! Send/receive buffer to/from bc_x%beg/bc_x%beg
+                    ! buffer to/from bc_x%beg/bc_x%beg
                     call MPI_SENDRECV( &
                         dx(0), buff_size, &
                         mpi_p, bc_x%beg, 1, &
@@ -1751,7 +1751,7 @@ contains
 
                 if (bc_x%beg >= 0) then      ! PBC at the end and beginning
 
-                    ! Send/receive buffer to/from bc_x%beg/bc_x%end
+                    ! buffer to/from bc_x%beg/bc_x%end
                     call MPI_SENDRECV( &
                         dx(0), buff_size, &
                         mpi_p, bc_x%beg, 1, &
@@ -1761,7 +1761,7 @@ contains
 
                 else                        ! PBC at the end only
 
-                    ! Send/receive buffer to/from bc_x%end/bc_x%end
+                    ! buffer to/from bc_x%end/bc_x%end
                     call MPI_SENDRECV( &
                         dx(m - buff_size + 1), buff_size, &
                         mpi_p, bc_x%end, 0, &
@@ -1772,16 +1772,16 @@ contains
                 end if
 
             end if
-            ! END: MPI Communication in x-direction
+            ! MPI Communication in x-direction
 
-            ! MPI Communication in y-direction
+            ! Communication in y-direction
         elseif (mpi_dir == 2) then
 
             if (pbc_loc == -1) then      ! PBC at the beginning
 
                 if (bc_y%end >= 0) then      ! PBC at the beginning and end
 
-                    ! Send/receive buffer to/from bc_y%end/bc_y%beg
+                    ! buffer to/from bc_y%end/bc_y%beg
                     call MPI_SENDRECV( &
                         dy(n - buff_size + 1), buff_size, &
                         mpi_p, bc_y%end, 0, &
@@ -1791,7 +1791,7 @@ contains
 
                 else                        ! PBC at the beginning only
 
-                    ! Send/receive buffer to/from bc_y%beg/bc_y%beg
+                    ! buffer to/from bc_y%beg/bc_y%beg
                     call MPI_SENDRECV( &
                         dy(0), buff_size, &
                         mpi_p, bc_y%beg, 1, &
@@ -1805,7 +1805,7 @@ contains
 
                 if (bc_y%beg >= 0) then      ! PBC at the end and beginning
 
-                    ! Send/receive buffer to/from bc_y%beg/bc_y%end
+                    ! buffer to/from bc_y%beg/bc_y%end
                     call MPI_SENDRECV( &
                         dy(0), buff_size, &
                         mpi_p, bc_y%beg, 1, &
@@ -1815,7 +1815,7 @@ contains
 
                 else                        ! PBC at the end only
 
-                    ! Send/receive buffer to/from bc_y%end/bc_y%end
+                    ! buffer to/from bc_y%end/bc_y%end
                     call MPI_SENDRECV( &
                         dy(n - buff_size + 1), buff_size, &
                         mpi_p, bc_y%end, 0, &
@@ -1826,16 +1826,16 @@ contains
                 end if
 
             end if
-            ! END: MPI Communication in y-direction
+            ! MPI Communication in y-direction
 
-            ! MPI Communication in z-direction
+            ! Communication in z-direction
         else
 
             if (pbc_loc == -1) then      ! PBC at the beginning
 
                 if (bc_z%end >= 0) then      ! PBC at the beginning and end
 
-                    ! Send/receive buffer to/from bc_z%end/bc_z%beg
+                    ! buffer to/from bc_z%end/bc_z%beg
                     call MPI_SENDRECV( &
                         dz(p - buff_size + 1), buff_size, &
                         mpi_p, bc_z%end, 0, &
@@ -1845,7 +1845,7 @@ contains
 
                 else                        ! PBC at the beginning only
 
-                    ! Send/receive buffer to/from bc_z%beg/bc_z%beg
+                    ! buffer to/from bc_z%beg/bc_z%beg
                     call MPI_SENDRECV( &
                         dz(0), buff_size, &
                         mpi_p, bc_z%beg, 1, &
@@ -1859,7 +1859,7 @@ contains
 
                 if (bc_z%beg >= 0) then      ! PBC at the end and beginning
 
-                    ! Send/receive buffer to/from bc_z%beg/bc_z%end
+                    ! buffer to/from bc_z%beg/bc_z%end
                     call MPI_SENDRECV( &
                         dz(0), buff_size, &
                         mpi_p, bc_z%beg, 1, &
@@ -1869,7 +1869,7 @@ contains
 
                 else                        ! PBC at the end only
 
-                    ! Send/receive buffer to/from bc_z%end/bc_z%end
+                    ! buffer to/from bc_z%end/bc_z%end
                     call MPI_SENDRECV( &
                         dz(p - buff_size + 1), buff_size, &
                         mpi_p, bc_z%end, 0, &
@@ -1882,7 +1882,7 @@ contains
             end if
 
         end if
-        ! END: MPI Communication in z-direction
+        ! MPI Communication in z-direction
 #endif
 
     end subroutine s_mpi_sendrecv_grid_variables_buffers

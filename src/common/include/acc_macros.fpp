@@ -305,4 +305,4 @@
     #:set acc_directive = '!$acc wait ' + clause_val + extraAccArgs_val.strip('\n')
     $:acc_directive
 #:enddef
-! New line at end of file is required for FYPP
+! line at end of file is required for FYPP

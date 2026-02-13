@@ -1,15 +1,15 @@
 !>
-!! @file p_main.f90
-!! @brief Contains program p_main
+!!
+!! program p_main
 
 !> @brief The post-process restructures raw unformatted data, outputted by
-!!              the simulation, into a formatted database, Silo-HDF5 or Binary,
-!!              chosen by the user. The user may also specify which variables to
-!!              include in the database. The choices range from any one of the
-!!              primitive and conservative variables, as well as quantities that
-!!              can be derived from those such as the unadvected volume fraction,
-!!              specific heat ratio, liquid stiffness, speed of sound, vorticity
-!!              and the numerical Schlieren function.
+!! into a formatted database, Silo-HDF5 or Binary,
+!! the user. The user may also specify which variables to
+!! the database. The choices range from any one of the
+!! conservative variables, as well as quantities that
+!! derived from those such as the unadvected volume fraction,
+!! ratio, liquid stiffness, speed of sound, vorticity
+!! numerical Schlieren function.
 program p_main
 
     use m_global_parameters     !< Global parameters for the code
@@ -20,8 +20,8 @@ program p_main
     integer :: t_step !< Iterator for the main time-stepping loop
 
     character(LEN=name_len) :: varname !<
-    !! Generic storage for the name(s) of the flow variable(s) that will be added
-    !! to the formatted database file(s)
+    !! for the name(s) of the flow variable(s) that will be added
+    !! formatted database file(s)
 
     real(wp) :: pres
     real(wp) :: c
@@ -36,18 +36,18 @@ program p_main
         t_step = n_start
         n_save = int(t_stop/t_save) + 1
     else
-        ! Setting the time-step iterator to the first time step to be post-processed
+        ! the time-step iterator to the first time step to be post-processed
         t_step = t_step_start
     end if
 
-    ! Time-Marching Loop
+    ! Loop
     do
 
-        ! If all time-steps are not ready to be post-processed and one rank is
-        ! faster than another, the slower rank processing the last available
-        ! step might be killed when the faster rank attempts to process the
-        ! first missing step, before the slower rank finishes writing the last
-        ! available step. To avoid this, we force synchronization here.
+        ! all time-steps are not ready to be post-processed and one rank is
+        ! than another, the slower rank processing the last available
+        ! might be killed when the faster rank attempts to process the
+        ! missing step, before the slower rank finishes writing the last
+        ! step. To avoid this, we force synchronization here.
         call s_mpi_barrier()
 
         call cpu_time(start)
@@ -71,11 +71,11 @@ program p_main
                 exit
             end if
         else
-            ! Modifies the time-step iterator so that it may reach the final time-
-            ! step to be post-processed, in the case that this one is not originally
-            ! attainable through constant incrementation from the first time-step.
-            ! This modification is performed upon reaching the final time-step. In
-            ! case that it is not needed, the post-processor is done and may exit.
+            ! the time-step iterator so that it may reach the final time-
+            ! to be post-processed, in the case that this one is not originally
+            ! through constant incrementation from the first time-step.
+            ! modification is performed upon reaching the final time-step. In
+            ! that it is not needed, the post-processor is done and may exit.
             if ((t_step_stop - t_step) < t_step_save .and. t_step_stop /= t_step) then
                 t_step = t_step_stop - t_step_save
             elseif (t_step == t_step_stop) then
@@ -86,12 +86,12 @@ program p_main
         if (cfl_dt) then
             t_step = t_step + 1
         else
-            ! Incrementing time-step iterator to next time-step to be post-processed
+            ! time-step iterator to next time-step to be post-processed
             t_step = t_step + t_step_save
         end if
 
     end do
-    ! END: Time-Marching Loop
+    ! Time-Marching Loop
 
     close (11)
 

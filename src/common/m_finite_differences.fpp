@@ -61,15 +61,15 @@ contains
     end subroutine s_compute_fd_divergence
 
     !>  The purpose of this subroutine is to compute the finite-
-    !!      difference coefficients for the centered schemes utilized
-    !!      in computations of first order spatial derivatives in the
-    !!      s-coordinate direction. The s-coordinate direction refers
-    !!      to the x-, y- or z-coordinate direction, depending on the
-    !!      subroutine's inputs. Note that coefficients of up to 4th
-    !!      order accuracy are available.
-    !!  @param q Number of cells in the s-coordinate direction
-    !!  @param s_cc Locations of the cell-centers in the s-coordinate direction
-    !!  @param fd_coeff_s Finite-diff. coefficients in the s-coordinate direction
+    !! for the centered schemes utilized
+    !! of first order spatial derivatives in the
+    !! The s-coordinate direction refers
+    !! x-, y- or z-coordinate direction, depending on the
+    !! Note that coefficients of up to 4th
+    !! are available.
+    !! Number of cells in the s-coordinate direction
+    !! Locations of the cell-centers in the s-coordinate direction
+    !! Finite-diff. coefficients in the s-coordinate direction
     subroutine s_compute_finite_difference_coefficients(q, s_cc, fd_coeff_s, local_buff_size, &
                                                         fd_number_in, fd_order_in, offset_s)
 
@@ -98,7 +98,7 @@ contains
         allocate (fd_coeff_s(-fd_number_in:fd_number_in, lb:lE))
 #endif
 
-        ! Computing the 1st order finite-difference coefficients
+        ! the 1st order finite-difference coefficients
         if (fd_order_in == 1) then
             do i = lB, lE
                 fd_coeff_s(-1, i) = 0._wp
@@ -106,7 +106,7 @@ contains
                 fd_coeff_s(1, i) = -fd_coeff_s(0, i)
             end do
 
-            ! Computing the 2nd order finite-difference coefficients
+            ! the 2nd order finite-difference coefficients
         elseif (fd_order_in == 2) then
             do i = lB, lE
                 fd_coeff_s(-1, i) = -1._wp/(s_cc(i + 1) - s_cc(i - 1))
@@ -114,7 +114,7 @@ contains
                 fd_coeff_s(1, i) = -fd_coeff_s(-1, i)
             end do
 
-            ! Computing the 4th order finite-difference coefficients
+            ! the 4th order finite-difference coefficients
         else
             do i = lB, lE
                 fd_coeff_s(-2, i) = 1._wp/(s_cc(i - 2) - 8._wp*s_cc(i - 1) - s_cc(i + 2) + 8._wp*s_cc(i + 1))

@@ -1,6 +1,6 @@
 !>
-!! @file m_fftw.f90
-!! @brief Contains module m_fftw
+!!
+!! module m_fftw
 
 #:include 'macros.fpp'
 
@@ -39,10 +39,10 @@ module m_fftw
     real(c_double), pointer :: data_real(:) !< Real data
 
     complex(c_double_complex), pointer :: data_cmplx(:) !<
-    !! Complex data in Fourier space
+    !! in Fourier space
 
     complex(c_double_complex), pointer :: data_fltr_cmplx(:) !<
-    !! Filtered complex data in Fourier space
+    !! data in Fourier space
 
 #if defined(MFC_GPU)
     $:GPU_DECLARE(create='[real_size,cmplx_size,x_size,batch_size,Nfq]')
@@ -52,11 +52,15 @@ module m_fftw
     complex(dp), allocatable, target :: data_fltr_cmplx_gpu(:)
     $:GPU_DECLARE(create='[data_real_gpu,data_cmplx_gpu,data_fltr_cmplx_gpu]')
 
+!> @cond
 #if defined(__PGI)
     integer :: fwd_plan_gpu, bwd_plan_gpu
 #else
-    type(c_ptr) :: fwd_plan_gpu, bwd_plan_gpu
+!> @endcond
+    type(c_ptr) :: fwd_plan_gpu, bwd_plan_gpu !< GPU FFT plan handles
+!> @cond
 #endif
+!> @endcond
 
     integer, allocatable :: gpu_fft_size(:), iembed(:), oembed(:)
 
@@ -66,15 +70,15 @@ module m_fftw
 contains
 
     !>  The purpose of this subroutine is to create the fftw plan
-        !!      that will be used in the forward and backward DFTs when
-        !!      applying the Fourier filter in the azimuthal direction.
+        !! be used in the forward and backward DFTs when
+        !! Fourier filter in the azimuthal direction.
     impure subroutine s_initialize_fftw_module
 
         integer :: ierr !< Generic flag used to identify and report GPU errors
 
-        ! Size of input array going into DFT
+        ! of input array going into DFT
         real_size = p + 1
-        ! Size of output array coming out of DFT
+        ! of output array coming out of DFT
         cmplx_size = (p + 1)/2 + 1
 
         x_size = m + 1
@@ -91,16 +95,16 @@ contains
         $:GPU_ENTER_DATA(copyin='[real_size,cmplx_size,x_size,sys_size,batch_size,Nfq]')
         $:GPU_UPDATE(device='[real_size,cmplx_size,x_size,sys_size,batch_size]')
 #else
-        ! Allocate input and output DFT data sizes
+        ! input and output DFT data sizes
         fftw_real_data = fftw_alloc_real(int(real_size, c_size_t))
         fftw_cmplx_data = fftw_alloc_complex(int(cmplx_size, c_size_t))
         fftw_fltr_cmplx_data = fftw_alloc_complex(int(cmplx_size, c_size_t))
-        ! Associate input and output data pointers with allocated memory
+        ! input and output data pointers with allocated memory
         call c_f_pointer(fftw_real_data, data_real, [real_size])
         call c_f_pointer(fftw_cmplx_data, data_cmplx, [cmplx_size])
         call c_f_pointer(fftw_fltr_cmplx_data, data_fltr_cmplx, [cmplx_size])
 
-        ! Generate plans for forward and backward DFTs
+        ! plans for forward and backward DFTs
         fwd_plan = fftw_plan_dft_r2c_1d(real_size, data_real, data_cmplx, FFTW_ESTIMATE)
         bwd_plan = fftw_plan_dft_c2r_1d(real_size, data_fltr_cmplx, data_real, FFTW_ESTIMATE)
 #endif
@@ -123,17 +127,17 @@ contains
     end subroutine s_initialize_fftw_module
 
     !>  The purpose of this subroutine is to apply a Fourier low-
-        !!      pass filter to the flow variables in the azimuthal direction
-        !!      to remove the high-frequency content. This alleviates the
-        !!      restrictive CFL condition arising from cells near the axis.
-        !! @param q_cons_vf Conservative variables
+        !! to the flow variables in the azimuthal direction
+        !! the high-frequency content. This alleviates the
+        !! condition arising from cells near the axis.
+        !! Conservative variables
     impure subroutine s_apply_fourier_filter(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         integer :: i, j, k, l !< Generic loop iterators
         integer :: ierr !< Generic flag used to identify and report GPU errors
 
-        ! Restrict filter to processors that have cells adjacent to axis
+        ! filter to processors that have cells adjacent to axis
         if (bc_y%beg >= 0) return
 #if defined(MFC_GPU)
 
@@ -277,7 +281,7 @@ contains
             end do
         end do
 
-        ! Apply Fourier filter to additional rings
+        ! Fourier filter to additional rings
         do i = 1, fourier_rings
             Nfq = min(floor(2_dp*real(i, dp)*pi), cmplx_size)
             do j = 0, m
@@ -297,8 +301,8 @@ contains
     end subroutine s_apply_fourier_filter
 
     !>  The purpose of this subroutine is to destroy the fftw plan
-        !!      that will be used in the forward and backward DFTs when
-        !!      applying the Fourier filter in the azimuthal direction.
+        !! be used in the forward and backward DFTs when
+        !! Fourier filter in the azimuthal direction.
     impure subroutine s_finalize_fftw_module
 
 #if defined(MFC_GPU)

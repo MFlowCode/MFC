@@ -421,7 +421,7 @@ def generate_parameter_docs() -> str:  # pylint: disable=too-many-locals,too-man
 
     # Document each family
     for family, params in sorted_families:
-        lines.append(f"## {family}")
+        lines.append(f"## {family} {{#{family}}}")
         lines.append("")
 
         desc = family_descriptions.get(family, "")

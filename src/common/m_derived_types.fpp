@@ -1,11 +1,11 @@
 !>
-!! @file m_derived_types.f90
-!! @brief Contains module m_derived_types
+!!
+!! module m_derived_types
 
 #:include "macros.fpp"
 
 !> @brief This file contains the definitions of all of the custom-defined
-!!              types used in the pre-process code.
+!! in the pre-process code.
 module m_derived_types
 
     use m_constants  !< Constants
@@ -75,7 +75,7 @@ module m_derived_types
     end type vector_field
 
     !> Generic 3-component vector (e.g., spatial coordinates or field components)
-    !! Named _dt (derived types: x,y,z) to differentiate from t_vec3 (3-component vector)
+    !! (derived types: x,y,z) to differentiate from t_vec3 (3-component vector)
     type vec3_dt ! dt for derived types
         real(wp) :: x
         real(wp) :: y
@@ -143,23 +143,23 @@ module m_derived_types
     !> Defines parameters for a Model Patch
     type ic_model_parameters
         character(LEN=pathlen_max) :: filepath !<
-        !! Path the STL file relative to case_dir.
+        !! STL file relative to case_dir.
 
         real(wp), dimension(1:3) :: translate !<
-        !! Translation of the STL object.
+        !! the STL object.
 
         real(wp), dimension(1:3) :: scale !<
-        !! Scale factor for the STL object.
+        !! for the STL object.
 
         real(wp), dimension(1:3) :: rotate !<
-        !! Angle to rotate the STL object along each cartesian coordinate axis,
-        !! in radians.
+        !! rotate the STL object along each cartesian coordinate axis,
+        !!
 
         integer :: spc !<
-        !! Number of samples per cell to use when discretizing the STL object.
+        !! samples per cell to use when discretizing the STL object.
 
         real(wp) :: threshold !<
-        !! Threshold to turn on smoothen STL patch.
+        !! turn on smoothen STL patch.
     end type ic_model_parameters
 
     type :: t_triangle
@@ -183,54 +183,54 @@ module m_derived_types
     end type t_model
 
     !> Derived type adding initial condition (ic) patch parameters as attributes
-    !! NOTE: The requirements for the specification of the above parameters
-    !! are strongly dependent on both the choice of the multicomponent flow
-    !! model as well as the choice of the patch geometry.
+    !! requirements for the specification of the above parameters
+    !! dependent on both the choice of the multicomponent flow
+    !! well as the choice of the patch geometry.
     type ic_patch_parameters
 
         integer :: geometry !< Type of geometry for the patch
 
         real(wp) :: x_centroid, y_centroid, z_centroid !<
-        !! Location of the geometric center, i.e. the centroid, of the patch. It
-        !! is specified through its x-, y- and z-coordinates, respectively.
+        !! the geometric center, i.e. the centroid, of the patch. It
+        !! through its x-, y- and z-coordinates, respectively.
 
         real(wp) :: length_x, length_y, length_z !< Dimensions of the patch. x,y,z Lengths.
         real(wp) :: radius !< Dimensions of the patch. radius.
 
         real(wp), dimension(3) :: radii !<
-        !! Vector indicating the various radii for the elliptical and ellipsoidal
-        !! patch geometries. It is specified through its x-, y-, and z-components
-        !! respectively.
+        !! the various radii for the elliptical and ellipsoidal
+        !! It is specified through its x-, y-, and z-components
+        !!
 
         real(wp) :: epsilon, beta !<
-        !! The isentropic vortex parameters for the amplitude of the disturbance and
-        !! domain of influence.
+        !! vortex parameters for the amplitude of the disturbance and
+        !! influence.
 
         real(wp), dimension(2:9) :: a !<
-        !! The parameters needed for the spherical harmonic patch
+        !! needed for the spherical harmonic patch
 
         logical :: non_axis_sym
 
         real(wp), dimension(3) :: normal !<
-        !! Normal vector indicating the orientation of the patch. It is specified
-        !! through its x-, y- and z-components, respectively.
+        !! indicating the orientation of the patch. It is specified
+        !! x-, y- and z-components, respectively.
 
         logical, dimension(0:num_patches_max - 1) :: alter_patch !<
 
-        !! List of permissions that indicate to the current patch which preceding
-        !! patches it is allowed to overwrite when it is in process of being laid
-        !! out in the domain
+        !! permissions that indicate to the current patch which preceding
+        !! is allowed to overwrite when it is in process of being laid
+        !! the domain
 
         logical :: smoothen !<
-        !! Permission indicating to the current patch whether its boundaries will
-        !! be smoothed out across a few cells or whether they are to remain sharp
+        !! to the current patch whether its boundaries will
+        !! out across a few cells or whether they are to remain sharp
 
         integer :: smooth_patch_id !<
-        !! Identity (id) of the patch with which current patch is to get smoothed
+        !! of the patch with which current patch is to get smoothed
 
         real(wp) :: smooth_coeff !<
-        !! Smoothing coefficient (coeff) for the size of the stencil of
-        !! cells across which boundaries of the current patch will be smeared out
+        !! (coeff) for the size of the stencil of
+        !! which boundaries of the current patch will be smeared out
 
         real(wp), dimension(num_fluids_max) :: alpha_rho
         real(wp) :: rho
@@ -243,15 +243,15 @@ module m_derived_types
         real(wp) :: qv !<
         real(wp) :: qvp !<
 
-        !! Primitive variables associated with the patch. In order, these include
-        !! the partial densities, density, velocity, pressure, volume fractions,
-        !! specific heat ratio function and the liquid stiffness function.
+        !! associated with the patch. In order, these include
+        !! densities, density, velocity, pressure, volume fractions,
+        !! ratio function and the liquid stiffness function.
 
         real(wp) :: Bx, By, Bz !<
-        !! Magnetic field components; B%x is not used for 1D
+        !! components; B%x is not used for 1D
 
         real(wp), dimension(6) :: tau_e !<
-        !! Elastic stresses added to primitive variables if hypoelasticity = True
+        !! added to primitive variables if hypoelasticity = True
 
         real(wp) :: R0 !< Bubble size
         real(wp) :: V0 !< Bubble velocity
@@ -260,30 +260,30 @@ module m_derived_types
         real(wp) :: m0 !< Bubble velocity
 
         integer :: hcid
-        !! id for hard coded initial condition
+        !! hard coded initial condition
 
         real(wp) :: cf_val !! color function value
         real(wp) :: Y(1:num_species)
 
-        !! STL or OBJ model input parameter
+        !! OBJ model input parameter
         character(LEN=pathlen_max) :: model_filepath !<
-        !! Path the STL file relative to case_dir.
+        !! STL file relative to case_dir.
 
         real(wp), dimension(1:3) :: model_translate !<
-        !! Translation of the STL object.
+        !! the STL object.
 
         real(wp), dimension(1:3) :: model_scale !<
-        !! Scale factor for the STL object.
+        !! for the STL object.
 
         real(wp), dimension(1:3) :: model_rotate !<
-        !! Angle to rotate the STL object along each cartesian coordinate axis,
-        !! in radians.
+        !! rotate the STL object along each cartesian coordinate axis,
+        !!
 
         integer :: model_spc !<
-        !! Number of samples per cell to use when discretizing the STL object.
+        !! samples per cell to use when discretizing the STL object.
 
         real(wp) :: model_threshold !<
-        !! Threshold to turn on smoothen STL patch.
+        !! turn on smoothen STL patch.
 
     end type ic_patch_parameters
 
@@ -292,10 +292,10 @@ module m_derived_types
         integer :: geometry !< Type of geometry for the patch
 
         real(wp) :: x_centroid, y_centroid, z_centroid !<
-        !! Location of the geometric center, i.e. the centroid, of the patch. It
-        !! is specified through its x-, y- and z-coordinates, respectively.
+        !! the geometric center, i.e. the centroid, of the patch. It
+        !! through its x-, y- and z-coordinates, respectively.
         real(wp) :: step_x_centroid, step_y_centroid, step_z_centroid !<
-        !! Centroid locations of intermediate steps in the time_stepper module
+        !! of intermediate steps in the time_stepper module
         real(wp), dimension(1:3) :: centroid_offset ! offset of center of mass from computed cell center for odd-shaped IBs
 
         real(wp), dimension(1:3) :: angles
@@ -311,27 +311,27 @@ module m_derived_types
 
         logical :: slip
 
-        !! STL or OBJ model input parameter
+        !! OBJ model input parameter
         character(LEN=pathlen_max) :: model_filepath !<
-        !! Path the STL file relative to case_dir.
+        !! STL file relative to case_dir.
 
         real(wp), dimension(1:3) :: model_translate !<
-        !! Translation of the STL object.
+        !! the STL object.
 
         real(wp), dimension(1:3) :: model_scale !<
-        !! Scale factor for the STL object.
+        !! for the STL object.
 
         real(wp), dimension(1:3) :: model_rotate !<
-        !! Angle to rotate the STL object along each cartesian coordinate axis,
-        !! in radians.
+        !! rotate the STL object along each cartesian coordinate axis,
+        !!
 
         integer :: model_spc !<
-        !! Number of samples per cell to use when discretizing the STL object.
+        !! samples per cell to use when discretizing the STL object.
 
         real(wp) :: model_threshold !<
-        !! Threshold to turn on smoothen STL patch.
+        !! turn on smoothen STL patch.
 
-        !! Patch conditions for moving imersed boundaries
+        !! for moving imersed boundaries
         integer :: moving_ibm ! 0 for no moving, 1 for moving, 2 for moving on forced path
         real(wp) :: mass, moment ! mass and moment of inertia of object used to compute forces in 2-way coupling
         real(wp), dimension(1:3) :: force, torque ! vectors for the computed force and torque values applied to an IB
@@ -343,7 +343,7 @@ module m_derived_types
     end type ib_patch_parameters
 
     !> Derived type annexing the physical parameters (PP) of the fluids. These
-    !! include the specific heat ratio function and liquid stiffness function.
+    !! specific heat ratio function and liquid stiffness function.
     type physical_parameters
         real(wp) :: gamma   !< Sp. heat ratio
         real(wp) :: pi_inf  !< Liquid stiffness

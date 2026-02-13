@@ -1,6 +1,6 @@
 !>
-!! @file m_patches.fpp
-!! @brief Contains module m_patches
+!!
+!! module m_patches
 
 #:include 'case.fpp'
 #:include 'ExtrusionHardcodedIC.fpp'
@@ -42,27 +42,27 @@ module m_icpp_patches
 
     integer :: smooth_patch_id
     real(wp) :: smooth_coeff !<
-    !! These variables are analogous in both meaning and use to the similarly
-    !! named components in the ic_patch_parameters type (see m_derived_types.f90
-    !! for additional details). They are employed as a means to more concisely
-    !! perform the actions necessary to lay out a particular patch on the grid.
+    !! are analogous in both meaning and use to the similarly
+    !! in the ic_patch_parameters type (see m_derived_types.f90
+    !! details). They are employed as a means to more concisely
+    !! actions necessary to lay out a particular patch on the grid.
 
     real(wp) :: eta !<
-    !! In the case that smoothing of patch boundaries is enabled and the boundary
-    !! between two adjacent patches is to be smeared out, this variable's purpose
-    !! is to act as a pseudo volume fraction to indicate the contribution of each
-    !! patch toward the composition of a cell's fluid state.
+    !! case that smoothing of patch boundaries is enabled and the boundary
+    !! adjacent patches is to be smeared out, this variable's purpose
+    !! act as a pseudo volume fraction to indicate the contribution of each
+    !! the composition of a cell's fluid state.
 
     real(wp) :: cart_x, cart_y, cart_z
     real(wp) :: sph_phi !<
-    !! Variables to be used to hold cell locations in Cartesian coordinates if
-    !! 3D simulation is using cylindrical coordinates
+    !! be used to hold cell locations in Cartesian coordinates if
+    !! is using cylindrical coordinates
 
     type(bounds_info) :: x_boundary, y_boundary, z_boundary  !<
-    !! These variables combine the centroid and length parameters associated with
-    !! a particular patch to yield the locations of the patch boundaries in the
-    !! x-, y- and z-coordinate directions. They are used as a means to concisely
-    !! perform the actions necessary to lay out a particular patch on the grid.
+    !! combine the centroid and length parameters associated with
+    !! patch to yield the locations of the patch boundaries in the
+    !! and z-coordinate directions. They are used as a means to concisely
+    !! actions necessary to lay out a particular patch on the grid.
 
     character(len=5) :: istr ! string to store int to string result for error checking
 
@@ -78,7 +78,7 @@ contains
 #endif
         integer :: i
 
-        !  3D Patch Geometries
+        !  Patch Geometries
         if (p > 0) then
 
             do i = 1, num_patches
@@ -89,35 +89,35 @@ contains
 
                 !> ICPP Patches
                 !> @{
-                ! Spherical patch
+                ! patch
                 if (patch_icpp(i)%geometry == 8) then
                     call s_icpp_sphere(i, patch_id_fp, q_prim_vf)
-                    ! Cuboidal patch
+                    ! patch
                 elseif (patch_icpp(i)%geometry == 9) then
                     call s_icpp_cuboid(i, patch_id_fp, q_prim_vf)
-                    ! Cylindrical patch
+                    ! patch
                 elseif (patch_icpp(i)%geometry == 10) then
                     call s_icpp_cylinder(i, patch_id_fp, q_prim_vf)
-                    ! Swept plane patch
+                    ! plane patch
                 elseif (patch_icpp(i)%geometry == 11) then
                     call s_icpp_sweep_plane(i, patch_id_fp, q_prim_vf)
-                    ! Ellipsoidal patch
+                    ! patch
                 elseif (patch_icpp(i)%geometry == 12) then
                     call s_icpp_ellipsoid(i, patch_id_fp, q_prim_vf)
-                    ! Spherical harmonic patch
+                    ! harmonic patch
                 elseif (patch_icpp(i)%geometry == 14) then
                     call s_icpp_spherical_harmonic(i, patch_id_fp, q_prim_vf)
-                    ! 3D Modified circular patch
+                    ! Modified circular patch
                 elseif (patch_icpp(i)%geometry == 19) then
                     call s_icpp_3dvarcircle(i, patch_id_fp, q_prim_vf)
-                    ! 3D STL patch
+                    ! STL patch
                 elseif (patch_icpp(i)%geometry == 21) then
                     call s_icpp_model(i, patch_id_fp, q_prim_vf)
                 end if
             end do
             !> @}
 
-            ! 2D Patch Geometries
+            ! Patch Geometries
         elseif (n > 0) then
 
             do i = 1, num_patches
@@ -128,42 +128,42 @@ contains
 
                 !> ICPP Patches
                 !> @{
-                ! Circular patch
+                ! patch
                 if (patch_icpp(i)%geometry == 2) then
                     call s_icpp_circle(i, patch_id_fp, q_prim_vf)
-                    ! Rectangular patch
+                    ! patch
                 elseif (patch_icpp(i)%geometry == 3) then
                     call s_icpp_rectangle(i, patch_id_fp, q_prim_vf)
-                    ! Swept line patch
+                    ! line patch
                 elseif (patch_icpp(i)%geometry == 4) then
                     call s_icpp_sweep_line(i, patch_id_fp, q_prim_vf)
-                    ! Elliptical patch
+                    ! patch
                 elseif (patch_icpp(i)%geometry == 5) then
                     call s_icpp_ellipse(i, patch_id_fp, q_prim_vf)
-                    ! Unimplemented patch (formerly isentropic vortex)
+                    ! patch (formerly isentropic vortex)
                 elseif (patch_icpp(i)%geometry == 6) then
                     call s_mpi_abort('This used to be the isentropic vortex patch, '// &
                                      'which no longer exists. See Examples. Exiting.')
-                    ! Spherical Harmonic Patch
+                    ! Harmonic Patch
                 elseif (patch_icpp(i)%geometry == 14) then
                     call s_icpp_spherical_harmonic(i, patch_id_fp, q_prim_vf)
-                    ! Spiral patch
+                    ! patch
                 elseif (patch_icpp(i)%geometry == 17) then
                     call s_icpp_spiral(i, patch_id_fp, q_prim_vf)
-                    ! Modified circular patch
+                    ! circular patch
                 elseif (patch_icpp(i)%geometry == 18) then
                     call s_icpp_varcircle(i, patch_id_fp, q_prim_vf)
-                    ! TaylorGreen vortex patch
+                    ! vortex patch
                 elseif (patch_icpp(i)%geometry == 20) then
                     call s_icpp_2D_TaylorGreen_vortex(i, patch_id_fp, q_prim_vf)
-                    ! STL patch
+                    ! patch
                 elseif (patch_icpp(i)%geometry == 21) then
                     call s_icpp_model(i, patch_id_fp, q_prim_vf)
                 end if
                 !> @}
             end do
 
-            ! 1D Patch Geometries
+            ! Patch Geometries
         else
 
             do i = 1, num_patches
@@ -172,10 +172,10 @@ contains
                     print *, 'Processing patch', i
                 end if
 
-                ! Line segment patch
+                ! segment patch
                 if (patch_icpp(i)%geometry == 1) then
                     call s_icpp_line_segment(i, patch_id_fp, q_prim_vf)
-                    ! 1d analytical
+                    ! analytical
                 elseif (patch_icpp(i)%geometry == 16) then
                     call s_icpp_1d_bubble_pulse(i, patch_id_fp, q_prim_vf)
                 end if
@@ -186,14 +186,14 @@ contains
     end subroutine s_apply_icpp_patches
 
     !>          The line segment patch is a 1D geometry that may be used,
-    !!              for example, in creating a Riemann problem. The geometry
-    !!              of the patch is well-defined when its centroid and length
-    !!              in the x-coordinate direction are provided. Note that the
-    !!              line segment patch DOES NOT allow for the smearing of its
-    !!              boundaries.
-    !! @param patch_id patch identifier
-    !! @param patch_id_fp Array to track patch ids
-    !! @param q_prim_vf Array of primitive variables
+    !! in creating a Riemann problem. The geometry
+    !! patch is well-defined when its centroid and length
+    !! x-coordinate direction are provided. Note that the
+    !! patch DOES NOT allow for the smearing of its
+    !!
+    !! patch identifier
+    !! Array to track patch ids
+    !! Array of primitive variables
     subroutine s_icpp_line_segment(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
@@ -204,10 +204,10 @@ contains
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
-        ! Generic loop iterators
+        ! loop iterators
         integer :: i, j, k
 
-        ! Placeholders for the cell boundary values
+        ! for the cell boundary values
         real(wp) :: pi_inf, gamma, lit_gamma
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded1DVariables()
@@ -218,25 +218,25 @@ contains
         j = 0
         k = 0
 
-        ! Transferring the line segment's centroid and length information
+        ! the line segment's centroid and length information
         x_centroid = patch_icpp(patch_id)%x_centroid
         length_x = patch_icpp(patch_id)%length_x
 
-        ! Computing the beginning and end x-coordinates of the line segment
-        ! based on its centroid and length
+        ! the beginning and end x-coordinates of the line segment
+        ! on its centroid and length
         x_boundary%beg = x_centroid - 0.5_wp*length_x
         x_boundary%end = x_centroid + 0.5_wp*length_x
 
-        ! Since the line segment patch does not allow for its boundaries to
-        ! be smoothed out, the pseudo volume fraction is set to 1 to ensure
-        ! that only the current patch contributes to the fluid state in the
-        ! cells that this patch covers.
+        ! the line segment patch does not allow for its boundaries to
+        ! smoothed out, the pseudo volume fraction is set to 1 to ensure
+        ! only the current patch contributes to the fluid state in the
+        ! that this patch covers.
         eta = 1._wp
 
-        ! Checking whether the line segment covers a particular cell in the
-        ! domain and verifying whether the current patch has the permission
-        ! to write to that cell. If both queries check out, the primitive
-        ! variables of the current patch are assigned to this cell.
+        ! whether the line segment covers a particular cell in the
+        ! and verifying whether the current patch has the permission
+        ! write to that cell. If both queries check out, the primitive
+        ! of the current patch are assigned to this cell.
         do i = 0, m
             if (x_boundary%beg <= x_cc(i) .and. &
                 x_boundary%end >= x_cc(i) .and. &
@@ -247,12 +247,12 @@ contains
 
                 @:analytical()
 
-                ! check if this should load a hardcoded patch
+                ! if this should load a hardcoded patch
                 if (patch_icpp(patch_id)%hcid /= dflt_int) then
                     @:Hardcoded1D()
                 end if
 
-                ! Updating the patch identities bookkeeping variable
+                ! the patch identities bookkeeping variable
                 if (1._wp - eta < sgm_eps) patch_id_fp(i, 0, 0) = patch_id
 
             end if
@@ -262,12 +262,12 @@ contains
     end subroutine s_icpp_line_segment
 
     !>  The spiral patch is a 2D geometry that may be used, The geometry
-        !!              of the patch is well-defined when its centroid and radius
-        !!              are provided. Note that the circular patch DOES allow for
-        !!              the smoothing of its boundary.
-        !! @param patch_id patch identifier
-        !! @param patch_id_fp Array to track patch ids
-        !! @param q_prim_vf Array of primitive variables
+        !! patch is well-defined when its centroid and radius
+        !! Note that the circular patch DOES allow for
+        !! of its boundary.
+        !! patch identifier
+        !! Array to track patch ids
+        !! Array of primitive variables
     impure subroutine s_icpp_spiral(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
@@ -284,8 +284,8 @@ contains
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded2DVariables()
 
-        ! Transferring the circular patch's radius, centroid, smearing patch
-        ! identity and smearing coefficient information
+        ! the circular patch's radius, centroid, smearing patch
+        ! and smearing coefficient information
         x_centroid = patch_icpp(patch_id)%x_centroid
         y_centroid = patch_icpp(patch_id)%y_centroid
         mya = patch_icpp(patch_id)%radius
@@ -326,7 +326,7 @@ contains
                         @:Hardcoded2D()
                     end if
 
-                    ! Updating the patch identities bookkeeping variable
+                    ! the patch identities bookkeeping variable
                     if (1._wp - eta < sgm_eps) patch_id_fp(i, j, 0) = patch_id
                 end if
             end do
@@ -336,13 +336,13 @@ contains
     end subroutine s_icpp_spiral
 
     !> The circular patch is a 2D geometry that may be used, for
-        !!              example, in creating a bubble or a droplet. The geometry
-        !!              of the patch is well-defined when its centroid and radius
-        !!              are provided. Note that the circular patch DOES allow for
-        !!              the smoothing of its boundary.
-        !! @param patch_id is the patch identifier
-        !! @param patch_id_fp Array to track patch ids
-        !! @param q_prim_vf Array of primitive variables
+        !! creating a bubble or a droplet. The geometry
+        !! patch is well-defined when its centroid and radius
+        !! Note that the circular patch DOES allow for
+        !! of its boundary.
+        !! is the patch identifier
+        !! Array to track patch ids
+        !! Array of primitive variables
     subroutine s_icpp_circle(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
@@ -359,8 +359,8 @@ contains
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded2DVariables()
 
-        ! Transferring the circular patch's radius, centroid, smearing patch
-        ! identity and smearing coefficient information
+        ! the circular patch's radius, centroid, smearing patch
+        ! and smearing coefficient information
 
         x_centroid = patch_icpp(patch_id)%x_centroid
         y_centroid = patch_icpp(patch_id)%y_centroid
@@ -368,15 +368,15 @@ contains
         smooth_patch_id = patch_icpp(patch_id)%smooth_patch_id
         smooth_coeff = patch_icpp(patch_id)%smooth_coeff
 
-        ! Initializing the pseudo volume fraction value to 1. The value will
-        ! be modified as the patch is laid out on the grid, but only in the
-        ! case that smoothing of the circular patch's boundary is enabled.
+        ! the pseudo volume fraction value to 1. The value will
+        ! modified as the patch is laid out on the grid, but only in the
+        ! that smoothing of the circular patch's boundary is enabled.
         eta = 1._wp
 
-        ! Checking whether the circle covers a particular cell in the domain
-        ! and verifying whether the current patch has permission to write to
-        ! that cell. If both queries check out, the primitive variables of
-        ! the current patch are assigned to this cell.
+        ! whether the circle covers a particular cell in the domain
+        ! verifying whether the current patch has permission to write to
+        ! cell. If both queries check out, the primitive variables of
+        ! current patch are assigned to this cell.
 
         do j = 0, n
             do i = 0, m
@@ -414,13 +414,13 @@ contains
     end subroutine s_icpp_circle
 
     !>  The varcircle patch is a 2D geometry that may be used
-        !!             . It  generatres an annulus
-        !! @param patch_id is the patch identifier
-        !! @param patch_id_fp Array to track patch ids
-        !! @param q_prim_vf Array of primitive variables
+        !!  generatres an annulus
+        !! is the patch identifier
+        !! Array to track patch ids
+        !! Array of primitive variables
     subroutine s_icpp_varcircle(patch_id, patch_id_fp, q_prim_vf)
 
-        ! Patch identifier
+        ! identifier
         integer, intent(in) :: patch_id
 #ifdef MFC_MIXED_PRECISION
         integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
@@ -429,14 +429,14 @@ contains
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
-        ! Generic loop iterators
+        ! loop iterators
         integer :: i, j, k
         real(wp) :: radius, myr, thickness
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded2DVariables()
 
-        ! Transferring the circular patch's radius, centroid, smearing patch
-        ! identity and smearing coefficient information
+        ! the circular patch's radius, centroid, smearing patch
+        ! and smearing coefficient information
         x_centroid = patch_icpp(patch_id)%x_centroid
         y_centroid = patch_icpp(patch_id)%y_centroid
         radius = patch_icpp(patch_id)%radius
@@ -444,15 +444,15 @@ contains
         smooth_coeff = patch_icpp(patch_id)%smooth_coeff
         thickness = patch_icpp(patch_id)%epsilon
 
-        ! Initializing the pseudo volume fraction value to 1. The value will
-        ! be modified as the patch is laid out on the grid, but only in the
-        ! case that smoothing of the circular patch's boundary is enabled.
+        ! the pseudo volume fraction value to 1. The value will
+        ! modified as the patch is laid out on the grid, but only in the
+        ! that smoothing of the circular patch's boundary is enabled.
         eta = 1._wp
 
-        ! Checking whether the circle covers a particular cell in the domain
-        ! and verifying whether the current patch has permission to write to
-        ! that cell. If both queries check out, the primitive variables of
-        ! the current patch are assigned to this cell.
+        ! whether the circle covers a particular cell in the domain
+        ! verifying whether the current patch has permission to write to
+        ! cell. If both queries check out, the primitive variables of
+        ! current patch are assigned to this cell.
         do j = 0, n
             do i = 0, m
                 myr = sqrt((x_cc(i) - x_centroid)**2 &
@@ -470,7 +470,7 @@ contains
                         @:Hardcoded2D()
                     end if
 
-                    ! Updating the patch identities bookkeeping variable
+                    ! the patch identities bookkeeping variable
                     if (1._wp - eta < sgm_eps) patch_id_fp(i, j, 0) = patch_id
 
                     q_prim_vf(alf_idx)%sf(i, j, 0) = patch_icpp(patch_id)%alpha(1)* &
@@ -483,12 +483,12 @@ contains
 
     end subroutine s_icpp_varcircle
 
-    !! @param patch_id is the patch identifier
-    !! @param patch_id_fp Array to track patch ids
-    !! @param q_prim_vf Array of primitive variables
+    !! is the patch identifier
+    !! Array to track patch ids
+    !! Array of primitive variables
     subroutine s_icpp_3dvarcircle(patch_id, patch_id_fp, q_prim_vf)
 
-        ! Patch identifier
+        ! identifier
         integer, intent(in) :: patch_id
 #ifdef MFC_MIXED_PRECISION
         integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
@@ -497,14 +497,14 @@ contains
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
-        ! Generic loop iterators
+        ! loop iterators
         integer :: i, j, k
         real(wp) :: radius, myr, thickness
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded3DVariables()
 
-        ! Transferring the circular patch's radius, centroid, smearing patch
-        ! identity and smearing coefficient information
+        ! the circular patch's radius, centroid, smearing patch
+        ! and smearing coefficient information
         x_centroid = patch_icpp(patch_id)%x_centroid
         y_centroid = patch_icpp(patch_id)%y_centroid
         z_centroid = patch_icpp(patch_id)%z_centroid
@@ -514,17 +514,17 @@ contains
         smooth_coeff = patch_icpp(patch_id)%smooth_coeff
         thickness = patch_icpp(patch_id)%epsilon
 
-        ! Initializing the pseudo volume fraction value to 1. The value will
-        ! be modified as the patch is laid out on the grid, but only in the
-        ! case that smoothing of the circular patch's boundary is enabled.
+        ! the pseudo volume fraction value to 1. The value will
+        ! modified as the patch is laid out on the grid, but only in the
+        ! that smoothing of the circular patch's boundary is enabled.
         eta = 1._wp
 
-        ! write for all z
+        ! for all z
 
-        ! Checking whether the circle covers a particular cell in the domain
-        ! and verifying whether the current patch has permission to write to
-        ! that cell. If both queries check out, the primitive variables of
-        ! the current patch are assigned to this cell.
+        ! whether the circle covers a particular cell in the domain
+        ! verifying whether the current patch has permission to write to
+        ! cell. If both queries check out, the primitive variables of
+        ! current patch are assigned to this cell.
         do k = 0, p
             do j = 0, n
                 do i = 0, m
@@ -543,7 +543,7 @@ contains
                             @:Hardcoded3D()
                         end if
 
-                        ! Updating the patch identities bookkeeping variable
+                        ! the patch identities bookkeeping variable
                         if (1._wp - eta < sgm_eps) patch_id_fp(i, j, k) = patch_id
 
                         q_prim_vf(alf_idx)%sf(i, j, k) = patch_icpp(patch_id)%alpha(1)* &
@@ -558,12 +558,12 @@ contains
     end subroutine s_icpp_3dvarcircle
 
     !> The elliptical patch is a 2D geometry. The geometry of
-        !!      the patch is well-defined when its centroid and radii
-        !!      are provided. Note that the elliptical patch DOES allow
-        !!      for the smoothing of its boundary
-        !! @param patch_id is the patch identifier
-        !! @param patch_id_fp Array to track patch ids
-        !! @param q_prim_vf Array of primitive variables
+        !! is well-defined when its centroid and radii
+        !! Note that the elliptical patch DOES allow
+        !! smoothing of its boundary
+        !! is the patch identifier
+        !! Array to track patch ids
+        !! Array of primitive variables
     subroutine s_icpp_ellipse(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
@@ -579,8 +579,8 @@ contains
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded2DVariables()
 
-        ! Transferring the elliptical patch's radii, centroid, smearing
-        ! patch identity, and smearing coefficient information
+        ! the elliptical patch's radii, centroid, smearing
+        ! identity, and smearing coefficient information
         x_centroid = patch_icpp(patch_id)%x_centroid
         y_centroid = patch_icpp(patch_id)%y_centroid
         a = patch_icpp(patch_id)%radii(1)
@@ -588,16 +588,16 @@ contains
         smooth_patch_id = patch_icpp(patch_id)%smooth_patch_id
         smooth_coeff = patch_icpp(patch_id)%smooth_coeff
 
-        ! Initializing the pseudo volume fraction value to 1. The value
-        ! be modified as the patch is laid out on the grid, but only in
-        ! the case that smoothing of the elliptical patch's boundary is
-        ! enabled.
+        ! the pseudo volume fraction value to 1. The value
+        ! modified as the patch is laid out on the grid, but only in
+        ! case that smoothing of the elliptical patch's boundary is
+        !
         eta = 1._wp
 
-        ! Checking whether the ellipse covers a particular cell in the
-        ! domain and verifying whether the current patch has permission
-        ! to write to that cell. If both queries check out, the primitive
-        ! variables of the current patch are assigned to this cell.
+        ! whether the ellipse covers a particular cell in the
+        ! and verifying whether the current patch has permission
+        ! write to that cell. If both queries check out, the primitive
+        ! of the current patch are assigned to this cell.
         do j = 0, n
             do i = 0, m
 
@@ -624,7 +624,7 @@ contains
                         @:Hardcoded2D()
                     end if
 
-                    ! Updating the patch identities bookkeeping variable
+                    ! the patch identities bookkeeping variable
                     if (1._wp - eta < sgm_eps) patch_id_fp(i, j, 0) = patch_id
                 end if
             end do
@@ -634,15 +634,15 @@ contains
     end subroutine s_icpp_ellipse
 
     !> The ellipsoidal patch is a 3D geometry. The geometry of
-        !!       the patch is well-defined when its centroid and radii
-        !!       are provided. Note that the ellipsoidal patch DOES allow
-        !!       for the smoothing of its boundary
-        !! @param patch_id is the patch identifier
-        !! @param patch_id_fp Array to track patch ids
-        !! @param q_prim_vf Array of primitive variables
+        !! is well-defined when its centroid and radii
+        !! Note that the ellipsoidal patch DOES allow
+        !! smoothing of its boundary
+        !! is the patch identifier
+        !! Array to track patch ids
+        !! Array of primitive variables
     subroutine s_icpp_ellipsoid(patch_id, patch_id_fp, q_prim_vf)
 
-        ! Patch identifier
+        ! identifier
         integer, intent(in) :: patch_id
 #ifdef MFC_MIXED_PRECISION
         integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
@@ -651,14 +651,14 @@ contains
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
-        ! Generic loop iterators
+        ! loop iterators
         integer :: i, j, k
         real(wp) :: a, b, c
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded3DVariables()
 
-        ! Transferring the ellipsoidal patch's radii, centroid, smearing
-        ! patch identity, and smearing coefficient information
+        ! the ellipsoidal patch's radii, centroid, smearing
+        ! identity, and smearing coefficient information
         x_centroid = patch_icpp(patch_id)%x_centroid
         y_centroid = patch_icpp(patch_id)%y_centroid
         z_centroid = patch_icpp(patch_id)%z_centroid
@@ -668,16 +668,16 @@ contains
         smooth_patch_id = patch_icpp(patch_id)%smooth_patch_id
         smooth_coeff = patch_icpp(patch_id)%smooth_coeff
 
-        ! Initializing the pseudo volume fraction value to 1. The value
-        ! be modified as the patch is laid out on the grid, but only in
-        ! the case that smoothing of the ellipsoidal patch's boundary is
-        ! enabled.
+        ! the pseudo volume fraction value to 1. The value
+        ! modified as the patch is laid out on the grid, but only in
+        ! case that smoothing of the ellipsoidal patch's boundary is
+        !
         eta = 1._wp
 
-        ! Checking whether the ellipsoid covers a particular cell in the
-        ! domain and verifying whether the current patch has permission
-        ! to write to that cell. If both queries check out, the primitive
-        ! variables of the current patch are assigned to this cell.
+        ! whether the ellipsoid covers a particular cell in the
+        ! and verifying whether the current patch has permission
+        ! write to that cell. If both queries check out, the primitive
+        ! of the current patch are assigned to this cell.
         do k = 0, p
             do j = 0, n
                 do i = 0, m
@@ -714,7 +714,7 @@ contains
                             @:Hardcoded3D()
                         end if
 
-                        ! Updating the patch identities bookkeeping variable
+                        ! the patch identities bookkeeping variable
                         if (1._wp - eta < sgm_eps) patch_id_fp(i, j, k) = patch_id
                     end if
                 end do
@@ -725,16 +725,16 @@ contains
     end subroutine s_icpp_ellipsoid
 
     !> The rectangular patch is a 2D geometry that may be used,
-        !!              for example, in creating a solid boundary, or pre-/post-
-        !!              shock region, in alignment with the axes of the Cartesian
-        !!              coordinate system. The geometry of such a patch is well-
-        !!              defined when its centroid and lengths in the x- and y-
-        !!              coordinate directions are provided. Please note that the
-        !!              rectangular patch DOES NOT allow for the smoothing of its
-        !!              boundaries.
-        !! @param patch_id is the patch identifier
-        !! @param patch_id_fp Array to track patch ids
-        !! @param q_prim_vf Array of primitive variables
+        !! in creating a solid boundary, or pre-/post-
+        !! in alignment with the axes of the Cartesian
+        !! The geometry of such a patch is well-
+        !! its centroid and lengths in the x- and y-
+        !! are provided. Please note that the
+        !! DOES NOT allow for the smoothing of its
+        !!
+        !! is the patch identifier
+        !! Array to track patch ids
+        !! Array of primitive variables
     subroutine s_icpp_rectangle(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
@@ -754,29 +754,29 @@ contains
         gamma = gammas(1)
         lit_gamma = gs_min(1)
 
-        ! Transferring the rectangle's centroid and length information
+        ! the rectangle's centroid and length information
         x_centroid = patch_icpp(patch_id)%x_centroid
         y_centroid = patch_icpp(patch_id)%y_centroid
         length_x = patch_icpp(patch_id)%length_x
         length_y = patch_icpp(patch_id)%length_y
 
-        ! Computing the beginning and the end x- and y-coordinates of the
-        ! rectangle based on its centroid and lengths
+        ! the beginning and the end x- and y-coordinates of the
+        ! based on its centroid and lengths
         x_boundary%beg = x_centroid - 0.5_wp*length_x
         x_boundary%end = x_centroid + 0.5_wp*length_x
         y_boundary%beg = y_centroid - 0.5_wp*length_y
         y_boundary%end = y_centroid + 0.5_wp*length_y
 
-        ! Since the rectangular patch does not allow for its boundaries to
-        ! be smoothed out, the pseudo volume fraction is set to 1 to ensure
-        ! that only the current patch contributes to the fluid state in the
-        ! cells that this patch covers.
+        ! the rectangular patch does not allow for its boundaries to
+        ! smoothed out, the pseudo volume fraction is set to 1 to ensure
+        ! only the current patch contributes to the fluid state in the
+        ! that this patch covers.
         eta = 1._wp
 
-        ! Checking whether the rectangle covers a particular cell in the
-        ! domain and verifying whether the current patch has the permission
-        ! to write to that cell. If both queries check out, the primitive
-        ! variables of the current patch are assigned to this cell.
+        ! whether the rectangle covers a particular cell in the
+        ! and verifying whether the current patch has the permission
+        ! write to that cell. If both queries check out, the primitive
+        ! of the current patch are assigned to this cell.
         do j = 0, n
             do i = 0, m
                 if (x_boundary%beg <= x_cc(i) .and. &
@@ -802,7 +802,7 @@ contains
                                 rhoref*(1._wp - q_prim_vf(alf_idx)%sf(i, j, 0))
                         end if
 
-                        ! Updating the patch identities bookkeeping variable
+                        ! the patch identities bookkeeping variable
                         if (1._wp - eta < sgm_eps) patch_id_fp(i, j, 0) = patch_id
                     end if
                 end if
@@ -813,15 +813,15 @@ contains
     end subroutine s_icpp_rectangle
 
     !> The swept line patch is a 2D geometry that may be used,
-        !!      for example, in creating a solid boundary, or pre-/post-
-        !!      shock region, at an angle with respect to the axes of the
-        !!      Cartesian coordinate system. The geometry of the patch is
-        !!      well-defined when its centroid and normal vector, aimed
-        !!      in the sweep direction, are provided. Note that the sweep
-        !!      line patch DOES allow the smoothing of its boundary.
-        !! @param patch_id is the patch identifier
-        !! @param patch_id_fp Array to track patch ids
-        !! @param q_prim_vf Array of primitive variables
+        !! in creating a solid boundary, or pre-/post-
+        !! at an angle with respect to the axes of the
+        !! system. The geometry of the patch is
+        !! its centroid and normal vector, aimed
+        !! sweep direction, are provided. Note that the sweep
+        !! DOES allow the smoothing of its boundary.
+        !! is the patch identifier
+        !! Array to track patch ids
+        !! Array of primitive variables
     subroutine s_icpp_sweep_line(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
@@ -837,26 +837,26 @@ contains
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded3DVariables()
 
-        ! Transferring the centroid information of the line to be swept
+        ! the centroid information of the line to be swept
         x_centroid = patch_icpp(patch_id)%x_centroid
         y_centroid = patch_icpp(patch_id)%y_centroid
         smooth_patch_id = patch_icpp(patch_id)%smooth_patch_id
         smooth_coeff = patch_icpp(patch_id)%smooth_coeff
 
-        ! Obtaining coefficients of the equation describing the sweep line
+        ! coefficients of the equation describing the sweep line
         a = patch_icpp(patch_id)%normal(1)
         b = patch_icpp(patch_id)%normal(2)
         c = -a*x_centroid - b*y_centroid
 
-        ! Initializing the pseudo volume fraction value to 1. The value will
-        ! be modified as the patch is laid out on the grid, but only in the
-        ! case that smoothing of the sweep line patch's boundary is enabled.
+        ! the pseudo volume fraction value to 1. The value will
+        ! modified as the patch is laid out on the grid, but only in the
+        ! that smoothing of the sweep line patch's boundary is enabled.
         eta = 1._wp
 
-        ! Checking whether the region swept by the line covers a particular
-        ! cell in the domain and verifying whether the current patch has the
-        ! permission to write to that cell. If both queries check out, the
-        ! primitive variables of the current patch are written to this cell.
+        ! whether the region swept by the line covers a particular
+        ! in the domain and verifying whether the current patch has the
+        ! to write to that cell. If both queries check out, the
+        ! variables of the current patch are written to this cell.
         do j = 0, n
             do i = 0, m
 
@@ -880,7 +880,7 @@ contains
                         @:Hardcoded3D()
                     end if
 
-                    ! Updating the patch identities bookkeeping variable
+                    ! the patch identities bookkeeping variable
                     if (1._wp - eta < sgm_eps) patch_id_fp(i, j, 0) = patch_id
                 end if
 
@@ -891,12 +891,12 @@ contains
     end subroutine s_icpp_sweep_line
 
     !> The Taylor Green vortex is 2D decaying vortex that may be used,
-        !!              for example, to verify the effects of viscous attenuation.
-        !!              Geometry of the patch is well-defined when its centroid
-        !!              are provided.
-        !! @param patch_id is the patch identifier
-        !! @param patch_id_fp Array to track patch ids
-        !! @param q_prim_vf Array of primitive variables
+        !! to verify the effects of viscous attenuation.
+        !! the patch is well-defined when its centroid
+        !!
+        !! is the patch identifier
+        !! Array to track patch ids
+        !! Array of primitive variables
     subroutine s_icpp_2D_TaylorGreen_Vortex(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
@@ -917,33 +917,33 @@ contains
         gamma = gammas(1)
         lit_gamma = gs_min(1)
 
-        ! Transferring the patch's centroid and length information
+        ! the patch's centroid and length information
         x_centroid = patch_icpp(patch_id)%x_centroid
         y_centroid = patch_icpp(patch_id)%y_centroid
         length_x = patch_icpp(patch_id)%length_x
         length_y = patch_icpp(patch_id)%length_y
 
-        ! Computing the beginning and the end x- and y-coordinates
-        ! of the patch based on its centroid and lengths
+        ! the beginning and the end x- and y-coordinates
+        ! the patch based on its centroid and lengths
         x_boundary%beg = x_centroid - 0.5_wp*length_x
         x_boundary%end = x_centroid + 0.5_wp*length_x
         y_boundary%beg = y_centroid - 0.5_wp*length_y
         y_boundary%end = y_centroid + 0.5_wp*length_y
 
-        ! Since the patch doesn't allow for its boundaries to be
-        ! smoothed out, the pseudo volume fraction is set to 1 to
-        ! ensure that only the current patch contributes to the fluid
-        ! state in the cells that this patch covers.
+        ! the patch doesn't allow for its boundaries to be
+        ! out, the pseudo volume fraction is set to 1 to
+        ! that only the current patch contributes to the fluid
+        ! in the cells that this patch covers.
         eta = 1._wp
-        ! U0 is the characteristic velocity of the vortex
+        ! is the characteristic velocity of the vortex
         U0 = patch_icpp(patch_id)%vel(1)
-        ! L0 is the characteristic length of the vortex
+        ! is the characteristic length of the vortex
         L0 = patch_icpp(patch_id)%vel(2)
-        ! Checking whether the patch covers a particular cell in the
-        ! domain and verifying whether the current patch has the
-        ! permission to write to that cell. If both queries check out,
-        ! the primitive variables of the current patch are assigned
-        ! to this cell.
+        ! whether the patch covers a particular cell in the
+        ! and verifying whether the current patch has the
+        ! to write to that cell. If both queries check out,
+        ! primitive variables of the current patch are assigned
+        ! this cell.
         do j = 0, n
             do i = 0, m
                 if (x_boundary%beg <= x_cc(i) .and. &
@@ -960,10 +960,10 @@ contains
                         @:Hardcoded2D()
                     end if
 
-                    ! Updating the patch identities bookkeeping variable
+                    ! the patch identities bookkeeping variable
                     if (1._wp - eta < sgm_eps) patch_id_fp(i, j, 0) = patch_id
 
-                    ! Assign Parameters
+                    ! Parameters
                     q_prim_vf(mom_idx%beg)%sf(i, j, 0) = U0*sin(x_cc(i)/L0)*cos(y_cc(j)/L0)
                     q_prim_vf(mom_idx%end)%sf(i, j, 0) = -U0*cos(x_cc(i)/L0)*sin(y_cc(j)/L0)
                     q_prim_vf(E_idx)%sf(i, j, 0) = patch_icpp(patch_id)%pres + (cos(2*x_cc(i))/L0 + &
@@ -976,14 +976,14 @@ contains
 
     end subroutine s_icpp_2D_TaylorGreen_Vortex
 
-        !! @param patch_id is the patch identifier
-        !! @param patch_id_fp Array to track patch ids
-        !! @param q_prim_vf Array of primitive variables
+        !! is the patch identifier
+        !! Array to track patch ids
+        !! Array of primitive variables
     subroutine s_icpp_1d_bubble_pulse(patch_id, patch_id_fp, q_prim_vf)
-        ! Description: This patch assigns the primitive variables as analytical
-        !       functions such that the code can be verified.
+        ! This patch assigns the primitive variables as analytical
+        !       such that the code can be verified.
 
-        ! Patch identifier
+        ! identifier
         integer, intent(in) :: patch_id
 #ifdef MFC_MIXED_PRECISION
         integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
@@ -992,9 +992,9 @@ contains
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
-        ! Generic loop iterators
+        ! loop iterators
         integer :: i, j, k
-        ! Placeholders for the cell boundary values
+        ! for the cell boundary values
         real(wp) :: pi_inf, gamma, lit_gamma
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded1DVariables()
@@ -1003,25 +1003,25 @@ contains
         gamma = gammas(1)
         lit_gamma = gs_min(1)
 
-        ! Transferring the patch's centroid and length information
+        ! the patch's centroid and length information
         x_centroid = patch_icpp(patch_id)%x_centroid
         length_x = patch_icpp(patch_id)%length_x
 
-        ! Computing the beginning and the end x- and y-coordinates
-        ! of the patch based on its centroid and lengths
+        ! the beginning and the end x- and y-coordinates
+        ! the patch based on its centroid and lengths
         x_boundary%beg = x_centroid - 0.5_wp*length_x
         x_boundary%end = x_centroid + 0.5_wp*length_x
 
-        ! Since the patch doesn't allow for its boundaries to be
-        ! smoothed out, the pseudo volume fraction is set to 1 to
-        ! ensure that only the current patch contributes to the fluid
-        ! state in the cells that this patch covers.
+        ! the patch doesn't allow for its boundaries to be
+        ! out, the pseudo volume fraction is set to 1 to
+        ! that only the current patch contributes to the fluid
+        ! in the cells that this patch covers.
         eta = 1._wp
 
-        ! Checking whether the line segment covers a particular cell in the
-        ! domain and verifying whether the current patch has the permission
-        ! to write to that cell. If both queries check out, the primitive
-        ! variables of the current patch are assigned to this cell.
+        ! whether the line segment covers a particular cell in the
+        ! and verifying whether the current patch has the permission
+        ! write to that cell. If both queries check out, the primitive
+        ! of the current patch are assigned to this cell.
         do i = 0, m
             if (x_boundary%beg <= x_cc(i) .and. &
                 x_boundary%end >= x_cc(i) .and. &
@@ -1042,10 +1042,10 @@ contains
     end subroutine s_icpp_1D_bubble_pulse
 
     !> This patch generates the shape of the spherical harmonics
-        !!      as a perturbation to a perfect sphere
-        !! @param patch_id is the patch identifier
-        !! @param patch_id_fp Array to track patch ids
-        !! @param q_prim_vf Array of primitive variables
+        !! perturbation to a perfect sphere
+        !! is the patch identifier
+        !! Array to track patch ids
+        !! Array of primitive variables
     subroutine s_icpp_spherical_harmonic(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(IN) :: patch_id
@@ -1063,7 +1063,7 @@ contains
 
         integer :: i, j, k !< generic loop iterators
 
-        ! Transferring the patch's centroid and radius information
+        ! the patch's centroid and radius information
         x_centroid_local = patch_icpp(patch_id)%x_centroid
         y_centroid_local = patch_icpp(patch_id)%y_centroid
         z_centroid_local = patch_icpp(patch_id)%z_centroid
@@ -1080,17 +1080,17 @@ contains
         as(9) = patch_icpp(patch_id)%a(9)
         non_axis_sym_in = patch_icpp(patch_id)%non_axis_sym
 
-        ! Since the analytical patch does not allow for its boundaries to get
-        ! smoothed out, the pseudo volume fraction is set to 1 to make sure
-        ! that only the current patch contributes to the fluid state in the
-        ! cells that this patch covers.
+        ! the analytical patch does not allow for its boundaries to get
+        ! out, the pseudo volume fraction is set to 1 to make sure
+        ! only the current patch contributes to the fluid state in the
+        ! that this patch covers.
         eta_local = 1._wp
         eps = 1.e-32_wp
 
-        ! Checking whether the patch covers a particular cell in the domain
-        ! and verifying whether the current patch has permission to write to
-        ! to that cell. If both queries check out, the primitive variables
-        ! of the current patch are assigned to this cell.
+        ! whether the patch covers a particular cell in the domain
+        ! verifying whether the current patch has permission to write to
+        ! that cell. If both queries check out, the primitive variables
+        ! the current patch are assigned to this cell.
         if (p > 0 .and. .not. non_axis_sym_in) then
             do k = 0, p
                 do j = 0, n
@@ -1190,13 +1190,13 @@ contains
     end subroutine s_icpp_spherical_harmonic
 
     !>          The spherical patch is a 3D geometry that may be used,
-        !!              for example, in creating a bubble or a droplet. The patch
-        !!              geometry is well-defined when its centroid and radius are
-        !!              provided. Please note that the spherical patch DOES allow
-        !!              for the smoothing of its boundary.
-        !! @param patch_id is the patch identifier
-        !! @param patch_id_fp Array to track patch ids
-        !! @param q_prim_vf Array of primitive variables
+        !! in creating a bubble or a droplet. The patch
+        !! well-defined when its centroid and radius are
+        !! note that the spherical patch DOES allow
+        !! smoothing of its boundary.
+        !! is the patch identifier
+        !! Array to track patch ids
+        !! Array of primitive variables
     subroutine s_icpp_sphere(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
@@ -1207,17 +1207,17 @@ contains
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
-        ! Generic loop iterators
+        ! loop iterators
         integer :: i, j, k
         real(wp) :: radius
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded3DVariables()
 
-        !! Variables to initialize the pressure field that corresponds to the
-            !! bubble-collapse test case found in Tiwari et al. (2013)
+        !! initialize the pressure field that corresponds to the
+            !! case found in Tiwari et al. (2013)
 
-        ! Transferring spherical patch's radius, centroid, smoothing patch
-        ! identity and smoothing coefficient information
+        ! spherical patch's radius, centroid, smoothing patch
+        ! and smoothing coefficient information
         x_centroid = patch_icpp(patch_id)%x_centroid
         y_centroid = patch_icpp(patch_id)%y_centroid
         z_centroid = patch_icpp(patch_id)%z_centroid
@@ -1225,15 +1225,15 @@ contains
         smooth_patch_id = patch_icpp(patch_id)%smooth_patch_id
         smooth_coeff = patch_icpp(patch_id)%smooth_coeff
 
-        ! Initializing the pseudo volume fraction value to 1. The value will
-        ! be modified as the patch is laid out on the grid, but only in the
-        ! case that smoothing of the spherical patch's boundary is enabled.
+        ! the pseudo volume fraction value to 1. The value will
+        ! modified as the patch is laid out on the grid, but only in the
+        ! that smoothing of the spherical patch's boundary is enabled.
         eta = 1._wp
 
-        ! Checking whether the sphere covers a particular cell in the domain
-        ! and verifying whether the current patch has permission to write to
-        ! that cell. If both queries check out, the primitive variables of
-        ! the current patch are assigned to this cell.
+        ! whether the sphere covers a particular cell in the domain
+        ! verifying whether the current patch has permission to write to
+        ! cell. If both queries check out, the primitive variables of
+        ! current patch are assigned to this cell.
         do k = 0, p
             do j = 0, n
                 do i = 0, m
@@ -1276,16 +1276,16 @@ contains
     end subroutine s_icpp_sphere
 
     !> The cuboidal patch is a 3D geometry that may be used, for
-        !!              example, in creating a solid boundary, or pre-/post-shock
-        !!              region, which is aligned with the axes of the Cartesian
-        !!              coordinate system. The geometry of such a patch is well-
-        !!              defined when its centroid and lengths in the x-, y- and
-        !!              z-coordinate directions are provided. Please notice that
-        !!              the cuboidal patch DOES NOT allow for the smearing of its
-        !!              boundaries.
-        !! @param patch_id is the patch identifier
-        !! @param patch_id_fp Array to track patch ids
-        !! @param q_prim_vf Array of primitive variables
+        !! creating a solid boundary, or pre-/post-shock
+        !! is aligned with the axes of the Cartesian
+        !! The geometry of such a patch is well-
+        !! its centroid and lengths in the x-, y- and
+        !! are provided. Please notice that
+        !! patch DOES NOT allow for the smearing of its
+        !!
+        !! is the patch identifier
+        !! Array to track patch ids
+        !! Array of primitive variables
     subroutine s_icpp_cuboid(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
@@ -1300,7 +1300,7 @@ contains
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded3DVariables()
 
-        ! Transferring the cuboid's centroid and length information
+        ! the cuboid's centroid and length information
         x_centroid = patch_icpp(patch_id)%x_centroid
         y_centroid = patch_icpp(patch_id)%y_centroid
         z_centroid = patch_icpp(patch_id)%z_centroid
@@ -1308,8 +1308,8 @@ contains
         length_y = patch_icpp(patch_id)%length_y
         length_z = patch_icpp(patch_id)%length_z
 
-        ! Computing the beginning and the end x-, y- and z-coordinates of
-        ! the cuboid based on its centroid and lengths
+        ! the beginning and the end x-, y- and z-coordinates of
+        ! cuboid based on its centroid and lengths
         x_boundary%beg = x_centroid - 0.5_wp*length_x
         x_boundary%end = x_centroid + 0.5_wp*length_x
         y_boundary%beg = y_centroid - 0.5_wp*length_y
@@ -1317,16 +1317,16 @@ contains
         z_boundary%beg = z_centroid - 0.5_wp*length_z
         z_boundary%end = z_centroid + 0.5_wp*length_z
 
-        ! Since the cuboidal patch does not allow for its boundaries to get
-        ! smoothed out, the pseudo volume fraction is set to 1 to make sure
-        ! that only the current patch contributes to the fluid state in the
-        ! cells that this patch covers.
+        ! the cuboidal patch does not allow for its boundaries to get
+        ! out, the pseudo volume fraction is set to 1 to make sure
+        ! only the current patch contributes to the fluid state in the
+        ! that this patch covers.
         eta = 1._wp
 
-        ! Checking whether the cuboid covers a particular cell in the domain
-        ! and verifying whether the current patch has permission to write to
-        ! to that cell. If both queries check out, the primitive variables
-        ! of the current patch are assigned to this cell.
+        ! whether the cuboid covers a particular cell in the domain
+        ! verifying whether the current patch has permission to write to
+        ! that cell. If both queries check out, the primitive variables
+        ! the current patch are assigned to this cell.
         do k = 0, p
             do j = 0, n
                 do i = 0, m
@@ -1355,7 +1355,7 @@ contains
                                 @:Hardcoded3D()
                             end if
 
-                            ! Updating the patch identities bookkeeping variable
+                            ! the patch identities bookkeeping variable
                             if (1._wp - eta < sgm_eps) patch_id_fp(i, j, k) = patch_id
 
                         end if
@@ -1368,16 +1368,16 @@ contains
     end subroutine s_icpp_cuboid
 
     !> The cylindrical patch is a 3D geometry that may be used,
-        !!              for example, in setting up a cylindrical solid boundary
-        !!              confinement, like a blood vessel. The geometry of this
-        !!              patch is well-defined when the centroid, the radius and
-        !!              the length along the cylinder's axis, parallel to the x-,
-        !!              y- or z-coordinate direction, are provided. Please note
-        !!              that the cylindrical patch DOES allow for the smoothing
-        !!              of its lateral boundary.
-        !! @param patch_id is the patch identifier
-        !! @param patch_id_fp Array to track patch ids
-        !! @param q_prim_vf Array of primitive variables
+        !! in setting up a cylindrical solid boundary
+        !! a blood vessel. The geometry of this
+        !! well-defined when the centroid, the radius and
+        !! along the cylinder's axis, parallel to the x-,
+        !! z-coordinate direction, are provided. Please note
+        !! cylindrical patch DOES allow for the smoothing
+        !! lateral boundary.
+        !! is the patch identifier
+        !! Array to track patch ids
+        !! Array of primitive variables
     subroutine s_icpp_cylinder(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
@@ -1393,8 +1393,8 @@ contains
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded3DVariables()
 
-        ! Transferring the cylindrical patch's centroid, length, radius,
-        ! smoothing patch identity and smoothing coefficient information
+        ! the cylindrical patch's centroid, length, radius,
+        ! patch identity and smoothing coefficient information
         x_centroid = patch_icpp(patch_id)%x_centroid
         y_centroid = patch_icpp(patch_id)%y_centroid
         z_centroid = patch_icpp(patch_id)%z_centroid
@@ -1405,8 +1405,8 @@ contains
         smooth_patch_id = patch_icpp(patch_id)%smooth_patch_id
         smooth_coeff = patch_icpp(patch_id)%smooth_coeff
 
-        ! Computing the beginning and the end x-, y- and z-coordinates of
-        ! the cylinder based on its centroid and lengths
+        ! the beginning and the end x-, y- and z-coordinates of
+        ! cylinder based on its centroid and lengths
         x_boundary%beg = x_centroid - 0.5_wp*length_x
         x_boundary%end = x_centroid + 0.5_wp*length_x
         y_boundary%beg = y_centroid - 0.5_wp*length_y
@@ -1414,15 +1414,15 @@ contains
         z_boundary%beg = z_centroid - 0.5_wp*length_z
         z_boundary%end = z_centroid + 0.5_wp*length_z
 
-        ! Initializing the pseudo volume fraction value to 1. The value will
-        ! be modified as the patch is laid out on the grid, but only in the
-        ! case that smearing of the cylindrical patch's boundary is enabled.
+        ! the pseudo volume fraction value to 1. The value will
+        ! modified as the patch is laid out on the grid, but only in the
+        ! that smearing of the cylindrical patch's boundary is enabled.
         eta = 1._wp
 
-        ! Checking whether the cylinder covers a particular cell in the
-        ! domain and verifying whether the current patch has the permission
-        ! to write to that cell. If both queries check out, the primitive
-        ! variables of the current patch are assigned to this cell.
+        ! whether the cylinder covers a particular cell in the
+        ! and verifying whether the current patch has the permission
+        ! write to that cell. If both queries check out, the primitive
+        ! of the current patch are assigned to this cell.
         do k = 0, p
             do j = 0, n
                 do i = 0, m
@@ -1481,7 +1481,7 @@ contains
                             @:Hardcoded3D()
                         end if
 
-                        ! Updating the patch identities bookkeeping variable
+                        ! the patch identities bookkeeping variable
                         if (1._wp - eta < sgm_eps) patch_id_fp(i, j, k) = patch_id
                     end if
                 end do
@@ -1492,15 +1492,15 @@ contains
     end subroutine s_icpp_cylinder
 
     !>      The swept plane patch is a 3D geometry that may be used,
-        !!              for example, in creating a solid boundary, or pre-/post-
-        !!              shock region, at an angle with respect to the axes of the
-        !!              Cartesian coordinate system. The geometry of the patch is
-        !!              well-defined when its centroid and normal vector, aimed
-        !!              in the sweep direction, are provided. Note that the sweep
-        !!              plane patch DOES allow the smoothing of its boundary.
-        !! @param patch_id is the patch identifier
-        !! @param patch_id_fp Array to track patch ids
-        !! @param q_prim_vf Primitive variables
+        !! in creating a solid boundary, or pre-/post-
+        !! at an angle with respect to the axes of the
+        !! system. The geometry of the patch is
+        !! its centroid and normal vector, aimed
+        !! sweep direction, are provided. Note that the sweep
+        !! DOES allow the smoothing of its boundary.
+        !! is the patch identifier
+        !! Array to track patch ids
+        !! Primitive variables
     subroutine s_icpp_sweep_plane(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
@@ -1516,28 +1516,28 @@ contains
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded3DVariables()
 
-        ! Transferring the centroid information of the plane to be swept
+        ! the centroid information of the plane to be swept
         x_centroid = patch_icpp(patch_id)%x_centroid
         y_centroid = patch_icpp(patch_id)%y_centroid
         z_centroid = patch_icpp(patch_id)%z_centroid
         smooth_patch_id = patch_icpp(patch_id)%smooth_patch_id
         smooth_coeff = patch_icpp(patch_id)%smooth_coeff
 
-        ! Obtaining coefficients of the equation describing the sweep plane
+        ! coefficients of the equation describing the sweep plane
         a = patch_icpp(patch_id)%normal(1)
         b = patch_icpp(patch_id)%normal(2)
         c = patch_icpp(patch_id)%normal(3)
         d = -a*x_centroid - b*y_centroid - c*z_centroid
 
-        ! Initializing the pseudo volume fraction value to 1. The value will
-        ! be modified as the patch is laid out on the grid, but only in the
-        ! case that smearing of the sweep plane patch's boundary is enabled.
+        ! the pseudo volume fraction value to 1. The value will
+        ! modified as the patch is laid out on the grid, but only in the
+        ! that smearing of the sweep plane patch's boundary is enabled.
         eta = 1._wp
 
-        ! Checking whether the region swept by the plane covers a particular
-        ! cell in the domain and verifying whether the current patch has the
-        ! permission to write to that cell. If both queries check out, the
-        ! primitive variables of the current patch are written to this cell.
+        ! whether the region swept by the plane covers a particular
+        ! in the domain and verifying whether the current patch has the
+        ! to write to that cell. If both queries check out, the
+        ! variables of the current patch are written to this cell.
         do k = 0, p
             do j = 0, n
                 do i = 0, m
@@ -1572,7 +1572,7 @@ contains
                             @:Hardcoded3D()
                         end if
 
-                        ! Updating the patch identities bookkeeping variable
+                        ! the patch identities bookkeeping variable
                         if (1._wp - eta < sgm_eps) patch_id_fp(i, j, k) = patch_id
                     end if
 
@@ -1584,11 +1584,11 @@ contains
     end subroutine s_icpp_sweep_plane
 
     !> The STL patch is a 2/3D geometry that is imported from an STL file.
-    !! @param patch_id is the patch identifier
-    !! @param patch_id_fp Array to track patch ids
-    !! @param q_prim_vf Primitive variables
-    !! @param STL_levelset STL levelset
-    !! @param STL_levelset_norm STL levelset normals
+    !! is the patch identifier
+    !! Array to track patch ids
+    !! Primitive variables
+    !! STL levelset
+    !! STL levelset normals
     subroutine s_icpp_model(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id
@@ -1599,7 +1599,7 @@ contains
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
-        ! Variables for IBM+STL
+        ! for IBM+STL
         real(wp) :: normals(1:3) !< Boundary normal buffer
         integer :: boundary_vertex_count, boundary_edge_count, total_vertices !< Boundary vertex
         real(wp), allocatable, dimension(:, :, :) :: boundary_v !< Boundary vertex buffer
@@ -1637,39 +1637,39 @@ contains
             print *, " * Transforming model."
         end if
 
-        ! Get the model center before transforming the model
+        ! the model center before transforming the model
         bbox_old = f_create_bbox(model)
         model_center(1:3) = (bbox_old%min(1:3) + bbox_old%max(1:3))/2._wp
 
-        ! Compute the transform matrices for vertices and normals
+        ! the transform matrices for vertices and normals
         transform = f_create_transform_matrix(params, model_center)
         transform_n = f_create_transform_matrix(params)
 
         call s_transform_model(model, transform, transform_n)
 
-        ! Recreate the bounding box after transformation
+        ! the bounding box after transformation
         bbox = f_create_bbox(model)
 
-        ! Show the number of vertices in the original STL model
+        ! the number of vertices in the original STL model
         if (proc_rank == 0) then
             print *, ' * Number of input model vertices:', 3*model%ntrs
         end if
 
         call f_check_boundary(model, boundary_v, boundary_vertex_count, boundary_edge_count)
 
-        ! Check if the model needs interpolation
+        ! if the model needs interpolation
         if (p > 0) then
             call f_check_interpolation_3D(model, (/dx, dy, dz/), interpolate)
         else
             call f_check_interpolation_2D(boundary_v, boundary_edge_count, (/dx, dy, dz/), interpolate)
         end if
 
-        ! Show the number of edges and boundary edges in 2D STL models
+        ! the number of edges and boundary edges in 2D STL models
         if (proc_rank == 0 .and. p == 0) then
             print *, ' * Number of 2D model boundary edges:', boundary_edge_count
         end if
 
-        ! Interpolate the STL model along the edges (2D) and on triangle facets (3D)
+        ! the STL model along the edges (2D) and on triangle facets (3D)
         if (interpolate) then
             if (proc_rank == 0) then
                 print *, ' * Interpolating STL vertices.'
@@ -1738,8 +1738,8 @@ contains
                     call s_assign_patch_primitive_variables(patch_id, i, j, k, &
                                                             eta, q_prim_vf, patch_id_fp)
 
-                    ! Note: Should probably use *eta* to compute primitive variables
-                    ! if defining them analytically.
+                    ! Should probably use *eta* to compute primitive variables
+                    ! defining them analytically.
                     @:analytical()
                 end do; end do; end do
 
@@ -1785,9 +1785,9 @@ contains
     end subroutine s_convert_cylindrical_to_spherical_coord
 
     !> Archimedes spiral function
-    !! @param myth Angle
-    !! @param offset Thickness
-    !! @param a Starting position
+    !! Angle
+    !! Thickness
+    !! Starting position
     elemental function f_r(myth, offset, a)
 
         $:GPU_ROUTINE(parallelism='[seq]')

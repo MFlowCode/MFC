@@ -1,6 +1,6 @@
 !>
-!! @file m_hypoelastic.f90
-!! @brief Contains module m_hypoelastic
+!!
+!! module m_hypoelastic
 
 #:include 'macros.fpp'
 
@@ -65,7 +65,7 @@ contains
             @:ALLOCATE(fd_coeff_z_hypo(-fd_number:fd_number, 0:p))
         end if
 
-        ! Computing centered finite difference coefficients
+        ! centered finite difference coefficients
         call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x_hypo, buff_size, &
                                                       fd_number, fd_order)
         $:GPU_UPDATE(device='[fd_coeff_x_hypo]')
@@ -83,10 +83,10 @@ contains
     end subroutine s_initialize_hypoelastic_module
 
     !>  The purpose of this procedure is to compute the source terms
-        !!      that are needed for the elastic stress equations
-        !!  @param idir Dimension splitting index
-        !!  @param q_prim_vf Primitive variables
-        !!  @param rhs_vf rhs variables
+        !! needed for the elastic stress equations
+        !! Dimension splitting index
+        !! Primitive variables
+        !! rhs variables
     subroutine s_compute_hypoelastic_rhs(idir, q_prim_vf, rhs_vf)
 
         integer, intent(in) :: idir
@@ -101,8 +101,8 @@ contains
         ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
 
         if (idir == 1) then
-            ! calculate velocity gradients + rho_K and G_K
-            ! TODO: re-organize these loops one by one for GPU efficiency if possible?
+            ! velocity gradients + rho_K and G_K
+            ! re-organize these loops one by one for GPU efficiency if possible?
 
             $:GPU_PARALLEL_LOOP(collapse=3)
             do q = 0, p
@@ -158,7 +158,7 @@ contains
                 end do
                 $:END_GPU_PARALLEL_LOOP()
 
-                ! 3D
+                !
                 if (ndirs == 3) then
 
                     $:GPU_PARALLEL_LOOP(collapse=3)
@@ -220,7 +220,7 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
 
-            ! apply rhs source term to elastic stress equation
+            ! rhs source term to elastic stress equation
             $:GPU_PARALLEL_LOOP(collapse=3)
             do q = 0, p
                 do l = 0, n
@@ -345,22 +345,22 @@ contains
             do q = 0, p
                 do l = 0, n
                     do k = 0, m
-                        ! S_xx -= rho * v/r * (tau_xx + 2/3*G)
+                        ! -= rho * v/r * (tau_xx + 2/3*G)
                         rhs_vf(strxb)%sf(k, l, q) = rhs_vf(strxb)%sf(k, l, q) - &
                                                     rho_K_field(k, l, q)*q_prim_vf(momxb + 1)%sf(k, l, q)/y_cc(l)* &
                                                     (q_prim_vf(strxb)%sf(k, l, q) + (2._wp/3._wp)*G_K_field(k, l, q)) ! tau_xx + 2/3*G
 
-                        ! S_xr -= rho * v/r * tau_xr
+                        ! -= rho * v/r * tau_xr
                         rhs_vf(strxb + 1)%sf(k, l, q) = rhs_vf(strxb + 1)%sf(k, l, q) - &
                                                         rho_K_field(k, l, q)*q_prim_vf(momxb + 1)%sf(k, l, q)/y_cc(l)* &
                                                         q_prim_vf(strxb + 1)%sf(k, l, q) ! tau_xx
 
-                        ! S_rr -= rho * v/r * (tau_rr + 2/3*G)
+                        ! -= rho * v/r * (tau_rr + 2/3*G)
                         rhs_vf(strxb + 2)%sf(k, l, q) = rhs_vf(strxb + 2)%sf(k, l, q) - &
                                                         rho_K_field(k, l, q)*q_prim_vf(momxb + 1)%sf(k, l, q)/y_cc(l)* &
                                                         (q_prim_vf(strxb + 2)%sf(k, l, q) + (2._wp/3._wp)*G_K_field(k, l, q)) ! tau_rr + 2/3*G
 
-                        ! S_thetatheta += rho * ( -(tau_thetatheta + 2/3*G)*(du/dx + dv/dr + v/r) + 2*(tau_thetatheta + G)*v/r )
+                        ! += rho * ( -(tau_thetatheta + 2/3*G)*(du/dx + dv/dr + v/r) + 2*(tau_thetatheta + G)*v/r )
                         rhs_vf(strxb + 3)%sf(k, l, q) = rhs_vf(strxb + 3)%sf(k, l, q) + &
                                                         rho_K_field(k, l, q)*( &
                                                         -(q_prim_vf(strxb + 3)%sf(k, l, q) + (2._wp/3._wp)*G_K_field(k, l, q))* &
@@ -414,7 +414,7 @@ contains
             $:GPU_PARALLEL_LOOP(collapse=2, private='[tau_p]')
             do l = 0, n
                 do k = 0, m
-                    ! Maximum principal stress
+                    ! principal stress
                     tau_p = 0.5_wp*(q_cons_vf(stress_idx%beg)%sf(k, l, q) + &
                                     q_cons_vf(stress_idx%beg + 2)%sf(k, l, q)) + &
                             sqrt((q_cons_vf(stress_idx%beg)%sf(k, l, q) - &
@@ -437,14 +437,14 @@ contains
                         tau_yz = q_cons_vf(stress_idx%beg + 4)%sf(k, l, q)
                         tau_zz = q_cons_vf(stress_idx%beg + 5)%sf(k, l, q)
 
-                        ! Invariants of the stress tensor
+                        ! of the stress tensor
                         I1 = tau_xx + tau_yy + tau_zz
                         I2 = tau_xx*tau_yy + tau_xx*tau_zz + tau_yy*tau_zz - &
                              (tau_xy**2.0_wp + tau_xz**2.0_wp + tau_yz**2.0_wp)
                         I3 = tau_xx*tau_yy*tau_zz + 2.0_wp*tau_xy*tau_xz*tau_yz - &
                              tau_xx*tau_yz**2.0_wp - tau_yy*tau_xz**2.0_wp - tau_zz*tau_xy**2.0_wp
 
-                        ! Maximum principal stress
+                        ! principal stress
                         temp = I1**2.0_wp - 3.0_wp*I2
                         sqrt_term_1 = sqrt(max(temp, 0.0_wp))
                         if (sqrt_term_1 > verysmall) then ! Avoid 0/0

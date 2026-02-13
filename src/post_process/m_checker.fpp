@@ -1,5 +1,5 @@
 !>
-!!@file m_checker.f90
+!!@file
 !!@brief Contains module m_checker
 
 #:include 'macros.fpp'
@@ -22,7 +22,7 @@ module m_checker
 contains
 
     !> Checks compatibility of parameters in the input file.
-        !! Used by the post_process stage
+        !! the post_process stage
     impure subroutine s_check_inputs
 
         call s_check_inputs_output_format

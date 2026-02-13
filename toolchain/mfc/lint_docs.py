@@ -72,7 +72,10 @@ def check_docs(repo_root: Path) -> list[str]:
             # Strip trailing punctuation that may have leaked in
             path_str = path_str.rstrip(".,;:!?")
             if not (repo_root / path_str).exists():
-                errors.append(f"  {doc} references '{path_str}' but it does not exist")
+                errors.append(
+                    f"  {doc} references '{path_str}' but it does not exist."
+                    " Fix: update the path or remove the reference"
+                )
     return errors
 
 
@@ -101,7 +104,10 @@ def check_cite_keys(repo_root: Path) -> list[str]:
         for match in CITE_RE.finditer(text):
             key = match.group(1)
             if key.lower() not in valid_keys:
-                errors.append(f"  {rel} uses \\cite {key} but no bib entry found")
+                errors.append(
+                    f"  {rel} uses \\cite {key} but no bib entry found."
+                    " Fix: add entry to docs/references.bib or fix the key"
+                )
 
     return errors
 
@@ -196,7 +202,115 @@ def check_param_refs(repo_root: Path) -> list[str]:  # pylint: disable=too-many-
             # Normalize %% to % for lookup
             normalized = param.replace("%%", "%")
             if not _is_valid_param(normalized, valid_params, sub_params):
-                errors.append(f"  {doc_rel} references parameter '{param}' not in REGISTRY")
+                errors.append(
+                    f"  {doc_rel} references parameter '{param}' not in REGISTRY."
+                    " Fix: check spelling or add to definitions.py"
+                )
+
+    return errors
+
+
+def check_math_syntax(repo_root: Path) -> list[str]:
+    """Check that docs use Doxygen math syntax (\\f$, \\f[) not raw $$/$."""
+    doc_dir = repo_root / "docs" / "documentation"
+    if not doc_dir.exists():
+        return []
+
+    errors = []
+    for md_file in sorted(doc_dir.glob("*.md")):
+        text = md_file.read_text(encoding="utf-8")
+        rel = md_file.relative_to(repo_root)
+        in_code = False
+
+        for i, line in enumerate(text.split("\n"), 1):
+            if line.strip().startswith("```"):
+                in_code = not in_code
+                continue
+            if in_code:
+                continue
+
+            # Strip inline code and Doxygen math before checking
+            cleaned = re.sub(r"`[^`\n]+`", "", line)
+            cleaned = re.sub(r"\\f\$.*?\\f\$", "", cleaned)
+            cleaned = re.sub(r"\\f\[.*?\\f\]", "", cleaned)
+
+            if "$$" in cleaned:
+                errors.append(
+                    f"  {rel}:{i} uses $$...$$ display math."
+                    " Fix: replace $$ with \\f[ and \\f]"
+                )
+                continue
+
+            for m in re.finditer(r"\$([^$\n]+?)\$", cleaned):
+                if re.search(r"\\[a-zA-Z]", m.group(1)):
+                    errors.append(
+                        f"  {rel}:{i} uses $...$ with LaTeX commands."
+                        " Fix: replace $ delimiters with \\f$ and \\f$"
+                    )
+                    break  # one error per line
+
+    return errors
+
+
+def _gitignored_docs(repo_root: Path) -> set[str]:
+    """Return set of gitignored doc file basenames."""
+    import subprocess  # pylint: disable=import-outside-toplevel
+
+    doc_dir = repo_root / "docs" / "documentation"
+    try:
+        result = subprocess.run(
+            ["git", "ls-files", "--ignored", "--exclude-standard", "-o"],
+            capture_output=True, text=True, cwd=repo_root, check=False,
+        )
+        return {
+            Path(f).name for f in result.stdout.splitlines()
+            if f.startswith(str(doc_dir.relative_to(repo_root)))
+        }
+    except FileNotFoundError:
+        return set()
+
+
+def check_section_anchors(repo_root: Path) -> list[str]:
+    """Check that markdown ](#id) links have matching {#id} definitions."""
+    doc_dir = repo_root / "docs" / "documentation"
+    if not doc_dir.exists():
+        return []
+
+    ignored = _gitignored_docs(repo_root)
+
+    errors = []
+    for md_file in sorted(doc_dir.glob("*.md")):
+        if md_file.name in ignored:
+            continue
+        text = md_file.read_text(encoding="utf-8")
+        rel = md_file.relative_to(repo_root)
+
+        # Collect all {#id} anchors (outside code blocks)
+        anchors = set()
+        in_code = False
+        for line in text.split("\n"):
+            if line.strip().startswith("```"):
+                in_code = not in_code
+                continue
+            if not in_code:
+                anchors.update(re.findall(r"\{#([\w-]+)\}", line))
+
+        # Check all ](#id) links
+        in_code = False
+        for i, line in enumerate(text.split("\n"), 1):
+            if line.strip().startswith("```"):
+                in_code = not in_code
+                continue
+            if in_code:
+                continue
+            for m in re.finditer(r"\]\(#([\w-]+)\)", line):
+                if m.group(1) not in anchors:
+                    errors.append(
+                        f"  {rel}:{i} links to #{m.group(1)}"
+                        f" but no {{#{m.group(1)}}} anchor exists."
+                        f" Fix: add {{#{m.group(1)}}} to the target"
+                        " section header"
+                    )
 
     return errors
 
@@ -222,7 +336,10 @@ def check_page_refs(repo_root: Path) -> list[str]:
         for match in REF_RE.finditer(text):
             ref_target = match.group(1)
             if ref_target not in page_ids:
-                errors.append(f"  {rel} uses @ref {ref_target} but no @page with that ID exists")
+                errors.append(
+                    f"  {rel} uses @ref {ref_target} but no @page with that ID exists."
+                    " Fix: check the page ID or add @page declaration"
+                )
 
     return errors
 
@@ -235,6 +352,8 @@ def main():
     all_errors.extend(check_cite_keys(repo_root))
     all_errors.extend(check_param_refs(repo_root))
     all_errors.extend(check_page_refs(repo_root))
+    all_errors.extend(check_math_syntax(repo_root))
+    all_errors.extend(check_section_anchors(repo_root))
 
     if all_errors:
         print("Doc reference check failed:")

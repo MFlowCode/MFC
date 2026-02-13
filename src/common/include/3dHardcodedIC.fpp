@@ -1,12 +1,12 @@
 #:def Hardcoded3DVariables()
-    ! Place any declaration of intermediate variables here
+    ! any declaration of intermediate variables here
     real(wp) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, alph, Mach
     real(wp) :: eps
 
-    ! IGR Jets
-    ! Arrays to stor position and radii of jets from input file
+    ! Jets
+    ! to stor position and radii of jets from input file
     real(wp), dimension(:), allocatable :: y_th_arr, z_th_arr, r_th_arr
-    ! Variables to describe initial condition of jet
+    ! to describe initial condition of jet
     real(wp) :: r, ux_th, ux_am, p_th, p_am, rho_th, rho_am, y_th, z_th, r_th, eps_smooth
     real(wp) :: rcut, xcut ! Intermediate variables for creating smooth initial condition
 
@@ -175,13 +175,13 @@
         q_prim_vf(E_idx)%sf(i, j, k) = p_th*rcut*xcut + p_am
 
     case (370)
-        ! This hardcoded case extrudes a 2D profile to initialize a 3D simulation domain
+        ! hardcoded case extrudes a 2D profile to initialize a 3D simulation domain
         @: HardcodedReadValues()
 
     case (380)
-        ! This is patch is hard-coded for test suite optimization used in the
-        ! 3D_TaylorGreenVortex case:
-        ! This analytic patch used geometry 9
+        ! is patch is hard-coded for test suite optimization used in the
+        ! case:
+        ! analytic patch used geometry 9
         Mach = 0.1
         if (patch_id == 1) then
             q_prim_vf(E_idx)%sf(i, j, k) = 101325 + (Mach**2*376.636429464809**2/16)*(cos(2*x_cc(i)/1) + cos(2*y_cc(j)/1))*(cos(2*z_cc(k)/1) + 2)

@@ -1,22 +1,22 @@
 !>
-!! @file m_rhs.f90
-!! @brief Contains module m_rhs
+!!
+!! module m_rhs
 
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
 !> @brief The module contains the subroutines used to calculate the right-
-!!              hane-side (RHS) in the quasi-conservative, shock- and interface-
-!!              capturing finite-volume framework for the multicomponent Navier-
-!!              Stokes equations supplemented by appropriate advection equations
-!!              used to capture the material interfaces. The system of equations
-!!              is closed by the stiffened gas equation of state, as well as any
-!!              required mixture relationships. Capillarity effects are included
-!!              and are modeled by the means of a volume force acting across the
-!!              diffuse material interface region. The implementation details of
-!!              surface tension may be found in Perigaud and Saurel (2005). Note
-!!              that both viscous and surface tension effects are only available
-!!              in the volume fraction model.
+!! in the quasi-conservative, shock- and interface-
+!! framework for the multicomponent Navier-
+!! supplemented by appropriate advection equations
+!! capture the material interfaces. The system of equations
+!! by the stiffened gas equation of state, as well as any
+!! relationships. Capillarity effects are included
+!! modeled by the means of a volume force acting across the
+!! interface region. The implementation details of
+!! may be found in Perigaud and Saurel (2005). Note
+!! viscous and surface tension effects are only available
+!! volume fraction model.
 module m_rhs
 
     use m_derived_types        !< Definitions of the derived types
@@ -28,10 +28,10 @@ module m_rhs
     use m_variables_conversion !< State variables type conversion procedures
 
     use m_weno                 !< Weighted and essentially non-oscillatory (WENO)
-                               !! schemes for spatial reconstruction of variables
+                               !! spatial reconstruction of variables
 
     use m_muscl                !< Monotonic Upstream-centered (MUSCL)
-                               !! schemes for conservation laws
+                               !! conservation laws
 
     use m_riemann_solvers      !< Exact and approximate Riemann problem solvers
 
@@ -75,32 +75,32 @@ module m_rhs
  s_compute_rhs, &
  s_finalize_rhs_module
 
-    !! This variable contains the WENO-reconstructed values of the cell-average
-    !! conservative variables, which are located in q_cons_vf, at cell-interior
-    !! Gaussian quadrature points (QP).
+    !! contains the WENO-reconstructed values of the cell-average
+    !! which are located in q_cons_vf, at cell-interior
+    !! points (QP).
     type(vector_field) :: q_cons_qp !<
     $:GPU_DECLARE(create='[q_cons_qp]')
 
-    !! The primitive variables at cell-interior Gaussian quadrature points. These
-    !! are calculated from the conservative variables and gradient magnitude (GM)
-    !! of the volume fractions, q_cons_qp and gm_alpha_qp, respectively.
+    !! variables at cell-interior Gaussian quadrature points. These
+    !! from the conservative variables and gradient magnitude (GM)
+    !! volume fractions, q_cons_qp and gm_alpha_qp, respectively.
     type(vector_field) :: q_prim_qp !<
     $:GPU_DECLARE(create='[q_prim_qp]')
 
     !> @name The first-order spatial derivatives of the primitive variables at cell-
-    !! interior Gaussian quadrature points. These are WENO-reconstructed from
-    !! their respective cell-average values, obtained through the application
-    !! of the divergence theorem on the integral-average cell-boundary values
-    !! of the primitive variables, located in qK_prim_n, where K = L or R.
+    !! quadrature points. These are WENO-reconstructed from
+    !! cell-average values, obtained through the application
+    !! divergence theorem on the integral-average cell-boundary values
+    !! primitive variables, located in qK_prim_n, where K = L or R.
     !> @{
     type(vector_field), allocatable, dimension(:) :: dq_prim_dx_qp, dq_prim_dy_qp, dq_prim_dz_qp
     $:GPU_DECLARE(create='[dq_prim_dx_qp,dq_prim_dy_qp,dq_prim_dz_qp]')
     !> @}
 
     !> @name The left and right WENO-reconstructed cell-boundary values of the cell-
-    !! average first-order spatial derivatives of the primitive variables. The
-    !! cell-average of the first-order spatial derivatives may be found in the
-    !! variables dq_prim_ds_qp, where s = x, y or z.
+    !! spatial derivatives of the primitive variables. The
+    !! the first-order spatial derivatives may be found in the
+    !! where s = x, y or z.
     !> @{
     type(vector_field), allocatable, dimension(:) :: dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n
     type(vector_field), allocatable, dimension(:) :: dqR_prim_dx_n, dqR_prim_dy_n, dqR_prim_dz_n
@@ -114,14 +114,14 @@ module m_rhs
     $:GPU_DECLARE(create='[tau_Re_vf]')
 
     type(vector_field) :: gm_alpha_qp  !<
-    !! The gradient magnitude of the volume fractions at cell-interior Gaussian
-    !! quadrature points. gm_alpha_qp is calculated from individual first-order
-    !! spatial derivatives located in dq_prim_ds_qp.
+    !! magnitude of the volume fractions at cell-interior Gaussian
+    !! gm_alpha_qp is calculated from individual first-order
+    !! located in dq_prim_ds_qp.
 
     $:GPU_DECLARE(create='[gm_alpha_qp]')
 
     !> @name The left and right WENO-reconstructed cell-boundary values of the cell-
-    !! average gradient magnitude of volume fractions, located in gm_alpha_qp.
+    !! magnitude of volume fractions, located in gm_alpha_qp.
     !> @{
     type(vector_field), allocatable, dimension(:) :: gm_alphaL_n
     type(vector_field), allocatable, dimension(:) :: gm_alphaR_n
@@ -131,8 +131,8 @@ module m_rhs
     !> @}
 
     !> @name The cell-boundary values of the fluxes (src - source, gsrc - geometrical
-    !! source). These are computed by applying the chosen Riemann problem solver
-    !! .on the left and right cell-boundary values of the primitive variables
+    !! are computed by applying the chosen Riemann problem solver
+    !! left and right cell-boundary values of the primitive variables
     !> @{
     type(vector_field), allocatable, dimension(:) :: flux_n
     type(vector_field), allocatable, dimension(:) :: flux_src_n
@@ -179,8 +179,8 @@ module m_rhs
 contains
 
     !> The computation of parameters, the allocation of memory,
-        !!      the association of pointers and/or the execution of any
-        !!      other procedures that are necessary to setup the module.
+        !! of pointers and/or the execution of any
+        !! that are necessary to setup the module.
     impure subroutine s_initialize_rhs_module
 
         integer :: i, j, k, l, id !< Generic loop iterators
@@ -202,9 +202,9 @@ contains
         end if
 
         if (surface_tension) then
-            ! This assumes that the color function advection equation is
-            ! the last equation. If this changes then this logic will
-            ! need updated
+            ! assumes that the color function advection equation is
+            ! last equation. If this changes then this logic will
+            ! updated
             do l = adv_idx%end + 1, sys_size - 1
                 @:ALLOCATE(q_prim_qp%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
             end do
@@ -220,7 +220,7 @@ contains
 
             do l = 1, cont_idx%end
                 if (relativity) then
-                    ! Cons and Prim densities are different for relativity
+                    ! and Prim densities are different for relativity
                     @:ALLOCATE(q_prim_qp%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
                 else
                     q_prim_qp%vf(l)%sf => q_cons_qp%vf(l)%sf
@@ -250,7 +250,7 @@ contains
             $:GPU_ENTER_DATA(attach='[q_prim_qp%vf(psi_idx)%sf]')
         end if
 
-        ! Allocation/Association of flux_n, flux_src_n, and flux_gsrc_n
+        ! of flux_n, flux_src_n, and flux_gsrc_n
         if (.not. igr) then
             @:ALLOCATE(flux_n(1:num_dims))
             @:ALLOCATE(flux_src_n(1:num_dims))
@@ -341,12 +341,12 @@ contains
                 end if
 
             end do
-            ! END: Allocation/Association of flux_n, flux_src_n, and flux_gsrc_n
+            ! Allocation/Association of flux_n, flux_src_n, and flux_gsrc_n
         end if
 
         if ((.not. igr) .or. dummy) then
 
-            ! Allocation of dq_prim_ds_qp
+            ! of dq_prim_ds_qp
             @:ALLOCATE(dq_prim_dx_qp(1:1))
             @:ALLOCATE(dq_prim_dy_qp(1:1))
             @:ALLOCATE(dq_prim_dz_qp(1:1))
@@ -354,7 +354,7 @@ contains
             @:ALLOCATE(qL_prim(1:num_dims))
             @:ALLOCATE(qR_prim(1:num_dims))
 
-            ! Allocation/Association of dqK_prim_ds_n
+            ! of dqK_prim_ds_n
             @:ALLOCATE(dqL_prim_dx_n(1:num_dims))
             @:ALLOCATE(dqL_prim_dy_n(1:num_dims))
             @:ALLOCATE(dqL_prim_dz_n(1:num_dims))
@@ -621,9 +621,9 @@ contains
         if (mpp_lim .and. bubbles_euler) then
             @:ALLOCATE(alf_sum%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
         end if
-        ! END: Allocation/Association of qK_cons_n and qK_prim_n
+        ! Allocation/Association of qK_cons_n and qK_prim_n
 
-        ! Allocation of gm_alphaK_n
+        ! of gm_alphaK_n
         if (.not. igr) then
             @:ALLOCATE(gm_alphaL_n(1:num_dims))
             @:ALLOCATE(gm_alphaR_n(1:num_dims))
@@ -665,7 +665,7 @@ contains
         call cpu_time(t_start)
 
         if (.not. igr .or. dummy) then
-            ! Association/Population of Working Variables
+            ! of Working Variables
             $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
             do i = 1, sys_size
                 do l = idwbuff(3)%beg, idwbuff(3)%end
@@ -678,7 +678,7 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
 
-            ! Converting Conservative to Primitive Variables
+            ! Conservative to Primitive Variables
 
             if (mpp_lim .and. bubbles_euler) then
                 $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
@@ -753,7 +753,7 @@ contains
             call nvtxEndRange
         end if
 
-        ! Dimensional Splitting Loop
+        ! Splitting Loop
         do id = 1, num_dims
 
             if (igr .or. dummy) then
@@ -788,12 +788,12 @@ contains
             end if
             if ((.not. igr) .or. dummy) then! Finite volume solve
 
-                ! Reconstructing Primitive/Conservative Variables
+                ! Primitive/Conservative Variables
                 call nvtxStartRange("RHS-WENO")
 
                 if (.not. surface_tension) then
                     if (all(Re_size == 0)) then
-                        ! Reconstruct densitiess
+                        ! densitiess
                         iv%beg = 1; iv%end = sys_size
                         call s_reconstruct_cell_boundary_values( &
                             q_prim_qp%vf(1:sys_size), &
@@ -863,7 +863,7 @@ contains
 
                 end if
 
-                ! Reconstruct viscous derivatives for viscosity
+                ! viscous derivatives for viscosity
                 if (weno_Re_flux) then
                     iv%beg = momxb; iv%end = momxe
                     call s_reconstruct_cell_boundary_values_visc_deriv( &
@@ -892,7 +892,7 @@ contains
 
                 call nvtxEndRange ! WENO
 
-                ! Configuring Coordinate Direction Indexes
+                ! Coordinate Direction Indexes
                 if (id == 1) then
                     irx%beg = -1; iry%beg = 0; irz%beg = 0
                 elseif (id == 2) then
@@ -901,9 +901,9 @@ contains
                     irx%beg = 0; iry%beg = 0; irz%beg = -1
                 end if
                 irx%end = m; iry%end = n; irz%end = p
-                ! $:GPU_UPDATE(host='[qL_rsx_vf,qR_rsx_vf]')
-                ! print *, "L", qL_rsx_vf(100:300, 0, 0, 1)
-                ! print *, "R", qR_rsx_vf(100:300, 0, 0, 1)
+                !
+                ! *, "L", qL_rsx_vf(100:300, 0, 0, 1)
+                ! *, "R", qR_rsx_vf(100:300, 0, 0, 1)
 
                 !Computing Riemann Solver Flux and Source Flux
                 call nvtxStartRange("RHS-RIEMANN-SOLVER")
@@ -927,8 +927,8 @@ contains
                 !$:GPU_UPDATE(host='[flux_n(1)%vf(1)%sf]')
                 !print *, "FLUX", flux_n(1)%vf(1)%sf(100:300, 0, 0)
 
-                ! Additional physics and source terms
-                ! RHS addition for advection source
+                ! physics and source terms
+                ! addition for advection source
                 call nvtxStartRange("RHS-ADVECTION-SRC")
                 call s_compute_advection_source_term(id, &
                                                      rhs_vf, &
@@ -937,21 +937,21 @@ contains
                                                      flux_src_n(id))
                 call nvtxEndRange
 
-                ! RHS additions for hypoelasticity
+                ! additions for hypoelasticity
                 call nvtxStartRange("RHS-HYPOELASTICITY")
                 if (hypoelasticity) call s_compute_hypoelastic_rhs(id, &
                                                                    q_prim_qp%vf, &
                                                                    rhs_vf)
                 call nvtxEndRange
 
-                ! RHS for diffusion
+                ! for diffusion
                 if (chemistry .and. chem_params%diffusion) then
                     call nvtxStartRange("RHS-CHEM-DIFFUSION")
                     call s_compute_chemistry_diffusion_flux(id, q_prim_qp%vf, flux_src_n(id)%vf, irx, iry, irz)
                     call nvtxEndRange
                 end if
 
-                ! RHS additions for viscosity
+                ! additions for viscosity
                 if (viscous .or. surface_tension .or. chem_params%diffusion) then
                     call nvtxStartRange("RHS-ADD-PHYSICS")
                     call s_compute_additional_physics_rhs(id, &
@@ -964,14 +964,14 @@ contains
                     call nvtxEndRange
                 end if
 
-                ! RHS additions for sub-grid bubbles_euler
+                ! additions for sub-grid bubbles_euler
                 if (bubbles_euler) then
                     call nvtxStartRange("RHS-BUBBLES-COMPUTE")
                     call s_compute_bubbles_EE_rhs(id, q_prim_qp%vf, divu)
                     call nvtxEndRange
                 end if
 
-                ! RHS additions for qbmm bubbles
+                ! additions for qbmm bubbles
                 if (qbmm) then
                     call nvtxStartRange("RHS-QBMM")
                     call s_compute_qbmm_rhs(id, &
@@ -983,7 +983,7 @@ contains
                                             rhs_pb)
                     call nvtxEndRange
                 end if
-                ! END: Additional physics and source terms
+                ! Additional physics and source terms
 
                 if (hyper_cleaning) then
                     $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
@@ -998,10 +998,10 @@ contains
                     $:END_GPU_PARALLEL_LOOP()
                 end if
 
-                ! END: Additional physics and source terms
+                ! Additional physics and source terms
             end if
         end do
-        ! END: Dimensional Splitting Loop
+        ! Dimensional Splitting Loop
 
         if (ib) then
             $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=3)
@@ -1019,8 +1019,8 @@ contains
             $:END_GPU_PARALLEL_LOOP()
         end if
 
-        ! Additional Physics and Source Temrs
-        ! Additions for acoustic_source
+        ! Physics and Source Temrs
+        ! for acoustic_source
         if (acoustic_source) then
             call nvtxStartRange("RHS-ACOUSTIC-SRC")
             call s_acoustic_src_calculations(q_cons_qp%vf(1:sys_size), &
@@ -1030,7 +1030,7 @@ contains
             call nvtxEndRange
         end if
 
-        ! Add bubbles source term
+        ! bubbles source term
         if (bubbles_euler .and. (.not. adap_dt) .and. (.not. qbmm)) then
             call nvtxStartRange("RHS-BUBBLES-SRC")
             call s_compute_bubble_EE_source( &
@@ -1042,14 +1042,14 @@ contains
         end if
 
         if (bubbles_lagrange) then
-            ! RHS additions for sub-grid bubbles_lagrange
+            ! additions for sub-grid bubbles_lagrange
             call nvtxStartRange("RHS-EL-BUBBLES-SRC")
             call s_compute_bubbles_EL_source( &
                 q_cons_qp%vf(1:sys_size), &
                 q_prim_qp%vf(1:sys_size), &
                 rhs_vf)
             call nvtxEndRange
-            ! Compute bubble dynamics
+            ! bubble dynamics
             if (.not. adap_dt) then
                 call nvtxStartRange("RHS-EL-BUBBLES-DYN")
                 call s_compute_bubble_EL_dynamics( &
@@ -1067,7 +1067,7 @@ contains
 
         if (cont_damage) call s_compute_damage_state(q_cons_qp%vf, rhs_vf)
 
-        ! END: Additional pphysics and source terms
+        ! Additional pphysics and source terms
 
         if (run_time_info .or. probe_wrt .or. ib .or. bubbles_lagrange) then
             if (.not. igr .or. dummy) then
@@ -1344,7 +1344,7 @@ contains
             type(vector_field), intent(in) :: q_cons_vf_arg
             type(vector_field), intent(in) :: q_prim_vf_arg
             type(vector_field), intent(in) :: flux_src_n_vf_arg
-            ! CORRECTED DECLARATION FOR Kterm_arg:
+            ! DECLARATION FOR Kterm_arg:
             real(wp), allocatable, dimension(:, :, :), intent(in) :: Kterm_arg
 
             integer :: j_adv, k_idx, l_idx, q_idx
@@ -1735,8 +1735,8 @@ contains
                 end if
             end if
 
-            ! Applying the geometrical viscous Riemann source fluxes calculated as average
-            ! of values at cell boundaries
+            ! the geometrical viscous Riemann source fluxes calculated as average
+            ! values at cell boundaries
             if (cyl_coord) then
                 if ((bc_y%beg == -2) .or. (bc_y%beg == -14)) then
 
@@ -1868,15 +1868,15 @@ contains
     end subroutine s_compute_additional_physics_rhs
 
     !>  The purpose of this subroutine is to WENO-reconstruct the
-        !!      left and the right cell-boundary values, including values
-        !!      at the Gaussian quadrature points, from the cell-averaged
-        !!      variables.
-        !!  @param v_vf Cell-average variables
-        !!  @param vL_qp Left WENO-reconstructed, cell-boundary values including
-        !!          the values at the quadrature points, of the cell-average variables
-        !!  @param vR_qp Right WENO-reconstructed, cell-boundary values including
-        !!          the values at the quadrature points, of the cell-average variables
-        !!  @param norm_dir Splitting coordinate direction
+        !! the right cell-boundary values, including values
+        !! Gaussian quadrature points, from the cell-averaged
+        !!
+        !! Cell-average variables
+        !! Left WENO-reconstructed, cell-boundary values including
+        !! at the quadrature points, of the cell-average variables
+        !! Right WENO-reconstructed, cell-boundary values including
+        !! at the quadrature points, of the cell-average variables
+        !! Splitting coordinate direction
     subroutine s_reconstruct_cell_boundary_values(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, &
                                                   norm_dir)
 
@@ -1891,7 +1891,7 @@ contains
 
         #:for SCHEME, TYPE in [('weno','WENO_TYPE'), ('muscl','MUSCL_TYPE')]
             if (recon_type == ${TYPE}$ .or. dummy) then
-                ! Reconstruction in s1-direction
+                ! in s1-direction
                 if (norm_dir == 1) then
                     is1 = idwbuff(1); is2 = idwbuff(2); is3 = idwbuff(3)
                     recon_dir = 1; is1%beg = is1%beg + ${SCHEME}$_polyn
@@ -1942,7 +1942,7 @@ contains
         integer :: recon_dir !< Coordinate direction of the WENO reconstruction
 
         integer :: i, j, k, l
-        ! Reconstruction in s1-direction
+        ! in s1-direction
 
         #:for SCHEME, TYPE in [('weno','WENO_TYPE'), ('muscl', 'MUSCL_TYPE')]
             if (recon_type == ${TYPE}$ .or. dummy) then
@@ -2020,7 +2020,7 @@ contains
         if (.not. igr) then
             do j = cont_idx%beg, cont_idx%end
                 if (relativity) then
-                    ! Cons and Prim densities are different for relativity
+                    ! and Prim densities are different for relativity
                     @:DEALLOCATE(q_cons_qp%vf(j)%sf)
                     @:DEALLOCATE(q_prim_qp%vf(j)%sf)
                 else
