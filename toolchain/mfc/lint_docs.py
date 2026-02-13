@@ -130,13 +130,13 @@ def _is_valid_param(param: str, valid_params: set, sub_params: set) -> bool:
     if base in valid_params or base in sub_params:
         return True
 
-    # Check sub-param part after %
+    # Compound params (with %): validate both family prefix and attribute
     if "%" in param:
         sub = param.split("%")[-1]
-        if sub in sub_params:
-            return True
+        family_ok = any(p.startswith(base + "%") for p in valid_params)
+        return family_ok and sub in sub_params
 
-    # Family prefix check (only accept at a boundary to avoid prefix-typo matches)
+    # Simple params: family prefix check at structural boundaries
     if any(p.startswith(base + b) for b in ("(", "%", "_") for p in valid_params):
         return True
 
