@@ -10,6 +10,7 @@ if [ "$job_device" = "gpu" ]; then
     fi
 fi
 
+# Build source code on compute node (deps already fetched on login node)
 max_attempts=3
 attempt=1
 while [ $attempt -le $max_attempts ]; do
@@ -20,8 +21,8 @@ while [ $attempt -le $max_attempts ]; do
     fi
 
     if [ $attempt -lt $max_attempts ]; then
-        echo "Build failed on attempt $attempt. Cleaning and retrying in 30s..."
-        ./mfc.sh clean
+        echo "Build failed on attempt $attempt. Cleaning source targets and retrying in 30s..."
+        ./mfc.sh clean -t pre_process simulation post_process syscheck
         sleep 30
     else
         echo "Build failed after $max_attempts attempts."
@@ -37,6 +38,8 @@ if [ "$job_device" = "gpu" ]; then
     gpu_ids=$(seq -s ' ' 0 $(($gpu_count-1))) # 0,1,2,...,gpu_count-1
     device_opts="-g $gpu_ids"
     n_test_threads=`expr $gpu_count \* 2`
+else
+    device_opts="--no-gpu"
 fi
 
 ./mfc.sh test -v --max-attempts 3 -a -j $n_test_threads $device_opts -- -c phoenix
