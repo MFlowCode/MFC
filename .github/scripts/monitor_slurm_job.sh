@@ -37,7 +37,7 @@ get_job_state() {
   local state
 
   # Try squeue first (fast, works for active jobs)
-  state=$(squeue -j "$jid" -h -o '%T' 2>/dev/null | head -n1 | tr -d ' ')
+  state=$(squeue -j "$jid" -h -o '%T' 2>/dev/null | head -n1 | tr -d ' ' || true)
   if [ -n "$state" ]; then
     echo "$state"
     return
@@ -45,7 +45,7 @@ get_job_state() {
 
   # Fallback to sacct (works for completed/historical jobs)
   if command -v sacct >/dev/null 2>&1; then
-    state=$(sacct -j "$jid" -n -X -P -o State 2>/dev/null | head -n1 | cut -d'|' -f1)
+    state=$(sacct -j "$jid" -n -X -P -o State 2>/dev/null | head -n1 | cut -d'|' -f1 || true)
     if [ -n "$state" ]; then
       echo "$state"
       return
@@ -164,7 +164,7 @@ exec 3<&-
 kill "${tail_pid}" 2>/dev/null || true
 tail_pid=""
 
-# Wait for output file to finish growing (stabilize) before stopping tail
+# Wait for output file to stabilize (NFS flush) before final read
 if [ -f "$output_file" ]; then
   last_size=-1
   same_count=0
