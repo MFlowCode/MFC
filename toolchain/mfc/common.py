@@ -1,4 +1,4 @@
-import os, yaml, typing, shutil, subprocess, logging
+import os, yaml, typing, shutil, subprocess, logging, time
 
 from os.path import join, abspath, normpath, dirname, realpath
 
@@ -122,8 +122,16 @@ def create_directory(dirpath: str) -> None:
 
 
 def delete_directory(dirpath: str) -> None:
-    if os.path.isdir(dirpath):
-        shutil.rmtree(dirpath)
+    for attempt in range(5):
+        if not os.path.isdir(dirpath):
+            return
+        try:
+            shutil.rmtree(dirpath)
+            return
+        except OSError:
+            if attempt == 4:
+                raise
+            time.sleep(1)
 
 
 def get_program_output(arguments: typing.List[str] = None, cwd=None):
