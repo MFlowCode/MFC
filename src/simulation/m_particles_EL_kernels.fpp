@@ -494,119 +494,17 @@ contains
 
     end subroutine s_get_cell
 
-    !! This function interpolates the velocity of Eulerian field at the position
-            !! of the particle.
-            !! @param pos Position of the particle in directiion i
-            !! @param cell Computational coordinates of the particle
-            !! @param i Direction of the velocity (1: x, 2: y, 3: z)
-            !! @param q_prim_vf Eulerian field with primitive variables
-            !! @return v Interpolated velocity at the position of the particle
-    function f_interpolate_velocity(pos, cell, i, q_prim_vf) result(v)
-        $:GPU_ROUTINE(parallelism='[seq]')
-        real(wp), intent(in) :: pos
-        integer, dimension(3), intent(in) :: cell
-        integer, intent(in) :: i
-        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
-
-        real(wp) :: v
-        real(wp), dimension(fd_order + 1) :: xi, eta, L
-
-        if (fd_order == 1) then
-            v = q_prim_vf(momxb + i - 1)%sf(cell(1), cell(2), cell(3))
-
-        elseif (fd_order == 2) then
-            if (i == 1) then
-                xi(1) = x_cc(cell(1) - 1)
-                eta(1) = q_prim_vf(momxb)%sf(cell(1) - 1, cell(2), cell(3))
-                xi(2) = x_cc(cell(1))
-                eta(2) = q_prim_vf(momxb)%sf(cell(1), cell(2), cell(3))
-                xi(3) = x_cc(cell(1) + 1)
-                eta(3) = q_prim_vf(momxb)%sf(cell(1) + 1, cell(2), cell(3))
-            elseif (i == 2) then
-                xi(1) = y_cc(cell(2) - 1)
-                eta(1) = q_prim_vf(momxb + 1)%sf(cell(1), cell(2) - 1, cell(3))
-                xi(2) = y_cc(cell(2))
-                eta(2) = q_prim_vf(momxb + 1)%sf(cell(1), cell(2), cell(3))
-                xi(3) = y_cc(cell(2) + 1)
-                eta(3) = q_prim_vf(momxb + 1)%sf(cell(1), cell(2) + 1, cell(3))
-            elseif (i == 3) then
-                xi(1) = z_cc(cell(3) - 1)
-                eta(1) = q_prim_vf(momxe)%sf(cell(1), cell(2), cell(3) - 1)
-                xi(2) = z_cc(cell(3))
-                eta(2) = q_prim_vf(momxe)%sf(cell(1), cell(2), cell(3))
-                xi(3) = z_cc(cell(3) + 1)
-                eta(3) = q_prim_vf(momxe)%sf(cell(1), cell(2), cell(3) + 1)
-            end if
-
-            L(1) = ((pos - xi(2))*(pos - xi(3)))/((xi(1) - xi(2))*(xi(1) - xi(3)))
-            L(2) = ((pos - xi(1))*(pos - xi(3)))/((xi(2) - xi(1))*(xi(2) - xi(3)))
-            L(3) = ((pos - xi(1))*(pos - xi(2)))/((xi(3) - xi(1))*(xi(3) - xi(2)))
-
-            v = L(1)*eta(1) + L(2)*eta(2) + L(3)*eta(3)
-        elseif (fd_order == 4) then
-            if (i == 1) then
-                xi(1) = x_cc(cell(1) - 2)
-                eta(1) = q_prim_vf(momxb)%sf(cell(1) - 2, cell(2), cell(3))
-                xi(2) = x_cc(cell(1) - 1)
-                eta(2) = q_prim_vf(momxb)%sf(cell(1) - 1, cell(2), cell(3))
-                xi(3) = x_cc(cell(1))
-                eta(3) = q_prim_vf(momxb)%sf(cell(1), cell(2), cell(3))
-                xi(4) = x_cc(cell(1) + 1)
-                eta(4) = q_prim_vf(momxb)%sf(cell(1) + 1, cell(2), cell(3))
-                xi(5) = x_cc(cell(1) + 2)
-                eta(5) = q_prim_vf(momxb)%sf(cell(1) + 2, cell(2), cell(3))
-            elseif (i == 2) then
-                xi(1) = y_cc(cell(2) - 2)
-                eta(1) = q_prim_vf(momxb + 1)%sf(cell(1), cell(2) - 2, cell(3))
-                xi(2) = y_cc(cell(2) - 1)
-                eta(2) = q_prim_vf(momxb + 1)%sf(cell(1), cell(2) - 1, cell(3))
-                xi(3) = y_cc(cell(2))
-                eta(3) = q_prim_vf(momxb + 1)%sf(cell(1), cell(2), cell(3))
-                xi(4) = y_cc(cell(2) + 1)
-                eta(4) = q_prim_vf(momxb + 1)%sf(cell(1), cell(2) + 1, cell(3))
-                xi(5) = y_cc(cell(2) + 2)
-                eta(5) = q_prim_vf(momxb + 1)%sf(cell(1), cell(2) + 2, cell(3))
-            elseif (i == 3) then
-                xi(1) = z_cc(cell(3) - 2)
-                eta(1) = q_prim_vf(momxe)%sf(cell(1), cell(2), cell(3) - 2)
-                xi(2) = z_cc(cell(3) - 1)
-                eta(2) = q_prim_vf(momxe)%sf(cell(1), cell(2), cell(3) - 1)
-                xi(3) = z_cc(cell(3))
-                eta(3) = q_prim_vf(momxe)%sf(cell(1), cell(2), cell(3))
-                xi(4) = z_cc(cell(3) + 1)
-                eta(4) = q_prim_vf(momxe)%sf(cell(1), cell(2), cell(3) + 1)
-                xi(5) = z_cc(cell(3) + 2)
-                eta(5) = q_prim_vf(momxe)%sf(cell(1), cell(2), cell(3) + 2)
-            end if
-
-            L(1) = (pos - xi(2))*(pos - xi(3))*(pos - xi(4))*(pos - xi(5))/ &
-                   ((xi(1) - xi(2))*(xi(1) - xi(3))*(xi(1) - xi(4))*(xi(1) - xi(5)))
-            L(2) = (pos - xi(1))*(pos - xi(3))*(pos - xi(4))*(pos - xi(5))/ &
-                   ((xi(2) - xi(1))*(xi(2) - xi(3))*(xi(2) - xi(4))*(xi(2) - xi(5)))
-            L(3) = (pos - xi(1))*(pos - xi(2))*(pos - xi(4))*(pos - xi(5))/ &
-                   ((xi(3) - xi(1))*(xi(3) - xi(2))*(xi(3) - xi(4))*(xi(3) - xi(5)))
-            L(4) = (pos - xi(1))*(pos - xi(2))*(pos - xi(3))*(pos - xi(5))/ &
-                   ((xi(4) - xi(1))*(xi(4) - xi(2))*(xi(4) - xi(3))*(xi(4) - xi(5)))
-            L(5) = (pos - xi(1))*(pos - xi(2))*(pos - xi(3))*(pos - xi(4))/ &
-                   ((xi(5) - xi(1))*(xi(5) - xi(2))*(xi(5) - xi(3))*(xi(5) - xi(4)))
-
-            v = L(1)*eta(1) + L(2)*eta(2) + L(3)*eta(3) + L(4)*eta(4) + L(5)*eta(5)
-        end if
-
-    end function f_interpolate_velocity
-
     function f_interp_prim_trilinear(pos, cell, field_vf, field_index) result(val)
         $:GPU_ROUTINE(parallelism='[seq]')
 
-        real(wp), dimension(3), intent(in) :: pos      ! particle position
-        integer, dimension(3), intent(in) :: cell     ! left/lower cell index
+        real(wp), dimension(3), intent(in) :: pos
+        integer, dimension(3), intent(in) :: cell
         type(scalar_field), dimension(:), intent(in) :: field_vf
         integer, intent(in) :: field_index
 
         real(wp) :: val
         real(wp) :: wx, wy, wz
         real(wp) :: fx0, fx1, fy0, fy1
-
         integer :: i, j, k
 
         i = cell(1)
@@ -615,20 +513,34 @@ contains
 
         wx = (pos(1) - x_cc(i))/(x_cc(i + 1) - x_cc(i))
         wy = (pos(2) - y_cc(j))/(y_cc(j + 1) - y_cc(j))
+
+        ! 2D case bilinear
+        if (num_dims == 2) then
+
+            fx0 = (1 - wx)*field_vf(field_index)%sf(i, j, 0) + &
+                  wx*field_vf(field_index)%sf(i + 1, j, 0)
+
+            fx1 = (1 - wx)*field_vf(field_index)%sf(i, j + 1, 0) + &
+                  wx*field_vf(field_index)%sf(i + 1, j + 1, 0)
+
+            val = (1 - wy)*fx0 + wy*fx1
+            return
+        end if
+
+        ! 3D case trilinear
         wz = (pos(3) - z_cc(k))/(z_cc(k + 1) - z_cc(k))
 
         fx0 = (1 - wx)*field_vf(field_index)%sf(i, j, k) + wx*field_vf(field_index)%sf(i + 1, j, k)
         fx1 = (1 - wx)*field_vf(field_index)%sf(i, j + 1, k) + wx*field_vf(field_index)%sf(i + 1, j + 1, k)
-
         fy0 = (1 - wy)*fx0 + wy*fx1
 
         fx0 = (1 - wx)*field_vf(field_index)%sf(i, j, k + 1) + wx*field_vf(field_index)%sf(i + 1, j, k + 1)
         fx1 = (1 - wx)*field_vf(field_index)%sf(i, j + 1, k + 1) + wx*field_vf(field_index)%sf(i + 1, j + 1, k + 1)
-
         fy1 = (1 - wy)*fx0 + wy*fx1
 
         val = (1 - wz)*fy0 + wz*fy1
-    end function f_interp_prim_trilinear
+
+    end function
 
     !! This function calculates the force on a particle
             !!      based on the pressure gradient, velocity, and drag model.
@@ -684,11 +596,10 @@ contains
             rho_fluid = f_interp_prim_trilinear(pos, cell, q_prim_vf, 1)
             pressure_fluid = f_interp_prim_trilinear(pos, cell, q_prim_vf, E_idx)
             do dir = 1, num_dims
-                if (lag_params%pressure_force) then
+                if (lag_params%pressure_force .or. lag_params%added_mass_model > 0) then
                     dp(dir) = f_interp_prim_trilinear(pos, cell, fieldvars, dir)
                 end if
                 if (lag_params%added_mass_model > 0) then
-                    dp(dir) = f_interp_prim_trilinear(pos, cell, fieldvars, dir)
                     grad_rho(dir) = f_interp_prim_trilinear(pos, cell, fieldvars, 3 + dir)
                     drhodt = drhodt + f_interp_prim_trilinear(pos, cell, fieldvars, 6 + dir)
                 end if
@@ -698,11 +609,10 @@ contains
             rho_fluid = q_prim_vf(1)%sf(cell(1), cell(2), cell(3))
             pressure_fluid = q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3))
             do dir = 1, num_dims
-                if (lag_params%pressure_force) then
+                if (lag_params%pressure_force .or. lag_params%added_mass_model > 0) then
                     dp(dir) = fieldvars(dir)%sf(cell(1), cell(2), cell(3))
                 end if
                 if (lag_params%added_mass_model > 0) then
-                    dp(dir) = fieldvars(dir)%sf(cell(1), cell(2), cell(3))
                     grad_rho(dir) = fieldvars(3 + dir)%sf(cell(1), cell(2), cell(3))
                     drhodt = drhodt + fieldvars(6 + dir)%sf(cell(1), cell(2), cell(3))
                 end if
