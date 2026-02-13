@@ -1,5 +1,5 @@
 !>
-!! @file m_hypoelastic.f90
+!! @file
 !! @brief Contains module m_hypoelastic
 
 #:include 'macros.fpp'

@@ -1,5 +1,5 @@
 !>
-!! @file m_data_output.f90
+!! @file
 !! @brief Contains module m_data_output
 
 !> @brief This module enables the restructuring of the raw simulation data

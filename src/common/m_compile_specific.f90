@@ -1,5 +1,5 @@
 !>
-!! @file m_compile_specific.f90
+!! @file
 !! @brief Contains module m_compile_specific
 
 !> @brief This module contains subroutines that are compiler specific

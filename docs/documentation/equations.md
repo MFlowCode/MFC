@@ -7,6 +7,8 @@ Each section notes the input parameter(s) that activate the corresponding physic
 
 The models and algorithms described here are detailed in \cite Wilfong26 (MFC 5.0) and \cite Bryngelson21. Foundational references for each model are cited inline; see the \ref citelist "Bibliography" for full details.
 
+For parameter details and allowed values, see @ref case "Case Files" and the @ref parameters "Case Parameters" reference.
+
 ---
 
 ## 1. Overview

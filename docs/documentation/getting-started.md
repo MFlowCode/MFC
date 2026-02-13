@@ -70,7 +70,7 @@ for a Linux experience.
 
  <details>
 
-   <summary><h3>Windows + WSL (Recommended)</h3></summary>
+   <summary><b>Windows + WSL (Recommended)</b></summary>
 
 Install [Windows Subsystem for Linux (WSL)](https://docs.microsoft.com/en-us/windows/wsl/) on Windows 11:
 Either
@@ -92,7 +92,7 @@ Once you have WSL installed, you can follow the instructions for *nix systems ab
 
   <details>
 
-   <summary><h3>Native Windows (Intel)</h3></summary>
+   <summary><b>Native Windows (Intel)</b></summary>
 
 Install the latest version of:
 - [Microsoft Visual Studio Community](https://visualstudio.microsoft.com/)
@@ -118,7 +118,9 @@ You will also have access to the `.sln` Microsoft Visual Studio solution files f
 
   </details>
 
-  <summary><h3>MacOS</h3></summary>
+  <details>
+
+  <summary><b>MacOS</b></summary>
 
 Using [Homebrew](https://brew.sh/) you can install the necessary dependencies
 before configuring your environment:

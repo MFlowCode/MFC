@@ -1,5 +1,5 @@
 !>
-!! @file m_acoustic_src.fpp
+!! @file
 !! @brief Contains module m_acoustic_src
 
 #:include 'macros.fpp'

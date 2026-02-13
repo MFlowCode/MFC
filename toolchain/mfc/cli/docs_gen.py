@@ -5,8 +5,18 @@ This module generates markdown documentation that is always
 in sync with the CLI schema definitions.
 """
 
+import re
 from typing import List
 from .schema import CLISchema, Command, Argument
+
+
+def _escape_doxygen(text: str) -> str:
+    """Escape text for Doxygen markdown (avoid unintended refs/tags)."""
+    # Escape # followed by a letter (Doxygen interprets as section ref)
+    text = re.sub(r"#([a-zA-Z])", r"\#\1", text)
+    # Escape bare <word> that aren't HTML (Doxygen treats as XML tag)
+    text = re.sub(r"<(?!/?(?:code|b|i|em|strong|br|details|summary|p|ul|li|ol|a|pre|table|tr|td|th|sup|sub|hr)\b)(\w+)>", r"\\<\1>", text)
+    return text
 
 
 def _format_argument_row(arg: Argument) -> str:
@@ -20,8 +30,8 @@ def _format_argument_row(arg: Argument) -> str:
     # Format default value
     default_str = _format_default(arg.default)
 
-    # Escape pipes in help text
-    help_text = arg.help.replace("|", "\\|")
+    # Escape pipes and Doxygen-sensitive patterns in help text
+    help_text = _escape_doxygen(arg.help).replace("|", "\\|")
 
     return f"| {flag_str} | {help_text} | {default_str} |"
 
@@ -128,7 +138,7 @@ def _generate_command_section(cmd: Command, schema: CLISchema) -> List[str]:
     lines = []
 
     # Command header (no alias in heading to keep anchor simple)
-    lines.append(f"### {cmd.name}")
+    lines.append(f"### {cmd.name} {{#{cmd.name}}}")
     lines.append("")
 
     # Alias note if present
@@ -234,7 +244,7 @@ def generate_cli_reference(schema: CLISchema) -> str:
     # Command categories
     core_commands = ["build", "run", "test", "clean", "validate"]
     utility_commands = ["new", "params", "packer", "completion", "generate", "help"]
-    dev_commands = ["lint", "format", "spelling", "count", "count_diff"]
+    dev_commands = ["lint", "format", "spelling", "precheck", "count", "count_diff"]
     ci_commands = ["bench", "bench_diff"]
     other_commands = ["load", "interactive"]
 
