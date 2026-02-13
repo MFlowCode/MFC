@@ -136,8 +136,8 @@ def _is_valid_param(param: str, valid_params: set, sub_params: set) -> bool:
         if sub in sub_params:
             return True
 
-    # Family prefix check
-    if any(p.startswith(base) for p in valid_params):
+    # Family prefix check (only accept at a boundary to avoid prefix-typo matches)
+    if any(p.startswith(base + b) for b in ("(", "%", "_") for p in valid_params):
         return True
 
     return False
