@@ -11,6 +11,8 @@ if [ "$job_device" = "gpu" ]; then
     elif [ "$job_interface" = "omp" ]; then
         device_opts+=" mp"
     fi
+else
+    device_opts+=" --no-gpu"
 fi
 
 # Build source code on compute node (deps already fetched on login node)

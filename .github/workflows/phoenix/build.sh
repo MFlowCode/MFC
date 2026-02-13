@@ -3,6 +3,9 @@
 # Fetch dependencies on login node (internet access).
 # Source code is built on compute nodes via test.sh / bench.sh.
 
+# Ignore SIGHUP to survive login node session drops
+trap '' HUP
+
 job_device=$1
 job_interface=$2
 build_opts=""

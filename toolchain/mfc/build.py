@@ -620,19 +620,22 @@ def build(targets = None, case: input.MFCInputFile = None, history: typing.Set[s
     if ARG("deps_only", False):
         all_deps = set()
         for target in targets:
-            target = get_target(target)
+            if target.isDependency:
+                all_deps.add(target)
             for dep in target.requires.compute():
                 all_deps.add(dep)
 
+        sorted_deps = sorted(all_deps, key=lambda t: t.name)
+
         if len(history) == 0:
-            cons.print(f"[bold]Fetch Dependencies | {format_list_to_string([d.name for d in all_deps], 'magenta', 'None')}[/bold]")
+            cons.print(f"[bold]Fetch Dependencies | {format_list_to_string([d.name for d in sorted_deps], 'magenta', 'None')}[/bold]")
             cons.print(no_indent=True)
 
-        if not all_deps:
+        if not sorted_deps:
             cons.print("[yellow]No dependencies to build for the requested targets.[/yellow]")
             return
 
-        for dep in all_deps:
+        for dep in sorted_deps:
             __build_target(dep, case, history)
 
         return
