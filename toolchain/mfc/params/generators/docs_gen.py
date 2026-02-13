@@ -457,16 +457,13 @@ def generate_parameter_docs() -> str:  # pylint: disable=too-many-locals,too-man
             lines.append("### Patterns")
             lines.append("")
             # Build header dynamically based on which optional columns are needed
-            hdr = "| Pattern | Example | Description"
-            sep = "|---------|---------|------------"
+            cols = ["Pattern", "Example", "Description"]
             if pattern_has_symbols:
-                hdr += " | Symbol"
-                sep += "-|-------"
+                cols.append("Symbol")
             if pattern_has_constraints:
-                hdr += " | Constraints"
-                sep += "-|------------"
-            lines.append(hdr + " |")
-            lines.append(sep + "-|")
+                cols.append("Constraints")
+            lines.append("| " + " | ".join(cols) + " |")
+            lines.append("| " + " | ".join("-" * max(3, len(c)) for c in cols) + " |")
 
             for pattern, examples in sorted(patterns.items()):
                 example = examples[0]
@@ -499,15 +496,12 @@ def generate_parameter_docs() -> str:  # pylint: disable=too-many-locals,too-man
             # Check if any param in this family has a math symbol
             full_has_symbols = any(get_math_symbol(n) for n, _ in params)
 
-            hdr = "| Parameter | Type | Description"
-            sep = "|-----------|------|------------"
+            cols = ["Parameter", "Type", "Description"]
             if full_has_symbols:
-                hdr += " | Symbol"
-                sep += "-|-------"
-            hdr += " | Constraints"
-            sep += "-|------------"
-            lines.append(hdr + " |")
-            lines.append(sep + "-|")
+                cols.append("Symbol")
+            cols.append("Constraints")
+            lines.append("| " + " | ".join(cols) + " |")
+            lines.append("| " + " | ".join("-" * max(3, len(c)) for c in cols) + " |")
 
             for name, param in params:
                 type_str = _type_to_str(param.param_type)

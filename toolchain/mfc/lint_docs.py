@@ -211,13 +211,13 @@ def check_page_refs(repo_root: Path) -> list[str]:
     page_ids = {"citelist"}  # Doxygen built-in
     for md_file in doc_dir.glob("*.md"):
         text = md_file.read_text(encoding="utf-8")
-        m = re.match(r"@page\s+(\w+)", text)
+        m = re.search(r"^\s*@page\s+(\w+)", text, flags=re.MULTILINE)
         if m:
             page_ids.add(m.group(1))
 
     errors = []
     for md_file in sorted(doc_dir.glob("*.md")):
-        text = md_file.read_text(encoding="utf-8")
+        text = _strip_code_blocks(md_file.read_text(encoding="utf-8"))
         rel = md_file.relative_to(repo_root)
         for match in REF_RE.finditer(text):
             ref_target = match.group(1)
