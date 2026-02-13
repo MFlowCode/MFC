@@ -11,6 +11,7 @@ Welcome to the Multi-component Flow Code (MFC) documentation.
 
 ## Reference
 
+- @ref equations "Equations" - Comprehensive equations reference
 - @ref parameters "Case Parameters" - All ~3,400 parameters
 - @ref cli-reference "CLI Reference" - Command line options
 - @ref case_constraints "Case Creator Guide" - Feature compatibility
