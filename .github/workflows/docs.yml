@@ -21,7 +21,7 @@ jobs:
     - name: Build Doxygen
       run:  |
         sudo apt update -y
-        sudo apt install -y cmake ninja-build graphviz graphviz
+        sudo apt install -y cmake ninja-build graphviz texlive-binaries
         git clone https://github.com/doxygen/doxygen.git ../doxygen
         cd ../doxygen
         git checkout Release_1_16_1
