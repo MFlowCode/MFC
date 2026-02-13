@@ -92,6 +92,9 @@ for i in "${!configs[@]}"; do
     echo "  Starting: $cluster $device $interface"
     (
         cd "$dir"
+        # Give each build its own temp dir to avoid Cray compiler conflicts
+        export TMPDIR="$(pwd)/.tmp-build"
+        mkdir -p "$TMPDIR"
         bash .github/workflows/${cluster}/build.sh "$device" "$interface"
     ) > "$log" 2>&1 &
     build_pids[$i]=$!
