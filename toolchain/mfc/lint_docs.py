@@ -328,7 +328,7 @@ def check_doxygen_percent(repo_root: Path) -> list[str]:
         return []
 
     ignored = _gitignored_docs(repo_root)
-    code_span_re = re.compile(r"`([^`\n]+)`")
+    code_span_re = re.compile(r"``([^`\n]+)``|`([^`\n]+)`")
     bad_pct_re = re.compile(r"(?<!%)%(?=[a-zA-Z_])")
 
     errors = []
@@ -345,7 +345,7 @@ def check_doxygen_percent(repo_root: Path) -> list[str]:
             if in_code:
                 continue
             for m in code_span_re.finditer(line):
-                span = m.group(1)
+                span = m.group(1) or m.group(2)
                 if bad_pct_re.search(span):
                     fixed = bad_pct_re.sub("%%", span)
                     errors.append(

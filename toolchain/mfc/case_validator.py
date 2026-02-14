@@ -2264,10 +2264,10 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         num_fluids = self.get('num_fluids')
         model_eqns = self.get('model_eqns')
 
-        if num_fluids is None or model_eqns == 1:
+        if not self._is_numeric(num_fluids) or model_eqns == 1:
             return
 
-        for i in range(1, num_fluids + 1):
+        for i in range(1, int(num_fluids) + 1):
             gamma = self.get(f'fluid_pp({i})%gamma')
             if gamma is None or not self._is_numeric(gamma) or gamma <= 0:
                 continue
