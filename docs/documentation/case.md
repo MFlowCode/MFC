@@ -65,7 +65,7 @@ To run such a case, use the following format:
 For example, to run the `scaling` case in "weak-scaling" mode:
 
 ```shell
-./mfc.sh run examples/scaling/case.py -t pre_process -j 8 -- --scaling weak
+./mfc.sh run examples/scaling/benchmark.py -t pre_process -j 8 -- --scaling weak
 ```
 
 ## Parameters
