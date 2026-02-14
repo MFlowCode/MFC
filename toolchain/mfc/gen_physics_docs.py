@@ -8,6 +8,7 @@ Produces docs/documentation/physics_constraints.md (Doxygen-compatible).
 
 from __future__ import annotations
 
+import re
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -46,6 +47,26 @@ _SEVERITY_ICON = {
     "error": "- ",
     "warning": "- \\f$\\triangle\\f$ ",
 }
+
+# Regex to detect code-like tokens in validation messages.
+# Matches (in order of priority):
+#   1. Fortran-style accessors:  fluid_pp(i)%gamma, bc_y%beg
+#   2. Known short param names with optional array index: alpha(j), vel(2), Re(1), nb, dt
+#   3. Snake_case identifiers with optional array index: model_eqns, weno_order, alpha_rho(j)
+#   4. Single-letter grid dimension params: m, n, p
+_CODE_RE = re.compile(
+    r"(?<!`)\b("
+    r"\w+(?:\([^)]*\))?%\w+(?:\([^)]*\))?"
+    r"|(?:alpha|vel|Re|dt|nb|sigma|mhd|igr|Bx0|viscous|thermal|polytropic|relativity|rhoref|pref|var)(?:\([^)]*\))?"
+    r"|[a-z]\w*_\w+(?:\([^)]*\))?"
+    r"|[mnp]"
+    r")(?!\w)"
+)
+
+
+def _format_message(msg: str) -> str:
+    """Wrap code-like parameter references in backticks."""
+    return _CODE_RE.sub(r"`\1`", msg)
 
 
 def _stages_str(stages: Set[str]) -> str:
@@ -88,7 +109,7 @@ def _render_method(doc: dict, method_rules: List[Rule], lines: List[str]) -> Non
         if msgs:
             lines.append("**Enforced checks:**\n")
             for m in msgs[:8]:
-                lines.append(f"{_SEVERITY_ICON.get(m.severity, '- ')}{m.message}")
+                lines.append(f"{_SEVERITY_ICON.get(m.severity, '- ')}{_format_message(m.message)}")
             if len(msgs) > 8:
                 lines.append(f"- *(+{len(msgs) - 8} more)*")
             lines.append("")

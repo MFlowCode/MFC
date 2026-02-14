@@ -72,7 +72,7 @@ PHYSICS_DOCS = {
     "check_alpha_rho_consistency": {
         "title": "Alpha-Rho Consistency",
         "category": "Mixture Constraints",
-        "math": r"\alpha_j = 0 \implies \alpha_j \rho_j = 0, \quad \alpha_j > 0 \implies \alpha_j \rho_j > 0",
+        "math": r"\alpha_j = 0 \Rightarrow \alpha_j \rho_j = 0, \quad \alpha_j > 0 \Rightarrow \alpha_j \rho_j > 0",
         "explanation": (
             "Warns about physically inconsistent combinations: "
             "density assigned to an absent phase, or a present phase with zero density."
@@ -106,7 +106,7 @@ PHYSICS_DOCS = {
     "check_velocity_components": {
         "title": "Velocity Components in Inactive Dimensions",
         "category": "Velocity and Dimensional Consistency",
-        "math": r"n = 0 \implies v_2 = 0, \quad p = 0 \implies v_3 = 0",
+        "math": r"n = 0 \Rightarrow v_2 = 0, \quad p = 0 \Rightarrow v_3 = 0",
         "explanation": "Setting velocity components in dimensions that do not exist is almost certainly a mistake.",
         "exceptions": ["MHD simulations (transverse velocity couples to magnetic field in 1D)"],
     },
