@@ -45,11 +45,12 @@ jobs:
         failed=0
         passed=0
         for case in examples/*/case.py; do
-          if ./mfc.sh validate "$case" > /dev/null 2>&1; then
+          output=$(./mfc.sh validate "$case" 2>&1)
+          if [ $? -eq 0 ]; then
             passed=$((passed + 1))
           else
             echo "FAIL: $case"
-            ./mfc.sh validate "$case" 2>&1 || true
+            echo "$output"
             failed=$((failed + 1))
           fi
         done
