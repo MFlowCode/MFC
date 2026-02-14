@@ -1,5 +1,5 @@
 !>
-!! @file m_compute_levelset.fpp
+!!@file
 !! @brief Contains module m_compute_levelset
 
 #:include 'macros.fpp'
