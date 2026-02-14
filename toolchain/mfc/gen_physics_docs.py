@@ -57,7 +57,8 @@ _SEVERITY_ICON = {
 _CODE_RE = re.compile(
     r"(?<!`)\b("
     r"\w+(?:\([^)]*\))?%\w+(?:\([^)]*\))?"
-    r"|(?:alpha|vel|Re|dt|nb|sigma|mhd|igr|Bx0|viscous|thermal|polytropic|relativity|rhoref|pref|var)(?:\([^)]*\))?"
+    r"|(?:alpha|vel|Re|dt|nb|sigma|mhd|igr|Bx0|viscous|thermal|polytropic|relativity"
+    r"|rhoref|pref|var|wavelength|npulse|hypoelasticity)(?:\([^)]*\))?"
     r"|[a-z]\w*_\w+(?:\([^)]*\))?"
     r"|[mnp]"
     r")(?!\w)"
@@ -65,8 +66,41 @@ _CODE_RE = re.compile(
 
 
 def _format_message(msg: str) -> str:
-    """Wrap code-like parameter references in backticks."""
-    return _CODE_RE.sub(r"`\1`", msg)
+    """Format a validation message for Doxygen-compatible markdown.
+
+    Handles MFC/Fortran naming conventions:
+    - Cleans AST artifacts: istr→i, jstr→j (f-string index variables)
+    - Strips runtime value placeholders: (got varname)
+    - Wraps code-like parameter references in backticks
+    - Escapes Fortran ``%`` accessor for Doxygen (``\\%`` → literal %)
+    """
+    # Clean AST extraction artifacts: istr/jstr are f-string index vars
+    msg = re.sub(r"\bistr\b", "i", msg)
+    msg = re.sub(r"\bjstr\b", "j", msg)
+
+    # Remove "(got <varname>)" — Python variable names, not useful in docs
+    msg = re.sub(r"\s*\(got \w+\)", "", msg)
+
+    # Clean f-string value placeholders that appear as bare variable names.
+    # e.g. "= gamma implies" → "implies", "for pulse = pulse" → "for the given pulse"
+    msg = re.sub(r"= (\w+) implies physical (\w+) = (\w+)", r"implies physical \2", msg)
+    msg = re.sub(r"= (vel2|vel3) but", "is nonzero but", msg)
+    msg = re.sub(r"for (support|pulse) = \1\b", r"for the given \1", msg)
+    msg = re.sub(r"for (support|pulse) = (\d+)", r"for \1 = \2", msg)
+
+    # Wrap code-like tokens in backticks
+    msg = _CODE_RE.sub(r"`\1`", msg)
+
+    # Escape % inside backtick code spans for Doxygen.
+    # Doxygen treats %<word> as "suppress auto-link" and consumes the %.
+    # \% produces a literal % in Doxygen output.
+    msg = re.sub(
+        r"`([^`]*%[^`]*)`",
+        lambda m: "`" + m.group(1).replace("%", "\\%") + "`",
+        msg,
+    )
+
+    return msg
 
 
 def _stages_str(stages: Set[str]) -> str:
