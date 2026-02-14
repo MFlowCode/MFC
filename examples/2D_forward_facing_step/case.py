@@ -70,9 +70,9 @@ print(
             "patch_icpp(1)%alpha(1)": 1.0,
             # Patch: No slip rectangle
             "patch_ib(1)%geometry": 3,
-            "patch_ib(1)%x_centroid": 11.5 * h,
-            "patch_ib(1)%y_centroid": h,
-            "patch_ib(1)%length_x": 17 * h,
+            "patch_ib(1)%x_centroid": 9 * h,
+            "patch_ib(1)%y_centroid": 0.5 * h,
+            "patch_ib(1)%length_x": 12 * h,
             "patch_ib(1)%length_y": h,
             "patch_ib(1)%slip": "T",
             # Fluids Physical Parameters
