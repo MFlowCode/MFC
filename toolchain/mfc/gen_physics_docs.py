@@ -136,13 +136,21 @@ def _render_undocumented(by_method: Dict[str, List[Rule]], lines: List[str]) -> 
         "The following checks do not yet have physics documentation. "
         "See @ref contributing for how to add `PHYSICS_DOCS` entries.\n"
     )
-    lines.append("| Check | Stage | Severity |")
-    lines.append("|-------|-------|----------|")
+    lines.append("| Check | Parameters | Stage | Severity |")
+    lines.append("|-------|-----------|-------|----------|")
     for method in undocumented:
         method_rules = by_method[method]
         stages = _collect_stages(method_rules)
         title = method.replace("check_", "").replace("_", " ").title()
-        lines.append(f"| {title} | {_stages_str(stages)} | {_severity_badge(method_rules)} |")
+        params: Set[str] = set()
+        for r in method_rules:
+            params.update(r.params)
+        param_str = ", ".join(f"`{p}`" for p in sorted(params)[:6])
+        if len(params) > 6:
+            param_str += ", ..."
+        lines.append(
+            f"| {title} | {param_str} | {_stages_str(stages)} | {_severity_badge(method_rules)} |"
+        )
     lines.append("")
 
 
