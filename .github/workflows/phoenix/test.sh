@@ -24,7 +24,7 @@ while [ $attempt -le $max_attempts ]; do
 
     if [ $attempt -lt $max_attempts ]; then
         echo "Build failed on attempt $attempt. Clearing staging/install and retrying in 30s..."
-        rm -rf build/staging build/install build/lock.yaml
+        rm -rf build/staging build/lock.yaml
         sleep 30
     else
         echo "Build failed after $max_attempts attempts."
@@ -36,7 +36,6 @@ done
 # Release the cache lock before running tests. Tests only read installed
 # binaries and can take hours — no need to block other builds.
 if [ "${_cache_locked:-false}" = true ]; then
-    flock --unlock 9
     exec 9>&-
     echo "Released build cache lock before tests"
 fi

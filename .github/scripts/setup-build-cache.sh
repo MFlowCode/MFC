@@ -48,6 +48,11 @@ if flock --timeout 3600 9; then
 else
     echo "  WARNING: Cache lock timeout (1h), building locally without cache"
     exec 9>&-
+    # Remove any existing symlink to the shared cache so we don't write
+    # into it without the lock. Then create a real local directory.
+    if [ -L "build" ]; then
+        rm -f "build"
+    fi
     mkdir -p "build"
     echo "========================="
     return 0 2>/dev/null || true
