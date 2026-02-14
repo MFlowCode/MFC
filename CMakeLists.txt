@@ -660,27 +660,19 @@ if (MFC_DOCUMENTATION)
         VERBATIM
     )
 
-    # Generate case_constraints.md from case_validator.py and examples/
+    # Generate case_constraints.md and physics_constraints.md together.
+    # Both are produced by gen_constraints.sh, so a single command avoids races.
     add_custom_command(
         OUTPUT  "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/case_constraints.md"
+                "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/physics_constraints.md"
         DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/mfc/gen_case_constraints_docs.py"
+                "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/mfc/gen_physics_docs.py"
                 "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/mfc/case_validator.py"
                 "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/mfc/params/definitions.py"
                 "${examples_DOCs}"
         COMMAND "bash" "${CMAKE_CURRENT_SOURCE_DIR}/docs/gen_constraints.sh"
                        "${CMAKE_CURRENT_SOURCE_DIR}"
-        COMMENT "Generating case_constraints.md"
-        VERBATIM
-    )
-
-    # Generate physics_constraints.md from PHYSICS_DOCS + AST-extracted rules
-    add_custom_command(
-        OUTPUT  "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/physics_constraints.md"
-        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/mfc/gen_physics_docs.py"
-                "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/mfc/case_validator.py"
-        COMMAND "bash" "${CMAKE_CURRENT_SOURCE_DIR}/docs/gen_constraints.sh"
-                       "${CMAKE_CURRENT_SOURCE_DIR}"
-        COMMENT "Generating physics_constraints.md"
+        COMMENT "Generating case_constraints.md and physics_constraints.md"
         VERBATIM
     )
 

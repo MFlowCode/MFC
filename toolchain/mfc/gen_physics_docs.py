@@ -110,7 +110,11 @@ def _format_message(msg: str) -> str:
 def _stages_str(stages: Set[str]) -> str:
     order = ["common", "pre_process", "simulation", "post_process"]
     ordered = [s for s in order if s in stages]
-    return ", ".join(ordered) if ordered else "all"
+    if ordered:
+        return ", ".join(ordered)
+    if stages:
+        return ", ".join(sorted(stages))
+    return "all"
 
 
 def _severity_badge(rules: List[Rule]) -> str:
@@ -193,7 +197,8 @@ def render(rules: List[Rule]) -> str:
         "@ref case_constraints \"Case Creator Guide\".\n"
     )
 
-    for category in CATEGORY_ORDER:
+    extra_categories = [c for c in by_category if c not in CATEGORY_ORDER]
+    for category in CATEGORY_ORDER + sorted(extra_categories):
         methods = by_category.get(category)
         if not methods:
             continue
