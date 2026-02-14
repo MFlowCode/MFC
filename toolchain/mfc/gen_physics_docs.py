@@ -145,7 +145,11 @@ def _render_method(doc: dict, method_rules: List[Rule], lines: List[str]) -> Non
         lines.append(f"**Stage:** {_stages_str(stages)} | **Severity:** {_severity_badge(method_rules)}\n")
 
         seen: Set[str] = set()
-        msgs = [r for r in method_rules if not (r.message in seen or seen.add(r.message))]  # type: ignore[func-returns-value]
+        msgs = []
+        for r in method_rules:
+            if r.message not in seen:
+                seen.add(r.message)
+                msgs.append(r)
         if msgs:
             lines.append("**Enforced checks:**\n")
             for m in msgs:
