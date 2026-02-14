@@ -323,7 +323,7 @@ def check_page_refs(repo_root: Path) -> list[str]:
 
     # Collect all @page identifiers
     # Include Doxygen built-ins and auto-generated pages (created by ./mfc.sh generate)
-    page_ids = {"citelist", "parameters", "case_constraints", "examples", "cli"}
+    page_ids = {"citelist", "parameters", "case_constraints", "physics_constraints", "examples", "cli"}
     for md_file in doc_dir.glob("*.md"):
         text = md_file.read_text(encoding="utf-8")
         m = re.search(r"^\s*@page\s+(\w+)", text, flags=re.MULTILINE)

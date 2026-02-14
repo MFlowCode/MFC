@@ -1,0 +1,178 @@
+#!/usr/bin/env python3
+"""
+Generate physics constraints documentation from PHYSICS_DOCS metadata
+and AST-extracted validation rules.
+
+Produces docs/documentation/physics_constraints.md (Doxygen-compatible).
+"""
+
+from __future__ import annotations
+
+import sys
+from collections import defaultdict
+from pathlib import Path
+from typing import Dict, List, Set
+
+HERE = Path(__file__).resolve().parent
+CASE_VALIDATOR_PATH = HERE / "case_validator.py"
+
+# Make the toolchain package importable
+_toolchain_dir = str(HERE.parent)
+if _toolchain_dir not in sys.path:
+    sys.path.insert(0, _toolchain_dir)
+
+from mfc.case_validator import PHYSICS_DOCS  # noqa: E402  pylint: disable=wrong-import-position
+from mfc.params.ast_analyzer import (  # noqa: E402  pylint: disable=wrong-import-position
+    Rule,
+    analyze_case_validator,
+)
+
+# Canonical category ordering
+CATEGORY_ORDER = [
+    "Thermodynamic Constraints",
+    "Mixture Constraints",
+    "Domain and Geometry",
+    "Velocity and Dimensional Consistency",
+    "Model Equations",
+    "Boundary Conditions",
+    "Bubble Physics",
+    "Feature Compatibility",
+    "Numerical Schemes",
+    "Acoustic Sources",
+    "Post-Processing",
+]
+
+_SEVERITY_ICON = {
+    "error": "- ",
+    "warning": "- \\f$\\triangle\\f$ ",
+}
+
+
+def _stages_str(stages: Set[str]) -> str:
+    order = ["common", "pre_process", "simulation", "post_process"]
+    ordered = [s for s in order if s in stages]
+    return ", ".join(ordered) if ordered else "all"
+
+
+def _severity_badge(rules: List[Rule]) -> str:
+    severities = {r.severity for r in rules}
+    if "error" in severities and "warning" in severities:
+        return "error + warning"
+    if "warning" in severities:
+        return "warning"
+    return "error"
+
+
+def _collect_stages(rules: List[Rule]) -> Set[str]:
+    stages: Set[str] = set()
+    for r in rules:
+        stages |= r.stages
+    return stages
+
+
+def _render_method(doc: dict, method_rules: List[Rule], lines: List[str]) -> None:
+    """Render one PHYSICS_DOCS entry + its AST-extracted rules."""
+    lines.append(f"### {doc['title']}\n")
+
+    if "math" in doc:
+        lines.append(f"\\f[{doc['math']}\\f]\n")
+
+    lines.append(f"{doc['explanation']}\n")
+
+    if method_rules:
+        stages = _collect_stages(method_rules)
+        lines.append(f"**Stage:** {_stages_str(stages)} | **Severity:** {_severity_badge(method_rules)}\n")
+
+        seen: Set[str] = set()
+        msgs = [r for r in method_rules if not (r.message in seen or seen.add(r.message))]  # type: ignore[func-returns-value]
+        if msgs:
+            lines.append("**Enforced checks:**\n")
+            for m in msgs[:8]:
+                lines.append(f"{_SEVERITY_ICON.get(m.severity, '- ')}{m.message}")
+            if len(msgs) > 8:
+                lines.append(f"- *(+{len(msgs) - 8} more)*")
+            lines.append("")
+
+    if "exceptions" in doc:
+        lines.append("**Exceptions** (constraint does not apply):\n")
+        for exc in doc["exceptions"]:
+            lines.append(f"- {exc}")
+        lines.append("")
+
+    if "references" in doc:
+        cites = ", ".join(f"\\cite {r}" for r in doc["references"])
+        lines.append(f"**References:** {cites}\n")
+
+
+def _render_undocumented(by_method: Dict[str, List[Rule]], lines: List[str]) -> None:
+    """Render table of check methods that lack PHYSICS_DOCS entries."""
+    documented = set(PHYSICS_DOCS.keys())
+    undocumented = sorted(m for m in by_method if m.startswith("check_") and m not in documented)
+    if not undocumented:
+        return
+
+    lines.append("---\n")
+    lines.append("## Other Validation Checks\n")
+    lines.append(
+        "The following checks do not yet have physics documentation. "
+        "See @ref contributing for how to add `PHYSICS_DOCS` entries.\n"
+    )
+    lines.append("| Check | Stage | Severity |")
+    lines.append("|-------|-------|----------|")
+    for method in undocumented:
+        method_rules = by_method[method]
+        stages = _collect_stages(method_rules)
+        title = method.replace("check_", "").replace("_", " ").title()
+        lines.append(f"| {title} | {_stages_str(stages)} | {_severity_badge(method_rules)} |")
+    lines.append("")
+
+
+def render(rules: List[Rule]) -> str:
+    """Render physics constraints page from PHYSICS_DOCS + AST rules."""
+    by_method: Dict[str, List[Rule]] = defaultdict(list)
+    for r in rules:
+        by_method[r.method].append(r)
+
+    by_category: Dict[str, List[str]] = defaultdict(list)
+    for method, doc in PHYSICS_DOCS.items():
+        by_category[doc["category"]].append(method)
+
+    lines: List[str] = []
+    lines.append("@page physics_constraints Physics Constraints\n")
+    lines.append("# Physics Constraints Reference\n")
+    lines.append(
+        "> Auto-generated from `PHYSICS_DOCS` in `case_validator.py` and "
+        "AST-extracted validation rules. Do not edit by hand.\n"
+    )
+    lines.append(
+        "This document catalogs the physics constraints enforced by MFC's case parameter validator. "
+        "Constraints are organized by physical category with mathematical justifications.\n"
+    )
+    lines.append(
+        "For parameter syntax and allowed values, see @ref case \"Case Files\" and "
+        "the @ref parameters \"Case Parameters\" reference. "
+        "For feature compatibility and working examples, see "
+        "@ref case_constraints \"Case Creator Guide\".\n"
+    )
+
+    for category in CATEGORY_ORDER:
+        methods = by_category.get(category)
+        if not methods:
+            continue
+        lines.append("---\n")
+        lines.append(f"## {category}\n")
+        for method in methods:
+            _render_method(PHYSICS_DOCS[method], by_method.get(method, []), lines)
+
+    _render_undocumented(by_method, lines)
+
+    return "\n".join(lines)
+
+
+def main() -> None:
+    analysis = analyze_case_validator(CASE_VALIDATOR_PATH)
+    print(render(analysis["rules"]))
+
+
+if __name__ == "__main__":
+    main()

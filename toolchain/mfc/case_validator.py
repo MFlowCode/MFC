@@ -21,6 +21,230 @@ from .common import MFCException
 from .params.definitions import CONSTRAINTS
 
 
+# Physics documentation for check methods.
+# Each entry maps a check method name to metadata used by gen_physics_docs.py
+# to auto-generate docs/documentation/physics_constraints.md.
+# See the contributing guide for how to add entries.
+PHYSICS_DOCS = {
+    # --- Thermodynamic Constraints ---
+    "check_stiffened_eos": {
+        "title": "Stiffened EOS Positivity",
+        "category": "Thermodynamic Constraints",
+        "math": r"\Gamma > 0, \quad \Pi_\infty \geq 0, \quad c_v \geq 0",
+        "explanation": "The equation-of-state parameters must satisfy basic positivity requirements for thermodynamic stability.",
+        "references": ["Wilfong26"],
+    },
+    "check_eos_parameter_sanity": {
+        "title": "EOS Parameter Sanity (Transformed Gamma)",
+        "category": "Thermodynamic Constraints",
+        "math": r"\Gamma = \frac{1}{\gamma - 1}",
+        "explanation": (
+            "MFC uses the transformed stiffened gas parameter. "
+            "A common mistake is entering the physical gamma (e.g., 1.4 for air) "
+            "instead of the transformed value 1/(gamma-1) = 2.5."
+        ),
+        "references": ["Wilfong26", "Allaire02"],
+    },
+    "check_patch_physics": {
+        "title": "Patch Initial Condition Constraints",
+        "category": "Thermodynamic Constraints",
+        "math": r"p > 0, \quad \alpha_i \rho_i \geq 0, \quad 0 \leq \alpha_i \leq 1",
+        "explanation": (
+            "All initial patch pressures must be strictly positive. "
+            "Partial densities must be non-negative. "
+            "Volume fractions must be in [0,1]."
+        ),
+    },
+    # --- Mixture Constraints ---
+    "check_volume_fraction_sum": {
+        "title": "Volume Fraction Sum",
+        "category": "Mixture Constraints",
+        "math": r"\sum_{i=1}^{N_f} \alpha_i = 1",
+        "explanation": "For multi-component models, volume fractions must satisfy the mixture constraint.",
+        "exceptions": [
+            "Single-fluid Euler-Euler bubble models (alpha represents void fraction)",
+            "Lagrangian bubble models (Lagrangian phase not tracked on Euler grid)",
+            "IBM cases (alpha acts as level-set indicator)",
+            "Alter patches and hard-coded IC patches (values computed at runtime)",
+            "Analytical expressions (cannot validate statically)",
+        ],
+    },
+    "check_alpha_rho_consistency": {
+        "title": "Alpha-Rho Consistency",
+        "category": "Mixture Constraints",
+        "math": r"\alpha_j = 0 \implies \alpha_j \rho_j = 0, \quad \alpha_j > 0 \implies \alpha_j \rho_j > 0",
+        "explanation": (
+            "Warns about physically inconsistent combinations: "
+            "density assigned to an absent phase, or a present phase with zero density."
+        ),
+    },
+    # --- Domain and Geometry ---
+    "check_domain_bounds": {
+        "title": "Domain Bounds",
+        "category": "Domain and Geometry",
+        "math": r"x_{\mathrm{end}} > x_{\mathrm{beg}}, \quad y_{\mathrm{end}} > y_{\mathrm{beg}}, \quad z_{\mathrm{end}} > z_{\mathrm{beg}}",
+        "explanation": "Each active spatial dimension must have positive extent.",
+    },
+    "check_simulation_domain": {
+        "title": "Dimensionality",
+        "category": "Domain and Geometry",
+        "math": r"m > 0, \quad n \geq 0, \quad p \geq 0",
+        "explanation": (
+            "The x-direction must have cells. Cannot have z without y. "
+            "Cylindrical coordinates require odd p."
+        ),
+    },
+    "check_patch_within_domain": {
+        "title": "Patch Within Domain",
+        "category": "Domain and Geometry",
+        "explanation": (
+            "For patches with centroid + length geometry, the bounding box must not be "
+            "entirely outside the computational domain. Skipped when grid stretching is active."
+        ),
+    },
+    # --- Velocity and Dimensional Consistency ---
+    "check_velocity_components": {
+        "title": "Velocity Components in Inactive Dimensions",
+        "category": "Velocity and Dimensional Consistency",
+        "math": r"n = 0 \implies v_2 = 0, \quad p = 0 \implies v_3 = 0",
+        "explanation": "Setting velocity components in dimensions that do not exist is almost certainly a mistake.",
+        "exceptions": ["MHD simulations (transverse velocity couples to magnetic field in 1D)"],
+    },
+    # --- Model Equations ---
+    "check_model_eqns_and_num_fluids": {
+        "title": "Model Equation Selection",
+        "category": "Model Equations",
+        "explanation": (
+            "Model 1: gamma-law single-fluid. "
+            "Model 2: five-equation (Allaire). "
+            "Model 3: six-equation (Saurel). "
+            "Model 4: four-equation (single-component with bubbles)."
+        ),
+        "references": ["Wilfong26", "Allaire02", "Saurel09"],
+    },
+    # --- Boundary Conditions ---
+    "check_boundary_conditions": {
+        "title": "Boundary Condition Compatibility",
+        "category": "Boundary Conditions",
+        "explanation": (
+            "Periodicity must match on both ends. Valid BC values range from -1 to -17. "
+            "Cylindrical coordinates have specific BC requirements at the axis."
+        ),
+    },
+    # --- Bubble Physics ---
+    "check_bubbles_euler": {
+        "title": "Euler-Euler Bubble Model",
+        "category": "Bubble Physics",
+        "explanation": (
+            "Requires nb >= 1, positive reference quantities. "
+            "Polydisperse requires odd nb > 1 and poly_sigma > 0. QBMM requires nnode = 4."
+        ),
+        "references": ["Bryngelson21"],
+    },
+    "check_bubbles_euler_simulation": {
+        "title": "Bubble Simulation Constraints",
+        "category": "Bubble Physics",
+        "explanation": (
+            "Requires HLLC Riemann solver and arithmetic average. "
+            "Five-equation model does not support Gilmore bubble_model."
+        ),
+    },
+    "check_bubbles_lagrange": {
+        "title": "Euler-Lagrange Bubble Model",
+        "category": "Bubble Physics",
+        "explanation": "2D/3D only. Requires polytropic = F and thermal = 3. Not compatible with model_eqns = 3.",
+    },
+    # --- Numerical Schemes ---
+    "check_weno": {
+        "title": "WENO Reconstruction",
+        "category": "Numerical Schemes",
+        "explanation": (
+            "weno_order must be 1, 3, 5, or 7. Grid must have enough cells. "
+            "Only one of mapped_weno, wenoz, teno can be active."
+        ),
+    },
+    "check_muscl": {
+        "title": "MUSCL Reconstruction",
+        "category": "Numerical Schemes",
+        "explanation": "muscl_order must be 1 or 2. Second order requires muscl_lim in {1,2,3,4,5}.",
+    },
+    "check_time_stepping": {
+        "title": "Time Stepping",
+        "category": "Numerical Schemes",
+        "explanation": (
+            "time_stepper in {1,2,3}. Fixed dt must be positive. "
+            "CFL-based modes require cfl_target in (0,1]."
+        ),
+    },
+    "check_viscosity": {
+        "title": "Viscosity",
+        "category": "Numerical Schemes",
+        "math": r"\mathrm{Re}_1 > 0, \quad \mathrm{Re}_2 > 0",
+        "explanation": "Reynolds numbers must be positive. Not supported with model_eqns = 1.",
+    },
+    # --- Feature Compatibility ---
+    "check_mhd": {
+        "title": "Magnetohydrodynamics (MHD)",
+        "category": "Feature Compatibility",
+        "explanation": (
+            "Requires model_eqns = 2, num_fluids = 1, HLL or HLLD Riemann solver. "
+            "No relativity with HLLD."
+        ),
+    },
+    "check_surface_tension": {
+        "title": "Surface Tension",
+        "category": "Feature Compatibility",
+        "explanation": "Requires model_eqns 2 or 3, num_fluids = 2.",
+    },
+    "check_hypoelasticity": {
+        "title": "Hypoelasticity",
+        "category": "Feature Compatibility",
+        "explanation": "Requires model_eqns = 2, HLL Riemann solver.",
+    },
+    "check_phase_change": {
+        "title": "Phase Change",
+        "category": "Feature Compatibility",
+        "explanation": "Model 2: relax_model 5 or 6. Model 3: relax_model 1, 4, 5, or 6.",
+    },
+    "check_alt_soundspeed": {
+        "title": "Alternative Sound Speed",
+        "category": "Feature Compatibility",
+        "explanation": "Requires model_eqns = 2, num_fluids 2 or 3, HLLC solver. Incompatible with bubbles.",
+    },
+    "check_igr": {
+        "title": "Iterative Generalized Riemann (IGR)",
+        "category": "Feature Compatibility",
+        "explanation": (
+            "Requires model_eqns = 2. Incompatible with characteristic BCs, "
+            "bubbles, MHD, and elastic models."
+        ),
+    },
+    # --- Acoustic Sources ---
+    "check_acoustic_source": {
+        "title": "Acoustic Sources",
+        "category": "Acoustic Sources",
+        "explanation": (
+            "Dimension-specific support types. Pulse type in {1,2,3,4}. "
+            "Non-planar sources require foc_length and aperture."
+        ),
+    },
+    # --- Post-Processing ---
+    "check_vorticity": {
+        "title": "Vorticity Output",
+        "category": "Post-Processing",
+        "explanation": "omega_wrt requires at least 2D (n > 0). 3D components require p > 0. Requires fd_order.",
+    },
+    "check_fft": {
+        "title": "FFT Output",
+        "category": "Post-Processing",
+        "explanation": (
+            "Requires 3D with all periodic boundaries. "
+            "Global dimensions must be even. Incompatible with cylindrical coordinates."
+        ),
+    },
+}
+
+
 @lru_cache(maxsize=1)
 def _get_logical_params_from_registry() -> Set[str]:
     """

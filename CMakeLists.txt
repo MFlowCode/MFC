@@ -673,6 +673,17 @@ if (MFC_DOCUMENTATION)
         VERBATIM
     )
 
+    # Generate physics_constraints.md from PHYSICS_DOCS + AST-extracted rules
+    add_custom_command(
+        OUTPUT  "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/physics_constraints.md"
+        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/mfc/gen_physics_docs.py"
+                "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/mfc/case_validator.py"
+        COMMAND "bash" "${CMAKE_CURRENT_SOURCE_DIR}/docs/gen_constraints.sh"
+                       "${CMAKE_CURRENT_SOURCE_DIR}"
+        COMMENT "Generating physics_constraints.md"
+        VERBATIM
+    )
+
     # Generate cli-reference.md from cli/commands.py
     add_custom_command(
         OUTPUT  "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/cli-reference.md"
@@ -732,11 +743,13 @@ if (MFC_DOCUMENTATION)
 
         set(opt_example_dependency "")
         set(opt_constraints_dependency "")
+        set(opt_physics_dependency "")
         set(opt_cli_reference_dependency "")
         set(opt_parameters_dependency "")
         if (${target} STREQUAL documentation)
             set(opt_example_dependency "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/examples.md")
             set(opt_constraints_dependency "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/case_constraints.md")
+            set(opt_physics_dependency "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/physics_constraints.md")
             set(opt_cli_reference_dependency "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/cli-reference.md")
             set(opt_parameters_dependency "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/parameters.md")
         endif()
@@ -749,6 +762,7 @@ if (MFC_DOCUMENTATION)
             DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/${target}-Doxyfile"
                     "${opt_example_dependency}"
                     "${opt_constraints_dependency}"
+                    "${opt_physics_dependency}"
                     "${opt_cli_reference_dependency}"
                     "${opt_parameters_dependency}"
                     "${${target}_SRCs}" "${${target}_DOCs}"

@@ -274,6 +274,8 @@ def check_my_feature(self):
         self.errors.append("my_param requires other_param to be set")
 ```
 
+If your check enforces a physics constraint, also add a `PHYSICS_DOCS` entry (see [How to Document Physics Constraints](#how-to-document-physics-constraints) below).
+
 **Step 5: Declare in Fortran** (`src/<target>/m_global_parameters.fpp`)
 
 Add the variable declaration in the appropriate target's global parameters module. Choose the target(s) where the parameter is used:
@@ -658,6 +660,41 @@ Checklist:
 ### Debugging
 
 See @ref troubleshooting for debugging workflows, profiling tools, GPU diagnostic environment variables, common build/runtime errors, and fixes.
+
+### How to Document Physics Constraints {#how-to-document-physics-constraints}
+
+When adding a new `check_` method to `case_validator.py`, document its physics by adding an entry to the `PHYSICS_DOCS` dict at the top of the file:
+
+```python
+PHYSICS_DOCS = {
+    ...
+    "check_my_feature": {
+        "title": "My Feature Constraint",          # Required: human-readable title
+        "category": "Thermodynamic Constraints",    # Required: groups the constraint in docs
+        "explanation": "Why this constraint exists.", # Required: plain English
+        "math": r"\alpha > 0",                      # Optional: LaTeX formula
+        "references": ["Wilfong26"],                # Optional: BibTeX keys from references.bib
+        "exceptions": ["IBM cases"],                # Optional: when constraint doesn't apply
+    },
+}
+```
+
+The @ref physics_constraints "Physics Constraints" page is **auto-generated** — run `./mfc.sh generate` to rebuild it.
+The generator merges your `PHYSICS_DOCS` entry with the AST-extracted `prohibit()`/`warn()` calls,
+so stage, severity, and parameter information appear automatically.
+
+**Fields:**
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `title` | Yes | Section heading in generated docs |
+| `category` | Yes | Grouping category (e.g., "Mixture Constraints") |
+| `explanation` | Yes | Plain English description of the physics |
+| `math` | No | LaTeX formula (rendered by Doxygen's MathJax) |
+| `references` | No | List of BibTeX cite keys from `docs/references.bib` |
+| `exceptions` | No | List of cases where the constraint doesn't apply |
+
+**Categories:** Thermodynamic Constraints, Mixture Constraints, Domain and Geometry, Velocity and Dimensional Consistency, Model Equations, Boundary Conditions, Bubble Physics, Feature Compatibility, Numerical Schemes, Acoustic Sources, Post-Processing.
 
 ## Testing
 
