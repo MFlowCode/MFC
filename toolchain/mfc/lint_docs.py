@@ -315,6 +315,47 @@ def check_section_anchors(repo_root: Path) -> list[str]:
     return errors
 
 
+def check_doxygen_percent(repo_root: Path) -> list[str]:
+    """Check that Fortran % accessors inside backtick code spans use %% (Doxygen escape).
+
+    Doxygen treats %<word> as "suppress auto-link" and silently eats the %
+    character, even inside backtick code spans.  Writing %% produces a
+    literal %.  Only flag % followed by [a-zA-Z_] (the pattern Doxygen
+    consumes); %[, %(, etc. are safe.
+    """
+    doc_dir = repo_root / "docs" / "documentation"
+    if not doc_dir.exists():
+        return []
+
+    ignored = _gitignored_docs(repo_root)
+    code_span_re = re.compile(r"`([^`\n]+)`")
+    bad_pct_re = re.compile(r"(?<!%)%(?=[a-zA-Z_])")
+
+    errors = []
+    for md_file in sorted(doc_dir.glob("*.md")):
+        if md_file.name in ignored:
+            continue
+        text = md_file.read_text(encoding="utf-8")
+        rel = md_file.relative_to(repo_root)
+        in_code = False
+        for i, line in enumerate(text.split("\n"), 1):
+            if line.strip().startswith("```"):
+                in_code = not in_code
+                continue
+            if in_code:
+                continue
+            for m in code_span_re.finditer(line):
+                span = m.group(1)
+                if bad_pct_re.search(span):
+                    fixed = bad_pct_re.sub("%%", span)
+                    errors.append(
+                        f"  {rel}:{i} Doxygen will eat the % in `{span}`."
+                        f" Fix: `{fixed}`"
+                    )
+
+    return errors
+
+
 def check_page_refs(repo_root: Path) -> list[str]:
     """Check that @ref targets in docs reference existing page identifiers."""
     doc_dir = repo_root / "docs" / "documentation"
@@ -354,6 +395,7 @@ def main():
     all_errors.extend(check_param_refs(repo_root))
     all_errors.extend(check_page_refs(repo_root))
     all_errors.extend(check_math_syntax(repo_root))
+    all_errors.extend(check_doxygen_percent(repo_root))
     all_errors.extend(check_section_anchors(repo_root))
 
     if all_errors:

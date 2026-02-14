@@ -64,8 +64,8 @@ q_cons_vf (conservative variables: density, momentum, energy, volume fractions)
 ```
 
 Key data structures (defined in `src/common/m_derived_types.fpp`):
-- `scalar_field` — wraps a 3D `real(stp)` array (`%sf(i,j,k)`)
-- `vector_field` — array of `scalar_field` (`%vf(1:sys_size)`)
+- `scalar_field` — wraps a 3D `real(stp)` array (`%%sf(i,j,k)`)
+- `vector_field` — array of `scalar_field` (`%%vf(1:sys_size)`)
 - `q_cons_vf` / `q_prim_vf` — conservative and primitive state vectors
 
 ### Build Toolchain
@@ -136,7 +136,7 @@ Both human reviewers and AI code reviewers reference this section.
 
 ### Array Bounds and Indexing
 
-- MFC uses **non-unity lower bounds** (e.g., `idwbuff(1)%beg:idwbuff(1)%end` with negative ghost-cell indices). Always verify loop bounds match array declarations.
+- MFC uses **non-unity lower bounds** (e.g., `idwbuff(1)%%beg:idwbuff(1)%%end` with negative ghost-cell indices). Always verify loop bounds match array declarations.
 - **Riemann solver indexing:** Left states at `j`, right states at `j+1`. Off-by-one here corrupts fluxes.
 
 ### Precision and Type Safety
@@ -164,7 +164,7 @@ Both human reviewers and AI code reviewers reference this section.
 - **Pressure formula** must match `model_eqns` value. Model 2/3 (multi-fluid), model 4 (bubbles), MHD, and hypoelastic each use different EOS formulations. Wrong formula = wrong physics.
 - **Conservative-primitive conversion:** Density recovery, kinetic energy, and pressure each have model-specific paths. Verify the correct branch is taken.
 - **Volume fractions** must sum to 1. `alpha_rho_K` must be non-negative. Species mass fractions should be clipped to [0,1].
-- **Boundary conditions:** Periodic BCs must match at both ends (`bc_x%beg` and `bc_x%end`). Cylindrical coordinates have special requirements (`bc_y%beg = -14` for axis in 3D).
+- **Boundary conditions:** Periodic BCs must match at both ends (`bc_x%%beg` and `bc_x%%end`). Cylindrical coordinates have special requirements (`bc_y%%beg = -14` for axis in 3D).
 - **Parameter constraints:** New parameters or physics features must be validated in `toolchain/mfc/case_validator.py`. New features should add corresponding validation.
 
 ### Python Toolchain

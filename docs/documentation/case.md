@@ -297,7 +297,7 @@ These physical parameters must be consistent with fluid material's parameters de
 
 #### Elliptic Smoothing
 
-Initial conditions in which not all patches support the `patch_icpp(j)%smoothen` parameter can still be smoothed by applying iterations of the heat equation to the initial condition.
+Initial conditions in which not all patches support the `patch_icpp(j)%%smoothen` parameter can still be smoothed by applying iterations of the heat equation to the initial condition.
 This is enabled by adding `'elliptic_smoothing': "T",` and `'elliptic_smoothing_iters': N,` to the case dictionary, where `N` is the number of smoothing iterations to apply.
 
 ### 4. Immersed Boundary Patches {#sec-immersed-boundary-patches}
@@ -620,8 +620,8 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 | `num_probes`            | Integer | Number of probes	|
 | `probe(i)%[x,y,z]`      | Real	  | Coordinates of probe $i$	|
 | `output_partial_domain` | Logical | Output part of the domain |
-| `[x,y,z]_output%beg`    | Real    | Beginning of the output domain in the [x,y,z]-direction |
-| `[x,y,z]_output%end`    | Real    | End of the output domain in the [x,y,z]-direction |
+| `[x,y,z]_output%%beg`    | Real    | Beginning of the output domain in the [x,y,z]-direction |
+| `[x,y,z]_output%%end`    | Real    | End of the output domain in the [x,y,z]-direction |
 | `lag_txt_wrt`           | Logical | Write Lagrangian bubble data to `.dat` files |
 | `lag_header`            | Logical | Write header to Lagrangian bubble `.dat` files |
 | `lag_db_wrt`            | Logical | Write Lagrangian bubble data to silo/hdf5 database files |
@@ -667,7 +667,7 @@ If `file_per_process` is true, then pre_process, simulation, and post_process mu
 
 - `probe_wrt` activates the output of state variables at coordinates specified by `probe(i)%[x;y,z]`.
 
-- `output_partial_domain` activates the output of part of the domain specified by `[x,y,z]_output%beg` and `[x,y,z]_output%end`.
+- `output_partial_domain` activates the output of part of the domain specified by `[x,y,z]_output%%beg` and `[x,y,z]_output%%end`.
 This is useful for large domains where only a portion of the domain is of interest.
 It is not supported when `precision = 1` and `format = 1`.
 It also cannot be enabled with `flux_wrt`, `heat_ratio_wrt`, `pres_inf_wrt`, `c_wrt`, `omega_wrt`, `ib`, `schlieren_wrt`, `qm_wrt`, or 'liutex_wrt'.
@@ -991,30 +991,30 @@ Note: For relativistic flow, the conservative and primitive densities are differ
 
 When ``cyl_coord = 'T'`` is set in 3D the following constraints must be met:
 
-- `bc_y%beg = -14`  enables the axis boundary condition
+- `bc_y%%beg = -14`  enables the axis boundary condition
 
-- `bc_z%beg = bc_z%end = -1`  enables periodic boundary conditions in the azimuthal direction
+- `bc_z%%beg = bc_z%%end = -1`  enables periodic boundary conditions in the azimuthal direction
 
-- `z_domain%beg = 0`  sets the azimuthal starting point to 0
+- `z_domain%%beg = 0`  sets the azimuthal starting point to 0
 
-- `z_domain%end = 2*math.pi` to set the azimuthal ending point to \f$2\pi\f$ (note, requires `import math` in the case file)
+- `z_domain%%end = 2*math.pi` to set the azimuthal ending point to \f$2\pi\f$ (note, requires `import math` in the case file)
 
 When ``cyl_coord = 'T'`` is set in 2D the following constraints must be met:
 
-- `bc_y%beg = -2` to enable reflective boundary conditions
+- `bc_y%%beg = -2` to enable reflective boundary conditions
 
 ### 17. Chemistry
 
 | Parameter                     | Type    | Description                                              |
 | ---:                          | :---:   | :---                                                     |
 | `chemistry`                   | Logical | Enable chemistry simulation                              |
-| `chem_params%diffusion`       | Logical | Enable multispecies diffusion                            |
-| `chem_params%reactions`       | Logical | Enable chemical reactions                                |
-| `chem_params%gamma_method`    | Integer | Methodology for calculating the heat capacity ratio      |
-| `chem_params%transport_model` | Integer | Methodology for calculating the diffusion coefficients   |
+| `chem_params%%diffusion`       | Logical | Enable multispecies diffusion                            |
+| `chem_params%%reactions`       | Logical | Enable chemical reactions                                |
+| `chem_params%%gamma_method`    | Integer | Methodology for calculating the heat capacity ratio      |
+| `chem_params%%transport_model` | Integer | Methodology for calculating the diffusion coefficients   |
 | `cantera_file`                | String  | Cantera-format mechanism file (e.g., .yaml)              |
 
-- `chem_params%transport_model` specifies the methodology for calculating diffusion coefficients and other transport properties, `1` for mixture-average, `2` for Unity-Lewis
+- `chem_params%%transport_model` specifies the methodology for calculating diffusion coefficients and other transport properties, `1` for mixture-average, `2` for Unity-Lewis
 
 - `cantera_file` specifies the chemical mechanism file. If the file is part of the standard Cantera library, only the filename is required. Otherwise, the file must be located in the same directory as your `case.py` file
 
@@ -1051,15 +1051,15 @@ The entries labeled "Characteristic." are characteristic boundary conditions bas
 
 | Parameter                     | Type    | Description |
 | ---:                          | :----:  | :--- |
-| `bc_[x,y,z]%grcbc_in`         | Logical | Enable grcbc for subsonic inflow |
-| `bc_[x,y,z]%grcbc_out`        | Logical | Enable grcbc for subsonic outflow (pressure)|
-| `bc_[x,y,z]%grcbc_vel_out`    | Logical | Enable grcbc for subsonic outflow (pressure + normal velocity) |
-| `bc_[x,y,z]%vel_in`           | Real Array | Inflow velocities in x, y and z directions |
-| `bc_[x,y,z]%vel_out`          | Real Array | Outflow velocities in x, y and z directions |
-| `bc_[x,y,z]%pres_in`          | Real    | Inflow pressure |
-| `bc_[x,y,z]%pres_out`         | Real    | Outflow pressure |
-| `bc_[x,y,z]%alpha_rho_in`     | Real Array | Inflow density |
-| `bc_[x,y,z]%alpha_in`         | Real Array | Inflow void fraction |
+| `bc_[x,y,z]%%grcbc_in`         | Logical | Enable grcbc for subsonic inflow |
+| `bc_[x,y,z]%%grcbc_out`        | Logical | Enable grcbc for subsonic outflow (pressure)|
+| `bc_[x,y,z]%%grcbc_vel_out`    | Logical | Enable grcbc for subsonic outflow (pressure + normal velocity) |
+| `bc_[x,y,z]%%vel_in`           | Real Array | Inflow velocities in x, y and z directions |
+| `bc_[x,y,z]%%vel_out`          | Real Array | Outflow velocities in x, y and z directions |
+| `bc_[x,y,z]%%pres_in`          | Real    | Inflow pressure |
+| `bc_[x,y,z]%%pres_out`         | Real    | Outflow pressure |
+| `bc_[x,y,z]%%alpha_rho_in`     | Real Array | Inflow density |
+| `bc_[x,y,z]%%alpha_in`         | Real Array | Inflow void fraction |
 
 This boundary condition can be used for subsonic inflow (`bc_[x,y,z]%[beg,end]` = -7) and subsonic outflow (`bc_[x,y,z]%[beg,end]` = -8) characteristic boundary conditions. These are based on \cite Pirozzoli13. This enables to provide inflow and outflow conditions outside the computational domain.
 
