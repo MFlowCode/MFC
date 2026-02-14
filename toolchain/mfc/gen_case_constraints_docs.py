@@ -789,10 +789,13 @@ def render_markdown(rules: Iterable[Rule]) -> str:  # pylint: disable=too-many-l
 # Main
 # ---------------------------------------------------------------------------
 
-def main() -> None:
+def main(as_string: bool = False) -> str:
+    """Generate case constraints documentation. Returns markdown string."""
     analysis = analyze_case_validator(CASE_VALIDATOR_PATH)
     md = render_markdown(analysis["rules"])
-    print(md)
+    if not as_string:
+        print(md)
+    return md
 
 
 if __name__ == "__main__":
