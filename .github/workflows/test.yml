@@ -210,6 +210,8 @@ jobs:
     steps:
       - name: Clone
         uses: actions/checkout@v4
+        with:
+          clean: false
 
       - name: Build
         if:   matrix.cluster != 'phoenix'
