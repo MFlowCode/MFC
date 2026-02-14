@@ -108,10 +108,8 @@ def _render_method(doc: dict, method_rules: List[Rule], lines: List[str]) -> Non
         msgs = [r for r in method_rules if not (r.message in seen or seen.add(r.message))]  # type: ignore[func-returns-value]
         if msgs:
             lines.append("**Enforced checks:**\n")
-            for m in msgs[:8]:
+            for m in msgs:
                 lines.append(f"{_SEVERITY_ICON.get(m.severity, '- ')}{_format_message(m.message)}")
-            if len(msgs) > 8:
-                lines.append(f"- *(+{len(msgs) - 8} more)*")
             lines.append("")
 
     if "exceptions" in doc:
