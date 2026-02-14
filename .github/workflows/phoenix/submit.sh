@@ -24,7 +24,7 @@ sbatch_cpu_opts="\
 
 sbatch_gpu_opts="\
 #SBATCH --gres=gpu:H200:2
-#SBATCH --ntasks-per-node=8       # Number of cores per node required\
+#SBATCH --ntasks-per-node=8       # Number of tasks (MPI ranks) per node\
 "
 
 if [ "$2" = "cpu" ]; then
