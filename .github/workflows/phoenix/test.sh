@@ -10,6 +10,9 @@ if [ "$job_device" = "gpu" ]; then
     fi
 fi
 
+# Set up persistent build cache
+source .github/scripts/setup-build-cache.sh phoenix "$job_device" "$job_interface"
+
 max_attempts=3
 attempt=1
 while [ $attempt -le $max_attempts ]; do
@@ -20,8 +23,8 @@ while [ $attempt -le $max_attempts ]; do
     fi
 
     if [ $attempt -lt $max_attempts ]; then
-        echo "Build failed on attempt $attempt. Cleaning and retrying in 30s..."
-        ./mfc.sh clean
+        echo "Build failed on attempt $attempt. Clearing staging/install and retrying in 30s..."
+        rm -rf build/staging build/install build/lock.yaml
         sleep 30
     else
         echo "Build failed after $max_attempts attempts."
@@ -29,6 +32,14 @@ while [ $attempt -le $max_attempts ]; do
     fi
     attempt=$((attempt + 1))
 done
+
+# Release the cache lock before running tests. Tests only read installed
+# binaries and can take hours — no need to block other builds.
+if [ "${_cache_locked:-false}" = true ]; then
+    flock --unlock 9
+    exec 9>&-
+    echo "Released build cache lock before tests"
+fi
 
 n_test_threads=8
 

@@ -18,6 +18,9 @@ fi
 
 . ./mfc.sh load -c f -m g
 
+# Set up persistent build cache
+source .github/scripts/setup-build-cache.sh frontier "$job_device" "$job_interface"
+
 max_attempts=3
 attempt=1
 while [ $attempt -le $max_attempts ]; do
@@ -45,8 +48,8 @@ while [ $attempt -le $max_attempts ]; do
     fi
 
     if [ $attempt -lt $max_attempts ]; then
-        echo "Build failed on attempt $attempt. Cleaning and retrying in 30s..."
-        ./mfc.sh clean
+        echo "Build failed on attempt $attempt. Clearing staging/install and retrying in 30s..."
+        rm -rf build/staging build/install build/lock.yaml
         sleep 30
     fi
     attempt=$((attempt + 1))
