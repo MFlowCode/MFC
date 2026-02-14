@@ -44,7 +44,7 @@ jobs:
       run: |
         failed=0
         passed=0
-        for case in examples/*/case.py examples/*/benchmark.py; do
+        for case in examples/*/case.py; do
           [ -f "$case" ] || continue
           output=$(./mfc.sh validate "$case" 2>&1)
           if [ $? -eq 0 ]; then

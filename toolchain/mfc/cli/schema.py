@@ -129,7 +129,7 @@ class Command:  # pylint: disable=too-many-instance-attributes
     include_common: List[str] = field(default_factory=list)  # e.g., ["targets", "jobs"]
 
     # Subcommands (for nested commands like "packer pack")
-    subcommands: List[Command] = field(default_factory=list)
+    subcommands: List["Command"] = field(default_factory=list)
 
     # Documentation
     description: Optional[str] = None   # Long description for docs
