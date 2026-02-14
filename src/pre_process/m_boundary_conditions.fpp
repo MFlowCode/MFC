@@ -1,5 +1,5 @@
 !>
-!! @file m_boundary_conditions.fpp
+!! @file
 !! @brief Contains module m_boundary_conditions
 
 !> @brief This module contains

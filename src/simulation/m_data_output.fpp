@@ -1,4 +1,4 @@
-!! @file m_data_output.f90
+!! @file
 !! @brief Contains module m_data_output
 
 #:include 'macros.fpp'

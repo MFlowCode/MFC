@@ -54,17 +54,17 @@ For analysis and processing of the database using VisIt's capability, the user i
 ## Serial data output
 
 If ``parallel_io = 'F'``, MFC will output the conservative variables to a directory `D/`. 
-If multiple cores are used ($\mathtt{ppn > 1}$), then a separate file is created for each core.
+If multiple cores are used (\f$\mathtt{ppn > 1}\f$), then a separate file is created for each core.
 If only one coordinate dimension (`n = 0` and `p = 0`) exists, the primitive variables will also be written to `D/`.
 The file names correspond to the variables associated with each equation solved by MFC.
 They are written at every `t_step_save` time step.
 The conservative variables are
 
-$$ {(\rho \alpha)}\_{1}, \dots, (\rho\alpha)\_{N\_c}, \rho u\_{1}, \dots, \rho u\_{N\_d}, E, \alpha\_1, \dots, \alpha\_{N\_c} $$
+\f[ (\rho \alpha)_{1}, \dots, (\rho\alpha)_{N_c}, \rho u_{1}, \dots, \rho u_{N_d}, E, \alpha_1, \dots, \alpha_{N_c} \f]
 
 and the primitive variables are
 
-$$ {(\rho \alpha)}\_1, \dots, (\rho\alpha)\_{N\_c}, u\_1, \dots, u\_{N\_d}, p, \alpha\_1, \dots, \alpha\_{N\_c} $$
+\f[ (\rho \alpha)_1, \dots, (\rho\alpha)_{N_c}, u_1, \dots, u_{N_d}, p, \alpha_1, \dots, \alpha_{N_c} \f]
 
 where $N_c$ are the number of components `num_fluids` and $N_d$ is the number of spatial dimensions. 
 There are exceptions: if `model_eqns = 3`, then the six-equation model appends these variables with the internal energies of each component.
@@ -72,12 +72,12 @@ If there are sub-grid bubbles `bubbles = T`, then the bubble variables are also 
 These depend on the bubble dynamics model used.
 If ``polytropic = 'T'``, then the conservative variables are appended by 
 
-$$ n\_b R\_1, n\_b {\\dot R}\_1, \dots, n\_b R\_{N\_b}, n\_b {\\dot R}\_{N\_b} $$
+\f[ n_b R_1, n_b \dot{R}_1, \dots, n_b R_{N_b}, n_b \dot{R}_{N_b} \f]
 
 where $n_B$ is the bubble number density, and $N_b$ is the number of bubble sizes (see the matching variable in the input file, `Nb`).
 The primitive bubble variables do not include $n_B$:
 
-$$ R\_1, {\\dot R}\_1, \dots, R\_{N\_b}, {\\dot R}\_{N\_b} $$
+\f[ R_1, \dot{R}_1, \dots, R_{N_b}, \dot{R}_{N_b} \f]
 
 ## Remote Visualization on PACE Phoenix
 

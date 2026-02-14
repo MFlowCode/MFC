@@ -1,5 +1,5 @@
 !>
-!! @file m_ibm.fpp
+!! @file
 !! @brief Contains module m_ibm
 
 #:include 'macros.fpp'

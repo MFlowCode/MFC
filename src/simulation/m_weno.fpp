@@ -1,5 +1,5 @@
 !>
-!! @file m_weno.f90
+!! @file
 !! @brief Contains module m_weno
 #:include 'case.fpp'
 #:include 'macros.fpp'

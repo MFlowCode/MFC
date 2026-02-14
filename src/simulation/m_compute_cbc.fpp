@@ -1,5 +1,5 @@
 !>
-!! @file m_compute_cbc.f90
+!! @file
 !! @brief CBC computation module
 #:include 'case.fpp'
 #:include 'macros.fpp'

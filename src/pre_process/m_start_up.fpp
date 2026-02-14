@@ -1,5 +1,5 @@
 !>
-!! @file m_start_up.f90
+!! @file
 !! @brief Contains module m_start_up
 
 !> @brief This module contains subroutines that read, and check consistency

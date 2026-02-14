@@ -1,5 +1,5 @@
 !>
-!! @file m_grid.f90
+!! @file
 !! @brief Contains module m_grid
 
 !> @brief  This module takes care of creating the rectilinear grid on which

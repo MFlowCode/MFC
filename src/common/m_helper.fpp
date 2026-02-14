@@ -2,7 +2,7 @@
 #:include 'macros.fpp'
 
 !>
-!! @file m_helper.f90
+!! @file
 !! @brief Contains module m_helper
 
 module m_helper
