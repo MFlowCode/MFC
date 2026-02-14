@@ -2207,6 +2207,14 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         z_beg = self.get('z_domain%beg') if self._is_numeric(p) and p > 0 else None
         z_end = self.get('z_domain%end') if self._is_numeric(p) and p > 0 else None
 
+        # Pre-check domain bounds are numeric (could be analytical expressions)
+        x_bounds_ok = (x_beg is not None and x_end is not None
+                       and self._is_numeric(x_beg) and self._is_numeric(x_end))
+        y_bounds_ok = (y_beg is not None and y_end is not None
+                       and self._is_numeric(y_beg) and self._is_numeric(y_end))
+        z_bounds_ok = (z_beg is not None and z_end is not None
+                       and self._is_numeric(z_beg) and self._is_numeric(z_end))
+
         for i in range(1, num_patches + 1):
             geometry = self.get(f'patch_icpp({i})%geometry')
             if geometry is None:
@@ -2220,16 +2228,16 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
             xc = self.get(f'patch_icpp({i})%x_centroid')
             lx = self.get(f'patch_icpp({i})%length_x')
 
-            has_x = (xc is not None and lx is not None
-                     and x_beg is not None and x_end is not None)
-            if has_x and self._is_numeric(xc) and self._is_numeric(lx):
+            has_x = xc is not None and lx is not None
+            if (has_x and x_bounds_ok
+                    and self._is_numeric(xc) and self._is_numeric(lx)):
                 patch_x_lo = xc - lx / 2.0
                 patch_x_hi = xc + lx / 2.0
                 self.prohibit(patch_x_hi < x_beg or patch_x_lo > x_end,
                              f"patch_icpp({i}): x-extent [{patch_x_lo}, {patch_x_hi}] "
                              f"is entirely outside domain [{x_beg}, {x_end}]")
 
-            if geometry in [3, 9] and y_beg is not None and y_end is not None:
+            if geometry in [3, 9] and y_bounds_ok:
                 yc = self.get(f'patch_icpp({i})%y_centroid')
                 ly = self.get(f'patch_icpp({i})%length_y')
                 if (yc is not None and ly is not None
@@ -2240,7 +2248,7 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
                                  f"patch_icpp({i}): y-extent [{patch_y_lo}, {patch_y_hi}] "
                                  f"is entirely outside domain [{y_beg}, {y_end}]")
 
-            if geometry == 9 and z_beg is not None and z_end is not None:
+            if geometry == 9 and z_bounds_ok:
                 zc = self.get(f'patch_icpp({i})%z_centroid')
                 lz = self.get(f'patch_icpp({i})%length_z')
                 if (zc is not None and lz is not None
