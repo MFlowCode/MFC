@@ -88,15 +88,18 @@ def _format_message(msg: str) -> str:
     msg = re.sub(r"for (support|pulse) = \1\b", r"for the given \1", msg)
     msg = re.sub(r"for (support|pulse) = (\d+)", r"for \1 = \2", msg)
 
-    # Wrap code-like tokens in backticks (or <code> for Fortran % accessors).
-    # Doxygen treats %<word> as "suppress auto-link" and consumes the %,
-    # even inside backtick and <code> spans. To preserve the Fortran %
-    # accessor, split into adjacent <code> tags so % is never followed
-    # by a word character: <code>bc_y%</code><code>beg</code>.
+    # Wrap code-like tokens in code formatting.
+    # Doxygen consumes %<word> as "suppress auto-link" even inside backtick
+    # and <code> spans. For Fortran % accessors, use split <code> tags with
+    # CSS classes that remove internal borders, making them visually seamless.
     def _wrap_code(match: re.Match) -> str:
         token = match.group(1)
         if "%" in token:
-            return "<code>" + token.replace("%", "%</code><code>") + "</code>"
+            parts = token.split("%")
+            result = parts[0]
+            for part in parts[1:]:
+                result += '%</code><code class="f90r">' + part
+            return '<code class="f90l">' + result + "</code>"
         return f"`{token}`"
 
     msg = _CODE_RE.sub(_wrap_code, msg)
