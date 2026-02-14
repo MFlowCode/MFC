@@ -123,35 +123,8 @@ def _render_method(doc: dict, method_rules: List[Rule], lines: List[str]) -> Non
         lines.append(f"**References:** {cites}\n")
 
 
-def _render_undocumented(by_method: Dict[str, List[Rule]], lines: List[str]) -> None:
-    """Render table of check methods that lack PHYSICS_DOCS entries."""
-    documented = set(PHYSICS_DOCS.keys())
-    undocumented = sorted(m for m in by_method if m.startswith("check_") and m not in documented)
-    if not undocumented:
-        return
-
-    lines.append("---\n")
-    lines.append("## Other Validation Checks\n")
-    lines.append(
-        "The following checks do not yet have physics documentation. "
-        "See @ref contributing for how to add `PHYSICS_DOCS` entries.\n"
-    )
-    lines.append("| Check | Parameters | Stage | Severity |")
-    lines.append("|-------|-----------|-------|----------|")
-    for method in undocumented:
-        method_rules = by_method[method]
-        stages = _collect_stages(method_rules)
-        title = method.replace("check_", "").replace("_", " ").title()
-        params: Set[str] = set()
-        for r in method_rules:
-            params.update(r.params)
-        param_str = ", ".join(f"`{p}`" for p in sorted(params)[:6])
-        if len(params) > 6:
-            param_str += ", ..."
-        lines.append(
-            f"| {title} | {param_str} | {_stages_str(stages)} | {_severity_badge(method_rules)} |"
-        )
-    lines.append("")
+    # Undocumented checks are omitted — they are discoverable via
+    # @ref case_constraints "Case Creator Guide".
 
 
 def render(rules: List[Rule]) -> str:
@@ -190,8 +163,6 @@ def render(rules: List[Rule]) -> str:
         lines.append(f"## {category}\n")
         for method in methods:
             _render_method(PHYSICS_DOCS[method], by_method.get(method, []), lines)
-
-    _render_undocumented(by_method, lines)
 
     return "\n".join(lines)
 
