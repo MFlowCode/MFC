@@ -1,5 +1,5 @@
 !>
-!! @file m_qbmm.f90
+!! @file
 !! @brief Contains module m_qbmm
 
 #:include 'case.fpp'

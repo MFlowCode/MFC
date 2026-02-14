@@ -638,6 +638,17 @@ def get_pattern_description(pattern_name: str) -> str:
     return desc
 
 
+def get_math_symbol(param_name: str) -> str:
+    """Get the LaTeX math symbol for a parameter, if one is defined.
+
+    Looks up the math_symbol field from the parameter registry (single source of truth).
+    Symbols are defined via math= in the _r() calls in definitions.py.
+    """
+    from . import REGISTRY  # pylint: disable=import-outside-toplevel
+    param = REGISTRY.all_params.get(param_name)
+    return param.math_symbol if param else ""
+
+
 # Feature group descriptions (for display purposes)
 # The actual parameter-to-tag mapping is in definitions.py (single source of truth)
 FEATURE_DESCRIPTIONS = {

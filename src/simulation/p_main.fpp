@@ -1,5 +1,5 @@
 !>
-!! @file p_main.f90
+!! @file
 !! @brief Contains program p_main
 
 !> @brief  Quasi-conservative, shock- and interface- capturing finite-volume

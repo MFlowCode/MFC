@@ -61,6 +61,7 @@ class ParamDef:  # pylint: disable=too-many-instance-attributes
     dependencies: Optional[Dict[str, Any]] = None  # {"requires": [...], "recommends": [...]}
     tags: Set[str] = field(default_factory=set)  # Feature tags: "mhd", "bubbles", etc.
     hint: str = ""  # Constraint/usage hint for docs (e.g. "Used with grcbc_in")
+    math_symbol: str = ""  # LaTeX math symbol (Doxygen format, e.g. "\\f$\\gamma_k\\f$")
 
     def __post_init__(self):
         # Validate name

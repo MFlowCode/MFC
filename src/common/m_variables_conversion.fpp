@@ -1,5 +1,5 @@
 !>
-!! @file m_variables_conversion.f90
+!! @file
 !! @brief Contains module m_variables_conversion
 
 #:include 'macros.fpp'

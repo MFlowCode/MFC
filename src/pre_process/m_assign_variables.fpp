@@ -1,5 +1,5 @@
 !>
-!! @file m_assign_variables.f90
+!! @file
 !! @brief Contains module m_assign_variables
 
 #:include 'case.fpp'

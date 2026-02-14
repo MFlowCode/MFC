@@ -1,5 +1,5 @@
 !>
-!! @file m_patches.fpp
+!! @file
 !! @brief Contains module m_patches
 
 #:include 'case.fpp'

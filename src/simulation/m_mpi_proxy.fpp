@@ -1,5 +1,5 @@
 !>
-!! @file m_mpi_proxy.f90
+!! @file
 !! @brief Contains module m_mpi_proxy
 
 #:include 'case.fpp'

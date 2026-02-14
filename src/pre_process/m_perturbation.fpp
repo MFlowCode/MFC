@@ -1,5 +1,5 @@
 !>
-!! @file m_perturbation.fpp
+!! @file
 !! @brief Contains module m_perturbation
 
 !> @brief This module contains subroutines that compute perturbations to the

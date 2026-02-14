@@ -1,5 +1,5 @@
 !>
-!! @file m_derived_types.f90
+!! @file
 !! @brief Contains module m_derived_types
 
 #:include "macros.fpp"

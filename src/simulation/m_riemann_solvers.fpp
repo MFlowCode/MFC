@@ -1,5 +1,5 @@
 !>
-!! @file m_riemann_solvers.f90
+!! @file
 !! @brief Contains module m_riemann_solvers
 
 !> @brief This module features a database of approximate and exact Riemann
@@ -4668,14 +4668,14 @@ contains
         !! Calculates Cartesian components of the stress tensor using averaged velocity derivatives
         !! and cylindrical geometric factors, then updates `flux_src_vf`.
         !! Assumes x-dir is axial (z_cyl), y-dir is radial (r_cyl), z-dir is azimuthal (theta_cyl for derivatives).
-        !! @param[in] velL_vf Left boundary velocity ($v_x, v_y, v_z$) (num_dims scalar_field).
-        !! @param[in] dvelL_dx_vf Left boundary $\partial v_i/\partial x$ (num_dims scalar_field).
-        !! @param[in] dvelL_dy_vf Left boundary $\partial v_i/\partial y$ (num_dims scalar_field).
-        !! @param[in] dvelL_dz_vf Left boundary $\partial v_i/\partial z$ (num_dims scalar_field).
-        !! @param[in] velR_vf Right boundary velocity ($v_x, v_y, v_z$) (num_dims scalar_field).
-        !! @param[in] dvelR_dx_vf Right boundary $\partial v_i/\partial x$ (num_dims scalar_field).
-        !! @param[in] dvelR_dy_vf Right boundary $\partial v_i/\partial y$ (num_dims scalar_field).
-        !! @param[in] dvelR_dz_vf Right boundary $\partial v_i/\partial z$ (num_dims scalar_field).
+        !! @param[in] velL_vf Left boundary velocity (\f$v_x, v_y, v_z\f$) (num_dims scalar_field).
+        !! @param[in] dvelL_dx_vf Left boundary \f$\partial v_i/\partial x\f$ (num_dims scalar_field).
+        !! @param[in] dvelL_dy_vf Left boundary \f$\partial v_i/\partial y\f$ (num_dims scalar_field).
+        !! @param[in] dvelL_dz_vf Left boundary \f$\partial v_i/\partial z\f$ (num_dims scalar_field).
+        !! @param[in] velR_vf Right boundary velocity (\f$v_x, v_y, v_z\f$) (num_dims scalar_field).
+        !! @param[in] dvelR_dx_vf Right boundary \f$\partial v_i/\partial x\f$ (num_dims scalar_field).
+        !! @param[in] dvelR_dy_vf Right boundary \f$\partial v_i/\partial y\f$ (num_dims scalar_field).
+        !! @param[in] dvelR_dz_vf Right boundary \f$\partial v_i/\partial z\f$ (num_dims scalar_field).
         !! @param[inout] flux_src_vf Intercell source flux array to update (sys_size scalar_field).
         !! @param[in] norm_dir Interface normal direction (1=x-face, 2=y-face, 3=z-face).
         !! @param[in] ix Global X-direction loop bounds (int_bounds_info).
@@ -4697,30 +4697,30 @@ contains
 
         ! Local variables
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3) :: avg_v_int       !!< Averaged interface velocity $(v_x, v_y, v_z)$ (grid directions).
-            real(wp), dimension(3) :: avg_dvdx_int    !!< Averaged interface $\partial v_i/\partial x$ (grid dir 1).
-            real(wp), dimension(3) :: avg_dvdy_int    !!< Averaged interface $\partial v_i/\partial y$ (grid dir 2).
-            real(wp), dimension(3) :: avg_dvdz_int    !!< Averaged interface $\partial v_i/\partial z$ (grid dir 3).
-            real(wp), dimension(3) :: vel_src_int !!< Interface velocity $(v_1,v_2,v_3)$ (grid directions) for viscous work.
-            real(wp), dimension(3) :: stress_vector_shear !!< Shear stress vector $(\sigma_{N1}, \sigma_{N2}, \sigma_{N3})$ on N-face (grid directions).
+            real(wp), dimension(3) :: avg_v_int       !!< Averaged interface velocity (\f$v_x, v_y, v_z\f$) (grid directions).
+            real(wp), dimension(3) :: avg_dvdx_int    !!< Averaged interface \f$\partial v_i/\partial x\f$ (grid dir 1).
+            real(wp), dimension(3) :: avg_dvdy_int    !!< Averaged interface \f$\partial v_i/\partial y\f$ (grid dir 2).
+            real(wp), dimension(3) :: avg_dvdz_int    !!< Averaged interface \f$\partial v_i/\partial z\f$ (grid dir 3).
+            real(wp), dimension(3) :: vel_src_int !!< Interface velocity (\f$v_1,v_2,v_3\f$) (grid directions) for viscous work.
+            real(wp), dimension(3) :: stress_vector_shear !!< Shear stress vector (\f$\sigma_{N1}, \sigma_{N2}, \sigma_{N3}\f$) on N-face (grid directions).
         #:else
-            real(wp), dimension(num_dims) :: avg_v_int       !!< Averaged interface velocity $(v_x, v_y, v_z)$ (grid directions).
-            real(wp), dimension(num_dims) :: avg_dvdx_int    !!< Averaged interface $\partial v_i/\partial x$ (grid dir 1).
-            real(wp), dimension(num_dims) :: avg_dvdy_int    !!< Averaged interface $\partial v_i/\partial y$ (grid dir 2).
-            real(wp), dimension(num_dims) :: avg_dvdz_int    !!< Averaged interface $\partial v_i/\partial z$ (grid dir 3).
-            real(wp), dimension(num_dims) :: vel_src_int !!< Interface velocity $(v_1,v_2,v_3)$ (grid directions) for viscous work.
-            real(wp), dimension(num_dims) :: stress_vector_shear !!< Shear stress vector $(\sigma_{N1}, \sigma_{N2}, \sigma_{N3})$ on N-face (grid directions).
+            real(wp), dimension(num_dims) :: avg_v_int       !!< Averaged interface velocity (\f$v_x, v_y, v_z\f$) (grid directions).
+            real(wp), dimension(num_dims) :: avg_dvdx_int    !!< Averaged interface \f$\partial v_i/\partial x\f$ (grid dir 1).
+            real(wp), dimension(num_dims) :: avg_dvdy_int    !!< Averaged interface \f$\partial v_i/\partial y\f$ (grid dir 2).
+            real(wp), dimension(num_dims) :: avg_dvdz_int    !!< Averaged interface \f$\partial v_i/\partial z\f$ (grid dir 3).
+            real(wp), dimension(num_dims) :: vel_src_int !!< Interface velocity (\f$v_1,v_2,v_3\f$) (grid directions) for viscous work.
+            real(wp), dimension(num_dims) :: stress_vector_shear !!< Shear stress vector (\f$\sigma_{N1}, \sigma_{N2}, \sigma_{N3}\f$) on N-face (grid directions).
         #:endif
-        real(wp) :: stress_normal_bulk  !!< Normal bulk stress component $\sigma_{NN}$ on N-face.
+        real(wp) :: stress_normal_bulk  !!< Normal bulk stress component \f$\sigma_{NN}\f$ on N-face.
 
         real(wp) :: Re_s, Re_b        !!< Effective interface shear and bulk Reynolds numbers.
         real(wp) :: r_eff             !!< Effective radius at interface for cylindrical terms.
-        real(wp) :: div_v_term_const  !!< Common term $-(2/3)(\nabla \cdot \mathbf{v}) / \text{Re}_s$ for shear stress diagonal.
-        real(wp) :: divergence_cyl    !!< Full divergence $\nabla \cdot \mathbf{v}$ in cylindrical coordinates.
+        real(wp) :: div_v_term_const  !!< Common term \f$-(2/3)(\nabla \cdot \mathbf{v}) / \text{Re}_s\f$ for shear stress diagonal.
+        real(wp) :: divergence_cyl    !!< Full divergence \f$\nabla \cdot \mathbf{v}\f$ in cylindrical coordinates.
 
-        integer :: j, k, l           !!< Loop iterators for $x, y, z$ grid directions.
+        integer :: j, k, l           !!< Loop iterators for \f$x, y, z\f$ grid directions.
         integer :: i_vel             !!< Loop iterator for velocity components.
-        integer :: idx_rp(3)         !!< Indices $(j,k,l)$ of 'right' point for averaging.
+        integer :: idx_rp(3)         !!< Indices \f$(j,k,l)\f$ of 'right' point for averaging.
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[idx_rp, avg_v_int, avg_dvdx_int, avg_dvdy_int, avg_dvdz_int, Re_s, Re_b, vel_src_int, r_eff, divergence_cyl, stress_vector_shear, stress_normal_bulk, div_v_term_const]')
         do l = iz%beg, iz%end

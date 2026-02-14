@@ -781,11 +781,6 @@ DEPENDENCIES = {
             "requires": ["sigma"],
         }
     },
-    "mhd": {
-        "when_true": {
-            "recommends": ["hyper_cleaning"],
-        }
-    },
     "relativity": {
         "when_true": {
             "requires": ["mhd"],
@@ -813,7 +808,7 @@ DEPENDENCIES = {
     },
 }
 
-def _r(name, ptype, tags=None, desc=None, hint=None):
+def _r(name, ptype, tags=None, desc=None, hint=None, math=None):  # pylint: disable=too-many-arguments,too-many-positional-arguments
     """Register a parameter with optional feature tags and description."""
     if hint is None:
         hint = _lookup_hint(name)
@@ -832,6 +827,7 @@ def _r(name, ptype, tags=None, desc=None, hint=None):
         dependencies=DEPENDENCIES.get(name),
         tags=tags if tags else set(),
         hint=hint,
+        math_symbol=math or "",
     ))
 
 
@@ -862,7 +858,9 @@ def _load():  # pylint: disable=too-many-locals,too-many-statements
     for n in ["time_stepper", "t_step_old", "t_step_start", "t_step_stop",
               "t_step_save", "t_step_print", "adap_dt_max_iters"]:
         _r(n, INT, {"time"})
-    for n in ["dt", "cfl_target", "cfl_max", "t_tol", "adap_dt_tol", "t_stop", "t_save"]:
+    _r("dt", REAL, {"time"}, math=r"\f$\Delta t\f$")
+    _r("cfl_target", REAL, {"time"}, math=r"\f$\mathrm{CFL}\f$")
+    for n in ["cfl_max", "t_tol", "adap_dt_tol", "t_stop", "t_save"]:
         _r(n, REAL, {"time"})
     for n in ["cfl_adap_dt", "cfl_const_dt", "cfl_dt", "adap_dt"]:
         _r(n, LOG, {"time"})
@@ -872,8 +870,9 @@ def _load():  # pylint: disable=too-many-locals,too-many-statements
     _r("recon_type", INT)
     _r("muscl_order", INT)
     _r("muscl_lim", INT)
-    for n in ["weno_eps", "teno_CT", "wenoz_q"]:
-        _r(n, REAL, {"weno"})
+    _r("weno_eps", REAL, {"weno"}, math=r"\f$\varepsilon\f$")
+    _r("teno_CT", REAL, {"weno"}, math=r"\f$C_T\f$")
+    _r("wenoz_q", REAL, {"weno"})
     for n in ["mapped_weno", "wenoz", "teno", "weno_avg", "mp_weno", "null_weights"]:
         _r(n, LOG, {"weno"})
     _r("weno_Re_flux", LOG, {"weno", "viscosity"})
@@ -883,16 +882,18 @@ def _load():  # pylint: disable=too-many-locals,too-many-statements
         _r(n, INT, {"riemann"})
 
     # --- MHD ---
-    _r("Bx0", REAL, {"mhd"})
-    for n in ["hyper_cleaning_speed", "hyper_cleaning_tau"]:
-        _r(n, REAL, {"mhd"})
+    _r("Bx0", REAL, {"mhd"}, math=r"\f$B_{x,0}\f$")
+    _r("hyper_cleaning_speed", REAL, {"mhd"}, math=r"\f$c_h\f$")
+    _r("hyper_cleaning_tau", REAL, {"mhd"})
     for n in ["mhd", "hyper_cleaning", "powell"]:
         _r(n, LOG, {"mhd"})
 
     # --- Bubbles ---
-    for n in ["R0ref", "nb", "Web", "Ca"]:
-        _r(n, REAL, {"bubbles"})
-    _r("Re_inv", REAL, {"bubbles", "viscosity"})
+    _r("R0ref", REAL, {"bubbles"}, math=r"\f$R_0\f$")
+    _r("nb", REAL, {"bubbles"}, math=r"\f$N_b\f$")
+    _r("Web", REAL, {"bubbles"}, math=r"\f$\mathrm{We}\f$")
+    _r("Ca", REAL, {"bubbles"}, math=r"\f$\mathrm{Ca}\f$")
+    _r("Re_inv", REAL, {"bubbles", "viscosity"}, math=r"\f$\mathrm{Re}^{-1}\f$")
     _r("bubble_model", INT, {"bubbles"})
     for n in ["polytropic", "bubbles_euler", "polydisperse", "qbmm", "bubbles_lagrange"]:
         _r(n, LOG, {"bubbles"})
@@ -905,7 +906,7 @@ def _load():  # pylint: disable=too-many-locals,too-many-statements
         _r(n, LOG, {"elasticity"})
 
     # --- Surface tension ---
-    _r("sigma", REAL, {"surface_tension"})
+    _r("sigma", REAL, {"surface_tension"}, math=r"\f$\sigma\f$")
     _r("surface_tension", LOG, {"surface_tension"})
 
     # --- Chemistry ---
@@ -964,10 +965,16 @@ def _load():  # pylint: disable=too-many-locals,too-many-statements
               "num_igr_warm_start_iters", "igr_iter_solver", "nv_uvm_igr_temps_on_gpu",
               "flux_lim"]:
         _r(n, INT)
-    for n in ["pref", "poly_sigma", "rhoref", "mixlayer_vel_coef", "mixlayer_domain",
-              "mixlayer_perturb_k0", "perturb_flow_mag", "fluid_rho", "sigR", "sigV",
-              "rhoRV", "palpha_eps", "ptgalpha_eps", "pi_fac", "tau_star",
-              "cont_damage_s", "alpha_bar", "alf_factor", "ic_eps", "ic_beta"]:
+    _r("pref", REAL, math=r"\f$p_\text{ref}\f$")
+    _r("poly_sigma", REAL, math=r"\f$\sigma_\text{poly}\f$")
+    _r("rhoref", REAL, math=r"\f$\rho_\text{ref}\f$")
+    _r("palpha_eps", REAL, math=r"\f$\varepsilon_\alpha\f$")
+    _r("ptgalpha_eps", REAL, math=r"\f$\varepsilon_\alpha\f$")
+    _r("pi_fac", REAL, math=r"\f$\pi\text{-factor}\f$")
+    for n in ["mixlayer_vel_coef", "mixlayer_domain", "mixlayer_perturb_k0",
+              "perturb_flow_mag", "fluid_rho", "sigR", "sigV", "rhoRV",
+              "tau_star", "cont_damage_s", "alpha_bar", "alf_factor",
+              "ic_eps", "ic_beta"]:
         _r(n, REAL)
     for n in ["mpp_lim", "relax", "adv_n", "cont_damage", "igr", "down_sample",
               "old_grid", "old_ic", "mixlayer_vel_profile", "mixlayer_perturb",
@@ -979,8 +986,10 @@ def _load():  # pylint: disable=too-many-locals,too-many-statements
 
     # Body force
     for d in ["x", "y", "z"]:
-        for v in ["k", "w", "p", "g"]:
-            _r(f"{v}_{d}", REAL)
+        _r(f"g_{d}", REAL, math=r"\f$g_" + d + r"\f$")
+        _r(f"k_{d}", REAL, math=r"\f$k_" + d + r"\f$")
+        _r(f"w_{d}", REAL, math=r"\f$\omega_" + d + r"\f$")
+        _r(f"p_{d}", REAL, math=r"\f$\phi_" + d + r"\f$")
         _r(f"bf_{d}", LOG)
 
     # ==========================================================================
@@ -994,20 +1003,23 @@ def _load():  # pylint: disable=too-many-locals,too-many-statements
             _r(f"{px}{a}", INT)
         for a in ["smoothen", "alter_patch"] if i >= 2 else ["smoothen"]:
             _r(f"{px}{a}", LOG)
+        for a, sym in [("rho", r"\f$\rho\f$"), ("gamma", r"\f$\gamma\f$"),
+                       ("pi_inf", r"\f$\pi_\infty\f$"), ("cv", r"\f$c_v\f$"),
+                       ("qv", r"\f$q_v\f$"), ("qvp", r"\f$q'_v\f$")]:
+            _r(f"{px}{a}", REAL, math=sym)
         for a in ["radius", "radii", "epsilon", "beta", "normal", "alpha_rho",
-                  "non_axis_sym", "smooth_coeff", "rho", "vel", "alpha", "gamma",
-                  "pi_inf", "cv", "qv", "qvp", "model_threshold"]:
+                  "non_axis_sym", "smooth_coeff", "vel", "alpha", "model_threshold"]:
             _r(f"{px}{a}", REAL)
         # Bubble fields
         for a in ["r0", "v0", "p0", "m0"]:
             _r(f"{px}{a}", REAL, {"bubbles"})
         for j in range(2, 10):
             _r(f"{px}a({j})", REAL)
-        _r(f"{px}pres", A_REAL)
+        _r(f"{px}pres", A_REAL, math=r"\f$p\f$")
         _r(f"{px}cf_val", A_REAL)
         # MHD fields
-        for a in ["Bx", "By", "Bz"]:
-            _r(f"{px}{a}", A_REAL, {"mhd"})
+        for a, sym in [("Bx", r"\f$B_x\f$"), ("By", r"\f$B_y\f$"), ("Bz", r"\f$B_z\f$")]:
+            _r(f"{px}{a}", A_REAL, {"mhd"}, math=sym)
         # Chemistry species
         for j in range(1, 101):
             _r(f"{px}Y({j})", A_REAL, {"chemistry"})
@@ -1021,13 +1033,13 @@ def _load():  # pylint: disable=too-many-locals,too-many-statements
         for j in range(1, 4):
             _r(f"{px}radii({j})", REAL)
             _r(f"{px}normal({j})", REAL)
-            _r(f"{px}vel({j})", A_REAL)
+            _r(f"{px}vel({j})", A_REAL, math=r"\f$u_" + str(j) + r"\f$")
         for f in range(1, NF + 1):
-            _r(f"{px}alpha({f})", A_REAL)
-            _r(f"{px}alpha_rho({f})", A_REAL)
+            _r(f"{px}alpha({f})", A_REAL, math=r"\f$\alpha_" + str(f) + r"\f$")
+            _r(f"{px}alpha_rho({f})", A_REAL, math=r"\f$\alpha \rho\f$")
         # Elasticity stress tensor
         for j in range(1, 7):
-            _r(f"{px}tau_e({j})", A_REAL, {"elasticity"})
+            _r(f"{px}tau_e({j})", A_REAL, {"elasticity"}, math=r"\f$\tau_e\f$")
         if i >= 2:
             for j in range(1, i):
                 _r(f"{px}alter_patch({j})", LOG)
@@ -1035,21 +1047,30 @@ def _load():  # pylint: disable=too-many-locals,too-many-statements
     # --- fluid_pp (10 fluids) ---
     for f in range(1, NF + 1):
         px = f"fluid_pp({f})%"
-        for a in ["gamma", "pi_inf", "cv", "qv", "qvp"]:
-            _r(f"{px}{a}", REAL)
-        _r(f"{px}mul0", REAL, {"viscosity"})
-        _r(f"{px}ss", REAL, {"surface_tension"})
+        for a, sym in [("gamma", r"\f$\gamma_k\f$"), ("pi_inf", r"\f$\pi_{\infty,k}\f$"),
+                       ("cv", r"\f$c_{v,k}\f$"), ("qv", r"\f$q_{v,k}\f$"),
+                       ("qvp", r"\f$q'_{v,k}\f$")]:
+            _r(f"{px}{a}", REAL, math=sym)
+        _r(f"{px}mul0", REAL, {"viscosity"}, math=r"\f$\mu_{l,k}\f$")
+        _r(f"{px}ss", REAL, {"surface_tension"}, math=r"\f$\sigma_k\f$")
         for a in ["pv", "gamma_v", "M_v", "mu_v", "k_v", "cp_v", "D_v"]:
             _r(f"{px}{a}", REAL, {"bubbles"})
-        _r(f"{px}G", REAL, {"elasticity"})
-        for j in [1, 2]:
-            _r(f"{px}Re({j})", REAL, {"viscosity"})
+        _r(f"{px}G", REAL, {"elasticity"}, math=r"\f$G_k\f$")
+        _r(f"{px}Re(1)", REAL, {"viscosity"}, math=r"\f$\mathrm{Re}_k\f$ (shear)")
+        _r(f"{px}Re(2)", REAL, {"viscosity"}, math=r"\f$\mathrm{Re}_k\f$ (bulk)")
 
     # --- bub_pp (bubble properties) ---
-    for a in ["R0ref", "p0ref", "rho0ref", "T0ref", "ss", "pv", "vd",
-              "mu_l", "mu_v", "mu_g", "gam_v", "gam_g",
-              "M_v", "M_g", "k_v", "k_g", "cp_v", "cp_g", "R_v", "R_g"]:
-        _r(f"bub_pp%{a}", REAL, {"bubbles"})
+    for a, sym in [("R0ref", r"\f$R_0\f$"), ("p0ref", r"\f$p_0\f$"),
+                   ("rho0ref", r"\f$\rho_l\f$"), ("T0ref", r"\f$T_0\f$"),
+                   ("ss", r"\f$\sigma\f$"), ("pv", r"\f$p_v\f$"),
+                   ("vd", r"\f$D\f$"), ("mu_l", r"\f$\mu_l\f$"),
+                   ("mu_v", r"\f$\mu_v\f$"), ("mu_g", r"\f$\mu_g\f$"),
+                   ("gam_v", r"\f$\gamma_v\f$"), ("gam_g", r"\f$\gamma_g\f$"),
+                   ("M_v", r"\f$M_v\f$"), ("M_g", r"\f$M_g\f$"),
+                   ("k_v", r"\f$k_v\f$"), ("k_g", r"\f$k_g\f$"),
+                   ("cp_v", r"\f$c_{p,v}\f$"), ("cp_g", r"\f$c_{p,g}\f$"),
+                   ("R_v", r"\f$R_v\f$"), ("R_g", r"\f$R_g\f$")]:
+        _r(f"bub_pp%{a}", REAL, {"bubbles"}, math=sym)
 
     # --- patch_ib (10 immersed boundaries) ---
     for i in range(1, NI + 1):

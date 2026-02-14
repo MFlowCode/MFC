@@ -1,5 +1,5 @@
 !>
-!! @file m_data_input.f90
+!! @file
 !> @brief Contains module m_data_input
 
 !> @brief This module features procedures, which for a specific time-step,
@@ -211,8 +211,10 @@ contains
     end subroutine s_read_ib_data_files
 
     !> Helper subroutine to allocate field arrays for given dimensionality
-    !!  @param start_idx Starting index for allocation
-    !!  @param end_x, end_y, end_z End indices for each dimension
+    !!  @param local_start_idx Starting index for allocation
+    !!  @param end_x End index for x dimension
+    !!  @param end_y End index for y dimension
+    !!  @param end_z End index for z dimension
     impure subroutine s_allocate_field_arrays(local_start_idx, end_x, end_y, end_z)
 
         integer, intent(in) :: local_start_idx, end_x, end_y, end_z
