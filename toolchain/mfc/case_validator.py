@@ -1638,7 +1638,7 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         bubbles_euler = self.get('bubbles_euler', 'F') == 'T'
         num_ibs = self.get('num_ibs', 0) or 0  # IBM (Immersed Boundary Method)
 
-        if num_patches is None or num_patches <= 0:
+        if not self._is_numeric(num_patches) or num_patches <= 0:
             return
 
         for i in range(1, num_patches + 1):
@@ -2045,23 +2045,23 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         """Checks that domain end > domain begin for each active dimension"""
         x_beg = self.get('x_domain%beg')
         x_end = self.get('x_domain%end')
-        if x_beg is not None and x_end is not None:
+        if self._is_numeric(x_beg) and self._is_numeric(x_end):
             self.prohibit(x_end <= x_beg,
                          f"x_domain%end ({x_end}) must be greater than x_domain%beg ({x_beg})")
 
         n = self.get('n', 0)
-        if n is not None and n > 0:
+        if self._is_numeric(n) and n > 0:
             y_beg = self.get('y_domain%beg')
             y_end = self.get('y_domain%end')
-            if y_beg is not None and y_end is not None:
+            if self._is_numeric(y_beg) and self._is_numeric(y_end):
                 self.prohibit(y_end <= y_beg,
                              f"y_domain%end ({y_end}) must be greater than y_domain%beg ({y_beg})")
 
         p = self.get('p', 0)
-        if p is not None and p > 0:
+        if self._is_numeric(p) and p > 0:
             z_beg = self.get('z_domain%beg')
             z_end = self.get('z_domain%end')
-            if z_beg is not None and z_end is not None:
+            if self._is_numeric(z_beg) and self._is_numeric(z_end):
                 self.prohibit(z_end <= z_beg,
                              f"z_domain%end ({z_end}) must be greater than z_domain%beg ({z_beg})")
 
@@ -2099,7 +2099,7 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         if num_ibs > 0:
             return
 
-        if num_patches is None or num_patches <= 0 or num_fluids is None:
+        if not self._is_numeric(num_patches) or num_patches <= 0 or not self._is_numeric(num_fluids):
             return
 
         for i in range(1, num_patches + 1):
@@ -2146,7 +2146,7 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         num_patches = self.get('num_patches', 0)
         num_fluids = self.get('num_fluids', 1)
 
-        if num_patches is None or num_patches <= 0 or num_fluids is None:
+        if not self._is_numeric(num_patches) or num_patches <= 0 or not self._is_numeric(num_fluids):
             return
 
         for i in range(1, num_patches + 1):
@@ -2188,7 +2188,7 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         extents are transformed and the domain bounds are not directly comparable.
         """
         num_patches = self.get('num_patches', 0)
-        if num_patches is None or num_patches <= 0:
+        if not self._is_numeric(num_patches) or num_patches <= 0:
             return
 
         # Skip when any grid stretching is active — domain bounds don't map
@@ -2202,10 +2202,10 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         x_end = self.get('x_domain%end')
         n = self.get('n', 0)
         p = self.get('p', 0)
-        y_beg = self.get('y_domain%beg') if n and n > 0 else None
-        y_end = self.get('y_domain%end') if n and n > 0 else None
-        z_beg = self.get('z_domain%beg') if p and p > 0 else None
-        z_end = self.get('z_domain%end') if p and p > 0 else None
+        y_beg = self.get('y_domain%beg') if self._is_numeric(n) and n > 0 else None
+        y_end = self.get('y_domain%end') if self._is_numeric(n) and n > 0 else None
+        z_beg = self.get('z_domain%beg') if self._is_numeric(p) and p > 0 else None
+        z_end = self.get('z_domain%end') if self._is_numeric(p) and p > 0 else None
 
         for i in range(1, num_patches + 1):
             geometry = self.get(f'patch_icpp({i})%geometry')
@@ -2295,28 +2295,31 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         num_patches = self.get('num_patches', 0)
         mhd = self.get('mhd', 'F') == 'T'
 
-        if num_patches is None or num_patches <= 0:
+        if not self._is_numeric(num_patches) or num_patches <= 0:
             return
 
         # MHD simulations legitimately use transverse velocities in 1D
         if mhd:
             return
 
+        n_is_1d = self._is_numeric(n) and n == 0
+        p_is_2d = self._is_numeric(p) and p == 0
+
         for i in range(1, num_patches + 1):
             geometry = self.get(f'patch_icpp({i})%geometry')
             if geometry is None:
                 continue
 
-            if n is not None and n == 0:
+            if n_is_1d:
                 vel2 = self.get(f'patch_icpp({i})%vel(2)')
-                if vel2 is not None and self._is_numeric(vel2) and vel2 != 0:
-                    self.prohibit(True,
+                if vel2 is not None and self._is_numeric(vel2):
+                    self.prohibit(vel2 != 0,
                                  f"patch_icpp({i})%vel(2) = {vel2} but n = 0 (1D simulation)")
 
-            if p is not None and p == 0:
+            if p_is_2d:
                 vel3 = self.get(f'patch_icpp({i})%vel(3)')
-                if vel3 is not None and self._is_numeric(vel3) and vel3 != 0:
-                    self.prohibit(True,
+                if vel3 is not None and self._is_numeric(vel3):
+                    self.prohibit(vel3 != 0,
                                  f"patch_icpp({i})%vel(3) = {vel3} but p = 0 (1D/2D simulation)")
 
     # ===================================================================

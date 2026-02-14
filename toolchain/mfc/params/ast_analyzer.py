@@ -7,8 +7,6 @@ provides convenience functions for both doc generators (parameters.md
 and case_constraints.md).
 """
 
-from __future__ import annotations
-
 import ast
 import re
 from dataclasses import dataclass, field

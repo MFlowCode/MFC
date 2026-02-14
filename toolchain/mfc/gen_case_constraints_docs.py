@@ -8,8 +8,6 @@ maps them to parameters and stages, and emits Markdown to stdout.
 Also generates case design playbook from curated working examples.
 """  # pylint: disable=too-many-lines
 
-from __future__ import annotations
-
 import json
 import sys
 import subprocess
@@ -756,7 +754,7 @@ def render_markdown(rules: Iterable[Rule]) -> str:  # pylint: disable=too-many-l
         # Method name -> human-readable title
         method_titles = {
             "check_volume_fraction_sum": "Volume Fraction Sum",
-            "check_alpha_rho_consistency": "Alpha–Rho Consistency",
+            "check_alpha_rho_consistency": "Alpha-Rho Consistency",
             "check_eos_parameter_sanity": "EOS Parameter Sanity",
         }
 

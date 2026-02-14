@@ -6,8 +6,6 @@ and AST-extracted validation rules.
 Produces docs/documentation/physics_constraints.md (Doxygen-compatible).
 """
 
-from __future__ import annotations
-
 import re
 import sys
 from collections import defaultdict
