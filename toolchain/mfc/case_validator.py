@@ -51,6 +51,7 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
     def __init__(self, params: Dict[str, Any]):
         self.params = params
         self.errors: List[str] = []
+        self.warnings: List[str] = []
 
     def get(self, key: str, default=None):
         """Get parameter value with default"""
@@ -64,6 +65,11 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         """Assert that condition is False, otherwise add error"""
         if condition:
             self.errors.append(message)
+
+    def warn(self, condition: bool, message: str):
+        """Add a non-fatal warning if condition is True"""
+        if condition:
+            self.warnings.append(message)
 
     def _validate_logical(self, key: str):
         """Validate that a parameter is a valid Fortran logical ('T' or 'F')."""
@@ -1808,6 +1814,288 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
                      "None of the flow variables have been selected for post-process")
 
     # ===================================================================
+    # Cross-Cutting Physics Checks
+    # ===================================================================
+
+    def check_domain_bounds(self):
+        """Checks that domain end > domain begin for each active dimension"""
+        x_beg = self.get('x_domain%beg')
+        x_end = self.get('x_domain%end')
+        if x_beg is not None and x_end is not None:
+            self.prohibit(x_end <= x_beg,
+                         f"x_domain%end ({x_end}) must be greater than x_domain%beg ({x_beg})")
+
+        n = self.get('n', 0)
+        if n is not None and n > 0:
+            y_beg = self.get('y_domain%beg')
+            y_end = self.get('y_domain%end')
+            if y_beg is not None and y_end is not None:
+                self.prohibit(y_end <= y_beg,
+                             f"y_domain%end ({y_end}) must be greater than y_domain%beg ({y_beg})")
+
+        p = self.get('p', 0)
+        if p is not None and p > 0:
+            z_beg = self.get('z_domain%beg')
+            z_end = self.get('z_domain%end')
+            if z_beg is not None and z_end is not None:
+                self.prohibit(z_end <= z_beg,
+                             f"z_domain%end ({z_end}) must be greater than z_domain%beg ({z_beg})")
+
+    def check_volume_fraction_sum(self):  # pylint: disable=too-many-locals
+        """Warns if volume fractions do not sum to 1 for multi-component models.
+
+        For model_eqns in [2, 3, 4], the mixture constraint sum(alpha_j) = 1
+        must hold. Skips patches with analytical expressions, alter_patch,
+        hcid, bubbles_euler single-fluid cases (where alpha represents
+        the void fraction, not a partition of unity), and bubbles_lagrange
+        cases (where the Lagrangian phase is not tracked on the Euler grid).
+        """
+        model_eqns = self.get('model_eqns')
+        if model_eqns not in [2, 3, 4]:
+            return
+
+        num_patches = self.get('num_patches', 0)
+        num_fluids = self.get('num_fluids', 1)
+        bubbles_euler = self.get('bubbles_euler', 'F') == 'T'
+        bubbles_lagrange = self.get('bubbles_lagrange', 'F') == 'T'
+
+        # For bubbles_euler with single fluid, alpha is the void fraction
+        # and does not need to sum to 1
+        if bubbles_euler and num_fluids == 1:
+            return
+
+        # For bubbles_lagrange, the Lagrangian phase volume is not
+        # represented in the Eulerian volume fractions
+        if bubbles_lagrange:
+            return
+
+        # IBM cases use alpha as a level-set indicator, not a physical
+        # volume fraction, so the sum-to-1 constraint does not apply
+        num_ibs = self.get('num_ibs', 0) or 0
+        if num_ibs > 0:
+            return
+
+        if num_patches is None or num_patches <= 0 or num_fluids is None:
+            return
+
+        for i in range(1, num_patches + 1):
+            geometry = self.get(f'patch_icpp({i})%geometry')
+            if geometry is None:
+                continue
+
+            # Skip special patches
+            hcid = self.get(f'patch_icpp({i})%hcid')
+            if hcid is not None:
+                continue
+            alter_patches = [self.get(f'patch_icpp({i})%alter_patch({j})') == 'T'
+                           for j in range(1, num_patches + 1)]
+            if any(alter_patches):
+                continue
+
+            # Collect alpha values, skip if any are analytical expressions
+            alphas = []
+            has_expression = False
+            for j in range(1, num_fluids + 1):
+                alpha = self.get(f'patch_icpp({i})%alpha({j})')
+                if alpha is None:
+                    has_expression = True
+                    break
+                if not self._is_numeric(alpha):
+                    has_expression = True
+                    break
+                alphas.append(alpha)
+
+            if has_expression or len(alphas) != num_fluids:
+                continue
+
+            alpha_sum = sum(alphas)
+            self.warn(abs(alpha_sum - 1.0) > 1e-6,
+                     f"patch_icpp({i}): volume fractions sum to {alpha_sum:.8g}, expected 1.0")
+
+    def check_alpha_rho_consistency(self):
+        """Warns about inconsistent alpha/alpha_rho pairs.
+
+        Catches common mistakes:
+        - alpha(j) = 0 but alpha_rho(j) != 0 (density in absent phase)
+        - alpha(j) > 0 but alpha_rho(j) = 0 (present phase has zero density)
+        """
+        num_patches = self.get('num_patches', 0)
+        num_fluids = self.get('num_fluids', 1)
+
+        if num_patches is None or num_patches <= 0 or num_fluids is None:
+            return
+
+        for i in range(1, num_patches + 1):
+            geometry = self.get(f'patch_icpp({i})%geometry')
+            if geometry is None:
+                continue
+
+            # Skip special patches
+            hcid = self.get(f'patch_icpp({i})%hcid')
+            if hcid is not None:
+                continue
+            alter_patches = [self.get(f'patch_icpp({i})%alter_patch({j})') == 'T'
+                           for j in range(1, num_patches + 1)]
+            if any(alter_patches):
+                continue
+
+            for j in range(1, num_fluids + 1):
+                alpha = self.get(f'patch_icpp({i})%alpha({j})')
+                alpha_rho = self.get(f'patch_icpp({i})%alpha_rho({j})')
+
+                if alpha is None or alpha_rho is None:
+                    continue
+                if not self._is_numeric(alpha) or not self._is_numeric(alpha_rho):
+                    continue
+
+                self.warn(alpha == 0 and alpha_rho != 0,
+                         f"patch_icpp({i}): alpha({j}) = 0 but alpha_rho({j}) = {alpha_rho} "
+                         f"(density in absent phase)")
+                self.warn(alpha > 1e-10 and alpha_rho == 0,
+                         f"patch_icpp({i}): alpha({j}) = {alpha} but alpha_rho({j}) = 0 "
+                         f"(present phase has zero density)")
+
+    def check_patch_within_domain(self):  # pylint: disable=too-many-locals
+        """Checks that centroid+length patches are not entirely outside the domain.
+
+        Only applies to geometry types whose bounding box is fully determined
+        by centroid and length (line segments=1, rectangles=3, cuboids=9).
+        Skipped when grid stretching is active because the physical domain
+        extents are transformed and the domain bounds are not directly comparable.
+        """
+        num_patches = self.get('num_patches', 0)
+        if num_patches is None or num_patches <= 0:
+            return
+
+        # Skip when any grid stretching is active — domain bounds don't map
+        # directly to physical coordinates in stretched grids
+        if (self.get('stretch_x', 'F') == 'T' or
+                self.get('stretch_y', 'F') == 'T' or
+                self.get('stretch_z', 'F') == 'T'):
+            return
+
+        x_beg = self.get('x_domain%beg')
+        x_end = self.get('x_domain%end')
+        n = self.get('n', 0)
+        p = self.get('p', 0)
+        y_beg = self.get('y_domain%beg') if n and n > 0 else None
+        y_end = self.get('y_domain%end') if n and n > 0 else None
+        z_beg = self.get('z_domain%beg') if p and p > 0 else None
+        z_end = self.get('z_domain%end') if p and p > 0 else None
+
+        for i in range(1, num_patches + 1):
+            geometry = self.get(f'patch_icpp({i})%geometry')
+            if geometry is None:
+                continue
+
+            # Only check patches whose bounding box is fully determined
+            # by centroid + length (line segments=1, rectangles=3, cuboids=9)
+            if geometry not in [1, 3, 9]:
+                continue
+
+            xc = self.get(f'patch_icpp({i})%x_centroid')
+            lx = self.get(f'patch_icpp({i})%length_x')
+
+            has_x = (xc is not None and lx is not None
+                     and x_beg is not None and x_end is not None)
+            if has_x and self._is_numeric(xc) and self._is_numeric(lx):
+                patch_x_lo = xc - lx / 2.0
+                patch_x_hi = xc + lx / 2.0
+                self.prohibit(patch_x_hi < x_beg or patch_x_lo > x_end,
+                             f"patch_icpp({i}): x-extent [{patch_x_lo}, {patch_x_hi}] "
+                             f"is entirely outside domain [{x_beg}, {x_end}]")
+
+            if geometry in [3, 9] and y_beg is not None and y_end is not None:
+                yc = self.get(f'patch_icpp({i})%y_centroid')
+                ly = self.get(f'patch_icpp({i})%length_y')
+                if (yc is not None and ly is not None
+                        and self._is_numeric(yc) and self._is_numeric(ly)):
+                    patch_y_lo = yc - ly / 2.0
+                    patch_y_hi = yc + ly / 2.0
+                    self.prohibit(patch_y_hi < y_beg or patch_y_lo > y_end,
+                                 f"patch_icpp({i}): y-extent [{patch_y_lo}, {patch_y_hi}] "
+                                 f"is entirely outside domain [{y_beg}, {y_end}]")
+
+            if geometry == 9 and z_beg is not None and z_end is not None:
+                zc = self.get(f'patch_icpp({i})%z_centroid')
+                lz = self.get(f'patch_icpp({i})%length_z')
+                if (zc is not None and lz is not None
+                        and self._is_numeric(zc) and self._is_numeric(lz)):
+                    patch_z_lo = zc - lz / 2.0
+                    patch_z_hi = zc + lz / 2.0
+                    self.prohibit(patch_z_hi < z_beg or patch_z_lo > z_end,
+                                 f"patch_icpp({i}): z-extent [{patch_z_lo}, {patch_z_hi}] "
+                                 f"is entirely outside domain [{z_beg}, {z_end}]")
+
+    def check_eos_parameter_sanity(self):
+        """Warns if EOS gamma parameter looks like raw physical gamma.
+
+        MFC uses the transformed parameter Gamma = 1/(gamma-1), not the
+        physical specific heat ratio gamma directly. Common mistake:
+        entering gamma=1.4 (physical) instead of gamma=1/(1.4-1)=2.5.
+
+        - gamma < 0.1 implies physical gamma > 11 (unusual)
+        - gamma > 1000 implies physical gamma ≈ 1.001 (unusual)
+        """
+        num_fluids = self.get('num_fluids')
+        model_eqns = self.get('model_eqns')
+
+        if num_fluids is None or model_eqns == 1:
+            return
+
+        for i in range(1, num_fluids + 1):
+            gamma = self.get(f'fluid_pp({i})%gamma')
+            if gamma is None or not self._is_numeric(gamma) or gamma <= 0:
+                continue
+
+            # gamma = 1/(physical_gamma - 1), so physical_gamma = 1/gamma + 1
+            physical_gamma = 1.0 / gamma + 1.0
+
+            self.warn(gamma < 0.1,
+                     f"fluid_pp({i})%gamma = {gamma} implies physical gamma = {physical_gamma:.2f} "
+                     f"(unusually high). MFC uses the transformed parameter Gamma = 1/(gamma-1)")
+            self.warn(gamma > 1000,
+                     f"fluid_pp({i})%gamma = {gamma} implies physical gamma = {physical_gamma:.6f} "
+                     f"(very close to 1). Did you enter the physical gamma instead of 1/(gamma-1)?")
+
+    def check_velocity_components(self):
+        """Checks that velocity components are not set in inactive dimensions.
+
+        vel(2) must be zero in 1D (n=0), vel(3) must be zero in 1D/2D (p=0).
+        Exempts MHD simulations where transverse velocity components are
+        physically meaningful even in 1D (they carry transverse momentum
+        coupled to the magnetic field).
+        """
+        n = self.get('n', 0)
+        p = self.get('p', 0)
+        num_patches = self.get('num_patches', 0)
+        mhd = self.get('mhd', 'F') == 'T'
+
+        if num_patches is None or num_patches <= 0:
+            return
+
+        # MHD simulations legitimately use transverse velocities in 1D
+        if mhd:
+            return
+
+        for i in range(1, num_patches + 1):
+            geometry = self.get(f'patch_icpp({i})%geometry')
+            if geometry is None:
+                continue
+
+            if n is not None and n == 0:
+                vel2 = self.get(f'patch_icpp({i})%vel(2)')
+                if vel2 is not None and self._is_numeric(vel2) and vel2 != 0:
+                    self.prohibit(True,
+                                 f"patch_icpp({i})%vel(2) = {vel2} but n = 0 (1D simulation)")
+
+            if p is not None and p == 0:
+                vel3 = self.get(f'patch_icpp({i})%vel(3)')
+                if vel3 is not None and self._is_numeric(vel3) and vel3 != 0:
+                    self.prohibit(True,
+                                 f"patch_icpp({i})%vel(3) = {vel3} but p = 0 (1D/2D simulation)")
+
+    # ===================================================================
     # Main Validation Entry Points
     # ===================================================================
 
@@ -1815,6 +2103,7 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         """Validate parameters common to all stages"""
         self.check_parameter_types()  # Type validation first
         self.check_simulation_domain()
+        self.check_domain_bounds()
         self.check_model_eqns_and_num_fluids()
         self.check_igr()
         self.check_weno()
@@ -1828,6 +2117,7 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         self.check_phase_change()
         self.check_ibm()
         self.check_stiffened_eos()
+        self.check_eos_parameter_sanity()
         self.check_surface_tension()
         self.check_mhd()
 
@@ -1864,6 +2154,10 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         self.check_chemistry()
         self.check_misc_pre_process()
         self.check_patch_physics()
+        self.check_volume_fraction_sum()
+        self.check_alpha_rho_consistency()
+        self.check_patch_within_domain()
+        self.check_velocity_components()
         self.check_bc_patches()
 
     def validate_post_process(self):
@@ -1897,6 +2191,7 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
             CaseConstraintError: If any constraint violations are found
         """
         self.errors = []
+        self.warnings = []
 
         if stage == 'simulation':
             self.validate_simulation()
@@ -1907,11 +2202,13 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         else:
             # No stage-specific constraints for auxiliary targets like 'syscheck'.
             # Silently skip validation rather than treating this as an error.
-            return
+            return []
 
         if self.errors:
             error_msg = self._format_errors()
             raise CaseConstraintError(error_msg)
+
+        return self.warnings
 
     def _format_errors(self) -> str:
         """Format errors with enhanced context and suggestions."""
@@ -1952,15 +2249,18 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         return "\n".join(lines)
 
 
-def validate_case_constraints(params: Dict[str, Any], stage: str = 'simulation'):
+def validate_case_constraints(params: Dict[str, Any], stage: str = 'simulation') -> List[str]:
     """Convenience function to validate case parameters
 
     Args:
         params: Dictionary of case parameters
         stage: One of 'simulation', 'pre_process', or 'post_process'
 
+    Returns:
+        List of warning messages (non-fatal issues)
+
     Raises:
         CaseConstraintError: If any constraint violations are found
     """
     validator = CaseValidator(params)
-    validator.validate(stage)
+    return validator.validate(stage) or []
