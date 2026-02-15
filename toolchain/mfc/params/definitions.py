@@ -639,7 +639,7 @@ CONSTRAINTS = {
 
     # Bubbles
     "bubble_model": {
-        "choices": [1, 2, 3],
+        "choices": [0, 1, 2, 3],
         "value_labels": {0: "Particle", 1: "Gilmore", 2: "Keller-Miksis", 3: "Rayleigh-Plesset"},
     },
 

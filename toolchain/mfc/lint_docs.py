@@ -60,7 +60,7 @@ PARAM_DOCS = {
 }
 
 # Match @ref page_id patterns
-REF_RE = re.compile(r"@ref\s+(\w+)")
+REF_RE = re.compile(r"@ref\s+([\w-]+)")
 
 
 def check_docs(repo_root: Path) -> list[str]:
@@ -373,7 +373,7 @@ def check_page_refs(repo_root: Path) -> list[str]:
     page_ids = {"citelist", "parameters", "case_constraints", "physics_constraints", "examples", "cli-reference"}
     for md_file in doc_dir.glob("*.md"):
         text = md_file.read_text(encoding="utf-8")
-        m = re.search(r"^\s*@page\s+(\w+)", text, flags=re.MULTILINE)
+        m = re.search(r"^\s*@page\s+([\w-]+)", text, flags=re.MULTILINE)
         if m:
             page_ids.add(m.group(1))
 

@@ -43,7 +43,6 @@ module m_mpi_common
     $:GPU_DECLARE(create='[comm_coords, comm_size]')
     !! Variables for EL bubbles communication
 
-
 #ifndef __NVCOMPILER_GPU_UNIFIED_MEM
     $:GPU_DECLARE(create='[buff_send, buff_recv]')
 #endif
