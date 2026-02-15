@@ -52,7 +52,7 @@ where the dimensionless groups are:
 | \f$\text{We}_b\f$ (bubble Weber number) | \f$1/\sigma\f$ | `Web` | `1 / bub_pp%ss` |
 | \f$\text{Re}_{\text{inv}}\f$ (inverse bubble Reynolds number) | \f$\mu_l\f$ | `Re_inv` | `bub_pp%mu_l` |
 
-These groups are computed in `src/common/m_helper.fpp` (lines 143--194). Because the bubble equations use these dimensionless numbers directly, **all** `bub_pp%` parameters must be provided in non-dimensional form by the user. The code does not perform any internal non-dimensionalization of these inputs.
+These groups are computed during bubble-parameter initialization in `src/common/m_helper.fpp` (see subroutine `s_initialize_bubble_vars`). Because the bubble equations use these dimensionless numbers directly, all dimensional bubble inputs (pressures, viscosities, surface tension, etc.) in `bub_pp%` must be supplied in non-dimensional form by the user. The code does not perform any internal non-dimensionalization of these quantities.
 
 ### Reference Scales
 
@@ -82,6 +82,7 @@ The following table lists every `bub_pp%` parameter and its required non-dimensi
 | `bub_pp%mu_l` | Liquid dynamic viscosity | \f$\mu_l / (\rho_0\,x_0\,u_0)\f$ |
 | `bub_pp%mu_v` | Vapor dynamic viscosity | \f$\mu_v / (\rho_0\,x_0\,u_0)\f$ |
 | `bub_pp%mu_g` | Gas dynamic viscosity | \f$\mu_g / (\rho_0\,x_0\,u_0)\f$ |
+| `bub_pp%vd` | Vapor diffusivity | \f$D / (x_0\,u_0)\f$ |
 | `bub_pp%k_v` | Vapor thermal conductivity | \f$k_v\,T_0 / (x_0\,\rho_0\,u_0^3)\f$ |
 | `bub_pp%k_g` | Gas thermal conductivity | \f$k_g\,T_0 / (x_0\,\rho_0\,u_0^3)\f$ |
 | `bub_pp%cp_v` | Vapor specific heat | \f$c_{p,v}\,T_0 / u_0^2\f$ |
@@ -90,8 +91,8 @@ The following table lists every `bub_pp%` parameter and its required non-dimensi
 | `bub_pp%R_g` | Gas gas constant | \f$R_g\,T_0 / u_0^2\f$ |
 | `bub_pp%gam_v` | Vapor heat capacity ratio | Already dimensionless (no scaling) |
 | `bub_pp%gam_g` | Gas heat capacity ratio | Already dimensionless (no scaling) |
-| `bub_pp%M_v` | Vapor molar mass | Already dimensionless (no scaling) |
-| `bub_pp%M_g` | Gas molar mass | Already dimensionless (no scaling) |
+| `bub_pp%M_v` | Vapor molar mass | Consistent units; only ratios are used (no scaling needed) |
+| `bub_pp%M_g` | Gas molar mass | Consistent units; only ratios are used (no scaling needed) |
 
 When the reference scales match the bubble reference values (e.g., \f$x_0 = R_{0,\text{ref}}\f$, \f$p_0 = p_{0,\text{ref}}\f$, \f$\rho_0 = \rho_{0,\text{ref}}\f$), the reference parameters simplify to unity: `bub_pp%R0ref = 1`, `bub_pp%p0ref = 1`, `bub_pp%rho0ref = 1`.
 
