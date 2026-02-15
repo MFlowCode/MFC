@@ -55,7 +55,7 @@ CASE_MD_SKIP = {
 
 # Docs to check for parameter references, with per-file skip sets
 PARAM_DOCS = {
-    "docs/documentation/equations.md": set(),
+    "docs/documentation/equations.md": {"bub_pp%%"},
     "docs/documentation/case.md": CASE_MD_SKIP,
 }
 

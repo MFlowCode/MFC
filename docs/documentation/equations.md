@@ -43,14 +43,14 @@ Several EOS and transport parameters use **transformed stored forms** that diffe
 
 | Parameter | Physical quantity | What MFC expects (stored form) |
 |---|---|---|
-| `fluid_pp(i)%gamma` | Heat capacity ratio \f$\gamma\f$ | \f$\Gamma = \dfrac{1}{\gamma - 1}\f$ |
-| `fluid_pp(i)%pi_inf` | Stiffness pressure \f$\pi_\infty\f$ [Pa] | \f$\Pi_\infty = \dfrac{\gamma\,\pi_\infty}{\gamma - 1}\f$ [Pa] |
-| `fluid_pp(i)%Re(1)` | Dynamic viscosity \f$\mu\f$ | \f$1/\mu\f$ (inverse viscosity) |
-| `fluid_pp(i)%Re(2)` | Bulk viscosity \f$\mu_b\f$ | \f$1/\mu_b\f$ (inverse bulk viscosity) |
+| `fluid_pp(i)%%gamma` | Heat capacity ratio \f$\gamma\f$ | \f$\Gamma = \dfrac{1}{\gamma - 1}\f$ |
+| `fluid_pp(i)%%pi_inf` | Stiffness pressure \f$\pi_\infty\f$ [Pa] | \f$\Pi_\infty = \dfrac{\gamma\,\pi_\infty}{\gamma - 1}\f$ [Pa] |
+| `fluid_pp(i)%%Re(1)` | Dynamic viscosity \f$\mu\f$ | \f$1/\mu\f$ (inverse viscosity) |
+| `fluid_pp(i)%%Re(2)` | Bulk viscosity \f$\mu_b\f$ | \f$1/\mu_b\f$ (inverse bulk viscosity) |
 
 These transformations arise because MFC internally solves the energy equation using the transformed variables \f$\Gamma\f$ and \f$\Pi_\infty\f$ (see Section 3.1), and the viscous stress is computed by dividing by `Re` rather than multiplying by \f$\mu\f$.
 
-**Common mistake:** setting `fluid_pp(1)%gamma = 1.4` for air. The correct value is `1.0 / (1.4 - 1.0) = 2.5`. Setting `gamma = 1.4` corresponds to a physical \f$\gamma \approx 1.71\f$, which is not a standard gas.
+**Common mistake:** setting `fluid_pp(1)%%gamma = 1.4` for air. The correct value is `1.0 / (1.4 - 1.0) = 2.5`. Setting `gamma = 1.4` corresponds to a physical \f$\gamma \approx 1.71\f$, which is not a standard gas.
 
 ### Common Material Values
 
@@ -101,12 +101,12 @@ The dimensionless groups are:
 
 | Dimensionless group | Definition | Code variable | Computed from |
 |---|---|---|---|
-| \f$\text{Ca}\f$ (Cavitation number) | \f$p_{0,\text{ref}} - p_v\f$ | `Ca` | `bub_pp%p0ref - bub_pp%pv` |
-| \f$\text{Eu}\f$ (Euler number) | \f$p_{0,\text{ref}}\f$ | `Eu` | `bub_pp%p0ref` |
-| \f$\text{We}_b\f$ (bubble Weber number) | \f$1/\sigma\f$ | `Web` | `1 / bub_pp%ss` |
-| \f$\text{Re}_{\text{inv}}\f$ (inverse bubble Reynolds number) | \f$\mu_l\f$ | `Re_inv` | `bub_pp%mu_l` |
+| \f$\text{Ca}\f$ (Cavitation number) | \f$p_{0,\text{ref}} - p_v\f$ | `Ca` | `bub_pp%%p0ref - bub_pp%%pv` |
+| \f$\text{Eu}\f$ (Euler number) | \f$p_{0,\text{ref}}\f$ | `Eu` | `bub_pp%%p0ref` |
+| \f$\text{We}_b\f$ (bubble Weber number) | \f$1/\sigma\f$ | `Web` | `1 / bub_pp%%ss` |
+| \f$\text{Re}_{\text{inv}}\f$ (inverse bubble Reynolds number) | \f$\mu_l\f$ | `Re_inv` | `bub_pp%%mu_l` |
 
-Because the bubble equations use these dimensionless numbers directly, `bub_pp%...` is interpreted by the code as **already non-dimensional**. The code does **not** non-dimensionalize bubble quantities internally. Therefore, when bubbles are enabled, the simulation must be run in a **fully non-dimensional** form: **all** inputs — flow ICs/BCs, EOS parameters, domain lengths, `dt`, and `bub_pp%` values — must be scaled with the same \f$(x_0, p_0, \rho_0, u_0, t_0, T_0)\f$ reference quantities, or the coupled solution will be physically incorrect.
+Because the bubble equations use these dimensionless numbers directly, all `bub_pp%%` inputs are interpreted by the code as **already non-dimensional**. The code does **not** non-dimensionalize bubble quantities internally. Therefore, when bubbles are enabled, the simulation must be run in a **fully non-dimensional** form: **all** inputs — flow ICs/BCs, EOS parameters, domain lengths, `dt`, and `bub_pp%%` values — must be scaled with the same \f$(x_0, p_0, \rho_0, u_0, t_0, T_0)\f$ reference quantities, or the coupled solution will be physically incorrect.
 
 ### Reference Scales
 
@@ -123,32 +123,32 @@ When using bubble models, the user must choose reference scales and non-dimensio
 
 ### Non-Dimensionalization of Input Parameters
 
-The following table lists every `bub_pp%` parameter and its required non-dimensionalization:
+The following table lists every `bub_pp%%` parameter and its required non-dimensionalization:
 
 | Parameter | Physical meaning | Non-dimensional form |
 |---|---|---|
-| `bub_pp%R0ref` | Reference bubble radius | \f$R_{0,\text{ref}} / x_0\f$ |
-| `bub_pp%p0ref` | Reference bubble pressure | \f$p_{0,\text{ref}} / p_0\f$ |
-| `bub_pp%rho0ref` | Reference liquid density | \f$\rho_{0,\text{ref}} / \rho_0\f$ |
-| `bub_pp%T0ref` | Reference temperature | \f$T_{0,\text{ref}} / T_0\f$ (typically 1) |
-| `bub_pp%ss` | Surface tension \f$\sigma\f$ | \f$\sigma / (\rho_0\,x_0\,u_0^2)\f$ |
-| `bub_pp%pv` | Vapor pressure | \f$p_v / p_0\f$ |
-| `bub_pp%mu_l` | Liquid dynamic viscosity | \f$\mu_l / (\rho_0\,x_0\,u_0)\f$ |
-| `bub_pp%mu_v` | Vapor dynamic viscosity | \f$\mu_v / (\rho_0\,x_0\,u_0)\f$ |
-| `bub_pp%mu_g` | Gas dynamic viscosity | \f$\mu_g / (\rho_0\,x_0\,u_0)\f$ |
-| `bub_pp%vd` | Vapor diffusivity | \f$D / (x_0\,u_0)\f$ |
-| `bub_pp%k_v` | Vapor thermal conductivity | \f$k_v\,T_0 / (x_0\,\rho_0\,u_0^3)\f$ |
-| `bub_pp%k_g` | Gas thermal conductivity | \f$k_g\,T_0 / (x_0\,\rho_0\,u_0^3)\f$ |
-| `bub_pp%cp_v` | Vapor specific heat | \f$c_{p,v}\,T_0 / u_0^2\f$ |
-| `bub_pp%cp_g` | Gas specific heat | \f$c_{p,g}\,T_0 / u_0^2\f$ |
-| `bub_pp%R_v` | Vapor gas constant | \f$R_v\,T_0 / u_0^2\f$ |
-| `bub_pp%R_g` | Gas gas constant | \f$R_g\,T_0 / u_0^2\f$ |
-| `bub_pp%gam_v` | Vapor heat capacity ratio | Already dimensionless (no scaling) |
-| `bub_pp%gam_g` | Gas heat capacity ratio | Already dimensionless (no scaling) |
-| `bub_pp%M_v` | Vapor molar mass | Consistent units; only ratios are used (no scaling needed) |
-| `bub_pp%M_g` | Gas molar mass | Consistent units; only ratios are used (no scaling needed) |
+| `bub_pp%%R0ref` | Reference bubble radius | \f$R_{0,\text{ref}} / x_0\f$ |
+| `bub_pp%%p0ref` | Reference bubble pressure | \f$p_{0,\text{ref}} / p_0\f$ |
+| `bub_pp%%rho0ref` | Reference liquid density | \f$\rho_{0,\text{ref}} / \rho_0\f$ |
+| `bub_pp%%T0ref` | Reference temperature | \f$T_{0,\text{ref}} / T_0\f$ (typically 1) |
+| `bub_pp%%ss` | Surface tension \f$\sigma\f$ | \f$\sigma / (\rho_0\,x_0\,u_0^2)\f$ |
+| `bub_pp%%pv` | Vapor pressure | \f$p_v / p_0\f$ |
+| `bub_pp%%mu_l` | Liquid dynamic viscosity | \f$\mu_l / (\rho_0\,x_0\,u_0)\f$ |
+| `bub_pp%%mu_v` | Vapor dynamic viscosity | \f$\mu_v / (\rho_0\,x_0\,u_0)\f$ |
+| `bub_pp%%mu_g` | Gas dynamic viscosity | \f$\mu_g / (\rho_0\,x_0\,u_0)\f$ |
+| `bub_pp%%vd` | Vapor diffusivity | \f$D / (x_0\,u_0)\f$ |
+| `bub_pp%%k_v` | Vapor thermal conductivity | \f$k_v\,T_0 / (x_0\,\rho_0\,u_0^3)\f$ |
+| `bub_pp%%k_g` | Gas thermal conductivity | \f$k_g\,T_0 / (x_0\,\rho_0\,u_0^3)\f$ |
+| `bub_pp%%cp_v` | Vapor specific heat | \f$c_{p,v}\,T_0 / u_0^2\f$ |
+| `bub_pp%%cp_g` | Gas specific heat | \f$c_{p,g}\,T_0 / u_0^2\f$ |
+| `bub_pp%%R_v` | Vapor gas constant | \f$R_v\,T_0 / u_0^2\f$ |
+| `bub_pp%%R_g` | Gas gas constant | \f$R_g\,T_0 / u_0^2\f$ |
+| `bub_pp%%gam_v` | Vapor heat capacity ratio | Already dimensionless (no scaling) |
+| `bub_pp%%gam_g` | Gas heat capacity ratio | Already dimensionless (no scaling) |
+| `bub_pp%%M_v` | Vapor molar mass | Consistent units; only ratios are used (no scaling needed) |
+| `bub_pp%%M_g` | Gas molar mass | Consistent units; only ratios are used (no scaling needed) |
 
-When the reference scales match the bubble reference values (e.g., \f$x_0 = R_{0,\text{ref}}\f$, \f$p_0 = p_{0,\text{ref}}\f$, \f$\rho_0 = \rho_{0,\text{ref}}\f$), the reference parameters simplify to unity: `bub_pp%R0ref = 1`, `bub_pp%p0ref = 1`, `bub_pp%rho0ref = 1`.
+When the reference scales match the bubble reference values (e.g., \f$x_0 = R_{0,\text{ref}}\f$, \f$p_0 = p_{0,\text{ref}}\f$, \f$\rho_0 = \rho_{0,\text{ref}}\f$), the reference parameters simplify to unity: `bub_pp%%R0ref = 1`, `bub_pp%%p0ref = 1`, `bub_pp%%rho0ref = 1`.
 
 ### Flow Parameters with Bubbles
 
@@ -156,28 +156,28 @@ When bubbles are enabled, the flow-level parameters must also be non-dimensional
 
 | Parameter | Non-dimensional form |
 |---|---|
-| `x_domain%beg`, `x_domain%end` | Domain bounds divided by \f$x_0\f$ |
-| `patch_icpp(i)%pres` | Pressure divided by \f$p_0\f$ |
-| `patch_icpp(i)%alpha_rho(j)` | Partial density divided by \f$\rho_0\f$ |
-| `patch_icpp(i)%vel(j)` | Velocity divided by \f$u_0\f$ |
-| `fluid_pp(i)%gamma` | \f$1/(\gamma_i - 1)\f$ (dimensionless, same as without bubbles) |
-| `fluid_pp(i)%pi_inf` | \f$\gamma_i\,\pi_{\infty,i} / [(\gamma_i - 1)\,p_0]\f$ (scaled by reference pressure) |
-| `fluid_pp(i)%Re(1)` | \f$\rho_0\,x_0\,u_0 / \mu_i\f$ (Reynolds number, inverse viscosity) |
+| `x_domain%%beg`, `x_domain%%end` | Domain bounds divided by \f$x_0\f$ |
+| `patch_icpp(i)%%pres` | Pressure divided by \f$p_0\f$ |
+| `patch_icpp(i)%%alpha_rho(j)` | Partial density divided by \f$\rho_0\f$ |
+| `patch_icpp(i)%%vel(j)` | Velocity divided by \f$u_0\f$ |
+| `fluid_pp(i)%%gamma` | \f$1/(\gamma_i - 1)\f$ (dimensionless, same as without bubbles) |
+| `fluid_pp(i)%%pi_inf` | \f$\gamma_i\,\pi_{\infty,i} / [(\gamma_i - 1)\,p_0]\f$ (scaled by reference pressure) |
+| `fluid_pp(i)%%Re(1)` | \f$\rho_0\,x_0\,u_0 / \mu_i\f$ (Reynolds number, inverse viscosity) |
 | `dt` | Time step divided by \f$t_0\f$ |
 
 ### Two Different Viscosity Parameters
 
 MFC has two conceptually distinct viscosity-related parameters that serve different physical roles:
 
-1. **`fluid_pp(i)%Re(1)`** — Used for the **macroscopic flow viscous stress tensor** (Navier-Stokes equations). This is \f$1/\mu\f$ in dimensional simulations, or \f$\rho_0 x_0 u_0 / \mu\f$ (a Reynolds number) when non-dimensionalized. It appears as a **divisor** in the viscous stress computation:
+1. **`fluid_pp(i)%%Re(1)`** — Used for the **macroscopic flow viscous stress tensor** (Navier-Stokes equations). This is \f$1/\mu\f$ in dimensional simulations, or \f$\rho_0 x_0 u_0 / \mu\f$ (a Reynolds number) when non-dimensionalized. It appears as a **divisor** in the viscous stress computation:
    \f[\tau_{ij} \propto \frac{\nabla u}{\text{Re}}\f]
-   Stored in the `physical_parameters` derived type (`src/common/m_derived_types.fpp`).
+   Stored in the physical\_parameters derived type (`src/common/m_derived_types.fpp`).
 
-2. **`bub_pp%mu_l`** — Used for **microscale bubble wall viscous damping** (Rayleigh-Plesset / Keller-Miksis equations). This is the non-dimensional liquid viscosity \f$\mu_l / (\rho_0 x_0 u_0)\f$. It appears as a **multiplier** in the bubble wall pressure:
+2. **`bub_pp%%mu_l`** — Used for **microscale bubble wall viscous damping** (Rayleigh-Plesset / Keller-Miksis equations). This is the non-dimensional liquid viscosity \f$\mu_l / (\rho_0 x_0 u_0)\f$. It appears as a **multiplier** in the bubble wall pressure:
    \f[p_{bw} \ni -\frac{4\,\text{Re}_{\text{inv}}\,\dot{R}}{R}\f]
-   Stored in the `subgrid_bubble_physical_parameters` derived type (`src/common/m_derived_types.fpp`).
+   Stored in the subgrid\_bubble\_physical\_parameters derived type (`src/common/m_derived_types.fpp`).
 
-These two parameters represent viscous effects at fundamentally different scales — bulk flow dissipation vs. single-bubble-wall damping — and are stored in separate derived types with separate code paths. They are **not** interchangeable: `fluid_pp%Re(1)` is an inverse viscosity while `bub_pp%mu_l` is a viscosity (non-dimensionalized).
+These two parameters represent viscous effects at fundamentally different scales — bulk flow dissipation vs. single-bubble-wall damping — and are stored in separate derived types with separate code paths. They are **not** interchangeable: `fluid_pp%%Re(1)` is an inverse viscosity while `bub_pp%%mu_l` is a viscosity (non-dimensionalized).
 
 ### Example: Non-Dimensionalizing a Bubble Case
 
@@ -221,7 +221,7 @@ params = {
 }
 ```
 
-Note the inverse relationship: `fluid_pp%Re(1) = 1 / bub_pp%mu_l` when both use the same reference scales and the same physical viscosity. This is expected — they encode the same physical viscosity but in reciprocal forms for their respective equations.
+Note the inverse relationship: `fluid_pp%%Re(1) = 1 / bub_pp%%mu_l` when both use the same reference scales and the same physical viscosity. This is expected — they encode the same physical viscosity but in reciprocal forms for their respective equations.
 
 ---
 
