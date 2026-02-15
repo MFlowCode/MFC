@@ -49,6 +49,9 @@ jobs:
         run: |
           ! grep -iR -e '\.\.\.' -e '\-\-\-' -e '===' ./src/*
 
+      - name: Lint Docs
+        run: python3 toolchain/mfc/lint_docs.py
+
   file-changes:
     name: Detect File Changes
     runs-on: 'ubuntu-latest'

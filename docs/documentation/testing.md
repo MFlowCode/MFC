@@ -99,7 +99,7 @@ To test the post-processing code, append the `-a` or `--test-all` option:
 ./mfc.sh test -a -j 8
 ```
 
-This argument will re-run the test stack with `parallel_io='T'`, which generates silo_hdf5 files.
+This argument will re-run the test stack with ``parallel_io='T'``, which generates silo_hdf5 files.
 It will also turn most write parameters (`*_wrt`) on.
 Then, it searches through the silo files using `h5dump` to ensure that there are no `NaN`s or `Infinity`s.
 Although adding this option does not guarantee that accurate `.silo` files are generated, it does ensure that the post-process code does not fail or produce malformed data.
