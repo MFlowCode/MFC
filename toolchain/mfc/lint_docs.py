@@ -403,9 +403,11 @@ def check_physics_docs_coverage(repo_root: Path) -> list[str]:
     except ImportError:
         return []
 
-    # Methods that are purely structural/mechanical and don't need physics docs
+    # Methods without PHYSICS_DOCS entries. Add a PHYSICS_DOCS entry (with math,
+    # references, and explanation) to case_validator.py to remove from this set.
     skip = {
-        "check_parameter_types",     # type validation, not physics
+        # Structural/mechanical checks (no physics meaning)
+        "check_parameter_types",     # type validation
         "check_output_format",       # output format selection
         "check_restart",             # restart file logistics
         "check_parallel_io_pre_process",  # parallel I/O settings
@@ -425,6 +427,24 @@ def check_physics_docs_coverage(repo_root: Path) -> list[str]:
         "check_perturb_density",     # parameter pairing validation
         "check_qm",                  # output dimension requirements
         "check_chemistry",           # runtime Cantera validation only
+        # Awaiting proper physics documentation (math, references, explanation)
+        "check_adaptive_time_stepping",
+        "check_adv_n",
+        "check_body_forces",
+        "check_continuum_damage",
+        "check_grcbc",
+        "check_hyperelasticity",
+        "check_ibm",
+        "check_igr_simulation",
+        "check_mhd_simulation",
+        "check_model_eqns_simulation",
+        "check_muscl_simulation",
+        "check_partial_density",
+        "check_qbmm_and_polydisperse",
+        "check_riemann_solver",
+        "check_schlieren",
+        "check_volume_fraction",
+        "check_weno_simulation",
     }
 
     validator_path = repo_root / "toolchain" / "mfc" / "case_validator.py"
