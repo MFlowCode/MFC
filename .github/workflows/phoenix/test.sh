@@ -33,13 +33,6 @@ while [ $attempt -le $max_attempts ]; do
     attempt=$((attempt + 1))
 done
 
-# Release the cache lock before running tests. Tests only read installed
-# binaries and can take hours — no need to block other builds.
-if [ "${_cache_locked:-false}" = true ]; then
-    exec 9>&-
-    echo "Released build cache lock before tests"
-fi
-
 n_test_threads=8
 
 if [ "$job_device" = "gpu" ]; then
