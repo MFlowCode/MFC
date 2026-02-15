@@ -8,8 +8,6 @@ maps them to parameters and stages, and emits Markdown to stdout.
 Also generates case design playbook from curated working examples.
 """  # pylint: disable=too-many-lines
 
-from __future__ import annotations
-
 import json
 import sys
 import subprocess
@@ -637,10 +635,14 @@ def render_markdown(rules: Iterable[Rule]) -> str:  # pylint: disable=too-many-l
         requirements = []
         incompatibilities = []
         ranges = []
+        warnings = []
 
         for rule in rules_for_param:
             msg = rule.message
             if "IGR" in msg:
+                continue
+            if rule.severity == "warning":
+                warnings.append(msg)
                 continue
             kind = classify_message(msg)
             if kind == "requirement":
@@ -691,7 +693,7 @@ def render_markdown(rules: Iterable[Rule]) -> str:  # pylint: disable=too-many-l
                 _render_cond_parts(f"= {wv_val}", wv_cond)
 
         # Skip if nothing to show
-        if not (schema_parts or dep_parts or requirements or incompatibilities or ranges):
+        if not (schema_parts or dep_parts or requirements or incompatibilities or ranges or warnings):
             continue
 
         lines.append(f"\n<details>")
@@ -710,24 +712,70 @@ def render_markdown(rules: Iterable[Rule]) -> str:  # pylint: disable=too-many-l
             lines.append("")
 
         if requirements:
-            lines.append("**Requirements:**")
+            lines.append("**Requirements** (errors):")
             for req in requirements[:3]:
                 lines.append(f"- {req}")
             lines.append("")
 
         if incompatibilities:
-            lines.append("**Incompatibilities:**")
+            lines.append("**Incompatibilities** (errors):")
             for inc in incompatibilities[:3]:
                 lines.append(f"- {inc}")
             lines.append("")
 
         if ranges:
-            lines.append("**Valid values:**")
+            lines.append("**Valid values** (errors):")
             for rng in ranges[:2]:
                 lines.append(f"- {rng}")
             lines.append("")
 
+        if warnings:
+            lines.append("**Warnings** (non-fatal):")
+            for w in warnings[:3]:
+                lines.append(f"- ⚠️ {w}")
+            lines.append("")
+
         lines.append("</details>\n")
+
+    # 7. Physics Warnings section (non-fatal checks from self.warn() calls)
+    all_warnings = [r for r in rules if r.severity == "warning"]
+    if all_warnings:
+        lines.append("## ⚠️ Physics Warnings {#physics-warnings}\n")
+        lines.append(
+            "These checks are **non-fatal** — they print a yellow warning but do not abort the run. "
+            "They catch common mistakes in initial conditions and EOS parameters.\n"
+        )
+
+        # Group by method
+        warnings_by_method: Dict[str, List[Rule]] = defaultdict(list)
+        for r in all_warnings:
+            warnings_by_method[r.method].append(r)
+
+        # Method name -> human-readable title
+        method_titles = {
+            "check_volume_fraction_sum": "Volume Fraction Sum",
+            "check_alpha_rho_consistency": "Alpha-Rho Consistency",
+            "check_eos_parameter_sanity": "EOS Parameter Sanity",
+        }
+
+        lines.append("| Check | Stage | Description |")
+        lines.append("|-------|-------|-------------|")
+        for method, method_rules in sorted(warnings_by_method.items()):
+            title = method_titles.get(method, method.replace("check_", "").replace("_", " ").title())
+            stages_str = ", ".join(sorted(method_rules[0].stages)) if method_rules[0].stages else "all"
+            # Deduplicate messages (loop-expanded may repeat patterns)
+            seen_msgs = set()
+            descs = []
+            for r in method_rules:
+                if r.message not in seen_msgs:
+                    seen_msgs.add(r.message)
+                    descs.append(r.message)
+            desc_str = "; ".join(descs[:2])
+            if len(descs) > 2:
+                desc_str += f" (+{len(descs)-2} more)"
+            lines.append(f"| **{title}** | {stages_str} | {desc_str} |")
+
+        lines.append("")
 
     # Add a footer with link to full validator
     lines.append("\n---\n")
@@ -741,10 +789,13 @@ def render_markdown(rules: Iterable[Rule]) -> str:  # pylint: disable=too-many-l
 # Main
 # ---------------------------------------------------------------------------
 
-def main() -> None:
+def main(as_string: bool = False) -> str:
+    """Generate case constraints documentation. Returns markdown string."""
     analysis = analyze_case_validator(CASE_VALIDATOR_PATH)
     md = render_markdown(analysis["rules"])
-    print(md)
+    if not as_string:
+        print(md)
+    return md
 
 
 if __name__ == "__main__":

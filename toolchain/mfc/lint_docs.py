@@ -4,13 +4,19 @@ import re
 import sys
 from pathlib import Path
 
-# Docs to scan for file path references
+# Docs to scan for file path references (all hand-written docs with code refs)
 DOCS = [
     "docs/documentation/contributing.md",
     "docs/documentation/gpuParallelization.md",
     "docs/documentation/running.md",
     "docs/documentation/case.md",
     "docs/documentation/equations.md",
+    "docs/documentation/testing.md",
+    "docs/documentation/getting-started.md",
+    "docs/documentation/docker.md",
+    "docs/documentation/troubleshooting.md",
+    "docs/documentation/visualization.md",
+    "docs/documentation/expectedPerformance.md",
     ".github/copilot-instructions.md",
 ]
 
@@ -315,6 +321,47 @@ def check_section_anchors(repo_root: Path) -> list[str]:
     return errors
 
 
+def check_doxygen_percent(repo_root: Path) -> list[str]:
+    """Check that Fortran % accessors inside backtick code spans use %% (Doxygen escape).
+
+    Doxygen treats %<word> as "suppress auto-link" and silently eats the %
+    character, even inside backtick code spans.  Writing %% produces a
+    literal %.  Only flag % followed by [a-zA-Z_] (the pattern Doxygen
+    consumes); %[, %(, etc. are safe.
+    """
+    doc_dir = repo_root / "docs" / "documentation"
+    if not doc_dir.exists():
+        return []
+
+    ignored = _gitignored_docs(repo_root)
+    code_span_re = re.compile(r"``([^`\n]+)``|`([^`\n]+)`")
+    bad_pct_re = re.compile(r"(?<!%)%(?=[a-zA-Z_])")
+
+    errors = []
+    for md_file in sorted(doc_dir.glob("*.md")):
+        if md_file.name in ignored:
+            continue
+        text = md_file.read_text(encoding="utf-8")
+        rel = md_file.relative_to(repo_root)
+        in_code = False
+        for i, line in enumerate(text.split("\n"), 1):
+            if line.strip().startswith("```"):
+                in_code = not in_code
+                continue
+            if in_code:
+                continue
+            for m in code_span_re.finditer(line):
+                span = m.group(1) or m.group(2)
+                if bad_pct_re.search(span):
+                    fixed = bad_pct_re.sub("%%", span)
+                    errors.append(
+                        f"  {rel}:{i} Doxygen will eat the % in `{span}`."
+                        f" Fix: `{fixed}`"
+                    )
+
+    return errors
+
+
 def check_page_refs(repo_root: Path) -> list[str]:
     """Check that @ref targets in docs reference existing page identifiers."""
     doc_dir = repo_root / "docs" / "documentation"
@@ -322,7 +369,8 @@ def check_page_refs(repo_root: Path) -> list[str]:
         return []
 
     # Collect all @page identifiers
-    page_ids = {"citelist"}  # Doxygen built-in
+    # Include Doxygen built-ins and auto-generated pages (created by ./mfc.sh generate)
+    page_ids = {"citelist", "parameters", "case_constraints", "physics_constraints", "examples", "cli-reference"}
     for md_file in doc_dir.glob("*.md"):
         text = md_file.read_text(encoding="utf-8")
         m = re.search(r"^\s*@page\s+(\w+)", text, flags=re.MULTILINE)
@@ -344,6 +392,163 @@ def check_page_refs(repo_root: Path) -> list[str]:
     return errors
 
 
+def check_physics_docs_coverage(repo_root: Path) -> list[str]:
+    """Check that all check methods with enforcement calls have PHYSICS_DOCS entries."""
+    toolchain_dir = str(repo_root / "toolchain")
+    if toolchain_dir not in sys.path:
+        sys.path.insert(0, toolchain_dir)
+    try:
+        from mfc.case_validator import PHYSICS_DOCS  # pylint: disable=import-outside-toplevel
+        from mfc.params.ast_analyzer import analyze_case_validator  # pylint: disable=import-outside-toplevel
+    except ImportError:
+        return []
+
+    # Methods without PHYSICS_DOCS entries. Add a PHYSICS_DOCS entry (with math,
+    # references, and explanation) to case_validator.py to remove from this set.
+    skip = {
+        # Structural/mechanical checks (no physics meaning)
+        "check_parameter_types",     # type validation
+        "check_output_format",       # output format selection
+        "check_restart",             # restart file logistics
+        "check_parallel_io_pre_process",  # parallel I/O settings
+        "check_misc_pre_process",    # miscellaneous pre-process flags
+        "check_bc_patches",          # boundary patch geometry
+        "check_grid_stretching",     # grid stretching parameters
+        "check_qbmm_pre_process",    # QBMM pre-process settings
+        "check_probe_integral_output",  # probe/integral output settings
+        "check_finite_difference",   # fd_order value validation
+        "check_flux_limiter",        # output dimension requirements
+        "check_liutex_post",         # output dimension requirements
+        "check_momentum_post",       # output dimension requirements
+        "check_velocity_post",       # output dimension requirements
+        "check_surface_tension_post",  # output feature dependency
+        "check_no_flow_variables",   # output variable selection
+        "check_partial_domain",      # output format settings
+        "check_perturb_density",     # parameter pairing validation
+        "check_qm",                  # output dimension requirements
+        "check_chemistry",           # runtime Cantera validation only
+        # Awaiting proper physics documentation (math, references, explanation)
+        "check_adaptive_time_stepping",
+        "check_adv_n",
+        "check_body_forces",
+        "check_continuum_damage",
+        "check_grcbc",
+        "check_hyperelasticity",
+        "check_ibm",
+        "check_igr_simulation",
+        "check_mhd_simulation",
+        "check_model_eqns_simulation",
+        "check_muscl_simulation",
+        "check_partial_density",
+        "check_qbmm_and_polydisperse",
+        "check_riemann_solver",
+        "check_schlieren",
+        "check_volume_fraction",
+        "check_weno_simulation",
+    }
+
+    validator_path = repo_root / "toolchain" / "mfc" / "case_validator.py"
+    analysis = analyze_case_validator(validator_path)
+    rules = analysis["rules"]
+
+    # Find methods that have at least one prohibit/warn call
+    methods_with_rules = {r.method for r in rules}
+
+    errors = []
+    for method in sorted(methods_with_rules):
+        if method in PHYSICS_DOCS:
+            continue
+        if method in skip:
+            continue
+        errors.append(
+            f"  {method} has validation rules but no PHYSICS_DOCS entry."
+            " Fix: add entry to PHYSICS_DOCS in case_validator.py"
+            " or add to skip set in lint_docs.py"
+        )
+
+    return errors
+
+
+# Important Python identifiers in contributing.md mapped to files where they must exist.
+# If an identifier is renamed or removed, this check catches the stale doc reference.
+_CONTRIBUTING_IDENTIFIERS = {
+    "PHYSICS_DOCS": "toolchain/mfc/case_validator.py",
+    "CONSTRAINTS": "toolchain/mfc/params/definitions.py",
+    "DEPENDENCIES": "toolchain/mfc/params/definitions.py",
+    "REGISTRY": "toolchain/mfc/params/__init__.py",
+}
+
+
+def check_identifier_refs(repo_root: Path) -> list[str]:
+    """Check that important identifiers referenced in contributing.md still exist."""
+    doc_path = repo_root / "docs" / "documentation" / "contributing.md"
+    if not doc_path.exists():
+        return []
+
+    text = _strip_code_blocks(doc_path.read_text(encoding="utf-8"))
+    errors = []
+
+    for identifier, source_file in _CONTRIBUTING_IDENTIFIERS.items():
+        # Check identifier is actually referenced in the doc
+        if f"`{identifier}" not in text:
+            continue
+        source_path = repo_root / source_file
+        if not source_path.exists():
+            errors.append(
+                f"  contributing.md references `{identifier}` in {source_file}"
+                f" but {source_file} does not exist"
+            )
+            continue
+        source_text = source_path.read_text(encoding="utf-8")
+        if identifier not in source_text:
+            errors.append(
+                f"  contributing.md references `{identifier}` but it was not"
+                f" found in {source_file}. Fix: update the docs or the identifier"
+            )
+
+    return errors
+
+
+# Match ./mfc.sh <command> patterns (the subcommand name)
+_CLI_CMD_RE = re.compile(r"\./mfc\.sh\s+([a-z][a-z_-]*)")
+
+
+def check_cli_refs(repo_root: Path) -> list[str]:
+    """Check that ./mfc.sh commands referenced in docs exist in the CLI schema."""
+    toolchain_dir = str(repo_root / "toolchain")
+    if toolchain_dir not in sys.path:
+        sys.path.insert(0, toolchain_dir)
+    try:
+        from mfc.cli.commands import MFC_CLI_SCHEMA  # pylint: disable=import-outside-toplevel
+    except ImportError:
+        return []
+
+    valid_commands = {cmd.name for cmd in MFC_CLI_SCHEMA.commands}
+    # Also accept "init" (shell function) and "load" (shell function)
+    valid_commands.update({"init", "load"})
+
+    errors = []
+    doc_path = repo_root / "docs" / "documentation" / "running.md"
+    if not doc_path.exists():
+        return []
+
+    text = _strip_code_blocks(doc_path.read_text(encoding="utf-8"))
+    seen = set()
+    for match in _CLI_CMD_RE.finditer(text):
+        cmd = match.group(1)
+        if cmd in seen or cmd in valid_commands:
+            seen.add(cmd)
+            continue
+        seen.add(cmd)
+        errors.append(
+            f"  running.md references './mfc.sh {cmd}' but '{cmd}'"
+            " is not a known CLI command."
+            " Fix: update the command name or remove the reference"
+        )
+
+    return errors
+
+
 def main():
     repo_root = Path(__file__).resolve().parents[2]
 
@@ -353,7 +558,11 @@ def main():
     all_errors.extend(check_param_refs(repo_root))
     all_errors.extend(check_page_refs(repo_root))
     all_errors.extend(check_math_syntax(repo_root))
+    all_errors.extend(check_doxygen_percent(repo_root))
     all_errors.extend(check_section_anchors(repo_root))
+    all_errors.extend(check_physics_docs_coverage(repo_root))
+    all_errors.extend(check_identifier_refs(repo_root))
+    all_errors.extend(check_cli_refs(repo_root))
 
     if all_errors:
         print("Doc reference check failed:")
