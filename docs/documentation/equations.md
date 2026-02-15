@@ -54,7 +54,7 @@ The dimensionless groups are:
 | \f$\text{We}_b\f$ (bubble Weber number) | \f$1/\sigma\f$ | `Web` | `1 / bub_pp%ss` |
 | \f$\text{Re}_{\text{inv}}\f$ (inverse bubble Reynolds number) | \f$\mu_l\f$ | `Re_inv` | `bub_pp%mu_l` |
 
-These groups are computed during bubble-parameter initialization in `src/common/m_helper.fpp` (see subroutine `s_initialize_bubble_vars`). Because the bubble equations use these dimensionless numbers directly, all dimensional bubble inputs (pressures, viscosities, surface tension, etc.) in `bub_pp%` must be supplied in non-dimensional form by the user. The code does not perform any internal non-dimensionalization of these quantities. When bubbles are enabled, **all** inputs — flow ICs/BCs, EOS parameters, domain lengths, `dt`, and `bub_pp%` values — must be scaled with the same reference quantities, or the coupled solution will be physically incorrect.
+Because the bubble equations use these dimensionless numbers directly, `bub_pp%...` is interpreted by the code as **already non-dimensional**. The code does **not** non-dimensionalize bubble quantities internally. Therefore, when bubbles are enabled, the simulation must be run in a **fully non-dimensional** form: **all** inputs — flow ICs/BCs, EOS parameters, domain lengths, `dt`, and `bub_pp%` values — must be scaled with the same \f$(x_0, p_0, \rho_0, u_0, t_0, T_0)\f$ reference quantities, or the coupled solution will be physically incorrect.
 
 ### Reference Scales
 
