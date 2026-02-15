@@ -299,15 +299,19 @@ def _format_validator_rules(param_name: str, by_trigger: Dict[str, list],  # pyl
             seen.add(r.message)
             unique_rules.append(r)
 
-    # Classify and pick representative messages
+    # Classify and pick representative messages, separating errors from warnings
     requirements = []
     incompatibilities = []
     ranges = []
     others = []
+    warnings = []
 
     for r in unique_rules:
-        kind = classify_message(r.message)
         msg = _backtick_params(r.message, pattern)
+        if r.severity == "warning":
+            warnings.append(msg)
+            continue
+        kind = classify_message(r.message)
         if kind == "requirement":
             requirements.append(msg)
         elif kind == "incompatibility":
@@ -326,6 +330,13 @@ def _format_validator_rules(param_name: str, by_trigger: Dict[str, list],  # pyl
                 break
             parts.append(msg)
             budget -= 1
+
+    # Append warnings with label (budget permitting)
+    for msg in warnings:
+        if budget <= 0:
+            break
+        parts.append(f"Warning: {msg}")
+        budget -= 1
 
     return "; ".join(parts)
 

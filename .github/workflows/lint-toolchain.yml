@@ -42,5 +42,21 @@ jobs:
 
     - name: Validate example cases
       run: |
-        ./mfc.sh validate examples/1D_sodshocktube/case.py
-        ./mfc.sh validate examples/2D_shockbubble/case.py
+        failed=0
+        passed=0
+        for case in examples/*/case.py; do
+          [ -f "$case" ] || continue
+          output=$(./mfc.sh validate "$case" 2>&1)
+          if [ $? -eq 0 ]; then
+            passed=$((passed + 1))
+          else
+            echo "FAIL: $case"
+            echo "$output"
+            failed=$((failed + 1))
+          fi
+        done
+        echo ""
+        echo "Results: $passed passed, $failed failed"
+        if [ "$failed" -ne 0 ]; then
+          exit 1
+        fi

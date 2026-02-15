@@ -64,8 +64,8 @@ q_cons_vf (conservative variables: density, momentum, energy, volume fractions)
 ```
 
 Key data structures (defined in `src/common/m_derived_types.fpp`):
-- `scalar_field` — wraps a 3D `real(stp)` array (`%sf(i,j,k)`)
-- `vector_field` — array of `scalar_field` (`%vf(1:sys_size)`)
+- `scalar_field` — wraps a 3D `real(stp)` array (`%%sf(i,j,k)`)
+- `vector_field` — array of `scalar_field` (`%%vf(1:sys_size)`)
 - `q_cons_vf` / `q_prim_vf` — conservative and primitive state vectors
 
 ### Build Toolchain
@@ -136,7 +136,7 @@ Both human reviewers and AI code reviewers reference this section.
 
 ### Array Bounds and Indexing
 
-- MFC uses **non-unity lower bounds** (e.g., `idwbuff(1)%beg:idwbuff(1)%end` with negative ghost-cell indices). Always verify loop bounds match array declarations.
+- MFC uses **non-unity lower bounds** (e.g., `idwbuff(1)%%beg:idwbuff(1)%%end` with negative ghost-cell indices). Always verify loop bounds match array declarations.
 - **Riemann solver indexing:** Left states at `j`, right states at `j+1`. Off-by-one here corrupts fluxes.
 
 ### Precision and Type Safety
@@ -164,7 +164,7 @@ Both human reviewers and AI code reviewers reference this section.
 - **Pressure formula** must match `model_eqns` value. Model 2/3 (multi-fluid), model 4 (bubbles), MHD, and hypoelastic each use different EOS formulations. Wrong formula = wrong physics.
 - **Conservative-primitive conversion:** Density recovery, kinetic energy, and pressure each have model-specific paths. Verify the correct branch is taken.
 - **Volume fractions** must sum to 1. `alpha_rho_K` must be non-negative. Species mass fractions should be clipped to [0,1].
-- **Boundary conditions:** Periodic BCs must match at both ends (`bc_x%beg` and `bc_x%end`). Cylindrical coordinates have special requirements (`bc_y%beg = -14` for axis in 3D).
+- **Boundary conditions:** Periodic BCs must match at both ends (`bc_x%%beg` and `bc_x%%end`). Cylindrical coordinates have special requirements (`bc_y%%beg = -14` for axis in 3D).
 - **Parameter constraints:** New parameters or physics features must be validated in `toolchain/mfc/case_validator.py`. New features should add corresponding validation.
 
 ### Python Toolchain
@@ -273,6 +273,8 @@ def check_my_feature(self):
     if self.params["my_param"] > 0 and not self.params["other_param"]:
         self.errors.append("my_param requires other_param to be set")
 ```
+
+If your check enforces a physics constraint, also add a `PHYSICS_DOCS` entry (see [How to Document Physics Constraints](#how-to-document-physics-constraints) below).
 
 **Step 5: Declare in Fortran** (`src/<target>/m_global_parameters.fpp`)
 
@@ -658,6 +660,41 @@ Checklist:
 ### Debugging
 
 See @ref troubleshooting for debugging workflows, profiling tools, GPU diagnostic environment variables, common build/runtime errors, and fixes.
+
+### How to Document Physics Constraints {#how-to-document-physics-constraints}
+
+When adding a new `check_` method to `case_validator.py`, document its physics by adding an entry to the `PHYSICS_DOCS` dict at the top of the file:
+
+```python
+PHYSICS_DOCS = {
+    ...
+    "check_my_feature": {
+        "title": "My Feature Constraint",          # Required: human-readable title
+        "category": "Thermodynamic Constraints",    # Required: groups the constraint in docs
+        "explanation": "Why this constraint exists.", # Required: plain English
+        "math": r"\alpha > 0",                      # Optional: LaTeX formula
+        "references": ["Wilfong26"],                # Optional: BibTeX keys from references.bib
+        "exceptions": ["IBM cases"],                # Optional: when constraint doesn't apply
+    },
+}
+```
+
+The @ref physics_constraints "Physics Constraints" page is **auto-generated** — run `./mfc.sh generate` to rebuild it.
+The generator merges your `PHYSICS_DOCS` entry with the AST-extracted `prohibit()`/`warn()` calls,
+so stage, severity, and parameter information appear automatically.
+
+**Fields:**
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `title` | Yes | Section heading in generated docs |
+| `category` | Yes | Grouping category (e.g., "Mixture Constraints") |
+| `explanation` | Yes | Plain English description of the physics |
+| `math` | No | LaTeX formula (rendered by Doxygen's MathJax) |
+| `references` | No | List of BibTeX cite keys from `docs/references.bib` |
+| `exceptions` | No | List of cases where the constraint doesn't apply |
+
+**Categories:** Thermodynamic Constraints, Mixture Constraints, Domain and Geometry, Velocity and Dimensional Consistency, Model Equations, Boundary Conditions, Bubble Physics, Feature Compatibility, Numerical Schemes, Acoustic Sources, Post-Processing.
 
 ## Testing
 

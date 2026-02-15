@@ -110,9 +110,16 @@ class MFCInputFile(Case):
         stage = target_obj.name
 
         try:
-            case_validator.validate_case_constraints(self.params, stage)
+            warnings = case_validator.validate_case_constraints(self.params, stage)
         except case_validator.CaseConstraintError as e:
             raise common.MFCException(f"Case validation failed for {stage}:\n{e}") from e
+
+        if warnings:
+            cons.print()
+            cons.print("[bold yellow]Physics warnings:[/bold yellow]")
+            for warning in warnings:
+                cons.print(f"  [yellow]- {warning}[/yellow]")
+            cons.print()
 
     # Generate case.fpp & [target.name].inp
     def generate(self, target) -> None:
