@@ -377,6 +377,17 @@ def check_page_refs(repo_root: Path) -> list[str]:
         if m:
             page_ids.add(m.group(1))
 
+    # Also collect {#id} anchors (valid @ref targets across files)
+    for md_file in doc_dir.glob("*.md"):
+        text = md_file.read_text(encoding="utf-8")
+        in_code = False
+        for line in text.split("\n"):
+            if line.strip().startswith("```"):
+                in_code = not in_code
+                continue
+            if not in_code:
+                page_ids.update(re.findall(r"\{#([\w-]+)\}", line))
+
     errors = []
     for md_file in sorted(doc_dir.glob("*.md")):
         text = _strip_code_blocks(md_file.read_text(encoding="utf-8"))

@@ -198,6 +198,12 @@ MFC has example cases in the `examples` folder. You can run such a case interact
 
 Please refer to the @ref running "Running" document for more information on `case.py` files and how to run them.
 
+## Units and Dimensions
+
+MFC is **unit-agnostic**: the solver performs no internal unit conversions. Whatever units you provide for initial conditions, boundary conditions, and material properties, the same units appear in the output.
+
+The only requirement is **consistency** — all inputs must use the same unit system. Note that some parameters use **transformed stored forms** rather than standard physical values (e.g., `gamma` expects \f$1/(\gamma-1)\f$, not \f$\gamma\f$ itself). See @ref sec-stored-forms for details.
+
 ## Helpful Tools
 
 ### Parameter Lookup

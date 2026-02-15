@@ -29,15 +29,17 @@ The parameter `model_eqns` (1, 2, 3, or 4) selects the governing equation set.
 
 ---
 
-## 1b. Units, Dimensions, and Non-Dimensionalization
+## 1b. Units, Dimensions, and Non-Dimensionalization {#sec-units-dimensions}
 
-### Dimensional Handling in the Flow Solver
+### General Users: Dimensional Handling {#sec-dimensional-handling}
+
+#### Dimensions In = Dimensions Out {#sec-dimensions-in-out}
 
 The main flow solver (Navier-Stokes equations, Riemann solvers, viscous stress, body forces, surface tension, etc.) is **unit-agnostic**: whatever units the user provides for the initial and boundary conditions, the solver preserves them throughout the computation. If the user inputs SI units, the outputs are in SI units. If the user inputs CGS, the outputs are in CGS. No internal non-dimensionalization is performed by the flow solver.
 
 This means that for simulations **without** sub-grid bubble models, the user can work in any consistent unit system without additional effort.
 
-### Stored Parameter Conventions
+#### Stored Parameter Conventions {#sec-stored-forms}
 
 Several EOS and transport parameters use **transformed stored forms** that differ from the standard physical values. This is the most common source of input errors:
 
@@ -52,7 +54,7 @@ These transformations arise because MFC internally solves the energy equation us
 
 **Common mistake:** setting `fluid_pp(1)%%gamma = 1.4` for air. The correct value is `1.0 / (1.4 - 1.0) = 2.5`. Setting `gamma = 1.4` corresponds to a physical \f$\gamma \approx 1.71\f$, which is not a standard gas.
 
-### Common Material Values
+#### Common Material Values {#sec-material-values}
 
 Pre-computed stored-form values for common fluids (SI units):
 
@@ -85,11 +87,13 @@ mu = 1.002e-3  # water viscosity [Pa·s]
 "fluid_pp(1)%Re(1)": 1.0 / mu,  # ≈ 998
 ```
 
-### Unit Consistency
+#### Unit Consistency {#sec-unit-consistency}
 
 The solver does not check or convert units. All inputs must use the **same consistent unit system** (e.g., all SI or all CGS). Mixing units — for example, pressures in atmospheres with densities in kg/m³ — will produce silently incorrect results.
 
-### Non-Dimensional Bubble Dynamics
+### Bubble Users: Non-Dimensional Framework {#sec-bubble-nondim}
+
+#### Non-Dimensional Bubble Dynamics {#sec-nondim-bubble-dynamics}
 
 The sub-grid bubble models (`bubbles_euler = .true.` or `bubbles_lagrange = .true.`) solve the bubble wall dynamics in **non-dimensional form**. The bubble wall pressure equation as implemented is:
 
@@ -108,7 +112,7 @@ The dimensionless groups are:
 
 Because the bubble equations use these dimensionless numbers directly, all `bub_pp%%` inputs are interpreted by the code as **already non-dimensional**. The code does **not** non-dimensionalize bubble quantities internally. Therefore, when bubbles are enabled, the simulation must be run in a **fully non-dimensional** form: **all** inputs — flow ICs/BCs, EOS parameters, domain lengths, `dt`, and `bub_pp%%` values — must be scaled with the same \f$(x_0, p_0, \rho_0, u_0, t_0, T_0)\f$ reference quantities, or the coupled solution will be physically incorrect.
 
-### Reference Scales
+#### Reference Scales {#sec-reference-scales}
 
 When using bubble models, the user must choose reference scales and non-dimensionalize **all** inputs (flow and bubble) consistently. The standard convention used in the MFC examples is:
 
@@ -121,7 +125,7 @@ When using bubble models, the user must choose reference scales and non-dimensio
 | Time | \f$t_0\f$ | \f$x_0 / u_0\f$ (derived) |
 | Temperature | \f$T_0\f$ | \f$T_{0,\text{ref}}\f$ (reference temperature) |
 
-### Non-Dimensionalization of Input Parameters
+#### Non-Dimensionalization of Input Parameters {#sec-nondim-inputs}
 
 The following table lists every `bub_pp%%` parameter and its required non-dimensionalization:
 
@@ -150,7 +154,7 @@ The following table lists every `bub_pp%%` parameter and its required non-dimens
 
 When the reference scales match the bubble reference values (e.g., \f$x_0 = R_{0,\text{ref}}\f$, \f$p_0 = p_{0,\text{ref}}\f$, \f$\rho_0 = \rho_{0,\text{ref}}\f$), the reference parameters simplify to unity: `bub_pp%%R0ref = 1`, `bub_pp%%p0ref = 1`, `bub_pp%%rho0ref = 1`.
 
-### Flow Parameters with Bubbles
+#### Flow Parameters with Bubbles {#sec-flow-params-bubbles}
 
 When bubbles are enabled, the flow-level parameters must also be non-dimensionalized with the same reference scales:
 
@@ -165,7 +169,7 @@ When bubbles are enabled, the flow-level parameters must also be non-dimensional
 | `fluid_pp(i)%%Re(1)` | \f$\rho_0\,x_0\,u_0 / \mu_i\f$ (Reynolds number, inverse viscosity) |
 | `dt` | Time step divided by \f$t_0\f$ |
 
-### Two Different Viscosity Parameters
+#### Two Different Viscosity Parameters {#sec-two-viscosities}
 
 MFC has two conceptually distinct viscosity-related parameters that serve different physical roles:
 
@@ -179,7 +183,9 @@ MFC has two conceptually distinct viscosity-related parameters that serve differ
 
 These two parameters represent viscous effects at fundamentally different scales — bulk flow dissipation vs. single-bubble-wall damping — and are stored in separate derived types with separate code paths. They are **not** interchangeable: `fluid_pp%%Re(1)` is an inverse viscosity while `bub_pp%%mu_l` is a viscosity (non-dimensionalized).
 
-### Example: Non-Dimensionalizing a Bubble Case
+### Worked Examples {#sec-nondim-example}
+
+#### Example: Non-Dimensionalizing a Bubble Case {#sec-bubble-example}
 
 A typical bubble case setup in `case.py` follows this pattern:
 

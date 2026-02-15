@@ -387,6 +387,14 @@ Details of implementation of viscosity in MFC can be found in \cite Coralic15.
 
 - `fluid_pp(i)%%G` is required for `hypoelasticity`.
 
+> **Stored-form parameters:** The values `gamma`, `pi_inf`, and `Re(1)`/`Re(2)` are **not** the raw physical quantities. MFC expects transformed stored forms:
+> - `gamma` = \f$1/(\gamma-1)\f$, not \f$\gamma\f$ itself
+> - `pi_inf` = \f$\gamma\,\pi_\infty / (\gamma - 1)\f$, not \f$\pi_\infty\f$ itself
+> - `Re(1)` = \f$1/\mu\f$ (inverse viscosity), not \f$\mu\f$ itself
+>
+> Setting `gamma = 1.4` for air is a common mistake; the correct value is `1.0 / (1.4 - 1.0) = 2.5`.
+> See @ref sec-stored-forms and @ref sec-material-values in the Equations reference for the full table.
+
 ### 6. Simulation Algorithm {#sec-simulation-algorithm}
 
 See @ref equations "Equations" for the mathematical models these parameters control.
