@@ -26,7 +26,7 @@ For example, to run a weak-scaling test that uses ~4GB of GPU memory per rank
 on 8 2-rank nodes with case optimization, one could:
 
 ```shell
-./mfc.sh run examples/scaling/case.py -t pre_process simulation                    \
+./mfc.sh run examples/scaling/benchmark.py -t pre_process simulation                    \
              -e batch -p mypartition -N 8 -n 2 -w "01:00:00" -# "MFC Weak Scaling" \
              --case-optimization -j 32 -- --scaling weak --memory 4
 ```

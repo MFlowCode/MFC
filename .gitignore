@@ -44,6 +44,7 @@ docs/*/result*
 docs/documentation/*-example.png
 docs/documentation/examples.md
 docs/documentation/case_constraints.md
+docs/documentation/physics_constraints.md
 
 examples/*batch/*/
 examples/**/D/*

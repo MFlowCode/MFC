@@ -6,7 +6,6 @@ and their properties. These definitions serve as the single source of truth
 for generating argparse parsers, shell completions, and documentation.
 """
 
-from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import List, Optional, Any, Union
@@ -130,7 +129,7 @@ class Command:  # pylint: disable=too-many-instance-attributes
     include_common: List[str] = field(default_factory=list)  # e.g., ["targets", "jobs"]
 
     # Subcommands (for nested commands like "packer pack")
-    subcommands: List[Command] = field(default_factory=list)
+    subcommands: List["Command"] = field(default_factory=list)
 
     # Documentation
     description: Optional[str] = None   # Long description for docs
