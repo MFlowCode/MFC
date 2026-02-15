@@ -43,7 +43,9 @@ The sub-grid bubble models (`bubbles_euler = .true.` or `bubbles_lagrange = .tru
 
 \f[p_{bw} = \left(\text{Ca} + \frac{2}{\text{We}_b\,R_0}\right)\left(\frac{R_0}{R}\right)^{3\gamma} - \text{Ca} - \frac{4\,\text{Re}_{\text{inv}}\,\dot{R}}{R} - \frac{2}{R\,\text{We}_b}\f]
 
-where the dimensionless groups are:
+Here \f$R\f$ and \f$R_0\f$ are non-dimensional radii (scaled by \f$x_0\f$), and \f$\dot{R}\f$ is a non-dimensional wall speed (scaled by \f$u_0\f$); the entire bubble ODE is solved in non-dimensional variables.
+
+The dimensionless groups are:
 
 | Dimensionless group | Definition | Code variable | Computed from |
 |---|---|---|---|
@@ -52,7 +54,7 @@ where the dimensionless groups are:
 | \f$\text{We}_b\f$ (bubble Weber number) | \f$1/\sigma\f$ | `Web` | `1 / bub_pp%ss` |
 | \f$\text{Re}_{\text{inv}}\f$ (inverse bubble Reynolds number) | \f$\mu_l\f$ | `Re_inv` | `bub_pp%mu_l` |
 
-These groups are computed during bubble-parameter initialization in `src/common/m_helper.fpp` (see subroutine `s_initialize_bubble_vars`). Because the bubble equations use these dimensionless numbers directly, all dimensional bubble inputs (pressures, viscosities, surface tension, etc.) in `bub_pp%` must be supplied in non-dimensional form by the user. The code does not perform any internal non-dimensionalization of these quantities.
+These groups are computed during bubble-parameter initialization in `src/common/m_helper.fpp` (see subroutine `s_initialize_bubble_vars`). Because the bubble equations use these dimensionless numbers directly, all dimensional bubble inputs (pressures, viscosities, surface tension, etc.) in `bub_pp%` must be supplied in non-dimensional form by the user. The code does not perform any internal non-dimensionalization of these quantities. When bubbles are enabled, **all** inputs — flow ICs/BCs, EOS parameters, domain lengths, `dt`, and `bub_pp%` values — must be scaled with the same reference quantities, or the coupled solution will be physically incorrect.
 
 ### Reference Scales
 
