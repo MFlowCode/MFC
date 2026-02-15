@@ -82,10 +82,10 @@ if [ -f "$_workspace_marker" ]; then
                -o -name "*.make" -o -name "Makefile" \
                -o -name "build.ninja" \) \
             -exec sed -i "s|${_old_workspace}|$(pwd)|g" {} + 2>/dev/null || true
-        # Update pkg-config and cmake config files in install/
-        find "$_cache_dir/install" -type f \
-            \( -name "*.pc" -o -name "*.cmake" \) \
-            -exec sed -i "s|${_old_workspace}|$(pwd)|g" {} + 2>/dev/null || true
+        # Compiled binaries have stale paths baked in — delete install/
+        # so CMake rebuilds and re-installs them with correct paths.
+        echo "  Clearing install/ to force rebuild of binaries..."
+        rm -rf "$_cache_dir/install"
     fi
 fi
 echo "$(pwd)" > "$_workspace_marker"
