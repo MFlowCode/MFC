@@ -3,6 +3,22 @@
  * Overrides for doxygen-awesome theme
  */
 
+/* Seamless split <code> tags for Fortran % struct accessors.
+ * Doxygen consumes %<word> even inside code spans, so we split around %
+ * into adjacent <code> elements and remove internal borders/padding. */
+code.f90l {
+    border-right: 0;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+    padding-right: 0;
+}
+code.f90r {
+    border-left: 0;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    padding-left: 0;
+}
+
 /* Fix inline code visibility in colored admonition blocks (warning, attention, important, note, etc.) */
 
 /* Warning/Attention/Important blocks (red/pink background) */
