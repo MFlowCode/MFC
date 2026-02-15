@@ -625,7 +625,7 @@ _DOXYGEN_BLOCK_CMDS = {
 }
 
 
-def check_doxygen_commands_in_backticks(repo_root: Path) -> list[str]:
+def check_doxygen_commands_in_backticks(repo_root: Path) -> list[str]:  # pylint: disable=too-many-locals
     """Check for Doxygen @/\\ commands inside backtick code spans.
 
     Doxygen processes certain block commands even inside backtick code
@@ -708,6 +708,71 @@ def check_single_quote_in_backtick(repo_root: Path) -> list[str]:
     return errors
 
 
+# LaTeX commands that require AMSmath but are not reliably loaded by the
+# MathJax configuration (config.js).  Use the standard alternatives instead.
+_AMSMATH_ONLY_CMDS = {
+    "dfrac": "frac",
+    "tfrac": "frac",
+    "dbinom": "binom",
+    "tbinom": "binom",
+    "dddot": "dot",
+    "ddddot": "dot",
+}
+
+
+def check_amsmath_in_doxygen_math(repo_root: Path) -> list[str]:  # pylint: disable=too-many-locals
+    """Flag AMSmath-only commands in Doxygen math that may not render."""
+    doc_dir = repo_root / "docs" / "documentation"
+    if not doc_dir.exists():
+        return []
+
+    ignored = _gitignored_docs(repo_root)
+    # Match \f$...\f$ inline or content between \f[ and \f]
+    inline_re = re.compile(r"\\f\$(.*?)\\f\$")
+    cmd_names = "|".join(re.escape(c) for c in sorted(_AMSMATH_ONLY_CMDS))
+    ams_re = re.compile(rf"\\({cmd_names})\b")
+
+    errors = []
+    for md_file in sorted(doc_dir.glob("*.md")):
+        if md_file.name in ignored:
+            continue
+        text = md_file.read_text(encoding="utf-8")
+        rel = md_file.relative_to(repo_root)
+        in_code = False
+        in_display = False
+
+        for i, line in enumerate(text.split("\n"), 1):
+            if line.strip().startswith("```"):
+                in_code = not in_code
+                continue
+            if in_code:
+                continue
+
+            # Check inline math \f$...\f$
+            for m in inline_re.finditer(line):
+                for cm in ams_re.finditer(m.group(1)):
+                    alt = _AMSMATH_ONLY_CMDS[cm.group(1)]
+                    errors.append(
+                        f"  {rel}:{i} uses \\{cm.group(1)} (AMSmath) in"
+                        f" math. Fix: use \\{alt} instead"
+                    )
+
+            # Check display math lines between \f[ and \f]
+            if "\\f[" in line:
+                in_display = True
+            if in_display:
+                for cm in ams_re.finditer(line):
+                    alt = _AMSMATH_ONLY_CMDS[cm.group(1)]
+                    errors.append(
+                        f"  {rel}:{i} uses \\{cm.group(1)} (AMSmath) in"
+                        f" math. Fix: use \\{alt} instead"
+                    )
+            if "\\f]" in line:
+                in_display = False
+
+    return errors
+
+
 def main():
     repo_root = Path(__file__).resolve().parents[2]
 
@@ -721,6 +786,7 @@ def main():
     all_errors.extend(check_doxygen_percent(repo_root))
     all_errors.extend(check_doxygen_commands_in_backticks(repo_root))
     all_errors.extend(check_single_quote_in_backtick(repo_root))
+    all_errors.extend(check_amsmath_in_doxygen_math(repo_root))
     all_errors.extend(check_section_anchors(repo_root))
     all_errors.extend(check_physics_docs_coverage(repo_root))
     all_errors.extend(check_identifier_refs(repo_root))

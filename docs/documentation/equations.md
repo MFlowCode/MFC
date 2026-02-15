@@ -43,8 +43,8 @@ Several EOS and transport parameters use **transformed stored forms** that diffe
 
 | Parameter | Physical quantity | What MFC expects (stored form) |
 |---|---|---|
-| `fluid_pp(i)%%gamma` | Heat capacity ratio \f$\gamma\f$ | \f$\Gamma = \dfrac{1}{\gamma - 1}\f$ |
-| `fluid_pp(i)%%pi_inf` | Stiffness pressure \f$\pi_\infty\f$ [Pa] | \f$\Pi_\infty = \dfrac{\gamma\,\pi_\infty}{\gamma - 1}\f$ [Pa] |
+| `fluid_pp(i)%%gamma` | Heat capacity ratio \f$\gamma\f$ | \f$\Gamma = \frac{1}{\gamma - 1}\f$ |
+| `fluid_pp(i)%%pi_inf` | Stiffness pressure \f$\pi_\infty\f$ [Pa] | \f$\Pi_\infty = \frac{\gamma\,\pi_\infty}{\gamma - 1}\f$ [Pa] |
 | `fluid_pp(i)%%Re(1)` | Dynamic viscosity \f$\mu\f$ | \f$1/\mu\f$ (inverse viscosity) |
 | `fluid_pp(i)%%Re(2)` | Bulk viscosity \f$\mu_b\f$ | \f$1/\mu_b\f$ (inverse bulk viscosity) |
 
