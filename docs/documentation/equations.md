@@ -37,6 +37,58 @@ The main flow solver (Navier-Stokes equations, Riemann solvers, viscous stress, 
 
 This means that for simulations **without** sub-grid bubble models, the user can work in any consistent unit system without additional effort.
 
+### Stored Parameter Conventions
+
+Several EOS and transport parameters use **transformed stored forms** that differ from the standard physical values. This is the most common source of input errors:
+
+| Parameter | Physical quantity | What MFC expects (stored form) |
+|---|---|---|
+| `fluid_pp(i)%gamma` | Heat capacity ratio \f$\gamma\f$ | \f$\Gamma = \dfrac{1}{\gamma - 1}\f$ |
+| `fluid_pp(i)%pi_inf` | Stiffness pressure \f$\pi_\infty\f$ [Pa] | \f$\Pi_\infty = \dfrac{\gamma\,\pi_\infty}{\gamma - 1}\f$ [Pa] |
+| `fluid_pp(i)%Re(1)` | Dynamic viscosity \f$\mu\f$ | \f$1/\mu\f$ (inverse viscosity) |
+| `fluid_pp(i)%Re(2)` | Bulk viscosity \f$\mu_b\f$ | \f$1/\mu_b\f$ (inverse bulk viscosity) |
+
+These transformations arise because MFC internally solves the energy equation using the transformed variables \f$\Gamma\f$ and \f$\Pi_\infty\f$ (see Section 3.1), and the viscous stress is computed by dividing by `Re` rather than multiplying by \f$\mu\f$.
+
+**Common mistake:** setting `fluid_pp(1)%gamma = 1.4` for air. The correct value is `1.0 / (1.4 - 1.0) = 2.5`. Setting `gamma = 1.4` corresponds to a physical \f$\gamma \approx 1.71\f$, which is not a standard gas.
+
+### Common Material Values
+
+Pre-computed stored-form values for common fluids (SI units):
+
+| Material | \f$\gamma\f$ | \f$\pi_\infty\f$ [Pa] | `gamma` (stored) | `pi_inf` (stored) [Pa] |
+|---|---|---|---|---|
+| Air | 1.4 | 0 | 2.5 | 0 |
+| Helium | 5/3 | 0 | 1.5 | 0 |
+| Water (Tait) | 4.4 | 6.0e8 | 0.2941 | 7.76e8 |
+| Water (\cite LeMetayer04) | 6.12 | 3.43e8 | 0.1953 | 4.10e8 |
+
+Example for an air-water simulation:
+
+```python
+# Air (fluid 1)
+gam_a  = 1.4
+"fluid_pp(1)%gamma":  1.0 / (gam_a - 1.0),   # = 2.5
+"fluid_pp(1)%pi_inf": 0.0,
+
+# Water (fluid 2)
+gam_w  = 4.4
+pi_w   = 6.0e8  # Pa
+"fluid_pp(2)%gamma":  1.0 / (gam_w - 1.0),            # ≈ 0.294
+"fluid_pp(2)%pi_inf": gam_w * pi_w / (gam_w - 1.0),   # ≈ 7.76e8
+```
+
+For viscous cases, provide the **reciprocal** of the dynamic viscosity:
+
+```python
+mu = 1.002e-3  # water viscosity [Pa·s]
+"fluid_pp(1)%Re(1)": 1.0 / mu,  # ≈ 998
+```
+
+### Unit Consistency
+
+The solver does not check or convert units. All inputs must use the **same consistent unit system** (e.g., all SI or all CGS). Mixing units — for example, pressures in atmospheres with densities in kg/m³ — will produce silently incorrect results.
+
 ### Non-Dimensional Bubble Dynamics
 
 The sub-grid bubble models (`bubbles_euler = .true.` or `bubbles_lagrange = .true.`) solve the bubble wall dynamics in **non-dimensional form**. The bubble wall pressure equation as implemented is:
@@ -281,7 +333,7 @@ The pressure is recovered from the total energy as:
 
 \f[\frac{1}{\rho\,c^2} = \sum_k \frac{\alpha_k}{\rho_k\,c_k^2}\f]
 
-Input parameters per fluid: `gamma` (\f$\gamma_k\f$), `pi_inf` (\f$\pi_{\infty,k}\f$), `cv` (\f$c_{v,k}\f$), `qv` (\f$q_{v,k}\f$), `qvp` (\f$q'_{v,k}\f$).
+Input parameters per fluid: `gamma` (\f$\Gamma_k = 1/(\gamma_k - 1)\f$), `pi_inf` (\f$\Pi_{\infty,k} = \gamma_k\,\pi_{\infty,k}/(\gamma_k - 1)\f$), `cv` (\f$c_{v,k}\f$), `qv` (\f$q_{v,k}\f$), `qvp` (\f$q'_{v,k}\f$). Note that `gamma` and `pi_inf` are stored in transformed form, not as the raw physical values (see Section 1b).
 
 ### 3.2 Ideal Gas EOS (Chemistry, `chemistry = .true.`)
 
