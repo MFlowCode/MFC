@@ -75,11 +75,16 @@ if [ -f "$_workspace_marker" ]; then
     _old_workspace=$(cat "$_workspace_marker")
     if [ "$_old_workspace" != "$(pwd)" ]; then
         echo "  Workspace path changed: $_old_workspace -> $(pwd)"
-        echo "  Updating cached CMake paths..."
+        echo "  Updating cached paths..."
+        # Update CMake build files in staging/
         find "$_cache_dir/staging" -type f \
             \( -name "CMakeCache.txt" -o -name "*.cmake" \
                -o -name "*.make" -o -name "Makefile" \
                -o -name "build.ninja" \) \
+            -exec sed -i "s|${_old_workspace}|$(pwd)|g" {} + 2>/dev/null || true
+        # Update pkg-config and cmake config files in install/
+        find "$_cache_dir/install" -type f \
+            \( -name "*.pc" -o -name "*.cmake" \) \
             -exec sed -i "s|${_old_workspace}|$(pwd)|g" {} + 2>/dev/null || true
     fi
 fi
