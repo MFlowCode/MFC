@@ -1,5 +1,5 @@
 !>
-!! @file m_patches.fpp
+!! @file
 !! @brief Contains module m_patches
 
 #:include 'case.fpp'
@@ -21,15 +21,11 @@ module m_icpp_patches
 
     use m_helper
 
-    use m_compute_levelset      ! Subroutines to calculate levelsets for IBs
-
     use m_mpi_common
 
     use m_assign_variables
 
     use m_mpi_common
-
-    use m_ib_patches
 
     use m_variables_conversion
 
@@ -1587,8 +1583,6 @@ contains
     !! @param patch_id is the patch identifier
     !! @param patch_id_fp Array to track patch ids
     !! @param q_prim_vf Primitive variables
-    !! @param STL_levelset STL levelset
-    !! @param STL_levelset_norm STL levelset normals
     subroutine s_icpp_model(patch_id, patch_id_fp, q_prim_vf)
 
         integer, intent(in) :: patch_id

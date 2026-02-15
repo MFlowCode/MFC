@@ -1,5 +1,5 @@
 !>
-!! @file   m_model.fpp
+!! @file
 !! @author Henry Le Berre <hberre3@gatech.edu>
 !! @brief  Contains module m_model
 
@@ -487,6 +487,8 @@ contains
     !! @return True if the point is inside the octree, false otherwise.
     impure function f_model_is_inside(model, point, spacing, spc) result(fraction)
 
+        ! $:GPU_ROUTINE(parallelism='[seq]')
+
         type(t_model), intent(in) :: model
         real(wp), dimension(1:3), intent(in) :: point
         real(wp), dimension(1:3), intent(in) :: spacing
@@ -498,6 +500,15 @@ contains
         integer :: i, j, nInOrOut, nHits
 
         real(wp), dimension(1:spc, 1:3) :: ray_origins, ray_dirs
+
+        ! TODO :: The random number generation prohibits GPU compute due to the subroutine not being able to be called in kernels
+        ! This should be swapped out with something that allows GPU compute. I recommend the fibonacci sphere:
+        ! do i = 1, spc
+        !   phi = acos(1.0 - 2.0*(i-1.0)/(spc-1.0))
+        !   theta = pi * (1.0 + sqrt(5.0)) * (i-1.0)
+        !   ray_dirs(i,:) = [cos(theta)*sin(phi), sin(theta)*sin(phi), cos(phi)]
+        !   ray_origins(i,:) = point
+        ! end do
 
         do i = 1, spc
             call random_number(ray_origins(i, :))
@@ -739,7 +750,6 @@ contains
         interpolate = .false.
 
         do j = 1, boundary_edge_count
-
             l1 = sqrt((boundary_v(j, 2, 1) - boundary_v(j, 1, 1))**2 + &
                       (boundary_v(j, 2, 2) - boundary_v(j, 1, 2))**2)
 
@@ -1049,6 +1059,8 @@ contains
     !! @param distance     The output levelset distance
     subroutine f_distance_normals_3D(model, point, normals, distance)
 
+        $:GPU_ROUTINE(parallelism='[seq]')
+
         type(t_model), intent(IN) :: model
         real(wp), dimension(1:3), intent(in) :: point
         real(wp), dimension(1:3), intent(out) :: normals
@@ -1112,8 +1124,11 @@ contains
     !! @return                             Distance which the levelset distance without interpolation
     function f_distance(boundary_v, boundary_edge_count, point) result(distance)
 
+        $:GPU_ROUTINE(parallelism='[seq]')
+
         integer, intent(in) :: boundary_edge_count
-        real(wp), intent(in), dimension(1:boundary_edge_count, 1:3, 1:2) :: boundary_v
+        real(wp), intent(in), dimension(:, :, :) :: boundary_v
+        ! real(wp), intent(in), dimension(1:boundary_edge_count, 1:3, 1:2) :: boundary_v
         real(wp), dimension(1:3), intent(in) :: point
 
         integer :: i
@@ -1143,8 +1158,10 @@ contains
     !! @param normals                      Output levelset normals without interpolation
     subroutine f_normals(boundary_v, boundary_edge_count, point, normals)
 
+        $:GPU_ROUTINE(parallelism='[seq]')
+
         integer, intent(in) :: boundary_edge_count
-        real(wp), intent(in), dimension(1:boundary_edge_count, 1:3, 1:2) :: boundary_v
+        real(wp), intent(in), dimension(:, :, :) :: boundary_v
         real(wp), dimension(1:3), intent(in) :: point
         real(wp), dimension(1:3), intent(out) :: normals
 
@@ -1203,8 +1220,10 @@ contains
     !! @return                             Distance which the levelset distance without interpolation
     function f_interpolated_distance(interpolated_boundary_v, total_vertices, point) result(distance)
 
+        $:GPU_ROUTINE(parallelism='[seq]')
+
         integer, intent(in) :: total_vertices
-        real(wp), intent(in), dimension(1:total_vertices, 1:3) :: interpolated_boundary_v
+        real(wp), intent(in), dimension(:, :) :: interpolated_boundary_v
         real(wp), dimension(1:3), intent(in) :: point
 
         integer :: i !< Loop iterator

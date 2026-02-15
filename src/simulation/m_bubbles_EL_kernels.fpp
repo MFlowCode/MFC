@@ -1,5 +1,5 @@
 !>
-!! @file m_bubbles_EL_kernels.f90
+!! @file
 !! @brief Contains module m_bubbles_EL_kernels
 
 #:include 'macros.fpp'

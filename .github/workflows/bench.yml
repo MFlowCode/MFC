@@ -1,24 +1,32 @@
 name: 'Benchmark'
 
 on:
-  pull_request:
-  pull_request_review:
-    types: [submitted]
+  # Trigger when Test Suite completes (no polling needed)
+  workflow_run:
+    workflows: ["Test Suite"]
+    types: [completed]
   workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.workflow_run.head_branch || github.ref }}
   cancel-in-progress: true
 
 jobs:
   file-changes:
     name: Detect File Changes
+    # Only run if Test Suite passed (or manual dispatch)
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: 'ubuntu-latest'
     outputs:
       checkall: ${{ steps.changes.outputs.checkall }}
+      pr_number: ${{ steps.pr-info.outputs.pr_number }}
+      pr_approved: ${{ steps.pr-info.outputs.approved }}
+      pr_author: ${{ steps.pr-info.outputs.author }}
     steps:
       - name: Clone
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Detect Changes
         uses: dorny/paths-filter@v3
@@ -26,62 +34,52 @@ jobs:
         with:
           filters: ".github/file-filter.yml"
 
-  wait-for-tests:
-    name: Wait for Test Suite
-    runs-on: ubuntu-latest
-    steps:
-      - name: Wait for Test Suite to Pass
+      - name: Get PR Info
+        id: pr-info
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          echo "Waiting for Test Suite workflow to complete..."
-          SHA="${{ github.event.pull_request.head.sha || github.sha }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "pr_number=" >> $GITHUB_OUTPUT
+            echo "approved=true" >> $GITHUB_OUTPUT
+            echo "author=${{ github.actor }}" >> $GITHUB_OUTPUT
+          else
+            # Get PR number from workflow_run
+            PR_NUMBER="${{ github.event.workflow_run.pull_requests[0].number }}"
+            if [ -n "$PR_NUMBER" ]; then
+              echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
 
-          # Poll every 60 seconds for up to 3 hours
-          for i in $(seq 1 180); do
-            # Get the Test Suite workflow runs for this commit
-            STATUS=$(gh api repos/${{ github.repository }}/commits/$SHA/check-runs \
-              --jq '.check_runs[] | select(.name == "Lint Gate") | .conclusion' | head -1)
+              # Fetch actual PR author from API (workflow_run.actor is the re-runner, not PR author)
+              PR_AUTHOR=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER --jq '.user.login')
+              echo "author=$PR_AUTHOR" >> $GITHUB_OUTPUT
 
-            if [ "$STATUS" = "success" ]; then
-              echo "Lint Gate passed. Checking test jobs..."
-
-              # Check if any Github test jobs failed
-              FAILED=$(gh api repos/${{ github.repository }}/commits/$SHA/check-runs \
-                --jq '[.check_runs[] | select(.name | startswith("Github")) | select(.conclusion == "failure")] | length')
-
-              if [ "$FAILED" != "0" ]; then
-                echo "::error::Test Suite has failing jobs. Benchmarks will not run."
-                exit 1
+              # Check if PR is approved
+              APPROVED=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER/reviews \
+                --jq '[.[] | select(.state == "APPROVED")] | length')
+              if [ "$APPROVED" -gt 0 ]; then
+                echo "approved=true" >> $GITHUB_OUTPUT
+              else
+                echo "approved=false" >> $GITHUB_OUTPUT
               fi
-
-              # Check if Github tests are still running
-              PENDING=$(gh api repos/${{ github.repository }}/commits/$SHA/check-runs \
-                --jq '[.check_runs[] | select(.name | startswith("Github")) | select(.conclusion == null)] | length')
-
-              if [ "$PENDING" = "0" ]; then
-                echo "All Test Suite jobs completed successfully!"
-                exit 0
-              fi
-
-              echo "Tests still running ($PENDING pending)..."
-            elif [ "$STATUS" = "failure" ]; then
-              echo "::error::Lint Gate failed. Benchmarks will not run."
-              exit 1
             else
-              echo "Lint Gate status: ${STATUS:-pending}..."
+              echo "pr_number=" >> $GITHUB_OUTPUT
+              echo "approved=false" >> $GITHUB_OUTPUT
+              echo "author=" >> $GITHUB_OUTPUT
             fi
-
-            sleep 60
-          done
-
-          echo "::error::Timeout waiting for Test Suite to complete."
-          exit 1
+          fi
 
   self:
     name: "${{ matrix.name }} (${{ matrix.device }}${{ matrix.interface != 'none' && format('-{0}', matrix.interface) || '' }})"
-    if: ${{ github.repository=='MFlowCode/MFC' && needs.file-changes.outputs.checkall=='true' && ((github.event_name=='pull_request_review' && github.event.review.state=='approved') || (github.event_name=='pull_request' && (github.event.pull_request.user.login=='sbryngelson' || github.event.pull_request.user.login=='wilfonba'))) }}
-    needs: [file-changes, wait-for-tests]
+    if: >
+      github.repository == 'MFlowCode/MFC' &&
+      needs.file-changes.outputs.checkall == 'true' &&
+      (
+        github.event_name == 'workflow_dispatch' ||
+        needs.file-changes.outputs.pr_approved == 'true' ||
+        needs.file-changes.outputs.pr_author == 'sbryngelson' ||
+        needs.file-changes.outputs.pr_author == 'wilfonba'
+      )
+    needs: [file-changes]
     strategy:
       fail-fast: false
       matrix:
@@ -145,6 +143,7 @@ jobs:
       - name: Clone - PR
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           path: pr
 
       - name: Clone - Master

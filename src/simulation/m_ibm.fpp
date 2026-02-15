@@ -1,5 +1,5 @@
 !>
-!! @file m_ibm.fpp
+!! @file
 !! @brief Contains module m_ibm
 
 #:include 'macros.fpp'
@@ -40,11 +40,8 @@ module m_ibm
  s_ibm_correct_state, &
  s_finalize_ibm_module
 
-    integer, allocatable, dimension(:, :, :) :: patch_id_fp
     type(integer_field), public :: ib_markers
-    type(levelset_field), public :: levelset
-    type(levelset_norm_field), public :: levelset_norm
-    $:GPU_DECLARE(create='[ib_markers,levelset,levelset_norm]')
+    $:GPU_DECLARE(create='[ib_markers]')
 
     type(ghost_point), dimension(:), allocatable :: ghost_points
     type(ghost_point), dimension(:), allocatable :: inner_points
@@ -67,22 +64,14 @@ contains
         if (p > 0) then
             @:ALLOCATE(ib_markers%sf(-buff_size:m+buff_size, &
                 -buff_size:n+buff_size, -buff_size:p+buff_size))
-            @:ALLOCATE(levelset%sf(-buff_size:m+buff_size, &
-                -buff_size:n+buff_size, -buff_size:p+buff_size, 1:num_ibs))
-            @:ALLOCATE(levelset_norm%sf(-buff_size:m+buff_size, &
-                -buff_size:n+buff_size, -buff_size:p+buff_size, 1:num_ibs, 1:3))
         else
             @:ALLOCATE(ib_markers%sf(-buff_size:m+buff_size, &
                 -buff_size:n+buff_size, 0:0))
-            @:ALLOCATE(levelset%sf(-buff_size:m+buff_size, &
-                -buff_size:n+buff_size, 0:0, 1:num_ibs))
-            @:ALLOCATE(levelset_norm%sf(-buff_size:m+buff_size, &
-                -buff_size:n+buff_size, 0:0, 1:num_ibs, 1:3))
         end if
 
+        @:ALLOCATE(models(num_ibs))
+
         @:ACC_SETUP_SFs(ib_markers)
-        @:ACC_SETUP_SFs(levelset)
-        @:ACC_SETUP_SFs(levelset_norm)
 
         $:GPU_ENTER_DATA(copyin='[num_gps,num_inner_gps]')
 
@@ -103,26 +92,35 @@ contains
                 moving_immersed_boundary_flag = .true.
             end if
             call s_update_ib_rotation_matrix(i)
-            call s_compute_centroid_offset(i)
         end do
-        $:GPU_ENTER_DATA(copyin='[patch_ib]')
+        $:GPU_UPDATE(device='[patch_ib(1:num_ibs)]')
 
-        ! Allocating the patch identities bookkeeping variable
-        allocate (patch_id_fp(0:m, 0:n, 0:p))
+        ! GPU routines require updated cell centers
+        $:GPU_UPDATE(device='[x_cc, y_cc]')
+        if (p /= 0) then
+            $:GPU_UPDATE(device='[z_cc]')
+        end if
 
+        ! allocate STL models
+        call s_instantiate_STL_models()
+
+        ! recompute the new ib_patch locations and broadcast them.
+        ib_markers%sf = 0._wp
+        call s_apply_ib_patches(ib_markers%sf(0:m, 0:n, 0:p))
         $:GPU_UPDATE(device='[ib_markers%sf]')
-        $:GPU_UPDATE(device='[levelset%sf]')
-        $:GPU_UPDATE(device='[levelset_norm%sf]')
-
-        ! Get neighboring IB variables from other processors
         call s_populate_ib_buffers()
-
         $:GPU_UPDATE(host='[ib_markers%sf]')
+        do i = 1, num_ibs
+            if (patch_ib(i)%moving_ibm /= 0) call s_compute_centroid_offset(i) ! offsets are computed after IB markers are generated
+            $:GPU_UPDATE(device='[patch_ib(i)]')
+        end do
 
         ! find the number of ghost points and set them to be the maximum total across ranks
         call s_find_num_ghost_points(num_gps, num_inner_gps)
         call s_mpi_allreduce_integer_sum(num_gps, max_num_gps)
         call s_mpi_allreduce_integer_sum(num_inner_gps, max_num_inner_gps)
+        max_num_gps = min(max_num_gps, (m + 1)*(n + 1)*(p + 1)/2)
+        max_num_inner_gps = min(max_num_inner_gps, (m + 1)*(n + 1)*(p + 1)/2)
 
         ! set the size of the ghost point arrays to be the amount of points total, plus a factor of 2 buffer
         $:GPU_UPDATE(device='[num_gps, num_inner_gps]')
@@ -134,7 +132,10 @@ contains
         call s_find_ghost_points(ghost_points, inner_points)
         $:GPU_UPDATE(device='[ghost_points, inner_points]')
 
-        call s_compute_image_points(ghost_points, levelset, levelset_norm)
+        call s_apply_levelset(ghost_points, num_gps)
+        $:GPU_UPDATE(device='[ghost_points]')
+
+        call s_compute_image_points(ghost_points)
         $:GPU_UPDATE(device='[ghost_points]')
 
         call s_compute_interpolation_coeffs(ghost_points)
@@ -290,7 +291,7 @@ contains
                     $:GPU_LOOP(parallelism='[seq]')
                     do q = 1, num_fluids
                         ! Se the pressure inside a moving immersed boundary based upon the pressure of the image point. acceleration, and normal vector direction
-                        q_prim_vf(E_idx)%sf(j, k, l) = q_prim_vf(E_idx)%sf(j, k, l) + pres_IP/(1._wp - 2._wp*abs(levelset%sf(j, k, l, patch_id)*alpha_rho_IP(q)/pres_IP)*dot_product(patch_ib(patch_id)%force/patch_ib(patch_id)%mass, levelset_norm%sf(j, k, l, patch_id, :)))
+                        q_prim_vf(E_idx)%sf(j, k, l) = q_prim_vf(E_idx)%sf(j, k, l) + pres_IP/(1._wp - 2._wp*abs(gp%levelset*alpha_rho_IP(q)/pres_IP)*dot_product(patch_ib(patch_id)%force/patch_ib(patch_id)%mass, gp%levelset_norm))
                     end do
                 end if
 
@@ -307,7 +308,7 @@ contains
 
                 ! Calculate velocity of ghost cell
                 if (gp%slip) then
-                    norm(1:3) = levelset_norm%sf(gp%loc(1), gp%loc(2), gp%loc(3), gp%ib_patch_id, 1:3)
+                    norm(1:3) = gp%levelset_norm
                     buf = sqrt(sum(norm**2))
                     norm = norm/buf
                     vel_norm_IP = sum(vel_IP*norm)*norm
@@ -439,13 +440,9 @@ contains
 
     !>  Function that computes the image points for each ghost point
         !!  @param ghost_points Ghost Points
-        !!  @param levelset Closest distance from each grid cell to IB
-        !!  @param levelset_norm Vector pointing in the direction of the closest distance
-    impure subroutine s_compute_image_points(ghost_points_in, levelset_in, levelset_norm_in)
+    impure subroutine s_compute_image_points(ghost_points_in)
 
         type(ghost_point), dimension(num_gps), intent(INOUT) :: ghost_points_in
-        type(levelset_field), intent(IN) :: levelset_in
-        type(levelset_norm_field), intent(IN) :: levelset_norm_in
 
         real(wp) :: dist
         real(wp), dimension(3) :: norm
@@ -476,8 +473,8 @@ contains
 
             ! Calculate and store the precise location of the image point
             patch_id = gp%ib_patch_id
-            dist = abs(real(levelset_in%sf(i, j, k, patch_id), kind=wp))
-            norm(:) = levelset_norm_in%sf(i, j, k, patch_id, :)
+            dist = abs(real(gp%levelset, kind=wp))
+            norm(:) = gp%levelset_norm
             ghost_points_in(q)%ip_loc(:) = physical_loc(:) + 2*dist*norm(:)
 
             ! Find the closest grid point to the image point
@@ -511,9 +508,15 @@ contains
                                .or. temp_loc > s_cc(index + 1)))
                         index = index + dir
                         if (index < -buff_size .or. index > bound) then
-                            print *, "temp_loc=", temp_loc, " s_cc(index)=", s_cc(index), " s_cc(index+1)=", s_cc(index + 1)
-                            print *, "Increase buff_size further in m_helper_basic (currently set to a minimum of 10)"
-                            error stop "Increase buff_size"
+                            print *, "A required image point is not located in this computational domain."
+                            print *, "Ghost Point is located at ", [x_cc(i), y_cc(j), z_cc(k)], " while moving in dimension ", dim
+                            print *, "We are searching for image point at ", ghost_points_in(q)%ip_loc(:)
+                            print *, "We can only support points located inside the box from ", [x_cc(-buff_size), y_cc(-buff_size), z_cc(-buff_size)]
+                            print *, "To ", [x_cc(m + buff_size - 1), y_cc(n + buff_size - 1), z_cc(p + buff_size - 1)]
+                            print *, "Image point is located approximately ", (ghost_points_in(q)%loc(dim) - ghost_points_in(q)%ip_loc(dim))/(s_cc(1) - s_cc(0)), " grid cells away"
+                            print *, "Levelset ", dist, " and Norm: ", norm(:)
+                            print *, "A short term fix may include increasing buff_size further in m_helper_basic (currently set to a minimum of 10)"
+                            error stop "Ghost Point and Image Point on Different Processors"
                         end if
                     end do
                     ghost_points_in(q)%ip_grid(dim) = index
@@ -980,18 +983,14 @@ contains
 
     !> Resets the current indexes of immersed boundaries and replaces them after updating
     !> the position of each moving immersed boundary
-    impure subroutine s_update_mib(num_ibs, levelset, levelset_norm)
+    impure subroutine s_update_mib(num_ibs)
 
         integer, intent(in) :: num_ibs
-        type(levelset_field), intent(inout) :: levelset
-        type(levelset_norm_field), intent(inout) :: levelset_norm
 
         integer :: i, ierr
 
         ! Clears the existing immersed boundary indices
         ib_markers%sf = 0._wp
-        levelset%sf = 0._wp
-        levelset_norm%sf = 0._wp
 
         ! recalulcate the rotation matrix based upon the new angles
         do i = 1, num_ibs
@@ -1003,10 +1002,10 @@ contains
         $:GPU_UPDATE(device='[patch_ib]')
 
         ! recompute the new ib_patch locations and broadcast them.
-        call s_apply_ib_patches(ib_markers%sf(0:m, 0:n, 0:p), levelset, levelset_norm)
-        call s_populate_ib_buffers() ! transmits the new IB markers via MPI
+        call s_apply_ib_patches(ib_markers%sf(0:m, 0:n, 0:p))
         $:GPU_UPDATE(device='[ib_markers%sf]')
-        $:GPU_UPDATE(host='[levelset%sf, levelset_norm%sf]')
+        call s_populate_ib_buffers()
+        $:GPU_UPDATE(host='[ib_markers%sf]')
 
         ! recalculate the ghost point locations and coefficients
         call s_find_num_ghost_points(num_gps, num_inner_gps)
@@ -1015,7 +1014,10 @@ contains
         call s_find_ghost_points(ghost_points, inner_points)
         $:GPU_UPDATE(device='[ghost_points, inner_points]')
 
-        call s_compute_image_points(ghost_points, levelset, levelset_norm)
+        call s_apply_levelset(ghost_points, num_gps)
+        $:GPU_UPDATE(device='[ghost_points]')
+
+        call s_compute_image_points(ghost_points)
         $:GPU_UPDATE(device='[ghost_points]')
 
         call s_compute_interpolation_coeffs(ghost_points)
@@ -1180,8 +1182,10 @@ contains
     impure subroutine s_finalize_ibm_module()
 
         @:DEALLOCATE(ib_markers%sf)
-        @:DEALLOCATE(levelset%sf)
-        @:DEALLOCATE(levelset_norm%sf)
+        if (allocated(airfoil_grid_u)) then
+            @:DEALLOCATE(airfoil_grid_u)
+            @:DEALLOCATE(airfoil_grid_l)
+        end if
 
     end subroutine s_finalize_ibm_module
 

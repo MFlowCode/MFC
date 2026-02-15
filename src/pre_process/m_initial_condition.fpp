@@ -1,5 +1,5 @@
 !>
-!! @file m_initial_condition.f90
+!! @file
 !! @brief Contains module m_initial_condition
 
 !> @brief This module provides a platform that is analogous to constructive
@@ -27,8 +27,6 @@ module m_initial_condition
     use m_variables_conversion  ! Subroutines to change the state variables from
     ! one form to another
 
-    use m_ib_patches
-
     use m_icpp_patches
 
     use m_assign_variables
@@ -53,23 +51,15 @@ module m_initial_condition
 
     type(integer_field), dimension(:, :), allocatable :: bc_type !< bc_type fields
 
+!> @cond
 #ifdef MFC_MIXED_PRECISION
     integer(kind=1), allocatable, dimension(:, :, :) :: patch_id_fp
 #else
+!> @endcond
     integer, allocatable, dimension(:, :, :) :: patch_id_fp
+!> @cond
 #endif
-
-    !! Bookkepping variable used to track the patch identities (id) associated
-    !! with each of the cells in the computational domain. Note that only one
-    !! patch identity may be associated with any one cell.
-
-    type(integer_field) :: ib_markers !<
-    !! Bookkepping variable used to track whether a given cell is within an
-    !! immersed boundary. The default is 0, otherwise the value is assigned
-    !! to the patch ID of the immersed boundary.
-
-    type(levelset_field) :: levelset
-    type(levelset_norm_field) :: levelset_norm
+!> @endcond
 
 contains
 
@@ -98,13 +88,6 @@ contains
 
         ! Allocating the patch identities bookkeeping variable
         allocate (patch_id_fp(0:m, 0:n, 0:p))
-
-        if (ib) then
-            allocate (ib_markers%sf(0:m, 0:n, 0:p))
-            allocate (levelset%sf(0:m, 0:n, 0:p, 1:num_ibs))
-            allocate (levelset_norm%sf(0:m, 0:n, 0:p, 1:num_ibs, 1:3))
-            ib_markers%sf = 0
-        end if
 
         if (qbmm .and. .not. polytropic) then
             !Allocate bubble pressure pb and vapor mass mv for non-polytropic qbmm at all quad nodes and R0 bins
@@ -203,12 +186,6 @@ contains
                                                                idwbuff)
         end if
 
-        if (ib) then
-            do i = 1, num_ibs
-                call s_update_ib_rotation_matrix(i)
-            end do
-            call s_apply_ib_patches(ib_markers%sf, levelset, levelset_norm)
-        end if
         call s_apply_icpp_patches(patch_id_fp, q_prim_vf)
 
         if (num_bc_patches > 0) call s_apply_boundary_patches(q_prim_vf, bc_type)
@@ -252,10 +229,6 @@ contains
 
         ! Deallocating the patch identities bookkeeping variable
         deallocate (patch_id_fp)
-
-        if (ib) then
-            deallocate (ib_markers%sf, levelset%sf, levelset_norm%sf)
-        end if
 
         deallocate (bc_type(1, 1)%sf)
         deallocate (bc_type(1, 2)%sf)

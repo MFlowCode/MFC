@@ -1,5 +1,5 @@
 !>
-!! @file m_derived_types.f90
+!! @file
 !! @brief Contains module m_derived_types
 
 #:include "macros.fpp"
@@ -180,7 +180,17 @@ module m_derived_types
     type :: t_model
         integer :: ntrs   ! Number of triangles
         type(t_triangle), allocatable :: trs(:) ! Triangles
+
     end type t_model
+
+    type :: t_model_array
+        type(t_model), allocatable :: model
+        real(wp), allocatable, dimension(:, :, :) :: boundary_v
+        real(wp), allocatable, dimension(:, :) :: interpolated_boundary_v
+        integer :: boundary_edge_count
+        integer :: total_vertices
+        logical :: interpolate
+    end type t_model_array
 
     !> Derived type adding initial condition (ic) patch parameters as attributes
     !! NOTE: The requirements for the specification of the above parameters
@@ -437,6 +447,8 @@ module m_derived_types
         integer, dimension(3) :: ip_grid !< Top left grid point of IP
         real(wp), dimension(2, 2, 2) :: interp_coeffs !< Interpolation Coefficients of image point
         integer :: ib_patch_id !< ID of the IB Patch the ghost point is part of
+        real(wp) :: levelset
+        real(wp), dimension(1:3) :: levelset_norm
         logical :: slip
         integer, dimension(3) :: DB
     end type ghost_point

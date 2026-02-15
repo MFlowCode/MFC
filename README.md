@@ -46,7 +46,11 @@
 
 <p align="center">
   <a href="https://star-history.com/#MFlowCode/MFC&Date">
-    <img src="https://api.star-history.com/svg?repos=MFlowCode/MFC&type=Date&theme=dark" alt="Star History Chart" width="600"/>
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=MFlowCode/MFC&type=Date&theme=dark" />
+      <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=MFlowCode/MFC&type=Date" />
+      <img src="https://api.star-history.com/svg?repos=MFlowCode/MFC&type=Date&theme=dark" alt="Star History Chart" width="600"/>
+    </picture>
   </a>
 </p>
 
@@ -70,13 +74,13 @@ MFC runs at exascale on the world's fastest supercomputers:
 
 **Welcome!**
 MFC simulates compressible multi-phase flows, [among other things](#what-else-can-this-thing-do). 
-It uses metaprogramming and is short (20K lines) and portable.
+It uses metaprogramming and is short (~40K lines of Fortran) and portable.
 MFC conducted the largest known CFD simulation at <a href="https://arxiv.org/abs/2505.07392" target="_blank">200 trillion grid points</a>, and 1 quadrillion degrees of freedom (as of September 2025).
 MFC is a 2025 Gordon Bell Prize Finalist.
 
 <p align="center">
-<a href="https://doi.org/10.48550/arXiv.2503.07953" target="_blank">
-    <img src="https://img.shields.io/badge/DOI-10.48550/arXiv.2503.07953-thistle.svg"/>
+<a href="https://doi.org/10.1016/j.cpc.2026.110055" target="_blank">
+    <img src="https://img.shields.io/badge/DOI-10.1016/j.cpc.2026.110055-thistle.svg"/>
 </a>
 <a href="https://doi.org/10.5281/zenodo.17049757" target="_blank">
     <img src="https://zenodo.org/badge/DOI/10.5281/zenodo.17049757.svg"/>
@@ -90,12 +94,14 @@ Is MFC useful for you? Consider citing it or giving a star!
 </p>
 
 ```bibtex
-@article{Wilfong_2025,
-  author = {Wilfong, Benjamin and {Le Berre}, Henry and Radhakrishnan, Anand and Gupta, Ansh and Vaca-Revelo, Diego and Adam, Dimitrios and Yu, Haocheng and Lee, Hyeoksu and Chreim, Jose Rodolfo and {Carcana Barbosa}, Mirelys and Zhang, Yanjun and Cisneros-Garibay, Esteban and Gnanaskandan, Aswin and {Rodriguez Jr.}, Mauro and Budiardja, Reuben D. and Abbott, Stephen and Colonius, Tim and Bryngelson, Spencer H.},
-  title = {{MFC 5.0: A}n exascale many-physics flow solver},
-  journal = {arXiv preprint arXiv:2503.07953},
-  year = {2025},
-  doi = {10.48550/arXiv.2503.07953}
+@article{wilfong26,
+  Author = {Benjamin Wilfong and Henry {Le Berre} and Anand Radhakrishnan and Ansh Gupta and Daniel J. Vickers and Diego Vaca-Revelo and Dimitrios Adam and Haocheng Yu and Hyeoksu Lee and Jose Rodolfo Chreim and Mirelys {Carcana Barbosa} and Yanjun Zhang and Esteban Cisneros-Garibay and Aswin Gnanaskandan and Mauro {Rodriguez Jr.} and Reuben D. Budiardja and Stephen Abbott and Tim Colonius and Spencer H. Bryngelson},
+  Title = {{MFC 5.0: A}n exascale many-physics flow solver},
+  journal = {Computer Physics Communications},
+  year = {2026},
+  volume = {322},
+  pages = {110055},
+  doi = {10.1016/j.cpc.2026.110055},
 }
 ```
 
@@ -199,53 +205,19 @@ then you can build MFC and run the test suite!
 ```
 And... you're done!
 
-## Toolchain Features
-
-The `mfc.sh` script provides a comprehensive toolchain for building, running, and testing MFC:
+## Toolchain
 
 | Command | Description |
 |---------|-------------|
 | `./mfc.sh build` | Build MFC and its dependencies |
-| `./mfc.sh run case.py` | Run a simulation case |
+| `./mfc.sh run case.py` | Run a simulation case (interactive or batch: SLURM/PBS/LSF) |
 | `./mfc.sh test` | Run the test suite |
 | `./mfc.sh validate case.py` | Check a case file for errors before running |
 | `./mfc.sh init my_case` | Create a new case from a template |
 | `./mfc.sh clean` | Remove build artifacts |
 | `./mfc.sh interactive` | Launch interactive menu-driven interface |
 
-### Quick Start Workflow
-
-```bash
-./mfc.sh init my_first_case           # Create a new case from template
-./mfc.sh validate my_first_case/case.py  # Validate the case file
-./mfc.sh build -j $(nproc)            # Build MFC
-./mfc.sh run my_first_case/case.py    # Run the simulation
-```
-
-### Case Templates
-
-Create new cases quickly with built-in templates:
-
-```bash
-./mfc.sh init --list                  # List available templates
-./mfc.sh init my_case -t 2D_minimal   # Create 2D case
-./mfc.sh init my_case -t example:1D_sodshocktube  # Copy from examples
-```
-
-### Shell Completion
-
-Enable tab completion for commands and options:
-
-```bash
-# Bash
-source toolchain/completions/mfc.bash
-
-# Zsh (add to fpath)
-fpath=(path/to/MFC/toolchain/completions $fpath)
-autoload -Uz compinit && compinit
-```
-
-You can learn more about MFC's capabilities [via its documentation](https://mflowcode.github.io/documentation/index.html) or play with the examples located in the `examples/` directory (some are [shown here](https://mflowcode.github.io/documentation/md_examples.html))!
+Run `./mfc.sh <command> --help` for detailed options, or see the [full documentation](https://mflowcode.github.io/documentation/index.html). Tab completion for bash and zsh is auto-installed after you have run `./mfc.sh generate` (or any non-`init` command) at least once. Play with the examples in `examples/` ([showcased here](https://mflowcode.github.io/documentation/md_examples.html)).
 
 The shock-droplet interaction case above was run via
 ```shell
@@ -282,13 +254,16 @@ We also scale ideally to >98% of LLNL El Capitan.
 	* Complex/arbitrary geometries via immersed boundary method
 	* STL geometry files supported
 * Surface tension for multiphase cases
-* Sub-grid dynamics
-	* Euler-Euler particle models for bubble dynamics and similar
-	* Euler-Lagrange bubble dynamics
+* Sub-grid bubble dynamics
+	* Euler-Euler volume-averaged bubble models
+	* Euler-Lagrange particle tracking
+	* Quadrature-based moment methods (QBMM)
 * Viscous effects (high-order accurate representations)
+* Hypoelastic and hyperelastic material models
 * Ideal and stiffened gas equations of state
 * Body forces
 * Acoustic wave generation (one- and two-way sound sources)
+* Chemistry and multi-species transport via [Pyrometheus](https://github.com/pyrometheus/pyrometheus)
 * Magnetohydrodynamics (MHD)
 * Relativistic Magnetohydrodynamics (RMHD)
 
@@ -323,7 +298,9 @@ We also scale ideally to >98% of LLNL El Capitan.
 	* \>33K AMD GPUs (MI250X) on [OLCF Frontier](https://www.olcf.ornl.gov/frontier/) 
 	* \>10K NVIDIA GPUs (V100) on [OLCF Summit](https://www.olcf.ornl.gov/summit/) 
 * Near compute roofline behavior
+* Compile-time case optimization (hard-codes parameters for significant speedup)
 * RDMA (remote data memory access; GPU-GPU direct communication) via GPU-aware MPI on NVIDIA (CUDA-aware MPI) and AMD GPU systems
+* Built-in profiling support (NVIDIA Nsight Compute/Systems, AMD rocprof)
 * Optional single-precision computation and storage
 
 ### Software robustness and other features
@@ -344,12 +321,14 @@ If referencing MFC's (GPU) performance, consider citing ref. 1 and 2, which desc
 The original open-source release of MFC is ref. 3, which should be cited for provenance as appropriate.
 
 ```bibtex
-@article{Wilfong_2025,
-  author = {Wilfong, Benjamin and {Le Berre}, Henry and Radhakrishnan, Anand and Gupta, Ansh and Vaca-Revelo, Diego and Adam, Dimitrios and Yu, Haocheng and Lee, Hyeoksu and Chreim, Jose Rodolfo and {Carcana Barbosa}, Mirelys and Zhang, Yanjun and Cisneros-Garibay, Esteban and Gnanaskandan, Aswin and {Rodriguez Jr.}, Mauro and Budiardja, Reuben D. and Abbott, Stephen and Colonius, Tim and Bryngelson, Spencer H.},
-  title = {{MFC 5.0: A}n exascale many-physics flow solver},
-  journal = {arXiv preprint arXiv:2503.07953},
-  year = {2025},
-  doi = {10.48550/arXiv.2503.07953}
+@article{wilfong26,
+  Author = {Benjamin Wilfong and Henry {Le Berre} and Anand Radhakrishnan and Ansh Gupta and Daniel J. Vickers and Diego Vaca-Revelo and Dimitrios Adam and Haocheng Yu and Hyeoksu Lee and Jose Rodolfo Chreim and Mirelys {Carcana Barbosa} and Yanjun Zhang and Esteban Cisneros-Garibay and Aswin Gnanaskandan and Mauro {Rodriguez Jr.} and Reuben D. Budiardja and Stephen Abbott and Tim Colonius and Spencer H. Bryngelson},
+  Title = {{MFC 5.0: A}n exascale many-physics flow solver},
+  journal = {Computer Physics Communications},
+  year = {2026},
+  volume = {322},
+  pages = {110055},
+  doi = {10.1016/j.cpc.2026.110055},
 }
 
 @article{Radhakrishnan_2024,

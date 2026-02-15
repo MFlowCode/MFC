@@ -1,13 +1,31 @@
 # .pr_agent.toml
 [github_app]
-# Run these tools automatically on every new PR:
-pr_commands = ["/describe", "/review", "/improve"]
+pr_commands = [
+  "/review",
+  "/improve",
+]
+
+handle_push_trigger = true
+push_commands = ["/improve"]
 
 [pr_reviewer]                # (all fields optional)
 num_max_findings        = 10  # how many items to surface
 require_tests_review    = true
 extra_instructions = """
-Focus on duplicate code, the possibility of bugs, and if the PR added appropriate tests if it added a simulation feature.
+Project context and review priorities: .github/copilot-instructions.md
+Coding standards and common pitfalls: docs/documentation/contributing.md
+GPU macro API: docs/documentation/gpuParallelization.md
+
+Prioritize correctness over style (formatting is enforced by pre-commit hooks).
+Key areas: logic bugs, numerical issues,
+array bounds (non-unity lower bounds with ghost cells), MPI halo exchange
+correctness (pack/unpack offsets, GPU data coherence), precision mixing
+(stp vs wp), ALLOCATE/DEALLOCATE pairing (GPU memory leaks), physics model
+consistency (pressure formula must match model_eqns), missing case_validator.py
+constraints for new parameters, and compiler portability across all four
+supported compilers.
+Python toolchain requires Python 3.10+; do not suggest __future__ imports
+or other backwards-compatibility shims.
 """
 
 [pr_code_suggestions]

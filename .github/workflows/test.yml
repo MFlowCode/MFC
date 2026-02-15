@@ -1,6 +1,10 @@
 name: 'Test Suite'
 
-on: [push, pull_request, workflow_dispatch]
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -125,14 +129,16 @@ jobs:
 
       - name: Build
         run:  |
-          /bin/bash mfc.sh test --dry-run -j $(nproc) --${{ matrix.debug }} --${{ matrix.mpi }} --${{ matrix.precision }} 
+          /bin/bash mfc.sh test -v --dry-run -j $(nproc) --${{ matrix.debug }} --${{ matrix.mpi }} --${{ matrix.precision }} $TEST_ALL
+        env:
+          TEST_ALL: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
 
       - name: Test
         run:  |
-          /bin/bash mfc.sh test --max-attempts 3 -j $(nproc) $OPT1 $OPT2
+          /bin/bash mfc.sh test -v --max-attempts 3 -j $(nproc) $TEST_ALL $TEST_PCT
         env:
-          OPT1: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
-          OPT2: ${{ matrix.debug == 'debug' && '-% 20' || '' }}
+          TEST_ALL: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
+          TEST_PCT: ${{ matrix.debug == 'debug' && '-% 20' || '' }}
 
   self:
     name: "${{ matrix.cluster_name }} (${{ matrix.device }}${{ matrix.interface != 'none' && format('-{0}', matrix.interface) || '' }})"
@@ -143,78 +149,66 @@ jobs:
     strategy:
       matrix:
         include:
-          # Phoenix (GT)
-          - lbl: 'gt'
-            lbl_comp: 'gt'
+          # Phoenix (GT) — build+test combined in SLURM job
+          - runner:       'gt'
+            cluster:      'phoenix'
             cluster_name: 'Georgia Tech | Phoenix'
             device: 'gpu'
             interface: 'acc'
-          - lbl: 'gt'
-            lbl_comp: 'gt'
+          - runner:       'gt'
+            cluster:      'phoenix'
             cluster_name: 'Georgia Tech | Phoenix'
             device: 'gpu'
             interface: 'omp'
-          - lbl: 'gt'
-            lbl_comp: 'gt'
+          - runner:       'gt'
+            cluster:      'phoenix'
             cluster_name: 'Georgia Tech | Phoenix'
             device: 'cpu'
             interface: 'none'
-          # Frontier (ORNL)
-          - lbl: 'frontier'
-            lbl_comp: 'frontier'
+          # Frontier (ORNL) — build on login node, test via SLURM
+          - runner:       'frontier'
+            cluster:      'frontier'
             cluster_name: 'Oak Ridge | Frontier'
             device: 'gpu'
             interface: 'acc'
-          - lbl: 'frontier'
-            lbl_comp: 'frontier'
+          - runner:       'frontier'
+            cluster:      'frontier'
             cluster_name: 'Oak Ridge | Frontier'
             device: 'gpu'
             interface: 'omp'
-          - lbl: 'frontier'
-            lbl_comp: 'frontier'
+          - runner:       'frontier'
+            cluster:      'frontier'
             cluster_name: 'Oak Ridge | Frontier'
             device: 'cpu'
             interface: 'none'
-          - lbl: 'frontier'
-            lbl_comp: 'frontier_amd'
+          # Frontier AMD — build on login node, test via SLURM
+          - runner:       'frontier'
+            cluster:      'frontier_amd'
             cluster_name: 'Oak Ridge | Frontier (AMD)'
             device: 'gpu'
             interface: 'omp'
-          - lbl: 'frontier'
-            lbl_comp: 'frontier_amd'
+          - runner:       'frontier'
+            cluster:      'frontier_amd'
             cluster_name: 'Oak Ridge | Frontier (AMD)'
             device: 'cpu'
             interface: 'none'
     runs-on:
       group:  phoenix
-      labels: ${{ matrix.lbl }}
+      labels: ${{ matrix.runner }}
     env:
-      NODE_OPTIONS: ${{ matrix.lbl == 'gt' && '--max-old-space-size=2048' || '' }}
+      NODE_OPTIONS: ${{ matrix.cluster == 'phoenix' && '--max-old-space-size=2048' || '' }}
       ACTIONS_RUNNER_FORCE_ACTIONS_NODE_VERSION: node16
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
     steps:
       - name: Clone
         uses: actions/checkout@v4
 
-      - name: Build & Test
-        if:   matrix.lbl_comp == 'gt'
-        run:  bash .github/workflows/phoenix/submit.sh .github/workflows/phoenix/test.sh ${{ matrix.device }} ${{ matrix.interface }}
-
       - name: Build
-        if:   matrix.lbl_comp == 'frontier'
-        run:  bash .github/workflows/frontier/build.sh ${{ matrix.device }} ${{ matrix.interface }}
+        if:   matrix.cluster != 'phoenix'
+        run:  bash .github/workflows/${{ matrix.cluster }}/build.sh ${{ matrix.device }} ${{ matrix.interface }}
 
       - name: Test
-        if:   matrix.lbl_comp == 'frontier'
-        run:  bash .github/workflows/frontier/submit.sh .github/workflows/frontier/test.sh ${{matrix.device}} ${{ matrix.interface }}
-
-      - name: Build
-        if:   matrix.lbl_comp == 'frontier_amd'
-        run:  bash .github/workflows/frontier_amd/build.sh ${{ matrix.device }} ${{ matrix.interface }}
-
-      - name: Test
-        if:   matrix.lbl_comp == 'frontier_amd'
-        run:  bash .github/workflows/frontier_amd/submit.sh .github/workflows/frontier_amd/test.sh ${{matrix.device}} ${{ matrix.interface }}  
+        run:  bash .github/workflows/${{ matrix.cluster }}/submit.sh .github/workflows/${{ matrix.cluster }}/test.sh ${{ matrix.device }} ${{ matrix.interface }}
 
       - name: Print Logs
         if:   always()
@@ -222,14 +216,7 @@ jobs:
 
       - name: Archive Logs
         uses: actions/upload-artifact@v4
-        if:   matrix.lbl_comp == 'frontier'
-        with:
-          name: logs-${{ strategy.job-index }}-${{ matrix.device }}-${{ matrix.interface }}
-          path: test-${{ matrix.device }}-${{ matrix.interface }}.out
-
-      - name: Archive Logs
-        uses: actions/upload-artifact@v4
-        if:   matrix.lbl_comp == 'frontier_amd'
+        if:   matrix.cluster != 'phoenix'
         with:
           name: logs-${{ strategy.job-index }}-${{ matrix.device }}-${{ matrix.interface }}
           path: test-${{ matrix.device }}-${{ matrix.interface }}.out

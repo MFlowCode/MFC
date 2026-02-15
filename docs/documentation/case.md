@@ -65,7 +65,7 @@ To run such a case, use the following format:
 For example, to run the `scaling` case in "weak-scaling" mode:
 
 ```shell
-./mfc.sh run examples/scaling/case.py -t pre_process -j 8 -- --scaling weak
+./mfc.sh run examples/scaling/benchmark.py -t pre_process -j 8 -- --scaling weak
 ```
 
 ## Parameters
@@ -82,23 +82,23 @@ Before diving into parameter details, check the **@ref case_constraints "Feature
 - Full reference: **@ref parameters "Case Parameters"** - Complete parameter documentation
 
 There are multiple sets of parameters that must be specified in the python input file:
-1. [Runtime Parameters](#1-runtime)
-2. [Computational Domain Parameters](#2-computational-domain)
-3. [Patch Parameters](#3-patches)
-4. [Immersed Boundary Patches](#4-immersed-boundary-patches)
-5. [Fluid Material's Parameters](#5-fluid-materials)
-6. [Simulation Algorithm Parameters](#6-simulation-algorithm)
-7. [Formatted Database and Structure Parameters](#7-formatted-output)
-8. [(Optional) Acoustic Source Parameters](#8-acoustic-source)
-9. [(Optional) Ensemble-Averaged Bubble Model Parameters](#9-ensemble-averaged-bubble-model)
-10. [(Optional) Velocity Field Setup Parameters](#10-velocity-field-setup)
-11. [(Optional) Phase Change Parameters](#11-Phase-Change-Model)
-12. [(Optional) Artificial Mach Number Parameters](#12-artificial-Mach-number)
+1. [Runtime Parameters](#sec-runtime)
+2. [Computational Domain Parameters](#sec-computational-domain)
+3. [Patch Parameters](#sec-patches)
+4. [Immersed Boundary Patches](#sec-immersed-boundary-patches)
+5. [Fluid Material's Parameters](#sec-fluid-materials)
+6. [Simulation Algorithm Parameters](#sec-simulation-algorithm)
+7. [Formatted Database and Structure Parameters](#sec-formatted-output)
+8. [(Optional) Acoustic Source Parameters](#sec-acoustic-source)
+9. [(Optional) Ensemble-Averaged Bubble Model Parameters](#sec-bubble-models)
+10. [(Optional) Velocity Field Setup Parameters](#sec-velocity-field-setup)
+11. [(Optional) Phase Change Parameters](#sec-phase-change)
+12. [(Optional) Artificial Mach Number Parameters](#sec-artificial-mach-number)
 
 Items 8, 9, 10, 11 and 12 are optional sets of parameters that activate the acoustic source model, ensemble-averaged bubble model, initial velocity field setup, phase change, artificial Mach number respectively.
 Definition of the parameters is described in the following subsections.
 
-### 1. Runtime
+### 1. Runtime {#sec-runtime}
 
 | Parameter        | Type           | Description                               |
 | ---:             |    :----:      |          :---                             |
@@ -110,7 +110,7 @@ Definition of the parameters is described in the following subsections.
 The underlying MPI implementation and communication infrastructure must support this
 feature, detecting GPU pointers and performing RDMA accordingly.
 
-### 2. Computational Domain
+### 2. Computational Domain {#sec-computational-domain}
 
 | Parameter                | Type    | Description                      |
 | ---:                     | :----:  |          :---                    |
@@ -129,7 +129,7 @@ The parameters define the boundaries of the spatial and temporal domains, and th
 
 - `[x,y,z]_domain%[beg,end]` define the spatial domain in $x$, $y$, and $z$ Cartesian coordinates:
 
-$$ x \in \left[ x \\_ domain \\% beg, x \\_ domain \\% end \right], y \in \left[ y \\_ domain \\% beg, y \\_ domain \\% end \right], z \in \left[ z \\_ domain \\% beg, z \\_ domain \\% end \right] $$
+\f[ x \in \left[ x\_domain\%beg, \; x\_domain\%end \right], \quad y \in \left[ y\_domain\%beg, \; y\_domain\%end \right], \quad z \in \left[ z\_domain\%beg, \; z\_domain\%end \right] \f]
 
 - $m$, $n$, and $p$ define the number of finite volume cells that uniformly discretize the domain along the $x$, $y$, and $z$ axes, respectively.
 Note that the actual number of cells in each coordinate axis is given as $[m,n,p]+1$.
@@ -141,7 +141,7 @@ The grid is gradually stretched such that the domain boundaries are pushed away 
 
 - `a_[x,y,z]`, `[x,y,z]_a`, and `[x,y,z]_b` are parameters that define the grid stretching function. When grid stretching along the $x$ axis is considered, the stretching function is given as:
 
-$$ x_{cb,stretch} = x_{cb} + \frac{x_{cb}}{a_x} \Bigg[ \mathrm{log}\left[\mathrm{cosh} \left( \frac{a_x(x_{cb}-x_a)}{L} \right) \right] + \mathrm{log}\left[\mathrm{cosh} \left( \frac{a_x(x_{cb}-x_b)}{L} \right) \right] -2 \mathrm{log}\left[\mathrm{cosh} \left( \frac{a_x(x_b-x_a)}{2L} \right) \right]  \Bigg] $$
+\f[ x_{cb,stretch} = x_{cb} + \frac{x_{cb}}{a_x} \Bigg[ \mathrm{log}\left[\mathrm{cosh} \left( \frac{a_x(x_{cb}-x_a)}{L} \right) \right] + \mathrm{log}\left[\mathrm{cosh} \left( \frac{a_x(x_{cb}-x_b)}{L} \right) \right] -2 \mathrm{log}\left[\mathrm{cosh} \left( \frac{a_x(x_b-x_a)}{2L} \right) \right]  \Bigg] \f]
 
 where `x_cb` and `x_[cb,stretch]` are the coordinates of a cell boundary at the original and stretched domains, respectively.
 `L` is the domain length along the `x` axis: `L`=`x_domain%%end`-`x_domain%%beg`.
@@ -158,7 +158,7 @@ When $p=0$, the domain is defined on $x$-$y$ axi-symmetric coordinates.
 In both Coordinates, mesh stretching can be defined along the $x$- and $y$-axes.
 MPI topology is automatically optimized to maximize the parallel efficiency for given choice of coordinate systems.
 
-### 3. Patches
+### 3. Patches {#sec-patches}
 
 | Parameter            | Type    | Analytical Definition | Description                                                  |
 | ---:                 | :----:  | :----:                | :---                                                         |
@@ -220,7 +220,7 @@ Additionally, the following variables are made available as shorthand:
 | `y`       | `y_cc(j)`                | `ly`      | The patch's `length_y`    | `yc`      | The patch's `y_centroid` |
 | `z`       | `z_cc(k)`                | `lz`      | The patch's `length_z`    | `zc`      | The patch's `z_centroid` |
 | `eps`     | The patch's `epsilon`    | `beta`    | The patch's `beta`        | `radii`   | The patch's `radii`      |
-| `tau_e`   | The patch's `tau_e`      | `r`       | The patch's `radius`      | `pi` and `e` | $\pi$ and $e$         |
+| `tau_e`   | The patch's `tau_e`      | `r`       | The patch's `radius`      | `pi` and `e` | \f$\pi\f$ and \f$e\f$ |
 
 where $(i,j,k)$ are the grid-indices of the current cell in each coordinate direction.
 
@@ -236,9 +236,9 @@ end if
 
 Some patch configurations are not adequately handled with the above analytic variable definitions.
 In this case, a hard coded patch can be used.
-Hard coded patches can be added by adding additional hard coded patch identifiers to `src/pre_process/include/1[2,3]dHardcodedIC.fpp`.
+Hard coded patches can be added by adding additional hard coded patch identifiers to `src/common/include/1[2,3]dHardcodedIC.fpp`.
 When using a hard coded patch, the `patch_icpp(patch_id)%%hcid` must be set to the hard-coded patch id.
-For example, to add a 2D Hardcoded patch with an id of 200, one would add the following to `src/pre_process/include/2dHardcodedIC.fpp`
+For example, to add a 2D Hardcoded patch with an id of 200, one would add the following to `src/common/include/2dHardcodedIC.fpp`
 
 ```f90
     case(200)
@@ -256,7 +256,7 @@ The code provides three pre-built patches for dimensional extrusion of initial c
 - `case(370)`: Extrude 2D data to 3D domain
 
 Setup: Only requires specifying `init_dir` and filename pattern via `zeros_default`. Grid dimensions are automatically detected from the data files.
-Implementation: All variables and file handling are managed in `src/pre_process/include/ExtrusionHardcodedIC.fpp` with no manual grid configuration needed.
+Implementation: All variables and file handling are managed in `src/common/include/ExtrusionHardcodedIC.fpp` with no manual grid configuration needed.
 Usage: Ideal for initializing simulations from lower-dimensional solutions, enabling users to add perturbations or modifications to the base extruded fields for flow instability studies.
 
 #### Parameter Descriptions
@@ -281,12 +281,12 @@ For instance, in a 2D simulation, when a cylindrical `patch(2)` is immersed in a
 
 - `smoothen` activates smoothening of the boundary of the patch that alters the existing patch.
 When smoothening occurs, fluids of the two patches are mixed in the region of the boundary.
-For instance, in the aforementioned case of the cylindrical patch immersed in the rectangular patch, smoothening occurs when ``patch_icpp(2)smoothen = 'T'``.
+For instance, in the aforementioned case of the cylindrical patch immersed in the rectangular patch, smoothening occurs when ``patch_icpp(2)%%smoothen = 'T'``.
 `smooth_coeff` controls the thickness of the region of smoothening (sharpness of the mixture region).
 The default value of `smooth_coeff` is unity. The region of smoothening is thickened with decreasing the value.
 Optimal choice of the value of `smooth_coeff` is case-dependent and left to the user.
 
-- `patch_icpp(j)alpha(i)`, `patch_icpp(j)alpha_rho(i)`, `patch_icpp(j)pres`, and `patch_icpp(j)vel(i)` define for $j$-th patch the void fraction of `fluid(i)`, partial density of `fluid(i)`, the pressure, and the velocity in the $i$-th coordinate direction.
+- `patch_icpp(j)%%alpha(i)`, `patch_icpp(j)%%alpha_rho(i)`, `patch_icpp(j)%%pres`, and `patch_icpp(j)%%vel(i)` define for $j$-th patch the void fraction of `fluid(i)`, partial density of `fluid(i)`, the pressure, and the velocity in the $i$-th coordinate direction.
 These physical parameters must be consistent with fluid material's parameters defined in the next subsection.
 
 - `model_filepath` defines the root directory of the STL or OBJ model file.
@@ -297,10 +297,10 @@ These physical parameters must be consistent with fluid material's parameters de
 
 #### Elliptic Smoothing
 
-Initial conditions in which not all patches support the `patch_icpp(j)%smoothen` parameter can still be smoothed by applying iterations of the heat equation to the initial condition.
+Initial conditions in which not all patches support the `patch_icpp(j)%%smoothen` parameter can still be smoothed by applying iterations of the heat equation to the initial condition.
 This is enabled by adding `'elliptic_smoothing': "T",` and `'elliptic_smoothing_iters': N,` to the case dictionary, where `N` is the number of smoothing iterations to apply.
 
-### 4. Immersed Boundary Patches
+### 4. Immersed Boundary Patches {#sec-immersed-boundary-patches}
 
 | Parameter            | Type    | Description |
 | ---:                 | :----:  | :---                |
@@ -345,7 +345,7 @@ Additional details on this specification can be found in [The Naca Airfoil Serie
 
 - `slip` applies a slip boundary to the surface of the patch if true and a no-slip boundary condition to the surface if false.
 
-- Please see [Patch Parameters](#3-patches) for the descriptions of `model_filepath`, `model_scale`, `model_rotate`, `model_translate`, `model_spc`, and `model_threshold`.
+- Please see [Patch Parameters](#sec-patches) for the descriptions of `model_filepath`, `model_scale`, `model_rotate`, `model_translate`, `model_spc`, and `model_threshold`.
 
 - `moving_ibm` sets the method by which movement will be applied to the immersed boundary. Using 0 will result in no movement. Using 1 will result 1-way coupling where the boundary moves at a constant rate and applied forces to the fluid based upon it's own motion. In 1-way coupling, the fluid does not apply forces back onto the IB.
 
@@ -353,12 +353,12 @@ Additional details on this specification can be found in [The Naca Airfoil Serie
 
 - `angular_vel(i)` is the initial angular velocity of the IB about the x, y, z axes for i=1, 2, 3 in radians per second. When `moving_ibm` equals 1, this angular velocity is constant.
 
-### 5. Fluid Material’s
+### 5. Fluid Material's {#sec-fluid-materials}
 
 | Parameter | Type   | Description                                    |
 | ---:      | :----: |          :---                                  |
-| `gamma`   | Real   | Stiffened-gas parameter $\Gamma$ of fluid.     |
-| `pi_inf`  | Real   | Stiffened-gas parameter $\Pi_\infty$ of fluid. |
+| `gamma`   | Real   | Stiffened-gas parameter \f$\Gamma\f$ of fluid.     |
+| `pi_inf`  | Real   | Stiffened-gas parameter \f$\Pi_\infty\f$ of fluid. |
 | `Re(1)` * | Real   | Shear viscosity of fluid.                      |
 | `Re(2)` * | Real   | Volume viscosity of fluid.                     |
 | `cv`   ** | Real   | Sffened-gas parameter $c_v$ of fluid.          |
@@ -376,26 +376,28 @@ Fluid material's parameters. All parameters except for sigma should be prepended
 The table lists the fluid material's parameters.
 The parameters define material's property of compressible fluids that are used in simulation.
 
-- `fluid_pp(i)%%gamma` and `fluid_pp(i)%%pi_inf` define $\Gamma$ and $\Pi$ as parameters of $i$-th fluid that are used in stiffened gas equation of state.
+- `fluid_pp(i)%%gamma` and `fluid_pp(i)%%pi_inf` define \f$\Gamma\f$ and \f$\Pi\f$ as parameters of $i$-th fluid that are used in stiffened gas equation of state.
 
 - `fluid_pp(i)%%Re(1)` and `fluid_pp(i)%%Re(2)` define the shear and volume viscosities of $i$-th fluid, respectively.
 
 When these parameters are undefined, fluids are treated as inviscid.
-Details of implementation of viscosity in MFC can be found in [Coralic (2015)](@ref references).
+Details of implementation of viscosity in MFC can be found in \cite Coralic15.
 
 - `fluid_pp(i)%%cv`, `fluid_pp(i)%%qv`, and `fluid_pp(i)%%qvp` define $c_v$, $q$, and $q'$ as parameters of $i$-th fluid that are used in stiffened gas equation of state.
 
 - `fluid_pp(i)%%G` is required for `hypoelasticity`.
 
-### 6. Simulation Algorithm
-  
+### 6. Simulation Algorithm {#sec-simulation-algorithm}
+
+See @ref equations "Equations" for the mathematical models these parameters control.
+
 | Parameter                  | Type    | Description                                    |
 | ---:                       | :----:  |          :---                                  |
 | `bc_[x,y,z]%%beg[end]`     | Integer | Beginning [ending] boundary condition in the $[x,y,z]$-direction (negative integer, see table [Boundary Conditions](#boundary-conditions)) |
 | `bc_[x,y,z]%%vb[1,2,3]`‡   | Real    | Velocity in the (x,1), (y, 2), (z,3) direction applied to `bc_[x,y,z]%%beg` |
 | `bc_[x,y,z]%%ve[1,2,3]`‡   | Real    | Velocity in the (x,1), (y, 2), (z,3) direction applied to `bc_[x,y,z]%%end` |
-| `model_eqns`               | Integer | Multicomponent model: [1] $\Gamma/\Pi_\infty$; [2] 5-equation; [3] 6-equation; [4] 4-equation |
-| `alt_soundspeed` *         | Logical | Alternate sound speed and $K \nabla \cdot u$ for 5-equation model |
+| `model_eqns`               | Integer | Multicomponent model: [1] \f$\Gamma/\Pi_\infty\f$; [2] 5-equation; [3] 6-equation; [4] 4-equation |
+| `alt_soundspeed` *         | Logical | Alternate sound speed and \f$K \nabla \cdot u\f$ for 5-equation model |
 | `adv_n`   	               | Logical | Solving directly for the number density (in the method of classes) and compute void fraction from the number density |
 | `mpp_lim`	                 | Logical | Mixture physical parameters limits |
 | `mixture_err`              | Logical | Mixture properties correction |
@@ -419,9 +421,9 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](@
 | `ic_eps`                   | Real    | Interface compression threshold (default: 1e-4) |
 | `ic_beta`                  | Real    | Interface compression sharpness parameter (default: 1.6) |
 | `riemann_solver`           | Integer | Riemann solver algorithm: [1] HLL*; [2] HLLC; [3] Exact*; [4] HLLD	(only for MHD) |
-| `low_Mach`                 | Integer | Low Mach number correction for HLLC Riemann solver: [0] None; [1] Pressure (Chen et al. 2022); [2] Velocity (Thornber et al. 2008)	 |
+| `low_Mach`                 | Integer | Low Mach number correction for HLLC Riemann solver: [0] None; [1] Pressure (\cite Chen22); [2] Velocity (\cite Thornber08)	 |
 | `avg_state`	               | Integer | Averaged state evaluation method: [1] Roe average*; [2] Arithmetic mean  |
-| `wave_speeds`              | Integer | Wave-speed estimation: [1] Direct (Batten et al. 1997); [2] Pressure-velocity* (Toro 1999)	 |
+| `wave_speeds`              | Integer | Wave-speed estimation: [1] Direct (\cite Batten97); [2] Pressure-velocity* (\cite Toro09)	 |
 | `weno_Re_flux`             | Logical | Compute velocity gradient using scalar divergence theorem	 |
 | `weno_avg`          	     | Logical | Arithmetic mean of left and right, WENO-reconstructed, cell-boundary values |
 | `dt`                       | Real    | Time step size |
@@ -438,7 +440,7 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](@
 | `surface_tension`          | Logical | Activate surface tension |
 | `viscous`                  | Logical | Activate viscosity |
 | `hypoelasticity`           | Logical | Activate hypoelasticity* |
-| `igr`                      | Logical | Enable solution via information geometric regularization (IGR) [Cao (2024)](@ref references) |
+| `igr`                      | Logical | Enable solution via information geometric regularization (IGR) \cite Cao24 |
 | `igr_order`                | Integer | Order of reconstruction for IGR [3,5] |
 | `alf_factor`               | Real    | Alpha factor for IGR entropic pressure (default 10) |
 | `igr_pres_lim`             | Logical | Limit IGR pressure to avoid negative values (default F) |
@@ -452,8 +454,8 @@ Details of implementation of viscosity in MFC can be found in [Coralic (2015)](@
 
 The table lists simulation algorithm parameters.
 The parameters are used to specify options in algorithms that are used to integrate the governing equations of the multi-component flow based on the initial condition.
-Models and assumptions that are used to formulate and discretize the governing equations are described in [Bryngelson et al. (2019)](@ref references).
-Details of the simulation algorithms and implementation of the WENO scheme can be found in [Coralic (2015)](@ref references).
+Models and assumptions that are used to formulate and discretize the governing equations are described in \cite Wilfong26 and \cite Bryngelson21.
+Details of the simulation algorithms and implementation of the WENO scheme can be found in \cite Coralic15.
 
 - `bc_[x,y,z]%[beg,end]` specifies the boundary conditions at the beginning and the end of domain boundaries in each coordinate direction by a negative integer from -1 through -16.
 See table [Boundary Conditions](#boundary-conditions) for details.
@@ -461,27 +463,27 @@ Boundary condition patches can be used with non-characteristic boundary conditio
 Their use is detailed in [Boundary Condition Patches](#boundary-condition-patches).
 
 - `bc_[x,y,z]%%vb[1,2,3]` specifies the velocity in the (x,1), (y,2), (z,3) direction applied to `bc_[x,y,z]%%beg` when using `bc_[x,y,z]%%beg = -16`.
-Tangential velocities require viscosity, `weno_avg = T`, and `bc_[x,y,z]%%beg = -16` to work properly. Normal velocities require `bc_[x,y,z]%%end = -15` or `\bc_[x,y,z]%%end = -16` to work properly.
+Tangential velocities require viscosity, `weno_avg = T`, and `bc_[x,y,z]%%beg = -16` to work properly. Normal velocities require `bc_[x,y,z]%%end = -15` or `bc_[x,y,z]%%end = -16` to work properly.
 
 - `bc_[x,y,z]%%ve[1,2,3]` specifies the velocity in the (x,1), (y,2), (z,3) direction applied to `bc_[x,y,z]%%beg` when using `bc_[x,y,z]%%end = -16`.
-Tangential velocities require viscosity, `weno_avg = T`, and `bc_[x,y,z]%%end = 16` to work properly. Normal velocities require `bc_[x,y,z]%%end = -15` or `\bc_[x,y,z]%%end = -16` to work properly.
+Tangential velocities require viscosity, `weno_avg = T`, and `bc_[x,y,z]%%end = 16` to work properly. Normal velocities require `bc_[x,y,z]%%end = -15` or `bc_[x,y,z]%%end = -16` to work properly.
 
 - `model_eqns` specifies the choice of the multi-component model that is used to formulate the dynamics of the flow using integers from 1 through 3.
-`model_eqns = 1`, `2`, and `3` correspond to $\Gamma$-$\Pi_\infty$ model ([Johnsen, 2008](@ref references)), 5-equation model ([Allaire et al., 2002](@ref references)), and 6-equation model ([Saurel et al., 2009](@ref references)), respectively.
-The difference of the two models is assessed by ([Schmidmayer et al., 2019](@ref references)).
+`model_eqns = 1`, `2`, and `3` correspond to \f$\Gamma\f$-\f$\Pi_\infty\f$ model (\cite Johnsen08), 5-equation model (\cite Allaire02), and 6-equation model (\cite Saurel09), respectively.
+The difference of the two models is assessed by (\cite Schmidmayer20).
 Note that some code parameters are only compatible with 5-equation model.
 
-- `alt_soundspeed` activates the source term in the advection equations for the volume fractions, $K\nabla\cdot \underline{u}$, that regularizes the speed of sound in the mixture region when the 5-equation model is used.
-The effect and use of the source term are assessed by [Schmidmayer et al., 2019](@ref references).
+- `alt_soundspeed` activates the source term in the advection equations for the volume fractions, \f$K\nabla\cdot \underline{u}\f$, that regularizes the speed of sound in the mixture region when the 5-equation model is used.
+The effect and use of the source term are assessed by \cite Schmidmayer20.
 
 - `adv_n` activates the direct computation of number density by the Riemann solver instead of computing number density from the void fraction in the method of classes.
 
-- `mpp_lim` activates correction of solutions to avoid a negative void fraction of each component in each grid cell, such that $\alpha_i>\varepsilon$ is satisfied at each time step.
+- `mpp_lim` activates correction of solutions to avoid a negative void fraction of each component in each grid cell, such that \f$\alpha_i>\varepsilon\f$ is satisfied at each time step.
 
 - `mixture_err` activates correction of solutions to avoid imaginary speed of sound at each grid cell.
 
 - `time_stepper` specifies the order of the Runge-Kutta (RK) time integration scheme that is used for temporal integration in simulation, from the 1st to 5th order by corresponding integer.
-Note that `time_stepper = 3` specifies the total variation diminishing (TVD), third order RK scheme ([Gottlieb and Shu, 1998](@ref references)).
+Note that `time_stepper = 3` specifies the total variation diminishing (TVD), third order RK scheme (\cite Gottlieb98).
 
 - `adap_dt` activates the Strang operator splitting scheme which splits flux and source terms in time marching, and an adaptive time stepping strategy is implemented for the source term. It requires ``bubbles_euler = 'T'``, ``polytropic = 'T'``, ``adv_n = 'T'`` and `time_stepper = 3`. Additionally, it can be used with ``bubbles_lagrange = 'T'`` and `time_stepper = 3`. `adap_dt_tol` and `adap_dt_max_iters` are 1e-4 and 100, respectively, by default.
 
@@ -490,19 +492,19 @@ Note that `time_stepper = 3` specifies the total variation diminishing (TVD), th
 - `weno_eps` specifies the lower bound of the WENO nonlinear weights.
 It is recommended to set `weno_eps` to $10^{-6}$ for WENO-JS, and to $10^{-40}$ for other WENO variants.
 
-- `mapped_weno` activates the WENO-M scheme in place of the default WENO-JS scheme ([Henrick et al., 2005](@ref references)). WENO-M a variant of the WENO scheme that remaps the nonlinear WENO-JS weights by assigning larger weights to non-smooth stencils, reducing dissipation compared to the default WENO-JS scheme, at the expense of higher computational cost. Only one of `mapped_weno`, `wenoz`, and `teno` can be activated.
+- `mapped_weno` activates the WENO-M scheme in place of the default WENO-JS scheme (\cite Henrick05). WENO-M a variant of the WENO scheme that remaps the nonlinear WENO-JS weights by assigning larger weights to non-smooth stencils, reducing dissipation compared to the default WENO-JS scheme, at the expense of higher computational cost. Only one of `mapped_weno`, `wenoz`, and `teno` can be activated.
 
-- `wenoz` activates the WENO-Z scheme in place of the default WENO-JS scheme ([Borges et al., 2008](@ref references)). WENO-Z is a variant of the WENO scheme that further reduces the dissipation compared to the WENO-M scheme. It has similar computational cost to the WENO-JS scheme.
+- `wenoz` activates the WENO-Z scheme in place of the default WENO-JS scheme (\cite Borges08). WENO-Z is a variant of the WENO scheme that further reduces the dissipation compared to the WENO-M scheme. It has similar computational cost to the WENO-JS scheme.
 
 - `wenoz_q` specifies the power parameter `q` used in the WENO-Z scheme. It controls how aggressively the smoothness coefficients scale the weights. A higher value of `wenoz_q` increases the sensitivity to smoothness, improving stability but worsening numerical dissipation. For WENO3 and WENO5, `q=1` is fixed, so `wenoz_q` must not be set. For WENO7, `wenoz_q` can be set to 2, 3, or 4.
 
-- `teno` activates the TENO scheme in place of the default WENO-JS scheme ([Fu et al., 2016](@ref references)). TENO is a variant of the ENO scheme that is the least dissipative, but could be less robust for extreme cases. It uses a threshold to identify smooth and non-smooth stencils, and applies optimal weights to the smooth stencils. Only available for `weno_order = 5` and `7`. Requires `teno_CT` to be set. Does not support grid stretching.
+- `teno` activates the TENO scheme in place of the default WENO-JS scheme (\cite Fu16). TENO is a variant of the ENO scheme that is the least dissipative, but could be less robust for extreme cases. It uses a threshold to identify smooth and non-smooth stencils, and applies optimal weights to the smooth stencils. Only available for `weno_order = 5` and `7`. Requires `teno_CT` to be set. Does not support grid stretching.
 
 - `teno_CT` specifies the threshold for the TENO scheme. This dimensionless constant, also known as $C_T$, sets a threshold to identify smooth and non-smooth stencils. Larger values make the scheme more robust but also more dissipative. A recommended value for teno_CT is `1e-6`. When adjusting this parameter, it is recommended to try values like `1e-5` or `1e-7` for TENO5. A smaller value can be used for TENO7.
 
 - `null_weights` activates nullification of the nonlinear WENO weights at the buffer regions outside the domain boundaries when the Riemann extrapolation boundary condition is specified (`bc_[x,y,z]%%beg[end]} = -4`).
 
-- `mp_weno` activates monotonicity preservation in the WENO reconstruction (MPWENO) such that the values of reconstructed variables do not reside outside the range spanned by WENO stencil ([Balsara and Shu, 2000](@ref references); [Suresh and Huynh, 1997](@ref references)).
+- `mp_weno` activates monotonicity preservation in the WENO reconstruction (MPWENO) such that the values of reconstructed variables do not reside outside the range spanned by WENO stencil (\cite Balsara00; \cite Suresh97).
 
 - `muscl_order` specifies the order of the MUSCL scheme that is used for spatial reconstruction of variables by an integer of 1, or 2, that corresponds to the 1st, and 2nd order respectively. When using `muscl_order = 2`, `muscl_lim` must be defined.
 
@@ -512,16 +514,16 @@ It is recommended to set `weno_eps` to $10^{-6}$ for WENO-JS, and to $10^{-40}$ 
 - `int_comp` activates interface compression using THINC used in MUSCL Reconstruction, with control parameters (`ic_eps`, and `ic_beta`).
 
 - `riemann_solver` specifies the choice of the Riemann solver that is used in simulation by an integer from 1 through 4.
-`riemann_solver = 1`, `2`, and `3` correspond to HLL, HLLC, and Exact Riemann solver, respectively ([Toro, 2013](@ref references)).
-`riemann_solver = 4` is only for MHD simulations. It resolves 5 of the full seven-wave structure of the MHD equations ([Miyoshi and Kusano, 2005](@ref references)).
+`riemann_solver = 1`, `2`, and `3` correspond to HLL, HLLC, and Exact Riemann solver, respectively (\cite Toro09).
+`riemann_solver = 4` is only for MHD simulations. It resolves 5 of the full seven-wave structure of the MHD equations (\cite Miyoshi05).
 
-- `low_Mach` specifies the choice of the low Mach number correction scheme for the HLLC Riemann solver. `low_Mach = 0` is default value and does not apply any correction scheme. `low_Mach = 1` and `2` apply the anti-dissipation pressure correction method ([Chen et al., 2022](@ref references)) and the improved velocity reconstruction method ([Thornber et al., 2008](@ref references)). This feature requires `model_eqns = 2` or `3`. `low_Mach = 1` works for `riemann_solver = 1` and `2`, but `low_Mach = 2` only works for `riemann_solver = 2`.
+- `low_Mach` specifies the choice of the low Mach number correction scheme for the HLLC Riemann solver. `low_Mach = 0` is default value and does not apply any correction scheme. `low_Mach = 1` and `2` apply the anti-dissipation pressure correction method (\cite Chen22) and the improved velocity reconstruction method (\cite Thornber08). This feature requires `model_eqns = 2` or `3`. `low_Mach = 1` works for `riemann_solver = 1` and `2`, but `low_Mach = 2` only works for `riemann_solver = 2`.
 
 - `avg_state` specifies the choice of the method to compute averaged variables at the cell-boundaries from the left and the right states in the Riemann solver by an integer of 1 or 2.
 `avg_state = 1` and `2` correspond to Roe- and arithmetic averages, respectively.
 
 - `wave_speeds` specifies the choice of the method to compute the left, right, and middle wave speeds in the Riemann solver by an integer of 1 and 2.
-`wave_speeds = 1` and `2` correspond to the direct method ([Batten et al., 1997](@ref references)), and indirect method that approximates the pressures and velocity ([Toro, 2013](@ref references)), respectively.
+`wave_speeds = 1` and `2` correspond to the direct method (\cite Batten97), and indirect method that approximates the pressures and velocity (\cite Toro09), respectively.
 
 - `weno_Re_flux` activates the scalar divergence theorem in computing the velocity gradients using WENO-reconstructed cell boundary values.
 If this option is false, velocity gradient is computed using finite difference scheme of order 2 which is independent of the WENO order.
@@ -529,13 +531,13 @@ If this option is false, velocity gradient is computed using finite difference s
 - `weno_avg` it activates the arithmetic average of the left and right, WENO-reconstructed, cell-boundary values.
 This option requires `weno_Re_flux` to be true because cell boundary values are only utilized when employing the scalar divergence method in the computation of velocity gradients.
 
-- `surface_tension` activates surface tension when set to ``'T'``. Requires `sigma` to be set and `num_fluids`. The color function in each patch should be assigned such that `patch_icpp(i)%cf_val = 1` in patches where `patch_icpp(i)%alpha = 1 - eps` and `patch_icpp(i)%cf_val = 0` in patches where `patch_icpp(i)%alpha = eps`.
+- `surface_tension` activates surface tension when set to ``'T'``. Requires `sigma` to be set and `num_fluids`. The color function in each patch should be assigned such that `patch_icpp(i)%%cf_val = 1` in patches where `patch_icpp(i)%%alpha = 1 - eps` and `patch_icpp(i)%%cf_val = 0` in patches where `patch_icpp(i)%%alpha = eps`.
 
 - `viscous` activates viscosity when set to ``'T'``. Requires `Re(1)` and `Re(2)` to be set.
 
 - `hypoelasticity` activates elastic stress calculations for fluid-solid interactions. Requires `G` to be set in the fluid material's parameters.
 
-#### Boundary Condition Patches
+#### Boundary Condition Patches {#boundary-condition-patches}
 
 | Parameter              | Type    | Description                                                     |
 | ---:                   | :----:  |          :---                                                   |
@@ -545,7 +547,7 @@ This option requires `weno_Re_flux` to be true because cell boundary values are 
 | `type`*                | Integer | The geometry of the patch. [1]: Line [2]: Circle [3]: Rectangle |
 | `x[y,z]_centroid`*     | Real    | Centroid of the boundary patch in the x[y,z]-direction          |
 | `length_x[y,z]`*       | Real    | Length of the boundary patch in the x[y,z]-direction            |
-| `radiue`*              | Real    | Radius of the boundary patch                                    |
+| `radius`*              | Real    | Radius of the boundary patch                                    |
 *: These parameters should be prepended with `patch_bc(j)%` where $j$ is the patch index.
 
 Boundary condition patches can be used with the following boundary condition types:
@@ -563,7 +565,7 @@ Squares and circles on each face are supported for 3D simulations.
 - `dt` specifies the constant time step size used in the simulation.
 The value of `dt` needs to be sufficiently small to satisfy the Courant-Friedrichs-Lewy (CFL) condition.
 
-- `t_step_start` and `t_step_end` define the time steps at which the simulation starts and ends.
+- `t_step_start` and `t_step_stop` define the time steps at which the simulation starts and ends.
 
 `t_step_save` is the time step interval for data output during simulation.
 To newly start the simulation, set `t_step_start = 0`.
@@ -586,7 +588,7 @@ To restart the simulation from $k$-th time step, set `t_step_start = k`; see @re
 To newly start the simulation, set `n_start = 0`.
 To restart the simulation from $k$-th time step, see @ref running "Restarting Cases".
 
-### 7. Formatted Output
+### 7. Formatted Output {#sec-formatted-output}
 
 | Parameter               | Type    | Description                                    |
 | ---:                    | :----:  |          :---                                  |
@@ -612,15 +614,14 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 | `schlieren_wrt`         | Logical | Add the numerical schlieren to the database|
 | `qm_wrt`                | Logical | Add the Q-criterion to the database|
 | `liutex_wrt`            | Logical | Add the Liutex to the database|
-| `tau_wrt`               | Logical | Add the elastic stress components to the database|
 | `fd_order`              | Integer | Order of finite differences for computing the vorticity and the numerical Schlieren function [1,2,4] |
 | `schlieren_alpha(i)`    | Real    | Intensity of the numerical Schlieren computed via `alpha(i)` |
 | `probe_wrt`             | Logical | Write the flow chosen probes data files for each time step	|
 | `num_probes`            | Integer | Number of probes	|
 | `probe(i)%[x,y,z]`      | Real	  | Coordinates of probe $i$	|
 | `output_partial_domain` | Logical | Output part of the domain |
-| `[x,y,z]_output%beg`    | Real    | Beginning of the output domain in the [x,y,z]-direction |
-| `[x,y,z]_output%end`    | Real    | End of the output domain in the [x,y,z]-direction |
+| `[x,y,z]_output%%beg`    | Real    | Beginning of the output domain in the [x,y,z]-direction |
+| `[x,y,z]_output%%end`    | Real    | End of the output domain in the [x,y,z]-direction |
 | `lag_txt_wrt`           | Logical | Write Lagrangian bubble data to `.dat` files |
 | `lag_header`            | Logical | Write header to Lagrangian bubble `.dat` files |
 | `lag_db_wrt`            | Logical | Write Lagrangian bubble data to silo/hdf5 database files |
@@ -666,12 +667,12 @@ If `file_per_process` is true, then pre_process, simulation, and post_process mu
 
 - `probe_wrt` activates the output of state variables at coordinates specified by `probe(i)%[x;y,z]`.
 
-- `output_partial_domain` activates the output of part of the domain specified by `[x,y,z]_output%beg` and `[x,y,z]_output%end`.
+- `output_partial_domain` activates the output of part of the domain specified by `[x,y,z]_output%%beg` and `[x,y,z]_output%%end`.
 This is useful for large domains where only a portion of the domain is of interest.
 It is not supported when `precision = 1` and `format = 1`.
 It also cannot be enabled with `flux_wrt`, `heat_ratio_wrt`, `pres_inf_wrt`, `c_wrt`, `omega_wrt`, `ib`, `schlieren_wrt`, `qm_wrt`, or 'liutex_wrt'.
 
-### 8. Acoustic Source {#acoustic-source}
+### 8. Acoustic Source {#sec-acoustic-source}
 
 | Parameter                             | Type    | Description |
 | ---:                                  | :----:  | :--- |
@@ -702,7 +703,7 @@ It also cannot be enabled with `flux_wrt`, `heat_ratio_wrt`, `pres_inf_wrt`, `c_
 | `acoustic(i)%%bb_bandwidth`           | Real    | The bandwidth of each frequency in the broadband wave |
 | `acoustic(i)%%bb_lowest_freq`         | Real    | The lower frequency bound of the broadband wave |
 
-Details of the transducer acoustic source model can be found in [Maeda and Colonius (2017)](@ref references).
+Details of the transducer acoustic source model can be found in \cite Maeda17.
 
 - `acoustic_source` activates the acoustic source module.
 
@@ -714,7 +715,7 @@ Details of the transducer acoustic source model can be found in [Maeda and Colon
 
 - `%%loc(j)` specifies the location of the acoustic source in the $j$-th coordinate direction. For planer support, the location defines midpoint of the source plane. For transducer arrays, the location defines the center of the transducer or transducer array (not the focal point; for 3D it's the tip of the spherical cap, for 2D it's the tip of the arc).
 
-- `%%pulse` specifies the acoustic wave form. `%%pulse = 1`, `2`, `3` and `4` correspond to sinusoidal wave, Gaussian wave, square wave and broadband wave, respectively. The implementation of the broadband wave is based on [Tam (2005)](@ref references)
+- `%%pulse` specifies the acoustic wave form. `%%pulse = 1`, `2`, `3` and `4` correspond to sinusoidal wave, Gaussian wave, square wave and broadband wave, respectively. The implementation of the broadband wave is based on \cite Tam05
 
 - `%%npulse` specifies the number of cycles of the acoustic wave generated. Only applies to `%%pulse = 1 and 3` (sine and square waves), and must be an integer for non-planar waves.
 
@@ -752,7 +753,7 @@ Details of the transducer acoustic source model can be found in [Maeda and Colon
 
 - `%%bb_lowest_freq` specifies the lower frequency bound of the broadband acoustic wave. The upper frequency bound will be calculated as `%%bb_lowest_freq + %%bb_num_freq * %%bb_bandwidth`. The wave is no longer broadband below the lower bound and above the upper bound.
 
-### 9. Sub-grid Bubble Models
+### 9. Sub-grid Bubble Models {#sec-bubble-models}
 
 | Parameter          | Type    | Description                                    |
 | ---:               | :----:  |          :---                                  |
@@ -795,7 +796,9 @@ This table lists the sub-grid bubble model parameters, which can be utilized in 
 
 - `bub_pp` specifies simulation parameters for the EE and/or EL bubble model. 
 
-Implementation of the parameters into the model follows [Ando (2010)](@ref references).
+Implementation of the parameters into the model follows \cite Ando10.
+
+See @ref equations "Equations" Section 9 for the bubble dynamics equations.
 
 #### 9.1 Ensemble-Averaged Bubble Model
 
@@ -816,10 +819,10 @@ Implementation of the parameters into the model follows [Ando (2010)](@ref refer
 This table lists the ensemble-averaged bubble model parameters.
 
 - `polytropic` activates polytropic gas compression in the bubble.
-When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due to heat and mass transfer across the bubble wall with constant heat and mass transfer coefficients based on ([Preston et al., 2007](@ref references)).
+When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due to heat and mass transfer across the bubble wall with constant heat and mass transfer coefficients based on (\cite Preston07).
 
 - `thermal` specifies a model for heat transfer across the bubble interface by an integer from 1 through 3.
-`thermal = 1`, `2`, and `3` correspond to no heat transfer (adiabatic gas compression), isothermal heat transfer, and heat transfer with a constant heat transfer coefficient based on [Preston et al., 2007](@ref references), respectively.
+`thermal = 1`, `2`, and `3` correspond to no heat transfer (adiabatic gas compression), isothermal heat transfer, and heat transfer with a constant heat transfer coefficient based on \cite Preston07, respectively.
 
 - `polydisperse` activates polydispersity in the bubble model through a probability density function (PDF) of the equilibrium bubble radius. Simpson's rule is used for integrating the log-normal PDF of equilibrium bubble radius for polydisperse populations.
 
@@ -857,17 +860,17 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 
 - `nBubs_glb` Total number of bubbles. Their initial conditions need to be specified in the ./input/lag_bubbles.dat file. See the example cases for additional information.
 
-- `solver_approach` Specifies the Euler-Lagrange coupling method: [1] enables a one-way coupling approach, where the bubbles do not influence the Eulerian field. [2] activates the two-way coupling approach based on [Maeda and Colonius (2018)](@ref references), where the effect of the bubbles is added in the Eulerian field as source terms.
+- `solver_approach` Specifies the Euler-Lagrange coupling method: [1] enables a one-way coupling approach, where the bubbles do not influence the Eulerian field. [2] activates the two-way coupling approach based on \cite Maeda18, where the effect of the bubbles is added in the Eulerian field as source terms.
 
-- `cluster_type` Specifies method to find p_inf (pressure that drives the bubble dynamics): [1] activates the bilinear interpolation of the pressure field, while [2] enables the bubble dynamic closure based on [Maeda and Colonius (2018)](@ref references), the full model is obtained when `pressure_corrector` is true.
+- `cluster_type` Specifies method to find p_inf (pressure that drives the bubble dynamics): [1] activates the bilinear interpolation of the pressure field, while [2] enables the bubble dynamic closure based on \cite Maeda18, the full model is obtained when `pressure_corrector` is true.
 
-- `smooth_type` Specifies the smoothening method of projecting the lagrangian bubbles in the Eulerian field: [1] activates the gaussian kernel function described in  [Maeda and Colonius (2018)](@ref references), while [2] activates the delta kernel function where the effect of the bubble is only seen in the specific bubble location cell.
+- `smooth_type` Specifies the smoothening method of projecting the lagrangian bubbles in the Eulerian field: [1] activates the gaussian kernel function described in  \cite Maeda18, while [2] activates the delta kernel function where the effect of the bubble is only seen in the specific bubble location cell.
 
-- `heatTransfer_model` Activates the heat transfer model at the bubble's interface based on ([Preston et al., 2007](@ref references)).
+- `heatTransfer_model` Activates the heat transfer model at the bubble's interface based on (\cite Preston07).
 
-- `massTransfer_model` Activates the mass transfer model at the bubble's interface based on ([Preston et al., 2007](@ref references)).
+- `massTransfer_model` Activates the mass transfer model at the bubble's interface based on (\cite Preston07).
 
-### 10. Velocity Field Setup
+### 10. Velocity Field Setup {#sec-velocity-field-setup}
 
 | Parameter              | Type    | Description |
 | ---:                   | :----:  | :--- |
@@ -897,11 +900,11 @@ The parameters are optionally used to define initial velocity profiles and pertu
 
 - `mixlayer_vel_coef` is a parameter for the hyperbolic tangent profile of a mixing layer when `mixlayer_vel_profile = 'T'`. The mean streamwise velocity profile is given as:
 
-$$ u = \mbox{patch\_icpp(1)\%vel(1)} * \tanh( y_{cc} * \mbox{mixlayer\_vel\_coef}) $$
+\f[ u = \text{patch\_icpp(1)\%vel(1)} \cdot \tanh( y_{cc} \cdot \text{mixlayer\_vel\_coef}) \f]
 
-- `mixlayer_perturb` activates the velocity perturbation for a temporal mixing layer with hyperbolic tangent mean streamwise velocity profile, using an inverter version of the spectrum-based synthetic turbulence generation method proposed by Guo et al. (2023, JFM). This option only works for `p > 0` and `mixlayer_vel_profile = 'T'`.
+- `mixlayer_perturb` activates the velocity perturbation for a temporal mixing layer with hyperbolic tangent mean streamwise velocity profile, using an inverter version of the spectrum-based synthetic turbulence generation method proposed by \cite Guo23. This option only works for `p > 0` and `mixlayer_vel_profile = 'T'`.
 
-### 11. Phase Change Model
+### 11. Phase Change Model {#sec-phase-change}
 | Parameter              | Type    | Description                                    |
 | ---:                   | :----:  |          :---                                  |
 | `relax`                | Logical | Activates Phase Change model |
@@ -917,7 +920,7 @@ $$ u = \mbox{patch\_icpp(1)\%vel(1)} * \tanh( y_{cc} * \mbox{mixlayer\_vel\_coef
 
 - `ptgalpha_eps` Specifies the tolerance used for the Newton Solvers used in the pTg-equilibrium model.
 
-### 12. Artificial Mach Number
+### 12. Artificial Mach Number {#sec-artificial-mach-number}
 | Parameter              | Type    | Description                                    |
 | ---:                   | :----:  |          :---                                  |
 | `pi_fac`               | Real    | Ratio of artificial and true `pi_\infty` values|
@@ -937,7 +940,7 @@ This parameter enables the use of true `pi_\infty` in bubble dynamics models whe
 
 `k_x[y,z]`, `w_x[y,z]`, `p_x[y,z]`, and `g_x[y,z]` define an oscillating acceleration in the `x[y,z]` direction with the form
 
-$$ a_{x[y,z]} = g_{x[y,z]} + k_{x[y,z]}\sin\left(w_{x[y,z]}t + p_{x[y,z]}\right). $$
+\f[ a_{x[y,z]} = g_{x[y,z]} + k_{x[y,z]}\sin\left(w_{x[y,z]}t + p_{x[y,z]}\right). \f]
 
 By convention, positive accelerations in the `x[y,z]` direction are in the positive `x[y,z]` direction.
 
@@ -957,7 +960,7 @@ By convention, positive accelerations in the `x[y,z]` direction are in the posit
 
 - `relativity` only works for `mhd` enabled and activates relativistic MHD (RMHD) simulation.
 
-- `hyper_cleaning` [Dedner et al., 2002](@ref references) only works with `mhd` in 2D/3D and reduces numerical `div B` errors by propagation and damping. Currently not compatible with HLLD (`riemann_solver = 4`).
+- `hyper_cleaning` \cite Dedner02 only works with `mhd` in 2D/3D and reduces numerical `div B` errors by propagation and damping. Currently not compatible with HLLD (`riemann_solver = 4`).
 
 - `hyper_cleaning_speed` sets the propagation speed of divergence-cleaning waves.
 
@@ -982,43 +985,43 @@ Note: For relativistic flow, the conservative and primitive densities are differ
 | `cont_damage_s`   | Real    | Power `s` for continuum damage model                |
 | `alpha_bar`       | Real    | Damage factor (rate) for continuum damage model     |
 
-- `cont_damage` activates continuum damage model for solid materials. Requires `tau_star`, `cont_damage_s`, and `alpha_bar` to be set (empirically determined) ([Cao et al., 2019](@ref references)).
+- `cont_damage` activates continuum damage model for solid materials. Requires `tau_star`, `cont_damage_s`, and `alpha_bar` to be set (empirically determined) (\cite Cao19).
 
 ### 16. Cylindrical Coordinates
 
 When ``cyl_coord = 'T'`` is set in 3D the following constraints must be met:
 
-- `bc_y%beg = -14`  enables the axis boundary condition
+- `bc_y%%beg = -14`  enables the axis boundary condition
 
-- `bc_z%beg = bc_z%end = -1`  enables periodic boundary conditions in the azimuthal direction
+- `bc_z%%beg = bc_z%%end = -1`  enables periodic boundary conditions in the azimuthal direction
 
-- `z_domain%beg = 0`  sets the azimuthal starting point to 0
+- `z_domain%%beg = 0`  sets the azimuthal starting point to 0
 
-- `z_comain%end = 2*math.pi` to set the azimuthal ending point to $2\pi$ (note, requires `import math` in the case file)
+- `z_domain%%end = 2*math.pi` to set the azimuthal ending point to \f$2\pi\f$ (note, requires `import math` in the case file)
 
 When ``cyl_coord = 'T'`` is set in 2D the following constraints must be met:
 
-- `bc_y%beg = -2` to enable reflective boundary conditions
+- `bc_y%%beg = -2` to enable reflective boundary conditions
 
 ### 17. Chemistry
 
 | Parameter                     | Type    | Description                                              |
 | ---:                          | :---:   | :---                                                     |
 | `chemistry`                   | Logical | Enable chemistry simulation                              |
-| `chem_params%diffusion`       | Logical | Enable multispecies diffusion                            |
-| `chem_params%reactions`       | Logical | Enable chemical reactions                                |
-| `chem_params%gamma_method`    | Integer | Methodology for calculating the heat capacity ratio      |
-| `chem_params%transport_model` | Integer | Methodology for calculating the diffusion coefficients   |
+| `chem_params%%diffusion`       | Logical | Enable multispecies diffusion                            |
+| `chem_params%%reactions`       | Logical | Enable chemical reactions                                |
+| `chem_params%%gamma_method`    | Integer | Methodology for calculating the heat capacity ratio      |
+| `chem_params%%transport_model` | Integer | Methodology for calculating the diffusion coefficients   |
 | `cantera_file`                | String  | Cantera-format mechanism file (e.g., .yaml)              |
 
-- `chem_params%transport_model` specifies the methodology for calculating diffusion coefficients and other transport properties, `1` for mixture-average, `2` for Unity-Lewis
+- `chem_params%%transport_model` specifies the methodology for calculating diffusion coefficients and other transport properties, `1` for mixture-average, `2` for Unity-Lewis
 
 - `cantera_file` specifies the chemical mechanism file. If the file is part of the standard Cantera library, only the filename is required. Otherwise, the file must be located in the same directory as your `case.py` file
 
 
 ## Enumerations
 
-### Boundary conditions
+### Boundary conditions {#boundary-conditions}
 
 | #    | Type           | Description |
 | ---: | :----:         | :---        |
@@ -1041,26 +1044,26 @@ When ``cyl_coord = 'T'`` is set in 2D the following constraints must be met:
 *: This boundary condition is only used for `bc_y%%beg` when using cylindrical coordinates (``cyl_coord = 'T'`` and 3D). For axisymmetric problems, use `bc_y%%beg = -2` with ``cyl_coord = 'T'`` in 2D.
 
 The boundary condition supported by the MFC are listed in table [Boundary Conditions](#boundary-conditions).
-Their number (`#`) corresponds to the input value in `input.py` labeled `bc_[x,y,z]%[beg,end]` (see table [Simulation Algorithm Parameters](#5-simulation-algorithm)).
-The entries labeled "Characteristic." are characteristic boundary conditions based on [Thompson (1987)](@ref references) and [Thompson (1990)](@ref references).
+Their number (`#`) corresponds to the input value in `input.py` labeled `bc_[x,y,z]%[beg,end]` (see table [Simulation Algorithm Parameters](#sec-simulation-algorithm)).
+The entries labeled "Characteristic." are characteristic boundary conditions based on \cite Thompson87 and \cite Thompson90.
 
 ### Generalized Characteristic Boundary conditions
 
 | Parameter                     | Type    | Description |
 | ---:                          | :----:  | :--- |
-| `bc_[x,y,z]%grcbc_in`         | Logical | Enable grcbc for subsonic inflow |
-| `bc_[x,y,z]%grcbc_out`        | Logical | Enable grcbc for subsonic outflow (pressure)|
-| `bc_[x,y,z]%grcbc_vel_out`    | Logical | Enable grcbc for subsonic outflow (pressure + normal velocity) |
-| `bc_[x,y,z]%vel_in`           | Real Array | Inflow velocities in x, y and z directions |
-| `bc_[x,y,z]%vel_out`          | Real Array | Outflow velocities in x, y and z directions |
-| `bc_[x,y,z]%pres_in`          | Real    | Inflow pressure |
-| `bc_[x,y,z]%pres_out`         | Real    | Outflow pressure |
-| `bc_[x,y,z]%alpha_rho_in`     | Real Array | Inflow density |
-| `bc_[x,y,z]%alpha_in`         | Real Array | Inflow void fraction |
+| `bc_[x,y,z]%%grcbc_in`         | Logical | Enable grcbc for subsonic inflow |
+| `bc_[x,y,z]%%grcbc_out`        | Logical | Enable grcbc for subsonic outflow (pressure)|
+| `bc_[x,y,z]%%grcbc_vel_out`    | Logical | Enable grcbc for subsonic outflow (pressure + normal velocity) |
+| `bc_[x,y,z]%%vel_in`           | Real Array | Inflow velocities in x, y and z directions |
+| `bc_[x,y,z]%%vel_out`          | Real Array | Outflow velocities in x, y and z directions |
+| `bc_[x,y,z]%%pres_in`          | Real    | Inflow pressure |
+| `bc_[x,y,z]%%pres_out`         | Real    | Outflow pressure |
+| `bc_[x,y,z]%%alpha_rho_in`     | Real Array | Inflow density |
+| `bc_[x,y,z]%%alpha_in`         | Real Array | Inflow void fraction |
 
-This boundary condition can be used for subsonic inflow (`bc_[x,y,z]%[beg,end]` = -7) and subsonic outflow (`bc_[x,y,z]%[beg,end]` = -8) characteristic boundary conditions. These are based on [Pirozzoli (2013)](@ref references). This enables to provide inflow and outflow conditions outside the computational domain.
+This boundary condition can be used for subsonic inflow (`bc_[x,y,z]%[beg,end]` = -7) and subsonic outflow (`bc_[x,y,z]%[beg,end]` = -8) characteristic boundary conditions. These are based on \cite Pirozzoli13. This enables to provide inflow and outflow conditions outside the computational domain.
 
-### Patch types
+### Patch types {#patch-types}
 
 | #    | Name                    | Dim.  | Smooth | Description |
 | ---: | :----:                  | :---: |  :---: | :--- |
@@ -1084,14 +1087,14 @@ This boundary condition can be used for subsonic inflow (`bc_[x,y,z]%[beg,end]` 
 | 18   | 2D Varcircle            | 2     | Y      | Requires `[x,y]_centroid`, `radius`, and `thickness` |
 | 19   | 3D Varcircle            | 3     | Y      | Requires `[x,y,z]_centroid`, `length_z`, `radius`, and `thickness` |
 | 20   | 2D Taylor-Green Vortex  | 2     | N      | Requires `[x,y]_centroid`, `length_x`, `length_y`, `vel(1)`, and `vel(2)` |
-| 21   | Model                   | 2 & 3 | Y      | Imports a Model (STL/OBJ). Requires `model%%filepath`. |
+| 21   | Model                   | 2 & 3 | Y      | Imports a Model (STL/OBJ). Requires `model_filepath`. |
 
 The patch types supported by the MFC are listed in table [Patch Types](#patch-types).
 This includes types exclusive to one-, two-, and three-dimensional problems.
 The patch type number (`#`) corresponds to the input value in `input.py` labeled  `patch_icpp(j)%%geometry` where $j$ is the patch index.
 Each patch requires a different set of parameters, which are also listed in this table.
 
-### Immersed Boundary Patch Types
+### Immersed Boundary Patch Types {#immersed-boundary-patch-types}
 
 | #    | Name               | Dim.   |
 | ---: | :----:             | :---   |
@@ -1116,7 +1119,7 @@ Each patch requires a different set of parameters, which are also listed in this
 | 10   | Annular Transducer Array     | 2D-Axisym | #9 requirements                                                                         |
 | 11   | Circular Transducer Array    | 3D        | #7 requirements, `%%element_polygon_ratio`, and `%%rotate_angle`                        |
 
-The required parameters for each acoustic support type are listed in [Acoustic Source](#acoustic-source).
+The required parameters for each acoustic support type are listed in [Acoustic Source](#sec-acoustic-source).
 The acoustic support number (`#`) corresponds to the acoustic support type `Acoustic(i)%%support`, where $i$ is the acoustic source index.
 For each `%%parameter`, prepend the parameter with `acoustic(i)%`.
 
@@ -1137,12 +1140,12 @@ Description of the acoustic support types:
 - `%%support = 1` specifies an infinite source plane that is normal to the $x$-axis and intersects with the axis at $x=$ `%%loc(1)` in 1D simulation. `%%dir > 0` specifies a rightward propagating wave, and `%%dir < 0` specifies a leftward propagating wave. `%%dir = 0` is not allowed.
 
 - `%%support = 2` specifies a semi-infinite source plane in 2D simulation.
-The midplane location is [`%%loc(1)`, `%%loc(2)`] and the normal vector is [$\mathrm{cos}$(`%%dir`), $\mathrm{sin}$(`%%dir`)]. The length of the source plane is `%%length`, and the plane is perpendicular to the direction of wave propagation (defined by `%%dir`).
+The midplane location is [`%%loc(1)`, `%%loc(2)`] and the normal vector is [\f$\mathrm{cos}\f$(`%%dir`), \f$\mathrm{sin}\f$(`%%dir`)]. The length of the source plane is `%%length`, and the plane is perpendicular to the direction of wave propagation (defined by `%%dir`).
 
 - `%%support = 3` specifies a semi-infinite source plane in 3D simulation.
-The midplane location is [`%%loc(1)`, `%%loc(2)`] and the normal vector is [$\mathrm{cos}$(`%%dir`), $\mathrm{sin}$(`%%dir`)]. The length of the source plane is `%%length`, and the plane is perpendicular to the direction of wave propagation (defined by `%%dir`). Note that the plane is infinite in the $z$-direction, so `%%loc(3)` is not required.
+The midplane location is [`%%loc(1)`, `%%loc(2)`] and the normal vector is [\f$\mathrm{cos}\f$(`%%dir`), \f$\mathrm{sin}\f$(`%%dir`)]. The length of the source plane is `%%length`, and the plane is perpendicular to the direction of wave propagation (defined by `%%dir`). Note that the plane is infinite in the $z$-direction, so `%%loc(3)` is not required.
 
-- `%%support = 5` specifies a circular transducer in 2D simulation. The transducer is centered at [`%%loc(1)`, `%%loc(2)`] with a focal length of `%%foc_length` and an aperture of `%%aperture`. The center location is not the focal point; it is the tip of the circular arc (intersection of the arc and the x-axis). The aperture is the length of the projection of the circular arc onto the y-axis. If a semi-circle is desired, set the aperture to double the focal length. Note that this is physically a cylindrical transducer, and due to the complexity of Green's function for 2D wave, no closed-form solution is available for the 2D circular transducer, and an approximate is used (see [Maeda and Colonius (2017)](@ref references) for details). For the mass source term correction factor, the theoretical approximation factor of -0.5 in ($r_{foc}^{-0.5}$) is replaced by an empirically determined factor of -0.85.
+- `%%support = 5` specifies a circular transducer in 2D simulation. The transducer is centered at [`%%loc(1)`, `%%loc(2)`] with a focal length of `%%foc_length` and an aperture of `%%aperture`. The center location is not the focal point; it is the tip of the circular arc (intersection of the arc and the x-axis). The aperture is the length of the projection of the circular arc onto the y-axis. If a semi-circle is desired, set the aperture to double the focal length. Note that this is physically a cylindrical transducer, and due to the complexity of Green's function for 2D wave, no closed-form solution is available for the 2D circular transducer, and an approximate is used (see \cite Maeda17 for details). For the mass source term correction factor, the theoretical approximation factor of -0.5 in ($r_{foc}^{-0.5}$) is replaced by an empirically determined factor of -0.85.
 
 - `%%support = 6` specifies a spherical transducer in 2D axisymmetric simulation. It is identical to `%%support = 5` in terms of simulation parameters. Note that this is physically a spherical 3D transducer, so the equation is exact.
 

@@ -1,5 +1,5 @@
 !>
-!! @file m_constants.f90
+!! @file
 !! @brief Contains constant values used throughout the code(s).
 
 module m_constants

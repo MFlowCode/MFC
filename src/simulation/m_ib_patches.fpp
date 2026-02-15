@@ -1,5 +1,5 @@
 !>
-!! @file m_patches.fpp
+!! @file
 !! @brief Contains module m_patches
 
 #:include 'case.fpp'
@@ -21,13 +21,11 @@ module m_ib_patches
 
     use m_helper
 
-    use m_compute_levelset      ! Subroutines to calculate levelsets for IBs
-
     use m_mpi_common
 
     implicit none
 
-    private; public :: s_apply_ib_patches, s_update_ib_rotation_matrix
+    private; public :: s_apply_ib_patches, s_update_ib_rotation_matrix, s_instantiate_STL_models, models, f_convert_cyl_to_cart
 
     real(wp) :: x_centroid, y_centroid, z_centroid
     real(wp) :: length_x, length_y, length_z
@@ -41,13 +39,6 @@ module m_ib_patches
     !! named components in the ic_patch_parameters type (see m_derived_types.f90
     !! for additional details). They are employed as a means to more concisely
     !! perform the actions necessary to lay out a particular patch on the grid.
-
-    real(wp) :: eta
-    $:GPU_DECLARE(create='[eta]')
-    !! In the case that smoothing of patch boundaries is enabled and the boundary
-    !! between two adjacent patches is to be smeared out, this variable's purpose
-    !! is to act as a pseudo volume fraction to indicate the contribution of each
-    !! patch toward the composition of a cell's fluid state.
 
     real(wp) :: cart_x, cart_y, cart_z
     real(wp) :: sph_phi !<
@@ -64,13 +55,15 @@ module m_ib_patches
 
     character(len=5) :: istr ! string to store int to string result for error checking
 
+    type(t_model_array), allocatable, target :: models(:)
+    $:GPU_DECLARE(create='[models]')
+    !! array of STL models that can be allocated and then used in IB marker and levelset compute
+
 contains
 
-    impure subroutine s_apply_ib_patches(ib_markers_sf, levelset, levelset_norm)
+    impure subroutine s_apply_ib_patches(ib_markers_sf)
 
         integer, dimension(:, :, :), intent(inout), optional :: ib_markers_sf
-        type(levelset_field), intent(inout), optional :: levelset !< Levelset determined by models
-        type(levelset_norm_field), intent(inout), optional :: levelset_norm !< Levelset_norm determined by models
 
         integer :: i
 
@@ -84,19 +77,15 @@ contains
 
                 if (patch_ib(i)%geometry == 8) then
                     call s_ib_sphere(i, ib_markers_sf)
-                    call s_sphere_levelset(i, levelset, levelset_norm)
                 elseif (patch_ib(i)%geometry == 9) then
                     call s_ib_cuboid(i, ib_markers_sf)
-                    call s_cuboid_levelset(i, levelset, levelset_norm)
                 elseif (patch_ib(i)%geometry == 10) then
                     call s_ib_cylinder(i, ib_markers_sf)
-                    call s_cylinder_levelset(i, levelset, levelset_norm)
                 elseif (patch_ib(i)%geometry == 11) then
                     call s_ib_3D_airfoil(i, ib_markers_sf)
-                    call s_3D_airfoil_levelset(i, levelset, levelset_norm)
                     ! STL+IBM patch
                 elseif (patch_ib(i)%geometry == 12) then
-                    call s_ib_model(i, ib_markers_sf, levelset, levelset_norm)
+                    call s_ib_model(i, ib_markers_sf)
                 end if
             end do
             !> @}
@@ -109,19 +98,15 @@ contains
             do i = 1, num_ibs
                 if (patch_ib(i)%geometry == 2) then
                     call s_ib_circle(i, ib_markers_sf)
-                    call s_circle_levelset(i, levelset, levelset_norm)
                 elseif (patch_ib(i)%geometry == 3) then
                     call s_ib_rectangle(i, ib_markers_sf)
-                    call s_rectangle_levelset(i, levelset, levelset_norm)
                 elseif (patch_ib(i)%geometry == 4) then
                     call s_ib_airfoil(i, ib_markers_sf)
-                    call s_airfoil_levelset(i, levelset, levelset_norm)
                     ! STL+IBM patch
                 elseif (patch_ib(i)%geometry == 5) then
-                    call s_ib_model(i, ib_markers_sf, levelset, levelset_norm)
+                    call s_ib_model(i, ib_markers_sf)
                 elseif (patch_ib(i)%geometry == 6) then
                     call s_ib_ellipse(i, ib_markers_sf)
-                    call s_ellipse_levelset(i, levelset, levelset_norm)
                 end if
             end do
             !> @}
@@ -129,6 +114,133 @@ contains
         end if
 
     end subroutine s_apply_ib_patches
+
+    subroutine s_instantiate_STL_models()
+
+        ! Variables for IBM+STL
+        real(wp) :: normals(1:3) !< Boundary normal buffer
+        integer :: boundary_vertex_count, boundary_edge_count, total_vertices !< Boundary vertex
+        real(wp), allocatable, dimension(:, :, :) :: boundary_v !< Boundary vertex buffer
+        real(wp), allocatable, dimension(:, :) :: interpolated_boundary_v !< Interpolated vertex buffer
+        real(wp) :: distance !< Levelset distance buffer
+        logical :: interpolate !< Logical variable to determine whether or not the model should be interpolated
+
+        integer :: i, j, k !< Generic loop iterators
+        integer :: patch_id
+
+        type(t_bbox) :: bbox, bbox_old
+        type(t_model) :: model
+        type(ic_model_parameters) :: params
+
+        real(wp) :: eta
+        real(wp), dimension(1:3) :: point, model_center
+        real(wp) :: grid_mm(1:3, 1:2)
+
+        real(wp), dimension(1:4, 1:4) :: transform, transform_n
+
+        call random_seed()
+
+        do patch_id = 1, num_ibs
+            if (patch_ib(patch_id)%geometry == 5 .or. patch_ib(patch_id)%geometry == 12) then
+                allocate (models(patch_id)%model)
+                print *, " * Reading model: "//trim(patch_ib(patch_id)%model_filepath)
+
+                model = f_model_read(patch_ib(patch_id)%model_filepath)
+                params%scale(:) = patch_ib(patch_id)%model_scale(:)
+                params%translate(:) = patch_ib(patch_id)%model_translate(:)
+                params%rotate(:) = patch_ib(patch_id)%model_rotate(:)
+                params%spc = patch_ib(patch_id)%model_spc
+                params%threshold = patch_ib(patch_id)%model_threshold
+
+                if (f_approx_equal(dot_product(params%scale, params%scale), 0._wp)) then
+                    params%scale(:) = 1._wp
+                end if
+
+                if (proc_rank == 0) then
+                    print *, " * Transforming model."
+                end if
+
+                ! Get the model center before transforming the model
+                bbox_old = f_create_bbox(model)
+                model_center(1:3) = (bbox_old%min(1:3) + bbox_old%max(1:3))/2._wp
+
+                ! Compute the transform matrices for vertices and normals
+                transform = f_create_transform_matrix(params, model_center)
+                transform_n = f_create_transform_matrix(params)
+
+                call s_transform_model(model, transform, transform_n)
+
+                ! Recreate the bounding box after transformation
+                bbox = f_create_bbox(model)
+
+                ! Show the number of vertices in the original STL model
+                if (proc_rank == 0) then
+                    print *, ' * Number of input model vertices:', 3*model%ntrs
+                end if
+
+                call f_check_boundary(model, boundary_v, boundary_vertex_count, boundary_edge_count)
+
+                ! Check if the model needs interpolation
+                if (p > 0) then
+                    call f_check_interpolation_3D(model, (/dx, dy, dz/), interpolate)
+                else
+                    call f_check_interpolation_2D(boundary_v, boundary_edge_count, (/minval(dx), minval(dy), 0._wp/), interpolate)
+                end if
+
+                ! Show the number of edges and boundary edges in 2D STL models
+                if (proc_rank == 0 .and. p == 0) then
+                    print *, ' * Number of 2D model boundary edges:', boundary_edge_count
+                end if
+
+                ! Interpolate the STL model along the edges (2D) and on triangle facets (3D)
+                if (interpolate) then
+                    if (proc_rank == 0) then
+                        print *, ' * Interpolating STL vertices.'
+                    end if
+
+                    if (p > 0) then
+                        call f_interpolate_3D(model, (/dx, dy, dz/), interpolated_boundary_v, total_vertices)
+                    else
+                        call f_interpolate_2D(boundary_v, boundary_edge_count, (/dx, dy, dz/), interpolated_boundary_v, total_vertices)
+                    end if
+
+                    if (proc_rank == 0) then
+                        print *, ' * Total number of interpolated boundary vertices:', total_vertices
+                    end if
+                end if
+
+                if (proc_rank == 0) then
+                    write (*, "(A, 3(2X, F20.10))") "    > Model:  Min:", bbox%min(1:3)
+                    write (*, "(A, 3(2X, F20.10))") "    >         Cen:", (bbox%min(1:3) + bbox%max(1:3))/2._wp
+                    write (*, "(A, 3(2X, F20.10))") "    >         Max:", bbox%max(1:3)
+
+                    grid_mm(1, :) = (/minval(x_cc(0:m)) - 0.e5_wp*dx(0), maxval(x_cc(0:m)) + 0.e5_wp*dx(m)/)
+                    grid_mm(2, :) = (/minval(y_cc(0:n)) - 0.e5_wp*dy(0), maxval(y_cc(0:n)) + 0.e5_wp*dy(n)/)
+
+                    if (p > 0) then
+                        grid_mm(3, :) = (/minval(z_cc(0:p)) - 0.e5_wp*dz(0), maxval(z_cc(0:p)) + 0.e5_wp*dz(p)/)
+                    else
+                        grid_mm(3, :) = (/0._wp, 0._wp/)
+                    end if
+
+                    write (*, "(A, 3(2X, F20.10))") "    > Domain: Min:", grid_mm(:, 1)
+                    write (*, "(A, 3(2X, F20.10))") "    >         Cen:", (grid_mm(:, 1) + grid_mm(:, 2))/2._wp
+                    write (*, "(A, 3(2X, F20.10))") "    >         Max:", grid_mm(:, 2)
+                end if
+
+                models(patch_id)%model = model
+                models(patch_id)%boundary_v = boundary_v
+                models(patch_id)%boundary_edge_count = boundary_edge_count
+                models(patch_id)%interpolate = interpolate
+                if (interpolate) then
+                    models(patch_id)%interpolated_boundary_v = interpolated_boundary_v
+                    models(patch_id)%total_vertices = total_vertices
+                end if
+
+            end if
+        end do
+
+    end subroutine s_instantiate_STL_models
 
     !> The circular patch is a 2D geometry that may be used, for
         !!              example, in creating a bubble or a droplet. The geometry
@@ -154,11 +266,6 @@ contains
         center(1) = patch_ib(patch_id)%x_centroid
         center(2) = patch_ib(patch_id)%y_centroid
         radius = patch_ib(patch_id)%radius
-
-        ! Initializing the pseudo volume fraction value to 1. The value will
-        ! be modified as the patch is laid out on the grid, but only in the
-        ! case that smoothing of the circular patch's boundary is enabled.
-        eta = 1._wp
 
         ! Checking whether the circle covers a particular cell in the domain
         ! and verifying whether the current patch has permission to write to
@@ -192,7 +299,7 @@ contains
         integer :: i, j, k
         integer :: Np1, Np2
 
-        real(wp), dimension(1:3) :: xy_local !< x and y coordinates in local IB frame
+        real(wp), dimension(1:3) :: xy_local, offset !< x and y coordinates in local IB frame
         real(wp), dimension(1:2) :: center !< x and y coordinates in local IB frame
         real(wp), dimension(1:3, 1:3) :: inverse_rotation
 
@@ -203,20 +310,16 @@ contains
         ma = patch_ib(patch_id)%m
         ta = patch_ib(patch_id)%t
         inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
+        offset(:) = patch_ib(patch_id)%centroid_offset(:)
 
-        ! rank(dx) is not consistent between pre_process and simulation. This IFDEF prevents compilation errors
-#ifdef MFC_PRE_PROCESS
-        Np1 = int((pa*ca_in/dx)*20)
-        Np2 = int(((ca_in - pa*ca_in)/dx)*20)
-#else
         Np1 = int((pa*ca_in/dx(0))*20)
         Np2 = int(((ca_in - pa*ca_in)/dx(0))*20)
-#endif
         Np = Np1 + Np2 + 1
+        $:GPU_UPDATE(device='[Np]')
 
         if (.not. allocated(airfoil_grid_u)) then
-            allocate (airfoil_grid_u(1:Np))
-            allocate (airfoil_grid_l(1:Np))
+            @:ALLOCATE(airfoil_grid_u(1:Np))
+            @:ALLOCATE(airfoil_grid_l(1:Np))
 
             ! TODO :: The below instantiations are already handles by the loop below
             airfoil_grid_u(1)%x = 0._wp
@@ -224,8 +327,6 @@ contains
 
             airfoil_grid_l(1)%x = 0._wp
             airfoil_grid_l(1)%y = 0._wp
-
-            eta = 1._wp
 
             do i = 1, Np1 + Np2 - 1
                 ! TODO :: This allocated the upper and lower airfoil arrays, and does not need to be performed each time the IB markers are updated. Place this as a separate subroutine.
@@ -271,15 +372,17 @@ contains
             airfoil_grid_l(Np)%x = ca_in
             airfoil_grid_l(Np)%y = 0._wp
 
+            $:GPU_UPDATE(device='[airfoil_grid_l,airfoil_grid_u]')
+
         end if
 
         $:GPU_PARALLEL_LOOP(private='[i,j,xy_local,k,f]', copy='[ib_markers_sf]',&
-                  & copyin='[patch_id,center,inverse_rotation,ma,ca_in,airfoil_grid_u,airfoil_grid_l]', collapse=2)
+                  & copyin='[patch_id,center,inverse_rotation,offset,ma,ca_in,airfoil_grid_u,airfoil_grid_l]', collapse=2)
         do j = 0, n
             do i = 0, m
                 xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp] ! get coordinate frame centered on IB
                 xy_local = matmul(inverse_rotation, xy_local) ! rotate the frame into the IB's coordinates
-                xy_local = xy_local - patch_ib(patch_id)%centroid_offset ! airfoils are a patch that require a centroid offset
+                xy_local = xy_local - offset ! airfoils are a patch that require a centroid offset
 
                 if (xy_local(1) >= 0._wp .and. xy_local(1) <= ca_in) then
                     xa = xy_local(1)/ca_in
@@ -345,7 +448,7 @@ contains
         integer :: i, j, k, l
         integer :: Np1, Np2
 
-        real(wp), dimension(1:3) :: xyz_local, center !< x, y, z coordinates in local IB frame
+        real(wp), dimension(1:3) :: xyz_local, center, offset !< x, y, z coordinates in local IB frame
         real(wp), dimension(1:3, 1:3) :: inverse_rotation
 
         center(1) = patch_ib(patch_id)%x_centroid
@@ -357,31 +460,26 @@ contains
         ma = patch_ib(patch_id)%m
         ta = patch_ib(patch_id)%t
         inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
+        offset(:) = patch_ib(patch_id)%centroid_offset(:)
 
-        ! rank(dx) is not consistent between pre_process and simulation. This IFDEF prevents compilation errors
-#ifdef MFC_PRE_PROCESS
-        Np1 = int((pa*ca_in/dx)*20)
-        Np2 = int(((ca_in - pa*ca_in)/dx)*20)
-#else
+        z_max = lz/2
+        z_min = -lz/2
+
         Np1 = int((pa*ca_in/dx(0))*20)
         Np2 = int(((ca_in - pa*ca_in)/dx(0))*20)
-#endif
         Np = Np1 + Np2 + 1
+        $:GPU_UPDATE(device='[Np]')
 
         if (.not. allocated(airfoil_grid_u)) then
-            allocate (airfoil_grid_u(1:Np))
-            allocate (airfoil_grid_l(1:Np))
+
+            @:ALLOCATE(airfoil_grid_u(1:Np))
+            @:ALLOCATE(airfoil_grid_l(1:Np))
 
             airfoil_grid_u(1)%x = 0._wp
             airfoil_grid_u(1)%y = 0._wp
 
             airfoil_grid_l(1)%x = 0._wp
             airfoil_grid_l(1)%y = 0._wp
-
-            z_max = lz/2
-            z_min = -lz/2
-
-            eta = 1._wp
 
             do i = 1, Np1 + Np2 - 1
                 if (i <= Np1) then
@@ -425,16 +523,18 @@ contains
 
             airfoil_grid_l(Np)%x = ca_in
             airfoil_grid_l(Np)%y = 0._wp
+
+            $:GPU_UPDATE(device='[airfoil_grid_l,airfoil_grid_u]')
         end if
 
         $:GPU_PARALLEL_LOOP(private='[i,j,l,xyz_local,k,f]', copy='[ib_markers_sf]',&
-                  & copyin='[patch_id,center,inverse_rotation,ma,ca_in,airfoil_grid_u,airfoil_grid_l]', collapse=3)
+                  & copyin='[patch_id,center,inverse_rotation,offset,ma,ca_in,airfoil_grid_u,airfoil_grid_l,z_min,z_max]', collapse=3)
         do l = 0, p
             do j = 0, n
                 do i = 0, m
                     xyz_local = [x_cc(i) - center(1), y_cc(j) - center(2), z_cc(l) - center(3)] ! get coordinate frame centered on IB
                     xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordinates
-                    xyz_local = xyz_local - patch_ib(patch_id)%centroid_offset ! airfoils are a patch that require a centroid offset
+                    xyz_local = xyz_local - offset ! airfoils are a patch that require a centroid offset
 
                     if (xyz_local(3) >= z_min .and. xyz_local(3) <= z_max) then
 
@@ -446,7 +546,7 @@ contains
                                 end do
                                 if (f_approx_equal(airfoil_grid_u(k)%x, xyz_local(1))) then
                                     if (xyz_local(2) <= airfoil_grid_u(k)%y) then
-                                        !!IB
+                                        !IB
                                         ib_markers_sf(i, j, l) = patch_id
                                     end if
                                 else
@@ -517,12 +617,6 @@ contains
         length(2) = patch_ib(patch_id)%length_y
         inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
 
-        ! Since the rectangular patch does not allow for its boundaries to
-        ! be smoothed out, the pseudo volume fraction is set to 1 to ensure
-        ! that only the current patch contributes to the fluid state in the
-        ! cells that this patch covers.
-        eta = 1._wp
-
         ! Checking whether the rectangle covers a particular cell in the
         ! domain and verifying whether the current patch has the permission
         ! to write to that cell. If both queries check out, the primitive
@@ -577,11 +671,6 @@ contains
         center(2) = patch_ib(patch_id)%y_centroid
         center(3) = patch_ib(patch_id)%z_centroid
         radius = patch_ib(patch_id)%radius
-
-        ! Initializing the pseudo volume fraction value to 1. The value will
-        ! be modified as the patch is laid out on the grid, but only in the
-        ! case that smoothing of the spherical patch's boundary is enabled.
-        eta = 1._wp
 
         ! Checking whether the sphere covers a particular cell in the domain
         ! and verifying whether the current patch has permission to write to
@@ -638,12 +727,6 @@ contains
         length(2) = patch_ib(patch_id)%length_y
         length(3) = patch_ib(patch_id)%length_z
         inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
-
-        ! Since the cuboidal patch does not allow for its boundaries to get
-        ! smoothed out, the pseudo volume fraction is set to 1 to make sure
-        ! that only the current patch contributes to the fluid state in the
-        ! cells that this patch covers.
-        eta = 1._wp
 
         ! Checking whether the cuboid covers a particular cell in the domain
         ! and verifying whether the current patch has permission to write to
@@ -714,11 +797,6 @@ contains
         length(3) = patch_ib(patch_id)%length_z
         radius = patch_ib(patch_id)%radius
         inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
-
-        ! Initializing the pseudo volume fraction value to 1. The value will
-        ! be modified as the patch is laid out on the grid, but only in the
-        ! case that smearing of the cylindrical patch's boundary is enabled.
-        eta = 1._wp
 
         ! Checking whether the cylinder covers a particular cell in the
         ! domain and verifying whether the current patch has the permission
@@ -811,215 +889,57 @@ contains
     !! @param ib_markers_sf Array to track patch ids
     !! @param STL_levelset STL levelset
     !! @param STL_levelset_norm STL levelset normals
-    subroutine s_ib_model(patch_id, ib_markers_sf, STL_levelset, STL_levelset_norm)
+    subroutine s_ib_model(patch_id, ib_markers_sf)
 
         integer, intent(in) :: patch_id
         integer, dimension(0:m, 0:n, 0:p), intent(inout) :: ib_markers_sf
 
-        ! Variables for IBM+STL
-        type(levelset_field), optional, intent(inout) :: STL_levelset !< Levelset determined by models
-        type(levelset_norm_field), optional, intent(inout) :: STL_levelset_norm !< Levelset_norm determined by models
-        real(wp) :: normals(1:3) !< Boundary normal buffer
-        integer :: boundary_vertex_count, boundary_edge_count, total_vertices !< Boundary vertex
-        real(wp), allocatable, dimension(:, :, :) :: boundary_v !< Boundary vertex buffer
-        real(wp), allocatable, dimension(:, :) :: interpolated_boundary_v !< Interpolated vertex buffer
-        real(wp) :: distance !< Levelset distance buffer
-        logical :: interpolate !< Logical variable to determine whether or not the model should be interpolated
-
         integer :: i, j, k !< Generic loop iterators
 
-        type(t_bbox) :: bbox, bbox_old
-        type(t_model) :: model
-        type(ic_model_parameters) :: params
+        type(t_model), pointer :: model
 
-        real(wp), dimension(1:3) :: point, model_center
+        real(wp) :: eta
+        real(wp), dimension(1:3) :: point, local_point, offset
+        real(wp), dimension(1:3) :: center, xyz_local
+        real(wp), dimension(1:3, 1:3) :: inverse_rotation
 
-        real(wp) :: grid_mm(1:3, 1:2)
+        model => models(patch_id)%model
+        center = 0._wp
+        center(1) = patch_ib(patch_id)%x_centroid
+        center(2) = patch_ib(patch_id)%y_centroid
+        if (p > 0) center(3) = patch_ib(patch_id)%z_centroid
+        inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
+        offset(:) = patch_ib(patch_id)%centroid_offset(:)
 
-        integer :: cell_num
-        integer :: ncells
+        do i = 0, m
+            do j = 0, n
+                do k = 0, p
 
-        real(wp), dimension(1:4, 1:4) :: transform, transform_n
-
-        print *, " * Reading model: "//trim(patch_ib(patch_id)%model_filepath)
-
-        model = f_model_read(patch_ib(patch_id)%model_filepath)
-        params%scale(:) = patch_ib(patch_id)%model_scale(:)
-        params%translate(:) = patch_ib(patch_id)%model_translate(:)
-        params%rotate(:) = patch_ib(patch_id)%model_rotate(:)
-        params%spc = patch_ib(patch_id)%model_spc
-        params%threshold = patch_ib(patch_id)%model_threshold
-
-        if (proc_rank == 0) then
-            print *, " * Transforming model."
-        end if
-
-        ! Get the model center before transforming the model
-        bbox_old = f_create_bbox(model)
-        model_center(1:3) = (bbox_old%min(1:3) + bbox_old%max(1:3))/2._wp
-
-        ! Compute the transform matrices for vertices and normals
-        transform = f_create_transform_matrix(params, model_center)
-        transform_n = f_create_transform_matrix(params)
-
-        call s_transform_model(model, transform, transform_n)
-
-        ! Recreate the bounding box after transformation
-        bbox = f_create_bbox(model)
-
-        ! Show the number of vertices in the original STL model
-        if (proc_rank == 0) then
-            print *, ' * Number of input model vertices:', 3*model%ntrs
-        end if
-
-        call f_check_boundary(model, boundary_v, boundary_vertex_count, boundary_edge_count)
-
-        ! Check if the model needs interpolation
-        if (p > 0) then
-            call f_check_interpolation_3D(model, (/dx, dy, dz/), interpolate)
-        else
-            call f_check_interpolation_2D(boundary_v, boundary_edge_count, (/dx, dy, dz/), interpolate)
-        end if
-
-        ! Show the number of edges and boundary edges in 2D STL models
-        if (proc_rank == 0 .and. p == 0) then
-            print *, ' * Number of 2D model boundary edges:', boundary_edge_count
-        end if
-
-        ! Interpolate the STL model along the edges (2D) and on triangle facets (3D)
-        if (interpolate) then
-            if (proc_rank == 0) then
-                print *, ' * Interpolating STL vertices.'
-            end if
-
-            if (p > 0) then
-                call f_interpolate_3D(model, (/dx, dy, dz/), interpolated_boundary_v, total_vertices)
-            else
-                call f_interpolate_2D(boundary_v, boundary_edge_count, (/dx, dy, dz/), interpolated_boundary_v, total_vertices)
-            end if
-
-            if (proc_rank == 0) then
-                print *, ' * Total number of interpolated boundary vertices:', total_vertices
-            end if
-        end if
-
-        if (proc_rank == 0) then
-            write (*, "(A, 3(2X, F20.10))") "    > Model:  Min:", bbox%min(1:3)
-            write (*, "(A, 3(2X, F20.10))") "    >         Cen:", (bbox%min(1:3) + bbox%max(1:3))/2._wp
-            write (*, "(A, 3(2X, F20.10))") "    >         Max:", bbox%max(1:3)
-
-            !call s_model_write("__out__.stl", model)
-            !call s_model_write("__out__.obj", model)
-
-            grid_mm(1, :) = (/minval(x_cc) - 0.e5_wp*dx, maxval(x_cc) + 0.e5_wp*dx/)
-            grid_mm(2, :) = (/minval(y_cc) - 0.e5_wp*dy, maxval(y_cc) + 0.e5_wp*dy/)
-
-            if (p > 0) then
-                grid_mm(3, :) = (/minval(z_cc) - 0.e5_wp*dz, maxval(z_cc) + 0.e5_wp*dz/)
-            else
-                grid_mm(3, :) = (/0._wp, 0._wp/)
-            end if
-
-            write (*, "(A, 3(2X, F20.10))") "    > Domain: Min:", grid_mm(:, 1)
-            write (*, "(A, 3(2X, F20.10))") "    >         Cen:", (grid_mm(:, 1) + grid_mm(:, 2))/2._wp
-            write (*, "(A, 3(2X, F20.10))") "    >         Max:", grid_mm(:, 2)
-        end if
-
-        ncells = (m + 1)*(n + 1)*(p + 1)
-        do i = 0, m; do j = 0, n; do k = 0, p
-
-                    cell_num = i*(n + 1)*(p + 1) + j*(p + 1) + (k + 1)
-                    if (proc_rank == 0 .and. mod(cell_num, ncells/100) == 0) then
-                        write (*, "(A, I3, A)", advance="no") &
-                            char(13)//"  * Generating grid: ", &
-                            nint(100*real(cell_num)/ncells), "%"
-                    end if
-
-                    point = (/x_cc(i), y_cc(j), 0._wp/)
+                    xyz_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]
                     if (p > 0) then
-                        point(3) = z_cc(k)
+                        xyz_local(3) = z_cc(k) - center(3)
                     end if
+                    xyz_local = matmul(inverse_rotation, xyz_local)
+                    xyz_local = xyz_local - offset
 
                     if (grid_geometry == 3) then
-                        point = f_convert_cyl_to_cart(point)
+                        xyz_local = f_convert_cyl_to_cart(xyz_local)
                     end if
 
-                    eta = f_model_is_inside(model, point, (/dx, dy, dz/), patch_ib(patch_id)%model_spc)
+                    if (p == 0) then
+                        eta = f_model_is_inside(model, xyz_local, (/dx(i), dy(j), 0._wp/), patch_ib(patch_id)%model_spc)
+                    else
+                        eta = f_model_is_inside(model, xyz_local, (/dx(i), dy(j), dz(k)/), patch_ib(patch_id)%model_spc)
+                    end if
 
                     ! Reading STL boundary vertices and compute the levelset and levelset_norm
                     if (eta > patch_ib(patch_id)%model_threshold) then
                         ib_markers_sf(i, j, k) = patch_id
                     end if
 
-                    ! 3D models
-                    if (p > 0) then
-
-                        ! Get the boundary normals and shortest distance between the cell center and the model boundary
-                        call f_distance_normals_3D(model, point, normals, distance)
-
-                        ! Get the shortest distance between the cell center and the interpolated model boundary
-                        if (interpolate) then
-                            STL_levelset%sf(i, j, k, patch_id) = f_interpolated_distance(interpolated_boundary_v, &
-                                                                                         total_vertices, &
-                                                                                         point)
-                        else
-                            STL_levelset%sf(i, j, k, patch_id) = distance
-                        end if
-
-                        ! Correct the sign of the levelset
-                        if (ib_markers_sf(i, j, k) > 0) then
-                            STL_levelset%sf(i, j, k, patch_id) = -abs(STL_levelset%sf(i, j, k, patch_id))
-                        end if
-
-                        ! Correct the sign of the levelset_norm
-                        if (ib_markers_sf(i, j, k) == 0) then
-                            normals(1:3) = -normals(1:3)
-                        end if
-
-                        ! Assign the levelset_norm
-                        STL_levelset_norm%sf(i, j, k, patch_id, 1:3) = normals(1:3)
-                    else
-                        ! 2D models
-                        if (interpolate) then
-                            ! Get the shortest distance between the cell center and the model boundary
-                            STL_levelset%sf(i, j, 0, patch_id) = f_interpolated_distance(interpolated_boundary_v, &
-                                                                                         total_vertices, &
-                                                                                         point)
-                        else
-                            ! Get the shortest distance between the cell center and the interpolated model boundary
-                            STL_levelset%sf(i, j, 0, patch_id) = f_distance(boundary_v, &
-                                                                            boundary_edge_count, &
-                                                                            point)
-                        end if
-
-                        ! Correct the sign of the levelset
-                        if (ib_markers_sf(i, j, k) > 0) then
-                            STL_levelset%sf(i, j, 0, patch_id) = -abs(STL_levelset%sf(i, j, 0, patch_id))
-                        end if
-
-                        ! Get the boundary normals
-                        call f_normals(boundary_v, &
-                                       boundary_edge_count, &
-                                       point, &
-                                       normals)
-
-                        ! Correct the sign of the levelset_norm
-                        if (ib_markers_sf(i, j, k) == 0) then
-                            normals(1:3) = -normals(1:3)
-                        end if
-
-                        ! Assign the levelset_norm
-                        STL_levelset_norm%sf(i, j, k, patch_id, 1:3) = normals(1:3)
-
-                    end if
-                end do; end do; end do
-
-        if (proc_rank == 0) then
-            print *, ""
-            print *, " * Cleaning up."
-        end if
-
-        call s_model_free(model)
+                end do
+            end do
+        end do
 
     end subroutine s_ib_model
 

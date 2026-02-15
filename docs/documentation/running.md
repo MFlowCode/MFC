@@ -309,8 +309,8 @@ If you want to restart a simulation,
 1. For the Computational Domain Parameters
     - Have the following removed __except__ `m`, `n`, and `p`:
 		- All domain/mesh information
-			- `(xyz)_domain%beg`
-			- `(xyz)_domain%end`
+			- `(xyz)_domain%%beg`
+			- `(xyz)_domain%%end`
 			- `stretch_(xyz)`
 			- `a_(xyz)`
 			- `(xyz)_a`
@@ -334,11 +334,11 @@ If you want to restart a simulation,
 
 3. For Patches
 	- Have all information about old patches (used in the `case.py` file) removed.
-		- `patch_icpp(1)%all variables`
-		- `patch_icpp(2)%all variables`
-		- `patch_icpp(num_patches)%all variables`
+		- `patch_icpp(1)%%all variables`
+		- `patch_icpp(2)%%all variables`
+		- `patch_icpp(num_patches)%%all variables`
 	- Add information about new patches that will be introduced, if any. The parameter num_patches should reflect this addition.
-		- e.g. `patch_icpp(1)%some variables of interest`
+		- e.g. `patch_icpp(1)%%some variables of interest`
 
 4. For Fluid properties
 	- Keep information about the fluid properties

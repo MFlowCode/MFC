@@ -1,5 +1,5 @@
 !>
-!! @file m_global_parameters.f90
+!! @file
 !! @brief Contains module m_global_parameters
 
 #:include 'case.fpp'
@@ -205,10 +205,6 @@ module m_global_parameters
 #ifdef MFC_MPI
 
     type(mpi_io_var), public :: MPI_IO_DATA
-    type(mpi_io_ib_var), public :: MPI_IO_IB_DATA
-    type(mpi_io_airfoil_ib_var), public :: MPI_IO_airfoil_IB_DATA
-    type(mpi_io_levelset_var), public :: MPI_IO_levelset_DATA
-    type(mpi_io_levelset_norm_var), public :: MPI_IO_levelsetnorm_DATA
 
     character(LEN=name_len) :: mpiiofs
     integer :: mpi_info_int !<
@@ -991,12 +987,6 @@ contains
                 allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
                 MPI_IO_DATA%var(i)%sf => null()
             end do
-        end if
-
-        if (ib) then
-            allocate (MPI_IO_IB_DATA%var%sf(0:m, 0:n, 0:p))
-            allocate (MPI_IO_levelset_DATA%var%sf(0:m, 0:n, 0:p, 1:num_ibs))
-            allocate (MPI_IO_levelsetnorm_DATA%var%sf(0:m, 0:n, 0:p, 1:num_ibs, 1:3))
         end if
 #endif
 

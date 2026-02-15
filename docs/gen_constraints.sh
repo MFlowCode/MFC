@@ -14,4 +14,5 @@ echo "Generating case constraints documentation..."
 python3 "$REPO_ROOT/toolchain/mfc/gen_case_constraints_docs.py" > "$REPO_ROOT/docs/documentation/case_constraints.md"
 echo "✓ Generated docs/documentation/case_constraints.md"
 
-
+python3 "$REPO_ROOT/toolchain/mfc/gen_physics_docs.py" > "$REPO_ROOT/docs/documentation/physics_constraints.md"
+echo "✓ Generated docs/documentation/physics_constraints.md"

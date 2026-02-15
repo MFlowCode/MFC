@@ -1,5 +1,5 @@
 !>
-!! @file m_rhs.f90
+!! @file
 !! @brief Contains module m_rhs
 
 #:include 'case.fpp'

@@ -1,5 +1,5 @@
 !>
-!! @file m_time_steppers.f90
+!! @file
 !! @brief Contains module m_time_steppers
 
 #:include 'macros.fpp'
@@ -82,6 +82,7 @@ module m_time_steppers
 
     $:GPU_DECLARE(create='[q_cons_ts,q_prim_vf,q_T_sf,rhs_vf,q_prim_ts1,q_prim_ts2,rhs_mv,rhs_pb,rk_coef,stor,bc_type]')
 
+!> @cond
 #if defined(__NVCOMPILER_GPU_UNIFIED_MEM)
     real(stp), allocatable, dimension(:, :, :, :), pinned, target :: q_cons_ts_pool_host
 #elif defined(FRONTIER_UNIFIED)
@@ -90,6 +91,7 @@ module m_time_steppers
     integer(kind=8) :: pool_size
     type(c_ptr) :: cptr_host, cptr_device
 #endif
+!> @endcond
 
 contains
 
@@ -127,6 +129,7 @@ contains
             @:PREFER_GPU(q_cons_ts(i)%vf)
         end do
 
+!> @cond
 #if defined(__NVCOMPILER_GPU_UNIFIED_MEM)
         if (num_ts == 2 .and. nv_uvm_out_of_core) then
             ! host allocation for q_cons_ts(2)%vf(j)%sf for all j
@@ -216,6 +219,7 @@ contains
             end do
         end do
 #else
+!> @endcond
         do i = 1, num_ts
             do j = 1, sys_size
                 @:ALLOCATE(q_cons_ts(i)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
@@ -224,7 +228,9 @@ contains
             end do
             @:ACC_SETUP_VFs(q_cons_ts(i))
         end do
+!> @cond
 #endif
+!> @endcond
 
         ! Allocating the cell-average primitive ts variables
         if (probe_wrt) then
@@ -835,7 +841,7 @@ contains
             end if
         end do
 
-        call s_update_mib(num_ibs, levelset, levelset_norm)
+        call s_update_mib(num_ibs)
 
     end subroutine s_propagate_immersed_boundaries
 
