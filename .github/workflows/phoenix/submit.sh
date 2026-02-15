@@ -48,6 +48,7 @@ submit_output=$(sbatch <<EOT
 $sbatch_device_opts
 #SBATCH -t 03:00:00                # Duration of the job (Ex: 15 mins)
 #SBATCH -q embers                  # QOS Name
+#SBATCH --requeue                  # Auto-requeue on preemption
 #SBATCH -o$output_file             # Combined output and error messages file
 
 set -e
