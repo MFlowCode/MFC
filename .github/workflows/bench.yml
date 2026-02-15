@@ -46,6 +46,13 @@ jobs:
           else
             # Get PR number from workflow_run
             PR_NUMBER="${{ github.event.workflow_run.pull_requests[0].number }}"
+            if [ -z "$PR_NUMBER" ]; then
+              # Cross-repo PRs don't populate pull_requests[]. Search by head SHA.
+              HEAD_SHA="${{ github.event.workflow_run.head_sha }}"
+              PR_NUMBER=$(gh api "repos/${{ github.repository }}/pulls?state=open&sort=updated&direction=desc&per_page=30" \
+                  --jq ".[] | select(.head.sha == \"$HEAD_SHA\") | .number" | head -1)
+            fi
+
             if [ -n "$PR_NUMBER" ]; then
               echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
 
@@ -53,14 +60,20 @@ jobs:
               PR_AUTHOR=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER --jq '.user.login')
               echo "author=$PR_AUTHOR" >> $GITHUB_OUTPUT
 
-              # Check if PR is approved
-              APPROVED=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER/reviews \
-                --jq '[.[] | select(.state == "APPROVED")] | length')
-              if [ "$APPROVED" -gt 0 ]; then
-                echo "approved=true" >> $GITHUB_OUTPUT
-              else
-                echo "approved=false" >> $GITHUB_OUTPUT
-              fi
+              # Check if PR is approved by a maintainer/admin (ignore AI bot approvals)
+              APPROVERS=$(gh api "repos/${{ github.repository }}/pulls/$PR_NUMBER/reviews" \
+                  --jq '[.[] | select(.state == "APPROVED") | .user.login] | unique | .[]')
+              APPROVED="false"
+              for approver in $APPROVERS; do
+                  PERM=$(gh api "repos/${{ github.repository }}/collaborators/$approver/permission" \
+                      --jq '.permission' 2>/dev/null || echo "none")
+                  if [ "$PERM" = "admin" ] || [ "$PERM" = "maintain" ] || [ "$PERM" = "write" ]; then
+                      echo "  Approved by $approver (permission: $PERM)"
+                      APPROVED="true"
+                      break
+                  fi
+              done
+              echo "approved=$APPROVED" >> $GITHUB_OUTPUT
             else
               echo "pr_number=" >> $GITHUB_OUTPUT
               echo "approved=false" >> $GITHUB_OUTPUT
@@ -76,8 +89,7 @@ jobs:
       (
         github.event_name == 'workflow_dispatch' ||
         needs.file-changes.outputs.pr_approved == 'true' ||
-        needs.file-changes.outputs.pr_author == 'sbryngelson' ||
-        needs.file-changes.outputs.pr_author == 'wilfonba'
+        needs.file-changes.outputs.pr_author == 'sbryngelson'
       )
     needs: [file-changes]
     strategy:

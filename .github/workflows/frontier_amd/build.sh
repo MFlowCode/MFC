@@ -18,8 +18,10 @@ fi
 
 . ./mfc.sh load -c famd -m g
 
-# Set up persistent build cache
-source .github/scripts/setup-build-cache.sh frontier_amd "$job_device" "$job_interface"
+# Only set up build cache for test suite, not benchmarks
+if [ "$run_bench" != "bench" ]; then
+    source .github/scripts/setup-build-cache.sh frontier_amd "$job_device" "$job_interface"
+fi
 
 max_attempts=3
 attempt=1
