@@ -99,8 +99,6 @@ jobs:
         with:
           path: build
           key: mfc-build-${{ matrix.os }}-${{ matrix.mpi }}-${{ matrix.debug }}-${{ matrix.precision }}-${{ matrix.intel }}-${{ hashFiles('CMakeLists.txt', 'toolchain/dependencies/**', 'toolchain/cmake/**', 'src/**/*.fpp', 'src/**/*.f90') }}
-          restore-keys: |
-            mfc-build-${{ matrix.os }}-${{ matrix.mpi }}-${{ matrix.debug }}-${{ matrix.precision }}-${{ matrix.intel }}-
 
       - name: Setup MacOS
         if:   matrix.os == 'macos'

@@ -40,8 +40,6 @@ jobs:
         with:
           path: build
           key: mfc-coverage-${{ hashFiles('CMakeLists.txt', 'toolchain/dependencies/**', 'toolchain/cmake/**', 'src/**/*.fpp', 'src/**/*.f90') }}
-          restore-keys: |
-            mfc-coverage-
 
       - name: Setup Ubuntu
         run: |
