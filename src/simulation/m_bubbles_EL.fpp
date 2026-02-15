@@ -31,6 +31,8 @@ module m_bubbles_EL
 
     use m_ibm
 
+    use m_finite_differences
+
     implicit none
 
     !(nBub)
@@ -188,6 +190,29 @@ contains
         end if
         $:GPU_UPDATE(device='[moving_lag_bubbles, lag_pressure_force, &
             & lag_gravity_force, lag_vel_model, lag_drag_model]')
+
+        ! Allocate cell-centered pressure gradient arrays and FD coefficients
+        if (lag_params%vel_model > 0 .and. lag_params%pressure_force) then
+            @:ALLOCATE(grad_p_x(0:m, 0:n, 0:p))
+            @:ALLOCATE(fd_coeff_x_pgrad(-fd_number:fd_number, 0:m))
+            call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x_pgrad, &
+                                                          buff_size, fd_number, fd_order)
+            $:GPU_UPDATE(device='[fd_coeff_x_pgrad]')
+            if (n > 0) then
+                @:ALLOCATE(grad_p_y(0:m, 0:n, 0:p))
+                @:ALLOCATE(fd_coeff_y_pgrad(-fd_number:fd_number, 0:n))
+                call s_compute_finite_difference_coefficients(n, y_cc, fd_coeff_y_pgrad, &
+                                                              buff_size, fd_number, fd_order)
+                $:GPU_UPDATE(device='[fd_coeff_y_pgrad]')
+            end if
+            if (p > 0) then
+                @:ALLOCATE(grad_p_z(0:m, 0:n, 0:p))
+                @:ALLOCATE(fd_coeff_z_pgrad(-fd_number:fd_number, 0:p))
+                call s_compute_finite_difference_coefficients(p, z_cc, fd_coeff_z_pgrad, &
+                                                              buff_size, fd_number, fd_order)
+                $:GPU_UPDATE(device='[fd_coeff_z_pgrad]')
+            end if
+        end if
 
         call s_read_input_bubbles(q_cons_vf, bc_type)
 
@@ -612,10 +637,9 @@ contains
 
         integer :: k, l
 
-        call nvtxStartRange("LAGRANGE-BUBBLE-DYNAMICS")
-
         ! Subgrid p_inf model based on Maeda and Colonius (2018).
         if (lag_params%pressure_corrector) then
+            call nvtxStartRange("LAGRANGE-BUBBLE-PINF-CORRECTION")
             ! Calculate velocity potentials (valid for one bubble per cell)
             $:GPU_PARALLEL_LOOP(private='[k,cell,paux,preterm1,term2,Romega,myR0,myR,myV,myPb,pint,term1_fac]')
             do k = 1, n_el_bubs_loc
@@ -635,8 +659,17 @@ contains
                 end if
             end do
             $:END_GPU_PARALLEL_LOOP()
+            call nvtxEndRange()
         end if
 
+        ! Precompute cell-centered pressure gradients for translational motion
+        if (moving_lag_bubbles .and. lag_pressure_force) then
+            call nvtxStartRange("LAGRANGE-BUBBLE-PRESSURE-GRADIENT")
+            call s_compute_pressure_gradients(q_prim_vf)
+            call nvtxEndRange()
+        end if
+
+        call nvtxStartRange("LAGRANGE-BUBBLE-DYNAMICS")
         ! Radial motion model
         adap_dt_stop_sum = 0
         $:GPU_PARALLEL_LOOP(private='[k,myalpha_rho,myalpha,Re,cell,myVapFlux,preterm1, term2, paux, pint, Romega,term1_fac,myR_m, mygamma_m, myPb, myMass_n, myMass_v,myR, myV, myBeta_c, myBeta_t, myR0, myPbdot, myMvdot,myPinf, aux1,aux2, myCson, myRho,gamma,pi_inf,qv,dmalf, dmntait, dmBtait, dm_bub_adv_src, dm_divu,adap_dt_stop,myPos,myVel]', &
@@ -737,6 +770,7 @@ contains
 
         end do
         $:END_GPU_PARALLEL_LOOP()
+        call nvtxEndRange
 
         if (adap_dt .and. adap_dt_stop_sum > 0) call s_mpi_abort("Adaptive time stepping failed to converge.")
 
@@ -745,8 +779,6 @@ contains
             if (moving_lag_bubbles) call s_enforce_EL_bubbles_boundary_conditions(q_prim_vf)
             call s_smear_voidfraction(bc_type)
         end if
-
-        call nvtxEndRange
 
     end subroutine s_compute_bubble_EL_dynamics
 
@@ -763,6 +795,7 @@ contains
 
         integer :: i, j, k, l
 
+        call nvtxStartRange("LAGRANGE-BUBBLE-EL-SOURCE")
         ! (q / (1 - beta)) * d(beta)/dt source
         if (p == 0) then
             $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
@@ -846,6 +879,7 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
         end do
+        call nvtxEndRange ! LAGRANGE-BUBBLE-EL-SOURCE
 
     end subroutine s_compute_bubbles_EL_source
 
@@ -892,7 +926,7 @@ contains
         type(integer_field), dimension(1:num_dims, 1:2), intent(in) :: bc_type
         integer :: i, j, k, l
 
-        call nvtxStartRange("BUBBLES-LAGRANGE-KERNELS")
+        call nvtxStartRange("BUBBLES-LAGRANGE-SMEARING")
         $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
         do i = 1, q_beta_idx
             do l = idwbuff(3)%beg, idwbuff(3)%end
@@ -929,7 +963,7 @@ contains
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
-        call nvtxEndRange ! BUBBLES-LAGRANGE-KERNELS
+        call nvtxEndRange ! BUBBLES-LAGRANGE-SMEARING
 
     end subroutine s_smear_voidfraction
 
@@ -1482,26 +1516,6 @@ contains
 
                 if (q_prim_vf(advxb)%sf(cell(1), cell(2), cell(3)) < (1._wp - lag_params%valmaxvoid)) then
                     keep_bubble(k) = 0
-                end if
-
-                ! Move bubbles back to surface of IB
-                if (ib) then
-                    cell = fd_number - buff_size
-                    call s_locate_cell(mtn_pos(k, 1:3, 2), cell, mtn_s(k, 1:3, 2))
-
-                    if (ib_markers%sf(cell(1), cell(2), cell(3)) /= 0) then
-                        patch_id = ib_markers%sf(cell(1), cell(2), cell(3))
-
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = 1, num_dims
-                            mtn_pos(k, i, 2) = mtn_pos(k, i, 2) - &
-                                               levelset_norm%sf(cell(1), cell(2), cell(3), patch_id, i) &
-                                               *levelset%sf(cell(1), cell(2), cell(3), patch_id)
-                        end do
-
-                        cell = fd_number - buff_size
-                        call s_locate_cell(mtn_pos(k, 1:3, 2), cell, mtn_s(k, 1:3, 2))
-                    end if
                 end if
             end if
         end do
@@ -2228,6 +2242,20 @@ contains
         @:DEALLOCATE(gas_dmvdt)
         @:DEALLOCATE(mtn_dposdt)
         @:DEALLOCATE(mtn_dveldt)
+
+        ! Deallocate pressure gradient arrays and FD coefficients
+        if (lag_params%vel_model > 0 .and. lag_params%pressure_force) then
+            @:DEALLOCATE(grad_p_x)
+            @:DEALLOCATE(fd_coeff_x_pgrad)
+            if (n > 0) then
+                @:DEALLOCATE(grad_p_y)
+                @:DEALLOCATE(fd_coeff_y_pgrad)
+                if (p > 0) then
+                    @:DEALLOCATE(grad_p_z)
+                    @:DEALLOCATE(fd_coeff_z_pgrad)
+                end if
+            end if
+        end if
 
     end subroutine s_finalize_lagrangian_solver
 

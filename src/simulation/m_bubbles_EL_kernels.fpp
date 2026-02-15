@@ -12,6 +12,16 @@ module m_bubbles_EL_kernels
 
     implicit none
 
+    ! Cell-centered pressure gradients (precomputed for translational motion)
+    real(wp), allocatable, dimension(:, :, :) :: grad_p_x, grad_p_y, grad_p_z
+    $:GPU_DECLARE(create='[grad_p_x, grad_p_y, grad_p_z]')
+
+    ! Finite-difference coefficients for pressure gradient computation
+    real(wp), allocatable, dimension(:, :) :: fd_coeff_x_pgrad
+    real(wp), allocatable, dimension(:, :) :: fd_coeff_y_pgrad
+    real(wp), allocatable, dimension(:, :) :: fd_coeff_z_pgrad
+    $:GPU_DECLARE(create='[fd_coeff_x_pgrad, fd_coeff_y_pgrad, fd_coeff_z_pgrad]')
+
 contains
 
     !> The purpose of this subroutine is to smear the strength of the lagrangian
@@ -372,6 +382,71 @@ contains
 
     end subroutine s_get_cell
 
+    !> Precomputes cell-centered pressure gradients (dp/dx, dp/dy, dp/dz) at all cell centers
+        !!      using finite-difference coefficients of the specified order. This avoids
+        !!      scattered memory accesses to the pressure field when computing translational
+        !!      bubble forces.
+        !! @param q_prim_vf Primitive variables (pressure is at index E_idx)
+    subroutine s_compute_pressure_gradients(q_prim_vf)
+
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+
+        integer :: i, j, k, r
+
+        ! dp/dx at all cell centers
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,r]', collapse=3)
+        do k = 0, p
+            do j = 0, n
+                do i = 0, m
+                    grad_p_x(i, j, k) = 0._wp
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do r = -fd_number, fd_number
+                        grad_p_x(i, j, k) = grad_p_x(i, j, k) + &
+                                            q_prim_vf(E_idx)%sf(i + r, j, k)*fd_coeff_x_pgrad(r, i)
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        ! dp/dy at all cell centers
+        if (n > 0) then
+            $:GPU_PARALLEL_LOOP(private='[i,j,k,r]', collapse=3)
+            do k = 0, p
+                do j = 0, n
+                    do i = 0, m
+                        grad_p_y(i, j, k) = 0._wp
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do r = -fd_number, fd_number
+                            grad_p_y(i, j, k) = grad_p_y(i, j, k) + &
+                                                q_prim_vf(E_idx)%sf(i, j + r, k)*fd_coeff_y_pgrad(r, j)
+                        end do
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+
+        ! dp/dz at all cell centers
+        if (p > 0) then
+            $:GPU_PARALLEL_LOOP(private='[i,j,k,r]', collapse=3)
+            do k = 0, p
+                do j = 0, n
+                    do i = 0, m
+                        grad_p_z(i, j, k) = 0._wp
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do r = -fd_number, fd_number
+                            grad_p_z(i, j, k) = grad_p_z(i, j, k) + &
+                                                q_prim_vf(E_idx)%sf(i, j, k + r)*fd_coeff_z_pgrad(r, k)
+                        end do
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+
+    end subroutine s_compute_pressure_gradients
+
     !! This function interpolates the velocity of Eulerian field at the position
             !! of the bubble.
             !! @param pos Position of the bubble in directiion i
@@ -491,74 +566,8 @@ contains
         integer, intent(in) :: i
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
 
-        real(wp) :: a, dp, vol, force
+        real(wp) :: dp, vol, force
         real(wp) :: v_rel
-        real(wp), dimension(fd_order) :: xi, eta, L
-
-        if (fd_order <= 2) then
-            if (i == 1) then
-                dp = (q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2), cell(3)) - &
-                      q_prim_vf(E_idx)%sf(cell(1) - 1, cell(2), cell(3)))/ &
-                     (x_cc(cell(1) + 1) - x_cc(cell(1) - 1))
-            elseif (i == 2) then
-                dp = (q_prim_vf(E_idx)%sf(cell(1), cell(2) + 1, cell(3)) - &
-                      q_prim_vf(E_idx)%sf(cell(1), cell(2) - 1, cell(3)))/ &
-                     (y_cc(cell(2) + 1) - y_cc(cell(2) - 1))
-            elseif (i == 3) then
-                dp = (q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3) + 1) - &
-                      q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3) - 1))/ &
-                     (z_cc(cell(3) + 1) - z_cc(cell(3) - 1))
-            end if
-        elseif (fd_order == 4) then
-            if (i == 1) then
-                xi(1) = x_cc(cell(1) - 1)
-                eta(1) = (q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3)) - &
-                          q_prim_vf(E_idx)%sf(cell(1) - 2, cell(2), cell(3)))/ &
-                         (x_cc(cell(1)) - x_cc(cell(1) - 2))
-                xi(2) = x_cc(cell(1))
-                eta(2) = (q_prim_vf(E_idx)%sf(cell(1) + 1, cell(2), cell(3)) - &
-                          q_prim_vf(E_idx)%sf(cell(1) - 1, cell(2), cell(3)))/ &
-                         (x_cc(cell(1) + 1) - x_cc(cell(1) - 1))
-                xi(3) = x_cc(cell(1) + 1)
-                eta(3) = (q_prim_vf(E_idx)%sf(cell(1) + 2, cell(2), cell(3)) - &
-                          q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3)))/ &
-                         (x_cc(cell(1) + 2) - x_cc(cell(1)))
-            elseif (i == 2) then
-                xi(1) = y_cc(cell(2) - 1)
-                eta(1) = (q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3)) - &
-                          q_prim_vf(E_idx)%sf(cell(1), cell(2) - 2, cell(3)))/ &
-                         (y_cc(cell(2)) - y_cc(cell(2) - 2))
-                xi(2) = y_cc(cell(2))
-                eta(2) = (q_prim_vf(E_idx)%sf(cell(1), cell(2) + 1, cell(3)) - &
-                          q_prim_vf(E_idx)%sf(cell(1), cell(2) - 1, cell(3)))/ &
-                         (y_cc(cell(2) + 1) - y_cc(cell(2) - 1))
-                xi(3) = y_cc(cell(2) + 1)
-                eta(3) = (q_prim_vf(E_idx)%sf(cell(1), cell(2) + 2, cell(3)) - &
-                          q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3)))/ &
-                         (y_cc(cell(2) + 2) - y_cc(cell(2)))
-            elseif (i == 3) then
-                xi(1) = z_cc(cell(3) - 1)
-                eta(1) = (q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3)) - &
-                          q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3) - 2))/ &
-                         (z_cc(cell(3)) - z_cc(cell(3) - 2))
-                xi(2) = z_cc(cell(3))
-                eta(2) = (q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3) + 1) - &
-                          q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3) - 1))/ &
-                         (z_cc(cell(3) + 1) - z_cc(cell(3) - 1))
-                xi(3) = z_cc(cell(3) + 1)
-                eta(3) = (q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3) + 2) - &
-                          q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3)))/ &
-                         (z_cc(cell(3) + 2) - z_cc(cell(3)))
-            end if
-
-            L(1) = ((pos - xi(2))*(pos - xi(3)))/((xi(1) - xi(2))*(xi(1) - xi(3)))
-            L(2) = ((pos - xi(1))*(pos - xi(3)))/((xi(2) - xi(1))*(xi(2) - xi(3)))
-            L(3) = ((pos - xi(1))*(pos - xi(2)))/((xi(3) - xi(1))*(xi(3) - xi(2)))
-
-            dp = L(1)*eta(1) + L(2)*eta(2) + L(3)*eta(3)
-        end if
-
-        vol = (4._wp/3._wp)*pi*(rad**3._wp)
 
         if (fd_order > 1) then
             v_rel = vel - f_interpolate_velocity(pos, cell, i, q_prim_vf)
@@ -576,7 +585,17 @@ contains
             force = force - (12._wp*pi*rad*v_rel)/Re
         end if
 
-        if (lag_params%pressure_force) then
+        if (lag_pressure_force) then
+            ! Use precomputed cell-centered pressure gradients
+            if (i == 1) then
+                dp = grad_p_x(cell(1), cell(2), cell(3))
+            elseif (i == 2) then
+                dp = grad_p_y(cell(1), cell(2), cell(3))
+            elseif (i == 3) then
+                dp = grad_p_z(cell(1), cell(2), cell(3))
+            end if
+
+            vol = (4._wp/3._wp)*pi*(rad**3._wp)
             force = force - vol*dp
         end if
 
