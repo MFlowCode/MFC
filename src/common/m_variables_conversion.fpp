@@ -339,7 +339,7 @@ contains
         ! their physical bounds to make sure that any mixture variables that
         ! are derived from them result within the limits that are set by the
         ! fluids physical parameters that make up the mixture
-        if (num_fluids == 1 .and. bubbles_euler) then
+        if (num_fluids == 1 .and. (bubbles_euler .or. particles_lagrange)) then
             rho_K = alpha_rho_K(1)
             gamma_K = gammas(1)
             pi_inf_K = pi_infs(1)

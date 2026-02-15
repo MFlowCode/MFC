@@ -42,20 +42,12 @@ module m_particles_EL
     $:GPU_DECLARE(create='[lag_part_id, particle_R0, Rmax_stats_part, Rmin_stats_part]')
 
     real(wp), allocatable, dimension(:) :: particle_mass            !< Particle Mass
-    ! real(wp), allocatable, dimension(:) :: gas_betaT         !< heatflux model (Preston et al., 2007)
-    ! real(wp), allocatable, dimension(:) :: gas_betaC         !< massflux model (Preston et al., 2007)
-    ! real(wp), allocatable, dimension(:) :: bub_dphidt        !< subgrid velocity potential (Maeda & Colonius, 2018)
     $:GPU_DECLARE(create='[particle_mass]')
-    ! bub_dphidt removed
 
     !(nPart, 1 -> actual val or 2 -> temp val)
-    ! real(wp), allocatable, dimension(:, :) :: gas_p          !< Pressure in the bubble
-    ! real(wp), allocatable, dimension(:, :) :: gas_mv         !< Vapor mass in the bubble
     real(wp), allocatable, dimension(:, :) :: particle_rad      !< Particle radius
-    ! real(wp), allocatable, dimension(:, :) :: intfc_vel      !< Velocity of the bubble interface
-    ! $:GPU_DECLARE(create='[gas_p, gas_mv, intfc_rad, intfc_vel]')
     $:GPU_DECLARE(create='[particle_rad]')
-    !New for particles
+
     !(nPart, 1-> x or 2->y or 3 ->z, 1 -> actual or 2 -> temporal val)
     real(wp), allocatable, dimension(:, :, :) :: particle_pos     !< Particle's position
     real(wp), allocatable, dimension(:, :, :) :: particle_posPrev !< Particle's previous position
@@ -64,12 +56,8 @@ module m_particles_EL
     $:GPU_DECLARE(create='[particle_pos, particle_posPrev, particle_vel, particle_s]')
     !(nPart, 1-> x or 2->y or 3 ->z, time-stage)
     real(wp), allocatable, dimension(:, :) :: particle_draddt   !< Time derivative of particle's radius
-    ! real(wp), allocatable, dimension(:, :) :: intfc_dveldt   !< Time derivative of particle's interface velocity
-    ! real(wp), allocatable, dimension(:, :) :: gas_dpdt       !< Time derivative of gas pressure
-    ! real(wp), allocatable, dimension(:, :) :: gas_dmvdt      !< Time derivative of the vapor mass in the bubble
     real(wp), allocatable, dimension(:, :, :) :: particle_dposdt  !< Time derivative of the particle's position
     real(wp), allocatable, dimension(:, :, :) :: particle_dveldt  !< Time derivative of the particle's velocity
-    ! $:GPU_DECLARE(create='[intfc_draddt, intfc_dveldt, gas_dpdt, gas_dmvdt, mtn_dposdt, mtn_dveldt]')
     $:GPU_DECLARE(create='[particle_draddt, particle_dposdt, particle_dveldt]')
 
     integer, private :: lag_num_ts                                  !<  Number of time stages in the time-stepping scheme
@@ -115,7 +103,7 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
 
-        integer :: nParticles_glb, i
+        integer :: nParticles_glb, i, j, k, nf
 
         ! Setting number of time-stages for selected time-stepping scheme
         lag_num_ts = time_stepper
@@ -134,16 +122,16 @@ contains
             call s_mpi_abort('Please check the lag_params%solver_approach input')
         end if
 
-        pcomm_coords(1)%beg = x_cb(mapcells)
-        pcomm_coords(1)%end = x_cb(m - mapcells - 1)
+        pcomm_coords(1)%beg = x_cb(-1)
+        pcomm_coords(1)%end = x_cb(m)
         $:GPU_UPDATE(device='[pcomm_coords(1)]')
         if (n > 0) then
-            pcomm_coords(2)%beg = y_cb(mapcells)
-            pcomm_coords(2)%end = y_cb(n - mapcells - 1)
+            pcomm_coords(2)%beg = y_cb(-1)
+            pcomm_coords(2)%end = y_cb(n)
             $:GPU_UPDATE(device='[pcomm_coords(2)]')
             if (p > 0) then
-                pcomm_coords(3)%beg = z_cb(mapCells)
-                pcomm_coords(3)%end = z_cb(p - mapCells - 1)
+                pcomm_coords(3)%beg = z_cb(-1)
+                pcomm_coords(3)%end = z_cb(p)
                 $:GPU_UPDATE(device='[pcomm_coords(3)]')
             end if
         end if
@@ -174,21 +162,12 @@ contains
         @:ALLOCATE(Rmax_stats_part(1:nParticles_glb))
         @:ALLOCATE(Rmin_stats_part(1:nParticles_glb))
         @:ALLOCATE(particle_mass(1:nParticles_glb))
-        ! @:ALLOCATE(gas_betaT(1:nParticles_glb))
-        ! @:ALLOCATE(gas_betaC(1:nParticles_glb))
-        ! @:ALLOCATE(bub_dphidt(1:nParticles_glb))
-        ! @:ALLOCATE(gas_p(1:nParticles_glb, 1:2))
-        ! @:ALLOCATE(gas_mv(1:nParticles_glb, 1:2))
         @:ALLOCATE(particle_rad(1:nParticles_glb, 1:2))
-        ! @:ALLOCATE(intfc_vel(1:nParticles_glb, 1:2))
         @:ALLOCATE(particle_pos(1:nParticles_glb, 1:3, 1:2))
         @:ALLOCATE(particle_posPrev(1:nParticles_glb, 1:3, 1:2))
         @:ALLOCATE(particle_vel(1:nParticles_glb, 1:3, 1:2))
         @:ALLOCATE(particle_s(1:nParticles_glb, 1:3, 1:2))
         @:ALLOCATE(particle_draddt(1:nParticles_glb, 1:lag_num_ts))
-        ! @:ALLOCATE(intfc_dveldt(1:nParticles_glb, 1:lag_num_ts))
-        ! @:ALLOCATE(gas_dpdt(1:nParticles_glb, 1:lag_num_ts))
-        ! @:ALLOCATE(gas_dmvdt(1:nParticles_glb, 1:lag_num_ts))
         @:ALLOCATE(particle_dposdt(1:nParticles_glb, 1:3, 1:lag_num_ts))
         @:ALLOCATE(particle_dveldt(1:nParticles_glb, 1:3, 1:lag_num_ts))
         @:ALLOCATE(f_p(1:nParticles_glb, 1:3))
@@ -217,6 +196,20 @@ contains
             & lag_gravity_force, lag_vel_model, lag_drag_model]')
 
         call s_read_input_particles(q_cons_vf)
+
+        !> Correct fluid volume fraction
+        $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3)
+        do k = idwint(3)%beg, idwint(3)%end
+            do j = idwint(2)%beg, idwint(2)%end
+                do i = idwint(1)%beg, idwint(1)%end
+                    do nf = 1, num_fluids
+                        q_cons_vf(E_idx + nf)%sf(i, j, k) = q_particles(1)%sf(i, j, k)
+                        q_cons_vf(nf)%sf(i, j, k) = q_particles(1)%sf(i, j, k)*q_cons_vf(nf)%sf(i, j, k)
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_initialize_particles_EL_module
 
@@ -290,40 +283,12 @@ contains
             if (n_el_particles_glb == 0) call s_mpi_abort('No particles in the domain. Check '//trim(lag_params%input_path))
         end if
 
-        if (num_procs > 1) then
-            call s_add_particles_to_transfer_list(n_el_particles_loc, particle_pos(:, :, 1), particle_posPrev(:, :, 1))
-            ! call s_mpi_sendrecv_particles(bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, &
-            !                               gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, &
-            !                               intfc_rad, intfc_vel, mtn_pos, mtn_posPrev, mtn_vel, &
-            !                               mtn_s, intfc_draddt, intfc_dveldt, gas_dpdt, &
-            !                               gas_dmvdt, mtn_dposdt, mtn_dveldt, lag_num_ts, n_el_particles_loc, &
-            !                               dest=1)
-
-            call s_mpi_sendrecv_solid_particles(particle_R0, Rmax_stats_part, Rmin_stats_part, particle_mass, f_p, lag_part_id, &
-                                                particle_rad, particle_pos, particle_posPrev, particle_vel, &
-                                                particle_s, particle_draddt, particle_dposdt, particle_dveldt, lag_num_ts, n_el_particles_loc, &
-                                                dest=1)
-
-        end if
-
         $:GPU_UPDATE(device='[particles_lagrange, lag_params]')
 
-        ! $:GPU_UPDATE(device='[lag_id,bub_R0,Rmax_stats,Rmin_stats,gas_mg, &
-        !     & gas_betaT,gas_betaC,bub_dphidt,gas_p,gas_mv, &
-        !     & intfc_rad,intfc_vel,mtn_pos,mtn_posPrev,mtn_vel, &
-        !     & mtn_s,intfc_draddt,intfc_dveldt,gas_dpdt,gas_dmvdt, &
-        !     & mtn_dposdt,mtn_dveldt,n_el_particles_loc]')
-
-        $:GPU_UPDATE(device='[lag_part_id,particle_R0,Rmax_stats_part,Rmin_stats_part,particle_mass, &
+        $:GPU_UPDATE(device='[lag_part_id,particle_R0,Rmax_stats_part,Rmin_stats_part,particle_mass,f_p, &
             & particle_rad,particle_pos,particle_posPrev,particle_vel, &
             & particle_s,particle_draddt, &
             & particle_dposdt,particle_dveldt,n_el_particles_loc]')
-
-        ! !$:GPU_PARALLEL_LOOP(private='[cell]')
-        do i = 1, n_el_particles_loc
-            cell = fd_number - buff_size
-            call s_locate_cell(particle_pos(i, 1:3, 1), cell, particle_s(i, 1:3, 1))
-        end do
 
         Rmax_glb = min(dflt_real, -dflt_real)
         Rmin_glb = max(dflt_real, -dflt_real)
@@ -376,9 +341,7 @@ contains
         particle_R0(part_id) = inputPart(7)
         Rmax_stats_part(part_id) = min(dflt_real, -dflt_real)
         Rmin_stats_part(part_id) = max(dflt_real, -dflt_real)
-        ! bub_dphidt(part_id) = 0._wp
         particle_rad(part_id, 1) = inputPart(7)
-        ! intfc_vel(part_id, 1) = inputPart(8)
         particle_pos(part_id, 1:3, 1) = inputPart(1:3)
         particle_posPrev(part_id, 1:3, 1) = particle_pos(part_id, 1:3, 1)
         particle_vel(part_id, 1:3, 1) = inputPart(4:6)
@@ -412,16 +375,6 @@ contains
             end if
         end if
 
-        ! call s_convert_to_mixture_variables(q_cons_vf, cell(1), cell(2), cell(3), &
-        !                                     rhol, gamma, pi_inf, qv, Re)
-        ! dynP = 0._wp
-        ! do i = 1, num_dims
-        !     dynP = dynP + 0.5_wp*q_cons_vf(contxe + i)%sf(cell(1), cell(2), cell(3))**2/rhol
-        ! end do
-        ! pliq = (q_cons_vf(E_idx)%sf(cell(1), cell(2), cell(3)) - dynP - pi_inf)/gamma
-        ! if (pliq < 0) print *, "Negative pressure", proc_rank, &
-        !     q_cons_vf(E_idx)%sf(cell(1), cell(2), cell(3)), pi_inf, gamma, pliq, cell, dynP
-
         ! Initial particle mass
         volparticle = 4._wp/3._wp*pi*particle_R0(part_id)**3 ! volume
         ! gas_mv(particle_id, 1) = pv*volparticle*(1._wp/(R_v*Tw))*(massflag) ! vapermass
@@ -429,7 +382,7 @@ contains
         if (particle_mass(part_id) <= 0._wp) then
             call s_mpi_abort("The initial particle mass is negative. Check the initial conditions.")
         end if
-        totalmass = particle_mass(part_id) !+ gas_mv(particle_id, 1) ! totalmass
+        ! totalmass = particle_mass(part_id) !+ gas_mv(particle_id, 1) ! totalmass
 
     end subroutine s_add_particles
 
@@ -634,7 +587,7 @@ contains
             end do
         end if
 
-        myGamma = fluid_pp(1)%gamma
+        myGamma = (1._wp/fluid_pp(1)%gamma) + 1._wp
         myRe = 1.48e-5 !fluid_pp(1)%Re(1) !Need a viscosity model for when modeling inviscid eulerian fluid
 
         call nvtxStartRange("LAGRANGE-PARTICLE-DYNAMICS")
@@ -644,7 +597,7 @@ contains
 
         do k = 1, n_el_particles_loc
 
-            cell = -buff_size
+            cell = fd_number - buff_size
             call s_locate_cell(particle_pos(k, 1:3, 2), cell, particle_s(k, 1:3, 2))
 
             ! Current particle state
@@ -706,7 +659,7 @@ contains
 
                         do nf = 1, num_fluids
                             q_prim_vf(E_idx + nf)%sf(i, j, k) = q_particles(1)%sf(i, j, k)
-                            q_prim_vf(nf)%sf(i, j, k) = q_particles(1)%sf(i, j, k)*q_prim_vf(nf)%sf(i, j, k)
+                            q_cons_vf(E_idx + nf)%sf(i, j, k) = q_particles(1)%sf(i, j, k)
                         end do
 
                         rhs_vf(momxb)%sf(i, j, k) = rhs_vf(momxb)%sf(i, j, k) + q_particles(1)%sf(i, j, k)*q_particles(2)%sf(i, j, k)
@@ -738,7 +691,7 @@ contains
     !>  The purpose of this subroutine is to smear the effect of the particles in the Eulerian framework
     subroutine s_smear_particle_sources()
 
-        integer :: i, j, k, l, dir
+        integer :: i, j, k, l
 
         $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
         do i = 1, nField_vars
@@ -783,18 +736,6 @@ contains
         $:END_GPU_PARALLEL_LOOP()
         call nvtxEndRange
 
-        call nvtxStartRange("PARTICLES-LAGRANGE-VOID-COMM")
-        if (num_procs > 1) then
-            #:for DIRC, DIRI in [('x', 1), ('y', 2), ('z', 3)]
-                #:for LOCC, LOCI in [('beg', -1), ('end', 1)]
-                    if (bc_${DIRC}$%${LOCC}$ >= 0) then
-                        call s_mpi_sendrecv_variables_buffers(q_particles, ${DIRI}$, ${LOCI}$, 1)
-                    end if
-                #:endfor
-            #:endfor
-        end if
-        call nvtxEndRange
-
     end subroutine s_smear_particle_sources
 
     !>  This subroutine updates the Lagrange variables using the tvd RK time steppers.
@@ -813,9 +754,6 @@ contains
             do k = 1, n_el_particles_loc
                 !u{1} = u{n} +  dt * RHS{n}
                 particle_rad(k, 1) = particle_rad(k, 1) + dt*particle_draddt(k, 1)
-                ! intfc_vel(k, 1) = intfc_vel(k, 1) + dt*intfc_dveldt(k, 1)
-                ! gas_p(k, 1) = gas_p(k, 1) + dt*gas_dpdt(k, 1)
-                ! gas_mv(k, 1) = gas_mv(k, 1) + dt*gas_dmvdt(k, 1)
                 if (moving_lag_particles) then
                     particle_posPrev(k, 1:3, 1) = particle_pos(k, 1:3, 1)
                     particle_pos(k, 1:3, 1) = particle_pos(k, 1:3, 1) + dt*particle_dposdt(k, 1:3, 1)
@@ -841,9 +779,6 @@ contains
                 do k = 1, n_el_particles_loc
                     !u{1} = u{n} +  dt * RHS{n}
                     particle_rad(k, 2) = particle_rad(k, 1) + dt*particle_draddt(k, 1)
-                    ! intfc_vel(k, 2) = intfc_vel(k, 1) + dt*intfc_dveldt(k, 1)
-                    ! gas_p(k, 2) = gas_p(k, 1) + dt*gas_dpdt(k, 1)
-                    ! gas_mv(k, 2) = gas_mv(k, 1) + dt*gas_dmvdt(k, 1)
                     if (moving_lag_particles) then
                         particle_posPrev(k, 1:3, 2) = particle_pos(k, 1:3, 1)
                         particle_pos(k, 1:3, 2) = particle_pos(k, 1:3, 1) + dt*particle_dposdt(k, 1:3, 1)
@@ -860,9 +795,6 @@ contains
                 do k = 1, n_el_particles_loc
                     !u{1} = u{n} + (1/2) * dt * (RHS{n} + RHS{1})
                     particle_rad(k, 1) = particle_rad(k, 1) + dt*(particle_draddt(k, 1) + particle_draddt(k, 2))/2._wp
-                    ! intfc_vel(k, 1) = intfc_vel(k, 1) + dt*(intfc_dveldt(k, 1) + intfc_dveldt(k, 2))/2._wp
-                    ! gas_p(k, 1) = gas_p(k, 1) + dt*(gas_dpdt(k, 1) + gas_dpdt(k, 2))/2._wp
-                    ! gas_mv(k, 1) = gas_mv(k, 1) + dt*(gas_dmvdt(k, 1) + gas_dmvdt(k, 2))/2._wp
                     if (moving_lag_particles) then
                         particle_posPrev(k, 1:3, 1) = particle_pos(k, 1:3, 2)
                         particle_pos(k, 1:3, 1) = particle_pos(k, 1:3, 1) + dt*(particle_dposdt(k, 1:3, 1) + particle_dposdt(k, 1:3, 2))/2._wp
@@ -890,9 +822,6 @@ contains
                 do k = 1, n_el_particles_loc
                     !u{1} = u{n} +  dt * RHS{n}
                     particle_rad(k, 2) = particle_rad(k, 1) + dt*particle_draddt(k, 1)
-                    ! intfc_vel(k, 2) = intfc_vel(k, 1) + dt*intfc_dveldt(k, 1)
-                    ! gas_p(k, 2) = gas_p(k, 1) + dt*gas_dpdt(k, 1)
-                    ! gas_mv(k, 2) = gas_mv(k, 1) + dt*gas_dmvdt(k, 1)
                     if (moving_lag_particles) then
                         particle_posPrev(k, 1:3, 2) = particle_pos(k, 1:3, 1)
                         particle_pos(k, 1:3, 2) = particle_pos(k, 1:3, 1) + dt*particle_dposdt(k, 1:3, 1)
@@ -909,9 +838,6 @@ contains
                 do k = 1, n_el_particles_loc
                     !u{2} = u{n} + (1/4) * dt * [RHS{n} + RHS{1}]
                     particle_rad(k, 2) = particle_rad(k, 1) + dt*(particle_draddt(k, 1) + particle_draddt(k, 2))/4._wp
-                    ! intfc_vel(k, 2) = intfc_vel(k, 1) + dt*(intfc_dveldt(k, 1) + intfc_dveldt(k, 2))/4._wp
-                    ! gas_p(k, 2) = gas_p(k, 1) + dt*(gas_dpdt(k, 1) + gas_dpdt(k, 2))/4._wp
-                    ! gas_mv(k, 2) = gas_mv(k, 1) + dt*(gas_dmvdt(k, 1) + gas_dmvdt(k, 2))/4._wp
                     if (moving_lag_particles) then
                         particle_posPrev(k, 1:3, 2) = particle_pos(k, 1:3, 2)
                         particle_pos(k, 1:3, 2) = particle_pos(k, 1:3, 1) + dt*(particle_dposdt(k, 1:3, 1) + particle_dposdt(k, 1:3, 2))/4._wp
@@ -928,9 +854,6 @@ contains
                 do k = 1, n_el_particles_loc
                     !u{n+1} = u{n} + (2/3) * dt * [(1/4)* RHS{n} + (1/4)* RHS{1} + RHS{2}]
                     particle_rad(k, 1) = particle_rad(k, 1) + (2._wp/3._wp)*dt*(particle_draddt(k, 1)/4._wp + particle_draddt(k, 2)/4._wp + particle_draddt(k, 3))
-                    ! intfc_vel(k, 1) = intfc_vel(k, 1) + (2._wp/3._wp)*dt*(intfc_dveldt(k, 1)/4._wp + intfc_dveldt(k, 2)/4._wp + intfc_dveldt(k, 3))
-                    ! gas_p(k, 1) = gas_p(k, 1) + (2._wp/3._wp)*dt*(gas_dpdt(k, 1)/4._wp + gas_dpdt(k, 2)/4._wp + gas_dpdt(k, 3))
-                    ! gas_mv(k, 1) = gas_mv(k, 1) + (2._wp/3._wp)*dt*(gas_dmvdt(k, 1)/4._wp + gas_dmvdt(k, 2)/4._wp + gas_dmvdt(k, 3))
                     if (moving_lag_particles) then
                         particle_posPrev(k, 1:3, 1) = particle_pos(k, 1:3, 2)
                         particle_pos(k, 1:3, 1) = particle_pos(k, 1:3, 1) + (2._wp/3._wp)*dt*(particle_dposdt(k, 1:3, 1)/4._wp + particle_dposdt(k, 1:3, 2)/4._wp + particle_dposdt(k, 1:3, 3))
@@ -966,6 +889,37 @@ contains
         real(wp) :: offset
         integer, dimension(3) :: cell
 
+        call nvtxStartRange("LAG-BC")
+        call nvtxStartRange("LAG-BC-DEV2HOST")
+        $:GPU_UPDATE(host='[particle_R0, Rmax_stats_part, Rmin_stats_part, particle_mass, f_p, &
+            & lag_part_id, particle_rad, &
+            & particle_pos, particle_posPrev, particle_vel, particle_s, particle_draddt, &
+            & particle_dposdt, particle_dveldt, keep_bubble, n_el_particles_loc, &
+            & wrap_bubble_dir, wrap_bubble_loc]')
+        call nvtxEndRange
+
+        ! Handle MPI transfer of bubbles going to another processor's local domain
+        if (num_procs > 1) then
+            call nvtxStartRange("LAG-BC-TRANSFER-LIST")
+            call s_add_particles_to_transfer_list(n_el_particles_loc, particle_pos(:, :, 2), particle_posPrev(:, :, 2))
+            call nvtxEndRange
+
+            call nvtxStartRange("LAG-BC-SENDRECV")
+            call s_mpi_sendrecv_solid_particles(particle_R0, Rmax_stats_part, Rmin_stats_part, particle_mass, f_p, &
+                                                lag_part_id, &
+                                                particle_rad, particle_pos, particle_posPrev, particle_vel, &
+                                                particle_s, particle_draddt, particle_dposdt, particle_dveldt, lag_num_ts, n_el_particles_loc, &
+                                                2)
+            call nvtxEndRange
+        end if
+
+        call nvtxStartRange("LAG-BC-HOST2DEV")
+        $:GPU_UPDATE(device='[particle_R0, Rmax_stats_part, Rmin_stats_part, particle_mass, f_p, &
+            & lag_part_id, particle_rad, &
+            & particle_pos, particle_posPrev, particle_vel, particle_s, particle_draddt, &
+            & particle_dposdt, particle_dveldt, n_el_particles_loc]')
+        call nvtxEndRange
+
         $:GPU_PARALLEL_LOOP(private='[k, cell]')
         do k = 1, n_el_particles_loc
             keep_bubble(k) = 1
@@ -981,16 +935,16 @@ contains
                     .and. particle_pos(k, 1, 2) > x_cb(m) - particle_rad(k, 2)) then
                 particle_pos(k, 1, 2) = x_cb(m) - particle_rad(k, 2)
             elseif (bc_x%beg == BC_PERIODIC .and. particle_pos(k, 1, 2) < pcomm_coords(1)%beg .and. &
-                    particle_posPrev(k, 1, 2) > pcomm_coords(1)%beg) then
+                    particle_posPrev(k, 1, 2) >= pcomm_coords(1)%beg) then
                 wrap_bubble_dir(k, 1) = 1
                 wrap_bubble_loc(k, 1) = -1
             elseif (bc_x%end == BC_PERIODIC .and. particle_pos(k, 1, 2) > pcomm_coords(1)%end .and. &
-                    particle_posPrev(k, 1, 2) < pcomm_coords(1)%end) then
+                    particle_posPrev(k, 1, 2) <= pcomm_coords(1)%end) then
                 wrap_bubble_dir(k, 1) = 1
                 wrap_bubble_loc(k, 1) = 1
-            elseif (particle_pos(k, 1, 2) >= x_cb(m + mapcells + 1)) then
+            elseif (particle_pos(k, 1, 2) >= x_cb(m)) then
                 keep_bubble(k) = 0
-            elseif (particle_pos(k, 1, 2) < x_cb(-mapcells - 2)) then
+            elseif (particle_pos(k, 1, 2) < x_cb(-1)) then
                 keep_bubble(k) = 0
             end if
 
@@ -1001,16 +955,16 @@ contains
                      .and. particle_pos(k, 2, 2) > y_cb(n) - particle_rad(k, 2)) then
                 particle_pos(k, 2, 2) = y_cb(n) - particle_rad(k, 2)
             elseif (bc_y%beg == BC_PERIODIC .and. particle_pos(k, 2, 2) < pcomm_coords(2)%beg .and. &
-                    particle_posPrev(k, 2, 2) > pcomm_coords(2)%beg) then
+                    particle_posPrev(k, 2, 2) >= pcomm_coords(2)%beg) then
                 wrap_bubble_dir(k, 2) = 1
                 wrap_bubble_loc(k, 2) = -1
             elseif (bc_y%end == BC_PERIODIC .and. particle_pos(k, 2, 2) > pcomm_coords(2)%end .and. &
-                    particle_posPrev(k, 2, 2) < pcomm_coords(2)%end) then
+                    particle_posPrev(k, 2, 2) <= pcomm_coords(2)%end) then
                 wrap_bubble_dir(k, 2) = 1
                 wrap_bubble_loc(k, 2) = 1
-            elseif (particle_pos(k, 2, 2) >= y_cb(n + mapcells + 1)) then
+            elseif (particle_pos(k, 2, 2) >= y_cb(n)) then
                 keep_bubble(k) = 0
-            elseif (particle_pos(k, 2, 2) < y_cb(-mapcells - 2)) then
+            elseif (particle_pos(k, 2, 2) < y_cb(-1)) then
                 keep_bubble(k) = 0
             end if
 
@@ -1022,16 +976,16 @@ contains
                          .and. particle_pos(k, 3, 2) > z_cb(p) - particle_rad(k, 2)) then
                     particle_pos(k, 3, 2) = z_cb(p) - particle_rad(k, 2)
                 elseif (bc_z%beg == BC_PERIODIC .and. particle_pos(k, 3, 2) < pcomm_coords(3)%beg .and. &
-                        particle_posPrev(k, 3, 2) > pcomm_coords(3)%beg) then
+                        particle_posPrev(k, 3, 2) >= pcomm_coords(3)%beg) then
                     wrap_bubble_dir(k, 3) = 1
                     wrap_bubble_loc(k, 3) = -1
                 elseif (bc_z%end == BC_PERIODIC .and. particle_pos(k, 3, 2) > pcomm_coords(3)%end .and. &
-                        particle_posPrev(k, 3, 2) < pcomm_coords(3)%end) then
+                        particle_posPrev(k, 3, 2) <= pcomm_coords(3)%end) then
                     wrap_bubble_dir(k, 3) = 1
                     wrap_bubble_loc(k, 3) = 1
-                elseif (particle_pos(k, 3, 2) >= z_cb(p + mapCells + 1)) then
+                elseif (particle_pos(k, 3, 2) >= z_cb(p)) then
                     keep_bubble(k) = 0
-                elseif (particle_pos(k, 3, 2) < z_cb(-mapCells - 2)) then
+                elseif (particle_pos(k, 3, 2) < z_cb(-1)) then
                     keep_bubble(k) = 0
                 end if
             end if
@@ -1068,16 +1022,15 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        call nvtxStartRange("LAG-BC")
-        call nvtxStartRange("LAG-BC-DEV2HOST")
-        $:GPU_UPDATE(host='[particle_R0, Rmax_stats_part, Rmin_stats_part, particle_mass, &
-            & lag_part_id, particle_rad, &
-            & particle_pos, particle_posPrev, particle_vel, particle_s, particle_draddt, &
-            & particle_dposdt, particle_dveldt, keep_bubble, n_el_particles_loc, &
-            & wrap_bubble_dir, wrap_bubble_loc]')
-        call nvtxEndRange
-
         if (n_el_particles_loc > 0) then
+            call nvtxStartRange("LAG-BC")
+            call nvtxStartRange("LAG-BC-DEV2HOST")
+            $:GPU_UPDATE(host='[particle_R0, Rmax_stats_part, Rmin_stats_part, particle_mass, f_p, &
+                & lag_part_id, particle_rad, &
+                & particle_pos, particle_posPrev, particle_vel, particle_s, particle_draddt, &
+                & particle_dposdt, particle_dveldt, keep_bubble, n_el_particles_loc, &
+                & wrap_bubble_dir, wrap_bubble_loc]')
+            call nvtxEndRange
 
             newBubs = 0
             do k = 1, n_el_particles_loc
@@ -1118,51 +1071,24 @@ contains
                     end do
                 end if
             end do
-            n_el_particles_loc = n_el_particles_loc + newBubs
-        end if
-
-        ! Handle MPI transfer of particle going to another processor's local domain
-        if (num_procs > 1) then
-            call nvtxStartRange("LAG-BC-TRANSFER-LIST")
-            call s_add_particles_to_transfer_list(n_el_particles_loc, particle_pos(:, :, 2), particle_posPrev(:, :, 2))
-            call nvtxEndRange
-
-            call nvtxStartRange("LAG-BC-SENDRECV")
-            ! call s_mpi_sendrecv_particles(particle_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, &
-            !                               gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, &
-            !                               particle_rad, intfc_vel, mtn_pos, mtn_posPrev, mtn_vel, &
-            !                               mtn_s, intfc_draddt, intfc_dveldt, gas_dpdt, &
-            !                               gas_dmvdt, mtn_dposdt, mtn_dveldt, lag_num_ts, n_el_particles_loc, &
-            !                               2)
-
-            call s_mpi_sendrecv_solid_particles(particle_R0, Rmax_stats_part, Rmin_stats_part, particle_mass, f_p, &
-                                                lag_part_id, &
-                                                particle_rad, particle_pos, particle_posPrev, particle_vel, &
-                                                particle_s, particle_draddt, particle_dposdt, particle_dveldt, lag_num_ts, n_el_particles_loc, &
-                                                2)
-            call nvtxEndRange
-        end if
-
-        call nvtxStartRange("LAG-BC-HOST2DEV")
-        ! $:GPU_UPDATE(device='[particle_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, &
-        !     & gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, particle_rad, intfc_vel, &
-        !     & mtn_pos, mtn_posPrev, mtn_vel, mtn_s, intfc_draddt, intfc_dveldt, &
-        !     & gas_dpdt, gas_dmvdt, mtn_dposdt, mtn_dveldt, n_el_particles_loc]')
-        $:GPU_UPDATE(device='[particle_R0, Rmax_stats_part, Rmin_stats_part, particle_mass, &
+            call nvtxStartRange("LAG-BC-HOST2DEV")
+            $:GPU_UPDATE(device='[particle_R0, Rmax_stats_part, Rmin_stats_part, particle_mass, f_p, &
             & lag_part_id, particle_rad, &
             & particle_pos, particle_posPrev, particle_vel, particle_s, particle_draddt, &
             & particle_dposdt, particle_dveldt, n_el_particles_loc]')
-        call nvtxEndRange
-        call nvtxEndRange
+            call nvtxEndRange
+        end if
 
-        ! $:GPU_PARALLEL_LOOP(private='[cell]')
-        ! do k = 1, n_el_particles_loc
-        !     cell = fd_number - buff_size
-        !     call s_locate_cell(mtn_pos(k, 1:3, 2), cell, mtn_s(k, 1:3, 2))
-        ! end do
+        $:GPU_PARALLEL_LOOP(private='[cell]')
+        do k = 1, n_el_particles_loc
+            cell = fd_number - buff_size
+            call s_locate_cell(particle_pos(k, 1:3, 2), cell, particle_s(k, 1:3, 2))
+        end do
 
         ! Update void fraction and communicate buffers
         call s_smear_particle_sources()
+
+        call nvtxEndRange ! LAG-BC
 
     end subroutine s_enforce_EL_particles_boundary_conditions
 
@@ -1230,10 +1156,7 @@ contains
 
         $:GPU_PARALLEL_LOOP(private='[k]')
         do k = 1, n_el_particles_loc
-            ! gas_p(k, 2) = gas_p(k, 1)
-            ! gas_mv(k, 2) = gas_mv(k, 1)
             particle_rad(k, 2) = particle_rad(k, 1)
-            ! intfc_vel(k, 2) = intfc_vel(k, 1)
             particle_pos(k, 1:3, 2) = particle_pos(k, 1:3, 1)
             particle_posPrev(k, 1:3, 2) = particle_posPrev(k, 1:3, 1)
             particle_vel(k, 1:3, 2) = particle_vel(k, 1:3, 1)
@@ -1320,7 +1243,6 @@ contains
     end function particle_in_domain_physical
 
     !> The purpose of this procedure is to calculate the gradient of a scalar field along the x, y and z directions
-        !!      following a second-order central difference considering uneven widths
         !! @param q Input scalar field
         !! @param dq Output gradient of q
         !! @param dir Gradient spatial direction
@@ -1332,51 +1254,85 @@ contains
 
         integer :: i, j, k
 
-        if (dir == 1) then
-            ! Gradient in x dir.
-            $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3)
-            do k = 0, p
-                do j = 0, n
-                    do i = 0, m
-                        dq(i, j, k) = q(i, j, k)*(dx(i + 1) - dx(i - 1)) &
-                                      + q(i + 1, j, k)*(dx(i) + dx(i - 1)) &
-                                      - q(i - 1, j, k)*(dx(i) + dx(i + 1))
-                        dq(i, j, k) = dq(i, j, k)/ &
-                                      ((dx(i) + dx(i - 1))*(dx(i) + dx(i + 1)))
+        if (fd_order == 4) then
+            if (dir == 1) then
+                $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3)
+                do k = idwbuff(3)%beg, idwbuff(3)%end
+                    do j = idwbuff(2)%beg, idwbuff(2)%end
+                        do i = idwbuff(1)%beg + 2, idwbuff(1)%end - 2
+                            dq(i, j, k) = (-q(i + 2, j, k) + 8*q(i + 1, j, k) - 8*q(i - 1, j, k) + q(i - 2, j, k))/(12*dx(i))
+                        end do
                     end do
                 end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        elseif (dir == 2) then
-            ! Gradient in y dir.
-            $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3)
-            do k = 0, p
-                do j = 0, n
-                    do i = 0, m
-                        dq(i, j, k) = q(i, j, k)*(dy(j + 1) - dy(j - 1)) &
-                                      + q(i, j + 1, k)*(dy(j) + dy(j - 1)) &
-                                      - q(i, j - 1, k)*(dy(j) + dy(j + 1))
-                        dq(i, j, k) = dq(i, j, k)/ &
-                                      ((dy(j) + dy(j - 1))*(dy(j) + dy(j + 1)))
+                $:END_GPU_PARALLEL_LOOP()
+            elseif (dir == 2) then
+                $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3)
+                do k = idwbuff(3)%beg, idwbuff(3)%end
+                    do j = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
+                        do i = idwbuff(1)%beg, idwbuff(1)%end
+                            dq(i, j, k) = (-q(i, j + 2, k) + 8*q(i, j + 1, k) - 8*q(i, j - 1, k) + q(i, j - 2, k))/(12*dy(j))
+                        end do
                     end do
                 end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        elseif (dir == 3) then
-            ! Gradient in z dir.
-            $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3)
-            do k = 0, p
-                do j = 0, n
-                    do i = 0, m
-                        dq(i, j, k) = q(i, j, k)*(dz(k + 1) - dz(k - 1)) &
-                                      + q(i, j, k + 1)*(dz(k) + dz(k - 1)) &
-                                      - q(i, j, k - 1)*(dz(k) + dz(k + 1))
-                        dq(i, j, k) = dq(i, j, k)/ &
-                                      ((dz(k) + dz(k - 1))*(dz(k) + dz(k + 1)))
+                $:END_GPU_PARALLEL_LOOP()
+            elseif (dir == 3) then
+                $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3)
+                do k = idwbuff(3)%beg + 2, idwbuff(3)%end - 2
+                    do j = idwbuff(2)%beg, idwbuff(2)%end
+                        do i = idwbuff(1)%beg, idwbuff(1)%end
+                            dq(i, j, k) = (-q(i, j, k + 2) + 8*q(i, j, k + 1) - 8*q(i, j, k - 1) + q(i, j, k - 2))/(12*dz(k))
+                        end do
                     end do
                 end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
+                $:END_GPU_PARALLEL_LOOP()
+            end if
+        else
+            if (dir == 1) then
+                ! Gradient in x dir.
+                $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3)
+                do k = idwbuff(3)%beg, idwbuff(3)%end
+                    do j = idwbuff(2)%beg, idwbuff(2)%end
+                        do i = idwbuff(1)%beg + 1, idwbuff(1)%end - 1
+                            dq(i, j, k) = q(i, j, k)*(dx(i + 1) - dx(i - 1)) &
+                                          + q(i + 1, j, k)*(dx(i) + dx(i - 1)) &
+                                          - q(i - 1, j, k)*(dx(i) + dx(i + 1))
+                            dq(i, j, k) = dq(i, j, k)/ &
+                                          ((dx(i) + dx(i - 1))*(dx(i) + dx(i + 1)))
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            elseif (dir == 2) then
+                ! Gradient in y dir.
+                $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3)
+                do k = idwbuff(3)%beg, idwbuff(3)%end
+                    do j = idwbuff(2)%beg + 1, idwbuff(2)%end - 1
+                        do i = idwbuff(1)%beg, idwbuff(1)%end
+                            dq(i, j, k) = q(i, j, k)*(dy(j + 1) - dy(j - 1)) &
+                                          + q(i, j + 1, k)*(dy(j) + dy(j - 1)) &
+                                          - q(i, j - 1, k)*(dy(j) + dy(j + 1))
+                            dq(i, j, k) = dq(i, j, k)/ &
+                                          ((dy(j) + dy(j - 1))*(dy(j) + dy(j + 1)))
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            elseif (dir == 3) then
+                ! Gradient in z dir.
+                $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3)
+                do k = idwbuff(3)%beg + 1, idwbuff(3)%end - 1
+                    do j = idwbuff(2)%beg, idwbuff(2)%end
+                        do i = idwbuff(1)%beg, idwbuff(1)%end
+                            dq(i, j, k) = q(i, j, k)*(dz(k + 1) - dz(k - 1)) &
+                                          + q(i, j, k + 1)*(dz(k) + dz(k - 1)) &
+                                          - q(i, j, k - 1)*(dz(k) + dz(k + 1))
+                            dq(i, j, k) = dq(i, j, k)/ &
+                                          ((dz(k) + dz(k - 1))*(dz(k) + dz(k + 1)))
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
         end if
 
     end subroutine s_gradient_dir
@@ -1441,11 +1397,7 @@ contains
                 f_p(k, 1), &
                 f_p(k, 2), &
                 f_p(k, 3), &
-                ! gas_mv(k, 1), &
-                ! gas_mv(k, 1)/(gas_mv(k, 1) + gas_mg(k)), &
                 particle_rad(k, 1)
-            ! intfc_vel(k, 1), &
-            ! gas_p(k, 1)
         end do
 
     end subroutine s_write_lag_particle_evol
@@ -1780,22 +1732,14 @@ contains
         Rmax_stats_part(dest) = Rmax_stats_part(src)
         Rmin_stats_part(dest) = Rmin_stats_part(src)
         particle_mass(dest) = particle_mass(src)
-        ! gas_betaT(dest) = gas_betaT(src)
-        ! gas_betaC(dest) = gas_betaC(src)
-        ! bub_dphidt(dest) = bub_dphidt(src)
         lag_part_id(dest, 1) = lag_part_id(src, 1)
-        ! gas_p(dest, 1:2) = gas_p(src, 1:2)
-        ! gas_mv(dest, 1:2) = gas_mv(src, 1:2)
         particle_rad(dest, 1:2) = particle_rad(src, 1:2)
-        ! intfc_vel(dest, 1:2) = intfc_vel(src, 1:2)
         particle_vel(dest, 1:3, 1:2) = particle_vel(src, 1:3, 1:2)
         particle_s(dest, 1:3, 1:2) = particle_s(src, 1:3, 1:2)
         particle_pos(dest, 1:3, 1:2) = particle_pos(src, 1:3, 1:2)
         particle_posPrev(dest, 1:3, 1:2) = particle_posPrev(src, 1:3, 1:2)
         particle_draddt(dest, 1:lag_num_ts) = particle_draddt(src, 1:lag_num_ts)
-        ! intfc_dveldt(dest, 1:lag_num_ts) = intfc_dveldt(src, 1:lag_num_ts)
-        ! gas_dpdt(dest, 1:lag_num_ts) = gas_dpdt(src, 1:lag_num_ts)
-        ! gas_dmvdt(dest, 1:lag_num_ts) = gas_dmvdt(src, 1:lag_num_ts)
+        f_p(dest, 1:3) = f_p(src, 1:3)
         particle_dposdt(dest, 1:3, 1:lag_num_ts) = particle_dposdt(src, 1:3, 1:lag_num_ts)
         particle_dveldt(dest, 1:3, 1:lag_num_ts) = particle_dveldt(src, 1:3, 1:lag_num_ts)
 
@@ -1826,21 +1770,12 @@ contains
         @:DEALLOCATE(Rmax_stats_part)
         @:DEALLOCATE(Rmin_stats_part)
         @:DEALLOCATE(particle_mass)
-        ! @:DEALLOCATE(gas_betaT)
-        ! @:DEALLOCATE(gas_betaC)
-        ! @:DEALLOCATE(bub_dphidt)
-        ! @:DEALLOCATE(gas_p)
-        ! @:DEALLOCATE(gas_mv)
         @:DEALLOCATE(particle_rad)
-        ! @:DEALLOCATE(intfc_vel)
         @:DEALLOCATE(particle_pos)
         @:DEALLOCATE(particle_posPrev)
         @:DEALLOCATE(particle_vel)
         @:DEALLOCATE(particle_s)
         @:DEALLOCATE(particle_draddt)
-        ! @:DEALLOCATE(intfc_dveldt)
-        ! @:DEALLOCATE(gas_dpdt)
-        ! @:DEALLOCATE(gas_dmvdt)
         @:DEALLOCATE(particle_dposdt)
         @:DEALLOCATE(particle_dveldt)
         @:DEALLOCATE(f_p)

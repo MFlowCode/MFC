@@ -32,14 +32,144 @@ contains
         type(scalar_field), dimension(:), intent(inout) :: updatedvar
         real(wp), dimension(1:lag_params%nParticles_glb, 1:3), intent(in) :: lbk_f_p
 
-        smoothfunc:select case(lag_params%smooth_type)
-        case (1)
-        call s_gaussian(nParticles, lbk_rad, lbk_s, lbk_pos, updatedvar, lbk_f_p)
-        case (2)
-        call s_deltafunc(nParticles, lbk_rad, lbk_s, updatedvar, lbk_f_p)
-        end select smoothfunc
+        call s_trilinear_projection(nParticles, lbk_rad, lbk_s, lbk_pos, updatedvar, lbk_f_p)
 
     end subroutine s_smoothfunction
+
+    !> The purpose of this procedure is to use trilinear projection to map the effect of the particles to the fluid.
+    subroutine s_trilinear_projection(nParticles, lbk_rad, lbk_s, lbk_pos, updatedvar, lbk_f_p)
+
+        integer, intent(in) :: nParticles
+        real(wp), dimension(1:lag_params%nParticles_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_pos
+        real(wp), dimension(1:lag_params%nParticles_glb, 1:2), intent(in) :: lbk_rad
+        real(wp), dimension(1:lag_params%nParticles_glb, 1:3), intent(in) :: lbk_f_p
+        type(scalar_field), dimension(:), intent(inout) :: updatedvar
+
+        real(wp), dimension(3) :: center
+        integer, dimension(3) :: cell
+        real(wp) :: addFun1, addFun2_x, addFun2_y, addFun2_z, addFun_E
+        real(wp) :: volpart, Vol
+        real(wp) :: fp_x, fp_y, fp_z
+        real(wp) :: vol_frac
+        real(wp), dimension(3) :: s_coord
+        real(wp) :: wx, wy, wz, w
+        integer :: l, i, j, k, nx, ny, nz, iL, jL, kL, kL_max, cx, cy, cz
+
+        $:GPU_PARALLEL_LOOP(private='[l,s_coord,cell,center,fp_x,fp_y,fp_z,i,j,k]')
+        do l = 1, nParticles
+
+            fp_x = -lbk_f_p(l, 1)
+            fp_y = -lbk_f_p(l, 2)
+            fp_z = -lbk_f_p(l, 3)
+
+            center(1:3) = 0._wp
+            volpart = 4._wp/3._wp*pi*lbk_rad(l, 2)**3._wp
+            s_coord(1:3) = lbk_s(l, 1:3, 2)
+            center(1:2) = lbk_pos(l, 1:2, 2)
+
+            if (p > 0) center(3) = lbk_pos(l, 3, 2)
+            call s_get_cell(s_coord, cell)
+
+            if (num_dims == 2) then
+                Vol = dx(cell(1))*dy(cell(2))*lag_params%charwidth
+                if (cyl_coord) Vol = dx(cell(1))*dy(cell(2))*y_cc(cell(2))*2._wp*pi
+            else
+                Vol = dx(cell(1))*dy(cell(2))*dz(cell(3))
+            end if
+            vol_frac = volpart/Vol
+
+            i = cell(1)
+            j = cell(2)
+            k = cell(3)
+
+            if (center(1) >= x_cc(i)) then
+                iL = i
+            else
+                iL = i - 1
+            end if
+            if (center(2) >= y_cc(j)) then
+                jL = j
+            else
+                jL = j - 1
+            end if
+            kL = 0
+            kL_max = -1
+            if (p > 0) then
+                if (center(3) >= z_cc(k)) then
+                    kL = k
+                    kL_max = kL
+                else
+                    kL = k - 1
+                    kL_max = kL
+                end if
+            end if
+            wx = (center(1) - x_cc(iL))/(x_cc(iL + 1) - x_cc(iL))
+            wy = (center(2) - y_cc(jL))/(y_cc(jL + 1) - y_cc(jL))
+            wz = 0._wp
+            if (p > 0) wz = (center(3) - z_cc(kL))/(z_cc(kL + 1) - z_cc(kL))
+
+            ! $:GPU_ATOMIC(atomic='update')
+            ! updatedvar(1)%sf(i, j, k) = updatedvar(1)%sf(i, j, k) &
+            !                             + real(vol_frac, kind=stp)
+
+            $:GPU_LOOP(collapse=3,private='[w]')
+            do nx = iL, iL + 1
+                do ny = jL, jL + 1
+                    do nz = kL, kL_max + 1
+                        cx = nx - iL
+                        cy = ny - jL
+                        cz = nz - kL
+                        ! Compute weight for this corner
+                        w = ((1.0_wp - wx)*(1 - cx) + wx*cx)* &
+                            ((1.0_wp - wy)*(1 - cy) + wy*cy)* &
+                            ((1.0_wp - wz)*(1 - cz) + wz*cz)
+
+                        addFun1 = (w*vol_frac)
+                        $:GPU_ATOMIC(atomic='update')
+                        updatedvar(1)%sf(nx, ny, nz) = updatedvar(1)%sf(nx, ny, nz) &
+                                                       + real(addFun1, kind=stp)
+
+                        if (lag_params%solver_approach == 2) then
+                            ! Add particle force to the grid cell
+                            addFun2_x = (w*fp_x)/Vol
+                            $:GPU_ATOMIC(atomic='update')
+                            updatedvar(2)%sf(nx, ny, nz) = &
+                                updatedvar(2)%sf(nx, ny, nz) &
+                                + real(addFun2_x, kind=stp)
+
+                            addFun2_y = (w*fp_y)/Vol
+                            $:GPU_ATOMIC(atomic='update')
+                            updatedvar(3)%sf(nx, ny, nz) = &
+                                updatedvar(3)%sf(nx, ny, nz) &
+                                + real(addFun2_y, kind=stp)
+
+                            if (num_dims == 3) then
+                                addFun2_z = (w*fp_z)/Vol
+                                $:GPU_ATOMIC(atomic='update')
+                                updatedvar(4)%sf(nx, ny, nz) = &
+                                    updatedvar(4)%sf(nx, ny, nz) &
+                                    + real(addFun2_z, kind=stp)
+
+                                addFun_E = 0._wp*w
+                                $:GPU_ATOMIC(atomic='update')
+                                updatedvar(5)%sf(nx, ny, nz) = &
+                                    updatedvar(5)%sf(nx, ny, nz) &
+                                    + real(addFun_E, kind=stp)
+                            else
+                                addFun_E = 0._wp*w
+                                $:GPU_ATOMIC(atomic='update')
+                                updatedvar(4)%sf(nx, ny, nz) = &
+                                    updatedvar(4)%sf(nx, ny, nz) &
+                                    + real(addFun_E, kind=stp)
+                            end if
+                        end if
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_trilinear_projection
 
     !> The purpose of this procedure contains the algorithm to use the delta kernel function to map the effect of the particles.
             !!      The effect of the particles only affects the cell where the particle is located.
@@ -146,7 +276,7 @@ contains
 
         real(wp), dimension(3) :: nodecoord
         real(wp) :: addFun1, addFun2_x, addFun2_y, addFun2_z, addFun_E, func_sum
-        real(wp) :: func, volpart
+        real(wp) :: func, volpart, Vol
         integer, dimension(3) :: cellaux
         real(wp), dimension(3) :: s_coord
         integer :: l, i, j, k
@@ -170,6 +300,14 @@ contains
             call s_get_cell(s_coord, cell)
             call s_compute_stddsv(cell, volpart, stddsv)
             strength_vol = volpart
+
+            if (num_dims == 2) then
+                Vol = dx(cell(1))*dy(cell(2))*lag_params%charwidth
+                if (cyl_coord) Vol = dx(cell(1))*dy(cell(2))*y_cc(cell(2))*2._wp*pi
+            else
+                Vol = dx(cell(1))*dy(cell(2))*dz(cell(3))
+            end if
+
             fp_x = lbk_f_p(l, 1)
             fp_y = lbk_f_p(l, 2)
             fp_z = lbk_f_p(l, 3)
@@ -224,7 +362,7 @@ contains
                             end if
 
                             !Update void fraction field
-                            addFun1 = func*strength_vol
+                            addFun1 = func*strength_vol !strength_vol/Vol
                             $:GPU_ATOMIC(atomic='update')
                             updatedvar(1)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
                                 updatedvar(1)%sf(cellaux(1), cellaux(2), cellaux(3)) &
@@ -503,39 +641,56 @@ contains
         integer, intent(in) :: field_index
 
         real(wp) :: val
-        real(wp) :: wx, wy, wz
+        real(wp) :: wx, wy, wz, x_lo, y_lo, z_lo
         real(wp) :: fx0, fx1, fy0, fy1
-        integer :: i, j, k
+        integer :: i, j, k, iL, jL, kL
 
         i = cell(1)
         j = cell(2)
         k = cell(3)
 
-        wx = (pos(1) - x_cc(i))/(x_cc(i + 1) - x_cc(i))
-        wy = (pos(2) - y_cc(j))/(y_cc(j + 1) - y_cc(j))
+        if (pos(1) >= x_cc(i)) then
+            iL = i
+        else
+            iL = i - 1
+        end if
+
+        if (pos(2) >= y_cc(j)) then
+            jL = j
+        else
+            jL = j - 1
+        end if
+
+        wx = (pos(1) - x_cc(iL))/(x_cc(iL + 1) - x_cc(iL))
+        wy = (pos(2) - y_cc(jL))/(y_cc(jL + 1) - y_cc(jL))
 
         ! 2D case bilinear
         if (num_dims == 2) then
 
-            fx0 = (1 - wx)*field_vf(field_index)%sf(i, j, 0) + &
-                  wx*field_vf(field_index)%sf(i + 1, j, 0)
+            fx0 = (1 - wx)*field_vf(field_index)%sf(iL, jL, 0) + &
+                  wx*field_vf(field_index)%sf(iL + 1, jL, 0)
 
-            fx1 = (1 - wx)*field_vf(field_index)%sf(i, j + 1, 0) + &
-                  wx*field_vf(field_index)%sf(i + 1, j + 1, 0)
+            fx1 = (1 - wx)*field_vf(field_index)%sf(iL, jL + 1, 0) + &
+                  wx*field_vf(field_index)%sf(iL + 1, jL + 1, 0)
 
             val = (1 - wy)*fx0 + wy*fx1
             return
         end if
 
         ! 3D case trilinear
-        wz = (pos(3) - z_cc(k))/(z_cc(k + 1) - z_cc(k))
+        if (pos(3) >= z_cc(k)) then
+            kL = k
+        else
+            kL = k - 1
+        end if
+        wz = (pos(3) - z_cc(kL))/(z_cc(kL + 1) - z_cc(kL))
 
-        fx0 = (1 - wx)*field_vf(field_index)%sf(i, j, k) + wx*field_vf(field_index)%sf(i + 1, j, k)
-        fx1 = (1 - wx)*field_vf(field_index)%sf(i, j + 1, k) + wx*field_vf(field_index)%sf(i + 1, j + 1, k)
+        fx0 = (1 - wx)*field_vf(field_index)%sf(iL, jL, kL) + wx*field_vf(field_index)%sf(iL + 1, jL, kL)
+        fx1 = (1 - wx)*field_vf(field_index)%sf(iL, jL + 1, kL) + wx*field_vf(field_index)%sf(iL + 1, jL + 1, kL)
         fy0 = (1 - wy)*fx0 + wy*fx1
 
-        fx0 = (1 - wx)*field_vf(field_index)%sf(i, j, k + 1) + wx*field_vf(field_index)%sf(i + 1, j, k + 1)
-        fx1 = (1 - wx)*field_vf(field_index)%sf(i, j + 1, k + 1) + wx*field_vf(field_index)%sf(i + 1, j + 1, k + 1)
+        fx0 = (1 - wx)*field_vf(field_index)%sf(iL, jL, kL + 1) + wx*field_vf(field_index)%sf(iL + 1, jL, kL + 1)
+        fx1 = (1 - wx)*field_vf(field_index)%sf(iL, jL + 1, kL + 1) + wx*field_vf(field_index)%sf(iL + 1, jL + 1, kL + 1)
         fy1 = (1 - wy)*fx0 + wy*fx1
 
         val = (1 - wz)*fy0 + wz*fy1
@@ -712,6 +867,12 @@ contains
         else
             rmass_add = 0._wp
         end if
+
+        do dir = 1, num_dims
+            if (.not. ieee_is_finite(force(dir))) then
+                force(dir) = 0._wp
+            end if
+        end do
 
     end subroutine f_get_particle_force
 
