@@ -20,8 +20,9 @@ sbatch_cpu_opts="\
 "
 
 sbatch_gpu_opts="\
-#SBATCH --gres=gpu:H200:2
-#SBATCH --ntasks-per-node=8       # Number of cores per node required\
+#SBATCH -CL40S
+#SBATCH --ntasks-per-node=4       # Number of cores per node required
+#SBATCH -G2\
 "
 
 if [ "$2" = "cpu" ]; then
