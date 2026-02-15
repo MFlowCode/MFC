@@ -380,7 +380,7 @@ $:END_GPU_PARALLEL_LOOP()
 Key rules:
 - Always pair `$:GPU_PARALLEL_LOOP(...)` with `$:END_GPU_PARALLEL_LOOP()`
 - Use `collapse(n)` to fuse nested loops when the loop bounds are independent
-- Declare all loop-local temporaries in `private='[...]'`
+- Declare all loop-local temporaries in ``private='[...]'``
 - Never use `stop` or `error stop` inside a GPU loop
 
 ### How to Allocate and Manage GPU Arrays

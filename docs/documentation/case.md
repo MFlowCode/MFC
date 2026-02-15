@@ -298,7 +298,7 @@ These physical parameters must be consistent with fluid material's parameters de
 #### Elliptic Smoothing
 
 Initial conditions in which not all patches support the `patch_icpp(j)%%smoothen` parameter can still be smoothed by applying iterations of the heat equation to the initial condition.
-This is enabled by adding `'elliptic_smoothing': "T",` and `'elliptic_smoothing_iters': N,` to the case dictionary, where `N` is the number of smoothing iterations to apply.
+This is enabled by adding ``'elliptic_smoothing': "T",`` and ``'elliptic_smoothing_iters': N,`` to the case dictionary, where `N` is the number of smoothing iterations to apply.
 
 ### 4. Immersed Boundary Patches {#sec-immersed-boundary-patches}
 
@@ -386,6 +386,14 @@ Details of implementation of viscosity in MFC can be found in \cite Coralic15.
 - `fluid_pp(i)%%cv`, `fluid_pp(i)%%qv`, and `fluid_pp(i)%%qvp` define $c_v$, $q$, and $q'$ as parameters of $i$-th fluid that are used in stiffened gas equation of state.
 
 - `fluid_pp(i)%%G` is required for `hypoelasticity`.
+
+> **Stored-form parameters:** The values `gamma`, `pi_inf`, and `Re(1)`/`Re(2)` are **not** the raw physical quantities. MFC expects transformed stored forms:
+> - `gamma` = \f$1/(\gamma-1)\f$, not \f$\gamma\f$ itself
+> - `pi_inf` = \f$\gamma\,\pi_\infty / (\gamma - 1)\f$, not \f$\pi_\infty\f$ itself
+> - `Re(1)` = \f$1/\mu\f$ (inverse viscosity), not \f$\mu\f$ itself
+>
+> Setting `gamma = 1.4` for air is a common mistake; the correct value is `1.0 / (1.4 - 1.0) = 2.5`.
+> See @ref sec-stored-forms and @ref sec-material-values in the Equations reference for the full table.
 
 ### 6. Simulation Algorithm {#sec-simulation-algorithm}
 
@@ -658,7 +666,7 @@ If `file_per_process` is true, then pre_process, simulation, and post_process mu
 
 - `cons_vars_wrt` and `prim_vars_wrt` activate the output of conservative and primitive state variables into the database.
 
-- `[variable's name]_wrt` activates the output of each specified variable into the database.
+- ``[variable's name]_wrt`` activates the output of each specified variable into the database.
 
 - `schlieren_alpha(i)` specifies the intensity of the numerical Schlieren of $i$-th component.
 
@@ -898,11 +906,11 @@ The parameters are optionally used to define initial velocity profiles and pertu
 
 - `mixlayer_vel_profile` activates setting the mean streamwise velocity to a hyperbolic tangent profile. This option works only for `n > 0`.
 
-- `mixlayer_vel_coef` is a parameter for the hyperbolic tangent profile of a mixing layer when `mixlayer_vel_profile = 'T'`. The mean streamwise velocity profile is given as:
+- `mixlayer_vel_coef` is a parameter for the hyperbolic tangent profile of a mixing layer when ``mixlayer_vel_profile = 'T'``. The mean streamwise velocity profile is given as:
 
 \f[ u = \text{patch\_icpp(1)\%vel(1)} \cdot \tanh( y_{cc} \cdot \text{mixlayer\_vel\_coef}) \f]
 
-- `mixlayer_perturb` activates the velocity perturbation for a temporal mixing layer with hyperbolic tangent mean streamwise velocity profile, using an inverter version of the spectrum-based synthetic turbulence generation method proposed by \cite Guo23. This option only works for `p > 0` and `mixlayer_vel_profile = 'T'`.
+- `mixlayer_perturb` activates the velocity perturbation for a temporal mixing layer with hyperbolic tangent mean streamwise velocity profile, using an inverter version of the spectrum-based synthetic turbulence generation method proposed by \cite Guo23. This option only works for `p > 0` and ``mixlayer_vel_profile = 'T'``.
 
 ### 11. Phase Change Model {#sec-phase-change}
 | Parameter              | Type    | Description                                    |
