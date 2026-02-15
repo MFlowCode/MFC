@@ -53,8 +53,8 @@ PARAM_DOCS = {
     "docs/documentation/case.md": CASE_MD_SKIP,
 }
 
-# Match @ref page_id patterns
-REF_RE = re.compile(r"@ref\s+(\w+)")
+# Match @ref page_id patterns (allow hyphens in page IDs like cli-reference)
+REF_RE = re.compile(r"@ref\s+([\w-]+)")
 
 
 def check_docs(repo_root: Path) -> list[str]:
@@ -322,10 +322,13 @@ def check_page_refs(repo_root: Path) -> list[str]:
         return []
 
     # Collect all @page identifiers
-    page_ids = {"citelist"}  # Doxygen built-in
+    # Include Doxygen built-ins and pages generated at build time by
+    # gen_parameters.sh, gen_cli_reference.sh, examples.sh, and
+    # gen_case_constraints_docs.py.
+    page_ids = {"citelist", "parameters", "cli-reference", "examples", "case_constraints"}
     for md_file in doc_dir.glob("*.md"):
         text = md_file.read_text(encoding="utf-8")
-        m = re.search(r"^\s*@page\s+(\w+)", text, flags=re.MULTILINE)
+        m = re.search(r"^\s*@page\s+([\w-]+)", text, flags=re.MULTILINE)
         if m:
             page_ids.add(m.group(1))
 
