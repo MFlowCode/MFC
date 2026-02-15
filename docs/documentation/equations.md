@@ -777,7 +777,7 @@ Used for viscous fluxes and velocity gradients.
 | `-15` | Slip wall |
 | `-16` | No-slip wall |
 
-### 16.2 Characteristic BCs (\cite Thompson87, \cite Thompson90; `bc_x%beg = -5` to `-12`)
+### 16.2 Characteristic BCs (\cite Thompson87, \cite Thompson90; `bc_x%%beg = -5` to `-12`)
 
 **Characteristic decomposition:**
 
