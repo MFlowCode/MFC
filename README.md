@@ -121,7 +121,11 @@ MFC weak scales to the full machines on [El Capitan](https://hpc.llnl.gov/hardwa
 MFC is a SPEChpc benchmark candidate, part of the JSC JUPITER Early Access Program, and used OLCF Frontier and LLNL El Capitan early access systems.
 
 <p align="center">
-    <img src="docs/res/weakScaling/weakscaling.png" alt="Weak scaling on El Capitan, Frontier, and Alps" width="400"/>
+    <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/res/weakScaling/weakscaling-dark.png"/>
+        <source media="(prefers-color-scheme: light)" srcset="docs/res/weakScaling/weakscaling.png"/>
+        <img src="docs/res/weakScaling/weakscaling.png" alt="Weak scaling on El Capitan, Frontier, and Alps" width="400"/>
+    </picture>
 </p>
 
 ## What else can this thing do?
