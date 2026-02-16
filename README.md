@@ -31,9 +31,6 @@
   <a href="https://mflowcode.github.io/">
     <img src="https://img.shields.io/badge/docs-mflowcode.github.io-blue" alt="Docs"/>
   </a>
-  <a href="https://github.com/MFlowCode/MFC/discussions">
-    <img src="https://img.shields.io/badge/discussions-join-brightgreen" alt="Discussions"/>
-  </a>
   <a href="https://github.com/codespaces/new?hide_repo_select=true&ref=master&repo=MFlowCode%2FMFC">
     <img src="https://img.shields.io/badge/Codespaces-Open-2ea44f?logo=github" alt="Codespaces"/>
   </a>
@@ -120,13 +117,11 @@ You can visualize the output data in `examples/3D_shockdroplet/silo_hdf5` via Pa
 
 ## Is this _really_ exascale?
 
-[OLCF Frontier](https://www.olcf.ornl.gov/frontier/) is the first exascale supercomputer.
-The weak scaling of MFC on this machine shows near-ideal utilization.
-We also scale ideally to >98% of LLNL El Capitan.
+MFC weak scales to the full machines on [El Capitan](https://hpc.llnl.gov/hardware/compute-platforms/el-capitan) (MI300A), [Frontier](https://www.olcf.ornl.gov/frontier/) (MI250X), and [Alps](https://www.cscs.ch/computers/alps) (GH200) with near-ideal efficiency.
 MFC is a SPEChpc benchmark candidate, part of the JSC JUPITER Early Access Program, and used OLCF Frontier and LLNL El Capitan early access systems.
 
 <p align="center">
-    <img src="docs/res/scaling.png" alt="Scaling" width="400"/>
+    <img src="docs/res/weakScaling/weakscaling.png" alt="Weak scaling on El Capitan, Frontier, and Alps" width="400"/>
 </p>
 
 ## What else can this thing do?
