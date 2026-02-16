@@ -90,26 +90,14 @@ jobs:
       ACTIONS_RUNNER_FORCE_ACTIONS_NODE_VERSION: node16
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
     steps:
-      - name: Clean workspace (Lustre-safe)
-        shell: bash
-        run: |
-          shopt -s dotglob nullglob
-          for i in 1 2 3 4 5; do
-            rm -rf -- "${GITHUB_WORKSPACE:?}/"* 2>/dev/null && break
-            echo "Clean attempt $i failed, retrying in 2s..."
-            sleep 2
-          done
-
       - name: Clone - PR
         uses: actions/checkout@v4
         with:
-          clean: false
           path: pr
 
       - name: Clone - Master
         uses: actions/checkout@v4
         with:
-          clean: false
           repository: MFlowCode/MFC
           ref: master
           path: master
