@@ -25,7 +25,11 @@ echo "  Cache dir: $_cache_dir"
 
 # Replace any existing build/ (real dir or stale symlink) with a symlink
 # to our runner-specific cache directory.
-if [ -e "build" ] || [ -L "build" ]; then
+# Use unlink for symlinks to avoid rm -rf following the link and deleting
+# the shared cache contents (which another runner may be using).
+if [ -L "build" ]; then
+    unlink "build"
+elif [ -e "build" ]; then
     rm -rf "build"
 fi
 
