@@ -110,7 +110,6 @@ contains
         ib_markers%sf = 0._wp
         $:GPU_UPDATE(device='[ib_markers%sf]')
         call s_apply_ib_patches(ib_markers)
-        call s_populate_ib_buffers()
         $:GPU_UPDATE(host='[ib_markers%sf]')
         do i = 1, num_ibs
             if (patch_ib(i)%moving_ibm /= 0) call s_compute_centroid_offset(i) ! offsets are computed after IB markers are generated
@@ -1008,12 +1007,12 @@ contains
         $:GPU_UPDATE(device='[patch_ib]')
 
         ! recompute the new ib_patch locations and broadcast them.
-        call nvtxStartRange("COMPUTE-IB-MARKERS")
+        call nvtxStartRange("APPLY-IB-PATCHES")
         $:GPU_UPDATE(device='[ib_markers%sf]')
         call s_apply_ib_patches(ib_markers)
-        call s_populate_ib_buffers()
-        $:GPU_UPDATE(host='[ib_markers%sf]')
         call nvtxEndRange
+
+        call nvtxStartRange("COMPUTE-GHOST-POINTS")
 
         ! recalculate the ghost point locations and coefficients
         call s_find_num_ghost_points(num_gps, num_inner_gps)
@@ -1022,10 +1021,10 @@ contains
         call s_find_ghost_points(ghost_points, inner_points)
         $:GPU_UPDATE(device='[ghost_points, inner_points]')
 
-        call nvtxStartRange("APPLY-LEVELSET")
+        call nvtxEndRange
+        
         call s_apply_levelset(ghost_points, num_gps)
         $:GPU_UPDATE(device='[ghost_points]')
-        call nvtxEndRange
 
         call s_compute_image_points(ghost_points)
         $:GPU_UPDATE(device='[ghost_points]')

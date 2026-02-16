@@ -85,7 +85,7 @@ contains
                     call s_ib_3D_airfoil(i, ib_markers)
                     ! STL+IBM patch
                 elseif (patch_ib(i)%geometry == 12) then
-                    call s_ib_model(i, ib_markers)
+                    call s_ib_3d_model(i, ib_markers)
                 end if
             end do
             !> @}
@@ -274,8 +274,8 @@ contains
 
         $:GPU_PARALLEL_LOOP(private='[i,j]',&
                   & copyin='[patch_id,center,radius]', collapse=2)
-        do j = 0, n
-            do i = 0, m
+        do j = -gp_layers, n+gp_layers
+            do i = -gp_layers, m+gp_layers
                 if ((x_cc(i) - center(1))**2 &
                     + (y_cc(j) - center(2))**2 <= radius**2) &
                     then
@@ -378,8 +378,8 @@ contains
 
         $:GPU_PARALLEL_LOOP(private='[i,j,xy_local,k,f]', &
                   & copyin='[patch_id,center,inverse_rotation,offset,ma,ca_in,airfoil_grid_u,airfoil_grid_l]', collapse=2)
-        do j = 0, n
-            do i = 0, m
+        do j = -gp_layers, n+gp_layers
+            do i = -gp_layers, m+gp_layers
                 xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp] ! get coordinate frame centered on IB
                 xy_local = matmul(inverse_rotation, xy_local) ! rotate the frame into the IB's coordinates
                 xy_local = xy_local - offset ! airfoils are a patch that require a centroid offset
@@ -529,9 +529,9 @@ contains
 
         $:GPU_PARALLEL_LOOP(private='[i,j,l,xyz_local,k,f]',&
                   & copyin='[patch_id,center,inverse_rotation,offset,ma,ca_in,airfoil_grid_u,airfoil_grid_l,z_min,z_max]', collapse=3)
-        do l = 0, p
-            do j = 0, n
-                do i = 0, m
+        do l = -gp_layers, p+gp_layers
+            do j = -gp_layers, n+gp_layers
+                do i = -gp_layers, m+gp_layers
                     xyz_local = [x_cc(i) - center(1), y_cc(j) - center(2), z_cc(l) - center(3)] ! get coordinate frame centered on IB
                     xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordinates
                     xyz_local = xyz_local - offset ! airfoils are a patch that require a centroid offset
@@ -623,8 +623,8 @@ contains
         ! variables of the current patch are assigned to this cell.
         $:GPU_PARALLEL_LOOP(private='[i,j, xy_local]',&
                   & copyin='[patch_id,center,length,inverse_rotation,x_cc,y_cc]', collapse=2)
-        do j = 0, n
-            do i = 0, m
+        do j = -gp_layers, n+gp_layers
+            do i = -gp_layers, m+gp_layers
                 ! get the x and y coordinates in the local IB frame
                 xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]
                 xy_local = matmul(inverse_rotation, xy_local)
@@ -678,9 +678,9 @@ contains
         ! the current patch are assigned to this cell.
         $:GPU_PARALLEL_LOOP(private='[i,j,k,cart_y,cart_z]',&
                   & copyin='[patch_id,center,radius]', collapse=3)
-        do k = 0, p
-            do j = 0, n
-                do i = 0, m
+        do k = -gp_layers, p+gp_layers
+            do j = -gp_layers, n+gp_layers
+                do i = -gp_layers, m+gp_layers
                     if (grid_geometry == 3) then
                         call s_convert_cylindrical_to_cartesian_coord(y_cc(j), z_cc(k))
                     else
@@ -734,9 +734,9 @@ contains
         ! of the current patch are assigned to this cell.
         $:GPU_PARALLEL_LOOP(private='[i,j,k,xyz_local,cart_y,cart_z]',&
                   & copyin='[patch_id,center,length,inverse_rotation]', collapse=3)
-        do k = 0, p
-            do j = 0, n
-                do i = 0, m
+        do k = -gp_layers, p+gp_layers
+            do j = -gp_layers, n+gp_layers
+                do i = -gp_layers, m+gp_layers
 
                     if (grid_geometry == 3) then
                         ! TODO :: This does not work and is not covered by any tests. This should be fixed
@@ -804,9 +804,9 @@ contains
         ! variables of the current patch are assigned to this cell.
         $:GPU_PARALLEL_LOOP(private='[i,j,k,xyz_local,cart_y,cart_z]',&
                   & copyin='[patch_id,center,length,radius,inverse_rotation]', collapse=3)
-        do k = 0, p
-            do j = 0, n
-                do i = 0, m
+         do k = -gp_layers, p+gp_layers
+            do j = -gp_layers, n+gp_layers
+                do i = -gp_layers, m+gp_layers
 
                     if (grid_geometry == 3) then
                         call s_convert_cylindrical_to_cartesian_coord(y_cc(j), z_cc(k))
@@ -867,8 +867,8 @@ contains
         ! domain
         $:GPU_PARALLEL_LOOP(private='[i,j, xy_local]',&
                   & copyin='[patch_id,center,ellipse_coeffs,inverse_rotation,x_cc,y_cc]', collapse=2)
-        do j = 0, n
-            do i = 0, m
+        do j = -gp_layers, n+gp_layers
+            do i = -gp_layers, m+gp_layers
                 ! get the x and y coordinates in the local IB frame
                 xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]
                 xy_local = matmul(inverse_rotation, xy_local)
@@ -884,12 +884,57 @@ contains
 
     end subroutine s_ib_ellipse
 
-    !> The STL patch is a 2/3D geometry that is imported from an STL file.
+    !> The STL patch is a 2D geometry that is imported from an STL file.
     !! @param patch_id is the patch identifier
     !! @param ib_markers Array to track patch ids
-    !! @param STL_levelset STL levelset
-    !! @param STL_levelset_norm STL levelset normals
     subroutine s_ib_model(patch_id, ib_markers)
+
+        integer, intent(in) :: patch_id
+        type(integer_field), intent(inout) :: ib_markers
+
+        integer :: i, j, k !< Generic loop iterators
+
+        type(t_model), pointer :: model
+
+        real(wp) :: eta
+        real(wp), dimension(1:3) :: point, local_point, offset
+        real(wp), dimension(1:3) :: center, xy_local
+        real(wp), dimension(1:3, 1:3) :: inverse_rotation
+
+        model => models(patch_id)%model
+        center = 0._wp
+        center(1) = patch_ib(patch_id)%x_centroid
+        center(2) = patch_ib(patch_id)%y_centroid
+        inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
+        offset(:) = patch_ib(patch_id)%centroid_offset(:)
+
+        do i = 0-gp_layers, m+gp_layers
+            do j = -gp_layers, n+gp_layers
+
+                    xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]
+                    xy_local = matmul(inverse_rotation, xy_local)
+                    xy_local = xy_local - offset
+
+                    if (grid_geometry == 3) then
+                        xy_local = f_convert_cyl_to_cart(xy_local)
+                    end if
+
+                    eta = f_model_is_inside(model, xy_local, (/dx(i), dy(j), 0._wp/), patch_ib(patch_id)%model_spc)
+
+                    ! Reading STL boundary vertices and compute the levelset and levelset_norm
+                    if (eta > patch_ib(patch_id)%model_threshold) then
+                        ib_markers%sf(i, j, 0) = patch_id
+                    end if
+
+            end do
+        end do
+
+    end subroutine s_ib_model
+
+    !> The STL patch is a 3D geometry that is imported from an STL file.
+    !! @param patch_id is the patch identifier
+    !! @param ib_markers Array to track patch ids
+    subroutine s_ib_3d_model(patch_id, ib_markers)
 
         integer, intent(in) :: patch_id
         type(integer_field), intent(inout) :: ib_markers
@@ -907,18 +952,15 @@ contains
         center = 0._wp
         center(1) = patch_ib(patch_id)%x_centroid
         center(2) = patch_ib(patch_id)%y_centroid
-        if (p > 0) center(3) = patch_ib(patch_id)%z_centroid
+        center(3) = patch_ib(patch_id)%z_centroid
         inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
         offset(:) = patch_ib(patch_id)%centroid_offset(:)
 
-        do i = 0, m
-            do j = 0, n
-                do k = 0, p
+        do i = 0-gp_layers, m+gp_layers
+            do j = -gp_layers, n+gp_layers
+                do k = -gp_layers, p+gp_layers
 
-                    xyz_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]
-                    if (p > 0) then
-                        xyz_local(3) = z_cc(k) - center(3)
-                    end if
+                    xyz_local = [x_cc(i) - center(1), y_cc(j) - center(2), z_cc(k) - center(3)]
                     xyz_local = matmul(inverse_rotation, xyz_local)
                     xyz_local = xyz_local - offset
 
@@ -926,11 +968,7 @@ contains
                         xyz_local = f_convert_cyl_to_cart(xyz_local)
                     end if
 
-                    if (p == 0) then
-                        eta = f_model_is_inside(model, xyz_local, (/dx(i), dy(j), 0._wp/), patch_ib(patch_id)%model_spc)
-                    else
-                        eta = f_model_is_inside(model, xyz_local, (/dx(i), dy(j), dz(k)/), patch_ib(patch_id)%model_spc)
-                    end if
+                    eta = f_model_is_inside(model, xyz_local, (/dx(i), dy(j), dz(k)/), patch_ib(patch_id)%model_spc)
 
                     ! Reading STL boundary vertices and compute the levelset and levelset_norm
                     if (eta > patch_ib(patch_id)%model_threshold) then
@@ -941,7 +979,7 @@ contains
             end do
         end do
 
-    end subroutine s_ib_model
+    end subroutine s_ib_3d_model
 
     !> Subroutine that computes a rotation matrix for converting to the rotating frame of the boundary
     subroutine s_update_ib_rotation_matrix(patch_id)
