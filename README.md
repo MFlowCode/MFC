@@ -85,7 +85,7 @@ MFC has high- and low-level documentation, visualizations, and more on [its webs
 ## Examples
 
 MFC ships with [137+ example cases](https://mflowcode.github.io/documentation/examples.html).
-Here is a high-Mach flow over an airfoil (see `examples/`):
+Here is a high-Mach flow over an airfoil (see [`examples/2D_ibm_airfoil/`](examples/2D_ibm_airfoil/)):
 
 <p align="center">
     <img src="docs/res/airfoil.png" alt="High-Mach airfoil flow" width="700"/><br/>
