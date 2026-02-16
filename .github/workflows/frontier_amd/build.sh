@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 # Ignore SIGHUP to survive login node session drops
 trap '' HUP
 
