@@ -14,9 +14,15 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MFC | Home</title>
-    <meta name="description" content="MFC is an exascale multiphysics CFD solver maintained by the research groups of Profs. Bryngelson and Colonius." />
-    <meta name=”keywords” content="exascale, fluid dynamics, cfd, computational fluid dynamics, compressible, hpc, bryngelson, colonius, subgrid, multiphase, frontier, summit, el capitan, aurora, amd gpu, gpu, nvidia"/>
+    <title>MFC | Exascale Multiphase Flow Solver</title>
+    <meta name="description" content="MFC is an open-source exascale multiphase flow solver and 2025 Gordon Bell Prize Finalist. Scales to 200+ trillion grid points on 43,000+ GPUs." />
+    <meta name="keywords" content="exascale, fluid dynamics, cfd, computational fluid dynamics, compressible, hpc, bryngelson, colonius, subgrid, multiphase, frontier, summit, el capitan, aurora, amd gpu, gpu, nvidia, gordon bell"/>
+    <meta property="og:title" content="MFC - Exascale Multiphase Flow Solver" />
+    <meta property="og:description" content="Open-source exascale multiphase flow solver. 2025 Gordon Bell Prize Finalist. Scales to 200+ trillion grid points on 43,000+ GPUs." />
+    <meta property="og:image" content="https://mflowcode.github.io/res/banner.png" />
+    <meta property="og:url" content="https://mflowcode.github.io" />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="icon" type="image/x-icon" href="res/icon.ico">
@@ -34,8 +40,7 @@
         ];
 
         const scalings = [
-            { image: "res/weakScaling/frontier.svg", label: "Oak Ridge Frontier (AMD MI250X GPUs)" },
-            { image: "res/weakScaling/summit.svg",   label: "Oak Ridge Summit (NVIDIA V100 GPUs)" },
+            { image: "res/weakScaling/weakscaling.png", label: "Weak scaling on El Capitan (MI300A), Frontier (MI250X), and Alps (GH200)" },
         ];
 
         document.addEventListener("DOMContentLoaded", () => {
@@ -71,7 +76,7 @@
             `).join("");
 
             document.getElementById("ft-scaling").innerHTML = scalings.map(s => `
-                <div class="flex md:w-2/6 flex-col text-white rounded bg-slate-900 rounded-b-lg">
+                <div class="flex md:w-2/6 mx-auto flex-col text-white rounded bg-slate-900 rounded-b-lg">
                     <div class="flex-1 grid bg-white pb-2">
                         <img class="place-self-center" src="${s.image}" alt="${s.label}">
                     </div>
@@ -118,8 +123,11 @@
                 <div class="w-full flex flex-col gap-4">
                     <img src="res/banner.png" class="h-20 md:h-24 mx-auto">
                 </div>
-                <div class="w-full flex flex-col text-white text-md md:text-lg text-justify font-semibold">
+                <div class="w-full flex flex-col text-white text-md md:text-lg text-justify font-semibold gap-3">
                     An exascale compressible multiphase and multiphysics flow code.
+                    <span class="text-amber-400 text-sm md:text-base font-bold">
+                        2025 Gordon Bell Prize Finalist - 200+ trillion grid points on 43,000+ GPUs
+                    </span>
                 </div>
             </div>
             <div class="flex mx-auto">
@@ -127,6 +135,7 @@
                     <a class="px-4 flex flex-row items-center py-4 border-b-2 hover:border-amber-400" href="https://github.com/MFlowCode/MFC">
                         <i class="pr-4 fa-brands fa-github"></i>
                         <span class="flex-1">GitHub</span>
+                        <img class="h-5 ml-2" src="https://img.shields.io/github/stars/MFlowCode/MFC?style=social" alt="GitHub stars">
                     </a>
                     <a class="px-4 flex flex-row items-center py-4 border-b-2 hover:border-amber-400" href="https://github.com/MFlowCode/MFC/releases/latest">
                         <i class="pr-4 fa-solid fa-download"></i>
@@ -198,7 +207,7 @@
         </div>
         <div class="text-justify flex-1 text-xs md:text-sm text-neutral-300">
             Multiple federal sponsors have supported MFC development, including the US Department of Defense (DOD), the National Institutes of Health (NIH), the Department of Energy (DOE), and the National Science Foundation (NSF).
-            MFC computations use OLCF Frontier, Summit, and Wombat; LLNC LC Tuolumne and Lassen; and many ACCESS-CI systems
+            MFC computations use OLCF Frontier, Summit, and Wombat; LLNL LC El Capitan, Tuolumne, and Lassen; and many ACCESS-CI systems
         </div>
     </div>
 </body>
