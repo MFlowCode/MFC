@@ -150,7 +150,7 @@ jobs:
               echo ""
               echo "=== Retrying $NUM_FAILED failed test(s): $FAILED ==="
               echo ""
-              /bin/bash mfc.sh test -v --max-attempts 3 -j $(nproc) --only $FAILED $TEST_ALL
+              /bin/bash mfc.sh test -v --max-attempts 3 -j $(nproc) --only $FAILED $TEST_ALL || exit $?
             else
               echo "Too many failures ($NUM_FAILED) to retry — likely a real issue."
               exit 1
