@@ -51,6 +51,10 @@
     <img src="docs/res/shockdrop.png" alt="Shock-droplet interaction simulated with MFC" width="700"/>
 </p>
 
+
+https://github.com/user-attachments/assets/4847e4d1-50ff-4d08-828e-74219ffa1021
+
+
 ## Why MFC?
 
 - **Exascale GPU performance** - Ideal weak scaling to 43K+ GPUs. Near compute-roofline behavior. [Compile-time case optimization](https://mflowcode.github.io/documentation/running.html) for up to 10x speedup.
