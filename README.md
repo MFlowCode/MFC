@@ -8,40 +8,40 @@
 
 <p align="center">
   <a href="https://github.com/MFlowCode/MFC/actions">
-    <img src="https://img.shields.io/github/actions/workflow/status/mflowcode/mfc/test.yml?style=flat&label=Tests&color=slateblue%09"/>
+    <img src="https://img.shields.io/github/actions/workflow/status/mflowcode/mfc/test.yml?style=flat&label=Tests&color=slateblue%09" alt="Tests"/>
   </a>
   <a href="https://github.com/MFlowCode/MFC/blob/master/.github/CONTRIBUTING.md">
-    <img src="https://img.shields.io/github/contributors-anon/mflowcode/mfc?style=flat&color=darkslategrey%09" />
+    <img src="https://img.shields.io/github/contributors-anon/mflowcode/mfc?style=flat&color=darkslategrey%09" alt="Contributors"/>
   </a>
   <a href="https://join.slack.com/t/mflowcode/shared_invite/zt-y75wibvk-g~zztjknjYkK1hFgCuJxVw">
-    <img src="https://img.shields.io/badge/slack-MFC-purple.svg?logo=slack" />
+    <img src="https://img.shields.io/badge/slack-MFC-purple.svg?logo=slack" alt="Slack"/>
   </a>
   <a href="https://lbesson.mit-license.org/">
-    <img src="https://img.shields.io/badge/License-MIT-crimson.svg" />
+    <img src="https://img.shields.io/badge/License-MIT-crimson.svg" alt="License"/>
   </a>
   <a href="https://codecov.io/github/MFlowCode/MFC" target="_blank">
-    <img src="https://codecov.io/github/MFlowCode/MFC/graph/badge.svg?token=8SY043QND4">
+    <img src="https://codecov.io/github/MFlowCode/MFC/graph/badge.svg?token=8SY043QND4" alt="Codecov"/>
   </a>
   <a href="https://github.com/MFlowCode/MFC/blob/master/.github/CONTRIBUTING.md" target="_blank">
-    <img src="https://img.shields.io/badge/Contributing-Guide-orange?style=flat">
+    <img src="https://img.shields.io/badge/Contributing-Guide-orange?style=flat" alt="Contributing"/>
   </a>
 </p>
 
 <p align="center">
   <a href="https://mflowcode.github.io/">
-    <img src="https://img.shields.io/badge/docs-mflowcode.github.io-blue" />
+    <img src="https://img.shields.io/badge/docs-mflowcode.github.io-blue" alt="Docs"/>
   </a>
   <a href="https://github.com/MFlowCode/MFC/discussions">
-    <img src="https://img.shields.io/badge/discussions-join-brightgreen" />
+    <img src="https://img.shields.io/badge/discussions-join-brightgreen" alt="Discussions"/>
   </a>
   <a href="https://github.com/codespaces/new?hide_repo_select=true&ref=master&repo=MFlowCode%2FMFC">
-    <img src="https://img.shields.io/badge/Codespaces-Open-2ea44f?logo=github" />
+    <img src="https://img.shields.io/badge/Codespaces-Open-2ea44f?logo=github" alt="Codespaces"/>
   </a>
   <a href="https://hub.docker.com/r/sbryngelson/mfc">
-    <img src="https://img.shields.io/badge/dockerhub-images-important.svg?logo=Docker&style=flat" />
+    <img src="https://img.shields.io/badge/dockerhub-images-important.svg?logo=Docker&style=flat" alt="DockerHub"/>
   </a>
   <a href="https://github.com/MFlowCode/homebrew-mfc">
-    <img src="https://img.shields.io/badge/homebrew-mflowcode%2Fmfc%2Fmfc-brown?logo=homebrew&style=flat" />
+    <img src="https://img.shields.io/badge/homebrew-mflowcode%2Fmfc%2Fmfc-brown?logo=homebrew&style=flat" alt="Homebrew"/>
   </a>
 </p>
 
@@ -186,10 +186,10 @@ MFC is a SPEChpc benchmark candidate, part of the JSC JUPITER Early Access Progr
 
 * GPU compatible on NVIDIA ([P/V/A/H]100, GH200, etc.) and AMD (MI[1/2/3]00+) GPU and APU hardware
 * Ideal weak scaling to 100% of the largest GPU and superchip supercomputers
- 	* \>43K AMD APUs (MI300A) on [LLNL El Capitan](https://hpc.llnl.gov/hardware/compute-platforms/el-capitan)
-   	* \>3K AMD APUs (MI300A) on [LLNL Tuolumne](https://hpc.llnl.gov/hardware/compute-platforms/tuolumne)
-	* \>33K AMD GPUs (MI250X) on [OLCF Frontier](https://www.olcf.ornl.gov/frontier/)
-	* \>10K NVIDIA GPUs (V100) on [OLCF Summit](https://www.olcf.ornl.gov/summit/)
+    * \>43K AMD APUs (MI300A) on [LLNL El Capitan](https://hpc.llnl.gov/hardware/compute-platforms/el-capitan)
+    * \>3K AMD APUs (MI300A) on [LLNL Tuolumne](https://hpc.llnl.gov/hardware/compute-platforms/tuolumne)
+    * \>33K AMD GPUs (MI250X) on [OLCF Frontier](https://www.olcf.ornl.gov/frontier/)
+    * \>10K NVIDIA GPUs (V100) on [OLCF Summit](https://www.olcf.ornl.gov/summit/)
 * Near compute roofline behavior
 * Compile-time case optimization (hard-codes parameters for significant speedup)
 * RDMA (remote data memory access; GPU-GPU direct communication) via GPU-aware MPI on NVIDIA (CUDA-aware MPI) and AMD GPU systems
@@ -215,13 +215,13 @@ The original open-source release of MFC is ref. 3, which should be cited for pro
 
 <p align="center">
 <a href="https://doi.org/10.1016/j.cpc.2026.110055" target="_blank">
-    <img src="https://img.shields.io/badge/DOI-10.1016/j.cpc.2026.110055-thistle.svg"/>
+    <img src="https://img.shields.io/badge/DOI-10.1016/j.cpc.2026.110055-thistle.svg" alt="DOI 10.1016/j.cpc.2026.110055"/>
 </a>
 <a href="https://doi.org/10.5281/zenodo.17049757" target="_blank">
-    <img src="https://zenodo.org/badge/DOI/10.5281/zenodo.17049757.svg"/>
+    <img src="https://zenodo.org/badge/DOI/10.5281/zenodo.17049757.svg" alt="Zenodo DOI"/>
 </a>
 <a href="https://github.com/MFlowCode/MFC/stargazers" target="_blank">
-    <img src="https://img.shields.io/github/stars/MFlowCode/MFC?style=flat&color=maroon"/>
+    <img src="https://img.shields.io/github/stars/MFlowCode/MFC?style=flat&color=maroon" alt="GitHub stars"/>
 </a>
 </p>
 
