@@ -102,18 +102,11 @@ And a high-amplitude acoustic wave reflecting and emerging through a circular or
 | `./mfc.sh run case.py` | Run a simulation case (interactive or batch: SLURM/PBS/LSF) |
 | `./mfc.sh test` | Run the test suite |
 | `./mfc.sh validate case.py` | Check a case file for errors before running |
-| `./mfc.sh init my_case` | Create a new case from a template |
+| `./mfc.sh new my_case` | Create a new case from a template |
 | `./mfc.sh clean` | Remove build artifacts |
 | `./mfc.sh interactive` | Launch interactive menu-driven interface |
 
-Run `./mfc.sh <command> --help` for detailed options, or see the [full documentation](https://mflowcode.github.io/documentation/index.html). Tab completion for bash and zsh is auto-installed after you have run `./mfc.sh generate` (or any non-`init` command) at least once. Play with the examples in `examples/` ([showcased here](https://mflowcode.github.io/documentation/examples.html)).
-
-The shock-droplet interaction case above was run via
-```shell
-./mfc.sh run -n $(nproc) ./examples/3D_shockdroplet/case.py
-```
-where `$(nproc)` is the number of cores the example will run on (and the number of physical cores on your CPU device).
-You can visualize the output data in `examples/3D_shockdroplet/silo_hdf5` via Paraview, Visit, or your favorite software.
+Run `./mfc.sh <command> --help` for detailed options, or see the [full documentation](https://mflowcode.github.io/documentation/index.html). Tab completion for bash and zsh is auto-installed after you have run `./mfc.sh generate` (or any non-`new` command) at least once. Play with the examples in `examples/` ([showcased here](https://mflowcode.github.io/documentation/examples.html)).
 
 ## Is this _really_ exascale?
 
