@@ -992,7 +992,7 @@ contains
 
         integer :: i, ierr
 
-        call nvtxStartRange("UPDATE-MIB")
+        call nvtxStartRange("UPDATE-MIBM")
 
         ! Clears the existing immersed boundary indices
         ib_markers%sf = 0._wp
@@ -1057,6 +1057,9 @@ contains
         #:else
             real(wp), dimension(num_fluids) :: dynamic_viscosities
         #:endif
+
+        call nvtxStartRange("COMPUTE-IB-FORCES")
+
         forces = 0._wp
         torques = 0._wp
 
@@ -1186,6 +1189,8 @@ contains
             patch_ib(i)%force(:) = forces(i, :)
             patch_ib(i)%torque(:) = matmul(patch_ib(i)%rotation_matrix_inverse, torques(i, :)) ! torques must be converted to the local coordinates of the IB
         end do
+
+        call nvtxEndRange
 
     end subroutine s_compute_ib_forces
 

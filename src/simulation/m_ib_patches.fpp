@@ -659,6 +659,7 @@ contains
 
         ! Generic loop iterators
         integer :: i, j, k
+        integer :: il, ir, jl, jr, kl, kr
         real(wp) :: radius
         real(wp), dimension(1:3) :: center
 
@@ -672,15 +673,26 @@ contains
         center(3) = patch_ib(patch_id)%z_centroid
         radius = patch_ib(patch_id)%radius
 
+        il = -gp_layers
+        jl = -gp_layers
+        kl = -gp_layers
+        ir = m + gp_layers
+        jr = n + gp_layers
+        kr = p + gp_layers
+        call get_bounding_indices(center(1) - radius, center(1) + radius, x_cc, il, ir)
+        call get_bounding_indices(center(2) - radius, center(2) + radius, y_cc, jl, jr)
+        call get_bounding_indices(center(3) - radius, center(3) + radius, z_cc, kl, kr)
+
         ! Checking whether the sphere covers a particular cell in the domain
         ! and verifying whether the current patch has permission to write to
         ! that cell. If both queries check out, the primitive variables of
         ! the current patch are assigned to this cell.
         $:GPU_PARALLEL_LOOP(private='[i,j,k,cart_y,cart_z]',&
                   & copyin='[patch_id,center,radius]', collapse=3)
-        do k = -gp_layers, p+gp_layers
-            do j = -gp_layers, n+gp_layers
-                do i = -gp_layers, m+gp_layers
+        do k = kl-1, kr+1
+            do j = jl-1, jr+1
+                do i = il-1, ir+1
+                ! do i = -gp_layers, m+gp_layers
                     if (grid_geometry == 3) then
                         call s_convert_cylindrical_to_cartesian_coord(y_cc(j), z_cc(k))
                     else
@@ -1057,6 +1069,46 @@ contains
         sph_phi = atan(cyl_y/cyl_x)
 
     end subroutine s_convert_cylindrical_to_spherical_coord
+
+    subroutine get_bounding_indices(left_bound, right_bound, cell_centers, left_index, right_index)
+
+      real(wp), intent(in) :: left_bound, right_bound
+      integer, intent(inout) :: left_index, right_index
+      real(wp), dimension(-buff_size:), intent(in) :: cell_centers
+
+      integer :: itr_left, itr_middle, itr_right
+
+        itr_left = left_index
+        itr_right = right_index
+
+        do while (itr_left + 1 < itr_right)
+            itr_middle = (itr_left + itr_right) / 2
+            if (cell_centers(itr_middle) < left_bound) then
+              itr_left = itr_middle
+            else if (cell_centers(itr_middle) > left_bound) then
+              itr_right = itr_middle
+            else
+                itr_left = itr_middle
+                exit
+            end if
+        end do
+        left_index = itr_left
+
+        itr_right = right_index
+        do while (itr_left + 1 < itr_right)
+            itr_middle = (itr_left + itr_right) / 2
+            if (cell_centers(itr_middle) < right_bound) then
+              itr_left = itr_middle
+            else if (cell_centers(itr_middle) > right_bound) then
+              itr_right = itr_middle
+            else
+                itr_right = itr_middle
+                exit
+            end if
+        end do
+        right_index = itr_right
+
+    end subroutine get_bounding_indices
 
     !> Archimedes spiral function
     !! @param myth Angle
