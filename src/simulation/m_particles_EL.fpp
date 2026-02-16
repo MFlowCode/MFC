@@ -197,19 +197,19 @@ contains
 
         call s_read_input_particles(q_cons_vf)
 
-        !> Correct fluid volume fraction
-        $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3)
-        do k = idwint(3)%beg, idwint(3)%end
-            do j = idwint(2)%beg, idwint(2)%end
-                do i = idwint(1)%beg, idwint(1)%end
-                    do nf = 1, num_fluids
-                        q_cons_vf(E_idx + nf)%sf(i, j, k) = q_particles(1)%sf(i, j, k)
-                        q_cons_vf(nf)%sf(i, j, k) = q_particles(1)%sf(i, j, k)*q_cons_vf(nf)%sf(i, j, k)
-                    end do
-                end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
+        ! !> Correct fluid volume fraction
+        ! $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3)
+        ! do k = idwint(3)%beg, idwint(3)%end
+        !     do j = idwint(2)%beg, idwint(2)%end
+        !         do i = idwint(1)%beg, idwint(1)%end
+        !             do nf = 1, num_fluids
+        !                 q_cons_vf(E_idx + nf)%sf(i, j, k) = q_particles(1)%sf(i, j, k)
+        !                 q_cons_vf(nf)%sf(i, j, k) = q_particles(1)%sf(i, j, k)*q_cons_vf(nf)%sf(i, j, k)
+        !             end do
+        !         end do
+        !     end do
+        ! end do
+        ! $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_initialize_particles_EL_module
 
@@ -582,8 +582,8 @@ contains
 
         if (lag_params%added_mass_model > 0) then
             do l = 1, num_dims
-                call s_gradient_dir(q_prim_vf(1)%sf, field_vars(dRhox_id + l - 1)%sf, l)
-                call s_gradient_dir(q_cons_vf(momxb + l - 1)%sf, field_vars(dRhoux_id + l - 1)%sf, l)
+                call s_gradient_dir(q_prim_vf(1)%sf/q_prim_vf(E_idx + 1)%sf, field_vars(dRhox_id + l - 1)%sf, l)
+                call s_gradient_dir(q_cons_vf(momxb + l - 1)%sf/q_cons_vf(E_idx + 1)%sf, field_vars(dRhoux_id + l - 1)%sf, l)
             end do
         end if
 
@@ -657,10 +657,10 @@ contains
                 do i = idwint(1)%beg, idwint(1)%end
                     if (q_particles(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
 
-                        do nf = 1, num_fluids
-                            q_prim_vf(E_idx + nf)%sf(i, j, k) = q_particles(1)%sf(i, j, k)
-                            q_cons_vf(E_idx + nf)%sf(i, j, k) = q_particles(1)%sf(i, j, k)
-                        end do
+                        ! do nf = 1, num_fluids
+                        !     q_prim_vf(E_idx + nf)%sf(i, j, k) = q_particles(1)%sf(i, j, k)
+                        !     q_cons_vf(E_idx + nf)%sf(i, j, k) = q_particles(1)%sf(i, j, k)
+                        ! end do
 
                         rhs_vf(momxb)%sf(i, j, k) = rhs_vf(momxb)%sf(i, j, k) + q_particles(1)%sf(i, j, k)*q_particles(2)%sf(i, j, k)
                         rhs_vf(momxb + 1)%sf(i, j, k) = rhs_vf(momxb + 1)%sf(i, j, k) + q_particles(1)%sf(i, j, k)*q_particles(3)%sf(i, j, k)
@@ -942,7 +942,7 @@ contains
                     particle_posPrev(k, 1, 2) <= pcomm_coords(1)%end) then
                 wrap_bubble_dir(k, 1) = 1
                 wrap_bubble_loc(k, 1) = 1
-            elseif (particle_pos(k, 1, 2) >= x_cb(m)) then
+            elseif (particle_pos(k, 1, 2) > x_cb(m)) then
                 keep_bubble(k) = 0
             elseif (particle_pos(k, 1, 2) < x_cb(-1)) then
                 keep_bubble(k) = 0
@@ -995,9 +995,9 @@ contains
                 cell = fd_number - buff_size
                 call s_locate_cell(particle_pos(k, 1:3, 2), cell, particle_s(k, 1:3, 2))
 
-                if (q_prim_vf(advxb)%sf(cell(1), cell(2), cell(3)) < (1._wp - lag_params%valmaxvoid)) then
-                    keep_bubble(k) = 0
-                end if
+                ! if (q_prim_vf(advxb)%sf(cell(1), cell(2), cell(3)) < (1._wp - lag_params%valmaxvoid)) then
+                !     keep_bubble(k) = 0
+                ! end if
 
                 ! Move bubbles back to surface of IB
                 if (ib) then
