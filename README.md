@@ -47,13 +47,7 @@
 
 > **2025 Gordon Bell Prize Finalist** - MFC simulates compressible multi-phase flows at exascale, using [Fypp](https://fypp.readthedocs.io/en/stable/fypp.html) metaprogramming in ~40K lines of Fortran. It conducted the [largest known public CFD simulation](https://arxiv.org/abs/2505.07392) at **200 trillion grid points** and 1 quadrillion degrees of freedom, scaling ideally to >43K AMD APUs on [El Capitan](https://hpc.llnl.gov/hardware/compute-platforms/el-capitan) and >33K AMD GPUs on [Frontier](https://www.olcf.ornl.gov/frontier/).
 
-<p align="center">
-    <img src="docs/res/shockdrop.png" alt="Shock-droplet interaction simulated with MFC" width="700"/>
-</p>
-
-
 https://github.com/user-attachments/assets/4847e4d1-50ff-4d08-828e-74219ffa1021
-
 
 ## Why MFC?
 
