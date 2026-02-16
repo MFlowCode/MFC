@@ -245,15 +245,17 @@ jobs:
       labels: ${{ matrix.runner }}
     env:
       NODE_OPTIONS: ${{ matrix.cluster == 'phoenix' && '--max-old-space-size=2048' || '' }}
-      ACTIONS_RUNNER_FORCE_ACTIONS_NODE_VERSION: node16
-      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
     steps:
       - name: Clone
         uses: actions/checkout@v4
 
       - name: Build
         if:   matrix.cluster != 'phoenix'
-        run:  bash .github/workflows/${{ matrix.cluster }}/build.sh ${{ matrix.device }} ${{ matrix.interface }}
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          retry_wait_seconds: 60
+          command: bash .github/workflows/${{ matrix.cluster }}/build.sh ${{ matrix.device }} ${{ matrix.interface }}
 
       - name: Test
         run:  bash .github/workflows/${{ matrix.cluster }}/submit.sh .github/workflows/${{ matrix.cluster }}/test.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.shard }}

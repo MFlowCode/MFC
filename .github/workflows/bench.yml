@@ -86,9 +86,6 @@ jobs:
       group: ${{ matrix.group }}
       labels: ${{ matrix.labels }}
     timeout-minutes: 480
-    env:
-      ACTIONS_RUNNER_FORCE_ACTIONS_NODE_VERSION: node16
-      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
     steps:
       - name: Clone - PR
         uses: actions/checkout@v4
@@ -104,10 +101,14 @@ jobs:
 
       - name: Setup & Build
         if: matrix.build_script != ''
-        run: |
-          (cd pr     && ${{ matrix.build_script }}) &
-          (cd master && ${{ matrix.build_script }}) &
-          wait %1 && wait %2
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          retry_wait_seconds: 60
+          command: |
+            (cd pr     && ${{ matrix.build_script }}) &
+            (cd master && ${{ matrix.build_script }}) &
+            wait %1 && wait %2
 
       - name: Bench (Master v. PR)
         run: bash pr/.github/scripts/run_parallel_benchmarks.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }}
