@@ -464,7 +464,7 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
             self.prohibit(not ib,
                           "periodic_ibs is set to true but ib is not enabled")
             self.prohibit(cyl_coord,
-                          "periodic_ibs not compatible with cyl_coords")
+                          "periodic_ibs not compatible with cyl_coord")
             for direction in ['x', 'y', 'z']:
                 for end in ['beg', 'end']:
                     bc_val = self.get(f'bc_{direction}%{end}')
