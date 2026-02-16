@@ -100,7 +100,10 @@ def __filter(cases_) -> typing.List[TestCase]:
         cases = [case for case in cases if case not in example_cases]
 
     if ARG("shard") is not None:
-        shard_idx, shard_count = (int(x) for x in ARG("shard").split("/"))
+        parts = ARG("shard").split("/")
+        if len(parts) != 2 or not all(p.isdigit() for p in parts) or int(parts[1]) < 1 or not 1 <= int(parts[0]) <= int(parts[1]):
+            raise MFCException(f"Invalid --shard '{ARG('shard')}': expected 'i/n' with 1 <= i <= n (e.g., '1/2').")
+        shard_idx, shard_count = int(parts[0]), int(parts[1])
         skipped_cases += [c for i, c in enumerate(cases) if i % shard_count != shard_idx - 1]
         cases = [c for i, c in enumerate(cases) if i % shard_count == shard_idx - 1]
 
