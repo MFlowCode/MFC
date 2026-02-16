@@ -802,6 +802,8 @@ contains
         integer :: i
         logical :: forces_computed
 
+        call nvtxStartRange("PROPAGATE-IMERSED-BOUNDARIES")
+
         forces_computed = .false.
 
         do i = 1, num_ibs
@@ -848,6 +850,8 @@ contains
         end do
 
         call s_update_mib(num_ibs)
+
+        call nvtxEndRange
 
     end subroutine s_propagate_immersed_boundaries
 
