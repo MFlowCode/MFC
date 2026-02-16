@@ -105,6 +105,7 @@ jobs:
         with:
           max_attempts: 3
           retry_wait_seconds: 60
+          timeout_minutes: 480
           command: |
             (cd pr     && ${{ matrix.build_script }}) &
             (cd master && ${{ matrix.build_script }}) &
