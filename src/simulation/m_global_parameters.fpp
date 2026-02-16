@@ -1,5 +1,5 @@
 !>
-!! @file m_global_parameters.f90
+!! @file
 !! @brief Contains module m_global_parameters
 
 #:include 'case.fpp'
@@ -410,7 +410,7 @@ module m_global_parameters
     !! the maximum allowable number of patches, num_patches_max, may be changed
     !! in the module m_derived_types.f90.
 
-    $:GPU_DECLARE(create='[ib,num_ibs,patch_ib,periodic_ibs]')
+    $:GPU_DECLARE(create='[ib,num_ibs,patch_ib,Np,airfoil_grid_u,airfoil_grid_l,periodic_ibs]')
     !> @}
 
     !> @name Bubble modeling
@@ -865,6 +865,47 @@ contains
             mhd = .false.
             relativity = .false.
         #:endif
+
+        do i = 1, num_patches_max
+            patch_ib(i)%geometry = dflt_int
+            patch_ib(i)%x_centroid = 0._wp
+            patch_ib(i)%y_centroid = 0._wp
+            patch_ib(i)%z_centroid = 0._wp
+            patch_ib(i)%length_x = dflt_real
+            patch_ib(i)%length_y = dflt_real
+            patch_ib(i)%length_z = dflt_real
+            patch_ib(i)%radius = dflt_real
+            patch_ib(i)%theta = dflt_real
+            patch_ib(i)%c = dflt_real
+            patch_ib(i)%t = dflt_real
+            patch_ib(i)%m = dflt_real
+            patch_ib(i)%p = dflt_real
+            patch_ib(i)%slip = .false.
+
+            ! Proper default values for translating STL models
+            patch_ib(i)%model_scale(:) = 1._wp
+            patch_ib(i)%model_translate(:) = 0._wp
+            patch_ib(i)%model_rotate(:) = 0._wp
+            patch_ib(i)%model_filepath(:) = dflt_char
+            patch_ib(i)%model_spc = num_ray
+            patch_ib(i)%model_threshold = ray_tracing_threshold
+
+            ! Variables to handle moving imersed boundaries, defaulting to no movement
+            patch_ib(i)%moving_ibm = 0
+            patch_ib(i)%vel(:) = 0._wp
+            patch_ib(i)%angles(:) = 0._wp
+            patch_ib(i)%angular_vel(:) = 0._wp
+            patch_ib(i)%mass = dflt_real
+            patch_ib(i)%moment = dflt_real
+            patch_ib(i)%centroid_offset(:) = 0._wp
+
+            ! sets values of a rotation matrix which can be used when calculating rotations
+            patch_ib(i)%rotation_matrix = 0._wp
+            patch_ib(i)%rotation_matrix(1, 1) = 1._wp
+            patch_ib(i)%rotation_matrix(2, 2) = 1._wp
+            patch_ib(i)%rotation_matrix(3, 3) = 1._wp
+            patch_ib(i)%rotation_matrix_inverse = patch_ib(i)%rotation_matrix
+        end do
 
     end subroutine s_assign_default_values_to_user_inputs
 

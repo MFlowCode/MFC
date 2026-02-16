@@ -1,5 +1,5 @@
 !>
-!! @file m_start_up.f90
+!! @file
 !! @brief Contains module m_start_up
 
 !> @brief This module contains subroutines that read, and check consistency
@@ -27,8 +27,6 @@ module m_start_up
                                 !! conservative variables to files
 
     use m_compile_specific      !< Compile-specific procedures
-
-    use m_ib_patches
 
     use m_icpp_patches
 
@@ -83,17 +81,13 @@ module m_start_up
         end subroutine s_read_abstract_grid_data_files
 
         !! @param q_cons_vf Conservative variables
-        !! @param ib_markers track if a cell is within the immersed boundary
-        impure subroutine s_read_abstract_ic_data_files(q_cons_vf_in, ib_markers_in)
+        impure subroutine s_read_abstract_ic_data_files(q_cons_vf_in)
 
             import :: scalar_field, integer_field, sys_size, pres_field
 
             type(scalar_field), &
                 dimension(sys_size), &
                 intent(inout) :: q_cons_vf_in
-
-            type(integer_field), &
-                intent(inout) :: ib_markers_in
 
         end subroutine s_read_abstract_ic_data_files
 
@@ -412,15 +406,11 @@ contains
         !!      the pre-process as a starting point in the creation of an
         !!      all new initial condition.
         !! @param q_cons_vf Conservative variables
-        !! @param ib_markers track if a cell is within the immersed boundary
-    impure subroutine s_read_serial_ic_data_files(q_cons_vf_in, ib_markers_in)
+    impure subroutine s_read_serial_ic_data_files(q_cons_vf_in)
 
         type(scalar_field), &
             dimension(sys_size), &
             intent(inout) :: q_cons_vf_in
-
-        type(integer_field), &
-            intent(inout) :: ib_markers_in
 
         character(LEN=len_trim(case_dir) + 3*name_len) :: file_loc !<
         ! Generic string used to store the address of a particular file
@@ -509,25 +499,6 @@ contains
                 end do
 
             end do
-        end if
-
-        ! Reading the IB markers
-        if (ib) then
-            write (file_num, '(I0)') i
-            file_loc = trim(t_step_dir)//'/ib.dat'
-            inquire (FILE=trim(file_loc), EXIST=file_check)
-
-            ! If it exists, the data file is read
-            if (file_check) then
-                open (1, FILE=trim(file_loc), FORM='unformatted', &
-                      STATUS='old', ACTION='read')
-                read (1) ib_markers_in%sf(0:m, 0:n, 0:p)
-                close (1)
-            else
-                call s_mpi_abort('File ib.dat is missing in ' &
-                                 //trim(t_step_dir)// &
-                                 '. Exiting.')
-            end if
         end if
 
         ! Since the preexisting grid and initial condition data files have
@@ -648,15 +619,11 @@ contains
         !!      the pre-process as a starting point in the creation of an
         !!      all new initial condition.
         !! @param q_cons_vf Conservative variables
-        !! @param ib_markers track if a cell is within the immersed boundary
-    impure subroutine s_read_parallel_ic_data_files(q_cons_vf_in, ib_markers_in)
+    impure subroutine s_read_parallel_ic_data_files(q_cons_vf_in)
 
         type(scalar_field), &
             dimension(sys_size), &
             intent(inout) :: q_cons_vf_in
-
-        type(integer_field), &
-            intent(inout) :: ib_markers_in
 
 #ifdef MFC_MPI
 
@@ -685,12 +652,7 @@ contains
         if (file_exist) then
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
-            ! Initialize MPI data I/O
-            if (ib) then
-                call s_initialize_mpi_data(q_cons_vf_in, ib_markers_in, levelset, levelset_norm)
-            else
-                call s_initialize_mpi_data(q_cons_vf_in)
-            end if
+            call s_initialize_mpi_data(q_cons_vf_in)
 
             ! Size of local arrays
             data_size = (m + 1)*(n + 1)*(p + 1)
@@ -737,29 +699,6 @@ contains
 
         else
             call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting. ')
-        end if
-
-        if (ib) then
-
-            write (file_loc, '(A)') 'ib.dat'
-            file_loc = trim(restart_dir)//trim(mpiiofs)//trim(file_loc)
-            inquire (FILE=trim(file_loc), EXIST=file_exist)
-
-            if (file_exist) then
-
-                call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
-
-                disp = 0
-
-                call MPI_FILE_SET_VIEW(ifile, disp, MPI_INTEGER, MPI_IO_IB_DATA%view, &
-                                       'native', mpi_info_int, ierr)
-                call MPI_FILE_READ(ifile, MPI_IO_IB_DATA%var%sf, data_size, &
-                                   MPI_INTEGER, status, ierr)
-
-            else
-                call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
-            end if
-
         end if
 
         call s_mpi_barrier()
@@ -840,7 +779,7 @@ contains
         ! Setting up grid and initial condition
         call cpu_time(start)
 
-        if (old_ic) call s_read_ic_data_files(q_cons_vf, ib_markers)
+        if (old_ic) call s_read_ic_data_files(q_cons_vf)
 
         call s_generate_initial_condition()
 
@@ -863,11 +802,7 @@ contains
             call s_infinite_relaxation_k(q_cons_vf)
         end if
 
-        if (ib) then
-            call s_write_data_files(q_cons_vf, q_prim_vf, bc_type, ib_markers, levelset, levelset_norm)
-        else
-            call s_write_data_files(q_cons_vf, q_prim_vf, bc_type)
-        end if
+        call s_write_data_files(q_cons_vf, q_prim_vf, bc_type)
 
         call cpu_time(finish)
     end subroutine s_apply_initial_condition

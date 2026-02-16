@@ -11,7 +11,7 @@ import re
 
 from ..schema import ParamType
 from ..registry import REGISTRY
-from ..descriptions import get_description
+from ..descriptions import get_description, get_math_symbol
 from ..ast_analyzer import analyze_case_validator, classify_message
 from .. import definitions  # noqa: F401  pylint: disable=unused-import
 
@@ -299,15 +299,19 @@ def _format_validator_rules(param_name: str, by_trigger: Dict[str, list],  # pyl
             seen.add(r.message)
             unique_rules.append(r)
 
-    # Classify and pick representative messages
+    # Classify and pick representative messages, separating errors from warnings
     requirements = []
     incompatibilities = []
     ranges = []
     others = []
+    warnings = []
 
     for r in unique_rules:
-        kind = classify_message(r.message)
         msg = _backtick_params(r.message, pattern)
+        if r.severity == "warning":
+            warnings.append(msg)
+            continue
+        kind = classify_message(r.message)
         if kind == "requirement":
             requirements.append(msg)
         elif kind == "incompatibility":
@@ -326,6 +330,13 @@ def _format_validator_rules(param_name: str, by_trigger: Dict[str, list],  # pyl
                 break
             parts.append(msg)
             budget -= 1
+
+    # Append warnings with label (budget permitting)
+    for msg in warnings:
+        if budget <= 0:
+            break
+        parts.append(f"Warning: {msg}")
+        budget -= 1
 
     return "; ".join(parts)
 
@@ -421,7 +432,7 @@ def generate_parameter_docs() -> str:  # pylint: disable=too-many-locals,too-man
 
     # Document each family
     for family, params in sorted_families:
-        lines.append(f"## {family}")
+        lines.append(f"## {family} {{#{family}}}")
         lines.append("")
 
         desc = family_descriptions.get(family, "")
@@ -441,25 +452,29 @@ def generate_parameter_docs() -> str:  # pylint: disable=too-many-locals,too-man
         # Use pattern view if it reduces rows, otherwise show full table
         if len(patterns) < len(params):
             # Pattern view - shows collapsed patterns
-            # Check if any member of a pattern has constraints
+            # Check if any member of a pattern has constraints or math symbols
             pattern_has_constraints = False
+            pattern_has_symbols = False
             for _pattern, examples in patterns.items():
                 for ex in examples:
                     p = REGISTRY.all_params[ex]
                     if p.constraints or ex in by_trigger or ex in by_param:
                         pattern_has_constraints = True
-                        break
-                if pattern_has_constraints:
+                    if get_math_symbol(ex):
+                        pattern_has_symbols = True
+                if pattern_has_constraints and pattern_has_symbols:
                     break
 
             lines.append("### Patterns")
             lines.append("")
+            # Build header dynamically based on which optional columns are needed
+            cols = ["Pattern", "Example", "Description"]
+            if pattern_has_symbols:
+                cols.append("Symbol")
             if pattern_has_constraints:
-                lines.append("| Pattern | Example | Description | Constraints |")
-                lines.append("|---------|---------|-------------|-------------|")
-            else:
-                lines.append("| Pattern | Example | Description |")
-                lines.append("|---------|---------|-------------|")
+                cols.append("Constraints")
+            lines.append("| " + " | ".join(cols) + " |")
+            lines.append("| " + " | ".join("-" * max(3, len(c)) for c in cols) + " |")
 
             for pattern, examples in sorted(patterns.items()):
                 example = examples[0]
@@ -471,6 +486,10 @@ def generate_parameter_docs() -> str:  # pylint: disable=too-many-locals,too-man
                 pattern_escaped = _escape_percent(pattern)
                 example_escaped = _escape_percent(example)
                 desc = _escape_percent(desc)
+                row = f"| `{pattern_escaped}` | `{example_escaped}` | {desc}"
+                if pattern_has_symbols:
+                    sym = get_math_symbol(example)
+                    row += f" | {sym}"
                 if pattern_has_constraints:
                     p = REGISTRY.all_params[example]
                     constraints = _format_constraints(p)
@@ -479,15 +498,21 @@ def generate_parameter_docs() -> str:  # pylint: disable=too-many-locals,too-man
                     if not extra:
                         extra = _format_tag_annotation(example, p)
                     extra = _escape_pct_outside_backticks(extra)
-                    lines.append(f"| `{pattern_escaped}` | `{example_escaped}` | {desc} | {extra} |")
-                else:
-                    lines.append(f"| `{pattern_escaped}` | `{example_escaped}` | {desc} |")
+                    row += f" | {extra}"
+                lines.append(row + " |")
 
             lines.append("")
         else:
             # Full table - no patterns to collapse
-            lines.append("| Parameter | Type | Description | Constraints |")
-            lines.append("|-----------|------|-------------|-------------|")
+            # Check if any param in this family has a math symbol
+            full_has_symbols = any(get_math_symbol(n) for n, _ in params)
+
+            cols = ["Parameter", "Type", "Description"]
+            if full_has_symbols:
+                cols.append("Symbol")
+            cols.append("Constraints")
+            lines.append("| " + " | ".join(cols) + " |")
+            lines.append("| " + " | ".join("-" * max(3, len(c)) for c in cols) + " |")
 
             for name, param in params:
                 type_str = _type_to_str(param.param_type)
@@ -504,7 +529,12 @@ def generate_parameter_docs() -> str:  # pylint: disable=too-many-locals,too-man
                 # Escape % for Doxygen (even inside backtick code spans)
                 name_escaped = _escape_percent(name)
                 desc = _escape_percent(desc)
-                lines.append(f"| `{name_escaped}` | {type_str} | {desc} | {extra} |")
+                row = f"| `{name_escaped}` | {type_str} | {desc}"
+                if full_has_symbols:
+                    sym = get_math_symbol(name)
+                    row += f" | {sym}"
+                row += f" | {extra}"
+                lines.append(row + " |")
 
             lines.append("")
 

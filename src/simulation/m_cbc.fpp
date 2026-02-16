@@ -1,5 +1,5 @@
 !>
-!! @file m_cbc.f90
+!! @file
 !! @brief Contains module m_cbc
 
 !> @brief The module features a large database of characteristic boundary

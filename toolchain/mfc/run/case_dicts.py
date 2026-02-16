@@ -17,7 +17,6 @@ Exports:
 import re
 from ..state import ARG
 
-
 def _load_all_params():
     """Load all parameters as {name: ParamType} dict."""
     from ..params import REGISTRY

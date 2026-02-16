@@ -1,5 +1,5 @@
 !>
-!! @file m_pressure_relaxation.fpp
+!! @file
 !! @brief Contains module m_pressure_relaxation
 
 #:include 'case.fpp'

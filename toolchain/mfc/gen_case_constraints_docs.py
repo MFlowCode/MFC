@@ -8,8 +8,6 @@ maps them to parameters and stages, and emits Markdown to stdout.
 Also generates case design playbook from curated working examples.
 """  # pylint: disable=too-many-lines
 
-from __future__ import annotations
-
 import json
 import sys
 import subprocess
@@ -282,22 +280,22 @@ def render_playbook_card(entry: PlaybookEntry, summary: Dict[str, Any]) -> str: 
 
     # Links
     lines.append("\n**Related Documentation:**")
-    lines.append(f"- [Model Equations (model_eqns = {summary['model_eqns']})](#-model-equations)")
+    lines.append(f"- [Model Equations (model_eqns = {summary['model_eqns']})](#model-equations)")
 
     if summary['riemann_solver']:
-        lines.append("- [Riemann Solvers](#️-riemann-solvers)")
+        lines.append("- [Riemann Solvers](#riemann-solvers)")
 
     if summary['bubbles_euler'] or summary['bubbles_lagrange']:
-        lines.append("- [Bubble Models](#-bubble-models)")
+        lines.append("- [Bubble Models](#bubble-models)")
 
     if summary['mhd']:
-        lines.append("- [MHD](#magnetohydrodynamics-mhd-mhd)")
+        lines.append("- [MHD](#compat-physics-models)")
 
     if summary['ib']:
-        lines.append("- [Immersed Boundaries](#immersed-boundaries-ib)")
+        lines.append("- [Immersed Boundaries](#compat-geometry)")
 
     if summary['viscous']:
-        lines.append("- [Viscosity](#viscosity-viscous)")
+        lines.append("- [Viscosity](#compat-physics-models)")
 
     lines.append("\n</details>\n")
     return "\n".join(lines)
@@ -310,7 +308,7 @@ def generate_playbook() -> str:
     # Validate examples - will exit(1) if any are missing
     validate_playbook_examples()
 
-    lines.append("## 🧩 Case Design Playbook\n")
+    lines.append("## 🧩 Case Design Playbook {#case-design-playbook}\n")
     lines.append(
         "> **Learn by example:** The cases below are curated from MFC's `examples/` "
         "directory and are validated, working configurations. "
@@ -382,7 +380,7 @@ def render_markdown(rules: Iterable[Rule]) -> str:  # pylint: disable=too-many-l
     }
 
     # 1. Quick Start: Common Configurations
-    lines.append("## 🚀 Common Configuration Patterns\n")
+    lines.append("## 🚀 Common Configuration Patterns {#common-configuration-patterns}\n")
     lines.append("Start with these proven combinations:\n")
     lines.append("")
     lines.append("<details open>")
@@ -426,11 +424,12 @@ def render_markdown(rules: Iterable[Rule]) -> str:  # pylint: disable=too-many-l
     lines.append("</details>\n")
 
     # 2. Feature Compatibility Matrix (simplified, no IGR column)
-    lines.append("## 📊 Feature Compatibility\n")
+    lines.append("## 📊 Feature Compatibility {#feature-compatibility}\n")
     lines.append("What works together:\n")
 
     for category, features in major_features.items():  # pylint: disable=too-many-nested-blocks
-        lines.append(f"\n### {category}\n")
+        cat_id = "compat-" + category.lower().replace(" ", "-")
+        lines.append(f"\n### {category} {{#{cat_id}}}\n")
 
         # Build compatibility info (exclude IGR from incompatibilities)
         compat_info = {}
@@ -492,7 +491,7 @@ def render_markdown(rules: Iterable[Rule]) -> str:  # pylint: disable=too-many-l
         lines.append("")
 
     # 3. Model Equations (data-driven from schema)
-    lines.append("## 🔢 Model Equations\n")
+    lines.append("## 🔢 Model Equations {#model-equations}\n")
     lines.append("Choose your governing equations:\n")
     lines.append("")
 
@@ -561,7 +560,7 @@ def render_markdown(rules: Iterable[Rule]) -> str:  # pylint: disable=too-many-l
         5: {"best_for": "Robust fallback", "requirements": "Not with cylindrical+viscous"},
     }
 
-    lines.append("## ⚙️ Riemann Solvers\n")
+    lines.append("## ⚙️ Riemann Solvers {#riemann-solvers}\n")
     lines.append("| Solver | `riemann_solver` | Best For | Requirements |")
     lines.append("|--------|-----------------|----------|-------------|")
 
@@ -577,7 +576,7 @@ def render_markdown(rules: Iterable[Rule]) -> str:  # pylint: disable=too-many-l
 
     # 5. Bubble Models (data-driven from schema dependencies + curated notes)
     if "bubbles_euler" in by_param or "bubbles_lagrange" in by_param:
-        lines.append("## 💧 Bubble Models\n")
+        lines.append("## 💧 Bubble Models {#bubble-models}\n")
         lines.append("")
 
         # Euler-Euler: inject schema dependency info (data-driven)
@@ -618,7 +617,7 @@ def render_markdown(rules: Iterable[Rule]) -> str:  # pylint: disable=too-many-l
         lines.append("</details>\n")
 
     # 6. Condensed Parameter Reference (auto-collected from schema)
-    lines.append("## 📖 Quick Parameter Reference\n")
+    lines.append("## 📖 Quick Parameter Reference {#quick-parameter-reference}\n")
     lines.append("Key parameters and their constraints:\n")
 
     # Auto-collect all params that have CONSTRAINTS or DEPENDENCIES entries
@@ -636,10 +635,14 @@ def render_markdown(rules: Iterable[Rule]) -> str:  # pylint: disable=too-many-l
         requirements = []
         incompatibilities = []
         ranges = []
+        warnings = []
 
         for rule in rules_for_param:
             msg = rule.message
             if "IGR" in msg:
+                continue
+            if rule.severity == "warning":
+                warnings.append(msg)
                 continue
             kind = classify_message(msg)
             if kind == "requirement":
@@ -690,7 +693,7 @@ def render_markdown(rules: Iterable[Rule]) -> str:  # pylint: disable=too-many-l
                 _render_cond_parts(f"= {wv_val}", wv_cond)
 
         # Skip if nothing to show
-        if not (schema_parts or dep_parts or requirements or incompatibilities or ranges):
+        if not (schema_parts or dep_parts or requirements or incompatibilities or ranges or warnings):
             continue
 
         lines.append(f"\n<details>")
@@ -709,24 +712,70 @@ def render_markdown(rules: Iterable[Rule]) -> str:  # pylint: disable=too-many-l
             lines.append("")
 
         if requirements:
-            lines.append("**Requirements:**")
+            lines.append("**Requirements** (errors):")
             for req in requirements[:3]:
                 lines.append(f"- {req}")
             lines.append("")
 
         if incompatibilities:
-            lines.append("**Incompatibilities:**")
+            lines.append("**Incompatibilities** (errors):")
             for inc in incompatibilities[:3]:
                 lines.append(f"- {inc}")
             lines.append("")
 
         if ranges:
-            lines.append("**Valid values:**")
+            lines.append("**Valid values** (errors):")
             for rng in ranges[:2]:
                 lines.append(f"- {rng}")
             lines.append("")
 
+        if warnings:
+            lines.append("**Warnings** (non-fatal):")
+            for w in warnings[:3]:
+                lines.append(f"- ⚠️ {w}")
+            lines.append("")
+
         lines.append("</details>\n")
+
+    # 7. Physics Warnings section (non-fatal checks from self.warn() calls)
+    all_warnings = [r for r in rules if r.severity == "warning"]
+    if all_warnings:
+        lines.append("## ⚠️ Physics Warnings {#physics-warnings}\n")
+        lines.append(
+            "These checks are **non-fatal** — they print a yellow warning but do not abort the run. "
+            "They catch common mistakes in initial conditions and EOS parameters.\n"
+        )
+
+        # Group by method
+        warnings_by_method: Dict[str, List[Rule]] = defaultdict(list)
+        for r in all_warnings:
+            warnings_by_method[r.method].append(r)
+
+        # Method name -> human-readable title
+        method_titles = {
+            "check_volume_fraction_sum": "Volume Fraction Sum",
+            "check_alpha_rho_consistency": "Alpha-Rho Consistency",
+            "check_eos_parameter_sanity": "EOS Parameter Sanity",
+        }
+
+        lines.append("| Check | Stage | Description |")
+        lines.append("|-------|-------|-------------|")
+        for method, method_rules in sorted(warnings_by_method.items()):
+            title = method_titles.get(method, method.replace("check_", "").replace("_", " ").title())
+            stages_str = ", ".join(sorted(method_rules[0].stages)) if method_rules[0].stages else "all"
+            # Deduplicate messages (loop-expanded may repeat patterns)
+            seen_msgs = set()
+            descs = []
+            for r in method_rules:
+                if r.message not in seen_msgs:
+                    seen_msgs.add(r.message)
+                    descs.append(r.message)
+            desc_str = "; ".join(descs[:2])
+            if len(descs) > 2:
+                desc_str += f" (+{len(descs)-2} more)"
+            lines.append(f"| **{title}** | {stages_str} | {desc_str} |")
+
+        lines.append("")
 
     # Add a footer with link to full validator
     lines.append("\n---\n")
@@ -740,10 +789,13 @@ def render_markdown(rules: Iterable[Rule]) -> str:  # pylint: disable=too-many-l
 # Main
 # ---------------------------------------------------------------------------
 
-def main() -> None:
+def main(as_string: bool = False) -> str:
+    """Generate case constraints documentation. Returns markdown string."""
     analysis = analyze_case_validator(CASE_VALIDATOR_PATH)
     md = render_markdown(analysis["rules"])
-    print(md)
+    if not as_string:
+        print(md)
+    return md
 
 
 if __name__ == "__main__":

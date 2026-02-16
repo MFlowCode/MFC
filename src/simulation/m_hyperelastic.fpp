@@ -1,5 +1,5 @@
 !>
-!! @file m_hyperelastic.f90
+!! @file
 !! @brief Contains module m_hyperelastic
 
 #:include 'macros.fpp'

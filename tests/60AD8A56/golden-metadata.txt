@@ -1,10 +1,10 @@
-This file was created on 2026-01-29 18:26:42.881513.
+This file was created on 2026-02-16 14:48:21.662546.
 
 mfc.sh:
 
-    Invocation: test --generate -f 60AD8A56 -t 60AD8A56
+    Invocation: test --generate --only 60AD8A56
     Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        1aa4b082059aacbb5d9a0183076414923e9f6044 on master (dirty)
+    Git:        75396b405d93f4a48146b2732416c8da8469e914 on master (dirty)
 
 pre_process:
 
@@ -40,7 +40,7 @@ pre_process:
         OMPI_CXX : 
         OMPI_FC  : 
 
-simulation:
+post_process:
 
     CMake Configuration:
     
@@ -50,8 +50,8 @@ simulation:
         Fortran : GNU v13.3.0 (/usr/bin/gfortran)
     
         PRE_PROCESS   : OFF
-        SIMULATION    : ON
-        POST_PROCESS  : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : ON
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
@@ -74,7 +74,7 @@ simulation:
         OMPI_CXX : 
         OMPI_FC  : 
 
-post_process:
+simulation:
 
     CMake Configuration:
     
@@ -84,8 +84,8 @@ post_process:
         Fortran : GNU v13.3.0 (/usr/bin/gfortran)
     
         PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : ON
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
@@ -160,7 +160,7 @@ CPU:
     Core(s) per socket:                      24
     Socket(s):                               1
     Stepping:                                1
-    CPU(s) scaling MHz:                      23%
+    CPU(s) scaling MHz:                      46%
     CPU max MHz:                             5800.0000
     CPU min MHz:                             800.0000
     BogoMIPS:                                5990.40
@@ -180,6 +180,7 @@ CPU:
     Vulnerability Mds:                       Not affected
     Vulnerability Meltdown:                  Not affected
     Vulnerability Mmio stale data:           Not affected
+    Vulnerability Old microcode:             Not affected
     Vulnerability Reg file data sampling:    Mitigation; Clear Register File
     Vulnerability Retbleed:                  Not affected
     Vulnerability Spec rstack overflow:      Not affected

@@ -34,8 +34,13 @@ def validate():
         for stage in stages:
             try:
                 validator = CaseValidator(case.params)
-                validator.validate(stage)
-                cons.print(f"[bold green]✓[/bold green] {stage} constraints passed")
+                warnings = validator.validate(stage)
+                if warnings:
+                    cons.print(f"[bold green]✓[/bold green] {stage} constraints passed (with warnings)")
+                    for warning in warnings:
+                        cons.print(f"    [yellow]⚠ {warning}[/yellow]")
+                else:
+                    cons.print(f"[bold green]✓[/bold green] {stage} constraints passed")
             except CaseConstraintError as e:
                 all_passed = False
                 cons.print(f"[bold yellow]![/bold yellow] {stage} constraints: issues found")

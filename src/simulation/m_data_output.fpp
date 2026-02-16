@@ -1,4 +1,4 @@
-!! @file m_data_output.f90
+!! @file
 !! @brief Contains module m_data_output
 
 #:include 'macros.fpp'
@@ -51,7 +51,8 @@ module m_data_output
               s_close_run_time_information_file, &
               s_close_com_files, &
               s_close_probe_files, &
-              s_finalize_data_output_module
+              s_finalize_data_output_module, &
+              s_write_ib_data_file
 
     real(wp), allocatable, dimension(:, :, :) :: icfl_sf  !< ICFL stability criterion
     real(wp), allocatable, dimension(:, :, :) :: vcfl_sf  !< VCFL stability criterion
@@ -504,13 +505,14 @@ contains
 
         ! Writing the IB markers
         if (ib) then
-            write (file_path, '(A,I0,A)') trim(t_step_dir)//'/ib.dat'
+            call s_write_serial_ib_data(t_step)
+            ! write (file_path, '(A,I0,A)') trim(t_step_dir)//'/ib.dat'
 
-            open (2, FILE=trim(file_path), &
-                  FORM='unformatted', &
-                  STATUS='new')
+            ! open (2, FILE=trim(file_path), &
+            !       FORM='unformatted', &
+            !       STATUS='new')
 
-            write (2) ib_markers%sf(0:m, 0:n, 0:p); close (2)
+            ! write (2) ib_markers%sf(0:m, 0:n, 0:p); close (2)
         end if
 
         gamma = gammas(1)
@@ -843,7 +845,7 @@ contains
                 call s_initialize_mpi_data_ds(q_cons_temp_ds)
             else
                 if (ib) then
-                    call s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm)
+                    call s_initialize_mpi_data(q_cons_vf, ib_markers)
                 else
                     call s_initialize_mpi_data(q_cons_vf)
                 end if
@@ -936,7 +938,7 @@ contains
             ! Initialize MPI data I/O
 
             if (ib) then
-                call s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm)
+                call s_initialize_mpi_data(q_cons_vf, ib_markers)
             elseif (present(beta)) then
                 call s_initialize_mpi_data(q_cons_vf, beta=beta)
             else
@@ -1022,25 +1024,98 @@ contains
 
             !Write ib data
             if (ib) then
-                write (file_loc, '(A)') 'ib.dat'
-                file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
-                call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
-                                   mpi_info_int, ifile, ierr)
+                call s_write_parallel_ib_data(t_step)
+                ! write (file_loc, '(A)') 'ib.dat'
+                ! file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+                ! call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
+                !                    mpi_info_int, ifile, ierr)
 
-                var_MOK = int(sys_size + 1, MPI_OFFSET_KIND)
-                disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1 + int(t_step/t_step_save))
+                ! var_MOK = int(sys_size + 1, MPI_OFFSET_KIND)
+                ! disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1 + int(t_step/t_step_save))
 
-                call MPI_FILE_SET_VIEW(ifile, disp, MPI_INTEGER, MPI_IO_IB_DATA%view, &
-                                       'native', mpi_info_int, ierr)
-                call MPI_FILE_WRITE_ALL(ifile, MPI_IO_IB_DATA%var%sf, data_size, &
-                                        MPI_INTEGER, status, ierr)
-                call MPI_FILE_CLOSE(ifile, ierr)
+                ! call MPI_FILE_SET_VIEW(ifile, disp, MPI_INTEGER, MPI_IO_IB_DATA%view, &
+                !                        'native', mpi_info_int, ierr)
+                ! call MPI_FILE_WRITE_ALL(ifile, MPI_IO_IB_DATA%var%sf, data_size, &
+                !                         MPI_INTEGER, status, ierr)
+                ! call MPI_FILE_CLOSE(ifile, ierr)
             end if
 
         end if
 #endif
 
     end subroutine s_write_parallel_data_files
+
+    subroutine s_write_serial_ib_data(time_step)
+
+        integer, intent(in) :: time_step
+        character(LEN=path_len + 2*name_len) :: file_path
+        character(LEN=path_len + 2*name_len) :: t_step_dir
+
+        ! Creating or overwriting the time-step root directory
+        write (t_step_dir, '(A,I0,A,I0)') trim(case_dir)//'/p_all'
+        write (t_step_dir, '(a,i0,a,i0)') trim(case_dir)//'/p_all/p', &
+            proc_rank, '/', time_step
+        write (file_path, '(A,I0,A)') trim(t_step_dir)//'/ib.dat'
+
+        open (2, FILE=trim(file_path), &
+              FORM='unformatted', &
+              STATUS='new')
+
+        write (2) ib_markers%sf(0:m, 0:n, 0:p); close (2)
+
+    end subroutine
+
+    subroutine s_write_parallel_ib_data(time_step)
+
+        integer, intent(in) :: time_step
+
+#ifdef MFC_MPI
+
+        character(LEN=path_len + 2*name_len) :: file_loc
+        integer(kind=MPI_OFFSET_kind) :: disp
+        integer(kind=MPI_OFFSET_kind) :: m_MOK, n_MOK, p_MOK
+        integer(kind=MPI_OFFSET_kind) :: WP_MOK, var_MOK, MOK
+        integer :: ifile, ierr, data_size
+        integer, dimension(MPI_STATUS_SIZE) :: status
+
+        ! Size of local arrays
+        data_size = (m + 1)*(n + 1)*(p + 1)
+        m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
+        n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
+        p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
+        WP_MOK = int(8._wp, MPI_OFFSET_KIND)
+        MOK = int(1._wp, MPI_OFFSET_KIND)
+
+        write (file_loc, '(A)') 'ib.dat'
+        file_loc = trim(case_dir)//'/restart_data'//trim(mpiiofs)//trim(file_loc)
+        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), &
+                           mpi_info_int, ifile, ierr)
+
+        var_MOK = int(sys_size + 1, MPI_OFFSET_KIND)
+        disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1 + int(time_step/t_step_save))
+        if (time_step == 0) disp = 0
+
+        call MPI_FILE_SET_VIEW(ifile, disp, MPI_INTEGER, MPI_IO_IB_DATA%view, &
+                               'native', mpi_info_int, ierr)
+        call MPI_FILE_WRITE_ALL(ifile, MPI_IO_IB_DATA%var%sf, data_size, &
+                                MPI_INTEGER, status, ierr)
+        call MPI_FILE_CLOSE(ifile, ierr)
+
+#endif
+
+    end subroutine s_write_parallel_ib_data
+
+    subroutine s_write_ib_data_file(time_step)
+
+        integer, intent(in) :: time_step
+
+        if (parallel_io) then
+            call s_write_parallel_ib_data(time_step)
+        else
+            call s_write_serial_ib_data(time_step)
+        end if
+
+    end subroutine
 
     !>  This writes a formatted data file where the root processor
     !!      can write out the CoM information

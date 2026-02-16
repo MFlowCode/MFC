@@ -1,12 +1,11 @@
 """
 Shared AST analyzer for case_validator.py.
 
-Extracts all `self.prohibit(...)` rules from CaseValidator, determines
-which parameter "triggers" each rule, and provides convenience functions
-for both doc generators (parameters.md and case_constraints.md).
+Extracts all `self.prohibit(...)` and `self.warn(...)` rules from
+CaseValidator, determines which parameter "triggers" each rule, and
+provides convenience functions for both doc generators (parameters.md
+and case_constraints.md).
 """
-
-from __future__ import annotations
 
 import ast
 import re
@@ -23,11 +22,12 @@ from collections import defaultdict
 @dataclass
 class Rule:
     method: str                      # e.g. "check_igr_simulation"
-    lineno: int                      # line number of the prohibit call
+    lineno: int                      # line number of the prohibit/warn call
     params: List[str]                # case parameter names used in condition
-    message: str                     # user-friendly error message
+    message: str                     # user-friendly error/warning message
     stages: Set[str] = field(default_factory=set)  # e.g. {"simulation", "pre_process"}
     trigger: Optional[str] = None    # param that "owns" this rule
+    severity: str = "error"          # "error" (prohibit) or "warning" (warn)
 
 
 # ---------------------------------------------------------------------------
@@ -83,7 +83,7 @@ def _resolve_fstring(node: ast.JoinedStr, subs: Dict[str, str]) -> Optional[str]
 
 
 def _resolve_message(msg_node: ast.AST, subs: Dict[str, str]) -> Optional[str]:
-    """Resolve a prohibit message, substituting loop variables in f-strings."""
+    """Resolve a prohibit/warn message, substituting loop variables in f-strings."""
     if isinstance(msg_node, ast.Constant) and isinstance(msg_node.value, str):
         return msg_node.value
     if isinstance(msg_node, ast.JoinedStr):
@@ -110,7 +110,7 @@ class CaseValidatorAnalyzer(ast.NodeVisitor):  # pylint: disable=too-many-instan
 
     - collects all methods
     - builds a call graph between methods
-    - extracts all self.prohibit(...) rules
+    - extracts all self.prohibit(...) and self.warn(...) rules
     """
 
     def __init__(self):
@@ -131,7 +131,7 @@ class CaseValidatorAnalyzer(ast.NodeVisitor):  # pylint: disable=too-many-instan
         # {method_name -> trigger_param} from guard detection
         self._method_guards: Dict[str, str] = {}
 
-        # Line numbers of prohibit calls handled by loop expansion (skip in visit_Call)
+        # Line numbers of prohibit/warn calls handled by loop expansion (skip in visit_Call)
         self._expanded_prohibit_lines: Set[int] = set()
 
     # --- top-level entrypoint ---
@@ -352,10 +352,10 @@ class CaseValidatorAnalyzer(ast.NodeVisitor):  # pylint: disable=too-many-instan
                         m[target.id] = param_name
         return m
 
-    def _create_loop_rules(self, stmts: list, method_name: str,  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    def _create_loop_rules(self, stmts: list, method_name: str,  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
                             local_map: Dict[str, str], subs: Dict[str, str],
                             loop_guard: Optional[str] = None):
-        """Create Rules for self.prohibit() calls found in loop body statements."""
+        """Create Rules for self.prohibit()/self.warn() calls found in loop body statements."""
         for stmt in stmts:
             # Skip nested literal-list for-loops (handled by recursion)
             if (isinstance(stmt, ast.For)
@@ -369,9 +369,10 @@ class CaseValidatorAnalyzer(ast.NodeVisitor):  # pylint: disable=too-many-instan
                 if not (isinstance(node.func, ast.Attribute)
                         and isinstance(node.func.value, ast.Name)
                         and node.func.value.id == "self"
-                        and node.func.attr == "prohibit"
+                        and node.func.attr in ("prohibit", "warn")
                         and len(node.args) >= 2):
                     continue
+                severity = "warning" if node.func.attr == "warn" else "error"
                 condition, msg_node = node.args[0], node.args[1]
                 msg = _resolve_message(msg_node, subs)
                 if msg is None:
@@ -391,6 +392,7 @@ class CaseValidatorAnalyzer(ast.NodeVisitor):  # pylint: disable=too-many-instan
                     params=params,
                     message=msg,
                     trigger=trigger,
+                    severity=severity,
                 )
                 self.rules.append(rule)
                 self._expanded_prohibit_lines.add(node.lineno)
@@ -428,16 +430,17 @@ class CaseValidatorAnalyzer(ast.NodeVisitor):  # pylint: disable=too-many-instan
                 # method call on self
                 self.call_graph[self.current_method].add(callee)
 
-        # detect self.prohibit(<condition>, "<message>")
-        # Skip prohibit calls already handled by loop expansion
+        # detect self.prohibit(<condition>, "<message>") and self.warn(<condition>, "<message>")
+        # Skip calls already handled by loop expansion
         if (  # pylint: disable=too-many-boolean-expressions
             isinstance(node.func, ast.Attribute)
             and isinstance(node.func.value, ast.Name)
             and node.func.value.id == "self"
-            and node.func.attr == "prohibit"
+            and node.func.attr in ("prohibit", "warn")
             and len(node.args) >= 2
             and node.lineno not in self._expanded_prohibit_lines
         ):
+            severity = "warning" if node.func.attr == "warn" else "error"
             condition, msg_node = node.args[0], node.args[1]
             msg = _extract_message(msg_node)
             if msg is not None:
@@ -450,6 +453,7 @@ class CaseValidatorAnalyzer(ast.NodeVisitor):  # pylint: disable=too-many-instan
                     params=params,
                     message=msg,
                     trigger=trigger,
+                    severity=severity,
                 )
                 self.rules.append(rule)
 

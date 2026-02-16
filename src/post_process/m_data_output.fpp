@@ -1,5 +1,5 @@
 !>
-!! @file m_data_output.f90
+!! @file
 !! @brief Contains module m_data_output
 
 !> @brief This module enables the restructuring of the raw simulation data
@@ -11,7 +11,7 @@ module m_data_output
 
     use m_derived_types         ! Definitions of the derived types
 
-    use m_global_parameters     ! Global parameters for the code
+    use m_global_parameters     ! Global parameters
 
     use m_derived_variables     !< Procedures used to compute quantities derived
 
