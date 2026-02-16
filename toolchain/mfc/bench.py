@@ -16,7 +16,7 @@ class BenchCase:
     path: str
     args: typing.List[str]
 
-# pylint: disable=too-many-locals, too-many-branches, too-many-statements
+# pylint: disable=too-many-locals, too-many-branches, too-many-statements, too-many-nested-blocks
 def bench(targets = None):
     if targets is None:
         targets = ARG("targets")
