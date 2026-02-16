@@ -73,9 +73,9 @@
 
 Your first simulation:
 ```bash
-./mfc.sh run examples/3d_shockdroplet/case.py -n $(nproc)
+./mfc.sh run examples/3D_shockdroplet/case.py -n $(nproc)
 ```
-Visualize the output in `examples/3d_shockdroplet/silo_hdf5/` with ParaView, VisIt, or your favorite tool.
+Visualize the output in `examples/3D_shockdroplet/silo_hdf5/` with ParaView, VisIt, or your favorite tool.
 For detailed build instructions (Linux, macOS, Windows/WSL, HPC clusters), see the [Getting Started guide](https://mflowcode.github.io/documentation/getting-started.html).
 
 Get in touch with <a href="mailto:shb@gatech.edu">Spencer</a> if you have questions!
@@ -113,10 +113,10 @@ Run `./mfc.sh <command> --help` for detailed options, or see the [full documenta
 
 The shock-droplet interaction case above was run via
 ```shell
-./mfc.sh run -n $(nproc) ./examples/3d_shockdroplet/case.py
+./mfc.sh run -n $(nproc) ./examples/3D_shockdroplet/case.py
 ```
 where `$(nproc)` is the number of cores the example will run on (and the number of physical cores on your CPU device).
-You can visualize the output data in `examples/3d_shockdroplet/silo_hdf5` via Paraview, Visit, or your favorite software.
+You can visualize the output data in `examples/3D_shockdroplet/silo_hdf5` via Paraview, Visit, or your favorite software.
 
 ## Is this _really_ exascale?
 
