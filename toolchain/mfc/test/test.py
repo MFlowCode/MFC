@@ -99,6 +99,11 @@ def __filter(cases_) -> typing.List[TestCase]:
         skipped_cases += example_cases
         cases = [case for case in cases if case not in example_cases]
 
+    if ARG("shard") is not None:
+        shard_idx, shard_count = (int(x) for x in ARG("shard").split("/"))
+        skipped_cases += [c for i, c in enumerate(cases) if i % shard_count != shard_idx - 1]
+        cases = [c for i, c in enumerate(cases) if i % shard_count == shard_idx - 1]
+
     if ARG("percent") == 100:
         return cases, skipped_cases
 

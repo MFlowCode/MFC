@@ -13,8 +13,13 @@ if [ "$job_device" = "gpu" ]; then
     fi
 fi
 
+shard_opts=""
+if [ -n "$job_shard" ]; then
+    shard_opts="--shard $job_shard"
+fi
+
 if [ "$job_device" = "gpu" ]; then
-    ./mfc.sh test -v -a --max-attempts 3 -j $ngpus $device_opts -- -c frontier_amd
+    ./mfc.sh test -v -a --max-attempts 3 -j $ngpus $device_opts $shard_opts -- -c frontier_amd
 else
     ./mfc.sh test -v -a --max-attempts 3 -j 32 --no-gpu -- -c frontier_amd
 fi

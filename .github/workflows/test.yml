@@ -163,7 +163,7 @@ jobs:
           TEST_PCT: ${{ matrix.debug == 'debug' && '-% 20' || '' }}
 
   self:
-    name: "${{ matrix.cluster_name }} (${{ matrix.device }}${{ matrix.interface != 'none' && format('-{0}', matrix.interface) || '' }})"
+    name: "${{ matrix.cluster_name }} (${{ matrix.device }}${{ matrix.interface != 'none' && format('-{0}', matrix.interface) || '' }}${{ matrix.shard != '' && format(' [{0}]', matrix.shard) || '' }})"
     if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true'
     needs: [lint-gate, file-changes]
     continue-on-error: false
@@ -177,43 +177,69 @@ jobs:
             cluster_name: 'Georgia Tech | Phoenix'
             device: 'gpu'
             interface: 'acc'
+            shard: ''
           - runner:       'gt'
             cluster:      'phoenix'
             cluster_name: 'Georgia Tech | Phoenix'
             device: 'gpu'
             interface: 'omp'
+            shard: ''
           - runner:       'gt'
             cluster:      'phoenix'
             cluster_name: 'Georgia Tech | Phoenix'
             device: 'cpu'
             interface: 'none'
-          # Frontier (ORNL) — build on login node, test via SLURM
+            shard: ''
+          # Frontier (ORNL) — build on login node, GPU tests sharded for batch partition
           - runner:       'frontier'
             cluster:      'frontier'
             cluster_name: 'Oak Ridge | Frontier'
             device: 'gpu'
             interface: 'acc'
+            shard: '1/2'
+          - runner:       'frontier'
+            cluster:      'frontier'
+            cluster_name: 'Oak Ridge | Frontier'
+            device: 'gpu'
+            interface: 'acc'
+            shard: '2/2'
           - runner:       'frontier'
             cluster:      'frontier'
             cluster_name: 'Oak Ridge | Frontier'
             device: 'gpu'
             interface: 'omp'
+            shard: '1/2'
+          - runner:       'frontier'
+            cluster:      'frontier'
+            cluster_name: 'Oak Ridge | Frontier'
+            device: 'gpu'
+            interface: 'omp'
+            shard: '2/2'
           - runner:       'frontier'
             cluster:      'frontier'
             cluster_name: 'Oak Ridge | Frontier'
             device: 'cpu'
             interface: 'none'
-          # Frontier AMD — build on login node, test via SLURM
+            shard: ''
+          # Frontier AMD — build on login node, GPU tests sharded for batch partition
           - runner:       'frontier'
             cluster:      'frontier_amd'
             cluster_name: 'Oak Ridge | Frontier (AMD)'
             device: 'gpu'
             interface: 'omp'
+            shard: '1/2'
+          - runner:       'frontier'
+            cluster:      'frontier_amd'
+            cluster_name: 'Oak Ridge | Frontier (AMD)'
+            device: 'gpu'
+            interface: 'omp'
+            shard: '2/2'
           - runner:       'frontier'
             cluster:      'frontier_amd'
             cluster_name: 'Oak Ridge | Frontier (AMD)'
             device: 'cpu'
             interface: 'none'
+            shard: ''
     runs-on:
       group:  phoenix
       labels: ${{ matrix.runner }}
@@ -230,7 +256,7 @@ jobs:
         run:  bash .github/workflows/${{ matrix.cluster }}/build.sh ${{ matrix.device }} ${{ matrix.interface }}
 
       - name: Test
-        run:  bash .github/workflows/${{ matrix.cluster }}/submit.sh .github/workflows/${{ matrix.cluster }}/test.sh ${{ matrix.device }} ${{ matrix.interface }}
+        run:  bash .github/workflows/${{ matrix.cluster }}/submit.sh .github/workflows/${{ matrix.cluster }}/test.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.shard }}
 
       - name: Print Logs
         if:   always()
