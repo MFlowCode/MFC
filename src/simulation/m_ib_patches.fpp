@@ -61,9 +61,9 @@ module m_ib_patches
 
 contains
 
-    impure subroutine s_apply_ib_patches(ib_markers_sf)
+    impure subroutine s_apply_ib_patches(ib_markers)
 
-        integer, dimension(:, :, :), intent(inout), optional :: ib_markers_sf
+        type(integer_field), intent(inout) :: ib_markers
 
         integer :: i
 
@@ -76,16 +76,16 @@ contains
             do i = 1, num_ibs
 
                 if (patch_ib(i)%geometry == 8) then
-                    call s_ib_sphere(i, ib_markers_sf)
+                    call s_ib_sphere(i, ib_markers)
                 elseif (patch_ib(i)%geometry == 9) then
-                    call s_ib_cuboid(i, ib_markers_sf)
+                    call s_ib_cuboid(i, ib_markers)
                 elseif (patch_ib(i)%geometry == 10) then
-                    call s_ib_cylinder(i, ib_markers_sf)
+                    call s_ib_cylinder(i, ib_markers)
                 elseif (patch_ib(i)%geometry == 11) then
-                    call s_ib_3D_airfoil(i, ib_markers_sf)
+                    call s_ib_3D_airfoil(i, ib_markers)
                     ! STL+IBM patch
                 elseif (patch_ib(i)%geometry == 12) then
-                    call s_ib_model(i, ib_markers_sf)
+                    call s_ib_model(i, ib_markers)
                 end if
             end do
             !> @}
@@ -97,16 +97,16 @@ contains
             !> @{
             do i = 1, num_ibs
                 if (patch_ib(i)%geometry == 2) then
-                    call s_ib_circle(i, ib_markers_sf)
+                    call s_ib_circle(i, ib_markers)
                 elseif (patch_ib(i)%geometry == 3) then
-                    call s_ib_rectangle(i, ib_markers_sf)
+                    call s_ib_rectangle(i, ib_markers)
                 elseif (patch_ib(i)%geometry == 4) then
-                    call s_ib_airfoil(i, ib_markers_sf)
+                    call s_ib_airfoil(i, ib_markers)
                     ! STL+IBM patch
                 elseif (patch_ib(i)%geometry == 5) then
-                    call s_ib_model(i, ib_markers_sf)
+                    call s_ib_model(i, ib_markers)
                 elseif (patch_ib(i)%geometry == 6) then
-                    call s_ib_ellipse(i, ib_markers_sf)
+                    call s_ib_ellipse(i, ib_markers)
                 end if
             end do
             !> @}
@@ -248,12 +248,12 @@ contains
         !!              are provided. Note that the circular patch DOES allow for
         !!              the smoothing of its boundary.
         !! @param patch_id is the patch identifier
-        !! @param ib_markers_sf Array to track patch ids
+        !! @param ib_markers Array to track patch ids
         !! @param ib True if this patch is an immersed boundary
-    subroutine s_ib_circle(patch_id, ib_markers_sf)
+    subroutine s_ib_circle(patch_id, ib_markers)
 
         integer, intent(in) :: patch_id
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: ib_markers_sf
+        type(integer_field), intent(inout) :: ib_markers
 
         real(wp), dimension(1:2) :: center
         real(wp) :: radius
@@ -272,14 +272,14 @@ contains
         ! that cell. If both queries check out, the primitive variables of
         ! the current patch are assigned to this cell.
 
-        $:GPU_PARALLEL_LOOP(private='[i,j]', copy='[ib_markers_sf]',&
+        $:GPU_PARALLEL_LOOP(private='[i,j]',&
                   & copyin='[patch_id,center,radius]', collapse=2)
         do j = 0, n
             do i = 0, m
                 if ((x_cc(i) - center(1))**2 &
                     + (y_cc(j) - center(2))**2 <= radius**2) &
                     then
-                    ib_markers_sf(i, j, 0) = patch_id
+                    ib_markers%sf(i, j, 0) = patch_id
                 end if
             end do
         end do
@@ -288,11 +288,11 @@ contains
     end subroutine s_ib_circle
 
     !! @param patch_id is the patch identifier
-    !! @param ib_markers_sf Array to track patch ids
-    subroutine s_ib_airfoil(patch_id, ib_markers_sf)
+    !! @param ib_markers Array to track patch ids
+    subroutine s_ib_airfoil(patch_id, ib_markers)
 
         integer, intent(in) :: patch_id
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: ib_markers_sf
+        type(integer_field), intent(inout) :: ib_markers
 
         real(wp) :: f, ca_in, pa, ma, ta
         real(wp) :: xa, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
@@ -376,7 +376,7 @@ contains
 
         end if
 
-        $:GPU_PARALLEL_LOOP(private='[i,j,xy_local,k,f]', copy='[ib_markers_sf]',&
+        $:GPU_PARALLEL_LOOP(private='[i,j,xy_local,k,f]', &
                   & copyin='[patch_id,center,inverse_rotation,offset,ma,ca_in,airfoil_grid_u,airfoil_grid_l]', collapse=2)
         do j = 0, n
             do i = 0, m
@@ -401,13 +401,13 @@ contains
                         if (f_approx_equal(airfoil_grid_u(k)%x, xy_local(1))) then
                             if (xy_local(2) <= airfoil_grid_u(k)%y) then
                                 !!IB
-                                ib_markers_sf(i, j, 0) = patch_id
+                                ib_markers%sf(i, j, 0) = patch_id
                             end if
                         else
                             f = (airfoil_grid_u(k)%x - xy_local(1))/(airfoil_grid_u(k)%x - airfoil_grid_u(k - 1)%x)
                             if (xy_local(2) <= ((1._wp - f)*airfoil_grid_u(k)%y + f*airfoil_grid_u(k - 1)%y)) then
                                 !!IB
-                                ib_markers_sf(i, j, 0) = patch_id
+                                ib_markers%sf(i, j, 0) = patch_id
                             end if
                         end if
                     else
@@ -418,14 +418,14 @@ contains
                         if (f_approx_equal(airfoil_grid_l(k)%x, xy_local(1))) then
                             if (xy_local(2) >= airfoil_grid_l(k)%y) then
                                 !!IB
-                                ib_markers_sf(i, j, 0) = patch_id
+                                ib_markers%sf(i, j, 0) = patch_id
                             end if
                         else
                             f = (airfoil_grid_l(k)%x - xy_local(1))/(airfoil_grid_l(k)%x - airfoil_grid_l(k - 1)%x)
 
                             if (xy_local(2) >= ((1._wp - f)*airfoil_grid_l(k)%y + f*airfoil_grid_l(k - 1)%y)) then
                                 !!IB
-                                ib_markers_sf(i, j, 0) = patch_id
+                                ib_markers%sf(i, j, 0) = patch_id
                             end if
                         end if
                     end if
@@ -437,12 +437,12 @@ contains
     end subroutine s_ib_airfoil
 
     !! @param patch_id is the patch identifier
-    !! @param ib_markers_sf Array to track patch ids
+    !! @param ib_markers Array to track patch ids
     !! @param ib True if this patch is an immersed boundary
-    subroutine s_ib_3D_airfoil(patch_id, ib_markers_sf)
+    subroutine s_ib_3D_airfoil(patch_id, ib_markers)
 
         integer, intent(in) :: patch_id
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: ib_markers_sf
+        type(integer_field), intent(inout) :: ib_markers
 
         real(wp) :: lz, z_max, z_min, f, ca_in, pa, ma, ta, xa, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
         integer :: i, j, k, l
@@ -527,7 +527,7 @@ contains
             $:GPU_UPDATE(device='[airfoil_grid_l,airfoil_grid_u]')
         end if
 
-        $:GPU_PARALLEL_LOOP(private='[i,j,l,xyz_local,k,f]', copy='[ib_markers_sf]',&
+        $:GPU_PARALLEL_LOOP(private='[i,j,l,xyz_local,k,f]',&
                   & copyin='[patch_id,center,inverse_rotation,offset,ma,ca_in,airfoil_grid_u,airfoil_grid_l,z_min,z_max]', collapse=3)
         do l = 0, p
             do j = 0, n
@@ -547,13 +547,13 @@ contains
                                 if (f_approx_equal(airfoil_grid_u(k)%x, xyz_local(1))) then
                                     if (xyz_local(2) <= airfoil_grid_u(k)%y) then
                                         !IB
-                                        ib_markers_sf(i, j, l) = patch_id
+                                        ib_markers%sf(i, j, l) = patch_id
                                     end if
                                 else
                                     f = (airfoil_grid_u(k)%x - xyz_local(1))/(airfoil_grid_u(k)%x - airfoil_grid_u(k - 1)%x)
                                     if (xyz_local(2) <= ((1._wp - f)*airfoil_grid_u(k)%y + f*airfoil_grid_u(k - 1)%y)) then
                                         !!IB
-                                        ib_markers_sf(i, j, l) = patch_id
+                                        ib_markers%sf(i, j, l) = patch_id
                                     end if
                                 end if
                             else
@@ -564,14 +564,14 @@ contains
                                 if (f_approx_equal(airfoil_grid_l(k)%x, xyz_local(1))) then
                                     if (xyz_local(2) >= airfoil_grid_l(k)%y) then
                                         !!IB
-                                        ib_markers_sf(i, j, l) = patch_id
+                                        ib_markers%sf(i, j, l) = patch_id
                                     end if
                                 else
                                     f = (airfoil_grid_l(k)%x - xyz_local(1))/(airfoil_grid_l(k)%x - airfoil_grid_l(k - 1)%x)
 
                                     if (xyz_local(2) >= ((1._wp - f)*airfoil_grid_l(k)%y + f*airfoil_grid_l(k - 1)%y)) then
                                         !!IB
-                                        ib_markers_sf(i, j, l) = patch_id
+                                        ib_markers%sf(i, j, l) = patch_id
                                     end if
                                 end if
                             end if
@@ -593,12 +593,12 @@ contains
         !!              rectangular patch DOES NOT allow for the smoothing of its
         !!              boundaries.
         !! @param patch_id is the patch identifier
-        !! @param ib_markers_sf Array to track patch ids
+        !! @param ib_markers Array to track patch ids
         !! @param ib True if this patch is an immersed boundary
-    subroutine s_ib_rectangle(patch_id, ib_markers_sf)
+    subroutine s_ib_rectangle(patch_id, ib_markers)
 
         integer, intent(in) :: patch_id
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: ib_markers_sf
+        type(integer_field), intent(inout) :: ib_markers
 
         integer :: i, j, k !< generic loop iterators
         real(wp) :: pi_inf, gamma, lit_gamma !< Equation of state parameters
@@ -621,7 +621,7 @@ contains
         ! domain and verifying whether the current patch has the permission
         ! to write to that cell. If both queries check out, the primitive
         ! variables of the current patch are assigned to this cell.
-        $:GPU_PARALLEL_LOOP(private='[i,j, xy_local]', copy='[ib_markers_sf]',&
+        $:GPU_PARALLEL_LOOP(private='[i,j, xy_local]',&
                   & copyin='[patch_id,center,length,inverse_rotation,x_cc,y_cc]', collapse=2)
         do j = 0, n
             do i = 0, m
@@ -635,7 +635,7 @@ contains
                     0.5_wp*length(2) >= xy_local(2)) then
 
                     ! Updating the patch identities bookkeeping variable
-                    ib_markers_sf(i, j, 0) = patch_id
+                    ib_markers%sf(i, j, 0) = patch_id
 
                 end if
             end do
@@ -650,12 +650,12 @@ contains
         !!              provided. Please note that the spherical patch DOES allow
         !!              for the smoothing of its boundary.
         !! @param patch_id is the patch identifier
-        !! @param ib_markers_sf Array to track patch ids
+        !! @param ib_markers Array to track patch ids
         !! @param ib True if this patch is an immersed boundary
-    subroutine s_ib_sphere(patch_id, ib_markers_sf)
+    subroutine s_ib_sphere(patch_id, ib_markers)
 
         integer, intent(in) :: patch_id
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: ib_markers_sf
+        type(integer_field), intent(inout) :: ib_markers
 
         ! Generic loop iterators
         integer :: i, j, k
@@ -676,7 +676,7 @@ contains
         ! and verifying whether the current patch has permission to write to
         ! that cell. If both queries check out, the primitive variables of
         ! the current patch are assigned to this cell.
-        $:GPU_PARALLEL_LOOP(private='[i,j,k,cart_y,cart_z]', copy='[ib_markers_sf]',&
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,cart_y,cart_z]',&
                   & copyin='[patch_id,center,radius]', collapse=3)
         do k = 0, p
             do j = 0, n
@@ -691,7 +691,7 @@ contains
                     if (((x_cc(i) - center(1))**2 &
                          + (cart_y - center(2))**2 &
                          + (cart_z - center(3))**2 <= radius**2)) then
-                        ib_markers_sf(i, j, k) = patch_id
+                        ib_markers%sf(i, j, k) = patch_id
                     end if
                 end do
             end do
@@ -709,11 +709,11 @@ contains
         !!              the cuboidal patch DOES NOT allow for the smearing of its
         !!              boundaries.
         !! @param patch_id is the patch identifier
-        !! @param ib_markers_sf Array to track patch ids
-    subroutine s_ib_cuboid(patch_id, ib_markers_sf)
+        !! @param ib_markers Array to track patch ids
+    subroutine s_ib_cuboid(patch_id, ib_markers)
 
         integer, intent(in) :: patch_id
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: ib_markers_sf
+        type(integer_field), intent(inout) :: ib_markers
 
         integer :: i, j, k !< Generic loop iterators
         real(wp), dimension(1:3) :: xyz_local, center, length !< x and y coordinates in local IB frame
@@ -732,7 +732,7 @@ contains
         ! and verifying whether the current patch has permission to write to
         ! to that cell. If both queries check out, the primitive variables
         ! of the current patch are assigned to this cell.
-        $:GPU_PARALLEL_LOOP(private='[i,j,k,xyz_local,cart_y,cart_z]', copy='[ib_markers_sf]',&
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,xyz_local,cart_y,cart_z]',&
                   & copyin='[patch_id,center,length,inverse_rotation]', collapse=3)
         do k = 0, p
             do j = 0, n
@@ -756,7 +756,7 @@ contains
                         0.5*length(3) >= xyz_local(3)) then
 
                         ! Updating the patch identities bookkeeping variable
-                        ib_markers_sf(i, j, k) = patch_id
+                        ib_markers%sf(i, j, k) = patch_id
                     end if
                 end do
             end do
@@ -774,12 +774,12 @@ contains
         !!              that the cylindrical patch DOES allow for the smoothing
         !!              of its lateral boundary.
         !! @param patch_id is the patch identifier
-        !! @param ib_markers_sf Array to track patch ids
+        !! @param ib_markers Array to track patch ids
         !! @param ib True if this patch is an immersed boundary
-    subroutine s_ib_cylinder(patch_id, ib_markers_sf)
+    subroutine s_ib_cylinder(patch_id, ib_markers)
 
         integer, intent(in) :: patch_id
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: ib_markers_sf
+        type(integer_field), intent(inout) :: ib_markers
 
         integer :: i, j, k !< Generic loop iterators
         real(wp) :: radius
@@ -802,7 +802,7 @@ contains
         ! domain and verifying whether the current patch has the permission
         ! to write to that cell. If both queries check out, the primitive
         ! variables of the current patch are assigned to this cell.
-        $:GPU_PARALLEL_LOOP(private='[i,j,k,xyz_local,cart_y,cart_z]', copy='[ib_markers_sf]',&
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,xyz_local,cart_y,cart_z]',&
                   & copyin='[patch_id,center,length,radius,inverse_rotation]', collapse=3)
         do k = 0, p
             do j = 0, n
@@ -836,7 +836,7 @@ contains
                           0.5_wp*length(3) >= xyz_local(3)))) then
 
                         ! Updating the patch identities bookkeeping variable
-                        ib_markers_sf(i, j, k) = patch_id
+                        ib_markers%sf(i, j, k) = patch_id
                     end if
                 end do
             end do
@@ -845,10 +845,10 @@ contains
 
     end subroutine s_ib_cylinder
 
-    subroutine s_ib_ellipse(patch_id, ib_markers_sf)
+    subroutine s_ib_ellipse(patch_id, ib_markers)
 
         integer, intent(in) :: patch_id
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: ib_markers_sf
+        type(integer_field), intent(inout) :: ib_markers
 
         integer :: i, j, k !< generic loop iterators
         real(wp), dimension(1:3) :: xy_local !< x and y coordinates in local IB frame
@@ -865,7 +865,7 @@ contains
 
         ! Checking whether the ellipse covers a particular cell in the
         ! domain
-        $:GPU_PARALLEL_LOOP(private='[i,j, xy_local]', copy='[ib_markers_sf]',&
+        $:GPU_PARALLEL_LOOP(private='[i,j, xy_local]',&
                   & copyin='[patch_id,center,ellipse_coeffs,inverse_rotation,x_cc,y_cc]', collapse=2)
         do j = 0, n
             do i = 0, m
@@ -876,7 +876,7 @@ contains
                 ! Ellipse condition (x/a)^2 + (y/b)^2 <= 1
                 if ((xy_local(1)/ellipse_coeffs(1))**2 + (xy_local(2)/ellipse_coeffs(2))**2 <= 1._wp) then
                     ! Updating the patch identities bookkeeping variable
-                    ib_markers_sf(i, j, 0) = patch_id
+                    ib_markers%sf(i, j, 0) = patch_id
                 end if
             end do
         end do
@@ -886,13 +886,13 @@ contains
 
     !> The STL patch is a 2/3D geometry that is imported from an STL file.
     !! @param patch_id is the patch identifier
-    !! @param ib_markers_sf Array to track patch ids
+    !! @param ib_markers Array to track patch ids
     !! @param STL_levelset STL levelset
     !! @param STL_levelset_norm STL levelset normals
-    subroutine s_ib_model(patch_id, ib_markers_sf)
+    subroutine s_ib_model(patch_id, ib_markers)
 
         integer, intent(in) :: patch_id
-        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: ib_markers_sf
+        type(integer_field), intent(inout) :: ib_markers
 
         integer :: i, j, k !< Generic loop iterators
 
@@ -934,7 +934,7 @@ contains
 
                     ! Reading STL boundary vertices and compute the levelset and levelset_norm
                     if (eta > patch_ib(patch_id)%model_threshold) then
-                        ib_markers_sf(i, j, k) = patch_id
+                        ib_markers%sf(i, j, k) = patch_id
                     end if
 
                 end do

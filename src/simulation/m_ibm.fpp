@@ -106,9 +106,9 @@ contains
 
         ! recompute the new ib_patch locations and broadcast them.
         ib_markers%sf = 0._wp
-        call s_apply_ib_patches(ib_markers%sf(0:m, 0:n, 0:p))
         $:GPU_UPDATE(device='[ib_markers%sf]')
-        call s_populate_ib_buffers()
+        call s_apply_ib_patches(ib_markers)
+        ! call s_populate_ib_buffers()
         $:GPU_UPDATE(host='[ib_markers%sf]')
         do i = 1, num_ibs
             if (patch_ib(i)%moving_ibm /= 0) call s_compute_centroid_offset(i) ! offsets are computed after IB markers are generated
@@ -1002,9 +1002,8 @@ contains
         $:GPU_UPDATE(device='[patch_ib]')
 
         ! recompute the new ib_patch locations and broadcast them.
-        call s_apply_ib_patches(ib_markers%sf(0:m, 0:n, 0:p))
-        $:GPU_UPDATE(device='[ib_markers%sf]')
-        call s_populate_ib_buffers()
+         $:GPU_UPDATE(device='[ib_markers%sf]')
+        call s_apply_ib_patches(ib_markers)
         $:GPU_UPDATE(host='[ib_markers%sf]')
 
         ! recalculate the ghost point locations and coefficients
