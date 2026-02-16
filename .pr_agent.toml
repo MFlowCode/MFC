@@ -9,7 +9,7 @@ handle_push_trigger = true
 push_commands = ["/improve"]
 
 [pr_reviewer]                # (all fields optional)
-num_max_findings        = 10  # how many items to surface
+num_max_findings        = 5   # how many items to surface
 require_tests_review    = true
 extra_instructions = """
 Project context and review priorities: .github/copilot-instructions.md
@@ -26,8 +26,12 @@ constraints for new parameters, and compiler portability across all four
 supported compilers.
 Python toolchain requires Python 3.10+; do not suggest __future__ imports
 or other backwards-compatibility shims.
+For CI/shell scripts, focus on correctness bugs only — not style, atomic
+writes, or FIFO alternatives.
+Do not suggest changes to code that was not modified in the PR.
 """
 
 [pr_code_suggestions]
+suggestions_depth           = "medium"
 commitable_code_suggestions = true
 apply_suggestions_checkbox  = true
