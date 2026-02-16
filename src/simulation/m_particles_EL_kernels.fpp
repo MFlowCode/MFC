@@ -724,7 +724,7 @@ contains
         real(wp), dimension(3), intent(out) :: force
         real(wp), intent(out) :: rmass_add
 
-        real(wp) :: a, vol, rho_fluid, pressure_fluid, alpha_fluid
+        real(wp) :: a, vol, rho_fluid, pressure_fluid
         real(wp), dimension(3) :: v_rel, dp
         real(wp), dimension(fd_order) :: xi, eta, L
         real(wp) :: particle_diam, gas_mu, vmag, cson
@@ -748,7 +748,7 @@ contains
 
         !!Interpolation - either tri-linear or 0th order
         if (fd_order > 1) then
-            alpha_fluid = f_interp_prim_trilinear(pos, cell, q_prim_vf, E_idx + 1)
+            ! alpha_fluid = f_interp_prim_trilinear(pos, cell, q_prim_vf, E_idx + 1)
             rho_fluid = f_interp_prim_trilinear(pos, cell, q_prim_vf, 1)
             pressure_fluid = f_interp_prim_trilinear(pos, cell, q_prim_vf, E_idx)
             do dir = 1, num_dims
@@ -762,7 +762,7 @@ contains
                 fluid_vel(dir) = f_interp_prim_trilinear(pos, cell, q_prim_vf, momxb + dir - 1)
             end do
         else
-            alpha_fluid = q_prim_vf(E_idx + 1)%sf(cell(1), cell(2), cell(3))
+            ! alpha_fluid = q_prim_vf(E_idx + 1)%sf(cell(1), cell(2), cell(3))
             rho_fluid = q_prim_vf(1)%sf(cell(1), cell(2), cell(3))
             pressure_fluid = q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3))
             do dir = 1, num_dims
@@ -777,7 +777,7 @@ contains
             end do
         end if
 
-        rho_fluid = rho_fluid/alpha_fluid
+        ! rho_fluid = rho_fluid/alpha_fluid
         drhodt = -drhodt
 
         v_rel = vel_p - fluid_vel

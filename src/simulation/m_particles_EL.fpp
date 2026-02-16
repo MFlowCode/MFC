@@ -582,8 +582,8 @@ contains
 
         if (lag_params%added_mass_model > 0) then
             do l = 1, num_dims
-                call s_gradient_dir(q_prim_vf(1)%sf/q_prim_vf(E_idx + 1)%sf, field_vars(dRhox_id + l - 1)%sf, l)
-                call s_gradient_dir(q_cons_vf(momxb + l - 1)%sf/q_cons_vf(E_idx + 1)%sf, field_vars(dRhoux_id + l - 1)%sf, l)
+                call s_gradient_dir(q_prim_vf(1)%sf, field_vars(dRhox_id + l - 1)%sf, l)
+                call s_gradient_dir(q_cons_vf(momxb + l - 1)%sf, field_vars(dRhoux_id + l - 1)%sf, l)
             end do
         end if
 
