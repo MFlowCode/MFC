@@ -108,8 +108,10 @@ jobs:
           timeout_minutes: 480
           command: |
             (cd pr     && ${{ matrix.build_script }}) &
+            pid1=$!
             (cd master && ${{ matrix.build_script }}) &
-            wait %1 && wait %2
+            pid2=$!
+            wait $pid1 && wait $pid2
           on_retry_command: |
             (cd pr     && ./mfc.sh clean) &
             (cd master && ./mfc.sh clean) &
