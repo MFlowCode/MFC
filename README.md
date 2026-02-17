@@ -8,10 +8,10 @@
 
 <p align="center">
   <a href="https://github.com/MFlowCode/MFC/actions">
-    <img src="https://img.shields.io/github/actions/workflow/status/mflowcode/mfc/test.yml?style=flat&label=Tests&color=slateblue%09" alt="Tests"/>
+    <img src="https://img.shields.io/github/actions/workflow/status/mflowcode/mfc/test.yml?style=flat&label=Tests&color=slateblue" alt="Tests"/>
   </a>
   <a href="https://github.com/MFlowCode/MFC/blob/master/.github/CONTRIBUTING.md">
-    <img src="https://img.shields.io/github/contributors-anon/mflowcode/mfc?style=flat&color=darkslategrey%09" alt="Contributors"/>
+    <img src="https://img.shields.io/github/contributors-anon/mflowcode/mfc?style=flat&color=darkslategrey" alt="Contributors"/>
   </a>
   <a href="https://join.slack.com/t/mflowcode/shared_invite/zt-y75wibvk-g~zztjknjYkK1hFgCuJxVw">
     <img src="https://img.shields.io/badge/slack-MFC-purple.svg?logo=slack" alt="Slack"/>
@@ -39,6 +39,9 @@
   </a>
   <a href="https://github.com/MFlowCode/homebrew-mfc">
     <img src="https://img.shields.io/badge/homebrew-mflowcode%2Fmfc%2Fmfc-brown?logo=homebrew&style=flat" alt="Homebrew"/>
+  </a>
+  <a href="https://www.youtube.com/@MFCode" target="_blank">
+    <img src="https://img.shields.io/badge/YouTube-MFlowCode-red?logo=youtube&style=flat" alt="YouTube"/>
   </a>
 </p>
 
