@@ -8,10 +8,10 @@
 
 <p align="center">
   <a href="https://github.com/MFlowCode/MFC/actions">
-    <img src="https://img.shields.io/github/actions/workflow/status/mflowcode/mfc/test.yml?style=flat&label=Tests&color=slateblue%09" alt="Tests"/>
+    <img src="https://img.shields.io/github/actions/workflow/status/mflowcode/mfc/test.yml?style=flat&label=Tests&color=slateblue" alt="Tests"/>
   </a>
   <a href="https://github.com/MFlowCode/MFC/blob/master/.github/CONTRIBUTING.md">
-    <img src="https://img.shields.io/github/contributors-anon/mflowcode/mfc?style=flat&color=darkslategrey%09" alt="Contributors"/>
+    <img src="https://img.shields.io/github/contributors-anon/mflowcode/mfc?style=flat&color=darkslategrey" alt="Contributors"/>
   </a>
   <a href="https://join.slack.com/t/mflowcode/shared_invite/zt-y75wibvk-g~zztjknjYkK1hFgCuJxVw">
     <img src="https://img.shields.io/badge/slack-MFC-purple.svg?logo=slack" alt="Slack"/>

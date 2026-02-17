@@ -172,7 +172,7 @@ MFC weak scales on multiple exascale GPU platforms with high efficiency:
 - **OLCF Frontier**: AMD MI250X GPUs (65,536 GCDs, 87% of the machine, 96% efficiency)
 - **CSCS Alps**: NVIDIA GH200 GPUs
 
-<img src="../res/weakScaling/weakscaling-dark.png" style="width:60%; border-radius: 10pt"/>
+<img src="../res/weakScaling/weakscaling.png" style="width:60%; border-radius: 10pt"/>
 
 ### NVIDIA V100 GPU (historical)
 
