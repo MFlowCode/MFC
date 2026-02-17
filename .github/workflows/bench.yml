@@ -110,6 +110,10 @@ jobs:
             (cd pr     && ${{ matrix.build_script }}) &
             (cd master && ${{ matrix.build_script }}) &
             wait %1 && wait %2
+          on_retry_command: |
+            (cd pr     && ./mfc.sh clean) &
+            (cd master && ./mfc.sh clean) &
+            wait
 
       - name: Bench (Master v. PR)
         run: bash pr/.github/scripts/run_parallel_benchmarks.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }}

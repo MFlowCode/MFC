@@ -257,6 +257,7 @@ jobs:
           retry_wait_seconds: 60
           timeout_minutes: 480
           command: bash .github/workflows/${{ matrix.cluster }}/build.sh ${{ matrix.device }} ${{ matrix.interface }}
+          on_retry_command: ./mfc.sh clean
 
       - name: Test
         run:  bash .github/workflows/${{ matrix.cluster }}/submit.sh .github/workflows/${{ matrix.cluster }}/test.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.shard }}
