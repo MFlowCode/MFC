@@ -66,7 +66,6 @@ def _is_param_valid_for_target(param_name: str, target_name: str) -> bool:
 
     Uses the Fortran namelist definitions as the source of truth.
     Handles indexed params like "patch_icpp(1)%geometry" by checking base name.
-
     Args:
         param_name: The parameter name (may include indices)
         target_name: One of 'pre_process', 'simulation', 'post_process'
