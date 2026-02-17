@@ -52,6 +52,14 @@ jobs:
               PR_NUMBER=$(gh api "repos/${{ github.repository }}/pulls?state=open&sort=updated&direction=desc&per_page=30" \
                   --jq ".[] | select(.head.sha == \"$HEAD_SHA\") | .number" | head -1)
             fi
+            if [ -z "$PR_NUMBER" ]; then
+              # workflow_run may report the merge/base SHA for forks. Fall back to branch name.
+              HEAD_BRANCH="${{ github.event.workflow_run.head_branch }}"
+              if [ -n "$HEAD_BRANCH" ] && [ "$HEAD_BRANCH" != "master" ]; then
+                PR_NUMBER=$(gh api "repos/${{ github.repository }}/pulls?state=open&sort=updated&direction=desc&per_page=30" \
+                    --jq ".[] | select(.head.ref == \"$HEAD_BRANCH\") | .number" | head -1)
+              fi
+            fi
 
             if [ -n "$PR_NUMBER" ]; then
               echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
