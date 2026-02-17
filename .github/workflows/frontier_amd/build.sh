@@ -50,8 +50,8 @@ while [ $attempt -le $max_attempts ]; do
     fi
 
     if [ $attempt -lt $max_attempts ]; then
-        echo "Build failed on attempt $attempt. Clearing staging and retrying in 30s..."
-        rm -rf build/staging build/lock.yaml
+        echo "Build failed on attempt $attempt. Clearing cache and retrying in 30s..."
+        rm -rf build/staging build/install build/lock.yaml
         sleep 30
     fi
     attempt=$((attempt + 1))
