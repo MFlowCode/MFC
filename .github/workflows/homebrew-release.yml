@@ -109,13 +109,14 @@ jobs:
 
           echo "Updating formula to v${VERSION}..."
 
-          # Update URL
-          sed -i "s|url \"https://github.com/MFlowCode/MFC/archive/refs/tags/v[^\"]*\.tar\.gz\"|url \"https://github.com/MFlowCode/MFC/archive/refs/tags/v${VERSION}.tar.gz\"|" "$FORMULA"
+          # Update URL (match any GitHub archive URL, not just MFlowCode/MFC,
+          # in case the formula temporarily points at a fork during testing)
+          sed -i "s|url \"https://github.com/[^\"]*/archive/[^\"]*\.tar\.gz\"|url \"https://github.com/MFlowCode/MFC/archive/refs/tags/v${VERSION}.tar.gz\"|" "$FORMULA"
 
           # Update SHA256 (the one right after url, not bottle SHAs)
           # This uses awk to only update the first sha256 after the url line
           awk -v newsha="$SHA256" '
-            /^  url "https:\/\/github.com\/MFlowCode\/MFC/ { found_url=1 }
+            /^  url "https:\/\/github.com\// { found_url=1 }
             found_url && /^  sha256 "/ && !updated {
               sub(/sha256 "[^"]*"/, "sha256 \"" newsha "\"")
               updated=1
@@ -157,13 +158,16 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           git add Formula/mfc.rb
-          git commit -m "Update MFC to v${VERSION}"
 
-          echo "Pushing to homebrew-mfc..."
-          git push origin main
-
-          echo "Successfully pushed formula update!"
-          echo "The bottle.yml workflow in homebrew-mfc will now build bottles automatically."
+          if git diff --cached --quiet; then
+            echo "::notice::Formula already up to date for v${VERSION} — nothing to push."
+          else
+            git commit -m "Update MFC to v${VERSION}"
+            echo "Pushing to homebrew-mfc..."
+            git push origin main
+            echo "Successfully pushed formula update!"
+            echo "The bottle.yml workflow in homebrew-mfc will now build bottles automatically."
+          fi
 
       - name: Dry run summary
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true' }}
