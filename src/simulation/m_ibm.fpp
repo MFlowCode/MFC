@@ -129,12 +129,9 @@ contains
         @:ALLOCATE(inner_points(1:int((max_num_gps + max_num_inner_gps) * 2.0)))
 
         $:GPU_ENTER_DATA(copyin='[ghost_points,inner_points]')
-
         call s_find_ghost_points(ghost_points, inner_points)
-        $:GPU_UPDATE(device='[ghost_points, inner_points]')
-
         call s_apply_levelset(ghost_points, num_gps)
-        $:GPU_UPDATE(device='[ghost_points]')
+        $:GPU_UPDATE(host='[ghost_points, inner_points]')
 
         call s_compute_image_points(ghost_points)
         $:GPU_UPDATE(device='[ghost_points]')
@@ -534,52 +531,55 @@ contains
 
     end subroutine s_compute_image_points
 
-    !> Function that finds the number of ghost points, used for allocating
+    !> Subroutine that finds the number of ghost points, used for allocating
     !! memory.
     subroutine s_find_num_ghost_points(num_gps_out, num_inner_gps_out)
 
         integer, intent(out) :: num_gps_out
         integer, intent(out) :: num_inner_gps_out
 
-        integer, dimension(2*gp_layers + 1, 2*gp_layers + 1) &
-            :: subsection_2D
-        integer, dimension(2*gp_layers + 1, 2*gp_layers + 1, 2*gp_layers + 1) &
-            :: subsection_3D
-        integer :: i, j, k!< Iterator variables
+        integer :: i, j, k, ii, jj, kk, gp_layers_z !< Iterator variables
+        integer :: num_gps_local, num_inner_gps_local !< local copies of the gp count to support GPU compute
+        logical :: is_gp
 
-        num_gps_out = 0
-        num_inner_gps_out = 0
+        num_gps_local = 0
+        num_inner_gps_local = 0
+        gp_layers_z = gp_layers
+        if (p == 0) gp_layers_z = 0
 
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,ii,jj,kk,is_gp]', copy='[num_gps_local,num_inner_gps_local]', firstprivate='[gp_layers,gp_layers_z]', collapse=3)
         do i = 0, m
             do j = 0, n
-                if (p == 0) then
-                    if (ib_markers%sf(i, j, 0) /= 0) then
-                        subsection_2D = ib_markers%sf( &
-                                        i - gp_layers:i + gp_layers, &
-                                        j - gp_layers:j + gp_layers, 0)
-                        if (any(subsection_2D == 0)) then
-                            num_gps_out = num_gps_out + 1
+                do k = 0, p
+                    if (ib_markers%sf(i, j, k) /= 0) then
+                        is_gp = .false.
+                        marker_search: do ii = i - gp_layers, i + gp_layers
+                            do jj = j - gp_layers, j + gp_layers
+                                do kk = k - gp_layers_z, k + gp_layers_z
+                                    if (ib_markers%sf(ii, jj, kk) == 0) then
+                                        ! if any neighbors are not in the IB, it is a ghost point
+                                        is_gp = .true.
+                                        exit marker_search
+                                    end if
+                                end do
+                            end do
+                        end do marker_search
+
+                        if (is_gp) then
+                            $:GPU_ATOMIC(atomic='update')
+                            num_gps_local = num_gps_local + 1
                         else
-                            num_inner_gps_out = num_inner_gps_out + 1
+                            $:GPU_ATOMIC(atomic='update')
+                            num_inner_gps_local = num_inner_gps_local + 1
                         end if
                     end if
-                else
-                    do k = 0, p
-                        if (ib_markers%sf(i, j, k) /= 0) then
-                            subsection_3D = ib_markers%sf( &
-                                            i - gp_layers:i + gp_layers, &
-                                            j - gp_layers:j + gp_layers, &
-                                            k - gp_layers:k + gp_layers)
-                            if (any(subsection_3D == 0)) then
-                                num_gps_out = num_gps_out + 1
-                            else
-                                num_inner_gps_out = num_inner_gps_out + 1
-                            end if
-                        end if
-                    end do
-                end if
+                end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        num_gps_out = num_gps_local
+        num_inner_gps_out = num_inner_gps_local
 
     end subroutine s_find_num_ghost_points
 
@@ -588,116 +588,89 @@ contains
 
         type(ghost_point), dimension(num_gps), intent(INOUT) :: ghost_points_in
         type(ghost_point), dimension(num_inner_gps), intent(INOUT) :: inner_points_in
-        integer, dimension(2*gp_layers + 1, 2*gp_layers + 1) &
-            :: subsection_2D
-        integer, dimension(2*gp_layers + 1, 2*gp_layers + 1, 2*gp_layers + 1) &
-            :: subsection_3D
-        integer :: i, j, k !< Iterator variables
-        integer :: count, count_i
+        integer :: i, j, k, ii, jj, kk, gp_layers_z !< Iterator variables
+        integer :: count, count_i, local_idx
         integer :: patch_id
+        logical :: is_gp
 
-        count = 1
-        count_i = 1
+        count = 0
+        count_i = 0
+        gp_layers_z = gp_layers
+        if (p == 0) gp_layers_z = 0
 
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,ii,jj,kk,is_gp,local_idx]', copyin='[count,count_i, x_domain, y_domain, z_domain]', firstprivate='[gp_layers,gp_layers_z]', collapse=3)
         do i = 0, m
             do j = 0, n
-                if (p == 0) then
-                    ! 2D
-                    if (ib_markers%sf(i, j, 0) /= 0) then
-                        subsection_2D = ib_markers%sf( &
-                                        i - gp_layers:i + gp_layers, &
-                                        j - gp_layers:j + gp_layers, 0)
-                        if (any(subsection_2D == 0)) then
-                            ghost_points_in(count)%loc = [i, j, 0]
-                            patch_id = ib_markers%sf(i, j, 0)
-                            ghost_points_in(count)%ib_patch_id = &
-                                patch_id
+                do k = 0, p
+                    if (ib_markers%sf(i, j, k) /= 0) then
+                        is_gp = .false.
+                        marker_search: do ii = i - gp_layers, i + gp_layers
+                            do jj = j - gp_layers, j + gp_layers
+                                do kk = k - gp_layers_z, k + gp_layers_z
+                                    if (ib_markers%sf(ii, jj, kk) == 0) then
+                                        ! if any neighbors are not in the IB, it is a ghost point
+                                        is_gp = .true.
+                                        exit marker_search
+                                    end if
+                                end do
+                            end do
+                        end do marker_search
 
-                            ghost_points_in(count)%slip = patch_ib(patch_id)%slip
-                            ! ghost_points(count)%rank = proc_rank
+                        if (is_gp) then
+                            $:GPU_ATOMIC(atomic='capture')
+                            count = count + 1
+                            local_idx = count
+                            $:END_GPU_ATOMIC_CAPTURE()
+
+                            ghost_points_in(local_idx)%loc = [i, j, k]
+                            patch_id = ib_markers%sf(i, j, k)
+                            ghost_points_in(local_idx)%ib_patch_id = patch_id
+
+                            ghost_points_in(local_idx)%slip = patch_ib(patch_id)%slip
 
                             if ((x_cc(i) - dx(i)) < x_domain%beg) then
-                                ghost_points_in(count)%DB(1) = -1
+                                ghost_points_in(local_idx)%DB(1) = -1
                             else if ((x_cc(i) + dx(i)) > x_domain%end) then
-                                ghost_points_in(count)%DB(1) = 1
+                                ghost_points_in(local_idx)%DB(1) = 1
                             else
-                                ghost_points_in(count)%DB(1) = 0
+                                ghost_points_in(local_idx)%DB(1) = 0
                             end if
 
                             if ((y_cc(j) - dy(j)) < y_domain%beg) then
-                                ghost_points_in(count)%DB(2) = -1
+                                ghost_points_in(local_idx)%DB(2) = -1
                             else if ((y_cc(j) + dy(j)) > y_domain%end) then
-                                ghost_points_in(count)%DB(2) = 1
+                                ghost_points_in(local_idx)%DB(2) = 1
                             else
-                                ghost_points_in(count)%DB(2) = 0
+                                ghost_points_in(local_idx)%DB(2) = 0
                             end if
 
-                            count = count + 1
+                            if (p /= 0) then
+                                if ((z_cc(k) - dz(k)) < z_domain%beg) then
+                                    ghost_points_in(local_idx)%DB(3) = -1
+                                else if ((z_cc(k) + dz(k)) > z_domain%end) then
+                                    ghost_points_in(local_idx)%DB(3) = 1
+                                else
+                                    ghost_points_in(local_idx)%DB(3) = 0
+                                end if
+                            end if
 
                         else
-                            inner_points_in(count_i)%loc = [i, j, 0]
-                            patch_id = ib_markers%sf(i, j, 0)
-                            inner_points_in(count_i)%ib_patch_id = &
-                                patch_id
-                            inner_points_in(count_i)%slip = patch_ib(patch_id)%slip
+                            $:GPU_ATOMIC(atomic='capture')
                             count_i = count_i + 1
+                            local_idx = count_i
+                            $:END_GPU_ATOMIC_CAPTURE()
+
+                            inner_points_in(local_idx)%loc = [i, j, k]
+                            patch_id = ib_markers%sf(i, j, k)
+                            inner_points_in(local_idx)%ib_patch_id = patch_id
+                            inner_points_in(local_idx)%slip = patch_ib(patch_id)%slip
 
                         end if
                     end if
-                else
-                    ! 3D
-                    do k = 0, p
-                        if (ib_markers%sf(i, j, k) /= 0) then
-                            subsection_3D = ib_markers%sf( &
-                                            i - gp_layers:i + gp_layers, &
-                                            j - gp_layers:j + gp_layers, &
-                                            k - gp_layers:k + gp_layers)
-                            if (any(subsection_3D == 0)) then
-                                ghost_points_in(count)%loc = [i, j, k]
-                                patch_id = ib_markers%sf(i, j, k)
-                                ghost_points_in(count)%ib_patch_id = &
-                                    ib_markers%sf(i, j, k)
-                                ghost_points_in(count)%slip = patch_ib(patch_id)%slip
-
-                                if ((x_cc(i) - dx(i)) < x_domain%beg) then
-                                    ghost_points_in(count)%DB(1) = -1
-                                else if ((x_cc(i) + dx(i)) > x_domain%end) then
-                                    ghost_points_in(count)%DB(1) = 1
-                                else
-                                    ghost_points_in(count)%DB(1) = 0
-                                end if
-
-                                if ((y_cc(j) - dy(j)) < y_domain%beg) then
-                                    ghost_points_in(count)%DB(2) = -1
-                                else if ((y_cc(j) + dy(j)) > y_domain%end) then
-                                    ghost_points_in(count)%DB(2) = 1
-                                else
-                                    ghost_points_in(count)%DB(2) = 0
-                                end if
-
-                                if ((z_cc(k) - dz(k)) < z_domain%beg) then
-                                    ghost_points_in(count)%DB(3) = -1
-                                else if ((z_cc(k) + dz(k)) > z_domain%end) then
-                                    ghost_points_in(count)%DB(3) = 1
-                                else
-                                    ghost_points_in(count)%DB(3) = 0
-                                end if
-
-                                count = count + 1
-                            else
-                                inner_points_in(count_i)%loc = [i, j, k]
-                                patch_id = ib_markers%sf(i, j, k)
-                                inner_points_in(count_i)%ib_patch_id = &
-                                    ib_markers%sf(i, j, k)
-                                inner_points_in(count_i)%slip = patch_ib(patch_id)%slip
-
-                                count_i = count_i + 1
-                            end if
-                        end if
-                    end do
-                end if
+                end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_find_ghost_points
 
@@ -1013,24 +986,23 @@ contains
         call nvtxEndRange
 
         call nvtxStartRange("COMPUTE-GHOST-POINTS")
-
         ! recalculate the ghost point locations and coefficients
         call s_find_num_ghost_points(num_gps, num_inner_gps)
         $:GPU_UPDATE(device='[num_gps, num_inner_gps]')
 
         call s_find_ghost_points(ghost_points, inner_points)
-        $:GPU_UPDATE(device='[ghost_points, inner_points]')
-
         call nvtxEndRange
-        
+
+        call nvtxStartRange("COMPUTE-IMAGE-POINTS")
         call s_apply_levelset(ghost_points, num_gps)
-        $:GPU_UPDATE(device='[ghost_points]')
+        $:GPU_UPDATE(host='[ghost_points, inner_points]')
 
         call s_compute_image_points(ghost_points)
         $:GPU_UPDATE(device='[ghost_points]')
 
         call s_compute_interpolation_coeffs(ghost_points)
         $:GPU_UPDATE(device='[ghost_points]')
+        call nvtxEndRange
 
         call nvtxEndRange
 

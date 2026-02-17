@@ -33,8 +33,6 @@ contains
 
         integer :: i, patch_id, patch_geometry
 
-        $:GPU_UPDATE(device='[gps(1:num_gps)]')
-
         !  3D Patch Geometries
         if (p > 0) then
 
@@ -91,8 +89,6 @@ contains
                 $:GPU_UPDATE(device='[gps(i)]')
             end if
         end do
-
-        $:GPU_UPDATE(host='[gps(1:num_gps)]')
 
     end subroutine s_apply_levelset
 

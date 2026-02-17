@@ -274,8 +274,8 @@ contains
 
         $:GPU_PARALLEL_LOOP(private='[i,j]',&
                   & copyin='[patch_id,center,radius]', collapse=2)
-        do j = -gp_layers, n+gp_layers
-            do i = -gp_layers, m+gp_layers
+        do j = -gp_layers, n + gp_layers
+            do i = -gp_layers, m + gp_layers
                 if ((x_cc(i) - center(1))**2 &
                     + (y_cc(j) - center(2))**2 <= radius**2) &
                     then
@@ -378,8 +378,8 @@ contains
 
         $:GPU_PARALLEL_LOOP(private='[i,j,xy_local,k,f]', &
                   & copyin='[patch_id,center,inverse_rotation,offset,ma,ca_in,airfoil_grid_u,airfoil_grid_l]', collapse=2)
-        do j = -gp_layers, n+gp_layers
-            do i = -gp_layers, m+gp_layers
+        do j = -gp_layers, n + gp_layers
+            do i = -gp_layers, m + gp_layers
                 xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp] ! get coordinate frame centered on IB
                 xy_local = matmul(inverse_rotation, xy_local) ! rotate the frame into the IB's coordinates
                 xy_local = xy_local - offset ! airfoils are a patch that require a centroid offset
@@ -529,9 +529,9 @@ contains
 
         $:GPU_PARALLEL_LOOP(private='[i,j,l,xyz_local,k,f]',&
                   & copyin='[patch_id,center,inverse_rotation,offset,ma,ca_in,airfoil_grid_u,airfoil_grid_l,z_min,z_max]', collapse=3)
-        do l = -gp_layers, p+gp_layers
-            do j = -gp_layers, n+gp_layers
-                do i = -gp_layers, m+gp_layers
+        do l = -gp_layers, p + gp_layers
+            do j = -gp_layers, n + gp_layers
+                do i = -gp_layers, m + gp_layers
                     xyz_local = [x_cc(i) - center(1), y_cc(j) - center(2), z_cc(l) - center(3)] ! get coordinate frame centered on IB
                     xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordinates
                     xyz_local = xyz_local - offset ! airfoils are a patch that require a centroid offset
@@ -623,8 +623,8 @@ contains
         ! variables of the current patch are assigned to this cell.
         $:GPU_PARALLEL_LOOP(private='[i,j, xy_local]',&
                   & copyin='[patch_id,center,length,inverse_rotation,x_cc,y_cc]', collapse=2)
-        do j = -gp_layers, n+gp_layers
-            do i = -gp_layers, m+gp_layers
+        do j = -gp_layers, n + gp_layers
+            do i = -gp_layers, m + gp_layers
                 ! get the x and y coordinates in the local IB frame
                 xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]
                 xy_local = matmul(inverse_rotation, xy_local)
@@ -673,6 +673,7 @@ contains
         center(3) = patch_ib(patch_id)%z_centroid
         radius = patch_ib(patch_id)%radius
 
+        ! find the indices to the left and right of the IB in i, j, k
         il = -gp_layers
         jl = -gp_layers
         kl = -gp_layers
@@ -689,10 +690,10 @@ contains
         ! the current patch are assigned to this cell.
         $:GPU_PARALLEL_LOOP(private='[i,j,k,cart_y,cart_z]',&
                   & copyin='[patch_id,center,radius]', collapse=3)
-        do k = kl-1, kr+1
-            do j = jl-1, jr+1
-                do i = il-1, ir+1
-                ! do i = -gp_layers, m+gp_layers
+        do k = kl - 1, kr + 1
+            do j = jl - 1, jr + 1
+                do i = il - 1, ir + 1
+                    ! do i = -gp_layers, m+gp_layers
                     if (grid_geometry == 3) then
                         call s_convert_cylindrical_to_cartesian_coord(y_cc(j), z_cc(k))
                     else
@@ -746,9 +747,9 @@ contains
         ! of the current patch are assigned to this cell.
         $:GPU_PARALLEL_LOOP(private='[i,j,k,xyz_local,cart_y,cart_z]',&
                   & copyin='[patch_id,center,length,inverse_rotation]', collapse=3)
-        do k = -gp_layers, p+gp_layers
-            do j = -gp_layers, n+gp_layers
-                do i = -gp_layers, m+gp_layers
+        do k = -gp_layers, p + gp_layers
+            do j = -gp_layers, n + gp_layers
+                do i = -gp_layers, m + gp_layers
 
                     if (grid_geometry == 3) then
                         ! TODO :: This does not work and is not covered by any tests. This should be fixed
@@ -816,9 +817,9 @@ contains
         ! variables of the current patch are assigned to this cell.
         $:GPU_PARALLEL_LOOP(private='[i,j,k,xyz_local,cart_y,cart_z]',&
                   & copyin='[patch_id,center,length,radius,inverse_rotation]', collapse=3)
-         do k = -gp_layers, p+gp_layers
-            do j = -gp_layers, n+gp_layers
-                do i = -gp_layers, m+gp_layers
+        do k = -gp_layers, p + gp_layers
+            do j = -gp_layers, n + gp_layers
+                do i = -gp_layers, m + gp_layers
 
                     if (grid_geometry == 3) then
                         call s_convert_cylindrical_to_cartesian_coord(y_cc(j), z_cc(k))
@@ -879,8 +880,8 @@ contains
         ! domain
         $:GPU_PARALLEL_LOOP(private='[i,j, xy_local]',&
                   & copyin='[patch_id,center,ellipse_coeffs,inverse_rotation,x_cc,y_cc]', collapse=2)
-        do j = -gp_layers, n+gp_layers
-            do i = -gp_layers, m+gp_layers
+        do j = -gp_layers, n + gp_layers
+            do i = -gp_layers, m + gp_layers
                 ! get the x and y coordinates in the local IB frame
                 xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]
                 xy_local = matmul(inverse_rotation, xy_local)
@@ -920,23 +921,23 @@ contains
         inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
         offset(:) = patch_ib(patch_id)%centroid_offset(:)
 
-        do i = 0-gp_layers, m+gp_layers
-            do j = -gp_layers, n+gp_layers
+        do i = 0 - gp_layers, m + gp_layers
+            do j = -gp_layers, n + gp_layers
 
-                    xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]
-                    xy_local = matmul(inverse_rotation, xy_local)
-                    xy_local = xy_local - offset
+                xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]
+                xy_local = matmul(inverse_rotation, xy_local)
+                xy_local = xy_local - offset
 
-                    if (grid_geometry == 3) then
-                        xy_local = f_convert_cyl_to_cart(xy_local)
-                    end if
+                if (grid_geometry == 3) then
+                    xy_local = f_convert_cyl_to_cart(xy_local)
+                end if
 
-                    eta = f_model_is_inside(model, xy_local, (/dx(i), dy(j), 0._wp/), patch_ib(patch_id)%model_spc)
+                eta = f_model_is_inside(model, xy_local, (/dx(i), dy(j), 0._wp/), patch_ib(patch_id)%model_spc)
 
-                    ! Reading STL boundary vertices and compute the levelset and levelset_norm
-                    if (eta > patch_ib(patch_id)%model_threshold) then
-                        ib_markers%sf(i, j, 0) = patch_id
-                    end if
+                ! Reading STL boundary vertices and compute the levelset and levelset_norm
+                if (eta > patch_ib(patch_id)%model_threshold) then
+                    ib_markers%sf(i, j, 0) = patch_id
+                end if
 
             end do
         end do
@@ -968,9 +969,9 @@ contains
         inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
         offset(:) = patch_ib(patch_id)%centroid_offset(:)
 
-        do i = 0-gp_layers, m+gp_layers
-            do j = -gp_layers, n+gp_layers
-                do k = -gp_layers, p+gp_layers
+        do i = 0 - gp_layers, m + gp_layers
+            do j = -gp_layers, n + gp_layers
+                do k = -gp_layers, p + gp_layers
 
                     xyz_local = [x_cc(i) - center(1), y_cc(j) - center(2), z_cc(k) - center(3)]
                     xyz_local = matmul(inverse_rotation, xyz_local)
@@ -1072,21 +1073,21 @@ contains
 
     subroutine get_bounding_indices(left_bound, right_bound, cell_centers, left_index, right_index)
 
-      real(wp), intent(in) :: left_bound, right_bound
-      integer, intent(inout) :: left_index, right_index
-      real(wp), dimension(-buff_size:), intent(in) :: cell_centers
+        real(wp), intent(in) :: left_bound, right_bound
+        integer, intent(inout) :: left_index, right_index
+        real(wp), dimension(-buff_size:), intent(in) :: cell_centers
 
-      integer :: itr_left, itr_middle, itr_right
+        integer :: itr_left, itr_middle, itr_right
 
         itr_left = left_index
         itr_right = right_index
 
         do while (itr_left + 1 < itr_right)
-            itr_middle = (itr_left + itr_right) / 2
+            itr_middle = (itr_left + itr_right)/2
             if (cell_centers(itr_middle) < left_bound) then
-              itr_left = itr_middle
+                itr_left = itr_middle
             else if (cell_centers(itr_middle) > left_bound) then
-              itr_right = itr_middle
+                itr_right = itr_middle
             else
                 itr_left = itr_middle
                 exit
@@ -1096,11 +1097,11 @@ contains
 
         itr_right = right_index
         do while (itr_left + 1 < itr_right)
-            itr_middle = (itr_left + itr_right) / 2
+            itr_middle = (itr_left + itr_right)/2
             if (cell_centers(itr_middle) < right_bound) then
-              itr_left = itr_middle
+                itr_left = itr_middle
             else if (cell_centers(itr_middle) > right_bound) then
-              itr_right = itr_middle
+                itr_right = itr_middle
             else
                 itr_right = itr_middle
                 exit
