@@ -258,7 +258,7 @@ contains
         real(wp), dimension(1:2) :: center
         real(wp) :: radius
 
-        integer :: i, j, k !< Generic loop iterators
+        integer :: i, j, il, ir, jl, jr !< Generic loop iterators
 
         ! Transferring the circular patch's radius, centroid, smearing patch
         ! identity and smearing coefficient information
@@ -267,6 +267,14 @@ contains
         center(2) = patch_ib(patch_id)%y_centroid
         radius = patch_ib(patch_id)%radius
 
+        ! find the indices to the left and right of the IB in i, j, k
+        il = -gp_layers
+        jl = -gp_layers
+        ir = m + gp_layers
+        jr = n + gp_layers
+        call get_bounding_indices(center(1) - radius, center(1) + radius, x_cc, il, ir)
+        call get_bounding_indices(center(2) - radius, center(2) + radius, y_cc, jl, jr)
+
         ! Checking whether the circle covers a particular cell in the domain
         ! and verifying whether the current patch has permission to write to
         ! that cell. If both queries check out, the primitive variables of
@@ -274,8 +282,8 @@ contains
 
         $:GPU_PARALLEL_LOOP(private='[i,j]',&
                   & copyin='[patch_id,center,radius]', collapse=2)
-        do j = -gp_layers, n + gp_layers
-            do i = -gp_layers, m + gp_layers
+        do j = jl, jr
+            do i = il, ir
                 if ((x_cc(i) - center(1))**2 &
                     + (y_cc(j) - center(2))**2 <= radius**2) &
                     then
@@ -296,7 +304,7 @@ contains
 
         real(wp) :: f, ca_in, pa, ma, ta
         real(wp) :: xa, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
-        integer :: i, j, k
+        integer :: i, j, k, il, ir, jl, jr
         integer :: Np1, Np2
 
         real(wp), dimension(1:3) :: xy_local, offset !< x and y coordinates in local IB frame
@@ -376,10 +384,19 @@ contains
 
         end if
 
+        ! find the indices to the left and right of the IB in i, j, k
+        il = -gp_layers
+        jl = -gp_layers
+        ir = m + gp_layers
+        jr = n + gp_layers
+        ! maximum distance any marker can be from the center is the length of the airfoil
+        call get_bounding_indices(center(1) - ca_in, center(1) + ca_in, x_cc, il, ir)
+        call get_bounding_indices(center(2) - ca_in, center(2) + ca_in, y_cc, jl, jr)
+
         $:GPU_PARALLEL_LOOP(private='[i,j,xy_local,k,f]', &
                   & copyin='[patch_id,center,inverse_rotation,offset,ma,ca_in,airfoil_grid_u,airfoil_grid_l]', collapse=2)
-        do j = -gp_layers, n + gp_layers
-            do i = -gp_layers, m + gp_layers
+        do j = jl, jr
+            do i = il, ir
                 xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp] ! get coordinate frame centered on IB
                 xy_local = matmul(inverse_rotation, xy_local) ! rotate the frame into the IB's coordinates
                 xy_local = xy_local - offset ! airfoils are a patch that require a centroid offset
@@ -534,7 +551,7 @@ contains
         ir = m + gp_layers
         jr = n + gp_layers
         lr = p + gp_layers
-        ! maximum distance any marker can be from the center is the legnth of the airfoil
+        ! maximum distance any marker can be from the center is the length of the airfoil
         call get_bounding_indices(center(1) - ca_in, center(1) + ca_in, x_cc, il, ir)
         call get_bounding_indices(center(2) - ca_in, center(2) + ca_in, y_cc, jl, jr)
         call get_bounding_indices(center(3) - ca_in, center(3) + ca_in, z_cc, ll, lr)
@@ -612,15 +629,11 @@ contains
         integer, intent(in) :: patch_id
         type(integer_field), intent(inout) :: ib_markers
 
-        integer :: i, j, k !< generic loop iterators
-        real(wp) :: pi_inf, gamma, lit_gamma !< Equation of state parameters
+        integer :: i, j, il, ir, jl, jr !< generic loop iterators
+        real(wp) :: corner_distance !< Equation of state parameters
         real(wp), dimension(1:3) :: xy_local !< x and y coordinates in local IB frame
         real(wp), dimension(1:2) :: length, center !< x and y coordinates in local IB frame
         real(wp), dimension(1:3, 1:3) :: inverse_rotation
-
-        pi_inf = fluid_pp(1)%pi_inf
-        gamma = fluid_pp(1)%gamma
-        lit_gamma = (1._wp + gamma)/gamma
 
         ! Transferring the rectangle's centroid and length information
         center(1) = patch_ib(patch_id)%x_centroid
@@ -629,14 +642,23 @@ contains
         length(2) = patch_ib(patch_id)%length_y
         inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
 
+        ! find the indices to the left and right of the IB in i, j, k
+        il = -gp_layers
+        jl = -gp_layers
+        ir = m + gp_layers
+        jr = n + gp_layers
+        corner_distance = sqrt(dot_product(length, length))/2._wp ! maximum distance any marker can be from the center
+        call get_bounding_indices(center(1) - corner_distance, center(1) + corner_distance, x_cc, il, ir)
+        call get_bounding_indices(center(2) - corner_distance, center(2) + corner_distance, y_cc, jl, jr)
+
         ! Checking whether the rectangle covers a particular cell in the
         ! domain and verifying whether the current patch has the permission
         ! to write to that cell. If both queries check out, the primitive
         ! variables of the current patch are assigned to this cell.
         $:GPU_PARALLEL_LOOP(private='[i,j, xy_local]',&
                   & copyin='[patch_id,center,length,inverse_rotation,x_cc,y_cc]', collapse=2)
-        do j = -gp_layers, n + gp_layers
-            do i = -gp_layers, m + gp_layers
+        do j = jl, jr
+            do i = il, ir
                 ! get the x and y coordinates in the local IB frame
                 xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]
                 xy_local = matmul(inverse_rotation, xy_local)
@@ -702,9 +724,9 @@ contains
         ! the current patch are assigned to this cell.
         $:GPU_PARALLEL_LOOP(private='[i,j,k,cart_y,cart_z]',&
                   & copyin='[patch_id,center,radius]', collapse=3)
-        do k = kl - 1, kr + 1
-            do j = jl - 1, jr + 1
-                do i = il - 1, ir + 1
+        do k = kl, kr
+            do j = jl, jr
+                do i = il, ir
                     ! do i = -gp_layers, m+gp_layers
                     if (grid_geometry == 3) then
                         call s_convert_cylindrical_to_cartesian_coord(y_cc(j), z_cc(k))
@@ -854,9 +876,9 @@ contains
         ! variables of the current patch are assigned to this cell.
         $:GPU_PARALLEL_LOOP(private='[i,j,k,xyz_local,cart_y,cart_z]',&
                   & copyin='[patch_id,center,length,radius,inverse_rotation]', collapse=3)
-        do k = -gp_layers, p + gp_layers
-            do j = -gp_layers, n + gp_layers
-                do i = -gp_layers, m + gp_layers
+        do k = kl, kr
+            do j = jl, jr
+                do i = il, ir
 
                     if (grid_geometry == 3) then
                         call s_convert_cylindrical_to_cartesian_coord(y_cc(j), z_cc(k))
