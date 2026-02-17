@@ -445,7 +445,7 @@ contains
         type(integer_field), intent(inout) :: ib_markers
 
         real(wp) :: lz, z_max, z_min, f, ca_in, pa, ma, ta, xa, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
-        integer :: i, j, k, l
+        integer :: i, j, k, l, il, ir, jl, jr, ll, lr
         integer :: Np1, Np2
 
         real(wp), dimension(1:3) :: xyz_local, center, offset !< x, y, z coordinates in local IB frame
@@ -527,11 +527,23 @@ contains
             $:GPU_UPDATE(device='[airfoil_grid_l,airfoil_grid_u]')
         end if
 
+        ! find the indices to the left and right of the IB in i, j, k
+        il = -gp_layers
+        jl = -gp_layers
+        ll = -gp_layers
+        ir = m + gp_layers
+        jr = n + gp_layers
+        lr = p + gp_layers
+        ! maximum distance any marker can be from the center is the legnth of the airfoil
+        call get_bounding_indices(center(1) - ca_in, center(1) + ca_in, x_cc, il, ir)
+        call get_bounding_indices(center(2) - ca_in, center(2) + ca_in, y_cc, jl, jr)
+        call get_bounding_indices(center(3) - ca_in, center(3) + ca_in, z_cc, ll, lr)
+
         $:GPU_PARALLEL_LOOP(private='[i,j,l,xyz_local,k,f]',&
                   & copyin='[patch_id,center,inverse_rotation,offset,ma,ca_in,airfoil_grid_u,airfoil_grid_l,z_min,z_max]', collapse=3)
-        do l = -gp_layers, p + gp_layers
-            do j = -gp_layers, n + gp_layers
-                do i = -gp_layers, m + gp_layers
+        do l = ll, lr
+            do j = jl, jr
+                do i = il, ir
                     xyz_local = [x_cc(i) - center(1), y_cc(j) - center(2), z_cc(l) - center(3)] ! get coordinate frame centered on IB
                     xyz_local = matmul(inverse_rotation, xyz_local) ! rotate the frame into the IB's coordinates
                     xyz_local = xyz_local - offset ! airfoils are a patch that require a centroid offset
@@ -728,9 +740,10 @@ contains
         integer, intent(in) :: patch_id
         type(integer_field), intent(inout) :: ib_markers
 
-        integer :: i, j, k !< Generic loop iterators
+        integer :: i, j, k, ir, il, jr, jl, kr, kl !< Generic loop iterators
         real(wp), dimension(1:3) :: xyz_local, center, length !< x and y coordinates in local IB frame
         real(wp), dimension(1:3, 1:3) :: inverse_rotation
+        real(wp) :: corner_distance
 
         ! Transferring the cuboid's centroid and length information
         center(1) = patch_ib(patch_id)%x_centroid
@@ -741,15 +754,27 @@ contains
         length(3) = patch_ib(patch_id)%length_z
         inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
 
+        ! find the indices to the left and right of the IB in i, j, k
+        il = -gp_layers
+        jl = -gp_layers
+        kl = -gp_layers
+        ir = m + gp_layers
+        jr = n + gp_layers
+        kr = p + gp_layers
+        corner_distance = sqrt(dot_product(length, length))/2._wp ! maximum distance any marker can be from the center
+        call get_bounding_indices(center(1) - corner_distance, center(1) + corner_distance, x_cc, il, ir)
+        call get_bounding_indices(center(2) - corner_distance, center(2) + corner_distance, y_cc, jl, jr)
+        call get_bounding_indices(center(3) - corner_distance, center(3) + corner_distance, z_cc, kl, kr)
+
         ! Checking whether the cuboid covers a particular cell in the domain
         ! and verifying whether the current patch has permission to write to
         ! to that cell. If both queries check out, the primitive variables
         ! of the current patch are assigned to this cell.
         $:GPU_PARALLEL_LOOP(private='[i,j,k,xyz_local,cart_y,cart_z]',&
                   & copyin='[patch_id,center,length,inverse_rotation]', collapse=3)
-        do k = -gp_layers, p + gp_layers
-            do j = -gp_layers, n + gp_layers
-                do i = -gp_layers, m + gp_layers
+        do k = kl, kr
+            do j = jl, jr
+                do i = il, ir
 
                     if (grid_geometry == 3) then
                         ! TODO :: This does not work and is not covered by any tests. This should be fixed
@@ -794,10 +819,11 @@ contains
         integer, intent(in) :: patch_id
         type(integer_field), intent(inout) :: ib_markers
 
-        integer :: i, j, k !< Generic loop iterators
+        integer :: i, j, k, il, ir, jl, jr, kl, kr !< Generic loop iterators
         real(wp) :: radius
         real(wp), dimension(1:3) :: xyz_local, center, length !< x and y coordinates in local IB frame
         real(wp), dimension(1:3, 1:3) :: inverse_rotation
+        real(wp) :: corner_distance
 
         ! Transferring the cylindrical patch's centroid, length, radius,
         ! smoothing patch identity and smoothing coefficient information
@@ -810,6 +836,17 @@ contains
         length(3) = patch_ib(patch_id)%length_z
         radius = patch_ib(patch_id)%radius
         inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
+
+        il = -gp_layers
+        jl = -gp_layers
+        kl = -gp_layers
+        ir = m + gp_layers
+        jr = n + gp_layers
+        kr = p + gp_layers
+        corner_distance = sqrt(radius**2 + maxval(length)**2) ! distance to rim of cylinder
+        call get_bounding_indices(center(1) - corner_distance, center(1) + corner_distance, x_cc, il, ir)
+        call get_bounding_indices(center(2) - corner_distance, center(2) + corner_distance, y_cc, jl, jr)
+        call get_bounding_indices(center(3) - corner_distance, center(3) + corner_distance, z_cc, kl, kr)
 
         ! Checking whether the cylinder covers a particular cell in the
         ! domain and verifying whether the current patch has the permission
