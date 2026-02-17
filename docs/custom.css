@@ -3,6 +3,16 @@
  * Overrides for doxygen-awesome theme
  */
 
+/* Narrower left navigation panel */
+html {
+    --side-nav-fixed-width: 210px;
+}
+
+/* Hide tree sync button */
+#nav-sync {
+    display: none;
+}
+
 /* Seamless split <code> tags for Fortran % struct accessors.
  * Doxygen consumes %<word> even inside code spans, so we split around %
  * into adjacent <code> elements and remove internal borders/padding. */

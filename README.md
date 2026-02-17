@@ -4,206 +4,98 @@
   </a>
 </p>
 
+<h3 align="center">An exascale many-physics flow solver</h3>
+
 <p align="center">
   <a href="https://github.com/MFlowCode/MFC/actions">
-    <img src="https://img.shields.io/github/actions/workflow/status/mflowcode/mfc/test.yml?style=flat&label=Tests&color=slateblue%09"/>
+    <img src="https://img.shields.io/github/actions/workflow/status/mflowcode/mfc/test.yml?style=flat&label=Tests&color=slateblue" alt="Tests"/>
   </a>
   <a href="https://github.com/MFlowCode/MFC/blob/master/.github/CONTRIBUTING.md">
-    <img src="https://img.shields.io/github/contributors-anon/mflowcode/mfc?style=flat&color=darkslategrey%09" />
+    <img src="https://img.shields.io/github/contributors-anon/mflowcode/mfc?style=flat&color=darkslategrey" alt="Contributors"/>
   </a>
   <a href="https://join.slack.com/t/mflowcode/shared_invite/zt-y75wibvk-g~zztjknjYkK1hFgCuJxVw">
-    <img src="https://img.shields.io/badge/slack-MFC-purple.svg?logo=slack" />
+    <img src="https://img.shields.io/badge/slack-MFC-purple.svg?logo=slack" alt="Slack"/>
   </a>
   <a href="https://lbesson.mit-license.org/">
-    <img src="https://img.shields.io/badge/License-MIT-crimson.svg" />
+    <img src="https://img.shields.io/badge/License-MIT-crimson.svg" alt="License"/>
   </a>
   <a href="https://codecov.io/github/MFlowCode/MFC" target="_blank">
-    <img src="https://codecov.io/github/MFlowCode/MFC/graph/badge.svg?token=8SY043QND4">
+    <img src="https://codecov.io/github/MFlowCode/MFC/graph/badge.svg?token=8SY043QND4" alt="Codecov"/>
   </a>
   <a href="https://github.com/MFlowCode/MFC/blob/master/.github/CONTRIBUTING.md" target="_blank">
-    <img src="https://img.shields.io/badge/Contributing-Guide-orange?style=flat">
+    <img src="https://img.shields.io/badge/Contributing-Guide-orange?style=flat" alt="Contributing"/>
   </a>
 </p>
 
 <p align="center">
   <a href="https://mflowcode.github.io/">
-    <img src="https://img.shields.io/badge/docs-mflowcode.github.io-blue" />
-  </a>
-  <a href="https://github.com/MFlowCode/MFC/discussions">
-    <img src="https://img.shields.io/badge/discussions-join-brightgreen" />
+    <img src="https://img.shields.io/badge/docs-mflowcode.github.io-blue" alt="Docs"/>
   </a>
   <a href="https://github.com/codespaces/new?hide_repo_select=true&ref=master&repo=MFlowCode%2FMFC">
-    <img src="https://img.shields.io/badge/Codespaces-Open-2ea44f?logo=github" />
+    <img src="https://img.shields.io/badge/Codespaces-Open-2ea44f?logo=github" alt="Codespaces"/>
   </a>
   <a href="https://hub.docker.com/r/sbryngelson/mfc">
-    <img src="https://img.shields.io/badge/dockerhub-images-important.svg?logo=Docker&style=flat" />
-  </a>	
-	
+    <img src="https://img.shields.io/badge/dockerhub-images-important.svg?logo=Docker&style=flat" alt="DockerHub"/>
+  </a>
   <a href="https://github.com/MFlowCode/homebrew-mfc">
-    <img src="https://img.shields.io/badge/homebrew-mflowcode%2Fmfc%2Fmfc-brown?logo=homebrew&style=flat" />
-  </a>	
-</p>
-
-<p align="center">
-  <a href="https://star-history.com/#MFlowCode/MFC&Date">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=MFlowCode/MFC&type=Date&theme=dark" />
-      <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=MFlowCode/MFC&type=Date" />
-      <img src="https://api.star-history.com/svg?repos=MFlowCode/MFC&type=Date&theme=dark" alt="Star History Chart" width="600"/>
-    </picture>
+    <img src="https://img.shields.io/badge/homebrew-mflowcode%2Fmfc%2Fmfc-brown?logo=homebrew&style=flat" alt="Homebrew"/>
+  </a>
+  <a href="https://www.youtube.com/@MFCode" target="_blank">
+    <img src="https://img.shields.io/badge/YouTube-MFlowCode-red?logo=youtube&style=flat" alt="YouTube"/>
   </a>
 </p>
 
-> **If MFC helps your work, please ⭐ the repo and cite it!**
+> **2025 Gordon Bell Prize Finalist** - MFC simulates compressible multi-phase flows at exascale, using [Fypp](https://fypp.readthedocs.io/en/stable/fypp.html) metaprogramming in ~40K lines of Fortran. It conducted the [largest known public CFD simulation](https://arxiv.org/abs/2505.07392) at **200 trillion grid points** and 1 quadrillion degrees of freedom, scaling ideally to >43K AMD APUs on [El Capitan](https://hpc.llnl.gov/hardware/compute-platforms/el-capitan) and >33K AMD GPUs on [Frontier](https://www.olcf.ornl.gov/frontier/).
 
-### Who uses MFC
+<div align="center">
+  <video src="https://github.com/user-attachments/assets/4ad20dc2-0920-4ba0-9c95-0949768f8332" width="700" controls autoplay loop muted playsinline></video>
+</div>
 
-MFC runs at exascale on the world's fastest supercomputers:
-- **OLCF Frontier** (>33K AMD MI250X GPUs)
-- **LLNL El Capitan** (>43K AMD MI300A APUs)
-- **LLNL Tuolumne**, **CSCS Alps**, and many others
+## Why MFC?
 
-### Try MFC
+- **Exascale GPU performance** - Ideal weak scaling to 43K+ GPUs. Near compute-roofline behavior. [Compile-time case optimization](https://mflowcode.github.io/documentation/running.html) for up to 10x speedup.
+- **Compact codebase** - ~40K lines of Fortran with [Fypp](https://fypp.readthedocs.io/en/stable/fypp.html) metaprogramming. Small enough to read and modify; powerful enough for [Gordon Bell](https://awards.acm.org/bell).
+- **Native multi-phase** - 4, 5, and 6-equation models, phase change, surface tension, bubble dynamics, and Euler-Lagrange particle tracking, all built in.
+- **Portable** - NVIDIA and AMD GPUs, CPUs, laptops to exascale. Docker, Codespaces, Homebrew, and [16+ HPC system templates](https://mflowcode.github.io/documentation/running.html).
+- **Tested** - 500+ regression tests per PR with line-level [coverage](https://app.codecov.io/gh/MFlowCode/MFC) across GNU, Intel, Cray, and NVIDIA compilers.
+- **Truly open** - MIT license, active [Slack](https://join.slack.com/t/mflowcode/shared_invite/zt-y75wibvk-g~zztjknjYkK1hFgCuJxVw), and responsive development team.
+
+> If MFC is useful to your work, please ⭐ star the repo and [cite it](#citation)!
+
+## Try MFC
 
 | Path | Command |
 | --- | --- |
-| **Codespaces** (fastest) 💨 | Click the "Codespaces" badge above to launch in 1 click |
+| **Codespaces** (fastest) 💨 | [Open a Codespace](https://github.com/codespaces/new?hide_repo_select=true&ref=master&repo=MFlowCode%2FMFC) - pre-built, zero install |
 | **Docker** 🐳 | `docker run -it --rm --entrypoint bash sbryngelson/mfc:latest-cpu` |
-| **Homebrew** (macOS) 🍺 | `brew install mflowcode/mfc/mfc && mfc $(brew --prefix mfc)/examples/1D_sodshocktube/case.py -n 2` |
-| **Local build** 💻 | `./mfc.sh build -j $(nproc) && ./mfc.sh test -j $(nproc)` |
+| **Homebrew** (macOS) 🍺 | `brew install mflowcode/mfc/mfc` |
+| **From source** 💻 | `git clone https://github.com/MFlowCode/MFC && cd MFC && ./mfc.sh build -j $(nproc)` |
 
-**Welcome!**
-MFC simulates compressible multi-phase flows, [among other things](#what-else-can-this-thing-do). 
-It uses metaprogramming and is short (~40K lines of Fortran) and portable.
-MFC conducted the largest known CFD simulation at <a href="https://arxiv.org/abs/2505.07392" target="_blank">200 trillion grid points</a>, and 1 quadrillion degrees of freedom (as of September 2025).
-MFC is a 2025 Gordon Bell Prize Finalist.
-
-<p align="center">
-<a href="https://doi.org/10.1016/j.cpc.2026.110055" target="_blank">
-    <img src="https://img.shields.io/badge/DOI-10.1016/j.cpc.2026.110055-thistle.svg"/>
-</a>
-<a href="https://doi.org/10.5281/zenodo.17049757" target="_blank">
-    <img src="https://zenodo.org/badge/DOI/10.5281/zenodo.17049757.svg"/>
-</a>
-<a href="https://github.com/MFlowCode/MFC/stargazers" target="_blank">
-    <img src="https://img.shields.io/github/stars/MFlowCode/MFC?style=flat&color=maroon"/>
-</a>
-
-</br>
-Is MFC useful for you? Consider citing it or giving a star! 
-</p>
-
-```bibtex
-@article{wilfong26,
-  Author = {Benjamin Wilfong and Henry {Le Berre} and Anand Radhakrishnan and Ansh Gupta and Daniel J. Vickers and Diego Vaca-Revelo and Dimitrios Adam and Haocheng Yu and Hyeoksu Lee and Jose Rodolfo Chreim and Mirelys {Carcana Barbosa} and Yanjun Zhang and Esteban Cisneros-Garibay and Aswin Gnanaskandan and Mauro {Rodriguez Jr.} and Reuben D. Budiardja and Stephen Abbott and Tim Colonius and Spencer H. Bryngelson},
-  Title = {{MFC 5.0: A}n exascale many-physics flow solver},
-  journal = {Computer Physics Communications},
-  year = {2026},
-  volume = {322},
-  pages = {110055},
-  doi = {10.1016/j.cpc.2026.110055},
-}
+Your first simulation:
+```bash
+./mfc.sh run examples/3D_shockdroplet/case.py -n $(nproc)
 ```
+Visualize the output in `examples/3D_shockdroplet/silo_hdf5/` with ParaView, VisIt, or your favorite tool.
+For detailed build instructions (Linux, macOS, Windows/WSL, HPC clusters), see the [Getting Started guide](https://mflowcode.github.io/documentation/getting-started.html).
 
-MFC is used on the latest leadership-class supercomputers.
-It scales <b>ideally to exascale</b>; [tens of thousands of GPUs on NVIDIA- and AMD-GPU machines](#is-this-really-exascale) on Oak Ridge Frontier, LLNL El Capitan, CSCS Alps, among others.
-MFC is a SPEChpc benchmark candidate, part of the JSC JUPITER Early Access Program, and used OLCF Frontier and LLNL El Capitan early access systems.
-  
 Get in touch with <a href="mailto:shb@gatech.edu">Spencer</a> if you have questions!
 We have an [active Slack channel](https://join.slack.com/t/mflowcode/shared_invite/zt-y75wibvk-g~zztjknjYkK1hFgCuJxVw) and development team.
 MFC has high- and low-level documentation, visualizations, and more on [its website](https://mflowcode.github.io/).
 
-## An example
+## Examples
 
-We keep many examples.
-Here are some of them!
-MFC can execute high-fidelity simulations of shock-droplet interaction (see `examples/3d_shockdroplet`)
-
-<p align="center">
-    <img src="docs/res/shockdrop.png" alt="Shock Droplet Example" width="700"/>
-</p>
-
-This one simulates high-Mach flow over an airfoil:
+MFC ships with [137+ example cases](https://mflowcode.github.io/documentation/examples.html).
+Here is a high-Mach flow over an airfoil (see [`examples/2D_ibm_airfoil/`](examples/2D_ibm_airfoil/)):
 
 <p align="center">
-    <img src="docs/res/airfoil.png" alt="Airfoil Example" width="700"/><br/>
+    <img src="docs/res/airfoil.png" alt="High-Mach airfoil flow" width="700"/><br/>
 </p>
 
-And here is a high-amplitude acoustic wave reflecting and emerging through a circular orifice:
+And a high-amplitude acoustic wave reflecting and emerging through a circular orifice:
 
 <p align="center">
-    <img src="docs/res/orifice.png" alt="Orifice Example" width="700"/><br/>
+    <img src="docs/res/orifice.png" alt="Acoustic wave through orifice" width="700"/><br/>
 </p>
-
-
-## Getting started
-
-You can navigate [to this webpage](https://mflowcode.github.io/documentation/md_getting-started.html) to get you get started using MFC on your local machine, cluster, or supercomputer!
-It's rather straightforward.
-Some examples are below.
-
-### Codespaces and Containers
-
-  <a href="https://github.com/codespaces/new?hide_repo_select=true&ref=master&repo=MFlowCode%2FMFC">
-    <img src="https://img.shields.io/badge/Codespaces-Open%20in%201%20click-2ea44f?logo=github" />
-  </a>
-  
-For a _very_ quick start, open a GitHub Codespace to load a pre-configured Docker container and familiarize yourself with MFC commands.
-Click <kbd> <> Code</kbd> (green button at top right) → <kbd>Codespaces</kbd> (right tab) → <kbd>+</kbd> (create a codespace).
-
-Alternatively, run MFC directly with Docker on your local machine:
-```bash
-docker run -it --rm --entrypoint bash sbryngelson/mfc:latest-cpu
-```
-Once inside the container, navigate to `/opt/MFC` to access MFC and run examples.
-
-> ****Note:**** Codespaces is a free service with a monthly quota of compute time and storage usage.
-> It is recommended for testing commands, troubleshooting, and running simple case files without installing dependencies or building MFC on your device.
-> Don't conduct any critical work here!
-> To learn more, please see [how Docker & Containers work](https://mflowcode.github.io/documentation/md_docker.html).
-
-### macOS quick start (Homebrew)
-
-<a href="https://github.com/MFlowCode/homebrew-mfc">
-<img src="https://img.shields.io/badge/homebrew-mflowcode%2Fmfc%2Fmfc-brown?logo=homebrew&style=flat" />
-</a>
-
-Install the prebuilt package and run an example:
-
-```bash
-brew install mflowcode/mfc/mfc
-mkdir -p ~/mfc_quickstart && cd ~/mfc_quickstart
-cp $(brew --prefix mfc)/examples/1D_sodshocktube/case.py .
-mfc case.py -n 2
-```
-
-Use `-n X` to select the number of MPI processes. For developer commands (`build`, `test`, etc.), clone the repo and use `./mfc.sh`.
-
-### macOS from source
-
-We'll give a brief introduction for building from source on MacOS below.
-Using [brew](https://brew.sh), install MFC's dependencies:
-```shell
-brew install coreutils python cmake fftw hdf5 gcc boost open-mpi lapack
-```
-You're now ready to build and test MFC!
-Put it to a local directory via
-```shell
-git clone https://github.com/MFlowCode/MFC
-cd MFC
-```
-and be sure MFC knows where to find Boost by appending to your dotfiles and sourcing them again
-```shell
-echo -e "export BOOST_INCLUDE='$(brew --prefix --installed boost)/include'" | tee -a ~/.bash_profile ~/.zshrc
-. ~/.bash_profile 2>/dev/null || . ~/.zshrc 2>/dev/null
-! [ -z "${BOOST_INCLUDE+x}" ] && echo 'Environment is ready!' || echo 'Error: $BOOST_INCLUDE is unset. Please adjust the previous commands to fit with your environment.'
-```
-then you can build MFC and run the test suite!
-```shell
-./mfc.sh build -j $(nproc)
-./mfc.sh test -j $(nproc)
-```
-And... you're done!
 
 ## Toolchain
 
@@ -213,27 +105,23 @@ And... you're done!
 | `./mfc.sh run case.py` | Run a simulation case (interactive or batch: SLURM/PBS/LSF) |
 | `./mfc.sh test` | Run the test suite |
 | `./mfc.sh validate case.py` | Check a case file for errors before running |
-| `./mfc.sh init my_case` | Create a new case from a template |
+| `./mfc.sh new my_case` | Create a new case from a template |
 | `./mfc.sh clean` | Remove build artifacts |
 | `./mfc.sh interactive` | Launch interactive menu-driven interface |
 
-Run `./mfc.sh <command> --help` for detailed options, or see the [full documentation](https://mflowcode.github.io/documentation/index.html). Tab completion for bash and zsh is auto-installed after you have run `./mfc.sh generate` (or any non-`init` command) at least once. Play with the examples in `examples/` ([showcased here](https://mflowcode.github.io/documentation/md_examples.html)).
-
-The shock-droplet interaction case above was run via
-```shell
-./mfc.sh run -n $(nproc) ./examples/3d_shockdroplet/case.py 
-```
-where `$(nproc)` is the number of cores the example will run on (and the number of physical cores on your CPU device).
-You can visualize the output data in `examples/3d_shockdroplet/silo_hdf5` via Paraview, Visit, or your favorite software.
+Run `./mfc.sh <command> --help` for detailed options, or see the [full documentation](https://mflowcode.github.io/documentation/index.html). Tab completion for bash and zsh is auto-installed after you have run `./mfc.sh generate` (or any non-`new` command) at least once. Play with the examples in `examples/` ([showcased here](https://mflowcode.github.io/documentation/examples.html)).
 
 ## Is this _really_ exascale?
 
-[OLCF Frontier](https://www.olcf.ornl.gov/frontier/) is the first exascale supercomputer.
-The weak scaling of MFC on this machine shows near-ideal utilization.
-We also scale ideally to >98% of LLNL El Capitan.
+MFC weak scales to the full machines on [El Capitan](https://hpc.llnl.gov/hardware/compute-platforms/el-capitan) (MI300A), [Frontier](https://www.olcf.ornl.gov/frontier/) (MI250X), and [Alps](https://www.cscs.ch/computers/alps) (GH200) with near-ideal efficiency.
+MFC is a SPEChpc benchmark candidate, part of the JSC JUPITER Early Access Program, and used OLCF Frontier and LLNL El Capitan early access systems.
 
 <p align="center">
-    <img src="docs/res/scaling.png" alt="Scaling" width="400"/>
+    <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/res/weakScaling/weakscaling-dark.png"/>
+        <source media="(prefers-color-scheme: light)" srcset="docs/res/weakScaling/weakscaling.png"/>
+        <img src="docs/res/weakScaling/weakscaling.png" alt="Weak scaling on El Capitan, Frontier, and Alps" width="400"/>
+    </picture>
 </p>
 
 ## What else can this thing do?
@@ -246,10 +134,10 @@ We also scale ideally to >98% of LLNL El Capitan.
 * Multi- and single-component
 	* 4, 5, and 6 equation models for multi-component/phase features
    	* Kapila and Allaire models 5-equation models
-* Multi- and single-phase 
+* Multi- and single-phase
 	* Phase change via p, pT, and pTg schemes
 * Grids
-	* 1-3D Cartesian, cylindrical, axisymmetric. 
+	* 1-3D Cartesian, cylindrical, axisymmetric.
 	* Arbitrary grid stretching for multiple domain regions.
 	* Complex/arbitrary geometries via immersed boundary method
 	* STL geometry files supported
@@ -293,10 +181,10 @@ We also scale ideally to >98% of LLNL El Capitan.
 
 * GPU compatible on NVIDIA ([P/V/A/H]100, GH200, etc.) and AMD (MI[1/2/3]00+) GPU and APU hardware
 * Ideal weak scaling to 100% of the largest GPU and superchip supercomputers
- 	* \>43K AMD APUs (MI300A) on [LLNL El Capitan](https://hpc.llnl.gov/hardware/compute-platforms/el-capitan)
-   	* \>3K AMD APUs (MI300A) on [LLNL Tuolumne](https://hpc.llnl.gov/hardware/compute-platforms/tuolumne)
-	* \>33K AMD GPUs (MI250X) on [OLCF Frontier](https://www.olcf.ornl.gov/frontier/) 
-	* \>10K NVIDIA GPUs (V100) on [OLCF Summit](https://www.olcf.ornl.gov/summit/) 
+    * \>43K AMD APUs (MI300A) on [LLNL El Capitan](https://hpc.llnl.gov/hardware/compute-platforms/el-capitan)
+    * \>3K AMD APUs (MI300A) on [LLNL Tuolumne](https://hpc.llnl.gov/hardware/compute-platforms/tuolumne)
+    * \>33K AMD GPUs (MI250X) on [OLCF Frontier](https://www.olcf.ornl.gov/frontier/)
+    * \>10K NVIDIA GPUs (V100) on [OLCF Summit](https://www.olcf.ornl.gov/summit/)
 * Near compute roofline behavior
 * Compile-time case optimization (hard-codes parameters for significant speedup)
 * RDMA (remote data memory access; GPU-GPU direct communication) via GPU-aware MPI on NVIDIA (CUDA-aware MPI) and AMD GPU systems
@@ -319,6 +207,18 @@ If you use MFC, consider citing it as below.
 Ref. 1 includes all modern MFC features, including GPU acceleration and many new physics features.
 If referencing MFC's (GPU) performance, consider citing ref. 1 and 2, which describe the solver and its design.
 The original open-source release of MFC is ref. 3, which should be cited for provenance as appropriate.
+
+<p align="center">
+<a href="https://doi.org/10.1016/j.cpc.2026.110055" target="_blank">
+    <img src="https://img.shields.io/badge/DOI-10.1016/j.cpc.2026.110055-thistle.svg" alt="DOI 10.1016/j.cpc.2026.110055"/>
+</a>
+<a href="https://doi.org/10.5281/zenodo.17049757" target="_blank">
+    <img src="https://zenodo.org/badge/DOI/10.5281/zenodo.17049757.svg" alt="Zenodo DOI"/>
+</a>
+<a href="https://github.com/MFlowCode/MFC/stargazers" target="_blank">
+    <img src="https://img.shields.io/github/stars/MFlowCode/MFC?style=flat&color=maroon" alt="GitHub stars"/>
+</a>
+</p>
 
 ```bibtex
 @article{wilfong26,
@@ -353,7 +253,7 @@ The original open-source release of MFC is ref. 3, which should be cited for pro
 ```
 
 ## License
- 
+
 Copyright 2021 Spencer Bryngelson and Tim Colonius.
 MFC is under the MIT license (see [LICENSE](LICENSE) for full text).
 
@@ -367,3 +267,15 @@ MFC computations have used many supercomputing systems. A partial list is below
   * NCSA Delta and DeltaAI, PSC Bridges(1/2), SDSC Comet and Expanse, Purdue Anvil, TACC Stampede(1-3), and TAMU ACES via ACCESS-CI allocations from Bryngelson, Colonius, Rodriguez, and more.
   * DOD systems Blueback, Onyx, Carpenter, Nautilus, and Narwhal via the DOD HPCMP program.
   * Sandia National Labs systems Doom and Attaway, and testbed systems Weaver and Vortex.
+
+---
+
+<p align="center">
+  <a href="https://star-history.com/#MFlowCode/MFC&Date">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=MFlowCode/MFC&type=Date&theme=dark" />
+      <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=MFlowCode/MFC&type=Date" />
+      <img src="https://api.star-history.com/svg?repos=MFlowCode/MFC&type=Date&theme=dark" alt="Star History Chart" width="600"/>
+    </picture>
+  </a>
+</p>
