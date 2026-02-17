@@ -131,13 +131,9 @@ contains
         $:GPU_ENTER_DATA(copyin='[ghost_points,inner_points]')
         call s_find_ghost_points(ghost_points, inner_points)
         call s_apply_levelset(ghost_points, num_gps)
-        $:GPU_UPDATE(host='[ghost_points, inner_points]')
 
         call s_compute_image_points(ghost_points)
-        $:GPU_UPDATE(device='[ghost_points]')
-
         call s_compute_interpolation_coeffs(ghost_points)
-        $:GPU_UPDATE(device='[ghost_points]')
 
         call nvtxEndRange
 
@@ -458,6 +454,7 @@ contains
         integer :: dir
         integer :: index
 
+        $:GPU_PARALLEL_LOOP(private='[q,gp,i,j,k,physical_loc,patch_id,dist,norm,dim,bound,dir,index,temp_loc,s_cc]')
         do q = 1, num_gps
             gp = ghost_points_in(q)
             i = gp%loc(1)
@@ -507,6 +504,7 @@ contains
                     do while ((temp_loc < s_cc(index) &
                                .or. temp_loc > s_cc(index + 1)))
                         index = index + dir
+#if !defined(MFC_OpenACC) && !defined(MFC_OpenMP)
                         if (index < -buff_size .or. index > bound) then
                             print *, "A required image point is not located in this computational domain."
                             print *, "Ghost Point is located at ", [x_cc(i), y_cc(j), z_cc(k)], " while moving in dimension ", dim
@@ -518,6 +516,7 @@ contains
                             print *, "A short term fix may include increasing buff_size further in m_helper_basic (currently set to a minimum of 10)"
                             error stop "Ghost Point and Image Point on Different Processors"
                         end if
+#endif
                     end do
                     ghost_points_in(q)%ip_grid(dim) = index
                     if (ghost_points_in(q)%DB(dim) == -1) then
@@ -528,6 +527,7 @@ contains
                 end if
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_compute_image_points
 
@@ -685,51 +685,74 @@ contains
         real(wp) :: buf
         real(wp), dimension(2, 2, 2) :: eta
         type(ghost_point) :: gp
-        integer :: i !< Iterator variables
-        integer :: i1, i2, j1, j2, k1, k2 !< Grid indexes
+        integer :: q, i, j, k, ii, jj, kk !< Grid indexes and iterators
         integer :: patch_id
+        logical is_cell_center
 
-        ! 2D
-        if (p <= 0) then
-            do i = 1, num_gps
-                gp = ghost_points_in(i)
-                ! Get the interpolation points
-                i1 = gp%ip_grid(1); i2 = i1 + 1
-                j1 = gp%ip_grid(2); j2 = j1 + 1
+        $:GPU_PARALLEL_LOOP(private='[q,i,j,k,ii,jj,kk,dist,buf,gp,interp_coeffs,eta,alpha,patch_id,is_cell_center]')
+        do q = 1, num_gps
+            gp = ghost_points_in(q)
+            ! Get the interpolation points
+            i = gp%ip_grid(1)
+            j = gp%ip_grid(2)
+            if (p /= 0) then
+                k = gp%ip_grid(3)
+            else
+                k = 0; 
+            end if
 
-                dist = 0._wp
-                buf = 1._wp
-                dist(1, 1, 1) = sqrt( &
-                                (x_cc(i1) - gp%ip_loc(1))**2 + &
-                                (y_cc(j1) - gp%ip_loc(2))**2)
-                dist(2, 1, 1) = sqrt( &
-                                (x_cc(i2) - gp%ip_loc(1))**2 + &
-                                (y_cc(j1) - gp%ip_loc(2))**2)
-                dist(1, 2, 1) = sqrt( &
-                                (x_cc(i1) - gp%ip_loc(1))**2 + &
-                                (y_cc(j2) - gp%ip_loc(2))**2)
-                dist(2, 2, 1) = sqrt( &
-                                (x_cc(i2) - gp%ip_loc(1))**2 + &
-                                (y_cc(j2) - gp%ip_loc(2))**2)
+            ! get the distance to a cell in each direction
+            dist = 0._wp
+            buf = 1._wp
+            do ii = 0, 1
+                do jj = 0, 1
+                    if (p == 0) then
+                        dist(1 + ii, 1 + jj, 1) = sqrt( &
+                                                  (x_cc(i + ii) - gp%ip_loc(1))**2 + &
+                                                  (y_cc(j + jj) - gp%ip_loc(2))**2)
+                    else
+                        do kk = 0, 1
+                            dist(1 + ii, 1 + jj, 1 + kk) = sqrt( &
+                                                           (x_cc(i + ii) - gp%ip_loc(1))**2 + &
+                                                           (y_cc(j + jj) - gp%ip_loc(2))**2 + &
+                                                           (z_cc(k + kk) - gp%ip_loc(3))**2)
+                        end do
+                    end if
+                end do
+            end do
 
-                interp_coeffs = 0._wp
+            ! check if we are arbitrarily close to a cell center
+            interp_coeffs = 0._wp
+            is_cell_center = .false.
+            check_is_cell_center: do ii = 0, 1
+                do jj = 0, 1
+                    if (dist(ii + 1, jj + 1, 1) <= 1.e-16_wp) then
+                        interp_coeffs(ii + 1, jj + 1, 1) = 1._wp
+                        is_cell_center = .true.
+                        exit check_is_cell_center
+                    else
+                        if (p /= 0) then
+                            if (dist(ii + 1, jj + 1, 2) <= 1.e-16_wp) then
+                                interp_coeffs(ii + 1, jj + 1, 2) = 1._wp
+                                is_cell_center = .true.
+                                exit check_is_cell_center
+                            end if
+                        end if
+                    end if
+                end do
+            end do check_is_cell_center
 
-                if (dist(1, 1, 1) <= 1.e-16_wp) then
-                    interp_coeffs(1, 1, 1) = 1._wp
-                else if (dist(2, 1, 1) <= 1.e-16_wp) then
-                    interp_coeffs(2, 1, 1) = 1._wp
-                else if (dist(1, 2, 1) <= 1.e-16_wp) then
-                    interp_coeffs(1, 2, 1) = 1._wp
-                else if (dist(2, 2, 1) <= 1.e-16_wp) then
-                    interp_coeffs(2, 2, 1) = 1._wp
-                else
+            if (.not. is_cell_center) then
+                ! if we are not arbitrarily close, interpolate
+                alpha = 1._wp
+                patch_id = gp%ib_patch_id
+                if (ib_markers%sf(i, j, k) /= 0) alpha(1, 1, 1) = 0._wp
+                if (ib_markers%sf(i + 1, j, k) /= 0) alpha(2, 1, 1) = 0._wp
+                if (ib_markers%sf(i, j + 1, k) /= 0) alpha(1, 2, 1) = 0._wp
+                if (ib_markers%sf(i + 1, j + 1, k) /= 0) alpha(2, 2, 1) = 0._wp
+
+                if (p == 0) then
                     eta(:, :, 1) = 1._wp/dist(:, :, 1)**2
-                    alpha = 1._wp
-                    patch_id = gp%ib_patch_id
-                    if (ib_markers%sf(i1, j1, 0) /= 0) alpha(1, 1, 1) = 0._wp
-                    if (ib_markers%sf(i2, j1, 0) /= 0) alpha(2, 1, 1) = 0._wp
-                    if (ib_markers%sf(i1, j2, 0) /= 0) alpha(1, 2, 1) = 0._wp
-                    if (ib_markers%sf(i2, j2, 0) /= 0) alpha(2, 2, 1) = 0._wp
                     buf = sum(alpha(:, :, 1)*eta(:, :, 1))
                     if (buf > 0._wp) then
                         interp_coeffs(:, :, 1) = alpha(:, :, 1)*eta(:, :, 1)/buf
@@ -737,82 +760,15 @@ contains
                         buf = sum(eta(:, :, 1))
                         interp_coeffs(:, :, 1) = eta(:, :, 1)/buf
                     end if
-                end if
-
-                ghost_points_in(i)%interp_coeffs = interp_coeffs
-            end do
-
-        else
-            do i = 1, num_gps
-                gp = ghost_points_in(i)
-                ! Get the interpolation points
-                i1 = gp%ip_grid(1); i2 = i1 + 1
-                j1 = gp%ip_grid(2); j2 = j1 + 1
-                k1 = gp%ip_grid(3); k2 = k1 + 1
-
-                ! Get interpolation weights (Chaudhuri et al. 2011, JCP)
-                dist(1, 1, 1) = sqrt( &
-                                (x_cc(i1) - gp%ip_loc(1))**2 + &
-                                (y_cc(j1) - gp%ip_loc(2))**2 + &
-                                (z_cc(k1) - gp%ip_loc(3))**2)
-                dist(2, 1, 1) = sqrt( &
-                                (x_cc(i2) - gp%ip_loc(1))**2 + &
-                                (y_cc(j1) - gp%ip_loc(2))**2 + &
-                                (z_cc(k1) - gp%ip_loc(3))**2)
-                dist(1, 2, 1) = sqrt( &
-                                (x_cc(i1) - gp%ip_loc(1))**2 + &
-                                (y_cc(j2) - gp%ip_loc(2))**2 + &
-                                (z_cc(k1) - gp%ip_loc(3))**2)
-                dist(2, 2, 1) = sqrt( &
-                                (x_cc(i2) - gp%ip_loc(1))**2 + &
-                                (y_cc(j2) - gp%ip_loc(2))**2 + &
-                                (z_cc(k1) - gp%ip_loc(3))**2)
-                dist(1, 1, 2) = sqrt( &
-                                (x_cc(i1) - gp%ip_loc(1))**2 + &
-                                (y_cc(j1) - gp%ip_loc(2))**2 + &
-                                (z_cc(k2) - gp%ip_loc(3))**2)
-                dist(2, 1, 2) = sqrt( &
-                                (x_cc(i2) - gp%ip_loc(1))**2 + &
-                                (y_cc(j1) - gp%ip_loc(2))**2 + &
-                                (z_cc(k2) - gp%ip_loc(3))**2)
-                dist(1, 2, 2) = sqrt( &
-                                (x_cc(i1) - gp%ip_loc(1))**2 + &
-                                (y_cc(j2) - gp%ip_loc(2))**2 + &
-                                (z_cc(k2) - gp%ip_loc(3))**2)
-                dist(2, 2, 2) = sqrt( &
-                                (x_cc(i2) - gp%ip_loc(1))**2 + &
-                                (y_cc(j2) - gp%ip_loc(2))**2 + &
-                                (z_cc(k2) - gp%ip_loc(3))**2)
-                interp_coeffs = 0._wp
-                buf = 1._wp
-                if (dist(1, 1, 1) <= 1.e-16_wp) then
-                    interp_coeffs(1, 1, 1) = 1._wp
-                else if (dist(2, 1, 1) <= 1.e-16_wp) then
-                    interp_coeffs(2, 1, 1) = 1._wp
-                else if (dist(1, 2, 1) <= 1.e-16_wp) then
-                    interp_coeffs(1, 2, 1) = 1._wp
-                else if (dist(2, 2, 1) <= 1.e-16_wp) then
-                    interp_coeffs(2, 2, 1) = 1._wp
-                else if (dist(1, 1, 2) <= 1.e-16_wp) then
-                    interp_coeffs(1, 1, 2) = 1._wp
-                else if (dist(2, 1, 2) <= 1.e-16_wp) then
-                    interp_coeffs(2, 1, 2) = 1._wp
-                else if (dist(1, 2, 2) <= 1.e-16_wp) then
-                    interp_coeffs(1, 2, 2) = 1._wp
-                else if (dist(2, 2, 2) <= 1.e-16_wp) then
-                    interp_coeffs(2, 2, 2) = 1._wp
                 else
+
+                    if (ib_markers%sf(i, j, k + 1) /= 0) alpha(1, 1, 2) = 0._wp
+                    if (ib_markers%sf(i + 1, j, k + 1) /= 0) alpha(2, 1, 2) = 0._wp
+                    if (ib_markers%sf(i, j + 1, k + 1) /= 0) alpha(1, 2, 2) = 0._wp
+                    if (ib_markers%sf(i + 1, j + 1, k + 1) /= 0) alpha(2, 2, 2) = 0._wp
                     eta = 1._wp/dist**2
-                    alpha = 1._wp
-                    if (ib_markers%sf(i1, j1, k1) /= 0) alpha(1, 1, 1) = 0._wp
-                    if (ib_markers%sf(i2, j1, k1) /= 0) alpha(2, 1, 1) = 0._wp
-                    if (ib_markers%sf(i1, j2, k1) /= 0) alpha(1, 2, 1) = 0._wp
-                    if (ib_markers%sf(i2, j2, k1) /= 0) alpha(2, 2, 1) = 0._wp
-                    if (ib_markers%sf(i1, j1, k2) /= 0) alpha(1, 1, 2) = 0._wp
-                    if (ib_markers%sf(i2, j1, k2) /= 0) alpha(2, 1, 2) = 0._wp
-                    if (ib_markers%sf(i1, j2, k2) /= 0) alpha(1, 2, 2) = 0._wp
-                    if (ib_markers%sf(i2, j2, k2) /= 0) alpha(2, 2, 2) = 0._wp
                     buf = sum(alpha*eta)
+
                     if (buf > 0._wp) then
                         interp_coeffs = alpha*eta/buf
                     else
@@ -821,9 +777,11 @@ contains
                     end if
                 end if
 
-                ghost_points_in(i)%interp_coeffs = interp_coeffs
-            end do
-        end if
+            end if
+
+            ghost_points_in(q)%interp_coeffs = interp_coeffs
+        end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_compute_interpolation_coeffs
 
@@ -988,20 +946,13 @@ contains
         call nvtxStartRange("COMPUTE-GHOST-POINTS")
         ! recalculate the ghost point locations and coefficients
         call s_find_num_ghost_points(num_gps, num_inner_gps)
-        $:GPU_UPDATE(device='[num_gps, num_inner_gps]')
-
         call s_find_ghost_points(ghost_points, inner_points)
         call nvtxEndRange
 
         call nvtxStartRange("COMPUTE-IMAGE-POINTS")
         call s_apply_levelset(ghost_points, num_gps)
-        $:GPU_UPDATE(host='[ghost_points, inner_points]')
-
         call s_compute_image_points(ghost_points)
-        $:GPU_UPDATE(device='[ghost_points]')
-
         call s_compute_interpolation_coeffs(ghost_points)
-        $:GPU_UPDATE(device='[ghost_points]')
         call nvtxEndRange
 
         call nvtxEndRange
