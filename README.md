@@ -40,7 +40,7 @@
   <a href="https://github.com/MFlowCode/homebrew-mfc">
     <img src="https://img.shields.io/badge/homebrew-mflowcode%2Fmfc%2Fmfc-brown?logo=homebrew&style=flat" alt="Homebrew"/>
   </a>
-  <a href="https://www.youtube.com/@MFCode">
+  <a href="https://www.youtube.com/@MFCode" target="_blank">
     <img src="https://img.shields.io/badge/YouTube-MFlowCode-red?logo=youtube&style=flat" alt="YouTube"/>
   </a>
 </p>
