@@ -40,6 +40,9 @@
   <a href="https://github.com/MFlowCode/homebrew-mfc">
     <img src="https://img.shields.io/badge/homebrew-mflowcode%2Fmfc%2Fmfc-brown?logo=homebrew&style=flat" alt="Homebrew"/>
   </a>
+  <a href="https://www.youtube.com/@MFCode">
+    <img src="https://img.shields.io/badge/YouTube-MFlowCode-red?logo=youtube&style=flat" alt="YouTube"/>
+  </a>
 </p>
 
 > **2025 Gordon Bell Prize Finalist** - MFC simulates compressible multi-phase flows at exascale, using [Fypp](https://fypp.readthedocs.io/en/stable/fypp.html) metaprogramming in ~40K lines of Fortran. It conducted the [largest known public CFD simulation](https://arxiv.org/abs/2505.07392) at **200 trillion grid points** and 1 quadrillion degrees of freedom, scaling ideally to >43K AMD APUs on [El Capitan](https://hpc.llnl.gov/hardware/compute-platforms/el-capitan) and >33K AMD GPUs on [Frontier](https://www.olcf.ornl.gov/frontier/).
