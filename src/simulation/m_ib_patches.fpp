@@ -138,11 +138,9 @@ contains
 
         real(wp), dimension(1:4, 1:4) :: transform, transform_n
 
-        call random_seed()
-
         do patch_id = 1, num_ibs
             if (patch_ib(patch_id)%geometry == 5 .or. patch_ib(patch_id)%geometry == 12) then
-                allocate (models(patch_id)%model)
+                @:ALLOCATE(models(patch_id)%model)
                 print *, " * Reading model: "//trim(patch_ib(patch_id)%model_filepath)
 
                 model = f_model_read(patch_ib(patch_id)%model_filepath)
@@ -236,6 +234,30 @@ contains
                     models(patch_id)%interpolated_boundary_v = interpolated_boundary_v
                     models(patch_id)%total_vertices = total_vertices
                 end if
+
+                ! update allocatables
+                $:GPU_ENTER_DATA(copyin='[models(patch_id)]')
+                $:GPU_ENTER_DATA(copyin='[models(patch_id)%model]')
+                $:GPU_ENTER_DATA(copyin='[models(patch_id)%model%trs]')
+                $:GPU_ENTER_DATA(copyin='[models(patch_id)%model%ntrs]')
+                $:GPU_ENTER_DATA(copyin='[models(patch_id)%boundary_v]')
+                do i = 1, models(patch_id)%model%ntrs
+                    $:GPU_ENTER_DATA(copyin='[models(patch_id)%model%trs(i)]')
+                end do
+                if (interpolate) then
+                    $:GPU_ENTER_DATA(copyin='[models(patch_id)%interpolated_boundary_v]')
+                end if
+
+                print *, "Entering GPU loop to read"
+
+                ! TODO :: REMOVE ME
+                $:GPU_PARALLEL_LOOP(private='[i]')
+                do i = 1, 3
+                    print *, "Num Triangles", models(1)%model%ntrs
+                    ! print *, "interpolate", models(i)%interpolate
+                    ! print *, "Vertices", models(i)%model%trs(1)%v
+                end do
+                $:END_GPU_PARALLEL_LOOP()
 
             end if
         end do
@@ -995,6 +1017,7 @@ contains
 
                 ! Reading STL boundary vertices and compute the levelset and levelset_norm
                 if (eta > patch_ib(patch_id)%model_threshold) then
+                  print *, eta, i, j
                     ib_markers%sf(i, j, 0) = patch_id
                 end if
 

@@ -479,6 +479,23 @@ contains
         is_buffered = .true.
     end subroutine s_skip_ignored_lines
 
+    !> This function is used to replace the fortran random number
+    !! generator because the native generator is not compatible being called
+    !! from GPU routines/functions
+    function f_model_random_number(seed) result(rval)
+      
+        ! $:GPU_ROUTINE(parallelism='[seq]')
+        
+        integer, intent(inout) :: seed
+        real(wp) :: rval
+        
+        seed = ieor(seed, ishft(seed, 13))
+        seed = ieor(seed, ishft(seed, -17))
+        seed = ieor(seed, ishft(seed, 5))
+        
+        rval = abs(real(seed, wp)) / real(huge(seed), wp)
+    end function f_model_random_number
+
     !> This procedure, recursively, finds whether a point is inside an octree.
     !! @param model    Model to search in.
     !! @param point    Point to test.
@@ -493,32 +510,33 @@ contains
         real(wp), dimension(1:3), intent(in) :: point
         real(wp), dimension(1:3), intent(in) :: spacing
         integer, intent(in) :: spc
+        real(wp) :: phi, theta
+        integer :: rand_seed
 
         real(wp) :: fraction
 
         type(t_ray) :: ray
-        integer :: i, j, nInOrOut, nHits
+        integer :: i, j, k, nInOrOut, nHits
 
         real(wp), dimension(1:spc, 1:3) :: ray_origins, ray_dirs
 
-        ! TODO :: The random number generation prohibits GPU compute due to the subroutine not being able to be called in kernels
-        ! This should be swapped out with something that allows GPU compute. I recommend the fibonacci sphere:
-        ! do i = 1, spc
-        !   phi = acos(1.0 - 2.0*(i-1.0)/(spc-1.0))
-        !   theta = pi * (1.0 + sqrt(5.0)) * (i-1.0)
-        !   ray_dirs(i,:) = [cos(theta)*sin(phi), sin(theta)*sin(phi), cos(phi)]
-        !   ray_origins(i,:) = point
-        ! end do
+        rand_seed = int(point(1) * 73856093_wp) + &
+                    int(point(2) * 19349663_wp) + &
+                    int(point(3) * 83492791_wp)
+        if (rand_seed == 0) rand_seed = 1
 
+        ! generate our random collection or rays
         do i = 1, spc
-            call random_number(ray_origins(i, :))
-            ray_origins(i, :) = point + (ray_origins(i, :) - 0.5_wp)*spacing(:)
-
-            call random_number(ray_dirs(i, :))
-            ray_dirs(i, :) = ray_dirs(i, :) - 0.5_wp
+            do k = 1, 3
+                ! random jitter in the origin helps us estimate volume fraction instead of only at the cell center
+                ray_origins(i, k) = point(k) + (f_model_random_number(rand_seed) - 0.5_wp) * spacing(k)
+                ! cast sample rays in all directions
+                ray_dirs(i, k) = point(k) + f_model_random_number(rand_seed) - 0.5_wp
+            end do
             ray_dirs(i, :) = ray_dirs(i, :)/sqrt(sum(ray_dirs(i, :)*ray_dirs(i, :)))
         end do
 
+        ! ray trace
         nInOrOut = 0
         do i = 1, spc
             ray%o = ray_origins(i, :)
@@ -526,11 +544,14 @@ contains
 
             nHits = 0
             do j = 1, model%ntrs
+                ! count the number of triangles this ray intersects
                 if (f_intersects_triangle(ray, model%trs(j))) then
                     nHits = nHits + 1
                 end if
             end do
 
+            ! if thje ray hits an odd number of triangles on its way out, then
+            ! it must be on the inside of the model
             nInOrOut = nInOrOut + mod(nHits, 2)
         end do
 
