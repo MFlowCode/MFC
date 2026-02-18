@@ -23,6 +23,27 @@
     <meta property="og:url" content="https://mflowcode.github.io" />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "MFC",
+      "alternateName": "Multi-Component Flow Code",
+      "description": "Open-source exascale multiphase flow solver. 2025 Gordon Bell Prize Finalist. Scales to 200+ trillion grid points on 43,000+ GPUs.",
+      "url": "https://mflowcode.github.io",
+      "applicationCategory": "Scientific Computing",
+      "operatingSystem": "Linux, macOS",
+      "license": "https://opensource.org/licenses/MIT",
+      "programmingLanguage": ["Fortran", "Python"],
+      "codeRepository": "https://github.com/MFlowCode/MFC",
+      "author": {
+        "@type": "Organization",
+        "name": "MFlowCode",
+        "url": "https://github.com/MFlowCode"
+      },
+      "award": "2025 ACM Gordon Bell Prize Finalist"
+    }
+    </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="icon" type="image/x-icon" href="res/icon.ico">
@@ -43,9 +64,12 @@
             { name: "Cavitation fragments kidney stone", image: "res/simulations/d.png", computer: "Summit",   computerUrl: "https://www.olcf.ornl.gov/summit/",                                            accelerators: "576 V100s", walltime: "30 min",  source: "https://doi.org/10.48550/arXiv.2305.09163" },
             { name: "Kidney stone stress waves",         image: "res/simulations/l.png", computer: "Bridges2", computerUrl: "https://www.psc.edu/resources/bridges-2/",                                      accelerators: "8 V100s",   walltime: "20m",     source: "https://www.youtube.com/watch?v=Q2L0J68qnRw" },
             { name: "Whale bubble net feeding",          image: "res/simulations/p.png", computer: "Delta",    computerUrl: "https://www.ncsa.illinois.edu/research/project-highlights/delta/",              accelerators: "128 A100s", walltime: "30m",     source: "https://www.youtube.com/watch?v=6EpP6tdCZSA" },
+            { name: "Earplug acoustics (kinetic energy)", image: "res/simulations/q.png", computer: "Delta",    computerUrl: "https://www.ncsa.illinois.edu/research/project-highlights/delta/",              accelerators: "8 A100s",   walltime: "5h",      source: "https://www.youtube.com/watch?v=xSW5wZkdbrc" },
+            { name: "Circular orifice (1 kHz)",          image: "res/simulations/r.png", computer: "Delta",    computerUrl: "https://www.ncsa.illinois.edu/research/project-highlights/delta/",              accelerators: "16 A100s",  walltime: "5h",      source: "https://www.youtube.com/watch?v=jOhJ_c7eco4" },
             // Bubble dynamics
             { name: "Collapsing bubbles (pressure)",     image: "res/simulations/b.png", computer: "Summit",   computerUrl: "https://www.olcf.ornl.gov/summit/",                                            accelerators: "216 V100s", walltime: "3h",      source: "https://doi.org/10.48550/arXiv.2305.09163" },
             { name: "Collapsing bubbles (streamlines)",  image: "res/simulations/c.png", computer: "Summit",   computerUrl: "https://www.olcf.ornl.gov/summit/",                                            accelerators: "216 V100s", walltime: "3h",      source: "https://doi.org/10.48550/arXiv.2305.09163" },
+            { name: "Euler-Lagrange particle cloud",     image: "res/simulations/s.png", computer: "Phoenix",  computerUrl: "https://www.pace.gatech.edu/",                                                 accelerators: "8 A100s",   walltime: "<1h",     source: "https://www.youtube.com/watch?v=RoT-yC5Lxmg" },
             // Fundamentals
             { name: "Breakup of vibrated interface",     image: "res/simulations/f.png", computer: "Summit",   computerUrl: "https://www.olcf.ornl.gov/summit/",                                            accelerators: "128 V100s", walltime: "4h",      source: "https://www.youtube.com/watch?v=XQ3g1oSg8mc" },
             { name: "Viscous Taylor-Green vortex",       image: "res/simulations/h.png", computer: "Delta",    computerUrl: "https://www.ncsa.illinois.edu/research/project-highlights/delta/",              accelerators: "128 A100s", walltime: "17h",     source: "https://www.youtube.com/watch?v=7i2h08dlDQw" },
