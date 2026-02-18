@@ -16,5 +16,11 @@ accept = ["200", "429"]
 
 verbose = "error"
 
-# Exclude sitemap from link checking (it contains pre-publish production URLs)
-exclude_path = ["**/sitemap.txt"]
+# Exclude sitemap file from scanning (it contains pre-publish production URLs)
+exclude_path = ["sitemap\\.xml"]
+
+# Exclude URLs that fail due to external issues (broken SSL, pre-deploy only, etc.)
+exclude = [
+    "https://mflowcode\\.github\\.io/sitemap\\.xml",  # Only exists after deployment
+    "https://cpe\\.ext\\.hpe\\.com",                   # HPE Cray docs have broken SSL cert
+]
