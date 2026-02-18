@@ -33,6 +33,10 @@ contains
 
         integer :: i, patch_id, patch_geometry
 
+        if (num_gps < 1) then
+            return
+        end if
+
         $:GPU_UPDATE(device='[gps(1:num_gps)]')
 
         !  3D Patch Geometries
