@@ -729,6 +729,8 @@ contains
 
         end if
 
+        ! print gp%levelset, gp%levelset_norm(1), gp%levelset_norm(2), gp%levelset_norm(3)
+
     end subroutine s_model_levelset
 
 end module m_compute_levelset

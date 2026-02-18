@@ -61,6 +61,8 @@ module m_ib_patches
     integer, allocatable :: gpu_ntrs(:)
     real(wp), allocatable, dimension(:,:,:,:) :: gpu_trs_v
     real(wp), allocatable, dimension(:,:,:)   :: gpu_trs_n
+    real(wp), allocatable, dimension(:,:,:) :: gpu_boundary_v
+    real(wp), allocatable, dimension(:,:,:) :: gpu_interpolated_boundary_v
 
 contains
 
@@ -1032,15 +1034,6 @@ contains
                     xy_local = f_convert_cyl_to_cart(xy_local)
                 end if
 
-                if (i == 13 .and. j == 16) then
-                  print *, "spc:", spc
-                  print *, "ntrs:", gpu_ntrs(patch_id)
-                  print *, "threshold:", threshold
-                  print *, "dx:", dx(i), dy(j)
-                  print *, "xy_local:", xy_local(1)
-
-                end if
-
                 eta = f_model_is_inside_flat(gpu_ntrs(patch_id), &
                                               gpu_trs_v, gpu_trs_n, &
                                               patch_id, &
@@ -1049,13 +1042,14 @@ contains
 
                 ! Reading STL boundary vertices and compute the levelset and levelset_norm
                 if (eta > threshold) then
-                  print *, eta, i, j
                     ib_markers%sf(i, j, 0) = patch_id
                 end if
 
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
+
+        $:GPU_UPDATE(host='[ib_markers%sf]')
 
     end subroutine s_ib_model
 
@@ -1075,7 +1069,6 @@ contains
         real(wp), dimension(1:3) :: center, xyz_local
         real(wp), dimension(1:3, 1:3) :: inverse_rotation
 
-        model => models(patch_id)%model
         center = 0._wp
         center(1) = patch_ib(patch_id)%x_centroid
         center(2) = patch_ib(patch_id)%y_centroid
@@ -1113,6 +1106,8 @@ contains
                 end do
             end do
         end do
+
+        $:GPU_UPDATE(host='[ib_markers%sf]')
 
     end subroutine s_ib_3d_model
 

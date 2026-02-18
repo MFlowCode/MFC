@@ -195,7 +195,7 @@ module m_derived_types
         ! --- GPU-friendly flattened arrays ---
         integer :: ntrs  ! copy of model%ntrs
         real(wp), allocatable, dimension(:, :, :) :: trs_v  ! (3, 3, ntrs) - triangle vertices
-        real(wp), allocatable, dimension(:, :)    :: trs_n  ! (3, ntrs)    - triangle normals
+        real(wp), allocatable, dimension(:, :) :: trs_n  ! (3, ntrs)    - triangle normals
     end type t_model_array
 
     !> Derived type adding initial condition (ic) patch parameters as attributes

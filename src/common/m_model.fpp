@@ -484,17 +484,17 @@ contains
     !! generator because the native generator is not compatible being called
     !! from GPU routines/functions
     function f_model_random_number(seed) result(rval)
-      
+
         $:GPU_ROUTINE(parallelism='[seq]')
-        
+
         integer, intent(inout) :: seed
         real(wp) :: rval
-        
+
         seed = ieor(seed, ishft(seed, 13))
         seed = ieor(seed, ishft(seed, -17))
         seed = ieor(seed, ishft(seed, 5))
-        
-        rval = abs(real(seed, wp)) / real(huge(seed), wp)
+
+        rval = abs(real(seed, wp))/real(huge(seed), wp)
     end function f_model_random_number
 
     !> This procedure, recursively, finds whether a point is inside an octree.
@@ -521,16 +521,16 @@ contains
 
         real(wp), dimension(1:spc, 1:3) :: ray_origins, ray_dirs
 
-        rand_seed = int(point(1) * 73856093_wp) + &
-                    int(point(2) * 19349663_wp) + &
-                    int(point(3) * 83492791_wp)
+        rand_seed = int(point(1)*73856093_wp) + &
+                    int(point(2)*19349663_wp) + &
+                    int(point(3)*83492791_wp)
         if (rand_seed == 0) rand_seed = 1
 
         ! generate our random collection or rays
         do i = 1, spc
             do k = 1, 3
                 ! random jitter in the origin helps us estimate volume fraction instead of only at the cell center
-                ray_origins(i, k) = point(k) + (f_model_random_number(rand_seed) - 0.5_wp) * spacing(k)
+                ray_origins(i, k) = point(k) + (f_model_random_number(rand_seed) - 0.5_wp)*spacing(k)
                 ! cast sample rays in all directions
                 ray_dirs(i, k) = point(k) + f_model_random_number(rand_seed) - 0.5_wp
             end do
@@ -561,12 +561,12 @@ contains
     end function f_model_is_inside
 
     impure function f_model_is_inside_flat(ntrs, trs_v, trs_n, pid, point, spacing, spc) result(fraction)
-        
+
         $:GPU_ROUTINE(parallelism='[seq]')
 
         integer, intent(in) :: ntrs
-        real(wp), dimension(:,:,:,:), intent(in) :: trs_v
-        real(wp), dimension(:,:,:), intent(in) :: trs_n
+        real(wp), dimension(:, :, :, :), intent(in) :: trs_v
+        real(wp), dimension(:, :, :), intent(in) :: trs_n
         integer, intent(in) :: pid
         real(wp), dimension(1:3), intent(in) :: point
         real(wp), dimension(1:3), intent(in) :: spacing
@@ -579,9 +579,9 @@ contains
         integer :: i, j, k, nInOrOut, nHits
         integer :: rand_seed
 
-        rand_seed = int(point(1) * 73856093_wp) + &
-                    int(point(2) * 19349663_wp) + &
-                    int(point(3) * 83492791_wp)
+        rand_seed = int(point(1)*73856093_wp) + &
+                    int(point(2)*19349663_wp) + &
+                    int(point(3)*83492791_wp)
         if (rand_seed == 0) rand_seed = 1
 
         ! generate our random collection of rays
@@ -589,11 +589,11 @@ contains
         do i = 1, spc
             ! Generate one ray at a time — no arrays needed
             do k = 1, 3
-                origin(k) = point(k) + (f_model_random_number(rand_seed) - 0.5_wp) * spacing(k)
+                origin(k) = point(k) + (f_model_random_number(rand_seed) - 0.5_wp)*spacing(k)
                 dir(k) = point(k) + f_model_random_number(rand_seed) - 0.5_wp
             end do
             dir_mag = sqrt(dir(1)*dir(1) + dir(2)*dir(2) + dir(3)*dir(3))
-            dir(:) = dir(:) / dir_mag
+            dir(:) = dir(:)/dir_mag
 
             ray%o = origin
             ray%d = dir
@@ -1327,14 +1327,14 @@ contains
     subroutine s_pack_model_for_gpu(ma)
         type(t_model_array), intent(inout) :: ma
         integer :: i
-    
+
         ma%ntrs = ma%model%ntrs
-        allocate(ma%trs_v(1:3, 1:3, 1:ma%ntrs))
-        allocate(ma%trs_n(1:3, 1:ma%ntrs))
-    
+        allocate (ma%trs_v(1:3, 1:3, 1:ma%ntrs))
+        allocate (ma%trs_n(1:3, 1:ma%ntrs))
+
         do i = 1, ma%ntrs
             ma%trs_v(:, :, i) = ma%model%trs(i)%v(:, :)
-            ma%trs_n(:, i)    = ma%model%trs(i)%n(:)
+            ma%trs_n(:, i) = ma%model%trs(i)%n(:)
         end do
     end subroutine
 
