@@ -16,5 +16,8 @@ accept = ["200", "429"]
 
 verbose = "error"
 
-# Exclude sitemap from link checking (it contains pre-publish production URLs)
-exclude_path = ["**/sitemap.xml"]
+# Exclude sitemap file from scanning (it contains pre-publish production URLs)
+exclude_path = ["sitemap\\.xml"]
+
+# Exclude sitemap URL referenced in robots.txt (only exists after deployment)
+exclude = ["https://mflowcode\\.github\\.io/sitemap\\.xml"]

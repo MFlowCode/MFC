@@ -820,6 +820,7 @@ if (MFC_DOCUMENTATION)
                 "${CMAKE_CURRENT_SOURCE_DIR}"
         COMMAND "${CMAKE_COMMAND}" -E touch "${CMAKE_CURRENT_BINARY_DIR}/inject-dates.stamp"
         COMMENT "Injecting page dates into documentation"
+        VERBATIM
     )
     add_custom_target(inject_page_dates DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/inject-dates.stamp")
     add_dependencies(documentation_doxygen inject_page_dates)

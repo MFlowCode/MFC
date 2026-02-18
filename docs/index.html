@@ -112,12 +112,12 @@
             `).join("");
 
             document.getElementById("ft-scaling").innerHTML = scalings.map(s => `
-                <div class="flex md:w-2/6 mx-auto flex-col text-white rounded bg-slate-900 rounded-b-lg">
+                <a href="documentation/expectedPerformance.html" class="flex md:w-2/6 mx-auto flex-col text-white rounded bg-slate-900 rounded-b-lg hover:ring-2 hover:ring-amber-400 transition-shadow no-underline">
                     <div class="flex-1 grid bg-white pb-2">
                         <img class="place-self-center" src="${s.image}" alt="${s.label}">
                     </div>
                     <div class="flex-1 p-2 font-semibold text-center">${s.label}</div>
-                </div>
+                </a>
             `).join("");
 
             fetch("https://api.github.com/repos/MFlowCode/MFC/releases/latest")
