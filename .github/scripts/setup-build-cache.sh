@@ -1,6 +1,6 @@
 #!/bin/bash
 # Sets up a persistent build cache for self-hosted CI runners.
-# Creates a symlink: ./build -> <scratch>/.mfc-ci-cache/<key>/build
+# Creates a symlink: ./build -> /storage/coda1/d-coc/0/sbryngelson3/.mfc-ci-cache/<key>/build
 #
 # Each runner gets its own cache keyed by (cluster, device, interface, runner).
 # This avoids cross-runner path issues entirely — CMake's absolute paths are
@@ -14,7 +14,7 @@ _cache_interface="${3:-none}"
 _cache_runner="${RUNNER_NAME:?RUNNER_NAME not set}"
 
 _cache_key="${_cache_cluster}-${_cache_device}-${_cache_interface}-${_cache_runner}"
-_cache_base="$HOME/scratch/.mfc-ci-cache/${_cache_key}/build"
+_cache_base="/storage/coda1/d-coc/0/sbryngelson3/.mfc-ci-cache/${_cache_key}/build"
 
 mkdir -p "$_cache_base"
 _cache_dir="$(cd "$_cache_base" && pwd -P)"
