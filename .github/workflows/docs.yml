@@ -37,6 +37,12 @@ jobs:
         cmake -S . -B build -G Ninja --install-prefix="$(pwd)/build/install" -D MFC_DOCUMENTATION=ON
         ninja -C build install
 
+    - name: Verify essential site files
+      run: |
+        for f in index.html 404.html robots.txt; do
+          test -f "build/install/docs/mfc/$f" || { echo "Missing $f"; exit 1; }
+        done
+
     - name: Upload Built Documentation Artifact
       uses: actions/upload-artifact@v4
       with:
