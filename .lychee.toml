@@ -19,5 +19,8 @@ verbose = "error"
 # Exclude sitemap file from scanning (it contains pre-publish production URLs)
 exclude_path = ["sitemap\\.xml"]
 
-# Exclude sitemap URL referenced in robots.txt (only exists after deployment)
-exclude = ["https://mflowcode\\.github\\.io/sitemap\\.xml"]
+# Exclude URLs that fail due to external issues (broken SSL, pre-deploy only, etc.)
+exclude = [
+    "https://mflowcode\\.github\\.io/sitemap\\.xml",  # Only exists after deployment
+    "https://cpe\\.ext\\.hpe\\.com",                   # HPE Cray docs have broken SSL cert
+]
