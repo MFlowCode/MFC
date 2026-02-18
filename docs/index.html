@@ -90,8 +90,8 @@
                             <img class="h-10" src="res/logo.png" alt="">
                         </div>
                         <div class="flex-1 p-2 font-semibold text-center">${s.name}</div>
-                        <a class="w-10 text-center" href="${s.source}">
-                            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                        <a class="w-10 text-center text-xl" href="${s.source}" target="_blank">
+                            <i class="${s.source.includes('youtube.com') ? 'fa-brands fa-youtube' : 'fa-solid fa-arrow-up-right-from-square'}"></i>
                         </a>
                     </div>
                     <div class="grid grid-cols-3 gap-4 px-4 py-2">
