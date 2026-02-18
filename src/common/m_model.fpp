@@ -22,7 +22,8 @@ module m_model
     ! Subroutines for STL immersed boundaries
     public :: f_check_boundary, f_register_edge, f_check_interpolation_2D, &
               f_check_interpolation_3D, f_interpolate_2D, f_interpolate_3D, &
-              f_interpolated_distance, f_normals, f_distance, f_distance_normals_3D, f_tri_area
+              f_interpolated_distance, f_normals, f_distance, f_distance_normals_3D, f_tri_area, s_pack_model_for_gpu, &
+              f_model_is_inside_flat
 
 contains
 
@@ -484,7 +485,7 @@ contains
     !! from GPU routines/functions
     function f_model_random_number(seed) result(rval)
       
-        ! $:GPU_ROUTINE(parallelism='[seq]')
+        $:GPU_ROUTINE(parallelism='[seq]')
         
         integer, intent(inout) :: seed
         real(wp) :: rval
@@ -559,12 +560,66 @@ contains
 
     end function f_model_is_inside
 
+    impure function f_model_is_inside_flat(ntrs, trs_v, trs_n, pid, point, spacing, spc) result(fraction)
+        
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        integer, intent(in) :: ntrs
+        real(wp), dimension(:,:,:,:), intent(in) :: trs_v
+        real(wp), dimension(:,:,:), intent(in) :: trs_n
+        integer, intent(in) :: pid
+        real(wp), dimension(1:3), intent(in) :: point
+        real(wp), dimension(1:3), intent(in) :: spacing
+        integer, intent(in) :: spc
+
+        real(wp) :: fraction
+        real(wp) :: origin(1:3), dir(1:3), dir_mag
+        type(t_ray) :: ray
+        type(t_triangle) :: tri
+        integer :: i, j, k, nInOrOut, nHits
+        integer :: rand_seed
+
+        rand_seed = int(point(1) * 73856093_wp) + &
+                    int(point(2) * 19349663_wp) + &
+                    int(point(3) * 83492791_wp)
+        if (rand_seed == 0) rand_seed = 1
+
+        ! generate our random collection of rays
+        nInOrOut = 0
+        do i = 1, spc
+            ! Generate one ray at a time — no arrays needed
+            do k = 1, 3
+                origin(k) = point(k) + (f_model_random_number(rand_seed) - 0.5_wp) * spacing(k)
+                dir(k) = point(k) + f_model_random_number(rand_seed) - 0.5_wp
+            end do
+            dir_mag = sqrt(dir(1)*dir(1) + dir(2)*dir(2) + dir(3)*dir(3))
+            dir(:) = dir(:) / dir_mag
+
+            ray%o = origin
+            ray%d = dir
+
+            nHits = 0
+            do j = 1, ntrs
+                tri%v(:, :) = trs_v(:, :, j, pid)
+                tri%n(:) = trs_n(:, j, pid)
+                if (f_intersects_triangle(ray, tri)) then
+                    nHits = nHits + 1
+                end if
+            end do
+            nInOrOut = nInOrOut + mod(nHits, 2)
+        end do
+
+        fraction = real(nInOrOut)/real(spc)
+    end function f_model_is_inside_flat
+
     ! From https://www.scratchapixel.com/lessons/3e-basic-rendering/ray-tracing-rendering-a-triangle/ray-triangle-intersection-geometric-solution.html
     !> This procedure checks if a ray intersects a triangle.
     !! @param ray      Ray.
     !! @param triangle Triangle.
     !! @return         True if the ray intersects the triangle, false otherwise.
     elemental function f_intersects_triangle(ray, triangle) result(intersects)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
 
         type(t_ray), intent(in) :: ray
         type(t_triangle), intent(in) :: triangle
@@ -1268,5 +1323,19 @@ contains
         distance = min_dist
 
     end function f_interpolated_distance
+
+    subroutine s_pack_model_for_gpu(ma)
+        type(t_model_array), intent(inout) :: ma
+        integer :: i
+    
+        ma%ntrs = ma%model%ntrs
+        allocate(ma%trs_v(1:3, 1:3, 1:ma%ntrs))
+        allocate(ma%trs_n(1:3, 1:ma%ntrs))
+    
+        do i = 1, ma%ntrs
+            ma%trs_v(:, :, i) = ma%model%trs(i)%v(:, :)
+            ma%trs_n(:, i)    = ma%model%trs(i)%n(:)
+        end do
+    end subroutine
 
 end module m_model

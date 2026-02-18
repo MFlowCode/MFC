@@ -25,7 +25,7 @@ module m_ib_patches
 
     implicit none
 
-    private; public :: s_apply_ib_patches, s_update_ib_rotation_matrix, s_instantiate_STL_models, models, f_convert_cyl_to_cart
+    private; public :: s_apply_ib_patches, s_update_ib_rotation_matrix, s_instantiate_STL_models, models, f_convert_cyl_to_cart, gpu_ntrs, gpu_trs_v, gpu_trs_n
 
     real(wp) :: x_centroid, y_centroid, z_centroid
     real(wp) :: length_x, length_y, length_z
@@ -55,9 +55,12 @@ module m_ib_patches
 
     character(len=5) :: istr ! string to store int to string result for error checking
 
-    type(t_model_array), allocatable, target :: models(:)
-    $:GPU_DECLARE(create='[models]')
     !! array of STL models that can be allocated and then used in IB marker and levelset compute
+    type(t_model_array), allocatable, target :: models(:)
+    !! GPU-friendly flat arrays for STL model data
+    integer, allocatable :: gpu_ntrs(:)
+    real(wp), allocatable, dimension(:,:,:,:) :: gpu_trs_v
+    real(wp), allocatable, dimension(:,:,:)   :: gpu_trs_n
 
 contains
 
@@ -140,7 +143,7 @@ contains
 
         do patch_id = 1, num_ibs
             if (patch_ib(patch_id)%geometry == 5 .or. patch_ib(patch_id)%geometry == 12) then
-                @:ALLOCATE(models(patch_id)%model)
+                allocate(models(patch_id)%model)
                 print *, " * Reading model: "//trim(patch_ib(patch_id)%model_filepath)
 
                 model = f_model_read(patch_ib(patch_id)%model_filepath)
@@ -229,38 +232,52 @@ contains
                 models(patch_id)%model = model
                 models(patch_id)%boundary_v = boundary_v
                 models(patch_id)%boundary_edge_count = boundary_edge_count
-                models(patch_id)%interpolate = interpolate
+                if (interpolate) then
+                    models(patch_id)%interpolate = 1
+                else
+                    models(patch_id)%interpolate = 0
+                end if
                 if (interpolate) then
                     models(patch_id)%interpolated_boundary_v = interpolated_boundary_v
                     models(patch_id)%total_vertices = total_vertices
                 end if
 
-                ! update allocatables
-                $:GPU_ENTER_DATA(copyin='[models(patch_id)]')
-                $:GPU_ENTER_DATA(copyin='[models(patch_id)%model]')
-                $:GPU_ENTER_DATA(copyin='[models(patch_id)%model%trs]')
-                $:GPU_ENTER_DATA(copyin='[models(patch_id)%model%ntrs]')
-                $:GPU_ENTER_DATA(copyin='[models(patch_id)%boundary_v]')
-                do i = 1, models(patch_id)%model%ntrs
-                    $:GPU_ENTER_DATA(copyin='[models(patch_id)%model%trs(i)]')
-                end do
-                if (interpolate) then
-                    $:GPU_ENTER_DATA(copyin='[models(patch_id)%interpolated_boundary_v]')
-                end if
-
-                print *, "Entering GPU loop to read"
-
-                ! TODO :: REMOVE ME
-                $:GPU_PARALLEL_LOOP(private='[i]')
-                do i = 1, 3
-                    print *, "Num Triangles", models(1)%model%ntrs
-                    ! print *, "interpolate", models(i)%interpolate
-                    ! print *, "Vertices", models(i)%model%trs(1)%v
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-
             end if
         end do
+
+        ! Pack and upload flat arrays for GPU (AFTER the loop)
+        block
+            integer :: pid, max_ntrs
+
+            max_ntrs = 0
+            do pid = 1, num_ibs
+                if (allocated(models(pid)%model)) then
+                    call s_pack_model_for_gpu(models(pid))
+                    max_ntrs = max(max_ntrs, models(pid)%ntrs)
+                end if
+            end do
+
+            if (max_ntrs > 0) then
+                allocate(gpu_ntrs(1:num_ibs))
+                allocate(gpu_trs_v(1:3, 1:3, 1:max_ntrs, 1:num_ibs))
+                allocate(gpu_trs_n(1:3, 1:max_ntrs, 1:num_ibs))
+
+                gpu_ntrs = 0
+                gpu_trs_v = 0._wp
+                gpu_trs_n = 0._wp
+
+                do pid = 1, num_ibs
+                    if (allocated(models(pid)%model)) then
+                        gpu_ntrs(pid) = models(pid)%ntrs
+                        gpu_trs_v(:, :, 1:models(pid)%ntrs, pid) = models(pid)%trs_v
+                        gpu_trs_n(:, 1:models(pid)%ntrs, pid)    = models(pid)%trs_n
+                    end if
+                end do
+
+                $:GPU_ENTER_DATA(copyin='[gpu_ntrs, gpu_trs_v, gpu_trs_n]')
+
+            end if
+        end block
 
     end subroutine s_instantiate_STL_models
 
@@ -986,23 +1003,25 @@ contains
         integer, intent(in) :: patch_id
         type(integer_field), intent(inout) :: ib_markers
 
-        integer :: i, j, k !< Generic loop iterators
+        integer :: i, j, k  !< Generic loop iterators
+        integer :: spc
 
-        type(t_model), pointer :: model
-
-        real(wp) :: eta
+        real(wp) :: eta, threshold
         real(wp), dimension(1:3) :: point, local_point, offset
         real(wp), dimension(1:3) :: center, xy_local
         real(wp), dimension(1:3, 1:3) :: inverse_rotation
 
-        model => models(patch_id)%model
         center = 0._wp
         center(1) = patch_ib(patch_id)%x_centroid
         center(2) = patch_ib(patch_id)%y_centroid
         inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
         offset(:) = patch_ib(patch_id)%centroid_offset(:)
+        spc = patch_ib(patch_id)%model_spc
+        threshold = patch_ib(patch_id)%model_threshold
 
-        do i = 0 - gp_layers, m + gp_layers
+        $:GPU_PARALLEL_LOOP(private='[i,j, xy_local, eta]',&
+                  & copyin='[patch_id,center,inverse_rotation, offset, spc, threshold]', collapse=2)
+        do i = -gp_layers, m + gp_layers
             do j = -gp_layers, n + gp_layers
 
                 xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]
@@ -1013,16 +1032,30 @@ contains
                     xy_local = f_convert_cyl_to_cart(xy_local)
                 end if
 
-                eta = f_model_is_inside(model, xy_local, (/dx(i), dy(j), 0._wp/), patch_ib(patch_id)%model_spc)
+                if (i == 13 .and. j == 16) then
+                  print *, "spc:", spc
+                  print *, "ntrs:", gpu_ntrs(patch_id)
+                  print *, "threshold:", threshold
+                  print *, "dx:", dx(i), dy(j)
+                  print *, "xy_local:", xy_local(1)
+
+                end if
+
+                eta = f_model_is_inside_flat(gpu_ntrs(patch_id), &
+                                              gpu_trs_v, gpu_trs_n, &
+                                              patch_id, &
+                                              xy_local, (/dx(i), dy(j), 0._wp/), &
+                                              spc)
 
                 ! Reading STL boundary vertices and compute the levelset and levelset_norm
-                if (eta > patch_ib(patch_id)%model_threshold) then
+                if (eta > threshold) then
                   print *, eta, i, j
                     ib_markers%sf(i, j, 0) = patch_id
                 end if
 
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_ib_model
 
@@ -1035,10 +1068,9 @@ contains
         type(integer_field), intent(inout) :: ib_markers
 
         integer :: i, j, k !< Generic loop iterators
+        integer :: spc
 
-        type(t_model), pointer :: model
-
-        real(wp) :: eta
+        real(wp) :: eta, threshold
         real(wp), dimension(1:3) :: point, local_point, offset
         real(wp), dimension(1:3) :: center, xyz_local
         real(wp), dimension(1:3, 1:3) :: inverse_rotation
@@ -1050,8 +1082,12 @@ contains
         center(3) = patch_ib(patch_id)%z_centroid
         inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
         offset(:) = patch_ib(patch_id)%centroid_offset(:)
+        spc = patch_ib(patch_id)%model_spc
+        threshold = patch_ib(patch_id)%model_threshold
 
-        do i = 0 - gp_layers, m + gp_layers
+        $:GPU_PARALLEL_LOOP(private='[i,j,k, xyz_local, eta]',&
+                  & copyin='[patch_id,center,inverse_rotation, offset, spc, threshold]', collapse=2)
+        do i = -gp_layers, m + gp_layers
             do j = -gp_layers, n + gp_layers
                 do k = -gp_layers, p + gp_layers
 
@@ -1063,7 +1099,11 @@ contains
                         xyz_local = f_convert_cyl_to_cart(xyz_local)
                     end if
 
-                    eta = f_model_is_inside(model, xyz_local, (/dx(i), dy(j), dz(k)/), patch_ib(patch_id)%model_spc)
+                    eta = f_model_is_inside_flat(gpu_ntrs(patch_id), &
+                                              gpu_trs_v, gpu_trs_n, &
+                                              patch_id, &
+                                              xyz_local, (/dx(i), dy(j), dz(k)/), &
+                                              spc)
 
                     ! Reading STL boundary vertices and compute the levelset and levelset_norm
                     if (eta > patch_ib(patch_id)%model_threshold) then

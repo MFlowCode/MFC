@@ -328,6 +328,8 @@ contains
     !! @return The cross product of the two vectors.
     pure function f_cross(a, b) result(c)
 
+        $:GPU_ROUTINE(parallelism='[seq]')
+
         real(wp), dimension(3), intent(in) :: a, b
         real(wp), dimension(3) :: c
 
