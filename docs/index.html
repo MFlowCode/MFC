@@ -23,20 +23,54 @@
     <meta property="og:url" content="https://mflowcode.github.io" />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareSourceCode",
+      "name": "MFC",
+      "alternateName": "Multi-Component Flow Code",
+      "description": "Open-source exascale multiphase flow solver. 2025 Gordon Bell Prize Finalist. Scales to 200+ trillion grid points on 43,000+ GPUs.",
+      "url": "https://mflowcode.github.io",
+      "license": "https://opensource.org/licenses/MIT",
+      "programmingLanguage": ["Fortran", "Python"],
+      "codeRepository": "https://github.com/MFlowCode/MFC",
+      "author": {
+        "@type": "Organization",
+        "name": "MFlowCode",
+        "url": "https://github.com/MFlowCode"
+      },
+      "award": "2025 ACM Gordon Bell Prize Finalist"
+    }
+    </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="icon" type="image/x-icon" href="res/icon.ico">
     <script>
         const sims = [
-            { name: "Viscous Taylor-Green vortex",       image: "res/simulations/h.png", computer: "Delta",   accelerators: "128 A100s", walltime: "17h",     source: "https://www.youtube.com/watch?v=7i2h08dlDQw" },
-            { name: "Shedding water droplet",            image: "res/simulations/a.png", computer: "Summit",  accelerators: "960 V100s", walltime: "4h",      source: "https://www.youtube.com/watch?v=Gjj-qZkXcrg" },
-            { name: "Flow over an airfoil (vorticity)",  image: "res/simulations/g.png", computer: "Delta",   accelerators: "128 A100s", walltime: "19h",     source: "https://www.youtube.com/watch?v=FvAgnBW59cY" },
-            { name: "Cavitation fragments kidney stone", image: "res/simulations/d.png", computer: "Summit",  accelerators: "576 V100s", walltime: "30 min",  source: "https://doi.org/10.48550/arXiv.2305.09163" },
-            { name: "Breakup of vibrated interface",     image: "res/simulations/f.png", computer: "Summit",  accelerators: "128 V100s", walltime: "4h",      source: "https://www.youtube.com/watch?v=XQ3g1oSg8mc" },
-            { name: "Mach 2 flow over a sphere",         image: "res/simulations/i.png", computer: "Phoenix", accelerators: "36 V100s",  walltime: "30m",     source: "https://www.youtube.com/watch?v=HQGSUvYEGqM" },
-            { name: "Mach 2 shear layer",                image: "res/simulations/j.png", computer: "Phoenix", accelerators: "32 V100s",  walltime: "15m",     source: "https://www.youtube.com/watch?v=GtcdCHLmJO8" },
-            { name: "Collapsing bubbles (pressure)",     image: "res/simulations/b.png", computer: "Summit",  accelerators: "216 V100s", walltime: "3h",      source: "https://doi.org/10.48550/arXiv.2305.09163" },
-            { name: "Collapsing bubbles (streamlines)",  image: "res/simulations/c.png", computer: "Summit",  accelerators: "216 V100s", walltime: "3h",      source: "https://doi.org/10.48550/arXiv.2305.09163" },
+            // Rockets & jets
+            { name: "Mach 12 Starship Super Heavy",      image: "res/simulations/o.png", computer: "Alps",     computerUrl: "https://www.cscs.ch/computers/alps/",                                          accelerators: "5K GH200s", walltime: "18h",     source: "https://www.youtube.com/watch?v=NSn3OVF8N4I" },
+            { name: "Mach 10 triple jet booster",        image: "res/simulations/n.png", computer: "Frontier", computerUrl: "https://www.olcf.ornl.gov/frontier/",                                          accelerators: "10K GCDs",  walltime: "12h",     source: "https://www.youtube.com/watch?v=pMUl55xqGgM" },
+            { name: "Mach 2 flow over a sphere",         image: "res/simulations/i.png", computer: "Phoenix",  computerUrl: "https://www.pace.gatech.edu/",                                                 accelerators: "36 V100s",  walltime: "30m",     source: "https://www.youtube.com/watch?v=HQGSUvYEGqM" },
+            { name: "Mach 2 shear layer",                image: "res/simulations/j.png", computer: "Phoenix",  computerUrl: "https://www.pace.gatech.edu/",                                                 accelerators: "32 V100s",  walltime: "15m",     source: "https://www.youtube.com/watch?v=GtcdCHLmJO8" },
+            // Aerodynamics
+            { name: "Flow over an airfoil (vorticity)",  image: "res/simulations/g.png", computer: "Delta",    computerUrl: "https://www.ncsa.illinois.edu/research/project-highlights/delta/",              accelerators: "128 A100s", walltime: "19h",     source: "https://www.youtube.com/watch?v=FvAgnBW59cY" },
+            { name: "Pitching airfoil (3D)",             image: "res/simulations/m.png", computer: "Phoenix",  computerUrl: "https://www.pace.gatech.edu/",                                                 accelerators: "1 A100",    walltime: "5h",      source: "https://www.youtube.com/watch?v=2XH-9MumDHU" },
+            // Shock-droplet
+            { name: "Shedding water droplet",            image: "res/simulations/a.png", computer: "Summit",   computerUrl: "https://www.olcf.ornl.gov/summit/",                                            accelerators: "960 V100s", walltime: "4h",      source: "https://www.youtube.com/watch?v=Gjj-qZkXcrg" },
+            // Biomedical & acoustics
+            { name: "Burstwave lithotripsy",             image: "res/simulations/k.png", computer: "Delta",    computerUrl: "https://www.ncsa.illinois.edu/research/project-highlights/delta/",              accelerators: "128 A100s", walltime: "30m",     source: "https://www.youtube.com/watch?v=XWsUTaJXGF8" },
+            { name: "Cavitation fragments kidney stone", image: "res/simulations/d.png", computer: "Summit",   computerUrl: "https://www.olcf.ornl.gov/summit/",                                            accelerators: "576 V100s", walltime: "30m",  source: "https://doi.org/10.48550/arXiv.2305.09163" },
+            { name: "Kidney stone stress waves",         image: "res/simulations/l.png", computer: "Bridges2", computerUrl: "https://www.psc.edu/resources/bridges-2/",                                      accelerators: "8 V100s",   walltime: "20m",     source: "https://www.youtube.com/watch?v=Q2L0J68qnRw" },
+            { name: "Whale bubble net feeding",          image: "res/simulations/p.png", computer: "Delta",    computerUrl: "https://www.ncsa.illinois.edu/research/project-highlights/delta/",              accelerators: "128 A100s", walltime: "30m",     source: "https://www.youtube.com/watch?v=6EpP6tdCZSA" },
+            { name: "Earplug acoustics (kinetic energy)", image: "res/simulations/q.png", computer: "Delta",    computerUrl: "https://www.ncsa.illinois.edu/research/project-highlights/delta/",              accelerators: "8 A100s",   walltime: "5h",      source: "https://www.youtube.com/watch?v=xSW5wZkdbrc" },
+            { name: "Circular orifice (1 kHz)",          image: "res/simulations/r.png", computer: "Delta",    computerUrl: "https://www.ncsa.illinois.edu/research/project-highlights/delta/",              accelerators: "16 A100s",  walltime: "5h",      source: "https://www.youtube.com/watch?v=jOhJ_c7eco4" },
+            // Bubble dynamics
+            { name: "Collapsing bubbles (pressure)",     image: "res/simulations/b.png", computer: "Summit",   computerUrl: "https://www.olcf.ornl.gov/summit/",                                            accelerators: "216 V100s", walltime: "3h",      source: "https://doi.org/10.48550/arXiv.2305.09163" },
+            { name: "Collapsing bubbles (streamlines)",  image: "res/simulations/c.png", computer: "Summit",   computerUrl: "https://www.olcf.ornl.gov/summit/",                                            accelerators: "216 V100s", walltime: "3h",      source: "https://doi.org/10.48550/arXiv.2305.09163" },
+            { name: "Euler-Lagrange particle cloud",     image: "res/simulations/s.png", computer: "Phoenix",  computerUrl: "https://www.pace.gatech.edu/",                                                 accelerators: "8 A100s",   walltime: "<1h",     source: "https://www.youtube.com/watch?v=RoT-yC5Lxmg" },
+            // Fundamentals
+            { name: "Breakup of vibrated interface",     image: "res/simulations/f.png", computer: "Summit",   computerUrl: "https://www.olcf.ornl.gov/summit/",                                            accelerators: "128 V100s", walltime: "4h",      source: "https://www.youtube.com/watch?v=XQ3g1oSg8mc" },
+            { name: "Viscous Taylor-Green vortex",       image: "res/simulations/h.png", computer: "Delta",    computerUrl: "https://www.ncsa.illinois.edu/research/project-highlights/delta/",              accelerators: "128 A100s", walltime: "17h",     source: "https://www.youtube.com/watch?v=7i2h08dlDQw" },
         ];
 
         const scalings = [
@@ -54,14 +88,14 @@
                             <img class="h-10" src="res/logo.png" alt="">
                         </div>
                         <div class="flex-1 p-2 font-semibold text-center">${s.name}</div>
-                        <a class="w-10 text-center" href="${s.source}">
-                            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                        <a class="w-10 text-center text-xl" href="${s.source}" target="_blank">
+                            <i class="${s.source.includes('youtube.com') ? 'fa-brands fa-youtube' : 'fa-solid fa-arrow-up-right-from-square'}"></i>
                         </a>
                     </div>
                     <div class="grid grid-cols-3 gap-4 px-4 py-2">
                         <div class="flex flex-row items-center">
                             <div class="pr-2"><i class="fa-solid fa-server"></i></div>
-                            <div class="flex-1 text-center">${s.computer}</div>
+                            <div class="flex-1 text-center">${s.computerUrl ? `<a href="${s.computerUrl}" class="underline hover:text-amber-400" target="_blank">${s.computer}</a>` : s.computer}</div>
                         </div>
                         <div class="flex flex-row items-center">
                             <div class="pr-2"><i class="fa-solid fa-microchip"></i></div>
@@ -76,12 +110,12 @@
             `).join("");
 
             document.getElementById("ft-scaling").innerHTML = scalings.map(s => `
-                <div class="flex md:w-2/6 mx-auto flex-col text-white rounded bg-slate-900 rounded-b-lg">
+                <a href="documentation/expectedPerformance.html" class="flex md:w-2/6 mx-auto flex-col text-white rounded bg-slate-900 rounded-b-lg hover:ring-2 hover:ring-amber-400 transition-shadow no-underline">
                     <div class="flex-1 grid bg-white pb-2">
                         <img class="place-self-center" src="${s.image}" alt="${s.label}">
                     </div>
                     <div class="flex-1 p-2 font-semibold text-center">${s.label}</div>
-                </div>
+                </a>
             `).join("");
 
             fetch("https://api.github.com/repos/MFlowCode/MFC/releases/latest")
