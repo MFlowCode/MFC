@@ -78,6 +78,7 @@ Your first simulation:
 Visualize the output in `examples/3D_shockdroplet/silo_hdf5/` with ParaView, VisIt, or your favorite tool.
 For detailed build instructions (Linux, macOS, Windows/WSL, HPC clusters), see the [Getting Started guide](https://mflowcode.github.io/documentation/getting-started.html).
 
+MFC is developed by the [Computational Physics Group at Georgia Tech](https://comp-physics.group) and collaborators.
 Get in touch with <a href="mailto:shb@gatech.edu">Spencer</a> if you have questions!
 We have an [active Slack channel](https://join.slack.com/t/mflowcode/shared_invite/zt-y75wibvk-g~zztjknjYkK1hFgCuJxVw) and development team.
 MFC has high- and low-level documentation, visualizations, and more on [its website](https://mflowcode.github.io/).
