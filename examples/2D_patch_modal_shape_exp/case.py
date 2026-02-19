@@ -19,7 +19,7 @@ Tfinal = 10.0 / c
 Nt = int(Tfinal / mydt)
 
 # Acoustic source (similar to 2D_acoustic_support5)
-t_cross = Lx / c # domain crossing time
+t_cross = Lx / c  # domain crossing time
 gauss_sigma_time = 0.03 * t_cross
 acoustic_delay = 0.15 * t_cross
 acoustic_loc_x = -3.5
