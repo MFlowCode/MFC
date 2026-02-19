@@ -335,7 +335,7 @@ module m_global_parameters
 
     real(wp) :: sigma
     logical :: surface_tension
-    !> #}
+    !> @}
 
     !> @name Index variables used for m_variables_conversion
     !> @{

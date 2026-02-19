@@ -326,7 +326,7 @@ module m_global_parameters
     ! boundary values.
     !> @{
     real(wp) :: wa_flg
-    !> @{
+    !> @}
 
     $:GPU_DECLARE(create='[wa_flg]')
 

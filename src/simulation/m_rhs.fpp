@@ -158,6 +158,7 @@ module m_rhs
     $:GPU_DECLARE(create='[irx,iry,irz]')
 
     type(int_bounds_info) :: is1, is2, is3
+    !> @}
     $:GPU_DECLARE(create='[is1,is2,is3]')
 
     !> @name Saved fluxes for testing

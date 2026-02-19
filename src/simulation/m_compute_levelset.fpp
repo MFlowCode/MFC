@@ -59,7 +59,6 @@ contains
                 end if
             end do
             $:END_GPU_PARALLEL_LOOP()
-            !> @}
 
             ! 2D Patch Geometries
         elseif (n > 0) then
@@ -81,7 +80,6 @@ contains
                 end if
             end do
             $:END_GPU_PARALLEL_LOOP()
-            !> @}
 
         end if
 
