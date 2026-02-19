@@ -117,7 +117,7 @@ contains
             & 'cfl_adap_dt', 'cfl_const_dt', 'cfl_dt', 'surface_tension',       &
             & 'shear_stress', 'bulk_stress', 'bubbles_lagrange',                &
             & 'hyperelasticity', 'down_sample', 'int_comp','fft_wrt', &
-            & 'hyper_cleaning' ]
+            & 'hyper_cleaning', 'periodic_ibs' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 

@@ -236,6 +236,7 @@ module m_global_parameters
     logical :: ib           !< Turn immersed boundaries on
     integer :: num_ibs      !< Number of immersed boundaries
     integer :: Np
+    logical :: periodic_ibs !< Periodically wrap immersed boundaries around domain
 
     type(ib_patch_parameters), dimension(num_patches_max) :: patch_ib
 
@@ -299,6 +300,9 @@ module m_global_parameters
 
     logical :: fft_wrt
     logical :: dummy  !< AMDFlang workaround: keep a dummy logical to avoid a compiler case-optimization bug when a parameter+GPU-kernel conditional is false
+
+    !< global domain bounds
+    real(wp), allocatable, dimension(:, :) :: domain_glb
 
 contains
 
@@ -541,6 +545,7 @@ contains
         ! Immersed Boundaries
         ib = .false.
         num_ibs = dflt_int
+        periodic_ibs = .false.
 
         do i = 1, num_patches_max
             patch_ib(i)%geometry = dflt_int
@@ -969,6 +974,18 @@ contains
             allocate (logic_grid(0:m, 0:n, 0:p))
         end if
 
+        allocate (domain_glb(num_dims, 2))
+        domain_glb(1, 1) = x_domain%beg
+        domain_glb(1, 2) = x_domain%end
+        if (n > 0) then ! 2D
+            domain_glb(2, 1) = y_domain%beg
+            domain_glb(2, 2) = y_domain%end
+            if (p > 0) then ! 3D
+                domain_glb(3, 1) = z_domain%beg
+                domain_glb(3, 2) = z_domain%end
+            end if
+        end if
+
     end subroutine s_initialize_global_parameters_module
 
     impure subroutine s_initialize_parallel_io
@@ -1023,6 +1040,8 @@ contains
         end if
 
         deallocate (proc_coords)
+
+        deallocate (domain_glb)
 
 #ifdef MFC_MPI
 

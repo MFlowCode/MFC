@@ -218,6 +218,7 @@ _SIMPLE_DESCS = {
     "case_dir": "Case directory path",
     "cantera_file": "Cantera mechanism file",
     "num_ibs": "Number of immersed boundaries",
+    "periodic_ibs": "Enable periodic wrapping of immersed boundaries",
     "num_source": "Number of acoustic sources",
     "num_probes": "Number of probes",
     "num_integrals": "Number of integral regions",
@@ -920,6 +921,7 @@ def _load():  # pylint: disable=too-many-locals,too-many-statements
     # --- Immersed boundary ---
     _r("num_ibs", INT, {"ib"})
     _r("ib", LOG, {"ib"})
+    _r("periodic_ibs", LOG, {"ib"})
 
     # --- Probes ---
     for n in ["num_probes", "num_integrals"]:

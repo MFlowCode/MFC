@@ -183,6 +183,7 @@ module m_global_parameters
     !! Starting cell-center index of local processor in global grid
 
     integer :: num_ibs  !< Number of immersed boundaries
+    logical :: periodic_ibs !< Periodically wrap immersed boundaries around domain
 
 #ifdef MFC_MPI
 
@@ -541,6 +542,7 @@ contains
 
         ! IBM
         num_ibs = dflt_int
+        periodic_ibs = .false.
 
         ! Output partial domain
         output_partial_domain = .false.

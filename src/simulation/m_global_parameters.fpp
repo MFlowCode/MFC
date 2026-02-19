@@ -400,6 +400,7 @@ module m_global_parameters
     !> @{
     logical :: ib
     integer :: num_ibs
+    logical :: periodic_ibs
 
     type(ib_patch_parameters), dimension(num_patches_max) :: patch_ib
     type(vec3_dt), allocatable, dimension(:) :: airfoil_grid_u, airfoil_grid_l
@@ -409,7 +410,7 @@ module m_global_parameters
     !! the maximum allowable number of patches, num_patches_max, may be changed
     !! in the module m_derived_types.f90.
 
-    $:GPU_DECLARE(create='[ib,num_ibs,patch_ib,Np,airfoil_grid_u,airfoil_grid_l]')
+    $:GPU_DECLARE(create='[ib,num_ibs,patch_ib,Np,airfoil_grid_u,airfoil_grid_l,periodic_ibs]')
     !> @}
 
     !> @name Bubble modeling
@@ -553,6 +554,10 @@ module m_global_parameters
     real(wp) :: alpha_bar       !< Damage rate factor for continuum damage modeling
     $:GPU_DECLARE(create='[tau_star,cont_damage_s,alpha_bar]')
     !> @}
+
+    !< global domain bounds
+    real(wp), allocatable, dimension(:, :) :: domain_glb
+    $:GPU_DECLARE(create='[domain_glb]')
 
     !> @name MHD Hyperbolic cleaning parameters
     !> @{!
@@ -719,6 +724,7 @@ contains
         ! Immersed Boundaries
         ib = .false.
         num_ibs = dflt_int
+        periodic_ibs = .false.
 
         ! Bubble modeling
         bubbles_euler = .false.
@@ -1357,6 +1363,19 @@ contains
 
         $:GPU_UPDATE(device='[relax,relax_model,palpha_eps,ptgalpha_eps]')
 
+        @:ALLOCATE(domain_glb(num_dims, 2))
+        domain_glb(1, 1) = x_domain%beg
+        domain_glb(1, 2) = x_domain%end
+        if (n > 0) then ! 2D
+            domain_glb(2, 1) = y_domain%beg
+            domain_glb(2, 2) = y_domain%end
+            if (p > 0) then ! 3D
+                domain_glb(3, 1) = z_domain%beg
+                domain_glb(3, 2) = z_domain%end
+            end if
+        end if
+        $:GPU_UPDATE(device='[domain_glb]')
+
         ! Allocating grid variables for the x-, y- and z-directions
         @:ALLOCATE(x_cb(-1 - buff_size:m + buff_size))
         @:ALLOCATE(x_cc(-buff_size:m + buff_size))
@@ -1455,6 +1474,8 @@ contains
         end if
 
         if (ib) MPI_IO_IB_DATA%var%sf => null()
+
+        @:DEALLOCATE(domain_glb)
 
         ! Deallocating grid variables for the x-, y- and z-directions
         @:DEALLOCATE(x_cb, x_cc, dx)

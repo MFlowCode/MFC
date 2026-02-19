@@ -633,7 +633,7 @@ contains
             if (ib) then
                 ! check if any IBMS are moving, and if so, update the markers, ghost points, levelsets, and levelset norms
                 if (moving_immersed_boundary_flag) then
-                    call s_propagate_immersed_boundaries(s)
+                    call s_propagate_immersed_boundaries(s, nstage)
                 end if
 
                 ! update the ghost fluid properties point values based on IB state
@@ -796,9 +796,10 @@ contains
 
     end subroutine s_apply_bodyforces
 
-    subroutine s_propagate_immersed_boundaries(s)
+    subroutine s_propagate_immersed_boundaries(s, nstage)
 
         integer, intent(in) :: s
+        integer, intent(in) :: nstage
         integer :: i
         logical :: forces_computed
 
@@ -844,6 +845,15 @@ contains
                 patch_ib(i)%x_centroid = (rk_coef(s, 1)*patch_ib(i)%step_x_centroid + rk_coef(s, 2)*patch_ib(i)%x_centroid + rk_coef(s, 3)*patch_ib(i)%vel(1)*dt)/rk_coef(s, 4)
                 patch_ib(i)%y_centroid = (rk_coef(s, 1)*patch_ib(i)%step_y_centroid + rk_coef(s, 2)*patch_ib(i)%y_centroid + rk_coef(s, 3)*patch_ib(i)%vel(2)*dt)/rk_coef(s, 4)
                 patch_ib(i)%z_centroid = (rk_coef(s, 1)*patch_ib(i)%step_z_centroid + rk_coef(s, 2)*patch_ib(i)%z_centroid + rk_coef(s, 3)*patch_ib(i)%vel(3)*dt)/rk_coef(s, 4)
+
+                ! wrap ib centroid around domain after final stage in timestep
+                if (periodic_ibs .and. s == nstage) then
+                    patch_ib(i)%x_centroid = domain_glb(1, 1) + modulo(patch_ib(i)%x_centroid - domain_glb(1, 1), domain_glb(1, 2) - domain_glb(1, 1))
+                    patch_ib(i)%y_centroid = domain_glb(2, 1) + modulo(patch_ib(i)%y_centroid - domain_glb(2, 1), domain_glb(2, 2) - domain_glb(2, 1))
+                    if (p > 0) then ! 3D
+                        patch_ib(i)%z_centroid = domain_glb(3, 1) + modulo(patch_ib(i)%z_centroid - domain_glb(3, 1), domain_glb(3, 2) - domain_glb(3, 1))
+                    end if
+                end if
             end if
         end do
 

@@ -106,23 +106,47 @@ contains
 
         type(ghost_point), intent(inout) :: gp
 
-        real(wp) :: radius, dist
-        real(wp), dimension(2) :: center
-        real(wp), dimension(3) :: dist_vec
+        real(wp) :: radius, dist, dist_temp
+        real(wp), dimension(2, 3) :: center
+        real(wp), dimension(3) :: dist_vec, dist_vec_temp
 
-        integer :: i, j, ib_patch_id !< Loop index variables
+        integer :: i, j, l, ib_patch_id, ix, iy !< Loop index variables
 
         ib_patch_id = gp%ib_patch_id
         i = gp%loc(1)
         j = gp%loc(2)
 
         radius = patch_ib(ib_patch_id)%radius
+        center(1, 1) = patch_ib(ib_patch_id)%x_centroid
+        center(2, 1) = patch_ib(ib_patch_id)%y_centroid
 
-        dist_vec(1) = x_cc(i) - patch_ib(ib_patch_id)%x_centroid
-        dist_vec(2) = y_cc(j) - patch_ib(ib_patch_id)%y_centroid
+        dist_vec(1) = x_cc(i) - center(1, 1)
+        dist_vec(2) = y_cc(j) - center(2, 1)
         dist_vec(3) = 0._wp
-        dist = sqrt(sum(dist_vec**2))
+        dist = sum(dist_vec**2)
 
+        if (periodic_ibs) then
+            ! periodically project centers
+            do l = 1, 2
+                center(l, 2) = center(l, 1) + (domain_glb(l, 2) - domain_glb(l, 1))
+                center(l, 3) = center(l, 1) - (domain_glb(l, 2) - domain_glb(l, 1))
+            end do
+            ! find minimum dist
+            do ix = 1, 3
+                do iy = 1, 3
+                    dist_vec_temp(1) = x_cc(i) - center(1, ix)
+                    dist_vec_temp(2) = y_cc(j) - center(2, iy)
+                    dist_vec_temp(3) = 0._wp
+                    dist_temp = sum(dist_vec_temp**2)
+                    if (dist_temp < dist) then
+                        dist = dist_temp
+                        dist_vec = dist_vec_temp
+                    end if
+                end do
+            end do
+        end if
+
+        dist = sqrt(dist)
         gp%levelset = dist - radius
         if (f_approx_equal(dist, 0._wp)) then
             gp%levelset_norm = 0._wp
@@ -544,10 +568,11 @@ contains
 
         type(ghost_point), intent(inout) :: gp
 
-        real(wp) :: radius, dist
-        real(wp), dimension(3) :: dist_vec, center
+        real(wp) :: radius, dist, dist_temp
+        real(wp), dimension(3) :: dist_vec, dist_vec_temp
+        real(wp), dimension(3, 3) :: center
 
-        integer :: i, j, k, ib_patch_id !< Loop index variables
+        integer :: i, j, k, l, ib_patch_id, ix, iy, iz !< Loop index variables
 
         ib_patch_id = gp%ib_patch_id
         i = gp%loc(1)
@@ -555,14 +580,39 @@ contains
         k = gp%loc(3)
 
         radius = patch_ib(ib_patch_id)%radius
-        center(1) = patch_ib(ib_patch_id)%x_centroid
-        center(2) = patch_ib(ib_patch_id)%y_centroid
-        center(3) = patch_ib(ib_patch_id)%z_centroid
+        center(1, 1) = patch_ib(ib_patch_id)%x_centroid
+        center(2, 1) = patch_ib(ib_patch_id)%y_centroid
+        center(3, 1) = patch_ib(ib_patch_id)%z_centroid
 
-        dist_vec(1) = x_cc(i) - center(1)
-        dist_vec(2) = y_cc(j) - center(2)
-        dist_vec(3) = z_cc(k) - center(3)
-        dist = sqrt(sum(dist_vec**2))
+        dist_vec(1) = x_cc(i) - center(1, 1)
+        dist_vec(2) = y_cc(j) - center(2, 1)
+        dist_vec(3) = z_cc(k) - center(3, 1)
+        dist = sum(dist_vec**2)
+
+        if (periodic_ibs) then
+            ! periodically project centers
+            do l = 1, 3
+                center(l, 2) = center(l, 1) + (domain_glb(l, 2) - domain_glb(l, 1))
+                center(l, 3) = center(l, 1) - (domain_glb(l, 2) - domain_glb(l, 1))
+            end do
+            ! find minimum dist
+            do ix = 1, 3
+                do iy = 1, 3
+                    do iz = 1, 3
+                        dist_vec_temp(1) = x_cc(i) - center(1, ix)
+                        dist_vec_temp(2) = y_cc(j) - center(2, iy)
+                        dist_vec_temp(3) = z_cc(k) - center(3, iz)
+                        dist_temp = sum(dist_vec_temp**2)
+                        if (dist_temp < dist) then
+                            dist = dist_temp
+                            dist_vec = dist_vec_temp
+                        end if
+                    end do
+                end do
+            end do
+        end if
+
+        dist = sqrt(dist)
         gp%levelset = dist - radius
         if (f_approx_equal(dist, 0._wp)) then
             gp%levelset_norm = (/1, 0, 0/)
