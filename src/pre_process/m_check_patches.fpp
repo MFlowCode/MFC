@@ -1,3 +1,7 @@
+!>
+!! @file
+!! @brief Contains module m_check_patches
+
 #:include 'macros.fpp'
 
 !> @brief This module contains subroutines that read, and check consistency

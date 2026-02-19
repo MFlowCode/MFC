@@ -1,3 +1,7 @@
+!>
+!! @file
+!! @brief Contains module m_surface_tension
+
 #:include 'case.fpp'
 #:include 'macros.fpp'
 #:include 'inline_capillary.fpp'

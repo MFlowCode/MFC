@@ -1,3 +1,7 @@
+!>
+!! @file
+!! @brief Contains module m_delay_file_access
+
 module m_delay_file_access
     use m_precision_select
     implicit none

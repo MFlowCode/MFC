@@ -1,6 +1,6 @@
-!!>
+!>
 !! @file
-!! @brief  Contains module m_chemistry
+!! @brief Contains module m_chemistry
 !! @author Henry Le Berre <hberre3@gatech.edu>
 
 #:include 'macros.fpp'

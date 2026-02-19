@@ -1,3 +1,7 @@
+!>
+!! @file
+!! @brief Contains module m_igr
+
 #:include 'case.fpp'
 #:include 'macros.fpp'
 

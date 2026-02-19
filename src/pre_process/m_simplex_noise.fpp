@@ -1,3 +1,7 @@
+!>
+!! @file
+!! @brief Contains module m_simplex_noise
+
 module m_simplex_noise
 
     use m_constants

@@ -1,3 +1,7 @@
+!>
+!! @file
+!! @brief Contains module m_mpi_common
+
 #:include 'case.fpp'
 #:include 'macros.fpp'
 

@@ -1,3 +1,4 @@
+!>
 !! @file
 !! @brief Contains module m_data_output
 

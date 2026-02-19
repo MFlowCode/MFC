@@ -1,3 +1,7 @@
+!>
+!! @file
+!! @brief Contains module m_body_forces
+
 #:include 'macros.fpp'
 
 module m_body_forces

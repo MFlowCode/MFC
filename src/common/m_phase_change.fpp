@@ -1,5 +1,7 @@
-!> energies (6-eqn to 4-eqn) equilibrium through an infinitely fast (algebraic)
-!> procedure.
+!>
+!! @file
+!! @brief Contains module m_phase_change
+
 #:include 'case.fpp'
 #:include 'macros.fpp'
 

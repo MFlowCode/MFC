@@ -1,3 +1,7 @@
+!>
+!! @file
+!! @brief Contains module m_muscl
+
 #:include 'macros.fpp'
 module m_muscl
 

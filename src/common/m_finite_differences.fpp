@@ -1,3 +1,7 @@
+!>
+!! @file
+!! @brief Contains module m_finite_differences
+
 #:include 'macros.fpp'
 
 module m_finite_differences
