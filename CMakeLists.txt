@@ -806,6 +806,25 @@ if (MFC_DOCUMENTATION)
     GEN_DOCS(post_process  "MFC: Post-Process")
     GEN_DOCS(documentation "MFC")
 
+    # Inject per-page last-updated dates into documentation markdown files.
+    # Runs after auto-generated .md files exist, before Doxygen processes them.
+    # Uses a stamp file so it only runs once per build.
+    add_custom_command(
+        OUTPUT  "${CMAKE_CURRENT_BINARY_DIR}/inject-dates.stamp"
+        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/examples.md"
+                "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/case_constraints.md"
+                "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/physics_constraints.md"
+                "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/cli-reference.md"
+                "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/parameters.md"
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/docs/inject-dates.py"
+                "${CMAKE_CURRENT_SOURCE_DIR}"
+        COMMAND "${CMAKE_COMMAND}" -E touch "${CMAKE_CURRENT_BINARY_DIR}/inject-dates.stamp"
+        COMMENT "Injecting page dates into documentation"
+        VERBATIM
+    )
+    add_custom_target(inject_page_dates DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/inject-dates.stamp")
+    add_dependencies(documentation_doxygen inject_page_dates)
+
     # > Copy Resources (main landing page & assets)
     install(DIRECTORY   "${CMAKE_CURRENT_SOURCE_DIR}/docs/res"
             DESTINATION "docs/mfc")
@@ -814,6 +833,7 @@ if (MFC_DOCUMENTATION)
             DESTINATION "docs/mfc")
 
     install(FILES       "${CMAKE_CURRENT_SOURCE_DIR}/docs/index.html"
+                        "${CMAKE_CURRENT_SOURCE_DIR}/docs/404.html"
             DESTINATION "docs/mfc")
 endif()
 

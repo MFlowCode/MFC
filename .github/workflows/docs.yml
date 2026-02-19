@@ -15,6 +15,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Full history for per-page last-updated dates
 
     # We build doxygen from source because of
     # https://github.com/doxygen/doxygen/issues/9016
@@ -35,6 +37,12 @@ jobs:
         cmake -S . -B build -G Ninja --install-prefix="$(pwd)/build/install" -D MFC_DOCUMENTATION=ON
         ninja -C build install
 
+    - name: Verify essential site files
+      run: |
+        for f in index.html 404.html robots.txt; do
+          test -f "build/install/docs/mfc/$f" || { echo "Missing $f"; exit 1; }
+        done
+
     - name: Upload Built Documentation Artifact
       uses: actions/upload-artifact@v4
       with:
@@ -51,19 +59,13 @@ jobs:
         base-url-path: https://mflowcode.github.io/
         path-to-root: build/install/docs/mfc
         include-pdf: false
-        sitemap-format: txt
+        sitemap-format: xml
 
     - name: Output stats
       run: |
         echo "sitemap-path = ${{ steps.sitemap.outputs.sitemap-path }}"
         echo "url-count = ${{ steps.sitemap.outputs.url-count }}"
         echo "excluded-count = ${{ steps.sitemap.outputs.excluded-count }}"
-
-    - name: Linkcheck - Lychee
-      uses: lycheeverse/lychee-action@v2
-      with:
-        args: -c .lychee.toml build/install/docs/mfc/
-        fail: false
 
     - name: Publish Documentation
       if:   github.repository == 'MFlowCode/MFC' && github.ref == 'refs/heads/master' &&  (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' )
@@ -80,6 +82,12 @@ jobs:
         git -C ../www add -A
         git -C ../www commit -m "Docs @ ${GITHUB_SHA::7}" || true
         git -C ../www push
+
+    - name: Linkcheck - Lychee
+      uses: lycheeverse/lychee-action@v2
+      with:
+        args: -c .lychee.toml build/install/docs/mfc/
+        fail: true
 
 # DOC_PUSH_URL should be of the format:
 # --> https://<username>:<token>@github.com/<username>/<repository>

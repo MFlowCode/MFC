@@ -349,9 +349,9 @@ def generate_parameter_docs() -> str:  # pylint: disable=too-many-locals,too-man
     by_param = analysis["by_param"]
 
     lines = [
-        "@page parameters Case Parameters Reference",
+        "@page parameters Case Parameters",
         "",
-        "# Case Parameters Reference",
+        "# Case Parameters",
         "",
         "> **Auto-generated** from parameter registry",
         "> ",
@@ -543,7 +543,7 @@ def generate_parameter_docs() -> str:  # pylint: disable=too-many-locals,too-man
 
     # Add footer
     lines.extend([
-        "## Command Line Reference",
+        "## CLI Reference",
         "",
         "Search parameters using the CLI:",
         "",
