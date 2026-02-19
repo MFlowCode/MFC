@@ -99,6 +99,14 @@ def __filter(cases_) -> typing.List[TestCase]:
         skipped_cases += example_cases
         cases = [case for case in cases if case not in example_cases]
 
+    if ARG("shard") is not None:
+        parts = ARG("shard").split("/")
+        if len(parts) != 2 or not all(p.isdigit() for p in parts) or int(parts[1]) < 1 or not 1 <= int(parts[0]) <= int(parts[1]):
+            raise MFCException(f"Invalid --shard '{ARG('shard')}': expected 'i/n' with 1 <= i <= n (e.g., '1/2').")
+        shard_idx, shard_count = int(parts[0]), int(parts[1])
+        skipped_cases += [c for i, c in enumerate(cases) if i % shard_count != shard_idx - 1]
+        cases = [c for i, c in enumerate(cases) if i % shard_count == shard_idx - 1]
+
     if ARG("percent") == 100:
         return cases, skipped_cases
 
@@ -205,6 +213,15 @@ def test():
 
     # Build the summary report
     _print_test_summary(nPASS, nFAIL, nSKIP, minutes, seconds, failed_tests, skipped_cases)
+
+    # Write failed UUIDs to file for CI retry logic
+    failed_uuids_path = os.path.join(common.MFC_TEST_DIR, "failed_uuids.txt")
+    if failed_tests:
+        with open(failed_uuids_path, "w") as f:
+            for test_info in failed_tests:
+                f.write(test_info['uuid'] + "\n")
+    elif os.path.exists(failed_uuids_path):
+        os.remove(failed_uuids_path)
 
     exit(nFAIL)
 
