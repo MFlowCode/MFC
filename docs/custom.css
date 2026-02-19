@@ -3,6 +3,12 @@
  * Overrides for doxygen-awesome theme
  */
 
+/* Hide empty nav-path footer (kept for navtree.js height calculation) */
+#nav-path {
+    height: 0;
+    overflow: hidden;
+}
+
 /* Cross-navigation panel at top of sidebar */
 #mfc-nav {
     display: flex;

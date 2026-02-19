@@ -536,6 +536,10 @@ contains
 end module m_my_feature
 ```
 
+**Step 3: Register the module in the architecture docs**
+
+Add your module name to the appropriate category in `docs/module_categories.json`. This ensures it appears on the @ref architecture "Code Architecture" page. The precheck linter will fail if a module is missing from this file.
+
 Key conventions:
 - `private` by default, explicitly `public` for the module API
 - Initialize/finalize subroutines for allocation lifecycle

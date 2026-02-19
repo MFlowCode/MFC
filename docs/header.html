@@ -73,16 +73,21 @@ document.addEventListener('DOMContentLoaded', function() {
   nav.id = 'mfc-nav';
   var items = [
     ['../documentation/index.html', 'documentation', 'User Guide'],
-    ['../pre_process/index.html',   'pre_process',   'Pre-Process API'],
-    ['../simulation/index.html',    'simulation',    'Simulation API'],
-    ['../post_process/index.html',  'post_process',  'Post-Process API']
+    ['../api/index.html',           'api',           'API Documentation']
   ];
   var path = window.location.pathname;
+  var apiPaths = ['/api/', '/pre_process/', '/simulation/', '/post_process/'];
   for (var i = 0; i < items.length; i++) {
     var a = document.createElement('a');
     a.href = items[i][0];
     a.textContent = items[i][2];
-    if (path.indexOf('/' + items[i][1] + '/') !== -1) a.className = 'active';
+    if (items[i][1] === 'api') {
+      for (var j = 0; j < apiPaths.length; j++) {
+        if (path.indexOf(apiPaths[j]) !== -1) { a.className = 'active'; break; }
+      }
+    } else {
+      if (path.indexOf('/' + items[i][1] + '/') !== -1) a.className = 'active';
+    }
     nav.appendChild(a);
   }
   var sideNav = document.getElementById('side-nav');

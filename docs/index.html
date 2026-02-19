@@ -55,11 +55,13 @@
             // Aerodynamics
             { name: "Flow over an airfoil (vorticity)",  image: "res/simulations/g.png", computer: "Delta",    computerUrl: "https://www.ncsa.illinois.edu/research/project-highlights/delta/",              accelerators: "128 A100s", walltime: "19h",     source: "https://www.youtube.com/watch?v=FvAgnBW59cY" },
             { name: "Pitching airfoil (3D)",             image: "res/simulations/m.png", computer: "Phoenix",  computerUrl: "https://www.pace.gatech.edu/",                                                 accelerators: "1 A100",    walltime: "5h",      source: "https://www.youtube.com/watch?v=2XH-9MumDHU" },
+            { name: "Flow over a dog (pressure)",        image: "res/simulations/u.png", computer: "HiPerGator", computerUrl: "https://www.rc.ufl.edu/about/hipergator/",                                   accelerators: "4 B200s",   walltime: "1h",      source: "https://www.youtube.com/watch?v=Xhvr2kkQa30" },
             // Shock-droplet
             { name: "Shedding water droplet",            image: "res/simulations/a.png", computer: "Summit",   computerUrl: "https://www.olcf.ornl.gov/summit/",                                            accelerators: "960 V100s", walltime: "4h",      source: "https://www.youtube.com/watch?v=Gjj-qZkXcrg" },
             // Biomedical & acoustics
             { name: "Burstwave lithotripsy",             image: "res/simulations/k.png", computer: "Delta",    computerUrl: "https://www.ncsa.illinois.edu/research/project-highlights/delta/",              accelerators: "128 A100s", walltime: "30m",     source: "https://www.youtube.com/watch?v=XWsUTaJXGF8" },
             { name: "Cavitation fragments kidney stone", image: "res/simulations/d.png", computer: "Summit",   computerUrl: "https://www.olcf.ornl.gov/summit/",                                            accelerators: "576 V100s", walltime: "30m",  source: "https://doi.org/10.48550/arXiv.2305.09163" },
+            { name: "Focused ultrasound on kidney stone", image: "res/simulations/v.png", computer: "Bridges2", computerUrl: "https://www.psc.edu/resources/bridges-2/",                                    accelerators: "10 V100s",  walltime: "2h",      source: "https://www.youtube.com/watch?v=z8j3NH-Y6i0" },
             { name: "Kidney stone stress waves",         image: "res/simulations/l.png", computer: "Bridges2", computerUrl: "https://www.psc.edu/resources/bridges-2/",                                      accelerators: "8 V100s",   walltime: "20m",     source: "https://www.youtube.com/watch?v=Q2L0J68qnRw" },
             { name: "Whale bubble net feeding",          image: "res/simulations/p.png", computer: "Delta",    computerUrl: "https://www.ncsa.illinois.edu/research/project-highlights/delta/",              accelerators: "128 A100s", walltime: "30m",     source: "https://www.youtube.com/watch?v=6EpP6tdCZSA" },
             { name: "Earplug acoustics (kinetic energy)", image: "res/simulations/q.png", computer: "Delta",    computerUrl: "https://www.ncsa.illinois.edu/research/project-highlights/delta/",              accelerators: "8 A100s",   walltime: "5h",      source: "https://www.youtube.com/watch?v=xSW5wZkdbrc" },
@@ -71,6 +73,7 @@
             // Fundamentals
             { name: "Breakup of vibrated interface",     image: "res/simulations/f.png", computer: "Summit",   computerUrl: "https://www.olcf.ornl.gov/summit/",                                            accelerators: "128 V100s", walltime: "4h",      source: "https://www.youtube.com/watch?v=XQ3g1oSg8mc" },
             { name: "Viscous Taylor-Green vortex",       image: "res/simulations/h.png", computer: "Delta",    computerUrl: "https://www.ncsa.illinois.edu/research/project-highlights/delta/",              accelerators: "128 A100s", walltime: "17h",     source: "https://www.youtube.com/watch?v=7i2h08dlDQw" },
+            { name: "Mach 1.5 shock-helium bubble",      image: "res/simulations/t.png", computer: "Phoenix",  computerUrl: "https://www.pace.gatech.edu/",                                                 accelerators: "1 A100",    walltime: "1h",      source: "https://www.youtube.com/watch?v=zDJoe0NYZsQ" },
         ];
 
         const scalings = [
@@ -172,7 +175,7 @@
                 </div>
             </div>
             <div class="flex mx-auto">
-                <div class="justify-center grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-x-4 md:gap-x-8 text-md md:text-xl text-center text-white font-medium">
+                <div class="justify-center grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-x-4 md:gap-x-8 text-md md:text-xl text-center text-white font-medium">
                     <a class="px-4 flex flex-row items-center py-4 border-b-2 hover:border-amber-400" href="https://github.com/MFlowCode/MFC">
                         <i class="pr-4 fa-brands fa-github"></i>
                         <span class="flex-1">GitHub</span>
@@ -191,10 +194,6 @@
                     <a class="px-4 flex flex-row items-center py-4 border-b-2 hover:border-amber-400" href="documentation/index.html">
                         <i class="pr-4 fa-solid fa-book"></i>
                         <span class="flex-1">Documentation</span>
-                    </a>
-                    <a class="px-4 flex flex-row items-center py-4 border-b-2 hover:border-amber-400" href="simulation/index.html">
-                        <i class="pr-4 fa-solid fa-code"></i>
-                        <span class="flex-1">API</span>
                     </a>
                     <a class="px-4 flex flex-row items-center py-4 border-b-2 hover:border-amber-400" href="documentation/papers.html">
                         <i class="pr-4 fa-solid fa-newspaper"></i>
