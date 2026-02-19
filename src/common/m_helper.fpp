@@ -49,6 +49,7 @@ contains
         !! @param vftmp is the void fraction
         !! @param Rtmp is the  bubble radii
         !! @param ntmp is the output number bubble density
+        !! @param weights is the quadrature weights
     subroutine s_comp_n_from_prim(vftmp, Rtmp, ntmp, weights)
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: vftmp
@@ -350,7 +351,8 @@ contains
     end subroutine s_swap
 
     !> This procedure creates a transformation matrix.
-    !! @param  p Parameters for the transformation.
+    !! @param param Parameters for the transformation.
+    !! @param center Optional center point for the transformation.
     !! @return Transformation matrix.
     function f_create_transform_matrix(param, center) result(out_matrix)
 
@@ -428,6 +430,7 @@ contains
     !> This procedure transforms a triangle by a matrix, one vertex at a time.
     !! @param triangle Triangle to transform.
     !! @param matrix   Transformation matrix.
+    !! @param matrix_n Normal transformation matrix.
     subroutine s_transform_triangle(triangle, matrix, matrix_n)
 
         type(t_triangle), intent(inout) :: triangle
@@ -444,8 +447,9 @@ contains
     end subroutine s_transform_triangle
 
     !> This procedure transforms a model by a matrix, one triangle at a time.
-    !! @param model  Model to transform.
-    !! @param matrix Transformation matrix.
+    !! @param model    Model to transform.
+    !! @param matrix   Transformation matrix.
+    !! @param matrix_n Normal transformation matrix.
     subroutine s_transform_model(model, matrix, matrix_n)
 
         type(t_model), intent(inout) :: model
@@ -500,7 +504,7 @@ contains
     end function f_xor
 
     !> This procedure converts logical to 1 or 0.
-    !! @param perdicate A Logical argument.
+    !! @param predicate A Logical argument.
     !! @return 1 if .true., 0 if .false..
     elemental function f_logical_to_int(predicate) result(int)
 

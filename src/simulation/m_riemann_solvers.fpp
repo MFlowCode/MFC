@@ -126,24 +126,29 @@ contains
         !!                        2) s_hllc_riemann_solver
         !!                        3) s_exact_riemann_solver
         !!                        4) s_hlld_riemann_solver
-        !!  @param qL_prim_vf The  left WENO-reconstructed cell-boundary values of the
-        !!      cell-average primitive variables
-        !!  @param qR_prim_vf The right WENO-reconstructed cell-boundary values of the
-        !!      cell-average primitive variables
+        !!  @param qL_prim_rsx_vf Left WENO-reconstructed cell-boundary values (x-dir)
+        !!  @param qL_prim_rsy_vf Left WENO-reconstructed cell-boundary values (y-dir)
+        !!  @param qL_prim_rsz_vf Left WENO-reconstructed cell-boundary values (z-dir)
         !!  @param dqL_prim_dx_vf The  left WENO-reconstructed cell-boundary values of the
         !!      first-order x-dir spatial derivatives
         !!  @param dqL_prim_dy_vf The  left WENO-reconstructed cell-boundary values of the
         !!      first-order y-dir spatial derivatives
         !!  @param dqL_prim_dz_vf The  left WENO-reconstructed cell-boundary values of the
         !!      first-order z-dir spatial derivatives
+        !!  @param qL_prim_vf The  left WENO-reconstructed cell-boundary values of the
+        !!      cell-average primitive variables
+        !!  @param qR_prim_rsx_vf Right WENO-reconstructed cell-boundary values (x-dir)
+        !!  @param qR_prim_rsy_vf Right WENO-reconstructed cell-boundary values (y-dir)
+        !!  @param qR_prim_rsz_vf Right WENO-reconstructed cell-boundary values (z-dir)
         !!  @param dqR_prim_dx_vf The right WENO-reconstructed cell-boundary values of the
         !!      first-order x-dir spatial derivatives
         !!  @param dqR_prim_dy_vf The right WENO-reconstructed cell-boundary values of the
         !!      first-order y-dir spatial derivatives
         !!  @param dqR_prim_dz_vf The right WENO-reconstructed cell-boundary values of the
         !!      first-order z-dir spatial derivatives
-        !!  @param gm_alphaL_vf  Left averaged gradient magnitude
-        !!  @param gm_alphaR_vf Right averaged gradient magnitude
+        !!  @param qR_prim_vf The right WENO-reconstructed cell-boundary values of the
+        !!      cell-average primitive variables
+        !!  @param q_prim_vf Cell-averaged primitive variables
         !!  @param flux_vf Intra-cell fluxes
         !!  @param flux_src_vf Intra-cell fluxes sources
         !!  @param flux_gsrc_vf Intra-cell geometric fluxes sources
@@ -151,7 +156,6 @@ contains
         !!  @param ix Index bounds in the x-dir
         !!  @param iy Index bounds in the y-dir
         !!  @param iz Index bounds in the z-dir
-        !!  @param q_prim_vf Cell-averaged primitive variables
     subroutine s_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
                                 dqL_prim_dy_vf, &
                                 dqL_prim_dz_vf, &
@@ -1929,24 +1933,29 @@ contains
         !!      see Toro (1999) and Johnsen (2007). The viscous and the
         !!      surface tension effects have been included by modifying
         !!      the exact Riemann solver of Perigaud and Saurel (2005).
-        !!  @param qL_prim_vf The left WENO-reconstructed cell-boundary values of the
-        !!      cell-average primitive variables
-        !!  @param qR_prim_vf The right WENO-reconstructed cell-boundary values of the
-        !!      cell-average primitive variables
+        !!  @param qL_prim_rsx_vf Left WENO-reconstructed cell-boundary values (x-dir)
+        !!  @param qL_prim_rsy_vf Left WENO-reconstructed cell-boundary values (y-dir)
+        !!  @param qL_prim_rsz_vf Left WENO-reconstructed cell-boundary values (z-dir)
         !!  @param dqL_prim_dx_vf The left WENO-reconstructed cell-boundary values of the
         !!      first-order x-dir spatial derivatives
         !!  @param dqL_prim_dy_vf The left WENO-reconstructed cell-boundary values of the
         !!      first-order y-dir spatial derivatives
         !!  @param dqL_prim_dz_vf The left WENO-reconstructed cell-boundary values of the
         !!      first-order z-dir spatial derivatives
+        !!  @param qL_prim_vf The left WENO-reconstructed cell-boundary values of the
+        !!      cell-average primitive variables
+        !!  @param qR_prim_rsx_vf Right WENO-reconstructed cell-boundary values (x-dir)
+        !!  @param qR_prim_rsy_vf Right WENO-reconstructed cell-boundary values (y-dir)
+        !!  @param qR_prim_rsz_vf Right WENO-reconstructed cell-boundary values (z-dir)
         !!  @param dqR_prim_dx_vf The right WENO-reconstructed cell-boundary values of the
         !!      first-order x-dir spatial derivatives
         !!  @param dqR_prim_dy_vf The right WENO-reconstructed cell-boundary values of the
         !!      first-order y-dir spatial derivatives
         !!  @param dqR_prim_dz_vf The right WENO-reconstructed cell-boundary values of the
         !!      first-order z-dir spatial derivatives
-        !!  @param gm_alphaL_vf Left averaged gradient magnitude
-        !!  @param gm_alphaR_vf Right averaged gradient magnitude
+        !!  @param qR_prim_vf The right WENO-reconstructed cell-boundary values of the
+        !!      cell-average primitive variables
+        !!  @param q_prim_vf Cell-averaged primitive variables
         !!  @param flux_vf Intra-cell fluxes
         !!  @param flux_src_vf Intra-cell fluxes sources
         !!  @param flux_gsrc_vf Intra-cell geometric fluxes sources
@@ -1954,7 +1963,6 @@ contains
         !!  @param ix Index bounds in the x-dir
         !!  @param iy Index bounds in the y-dir
         !!  @param iz Index bounds in the z-dir
-        !!  @param q_prim_vf Cell-averaged primitive variables
     subroutine s_hllc_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
                                      dqL_prim_dy_vf, &
                                      dqL_prim_dz_vf, &
@@ -4078,24 +4086,24 @@ contains
     !>  The purpose of this subroutine is to populate the buffers
         !!      of the left and right Riemann states variables, depending
         !!      on the boundary conditions.
-        !!  @param qL_prim_vf The  left WENO-reconstructed cell-boundary values of the
-        !!      cell-average primitive variables
-        !!  @param qR_prim_vf The right WENO-reconstructed cell-boundary values of the
-        !!      cell-average primitive variables
+        !!  @param qL_prim_rsx_vf Left WENO-reconstructed cell-boundary values (x-dir)
+        !!  @param qL_prim_rsy_vf Left WENO-reconstructed cell-boundary values (y-dir)
+        !!  @param qL_prim_rsz_vf Left WENO-reconstructed cell-boundary values (z-dir)
         !!  @param dqL_prim_dx_vf The  left WENO-reconstructed cell-boundary values of the
         !!      first-order x-dir spatial derivatives
         !!  @param dqL_prim_dy_vf The  left WENO-reconstructed cell-boundary values of the
         !!      first-order y-dir spatial derivatives
         !!  @param dqL_prim_dz_vf The  left WENO-reconstructed cell-boundary values of the
         !!      first-order z-dir spatial derivatives
+        !!  @param qR_prim_rsx_vf Right WENO-reconstructed cell-boundary values (x-dir)
+        !!  @param qR_prim_rsy_vf Right WENO-reconstructed cell-boundary values (y-dir)
+        !!  @param qR_prim_rsz_vf Right WENO-reconstructed cell-boundary values (z-dir)
         !!  @param dqR_prim_dx_vf The right WENO-reconstructed cell-boundary values of the
         !!      first-order x-dir spatial derivatives
         !!  @param dqR_prim_dy_vf The right WENO-reconstructed cell-boundary values of the
         !!      first-order y-dir spatial derivatives
         !!  @param dqR_prim_dz_vf The right WENO-reconstructed cell-boundary values of the
         !!      first-order z-dir spatial derivatives
-        !!  @param gm_alphaL_vf  Left averaged gradient magnitude
-        !!  @param gm_alphaR_vf Right averaged gradient magnitude
         !!  @param norm_dir Dir. splitting direction
         !!  @param ix Index bounds in the x-dir
         !!  @param iy Index bounds in the y-dir
@@ -4493,18 +4501,8 @@ contains
         !!      the association of pointers and/or the execution of any
         !!      other procedures needed to configure the chosen Riemann
         !!      solver algorithm.
-        !!  @param qL_prim_vf The  left WENO-reconstructed cell-boundary values of the
-        !!      cell-average primitive variables
-        !!  @param qR_prim_vf The right WENO-reconstructed cell-boundary values of the
-        !!      cell-average primitive variables
-        !!  @param flux_vf Intra-cell fluxes
         !!  @param flux_src_vf Intra-cell fluxes sources
-        !!  @param flux_gsrc_vf Intra-cell geometric fluxes sources
         !!  @param norm_dir Dir. splitting direction
-        !!  @param ix Index bounds in the x-dir
-        !!  @param iy Index bounds in the y-dir
-        !!  @param iz Index bounds in the z-dir
-        !!  @param q_prim_vf Cell-averaged primitive variables
     subroutine s_initialize_riemann_solver( &
         flux_src_vf, &
         norm_dir)
@@ -4849,19 +4847,14 @@ contains
     !> @brief Computes Cartesian viscous source flux contributions for momentum and energy.
     !! Calculates averaged velocity gradients, gets Re and interface velocities,
     !! calls helpers for shear/bulk stress, then updates `flux_src_vf`.
-    !! @param[in] velL_vf Left boundary velocity (num_dims scalar_field).
     !! @param[in] dvelL_dx_vf Left boundary d(vel)/dx (num_dims scalar_field).
     !! @param[in] dvelL_dy_vf Left boundary d(vel)/dy (num_dims scalar_field).
     !! @param[in] dvelL_dz_vf Left boundary d(vel)/dz (num_dims scalar_field).
-    !! @param[in] velR_vf Right boundary velocity (num_dims scalar_field).
     !! @param[in] dvelR_dx_vf Right boundary d(vel)/dx (num_dims scalar_field).
     !! @param[in] dvelR_dy_vf Right boundary d(vel)/dy (num_dims scalar_field).
     !! @param[in] dvelR_dz_vf Right boundary d(vel)/dz (num_dims scalar_field).
     !! @param[inout] flux_src_vf Intercell source flux array to update (sys_size scalar_field).
     !! @param[in] norm_dir Interface normal direction (1=x, 2=y, 3=z).
-    !! @param[in] ix X-direction loop bounds (int_bounds_info).
-    !! @param[in] iy Y-direction loop bounds (int_bounds_info).
-    !! @param[in] iz Z-direction loop bounds (int_bounds_info).
     subroutine s_compute_cartesian_viscous_source_flux(dvelL_dx_vf, &
                                                        dvelL_dy_vf, &
                                                        dvelL_dz_vf, &

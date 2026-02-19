@@ -82,6 +82,8 @@ contains
     !>  Writes grid and initial condition data files to the "0"
         !!  time-step directory in the local processor rank folder
         !! @param q_cons_vf Conservative variables
+        !! @param q_prim_vf Primitive variables
+        !! @param bc_type Boundary condition types
     impure subroutine s_write_serial_data_files(q_cons_vf, q_prim_vf, bc_type)
         type(scalar_field), &
             dimension(sys_size), &
@@ -450,6 +452,8 @@ contains
     !> Writes grid and initial condition data files in parallel to the "0"
         !!  time-step directory in the local processor rank folder
         !! @param q_cons_vf Conservative variables
+        !! @param q_prim_vf Primitive variables
+        !! @param bc_type Boundary condition types
     impure subroutine s_write_parallel_data_files(q_cons_vf, q_prim_vf, bc_type)
 
         ! Conservative variables

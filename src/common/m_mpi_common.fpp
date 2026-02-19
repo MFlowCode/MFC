@@ -577,6 +577,7 @@ contains
 
     !> The subroutine terminates the MPI execution environment.
         !! @param prnt error message to be printed
+        !! @param code optional exit code
     impure subroutine s_mpi_abort(prnt, code)
 
         character(len=*), intent(in), optional :: prnt
@@ -638,9 +639,12 @@ contains
     !>  The goal of this procedure is to populate the buffers of
         !!      the cell-average conservative variables by communicating
         !!      with the neighboring processors.
-        !!  @param q_cons_vf Cell-average conservative variables
+        !!  @param q_comm Cell-average conservative variables
         !!  @param mpi_dir MPI communication coordinate direction
         !!  @param pbc_loc Processor boundary condition (PBC) location
+        !!  @param nVar Number of variables to communicate
+        !!  @param pb_in Optional internal bubble pressure
+        !!  @param mv_in Optional bubble mass velocity
     subroutine s_mpi_sendrecv_variables_buffers(q_comm, &
                                                 mpi_dir, &
                                                 pbc_loc, &

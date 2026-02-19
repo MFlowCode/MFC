@@ -290,7 +290,6 @@ contains
         !!  @param MFL flag that tells whether the fluid is gas (0), liquid (1), or a mixture (2)
         !!  @param pS equilibrium pressure at the interface
         !!  @param p_infpT stiffness for the participating fluids under pT-equilibrium
-        !!  @param rM sum of the reacting masses
         !!  @param q_cons_vf Cell-average conservative variables
         !!  @param rhoe mixture energy
         !!  @param TS equilibrium temperature at the interface

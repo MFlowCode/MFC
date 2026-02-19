@@ -727,6 +727,8 @@ if (MFC_DOCUMENTATION)
         set(DOXYGEN_IMAGE_PATH       "\"${CMAKE_CURRENT_SOURCE_DIR}/docs/res\"\
                                       \"${CMAKE_CURRENT_SOURCE_DIR}/docs/${target}\"")
 
+        set(DOXYGEN_WARN_LOGFILE "\"${CMAKE_CURRENT_BINARY_DIR}/${target}-doxygen-warnings.log\"")
+
         file(MAKE_DIRECTORY "${DOXYGEN_OUTPUT_DIRECTORY}")
 
         configure_file(

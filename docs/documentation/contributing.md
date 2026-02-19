@@ -767,3 +767,6 @@ If your change touches GPU code (`src/simulation/`), see the GPU checklist in th
 - A maintainer will merge your PR once all reviews are approved and CI is green
 
 If your PR is large or architectural, consider opening an issue first to discuss the approach.
+
+
+<div style='text-align:center; font-size:0.75rem; color:#888; padding:16px 0 0;'>Page last updated: 2026-02-15</div>

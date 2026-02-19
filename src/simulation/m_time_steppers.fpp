@@ -663,7 +663,7 @@ contains
     end subroutine s_tvd_rk
 
     !> Bubble source part in Strang operator splitting scheme
-        !! @param t_step Current time-step
+        !! @param stage Current time-stage
     impure subroutine s_adaptive_dt_bubble(stage)
 
         integer, intent(in) :: stage
@@ -766,6 +766,9 @@ contains
 
     !> This subroutine applies the body forces source term at each
         !! Runge-Kutta stage
+        !! @param q_cons_vf Conservative variables
+        !! @param q_prim_vf_in Primitive variables
+        !! @param rhs_vf_in Right-hand side variables
     subroutine s_apply_bodyforces(q_cons_vf, q_prim_vf_in, rhs_vf_in, ldt)
 
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_cons_vf

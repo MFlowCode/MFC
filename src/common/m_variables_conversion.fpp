@@ -72,12 +72,15 @@ contains
         !!      Replaces a procedure pointer.
         !!  @param q_vf Conservative or primitive variables
         !!  @param i First-coordinate cell index
-        !!  @param j First-coordinate cell index
-        !!  @param k First-coordinate cell index
+        !!  @param j Second-coordinate cell index
+        !!  @param k Third-coordinate cell index
         !!  @param rho Density
         !!  @param gamma Specific heat ratio function
         !!  @param pi_inf Liquid stiffness function
         !!  @param qv Fluid reference energy
+        !!  @param Re_K Reynolds number (optional)
+        !!  @param G_K Shear modulus (optional)
+        !!  @param G Shear moduli of the fluids (optional)
     subroutine s_convert_to_mixture_variables(q_vf, i, j, k, &
                                               rho, gamma, pi_inf, qv, Re_K, G_K, G)
 
@@ -107,9 +110,13 @@ contains
         !! @param gamma Specific Heat Ratio
         !! @param rho Density
         !! @param qv fluid reference energy
+        !! @param rhoYks Species partial densities
         !! @param pres Pressure to calculate
+        !! @param T Temperature
         !! @param stress Shear Stress
         !! @param mom Momentum
+        !! @param G Shear modulus (optional)
+        !! @param pres_mag Magnetic pressure (optional)
     subroutine s_compute_pressure(energy, alf, dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, stress, mom, G, pres_mag)
         $:GPU_ROUTINE(function_name='s_compute_pressure',parallelism='[seq]', &
             & cray_inline=True)
@@ -238,6 +245,9 @@ contains
         !! @param gamma specific heat ratio
         !! @param pi_inf liquid stiffness
         !! @param qv fluid reference energy
+        !! @param Re_K Reynolds number (optional)
+        !! @param G_K Shear modulus (optional)
+        !! @param G Shear moduli of the fluids (optional)
     subroutine s_convert_species_to_mixture_variables(q_vf, k, l, r, rho, &
                                                       gamma, pi_inf, qv, Re_K, G_K, G)
 
@@ -573,11 +583,9 @@ contains
     !> The following procedure handles the conversion between
         !!      the conservative variables and the primitive variables.
         !! @param qK_cons_vf Conservative variables
+        !! @param q_T_sf Temperature scalar field
         !! @param qK_prim_vf Primitive variables
-        !! @param gm_alphaK_vf Gradient magnitude of the volume fraction
-        !! @param ix Index bounds in first coordinate direction
-        !! @param iy Index bounds in second coordinate direction
-        !! @param iz Index bounds in third coordinate direction
+        !! @param ibounds Index bounds in each coordinate direction
     subroutine s_convert_conservative_to_primitive_variables(qK_cons_vf, &
                                                              q_T_sf, &
                                                              qK_prim_vf, &
@@ -896,12 +904,8 @@ contains
 
     !>  The following procedure handles the conversion between
         !!      the primitive variables and the conservative variables.
-        !!  @param qK_prim_vf Primitive variables
-        !!  @param qK_cons_vf Conservative variables
-        !!  @param gm_alphaK_vf Gradient magnitude of the volume fractions
-        !!  @param ix Index bounds in the first coordinate direction
-        !!  @param iy Index bounds in the second coordinate direction
-        !!  @param iz Index bounds in the third coordinate direction
+        !!  @param q_prim_vf Primitive variables
+        !!  @param q_cons_vf Conservative variables
     impure subroutine s_convert_primitive_to_conservative_variables(q_prim_vf, &
                                                                     q_cons_vf)
 
@@ -1172,9 +1176,11 @@ contains
         !!  @param qK_prim_vf Primitive variables
         !!  @param FK_vf Flux variables
         !!  @param FK_src_vf Flux source variables
-        !!  @param ix Index bounds in the first coordinate direction
-        !!  @param iy Index bounds in the second coordinate direction
-        !!  @param iz Index bounds in the third coordinate direction
+        !!  @param is1 Index bounds in the first coordinate direction
+        !!  @param is2 Index bounds in the second coordinate direction
+        !!  @param is3 Index bounds in the third coordinate direction
+        !!  @param s2b Starting boundary index in the second coordinate direction
+        !!  @param s3b Starting boundary index in the third coordinate direction
     subroutine s_convert_primitive_to_flux_variables(qK_prim_vf, &
                                                      FK_vf, &
                                                      FK_src_vf, &

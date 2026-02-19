@@ -561,8 +561,6 @@ contains
         !!      inputs, it proceeds to calculate the Liutex vector and its
         !!      magnitude based on Xu et al. (2019).
         !!  @param q_prim_vf Primitive variables
-        !!  @param liutex_mag Liutex magnitude
-        !!  @param liutex_axis Liutex axis
     impure subroutine s_derive_liutex(q_prim_vf, liutex_mag, liutex_axis)
         integer, parameter :: nm = 3
         type(scalar_field), &

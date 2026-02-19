@@ -60,3 +60,6 @@ Supercomputing 22 (SC'22): Scalable GPU Accelerated Simulation of Multiphase Com
     pages        = {1--3}
 }
 ```
+
+
+<div style='text-align:center; font-size:0.75rem; color:#888; padding:16px 0 0;'>Page last updated: 2026-02-09</div>

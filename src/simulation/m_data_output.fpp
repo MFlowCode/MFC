@@ -83,8 +83,11 @@ contains
 
     !> Write data files. Dispatch subroutine that replaces procedure pointer.
         !! @param q_cons_vf Conservative variables
+        !! @param q_T_sf Temperature scalar field
         !! @param q_prim_vf Primitive variables
         !! @param t_step Current time step
+        !! @param bc_type Boundary condition type
+        !! @param beta Eulerian void fraction from lagrangian bubbles
     impure subroutine s_write_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, bc_type, beta)
 
         type(scalar_field), &
@@ -395,8 +398,11 @@ contains
     !>  The goal of this subroutine is to output the grid and
         !!      conservative variables data files for given time-step.
         !!  @param q_cons_vf Cell-average conservative variables
+        !!  @param q_T_sf Temperature scalar field
         !!  @param q_prim_vf Cell-average primitive variables
         !!  @param t_step Current time-step
+        !!  @param bc_type Boundary condition type
+        !!  @param beta Eulerian void fraction from lagrangian bubbles
     impure subroutine s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, bc_type, beta)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
@@ -793,6 +799,7 @@ contains
         !!      conservative variables data files for given time-step.
         !!  @param q_cons_vf Cell-average conservative variables
         !!  @param t_step Current time-step
+        !!  @param bc_type Boundary condition type
         !!  @param beta Eulerian void fraction from lagrangian bubbles
     impure subroutine s_write_parallel_data_files(q_cons_vf, t_step, bc_type, beta)
 
@@ -1121,8 +1128,7 @@ contains
     !>  This writes a formatted data file where the root processor
     !!      can write out the CoM information
     !!  @param t_step Current time-step
-    !!  @param q_com Center of mass information
-    !!  @param moments Higher moment information
+    !!  @param c_mass_in Center of mass information
     impure subroutine s_write_com_files(t_step, c_mass_in)
 
         integer, intent(in) :: t_step

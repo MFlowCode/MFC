@@ -1049,3 +1049,6 @@ Additionally, the **artificial Mach number** technique (`pi_fac`) modifies \f$\p
 
 **Advective flux limiting** based on local volume fraction gradient \f$\chi\f$ to prevent spurious oscillations near material interfaces.
 
+
+
+<div style='text-align:center; font-size:0.75rem; color:#888; padding:16px 0 0;'>Page last updated: 2026-02-15</div>

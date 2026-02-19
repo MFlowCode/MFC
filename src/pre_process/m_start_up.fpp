@@ -405,7 +405,7 @@ contains
         !!      initial condition data files so that they may be used by
         !!      the pre-process as a starting point in the creation of an
         !!      all new initial condition.
-        !! @param q_cons_vf Conservative variables
+        !! @param q_cons_vf_in Conservative variables
     impure subroutine s_read_serial_ic_data_files(q_cons_vf_in)
 
         type(scalar_field), &
@@ -618,7 +618,7 @@ contains
         !!      initial condition data files so that they may be used by
         !!      the pre-process as a starting point in the creation of an
         !!      all new initial condition.
-        !! @param q_cons_vf Conservative variables
+        !! @param q_cons_vf_in Conservative variables
     impure subroutine s_read_parallel_ic_data_files(q_cons_vf_in)
 
         type(scalar_field), &

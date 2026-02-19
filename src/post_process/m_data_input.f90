@@ -145,6 +145,7 @@ contains
 
     !> Helper subroutine to read IB data files
     !!  @param file_loc_base Base file location for IB data
+    !!  @param t_step Time step index
     impure subroutine s_read_ib_data_files(file_loc_base, t_step)
 
         character(len=*), intent(in) :: file_loc_base

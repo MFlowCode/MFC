@@ -650,9 +650,7 @@ contains
     end subroutine s_cylinder_levelset
 
     !> The STL patch is a 2/3D geometry that is imported from an STL file.
-    !! @param patch_id is the patch identifier
-    !! @param STL_levelset STL levelset
-    !! @param STL_levelset_norm STL levelset normals
+    !! @param gp Ghost point to compute levelset for
     subroutine s_model_levelset(gp)
         $:GPU_ROUTINE(parallelism='[seq]')
 

@@ -92,6 +92,9 @@ contains
 
     end subroutine s_comp_alpha_from_n
 
+    !>  Compute the right-hand side for Euler-Euler bubble transport
+        !! @param idir Direction index
+        !! @param q_prim_vf Primitive variables
     subroutine s_compute_bubbles_EE_rhs(idir, q_prim_vf, divu_in)
 
         integer, intent(in) :: idir
@@ -156,6 +159,7 @@ contains
         !!      that are needed for the bubble modeling
         !!  @param q_prim_vf Primitive variables
         !!  @param q_cons_vf Conservative variables
+        !!  @param rhs_vf Right-hand side variables
     impure subroutine s_compute_bubble_EE_source(q_cons_vf, q_prim_vf, rhs_vf, divu_in)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf

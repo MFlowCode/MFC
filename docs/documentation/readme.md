@@ -41,3 +41,6 @@ Welcome to the Multi-component Flow Code (MFC) documentation.
 - @ref papers "Papers" - Publications using MFC
 - \ref citelist "Bibliography" - Cited references
 - @ref authors "Authors" - Contributors
+
+
+<div style='text-align:center; font-size:0.75rem; color:#888; padding:16px 0 0;'>Page last updated: 2026-02-19</div>

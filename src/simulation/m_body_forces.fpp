@@ -97,6 +97,7 @@ contains
     !! so the system can be advanced in time
     !! @param q_cons_vf Conservative variables
     !! @param q_prim_vf Primitive variables
+    !! @param rhs_vf Right-hand side accumulator
     subroutine s_compute_body_forces_rhs(q_prim_vf, q_cons_vf, rhs_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf

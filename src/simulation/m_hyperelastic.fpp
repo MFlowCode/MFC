@@ -39,8 +39,6 @@ contains
 
     !>  The following subroutine handles the calculation of the btensor.
         !!   The calculation of the btensor takes qprimvf.
-        !! @param q_prim_vf Primitive variables
-        !! @param btensor is the output
         !! calculate the grad_xi, grad_xi is a nxn tensor
         !! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
         !! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
@@ -88,8 +86,8 @@ contains
 
     !>  The following subroutine handles the calculation of the btensor.
         !!   The calculation of the btensor takes qprimvf.
+        !! @param q_cons_vf Conservative variables
         !! @param q_prim_vf Primitive variables
-        !! @param btensor is the output
         !! calculate the grad_xi, grad_xi is a nxn tensor
         !! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
         !! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
@@ -218,8 +216,12 @@ contains
 
     !>  The following subroutine handles the calculation of the btensor.
         !!   The calculation of the btensor takes qprimvf.
+        !! @param btensor_in Left Cauchy-Green deformation tensor
         !! @param q_prim_vf Primitive variables
-        !! @param btensor is the output
+        !! @param G_param Elastic shear modulus
+        !! @param j x-direction cell index
+        !! @param k y-direction cell index
+        !! @param l z-direction cell index
         !! calculate the grad_xi, grad_xi is a nxn tensor
         !! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
         !! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
@@ -257,8 +259,12 @@ contains
 
     !>  The following subroutine handles the calculation of the btensor.
         !!   The calculation of the btensor takes qprimvf.
+        !! @param btensor_in Left Cauchy-Green deformation tensor
         !! @param q_prim_vf Primitive variables
-        !! @param btensor is the output
+        !! @param G_param Elastic shear modulus
+        !! @param j x-direction cell index
+        !! @param k y-direction cell index
+        !! @param l z-direction cell index
         !! calculate the grad_xi, grad_xi is a nxn tensor
         !! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
         !! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor

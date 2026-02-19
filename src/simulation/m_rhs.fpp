@@ -1872,10 +1872,12 @@ contains
         !!      at the Gaussian quadrature points, from the cell-averaged
         !!      variables.
         !!  @param v_vf Cell-average variables
-        !!  @param vL_qp Left WENO-reconstructed, cell-boundary values including
-        !!          the values at the quadrature points, of the cell-average variables
-        !!  @param vR_qp Right WENO-reconstructed, cell-boundary values including
-        !!          the values at the quadrature points, of the cell-average variables
+        !!  @param vL_x Left reconstructed cell-boundary values in x
+        !!  @param vL_y Left reconstructed cell-boundary values in y
+        !!  @param vL_z Left reconstructed cell-boundary values in z
+        !!  @param vR_x Right reconstructed cell-boundary values in x
+        !!  @param vR_y Right reconstructed cell-boundary values in y
+        !!  @param vR_z Right reconstructed cell-boundary values in z
         !!  @param norm_dir Splitting coordinate direction
     subroutine s_reconstruct_cell_boundary_values(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, &
                                                   norm_dir)

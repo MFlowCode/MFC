@@ -1200,13 +1200,7 @@ contains
         !!      other procedures that are required for the setup of the
         !!      WENO reconstruction.
         !! @param v_vf Cell-averaged variables
-        !! @param vL_vf Left WENO reconstructed cell-boundary values
-        !! @param vR_vf Right WENO reconstructed cell-boundary values
-        !! @param norm_dir Characteristic decommposition coordinate direction
         !! @param weno_dir Coordinate direction of the WENO reconstruction
-        !! @param is1_weno Index bounds in first coordinate direction
-        !! @param is2_weno Index bounds in second coordinate direction
-        !! @param is3_weno Index bounds in third coordinate direction
     subroutine s_initialize_weno(v_vf, &
                                  weno_dir)
 
@@ -1281,10 +1275,9 @@ contains
         !!      Balsara and Shu (2000), ensures that the reconstructed
         !!      values do not reside outside the range spanned by WENO
         !!      stencil.
-        !!  @param i Equation number
-        !!  @param j First-coordinate cell index
-        !!  @param k Secone-coordinate cell index
-        !!  @param l Thire-coordinate cell index
+        !!  @param v_rs_ws Reshaped cell-averaged variables
+        !!  @param vL_rs_vf Left WENO reconstructed cell-boundary values
+        !!  @param vR_rs_vf Right WENO reconstructed cell-boundary values
     subroutine s_preserve_monotonicity(v_rs_ws, vL_rs_vf, vR_rs_vf)
 
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(IN) :: v_rs_ws

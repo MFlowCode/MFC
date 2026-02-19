@@ -249,7 +249,6 @@ contains
         !!              the smoothing of its boundary.
         !! @param patch_id is the patch identifier
         !! @param ib_markers_sf Array to track patch ids
-        !! @param ib True if this patch is an immersed boundary
     subroutine s_ib_circle(patch_id, ib_markers_sf)
 
         integer, intent(in) :: patch_id
@@ -594,7 +593,6 @@ contains
         !!              boundaries.
         !! @param patch_id is the patch identifier
         !! @param ib_markers_sf Array to track patch ids
-        !! @param ib True if this patch is an immersed boundary
     subroutine s_ib_rectangle(patch_id, ib_markers_sf)
 
         integer, intent(in) :: patch_id
@@ -651,7 +649,6 @@ contains
         !!              for the smoothing of its boundary.
         !! @param patch_id is the patch identifier
         !! @param ib_markers_sf Array to track patch ids
-        !! @param ib True if this patch is an immersed boundary
     subroutine s_ib_sphere(patch_id, ib_markers_sf)
 
         integer, intent(in) :: patch_id
@@ -775,7 +772,6 @@ contains
         !!              of its lateral boundary.
         !! @param patch_id is the patch identifier
         !! @param ib_markers_sf Array to track patch ids
-        !! @param ib True if this patch is an immersed boundary
     subroutine s_ib_cylinder(patch_id, ib_markers_sf)
 
         integer, intent(in) :: patch_id
@@ -887,8 +883,6 @@ contains
     !> The STL patch is a 2/3D geometry that is imported from an STL file.
     !! @param patch_id is the patch identifier
     !! @param ib_markers_sf Array to track patch ids
-    !! @param STL_levelset STL levelset
-    !! @param STL_levelset_norm STL levelset normals
     subroutine s_ib_model(patch_id, ib_markers_sf)
 
         integer, intent(in) :: patch_id
