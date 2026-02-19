@@ -55,11 +55,13 @@
             // Aerodynamics
             { name: "Flow over an airfoil (vorticity)",  image: "res/simulations/g.png", computer: "Delta",    computerUrl: "https://www.ncsa.illinois.edu/research/project-highlights/delta/",              accelerators: "128 A100s", walltime: "19h",     source: "https://www.youtube.com/watch?v=FvAgnBW59cY" },
             { name: "Pitching airfoil (3D)",             image: "res/simulations/m.png", computer: "Phoenix",  computerUrl: "https://www.pace.gatech.edu/",                                                 accelerators: "1 A100",    walltime: "5h",      source: "https://www.youtube.com/watch?v=2XH-9MumDHU" },
+            { name: "Flow over a dog (pressure)",        image: "res/simulations/u.png", computer: "HiPerGator", computerUrl: "https://www.rc.ufl.edu/about/hipergator/",                                   accelerators: "4 B200s",   walltime: "1h",      source: "https://www.youtube.com/watch?v=Xhvr2kkQa30" },
             // Shock-droplet
             { name: "Shedding water droplet",            image: "res/simulations/a.png", computer: "Summit",   computerUrl: "https://www.olcf.ornl.gov/summit/",                                            accelerators: "960 V100s", walltime: "4h",      source: "https://www.youtube.com/watch?v=Gjj-qZkXcrg" },
             // Biomedical & acoustics
             { name: "Burstwave lithotripsy",             image: "res/simulations/k.png", computer: "Delta",    computerUrl: "https://www.ncsa.illinois.edu/research/project-highlights/delta/",              accelerators: "128 A100s", walltime: "30m",     source: "https://www.youtube.com/watch?v=XWsUTaJXGF8" },
             { name: "Cavitation fragments kidney stone", image: "res/simulations/d.png", computer: "Summit",   computerUrl: "https://www.olcf.ornl.gov/summit/",                                            accelerators: "576 V100s", walltime: "30m",  source: "https://doi.org/10.48550/arXiv.2305.09163" },
+            { name: "Focused ultrasound on kidney stone", image: "res/simulations/v.png", computer: "Bridges2", computerUrl: "https://www.psc.edu/resources/bridges-2/",                                    accelerators: "10 V100s",  walltime: "2h",      source: "https://www.youtube.com/watch?v=z8j3NH-Y6i0" },
             { name: "Kidney stone stress waves",         image: "res/simulations/l.png", computer: "Bridges2", computerUrl: "https://www.psc.edu/resources/bridges-2/",                                      accelerators: "8 V100s",   walltime: "20m",     source: "https://www.youtube.com/watch?v=Q2L0J68qnRw" },
             { name: "Whale bubble net feeding",          image: "res/simulations/p.png", computer: "Delta",    computerUrl: "https://www.ncsa.illinois.edu/research/project-highlights/delta/",              accelerators: "128 A100s", walltime: "30m",     source: "https://www.youtube.com/watch?v=6EpP6tdCZSA" },
             { name: "Earplug acoustics (kinetic energy)", image: "res/simulations/q.png", computer: "Delta",    computerUrl: "https://www.ncsa.illinois.edu/research/project-highlights/delta/",              accelerators: "8 A100s",   walltime: "5h",      source: "https://www.youtube.com/watch?v=xSW5wZkdbrc" },
@@ -71,6 +73,7 @@
             // Fundamentals
             { name: "Breakup of vibrated interface",     image: "res/simulations/f.png", computer: "Summit",   computerUrl: "https://www.olcf.ornl.gov/summit/",                                            accelerators: "128 V100s", walltime: "4h",      source: "https://www.youtube.com/watch?v=XQ3g1oSg8mc" },
             { name: "Viscous Taylor-Green vortex",       image: "res/simulations/h.png", computer: "Delta",    computerUrl: "https://www.ncsa.illinois.edu/research/project-highlights/delta/",              accelerators: "128 A100s", walltime: "17h",     source: "https://www.youtube.com/watch?v=7i2h08dlDQw" },
+            { name: "Mach 1.5 shock-helium bubble",      image: "res/simulations/t.png", computer: "Phoenix",  computerUrl: "https://www.pace.gatech.edu/",                                                 accelerators: "1 A100",    walltime: "1h",      source: "https://www.youtube.com/watch?v=zDJoe0NYZsQ" },
         ];
 
         const scalings = [
@@ -110,13 +113,20 @@
             `).join("");
 
             document.getElementById("ft-scaling").innerHTML = scalings.map(s => `
-                <a href="documentation/expectedPerformance.html" class="flex md:w-2/6 mx-auto flex-col text-white rounded bg-slate-900 rounded-b-lg hover:ring-2 hover:ring-amber-400 transition-shadow no-underline">
+                <div class="flex md:w-1/2 mx-auto flex-col text-white rounded bg-slate-900 rounded-b-lg">
                     <div class="flex-1 grid bg-white pb-2">
                         <img class="place-self-center" src="${s.image}" alt="${s.label}">
                     </div>
-                    <div class="flex-1 p-2 font-semibold text-center">${s.label}</div>
-                </a>
+                    <div class="flex flex-row items-center">
+                        <div class="flex-1 p-2 font-semibold text-center">${s.label}</div>
+                        <a class="w-10 text-center text-xl hover:text-amber-400 transition-colors" href="documentation/expectedPerformance.html">
+                            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                        </a>
+                    </div>
+                </div>
             `).join("");
+
+            document.getElementById("copyright-year").textContent = new Date().getFullYear();
 
             fetch("https://api.github.com/repos/MFlowCode/MFC/releases/latest")
                 .then(r => r.json())
@@ -240,10 +250,11 @@
     </main>
     <div class="flex flex-col w-full px-4 md:px-0 text-white py-8 gap-4 container mx-auto">
         <div class="font-bold text-center text-sm md:text-md md:text-left">
-            &copy; 2021 <a href="https://comp-physics.group/">Spencer H. Bryngelson and Tim Colonius</a>
+            &copy; <span id="copyright-year"></span> <a href="https://comp-physics.group/">Spencer H. Bryngelson and Tim Colonius</a>
+            &middot; <a href="https://comp-physics.group/" class="text-amber-400 hover:underline">Computational Physics Group @ Georgia Tech</a>
         </div>
         <div class="text-justify flex-1 text-xs md:text-sm text-neutral-300">
-            Multiple federal sponsors have supported MFC development, including the US Department of Defense (DOD), the National Institutes of Health (NIH), the Department of Energy (DOE), and the National Science Foundation (NSF).
+            Multiple federal sponsors have supported MFC development, including the US Department of Defense (DOD), the National Institutes of Health (NIH), the Department of Energy (DOE), the National Nuclear Security Administration (NNSA), and the National Science Foundation (NSF).
             MFC computations use OLCF Frontier, Summit, and Wombat; LLNL El Capitan, Tuolumne, and Lassen; and many ACCESS-CI systems
         </div>
     </div>

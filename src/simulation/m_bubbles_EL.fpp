@@ -1,10 +1,10 @@
 !>
 !! @file
-!! @brief Contains module m_bubbles_EL
+!! @brief Contains module @ref m_bubbles_el "m_bubbles_EL"
 
 #:include 'macros.fpp'
 
-!> @brief This module is used to to compute the volume-averaged bubble model
+!> @brief Tracks Lagrangian bubbles and couples their dynamics to the Eulerian flow via volume averaging
 module m_bubbles_EL
 
     use m_global_parameters             !< Definitions of the global parameters
@@ -521,10 +521,7 @@ contains
     end subroutine s_restart_bubbles
 
     !>  Contains the bubble dynamics subroutines.
-        !! @param q_cons_vf Conservative variables
         !! @param q_prim_vf Primitive variables
-        !! @param rhs_vf Calculated change of conservative variables
-        !! @param t_step Current time step
         !! @param stage Current stage in the time-stepper algorithm
     subroutine s_compute_bubble_EL_dynamics(q_prim_vf, stage)
 
@@ -764,7 +761,6 @@ contains
     end subroutine s_compute_bubbles_EL_source
 
     !>  This procedure computes the speed of sound from a given driving pressure
-        !! @param bub_id Bubble id
         !! @param q_prim_vf Primitive variables
         !! @param pinf Driving pressure
         !! @param cell Bubble cell
@@ -846,6 +842,8 @@ contains
         !! @param ptype 1: p at infinity, 2: averaged P at the bubble location
         !! @param f_pinfl Driving pressure
         !! @param cell Bubble cell
+        !! @param preterm1 Pre-computed term 1
+        !! @param term2 Computed term 2
         !! @param Romega Control volume radius
     subroutine s_get_pinf(bub_id, q_prim_vf, ptype, f_pinfl, cell, preterm1, term2, Romega)
         $:GPU_ROUTINE(function_name='s_get_pinf',parallelism='[seq]', &
@@ -1384,7 +1382,7 @@ contains
     end subroutine s_gradient_dir
 
     !> Subroutine that writes on each time step the changes of the lagrangian bubbles.
-        !!  @param q_time Current time
+        !!  @param qtime Current time
     impure subroutine s_write_lag_particles(qtime)
 
         real(wp), intent(in) :: qtime
@@ -1442,7 +1440,7 @@ contains
     !>  Subroutine that writes some useful statistics related to the volume fraction
             !!       of the particles (void fraction) in the computatioational domain
             !!       on each time step.
-            !!  @param q_time Current time
+            !!  @param qtime Current time
     impure subroutine s_write_void_evol(qtime)
 
         real(wp), intent(in) :: qtime

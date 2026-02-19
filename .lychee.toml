@@ -23,4 +23,6 @@ exclude_path = ["sitemap\\.xml"]
 exclude = [
     "https://mflowcode\\.github\\.io/sitemap\\.xml",  # Only exists after deployment
     "https://cpe\\.ext\\.hpe\\.com",                   # HPE Cray docs have broken SSL cert
+    "https://sc22\\.supercomputing\\.org",              # Returns 415 to automated requests
+    "https://strawberryperl\\.com",                    # Frequently times out
 ]

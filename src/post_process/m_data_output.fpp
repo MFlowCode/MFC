@@ -2,11 +2,7 @@
 !! @file
 !! @brief Contains module m_data_output
 
-!> @brief This module enables the restructuring of the raw simulation data
-!!              file(s) into formatted database file(s). The formats that may be
-!!              chosen from include Silo-HDF5 and Binary. Each of these database
-!!              structures contains information about the grid as well as each of
-!!              the flow variable(s) that were chosen by the user to be included.
+!> @brief Writes post-processed grid and flow-variable data to Silo-HDF5 or binary database files
 module m_data_output
 
     use m_derived_types         ! Definitions of the derived types
@@ -112,6 +108,7 @@ module m_data_output
 
 contains
 
+    !> @brief Allocate storage arrays, configure output directories, and count flow variables for formatted database output.
     impure subroutine s_initialize_data_output_module()
         ! Description: Computation of parameters, allocation procedures, and/or
         !              any other tasks needed to properly setup the module
@@ -440,6 +437,7 @@ contains
 
     end subroutine s_initialize_data_output_module
 
+    !> @brief Compute the cell-index bounds for the user-specified partial output domain in each coordinate direction.
     impure subroutine s_define_output_region
 
         integer :: i
@@ -476,6 +474,7 @@ contains
 
     end subroutine s_define_output_region
 
+    !> @brief Open (or create) the Silo-HDF5 or Binary formatted database slave and master files for a given time step.
     impure subroutine s_open_formatted_database_file(t_step)
         ! Description: This subroutine opens a new formatted database file, or
         !              replaces an old one, and readies it for the data storage
@@ -604,6 +603,7 @@ contains
 
     end subroutine s_open_formatted_database_file
 
+    !> @brief Open the interface data file for appending extracted interface coordinates.
     impure subroutine s_open_intf_data_file()
 
         character(LEN=path_len + 3*name_len) :: file_path !<
@@ -620,6 +620,7 @@ contains
 
     end subroutine s_open_intf_data_file
 
+    !> @brief Open the energy data file for appending volume-integrated energy budget quantities.
     impure subroutine s_open_energy_data_file()
 
         character(LEN=path_len + 3*name_len) :: file_path !<
@@ -636,6 +637,7 @@ contains
 
     end subroutine s_open_energy_data_file
 
+    !> @brief Write the computational grid (cell-boundary coordinates) to the formatted database slave and master files.
     impure subroutine s_write_grid_to_formatted_database_file(t_step)
         ! Description: The general objective of this subroutine is to write the
         !              necessary grid data to the formatted database file, for
@@ -843,6 +845,7 @@ contains
 
     end subroutine s_write_grid_to_formatted_database_file
 
+    !> @brief Write a single flow variable field to the formatted database slave and master files for a given time step.
     impure subroutine s_write_variable_to_formatted_database_file(varname, t_step)
         ! Description: The goal of this subroutine is to write to the formatted
         !              database file the flow variable at the current time-step,
@@ -1202,6 +1205,7 @@ contains
 
     end subroutine s_write_lag_bubbles_results_to_text
 
+    !> @brief Read Lagrangian bubble restart data and write bubble positions and scalar fields to the Silo database.
     impure subroutine s_write_lag_bubbles_to_formatted_database_file(t_step)
 
         integer, intent(in) :: t_step
@@ -1440,6 +1444,7 @@ contains
 
     end subroutine s_write_lag_bubbles_to_formatted_database_file
 
+    !> @brief Write a single Lagrangian bubble point-variable to the Silo database slave and master files.
     subroutine s_write_lag_variable_to_formatted_database_file(varname, t_step, data, nBubs)
 
         character(len=*), intent(in) :: varname
@@ -1494,6 +1499,7 @@ contains
 
     end subroutine s_write_lag_variable_to_formatted_database_file
 
+    !> @brief Extract the volume-fraction interface contour from primitive fields and write the coordinates to the interface data file.
     impure subroutine s_write_intf_data_file(q_prim_vf)
 
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf
@@ -1584,6 +1590,7 @@ contains
 
     end subroutine s_write_intf_data_file
 
+    !> @brief Compute volume-integrated kinetic, potential, and internal energies and write the energy budget to the energy data file.
     impure subroutine s_write_energy_data_file(q_prim_vf, q_cons_vf)
         type(scalar_field), dimension(sys_size), intent(IN) :: q_prim_vf, q_cons_vf
         real(wp) :: Elk, Egk, Elp, Egint, Vb, Vl, pres_av, Et
@@ -1684,6 +1691,7 @@ contains
 
     end subroutine s_write_energy_data_file
 
+    !> @brief Close the formatted database slave file and, for the root process, the master file.
     impure subroutine s_close_formatted_database_file()
         ! Description: The purpose of this subroutine is to close any formatted
         !              database file(s) that may be opened at the time-step that
@@ -1713,18 +1721,21 @@ contains
 
     end subroutine s_close_formatted_database_file
 
+    !> @brief Close the interface data file.
     impure subroutine s_close_intf_data_file()
 
         close (211)
 
     end subroutine s_close_intf_data_file
 
+    !> @brief Close the energy data file.
     impure subroutine s_close_energy_data_file()
 
         close (251)
 
     end subroutine s_close_energy_data_file
 
+    !> @brief Deallocate module arrays and release all data-output resources.
     impure subroutine s_finalize_data_output_module()
         ! Description: Deallocation procedures for the module
 

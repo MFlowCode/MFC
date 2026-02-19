@@ -2,11 +2,7 @@
 !! @file
 !! @brief Contains module m_mpi_proxy
 
-!> @brief This module serves as a proxy to the parameters and subroutines
-!!              available in the MPI implementation's MPI module. Specifically,
-!!              the role of the proxy is to harness basic MPI commands into more
-!!              complex procedures as to achieve the required pre-processing
-!!              communication goals.
+!> @brief Broadcasts user inputs and decomposes the domain across MPI ranks for pre-processing
 module m_mpi_proxy
 
 #ifdef MFC_MPI

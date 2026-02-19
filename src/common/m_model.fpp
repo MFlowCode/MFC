@@ -5,6 +5,7 @@
 
 #:include 'macros.fpp'
 
+!> @brief Binary STL file reader and processor for immersed boundary geometry
 module m_model
 
     use m_helper
@@ -461,6 +462,7 @@ contains
 
     end function f_read_line
 
+    !> @brief Reads the next non-comment line from a model file, using a buffered look-ahead mechanism.
     impure subroutine s_skip_ignored_lines(iunit, buffered_line, is_buffered)
         integer, intent(in) :: iunit
         character(80), intent(inout) :: buffered_line
@@ -600,9 +602,7 @@ contains
 
     !> This procedure checks and labels edges shared by two or more triangles facets of the 2D STL model.
     !! @param model                      Model to search in.
-    !! @param boundary_v                 Output boundary vertices/normals.
     !! @param boundary_vertex_count      Output total boundary vertex count
-    !! @param boundary_edge_count        Output total boundary edge counts
     subroutine f_check_boundary(model, boundary_v, boundary_vertex_count, boundary_edge_count)
 
         type(t_model), intent(in) :: model
@@ -713,10 +713,6 @@ contains
     end subroutine f_check_boundary
 
     !> This procedure appends the edge end vertices to a temporary buffer.
-    !! @param temp_boundary_v      Temporary edge end vertex buffer
-    !! @param edge                 Edges end points to be registered
-    !! @param edge_index           Edge index iterator
-    !! @param edge_count           Total number of edges
     subroutine f_register_edge(temp_boundary_v, edge, edge_index, edge_count)
 
         integer, intent(inout) :: edge_index !< Edge index iterator
@@ -733,9 +729,7 @@ contains
 
     !> This procedure check if interpolates is needed for 2D models.
     !! @param boundary_v                Temporary edge end vertex buffer
-    !! @param boundary_edge_count       Output total number of boundary edges
     !! @param spacing                   Dimensions of the current levelset cell
-    !! @param interpolate               Logical output
     subroutine f_check_interpolation_2D(boundary_v, boundary_edge_count, spacing, interpolate)
 
         logical, intent(inout) :: interpolate !< Logical indicator of interpolation
@@ -1117,10 +1111,8 @@ contains
 
     !> This procedure determines the levelset distance of 2D models without interpolation.
     !! @param boundary_v                   Group of all the boundary vertices of the 2D model without interpolation
-    !! @param boundary_vertex_count        Output the total number of boundary vertices
     !! @param boundary_edge_count          Output the total number of boundary edges
     !! @param point                        The cell centers of the current levelset cell
-    !! @param spacing                      Dimensions of the current levelset cell
     !! @return                             Distance which the levelset distance without interpolation
     function f_distance(boundary_v, boundary_edge_count, point) result(distance)
 

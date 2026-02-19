@@ -140,3 +140,6 @@ Below is a slightly altered version of that dialogue:
 * Click `Add Server` If you have not set up the PACE connection.
 This will create a new dialogue box where you can specify a configuration name and set the `Port` to `8722`.
 Once this is done, click `configure` and then `save` on the next dialogue box.
+
+
+<div style='text-align:center; font-size:0.75rem; color:#888; padding:16px 0 0;'>Page last updated: 2026-02-13</div>

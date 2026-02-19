@@ -4,19 +4,7 @@
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
-!> @brief  Weighted essentially non-oscillatory (WENO) reconstruction scheme
-!!              that is supplemented with monotonicity preserving bounds (MPWENO)
-!!              and a mapping function that boosts the accuracy of the non-linear
-!!              weights (WENOM). MPWENO, see Balsara and Shu (2000), prevents the
-!!              reconstructed values to lay outside the range set by the stencil,
-!!              while WENOM, see Henrick et al. (2005), recovers the formal order
-!!              of accuracy of the reconstruction at critical points. Please note
-!!              that the basic WENO approach is implemented according to the work
-!!              of Jiang and Shu (1996). WENO-Z, which is less dissipative than
-!!              WENO-JS and WENO-M, is implemented according to the work of
-!!              Borges, et al. (2008). TENO, which is even less dissipative than
-!!              WENO-Z but is less robust, is implemented according to the work
-!!              of Fu et al. (2016).
+!> @brief WENO/WENO-Z/TENO reconstruction with optional monotonicity-preserving bounds and mapped weights
 module m_weno
 
     use m_derived_types        !< Definitions of the derived types
@@ -637,6 +625,7 @@ contains
 
     end subroutine s_compute_weno_coefficients
 
+    !> @brief Performs WENO reconstruction of left and right cell-boundary values from cell-averaged variables.
     subroutine s_weno(v_vf, vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, &
                       weno_dir, &
                       is1_weno_d, is2_weno_d, is3_weno_d)
@@ -1200,13 +1189,7 @@ contains
         !!      other procedures that are required for the setup of the
         !!      WENO reconstruction.
         !! @param v_vf Cell-averaged variables
-        !! @param vL_vf Left WENO reconstructed cell-boundary values
-        !! @param vR_vf Right WENO reconstructed cell-boundary values
-        !! @param norm_dir Characteristic decommposition coordinate direction
         !! @param weno_dir Coordinate direction of the WENO reconstruction
-        !! @param is1_weno Index bounds in first coordinate direction
-        !! @param is2_weno Index bounds in second coordinate direction
-        !! @param is3_weno Index bounds in third coordinate direction
     subroutine s_initialize_weno(v_vf, &
                                  weno_dir)
 
@@ -1281,10 +1264,9 @@ contains
         !!      Balsara and Shu (2000), ensures that the reconstructed
         !!      values do not reside outside the range spanned by WENO
         !!      stencil.
-        !!  @param i Equation number
-        !!  @param j First-coordinate cell index
-        !!  @param k Secone-coordinate cell index
-        !!  @param l Thire-coordinate cell index
+        !!  @param v_rs_ws Reshaped cell-averaged variables
+        !!  @param vL_rs_vf Left WENO reconstructed cell-boundary values
+        !!  @param vR_rs_vf Right WENO reconstructed cell-boundary values
     subroutine s_preserve_monotonicity(v_rs_ws, vL_rs_vf, vR_rs_vf)
 
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(IN) :: v_rs_ws

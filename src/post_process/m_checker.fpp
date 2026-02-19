@@ -4,7 +4,7 @@
 
 #:include 'macros.fpp'
 
-!> @brief The purpose of the module is to check for compatible input files
+!> @brief Validates post-process input parameters and output format consistency
 module m_checker
 
     use m_global_parameters    !< Definitions of the global parameters

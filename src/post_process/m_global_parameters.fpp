@@ -4,9 +4,7 @@
 
 #:include 'case.fpp'
 
-!> @brief This module contains all of the parameters characterizing the
-!!      computational domain, simulation algorithm, stiffened equation of
-!!      state and finally, the formatted database file(s) structure.
+!> @brief Global parameters for the post-process: domain geometry, equation of state, and output database settings
 module m_global_parameters
 
 #ifdef MFC_MPI
@@ -335,7 +333,7 @@ module m_global_parameters
 
     real(wp) :: sigma
     logical :: surface_tension
-    !> #}
+    !> @}
 
     !> @name Index variables used for m_variables_conversion
     !> @{

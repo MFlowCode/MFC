@@ -4,7 +4,7 @@
 
 #:include 'macros.fpp'
 
-!> @brief This module contains procedures shared by the ensemble-averaged and volume-averaged bubble models.
+!> @brief Shared bubble-dynamics procedures (radial acceleration, wall pressure, sound speed) for ensemble- and volume-averaged models
 module m_bubbles
 
     use m_derived_types        !< Definitions of the derived types
@@ -210,7 +210,6 @@ contains
         !!  @param fRho Current density
         !!  @param fR Current bubble radius
         !!  @param fV Current bubble velocity
-        !!  @param fR0 Equilibrium bubble radius
         !!  @param fCpbw Boundary wall pressure
     elemental function f_rddot_RP(fCp, fRho, fR, fV, fCpbw)
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -317,7 +316,7 @@ contains
     end function f_rddot_KM
 
     !>  Subroutine that computes bubble wall properties for vapor bubbles
-        !!  @param pb Internal bubble pressure
+        !!  @param pb_in Internal bubble pressure
         !!  @param iR0 Current bubble size index
     elemental subroutine s_bwproperty(pb_in, iR0, chi_vw_out, k_mw_out, rho_mw_out)
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -345,6 +344,7 @@ contains
         !!  @param fpb
         !!  @param fmass_v Current mass of vapour
         !!  @param iR0 Bubble size index (EE) or bubble identifier (EL)
+        !!  @param vflux Computed vapour flux
         !!  @param fmass_g Current gas mass (EL)
         !!  @param fbeta_c Mass transfer coefficient (EL)
         !!  @param fR_m Mixture gas constant (EL)
@@ -793,16 +793,16 @@ contains
     end subroutine s_advance_substep
 
     !>  Changes of pressure and vapor mass in the lagrange bubbles.
-        !!  @param bub_id Bubble identifier
-        !!  @param fmass_g Current mass of gas
-        !!  @param fbeta_c Mass transfer coefficient
-        !!  @param fbeta_t Heat transfer coefficient
         !!  @param fR_tmp Bubble radius
         !!  @param fV_tmp Bubble radial velocity
         !!  @param fPb_tmp Internal bubble pressure
         !!  @param fMv_tmp Mass of vapor in the bubble
+        !!  @param bub_id Bubble identifier
+        !!  @param fmass_g Current mass of gas
+        !!  @param fbeta_c Mass transfer coefficient
+        !!  @param fbeta_t Heat transfer coefficient
         !!  @param fdPbdt_tmp Rate of change of the internal bubble pressure
-        !!  @param fdMvdt_tmp Rate of change of the mass of vapor in the bubble
+        !!  @param advance_EL Rate of change of the mass of vapor in the bubble
     elemental subroutine s_advance_EL(fR_tmp, fV_tmp, fPb_tmp, fMv_tmp, bub_id, &
                                       fmass_g, fbeta_c, fbeta_t, fdPbdt_tmp, advance_EL)
         $:GPU_ROUTINE(parallelism='[seq]')

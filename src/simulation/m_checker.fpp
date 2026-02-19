@@ -5,7 +5,7 @@
 #:include 'macros.fpp'
 #:include 'case.fpp'
 
-!> @brief The purpose of the module is to check for compatible input files
+!> @brief Validates simulation input parameters for consistency and supported configurations
 module m_checker
 
     use m_global_parameters    !< Definitions of the global parameters
@@ -63,6 +63,7 @@ contains
             "For 3D simulation, p must be greater than or equal to (num_stcls_min*weno_order - 1), whose value is "//trim(numStr))
     end subroutine s_check_inputs_weno
 
+    !> @brief Validates that the grid resolution is sufficient for the MUSCL reconstruction order.
     impure subroutine s_check_inputs_muscl
         character(len=5) :: numStr !< for int to string conversion
 

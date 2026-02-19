@@ -4,7 +4,7 @@
 
 #:include 'macros.fpp'
 
-!> @brief This module is used to compute source terms for hypoelastic model
+!> @brief Computes hypoelastic stress-rate source terms and damage-state evolution
 module m_hypoelastic
 
     use m_derived_types        !< Definitions of the derived types
@@ -37,6 +37,7 @@ module m_hypoelastic
 
 contains
 
+    !> @brief Allocates arrays and computes finite-difference coefficients for the hypoelastic stress model.
     impure subroutine s_initialize_hypoelastic_module
 
         integer :: i
@@ -375,6 +376,7 @@ contains
 
     end subroutine s_compute_hypoelastic_rhs
 
+    !> @brief Deallocates arrays used by the hypoelastic stress module.
     impure subroutine s_finalize_hypoelastic_module()
 
         @:DEALLOCATE(Gs_hypo)
@@ -392,6 +394,7 @@ contains
 
     end subroutine s_finalize_hypoelastic_module
 
+    !> @brief Computes the continuum damage source term from the principal stress state.
     subroutine s_compute_damage_state(q_cons_vf, rhs_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf

@@ -2,18 +2,7 @@
 !! @file
 !! @brief Contains module m_initial_condition
 
-!> @brief This module provides a platform that is analogous to constructive
-!!              solid geometry techniques and in this way allows for the creation
-!!              of a wide variety of initial conditions. Several 1D, 2D and 3D
-!!              fundamental geometries are included that may further be combined
-!!              into more complex shapes. This is achieved by carefully setting
-!!              up the order in which the patches are laid out in the domain and
-!!              specifying the priority that each patch has over the preceding
-!!              ones. The resulting shapes may be identified both by the values
-!!              of their primitive variables and the associated patch identities.
-!!              Note that the user may choose to read in and modify a preexisting
-!!              initial condition. The module m_start_up.f90 is responsible for
-!!             reading in the relevant data files.
+!> @brief Assembles initial conditions by layering prioritized patches via constructive solid geometry
 module m_initial_condition
 
     use m_derived_types         ! Definitions of the derived types
