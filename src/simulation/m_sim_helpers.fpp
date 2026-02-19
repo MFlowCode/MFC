@@ -93,7 +93,7 @@ contains
         !! @param alpha component alphas
         !! @param vel directional velocities
         !! @param vel_sum squard sum of velocity components
-        !! @param qv Vapor quality
+        !! @param qv Fluid reference energy
         !! @param j x index
         !! @param k y index
         !! @param l z index
