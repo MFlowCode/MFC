@@ -822,6 +822,22 @@ if (MFC_DOCUMENTATION)
     add_dependencies(simulation_doxygen gen_api_landing)
     add_dependencies(post_process_doxygen gen_api_landing)
 
+    # Fix @file/@brief headers to match actual module/program declarations.
+    # Handles mixed-case Fortran names and catches stale module renames.
+    add_custom_command(
+        OUTPUT  "${CMAKE_CURRENT_BINARY_DIR}/fix-file-briefs.stamp"
+        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/docs/fix_file_briefs.py"
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/docs/fix_file_briefs.py"
+                "${CMAKE_CURRENT_SOURCE_DIR}"
+        COMMAND "${CMAKE_COMMAND}" -E touch "${CMAKE_CURRENT_BINARY_DIR}/fix-file-briefs.stamp"
+        COMMENT "Fixing @file brief headers"
+        VERBATIM
+    )
+    add_custom_target(fix_file_briefs DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/fix-file-briefs.stamp")
+    add_dependencies(pre_process_doxygen fix_file_briefs)
+    add_dependencies(simulation_doxygen fix_file_briefs)
+    add_dependencies(post_process_doxygen fix_file_briefs)
+
     # Inject per-page last-updated dates into documentation markdown files.
     # Runs after auto-generated .md files exist, before Doxygen processes them.
     # Uses a stamp file so it only runs once per build.
