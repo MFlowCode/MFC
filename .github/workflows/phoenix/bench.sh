@@ -48,8 +48,8 @@ while [ $attempt -le $max_attempts ]; do
     fi
 
     if [ $attempt -lt $max_attempts ]; then
-        echo "Build failed on attempt $attempt. Cleaning and retrying in 30s..."
-        ./mfc.sh clean
+        echo "Build failed on attempt $attempt. Cleaning source targets and retrying in 30s..."
+        ./mfc.sh clean -t pre_process simulation post_process syscheck
         sleep 30
     else
         echo "Build failed after $max_attempts attempts."

@@ -154,6 +154,13 @@ BUILD_COMMAND = Command(
             default=False,
             dest="case_optimization",
         ),
+        Argument(
+            name="deps-only",
+            help="Only fetch and build dependencies, do not build MFC targets.",
+            action=ArgAction.STORE_TRUE,
+            default=False,
+            dest="deps_only",
+        ),
     ],
     examples=[
         Example("./mfc.sh build", "Build all default targets (CPU)"),

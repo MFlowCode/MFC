@@ -11,8 +11,32 @@ if [ "$job_device" = "gpu" ]; then
     elif [ "$job_interface" = "omp" ]; then
         device_opts+=" mp"
     fi
+else
+    device_opts+=" --no-gpu"
 fi
 
+# Build source code on compute node (deps already fetched on login node)
+max_attempts=3
+attempt=1
+while [ $attempt -le $max_attempts ]; do
+    echo "Build attempt $attempt of $max_attempts..."
+    if ./mfc.sh test -v -a --dry-run --rdma-mpi -j 8 $device_opts; then
+        echo "Build succeeded on attempt $attempt."
+        break
+    fi
+
+    if [ $attempt -lt $max_attempts ]; then
+        echo "Build failed on attempt $attempt. Cleaning source targets and retrying in 30s..."
+        ./mfc.sh clean -t pre_process simulation post_process syscheck
+        sleep 30
+    else
+        echo "Build failed after $max_attempts attempts."
+        exit 1
+    fi
+    attempt=$((attempt + 1))
+done
+
+# Run tests
 if [ "$job_device" = "gpu" ]; then
     ./mfc.sh test -v -a --rdma-mpi --max-attempts 3 -j $ngpus $device_opts -- -c frontier
 else

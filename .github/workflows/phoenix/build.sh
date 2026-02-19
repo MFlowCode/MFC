@@ -18,6 +18,6 @@ if [ "$job_device" = "gpu" ]; then
   fi
 fi
 
-. ./mfc.sh load -c famd -m g
+. ./mfc.sh load -c p -m $job_device
 
-./mfc.sh build --deps-only -j 8 $build_opts
+./mfc.sh build --deps-only -j $(nproc) $build_opts
