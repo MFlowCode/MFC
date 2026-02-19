@@ -89,12 +89,17 @@
                 .then(sims => renderSims(sims));
 
             document.getElementById("ft-scaling").innerHTML = scalings.map(s => `
-                <a href="documentation/expectedPerformance.html" class="flex md:w-2/6 mx-auto flex-col text-white rounded bg-slate-900 rounded-b-lg hover:ring-2 hover:ring-amber-400 transition-shadow no-underline">
+                <div class="flex md:w-1/2 mx-auto flex-col text-white rounded bg-slate-900 rounded-b-lg">
                     <div class="flex-1 grid bg-white pb-2">
                         <img class="place-self-center" src="${s.image}" alt="${s.label}">
                     </div>
-                    <div class="flex-1 p-2 font-semibold text-center">${s.label}</div>
-                </a>
+                    <div class="flex flex-row items-center">
+                        <div class="flex-1 p-2 font-semibold text-center">${s.label}</div>
+                        <a class="w-10 text-center text-xl hover:text-amber-400 transition-colors" href="documentation/expectedPerformance.html">
+                            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                        </a>
+                    </div>
+                </div>
             `).join("");
 
             document.getElementById("copyright-year").textContent = new Date().getFullYear();
