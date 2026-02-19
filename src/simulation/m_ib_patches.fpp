@@ -25,7 +25,7 @@ module m_ib_patches
 
     implicit none
 
-    private; public :: s_apply_ib_patches, s_update_ib_rotation_matrix, f_convert_cyl_to_cart
+    private; public :: s_apply_ib_patches, s_update_ib_rotation_matrix, f_convert_cyl_to_cart, s_instantiate_STL_models
 
     real(wp) :: x_centroid, y_centroid, z_centroid
     real(wp) :: length_x, length_y, length_z
@@ -887,10 +887,10 @@ contains
         integer, intent(in) :: patch_id
         type(integer_field), intent(inout) :: ib_markers
 
-        integer :: i, j, k !< Generic loop iterators
+        integer :: i, j, k, il, ir, jl, jr, kl, kr !< Generic loop iterators
         integer :: spc
 
-        real(wp) :: eta, threshold
+        real(wp) :: eta, threshold, corner_distance
         real(wp), dimension(1:3) :: point, local_point, offset
         real(wp), dimension(1:3) :: center, xyz_local
         real(wp), dimension(1:3, 1:3) :: inverse_rotation
@@ -904,11 +904,26 @@ contains
         spc = patch_ib(patch_id)%model_spc
         threshold = patch_ib(patch_id)%model_threshold
 
+        il = -gp_layers
+        jl = -gp_layers
+        kl = -gp_layers
+        ir = m + gp_layers
+        jr = n + gp_layers
+        kr = p + gp_layers
+        corner_distance = 0._wp
+        do i = 1, 3
+            corner_distance = corner_distance + maxval(abs(stl_bounding_boxes(patch_id, i, 1:3)))**2 ! distance to rim of cylinder
+        end do
+        corner_distance = sqrt(corner_distance)
+        call get_bounding_indices(center(1) - corner_distance, center(1) + corner_distance, x_cc, il, ir)
+        call get_bounding_indices(center(2) - corner_distance, center(2) + corner_distance, y_cc, jl, jr)
+        call get_bounding_indices(center(3) - corner_distance, center(3) + corner_distance, z_cc, kl, kr)
+
         $:GPU_PARALLEL_LOOP(private='[i,j,k, xyz_local, eta]',&
-                  & copyin='[patch_id,center,inverse_rotation, offset, spc, threshold]', collapse=2)
-        do i = -gp_layers, m + gp_layers
-            do j = -gp_layers, n + gp_layers
-                do k = -gp_layers, p + gp_layers
+                  & copyin='[patch_id,center,inverse_rotation, offset, spc, threshold]', collapse=3)
+        do i = il, ir
+            do j = jl, jr
+                do k = kl, kr
 
                     xyz_local = [x_cc(i) - center(1), y_cc(j) - center(2), z_cc(k) - center(3)]
                     xyz_local = matmul(inverse_rotation, xyz_local)
@@ -932,8 +947,227 @@ contains
                 end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_ib_3d_model
+
+    subroutine s_instantiate_STL_models()
+
+        ! Variables for IBM+STL
+        real(wp) :: normals(1:3) !< Boundary normal buffer
+        integer :: boundary_vertex_count, boundary_edge_count, total_vertices !< Boundary vertex
+        real(wp), allocatable, dimension(:, :, :) :: boundary_v !< Boundary vertex buffer
+        real(wp), allocatable, dimension(:, :) :: interpolated_boundary_v !< Interpolated vertex buffer
+        real(wp) :: dx_local, dy_local, dz_local !< Levelset distance buffer
+        logical :: interpolate !< Logical variable to determine whether or not the model should be interpolated
+
+        integer :: i, j, k !< Generic loop iterators
+        integer :: patch_id
+
+        type(t_bbox) :: bbox, bbox_old
+        type(t_model) :: model
+        type(ic_model_parameters) :: params
+
+        real(wp) :: eta
+        real(wp), dimension(1:3) :: point, model_center
+        real(wp) :: grid_mm(1:3, 1:2)
+
+        real(wp), dimension(1:4, 1:4) :: transform, transform_n
+
+        dx_local = minval(dx); dy_local = minval(dy)
+        if (p /= 0) dz_local = minval(dz)
+
+        do patch_id = 1, num_ibs
+            if (patch_ib(patch_id)%geometry == 5 .or. patch_ib(patch_id)%geometry == 12) then
+                allocate (models(patch_id)%model)
+                print *, " * Reading model: "//trim(patch_ib(patch_id)%model_filepath)
+
+                model = f_model_read(patch_ib(patch_id)%model_filepath)
+                params%scale(:) = patch_ib(patch_id)%model_scale(:)
+                params%translate(:) = patch_ib(patch_id)%model_translate(:)
+                params%rotate(:) = patch_ib(patch_id)%model_rotate(:)
+                params%spc = patch_ib(patch_id)%model_spc
+                params%threshold = patch_ib(patch_id)%model_threshold
+
+                if (f_approx_equal(dot_product(params%scale, params%scale), 0._wp)) then
+                    params%scale(:) = 1._wp
+                end if
+
+                if (proc_rank == 0) then
+                    print *, " * Transforming model."
+                end if
+
+                ! Get the model center before transforming the model
+                bbox_old = f_create_bbox(model)
+                model_center(1:3) = (bbox_old%min(1:3) + bbox_old%max(1:3))/2._wp
+
+                ! Compute the transform matrices for vertices and normals
+                transform = f_create_transform_matrix(params, model_center)
+                transform_n = f_create_transform_matrix(params)
+
+                call s_transform_model(model, transform, transform_n)
+
+                ! Recreate the bounding box after transformation
+                bbox = f_create_bbox(model)
+
+                ! Show the number of vertices in the original STL model
+                if (proc_rank == 0) then
+                    print *, ' * Number of input model vertices:', 3*model%ntrs
+                end if
+
+                call f_check_boundary(model, boundary_v, boundary_vertex_count, boundary_edge_count)
+
+                ! Check if the model needs interpolation
+                if (p > 0) then
+                    call f_check_interpolation_3D(model, (/dx_local, dy_local, dz_local/), interpolate)
+                else
+                    call f_check_interpolation_2D(boundary_v, boundary_edge_count, (/dx_local, dy_local, 0._wp/), interpolate)
+                end if
+                interpolate = .false.
+
+                ! Show the number of edges and boundary edges in 2D STL models
+                if (proc_rank == 0 .and. p == 0) then
+                    print *, ' * Number of 2D model boundary edges:', boundary_edge_count
+                end if
+
+                ! Interpolate the STL model along the edges (2D) and on triangle facets (3D)
+                if (interpolate) then
+                    if (proc_rank == 0) then
+                        print *, ' * Interpolating STL vertices.'
+                    end if
+
+                    if (p > 0) then
+                        call f_interpolate_3D(model, (/dx, dy, dz/), interpolated_boundary_v, total_vertices)
+                    else
+                        call f_interpolate_2D(boundary_v, boundary_edge_count, (/dx, dy, dz/), interpolated_boundary_v, total_vertices)
+                    end if
+
+                    if (proc_rank == 0) then
+                        print *, ' * Total number of interpolated boundary vertices:', total_vertices
+                    end if
+                end if
+
+                if (proc_rank == 0) then
+                    write (*, "(A, 3(2X, F20.10))") "    > Model:  Min:", bbox%min(1:3)
+                    write (*, "(A, 3(2X, F20.10))") "    >         Cen:", (bbox%min(1:3) + bbox%max(1:3))/2._wp
+                    write (*, "(A, 3(2X, F20.10))") "    >         Max:", bbox%max(1:3)
+
+                    grid_mm(1, :) = (/minval(x_cc(0:m)) - 0.5_wp*dx_local, maxval(x_cc(0:m)) + 0.5_wp*dx_local/)
+                    grid_mm(2, :) = (/minval(y_cc(0:n)) - 0.5_wp*dy_local, maxval(y_cc(0:n)) + 0.5_wp*dy_local/)
+
+                    if (p > 0) then
+                        grid_mm(3, :) = (/minval(z_cc(0:p)) - 0.5_wp*dz_local, maxval(z_cc(0:p)) + 0.5_wp*dz_local/)
+                    else
+                        grid_mm(3, :) = (/0._wp, 0._wp/)
+                    end if
+
+                    write (*, "(A, 3(2X, F20.10))") "    > Domain: Min:", grid_mm(:, 1)
+                    write (*, "(A, 3(2X, F20.10))") "    >         Cen:", (grid_mm(:, 1) + grid_mm(:, 2))/2._wp
+                    write (*, "(A, 3(2X, F20.10))") "    >         Max:", grid_mm(:, 2)
+                end if
+
+                allocate (stl_bounding_boxes(patch_id, 1:3, 1:3))
+                stl_bounding_boxes(patch_id, 1, 1:3) = [bbox%min(1), (bbox%min(1) + bbox%max(1))/2._wp, bbox%max(1)]
+                stl_bounding_boxes(patch_id, 2, 1:3) = [bbox%min(2), (bbox%min(2) + bbox%max(2))/2._wp, bbox%max(2)]
+                stl_bounding_boxes(patch_id, 3, 1:3) = [bbox%min(3), (bbox%min(3) + bbox%max(3))/2._wp, bbox%max(3)]
+
+                models(patch_id)%model = model
+                models(patch_id)%boundary_v = boundary_v
+                models(patch_id)%boundary_edge_count = boundary_edge_count
+                if (interpolate) then
+                    models(patch_id)%interpolate = 1
+                else
+                    models(patch_id)%interpolate = 0
+                end if
+                if (interpolate) then
+                    models(patch_id)%interpolated_boundary_v = interpolated_boundary_v
+                    models(patch_id)%total_vertices = total_vertices
+                end if
+
+            end if
+        end do
+
+        ! Pack and upload flat arrays for GPU (AFTER the loop)
+        block
+            integer :: pid, max_ntrs
+            integer :: max_bv1, max_bv2, max_bv3, max_iv1, max_iv2
+
+            max_ntrs = 0
+            max_bv1 = 0; max_bv2 = 0; max_bv3 = 0
+            max_iv1 = 0; max_iv2 = 0
+
+            do pid = 1, num_ibs
+                if (allocated(models(pid)%model)) then
+                    call s_pack_model_for_gpu(models(pid))
+                    max_ntrs = max(max_ntrs, models(pid)%ntrs)
+                end if
+                if (allocated(models(pid)%boundary_v)) then
+                    max_bv1 = max(max_bv1, size(models(pid)%boundary_v, 1))
+                    max_bv2 = max(max_bv2, size(models(pid)%boundary_v, 2))
+                    max_bv3 = max(max_bv3, size(models(pid)%boundary_v, 3))
+                end if
+                if (allocated(models(pid)%interpolated_boundary_v)) then
+                    max_iv1 = max(max_iv1, size(models(pid)%interpolated_boundary_v, 1))
+                    max_iv2 = max(max_iv2, size(models(pid)%interpolated_boundary_v, 2))
+                end if
+            end do
+
+            if (max_ntrs > 0) then
+                allocate (gpu_ntrs(1:num_ibs))
+                allocate (gpu_trs_v(1:3, 1:3, 1:max_ntrs, 1:num_ibs))
+                allocate (gpu_trs_n(1:3, 1:max_ntrs, 1:num_ibs))
+                allocate (gpu_interpolate(1:num_ibs))
+                allocate (gpu_boundary_edge_count(1:num_ibs))
+                allocate (gpu_total_vertices(1:num_ibs))
+
+                gpu_ntrs = 0
+                gpu_trs_v = 0._wp
+                gpu_trs_n = 0._wp
+                gpu_interpolate = 0
+                gpu_boundary_edge_count = 0
+                gpu_total_vertices = 0
+
+                if (max_bv1 > 0) then
+                    allocate (gpu_boundary_v(1:max_bv1, 1:max_bv2, 1:max_bv3, 1:num_ibs))
+                    gpu_boundary_v = 0._wp
+                end if
+
+                if (max_iv1 > 0) then
+                    allocate (gpu_interpolated_boundary_v(1:max_iv1, 1:max_iv2, 1:num_ibs))
+                    gpu_interpolated_boundary_v = 0._wp
+                end if
+
+                do pid = 1, num_ibs
+                    if (allocated(models(pid)%model)) then
+                        gpu_ntrs(pid) = models(pid)%ntrs
+                        gpu_trs_v(:, :, 1:models(pid)%ntrs, pid) = models(pid)%trs_v
+                        gpu_trs_n(:, 1:models(pid)%ntrs, pid) = models(pid)%trs_n
+                        gpu_interpolate(pid) = models(pid)%interpolate
+                        gpu_boundary_edge_count(pid) = models(pid)%boundary_edge_count
+                        gpu_total_vertices(pid) = models(pid)%total_vertices
+                    end if
+                    if (allocated(models(pid)%boundary_v)) then
+                        gpu_boundary_v(1:size(models(pid)%boundary_v, 1), &
+                                       1:size(models(pid)%boundary_v, 2), &
+                                       1:size(models(pid)%boundary_v, 3), pid) = models(pid)%boundary_v
+                    end if
+                    if (allocated(models(pid)%interpolated_boundary_v)) then
+                        gpu_interpolated_boundary_v(1:size(models(pid)%interpolated_boundary_v, 1), &
+                                                    1:size(models(pid)%interpolated_boundary_v, 2), pid) = models(pid)%interpolated_boundary_v
+                    end if
+                end do
+
+                $:GPU_ENTER_DATA(copyin='[gpu_ntrs, gpu_trs_v, gpu_trs_n, gpu_interpolate, gpu_boundary_edge_count, gpu_total_vertices]')
+                if (allocated(gpu_boundary_v)) then
+                    $:GPU_ENTER_DATA(copyin='[gpu_boundary_v]')
+                end if
+                if (allocated(gpu_interpolated_boundary_v)) then
+                    $:GPU_ENTER_DATA(copyin='[gpu_interpolated_boundary_v]')
+                end if
+            end if
+        end block
+
+    end subroutine s_instantiate_STL_models
 
     !> Subroutine that computes a rotation matrix for converting to the rotating frame of the boundary
     subroutine s_update_ib_rotation_matrix(patch_id)
