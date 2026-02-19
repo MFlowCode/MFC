@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Generate API landing pages for pre_process, simulation, and post_process.
+"""Generate API landing pages for MFC documentation.
 
 Usage: python3 gen_api_landing.py [source_dir]
   source_dir defaults to current directory.
 
 Scans src/{target}/*.fpp,*.f90 and src/common/*.fpp,*.f90 to produce module
-tables in docs/{target}/readme.md. Intro text is defined below per target.
+tables in docs/{target}/readme.md. Also generates a unified API landing page
+at docs/api/readme.md that links to all three sub-project APIs.
 """
 
 from __future__ import annotations
@@ -149,3 +150,31 @@ for target, info in TARGETS.items():
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text("\n".join(lines), encoding="utf-8")
     print(f"Generated {out}")
+
+# --- Unified API landing page ---
+api_lines = [
+    "@mainpage API Documentation",
+    "",
+    "MFC's source code is organized into three components that form a complete "
+    "simulation pipeline. Each component has full module-level API documentation.",
+    "",
+]
+
+for target, info in TARGETS.items():
+    label = info["title"].replace("MFC ", "")
+    api_lines.append(f"### [{label}](../{target}/index.html)")
+    api_lines.append("")
+    api_lines.append(info["intro"])
+    api_lines.append("")
+
+api_lines.append(
+    "All three components share a set of **common modules** for MPI communication, "
+    "variable conversion, derived types, and utility functions. "
+    "These are documented within each component's API reference."
+)
+api_lines.append("")
+
+api_out = src_dir / "docs" / "api" / "readme.md"
+api_out.parent.mkdir(parents=True, exist_ok=True)
+api_out.write_text("\n".join(api_lines), encoding="utf-8")
+print(f"Generated {api_out}")
