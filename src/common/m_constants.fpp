@@ -14,6 +14,7 @@ module m_constants
     real(wp), parameter :: small_alf = 1.e-11_wp                !< Small alf tolerance
     real(wp), parameter :: pi = 3.141592653589793_wp !< Pi
     real(wp), parameter :: verysmall = 1.e-12_wp              !< Very small number
+    real(wp), parameter :: small_radius = 1.e-32_wp           !< Radius cutoff to avoid division by zero for 3D spherical harmonic patch (geometry 14)
 
     integer, parameter :: num_stcls_min = 5                       !< Minimum # of stencils
     integer, parameter :: path_len = 400                          !< Maximum path length
@@ -24,6 +25,8 @@ module m_constants
     integer, parameter :: num_probes_max = 10                     !< Maximum number of flow probes in the simulation
     integer, parameter :: num_patches_max = 10
     integer, parameter :: num_bc_patches_max = 10
+    integer, parameter :: max_2d_fourier_modes = 10 !< Max Fourier mode index for 2D modal patch (geometry 13)
+    integer, parameter :: max_sph_harm_degree = 5   !< Max degree L for 3D spherical harmonic patch (geometry 14)
     integer, parameter :: pathlen_max = 400
     integer, parameter :: nnode = 4    !< Number of QBMM nodes
     integer, parameter :: dflt_num_igr_iters = 2 !< number of iterations for IGR elliptic solve

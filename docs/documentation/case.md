@@ -267,11 +267,11 @@ The number has to be a positive integer.
 - `num_fluids` defines the total number of fluids defined in each of the patches.
 The number has to be a positive integer.
 
-- `patch_icpp(j)%%geometry` defines the type of geometry of $j$-th patch by using an integer from 1 to 13.
+- `patch_icpp(j)%%geometry` defines the type of geometry of $j$-th patch by using an integer from 1 to 21.
 Definition of the patch type for each integer is listed in table [Patch Types](#patch-types).
 
 - `[x,y,z]_centroid`, `length_[x,y,z]`, and/or `radius` are used to uniquely define the geometry of the patch with given type.
-Requisite combinations of the parameters for each type can be found in is listed in table [Patch types](#patch-types).
+Requisite combinations of the parameters for each type are listed in table [Patch types](#patch-types).
 
 - `patch_icpp(j)%%alter_patch(i)` activates alternation of `patch(i)` with `patch(j)`.
 For instance, in a 2D simulation, when a cylindrical `patch(2)` is immersed in a rectangular `patch(1)`:
@@ -1087,8 +1087,8 @@ This boundary condition can be used for subsonic inflow (`bc_[x,y,z]%[beg,end]` 
 | 10   | Cylinder 		           | 3     | Y      | Requires `[x,y,z]_centroid`, `radius`, and `length_[x,y,z]`. |
 | 11   | Sweep plane 	           | 3     | Y      | Not coordinate-aligned. Requires `x[y,z]_centroid` and `normal(i)`. |
 | 12   | Ellipsoid 		           | 3     | Y      | Requires `[x,y,z]_centroid` and `radii(i)`. |
-| 13   | N/A        	           | N/A   | N/A    | No longer exists. Empty. |
-| 14   | Spherical Harmonic      | 3     | N      | Requires `[x,y,z]_centroid`, `radius`, `epsilon`, `beta` |
+| 13   | 2D modal (Fourier)      | 2     | Y      | Requires `x_centroid`, `y_centroid`, `radius`. Optional: `fourier_cos(n)`, `fourier_sin(n)` (n=1..10), `modal_clip_r_to_min`, `modal_r_min`, `modal_use_exp_form`. |
+| 14   | 3D spherical harmonic   | 3     | Y      | Requires `x_centroid`, `y_centroid`, `z_centroid`, `radius`. Optional: `sph_har_coeff(l,m)` (l=0..5, m=-l..l). |
 | 15   | N/A                     | N/A   | N/A    | No longer exists. Empty.  |
 | 16   | 1D bubble pulse         | 1     | N      | Requires `x_centroid`, `length_x` |
 | 17   | Spiral                  | 2     | N      | Requires `[x,y]_centroid` |
@@ -1101,6 +1101,19 @@ The patch types supported by the MFC are listed in table [Patch Types](#patch-ty
 This includes types exclusive to one-, two-, and three-dimensional problems.
 The patch type number (`#`) corresponds to the input value in `input.py` labeled  `patch_icpp(j)%%geometry` where $j$ is the patch index.
 Each patch requires a different set of parameters, which are also listed in this table.
+
+**Geometry 13: 2D modal (Fourier):**  
+Boundary is at polar angle $\theta = \mathrm{atan2}(y - y_{\mathrm{centroid}}, x - x_{\mathrm{centroid}})$.
+
+- **Additive form** (default, `modal_use_exp_form` false):  
+  $R_{\mathrm{boundary}} = \mathrm{radius} + \sum_n \bigl[ \mathtt{fourier\_cos}(n)\cos(n\theta) + \mathtt{fourier\_sin}(n)\sin(n\theta) \bigr]$.  
+  Coefficients are absolute: same units as `radius` (length).  
+  If this formula gives $R_{\mathrm{boundary}} < 0$ at some $\theta$, it is clipped to zero.  
+  With `modal_clip_r_to_min` true, if $R_{\mathrm{boundary}} <$ `modal_r_min` at some $\theta$, it is clipped to `modal_r_min`.  
+  
+- **Exponential form** (`modal_use_exp_form` true):  
+  $R_{\mathrm{boundary}} = \mathrm{radius} \times \exp\bigl( \sum_n [\ldots] \bigr)$.  
+  Coefficients are relative (dimensionless); the sum scales the radius.
 
 ### Immersed Boundary Patch Types {#immersed-boundary-patch-types}
 

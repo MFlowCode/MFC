@@ -470,6 +470,12 @@ contains
             patch_icpp(i)%a(8) = dflt_real
             patch_icpp(i)%a(9) = dflt_real
             patch_icpp(i)%non_axis_sym = .false.
+            patch_icpp(i)%fourier_cos(:) = 0._wp
+            patch_icpp(i)%fourier_sin(:) = 0._wp
+            patch_icpp(i)%modal_clip_r_to_min = .false.
+            patch_icpp(i)%modal_r_min = 1.e-12_wp
+            patch_icpp(i)%modal_use_exp_form = .false.
+            patch_icpp(i)%sph_har_coeff(:, :) = 0._wp
 
             !should get all of r0's and v0's
             patch_icpp(i)%r0 = dflt_real
