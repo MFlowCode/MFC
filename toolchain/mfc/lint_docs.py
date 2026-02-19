@@ -784,6 +784,50 @@ def check_amsmath_in_doxygen_math(repo_root: Path) -> list[str]:  # pylint: disa
     return errors
 
 
+_MODULE_RE = re.compile(r"^\s*module\s+(m_\w+)\s*$", re.IGNORECASE)
+_BRIEF_LINE_RE = re.compile(r"^!>\s*@brief\s+(.+)", re.IGNORECASE)
+_CONTAINS_RE = re.compile(r"^Contains\s+(module|program)\s+\w+", re.IGNORECASE)
+
+
+def check_module_briefs(repo_root: Path) -> list[str]:
+    """Check that every m_*.fpp/.f90 has a module-level !> @brief before the module declaration."""
+    src_dir = repo_root / "src"
+    if not src_dir.exists():
+        return []
+
+    errors = []
+    for fpp in sorted(src_dir.rglob("m_*.[fF]*")):
+        if fpp.suffix not in (".fpp", ".f90", ".F90"):
+            continue
+
+        lines = fpp.read_text(encoding="utf-8").splitlines()
+        # Find the "module m_xxx" declaration
+        mod_idx = None
+        for i, line in enumerate(lines[:80]):
+            if _MODULE_RE.match(line):
+                mod_idx = i
+                break
+        if mod_idx is None:
+            continue
+
+        # Scan lines before the module declaration for !> @brief
+        found_brief = False
+        for i in range(mod_idx):
+            m = _BRIEF_LINE_RE.match(lines[i].strip())
+            if m and not _CONTAINS_RE.match(m.group(1)):
+                found_brief = True
+                break
+
+        if not found_brief:
+            rel = fpp.relative_to(repo_root)
+            errors.append(
+                f"  {rel} has no module-level !> @brief before the module declaration."
+                " Fix: add '!> @brief <description>' on the line before 'module ...'"
+            )
+
+    return errors
+
+
 def main():
     repo_root = Path(__file__).resolve().parents[2]
 
@@ -802,6 +846,7 @@ def main():
     all_errors.extend(check_physics_docs_coverage(repo_root))
     all_errors.extend(check_identifier_refs(repo_root))
     all_errors.extend(check_cli_refs(repo_root))
+    all_errors.extend(check_module_briefs(repo_root))
 
     if all_errors:
         print("Doc reference check failed:")

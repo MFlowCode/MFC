@@ -5,18 +5,7 @@
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
-!> @brief The module contains the subroutines used to calculate the right-
-!!              hane-side (RHS) in the quasi-conservative, shock- and interface-
-!!              capturing finite-volume framework for the multicomponent Navier-
-!!              Stokes equations supplemented by appropriate advection equations
-!!              used to capture the material interfaces. The system of equations
-!!              is closed by the stiffened gas equation of state, as well as any
-!!              required mixture relationships. Capillarity effects are included
-!!              and are modeled by the means of a volume force acting across the
-!!              diffuse material interface region. The implementation details of
-!!              surface tension may be found in Perigaud and Saurel (2005). Note
-!!              that both viscous and surface tension effects are only available
-!!              in the volume fraction model.
+!> @brief Assembles the right-hand side of the governing equations using finite-volume flux differencing, Riemann solvers, and physical source terms
 module m_rhs
 
     use m_derived_types        !< Definitions of the derived types
@@ -158,6 +147,7 @@ module m_rhs
     $:GPU_DECLARE(create='[irx,iry,irz]')
 
     type(int_bounds_info) :: is1, is2, is3
+    !> @}
     $:GPU_DECLARE(create='[is1,is2,is3]')
 
     !> @name Saved fluxes for testing
@@ -641,6 +631,7 @@ contains
 
     end subroutine s_initialize_rhs_module
 
+    !> @brief Computes the right-hand side of the semi-discrete governing equations for a single time stage.
     impure subroutine s_compute_rhs(q_cons_vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_in, rhs_pb, mv_in, rhs_mv, t_step, time_avg, stage)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
@@ -1097,6 +1088,7 @@ contains
 
     end subroutine s_compute_rhs
 
+    !> @brief Accumulates advection source contributions from a given coordinate direction into the RHS.
     subroutine s_compute_advection_source_term(idir, rhs_vf, q_cons_vf, q_prim_vf, flux_src_n_vf)
 
         integer, intent(in) :: idir
@@ -1337,6 +1329,7 @@ contains
 
     contains
 
+        !> @brief Adds the advection source flux-difference terms for a single coordinate direction to the RHS.
         subroutine s_add_directional_advection_source_terms(current_idir, rhs_vf_arg, q_cons_vf_arg, &
                                                             q_prim_vf_arg, flux_src_n_vf_arg, Kterm_arg)
             integer, intent(in) :: current_idir
@@ -1562,6 +1555,7 @@ contains
 
     end subroutine s_compute_advection_source_term
 
+    !> @brief Adds viscous, surface-tension, and species-diffusion source flux contributions to the RHS for a given direction.
     subroutine s_compute_additional_physics_rhs(idir, q_prim_vf, rhs_vf, flux_src_n_in, &
                                                 dq_prim_dx_vf, dq_prim_dy_vf, dq_prim_dz_vf)
 
@@ -1872,10 +1866,12 @@ contains
         !!      at the Gaussian quadrature points, from the cell-averaged
         !!      variables.
         !!  @param v_vf Cell-average variables
-        !!  @param vL_qp Left WENO-reconstructed, cell-boundary values including
-        !!          the values at the quadrature points, of the cell-average variables
-        !!  @param vR_qp Right WENO-reconstructed, cell-boundary values including
-        !!          the values at the quadrature points, of the cell-average variables
+        !!  @param vL_x Left reconstructed cell-boundary values in x
+        !!  @param vL_y Left reconstructed cell-boundary values in y
+        !!  @param vL_z Left reconstructed cell-boundary values in z
+        !!  @param vR_x Right reconstructed cell-boundary values in x
+        !!  @param vR_y Right reconstructed cell-boundary values in y
+        !!  @param vR_z Right reconstructed cell-boundary values in z
         !!  @param norm_dir Splitting coordinate direction
     subroutine s_reconstruct_cell_boundary_values(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, &
                                                   norm_dir)
@@ -1931,6 +1927,7 @@ contains
         #:endfor
     end subroutine s_reconstruct_cell_boundary_values
 
+    !> @brief Performs first-order (piecewise constant) reconstruction of left and right cell-boundary values.
     subroutine s_reconstruct_cell_boundary_values_first_order(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, &
                                                               norm_dir)
 

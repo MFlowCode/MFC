@@ -32,9 +32,15 @@ Welcome to the Multi-component Flow Code (MFC) documentation.
 ## Development
 
 - @ref contributing "Contributing" - Developer guide and coding standards
+- [Pre-Process API](../pre_process/index.html) - Source code reference for mesh generation and initial conditions
+- [Simulation API](../simulation/index.html) - Source code reference for the flow solver
+- [Post-Process API](../post_process/index.html) - Source code reference for data extraction and visualization
 
 ## About
 
 - @ref papers "Papers" - Publications using MFC
 - \ref citelist "Bibliography" - Cited references
 - @ref authors "Authors" - Contributors
+
+
+<div style='text-align:center; font-size:0.75rem; color:#888; padding:16px 0 0;'>Page last updated: 2026-02-19</div>

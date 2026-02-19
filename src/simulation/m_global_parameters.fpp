@@ -5,12 +5,7 @@
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
-!> @brief The module contains all of the parameters describing the program
-!!              logistics, the computational domain and the simulation algorithm.
-!!              Additionally, for the volume fraction model, physical parameters
-!!              of each of the fluids present in the flow are located here. They
-!!              include stiffened gas equation of state parameters, the Reynolds
-!!              numbers and the Weber numbers.
+!> @brief Global parameters for the computational domain, fluid properties, and simulation algorithm configuration
 module m_global_parameters
 
 #ifdef MFC_MPI
@@ -326,7 +321,7 @@ module m_global_parameters
     ! boundary values.
     !> @{
     real(wp) :: wa_flg
-    !> @{
+    !> @}
 
     $:GPU_DECLARE(create='[wa_flg]')
 

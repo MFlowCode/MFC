@@ -1,6 +1,11 @@
+!>
+!! @file
+!! @brief Contains module m_sim_helpers
+
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
+!> @brief Simulation helper routines for enthalpy computation, CFL calculation, and stability checks
 module m_sim_helpers
 
     use m_derived_types        !< Definitions of the derived types
@@ -89,6 +94,7 @@ contains
         !! @param alpha component alphas
         !! @param vel directional velocities
         !! @param vel_sum squard sum of velocity components
+        !! @param qv Fluid reference energy
         !! @param j x index
         !! @param k y index
         !! @param l z index
@@ -164,6 +170,7 @@ contains
     !> Computes stability criterion for a specified dt
         !! @param vel directional velocities
         !! @param c mixture speed of sound
+        !! @param rho Density
         !! @param Re_l mixture Reynolds number
         !! @param j x index
         !! @param k y index
@@ -230,6 +237,7 @@ contains
 
     !> Computes dt for a specified CFL number
         !! @param vel directional velocities
+        !! @param c Speed of sound
         !! @param max_dt cell centered maximum dt
         !! @param rho cell centered density
         !! @param Re_l cell centered Reynolds number

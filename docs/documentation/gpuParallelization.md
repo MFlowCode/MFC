@@ -779,3 +779,6 @@ LIBOMPTARGET_JIT_SKIP_OPT=1
   - NVHPC is built on top of LLVM
 - [OpenMP Docs](https://www.openmp.org/spec-html/5.1/openmp.html)
 - [OpenACC Docs](https://www.openacc.org/sites/default/files/inline-files/OpenACC.2.7.pdf)
+
+
+<div style='text-align:center; font-size:0.75rem; color:#888; padding:16px 0 0;'>Page last updated: 2026-02-04</div>
