@@ -1064,7 +1064,11 @@ contains
         do j = 0, n
             do i = 0, m
                 r = sqrt((x_cc(i) - x_centroid)**2 + (y_cc(j) - y_centroid)**2)
-                theta = atan2(y_cc(j) - y_centroid, x_cc(i) - x_centroid)
+                if (r < small_radius) then
+                    theta = 0._wp
+                else
+                    theta = atan2(y_cc(j) - y_centroid, x_cc(i) - x_centroid)
+                end if
                 sum_series = 0._wp
                 do nn = 1, max_2d_fourier_modes
                     sum_series = sum_series + patch_icpp(patch_id)%fourier_cos(nn)*cos(real(nn, wp)*theta) &
