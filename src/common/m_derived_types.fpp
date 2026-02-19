@@ -184,7 +184,7 @@ module m_derived_types
     end type t_model
 
     type :: t_model_array
-        ! --- Original CPU-side fields (unchanged) ---
+        ! Original CPU-side fields (unchanged)
         type(t_model), allocatable :: model
         real(wp), allocatable, dimension(:, :, :) :: boundary_v
         real(wp), allocatable, dimension(:, :) :: interpolated_boundary_v
@@ -192,7 +192,7 @@ module m_derived_types
         integer :: total_vertices
         integer :: interpolate
 
-        ! --- GPU-friendly flattened arrays ---
+        ! GPU-friendly flattened arrays
         integer :: ntrs  ! copy of model%ntrs
         real(wp), allocatable, dimension(:, :, :) :: trs_v  ! (3, 3, ntrs) - triangle vertices
         real(wp), allocatable, dimension(:, :) :: trs_n  ! (3, ntrs)    - triangle normals

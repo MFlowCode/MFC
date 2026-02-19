@@ -17,13 +17,15 @@ module m_model
 
     private
 
-    public :: s_instantiate_STL_models, f_model_read, s_model_write, s_model_free, f_model_is_inside, models, gpu_ntrs, gpu_trs_v, gpu_trs_n
+    public :: s_instantiate_STL_models, f_model_read, s_model_write, s_model_free, f_model_is_inside, models, gpu_ntrs, &
+              gpu_trs_v, gpu_trs_n, gpu_boundary_v, gpu_interpolated_boundary_v, gpu_interpolate, gpu_boundary_edge_count, &
+              gpu_total_vertices
 
     ! Subroutines for STL immersed boundaries
     public :: f_check_boundary, f_register_edge, f_check_interpolation_2D, &
               f_check_interpolation_3D, f_interpolate_2D, f_interpolate_3D, &
               f_interpolated_distance, f_normals, f_distance, f_distance_normals_3D, f_tri_area, s_pack_model_for_gpu, &
-              f_model_is_inside_flat
+              f_model_is_inside_flat, f_distance_normals_3d_flat
 
     !! array of STL models that can be allocated and then used in IB marker and levelset compute
     type(t_model_array), allocatable, target :: models(:)
@@ -31,8 +33,11 @@ module m_model
     integer, allocatable :: gpu_ntrs(:)
     real(wp), allocatable, dimension(:, :, :, :) :: gpu_trs_v
     real(wp), allocatable, dimension(:, :, :) :: gpu_trs_n
-    real(wp), allocatable, dimension(:, :, :) :: gpu_boundary_v
+    real(wp), allocatable, dimension(:, :, :, :) :: gpu_boundary_v
     real(wp), allocatable, dimension(:, :, :) :: gpu_interpolated_boundary_v
+    integer, allocatable :: gpu_interpolate(:)
+    integer, allocatable :: gpu_boundary_edge_count(:)
+    integer, allocatable :: gpu_total_vertices(:)
 
 contains
 
@@ -174,12 +179,25 @@ contains
         ! Pack and upload flat arrays for GPU (AFTER the loop)
         block
             integer :: pid, max_ntrs
+            integer :: max_bv1, max_bv2, max_bv3, max_iv1, max_iv2
 
             max_ntrs = 0
+            max_bv1 = 0; max_bv2 = 0; max_bv3 = 0
+            max_iv1 = 0; max_iv2 = 0
+
             do pid = 1, num_ibs
                 if (allocated(models(pid)%model)) then
                     call s_pack_model_for_gpu(models(pid))
                     max_ntrs = max(max_ntrs, models(pid)%ntrs)
+                end if
+                if (allocated(models(pid)%boundary_v)) then
+                    max_bv1 = max(max_bv1, size(models(pid)%boundary_v, 1))
+                    max_bv2 = max(max_bv2, size(models(pid)%boundary_v, 2))
+                    max_bv3 = max(max_bv3, size(models(pid)%boundary_v, 3))
+                end if
+                if (allocated(models(pid)%interpolated_boundary_v)) then
+                    max_iv1 = max(max_iv1, size(models(pid)%interpolated_boundary_v, 1))
+                    max_iv2 = max(max_iv2, size(models(pid)%interpolated_boundary_v, 2))
                 end if
             end do
 
@@ -187,21 +205,54 @@ contains
                 allocate (gpu_ntrs(1:num_ibs))
                 allocate (gpu_trs_v(1:3, 1:3, 1:max_ntrs, 1:num_ibs))
                 allocate (gpu_trs_n(1:3, 1:max_ntrs, 1:num_ibs))
+                allocate (gpu_interpolate(1:num_ibs))
+                allocate (gpu_boundary_edge_count(1:num_ibs))
+                allocate (gpu_total_vertices(1:num_ibs))
 
                 gpu_ntrs = 0
                 gpu_trs_v = 0._wp
                 gpu_trs_n = 0._wp
+                gpu_interpolate = 0
+                gpu_boundary_edge_count = 0
+                gpu_total_vertices = 0
+
+                if (max_bv1 > 0) then
+                    allocate (gpu_boundary_v(1:max_bv1, 1:max_bv2, 1:max_bv3, 1:num_ibs))
+                    gpu_boundary_v = 0._wp
+                end if
+
+                if (max_iv1 > 0) then
+                    allocate (gpu_interpolated_boundary_v(1:max_iv1, 1:max_iv2, 1:num_ibs))
+                    gpu_interpolated_boundary_v = 0._wp
+                end if
 
                 do pid = 1, num_ibs
                     if (allocated(models(pid)%model)) then
                         gpu_ntrs(pid) = models(pid)%ntrs
                         gpu_trs_v(:, :, 1:models(pid)%ntrs, pid) = models(pid)%trs_v
                         gpu_trs_n(:, 1:models(pid)%ntrs, pid) = models(pid)%trs_n
+                        gpu_interpolate(pid) = models(pid)%interpolate
+                        gpu_boundary_edge_count(pid) = models(pid)%boundary_edge_count
+                        gpu_total_vertices(pid) = models(pid)%total_vertices
+                    end if
+                    if (allocated(models(pid)%boundary_v)) then
+                        gpu_boundary_v(1:size(models(pid)%boundary_v, 1), &
+                                       1:size(models(pid)%boundary_v, 2), &
+                                       1:size(models(pid)%boundary_v, 3), pid) = models(pid)%boundary_v
+                    end if
+                    if (allocated(models(pid)%interpolated_boundary_v)) then
+                        gpu_interpolated_boundary_v(1:size(models(pid)%interpolated_boundary_v, 1), &
+                                                    1:size(models(pid)%interpolated_boundary_v, 2), pid) = models(pid)%interpolated_boundary_v
                     end if
                 end do
 
-                $:GPU_ENTER_DATA(copyin='[gpu_ntrs, gpu_trs_v, gpu_trs_n]')
-
+                $:GPU_ENTER_DATA(copyin='[gpu_ntrs, gpu_trs_v, gpu_trs_n, gpu_interpolate, gpu_boundary_edge_count, gpu_total_vertices]')
+                if (allocated(gpu_boundary_v)) then
+                    $:GPU_ENTER_DATA(copyin='[gpu_boundary_v]')
+                end if
+                if (allocated(gpu_interpolated_boundary_v)) then
+                    $:GPU_ENTER_DATA(copyin='[gpu_interpolated_boundary_v]')
+                end if
             end if
         end block
 
@@ -731,7 +782,7 @@ contains
                 end if
             end do
 
-            ! if thje ray hits an odd number of triangles on its way out, then
+            ! if the ray hits an odd number of triangles on its way out, then
             ! it must be on the inside of the model
             nInOrOut = nInOrOut + mod(nHits, 2)
         end do
@@ -1370,6 +1421,66 @@ contains
         distance = dist_min
 
     end subroutine f_distance_normals_3D
+
+    subroutine f_distance_normals_3D_flat(ntrs, trs_v, trs_n, pid, point, normals, distance)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        integer, intent(in) :: ntrs
+        real(wp), dimension(:, :, :, :), intent(in) :: trs_v
+        real(wp), dimension(:, :, :), intent(in) :: trs_n
+        integer, intent(in) :: pid
+        real(wp), dimension(1:3), intent(in) :: point
+        real(wp), dimension(1:3), intent(out) :: normals
+        real(wp), intent(out) :: distance
+
+        real(wp), dimension(1:3, 1:3) :: tri
+        real(wp) :: dist_min, dist_t_min
+        real(wp) :: dist_min_normal, dist_buffer_normal
+        real(wp), dimension(1:3) :: midp
+        real(wp), dimension(1:3) :: dist_buffer
+        integer :: i, j, tri_idx
+
+        dist_min = 1.e12_wp
+        dist_min_normal = 1.e12_wp
+        distance = 0._wp
+
+        tri_idx = 0
+        do i = 1, ntrs
+            do j = 1, 3
+                tri(j, 1) = trs_v(j, 1, i, pid)
+                tri(j, 2) = trs_v(j, 2, i, pid)
+                tri(j, 3) = trs_v(j, 3, i, pid)
+                dist_buffer(j) = sqrt((point(1) - tri(j, 1))**2 + &
+                                      (point(2) - tri(j, 2))**2 + &
+                                      (point(3) - tri(j, 3))**2)
+            end do
+
+            do j = 1, 3
+                midp(j) = (tri(1, j) + tri(2, j) + tri(3, j))/3
+            end do
+
+            dist_t_min = minval(dist_buffer(1:3))
+            dist_buffer_normal = sqrt((point(1) - midp(1))**2 + &
+                                      (point(2) - midp(2))**2 + &
+                                      (point(3) - midp(3))**2)
+
+            if (dist_t_min < dist_min) then
+                dist_min = dist_t_min
+            end if
+
+            if (dist_buffer_normal < dist_min_normal) then
+                dist_min_normal = dist_buffer_normal
+                tri_idx = i
+            end if
+        end do
+
+        normals(1) = trs_n(1, tri_idx, pid)
+        normals(2) = trs_n(2, tri_idx, pid)
+        normals(3) = trs_n(3, tri_idx, pid)
+        distance = dist_min
+
+    end subroutine f_distance_normals_3D_flat
 
     !> This procedure determines the levelset distance of 2D models without interpolation.
     !! @param boundary_v                   Group of all the boundary vertices of the 2D model without interpolation

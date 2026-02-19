@@ -877,8 +877,6 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        $:GPU_UPDATE(host='[ib_markers%sf]')
-
     end subroutine s_ib_model
 
     !> The STL patch is a 3D geometry that is imported from an STL file.
@@ -934,8 +932,6 @@ contains
                 end do
             end do
         end do
-
-        $:GPU_UPDATE(host='[ib_markers%sf]')
 
     end subroutine s_ib_3d_model
 

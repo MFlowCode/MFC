@@ -50,6 +50,8 @@ contains
                     call s_cylinder_levelset(gps(i))
                 elseif (patch_geometry == 11) then
                     call s_3d_airfoil_levelset(gps(i))
+                elseif (patch_geometry == 12) then
+                    call s_model_levelset(gps(i))
                 end if
             end do
             $:END_GPU_PARALLEL_LOOP()
@@ -70,6 +72,8 @@ contains
                     call s_rectangle_levelset(gps(i))
                 elseif (patch_geometry == 4) then
                     call s_airfoil_levelset(gps(i))
+                elseif (patch_geometry == 5) then
+                    call s_model_levelset(gps(i))
                 elseif (patch_geometry == 6) then
                     call s_ellipse_levelset(gps(i))
                 end if
@@ -78,17 +82,6 @@ contains
             !> @}
 
         end if
-
-        ! STL models computed on the CPU for now
-        do i = 1, num_gps
-            patch_id = gps(i)%ib_patch_id
-            patch_geometry = patch_ib(patch_id)%geometry
-
-            if (patch_geometry == 5 .or. patch_geometry == 12) then
-                call s_model_levelset(gps(i))
-                $:GPU_UPDATE(device='[gps(i)]')
-            end if
-        end do
 
     end subroutine s_apply_levelset
 
@@ -651,7 +644,7 @@ contains
         type(ghost_point), intent(inout) :: gp
 
         integer :: i, j, k, patch_id, boundary_edge_count, total_vertices
-        logical :: interpolate
+        integer :: interpolate
         real(wp), dimension(1:3) :: center, xyz_local
         real(wp) :: normals(1:3) !< Boundary normal buffer
         real(wp) :: distance
@@ -663,9 +656,9 @@ contains
         k = gp%loc(3)
 
         ! load in model values
-        interpolate = models(patch_id)%interpolate
-        boundary_edge_count = models(patch_id)%boundary_edge_count
-        total_vertices = models(patch_id)%total_vertices
+        interpolate = gpu_interpolate(patch_id)
+        boundary_edge_count = gpu_boundary_edge_count(patch_id)
+        total_vertices = gpu_total_vertices(patch_id)
 
         center = 0._wp
         if (.not. f_is_default(patch_ib(patch_id)%x_centroid)) center(1) = patch_ib(patch_id)%x_centroid
@@ -673,6 +666,7 @@ contains
         if (p > 0) then
             if (.not. f_is_default(patch_ib(patch_id)%z_centroid)) center(3) = patch_ib(patch_id)%z_centroid
         end if
+
         inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
         rotation(:, :) = patch_ib(patch_id)%rotation_matrix(:, :)
 
@@ -691,11 +685,11 @@ contains
         if (p > 0) then
 
             ! Get the boundary normals and shortest distance between the cell center and the model boundary
-            call f_distance_normals_3D(models(patch_id)%model, xyz_local, normals, distance)
+            call f_distance_normals_3D_flat(gpu_ntrs(patch_id), gpu_trs_v, gpu_trs_n, patch_id, xyz_local, normals, distance)
 
             ! Get the shortest distance between the cell center and the interpolated model boundary
             if (interpolate) then
-                gp%levelset = f_interpolated_distance(models(patch_id)%interpolated_boundary_v, total_vertices, xyz_local)
+                gp%levelset = f_interpolated_distance(gpu_interpolated_boundary_v(:, :, patch_id), total_vertices, xyz_local)
             else
                 gp%levelset = distance
             end if
@@ -707,19 +701,18 @@ contains
             gp%levelset_norm = matmul(rotation, normals(1:3))
         else
             ! 2D models
-            if (interpolate) then
+            if (interpolate == 1) then
                 ! Get the shortest distance between the cell center and the model boundary
-                gp%levelset = f_interpolated_distance(models(patch_id)%interpolated_boundary_v, total_vertices, xyz_local)
+                gp%levelset = f_interpolated_distance(gpu_interpolated_boundary_v(:, :, patch_id), total_vertices, xyz_local)  ! Change 7
             else
-                ! Get the shortest distance between the cell center and the interpolated model boundary
-                gp%levelset = f_distance(models(patch_id)%boundary_v, boundary_edge_count, xyz_local)
+                gp%levelset = f_distance(gpu_boundary_v(:, :, :, patch_id), boundary_edge_count, xyz_local)  ! Change 8
             end if
 
             ! Correct the sign of the levelset
             gp%levelset = -abs(gp%levelset)
 
             ! Get the boundary normals
-            call f_normals(models(patch_id)%boundary_v, &
+            call f_normals(gpu_boundary_v(:, :, :, patch_id), &
                            boundary_edge_count, &
                            xyz_local, &
                            normals)
@@ -728,8 +721,6 @@ contains
             gp%levelset_norm = matmul(rotation, normals(1:3))
 
         end if
-
-        ! print gp%levelset, gp%levelset_norm(1), gp%levelset_norm(2), gp%levelset_norm(3)
 
     end subroutine s_model_levelset
 
