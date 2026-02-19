@@ -169,7 +169,6 @@ jobs:
     continue-on-error: false
     timeout-minutes: 480
     strategy:
-      fail-fast: false
       matrix:
         include:
           # Phoenix (GT) — build+test combined in SLURM job
