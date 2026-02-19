@@ -12,6 +12,8 @@ For each .fpp/.f90 in src/{pre_process,simulation,post_process,common}:
      (Doxygen lowercases Fortran namespaces).
 """
 
+from __future__ import annotations
+
 import re
 import sys
 from pathlib import Path
@@ -27,7 +29,8 @@ DIRS = [
 
 # First `module X` or `program X` that isn't `end module/program`.
 DECL_RE = re.compile(
-    r"^\s*(module|program)\s+(\w+)\s*$", re.MULTILINE | re.IGNORECASE
+    r"^\s*(module(?!\s+procedure)\b|program)\s+(\w+)\s*$",
+    re.MULTILINE | re.IGNORECASE,
 )
 
 # Any "Contains module/program <name>" in a Doxygen comment line.
@@ -66,7 +69,7 @@ for d in DIRS:
     if not d.exists():
         continue
     for f in sorted(list(d.glob("*.fpp")) + list(d.glob("*.f90"))):
-        text = f.read_text()
+        text = f.read_text(encoding="utf-8")
         entity = find_entity(text)
         if entity is None:
             continue
@@ -77,7 +80,7 @@ for d in DIRS:
             # No @file at all — prepend a complete header.
             header = f"!>\n!! @file\n!! @brief Contains {kind} {ref}\n\n"
             text = header + text
-            f.write_text(text)
+            f.write_text(text, encoding="utf-8")
             fixed += 1
             print(f"Added  {f.relative_to(src_dir)}")
             continue
@@ -96,7 +99,7 @@ for d in DIRS:
         new_text = text[: m.start()] + new_line + text[m.end() :]
 
         if new_text != text:
-            f.write_text(new_text)
+            f.write_text(new_text, encoding="utf-8")
             fixed += 1
             print(f"Fixed  {f.relative_to(src_dir)}: {current_name} -> {ref}")
 

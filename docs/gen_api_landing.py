@@ -4,9 +4,11 @@
 Usage: python3 gen_api_landing.py [source_dir]
   source_dir defaults to current directory.
 
-Scans src/{target}/*.fpp and src/common/*.fpp to produce module tables
-in docs/{target}/readme.md. Intro text is defined below per target.
+Scans src/{target}/*.fpp,*.f90 and src/common/*.fpp,*.f90 to produce module
+tables in docs/{target}/readme.md. Intro text is defined below per target.
 """
+
+from __future__ import annotations
 
 import sys
 from pathlib import Path
@@ -46,10 +48,12 @@ TARGETS = {
 
 
 def get_modules(directory: Path) -> list[str]:
-    """Return sorted list of module names (m_*) from .fpp files."""
-    return sorted(
-        f.stem for f in directory.glob("m_*.fpp")
-    )
+    """Return sorted list of module names (m_*) from .fpp and .f90 files."""
+    modules: set[str] = set()
+    for pattern in ("m_*.fpp", "m_*.f90"):
+        for f in directory.glob(pattern):
+            modules.add(f.stem)
+    return sorted(modules)
 
 
 for target, info in TARGETS.items():
@@ -88,5 +92,6 @@ for target, info in TARGETS.items():
         lines.append(f"- [{label} API](../{sib}/index.html)")
     lines.append("")
 
-    out.write_text("\n".join(lines))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text("\n".join(lines), encoding="utf-8")
     print(f"Generated {out}")

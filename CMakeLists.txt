@@ -813,6 +813,9 @@ if (MFC_DOCUMENTATION)
     add_custom_command(
         OUTPUT  "${CMAKE_CURRENT_BINARY_DIR}/gen-api-landing.stamp"
         DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/docs/gen_api_landing.py"
+                ${pre_process_FPPs} ${pre_process_F90s}
+                ${simulation_FPPs} ${simulation_F90s}
+                ${post_process_FPPs} ${post_process_F90s}
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/docs/gen_api_landing.py"
                 "${CMAKE_CURRENT_SOURCE_DIR}"
         COMMAND "${CMAKE_COMMAND}" -E touch "${CMAKE_CURRENT_BINARY_DIR}/gen-api-landing.stamp"
@@ -829,6 +832,9 @@ if (MFC_DOCUMENTATION)
     add_custom_command(
         OUTPUT  "${CMAKE_CURRENT_BINARY_DIR}/fix-file-briefs.stamp"
         DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/docs/fix_file_briefs.py"
+                ${pre_process_FPPs} ${pre_process_F90s}
+                ${simulation_FPPs} ${simulation_F90s}
+                ${post_process_FPPs} ${post_process_F90s}
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/docs/fix_file_briefs.py"
                 "${CMAKE_CURRENT_SOURCE_DIR}"
         COMMAND "${CMAKE_COMMAND}" -E touch "${CMAKE_CURRENT_BINARY_DIR}/fix-file-briefs.stamp"
