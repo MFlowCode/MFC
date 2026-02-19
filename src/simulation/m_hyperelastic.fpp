@@ -302,6 +302,7 @@ contains
 
     end subroutine s_Mooney_Rivlin_cauchy_solver
 
+    !> @brief Deallocates memory for hyperelastic deformation tensor and finite-difference coefficients.
     impure subroutine s_finalize_hyperelastic_module()
 
         integer :: i !< iterator

@@ -323,6 +323,7 @@ contains
 
     end subroutine s_convert_species_to_mixture_variables
 
+    !> @brief GPU-accelerated conversion of species volume fractions and partial densities to mixture density, gamma, pi_inf, and qv.
     subroutine s_convert_species_to_mixture_variables_acc(rho_K, &
                                                           gamma_K, pi_inf_K, qv_K, &
                                                           alpha_K, alpha_rho_K, Re_K, &
@@ -514,7 +515,7 @@ contains
 
     end subroutine s_initialize_variables_conversion_module
 
-    !Initialize mv at the quadrature nodes based on the initialized moments and sigma
+    !> @brief Initializes bubble mass-vapor values at quadrature nodes from the conserved moment statistics.
     subroutine s_initialize_mv(qK_cons_vf, mv)
 
         type(scalar_field), dimension(sys_size), intent(in) :: qK_cons_vf
@@ -547,7 +548,7 @@ contains
 
     end subroutine s_initialize_mv
 
-    !Initialize pb at the quadrature nodes using isothermal relations (Preston model)
+    !> @brief Initializes bubble internal pressures at quadrature nodes using isothermal relations from the Preston model.
     subroutine s_initialize_pb(qK_cons_vf, mv, pb)
         type(scalar_field), dimension(sys_size), intent(in) :: qK_cons_vf
 
@@ -1388,6 +1389,7 @@ contains
 
     end subroutine s_compute_species_fraction
 
+    !> @brief Deallocates fluid property arrays and post-processing fields allocated during module initialization.
     impure subroutine s_finalize_variables_conversion_module()
 
         ! Deallocating the density, the specific heat ratio function and the
@@ -1411,6 +1413,7 @@ contains
     end subroutine s_finalize_variables_conversion_module
 
 #ifndef MFC_PRE_PROCESS
+    !> @brief Computes the speed of sound from thermodynamic state variables, supporting multiple equation-of-state models.
     subroutine s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_sum, c_c, c, qv)
         $:GPU_ROUTINE(parallelism='[seq]')
 
@@ -1480,6 +1483,7 @@ contains
 #endif
 
 #ifndef MFC_PRE_PROCESS
+    !> @brief Computes the fast magnetosonic wave speed from the sound speed, density, and magnetic field components.
     subroutine s_compute_fast_magnetosonic_speed(rho, c, B, norm, c_fast, h)
         $:GPU_ROUTINE(function_name='s_compute_fast_magnetosonic_speed', &
             & parallelism='[seq]', cray_inline=True)

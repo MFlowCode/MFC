@@ -63,6 +63,7 @@ contains
             "For 3D simulation, p must be greater than or equal to (num_stcls_min*weno_order - 1), whose value is "//trim(numStr))
     end subroutine s_check_inputs_weno
 
+    !> @brief Validates that the grid resolution is sufficient for the MUSCL reconstruction order.
     impure subroutine s_check_inputs_muscl
         character(len=5) :: numStr !< for int to string conversion
 

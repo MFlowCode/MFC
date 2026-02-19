@@ -971,6 +971,7 @@ contains
 
     end subroutine s_initialize_global_parameters_module
 
+    !> @brief Configures MPI parallel I/O settings and allocates processor coordinate arrays.
     impure subroutine s_initialize_parallel_io
 
 #ifdef MFC_MPI
@@ -1008,6 +1009,7 @@ contains
 
     end subroutine s_initialize_parallel_io
 
+    !> @brief Deallocates all global grid, index, and equation-of-state parameter arrays.
     impure subroutine s_finalize_global_parameters_module
 
         integer :: i

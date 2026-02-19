@@ -36,6 +36,7 @@ module m_viscous
 
 contains
 
+    !> @brief Allocates and populates the viscous Reynolds number arrays and transfers data to the GPU.
     impure subroutine s_initialize_viscous_module
 
         integer :: i, j !< generic loop iterators
@@ -1023,6 +1024,7 @@ contains
 
     end subroutine s_get_viscous
 
+    !> @brief Reconstructs left and right cell-boundary values of viscous primitive variables using WENO or MUSCL.
     subroutine s_reconstruct_cell_boundary_values_visc(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, &
                                                        norm_dir, vL_prim_vf, vR_prim_vf, ix, iy, iz)
 
@@ -1127,6 +1129,7 @@ contains
 
     end subroutine s_reconstruct_cell_boundary_values_visc
 
+    !> @brief Reconstructs left and right cell-boundary values of viscous primitive variable derivatives using WENO or MUSCL.
     subroutine s_reconstruct_cell_boundary_values_visc_deriv(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, &
                                                              norm_dir, vL_prim_vf, vR_prim_vf, ix, iy, iz)
         type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
@@ -1547,7 +1550,7 @@ contains
 
     end subroutine s_compute_fd_gradient
 
-    ! computes the viscous stress tensor at a particule i, j, k element
+    !> @brief Computes the viscous stress tensor at a single grid cell using finite-difference velocity gradients.
     subroutine s_compute_viscous_stress_tensor(viscous_stress_tensor, q_prim_vf, dynamic_viscosity, i, j, k)
         $:GPU_ROUTINE(parallelism='[seq]')
 
@@ -1609,6 +1612,7 @@ contains
 
     end subroutine s_compute_viscous_stress_tensor
 
+    !> @brief Deallocates the viscous Reynolds number arrays.
     impure subroutine s_finalize_viscous_module()
 
         @:DEALLOCATE(Res_viscous)

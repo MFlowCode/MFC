@@ -143,6 +143,7 @@ contains
 
     end subroutine s_ibm_setup
 
+    !> @brief Exchanges immersed boundary marker data across MPI subdomain boundaries.
     subroutine s_populate_ib_buffers()
 
         #:for DIRC, DIRI in [('x', 1), ('y', 2), ('z', 3)]
@@ -852,6 +853,7 @@ contains
     !> Function that uses the interpolation coefficients and the current state
     !! at the cell centers in order to estimate the state at the image point
     !! @param gp Ghost point data structure
+    !> @brief Interpolates primitive variables from the fluid domain to a ghost point's image point using bilinear or trilinear interpolation.
     !! @param alpha_rho_IP Partial density at image point
     !! @param alpha_IP Volume fraction at image point
     !! @param pres_IP Pressure at image point
@@ -1038,9 +1040,7 @@ contains
 
     end subroutine s_update_mib
 
-    ! compute the surface integrals of the IB via a volume integraion method described in
-    ! "A coupled IBM/Euler-Lagrange framework for simulating shock-induced particle size segregation"
-    ! by Archana Sridhar and Jesse Capecelatro
+    !> @brief Computes pressure and viscous forces and torques on immersed bodies via a volume integration method.
     subroutine s_compute_ib_forces(q_prim_vf, fluid_pp)
 
         ! real(wp), dimension(idwbuff(1)%beg:idwbuff(1)%end, &
@@ -1335,6 +1335,7 @@ contains
 
     end subroutine s_compute_moment_of_inertia
 
+    !> @brief Computes the cross product c = a x b of two 3D vectors.
     subroutine s_cross_product(a, b, c)
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: a(3), b(3)

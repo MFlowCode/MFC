@@ -553,6 +553,7 @@ contains
 
     end subroutine s_compute_cbc_coefficients
 
+    !> @brief Associates finite-difference and polynomial-interpolation CBC coefficients with targets based on coordinate direction and boundary location.
     !!  The goal of the procedure is to associate the FD and PI
     !!      coefficients, or CBC coefficients, with the appropriate
     !!      targets, based on the coordinate direction and location
@@ -1628,7 +1629,7 @@ contains
 
     end subroutine s_finalize_cbc
 
-    ! Detext if the problem has any characteristic boundary conditions
+    !> @brief Detects whether any domain boundary uses characteristic boundary conditions.
     elemental subroutine s_any_cbc_boundaries(toggle)
 
         logical, intent(inout) :: toggle

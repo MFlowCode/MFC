@@ -65,6 +65,7 @@ contains
 
     end subroutine s_comp_n_from_prim
 
+    !> @brief Computes the bubble number density from the conservative void fraction and weighted bubble radii.
     subroutine s_comp_n_from_cons(vftmp, nRtmp, ntmp, weights)
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: vftmp
@@ -79,6 +80,7 @@ contains
 
     end subroutine s_comp_n_from_cons
 
+    !> @brief Prints a 2D real array to standard output, optionally dividing each element by a given scalar.
     impure subroutine s_print_2D_array(A, div)
 
         real(wp), dimension(:, :), intent(in) :: A
@@ -274,6 +276,7 @@ contains
 
     end subroutine s_transcoeff
 
+    !> @brief Converts an integer to its trimmed string representation.
     elemental subroutine s_int_to_str(i, res)
 
         integer, intent(in) :: i
@@ -664,6 +667,7 @@ contains
 
     end function f_gx
 
+    !> @brief Downsamples conservative variable fields by a factor of 3 in each direction using volume averaging.
     subroutine s_downsample_data(q_cons_vf, q_cons_temp, m_ds, n_ds, p_ds, m_glb_ds, n_glb_ds, p_glb_ds)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf, q_cons_temp
@@ -705,6 +709,7 @@ contains
 
     end subroutine s_downsample_data
 
+    !> @brief Upsamples conservative variable fields from a coarsened grid back to the original resolution using interpolation.
     subroutine s_upsample_data(q_cons_vf, q_cons_temp)
 
         type(scalar_field), intent(inout), dimension(sys_size) :: q_cons_vf, q_cons_temp

@@ -39,6 +39,7 @@ module m_check_patches
 
 contains
 
+    !> @brief Validates the geometry parameters of all active and inactive initial condition patches.
     impure subroutine s_check_patches
 
         integer :: i
@@ -532,6 +533,7 @@ contains
 
     end subroutine s_check_inactive_patch_primitive_variables
 
+    !> @brief Verifies that the model file referenced by the given patch exists on disk.
     impure subroutine s_check_model_geometry(patch_id)
 
         integer, intent(in) :: patch_id

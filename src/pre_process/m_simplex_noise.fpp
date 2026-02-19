@@ -72,6 +72,7 @@ module m_simplex_noise
 
 contains
 
+    !> @brief Evaluates 3D simplex noise at the given coordinates and returns a value in [-1, 1].
     function f_simplex3d(xin, yin, zin) result(n)
 
         real(wp), intent(in) :: xin, yin, zin
@@ -172,6 +173,7 @@ contains
 
     end function f_simplex3d
 
+    !> @brief Evaluates 2D simplex noise at the given coordinates and returns a value in [-1, 1].
     function f_simplex2d(xin, yin) result(n)
 
         real(wp), intent(in) :: xin, yin
@@ -238,6 +240,7 @@ contains
 
     end function f_simplex2d
 
+    !> @brief Computes the dot product of a 2D gradient vector with the given offset coordinates.
     function dot2(g, x, y) result(dot)
 
         integer, intent(in) :: g

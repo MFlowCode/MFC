@@ -263,6 +263,7 @@ contains
         end if
     end subroutine s_compute_viscous_source_flux
 
+    !> @brief Computes intercell fluxes using the Harten-Lax-van Leer (HLL) approximate Riemann solver.
     subroutine s_hll_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
                                     dqL_prim_dy_vf, &
                                     dqL_prim_dz_vf, &
@@ -1054,6 +1055,7 @@ contains
 
     end subroutine s_hll_riemann_solver
 
+    !> @brief Computes intercell fluxes using the Lax-Friedrichs (LF) approximate Riemann solver.
     subroutine s_lf_riemann_solver(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, dqL_prim_dx_vf, &
                                    dqL_prim_dy_vf, &
                                    dqL_prim_dz_vf, &

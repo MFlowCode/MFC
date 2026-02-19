@@ -268,6 +268,7 @@ contains
 
     end subroutine s_initialize_mpi_data_ds
 
+    !> @brief Gathers variable-length real vectors from all MPI ranks onto the root process.
     impure subroutine s_mpi_gather_data(my_vector, counts, gathered_vector, root)
 
         integer, intent(in) :: counts          ! Array of vector lengths for each process
@@ -300,6 +301,7 @@ contains
 #endif
     end subroutine s_mpi_gather_data
 
+    !> @brief Gathers per-rank time step wall-clock times onto rank 0 for performance reporting.
     impure subroutine mpi_bcast_time_step_values(proc_time, time_avg)
 
         real(wp), dimension(0:num_procs - 1), intent(inout) :: proc_time
@@ -314,6 +316,7 @@ contains
 
     end subroutine mpi_bcast_time_step_values
 
+    !> @brief Prints a case file error with the prohibited condition and message, then aborts execution.
     impure subroutine s_prohibit_abort(condition, message)
         character(len=*), intent(in) :: condition, message
 

@@ -26,6 +26,7 @@ module m_perturbation
 
 contains
 
+    !> @brief Allocates the temporary primitive variable array used by elliptic smoothing.
     impure subroutine s_initialize_perturbation_module()
 
         if (elliptic_smoothing) then
@@ -34,6 +35,7 @@ contains
 
     end subroutine s_initialize_perturbation_module
 
+    !> @brief Randomly perturbs partial density fields at the interface of a spherical volume fraction region.
     impure subroutine s_perturb_sphere(q_prim_vf)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer :: i, j, k, l !< generic loop operators
@@ -66,6 +68,7 @@ contains
 
     end subroutine s_perturb_sphere
 
+    !> @brief Adds random noise to the velocity and void fraction of the surrounding flow field.
     impure subroutine s_perturb_surrounding_flow(q_prim_vf)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer :: i, j, k !<  generic loop iterators
@@ -91,6 +94,7 @@ contains
         end do
     end subroutine s_perturb_surrounding_flow
 
+    !> @brief Iteratively smooths all primitive variable fields using a discrete elliptic (Laplacian) filter.
     impure subroutine s_elliptic_smoothing(q_prim_vf, bc_type)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
@@ -152,6 +156,7 @@ contains
 
     end subroutine s_elliptic_smoothing
 
+    !> @brief Perturbs velocity and volume fraction fields using multi-octave simplex noise.
     subroutine s_perturb_simplex(q_prim_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
@@ -323,6 +328,7 @@ contains
 
     end subroutine s_perturb_mixlayer
 
+    !> @brief Generates deterministic pseudo-random wave vector, polarization, and phase for a perturbation mode.
     subroutine s_generate_random_perturbation(khat, xi, phi, ik, yloc)
         integer, intent(in) :: ik
         real(wp), intent(in) :: yloc
@@ -347,7 +353,7 @@ contains
 
     end subroutine s_generate_random_perturbation
 
-    ! Generate a random unit vector (spherical distribution)
+    !> @brief Generates a unit vector uniformly distributed on the sphere from two random parameters.
     function f_unit_vector(theta, eta) result(vec)
         real(wp), intent(in) :: theta, eta
         real(wp) :: zeta, xi
@@ -373,6 +379,7 @@ contains
 
     end subroutine s_prng
 
+    !> @brief Computes a modular multiplication step for the linear congruential pseudo-random number generator.
     function modmul(a) result(val)
         integer, intent(in) :: a
         integer :: val
@@ -384,6 +391,7 @@ contains
 
     end function modmul
 
+    !> @brief Deallocates the temporary primitive variable array used by elliptic smoothing.
     impure subroutine s_finalize_perturbation_module()
 
         if (elliptic_smoothing) then

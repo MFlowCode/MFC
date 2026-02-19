@@ -1053,6 +1053,7 @@ contains
 
     end subroutine s_write_parallel_data_files
 
+    !> @brief Writes immersed boundary marker data to a serial (per-processor) unformatted file.
     subroutine s_write_serial_ib_data(time_step)
 
         integer, intent(in) :: time_step
@@ -1073,6 +1074,7 @@ contains
 
     end subroutine
 
+    !> @brief Writes immersed boundary marker data in parallel using MPI I/O.
     subroutine s_write_parallel_ib_data(time_step)
 
         integer, intent(in) :: time_step
@@ -1113,6 +1115,7 @@ contains
 
     end subroutine s_write_parallel_ib_data
 
+    !> @brief Dispatches immersed boundary data output to the serial or parallel writer.
     subroutine s_write_ib_data_file(time_step)
 
         integer, intent(in) :: time_step

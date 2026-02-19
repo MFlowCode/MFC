@@ -16,6 +16,7 @@ module m_delay_file_access
 
 contains
 
+    !> @brief Introduces a rank-dependent busy-wait delay to stagger parallel file access and reduce I/O contention.
     impure subroutine DelayFileAccess(ProcessRank)
         integer, intent(in) :: ProcessRank
 

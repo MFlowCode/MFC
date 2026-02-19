@@ -521,6 +521,7 @@ contains
 
     end subroutine s_initialize_time_steppers_module
 
+    !> @brief Advances the solution one full step using a TVD Runge-Kutta time integrator.
     impure subroutine s_tvd_rk(t_step, time_avg, nstage)
 #ifdef _CRAYFTN
         !DIR$ OPTIMIZE (-haggress)
@@ -700,6 +701,7 @@ contains
 
     end subroutine s_adaptive_dt_bubble
 
+    !> @brief Computes the global time step size from CFL stability constraints across all cells.
     impure subroutine s_compute_dt()
 
         real(wp) :: rho        !< Cell-avg. density
@@ -799,6 +801,7 @@ contains
 
     end subroutine s_apply_bodyforces
 
+    !> @brief Updates immersed boundary positions and velocities at the current Runge-Kutta stage.
     subroutine s_propagate_immersed_boundaries(s)
 
         integer, intent(in) :: s

@@ -37,6 +37,7 @@ module m_grid
 
     abstract interface
 
+        !> @brief Abstract interface for generating a rectilinear computational grid.
         impure subroutine s_generate_abstract_grid
 
         end subroutine s_generate_abstract_grid

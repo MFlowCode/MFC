@@ -637,6 +637,7 @@ contains
 
     end subroutine s_compute_weno_coefficients
 
+    !> @brief Performs WENO reconstruction of left and right cell-boundary values from cell-averaged variables.
     subroutine s_weno(v_vf, vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, &
                       weno_dir, &
                       is1_weno_d, is2_weno_d, is3_weno_d)

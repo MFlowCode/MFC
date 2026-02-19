@@ -462,6 +462,7 @@ contains
 
     end function f_read_line
 
+    !> @brief Reads the next non-comment line from a model file, using a buffered look-ahead mechanism.
     impure subroutine s_skip_ignored_lines(iunit, buffered_line, is_buffered)
         integer, intent(in) :: iunit
         character(80), intent(inout) :: buffered_line

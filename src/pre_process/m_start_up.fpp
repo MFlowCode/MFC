@@ -76,10 +76,12 @@ module m_start_up
 
     abstract interface
 
+        !> @brief Abstract interface for reading grid data files in serial or parallel.
         impure subroutine s_read_abstract_grid_data_files
 
         end subroutine s_read_abstract_grid_data_files
 
+        !> @brief Abstract interface for reading initial condition data files in serial or parallel.
         !! @param q_cons_vf Conservative variables
         impure subroutine s_read_abstract_ic_data_files(q_cons_vf_in)
 
@@ -707,6 +709,7 @@ contains
 
     end subroutine s_read_parallel_ic_data_files
 
+    !> @brief Initializes all pre-process modules, allocates data structures, and sets I/O procedure pointers.
     impure subroutine s_initialize_modules
         ! Computation of parameters, allocation procedures, and/or any other tasks
         ! needed to properly setup the modules
@@ -743,6 +746,7 @@ contains
 
     end subroutine s_initialize_modules
 
+    !> @brief Reads an existing grid from data files or generates a new grid from user inputs.
     impure subroutine s_read_grid()
 
         if (old_grid) then
@@ -761,6 +765,7 @@ contains
 
     end subroutine s_read_grid
 
+    !> @brief Generates or reads the initial condition, applies relaxation if needed, and writes output data files.
     impure subroutine s_apply_initial_condition(start, finish)
 
         real(wp), intent(inout) :: start, finish
@@ -807,6 +812,7 @@ contains
         call cpu_time(finish)
     end subroutine s_apply_initial_condition
 
+    !> @brief Gathers processor timing data and writes elapsed wall-clock time to a summary file.
     impure subroutine s_save_data(proc_time, time_avg, time_final, file_exists)
 
         real(wp), dimension(:), intent(inout) :: proc_time
@@ -841,6 +847,7 @@ contains
         end if
     end subroutine s_save_data
 
+    !> @brief Initializes MPI, reads and validates user inputs on rank 0, and decomposes the computational domain.
     impure subroutine s_initialize_mpi_domain
         ! Initialization of the MPI environment
 
@@ -867,6 +874,7 @@ contains
         call s_mpi_decompose_computational_domain()
     end subroutine s_initialize_mpi_domain
 
+    !> @brief Finalizes all pre-process modules, deallocates resources, and shuts down MPI.
     impure subroutine s_finalize_modules
         ! Disassociate pointers for serial and parallel I/O
         s_generate_grid => null()

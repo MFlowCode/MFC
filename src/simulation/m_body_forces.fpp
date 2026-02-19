@@ -173,6 +173,7 @@ contains
 
     end subroutine s_compute_body_forces_rhs
 
+    !> @brief Deallocates module variables used for body force computations.
     impure subroutine s_finalize_body_forces_module
 
         @:DEALLOCATE(rhoM)

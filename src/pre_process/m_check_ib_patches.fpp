@@ -37,6 +37,7 @@ module m_check_ib_patches
 
 contains
 
+    !> @brief Validates the geometry parameters of all active and inactive immersed boundary patches.
     impure subroutine s_check_ib_patches
 
         integer :: i

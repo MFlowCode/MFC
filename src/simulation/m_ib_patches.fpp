@@ -61,6 +61,7 @@ module m_ib_patches
 
 contains
 
+    !> @brief Applies all immersed boundary patch geometries to mark interior cells in the IB marker array.
     impure subroutine s_apply_ib_patches(ib_markers_sf)
 
         integer, dimension(:, :, :), intent(inout), optional :: ib_markers_sf
@@ -286,6 +287,7 @@ contains
 
     end subroutine s_ib_circle
 
+    !> @brief Marks cells inside a 2D NACA 4-digit airfoil immersed boundary using upper and lower surface grids.
     !! @param patch_id is the patch identifier
     !! @param ib_markers_sf Array to track patch ids
     subroutine s_ib_airfoil(patch_id, ib_markers_sf)
@@ -435,9 +437,9 @@ contains
 
     end subroutine s_ib_airfoil
 
+    !> @brief Marks cells inside a 3D extruded NACA 4-digit airfoil immersed boundary with finite span.
     !! @param patch_id is the patch identifier
     !! @param ib_markers_sf Array to track patch ids
-    !! @param ib True if this patch is an immersed boundary
     subroutine s_ib_3D_airfoil(patch_id, ib_markers_sf)
 
         integer, intent(in) :: patch_id
@@ -841,6 +843,7 @@ contains
 
     end subroutine s_ib_cylinder
 
+    !> @brief Marks cells inside a 2D elliptical immersed boundary defined by semi-axis lengths and rotation.
     subroutine s_ib_ellipse(patch_id, ib_markers_sf)
 
         integer, intent(in) :: patch_id
@@ -982,6 +985,7 @@ contains
 
     end subroutine s_update_ib_rotation_matrix
 
+    !> @brief Converts cylindrical (r, theta) coordinates to Cartesian (y, z) and stores in module variables.
     subroutine s_convert_cylindrical_to_cartesian_coord(cyl_y, cyl_z)
         $:GPU_ROUTINE(parallelism='[seq]')
 
@@ -992,6 +996,7 @@ contains
 
     end subroutine s_convert_cylindrical_to_cartesian_coord
 
+    !> @brief Converts a 3D cylindrical coordinate vector (x, r, theta) to Cartesian (x, y, z).
     pure function f_convert_cyl_to_cart(cyl) result(cart)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -1005,6 +1010,7 @@ contains
 
     end function f_convert_cyl_to_cart
 
+    !> @brief Converts cylindrical coordinates (x, r) to the spherical azimuthal angle phi and stores in a module variable.
     subroutine s_convert_cylindrical_to_spherical_coord(cyl_x, cyl_y)
         $:GPU_ROUTINE(parallelism='[seq]')
 
