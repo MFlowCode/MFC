@@ -25,7 +25,7 @@ module m_ib_patches
 
     implicit none
 
-    private; public :: s_apply_ib_patches, s_update_ib_rotation_matrix, s_instantiate_STL_models, models, f_convert_cyl_to_cart, gpu_ntrs, gpu_trs_v, gpu_trs_n
+    private; public :: s_apply_ib_patches, s_update_ib_rotation_matrix, f_convert_cyl_to_cart
 
     real(wp) :: x_centroid, y_centroid, z_centroid
     real(wp) :: length_x, length_y, length_z
@@ -54,15 +54,6 @@ module m_ib_patches
     !! perform the actions necessary to lay out a particular patch on the grid.
 
     character(len=5) :: istr ! string to store int to string result for error checking
-
-    !! array of STL models that can be allocated and then used in IB marker and levelset compute
-    type(t_model_array), allocatable, target :: models(:)
-    !! GPU-friendly flat arrays for STL model data
-    integer, allocatable :: gpu_ntrs(:)
-    real(wp), allocatable, dimension(:,:,:,:) :: gpu_trs_v
-    real(wp), allocatable, dimension(:,:,:)   :: gpu_trs_n
-    real(wp), allocatable, dimension(:,:,:) :: gpu_boundary_v
-    real(wp), allocatable, dimension(:,:,:) :: gpu_interpolated_boundary_v
 
 contains
 
@@ -119,169 +110,6 @@ contains
         end if
 
     end subroutine s_apply_ib_patches
-
-    subroutine s_instantiate_STL_models()
-
-        ! Variables for IBM+STL
-        real(wp) :: normals(1:3) !< Boundary normal buffer
-        integer :: boundary_vertex_count, boundary_edge_count, total_vertices !< Boundary vertex
-        real(wp), allocatable, dimension(:, :, :) :: boundary_v !< Boundary vertex buffer
-        real(wp), allocatable, dimension(:, :) :: interpolated_boundary_v !< Interpolated vertex buffer
-        real(wp) :: distance !< Levelset distance buffer
-        logical :: interpolate !< Logical variable to determine whether or not the model should be interpolated
-
-        integer :: i, j, k !< Generic loop iterators
-        integer :: patch_id
-
-        type(t_bbox) :: bbox, bbox_old
-        type(t_model) :: model
-        type(ic_model_parameters) :: params
-
-        real(wp) :: eta
-        real(wp), dimension(1:3) :: point, model_center
-        real(wp) :: grid_mm(1:3, 1:2)
-
-        real(wp), dimension(1:4, 1:4) :: transform, transform_n
-
-        do patch_id = 1, num_ibs
-            if (patch_ib(patch_id)%geometry == 5 .or. patch_ib(patch_id)%geometry == 12) then
-                allocate(models(patch_id)%model)
-                print *, " * Reading model: "//trim(patch_ib(patch_id)%model_filepath)
-
-                model = f_model_read(patch_ib(patch_id)%model_filepath)
-                params%scale(:) = patch_ib(patch_id)%model_scale(:)
-                params%translate(:) = patch_ib(patch_id)%model_translate(:)
-                params%rotate(:) = patch_ib(patch_id)%model_rotate(:)
-                params%spc = patch_ib(patch_id)%model_spc
-                params%threshold = patch_ib(patch_id)%model_threshold
-
-                if (f_approx_equal(dot_product(params%scale, params%scale), 0._wp)) then
-                    params%scale(:) = 1._wp
-                end if
-
-                if (proc_rank == 0) then
-                    print *, " * Transforming model."
-                end if
-
-                ! Get the model center before transforming the model
-                bbox_old = f_create_bbox(model)
-                model_center(1:3) = (bbox_old%min(1:3) + bbox_old%max(1:3))/2._wp
-
-                ! Compute the transform matrices for vertices and normals
-                transform = f_create_transform_matrix(params, model_center)
-                transform_n = f_create_transform_matrix(params)
-
-                call s_transform_model(model, transform, transform_n)
-
-                ! Recreate the bounding box after transformation
-                bbox = f_create_bbox(model)
-
-                ! Show the number of vertices in the original STL model
-                if (proc_rank == 0) then
-                    print *, ' * Number of input model vertices:', 3*model%ntrs
-                end if
-
-                call f_check_boundary(model, boundary_v, boundary_vertex_count, boundary_edge_count)
-
-                ! Check if the model needs interpolation
-                if (p > 0) then
-                    call f_check_interpolation_3D(model, (/dx, dy, dz/), interpolate)
-                else
-                    call f_check_interpolation_2D(boundary_v, boundary_edge_count, (/minval(dx), minval(dy), 0._wp/), interpolate)
-                end if
-
-                ! Show the number of edges and boundary edges in 2D STL models
-                if (proc_rank == 0 .and. p == 0) then
-                    print *, ' * Number of 2D model boundary edges:', boundary_edge_count
-                end if
-
-                ! Interpolate the STL model along the edges (2D) and on triangle facets (3D)
-                if (interpolate) then
-                    if (proc_rank == 0) then
-                        print *, ' * Interpolating STL vertices.'
-                    end if
-
-                    if (p > 0) then
-                        call f_interpolate_3D(model, (/dx, dy, dz/), interpolated_boundary_v, total_vertices)
-                    else
-                        call f_interpolate_2D(boundary_v, boundary_edge_count, (/dx, dy, dz/), interpolated_boundary_v, total_vertices)
-                    end if
-
-                    if (proc_rank == 0) then
-                        print *, ' * Total number of interpolated boundary vertices:', total_vertices
-                    end if
-                end if
-
-                if (proc_rank == 0) then
-                    write (*, "(A, 3(2X, F20.10))") "    > Model:  Min:", bbox%min(1:3)
-                    write (*, "(A, 3(2X, F20.10))") "    >         Cen:", (bbox%min(1:3) + bbox%max(1:3))/2._wp
-                    write (*, "(A, 3(2X, F20.10))") "    >         Max:", bbox%max(1:3)
-
-                    grid_mm(1, :) = (/minval(x_cc(0:m)) - 0.e5_wp*dx(0), maxval(x_cc(0:m)) + 0.e5_wp*dx(m)/)
-                    grid_mm(2, :) = (/minval(y_cc(0:n)) - 0.e5_wp*dy(0), maxval(y_cc(0:n)) + 0.e5_wp*dy(n)/)
-
-                    if (p > 0) then
-                        grid_mm(3, :) = (/minval(z_cc(0:p)) - 0.e5_wp*dz(0), maxval(z_cc(0:p)) + 0.e5_wp*dz(p)/)
-                    else
-                        grid_mm(3, :) = (/0._wp, 0._wp/)
-                    end if
-
-                    write (*, "(A, 3(2X, F20.10))") "    > Domain: Min:", grid_mm(:, 1)
-                    write (*, "(A, 3(2X, F20.10))") "    >         Cen:", (grid_mm(:, 1) + grid_mm(:, 2))/2._wp
-                    write (*, "(A, 3(2X, F20.10))") "    >         Max:", grid_mm(:, 2)
-                end if
-
-                models(patch_id)%model = model
-                models(patch_id)%boundary_v = boundary_v
-                models(patch_id)%boundary_edge_count = boundary_edge_count
-                if (interpolate) then
-                    models(patch_id)%interpolate = 1
-                else
-                    models(patch_id)%interpolate = 0
-                end if
-                if (interpolate) then
-                    models(patch_id)%interpolated_boundary_v = interpolated_boundary_v
-                    models(patch_id)%total_vertices = total_vertices
-                end if
-
-            end if
-        end do
-
-        ! Pack and upload flat arrays for GPU (AFTER the loop)
-        block
-            integer :: pid, max_ntrs
-
-            max_ntrs = 0
-            do pid = 1, num_ibs
-                if (allocated(models(pid)%model)) then
-                    call s_pack_model_for_gpu(models(pid))
-                    max_ntrs = max(max_ntrs, models(pid)%ntrs)
-                end if
-            end do
-
-            if (max_ntrs > 0) then
-                allocate(gpu_ntrs(1:num_ibs))
-                allocate(gpu_trs_v(1:3, 1:3, 1:max_ntrs, 1:num_ibs))
-                allocate(gpu_trs_n(1:3, 1:max_ntrs, 1:num_ibs))
-
-                gpu_ntrs = 0
-                gpu_trs_v = 0._wp
-                gpu_trs_n = 0._wp
-
-                do pid = 1, num_ibs
-                    if (allocated(models(pid)%model)) then
-                        gpu_ntrs(pid) = models(pid)%ntrs
-                        gpu_trs_v(:, :, 1:models(pid)%ntrs, pid) = models(pid)%trs_v
-                        gpu_trs_n(:, 1:models(pid)%ntrs, pid)    = models(pid)%trs_n
-                    end if
-                end do
-
-                $:GPU_ENTER_DATA(copyin='[gpu_ntrs, gpu_trs_v, gpu_trs_n]')
-
-            end if
-        end block
-
-    end subroutine s_instantiate_STL_models
 
     !> The circular patch is a 2D geometry that may be used, for
         !!              example, in creating a bubble or a droplet. The geometry
@@ -1035,10 +863,10 @@ contains
                 end if
 
                 eta = f_model_is_inside_flat(gpu_ntrs(patch_id), &
-                                              gpu_trs_v, gpu_trs_n, &
-                                              patch_id, &
-                                              xy_local, (/dx(i), dy(j), 0._wp/), &
-                                              spc)
+                                             gpu_trs_v, gpu_trs_n, &
+                                             patch_id, &
+                                             xy_local, (/dx(i), dy(j), 0._wp/), &
+                                             spc)
 
                 ! Reading STL boundary vertices and compute the levelset and levelset_norm
                 if (eta > threshold) then
@@ -1093,10 +921,10 @@ contains
                     end if
 
                     eta = f_model_is_inside_flat(gpu_ntrs(patch_id), &
-                                              gpu_trs_v, gpu_trs_n, &
-                                              patch_id, &
-                                              xyz_local, (/dx(i), dy(j), dz(k)/), &
-                                              spc)
+                                                 gpu_trs_v, gpu_trs_n, &
+                                                 patch_id, &
+                                                 xyz_local, (/dx(i), dy(j), dz(k)/), &
+                                                 spc)
 
                     ! Reading STL boundary vertices and compute the levelset and levelset_norm
                     if (eta > patch_ib(patch_id)%model_threshold) then

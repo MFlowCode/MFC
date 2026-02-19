@@ -28,6 +28,8 @@ module m_ibm
 
     use m_viscous
 
+    use m_model
+
     implicit none
 
     private :: s_compute_image_points, &
