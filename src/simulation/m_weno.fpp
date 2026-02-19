@@ -4,19 +4,7 @@
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
-!> @brief  Weighted essentially non-oscillatory (WENO) reconstruction scheme
-!!              that is supplemented with monotonicity preserving bounds (MPWENO)
-!!              and a mapping function that boosts the accuracy of the non-linear
-!!              weights (WENOM). MPWENO, see Balsara and Shu (2000), prevents the
-!!              reconstructed values to lay outside the range set by the stencil,
-!!              while WENOM, see Henrick et al. (2005), recovers the formal order
-!!              of accuracy of the reconstruction at critical points. Please note
-!!              that the basic WENO approach is implemented according to the work
-!!              of Jiang and Shu (1996). WENO-Z, which is less dissipative than
-!!              WENO-JS and WENO-M, is implemented according to the work of
-!!              Borges, et al. (2008). TENO, which is even less dissipative than
-!!              WENO-Z but is less robust, is implemented according to the work
-!!              of Fu et al. (2016).
+!> @brief WENO/WENO-Z/TENO reconstruction with optional monotonicity-preserving bounds and mapped weights
 module m_weno
 
     use m_derived_types        !< Definitions of the derived types

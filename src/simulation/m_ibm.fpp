@@ -4,8 +4,7 @@
 
 #:include 'macros.fpp'
 
-!> @brief This module is used to handle all operations related to immersed
-!!              boundary methods (IBMs)
+!> @brief Ghost-node immersed boundary method: locates ghost/image points, computes interpolation coefficients, and corrects the flow state
 module m_ibm
 
     use m_derived_types        !< Definitions of the derived types

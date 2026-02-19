@@ -4,8 +4,7 @@
 
 #:include 'macros.fpp'
 
-!> @brief This module contains subroutines that read, and check consistency
-!!              of, the user provided inputs and data.
+!> @brief Validates geometry parameters and constraints for initial condition patches
 
 #:include 'macros.fpp'
 

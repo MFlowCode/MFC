@@ -4,8 +4,7 @@
 
 #:include 'macros.fpp'
 
-!> @brief This module contains kernel functions used to map the effect of the lagrangian bubbles
-!!        in the Eulerian framework.
+!> @brief Kernel functions (Gaussian, delta) that smear Lagrangian bubble effects onto the Eulerian grid
 module m_bubbles_EL_kernels
 
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy

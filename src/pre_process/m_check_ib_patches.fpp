@@ -2,8 +2,7 @@
 !! @file
 !! @brief Contains module m_check_ib_patches
 
-!> @brief This module contains subroutines that read, and check consistency
-!!              of, the user provided inputs and data.
+!> @brief Validates geometry parameters and constraints for immersed boundary patches
 
 #:include 'macros.fpp'
 

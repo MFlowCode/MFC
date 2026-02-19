@@ -5,12 +5,7 @@
 #:include 'macros.fpp'
 #:include 'case.fpp'
 
-!> @brief The following module features a variety of time-stepping schemes.
-!!              Currently, it includes the following Runge-Kutta (RK) algorithms:
-!!                   1) 1st Order TVD RK
-!!                   2) 2nd Order TVD RK
-!!                   3) 3rd Order TVD RK
-!!              where TVD designates a total-variation-diminishing time-stepper.
+!> @brief Total-variation-diminishing (TVD) Runge--Kutta time integrators (1st-, 2nd-, and 3rd-order SSP)
 module m_time_steppers
 
     use m_derived_types        !< Definitions of the derived types

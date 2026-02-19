@@ -6,7 +6,7 @@
 #:include 'macros.fpp'
 #:include 'inline_capillary.fpp'
 
-!> @brief This module is used to compute source terms for surface tension model
+!> @brief Computes capillary source fluxes and color-function gradients for the diffuse-interface surface tension model
 module m_surface_tension
 
     use m_derived_types        !< Definitions of the derived types

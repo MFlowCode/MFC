@@ -5,13 +5,7 @@
 #:include 'macros.fpp'
 #:include 'case.fpp'
 
-!> @brief The primary purpose of this module is to output the grid and the
-!!              conservative variables data at the chosen time-step interval. In
-!!              addition, this module is also in charge of outputting a run-time
-!!              information file which summarizes the time-dependent behavior !of
-!!              the stability criteria. The latter include the inviscid Courant–
-!!              Friedrichs–Lewy (ICFL), viscous CFL (VCFL), capillary CFL (CCFL)
-!!              and cell Reynolds (Rc) numbers.
+!> @brief Writes solution data, run-time stability diagnostics (ICFL, VCFL, CCFL, Rc), and probe/center-of-mass files
 module m_data_output
 
     use m_derived_types        !< Definitions of the derived types

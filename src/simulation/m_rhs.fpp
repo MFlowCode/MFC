@@ -5,18 +5,7 @@
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
-!> @brief The module contains the subroutines used to calculate the right-
-!!              hane-side (RHS) in the quasi-conservative, shock- and interface-
-!!              capturing finite-volume framework for the multicomponent Navier-
-!!              Stokes equations supplemented by appropriate advection equations
-!!              used to capture the material interfaces. The system of equations
-!!              is closed by the stiffened gas equation of state, as well as any
-!!              required mixture relationships. Capillarity effects are included
-!!              and are modeled by the means of a volume force acting across the
-!!              diffuse material interface region. The implementation details of
-!!              surface tension may be found in Perigaud and Saurel (2005). Note
-!!              that both viscous and surface tension effects are only available
-!!              in the volume fraction model.
+!> @brief Assembles the right-hand side of the governing equations using finite-volume flux differencing, Riemann solvers, and physical source terms
 module m_rhs
 
     use m_derived_types        !< Definitions of the derived types

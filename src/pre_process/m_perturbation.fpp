@@ -2,8 +2,7 @@
 !! @file
 !! @brief Contains module m_perturbation
 
-!> @brief This module contains subroutines that compute perturbations to the
-!!              initial mean flow fields.
+!> @brief Perturbs initial mean flow fields with random noise, mixing-layer instabilities, or simplex noise
 module m_perturbation
 
     use m_derived_types         ! Definitions of the derived types

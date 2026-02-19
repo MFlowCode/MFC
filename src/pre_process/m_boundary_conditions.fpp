@@ -2,7 +2,7 @@
 !! @file
 !! @brief Contains module m_boundary_conditions
 
-!> @brief This module contains
+!> @brief Applies spatially varying boundary condition patches along domain edges and faces
 module m_boundary_conditions
 
     use m_derived_types

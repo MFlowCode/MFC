@@ -5,11 +5,7 @@
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
-!> @brief The module serves as a proxy to the parameters and subroutines
-!!          available in the MPI implementation's MPI module. Specifically,
-!!          the purpose of the proxy is to harness basic MPI commands into
-!!          more complicated procedures as to accomplish the communication
-!!          goals for the simulation.
+!> @brief MPI halo exchange, domain decomposition, and buffer packing/unpacking for the simulation solver
 module m_mpi_proxy
 
 #ifdef MFC_MPI

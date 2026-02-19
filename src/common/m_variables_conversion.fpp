@@ -5,10 +5,7 @@
 #:include 'macros.fpp'
 #:include 'case.fpp'
 
-!> @brief This module consists of subroutines used in the conversion of the
-!!              conservative variables into the primitive ones and vice versa. In
-!!              addition, the module also contains the subroutines used to obtain
-!!              the mixture variables and the subroutines used to compute pressure.
+!> @brief Conservative-to-primitive variable conversion, mixture property evaluation, and pressure computation
 module m_variables_conversion
 
     use m_derived_types        !< Definitions of the derived types

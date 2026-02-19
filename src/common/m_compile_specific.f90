@@ -2,7 +2,7 @@
 !! @file
 !! @brief Contains module m_compile_specific
 
-!> @brief This module contains subroutines that are compiler specific
+!> @brief Platform-specific file and directory operations: create, delete, inquire, getcwd, and basename
 module m_compile_specific
 
     ! Dependencies

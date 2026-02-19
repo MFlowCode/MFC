@@ -5,8 +5,7 @@
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
-!> @brief The purpose of the module is to check for compatible input files for.
-!!              inputs common to pre-processing, post-processing and simulation
+!> @brief Shared input validation checks for grid dimensions and AMD GPU compiler limits
 module m_checker_common
 
     use m_global_parameters    !< Definitions of the global parameters

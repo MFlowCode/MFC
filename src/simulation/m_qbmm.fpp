@@ -5,7 +5,7 @@
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
-!> @brief This module is used to compute moment inversion via qbmm
+!> @brief Quadrature-based moment methods (QBMM) for polydisperse bubble moment inversion and transport
 module m_qbmm
 
     use m_derived_types        !< Definitions of the derived types

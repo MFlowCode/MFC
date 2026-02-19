@@ -9,6 +9,7 @@
 #:include '3dHardcodedIC.fpp'
 #:include 'macros.fpp'
 
+!> @brief Constructs initial condition patch geometries (lines, circles, rectangles, spheres, etc.) on the grid
 module m_icpp_patches
 
     use m_model                 ! Subroutine(s) related to STL files

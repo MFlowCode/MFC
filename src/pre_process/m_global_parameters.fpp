@@ -4,9 +4,7 @@
 
 #:include 'case.fpp'
 
-!> @brief This module contains all of the parameters characterizing the
-!!              computational domain, simulation algorithm, initial condition
-!!              and the stiffened equation of state.
+!> @brief Defines global parameters for the computational domain, simulation algorithm, and initial conditions
 module m_global_parameters
 
 #ifdef MFC_MPI

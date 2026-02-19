@@ -5,7 +5,7 @@
 #:include 'macros.fpp'
 #:include 'case.fpp'
 
-!> @brief The purpose of the module is to check for compatible input files
+!> @brief Validates simulation input parameters for consistency and supported configurations
 module m_checker
 
     use m_global_parameters    !< Definitions of the global parameters

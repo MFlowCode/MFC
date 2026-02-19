@@ -9,6 +9,7 @@
 #:include '3dHardcodedIC.fpp'
 #:include 'macros.fpp'
 
+!> @brief Immersed boundary patch geometry constructors for 2D and 3D shapes
 module m_ib_patches
 
     use m_model                 ! Subroutine(s) related to STL files

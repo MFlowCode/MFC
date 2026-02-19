@@ -4,8 +4,7 @@
 
 #:include 'macros.fpp'
 
-!> @brief This module is used to handle all operations related to immersed
-!!              boundary methods (IBMs)
+!> @brief Computes signed-distance level-set fields and surface normals for immersed-boundary patch geometries
 module m_compute_levelset
 
     use m_ib_patches           !< The IB patch parameters

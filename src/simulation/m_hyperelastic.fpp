@@ -4,8 +4,7 @@
 
 #:include 'macros.fpp'
 
-!> @brief This module consists of subroutines used in the calculation
-!!              of the cauchy tensor
+!> @brief Computes the left Cauchy--Green deformation tensor and hyperelastic stress source terms
 
 module m_hyperelastic
 

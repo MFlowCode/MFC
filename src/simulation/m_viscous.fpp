@@ -4,7 +4,7 @@
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
-!> @brief The module contains the subroutines used to compute viscous terms.
+!> @brief Computes viscous stress tensors and diffusive flux contributions for the Navier--Stokes equations
 module m_viscous
 
     use m_derived_types        !< Definitions of the derived types

@@ -2,9 +2,7 @@
 !! @file
 !> @brief Contains module m_data_input
 
-!> @brief This module features procedures, which for a specific time-step,
-!!             read in the raw simulation data for the grid and the conservative
-!!             variables and fill out their buffer regions.
+!> @brief Reads raw simulation grid and conservative-variable data for a given time-step and fills buffer regions
 module m_data_input
 
 #ifdef MFC_MPI

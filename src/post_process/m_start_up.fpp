@@ -4,10 +4,7 @@
 !! @file
 !! @brief  Contains module m_start_up
 
-!> @brief This module contains the subroutines that read in and check the
-!!              consistency of the user provided inputs. This module also allocates, initializes and
-!!              deallocates the relevant variables and sets up the time stepping,
-!!              MPI decomposition and I/O procedures
+!> @brief Reads and validates user inputs, allocates variables, and configures MPI decomposition and I/O for post-processing
 
 module m_start_up
 

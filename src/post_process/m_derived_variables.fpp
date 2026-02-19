@@ -2,11 +2,7 @@
 !! @file
 !! @brief Contains module m_derived_variables
 
-!> @brief This module features subroutines that allow for the derivation of
-!!      numerous flow variables from the conservative and primitive ones.
-!!      Currently, the available derived variables include the unadvected
-!!      volume fraction, specific heat ratio, liquid stiffness, speed of
-!!      sound, vorticity and the numerical Schlieren function.
+!> @brief Computes derived flow quantities (sound speed, vorticity, Schlieren, etc.) from conservative and primitive variables
 
 module m_derived_variables
 

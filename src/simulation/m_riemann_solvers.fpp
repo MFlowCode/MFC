@@ -2,22 +2,7 @@
 !! @file
 !! @brief Contains module m_riemann_solvers
 
-!> @brief This module features a database of approximate and exact Riemann
-!!              problem solvers for the Navier-Stokes system of equations, which
-!!              is supplemented by appropriate advection equations that are used
-!!              to capture the material interfaces. The closure of the system is
-!!              achieved by the stiffened gas equation of state and any required
-!!              mixture relations. Surface tension effects are accounted for and
-!!              are modeled by means of a volume force acting across the diffuse
-!!              material interface region. The implementation details of viscous
-!!              and capillary effects, into the Riemann solvers, may be found in
-!!              Perigaud and Saurel (2005). Note that both effects are available
-!!              only in the volume fraction model. At this time, the approximate
-!!              and exact Riemann solvers that are listed below are available:
-!!                  1) Harten-Lax-van Leer (HLL)
-!!                  2) Harten-Lax-van Leer-Contact (HLLC)
-!!                  3) Exact
-!!                  4) Harten-Lax-van Leer Discontinuities (HLLD) - for MHD only
+!> @brief Approximate and exact Riemann solvers (HLL, HLLC, HLLD, exact) for the multicomponent Navier--Stokes equations
 
 #:include 'case.fpp'
 #:include 'macros.fpp'

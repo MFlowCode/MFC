@@ -4,7 +4,7 @@
 
 #:include 'macros.fpp'
 
-!> @brief The module contains the subroutines used to create a acoustic source pressure source term
+!> @brief Applies acoustic pressure source terms including focused, planar, and broadband transducers
 module m_acoustic_src
 
     use m_derived_types        !< Definitions of the derived types

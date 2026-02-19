@@ -4,7 +4,7 @@
 
 #:include 'macros.fpp'
 
-!> @brief This module is used to compute the ensemble-averaged bubble dynamic variables
+!> @brief Computes ensemble-averaged (Euler--Euler) bubble source terms for radius, velocity, pressure, and mass transfer
 module m_bubbles_EE
 
     use m_derived_types        !< Definitions of the derived types

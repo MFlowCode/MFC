@@ -4,7 +4,7 @@
 
 #:include 'macros.fpp'
 
-!> @brief This module is used to compute source terms for hypoelastic model
+!> @brief Computes hypoelastic stress-rate source terms and damage-state evolution
 module m_hypoelastic
 
     use m_derived_types        !< Definitions of the derived types

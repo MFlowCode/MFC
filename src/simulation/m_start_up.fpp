@@ -5,18 +5,7 @@
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
-!> @brief The purpose of the module is primarily to read in the files that
-!!              contain the inputs, the initial condition data and the grid data
-!!              that are provided by the user. The module is additionally tasked
-!!              with verifying the consistency of the user inputs and completing
-!!              the grid variablesThe purpose of the module is primarily to read
-!!              in the files that
-!!              contain the inputs, the initial condition data and the grid data
-!!              that are provided by the user. The module is additionally tasked
-!!              with verifying the consistency of the user inputs and completing
-!!              the grid variables. This module also also allocating, initializing
-!!              I/O, and deallocating the relevant variables on both cpus and gpus as well as
-!!              setting up the time stepping, domain decomposition and I/O procedures.
+!> @brief Reads input files, loads initial conditions and grid data, and orchestrates solver initialization and finalization
 module m_start_up
 
     use m_derived_types        !< Definitions of the derived types

@@ -5,10 +5,7 @@
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
-!> @brief The module contains the subroutines used to perform pressure relaxation
-!!        for multi-component flows using the 6-equation model. This includes
-!!        volume fraction correction, Newton-Raphson pressure equilibration, and
-!!        internal energy correction to maintain thermodynamic consistency.
+!> @brief Pressure relaxation for the six-equation multi-component model via Newton--Raphson equilibration and volume-fraction correction
 module m_pressure_relaxation
 
     use m_derived_types        !< Definitions of the derived types

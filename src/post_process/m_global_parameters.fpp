@@ -4,9 +4,7 @@
 
 #:include 'case.fpp'
 
-!> @brief This module contains all of the parameters characterizing the
-!!      computational domain, simulation algorithm, stiffened equation of
-!!      state and finally, the formatted database file(s) structure.
+!> @brief Global parameters for the post-process: domain geometry, equation of state, and output database settings
 module m_global_parameters
 
 #ifdef MFC_MPI

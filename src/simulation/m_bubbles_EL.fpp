@@ -4,7 +4,7 @@
 
 #:include 'macros.fpp'
 
-!> @brief This module is used to to compute the volume-averaged bubble model
+!> @brief Tracks Lagrangian bubbles and couples their dynamics to the Eulerian flow via volume averaging
 module m_bubbles_EL
 
     use m_global_parameters             !< Definitions of the global parameters

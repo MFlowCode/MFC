@@ -2,8 +2,7 @@
 !! @file
 !! @brief Contains module m_boundary_common
 
-!> @brief The purpose of the module is to apply noncharacteristic and processor
-!! boundary conditions
+!> @brief Noncharacteristic and processor boundary condition application for ghost cells and buffer regions
 #:include 'case.fpp'
 #:include 'macros.fpp'
 

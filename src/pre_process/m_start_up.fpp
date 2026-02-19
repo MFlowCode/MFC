@@ -2,10 +2,7 @@
 !! @file
 !! @brief Contains module m_start_up
 
-!> @brief This module contains subroutines that read, and check consistency
-!!              of, the user provided inputs, grid and data. This module also allocates
-!!                and initializes the relevant variables sets up the mpi decomposition and
-!!                initial condition procedures.
+!> @brief Reads and validates user inputs, loads existing grid/IC data, and initializes pre-process modules
 module m_start_up
 
     use m_derived_types         !< Definitions of the derived types
