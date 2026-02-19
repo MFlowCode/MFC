@@ -1103,16 +1103,16 @@ The patch type number (`#`) corresponds to the input value in `input.py` labeled
 Each patch requires a different set of parameters, which are also listed in this table.
 
 **Geometry 13: 2D modal (Fourier):**  
-Boundary is at polar angle $\theta = \mathrm{atan2}(y - y_{\mathrm{centroid}}, x - x_{\mathrm{centroid}})$.
+Boundary is at polar angle \f$\theta = \mathrm{atan2}(y - y_{\mathrm{centroid}}, x - x_{\mathrm{centroid}})\f$.
 
 - **Additive form** (default, `modal_use_exp_form` false):  
-  $R_{\mathrm{boundary}} = \mathrm{radius} + \sum_n \bigl[ \mathtt{fourier\_cos}(n)\cos(n\theta) + \mathtt{fourier\_sin}(n)\sin(n\theta) \bigr]$.  
+  \f$R_{\mathrm{boundary}} = \mathrm{radius} + \sum_n \bigl[ \mathtt{fourier\_cos}(n)\cos(n\theta) + \mathtt{fourier\_sin}(n)\sin(n\theta) \bigr]\f$.  
   Coefficients are absolute: same units as `radius` (length).  
-  If this formula gives $R_{\mathrm{boundary}} < 0$ at some $\theta$, it is clipped to zero.  
-  With `modal_clip_r_to_min` true, if $R_{\mathrm{boundary}} <$ `modal_r_min` at some $\theta$, it is clipped to `modal_r_min`.  
+  If this formula gives \f$R_{\mathrm{boundary}} < 0\f$ at some \f$\theta\f$, it is clipped to zero.  
+  With `modal_clip_r_to_min` true, if \f$R_{\mathrm{boundary}} <\f$ `modal_r_min` at some \f$\theta\f$, it is clipped to `modal_r_min`.  
   
 - **Exponential form** (`modal_use_exp_form` true):  
-  $R_{\mathrm{boundary}} = \mathrm{radius} \times \exp\bigl( \sum_n [\ldots] \bigr)$.  
+  \f$R_{\mathrm{boundary}} = \mathrm{radius} \times \exp\bigl( \sum_n [\ldots] \bigr)\f$.  
   Coefficients are relative (dimensionless); the sum scales the radius.
 
 ### Immersed Boundary Patch Types {#immersed-boundary-patch-types}
