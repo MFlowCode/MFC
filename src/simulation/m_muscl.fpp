@@ -3,6 +3,8 @@
 !! @brief Contains module m_muscl
 
 #:include 'macros.fpp'
+
+!> @brief MUSCL reconstruction with interface sharpening for contact-preserving advection
 module m_muscl
 
     use m_derived_types        !< Definitions of the derived types

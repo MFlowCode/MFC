@@ -5,6 +5,7 @@
 !! @file
 !! @brief Contains module m_helper
 
+!> @brief Utility routines for bubble model setup, coordinate transforms, array sampling, and special functions
 module m_helper
 
     use m_derived_types        !< Definitions of the derived types

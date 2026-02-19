@@ -5,6 +5,7 @@
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
+!> @brief Simulation helper routines for enthalpy computation, CFL calculation, and stability checks
 module m_sim_helpers
 
     use m_derived_types        !< Definitions of the derived types

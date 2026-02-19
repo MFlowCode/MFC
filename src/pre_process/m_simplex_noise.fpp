@@ -2,6 +2,7 @@
 !! @file
 !! @brief Contains module m_simplex_noise
 
+!> @brief 2D and 3D simplex noise generation for procedural initial condition perturbations
 module m_simplex_noise
 
     use m_constants

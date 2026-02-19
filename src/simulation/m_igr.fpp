@@ -5,6 +5,7 @@
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
+!> @brief Iterative ghost rasterization (IGR) for sharp immersed boundary treatment
 module m_igr
 
     use m_derived_types        !< Definitions of the derived types

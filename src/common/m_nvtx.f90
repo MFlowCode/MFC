@@ -2,6 +2,7 @@
 !! @file
 !! @brief Contains module m_nvtx
 
+!> @brief NVIDIA NVTX profiling API bindings for GPU performance instrumentation
 module m_nvtx
 
     use iso_c_binding

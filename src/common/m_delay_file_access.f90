@@ -2,6 +2,7 @@
 !! @file
 !! @brief Contains module m_delay_file_access
 
+!> @brief Rank-staggered file access delays to prevent I/O contention on parallel file systems
 module m_delay_file_access
     use m_precision_select
     implicit none

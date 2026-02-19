@@ -4,6 +4,7 @@
 
 #:include 'macros.fpp'
 
+!> @brief Finite difference operators for computing divergence of velocity fields
 module m_finite_differences
 
     use m_global_parameters

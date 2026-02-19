@@ -6,6 +6,7 @@
 #:include 'macros.fpp'
 #:include 'case.fpp'
 
+!> @brief Multi-species chemistry interface for thermodynamic properties, reaction rates, and transport coefficients
 module m_chemistry
 
     use m_thermochem, only: &

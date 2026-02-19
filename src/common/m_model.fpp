@@ -5,6 +5,7 @@
 
 #:include 'macros.fpp'
 
+!> @brief Binary STL file reader and processor for immersed boundary geometry
 module m_model
 
     use m_helper
