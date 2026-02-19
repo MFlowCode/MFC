@@ -1,6 +1,6 @@
 !>
 !! @file
-!! @brief Contains module m_bubbles_EE
+!! @brief Contains module @ref m_bubbles_ee "m_bubbles_EE"
 
 #:include 'macros.fpp'
 

@@ -1,6 +1,6 @@
 !>
 !! @file
-!! @brief Contains module m_patches
+!! @brief Contains module m_ib_patches
 
 #:include 'case.fpp'
 #:include 'ExtrusionHardcodedIC.fpp'
