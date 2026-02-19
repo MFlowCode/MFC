@@ -1,0 +1,89 @@
+[
+    {
+        "category": "Solver Core",
+        "modules": [
+            "m_rhs",
+            "m_time_steppers",
+            "m_weno",
+            "m_riemann_solvers",
+            "m_muscl",
+            "m_variables_conversion"
+        ]
+    },
+    {
+        "category": "Physics Models",
+        "modules": [
+            "m_viscous",
+            "m_surface_tension",
+            "m_bubbles",
+            "m_bubbles_EE",
+            "m_bubbles_EL",
+            "m_bubbles_EL_kernels",
+            "m_qbmm",
+            "m_hyperelastic",
+            "m_hypoelastic",
+            "m_phase_change",
+            "m_chemistry",
+            "m_acoustic_src",
+            "m_body_forces",
+            "m_pressure_relaxation"
+        ]
+    },
+    {
+        "category": "Boundary Conditions",
+        "modules": [
+            "m_cbc",
+            "m_compute_cbc",
+            "m_boundary_common",
+            "m_ibm",
+            "m_igr",
+            "m_ib_patches",
+            "m_compute_levelset"
+        ]
+    },
+    {
+        "category": "I/O and Startup",
+        "modules": [
+            "m_start_up",
+            "m_data_output",
+            "m_data_input",
+            "m_delay_file_access"
+        ]
+    },
+    {
+        "category": "Infrastructure",
+        "modules": [
+            "m_derived_types",
+            "m_global_parameters",
+            "m_mpi_common",
+            "m_mpi_proxy",
+            "m_constants",
+            "m_precision_select",
+            "m_helper",
+            "m_helper_basic",
+            "m_compile_specific",
+            "m_fftw",
+            "m_nvtx",
+            "m_model",
+            "m_finite_differences",
+            "m_checker",
+            "m_checker_common",
+            "m_sim_helpers",
+            "m_derived_variables"
+        ]
+    },
+    {
+        "category": "Pre-Process",
+        "modules": [
+            "m_grid",
+            "m_icpp_patches",
+            "m_initial_condition",
+            "m_assign_variables",
+            "m_check_patches",
+            "m_check_ib_patches",
+            "m_perturbation",
+            "m_simplex_noise",
+            "m_boundary_conditions"
+        ]
+    }
+]

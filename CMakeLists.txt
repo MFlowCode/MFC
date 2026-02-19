@@ -803,9 +803,10 @@ if (MFC_DOCUMENTATION)
          \"${CMAKE_CURRENT_SOURCE_DIR}/docs/custom.css\"")
 
     # > Generate Documentation & Landing Page
-    GEN_DOCS(pre_process   "MFC: Pre-Process")
-    GEN_DOCS(simulation    "MFC: Simulation")
-    GEN_DOCS(post_process  "MFC: Post-Process")
+    GEN_DOCS(pre_process   "MFC")
+    GEN_DOCS(simulation    "MFC")
+    GEN_DOCS(post_process  "MFC")
+    GEN_DOCS(api           "MFC")
     GEN_DOCS(documentation "MFC")
 
     # Generate API landing pages for pre_process, simulation, post_process.
@@ -826,6 +827,7 @@ if (MFC_DOCUMENTATION)
     add_dependencies(pre_process_doxygen gen_api_landing)
     add_dependencies(simulation_doxygen gen_api_landing)
     add_dependencies(post_process_doxygen gen_api_landing)
+    add_dependencies(api_doxygen gen_api_landing)
 
     # Fix @file/@brief headers to match actual module/program declarations.
     # Handles mixed-case Fortran names and catches stale module renames.
@@ -845,6 +847,24 @@ if (MFC_DOCUMENTATION)
     add_dependencies(pre_process_doxygen fix_file_briefs)
     add_dependencies(simulation_doxygen fix_file_briefs)
     add_dependencies(post_process_doxygen fix_file_briefs)
+
+    # Generate architecture.md from template + module_categories.json + source briefs.
+    add_custom_command(
+        OUTPUT  "${CMAKE_CURRENT_BINARY_DIR}/gen-architecture.stamp"
+        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/docs/gen_architecture.py"
+                "${CMAKE_CURRENT_SOURCE_DIR}/docs/module_categories.json"
+                "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/architecture.md.in"
+                ${pre_process_FPPs} ${pre_process_F90s}
+                ${simulation_FPPs} ${simulation_F90s}
+                ${post_process_FPPs} ${post_process_F90s}
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/docs/gen_architecture.py"
+                "${CMAKE_CURRENT_SOURCE_DIR}"
+        COMMAND "${CMAKE_COMMAND}" -E touch "${CMAKE_CURRENT_BINARY_DIR}/gen-architecture.stamp"
+        COMMENT "Generating architecture page"
+        VERBATIM
+    )
+    add_custom_target(gen_architecture DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/gen-architecture.stamp")
+    add_dependencies(documentation_doxygen gen_architecture)
 
     # Inject per-page last-updated dates into documentation markdown files.
     # Runs after auto-generated .md files exist, before Doxygen processes them.

@@ -1,5 +1,6 @@
 """Check that file paths, cite keys, parameters, and @ref targets in docs still exist."""
 
+import json
 import re
 import sys
 from pathlib import Path
@@ -370,7 +371,7 @@ def check_page_refs(repo_root: Path) -> list[str]:
 
     # Collect all @page identifiers (IDs may contain hyphens)
     # Include Doxygen built-ins and auto-generated pages (created by ./mfc.sh generate)
-    page_ids = {"citelist", "parameters", "case_constraints", "physics_constraints", "examples", "cli-reference"}
+    page_ids = {"citelist", "parameters", "case_constraints", "physics_constraints", "examples", "cli-reference", "architecture"}
     for md_file in doc_dir.glob("*.md"):
         text = md_file.read_text(encoding="utf-8")
         m = re.search(r"^\s*@page\s+([\w-]+)", text, flags=re.MULTILINE)
@@ -828,6 +829,38 @@ def check_module_briefs(repo_root: Path) -> list[str]:
     return errors
 
 
+def check_module_categories(repo_root: Path) -> list[str]:
+    """Check that every m_*.fpp/.f90 module is listed in module_categories.json."""
+    categories_file = repo_root / "docs" / "module_categories.json"
+    if not categories_file.exists():
+        return []
+
+    categories = json.loads(categories_file.read_text(encoding="utf-8"))
+    categorized = set()
+    for entry in categories:
+        categorized.update(entry["modules"])
+
+    src_dir = repo_root / "src"
+    if not src_dir.exists():
+        return []
+
+    errors = []
+    for fpp in sorted(src_dir.rglob("m_*.[fF]*")):
+        if fpp.suffix not in (".fpp", ".f90", ".F90"):
+            continue
+        name = fpp.stem
+        if name not in categorized:
+            rel = fpp.relative_to(repo_root)
+            cats = ", ".join(e["category"] for e in categories)
+            errors.append(
+                f"  {rel}: module {name} is not in docs/module_categories.json.\n"
+                f"    Fix: open docs/module_categories.json and add \"{name}\" to one of: {cats}.\n"
+                f"    This ensures it appears on the Code Architecture page."
+            )
+
+    return errors
+
+
 def main():
     repo_root = Path(__file__).resolve().parents[2]
 
@@ -847,6 +880,7 @@ def main():
     all_errors.extend(check_identifier_refs(repo_root))
     all_errors.extend(check_cli_refs(repo_root))
     all_errors.extend(check_module_briefs(repo_root))
+    all_errors.extend(check_module_categories(repo_root))
 
     if all_errors:
         print("Doc reference check failed:")
