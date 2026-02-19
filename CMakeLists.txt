@@ -834,6 +834,7 @@ if (MFC_DOCUMENTATION)
 
     install(FILES       "${CMAKE_CURRENT_SOURCE_DIR}/docs/index.html"
                         "${CMAKE_CURRENT_SOURCE_DIR}/docs/404.html"
+                        "${CMAKE_CURRENT_SOURCE_DIR}/docs/simulations.json"
             DESTINATION "docs/mfc")
 endif()
 
