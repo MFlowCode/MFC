@@ -34,12 +34,13 @@ output_file="$job_slug.out"
 submit_output=$(sbatch <<EOT
 #!/bin/bash
 #SBATCH -J MFC-$job_slug            # Job name
-#SBATCH -A ENG160                  # charge account
+#SBATCH -A CFD154                  # charge account
 #SBATCH -N 1                       # Number of nodes required
 $sbatch_device_opts
-#SBATCH -t 05:59:00                # Duration of the job (Ex: 15 mins)
+#SBATCH -t 01:59:00                # Duration of the job
 #SBATCH -o$output_file             # Combined output and error messages file
-#SBATCH -p extended                # Extended partition for shorter queues
+#SBATCH -p batch                   # Batch partition (concurrent jobs)
+#SBATCH --qos=hackathon            # Hackathon QOS for batch access
 
 set -e
 set -x
@@ -50,6 +51,7 @@ echo "Running in $(pwd):"
 job_slug="$job_slug"
 job_device="$2"
 job_interface="$3"
+job_shard="$4"
 
 . ./mfc.sh load -c f -m $([ "$2" = "gpu" ] && echo "g" || echo "c")
 
