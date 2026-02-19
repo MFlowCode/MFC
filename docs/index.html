@@ -118,6 +118,8 @@
                 </a>
             `).join("");
 
+            document.getElementById("copyright-year").textContent = new Date().getFullYear();
+
             fetch("https://api.github.com/repos/MFlowCode/MFC/releases/latest")
                 .then(r => r.json())
                 .then(r => { if (r.tag_name) document.getElementById("release-ver").innerText = r.tag_name; })
@@ -240,10 +242,10 @@
     </main>
     <div class="flex flex-col w-full px-4 md:px-0 text-white py-8 gap-4 container mx-auto">
         <div class="font-bold text-center text-sm md:text-md md:text-left">
-            &copy; 2021 <a href="https://comp-physics.group/">Spencer H. Bryngelson and Tim Colonius</a>
+            &copy; <span id="copyright-year"></span> <a href="https://comp-physics.group/">Spencer H. Bryngelson and Tim Colonius</a>
         </div>
         <div class="text-justify flex-1 text-xs md:text-sm text-neutral-300">
-            Multiple federal sponsors have supported MFC development, including the US Department of Defense (DOD), the National Institutes of Health (NIH), the Department of Energy (DOE), and the National Science Foundation (NSF).
+            Multiple federal sponsors have supported MFC development, including the US Department of Defense (DOD), the National Institutes of Health (NIH), the Department of Energy (DOE), the National Nuclear Security Administration (NNSA), and the National Science Foundation (NSF).
             MFC computations use OLCF Frontier, Summit, and Wombat; LLNL El Capitan, Tuolumne, and Lassen; and many ACCESS-CI systems
         </div>
     </div>
