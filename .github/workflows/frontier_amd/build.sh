@@ -20,6 +20,9 @@ fi
 
 . ./mfc.sh load -c famd -m g
 
+# Clean stale build artifacts from previous CI runs
+./mfc.sh clean
+
 if [ "$run_bench" == "bench" ]; then
     for dir in benchmarks/*/; do
         ./mfc.sh run -v "$dir/case.py" --case-optimization -j 4 --dry-run $build_opts

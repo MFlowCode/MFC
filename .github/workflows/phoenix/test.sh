@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# Clean stale build artifacts from previous CI runs to prevent
+# cross-compiler contamination (e.g. gfortran LAPACK linked by NVHPC)
+./mfc.sh clean
+
 build_opts=""
 if [ "$job_device" = "gpu" ]; then
     build_opts="--gpu"
