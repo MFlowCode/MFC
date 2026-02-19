@@ -58,7 +58,7 @@ get_job_state() {
 # Check if a state is terminal (job is done, for better or worse)
 is_terminal_state() {
   case "$1" in
-    COMPLETED|FAILED|CANCELLED|CANCELLED+|TIMEOUT|OUT_OF_MEMORY|NODE_FAIL|BOOT_FAIL|DEADLINE)
+    COMPLETED|FAILED|CANCELLED|CANCELLED+|TIMEOUT|OUT_OF_MEMORY|NODE_FAIL|BOOT_FAIL|DEADLINE|PREEMPTED|REVOKED)
       return 0 ;;
     *)
       return 1 ;;

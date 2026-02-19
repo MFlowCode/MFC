@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -105,13 +105,15 @@ jobs:
         with:
           max_attempts: 3
           retry_wait_seconds: 60
-          timeout_minutes: 480
+          timeout_minutes: 150
           command: |
             (cd pr     && ${{ matrix.build_script }}) &
             pid1=$!
             (cd master && ${{ matrix.build_script }}) &
             pid2=$!
-            wait $pid1 && wait $pid2
+            wait $pid1; e1=$?
+            wait $pid2; e2=$?
+            [ $e1 -eq 0 ] && [ $e2 -eq 0 ]
           on_retry_command: |
             (cd pr     && ./mfc.sh clean) &
             (cd master && ./mfc.sh clean) &
