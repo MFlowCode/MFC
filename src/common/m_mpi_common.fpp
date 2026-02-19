@@ -1,11 +1,11 @@
+!>
+!! @file
+!! @brief Contains module m_mpi_common
+
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
-!> @brief The module serves as a proxy to the parameters and subroutines
-!!          available in the MPI implementation's MPI module. Specifically,
-!!          the purpose of the proxy is to harness basic MPI commands into
-!!          more complicated procedures as to accomplish the communication
-!!          goals for the simulation.
+!> @brief MPI communication layer: domain decomposition, halo exchange, reductions, and parallel I/O setup
 module m_mpi_common
 
 #ifdef MFC_MPI
@@ -264,6 +264,7 @@ contains
 
     end subroutine s_initialize_mpi_data_ds
 
+    !> @brief Gathers variable-length real vectors from all MPI ranks onto the root process.
     impure subroutine s_mpi_gather_data(my_vector, counts, gathered_vector, root)
 
         integer, intent(in) :: counts          ! Array of vector lengths for each process
@@ -296,6 +297,7 @@ contains
 #endif
     end subroutine s_mpi_gather_data
 
+    !> @brief Gathers per-rank time step wall-clock times onto rank 0 for performance reporting.
     impure subroutine mpi_bcast_time_step_values(proc_time, time_avg)
 
         real(wp), dimension(0:num_procs - 1), intent(inout) :: proc_time
@@ -310,6 +312,7 @@ contains
 
     end subroutine mpi_bcast_time_step_values
 
+    !> @brief Prints a case file error with the prohibited condition and message, then aborts execution.
     impure subroutine s_prohibit_abort(condition, message)
         character(len=*), intent(in) :: condition, message
 
@@ -573,6 +576,7 @@ contains
 
     !> The subroutine terminates the MPI execution environment.
         !! @param prnt error message to be printed
+        !! @param code optional exit code
     impure subroutine s_mpi_abort(prnt, code)
 
         character(len=*), intent(in), optional :: prnt
@@ -634,9 +638,12 @@ contains
     !>  The goal of this procedure is to populate the buffers of
         !!      the cell-average conservative variables by communicating
         !!      with the neighboring processors.
-        !!  @param q_cons_vf Cell-average conservative variables
+        !!  @param q_comm Cell-average conservative variables
         !!  @param mpi_dir MPI communication coordinate direction
         !!  @param pbc_loc Processor boundary condition (PBC) location
+        !!  @param nVar Number of variables to communicate
+        !!  @param pb_in Optional internal bubble pressure
+        !!  @param mv_in Optional bubble mass velocity
     subroutine s_mpi_sendrecv_variables_buffers(q_comm, &
                                                 mpi_dir, &
                                                 pbc_loc, &

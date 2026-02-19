@@ -1202,3 +1202,6 @@ The above variables are used for all simulations.
 | hypoelastic variables     | N/A |
 
 The above variables correspond to optional physics.
+
+
+<div style='text-align:center; font-size:0.75rem; color:#888; padding:16px 0 0;'>Page last updated: 2026-02-15</div>

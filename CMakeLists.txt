@@ -727,6 +727,8 @@ if (MFC_DOCUMENTATION)
         set(DOXYGEN_IMAGE_PATH       "\"${CMAKE_CURRENT_SOURCE_DIR}/docs/res\"\
                                       \"${CMAKE_CURRENT_SOURCE_DIR}/docs/${target}\"")
 
+        set(DOXYGEN_WARN_LOGFILE "\"${CMAKE_CURRENT_BINARY_DIR}/${target}-doxygen-warnings.log\"")
+
         file(MAKE_DIRECTORY "${DOXYGEN_OUTPUT_DIRECTORY}")
 
         configure_file(
@@ -805,6 +807,44 @@ if (MFC_DOCUMENTATION)
     GEN_DOCS(simulation    "MFC: Simulation")
     GEN_DOCS(post_process  "MFC: Post-Process")
     GEN_DOCS(documentation "MFC")
+
+    # Generate API landing pages for pre_process, simulation, post_process.
+    # Scans src/{target}/*.fpp to produce module lists in docs/{target}/readme.md.
+    add_custom_command(
+        OUTPUT  "${CMAKE_CURRENT_BINARY_DIR}/gen-api-landing.stamp"
+        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/docs/gen_api_landing.py"
+                ${pre_process_FPPs} ${pre_process_F90s}
+                ${simulation_FPPs} ${simulation_F90s}
+                ${post_process_FPPs} ${post_process_F90s}
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/docs/gen_api_landing.py"
+                "${CMAKE_CURRENT_SOURCE_DIR}"
+        COMMAND "${CMAKE_COMMAND}" -E touch "${CMAKE_CURRENT_BINARY_DIR}/gen-api-landing.stamp"
+        COMMENT "Generating API landing pages"
+        VERBATIM
+    )
+    add_custom_target(gen_api_landing DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/gen-api-landing.stamp")
+    add_dependencies(pre_process_doxygen gen_api_landing)
+    add_dependencies(simulation_doxygen gen_api_landing)
+    add_dependencies(post_process_doxygen gen_api_landing)
+
+    # Fix @file/@brief headers to match actual module/program declarations.
+    # Handles mixed-case Fortran names and catches stale module renames.
+    add_custom_command(
+        OUTPUT  "${CMAKE_CURRENT_BINARY_DIR}/fix-file-briefs.stamp"
+        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/docs/fix_file_briefs.py"
+                ${pre_process_FPPs} ${pre_process_F90s}
+                ${simulation_FPPs} ${simulation_F90s}
+                ${post_process_FPPs} ${post_process_F90s}
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/docs/fix_file_briefs.py"
+                "${CMAKE_CURRENT_SOURCE_DIR}"
+        COMMAND "${CMAKE_COMMAND}" -E touch "${CMAKE_CURRENT_BINARY_DIR}/fix-file-briefs.stamp"
+        COMMENT "Fixing @file brief headers"
+        VERBATIM
+    )
+    add_custom_target(fix_file_briefs DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/fix-file-briefs.stamp")
+    add_dependencies(pre_process_doxygen fix_file_briefs)
+    add_dependencies(simulation_doxygen fix_file_briefs)
+    add_dependencies(post_process_doxygen fix_file_briefs)
 
     # Inject per-page last-updated dates into documentation markdown files.
     # Runs after auto-generated .md files exist, before Doxygen processes them.

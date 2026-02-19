@@ -66,4 +66,27 @@ $extrastylesheet
 </table>
 </div>
 <!--END TITLEAREA-->
+<!-- Cross-navigation injected into sidebar via script below -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var nav = document.createElement('div');
+  nav.id = 'mfc-nav';
+  var items = [
+    ['../documentation/index.html', 'documentation', 'User Guide'],
+    ['../pre_process/index.html',   'pre_process',   'Pre-Process API'],
+    ['../simulation/index.html',    'simulation',    'Simulation API'],
+    ['../post_process/index.html',  'post_process',  'Post-Process API']
+  ];
+  var path = window.location.pathname;
+  for (var i = 0; i < items.length; i++) {
+    var a = document.createElement('a');
+    a.href = items[i][0];
+    a.textContent = items[i][2];
+    if (path.indexOf('/' + items[i][1] + '/') !== -1) a.className = 'active';
+    nav.appendChild(a);
+  }
+  var sideNav = document.getElementById('side-nav');
+  if (sideNav) sideNav.insertBefore(nav, sideNav.firstChild);
+});
+</script>
 <!-- end header part -->

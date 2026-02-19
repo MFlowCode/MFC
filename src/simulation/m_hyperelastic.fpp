@@ -4,8 +4,7 @@
 
 #:include 'macros.fpp'
 
-!> @brief This module consists of subroutines used in the calculation
-!!              of the cauchy tensor
+!> @brief Computes the left Cauchy--Green deformation tensor and hyperelastic stress source terms
 
 module m_hyperelastic
 
@@ -39,8 +38,6 @@ contains
 
     !>  The following subroutine handles the calculation of the btensor.
         !!   The calculation of the btensor takes qprimvf.
-        !! @param q_prim_vf Primitive variables
-        !! @param btensor is the output
         !! calculate the grad_xi, grad_xi is a nxn tensor
         !! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
         !! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
@@ -88,8 +85,8 @@ contains
 
     !>  The following subroutine handles the calculation of the btensor.
         !!   The calculation of the btensor takes qprimvf.
+        !! @param q_cons_vf Conservative variables
         !! @param q_prim_vf Primitive variables
-        !! @param btensor is the output
         !! calculate the grad_xi, grad_xi is a nxn tensor
         !! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
         !! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
@@ -218,8 +215,12 @@ contains
 
     !>  The following subroutine handles the calculation of the btensor.
         !!   The calculation of the btensor takes qprimvf.
+        !! @param btensor_in Left Cauchy-Green deformation tensor
         !! @param q_prim_vf Primitive variables
-        !! @param btensor is the output
+        !! @param G_param Elastic shear modulus
+        !! @param j x-direction cell index
+        !! @param k y-direction cell index
+        !! @param l z-direction cell index
         !! calculate the grad_xi, grad_xi is a nxn tensor
         !! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
         !! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
@@ -257,8 +258,12 @@ contains
 
     !>  The following subroutine handles the calculation of the btensor.
         !!   The calculation of the btensor takes qprimvf.
+        !! @param btensor_in Left Cauchy-Green deformation tensor
         !! @param q_prim_vf Primitive variables
-        !! @param btensor is the output
+        !! @param G_param Elastic shear modulus
+        !! @param j x-direction cell index
+        !! @param k y-direction cell index
+        !! @param l z-direction cell index
         !! calculate the grad_xi, grad_xi is a nxn tensor
         !! calculate the inverse of grad_xi to obtain F, F is a nxn tensor
         !! calculate the FFtranspose to obtain the btensor, btensor is nxn tensor
@@ -296,6 +301,7 @@ contains
 
     end subroutine s_Mooney_Rivlin_cauchy_solver
 
+    !> @brief Deallocates memory for hyperelastic deformation tensor and finite-difference coefficients.
     impure subroutine s_finalize_hyperelastic_module()
 
         integer :: i !< iterator

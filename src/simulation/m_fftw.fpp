@@ -4,7 +4,7 @@
 
 #:include 'macros.fpp'
 
-!> @brief The module contains the subroutines for the FFT routines
+!> @brief Forward and inverse FFT wrappers (FFTW/cuFFT/hipFFT) for azimuthal Fourier filtering in cylindrical geometries
 module m_fftw
     use, intrinsic :: iso_c_binding
 
