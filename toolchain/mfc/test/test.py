@@ -190,6 +190,11 @@ def test():
 
     # Check if we aborted due to high failure rate
     if abort_tests.is_set():
+        # Clean up stale failed_uuids.txt so CI doesn't retry wrong tests
+        failed_uuids_path = os.path.join(common.MFC_TEST_DIR, "failed_uuids.txt")
+        if os.path.exists(failed_uuids_path):
+            os.remove(failed_uuids_path)
+
         total_completed = nFAIL + nPASS
         cons.print()
         cons.unindent()

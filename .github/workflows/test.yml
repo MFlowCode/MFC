@@ -28,7 +28,7 @@ jobs:
 
       - name: Check Formatting
         run: |
-          ./mfc.sh format -j $(nproc)
+          ./mfc.sh format -j "$(nproc)"
           git diff --exit-code || (echo "::error::Code is not formatted. Run './mfc.sh format' locally." && exit 1)
 
       - name: Spell Check
@@ -138,7 +138,7 @@ jobs:
 
       - name: Build
         run:  |
-          /bin/bash mfc.sh test -v --dry-run -j $(nproc) --${{ matrix.debug }} --${{ matrix.mpi }} --${{ matrix.precision }} $TEST_ALL
+          /bin/bash mfc.sh test -v --dry-run -j "$(nproc)" --${{ matrix.debug }} --${{ matrix.mpi }} --${{ matrix.precision }} $TEST_ALL
         env:
           TEST_ALL: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
 
@@ -146,17 +146,17 @@ jobs:
         run: |
           rm -f tests/failed_uuids.txt
           TEST_EXIT=0
-          /bin/bash mfc.sh test -v --max-attempts 3 -j $(nproc) $TEST_ALL $TEST_PCT || TEST_EXIT=$?
+          /bin/bash mfc.sh test -v --max-attempts 3 -j "$(nproc)" $TEST_ALL $TEST_PCT || TEST_EXIT=$?
 
           # Retry only if a small number of tests failed (sporadic failures)
           if [ -f tests/failed_uuids.txt ]; then
             NUM_FAILED=$(wc -l < tests/failed_uuids.txt)
-            if [ "$NUM_FAILED" -le 5 ]; then
+            if [ "$NUM_FAILED" -gt 0 ] && [ "$NUM_FAILED" -le 5 ]; then
               FAILED=$(cat tests/failed_uuids.txt | tr '\n' ' ')
               echo ""
               echo "=== Retrying $NUM_FAILED failed test(s): $FAILED ==="
               echo ""
-              /bin/bash mfc.sh test -v --max-attempts 3 -j $(nproc) --only $FAILED $TEST_ALL || exit $?
+              /bin/bash mfc.sh test -v --max-attempts 3 -j "$(nproc)" --only $FAILED $TEST_ALL || exit $?
             else
               echo "Too many failures ($NUM_FAILED) to retry — likely a real issue."
               exit 1
