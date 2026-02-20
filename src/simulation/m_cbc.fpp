@@ -2,21 +2,7 @@
 !! @file
 !! @brief Contains module m_cbc
 
-!> @brief The module features a large database of characteristic boundary
-!!              conditions (CBC) for the Euler system of equations. This system
-!!              is augmented by the appropriate advection equations utilized to
-!!              capture the material interfaces. The closure is achieved by the
-!!              stiffened equation of state and mixture relations. At this time,
-!!              the following CBC are available:
-!!                           1) Slip Wall
-!!                           2) Nonreflecting Subsonic Buffer
-!!                           3) Nonreflecting Subsonic Inflow
-!!                           4) Nonreflecting Subsonic Outflow
-!!                           5) Force-Free Subsonic Outflow
-!!                           6) Constant Pressure Subsonic Outflow
-!!                           7) Supersonic Inflow
-!!                           8) Supersonic Outflow
-!!              Please refer to Thompson (1987, 1990) for detailed descriptions.
+!> @brief Characteristic boundary conditions (CBC) for slip walls, non-reflecting subsonic inflow/outflow, and supersonic boundaries
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
@@ -553,6 +539,7 @@ contains
 
     end subroutine s_compute_cbc_coefficients
 
+    !> @brief Associates finite-difference and polynomial-interpolation CBC coefficients with targets based on coordinate direction and boundary location.
     !!  The goal of the procedure is to associate the FD and PI
     !!      coefficients, or CBC coefficients, with the appropriate
     !!      targets, based on the coordinate direction and location
@@ -1628,7 +1615,7 @@ contains
 
     end subroutine s_finalize_cbc
 
-    ! Detext if the problem has any characteristic boundary conditions
+    !> @brief Detects whether any domain boundary uses characteristic boundary conditions.
     elemental subroutine s_any_cbc_boundaries(toggle)
 
         logical, intent(inout) :: toggle

@@ -5,7 +5,7 @@
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
-!> @brief This module is used to compute moment inversion via qbmm
+!> @brief Quadrature-based moment methods (QBMM) for polydisperse bubble moment inversion and transport
 module m_qbmm
 
     use m_derived_types        !< Definitions of the derived types
@@ -43,6 +43,7 @@ module m_qbmm
 
 contains
 
+    !> @brief Allocates and initializes moment coefficient arrays for the QBMM module.
     impure subroutine s_initialize_qbmm_module
 
         integer :: i1, i2, q, i, j
@@ -411,6 +412,7 @@ contains
 
     end subroutine s_initialize_qbmm_module
 
+    !> @brief Computes the QBMM right-hand side source terms for bubble moment transport equations.
     subroutine s_compute_qbmm_rhs(idir, q_cons_vf, q_prim_vf, rhs_vf, flux_n_vf, pb, rhs_pb)
 
         integer, intent(in) :: idir
@@ -565,7 +567,7 @@ contains
 
     end subroutine s_compute_qbmm_rhs
 
-    !Coefficient array for non-polytropic model (pb and mv values are accounted in wght_pb and wght_mv)
+    !> @brief Builds the coefficient array for the non-polytropic bubble model.
     subroutine s_coeff_nonpoly(pres, rho, c, coeffs)
         $:GPU_ROUTINE(function_name='s_coeff_nonpoly',parallelism='[seq]', &
             & cray_inline=True)
@@ -644,7 +646,7 @@ contains
 
     end subroutine s_coeff_nonpoly
 
-!Coefficient array for polytropic model (pb for each R0 bin accounted for in wght_pb)
+    !> @brief Builds the coefficient array for the polytropic bubble model.
     subroutine s_coeff(pres, rho, c, coeffs)
         $:GPU_ROUTINE(function_name='s_coeff',parallelism='[seq]', &
             & cray_inline=True)
@@ -713,6 +715,7 @@ contains
 
     end subroutine s_coeff
 
+    !> @brief Performs moment inversion to recover quadrature weights and abscissas and evaluates bubble source terms.
     subroutine s_mom_inv(q_cons_vf, q_prim_vf, momsp, moms3d, pb, rhs_pb, mv, rhs_mv, ix, iy, iz)
 
         type(scalar_field), dimension(:), intent(inout) :: q_cons_vf, q_prim_vf
@@ -882,7 +885,7 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
     contains
-        ! Helper to select the correct coefficient routine
+        !> @brief Selects the polytropic or non-polytropic coefficient routine.
         subroutine s_coeff_selector(pres, rho, c, coeff, polytropic)
             $:GPU_ROUTINE(function_name='s_coeff_selector',parallelism='[seq]', &
                 & cray_inline=True)
@@ -900,6 +903,7 @@ contains
             end if
         end subroutine s_coeff_selector
 
+        !> @brief Performs conditional hyperbolic QMOM (CHyQMOM) inversion for bivariate moments.
         subroutine s_chyqmom(momin, wght, abscX, abscY)
             $:GPU_ROUTINE(function_name='s_chyqmom',parallelism='[seq]', &
                 & cray_inline=True)
@@ -958,6 +962,7 @@ contains
 
         end subroutine s_chyqmom
 
+        !> @brief Performs hyperbolic QMOM (HyQMOM) inversion for univariate moments.
         subroutine s_hyqmom(frho, fup, fmom)
             $:GPU_ROUTINE(function_name='s_hyqmom',parallelism='[seq]', &
                 & cray_inline=True)
@@ -978,6 +983,7 @@ contains
 
         end subroutine s_hyqmom
 
+        !> @brief Evaluates a weighted quadrature sum over all bubble size bins and nodes.
         function f_quad(abscX, abscY, wght_in, q, r, s)
             $:GPU_ROUTINE(parallelism='[seq]')
             #:if not MFC_CASE_OPTIMIZATION and USING_AMD
@@ -1003,6 +1009,7 @@ contains
 
         end function f_quad
 
+        !> @brief Evaluates a weighted 2D quadrature sum over quadrature nodes for a single size bin.
         function f_quad2D(abscX, abscY, wght_in, pow)
             $:GPU_ROUTINE(parallelism='[seq]')
             #:if not MFC_CASE_OPTIMIZATION and USING_AMD

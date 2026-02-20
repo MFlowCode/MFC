@@ -727,6 +727,8 @@ if (MFC_DOCUMENTATION)
         set(DOXYGEN_IMAGE_PATH       "\"${CMAKE_CURRENT_SOURCE_DIR}/docs/res\"\
                                       \"${CMAKE_CURRENT_SOURCE_DIR}/docs/${target}\"")
 
+        set(DOXYGEN_WARN_LOGFILE "\"${CMAKE_CURRENT_BINARY_DIR}/${target}-doxygen-warnings.log\"")
+
         file(MAKE_DIRECTORY "${DOXYGEN_OUTPUT_DIRECTORY}")
 
         configure_file(
@@ -801,10 +803,87 @@ if (MFC_DOCUMENTATION)
          \"${CMAKE_CURRENT_SOURCE_DIR}/docs/custom.css\"")
 
     # > Generate Documentation & Landing Page
-    GEN_DOCS(pre_process   "MFC: Pre-Process")
-    GEN_DOCS(simulation    "MFC: Simulation")
-    GEN_DOCS(post_process  "MFC: Post-Process")
+    GEN_DOCS(pre_process   "MFC")
+    GEN_DOCS(simulation    "MFC")
+    GEN_DOCS(post_process  "MFC")
+    GEN_DOCS(api           "MFC")
     GEN_DOCS(documentation "MFC")
+
+    # Generate API landing pages for pre_process, simulation, post_process.
+    # Scans src/{target}/*.fpp to produce module lists in docs/{target}/readme.md.
+    add_custom_command(
+        OUTPUT  "${CMAKE_CURRENT_BINARY_DIR}/gen-api-landing.stamp"
+        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/docs/gen_api_landing.py"
+                ${pre_process_FPPs} ${pre_process_F90s}
+                ${simulation_FPPs} ${simulation_F90s}
+                ${post_process_FPPs} ${post_process_F90s}
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/docs/gen_api_landing.py"
+                "${CMAKE_CURRENT_SOURCE_DIR}"
+        COMMAND "${CMAKE_COMMAND}" -E touch "${CMAKE_CURRENT_BINARY_DIR}/gen-api-landing.stamp"
+        COMMENT "Generating API landing pages"
+        VERBATIM
+    )
+    add_custom_target(gen_api_landing DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/gen-api-landing.stamp")
+    add_dependencies(pre_process_doxygen gen_api_landing)
+    add_dependencies(simulation_doxygen gen_api_landing)
+    add_dependencies(post_process_doxygen gen_api_landing)
+    add_dependencies(api_doxygen gen_api_landing)
+
+    # Fix @file/@brief headers to match actual module/program declarations.
+    # Handles mixed-case Fortran names and catches stale module renames.
+    add_custom_command(
+        OUTPUT  "${CMAKE_CURRENT_BINARY_DIR}/fix-file-briefs.stamp"
+        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/docs/fix_file_briefs.py"
+                ${pre_process_FPPs} ${pre_process_F90s}
+                ${simulation_FPPs} ${simulation_F90s}
+                ${post_process_FPPs} ${post_process_F90s}
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/docs/fix_file_briefs.py"
+                "${CMAKE_CURRENT_SOURCE_DIR}"
+        COMMAND "${CMAKE_COMMAND}" -E touch "${CMAKE_CURRENT_BINARY_DIR}/fix-file-briefs.stamp"
+        COMMENT "Fixing @file brief headers"
+        VERBATIM
+    )
+    add_custom_target(fix_file_briefs DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/fix-file-briefs.stamp")
+    add_dependencies(pre_process_doxygen fix_file_briefs)
+    add_dependencies(simulation_doxygen fix_file_briefs)
+    add_dependencies(post_process_doxygen fix_file_briefs)
+
+    # Generate architecture.md from template + module_categories.json + source briefs.
+    add_custom_command(
+        OUTPUT  "${CMAKE_CURRENT_BINARY_DIR}/gen-architecture.stamp"
+        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/docs/gen_architecture.py"
+                "${CMAKE_CURRENT_SOURCE_DIR}/docs/module_categories.json"
+                "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/architecture.md.in"
+                ${pre_process_FPPs} ${pre_process_F90s}
+                ${simulation_FPPs} ${simulation_F90s}
+                ${post_process_FPPs} ${post_process_F90s}
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/docs/gen_architecture.py"
+                "${CMAKE_CURRENT_SOURCE_DIR}"
+        COMMAND "${CMAKE_COMMAND}" -E touch "${CMAKE_CURRENT_BINARY_DIR}/gen-architecture.stamp"
+        COMMENT "Generating architecture page"
+        VERBATIM
+    )
+    add_custom_target(gen_architecture DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/gen-architecture.stamp")
+    add_dependencies(documentation_doxygen gen_architecture)
+
+    # Inject per-page last-updated dates into documentation markdown files.
+    # Runs after auto-generated .md files exist, before Doxygen processes them.
+    # Uses a stamp file so it only runs once per build.
+    add_custom_command(
+        OUTPUT  "${CMAKE_CURRENT_BINARY_DIR}/inject-dates.stamp"
+        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/examples.md"
+                "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/case_constraints.md"
+                "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/physics_constraints.md"
+                "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/cli-reference.md"
+                "${CMAKE_CURRENT_SOURCE_DIR}/docs/documentation/parameters.md"
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/docs/inject-dates.py"
+                "${CMAKE_CURRENT_SOURCE_DIR}"
+        COMMAND "${CMAKE_COMMAND}" -E touch "${CMAKE_CURRENT_BINARY_DIR}/inject-dates.stamp"
+        COMMENT "Injecting page dates into documentation"
+        VERBATIM
+    )
+    add_custom_target(inject_page_dates DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/inject-dates.stamp")
+    add_dependencies(documentation_doxygen inject_page_dates)
 
     # > Copy Resources (main landing page & assets)
     install(DIRECTORY   "${CMAKE_CURRENT_SOURCE_DIR}/docs/res"
@@ -814,6 +893,8 @@ if (MFC_DOCUMENTATION)
             DESTINATION "docs/mfc")
 
     install(FILES       "${CMAKE_CURRENT_SOURCE_DIR}/docs/index.html"
+                        "${CMAKE_CURRENT_SOURCE_DIR}/docs/404.html"
+                        "${CMAKE_CURRENT_SOURCE_DIR}/docs/simulations.json"
             DESTINATION "docs/mfc")
 endif()
 

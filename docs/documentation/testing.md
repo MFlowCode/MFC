@@ -104,3 +104,6 @@ It will also turn most write parameters (`*_wrt`) on.
 Then, it searches through the silo files using `h5dump` to ensure that there are no `NaN`s or `Infinity`s.
 Although adding this option does not guarantee that accurate `.silo` files are generated, it does ensure that the post-process code does not fail or produce malformed data.
 
+
+
+<div style='text-align:center; font-size:0.75rem; color:#888; padding:16px 0 0;'>Page last updated: 2026-02-15</div>

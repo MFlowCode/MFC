@@ -1,5 +1,10 @@
+!>
+!! @file
+!! @brief Contains module m_body_forces
+
 #:include 'macros.fpp'
 
+!> @brief Computes gravitational and user-defined body force source terms for the momentum equations
 module m_body_forces
 
     use m_derived_types        !< Definitions of the derived types
@@ -93,6 +98,7 @@ contains
     !! so the system can be advanced in time
     !! @param q_cons_vf Conservative variables
     !! @param q_prim_vf Primitive variables
+    !! @param rhs_vf Right-hand side accumulator
     subroutine s_compute_body_forces_rhs(q_prim_vf, q_cons_vf, rhs_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
@@ -167,6 +173,7 @@ contains
 
     end subroutine s_compute_body_forces_rhs
 
+    !> @brief Deallocates module variables used for body force computations.
     impure subroutine s_finalize_body_forces_module
 
         @:DEALLOCATE(rhoM)

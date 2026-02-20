@@ -3,6 +3,44 @@
  * Overrides for doxygen-awesome theme
  */
 
+/* Hide empty nav-path footer (kept for navtree.js height calculation) */
+#nav-path {
+    height: 0;
+    overflow: hidden;
+}
+
+/* Cross-navigation panel at top of sidebar */
+#mfc-nav {
+    display: flex;
+    flex-direction: column;
+    padding: 10px 12px 8px;
+    border-bottom: 1px solid var(--separator-color);
+    background: var(--side-nav-background);
+    font-size: 0.8rem;
+}
+
+#mfc-nav a {
+    display: block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    color: var(--page-foreground-color);
+    text-decoration: none;
+    opacity: 0.75;
+    transition: background 0.12s, opacity 0.12s;
+}
+
+#mfc-nav a:hover {
+    opacity: 1;
+    background: var(--side-nav-background-highlight, rgba(0,0,0,0.05));
+}
+
+#mfc-nav a.active {
+    font-weight: 600;
+    opacity: 1;
+    color: var(--primary-color);
+    background: var(--side-nav-background-highlight, rgba(0,0,0,0.05));
+}
+
 /* Narrower left navigation panel */
 html {
     --side-nav-fixed-width: 210px;

@@ -4,8 +4,7 @@
 
 #:include 'macros.fpp'
 
-!> @brief This module is used to handle all operations related to immersed
-!!              boundary methods (IBMs)
+!> @brief Computes signed-distance level-set fields and surface normals for immersed-boundary patch geometries
 module m_compute_levelset
 
     use m_ib_patches           !< The IB patch parameters
@@ -26,6 +25,7 @@ module m_compute_levelset
 
 contains
 
+    !> @brief Dispatches level-set distance and normal computations for all ghost points based on their patch geometry type.
     impure subroutine s_apply_levelset(gps, num_gps)
 
         type(ghost_point), dimension(:), intent(inout) :: gps
@@ -55,7 +55,6 @@ contains
                 end if
             end do
             $:END_GPU_PARALLEL_LOOP()
-            !> @}
 
             ! 2D Patch Geometries
         elseif (n > 0) then
@@ -79,12 +78,12 @@ contains
                 end if
             end do
             $:END_GPU_PARALLEL_LOOP()
-            !> @}
 
         end if
 
     end subroutine s_apply_levelset
 
+    !> @brief Computes the signed distance and outward normal from a ghost point to a circular immersed boundary.
     subroutine s_circle_levelset(gp)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -117,6 +116,7 @@ contains
 
     end subroutine s_circle_levelset
 
+    !> @brief Computes the signed distance and outward normal from a ghost point to a 2D NACA airfoil surface.
     subroutine s_airfoil_levelset(gp)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -199,6 +199,7 @@ contains
 
     end subroutine s_airfoil_levelset
 
+    !> @brief Computes the signed distance and outward normal from a ghost point to a 3D extruded airfoil surface including spanwise end caps.
     subroutine s_3d_airfoil_levelset(gp)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -373,6 +374,7 @@ contains
 
     end subroutine s_rectangle_levelset
 
+    !> @brief Computes the signed distance and outward normal from a ghost point to an elliptical immersed boundary via a quadratic projection.
     subroutine s_ellipse_levelset(gp)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -423,6 +425,7 @@ contains
 
     end subroutine s_ellipse_levelset
 
+    !> @brief Computes the signed distance and outward normal from a ghost point to the nearest face of a cuboid immersed boundary.
     subroutine s_cuboid_levelset(gp)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -523,6 +526,7 @@ contains
 
     end subroutine s_cuboid_levelset
 
+    !> @brief Computes the signed distance and outward normal from a ghost point to a spherical immersed boundary.
     subroutine s_sphere_levelset(gp)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -557,6 +561,7 @@ contains
 
     end subroutine s_sphere_levelset
 
+    !> @brief Computes the signed distance and outward normal from a ghost point to a cylindrical immersed boundary surface and end caps.
     subroutine s_cylinder_levelset(gp)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -635,9 +640,7 @@ contains
     end subroutine s_cylinder_levelset
 
     !> The STL patch is a 2/3D geometry that is imported from an STL file.
-    !! @param patch_id is the patch identifier
-    !! @param STL_levelset STL levelset
-    !! @param STL_levelset_norm STL levelset normals
+    !! @param gp Ghost point to compute levelset for
     subroutine s_model_levelset(gp)
         $:GPU_ROUTINE(parallelism='[seq]')
 

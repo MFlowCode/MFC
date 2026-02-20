@@ -1,0 +1,118 @@
+# Code Architecture {#architecture}
+
+This page explains how MFC's source code is organized, how data flows through the solver, and where to find things. Read this before diving into the source.
+
+## Three-Phase Pipeline
+
+MFC runs as three separate executables that communicate via binary files on disk:
+
+```
+pre_process ──> simulation ──> post_process
+  (grid +          (time         (derived
+  initial           advance)      quantities +
+  conditions)                     visualization)
+```
+
+| Phase | Entry Point | What It Does |
+|-------|-------------|--------------|
+| **Pre-Process** | `src/pre_process/p_main.f90` | Generates the computational grid and initial conditions from patch definitions. Writes binary grid and state files. |
+| **Simulation** | `src/simulation/p_main.fpp` | Reads the initial state and advances the governing equations in time. Periodically writes solution snapshots. |
+| **Post-Process** | `src/post_process/p_main.fpp` | Reads snapshots, computes derived quantities (vorticity, Schlieren, etc.), and writes Silo/HDF5 files for VisIt or ParaView. |
+
+Each phase is an independent MPI program. The simulation phase is where nearly all compute time is spent.
+
+## Directory Layout
+
+```
+src/
+  common/          Shared modules used by all three phases
+  pre_process/     Pre-process source (grid generation, patch construction)
+  simulation/      Simulation source (solver core, physics models)
+  post_process/    Post-process source (derived quantities, formatted I/O)
+```
+
+Shared modules in `src/common/` include MPI communication, derived types, variable conversion, and utility functions. They are compiled into each phase.
+
+## Key Data Structures
+
+Two arrays carry the solution through the entire simulation:
+
+| Variable | Contents | When Used |
+|----------|----------|-----------|
+| `q_cons_vf` | **Conservative** variables: \f$\alpha\rho\f$, \f$\rho u\f$, \f$\rho v\f$, \f$\rho w\f$, \f$E\f$, \f$\alpha\f$ | Storage, time integration, I/O |
+| `q_prim_vf` | **Primitive** variables: \f$\rho\f$, \f$u\f$, \f$v\f$, \f$w\f$, \f$p\f$, \f$\alpha\f$ | Reconstruction, Riemann solving, physics |
+
+Both are `vector_field` types (defined in `m_derived_types`), which are arrays of `scalar_field`. Each `scalar_field` wraps a 3D real array `sf(0:m, 0:n, 0:p)` representing one variable on the grid.
+
+The index layout within `q_cons_vf` depends on the flow model:
+
+```
+For model_eqns == 2 (5-equation, multi-fluid):
+
+  Index:    1 .. num_fluids | num_fluids+1 .. +num_vels | E_idx | adv_idx
+  Meaning:  alpha*rho_k     | momentum components       | energy | volume fractions
+```
+
+Additional variables are appended for bubbles, elastic stress, magnetic fields, or chemistry species when those models are enabled. The total count is `sys_size`.
+
+## The Simulation Loop
+
+The simulation advances the solution through this call chain each time step:
+
+```
+p_main (time-step loop)
+ └─ s_perform_time_step
+     ├─ s_compute_dt                    [adaptive CFL time step]
+     └─ s_tvd_rk                        [Runge-Kutta stages]
+         ├─ s_compute_rhs               [assemble dq/dt]
+         │   ├─ s_convert_conservative_to_primitive_variables
+         │   ├─ s_populate_variables_buffers     [MPI halo exchange]
+         │   └─ for each direction (x, y, z):
+         │       ├─ s_reconstruct_cell_boundary_values  [WENO]
+         │       ├─ s_riemann_solver                    [HLL/HLLC/HLLD]
+         │       ├─ s_compute_advection_source_term     [flux divergence]
+         │       └─ (physics source terms: viscous, bubbles, etc.)
+         ├─ RK update: q_cons = weighted combination of stages
+         ├─ s_apply_bodyforces           [if enabled]
+         ├─ s_pressure_relaxation        [if 6-equation model]
+         └─ s_ibm_correct_state          [if immersed boundaries]
+```
+
+### What happens at each stage
+
+1. **Conservative → Primitive**: Convert stored `q_cons_vf` to `q_prim_vf` (density, velocity, pressure) using the equation of state. This is done by `m_variables_conversion`.
+
+2. **MPI Halo Exchange**: Ghost cells at subdomain boundaries are filled by communicating with neighbor ranks. Handled by `m_mpi_proxy`.
+
+3. **WENO Reconstruction** (`m_weno`): For each coordinate direction, reconstruct left and right states at cell faces from cell-average primitives using high-order weighted essentially non-oscillatory stencils.
+
+4. **Riemann Solver** (`m_riemann_solvers`): At each cell face, solve the Riemann problem between left and right states to compute intercell fluxes. Available solvers: HLL, HLLC, HLLD.
+
+5. **Flux Differencing** (`m_rhs`): Accumulate the RHS as \f$\partial q / \partial t = -\frac{1}{\Delta x}(F_{j+1/2} - F_{j-1/2})\f$ plus source terms (viscous stress, surface tension, bubble dynamics, body forces, etc.).
+
+6. **Runge-Kutta Update** (`m_time_steppers`): Combine the RHS with the current state using TVD Runge-Kutta coefficients (1st, 2nd, or 3rd order SSP).
+
+## Module Map
+
+MFC has ~80 Fortran modules organized by function. Here is where to look for what:
+
+<!-- MODULE_MAP -->
+
+## MPI Parallelization
+
+The computational domain is decomposed into subdomains via `MPI_Cart_create`. Each rank owns a contiguous block of cells in (x, y, z). Ghost cells of width `buff_size` surround each subdomain and are filled by halo exchange before each RHS evaluation.
+
+On GPUs, the same domain decomposition applies. GPU kernels operate on the local subdomain, with explicit host-device transfers for MPI communication (unless GPU-aware MPI / RDMA is available).
+
+## Adding New Physics
+
+To add a new source term or physics model:
+
+1. **Create a module** in `src/simulation/` (e.g., `m_my_model.fpp`)
+2. **Add initialization/finalization** subroutines called from `m_start_up`
+3. **Add RHS contributions** called from the dimensional loop in `m_rhs:s_compute_rhs`
+4. **Add parameters** to `m_global_parameters` and input validation to `m_checker`
+5. **Add a module-level brief** (enforced by the linter in `lint_docs.py`)
+6. **Add the module to `docs/module_categories.json`** so it appears in this page
+
+Follow the pattern of existing modules like `m_body_forces` (simple) or `m_viscous` (more involved) as a template.

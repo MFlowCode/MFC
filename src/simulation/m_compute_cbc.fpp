@@ -4,6 +4,7 @@
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
+!> @brief Characteristic boundary condition (CBC) computations for subsonic inflow, outflow, and slip walls
 module m_compute_cbc
     use m_global_parameters
     implicit none

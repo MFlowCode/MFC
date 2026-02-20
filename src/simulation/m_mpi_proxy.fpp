@@ -5,11 +5,7 @@
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
-!> @brief The module serves as a proxy to the parameters and subroutines
-!!          available in the MPI implementation's MPI module. Specifically,
-!!          the purpose of the proxy is to harness basic MPI commands into
-!!          more complicated procedures as to accomplish the communication
-!!          goals for the simulation.
+!> @brief MPI halo exchange, domain decomposition, and buffer packing/unpacking for the simulation solver
 module m_mpi_proxy
 
 #ifdef MFC_MPI
@@ -47,6 +43,7 @@ module m_mpi_proxy
 
 contains
 
+    !> @brief Allocates immersed boundary communication buffers for MPI halo exchanges.
     subroutine s_initialize_mpi_proxy_module()
 
 #ifdef MFC_MPI
@@ -258,6 +255,7 @@ contains
 
     end subroutine s_mpi_bcast_user_inputs
 
+    !> @brief Packs, exchanges, and unpacks immersed boundary marker buffers between neighboring MPI ranks.
     subroutine s_mpi_sendrecv_ib_buffers(ib_markers, mpi_dir, pbc_loc)
 
         type(integer_field), intent(inout) :: ib_markers
@@ -442,6 +440,7 @@ contains
 
     end subroutine s_mpi_sendrecv_ib_buffers
 
+    !> @brief Broadcasts random phase numbers from rank 0 to all MPI processes.
     impure subroutine s_mpi_send_random_number(phi_rn, num_freq)
         integer, intent(in) :: num_freq
         real(wp), intent(inout), dimension(1:num_freq) :: phi_rn
@@ -453,6 +452,7 @@ contains
 
     end subroutine s_mpi_send_random_number
 
+    !> @brief Deallocates immersed boundary MPI communication buffers.
     subroutine s_finalize_mpi_proxy_module()
 
 #ifdef MFC_MPI

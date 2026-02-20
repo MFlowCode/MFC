@@ -1,5 +1,10 @@
+!>
+!! @file
+!! @brief Contains module m_finite_differences
+
 #:include 'macros.fpp'
 
+!> @brief Finite difference operators for computing divergence of velocity fields
 module m_finite_differences
 
     use m_global_parameters
@@ -70,6 +75,10 @@ contains
     !!  @param q Number of cells in the s-coordinate direction
     !!  @param s_cc Locations of the cell-centers in the s-coordinate direction
     !!  @param fd_coeff_s Finite-diff. coefficients in the s-coordinate direction
+    !!  @param local_buff_size Size of the local buffer
+    !!  @param fd_number_in Finite-difference number
+    !!  @param fd_order_in Finite-difference order of accuracy
+    !!  @param offset_s Optional offset bounds in the s-coordinate direction
     subroutine s_compute_finite_difference_coefficients(q, s_cc, fd_coeff_s, local_buff_size, &
                                                         fd_number_in, fd_order_in, offset_s)
 

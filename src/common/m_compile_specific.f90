@@ -2,7 +2,7 @@
 !! @file
 !! @brief Contains module m_compile_specific
 
-!> @brief This module contains subroutines that are compiler specific
+!> @brief Platform-specific file and directory operations: create, delete, inquire, getcwd, and basename
 module m_compile_specific
 
     ! Dependencies
@@ -25,6 +25,7 @@ contains
 
     end subroutine s_create_directory
 
+    !> @brief Deletes a file at the given path using a platform-specific system command.
     impure subroutine s_delete_file(filepath)
         character(LEN=*), intent(in) :: filepath
 
@@ -36,6 +37,7 @@ contains
 
     end subroutine s_delete_file
 
+    !> @brief Recursively deletes a directory using a platform-specific system command.
     impure subroutine s_delete_directory(dir_name)
         character(LEN=*), intent(in) :: dir_name
 
@@ -62,12 +64,14 @@ contains
 
     end subroutine my_inquire
 
+    !> @brief Retrieves the current working directory path via the GETCWD intrinsic.
     impure subroutine s_get_cwd(cwd)
         character(LEN=*), intent(out) :: cwd
 
         call GETCWD(cwd)
     end subroutine s_get_cwd
 
+    !> @brief Extracts the base filename from a directory path using the system basename command.
     impure subroutine s_get_basename(dirpath, basename)
         character(LEN=*), intent(in) :: dirpath
         character(LEN=*), intent(out) :: basename
