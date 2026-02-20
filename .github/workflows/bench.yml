@@ -123,6 +123,7 @@ jobs:
         run: bash pr/.github/scripts/run_parallel_benchmarks.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }}
 
       - name: Generate & Post Comment
+        if: always()
         run: |
           (cd pr && . ./mfc.sh load -c ${{ matrix.flag }} -m g)
           (cd pr && ./mfc.sh bench_diff ../master/bench-${{ matrix.device }}-${{ matrix.interface }}.yaml ../pr/bench-${{ matrix.device }}-${{ matrix.interface }}.yaml)

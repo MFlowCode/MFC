@@ -5,10 +5,7 @@
 #:include 'macros.fpp'
 #:include 'case.fpp'
 
-!> @brief This module consists of subroutines used in the conversion of the
-!!              conservative variables into the primitive ones and vice versa. In
-!!              addition, the module also contains the subroutines used to obtain
-!!              the mixture variables and the subroutines used to compute pressure.
+!> @brief Conservative-to-primitive variable conversion, mixture property evaluation, and pressure computation
 module m_variables_conversion
 
     use m_derived_types        !< Definitions of the derived types
@@ -72,12 +69,15 @@ contains
         !!      Replaces a procedure pointer.
         !!  @param q_vf Conservative or primitive variables
         !!  @param i First-coordinate cell index
-        !!  @param j First-coordinate cell index
-        !!  @param k First-coordinate cell index
+        !!  @param j Second-coordinate cell index
+        !!  @param k Third-coordinate cell index
         !!  @param rho Density
         !!  @param gamma Specific heat ratio function
         !!  @param pi_inf Liquid stiffness function
         !!  @param qv Fluid reference energy
+        !!  @param Re_K Reynolds number (optional)
+        !!  @param G_K Shear modulus (optional)
+        !!  @param G Shear moduli of the fluids (optional)
     subroutine s_convert_to_mixture_variables(q_vf, i, j, k, &
                                               rho, gamma, pi_inf, qv, Re_K, G_K, G)
 
@@ -107,9 +107,13 @@ contains
         !! @param gamma Specific Heat Ratio
         !! @param rho Density
         !! @param qv fluid reference energy
+        !! @param rhoYks Species partial densities
         !! @param pres Pressure to calculate
+        !! @param T Temperature
         !! @param stress Shear Stress
         !! @param mom Momentum
+        !! @param G Shear modulus (optional)
+        !! @param pres_mag Magnetic pressure (optional)
     subroutine s_compute_pressure(energy, alf, dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, stress, mom, G, pres_mag)
         $:GPU_ROUTINE(function_name='s_compute_pressure',parallelism='[seq]', &
             & cray_inline=True)
@@ -238,6 +242,9 @@ contains
         !! @param gamma specific heat ratio
         !! @param pi_inf liquid stiffness
         !! @param qv fluid reference energy
+        !! @param Re_K Reynolds number (optional)
+        !! @param G_K Shear modulus (optional)
+        !! @param G Shear moduli of the fluids (optional)
     subroutine s_convert_species_to_mixture_variables(q_vf, k, l, r, rho, &
                                                       gamma, pi_inf, qv, Re_K, G_K, G)
 
@@ -313,6 +320,7 @@ contains
 
     end subroutine s_convert_species_to_mixture_variables
 
+    !> @brief GPU-accelerated conversion of species volume fractions and partial densities to mixture density, gamma, pi_inf, and qv.
     subroutine s_convert_species_to_mixture_variables_acc(rho_K, &
                                                           gamma_K, pi_inf_K, qv_K, &
                                                           alpha_K, alpha_rho_K, Re_K, &
@@ -504,7 +512,7 @@ contains
 
     end subroutine s_initialize_variables_conversion_module
 
-    !Initialize mv at the quadrature nodes based on the initialized moments and sigma
+    !> @brief Initializes bubble mass-vapor values at quadrature nodes from the conserved moment statistics.
     subroutine s_initialize_mv(qK_cons_vf, mv)
 
         type(scalar_field), dimension(sys_size), intent(in) :: qK_cons_vf
@@ -537,7 +545,7 @@ contains
 
     end subroutine s_initialize_mv
 
-    !Initialize pb at the quadrature nodes using isothermal relations (Preston model)
+    !> @brief Initializes bubble internal pressures at quadrature nodes using isothermal relations from the Preston model.
     subroutine s_initialize_pb(qK_cons_vf, mv, pb)
         type(scalar_field), dimension(sys_size), intent(in) :: qK_cons_vf
 
@@ -573,11 +581,9 @@ contains
     !> The following procedure handles the conversion between
         !!      the conservative variables and the primitive variables.
         !! @param qK_cons_vf Conservative variables
+        !! @param q_T_sf Temperature scalar field
         !! @param qK_prim_vf Primitive variables
-        !! @param gm_alphaK_vf Gradient magnitude of the volume fraction
-        !! @param ix Index bounds in first coordinate direction
-        !! @param iy Index bounds in second coordinate direction
-        !! @param iz Index bounds in third coordinate direction
+        !! @param ibounds Index bounds in each coordinate direction
     subroutine s_convert_conservative_to_primitive_variables(qK_cons_vf, &
                                                              q_T_sf, &
                                                              qK_prim_vf, &
@@ -896,12 +902,8 @@ contains
 
     !>  The following procedure handles the conversion between
         !!      the primitive variables and the conservative variables.
-        !!  @param qK_prim_vf Primitive variables
-        !!  @param qK_cons_vf Conservative variables
-        !!  @param gm_alphaK_vf Gradient magnitude of the volume fractions
-        !!  @param ix Index bounds in the first coordinate direction
-        !!  @param iy Index bounds in the second coordinate direction
-        !!  @param iz Index bounds in the third coordinate direction
+        !!  @param q_prim_vf Primitive variables
+        !!  @param q_cons_vf Conservative variables
     impure subroutine s_convert_primitive_to_conservative_variables(q_prim_vf, &
                                                                     q_cons_vf)
 
@@ -1172,9 +1174,11 @@ contains
         !!  @param qK_prim_vf Primitive variables
         !!  @param FK_vf Flux variables
         !!  @param FK_src_vf Flux source variables
-        !!  @param ix Index bounds in the first coordinate direction
-        !!  @param iy Index bounds in the second coordinate direction
-        !!  @param iz Index bounds in the third coordinate direction
+        !!  @param is1 Index bounds in the first coordinate direction
+        !!  @param is2 Index bounds in the second coordinate direction
+        !!  @param is3 Index bounds in the third coordinate direction
+        !!  @param s2b Starting boundary index in the second coordinate direction
+        !!  @param s3b Starting boundary index in the third coordinate direction
     subroutine s_convert_primitive_to_flux_variables(qK_prim_vf, &
                                                      FK_vf, &
                                                      FK_src_vf, &
@@ -1382,6 +1386,7 @@ contains
 
     end subroutine s_compute_species_fraction
 
+    !> @brief Deallocates fluid property arrays and post-processing fields allocated during module initialization.
     impure subroutine s_finalize_variables_conversion_module()
 
         ! Deallocating the density, the specific heat ratio function and the
@@ -1405,6 +1410,7 @@ contains
     end subroutine s_finalize_variables_conversion_module
 
 #ifndef MFC_PRE_PROCESS
+    !> @brief Computes the speed of sound from thermodynamic state variables, supporting multiple equation-of-state models.
     subroutine s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, adv, vel_sum, c_c, c, qv)
         $:GPU_ROUTINE(parallelism='[seq]')
 
@@ -1474,6 +1480,7 @@ contains
 #endif
 
 #ifndef MFC_PRE_PROCESS
+    !> @brief Computes the fast magnetosonic wave speed from the sound speed, density, and magnetic field components.
     subroutine s_compute_fast_magnetosonic_speed(rho, c, B, norm, c_fast, h)
         $:GPU_ROUTINE(function_name='s_compute_fast_magnetosonic_speed', &
             & parallelism='[seq]', cray_inline=True)

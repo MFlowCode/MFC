@@ -1,11 +1,10 @@
 !>
 !! @file
-!! @brief Contains module m_bubbles_EL_kernels
+!! @brief Contains module @ref m_bubbles_el_kernels "m_bubbles_EL_kernels"
 
 #:include 'macros.fpp'
 
-!> @brief This module contains kernel functions used to map the effect of the lagrangian bubbles
-!!        in the Eulerian framework.
+!> @brief Kernel functions (Gaussian, delta) that smear Lagrangian bubble effects onto the Eulerian grid
 module m_bubbles_EL_kernels
 
     use m_mpi_proxy            !< Message passing interface (MPI) module proxy
@@ -379,7 +378,9 @@ contains
     end subroutine s_compute_stddsv
 
     !> The purpose of this procedure is to calculate the characteristic cell volume
-            !! @param cell Computational coordinates (x, y, z)
+            !! @param cellx x-direction cell index
+            !! @param celly y-direction cell index
+            !! @param cellz z-direction cell index
             !! @param Charvol Characteristic volume
     subroutine s_get_char_vol(cellx, celly, cellz, Charvol)
         $:GPU_ROUTINE(function_name='s_get_char_vol',parallelism='[seq]', &
@@ -402,7 +403,7 @@ contains
 
     !> This subroutine transforms the computational coordinates of the bubble from
             !!      real type into integer.
-            !! @param s Computational coordinates of the bubble, real type
+            !! @param s_cell Computational coordinates of the bubble, real type
             !! @param get_cell Computational coordinates of the bubble, integer type
     subroutine s_get_cell(s_cell, get_cell)
         $:GPU_ROUTINE(function_name='s_get_cell',parallelism='[seq]', &

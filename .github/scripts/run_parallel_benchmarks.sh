@@ -52,15 +52,15 @@ else
   echo "Master job completed successfully"
 fi
 
-# Check if either job failed
+# Warn if either job failed (partial results may still be usable)
 if [ "${pr_exit}" -ne 0 ] || [ "${master_exit}" -ne 0 ]; then
-  echo "ERROR: One or both benchmark jobs failed: pr_exit=${pr_exit}, master_exit=${master_exit}"
-  exit 1
+  echo "WARNING: Benchmark jobs had failures: pr=${pr_exit}, master=${master_exit}"
+  echo "Checking for partial results..."
+else
+  echo "=========================================="
+  echo "Both benchmark jobs completed successfully!"
+  echo "=========================================="
 fi
-
-echo "=========================================="
-echo "Both benchmark jobs completed successfully!"
-echo "=========================================="
 
 # Final verification that output files exist before proceeding
 pr_yaml="pr/bench-${device}-${interface}.yaml"

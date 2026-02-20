@@ -45,6 +45,11 @@ docs/documentation/*-example.png
 docs/documentation/examples.md
 docs/documentation/case_constraints.md
 docs/documentation/physics_constraints.md
+docs/documentation/architecture.md
+docs/pre_process/readme.md
+docs/simulation/readme.md
+docs/post_process/readme.md
+docs/api/readme.md
 
 examples/*batch/*/
 examples/**/D/*

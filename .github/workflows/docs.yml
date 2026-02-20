@@ -67,6 +67,12 @@ jobs:
         echo "url-count = ${{ steps.sitemap.outputs.url-count }}"
         echo "excluded-count = ${{ steps.sitemap.outputs.excluded-count }}"
 
+    - name: Linkcheck - Lychee
+      uses: lycheeverse/lychee-action@v2
+      with:
+        args: -c .lychee.toml build/install/docs/mfc/
+        fail: true
+
     - name: Publish Documentation
       if:   github.repository == 'MFlowCode/MFC' && github.ref == 'refs/heads/master' &&  (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' )
       run:  |
@@ -82,12 +88,6 @@ jobs:
         git -C ../www add -A
         git -C ../www commit -m "Docs @ ${GITHUB_SHA::7}" || true
         git -C ../www push
-
-    - name: Linkcheck - Lychee
-      uses: lycheeverse/lychee-action@v2
-      with:
-        args: -c .lychee.toml build/install/docs/mfc/
-        fail: true
 
 # DOC_PUSH_URL should be of the format:
 # --> https://<username>:<token>@github.com/<username>/<repository>

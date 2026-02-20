@@ -5,12 +5,7 @@
 #:include 'macros.fpp'
 #:include 'case.fpp'
 
-!> @brief The following module features a variety of time-stepping schemes.
-!!              Currently, it includes the following Runge-Kutta (RK) algorithms:
-!!                   1) 1st Order TVD RK
-!!                   2) 2nd Order TVD RK
-!!                   3) 3rd Order TVD RK
-!!              where TVD designates a total-variation-diminishing time-stepper.
+!> @brief Total-variation-diminishing (TVD) Runge--Kutta time integrators (1st-, 2nd-, and 3rd-order SSP)
 module m_time_steppers
 
     use m_derived_types        !< Definitions of the derived types
@@ -521,6 +516,7 @@ contains
 
     end subroutine s_initialize_time_steppers_module
 
+    !> @brief Advances the solution one full step using a TVD Runge-Kutta time integrator.
     impure subroutine s_tvd_rk(t_step, time_avg, nstage)
 #ifdef _CRAYFTN
         !DIR$ OPTIMIZE (-haggress)
@@ -663,7 +659,7 @@ contains
     end subroutine s_tvd_rk
 
     !> Bubble source part in Strang operator splitting scheme
-        !! @param t_step Current time-step
+        !! @param stage Current time-stage
     impure subroutine s_adaptive_dt_bubble(stage)
 
         integer, intent(in) :: stage
@@ -700,6 +696,7 @@ contains
 
     end subroutine s_adaptive_dt_bubble
 
+    !> @brief Computes the global time step size from CFL stability constraints across all cells.
     impure subroutine s_compute_dt()
 
         real(wp) :: rho        !< Cell-avg. density
@@ -766,6 +763,9 @@ contains
 
     !> This subroutine applies the body forces source term at each
         !! Runge-Kutta stage
+        !! @param q_cons_vf Conservative variables
+        !! @param q_prim_vf_in Primitive variables
+        !! @param rhs_vf_in Right-hand side variables
     subroutine s_apply_bodyforces(q_cons_vf, q_prim_vf_in, rhs_vf_in, ldt)
 
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_cons_vf
@@ -796,6 +796,7 @@ contains
 
     end subroutine s_apply_bodyforces
 
+    !> @brief Updates immersed boundary positions and velocities at the current Runge-Kutta stage.
     subroutine s_propagate_immersed_boundaries(s)
 
         integer, intent(in) :: s

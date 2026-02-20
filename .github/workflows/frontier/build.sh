@@ -1,7 +1,5 @@
 #!/bin/bash
 
-set -e
-
 # Ignore SIGHUP to survive login node session drops
 trap '' HUP
 
@@ -20,13 +18,44 @@ fi
 
 . ./mfc.sh load -c f -m g
 
-# Clean stale build artifacts from previous CI runs
-./mfc.sh clean
-
-if [ "$run_bench" == "bench" ]; then
-    for dir in benchmarks/*/; do
-        ./mfc.sh run -v "$dir/case.py" --case-optimization -j 4 --dry-run $build_opts
-    done
-else
-    ./mfc.sh test -v -a --dry-run --rdma-mpi -j 4 $build_opts
+# Only set up build cache for test suite, not benchmarks
+if [ "$run_bench" != "bench" ]; then
+    source .github/scripts/setup-build-cache.sh frontier "$job_device" "$job_interface"
 fi
+
+max_attempts=3
+attempt=1
+while [ $attempt -le $max_attempts ]; do
+    echo "Build attempt $attempt of $max_attempts..."
+    if [ "$run_bench" == "bench" ]; then
+        build_cmd_ok=true
+        for dir in benchmarks/*/; do
+            dirname=$(basename "$dir")
+            if ! ./mfc.sh run -v "$dir/case.py" --case-optimization -j 8 --dry-run $build_opts; then
+                build_cmd_ok=false
+                break
+            fi
+        done
+    else
+        if ./mfc.sh test -v -a --dry-run --rdma-mpi -j 8 $build_opts; then
+            build_cmd_ok=true
+        else
+            build_cmd_ok=false
+        fi
+    fi
+
+    if [ "$build_cmd_ok" = true ]; then
+        echo "Build succeeded on attempt $attempt."
+        exit 0
+    fi
+
+    if [ $attempt -lt $max_attempts ]; then
+        echo "Build failed on attempt $attempt. Clearing cache and retrying in 30s..."
+        rm -rf build/staging build/install build/lock.yaml
+        sleep 30
+    fi
+    attempt=$((attempt + 1))
+done
+
+echo "Build failed after $max_attempts attempts."
+exit 1

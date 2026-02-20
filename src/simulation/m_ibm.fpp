@@ -4,8 +4,7 @@
 
 #:include 'macros.fpp'
 
-!> @brief This module is used to handle all operations related to immersed
-!!              boundary methods (IBMs)
+!> @brief Ghost-node immersed boundary method: locates ghost/image points, computes interpolation coefficients, and corrects the flow state
 module m_ibm
 
     use m_derived_types        !< Definitions of the derived types
@@ -143,6 +142,7 @@ contains
 
     end subroutine s_ibm_setup
 
+    !> @brief Exchanges immersed boundary marker data across MPI subdomain boundaries.
     subroutine s_populate_ib_buffers()
 
         #:for DIRC, DIRI in [('x', 1), ('y', 2), ('z', 3)]
@@ -156,10 +156,8 @@ contains
     end subroutine s_populate_ib_buffers
 
     !>  Subroutine that updates the conservative variables at the ghost points
-        !!  @param q_cons_vf Conservative Variables
-        !!  @param q_prim_vf Primitive variables
-        !!  @param pb Internal bubble pressure
-        !!  @param mv Mass of vapor in bubble
+        !!  @param pb_in Internal bubble pressure
+        !!  @param mv_in Mass of vapor in bubble
     subroutine s_ibm_correct_state(q_cons_vf, q_prim_vf, pb_in, mv_in)
 
         type(scalar_field), &
@@ -439,7 +437,7 @@ contains
     end subroutine s_ibm_correct_state
 
     !>  Function that computes the image points for each ghost point
-        !!  @param ghost_points Ghost Points
+        !!  @param ghost_points_in Ghost Points
     impure subroutine s_compute_image_points(ghost_points_in)
 
         type(ghost_point), dimension(num_gps), intent(INOUT) :: ghost_points_in
@@ -853,6 +851,22 @@ contains
 
     !> Function that uses the interpolation coefficients and the current state
     !! at the cell centers in order to estimate the state at the image point
+    !! @param gp Ghost point data structure
+    !> @brief Interpolates primitive variables from the fluid domain to a ghost point's image point using bilinear or trilinear interpolation.
+    !! @param alpha_rho_IP Partial density at image point
+    !! @param alpha_IP Volume fraction at image point
+    !! @param pres_IP Pressure at image point
+    !! @param vel_IP Velocity at image point
+    !! @param c_IP Speed of sound at image point
+    !! @param r_IP Bubble radius at image point
+    !! @param v_IP Bubble radial velocity at image point
+    !! @param pb_IP Bubble pressure at image point
+    !! @param mv_IP Bubble vapor mass at image point
+    !! @param nmom_IP Bubble moment at image point
+    !! @param pb_in Internal bubble pressure array
+    !! @param mv_in Mass of vapor in bubble array
+    !! @param presb_IP Bubble node pressure at image point
+    !! @param massv_IP Bubble node vapor mass at image point
     subroutine s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, &
                                          pres_IP, vel_IP, c_IP, r_IP, v_IP, pb_IP, &
                                          mv_IP, nmom_IP, pb_in, mv_in, presb_IP, massv_IP)
@@ -1025,9 +1039,7 @@ contains
 
     end subroutine s_update_mib
 
-    ! compute the surface integrals of the IB via a volume integraion method described in
-    ! "A coupled IBM/Euler-Lagrange framework for simulating shock-induced particle size segregation"
-    ! by Archana Sridhar and Jesse Capecelatro
+    !> @brief Computes pressure and viscous forces and torques on immersed bodies via a volume integration method.
     subroutine s_compute_ib_forces(q_prim_vf, fluid_pp)
 
         ! real(wp), dimension(idwbuff(1)%beg:idwbuff(1)%end, &
@@ -1247,6 +1259,8 @@ contains
 
     end subroutine s_compute_centroid_offset
 
+    !>  Computes the moment of inertia for an immersed boundary
+        !!  @param ib_marker Immersed boundary marker index
     subroutine s_compute_moment_of_inertia(ib_marker, axis)
 
         real(wp), dimension(3), intent(in) :: axis !< the axis about which we compute the moment. Only required in 3D.
@@ -1320,6 +1334,7 @@ contains
 
     end subroutine s_compute_moment_of_inertia
 
+    !> @brief Computes the cross product c = a x b of two 3D vectors.
     subroutine s_cross_product(a, b, c)
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: a(3), b(3)

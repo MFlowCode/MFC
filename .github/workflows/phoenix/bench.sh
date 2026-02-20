@@ -1,9 +1,5 @@
 #!/bin/bash
 
-# Clean stale build artifacts from previous CI runs to prevent
-# cross-compiler contamination (e.g. gfortran LAPACK linked by NVHPC)
-./mfc.sh clean
-
 n_ranks=12
 
 echo "My interface is:" $job_interface

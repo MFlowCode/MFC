@@ -1,8 +1,12 @@
+!>
+!! @file
+!! @brief Contains module m_surface_tension
+
 #:include 'case.fpp'
 #:include 'macros.fpp'
 #:include 'inline_capillary.fpp'
 
-!> @brief This module is used to compute source terms for surface tension model
+!> @brief Computes capillary source fluxes and color-function gradients for the diffuse-interface surface tension model
 module m_surface_tension
 
     use m_derived_types        !< Definitions of the derived types
@@ -32,7 +36,7 @@ module m_surface_tension
     !> @name color function gradient components and magnitude
     !> @{
     type(scalar_field), allocatable, dimension(:) :: c_divs
-    !> @)
+    !> @}
     $:GPU_DECLARE(create='[c_divs]')
 
     !> @name cell boundary reconstructed gradient components and magnitude
@@ -69,6 +73,7 @@ contains
         end if
     end subroutine s_initialize_surface_tension_module
 
+    !> @brief Computes the capillary (surface-tension) source flux from reconstructed color-gradient fields.
     subroutine s_compute_capillary_source_flux( &
         vSrc_rsx_vf, vSrc_rsy_vf, vSrc_rsz_vf, &
         flux_src_vf, &
@@ -234,6 +239,7 @@ contains
 
     end subroutine s_compute_capillary_source_flux
 
+    !> @brief Computes color-function gradients and their norms, then reconstructs them at cell boundaries.
     impure subroutine s_get_capillary(q_prim_vf, bc_type)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
@@ -315,6 +321,7 @@ contains
 
     end subroutine s_get_capillary
 
+    !> @brief Reconstructs left and right cell-boundary values of capillary (color-gradient) variables using WENO or MUSCL.
     subroutine s_reconstruct_cell_boundary_values_capillary(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, &
                                                             norm_dir)
         type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
@@ -395,6 +402,7 @@ contains
 
     end subroutine s_reconstruct_cell_boundary_values_capillary
 
+    !> @brief Deallocates the color-gradient divergence and reconstructed boundary arrays for surface tension.
     impure subroutine s_finalize_surface_tension_module
         integer :: j
 
