@@ -691,7 +691,7 @@ contains
             call f_distance_normals_3D_flat(gpu_ntrs(patch_id), gpu_trs_v, gpu_trs_n, patch_id, xyz_local, normals, distance)
 
             ! Get the shortest distance between the cell center and the interpolated model boundary
-            if (interpolate) then
+            if (interpolate == 1) then
                 gp%levelset = f_interpolated_distance(gpu_interpolated_boundary_v(:, :, patch_id), total_vertices, xyz_local)
             else
                 gp%levelset = distance
