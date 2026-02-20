@@ -1020,7 +1020,8 @@ contains
                     print *, ' * Number of input model vertices:', 3*model%ntrs
                 end if
 
-                call f_check_boundary(model, boundary_v, boundary_vertex_count, boundary_edge_count)
+                ! Need the cells that form the boundary of the flat projection in 2D
+                if (p == 0) call f_check_boundary(model, boundary_v, boundary_vertex_count, boundary_edge_count)
 
                 ! Check if the model needs interpolation
                 if (p > 0) then
@@ -1028,7 +1029,6 @@ contains
                 else
                     call f_check_interpolation_2D(boundary_v, boundary_edge_count, (/dx_local, dy_local, 0._wp/), interpolate)
                 end if
-                print *, interpolate
 
                 ! Show the number of edges and boundary edges in 2D STL models
                 if (proc_rank == 0 .and. p == 0) then
@@ -1044,7 +1044,7 @@ contains
                     if (p > 0) then
                         call f_interpolate_3D(model, (/dx, dy, dz/), interpolated_boundary_v, total_vertices)
                     else
-                        call f_interpolate_2D(boundary_v, boundary_edge_count, (/dx, dy, dz/), interpolated_boundary_v, total_vertices)
+                        call f_interpolate_2D(boundary_v, boundary_edge_count, (/dx, dy, 0._wp/), interpolated_boundary_v, total_vertices)
                     end if
 
                     if (proc_rank == 0) then
@@ -1152,7 +1152,6 @@ contains
                         gpu_total_vertices(pid) = models(pid)%total_vertices
                     end if
                     if (allocated(models(pid)%boundary_v) .and. p == 0) then
-                      print *, size(models(pid)%boundary_v, 1), size(models(pid)%boundary_v, 2), size(models(pid)%boundary_v, 3)
                         gpu_boundary_v(1:size(models(pid)%boundary_v, 1), &
                                        1:size(models(pid)%boundary_v, 2), &
                                        1:size(models(pid)%boundary_v, 3), pid) = models(pid)%boundary_v

@@ -722,7 +722,6 @@ contains
 
             ! Assign the levelset_norm
             gp%levelset_norm = matmul(rotation, normals(1:3))
-
         end if
 
     end subroutine s_model_levelset

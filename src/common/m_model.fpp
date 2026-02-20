@@ -734,6 +734,7 @@ contains
         end do
 
         ! Check all edges and count repeated edges
+        $:GPU_PARALLEL_LOOP(private='[i,j]', copy='[temp_boundary_v,edge_occurrence]', copyin='[threshold_edge_zero]', collapse=2)
         do i = 1, edge_count
             do j = 1, edge_count
                 if (i /= j) then
@@ -746,11 +747,13 @@ contains
                          (abs(temp_boundary_v(i, 2, 1) - temp_boundary_v(j, 1, 1)) < threshold_edge_zero) .and. &
                          (abs(temp_boundary_v(i, 2, 2) - temp_boundary_v(j, 1, 2)) < threshold_edge_zero))) then
 
+                        $:GPU_ATOMIC(atomic='update')
                         edge_occurrence(i) = edge_occurrence(i) + 1
                     end if
                 end if
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
         ! Count the number of boundary vertices/edges
         boundary_vertex_count = 0
@@ -818,7 +821,7 @@ contains
 
     end subroutine f_register_edge
 
-    !> This procedure check if interpolates is needed for 2D models.
+    !> This procedure check if interpolation is needed for 2D models.
     !! @param boundary_v                Temporary edge end vertex buffer
     !! @param spacing                   Dimensions of the current levelset cell
     subroutine f_check_interpolation_2D(boundary_v, boundary_edge_count, spacing, interpolate)
@@ -830,24 +833,29 @@ contains
 
         real(wp) :: l1, cell_width !< Length of each boundary edge and cell width
         integer :: j !< Boundary edge index iterator
+        integer :: interpolate_integer !< integer form of interpolate logical to support GPU checking
 
         cell_width = minval(spacing(1:2))
-        interpolate = .false.
+        interpolate_integer = 0
 
+        $:GPU_PARALLEL_LOOP(private='[j,l1]', copyin='[boundary_v,cell_width,Ifactor_2D]', copy='[interpolate_integer]')
         do j = 1, boundary_edge_count
-            l1 = sqrt((boundary_v(j, 2, 1) - boundary_v(j, 1, 1))**2 + &
-                      (boundary_v(j, 2, 2) - boundary_v(j, 1, 2))**2)
+            if (interpolate_integer == 0) then
+                l1 = sqrt((boundary_v(j, 2, 1) - boundary_v(j, 1, 1))**2 + &
+                          (boundary_v(j, 2, 2) - boundary_v(j, 1, 2))**2)
 
-            if ((l1 > cell_width)) then
-                interpolate = .true.
-            else
-                interpolate = .false.
+                if ((l1*Ifactor_2D > cell_width)) then
+                    interpolate_integer = 1
+                end if
             end if
         end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        interpolate = (interpolate_integer == 1)
 
     end subroutine f_check_interpolation_2D
 
-    !> This procedure check if interpolates is needed for 3D models.
+    !> This procedure check if interpolation is needed for 3D models.
     !! @param model              Model to search in.
     !! @param spacing            Dimensions of the current levelset cell
     !! @param interpolate        Logical output
@@ -858,37 +866,45 @@ contains
         real(wp), dimension(1:3), intent(in) :: spacing
         real(wp), dimension(1:3) :: edge_l
         real(wp) :: cell_width
-        real(wp), dimension(1:3, 1:3) :: tri_v
-        integer :: i, j !< Loop iterator
+        real(wp), dimension(1:model%ntrs, 1:3, 1:3) :: tri_v
+        integer :: i, j, interpolate_integer !< Loop iterator
 
         cell_width = minval(spacing)
-        interpolate = .false.
+        interpolate_integer = 0
 
+        ! load up the array of triangles for GPU packing
         do i = 1, model%ntrs
             do j = 1, 3
-                tri_v(1, j) = model%trs(i)%v(1, j)
-                tri_v(2, j) = model%trs(i)%v(2, j)
-                tri_v(3, j) = model%trs(i)%v(3, j)
+                tri_v(i, 1, j) = model%trs(i)%v(1, j)
+                tri_v(i, 2, j) = model%trs(i)%v(2, j)
+                tri_v(i, 3, j) = model%trs(i)%v(3, j)
             end do
+        end do
 
-            edge_l(1) = sqrt((tri_v(1, 2) - tri_v(1, 1))**2 + &
-                             (tri_v(2, 2) - tri_v(2, 1))**2 + &
-                             (tri_v(3, 2) - tri_v(3, 1))**2)
-            edge_l(2) = sqrt((tri_v(1, 3) - tri_v(1, 2))**2 + &
-                             (tri_v(2, 3) - tri_v(2, 2))**2 + &
-                             (tri_v(3, 3) - tri_v(3, 2))**2)
-            edge_l(3) = sqrt((tri_v(1, 1) - tri_v(1, 3))**2 + &
-                             (tri_v(2, 1) - tri_v(2, 3))**2 + &
-                             (tri_v(3, 1) - tri_v(3, 3))**2)
+        ! compare the side of all
+        $:GPU_PARALLEL_LOOP(private='[i,edge_l]', copyin='[cell_width,tri_v,Ifactor_3D]', copy='[interpolate_integer]')
+        do i = 1, model%ntrs
+            if (interpolate_integer == 0) then
+                edge_l(1) = sqrt((tri_v(i, 1, 2) - tri_v(i, 1, 1))**2 + &
+                                 (tri_v(i, 2, 2) - tri_v(i, 2, 1))**2 + &
+                                 (tri_v(i, 3, 2) - tri_v(i, 3, 1))**2)
+                edge_l(2) = sqrt((tri_v(i, 1, 3) - tri_v(i, 1, 2))**2 + &
+                                 (tri_v(i, 2, 3) - tri_v(i, 2, 2))**2 + &
+                                 (tri_v(i, 3, 3) - tri_v(i, 3, 2))**2)
+                edge_l(3) = sqrt((tri_v(i, 1, 1) - tri_v(i, 1, 3))**2 + &
+                                 (tri_v(i, 2, 1) - tri_v(i, 2, 3))**2 + &
+                                 (tri_v(i, 3, 1) - tri_v(i, 3, 3))**2)
 
-            if ((edge_l(1) > cell_width) .or. &
-                (edge_l(2) > cell_width) .or. &
-                (edge_l(3) > cell_width)) then
-                interpolate = .true.
-            else
-                interpolate = .false.
+                if ((edge_l(1) > cell_width*Ifactor_3D) .or. &
+                    (edge_l(2) > cell_width*Ifactor_3D) .or. &
+                    (edge_l(3) > cell_width*Ifactor_3D)) then
+                    interpolate_integer = 1
+                end if
             end if
         end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        interpolate = (interpolate_integer == 1)
 
     end subroutine f_check_interpolation_3D
 
@@ -905,7 +921,7 @@ contains
         real(wp), allocatable, intent(inout), dimension(:, :) :: interpolated_boundary_v
 
         integer, intent(inout) :: total_vertices, boundary_edge_count
-        integer :: num_segments
+        integer :: num_segments, vertex_idx
         integer :: i, j
 
         real(wp) :: edge_length, cell_width
@@ -917,6 +933,7 @@ contains
 
         ! First pass: Calculate the total number of vertices including interpolated ones
         total_vertices = 1
+        $:GPU_PARALLEL_LOOP(private='[i,edge_x,edge_y,edge_length,num_segments]', copyin='[Ifactor_2D]', copy='[total_vertices]')
         do i = 1, boundary_edge_count
             ! Get the coordinates of the two ends of the current edge
             edge_x(1) = boundary_v(i, 1, 1)
@@ -936,14 +953,17 @@ contains
             end if
 
             ! Each edge contributes num_segments vertices
+            $:GPU_ATOMIC(atomic='update')
             total_vertices = total_vertices + num_segments
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
         ! Allocate memory for the new boundary vertices array
         allocate (interpolated_boundary_v(1:total_vertices, 1:3))
 
         ! Fill the new boundary vertices array with original and interpolated vertices
         total_vertices = 1
+        $:GPU_PARALLEL_LOOP(private='[i,edge_x,edge_y,edge_length,num_segments,edge_del,vertex_idx]', copyin='[Ifactor_2D]', copy='[total_vertices,interpolated_boundary_v]')
         do i = 1, boundary_edge_count
             ! Get the coordinates of the two ends of the current edge
             edge_x(1) = boundary_v(i, 1, 1)
@@ -972,18 +992,25 @@ contains
 
             ! Add original and interpolated vertices to the output array
             do j = 1, num_segments - 1
+                $:GPU_ATOMIC(atomic='capture')
                 total_vertices = total_vertices + 1
-                interpolated_boundary_v(total_vertices, 1) = edge_x(1) + j*edge_del(1)
-                interpolated_boundary_v(total_vertices, 2) = edge_y(1) + j*edge_del(2)
+                vertex_idx = total_vertices
+                $:END_GPU_ATOMIC_CAPTURE()
+                interpolated_boundary_v(vertex_idx, 1) = edge_x(1) + j*edge_del(1)
+                interpolated_boundary_v(vertex_idx, 2) = edge_y(1) + j*edge_del(2)
             end do
 
             ! Add the last vertex of the edge
             if (num_segments > 0) then
+                $:GPU_ATOMIC(atomic='capture')
                 total_vertices = total_vertices + 1
-                interpolated_boundary_v(total_vertices, 1) = edge_x(2)
-                interpolated_boundary_v(total_vertices, 2) = edge_y(2)
+                vertex_idx = total_vertices
+                $:END_GPU_ATOMIC_CAPTURE()
+                interpolated_boundary_v(vertex_idx, 1) = edge_x(2)
+                interpolated_boundary_v(vertex_idx, 2) = edge_y(2)
             end if
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine f_interpolate_2D
 
@@ -998,11 +1025,15 @@ contains
         real(wp), allocatable, intent(inout), dimension(:, :) :: interpolated_boundary_v
         integer, intent(out) :: total_vertices
 
-        integer :: i, j, k, num_triangles, num_segments, num_inner_vertices
+        integer :: i, j, k, num_triangles, num_segments, num_inner_vertices, vertex_idx
         real(wp), dimension(1:3, 1:3) :: tri
         real(wp), dimension(1:3) :: edge_del, cell_area
         real(wp), dimension(1:3) :: bary_coord !< Barycentric coordinates
         real(wp) :: edge_length, cell_width, cell_area_min, tri_area
+
+        ! GPU-friendly flat arrays packed from model
+        real(wp), allocatable, dimension(:, :, :) :: flat_v  ! (3, 3, num_triangles)
+        real(wp), allocatable, dimension(:, :) :: flat_n  ! (3, num_triangles)
 
         ! Number of triangles in the model
         num_triangles = model%ntrs
@@ -1015,18 +1046,23 @@ contains
         cell_area_min = minval(cell_area)
         num_inner_vertices = 0
 
+        ! Pack model into flat arrays on CPU
+        allocate (flat_v(1:3, 1:3, 1:num_triangles))
+        allocate (flat_n(1:3, 1:num_triangles))
+        do i = 1, num_triangles
+            flat_v(:, :, i) = model%trs(i)%v(:, :)
+            flat_n(:, i) = model%trs(i)%n(:)
+        end do
+
         ! Calculate the total number of vertices including interpolated ones
         total_vertices = 0
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,tri,edge_length,num_segments,num_inner_vertices]', copyin='[Ifactor_3D,Ifactor_bary_3D,flat_v,flat_n]', copy='[total_vertices]', collapse=1)
         do i = 1, num_triangles
             do j = 1, 3
                 ! Get the coordinates of the two vertices of the current edge
-                tri(1, 1) = model%trs(i)%v(j, 1)
-                tri(1, 2) = model%trs(i)%v(j, 2)
-                tri(1, 3) = model%trs(i)%v(j, 3)
+                tri(1, :) = flat_v(j, :, i)
                 ! Next vertex in the triangle (cyclic)
-                tri(2, 1) = model%trs(i)%v(mod(j, 3) + 1, 1)
-                tri(2, 2) = model%trs(i)%v(mod(j, 3) + 1, 2)
-                tri(2, 3) = model%trs(i)%v(mod(j, 3) + 1, 3)
+                tri(2, :) = flat_v(mod(j, 3) + 1, :, i)
 
                 ! Compute the length of the edge
                 edge_length = sqrt((tri(2, 1) - tri(1, 1))**2 + &
@@ -1041,39 +1077,35 @@ contains
                 end if
 
                 ! Each edge contributes num_segments vertices
+                $:GPU_ATOMIC(atomic='update')
                 total_vertices = total_vertices + num_segments + 1
             end do
 
             ! Add vertices inside the triangle
             do k = 1, 3
-                tri(k, 1) = model%trs(i)%v(k, 1)
-                tri(k, 2) = model%trs(i)%v(k, 2)
-                tri(k, 3) = model%trs(i)%v(k, 3)
+                tri(k, :) = flat_v(k, :, i)
             end do
             call f_tri_area(tri, tri_area)
 
             if (tri_area > threshold_bary*cell_area_min) then
                 num_inner_vertices = Ifactor_bary_3D*ceiling(tri_area/cell_area_min)
+                $:GPU_ATOMIC(atomic='update')
                 total_vertices = total_vertices + num_inner_vertices
             end if
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
         ! Allocate memory for the new boundary vertices array
         allocate (interpolated_boundary_v(1:total_vertices, 1:3))
 
         ! Fill the new boundary vertices array with original and interpolated vertices
         total_vertices = 0
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,tri,edge_length,num_segments,num_inner_vertices,edge_del,bary_coord,vertex_idx]', copyin='[Ifactor_3D,Ifactor_bary_3D]', copy='[total_vertices]', collapse=1)
         do i = 1, num_triangles
             ! Loop through the 3 edges of each triangle
             do j = 1, 3
-                ! Get the coordinates of the two vertices of the current edge
-                tri(1, 1) = model%trs(i)%v(j, 1)
-                tri(1, 2) = model%trs(i)%v(j, 2)
-                tri(1, 3) = model%trs(i)%v(j, 3)
-                ! Next vertex in the triangle (cyclic)
-                tri(2, 1) = model%trs(i)%v(mod(j, 3) + 1, 1)
-                tri(2, 2) = model%trs(i)%v(mod(j, 3) + 1, 2)
-                tri(2, 3) = model%trs(i)%v(mod(j, 3) + 1, 3)
+                tri(1, :) = flat_v(j, :, i)
+                tri(2, :) = flat_v(mod(j, 3) + 1, :, i)
 
                 ! Compute the length of the edge
                 edge_length = sqrt((tri(2, 1) - tri(1, 1))**2 + &
@@ -1093,33 +1125,42 @@ contains
 
                 ! Add original and interpolated vertices to the output array
                 do k = 0, num_segments - 1
+                    $:GPU_ATOMIC(atomic='capture')
                     total_vertices = total_vertices + 1
-                    interpolated_boundary_v(total_vertices, 1) = tri(1, 1) + k*edge_del(1)
-                    interpolated_boundary_v(total_vertices, 2) = tri(1, 2) + k*edge_del(2)
-                    interpolated_boundary_v(total_vertices, 3) = tri(1, 3) + k*edge_del(3)
+                    vertex_idx = total_vertices
+                    $:END_GPU_ATOMIC_CAPTURE()
+                    interpolated_boundary_v(vertex_idx, 1) = tri(1, 1) + k*edge_del(1)
+                    interpolated_boundary_v(vertex_idx, 2) = tri(1, 2) + k*edge_del(2)
+                    interpolated_boundary_v(vertex_idx, 3) = tri(1, 3) + k*edge_del(3)
                 end do
 
                 ! Add the last vertex of the edge
+                $:GPU_ATOMIC(atomic='capture')
                 total_vertices = total_vertices + 1
-                interpolated_boundary_v(total_vertices, 1) = tri(2, 1)
-                interpolated_boundary_v(total_vertices, 2) = tri(2, 2)
-                interpolated_boundary_v(total_vertices, 3) = tri(2, 3)
+                vertex_idx = total_vertices
+                $:END_GPU_ATOMIC_CAPTURE()
+                interpolated_boundary_v(vertex_idx, 1) = tri(2, 1)
+                interpolated_boundary_v(vertex_idx, 2) = tri(2, 2)
+                interpolated_boundary_v(vertex_idx, 3) = tri(2, 3)
             end do
 
             ! Interpolate verties that are not on edges
             do k = 1, 3
-                tri(k, 1) = model%trs(i)%v(k, 1)
-                tri(k, 2) = model%trs(i)%v(k, 2)
-                tri(k, 3) = model%trs(i)%v(k, 3)
+                tri(k, :) = flat_v(k, :, i)
             end do
             call f_tri_area(tri, tri_area)
 
             if (tri_area > threshold_bary*cell_area_min) then
                 num_inner_vertices = Ifactor_bary_3D*ceiling(tri_area/cell_area_min)
                 !Use barycentric coordinates for randomly distributed points
+
+                ! Deterministic seed per triangle
+                rand_seed = i*73856093 + 19349663
+                if (rand_seed == 0) rand_seed = 1
+
                 do k = 1, num_inner_vertices
-                    call random_number(bary_coord(1))
-                    call random_number(bary_coord(2))
+                    bary_coord(1) = f_model_random_number(rand_seed)
+                    bary_coord(2) = f_model_random_number(rand_seed)
 
                     if ((bary_coord(1) + bary_coord(2)) >= 1._wp) then
                         bary_coord(1) = 1._wp - bary_coord(1)
@@ -1127,6 +1168,7 @@ contains
                     end if
                     bary_coord(3) = 1._wp - bary_coord(1) - bary_coord(2)
 
+                    $:GPU_ATOMIC(atomic='update')
                     total_vertices = total_vertices + 1
                     interpolated_boundary_v(total_vertices, 1) = dot_product(bary_coord, tri(1:3, 1))
                     interpolated_boundary_v(total_vertices, 2) = dot_product(bary_coord, tri(1:3, 2))
@@ -1134,6 +1176,9 @@ contains
                 end do
             end if
         end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        deallocate (flat_v, flat_n)
 
     end subroutine f_interpolate_3D
 
@@ -1343,6 +1388,8 @@ contains
         real(wp), intent(out) :: tri_area
         real(wp), dimension(1:3) :: AB, AC, cross
         integer :: i !< Loop iterator
+
+        $:GPU_ROUTINE(parallelism='[seq]')
 
         do i = 1, 3
             AB(i) = tri(2, i) - tri(1, i)
