@@ -1028,7 +1028,7 @@ contains
                 else
                     call f_check_interpolation_2D(boundary_v, boundary_edge_count, (/dx_local, dy_local, 0._wp/), interpolate)
                 end if
-                interpolate = .false.
+                print *, interpolate
 
                 ! Show the number of edges and boundary edges in 2D STL models
                 if (proc_rank == 0 .and. p == 0) then
@@ -1151,12 +1151,13 @@ contains
                         gpu_boundary_edge_count(pid) = models(pid)%boundary_edge_count
                         gpu_total_vertices(pid) = models(pid)%total_vertices
                     end if
-                    if (allocated(models(pid)%boundary_v)) then
+                    if (allocated(models(pid)%boundary_v) .and. p == 0) then
+                      print *, size(models(pid)%boundary_v, 1), size(models(pid)%boundary_v, 2), size(models(pid)%boundary_v, 3)
                         gpu_boundary_v(1:size(models(pid)%boundary_v, 1), &
                                        1:size(models(pid)%boundary_v, 2), &
                                        1:size(models(pid)%boundary_v, 3), pid) = models(pid)%boundary_v
                     end if
-                    if (allocated(models(pid)%interpolated_boundary_v)) then
+                    if (allocated(models(pid)%interpolated_boundary_v) .and. gpu_interpolate(pid) == 1) then
                         gpu_interpolated_boundary_v(1:size(models(pid)%interpolated_boundary_v, 1), &
                                                     1:size(models(pid)%interpolated_boundary_v, 2), pid) = models(pid)%interpolated_boundary_v
                     end if
