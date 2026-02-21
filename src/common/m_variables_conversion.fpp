@@ -1101,8 +1101,6 @@ contains
                             nbub = 3._wp*q_prim_vf(alf_idx)%sf(j, k, l)/(4._wp*pi*R3tmp)
                         end if
 
-                        if (j == 0 .and. k == 0 .and. l == 0) print *, 'In convert, nbub:', nbub
-
                         do i = bub_idx%beg, bub_idx%end
                             q_cons_vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)*nbub
                         end do
