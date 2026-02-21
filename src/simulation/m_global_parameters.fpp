@@ -1215,8 +1215,8 @@ contains
         end if
 
         if (bubbles_euler .and. qbmm .and. .not. polytropic) then
-            allocate (MPI_IO_DATA%view(1:sys_size + 2*nb*4))
-            allocate (MPI_IO_DATA%var(1:sys_size + 2*nb*4))
+            allocate (MPI_IO_DATA%view(1:sys_size + 2*nb*nnode))
+            allocate (MPI_IO_DATA%var(1:sys_size + 2*nb*nnode))
         elseif (bubbles_lagrange) then
             allocate (MPI_IO_DATA%view(1:sys_size + 1))
             allocate (MPI_IO_DATA%var(1:sys_size + 1))
@@ -1232,7 +1232,7 @@ contains
             end do
         end if
         if (bubbles_euler .and. qbmm .and. .not. polytropic) then
-            do i = sys_size + 1, sys_size + 2*nb*4
+            do i = sys_size + 1, sys_size + 2*nb*nnode
                 allocate (MPI_IO_DATA%var(i)%sf(0:m, 0:n, 0:p))
                 MPI_IO_DATA%var(i)%sf => null()
             end do
