@@ -846,8 +846,8 @@ contains
         real(wp) :: dist_min, dist_proj, dist_v, dist_e, t
         real(wp) :: v1(1:3), v2(1:3), v3(1:3)
         real(wp) :: e0(1:3), e1(1:3), pv(1:3)
-        real(wp) :: n(1:3), proj(1:3)
-        real(wp) :: d, ndot, denom
+        real(wp) :: n(1:3), proj(1:3), normals(1:3), norm_vec(1:3)
+        real(wp) :: d, ndot, denom, norm_mag
         real(wp) :: u, v_bary, w
         real(wp) :: l00, l01, l11, l20, l21
         real(wp) :: edge(1:3), pe(1:3)
@@ -897,8 +897,8 @@ contains
             ! If projection is inside triangle
             if (u >= 0._wp .and. v_bary >= 0._wp .and. w >= 0._wp) then
                 dist_proj = sqrt((point(1) - proj(1))**2 + &
-                                 (point(2) - proj(2))**2 + &
-                                 (point(3) - proj(3))**2)
+                                (point(2) - proj(2))**2 + &
+                                (point(3) - proj(3))**2)
 
                 if (dist_proj < dist_min) then
                     dist_min = dist_proj
@@ -925,20 +925,35 @@ contains
 
                         if (dist_e < dist_min) then
                             dist_min = dist_e
-                            normals(:) = n(:)
+                            norm_vec(:) = point(:) - verts(:, j)
+                            norm_mag = sqrt(dot_product(norm_vec, norm_vec))
+                            if (norm_mag > 0._wp) norm_vec = norm_vec / norm_mag
+                            normals(:) = norm_vec(:)
                         end if
-                    end if
-                end do
+                    else if (t < 0._wp) then
+                        dist_v = sqrt((point(1) - verts(1, j))**2 + &
+                                      (point(2) - verts(2, j))**2 + &
+                                      (point(3) - verts(3, j))**2)
 
-                ! Check three vertices
-                do j = 1, 3
-                    dist_v = sqrt((point(1) - verts(1, j))**2 + &
-                                  (point(2) - verts(2, j))**2 + &
-                                  (point(3) - verts(3, j))**2)
+                        if (dist_v < dist_min) then
+                            dist_min = dist_v
+                            norm_vec(:) = point(:) - verts(:, j)
+                            norm_mag = sqrt(dot_product(norm_vec, norm_vec))
+                            if (norm_mag > 0._wp) norm_vec = norm_vec / norm_mag
+                            normals(:) = norm_vec(:)
+                        end if
+                    else
+                        dist_v = sqrt((point(1) - verts(1, mod(j, 3) + 1))**2 + &
+                                      (point(2) - verts(2, mod(j, 3) + 1))**2 + &
+                                      (point(3) - verts(3, mod(j, 3) + 1))**2)
 
-                    if (dist_v < dist_min) then
-                        dist_min = dist_v
-                        normals(:) = n(:)
+                        if (dist_v < dist_min) then
+                            dist_min = dist_v
+                            norm_vec(:) = point(:) - verts(:, mod(j, 3) + 1)
+                            norm_mag = sqrt(dot_product(norm_vec, norm_vec))
+                            if (norm_mag > 0._wp) norm_vec = norm_vec / norm_mag
+                            normals(:) = norm_vec(:)
+                        end if
                     end if
                 end do
             end if
@@ -967,12 +982,13 @@ contains
         real(wp), intent(out) :: distance
 
         integer :: i
-        real(wp) :: dist_min, dist, t
+        real(wp) :: dist_min, dist, t, norm_mag
         real(wp) :: v1(1:2), v2(1:2), edge(1:2), pv(1:2)
-        real(wp) :: edge_len_sq, proj(1:2)
+        real(wp) :: edge_len_sq, proj(1:2), norm(1:2), c
 
         dist_min = initial_distance_buffer
         normals = 0._wp
+        norm = 0._wp
 
         do i = 1, boundary_edge_count
             ! Edge endpoints
@@ -998,16 +1014,26 @@ contains
             if (t >= 0._wp .and. t <= 1._wp) then
                 proj = v1 + t*edge
                 dist = sqrt((point(1) - proj(1))**2 + (point(2) - proj(2))**2)
+                norm(1) = boundary_v(i, 3, 1, pid)
+                norm(2) = boundary_v(i, 3, 2, pid)
             else if (t < 0._wp) then ! negative t means that v1 is the closest point on the edge
                 dist = sqrt((point(1) - v1(1))**2 + (point(2) - v1(2))**2)
+                norm(1) = point(1) - v1(1)
+                norm(2) = point(2) - v1(2)
+                norm_mag = sqrt(dot_product(norm, norm))
+                norm = norm / norm_mag
             else ! t > 1 means that v2 is the closest point on the line edge
                 dist = sqrt((point(1) - v2(1))**2 + (point(2) - v2(2))**2)
+                norm(1) = point(1) - v2(1)
+                norm(2) = point(2) - v2(2)
+                norm_mag = sqrt(dot_product(norm, norm))
+                norm = norm / norm_mag
             end if
 
             if (dist < dist_min) then
                 dist_min = dist
-                normals(1) = boundary_v(i, 3, 1, pid)
-                normals(2) = boundary_v(i, 3, 2, pid)
+                normals(1) = norm(1)
+                normals(2) = norm(2)
             end if
         end do
 
