@@ -858,26 +858,18 @@ contains
                   & copyin='[patch_id,center,inverse_rotation, offset, spc, threshold]', collapse=2)
         do i = -gp_layers, m + gp_layers
             do j = -gp_layers, n + gp_layers
-
                 xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]
                 xy_local = matmul(inverse_rotation, xy_local)
                 xy_local = xy_local - offset
 
-                if (grid_geometry == 3) then
-                    xy_local = f_convert_cyl_to_cart(xy_local)
-                end if
-
                 eta = f_model_is_inside_flat(gpu_ntrs(patch_id), &
                                              gpu_trs_v, gpu_trs_n, &
-                                             patch_id, &
-                                             xy_local, (/dx(i), dy(j), 0._wp/), &
-                                             spc)
+                                             patch_id, xy_local)
 
                 ! Reading STL boundary vertices and compute the levelset and levelset_norm
-                if (eta > threshold) then
+                if (eta > 0.5_wp) then
                     ib_markers%sf(i, j, 0) = patch_id
                 end if
-
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
@@ -929,26 +921,18 @@ contains
         do i = il, ir
             do j = jl, jr
                 do k = kl, kr
-
                     xyz_local = [x_cc(i) - center(1), y_cc(j) - center(2), z_cc(k) - center(3)]
                     xyz_local = matmul(inverse_rotation, xyz_local)
                     xyz_local = xyz_local - offset
 
-                    if (grid_geometry == 3) then
-                        xyz_local = f_convert_cyl_to_cart(xyz_local)
-                    end if
-
                     eta = f_model_is_inside_flat(gpu_ntrs(patch_id), &
                                                  gpu_trs_v, gpu_trs_n, &
-                                                 patch_id, &
-                                                 xyz_local, (/dx(i), dy(j), dz(k)/), &
-                                                 spc)
+                                                 patch_id, xyz_local)
 
-                    ! Reading STL boundary vertices and compute the levelset and levelset_norm
-                    if (eta > patch_ib(patch_id)%model_threshold) then
+                    ! if (eta > patch_ib(patch_id)%model_threshold) then
+                    if (eta > 0.5_wp) then
                         ib_markers%sf(i, j, k) = patch_id
                     end if
-
                 end do
             end do
         end do

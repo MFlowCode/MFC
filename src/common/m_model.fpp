@@ -578,7 +578,14 @@ contains
 
     end function f_model_is_inside
 
-    impure function f_model_is_inside_flat(ntrs, trs_v, trs_n, pid, point, spacing, spc) result(fraction)
+    !> This procedure, given a cell center will determine if a point exists instide a surface
+    !! @param ntrs     Number of triangles in the model
+    !! @param trs_v    Model vertices of each triangle
+    !! @param trs_n    Model normal vectors of each triangle
+    !! @param pid      Patch ID od this model
+    !! @param point    Point to test.
+    !! @return fraction The perfentage of candidate rays cast indicate that we are inside the model
+    impure function f_model_is_inside_flat(ntrs, trs_v, trs_n, pid, point) result(fraction)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
@@ -587,47 +594,49 @@ contains
         real(wp), dimension(:, :, :), intent(in) :: trs_n
         integer, intent(in) :: pid
         real(wp), dimension(1:3), intent(in) :: point
-        real(wp), dimension(1:3), intent(in) :: spacing
-        integer, intent(in) :: spc
 
         real(wp) :: fraction
-        real(wp) :: origin(1:3), dir(1:3), dir_mag
         type(t_ray) :: ray
         type(t_triangle) :: tri
-        integer :: i, j, k, nInOrOut, nHits
-        integer :: rand_seed
+        integer :: i, j, k, q, nInOrOut, nHits
 
-        rand_seed = int(point(1)*73856093._wp) + &
-                    int(point(2)*19349663._wp) + &
-                    int(point(3)*83492791._wp)
-        if (rand_seed == 0) rand_seed = 1
-
-        ! generate our random collection of rays
+        ! cast 26 rays from the point and count the number at leave the boundary
         nInOrOut = 0
-        do i = 1, spc
-            ! Generate one ray at a time — no arrays needed
-            do k = 1, 3
-                origin(k) = point(k) + (f_model_random_number(rand_seed) - 0.5_wp)*spacing(k)
-                dir(k) = point(k) + f_model_random_number(rand_seed) - 0.5_wp
-            end do
-            dir_mag = sqrt(dir(1)*dir(1) + dir(2)*dir(2) + dir(3)*dir(3))
-            dir(:) = dir(:)/dir_mag
+        do i = -1, 1
+            do j = -1, 1
+                do k = -1, 1
+                    if (i /= 0 .or. j /= 0 .or. k /= 0) then
+                        ! We cannot get inersections if the ray is exactly in line with triangle plane
+                        if (p == 0 .and. k == 0) cycle
 
-            ray%o = origin
-            ray%d = dir
+                        ! generate the ray
+                        ray%o = point
+                        ray%d(:) = [real(i, wp), real(j, wp), real(k, wp)]
+                        ray%d = ray%d/sqrt(real(abs(i) + abs(j) + abs(k), wp))
 
-            nHits = 0
-            do j = 1, ntrs
-                tri%v(:, :) = trs_v(:, :, j, pid)
-                tri%n(:) = trs_n(:, j, pid)
-                if (f_intersects_triangle(ray, tri)) then
-                    nHits = nHits + 1
-                end if
+                        ! count the number of intersections
+                        nHits = 0
+                        do q = 1, ntrs
+                            tri%v(:, :) = trs_v(:, :, q, pid)
+                            tri%n(:) = trs_n(:, q, pid)
+                            if (f_intersects_triangle(ray, tri)) then
+                                nHits = nHits + 1
+                            end if
+                        end do
+                        ! if the ray intersected an odd number of times, we must be inside
+                        nInOrOut = nInOrOut + mod(nHits, 2)
+                    end if
+                end do
             end do
-            nInOrOut = nInOrOut + mod(nHits, 2)
         end do
 
-        fraction = real(nInOrOut)/real(spc)
+        if (p == 0) then
+            ! in 2D, we skipped 8 rays
+            fraction = real(nInOrOut)/18._wp
+        else
+            fraction = real(nInOrOut)/26._wp
+        end if
+
     end function f_model_is_inside_flat
 
     ! From https://www.scratchapixel.com/lessons/3e-basic-rendering/ray-tracing-rendering-a-triangle/ray-triangle-intersection-geometric-solution.html
@@ -846,7 +855,7 @@ contains
         real(wp) :: dist_min, dist_proj, dist_v, dist_e, t
         real(wp) :: v1(1:3), v2(1:3), v3(1:3)
         real(wp) :: e0(1:3), e1(1:3), pv(1:3)
-        real(wp) :: n(1:3), proj(1:3), normals(1:3), norm_vec(1:3)
+        real(wp) :: n(1:3), proj(1:3), norm_vec(1:3)
         real(wp) :: d, ndot, denom, norm_mag
         real(wp) :: u, v_bary, w
         real(wp) :: l00, l01, l11, l20, l21
@@ -884,6 +893,7 @@ contains
 
             denom = l00*l11 - l01*l01
 
+            ! compute the barycentric coordinates of the projection in the triangle
             if (abs(denom) > 0._wp) then
                 v_bary = (l11*l20 - l01*l21)/denom
                 w = (l00*l21 - l01*l20)/denom
@@ -897,8 +907,8 @@ contains
             ! If projection is inside triangle
             if (u >= 0._wp .and. v_bary >= 0._wp .and. w >= 0._wp) then
                 dist_proj = sqrt((point(1) - proj(1))**2 + &
-                                (point(2) - proj(2))**2 + &
-                                (point(3) - proj(3))**2)
+                                 (point(2) - proj(2))**2 + &
+                                 (point(3) - proj(3))**2)
 
                 if (dist_proj < dist_min) then
                     dist_min = dist_proj
@@ -927,7 +937,7 @@ contains
                             dist_min = dist_e
                             norm_vec(:) = point(:) - verts(:, j)
                             norm_mag = sqrt(dot_product(norm_vec, norm_vec))
-                            if (norm_mag > 0._wp) norm_vec = norm_vec / norm_mag
+                            if (norm_mag > 0._wp) norm_vec = norm_vec/norm_mag
                             normals(:) = norm_vec(:)
                         end if
                     else if (t < 0._wp) then
@@ -939,7 +949,7 @@ contains
                             dist_min = dist_v
                             norm_vec(:) = point(:) - verts(:, j)
                             norm_mag = sqrt(dot_product(norm_vec, norm_vec))
-                            if (norm_mag > 0._wp) norm_vec = norm_vec / norm_mag
+                            if (norm_mag > 0._wp) norm_vec = norm_vec/norm_mag
                             normals(:) = norm_vec(:)
                         end if
                     else
@@ -951,7 +961,7 @@ contains
                             dist_min = dist_v
                             norm_vec(:) = point(:) - verts(:, mod(j, 3) + 1)
                             norm_mag = sqrt(dot_product(norm_vec, norm_vec))
-                            if (norm_mag > 0._wp) norm_vec = norm_vec / norm_mag
+                            if (norm_mag > 0._wp) norm_vec = norm_vec/norm_mag
                             normals(:) = norm_vec(:)
                         end if
                     end if
@@ -1021,13 +1031,13 @@ contains
                 norm(1) = point(1) - v1(1)
                 norm(2) = point(2) - v1(2)
                 norm_mag = sqrt(dot_product(norm, norm))
-                norm = norm / norm_mag
+                norm = norm/norm_mag
             else ! t > 1 means that v2 is the closest point on the line edge
                 dist = sqrt((point(1) - v2(1))**2 + (point(2) - v2(2))**2)
                 norm(1) = point(1) - v2(1)
                 norm(2) = point(2) - v2(2)
                 norm_mag = sqrt(dot_product(norm, norm))
-                norm = norm / norm_mag
+                norm = norm/norm_mag
             end if
 
             if (dist < dist_min) then
