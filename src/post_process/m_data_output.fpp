@@ -1548,19 +1548,16 @@ contains
                         counter = counter + 1
                         x_d1(counter) = x_cc(j)
                         y_d1(counter) = y_cc(k)
-                        euc_d = sqrt((x_cc(j) - x_d1(i))**2 + (y_cc(k) - y_d1(i))**2)
-                        tgp = sqrt(dx(j)**2 + dy(k)**2)
                     else
-                        euc_d = sqrt((x_cc(j) - x_d1(i))**2 + (y_cc(k) - y_d1(i))**2)
                         tgp = sqrt(dx(j)**2 + dy(k)**2)
                         do i = 1, counter
+                            euc_d = sqrt((x_cc(j) - x_d1(i))**2 + (y_cc(k) - y_d1(i))**2)
                             if (euc_d < tgp) then
-                                cycle
-                            elseif (euc_d > tgp .and. i == counter) then
+                                exit
+                            elseif (i == counter) then
                                 counter = counter + 1
                                 x_d1(counter) = x_cc(j)
                                 y_d1(counter) = y_cc(k)
-
                             end if
                         end do
                     end if
