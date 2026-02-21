@@ -1019,7 +1019,7 @@ contains
                 end if
 
                 ! Need the cells that form the boundary of the flat projection in 2D
-                if (p == 0) call f_check_boundary(model, boundary_v, boundary_vertex_count, boundary_edge_count)
+                if (p == 0) call s_check_boundary(model, boundary_v, boundary_vertex_count, boundary_edge_count)
 
                 ! Show the number of edges and boundary edges in 2D STL models
                 if (proc_rank == 0 .and. p == 0) then

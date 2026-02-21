@@ -1652,7 +1652,7 @@ contains
             print *, ' * Number of input model vertices:', 3*model%ntrs
         end if
 
-        call f_check_boundary(model, boundary_v, boundary_vertex_count, boundary_edge_count)
+        call s_check_boundary(model, boundary_v, boundary_vertex_count, boundary_edge_count)
 
         ! Show the number of edges and boundary edges in 2D STL models
         if (proc_rank == 0 .and. p == 0) then

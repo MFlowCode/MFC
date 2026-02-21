@@ -23,8 +23,8 @@ module m_model
               gpu_total_vertices, stl_bounding_boxes
 
     ! Subroutines for STL immersed boundaries
-    public :: f_check_boundary, f_register_edge, f_model_is_inside_flat, &
-              f_distance_normals_3D, f_distance_normals_2D, s_pack_model_for_gpu
+    public :: s_check_boundary, s_register_edge, f_model_is_inside_flat, &
+              s_distance_normals_3D, s_distance_normals_2D, s_pack_model_for_gpu
 
     !! array of STL models that can be allocated and then used in IB marker and levelset compute
     type(t_model_array), allocatable, target :: models(:)
@@ -695,7 +695,7 @@ contains
     !> This procedure checks and labels edges shared by two or more triangles facets of the 2D STL model.
     !! @param model                      Model to search in.
     !! @param boundary_vertex_count      Output total boundary vertex count
-    subroutine f_check_boundary(model, boundary_v, boundary_vertex_count, boundary_edge_count)
+    subroutine s_check_boundary(model, boundary_v, boundary_vertex_count, boundary_edge_count)
 
         type(t_model), intent(in) :: model
         real(wp), allocatable, intent(out), dimension(:, :, :) :: boundary_v !< Output boundary vertices/normals
@@ -721,17 +721,17 @@ contains
             ! First edge (v1, v2)
             edge(1, 1:2) = model%trs(i)%v(1, 1:2)
             edge(2, 1:2) = model%trs(i)%v(2, 1:2)
-            call f_register_edge(temp_boundary_v, edge, edge_index, edge_count)
+            call s_register_edge(temp_boundary_v, edge, edge_index, edge_count)
 
             ! Second edge (v2, v3)
             edge(1, 1:2) = model%trs(i)%v(2, 1:2)
             edge(2, 1:2) = model%trs(i)%v(3, 1:2)
-            call f_register_edge(temp_boundary_v, edge, edge_index, edge_count)
+            call s_register_edge(temp_boundary_v, edge, edge_index, edge_count)
 
             ! Third edge (v3, v1)
             edge(1, 1:2) = model%trs(i)%v(3, 1:2)
             edge(2, 1:2) = model%trs(i)%v(1, 1:2)
-            call f_register_edge(temp_boundary_v, edge, edge_index, edge_count)
+            call s_register_edge(temp_boundary_v, edge, edge_index, edge_count)
         end do
 
         ! Check all edges and count repeated edges
@@ -805,10 +805,10 @@ contains
             boundary_v(i, 3, 2) = ynormal/v_norm
         end do
 
-    end subroutine f_check_boundary
+    end subroutine s_check_boundary
 
     !> This procedure appends the edge end vertices to a temporary buffer.
-    subroutine f_register_edge(temp_boundary_v, edge, edge_index, edge_count)
+    subroutine s_register_edge(temp_boundary_v, edge, edge_index, edge_count)
 
         integer, intent(inout) :: edge_index !< Edge index iterator
         integer, intent(inout) :: edge_count !< Total number of edges
@@ -820,7 +820,7 @@ contains
         temp_boundary_v(edge_index, 1, 1:2) = edge(1, 1:2)
         temp_boundary_v(edge_index, 2, 1:2) = edge(2, 1:2)
 
-    end subroutine f_register_edge
+    end subroutine s_register_edge
 
     !> This procedure determines the levelset distance and normals of 3D models
     !! by computing the exact closest point via projection onto triangle surfaces.
@@ -831,7 +831,7 @@ contains
     !! @param point                 The cell center of the current levelset cell
     !! @param normals               Output levelset normals
     !! @param distance              Output levelset distance
-    subroutine f_distance_normals_3D(ntrs, trs_v, trs_n, pid, point, normals, distance)
+    subroutine s_distance_normals_3D(ntrs, trs_v, trs_n, pid, point, normals, distance)
         $:GPU_ROUTINE(parallelism='[seq]')
 
         integer, intent(in) :: ntrs
@@ -946,7 +946,7 @@ contains
 
         distance = dist_min
 
-    end subroutine f_distance_normals_3D
+    end subroutine s_distance_normals_3D
 
     !> This procedure determines the levelset distance and normals of 2D models
     !! by computing the exact closest point via projection onto boundary edges.
@@ -956,7 +956,7 @@ contains
     !! @param point                 The cell center of the current levelset cell
     !! @param normals               Output levelset normals
     !! @param distance              Output levelset distance
-    subroutine f_distance_normals_2D(boundary_v, pid, boundary_edge_count, point, normals, distance)
+    subroutine s_distance_normals_2D(boundary_v, pid, boundary_edge_count, point, normals, distance)
         $:GPU_ROUTINE(parallelism='[seq]')
 
         real(wp), dimension(:, :, :, :), intent(in) :: boundary_v
@@ -1013,7 +1013,7 @@ contains
 
         distance = dist_min
 
-    end subroutine f_distance_normals_2D
+    end subroutine s_distance_normals_2D
 
     subroutine s_pack_model_for_gpu(ma)
         type(t_model_array), intent(inout) :: ma
