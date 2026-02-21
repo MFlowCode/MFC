@@ -74,7 +74,7 @@ contains
     subroutine s_comp_alpha_from_n(q_cons_vf)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         real(wp) :: nR3bar
-        integer(wp) :: i, j, k, l
+        integer :: i, j, k, l
 
         $:GPU_PARALLEL_LOOP(private='[i,j,k,l,nR3bar]', collapse=3)
         do l = 0, p
