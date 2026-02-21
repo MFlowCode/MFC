@@ -1146,8 +1146,6 @@ contains
 
         if (igr) then
             recon_order = igr_order
-        else
-            recon_order = weno_order
         end if
 
         ! 3D Cartesian Processor Topology
