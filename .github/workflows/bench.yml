@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}${{ github.event_name == 'pull_request_review' && github.event.review.user.type == 'Bot' && format('-bot-{0}', github.run_id) || '' }}
   cancel-in-progress: true
 
 jobs:
