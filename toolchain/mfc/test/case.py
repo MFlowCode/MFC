@@ -110,6 +110,7 @@ class TestCase(case.Case):
     override_tol: Optional[float] = None
     restart_check: bool = False
 
+    # pylint: disable=too-many-arguments, too-many-positional-arguments
     def __init__(self, trace: str, mods: dict, ppn: int = None, override_tol: float = None, restart_check: bool = False) -> None:
         self.trace        = trace
         self.ppn          = ppn or 1
@@ -302,6 +303,7 @@ print(json.dumps({{**case, **mods}}))
 
         return 1e8 * tolerance if single else tolerance
 
+# pylint: disable=too-many-instance-attributes
 @dataclasses.dataclass
 class TestCaseBuilder:
     trace:        str
