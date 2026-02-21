@@ -853,7 +853,7 @@ contains
         real(wp) :: edge(1:3), pe(1:3)
         real(wp) :: verts(1:3, 1:3)
 
-        dist_min = 1.e12_wp
+        dist_min = initial_distance_buffer
         normals = 0._wp
 
         do i = 1, ntrs
@@ -971,7 +971,7 @@ contains
         real(wp) :: v1(1:2), v2(1:2), edge(1:2), pv(1:2)
         real(wp) :: edge_len_sq, proj(1:2)
 
-        dist_min = 1.e12_wp
+        dist_min = initial_distance_buffer
         normals = 0._wp
 
         do i = 1, boundary_edge_count
