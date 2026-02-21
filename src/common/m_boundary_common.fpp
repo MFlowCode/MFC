@@ -275,7 +275,7 @@ contains
                             call s_symmetry(q_prim_vf, 3, 1, k, l, pb_in, mv_in)
                         case (BC_PERIODIC)
                             call s_periodic(q_prim_vf, 3, 1, k, l, pb_in, mv_in)
-                        case (BC_SlIP_WALL)
+                        case (BC_SLIP_WALL)
                             call s_slip_wall(q_prim_vf, 3, 1, k, l)
                         case (BC_NO_SLIP_WALL)
                             call s_no_slip_wall(q_prim_vf, 3, 1, k, l)
