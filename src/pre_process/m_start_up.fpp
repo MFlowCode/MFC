@@ -505,7 +505,7 @@ contains
         ! process may be cleaned out to make room for new pre-process data.
         ! In addition, the time-step folder that will contain the new grid
         ! and initial condition data are also generated.
-        call s_create_directory(trim(proc_rank_dir)//'/*')
+        call s_delete_directory(trim(proc_rank_dir))
         call s_create_directory(trim(proc_rank_dir)//'/0')
 
     end subroutine s_read_serial_ic_data_files
