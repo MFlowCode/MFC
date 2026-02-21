@@ -539,9 +539,9 @@ contains
 
         real(wp), dimension(1:spc, 1:3) :: ray_origins, ray_dirs
 
-        rand_seed = int(point(1)*73856093_wp) + &
-                    int(point(2)*19349663_wp) + &
-                    int(point(3)*83492791_wp)
+        rand_seed = int(point(1)*73856093._wp) + &
+                    int(point(2)*19349663._wp) + &
+                    int(point(3)*83492791._wp)
         if (rand_seed == 0) rand_seed = 1
 
         ! generate our random collection or rays
@@ -597,9 +597,9 @@ contains
         integer :: i, j, k, nInOrOut, nHits
         integer :: rand_seed
 
-        rand_seed = int(point(1)*73856093_wp) + &
-                    int(point(2)*19349663_wp) + &
-                    int(point(3)*83492791_wp)
+        rand_seed = int(point(1)*73856093._wp) + &
+                    int(point(2)*19349663._wp) + &
+                    int(point(3)*83492791._wp)
         if (rand_seed == 0) rand_seed = 1
 
         ! generate our random collection of rays
