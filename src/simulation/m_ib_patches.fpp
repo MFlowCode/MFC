@@ -1035,10 +1035,10 @@ contains
                 stl_bounding_boxes(patch_id, 3, 1:3) = [bbox%min(3), (bbox%min(3) + bbox%max(3))/2._wp, bbox%max(3)]
 
                 models(patch_id)%model = model
-                if (p == 0) then                                                                                                                       
-                    models(patch_id)%boundary_v = boundary_v                                                                                           
-                    models(patch_id)%boundary_edge_count = boundary_edge_count                                                                         
-                 end if  
+                if (p == 0) then
+                    models(patch_id)%boundary_v = boundary_v
+                    models(patch_id)%boundary_edge_count = boundary_edge_count
+                end if
             end if
         end do
 
