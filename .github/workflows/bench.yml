@@ -13,6 +13,9 @@ concurrency:
 jobs:
   file-changes:
     name: Detect File Changes
+    if: >
+      github.event_name != 'pull_request_review' ||
+      github.event.review.user.type != 'Bot'
     runs-on: 'ubuntu-latest'
     outputs:
       checkall: ${{ steps.changes.outputs.checkall }}
