@@ -967,7 +967,7 @@ contains
         real(wp), intent(out) :: distance
 
         integer :: i
-        real(wp) :: dist_min, dist_proj, dist_v1, dist_v2, t
+        real(wp) :: dist_min, dist, t
         real(wp) :: v1(1:2), v2(1:2), edge(1:2), pv(1:2)
         real(wp) :: edge_len_sq, proj(1:2)
 
@@ -982,11 +982,9 @@ contains
             v2(2) = boundary_v(i, 2, 2, pid)
 
             ! Edge vector and point-to-v1 vector
-            edge(1) = v2(1) - v1(1)
-            edge(2) = v2(2) - v1(2)
+            edge = v2 - v1
             pv(1) = point(1) - v1(1)
             pv(2) = point(2) - v1(2)
-
             edge_len_sq = dot_product(edge, edge)
 
             ! Parameter of projection onto the edge line
@@ -998,31 +996,18 @@ contains
 
             ! Check if projection falls within the segment
             if (t >= 0._wp .and. t <= 1._wp) then
-                proj(1) = v1(1) + t*edge(1)
-                proj(2) = v1(2) + t*edge(2)
-                dist_proj = sqrt((point(1) - proj(1))**2 + (point(2) - proj(2))**2)
+                proj = v1 + t*edge
+                dist = sqrt((point(1) - proj(1))**2 + (point(2) - proj(2))**2)
+            else if (t < 0._wp) then ! negative t means that v1 is the closest point on the edge
+                dist = sqrt((point(1) - v1(1))**2 + (point(2) - v1(2))**2)
+            else ! t > 1 means that v2 is the closest point on the line edge
+                dist = sqrt((point(1) - v2(1))**2 + (point(2) - v2(2))**2)
+            end if
 
-                if (dist_proj < dist_min) then
-                    dist_min = dist_proj
-                    normals(1) = boundary_v(i, 3, 1, pid)
-                    normals(2) = boundary_v(i, 3, 2, pid)
-                end if
-            else
-                ! Check distance to first vertex
-                dist_v1 = sqrt(pv(1)*pv(1) + pv(2)*pv(2))
-                if (dist_v1 < dist_min) then
-                    dist_min = dist_v1
-                    normals(1) = boundary_v(i, 3, 1, pid)
-                    normals(2) = boundary_v(i, 3, 2, pid)
-                end if
-
-                ! Check distance to second vertex
-                dist_v2 = sqrt((point(1) - v2(1))**2 + (point(2) - v2(2))**2)
-                if (dist_v2 < dist_min) then
-                    dist_min = dist_v2
-                    normals(1) = boundary_v(i, 3, 1, pid)
-                    normals(2) = boundary_v(i, 3, 2, pid)
-                end if
+            if (dist < dist_min) then
+                dist_min = dist
+                normals(1) = boundary_v(i, 3, 1, pid)
+                normals(2) = boundary_v(i, 3, 2, pid)
             end if
         end do
 
