@@ -476,7 +476,7 @@ contains
 
         ! Generic loop iterators
         integer :: i, j, k, l
-        real(wp) :: loc_violations, glb_violations
+        real(wp) :: loc_violations = 0._wp, glb_violations
 
         ! Downsample variables
         integer :: m_ds, n_ds, p_ds
