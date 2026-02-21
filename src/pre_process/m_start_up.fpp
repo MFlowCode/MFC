@@ -790,7 +790,11 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        q_cons_vf(psi_idx)%sf(j, k, l) = 1d-2*exp(-(x_cc(j)**2 + y_cc(k)**2 + z_cc(l)**2)/(2.0*0.05**2))
+                        if (p > 0) then
+                            q_cons_vf(psi_idx)%sf(j, k, l) = 1d-2*exp(-(x_cc(j)**2 + y_cc(k)**2 + z_cc(l)**2)/(2.0*0.05**2))
+                        else
+                            q_cons_vf(psi_idx)%sf(j, k, l) = 1d-2*exp(-(x_cc(j)**2 + y_cc(k)**2)/(2.0*0.05**2))
+                        end if
                         q_prim_vf(psi_idx)%sf(j, k, l) = q_cons_vf(psi_idx)%sf(j, k, l)
                     end do
                 end do
