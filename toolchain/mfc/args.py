@@ -109,7 +109,7 @@ def parse(config: MFCConfig):
     # Add default arguments of other subparsers
     # This ensures all argument keys exist even for commands that don't define them
     # Only process subparsers that have common arguments we need
-    relevant_subparsers = ["run", "test", "build", "clean", "count", "count_diff", "validate"]
+    relevant_subparsers = ["run", "test", "build", "clean", "count", "count_diff", "validate", "viz"]
     for name in relevant_subparsers:
         if args["command"] == name:
             continue
@@ -120,7 +120,7 @@ def parse(config: MFCConfig):
         # Parse with dummy input to get defaults (suppress errors for required positionals)
         try:
             # Commands with required positional input need a dummy value
-            if name in ["run", "validate"]:
+            if name in ["run", "validate", "viz"]:
                 vals, _ = subparser.parse_known_args(["dummy_input.py"])
             elif name == "build":
                 vals, _ = subparser.parse_known_args([])

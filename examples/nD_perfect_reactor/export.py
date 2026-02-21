@@ -2,10 +2,10 @@ import csv
 import cantera as ct
 from tqdm import tqdm
 
-import mfc.viz
+import mfc.viz_legacy as mfc_viz
 from case import dt, NS, Tend, SAVE_COUNT, sol
 
-case = mfc.viz.Case(".", dt)
+case = mfc_viz.Case(".", dt)
 
 for name in tqdm(sol.species_names, desc="Loading Variables"):
     case.load_variable(f"Y_{name}", f"prim.{5 + sol.species_index(name)}")

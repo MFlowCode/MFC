@@ -1,4 +1,4 @@
-import mfc.viz
+import mfc.viz_legacy as mfc_viz
 import os
 
 import subprocess
@@ -8,11 +8,11 @@ from tqdm import tqdm
 
 from case import sol_L as sol
 
-case = mfc.viz.Case(".")
+case = mfc_viz.Case(".")
 
 os.makedirs("viz", exist_ok=True)
 
-sns.set_theme(style=mfc.viz.generate_cpg_style())
+sns.set_theme(style=mfc_viz.generate_cpg_style())
 
 Y_VARS = ["H2", "O2", "H2O", "N2"]
 

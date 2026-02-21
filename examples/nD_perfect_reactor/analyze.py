@@ -3,12 +3,12 @@ import seaborn as sns
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 
-import mfc.viz
+import mfc.viz_legacy as mfc_viz
 from case import dt, Tend, SAVE_COUNT, sol
 
-case = mfc.viz.Case(".", dt)
+case = mfc_viz.Case(".", dt)
 
-sns.set_theme(style=mfc.viz.generate_cpg_style())
+sns.set_theme(style=mfc_viz.generate_cpg_style())
 
 Y_MAJORS = set(["H", "O", "OH", "HO2"])
 Y_MINORS = set(["H2O", "H2O2"])
