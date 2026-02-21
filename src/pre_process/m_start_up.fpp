@@ -679,7 +679,7 @@ contains
             end do
 
             if (qbmm .and. .not. polytropic) then
-                do i = sys_size + 1, sys_size + 2*nb*4
+                do i = sys_size + 1, sys_size + 2*nb*nnode
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
                     ! Initial displacement to skip at beginning of file
