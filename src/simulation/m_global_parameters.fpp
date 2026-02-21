@@ -814,8 +814,8 @@ contains
             integral(i)%xmax = dflt_real
             integral(i)%ymin = dflt_real
             integral(i)%ymax = dflt_real
-            integral(i)%ymin = dflt_real
-            integral(i)%ymax = dflt_real
+            integral(i)%zmin = dflt_real
+            integral(i)%zmax = dflt_real
         end do
 
         ! GRCBC flags
