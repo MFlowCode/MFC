@@ -985,7 +985,7 @@ contains
                         call s_compute_fd_gradient(q_prim_qp%vf(i), &
                                                    dq_prim_dx_qp(1)%vf(i), &
                                                    dq_prim_dy_qp(1)%vf(i), &
-                                                   dq_prim_dy_qp(1)%vf(i))
+                                                   dq_prim_dz_qp(1)%vf(i))
                     end do
 
                 end if
