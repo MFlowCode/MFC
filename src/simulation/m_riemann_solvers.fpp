@@ -653,7 +653,7 @@ contains
                             end if
 
                             if (hyper_cleaning) then ! mhd
-                                c_fast%L = min(c_fast%L, -hyper_cleaning_speed)
+                                c_fast%L = max(c_fast%L, hyper_cleaning_speed)
                                 c_fast%R = max(c_fast%R, hyper_cleaning_speed)
                             end if
 
