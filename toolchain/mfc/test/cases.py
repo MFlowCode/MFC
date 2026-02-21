@@ -427,8 +427,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
     def ibm_stl():
         common_mods = {
-        't_step_stop': Nt, 't_step_save': Nt
+        't_step_stop': Nt, 't_step_save': Nt,
+        'patch_ib(1)%model_scale(1)': 10.,
+        'patch_ib(1)%model_scale(2)': 10.,
+        'patch_ib(1)%model_scale(3)': 10.
         }
+
         for ndim in range(2, 4):
             cases.append(define_case_f(
                 f'{ndim}D -> IBM -> STL',
