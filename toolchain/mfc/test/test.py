@@ -456,6 +456,10 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
                 raise TestTimeoutError("Test case exceeded 1 hour timeout")
 
             restart_result = case.run_restart([PRE_PROCESS, SIMULATION], devices)
+
+            if timeout_flag.is_set():
+                raise TestTimeoutError("Test case exceeded 1 hour timeout")
+
             out_filepath_restart = os.path.join(case.get_dirpath(), "out_restart.txt")
             common.file_write(out_filepath_restart, restart_result.stdout)
 

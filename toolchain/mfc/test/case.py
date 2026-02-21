@@ -171,6 +171,7 @@ class TestCase(case.Case):
             return self.run(targets, gpus)
         finally:
             self.params = orig
+            self.create_directory()
 
     def get_trace(self) -> str:
         return self.trace

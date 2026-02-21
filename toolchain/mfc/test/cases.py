@@ -1140,7 +1140,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 mods[f'patch_icpp({patchID})%length_{direction}']   = lengths[patchID - 1]
                 for od in others:
                     mods[f'patch_icpp({patchID})%{od}_centroid'] = 0.5
-                    mods[f'patch_icpp({patchID})%length_{od}']   = 1
+                    mods[f'patch_icpp({patchID})%length_{od}']   = 1.0
 
             stack.push(f'3D Direction Symmetry -> Shock in {direction.upper()}', mods)
             cases.append(define_case_d(stack, '', {}))
