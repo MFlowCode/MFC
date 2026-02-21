@@ -233,7 +233,6 @@ contains
         if (qbmm) then
             do i = 1, nb
                 R3bar = R3bar + weight(i)*0.5_wp*(q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l))**3._wp
-                R3bar = R3bar + weight(i)*0.5_wp*(q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l))**3._wp
             end do
         else
             do i = 1, nb
