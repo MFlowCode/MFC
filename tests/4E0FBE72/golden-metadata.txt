@@ -1,12 +1,12 @@
-This file was created on 2026-02-21 02:18:55.160290.
+This file was created on 2026-02-21 14:54:00.234783.
 
 mfc.sh:
 
-    Invocation: test --only STL --no-build --generate
+    Invocation: test --only 4E0FBE72 --generate
     Lock:       mpi=Yes & gpu=Acc & debug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        04e82b6f797b2c8d1c09a6f74ee21a86c183a02c on gpu-optimizations (dirty)
+    Git:        1deb65a47b39eb957413b59b9a38788fa3d494dc on gpu-optimizations (dirty)
 
-simulation:
+pre_process:
 
     CMake Configuration:
     
@@ -15,8 +15,8 @@ simulation:
         C       : NVHPC v23.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvc)
         Fortran : NVHPC v23.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvfortran)
     
-        PRE_PROCESS   : OFF
-        SIMULATION    : ON
+        PRE_PROCESS   : ON
+        SIMULATION    : OFF
         POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
@@ -33,9 +33,9 @@ simulation:
     
     Configuration Environment:
     
-        CC       : /opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvc
-        CXX      : /opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvc++
-        FC       : /opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvfortran
+        CC       : nvc
+        CXX      : nvc++
+        FC       : nvfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -67,43 +67,9 @@ syscheck:
     
     Configuration Environment:
     
-        CC       : /opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvc
-        CXX      : /opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvc++
-        FC       : /opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
-pre_process:
-
-    CMake Configuration:
-    
-        CMake v3.28.3 on schwarzschild
-    
-        C       : NVHPC v23.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvc)
-        Fortran : NVHPC v23.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvfortran)
-    
-        PRE_PROCESS   : ON
-        SIMULATION    : OFF
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : ON
-        OpenMP  : OFF
-    
-        Fypp    : /home/dan/Documents/repos/MFC/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvc
-        CXX      : /opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvc++
-        FC       : /opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvfortran
+        CC       : nvc
+        CXX      : nvc++
+        FC       : nvfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -135,9 +101,43 @@ post_process:
     
     Configuration Environment:
     
-        CC       : /opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvc
-        CXX      : /opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvc++
-        FC       : /opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvfortran
+        CC       : nvc
+        CXX      : nvc++
+        FC       : nvfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+simulation:
+
+    CMake Configuration:
+    
+        CMake v3.28.3 on schwarzschild
+    
+        C       : NVHPC v23.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvc)
+        Fortran : NVHPC v23.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : ON
+        OpenMP  : OFF
+    
+        Fypp    : /home/dan/Documents/repos/MFC/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : nvc
+        CXX      : nvc++
+        FC       : nvfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -160,7 +160,7 @@ CPU:
     Core(s) per socket:                      12
     Socket(s):                               1
     Stepping:                                2
-    CPU(s) scaling MHz:                      37%
+    CPU(s) scaling MHz:                      39%
     CPU max MHz:                             5100.0000
     CPU min MHz:                             800.0000
     BogoMIPS:                                7219.20
