@@ -27,6 +27,37 @@ def _fortran_fpp_files(src_dir: Path):
     yield from sorted(src_dir.rglob("*.fpp"))
 
 
+def _check_single_fypp_list(full_line: str, rel: Path, start_line: int) -> list[str]:
+    """Parse one Fypp ``#:for ... in [...]`` line and return errors for duplicates."""
+    errors: list[str] = []
+
+    bracket_start = full_line.find("[")
+    bracket_end = full_line.rfind("]")
+    if not 0 <= bracket_start < bracket_end:
+        return errors
+
+    list_content = full_line[bracket_start + 1:bracket_end]
+    list_content = list_content.replace("&", "")
+
+    # Extract single- or double-quoted entries
+    entries = re.findall(r"['\"]([^'\"]*)['\"]", list_content)
+
+    seen: dict[str, int] = {}
+    for pos, entry in enumerate(entries, 1):
+        if entry in seen:
+            errors.append(
+                f"  {rel}:{start_line} Fypp list has duplicate"
+                f" entry '{entry}' (positions {seen[entry]}"
+                f" and {pos})."
+                " Fix: one copy is likely a typo for a"
+                " different variable"
+            )
+        else:
+            seen[entry] = pos
+
+    return errors
+
+
 def check_fypp_list_duplicates(repo_root: Path) -> list[str]:
     """Check for duplicate entries in Fypp ``#:for VAR in [...]`` lists.
 
@@ -52,27 +83,7 @@ def check_fypp_list_duplicates(repo_root: Path) -> list[str]:
                     i += 1
                     full += " " + lines[i].strip()
 
-                bracket_start = full.find("[")
-                bracket_end = full.rfind("]")
-                if bracket_start >= 0 and bracket_end > bracket_start:
-                    list_content = full[bracket_start + 1:bracket_end]
-                    list_content = list_content.replace("&", "")
-
-                    # Extract single- or double-quoted entries
-                    entries = re.findall(r"['\"]([^'\"]*)['\"]", list_content)
-
-                    seen: dict[str, int] = {}
-                    for pos, entry in enumerate(entries, 1):
-                        if entry in seen:
-                            errors.append(
-                                f"  {rel}:{start_line} Fypp list has duplicate"
-                                f" entry '{entry}' (positions {seen[entry]}"
-                                f" and {pos})."
-                                " Fix: one copy is likely a typo for a"
-                                " different variable"
-                            )
-                        else:
-                            seen[entry] = pos
+                errors.extend(_check_single_fypp_list(full, rel, start_line))
             i += 1
 
     return errors
