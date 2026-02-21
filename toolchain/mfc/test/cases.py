@@ -1109,6 +1109,229 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
     chemistry_cases()
 
+    def direction_symmetry_tests():
+        """3D tests with shock propagating in x and y directions.
+
+        Default 3D tests have the shock along z. These test x and y
+        code paths to catch direction-specific bugs in reconstruction,
+        Riemann solvers, and gradient calculations.
+        """
+        for direction in ['x', 'y']:
+            others = [d for d in ['x', 'y', 'z'] if d != direction]
+            mods = {
+                'm': 24, 'n': 24, 'p': 24,
+                'x_domain%beg': 0.E+00, 'x_domain%end': 1.E+00,
+                'y_domain%beg': 0.E+00, 'y_domain%end': 1.E+00,
+                'z_domain%beg': 0.E+00, 'z_domain%end': 1.E+00,
+                'bc_x%beg': -3, 'bc_x%end': -3,
+                'bc_y%beg': -3, 'bc_y%end': -3,
+                'bc_z%beg': -3, 'bc_z%end': -3,
+            }
+
+            centroids = [0.05, 0.45, 0.9]
+            lengths   = [0.1,  0.7,  0.2]
+
+            for patchID in range(1, 4):
+                mods[f'patch_icpp({patchID})%geometry'] = 9
+                mods[f'patch_icpp({patchID})%vel(1)'] = 0.0
+                mods[f'patch_icpp({patchID})%vel(2)'] = 0.0
+                mods[f'patch_icpp({patchID})%vel(3)'] = 0.0
+                mods[f'patch_icpp({patchID})%{direction}_centroid'] = centroids[patchID - 1]
+                mods[f'patch_icpp({patchID})%length_{direction}']   = lengths[patchID - 1]
+                for od in others:
+                    mods[f'patch_icpp({patchID})%{od}_centroid'] = 0.5
+                    mods[f'patch_icpp({patchID})%length_{od}']   = 1
+
+            stack.push(f'3D Direction Symmetry -> Shock in {direction.upper()}', mods)
+            cases.append(define_case_d(stack, '', {}))
+            stack.pop()
+
+    direction_symmetry_tests()
+
+    def mpi_consistency_tests():
+        """ppn=2 tests for physics sensitive to MPI decomposition.
+
+        Exercises bubble dynamics, viscous flows, and hypoelasticity
+        with 2 MPI ranks to catch broadcast/reduction bugs.
+        """
+        base_3d = {
+            'm': 29, 'n': 29, 'p': 49,
+            'x_domain%beg': 0.E+00, 'x_domain%end': 1.E+00,
+            'y_domain%beg': 0.E+00, 'y_domain%end': 1.E+00,
+            'z_domain%beg': 0.E+00, 'z_domain%end': 1.E+00,
+            'bc_x%beg': -3, 'bc_x%end': -3,
+            'bc_y%beg': -3, 'bc_y%end': -3,
+            'bc_z%beg': -3, 'bc_z%end': -3,
+        }
+
+        for patchID in range(1, 4):
+            base_3d[f'patch_icpp({patchID})%geometry'] = 9
+            base_3d[f'patch_icpp({patchID})%vel(1)'] = 0.0
+            base_3d[f'patch_icpp({patchID})%vel(2)'] = 0.0
+            base_3d[f'patch_icpp({patchID})%vel(3)'] = 0.0
+            base_3d[f'patch_icpp({patchID})%x_centroid'] = 0.5
+            base_3d[f'patch_icpp({patchID})%length_x'] = 1
+            base_3d[f'patch_icpp({patchID})%y_centroid'] = 0.5
+            base_3d[f'patch_icpp({patchID})%length_y'] = 1
+        base_3d.update({
+            'patch_icpp(1)%z_centroid': 0.05, 'patch_icpp(1)%length_z': 0.1,
+            'patch_icpp(2)%z_centroid': 0.45, 'patch_icpp(2)%length_z': 0.7,
+            'patch_icpp(3)%z_centroid': 0.9,  'patch_icpp(3)%length_z': 0.2,
+        })
+
+        # Bubbles with 2 MPI ranks
+        stack.push('MPI Consistency -> 3D -> Bubbles', {**base_3d,
+            'dt': 1e-06,
+            'bubbles_euler': 'T', 'nb': 1, 'polytropic': 'T', 'bubble_model': 2,
+            'fluid_pp(1)%gamma': 0.16, 'fluid_pp(1)%pi_inf': 3515.0,
+            'bub_pp%R0ref': 1.0, 'bub_pp%p0ref': 1.0, 'bub_pp%rho0ref': 1.0, 'bub_pp%T0ref': 1.0,
+            'bub_pp%ss': 0.07179866765358993, 'bub_pp%pv': 0.02308216136195411,
+            'bub_pp%vd': 0.2404125083932959,
+            'bub_pp%mu_l': 0.009954269975623244, 'bub_pp%mu_v': 8.758168074360729e-05,
+            'bub_pp%mu_g': 0.00017881922111898042, 'bub_pp%gam_v': 1.33, 'bub_pp%gam_g': 1.4,
+            'bub_pp%M_v': 18.02, 'bub_pp%M_g': 28.97, 'bub_pp%k_v': 0.5583395141263873,
+            'bub_pp%k_g': 0.7346421281308791, 'bub_pp%R_v': 1334.8378710170155,
+            'bub_pp%R_g': 830.2995663005393,
+            'patch_icpp(1)%alpha_rho(1)': 0.96, 'patch_icpp(1)%alpha(1)': 4e-02,
+            'patch_icpp(2)%alpha_rho(1)': 0.96, 'patch_icpp(2)%alpha(1)': 4e-02,
+            'patch_icpp(3)%alpha_rho(1)': 0.96, 'patch_icpp(3)%alpha(1)': 4e-02,
+            'patch_icpp(1)%pres': 1.0, 'patch_icpp(2)%pres': 1.0, 'patch_icpp(3)%pres': 1.0,
+        })
+        cases.append(define_case_d(stack, '', {}, ppn=2))
+        stack.pop()
+
+        # Viscous with 2 MPI ranks
+        stack.push('MPI Consistency -> 3D -> Viscous', {**base_3d,
+            'dt': 1e-11,
+            'fluid_pp(1)%Re(1)': 0.0001, 'viscous': 'T',
+            'patch_icpp(1)%vel(1)': 1.0,
+            'patch_icpp(2)%vel(1)': 1.0,
+            'patch_icpp(3)%vel(1)': 1.0,
+        })
+        cases.append(define_case_d(stack, '', {}, ppn=2))
+        stack.pop()
+
+        # Hypoelasticity with 2 MPI ranks
+        stack.push('MPI Consistency -> 3D -> Hypoelasticity', {**base_3d,
+            'hypoelasticity': 'T', 'riemann_solver': 1, 'fd_order': 4,
+            'fluid_pp(1)%gamma': 0.3, 'fluid_pp(1)%pi_inf': 7.8E+05,
+            'fluid_pp(1)%G': 1.E+05,
+            'patch_icpp(1)%pres': 1.E+06, 'patch_icpp(1)%alpha_rho(1)': 1000.E+00,
+            'patch_icpp(2)%pres': 1.E+05, 'patch_icpp(2)%alpha_rho(1)': 1000.E+00,
+            'patch_icpp(3)%pres': 5.E+05, 'patch_icpp(3)%alpha_rho(1)': 1000.E+00,
+            'patch_icpp(1)%tau_e(1)': 0.E+00, 'patch_icpp(2)%tau_e(1)': 0.E+00,
+            'patch_icpp(3)%tau_e(1)': 0.E+00,
+            'patch_icpp(1)%tau_e(2)': 0.E+00, 'patch_icpp(1)%tau_e(3)': 0.E+00,
+            'patch_icpp(2)%tau_e(2)': 0.E+00, 'patch_icpp(2)%tau_e(3)': 0.E+00,
+            'patch_icpp(3)%tau_e(2)': 0.E+00, 'patch_icpp(3)%tau_e(3)': 0.E+00,
+            'patch_icpp(1)%tau_e(4)': 0.E+00, 'patch_icpp(1)%tau_e(5)': 0.E+00,
+            'patch_icpp(1)%tau_e(6)': 0.E+00,
+            'patch_icpp(2)%tau_e(4)': 0.E+00, 'patch_icpp(2)%tau_e(5)': 0.E+00,
+            'patch_icpp(2)%tau_e(6)': 0.E+00,
+            'patch_icpp(3)%tau_e(4)': 0.E+00, 'patch_icpp(3)%tau_e(5)': 0.E+00,
+            'patch_icpp(3)%tau_e(6)': 0.E+00,
+        })
+        cases.append(define_case_d(stack, '', {}, ppn=2))
+        stack.pop()
+
+    mpi_consistency_tests()
+
+    def restart_roundtrip_tests():
+        """Tests that verify save-restart roundtrip fidelity.
+
+        Each test runs a straight simulation, then a restart from the
+        midpoint. The restarted output is compared against the straight
+        run output to verify restart I/O doesn't introduce drift.
+        """
+        # 1D restart
+        stack.push('Restart Roundtrip -> 1D', {
+            'm': 299, 'n': 0, 'p': 0,
+            'x_domain%beg': 0.E+00, 'x_domain%end': 1.E+00,
+            'bc_x%beg': -3, 'bc_x%end': -3,
+            'patch_icpp(1)%geometry': 1, 'patch_icpp(2)%geometry': 1,
+            'patch_icpp(3)%geometry': 1,
+            'patch_icpp(1)%x_centroid': 0.05, 'patch_icpp(1)%length_x': 0.1,
+            'patch_icpp(2)%x_centroid': 0.45, 'patch_icpp(2)%length_x': 0.7,
+            'patch_icpp(3)%x_centroid': 0.9,  'patch_icpp(3)%length_x': 0.2,
+            'patch_icpp(1)%vel(1)': 0.0, 'patch_icpp(2)%vel(1)': 0.0,
+            'patch_icpp(3)%vel(1)': 0.0,
+        })
+        cases.append(define_case_d(stack, '', {}, restart_check=True))
+        stack.pop()
+
+        # 3D restart
+        base_3d = {
+            'm': 24, 'n': 24, 'p': 24,
+            'x_domain%beg': 0.E+00, 'x_domain%end': 1.E+00,
+            'y_domain%beg': 0.E+00, 'y_domain%end': 1.E+00,
+            'z_domain%beg': 0.E+00, 'z_domain%end': 1.E+00,
+            'bc_x%beg': -3, 'bc_x%end': -3,
+            'bc_y%beg': -3, 'bc_y%end': -3,
+            'bc_z%beg': -3, 'bc_z%end': -3,
+        }
+        for patchID in range(1, 4):
+            base_3d[f'patch_icpp({patchID})%geometry'] = 9
+            base_3d[f'patch_icpp({patchID})%vel(1)'] = 0.0
+            base_3d[f'patch_icpp({patchID})%vel(2)'] = 0.0
+            base_3d[f'patch_icpp({patchID})%vel(3)'] = 0.0
+            base_3d[f'patch_icpp({patchID})%x_centroid'] = 0.5
+            base_3d[f'patch_icpp({patchID})%length_x'] = 1
+            base_3d[f'patch_icpp({patchID})%y_centroid'] = 0.5
+            base_3d[f'patch_icpp({patchID})%length_y'] = 1
+        base_3d.update({
+            'patch_icpp(1)%z_centroid': 0.05, 'patch_icpp(1)%length_z': 0.1,
+            'patch_icpp(2)%z_centroid': 0.45, 'patch_icpp(2)%length_z': 0.7,
+            'patch_icpp(3)%z_centroid': 0.9,  'patch_icpp(3)%length_z': 0.2,
+        })
+        stack.push('Restart Roundtrip -> 3D', base_3d)
+        cases.append(define_case_d(stack, '', {}, restart_check=True))
+        stack.pop()
+
+    restart_roundtrip_tests()
+
+    def kernel_golden_tests():
+        """Focused golden-value tests for specific physics kernels.
+
+        Grid stretching in 3D: exercises non-uniform grid spacing in all
+        three directions. Stretching interacts with WENO reconstruction
+        and gradient calculations in direction-specific ways. Not covered
+        by any dynamic test (only via examples at reduced resolution).
+        """
+        base_3d = {
+            'm': 24, 'n': 24, 'p': 24,
+            'x_domain%beg': 0.E+00, 'x_domain%end': 1.E+00,
+            'y_domain%beg': 0.E+00, 'y_domain%end': 1.E+00,
+            'z_domain%beg': 0.E+00, 'z_domain%end': 1.E+00,
+            'bc_x%beg': -3, 'bc_x%end': -3,
+            'bc_y%beg': -3, 'bc_y%end': -3,
+            'bc_z%beg': -3, 'bc_z%end': -3,
+        }
+        for patchID in range(1, 4):
+            base_3d[f'patch_icpp({patchID})%geometry'] = 9
+            base_3d[f'patch_icpp({patchID})%vel(1)'] = 0.0
+            base_3d[f'patch_icpp({patchID})%vel(2)'] = 0.0
+            base_3d[f'patch_icpp({patchID})%vel(3)'] = 0.0
+            base_3d[f'patch_icpp({patchID})%x_centroid'] = 0.5
+            base_3d[f'patch_icpp({patchID})%length_x'] = 1
+            base_3d[f'patch_icpp({patchID})%y_centroid'] = 0.5
+            base_3d[f'patch_icpp({patchID})%length_y'] = 1
+        base_3d.update({
+            'patch_icpp(1)%z_centroid': 0.05, 'patch_icpp(1)%length_z': 0.1,
+            'patch_icpp(2)%z_centroid': 0.45, 'patch_icpp(2)%length_z': 0.7,
+            'patch_icpp(3)%z_centroid': 0.9,  'patch_icpp(3)%length_z': 0.2,
+        })
+
+        # 3D grid stretching in all directions
+        stack.push('Kernel -> 3D -> Grid Stretching', {**base_3d,
+            'stretch_x': 'T', 'a_x': 2.0, 'x_a': -0.3, 'x_b': 0.3, 'loops_x': 1,
+            'stretch_y': 'T', 'a_y': 2.0, 'y_a': -0.3, 'y_b': 0.3, 'loops_y': 1,
+            'stretch_z': 'T', 'a_z': 2.0, 'z_a': -0.3, 'z_b': 0.3, 'loops_z': 1,
+        })
+        cases.append(define_case_d(stack, '', {}))
+        stack.pop()
+
+    kernel_golden_tests()
+
     # Sanity Check 1
     if stack.size() != 0:
         raise common.MFCException("list_cases: stack isn't fully pop'ed")

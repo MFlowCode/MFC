@@ -447,6 +447,34 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
                 if msg is not None:
                     raise MFCException(f"Test {case}: {msg}")
 
+        # Restart roundtrip verification: run to midpoint, restart,
+        # and compare restarted output against the straight run.
+        if getattr(case, 'restart_check', False) and not ARG("add_new_variables"):
+            straight_pack = pack
+
+            if timeout_flag.is_set():
+                raise TestTimeoutError("Test case exceeded 1 hour timeout")
+
+            restart_result = case.run_restart([PRE_PROCESS, SIMULATION], devices)
+            out_filepath_restart = os.path.join(case.get_dirpath(), "out_restart.txt")
+            common.file_write(out_filepath_restart, restart_result.stdout)
+
+            if restart_result.returncode != 0:
+                cons.print(restart_result.stdout)
+                raise MFCException(f"Test {case}: Restart roundtrip run failed.")
+
+            restart_pack, restart_err = packer.pack(case.get_dirpath())
+            if restart_err is not None:
+                raise MFCException(f"Test {case}: Restart pack error: {restart_err}")
+
+            if restart_pack.has_NaNs():
+                raise MFCException(f"Test {case}: NaNs detected in restarted output.")
+
+            _, restart_msg = packtol.compare(
+                restart_pack, straight_pack, packtol.Tolerance(tol, tol))
+            if restart_msg is not None:
+                raise MFCException(f"Test {case}: Restart roundtrip mismatch: {restart_msg}")
+
         if ARG("test_all"):
             case.delete_output()
             # Check timeout before launching the (potentially long) post-process run
