@@ -846,11 +846,11 @@ contains
                     end if
 
                     if (hypoelasticity) then
+                        if (cont_damage) G_K = G_K*max((1._wp - qK_cons_vf(damage_idx)%sf(j, k, l)), 0._wp)
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = strxb, strxe
                             ! subtracting elastic contribution for pressure calculation
                             if (G_K > verysmall) then
-                                if (cont_damage) G_K = G_K*max((1._wp - qK_cons_vf(damage_idx)%sf(j, k, l)), 0._wp)
                                 qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - &
                                                                 ((qK_prim_vf(i)%sf(j, k, l)**2._wp)/(4._wp*G_K))/gamma_K
                                 ! Double for shear stresses
@@ -1123,11 +1123,10 @@ contains
                     end if
 
                     if (hypoelasticity) then
+                        if (cont_damage) G = G*max((1._wp - q_prim_vf(damage_idx)%sf(j, k, l)), 0._wp)
                         do i = strxb, strxe
                             ! adding elastic contribution
                             if (G > verysmall) then
-                                if (cont_damage) G = G*max((1._wp - q_prim_vf(damage_idx)%sf(j, k, l)), 0._wp)
-
                                 q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) + &
                                                                (q_prim_vf(i)%sf(j, k, l)**2._wp)/(4._wp*G)
                                 ! Double for shear stresses
