@@ -165,7 +165,7 @@ contains
 
         integer, parameter :: mass_label = 1, mom_label = 2
 
-        sim_time = t_step*dt
+        sim_time = mytime
 
         $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
         do l = 0, p
