@@ -746,11 +746,9 @@ contains
         do j = 1, boundary_edge_count
             l1 = sqrt((boundary_v(j, 2, 1) - boundary_v(j, 1, 1))**2 + &
                       (boundary_v(j, 2, 2) - boundary_v(j, 1, 2))**2)
-
-            if ((l1 > cell_width)) then
+            if (l1 > cell_width) then
                 interpolate = .true.
-            else
-                interpolate = .false.
+                return
             end if
         end do
 
@@ -794,8 +792,7 @@ contains
                 (edge_l(2) > cell_width) .or. &
                 (edge_l(3) > cell_width)) then
                 interpolate = .true.
-            else
-                interpolate = .false.
+                return
             end if
         end do
 
