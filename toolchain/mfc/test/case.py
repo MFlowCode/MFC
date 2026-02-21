@@ -145,7 +145,7 @@ class TestCase(case.Case):
 
     def run_restart(self, targets, gpus):
         """Run a restart roundtrip: simulate to midpoint, then restart to end."""
-        mid_step = self.params['t_step_stop'] // 2
+        mid_step = (self.params['t_step_start'] + self.params['t_step_stop']) // 2
         orig = dict(self.params)
 
         try:
