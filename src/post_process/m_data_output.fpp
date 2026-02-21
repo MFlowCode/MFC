@@ -1102,6 +1102,7 @@ contains
         call MPI_BCAST(file_time, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(file_dt, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(file_num_procs, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+        time_real = file_time
 
         allocate (proc_bubble_counts(file_num_procs))
 
@@ -1271,6 +1272,7 @@ contains
         call MPI_BCAST(file_time, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(file_dt, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(file_num_procs, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+        time_real = file_time
 
         allocate (proc_bubble_counts(file_num_procs))
 
