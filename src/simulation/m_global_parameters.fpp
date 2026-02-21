@@ -700,8 +700,8 @@ contains
         bub_pp%gam_g = dflt_real; gam_g = dflt_real
         bub_pp%M_v = dflt_real; M_v = dflt_real
         bub_pp%M_g = dflt_real; M_g = dflt_real
-        bub_pp%k_v = dflt_real; k_v = dflt_real
-        bub_pp%k_g = dflt_real; k_g = dflt_real
+        bub_pp%k_v = dflt_real
+        bub_pp%k_g = dflt_real
         bub_pp%cp_v = dflt_real; cp_v = dflt_real
         bub_pp%cp_g = dflt_real; cp_g = dflt_real
         bub_pp%R_v = dflt_real; R_v = dflt_real
