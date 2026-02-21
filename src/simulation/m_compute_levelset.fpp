@@ -647,7 +647,6 @@ contains
         type(ghost_point), intent(inout) :: gp
 
         integer :: i, j, k, patch_id, boundary_edge_count, total_vertices
-        integer :: interpolate
         real(wp), dimension(1:3) :: center, xyz_local
         real(wp) :: normals(1:3) !< Boundary normal buffer
         real(wp) :: distance
@@ -659,7 +658,6 @@ contains
         k = gp%loc(3)
 
         ! load in model values
-        interpolate = gpu_interpolate(patch_id)
         boundary_edge_count = gpu_boundary_edge_count(patch_id)
         total_vertices = gpu_total_vertices(patch_id)
 
@@ -686,43 +684,25 @@ contains
 
         ! 3D models
         if (p > 0) then
-
             ! Get the boundary normals and shortest distance between the cell center and the model boundary
-            call f_distance_normals_3D_flat(gpu_ntrs(patch_id), gpu_trs_v, gpu_trs_n, patch_id, xyz_local, normals, distance)
+            call f_distance_normals_3D(gpu_ntrs(patch_id), gpu_trs_v, gpu_trs_n, patch_id, xyz_local, normals, distance)
 
-            ! Get the shortest distance between the cell center and the interpolated model boundary
-            if (interpolate == 1) then
-                gp%levelset = f_interpolated_distance(gpu_interpolated_boundary_v(:, :, patch_id), total_vertices, xyz_local)
-            else
-                gp%levelset = distance
-            end if
-
-            ! Correct the sign of the levelset
+            ! Get the shortest distance between the cell center and the model boundary
+            gp%levelset = distance
             gp%levelset = -abs(gp%levelset)
 
             ! Assign the levelset_norm
             gp%levelset_norm = matmul(rotation, normals(1:3))
         else
             ! 2D models
-            if (interpolate == 1) then
-                ! Get the shortest distance between the cell center and the model boundary
-                gp%levelset = f_interpolated_distance(gpu_interpolated_boundary_v(:, :, patch_id), total_vertices, xyz_local)  ! Change 7
-            else
-                gp%levelset = f_distance(gpu_boundary_v(:, :, :, patch_id), boundary_edge_count, xyz_local)  ! Change 8
-            end if
-
-            ! Correct the sign of the levelset
-            gp%levelset = -abs(gp%levelset)
-
-            ! Get the boundary normals
-            call f_normals(gpu_boundary_v(:, :, :, patch_id), &
-                           boundary_edge_count, &
-                           xyz_local, &
-                           normals)
-
-            ! Assign the levelset_norm
+            call f_distance_normals_2D(gpu_boundary_v, patch_id, &
+                                       boundary_edge_count, &
+                                       xyz_local, normals, distance)
+            gp%levelset = -abs(distance)
             gp%levelset_norm = matmul(rotation, normals(1:3))
         end if
+
+        print *, gp%levelset, gp%levelset_norm
 
     end subroutine s_model_levelset
 

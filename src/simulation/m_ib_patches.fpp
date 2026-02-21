@@ -962,9 +962,7 @@ contains
         real(wp) :: normals(1:3) !< Boundary normal buffer
         integer :: boundary_vertex_count, boundary_edge_count, total_vertices !< Boundary vertex
         real(wp), allocatable, dimension(:, :, :) :: boundary_v !< Boundary vertex buffer
-        real(wp), allocatable, dimension(:, :) :: interpolated_boundary_v !< Interpolated vertex buffer
         real(wp) :: dx_local, dy_local, dz_local !< Levelset distance buffer
-        logical :: interpolate !< Logical variable to determine whether or not the model should be interpolated
 
         integer :: i, j, k !< Generic loop iterators
         integer :: patch_id
@@ -1023,33 +1021,9 @@ contains
                 ! Need the cells that form the boundary of the flat projection in 2D
                 if (p == 0) call f_check_boundary(model, boundary_v, boundary_vertex_count, boundary_edge_count)
 
-                ! Check if the model needs interpolation
-                if (p > 0) then
-                    call f_check_interpolation_3D(model, (/dx_local, dy_local, dz_local/), interpolate)
-                else
-                    call f_check_interpolation_2D(boundary_v, boundary_edge_count, (/dx_local, dy_local, 0._wp/), interpolate)
-                end if
-
                 ! Show the number of edges and boundary edges in 2D STL models
                 if (proc_rank == 0 .and. p == 0) then
                     print *, ' * Number of 2D model boundary edges:', boundary_edge_count
-                end if
-
-                ! Interpolate the STL model along the edges (2D) and on triangle facets (3D)
-                if (interpolate) then
-                    if (proc_rank == 0) then
-                        print *, ' * Interpolating STL vertices.'
-                    end if
-
-                    if (p > 0) then
-                        call f_interpolate_3D(model, (/dx, dy, dz/), interpolated_boundary_v, total_vertices)
-                    else
-                        call f_interpolate_2D(boundary_v, boundary_edge_count, (/dx, dy, 0._wp/), interpolated_boundary_v, total_vertices)
-                    end if
-
-                    if (proc_rank == 0) then
-                        print *, ' * Total number of interpolated boundary vertices:', total_vertices
-                    end if
                 end if
 
                 if (proc_rank == 0) then
@@ -1079,16 +1053,6 @@ contains
                 models(patch_id)%model = model
                 models(patch_id)%boundary_v = boundary_v
                 models(patch_id)%boundary_edge_count = boundary_edge_count
-                if (interpolate) then
-                    models(patch_id)%interpolate = 1
-                else
-                    models(patch_id)%interpolate = 0
-                end if
-                if (interpolate) then
-                    models(patch_id)%interpolated_boundary_v = interpolated_boundary_v
-                    models(patch_id)%total_vertices = total_vertices
-                end if
-
             end if
         end do
 
@@ -1111,24 +1075,18 @@ contains
                     max_bv2 = max(max_bv2, size(models(pid)%boundary_v, 2))
                     max_bv3 = max(max_bv3, size(models(pid)%boundary_v, 3))
                 end if
-                if (allocated(models(pid)%interpolated_boundary_v)) then
-                    max_iv1 = max(max_iv1, size(models(pid)%interpolated_boundary_v, 1))
-                    max_iv2 = max(max_iv2, size(models(pid)%interpolated_boundary_v, 2))
-                end if
             end do
 
             if (max_ntrs > 0) then
                 allocate (gpu_ntrs(1:num_ibs))
                 allocate (gpu_trs_v(1:3, 1:3, 1:max_ntrs, 1:num_ibs))
                 allocate (gpu_trs_n(1:3, 1:max_ntrs, 1:num_ibs))
-                allocate (gpu_interpolate(1:num_ibs))
                 allocate (gpu_boundary_edge_count(1:num_ibs))
                 allocate (gpu_total_vertices(1:num_ibs))
 
                 gpu_ntrs = 0
                 gpu_trs_v = 0._wp
                 gpu_trs_n = 0._wp
-                gpu_interpolate = 0
                 gpu_boundary_edge_count = 0
                 gpu_total_vertices = 0
 
@@ -1137,17 +1095,11 @@ contains
                     gpu_boundary_v = 0._wp
                 end if
 
-                if (max_iv1 > 0) then
-                    allocate (gpu_interpolated_boundary_v(1:max_iv1, 1:max_iv2, 1:num_ibs))
-                    gpu_interpolated_boundary_v = 0._wp
-                end if
-
                 do pid = 1, num_ibs
                     if (allocated(models(pid)%model)) then
                         gpu_ntrs(pid) = models(pid)%ntrs
                         gpu_trs_v(:, :, 1:models(pid)%ntrs, pid) = models(pid)%trs_v
                         gpu_trs_n(:, 1:models(pid)%ntrs, pid) = models(pid)%trs_n
-                        gpu_interpolate(pid) = models(pid)%interpolate
                         gpu_boundary_edge_count(pid) = models(pid)%boundary_edge_count
                         gpu_total_vertices(pid) = models(pid)%total_vertices
                     end if
@@ -1156,18 +1108,11 @@ contains
                                        1:size(models(pid)%boundary_v, 2), &
                                        1:size(models(pid)%boundary_v, 3), pid) = models(pid)%boundary_v
                     end if
-                    if (allocated(models(pid)%interpolated_boundary_v) .and. gpu_interpolate(pid) == 1) then
-                        gpu_interpolated_boundary_v(1:size(models(pid)%interpolated_boundary_v, 1), &
-                                                    1:size(models(pid)%interpolated_boundary_v, 2), pid) = models(pid)%interpolated_boundary_v
-                    end if
                 end do
 
-                $:GPU_ENTER_DATA(copyin='[gpu_ntrs, gpu_trs_v, gpu_trs_n, gpu_interpolate, gpu_boundary_edge_count, gpu_total_vertices]')
+                $:GPU_ENTER_DATA(copyin='[gpu_ntrs, gpu_trs_v, gpu_trs_n, gpu_boundary_edge_count, gpu_total_vertices]')
                 if (allocated(gpu_boundary_v)) then
                     $:GPU_ENTER_DATA(copyin='[gpu_boundary_v]')
-                end if
-                if (allocated(gpu_interpolated_boundary_v)) then
-                    $:GPU_ENTER_DATA(copyin='[gpu_interpolated_boundary_v]')
                 end if
             end if
         end block

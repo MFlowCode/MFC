@@ -1601,7 +1601,6 @@ contains
         real(wp) :: normals(1:3) !< Boundary normal buffer
         integer :: boundary_vertex_count, boundary_edge_count, total_vertices !< Boundary vertex
         real(wp), allocatable, dimension(:, :, :) :: boundary_v !< Boundary vertex buffer
-        real(wp), allocatable, dimension(:, :) :: interpolated_boundary_v !< Interpolated vertex buffer
         real(wp) :: distance !< Levelset distance buffer
         logical :: interpolate !< Logical variable to determine whether or not the model should be interpolated
 
@@ -1655,33 +1654,9 @@ contains
 
         call f_check_boundary(model, boundary_v, boundary_vertex_count, boundary_edge_count)
 
-        ! Check if the model needs interpolation
-        if (p > 0) then
-            call f_check_interpolation_3D(model, (/dx, dy, dz/), interpolate)
-        else
-            call f_check_interpolation_2D(boundary_v, boundary_edge_count, (/dx, dy, dz/), interpolate)
-        end if
-
         ! Show the number of edges and boundary edges in 2D STL models
         if (proc_rank == 0 .and. p == 0) then
             print *, ' * Number of 2D model boundary edges:', boundary_edge_count
-        end if
-
-        ! Interpolate the STL model along the edges (2D) and on triangle facets (3D)
-        if (interpolate) then
-            if (proc_rank == 0) then
-                print *, ' * Interpolating STL vertices.'
-            end if
-
-            if (p > 0) then
-                call f_interpolate_3D(model, (/dx, dy, dz/), interpolated_boundary_v, total_vertices)
-            else
-                call f_interpolate_2D(boundary_v, boundary_edge_count, (/dx, dy, dz/), interpolated_boundary_v, total_vertices)
-            end if
-
-            if (proc_rank == 0) then
-                print *, ' * Total number of interpolated boundary vertices:', total_vertices
-            end if
         end if
 
         if (proc_rank == 0) then

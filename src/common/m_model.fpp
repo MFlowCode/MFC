@@ -19,14 +19,12 @@ module m_model
     private
 
     public :: f_model_read, s_model_write, s_model_free, f_model_is_inside, models, gpu_ntrs, &
-              gpu_trs_v, gpu_trs_n, gpu_boundary_v, gpu_interpolated_boundary_v, gpu_interpolate, gpu_boundary_edge_count, &
+              gpu_trs_v, gpu_trs_n, gpu_boundary_v, gpu_boundary_edge_count, &
               gpu_total_vertices, stl_bounding_boxes
 
     ! Subroutines for STL immersed boundaries
-    public :: f_check_boundary, f_register_edge, f_check_interpolation_2D, &
-              f_check_interpolation_3D, f_interpolate_2D, f_interpolate_3D, &
-              f_interpolated_distance, f_normals, f_distance, f_distance_normals_3D, f_tri_area, s_pack_model_for_gpu, &
-              f_model_is_inside_flat, f_distance_normals_3d_flat
+    public :: f_check_boundary, f_register_edge, f_model_is_inside_flat, &
+              f_distance_normals_3D, f_distance_normals_2D, s_pack_model_for_gpu
 
     !! array of STL models that can be allocated and then used in IB marker and levelset compute
     type(t_model_array), allocatable, target :: models(:)
@@ -35,8 +33,6 @@ module m_model
     real(wp), allocatable, dimension(:, :, :, :) :: gpu_trs_v
     real(wp), allocatable, dimension(:, :, :) :: gpu_trs_n
     real(wp), allocatable, dimension(:, :, :, :) :: gpu_boundary_v
-    real(wp), allocatable, dimension(:, :, :) :: gpu_interpolated_boundary_v
-    integer, allocatable :: gpu_interpolate(:)
     integer, allocatable :: gpu_boundary_edge_count(:)
     integer, allocatable :: gpu_total_vertices(:)
     real(wp), allocatable :: stl_bounding_boxes(:, :, :)
@@ -56,7 +52,7 @@ contains
         character(kind=c_char, len=80) :: header
         integer(kind=c_int32_t) :: nTriangles
 
-        real(kind=c_float) :: normal(3), v(3, 3)
+        real(kind=c_float) :: normal(3), v(3, 3), v_norm
         integer(kind=c_int16_t) :: attribute
 
         open (newunit=iunit, file=filepath, action='READ', &
@@ -86,6 +82,8 @@ contains
 
             model%trs(i)%v = v
             model%trs(i)%n = normal
+            v_norm = sqrt(normal(1)**2 + normal(2)**2 + normal(3)**2)
+            if (v_norm > 0._wp) model%trs(i)%n = normal/v_norm
         end do
 
         close (iunit)
@@ -102,6 +100,7 @@ contains
         integer :: i, j, iunit, iostat
         character(80) :: line, buffered_line
         logical :: is_buffered
+        real(wp) :: normal(3), v_norm
 
         is_buffered = .false.
 
@@ -150,7 +149,9 @@ contains
             end if
 
             call s_skip_ignored_lines(iunit, buffered_line, is_buffered)
-            read (line(13:), *) model%trs(i)%n
+            read (line(13:), *) normal
+            v_norm = sqrt(normal(1)**2 + normal(2)**2 + normal(3)**2)
+            if (v_norm > 0._wp) model%trs(i)%n = normal/v_norm
 
             call s_skip_ignored_lines(iunit, buffered_line, is_buffered)
             if (is_buffered) then
@@ -821,432 +822,16 @@ contains
 
     end subroutine f_register_edge
 
-    !> This procedure check if interpolation is needed for 2D models.
-    !! @param boundary_v                Temporary edge end vertex buffer
-    !! @param spacing                   Dimensions of the current levelset cell
-    subroutine f_check_interpolation_2D(boundary_v, boundary_edge_count, spacing, interpolate)
-
-        logical, intent(inout) :: interpolate !< Logical indicator of interpolation
-        integer, intent(in) :: boundary_edge_count !< Number of boundary edges
-        real(wp), intent(in), dimension(1:boundary_edge_count, 1:3, 1:2) :: boundary_v
-        real(wp), dimension(1:3), intent(in) :: spacing
-
-        real(wp) :: l1, cell_width !< Length of each boundary edge and cell width
-        integer :: j !< Boundary edge index iterator
-        integer :: interpolate_integer !< integer form of interpolate logical to support GPU checking
-
-        cell_width = minval(spacing(1:2))
-        interpolate_integer = 0
-
-        $:GPU_PARALLEL_LOOP(private='[j,l1]', copyin='[boundary_v,cell_width,Ifactor_2D]', copy='[interpolate_integer]')
-        do j = 1, boundary_edge_count
-            if (interpolate_integer == 0) then
-                l1 = sqrt((boundary_v(j, 2, 1) - boundary_v(j, 1, 1))**2 + &
-                          (boundary_v(j, 2, 2) - boundary_v(j, 1, 2))**2)
-
-                if ((l1*Ifactor_2D > cell_width)) then
-                    interpolate_integer = 1
-                end if
-            end if
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-        interpolate = (interpolate_integer == 1)
-
-    end subroutine f_check_interpolation_2D
-
-    !> This procedure check if interpolation is needed for 3D models.
-    !! @param model              Model to search in.
-    !! @param spacing            Dimensions of the current levelset cell
-    !! @param interpolate        Logical output
-    subroutine f_check_interpolation_3D(model, spacing, interpolate)
-
-        logical, intent(inout) :: interpolate
-        type(t_model), intent(in) :: model
-        real(wp), dimension(1:3), intent(in) :: spacing
-        real(wp), dimension(1:3) :: edge_l
-        real(wp) :: cell_width
-        real(wp), dimension(1:model%ntrs, 1:3, 1:3) :: tri_v
-        integer :: i, j, interpolate_integer !< Loop iterator
-
-        cell_width = minval(spacing)
-        interpolate_integer = 0
-
-        ! load up the array of triangles for GPU packing
-        do i = 1, model%ntrs
-            do j = 1, 3
-                tri_v(i, 1, j) = model%trs(i)%v(1, j)
-                tri_v(i, 2, j) = model%trs(i)%v(2, j)
-                tri_v(i, 3, j) = model%trs(i)%v(3, j)
-            end do
-        end do
-
-        ! compare the side of all
-        $:GPU_PARALLEL_LOOP(private='[i,edge_l]', copyin='[cell_width,tri_v,Ifactor_3D]', copy='[interpolate_integer]')
-        do i = 1, model%ntrs
-            if (interpolate_integer == 0) then
-                edge_l(1) = sqrt((tri_v(i, 1, 2) - tri_v(i, 1, 1))**2 + &
-                                 (tri_v(i, 2, 2) - tri_v(i, 2, 1))**2 + &
-                                 (tri_v(i, 3, 2) - tri_v(i, 3, 1))**2)
-                edge_l(2) = sqrt((tri_v(i, 1, 3) - tri_v(i, 1, 2))**2 + &
-                                 (tri_v(i, 2, 3) - tri_v(i, 2, 2))**2 + &
-                                 (tri_v(i, 3, 3) - tri_v(i, 3, 2))**2)
-                edge_l(3) = sqrt((tri_v(i, 1, 1) - tri_v(i, 1, 3))**2 + &
-                                 (tri_v(i, 2, 1) - tri_v(i, 2, 3))**2 + &
-                                 (tri_v(i, 3, 1) - tri_v(i, 3, 3))**2)
-
-                if ((edge_l(1) > cell_width*Ifactor_3D) .or. &
-                    (edge_l(2) > cell_width*Ifactor_3D) .or. &
-                    (edge_l(3) > cell_width*Ifactor_3D)) then
-                    interpolate_integer = 1
-                end if
-            end if
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-        interpolate = (interpolate_integer == 1)
-
-    end subroutine f_check_interpolation_3D
-
-    !> This procedure interpolates 2D models.
-    !! @param boundary_v                   Group of all the boundary vertices of the 2D model without interpolation
-    !! @param boundary_edge_count          Output total number of boundary edges
-    !! @param spacing                      Dimensions of the current levelset cell
-    !! @param interpolated_boundary_v      Output all the boundary vertices of the interpolated 2D model
-    !! @param total_vertices               Total number of vertices after interpolation
-    subroutine f_interpolate_2D(boundary_v, boundary_edge_count, spacing, interpolated_boundary_v, total_vertices)
-
-        real(wp), intent(in), dimension(:, :, :) :: boundary_v
-        real(wp), dimension(1:3), intent(in) :: spacing
-        real(wp), allocatable, intent(inout), dimension(:, :) :: interpolated_boundary_v
-
-        integer, intent(inout) :: total_vertices, boundary_edge_count
-        integer :: num_segments, vertex_idx
-        integer :: i, j
-
-        real(wp) :: edge_length, cell_width
-        real(wp), dimension(1:2) :: edge_x, edge_y, edge_del
-
-        ! Get the number of boundary edges
-        cell_width = minval(spacing(1:2))
-        num_segments = 0
-
-        ! First pass: Calculate the total number of vertices including interpolated ones
-        total_vertices = 1
-        $:GPU_PARALLEL_LOOP(private='[i,edge_x,edge_y,edge_length,num_segments]', copyin='[Ifactor_2D]', copy='[total_vertices]')
-        do i = 1, boundary_edge_count
-            ! Get the coordinates of the two ends of the current edge
-            edge_x(1) = boundary_v(i, 1, 1)
-            edge_y(1) = boundary_v(i, 1, 2)
-            edge_x(2) = boundary_v(i, 2, 1)
-            edge_y(2) = boundary_v(i, 2, 2)
-
-            ! Compute the length of the edge
-            edge_length = sqrt((edge_x(2) - edge_x(1))**2 + &
-                               (edge_y(2) - edge_y(1))**2)
-
-            ! Determine the number of segments
-            if (edge_length > cell_width) then
-                num_segments = Ifactor_2D*ceiling(edge_length/cell_width)
-            else
-                num_segments = 1
-            end if
-
-            ! Each edge contributes num_segments vertices
-            $:GPU_ATOMIC(atomic='update')
-            total_vertices = total_vertices + num_segments
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-        ! Allocate memory for the new boundary vertices array
-        allocate (interpolated_boundary_v(1:total_vertices, 1:3))
-
-        ! Fill the new boundary vertices array with original and interpolated vertices
-        total_vertices = 1
-        $:GPU_PARALLEL_LOOP(private='[i,edge_x,edge_y,edge_length,num_segments,edge_del,vertex_idx]', copyin='[Ifactor_2D]', copy='[total_vertices,interpolated_boundary_v]')
-        do i = 1, boundary_edge_count
-            ! Get the coordinates of the two ends of the current edge
-            edge_x(1) = boundary_v(i, 1, 1)
-            edge_y(1) = boundary_v(i, 1, 2)
-            edge_x(2) = boundary_v(i, 2, 1)
-            edge_y(2) = boundary_v(i, 2, 2)
-
-            ! Compute the length of the edge
-            edge_length = sqrt((edge_x(2) - edge_x(1))**2 + &
-                               (edge_y(2) - edge_y(1))**2)
-
-            ! Determine the number of segments and interpolation step
-            if (edge_length > cell_width) then
-                num_segments = Ifactor_2D*ceiling(edge_length/cell_width)
-                edge_del(1) = (edge_x(2) - edge_x(1))/num_segments
-                edge_del(2) = (edge_y(2) - edge_y(1))/num_segments
-            else
-                num_segments = 1
-                edge_del(1) = 0._wp
-                edge_del(2) = 0._wp
-            end if
-
-            interpolated_boundary_v(1, 1) = edge_x(1)
-            interpolated_boundary_v(1, 2) = edge_y(1)
-            interpolated_boundary_v(1, 3) = 0._wp
-
-            ! Add original and interpolated vertices to the output array
-            do j = 1, num_segments - 1
-                $:GPU_ATOMIC(atomic='capture')
-                total_vertices = total_vertices + 1
-                vertex_idx = total_vertices
-                $:END_GPU_ATOMIC_CAPTURE()
-                interpolated_boundary_v(vertex_idx, 1) = edge_x(1) + j*edge_del(1)
-                interpolated_boundary_v(vertex_idx, 2) = edge_y(1) + j*edge_del(2)
-            end do
-
-            ! Add the last vertex of the edge
-            if (num_segments > 0) then
-                $:GPU_ATOMIC(atomic='capture')
-                total_vertices = total_vertices + 1
-                vertex_idx = total_vertices
-                $:END_GPU_ATOMIC_CAPTURE()
-                interpolated_boundary_v(vertex_idx, 1) = edge_x(2)
-                interpolated_boundary_v(vertex_idx, 2) = edge_y(2)
-            end if
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-    end subroutine f_interpolate_2D
-
-    !> This procedure interpolates 3D models.
-    !! @param model                        Model to search in.
-    !! @param spacing                      Dimensions of the current levelset cell
-    !! @param interpolated_boundary_v      Output all the boundary vertices of the interpolated 3D model
-    !! @param total_vertices               Total number of vertices after interpolation
-    impure subroutine f_interpolate_3D(model, spacing, interpolated_boundary_v, total_vertices)
-        real(wp), dimension(1:3), intent(in) :: spacing
-        type(t_model), intent(in) :: model
-        real(wp), allocatable, intent(inout), dimension(:, :) :: interpolated_boundary_v
-        integer, intent(out) :: total_vertices
-
-        integer :: i, j, k, num_triangles, num_segments, num_inner_vertices, vertex_idx
-        real(wp), dimension(1:3, 1:3) :: tri
-        real(wp), dimension(1:3) :: edge_del, cell_area
-        real(wp), dimension(1:3) :: bary_coord !< Barycentric coordinates
-        real(wp) :: edge_length, cell_width, cell_area_min, tri_area
-
-        ! GPU-friendly flat arrays packed from model
-        real(wp), allocatable, dimension(:, :, :) :: flat_v  ! (3, 3, num_triangles)
-        real(wp), allocatable, dimension(:, :) :: flat_n  ! (3, num_triangles)
-
-        ! Number of triangles in the model
-        num_triangles = model%ntrs
-        cell_width = minval(spacing)
-
-        ! Find the minimum surface area
-        cell_area(1) = spacing(1)*spacing(2)
-        cell_area(2) = spacing(1)*spacing(3)
-        cell_area(3) = spacing(2)*spacing(3)
-        cell_area_min = minval(cell_area)
-        num_inner_vertices = 0
-
-        ! Pack model into flat arrays on CPU
-        allocate (flat_v(1:3, 1:3, 1:num_triangles))
-        allocate (flat_n(1:3, 1:num_triangles))
-        do i = 1, num_triangles
-            flat_v(:, :, i) = model%trs(i)%v(:, :)
-            flat_n(:, i) = model%trs(i)%n(:)
-        end do
-
-        ! Calculate the total number of vertices including interpolated ones
-        total_vertices = 0
-        $:GPU_PARALLEL_LOOP(private='[i,j,k,tri,edge_length,num_segments,num_inner_vertices]', copyin='[Ifactor_3D,Ifactor_bary_3D,flat_v,flat_n]', copy='[total_vertices]', collapse=1)
-        do i = 1, num_triangles
-            do j = 1, 3
-                ! Get the coordinates of the two vertices of the current edge
-                tri(1, :) = flat_v(j, :, i)
-                ! Next vertex in the triangle (cyclic)
-                tri(2, :) = flat_v(mod(j, 3) + 1, :, i)
-
-                ! Compute the length of the edge
-                edge_length = sqrt((tri(2, 1) - tri(1, 1))**2 + &
-                                   (tri(2, 2) - tri(1, 2))**2 + &
-                                   (tri(2, 3) - tri(1, 3))**2)
-
-                ! Determine the number of segments
-                if (edge_length > cell_width) then
-                    num_segments = Ifactor_3D*ceiling(edge_length/cell_width)
-                else
-                    num_segments = 1
-                end if
-
-                ! Each edge contributes num_segments vertices
-                $:GPU_ATOMIC(atomic='update')
-                total_vertices = total_vertices + num_segments + 1
-            end do
-
-            ! Add vertices inside the triangle
-            do k = 1, 3
-                tri(k, :) = flat_v(k, :, i)
-            end do
-            call f_tri_area(tri, tri_area)
-
-            if (tri_area > threshold_bary*cell_area_min) then
-                num_inner_vertices = Ifactor_bary_3D*ceiling(tri_area/cell_area_min)
-                $:GPU_ATOMIC(atomic='update')
-                total_vertices = total_vertices + num_inner_vertices
-            end if
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-        ! Allocate memory for the new boundary vertices array
-        allocate (interpolated_boundary_v(1:total_vertices, 1:3))
-
-        ! Fill the new boundary vertices array with original and interpolated vertices
-        total_vertices = 0
-        $:GPU_PARALLEL_LOOP(private='[i,j,k,tri,edge_length,num_segments,num_inner_vertices,edge_del,bary_coord,vertex_idx]', copyin='[Ifactor_3D,Ifactor_bary_3D]', copy='[total_vertices]', collapse=1)
-        do i = 1, num_triangles
-            ! Loop through the 3 edges of each triangle
-            do j = 1, 3
-                tri(1, :) = flat_v(j, :, i)
-                tri(2, :) = flat_v(mod(j, 3) + 1, :, i)
-
-                ! Compute the length of the edge
-                edge_length = sqrt((tri(2, 1) - tri(1, 1))**2 + &
-                                   (tri(2, 2) - tri(1, 2))**2 + &
-                                   (tri(2, 3) - tri(1, 3))**2)
-
-                ! Determine the number of segments and interpolation step
-                if (edge_length > cell_width) then
-                    num_segments = Ifactor_3D*ceiling(edge_length/cell_width)
-                    edge_del(1) = (tri(2, 1) - tri(1, 1))/num_segments
-                    edge_del(2) = (tri(2, 2) - tri(1, 2))/num_segments
-                    edge_del(3) = (tri(2, 3) - tri(1, 3))/num_segments
-                else
-                    num_segments = 1
-                    edge_del = 0._wp
-                end if
-
-                ! Add original and interpolated vertices to the output array
-                do k = 0, num_segments - 1
-                    $:GPU_ATOMIC(atomic='capture')
-                    total_vertices = total_vertices + 1
-                    vertex_idx = total_vertices
-                    $:END_GPU_ATOMIC_CAPTURE()
-                    interpolated_boundary_v(vertex_idx, 1) = tri(1, 1) + k*edge_del(1)
-                    interpolated_boundary_v(vertex_idx, 2) = tri(1, 2) + k*edge_del(2)
-                    interpolated_boundary_v(vertex_idx, 3) = tri(1, 3) + k*edge_del(3)
-                end do
-
-                ! Add the last vertex of the edge
-                $:GPU_ATOMIC(atomic='capture')
-                total_vertices = total_vertices + 1
-                vertex_idx = total_vertices
-                $:END_GPU_ATOMIC_CAPTURE()
-                interpolated_boundary_v(vertex_idx, 1) = tri(2, 1)
-                interpolated_boundary_v(vertex_idx, 2) = tri(2, 2)
-                interpolated_boundary_v(vertex_idx, 3) = tri(2, 3)
-            end do
-
-            ! Interpolate verties that are not on edges
-            do k = 1, 3
-                tri(k, :) = flat_v(k, :, i)
-            end do
-            call f_tri_area(tri, tri_area)
-
-            if (tri_area > threshold_bary*cell_area_min) then
-                num_inner_vertices = Ifactor_bary_3D*ceiling(tri_area/cell_area_min)
-                !Use barycentric coordinates for randomly distributed points
-
-                ! Deterministic seed per triangle
-                rand_seed = i*73856093 + 19349663
-                if (rand_seed == 0) rand_seed = 1
-
-                do k = 1, num_inner_vertices
-                    bary_coord(1) = f_model_random_number(rand_seed)
-                    bary_coord(2) = f_model_random_number(rand_seed)
-
-                    if ((bary_coord(1) + bary_coord(2)) >= 1._wp) then
-                        bary_coord(1) = 1._wp - bary_coord(1)
-                        bary_coord(2) = 1._wp - bary_coord(2)
-                    end if
-                    bary_coord(3) = 1._wp - bary_coord(1) - bary_coord(2)
-
-                    $:GPU_ATOMIC(atomic='update')
-                    total_vertices = total_vertices + 1
-                    interpolated_boundary_v(total_vertices, 1) = dot_product(bary_coord, tri(1:3, 1))
-                    interpolated_boundary_v(total_vertices, 2) = dot_product(bary_coord, tri(1:3, 2))
-                    interpolated_boundary_v(total_vertices, 3) = dot_product(bary_coord, tri(1:3, 3))
-                end do
-            end if
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-        deallocate (flat_v, flat_n)
-
-    end subroutine f_interpolate_3D
-
-    !> This procedure determines the levelset distance and normals of the 3D models without interpolation.
-    !! @param model        Model to search in.
-    !! @param point        The cell centers of the current level cell
-    !! @param normals      The output levelset normals
-    !! @param distance     The output levelset distance
-    subroutine f_distance_normals_3D(model, point, normals, distance)
-
-        $:GPU_ROUTINE(parallelism='[seq]')
-
-        type(t_model), intent(IN) :: model
-        real(wp), dimension(1:3), intent(in) :: point
-        real(wp), dimension(1:3), intent(out) :: normals
-        real(wp), intent(out) :: distance
-
-        real(wp), dimension(1:3, 1:3) :: tri
-        real(wp) :: dist_min, dist_t_min
-        real(wp) :: dist_min_normal, dist_buffer_normal
-        real(wp), dimension(1:3) :: midp !< Centers of the triangle facets
-        real(wp), dimension(1:3) :: dist_buffer !< Distance between the cell center and the vertices
-        integer :: i, j, tri_idx !< Iterator
-
-        dist_min = 1.e12_wp
-        dist_min_normal = 1.e12_wp
-        distance = 0._wp
-
-        tri_idx = 0
-        do i = 1, model%ntrs
-            do j = 1, 3
-                tri(j, 1) = model%trs(i)%v(j, 1)
-                tri(j, 2) = model%trs(i)%v(j, 2)
-                tri(j, 3) = model%trs(i)%v(j, 3)
-                dist_buffer(j) = sqrt((point(1) - tri(j, 1))**2 + &
-                                      (point(2) - tri(j, 2))**2 + &
-                                      (point(3) - tri(j, 3))**2)
-            end do
-
-            ! Get the surface center of each triangle facet
-            do j = 1, 3
-                midp(j) = (tri(1, j) + tri(2, j) + tri(3, j))/3
-            end do
-
-            dist_t_min = minval(dist_buffer(1:3))
-            dist_buffer_normal = sqrt((point(1) - midp(1))**2 + &
-                                      (point(2) - midp(2))**2 + &
-                                      (point(3) - midp(3))**2)
-
-            if (dist_t_min < dist_min) then
-                dist_min = dist_t_min
-            end if
-
-            if (dist_buffer_normal < dist_min_normal) then
-                dist_min_normal = dist_buffer_normal
-                tri_idx = i
-            end if
-        end do
-
-        normals(1) = model%trs(tri_idx)%n(1)
-        normals(2) = model%trs(tri_idx)%n(2)
-        normals(3) = model%trs(tri_idx)%n(3)
-        distance = dist_min
-
-    end subroutine f_distance_normals_3D
-
-    subroutine f_distance_normals_3D_flat(ntrs, trs_v, trs_n, pid, point, normals, distance)
-
+    !> This procedure determines the levelset distance and normals of 3D models
+    !! by computing the exact closest point via projection onto triangle surfaces.
+    !! @param ntrs                  Number of triangles for this patch
+    !! @param trs_v                 Flat GPU array of triangle vertices for all patches
+    !! @param trs_n                 Flat GPU array of triangle normals for all patches
+    !! @param pid                   Patch index into the arrays
+    !! @param point                 The cell center of the current levelset cell
+    !! @param normals               Output levelset normals
+    !! @param distance              Output levelset distance
+    subroutine f_distance_normals_3D(ntrs, trs_v, trs_n, pid, point, normals, distance)
         $:GPU_ROUTINE(parallelism='[seq]')
 
         integer, intent(in) :: ntrs
@@ -1257,186 +842,193 @@ contains
         real(wp), dimension(1:3), intent(out) :: normals
         real(wp), intent(out) :: distance
 
-        real(wp), dimension(1:3, 1:3) :: tri
-        real(wp) :: dist_min, dist_t_min
-        real(wp) :: dist_min_normal, dist_buffer_normal
-        real(wp), dimension(1:3) :: midp
-        real(wp), dimension(1:3) :: dist_buffer
-        integer :: i, j, tri_idx
+        integer :: i, j
+        real(wp) :: dist_min, dist_proj, dist_v, dist_e, t
+        real(wp) :: v1(1:3), v2(1:3), v3(1:3)
+        real(wp) :: e0(1:3), e1(1:3), pv(1:3)
+        real(wp) :: n(1:3), proj(1:3)
+        real(wp) :: d, ndot, denom
+        real(wp) :: u, v_bary, w
+        real(wp) :: d00, d01, d11, d20, d21
+        real(wp) :: edge(1:3), pe(1:3)
+        real(wp) :: verts(1:3, 1:3)
 
         dist_min = 1.e12_wp
-        dist_min_normal = 1.e12_wp
-        distance = 0._wp
+        normals = 0._wp
 
-        tri_idx = 0
         do i = 1, ntrs
-            do j = 1, 3
-                tri(j, 1) = trs_v(j, 1, i, pid)
-                tri(j, 2) = trs_v(j, 2, i, pid)
-                tri(j, 3) = trs_v(j, 3, i, pid)
-                dist_buffer(j) = sqrt((point(1) - tri(j, 1))**2 + &
-                                      (point(2) - tri(j, 2))**2 + &
-                                      (point(3) - tri(j, 3))**2)
-            end do
+            ! Triangle vertices
+            v1(:) = trs_v(1, :, i, pid)
+            v2(:) = trs_v(2, :, i, pid)
+            v3(:) = trs_v(3, :, i, pid)
 
-            do j = 1, 3
-                midp(j) = (tri(1, j) + tri(2, j) + tri(3, j))/3
-            end do
+            ! Triangle normal
+            n(:) = trs_n(:, i, pid)
 
-            dist_t_min = minval(dist_buffer(1:3))
-            dist_buffer_normal = sqrt((point(1) - midp(1))**2 + &
-                                      (point(2) - midp(2))**2 + &
-                                      (point(3) - midp(3))**2)
+            ! Project point onto triangle plane
+            pv(:) = point(:) - v1(:)
+            d = dot_product(pv, n)
+            if (abs(d) >= dist_min) cycle ! minimum distance is not small enough, no need to check validity
+            proj(:) = point(:) - d*n(:)
 
-            if (dist_t_min < dist_min) then
-                dist_min = dist_t_min
+            ! Check if projection is inside triangle using barycentric coordinates
+            e0(:) = v2(:) - v1(:)
+            e1(:) = v3(:) - v1(:)
+            pv(:) = proj(:) - v1(:)
+
+            d00 = dot_product(e0, e0)
+            d01 = dot_product(e0, e1)
+            d11 = dot_product(e1, e1)
+            d20 = dot_product(pv, e0)
+            d21 = dot_product(pv, e1)
+
+            denom = d00*d11 - d01*d01
+
+            if (abs(denom) > 0._wp) then
+                v_bary = (d11*d20 - d01*d21)/denom
+                w = (d00*d21 - d01*d20)/denom
+                u = 1._wp - v_bary - w
+            else
+                u = -1._wp
+                v_bary = -1._wp
+                w = -1._wp
             end if
 
-            if (dist_buffer_normal < dist_min_normal) then
-                dist_min_normal = dist_buffer_normal
-                tri_idx = i
+            ! If projection is inside triangle
+            if (u >= 0._wp .and. v_bary >= 0._wp .and. w >= 0._wp) then
+                dist_proj = sqrt((point(1) - proj(1))**2 + &
+                                 (point(2) - proj(2))**2 + &
+                                 (point(3) - proj(3))**2)
+
+                if (dist_proj < dist_min) then
+                    dist_min = dist_proj
+                    normals(:) = n(:)
+                end if
+            else
+                ! Projection outside triangle: check edges and vertices
+                verts(:, 1) = v1(:)
+                verts(:, 2) = v2(:)
+                verts(:, 3) = v3(:)
+
+                ! Check three edges
+                do j = 1, 3
+                    edge(:) = verts(:, mod(j, 3) + 1) - verts(:, j)
+                    pe(:) = point(:) - verts(:, j)
+
+                    t = dot_product(pe, edge)/max(dot_product(edge, edge), 1.e-30_wp)
+
+                    if (t >= 0._wp .and. t <= 1._wp) then
+                        proj(:) = verts(:, j) + t*edge(:)
+                        dist_e = sqrt((point(1) - proj(1))**2 + &
+                                      (point(2) - proj(2))**2 + &
+                                      (point(3) - proj(3))**2)
+
+                        if (dist_e < dist_min) then
+                            dist_min = dist_e
+                            normals(:) = n(:)
+                        end if
+                    end if
+                end do
+
+                ! Check three vertices
+                do j = 1, 3
+                    dist_v = sqrt((point(1) - verts(1, j))**2 + &
+                                  (point(2) - verts(2, j))**2 + &
+                                  (point(3) - verts(3, j))**2)
+
+                    if (dist_v < dist_min) then
+                        dist_min = dist_v
+                        normals(:) = n(:)
+                    end if
+                end do
             end if
         end do
 
-        normals(1) = trs_n(1, tri_idx, pid)
-        normals(2) = trs_n(2, tri_idx, pid)
-        normals(3) = trs_n(3, tri_idx, pid)
         distance = dist_min
 
-    end subroutine f_distance_normals_3D_flat
+    end subroutine f_distance_normals_3D
 
-    !> This procedure determines the levelset distance of 2D models without interpolation.
-    !! @param boundary_v                   Group of all the boundary vertices of the 2D model without interpolation
-    !! @param boundary_edge_count          Output the total number of boundary edges
-    !! @param point                        The cell centers of the current levelset cell
-    !! @return                             Distance which the levelset distance without interpolation
-    function f_distance(boundary_v, boundary_edge_count, point) result(distance)
-
+    !> This procedure determines the levelset distance and normals of 2D models
+    !! by computing the exact closest point via projection onto boundary edges.
+    !! @param boundary_v            Flat GPU array of boundary vertices/normals for all patches
+    !! @param pid                   Patch index into the boundary_v array
+    !! @param boundary_edge_count   Total number of boundary edges for this patch
+    !! @param point                 The cell center of the current levelset cell
+    !! @param normals               Output levelset normals
+    !! @param distance              Output levelset distance
+    subroutine f_distance_normals_2D(boundary_v, pid, boundary_edge_count, point, normals, distance)
         $:GPU_ROUTINE(parallelism='[seq]')
 
+        real(wp), dimension(:, :, :, :), intent(in) :: boundary_v
+        integer, intent(in) :: pid
         integer, intent(in) :: boundary_edge_count
-        real(wp), intent(in), dimension(:, :, :) :: boundary_v
-        ! real(wp), intent(in), dimension(1:boundary_edge_count, 1:3, 1:2) :: boundary_v
-        real(wp), dimension(1:3), intent(in) :: point
-
-        integer :: i
-        real(wp) :: dist_buffer1, dist_buffer2
-        real(wp), dimension(1:boundary_edge_count) :: dist_buffer
-        real(wp) :: distance
-
-        distance = 0._wp
-        do i = 1, boundary_edge_count
-            dist_buffer1 = sqrt((point(1) - boundary_v(i, 1, 1))**2 + &
-                                & (point(2) - boundary_v(i, 1, 2))**2)
-
-            dist_buffer2 = sqrt((point(1) - boundary_v(i, 2, 1))**2 + &
-                                & (point(2) - boundary_v(i, 2, 2))**2)
-
-            dist_buffer(i) = minval((/dist_buffer1, dist_buffer2/))
-        end do
-
-        distance = minval(dist_buffer)
-
-    end function f_distance
-
-    !> This procedure determines the levelset normals of 2D models without interpolation.
-    !! @param boundary_v                   Group of all the boundary vertices of the 2D model without interpolation
-    !! @param boundary_edge_count          Output the total number of boundary edges
-    !! @param point                        The cell centers of the current levelset cell
-    !! @param normals                      Output levelset normals without interpolation
-    subroutine f_normals(boundary_v, boundary_edge_count, point, normals)
-
-        $:GPU_ROUTINE(parallelism='[seq]')
-
-        integer, intent(in) :: boundary_edge_count
-        real(wp), intent(in), dimension(:, :, :) :: boundary_v
         real(wp), dimension(1:3), intent(in) :: point
         real(wp), dimension(1:3), intent(out) :: normals
+        real(wp), intent(out) :: distance
 
-        integer :: i, idx_buffer
-        real(wp) :: dist_min, dist_buffer
-        real(wp) :: midp(1:3)
+        integer :: i
+        real(wp) :: dist_min, dist_proj, dist_v1, dist_v2, t
+        real(wp) :: v1(1:2), v2(1:2), edge(1:2), pv(1:2)
+        real(wp) :: edge_len_sq, proj(1:2)
 
-        dist_buffer = 0._wp
-        dist_min = initial_distance_buffer
-        idx_buffer = 0
+        dist_min = 1.e12_wp
+        normals = 0._wp
 
         do i = 1, boundary_edge_count
-            midp(1) = (boundary_v(i, 2, 1) + boundary_v(i, 1, 1))/2
-            midp(2) = (boundary_v(i, 2, 2) + boundary_v(i, 1, 2))/2
-            midp(3) = 0._wp
+            ! Edge endpoints
+            v1(1) = boundary_v(i, 1, 1, pid)
+            v1(2) = boundary_v(i, 1, 2, pid)
+            v2(1) = boundary_v(i, 2, 1, pid)
+            v2(2) = boundary_v(i, 2, 2, pid)
 
-            dist_buffer = sqrt((point(1) - midp(1))**2 + &
-                                & (point(2) - midp(2))**2)
+            ! Edge vector and point-to-v1 vector
+            edge(1) = v2(1) - v1(1)
+            edge(2) = v2(2) - v1(2)
+            pv(1) = point(1) - v1(1)
+            pv(2) = point(2) - v1(2)
 
-            if (dist_buffer < dist_min) then
-                dist_min = dist_buffer
-                idx_buffer = i
+            edge_len_sq = dot_product(edge, edge)
+
+            ! Parameter of projection onto the edge line
+            if (edge_len_sq > 0._wp) then
+                t = dot_product(pv, edge)/edge_len_sq
+            else
+                t = 0._wp
+            end if
+
+            ! Check if projection falls within the segment
+            if (t >= 0._wp .and. t <= 1._wp) then
+                proj(1) = v1(1) + t*edge(1)
+                proj(2) = v1(2) + t*edge(2)
+                dist_proj = sqrt((point(1) - proj(1))**2 + (point(2) - proj(2))**2)
+
+                if (dist_proj < dist_min) then
+                    dist_min = dist_proj
+                    normals(1) = boundary_v(i, 3, 1, pid)
+                    normals(2) = boundary_v(i, 3, 2, pid)
+                end if
+            else
+                ! Check distance to first vertex
+                dist_v1 = sqrt(pv(1)*pv(1) + pv(2)*pv(2))
+                if (dist_v1 < dist_min) then
+                    dist_min = dist_v1
+                    normals(1) = boundary_v(i, 3, 1, pid)
+                    normals(2) = boundary_v(i, 3, 2, pid)
+                end if
+
+                ! Check distance to second vertex
+                dist_v2 = sqrt((point(1) - v2(1))**2 + (point(2) - v2(2))**2)
+                if (dist_v2 < dist_min) then
+                    dist_min = dist_v2
+                    normals(1) = boundary_v(i, 3, 1, pid)
+                    normals(2) = boundary_v(i, 3, 2, pid)
+                end if
             end if
         end do
 
-        normals(1) = boundary_v(idx_buffer, 3, 1)
-        normals(2) = boundary_v(idx_buffer, 3, 2)
-        normals(3) = 0._wp
+        distance = dist_min
 
-    end subroutine f_normals
-
-    !> This procedure calculates the barycentric facet area
-    subroutine f_tri_area(tri, tri_area)
-
-        real(wp), dimension(1:3, 1:3), intent(in) :: tri
-        real(wp), intent(out) :: tri_area
-        real(wp), dimension(1:3) :: AB, AC, cross
-        integer :: i !< Loop iterator
-
-        $:GPU_ROUTINE(parallelism='[seq]')
-
-        do i = 1, 3
-            AB(i) = tri(2, i) - tri(1, i)
-            AC(i) = tri(3, i) - tri(1, i)
-        end do
-
-        cross(1) = AB(2)*AC(3) - AB(3)*AC(2)
-        cross(2) = AB(3)*AC(1) - AB(1)*AC(3)
-        cross(3) = AB(1)*AC(2) - AB(2)*AC(1)
-        tri_area = 0.5_wp*sqrt(cross(1)**2 + cross(2)**2 + cross(3)**2)
-
-    end subroutine f_tri_area
-
-    !> This procedure determines the levelset of interpolated 2D models.
-    !! @param interpolated_boundary_v      Group of all the boundary vertices of the interpolated 2D model
-    !! @param total_vertices               Total number of vertices after interpolation
-    !! @param point                        The cell centers of the current levelset cell
-    !! @return                             Distance which the levelset distance without interpolation
-    function f_interpolated_distance(interpolated_boundary_v, total_vertices, point) result(distance)
-
-        $:GPU_ROUTINE(parallelism='[seq]')
-
-        integer, intent(in) :: total_vertices
-        real(wp), intent(in), dimension(:, :) :: interpolated_boundary_v
-        real(wp), dimension(1:3), intent(in) :: point
-
-        integer :: i !< Loop iterator
-        real(wp) :: dist_buffer, min_dist
-        real(wp) :: distance
-
-        distance = initial_distance_buffer
-        dist_buffer = initial_distance_buffer
-        min_dist = initial_distance_buffer
-
-        do i = 1, total_vertices
-            dist_buffer = sqrt((point(1) - interpolated_boundary_v(i, 1))**2 + &
-                               (point(2) - interpolated_boundary_v(i, 2))**2 + &
-                               (point(3) - interpolated_boundary_v(i, 3))**2)
-
-            if (min_dist > dist_buffer) then
-                min_dist = dist_buffer
-            end if
-        end do
-
-        distance = min_dist
-
-    end function f_interpolated_distance
+    end subroutine f_distance_normals_2D
 
     subroutine s_pack_model_for_gpu(ma)
         type(t_model_array), intent(inout) :: ma
