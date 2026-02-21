@@ -248,11 +248,12 @@ contains
         integer :: j, k, l
 
         real(wp) :: aCL, aCR, aC, aTHINC, qmin, qmax, A, B, C, sign, moncon
+        real(wp) :: rho_b, rho_e
 
         #:for MUSCL_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (muscl_dir == ${MUSCL_DIR}$) then
 
-                $:GPU_PARALLEL_LOOP(collapse=3,private='[j,k,l,aCL,aC,aCR,aTHINC,moncon,sign,qmin,qmax]')
+                $:GPU_PARALLEL_LOOP(collapse=3,private='[j,k,l,aCL,aC,aCR,aTHINC,moncon,sign,qmin,qmax,rho_b,rho_e]')
                 do l = is3_muscl%beg, is3_muscl%end
                     do k = is2_muscl%beg, is2_muscl%end
                         do j = is1_muscl%beg, is1_muscl%end
@@ -278,14 +279,16 @@ contains
                                 B = exp(sign*ic_beta*(2._wp*C - 1._wp))
                                 A = (B/cosh(ic_beta) - 1._wp)/tanh(ic_beta)
 
+                                ! Save original density ratios before THINC overwrites them
+                                rho_b = vL_rs_vf_${XYZ}$ (j, k, l, contxb)/vL_rs_vf_${XYZ}$ (j, k, l, advxb)
+                                rho_e = vL_rs_vf_${XYZ}$ (j, k, l, contxe)/(1._wp - vL_rs_vf_${XYZ}$ (j, k, l, advxb))
+
                                 ! Left reconstruction
                                 aTHINC = qmin + 5e-1_wp*qmax*(1._wp + sign*A)
                                 if (aTHINC < ic_eps) aTHINC = ic_eps
                                 if (aTHINC > 1 - ic_eps) aTHINC = 1 - ic_eps
-                                vL_rs_vf_${XYZ}$ (j, k, l, contxb) = vL_rs_vf_${XYZ}$ (j, k, l, contxb)/ &
-                                                                     vL_rs_vf_${XYZ}$ (j, k, l, advxb)*aTHINC
-                                vL_rs_vf_${XYZ}$ (j, k, l, contxe) = vL_rs_vf_${XYZ}$ (j, k, l, contxe)/ &
-                                                                     (1._wp - vL_rs_vf_${XYZ}$ (j, k, l, advxb))*(1._wp - aTHINC)
+                                vL_rs_vf_${XYZ}$ (j, k, l, contxb) = rho_b*aTHINC
+                                vL_rs_vf_${XYZ}$ (j, k, l, contxe) = rho_e*(1._wp - aTHINC)
                                 vL_rs_vf_${XYZ}$ (j, k, l, advxb) = aTHINC
                                 vL_rs_vf_${XYZ}$ (j, k, l, advxe) = 1 - aTHINC
 
@@ -293,10 +296,8 @@ contains
                                 aTHINC = qmin + 5e-1_wp*qmax*(1._wp + sign*(tanh(ic_beta) + A)/(1._wp + A*tanh(ic_beta)))
                                 if (aTHINC < ic_eps) aTHINC = ic_eps
                                 if (aTHINC > 1 - ic_eps) aTHINC = 1 - ic_eps
-                                vR_rs_vf_${XYZ}$ (j, k, l, contxb) = vL_rs_vf_${XYZ}$ (j, k, l, contxb)/ &
-                                                                     vL_rs_vf_${XYZ}$ (j, k, l, advxb)*aTHINC
-                                vR_rs_vf_${XYZ}$ (j, k, l, contxe) = vL_rs_vf_${XYZ}$ (j, k, l, contxe)/ &
-                                                                     (1._wp - vL_rs_vf_${XYZ}$ (j, k, l, advxb))*(1._wp - aTHINC)
+                                vR_rs_vf_${XYZ}$ (j, k, l, contxb) = rho_b*aTHINC
+                                vR_rs_vf_${XYZ}$ (j, k, l, contxe) = rho_e*(1._wp - aTHINC)
                                 vR_rs_vf_${XYZ}$ (j, k, l, advxb) = aTHINC
                                 vR_rs_vf_${XYZ}$ (j, k, l, advxe) = 1 - aTHINC
 
