@@ -181,9 +181,10 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
         fps = ARG('fps') or 10
         mp4_path = os.path.join(output_base, f'{varname}.mp4')
         cons.print(f"[bold]Generating MP4:[/bold] {mp4_path} ({len(requested_steps)} frames)")
-        render_mp4(case_dir, varname, requested_steps, mp4_path,
-                   fps=int(fps), read_func=read_step, **render_opts)
-        cons.print(f"[bold green]Done:[/bold green] {mp4_path}")
+        success = render_mp4(varname, requested_steps, mp4_path,
+                             fps=int(fps), read_func=read_step, **render_opts)
+        if success:
+            cons.print(f"[bold green]Done:[/bold green] {mp4_path}")
         return
 
     # Single or multiple PNG frames

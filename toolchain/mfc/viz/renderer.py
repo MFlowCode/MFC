@@ -129,13 +129,12 @@ def render_3d_slice(assembled, varname, step, output, slice_axis='z',  # pylint:
     plt.close(fig)
 
 
-def render_mp4(case_dir, varname, steps, output, fps=10,  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,too-many-statements
+def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,too-many-statements
                read_func=None, **opts):
     """
     Generate an MP4 video by iterating over timesteps.
 
     Args:
-        case_dir: Path to the case directory.
         varname: Variable name to plot.
         steps: List of timestep integers.
         output: Output MP4 file path.
@@ -174,8 +173,9 @@ def render_mp4(case_dir, varname, steps, output, fps=10,  # pylint: disable=too-
         if auto_vmax is None and all_maxs:
             opts['vmax'] = max(all_maxs)
 
-    # Write frames as images to a temp directory
-    viz_dir = os.path.join(case_dir, 'viz', '_frames')
+    # Write frames as images to a temp directory next to the output file
+    output_dir = os.path.dirname(os.path.abspath(output))
+    viz_dir = os.path.join(output_dir, '_frames')
     os.makedirs(viz_dir, exist_ok=True)
 
     try:
@@ -214,14 +214,16 @@ def render_mp4(case_dir, varname, steps, output, fps=10,  # pylint: disable=too-
         subprocess.run(ffmpeg_cmd, check=True, capture_output=True)
     except FileNotFoundError:
         print(f"ffmpeg not found. Frames saved to {viz_dir}/")
-        print(f"To create video manually: ffmpeg -framerate {fps} -i {frame_pattern} -c:v libx264 -pix_fmt yuv420p {output}")
-        return
+        print(f"To create video manually: ffmpeg -framerate {fps} "
+              f"-i {frame_pattern} -c:v libx264 -pix_fmt yuv420p {output}")
+        return False
     except subprocess.CalledProcessError as e:
         print(f"ffmpeg failed: {e.stderr.decode()}")
         print(f"Frames saved to {viz_dir}/")
-        return
+        return False
 
     # Clean up frames
     for fname in os.listdir(viz_dir):
         os.remove(os.path.join(viz_dir, fname))
     os.rmdir(viz_dir)
+    return True
