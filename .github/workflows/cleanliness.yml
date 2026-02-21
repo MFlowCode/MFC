@@ -86,6 +86,12 @@ jobs:
               grep -F 'Wmaybe-uninitialized' master.txt > mMaybe.txt
               diff prMaybe.txt mMaybe.txt
 
+          - name: Conversion Warnings Diff
+            continue-on-error: true
+            run: |
+              grep -F 'Wconversion' pr.txt > prConversion.txt
+              grep -F 'Wconversion' master.txt > mConversion.txt
+              diff prConversion.txt mConversion.txt
 
           - name: Everything Diff
             continue-on-error: true
@@ -106,12 +112,14 @@ jobs:
               pr_argument=$(grep -c -F 'Wunused-dummy-argument' pr.txt)
               pr_value=$(grep -c -F 'Wunused-value' pr.txt)
               pr_uninit=$(grep -c -F 'Wmaybe-uninitialized' pr.txt)
+              pr_conversion=$(grep -c -F 'Wconversion' pr.txt)
               pr_everything=$(grep -c '\-W' pr.txt)
 
               master_variable=$(grep -c -F 'Wunused-variable' master.txt)
               master_argument=$(grep -c -F 'Wunused-dummy-argument' master.txt)
               master_value=$(grep -c -F 'Wunused-value' master.txt)
               master_uninit=$(grep -c -F 'Wmaybe-uninitialized' master.txt)
+              master_conversion=$(grep -c -F 'Wconversion' master.txt)
               master_everything=$(grep -c '\-W' master.txt  )    
 
               echo "pr_everything=$pr_everything" >> $GITHUB_ENV
@@ -124,6 +132,7 @@ jobs:
               echo "Unused Dummy Argument: $pr_argument, Difference: $((pr_argument - master_argument))"
               echo "Unused Value: $pr_value, Difference: $((pr_value - master_value))"
               echo "Maybe Uninitialized: $pr_uninit, Difference: $((pr_uninit - master_uninit))"
+              echo "Conversion: $pr_conversion, Difference: $((pr_conversion - master_conversion))"
               echo "Everything: $pr_everything, Difference: $((pr_everything - master_everything))"
           
           

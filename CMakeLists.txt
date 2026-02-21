@@ -150,6 +150,7 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
             -fsignaling-nans
             -finit-real=snan
             -finit-integer=-99999999
+            -Wconversion
             -Wintrinsic-shadow
             -Wunderflow
             -Wrealloc-lhs
