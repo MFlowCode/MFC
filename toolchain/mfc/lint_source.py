@@ -142,7 +142,7 @@ def check_hardcoded_byte_size(repo_root: Path) -> list[str]:
             stripped = line.strip()
             if _is_comment_or_blank(stripped):
                 continue
-            if byte_re.search(stripped):
+            if byte_re.search(stripped.split("!")[0]):
                 errors.append(
                     f"  {rel}:{i + 1} hard-codes 8-byte real size."
                     " Fix: use 'storage_size(0._wp)/8' instead of"
