@@ -908,7 +908,7 @@ contains
             m_MOK = int(m_glb_save + 1, MPI_OFFSET_KIND)
             n_MOK = int(n_glb_save + 1, MPI_OFFSET_KIND)
             p_MOK = int(p_glb_save + 1, MPI_OFFSET_KIND)
-            WP_MOK = int(8._wp, MPI_OFFSET_KIND)
+            WP_MOK = int(storage_size(0._wp)/8, MPI_OFFSET_KIND)
             MOK = int(1._wp, MPI_OFFSET_KIND)
             str_MOK = int(name_len, MPI_OFFSET_KIND)
             NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
@@ -976,7 +976,7 @@ contains
             m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
             n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
             p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
-            WP_MOK = int(8._wp, MPI_OFFSET_KIND)
+            WP_MOK = int(storage_size(0._wp)/8, MPI_OFFSET_KIND)
             MOK = int(1._wp, MPI_OFFSET_KIND)
             str_MOK = int(name_len, MPI_OFFSET_KIND)
             NVARS_MOK = int(alt_sys, MPI_OFFSET_KIND)
@@ -1100,7 +1100,7 @@ contains
         m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
         n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
         p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
-        WP_MOK = int(8._wp, MPI_OFFSET_KIND)
+        WP_MOK = int(storage_size(0._wp)/8, MPI_OFFSET_KIND)
         MOK = int(1._wp, MPI_OFFSET_KIND)
 
         write (file_loc, '(A)') 'ib.dat'
