@@ -355,7 +355,7 @@ contains
         ! the time-step directory that will contain the new grid and initial
         ! condition data are also generated.
         if (old_ic .neqv. .true.) then
-            call s_delete_directory(trim(proc_rank_dir)//'/*')
+            call s_delete_directory(trim(proc_rank_dir))
             call s_create_directory(trim(proc_rank_dir)//'/0')
         end if
 
