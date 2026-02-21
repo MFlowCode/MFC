@@ -960,7 +960,7 @@ VIZ_COMMAND = Command(
         ),
         Argument(
             name="mp4",
-            help="Generate an MP4 video instead of individual PNGs.",
+            help="Generate an MP4 video instead of individual images.",
             action=ArgAction.STORE_TRUE,
             default=False,
         ),

@@ -90,7 +90,7 @@ def _read_record_endian(f, endian: str) -> bytes:
     return payload
 
 
-def read_binary_file(path: str, var_filter: Optional[str] = None) -> ProcessorData:
+def read_binary_file(path: str, var_filter: Optional[str] = None) -> ProcessorData:  # pylint: disable=too-many-locals,too-many-statements
     """
     Read a single MFC binary post-process file.
 
@@ -118,7 +118,7 @@ def read_binary_file(path: str, var_filter: Optional[str] = None) -> ProcessorDa
         elif n > 0:
             n_vals = (m + 2) + (n + 2)
         else:
-            n_vals = (m + 2)
+            n_vals = m + 2
 
         # Auto-detect grid precision from record size
         bytes_per_val = grid_bytes / n_vals
@@ -261,7 +261,7 @@ def _is_1d(case_dir: str) -> bool:
     return os.path.isdir(os.path.join(case_dir, 'binary', 'root'))
 
 
-def assemble(case_dir: str, step: int, fmt: str = 'binary',
+def assemble(case_dir: str, step: int, fmt: str = 'binary',  # pylint: disable=too-many-locals,too-many-statements
              var: Optional[str] = None) -> AssembledData:
     """
     Read and assemble multi-processor data for a given timestep.
@@ -318,12 +318,6 @@ def assemble(case_dir: str, step: int, fmt: str = 'binary',
         y_cc = (pd.y_cb[:-1] + pd.y_cb[1:]) / 2.0 if pd.n > 0 else np.array([0.0])
         z_cc = (pd.z_cb[:-1] + pd.z_cb[1:]) / 2.0 if pd.p > 0 else np.array([0.0])
         proc_centers.append((rank, pd, x_cc, y_cc, z_cc))
-
-    # Build sorted unique coordinate sets to determine global ordering
-    # Sort processors by their coordinate origins
-    all_x_origins = sorted(set(c[2][0] for c in proc_centers))
-    all_y_origins = sorted(set(c[3][0] for c in proc_centers)) if ndim >= 2 else [0.0]
-    all_z_origins = sorted(set(c[4][0] for c in proc_centers)) if ndim >= 3 else [0.0]
 
     # Build global coordinate arrays
     # For each unique origin in each dimension, accumulate sizes

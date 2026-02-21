@@ -9,7 +9,7 @@ Requires: h5py (optional dependency).
 """
 
 import os
-from typing import Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 import numpy as np
 
@@ -48,7 +48,6 @@ def _find_mesh_and_vars(h5file):
             for subkey in obj.keys():
                 subobj = obj[subkey]
                 if isinstance(subobj, h5py.Dataset):
-                    full_key = f"{key}/{subkey}"
                     arr = np.array(subobj)
                     if subkey in ('coord0', 'coord1', 'coord2'):
                         mesh_coords[subkey] = arr
@@ -109,7 +108,7 @@ def discover_timesteps_silo(case_dir: str) -> List[int]:
     return sorted(steps)
 
 
-def assemble_silo(case_dir: str, step: int,
+def assemble_silo(case_dir: str, step: int,  # pylint: disable=too-many-locals,too-many-statements
                   var: Optional[str] = None) -> AssembledData:
     """
     Read and assemble multi-processor Silo-HDF5 data for a given timestep.
@@ -160,10 +159,7 @@ def assemble_silo(case_dir: str, step: int,
         return AssembledData(ndim=ndim, x_cc=x_cc, y_cc=y_cc, z_cc=z_cc,
                              variables=pd.variables)
 
-    # Multi-processor assembly — reuse binary reader's assembly logic
-    from .reader import assemble as _binary_assemble  # noqa: avoid circular at module level
-    # Since silo files have the same ProcessorData structure, we can
-    # adapt the binary assembler. For now, use a simplified version.
+    # Multi-processor assembly — simplified version of binary reader's logic
 
     sample = proc_data[0][1]
     ndim = 1

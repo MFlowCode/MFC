@@ -34,7 +34,7 @@ def _parse_steps(step_arg, available_steps):
     return [int(step_arg)]
 
 
-def viz():
+def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branches
     """Main viz command dispatcher."""
     from .reader import discover_format, discover_timesteps, assemble  # pylint: disable=import-outside-toplevel
     from .renderer import render_1d, render_2d, render_3d_slice, render_mp4  # pylint: disable=import-outside-toplevel
@@ -155,6 +155,20 @@ def viz():
             from .silo_reader import assemble_silo  # pylint: disable=import-outside-toplevel
             return assemble_silo(case_dir, step, var=varname)
         return assemble(case_dir, step, fmt, var=varname)
+
+    # Validate variable name by reading the first timestep (without var filter)
+    def read_step_all_vars(step):
+        if fmt == 'silo':
+            from .silo_reader import assemble_silo  # pylint: disable=import-outside-toplevel
+            return assemble_silo(case_dir, step)
+        return assemble(case_dir, step, fmt)
+
+    test_assembled = read_step_all_vars(requested_steps[0])
+    if varname not in test_assembled.variables:
+        avail = sorted(test_assembled.variables.keys())
+        cons.print(f"[bold red]Error:[/bold red] Variable '{varname}' not found.")
+        cons.print(f"[bold]Available variables:[/bold] {', '.join(avail)}")
+        sys.exit(1)
 
     # Create output directory
     output_base = ARG('output')

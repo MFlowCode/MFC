@@ -8,17 +8,16 @@ for headless rendering.
 
 import os
 import subprocess
-from typing import Optional, List
 
 import numpy as np
 
 import matplotlib
 matplotlib.use('Agg')
-import matplotlib.pyplot as plt  # noqa: E402
-from matplotlib.colors import LogNorm  # noqa: E402
+import matplotlib.pyplot as plt  # pylint: disable=wrong-import-position
+from matplotlib.colors import LogNorm  # pylint: disable=wrong-import-position
 
 
-def render_1d(x_cc, data, varname, step, output, **opts):
+def render_1d(x_cc, data, varname, step, output, **opts):  # pylint: disable=too-many-arguments,too-many-positional-arguments
     """Render a 1D line plot and save as PNG."""
     fig, ax = plt.subplots(figsize=opts.get('figsize', (10, 6)))
     ax.plot(x_cc, data, linewidth=1.5)
@@ -36,7 +35,7 @@ def render_1d(x_cc, data, varname, step, output, **opts):
     plt.close(fig)
 
 
-def render_2d(x_cc, y_cc, data, varname, step, output, **opts):
+def render_2d(x_cc, y_cc, data, varname, step, output, **opts):  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
     """Render a 2D colormap via pcolormesh and save as PNG."""
     fig, ax = plt.subplots(figsize=opts.get('figsize', (10, 8)))
 
@@ -67,7 +66,7 @@ def render_2d(x_cc, y_cc, data, varname, step, output, **opts):
     plt.close(fig)
 
 
-def render_3d_slice(assembled, varname, step, output, slice_axis='z',
+def render_3d_slice(assembled, varname, step, output, slice_axis='z',  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,too-many-statements,too-many-branches
                     slice_index=None, slice_value=None, **opts):
     """Extract a 2D slice from 3D data and render as a colormap."""
     data_3d = assembled.variables[varname]
@@ -130,7 +129,7 @@ def render_3d_slice(assembled, varname, step, output, slice_axis='z',
     plt.close(fig)
 
 
-def render_mp4(case_dir, varname, steps, output, fps=10,
+def render_mp4(case_dir, varname, steps, output, fps=10,  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,too-many-statements
                read_func=None, **opts):
     """
     Generate an MP4 video by iterating over timesteps.
@@ -175,7 +174,7 @@ def render_mp4(case_dir, varname, steps, output, fps=10,
         if auto_vmax is None and all_maxs:
             opts['vmax'] = max(all_maxs)
 
-    # Write frames as PNGs to a temp directory
+    # Write frames as images to a temp directory
     viz_dir = os.path.join(case_dir, 'viz', '_frames')
     os.makedirs(viz_dir, exist_ok=True)
 
@@ -199,7 +198,7 @@ def render_mp4(case_dir, varname, steps, output, fps=10,
         elif assembled.ndim == 3:
             render_3d_slice(assembled, varname, step, frame_path, **opts)
 
-    # Combine PNGs into MP4 using ffmpeg
+    # Combine frames into MP4 using ffmpeg
     frame_pattern = os.path.join(viz_dir, '%06d.png')
     ffmpeg_cmd = [
         'ffmpeg', '-y',
