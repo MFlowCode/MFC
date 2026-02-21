@@ -226,7 +226,7 @@ contains
         character(LEN=*), intent(in) :: filepath
         type(t_model), intent(out) :: model
 
-        integer :: i, j, k, l, iunit, iostat, nVertices
+        integer :: i, j, k, l, iv3, iunit, iostat, nVertices
 
         real(wp), dimension(1:3), allocatable :: vertices(:, :)
 
@@ -275,10 +275,10 @@ contains
                 read (line(3:), *) vertices(i, :)
                 i = i + 1
             case ("f ")
-                read (line(3:), *) k, l, j
+                read (line(3:), *) k, l, iv3
                 model%trs(j)%v(1, :) = vertices(k, :)
                 model%trs(j)%v(2, :) = vertices(l, :)
-                model%trs(j)%v(3, :) = vertices(j, :)
+                model%trs(j)%v(3, :) = vertices(iv3, :)
                 j = j + 1
             case default
                 print *, "Error: unknown line type in OBJ file ", filepath
