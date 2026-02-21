@@ -702,8 +702,6 @@ contains
             gp%levelset_norm = matmul(rotation, normals(1:3))
         end if
 
-        print *, gp%levelset, gp%levelset_norm
-
     end subroutine s_model_levelset
 
 end module m_compute_levelset

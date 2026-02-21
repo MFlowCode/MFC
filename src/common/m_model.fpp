@@ -849,7 +849,7 @@ contains
         real(wp) :: n(1:3), proj(1:3)
         real(wp) :: d, ndot, denom
         real(wp) :: u, v_bary, w
-        real(wp) :: d00, d01, d11, d20, d21
+        real(wp) :: l00, l01, l11, l20, l21
         real(wp) :: edge(1:3), pe(1:3)
         real(wp) :: verts(1:3, 1:3)
 
@@ -876,17 +876,17 @@ contains
             e1(:) = v3(:) - v1(:)
             pv(:) = proj(:) - v1(:)
 
-            d00 = dot_product(e0, e0)
-            d01 = dot_product(e0, e1)
-            d11 = dot_product(e1, e1)
-            d20 = dot_product(pv, e0)
-            d21 = dot_product(pv, e1)
+            l00 = dot_product(e0, e0)
+            l01 = dot_product(e0, e1)
+            l11 = dot_product(e1, e1)
+            l20 = dot_product(pv, e0)
+            l21 = dot_product(pv, e1)
 
-            denom = d00*d11 - d01*d01
+            denom = l00*l11 - l01*l01
 
             if (abs(denom) > 0._wp) then
-                v_bary = (d11*d20 - d01*d21)/denom
-                w = (d00*d21 - d01*d20)/denom
+                v_bary = (l11*l20 - l01*l21)/denom
+                w = (l00*l21 - l01*l20)/denom
                 u = 1._wp - v_bary - w
             else
                 u = -1._wp
