@@ -12,7 +12,7 @@ retry_wait_time = 4
 
 # Comma-separated list of accepted status codes for valid links.
 # accept = ["200", "206", "403", "429"]
-accept = ["200", "429"]
+accept = ["200", "429", "502"]
 
 verbose = "error"
 
