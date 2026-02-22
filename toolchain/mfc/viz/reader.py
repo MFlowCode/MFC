@@ -56,6 +56,8 @@ def _detect_endianness(path: str) -> str:
     """Detect endianness from the first record marker (should be 16 for header)."""
     with open(path, 'rb') as f:
         raw = f.read(4)
+    if len(raw) < 4:
+        raise EOFError(f"File too short to detect endianness: {path}")
     le = struct.unpack('<i', raw)[0]
     if le == 16:
         return '<'
@@ -99,6 +101,10 @@ def read_binary_file(path: str, var_filter: Optional[str] = None) -> ProcessorDa
         # Record 1: header [m, n, p, dbvars] — 4 int32
         hdr = _read_record_endian(f, endian)
         m, n, p, dbvars = struct.unpack(f'{endian}4i', hdr)
+        if m < 0 or n < 0 or p < 0 or dbvars < 0:
+            raise ValueError(
+                f"Invalid header in {path}: m={m}, n={n}, p={p}, dbvars={dbvars}"
+            )
 
         # Record 2: grid coordinates — all in one record
         grid_raw = _read_record_endian(f, endian)
@@ -304,7 +310,7 @@ def assemble_from_proc_data(  # pylint: disable=too-many-locals
     else:
         global_z = np.array([0.0])
 
-    varnames = list(proc_data[0][1].variables.keys())
+    varnames = sorted({vn for _, pd in proc_data for vn in pd.variables})
     nx, ny, nz = len(global_x), len(global_y), len(global_z)
 
     global_vars: Dict[str, np.ndarray] = {}
@@ -372,12 +378,12 @@ def assemble(case_dir: str, step: int, fmt: str = 'binary',  # pylint: disable=t
         fpath = os.path.join(case_dir, 'binary', f'p{rank}', f'{step}.dat')
         if not os.path.isfile(fpath):
             import warnings  # pylint: disable=import-outside-toplevel
-            warnings.warn(f"Processor file not found, skipping: {fpath}")
+            warnings.warn(f"Processor file not found, skipping: {fpath}", stacklevel=2)
             continue
         pdata = read_binary_file(fpath, var_filter=var)
         if pdata.m == 0 and pdata.n == 0 and pdata.p == 0:
             import warnings  # pylint: disable=import-outside-toplevel
-            warnings.warn(f"Processor p{rank} has zero dimensions, skipping")
+            warnings.warn(f"Processor p{rank} has zero dimensions, skipping", stacklevel=2)
             continue
         proc_data.append((rank, pdata))
 
