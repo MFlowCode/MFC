@@ -15,20 +15,21 @@ jobs:
       id-token: write
 
     steps:
-      # IMPORTANT: no checkout for pull_request_target (fork-safe)
+      - name: Checkout PR head (fork)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
       - name: Run Claude Code Review
         id: claude-review
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-
-          # Workaround: bypass Anthropic OIDC->GitHub App token exchange
           github_token: ${{ github.token }}
 
           plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
           plugins: 'code-review@claude-code-plugins'
           prompt: '/code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }}'
-
-          # Optional: lets Claude read CI results
           additional_permissions: |
             actions: read
