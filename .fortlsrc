@@ -41,7 +41,6 @@
         "build/pre_process/",
         "build/simulation/",
         "build/post_process/",
-        "build/common/"
     ],
     "ext_mod_dirs": [
         "/usr/include/",
