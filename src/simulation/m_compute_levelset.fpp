@@ -33,8 +33,6 @@ contains
 
         integer :: i, patch_id, patch_geometry
 
-        print *, num_gps
-
         !  3D Patch Geometries
         if (p > 0) then
 
