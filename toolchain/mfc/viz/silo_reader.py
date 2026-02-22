@@ -16,7 +16,7 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
-from .reader import AssembledData, ProcessorData
+from .reader import AssembledData, ProcessorData, assemble_from_proc_data
 
 try:
     import h5py
@@ -38,15 +38,6 @@ def _check_h5py():
             "Or re-run post_process with format=2 to produce binary output."
         )
 
-
-def _read_silo_object(h5file, name):
-    """Read a Silo Named-Datatype object and return its ``silo`` attribute."""
-    obj = h5file[name]
-    if not isinstance(obj, h5py.Datatype):
-        return None
-    if "silo" not in obj.attrs:
-        return None
-    return obj.attrs["silo"]
 
 
 def _resolve_path(h5file, path_bytes):
@@ -81,6 +72,8 @@ def read_silo_file(  # pylint: disable=too-many-locals
                 continue
             silo_type = obj.attrs.get("silo_type")
             if silo_type is not None and int(silo_type) == _DB_QUADMESH:
+                if "silo" not in obj.attrs:
+                    continue
                 mesh_name = key
                 mesh_attr = obj.attrs["silo"]
                 break
@@ -119,6 +112,8 @@ def read_silo_file(  # pylint: disable=too-many-locals
             if var_filter is not None and key != var_filter:
                 continue
 
+            if "silo" not in obj.attrs:
+                continue
             attr = obj.attrs["silo"]
             data_path = attr["value0"]
             data = _resolve_path(f, data_path).astype(np.float64)
@@ -127,6 +122,9 @@ def read_silo_file(  # pylint: disable=too-many-locals
             # flat buffer.  HDF5 stores it row-major.  Reinterpret the
             # bytes in Fortran order so data[i,j,k] = value at (x_i,y_j,z_k),
             # matching the binary reader convention.
+            # Assumption: Silo/HDF5 preserves the Fortran dimension ordering
+            # (nx, ny, nz) as the dataset shape.  If a future Silo version
+            # reverses the shape, this reshape would silently transpose data.
             if data.ndim >= 2:
                 data = np.ascontiguousarray(data).ravel().reshape(data.shape, order='F')
             variables[key] = data
@@ -136,22 +134,7 @@ def read_silo_file(  # pylint: disable=too-many-locals
     )
 
 
-def discover_timesteps_silo(case_dir: str) -> List[int]:
-    """Return sorted list of available timesteps from ``silo_hdf5/`` directory."""
-    p0_dir = os.path.join(case_dir, "silo_hdf5", "p0")
-    if not os.path.isdir(p0_dir):
-        return []
-    steps = set()
-    for fname in os.listdir(p0_dir):
-        if fname.endswith(".silo") and not fname.startswith("collection"):
-            try:
-                steps.add(int(fname[:-5]))
-            except ValueError:
-                pass
-    return sorted(steps)
-
-
-def assemble_silo(  # pylint: disable=too-many-locals,too-many-statements,too-many-branches
+def assemble_silo(
     case_dir: str,
     step: int,
     var: Optional[str] = None,
@@ -182,88 +165,4 @@ def assemble_silo(  # pylint: disable=too-many-locals,too-many-statements,too-ma
     if not proc_data:
         raise FileNotFoundError(f"No Silo data found for step {step}")
 
-    # --- single processor — fast path ------------------------------------
-    if len(proc_data) == 1:
-        _, pd = proc_data[0]
-        x_cc = (pd.x_cb[:-1] + pd.x_cb[1:]) / 2.0
-        y_cc = (
-            (pd.y_cb[:-1] + pd.y_cb[1:]) / 2.0 if pd.n > 0 else np.array([0.0])
-        )
-        z_cc = (
-            (pd.z_cb[:-1] + pd.z_cb[1:]) / 2.0 if pd.p > 0 else np.array([0.0])
-        )
-        ndim = 1 + (pd.n > 0) + (pd.p > 0)
-        return AssembledData(
-            ndim=ndim,
-            x_cc=x_cc,
-            y_cc=y_cc,
-            z_cc=z_cc,
-            variables=pd.variables,
-        )
-
-    # --- multi-processor assembly ----------------------------------------
-    sample = proc_data[0][1]
-    ndim = 1 + (sample.n > 0) + (sample.p > 0)
-
-    # Compute cell centers for each processor
-    proc_centers: list = []
-    for rank, pd in proc_data:
-        x_cc = (pd.x_cb[:-1] + pd.x_cb[1:]) / 2.0
-        y_cc = (
-            (pd.y_cb[:-1] + pd.y_cb[1:]) / 2.0 if pd.n > 0 else np.array([0.0])
-        )
-        z_cc = (
-            (pd.z_cb[:-1] + pd.z_cb[1:]) / 2.0 if pd.p > 0 else np.array([0.0])
-        )
-        proc_centers.append((rank, pd, x_cc, y_cc, z_cc))
-
-    # Build unique sorted global coordinate arrays (handles ghost overlap)
-    all_x = np.concatenate([xc for _, _, xc, _, _ in proc_centers])
-    global_x = np.unique(np.round(all_x, 12))
-    if ndim >= 2:
-        all_y = np.concatenate([yc for _, _, _, yc, _ in proc_centers])
-        global_y = np.unique(np.round(all_y, 12))
-    else:
-        global_y = np.array([0.0])
-    if ndim >= 3:
-        all_z = np.concatenate([zc for _, _, _, _, zc in proc_centers])
-        global_z = np.unique(np.round(all_z, 12))
-    else:
-        global_z = np.array([0.0])
-
-    varnames = list(proc_data[0][1].variables.keys())
-    nx, ny, nz = len(global_x), len(global_y), len(global_z)
-
-    global_vars: Dict[str, np.ndarray] = {}
-    for vn in varnames:
-        if ndim == 3:
-            global_vars[vn] = np.zeros((nx, ny, nz))
-        elif ndim == 2:
-            global_vars[vn] = np.zeros((nx, ny))
-        else:
-            global_vars[vn] = np.zeros(nx)
-
-    # Place each processor's data using per-cell coordinate lookup
-    # (handles ghost/buffer cell overlap between processors)
-    for _rank, pd, x_cc, y_cc, z_cc in proc_centers:
-        xi = np.searchsorted(global_x, np.round(x_cc, 12))
-        yi = np.searchsorted(global_y, np.round(y_cc, 12)) if ndim >= 2 else np.array([0])
-        zi = np.searchsorted(global_z, np.round(z_cc, 12)) if ndim >= 3 else np.array([0])
-
-        for vn, data in pd.variables.items():
-            if vn not in global_vars:
-                continue
-            if ndim == 3:
-                global_vars[vn][np.ix_(xi, yi, zi)] = data
-            elif ndim == 2:
-                global_vars[vn][np.ix_(xi, yi)] = data
-            else:
-                global_vars[vn][xi] = data
-
-    return AssembledData(
-        ndim=ndim,
-        x_cc=global_x,
-        y_cc=global_y,
-        z_cc=global_z,
-        variables=global_vars,
-    )
+    return assemble_from_proc_data(proc_data)

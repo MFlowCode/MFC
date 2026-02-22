@@ -9,7 +9,7 @@ These can be visualized using MFC's built-in CLI tool or external tools like Par
 
 ## Quick visualization with `./mfc.sh viz`
 
-MFC includes a built-in visualization command that renders PNG images and MP4 videos directly from post-processed output — no external GUI tools needed.
+MFC includes a built-in visualization command that renders images and videos directly from post-processed output — no external GUI tools needed.
 
 ### Basic usage
 

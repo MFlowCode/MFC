@@ -24,7 +24,14 @@ NAME_LEN = 50  # Fortran character length for variable names
 
 @dataclass
 class ProcessorData:
-    """Data from a single processor file."""
+    """Data from a single processor file.
+
+    m, n, p follow the Fortran header convention: x_cb has m+2 elements,
+    data arrays have (m+1) cells per dimension.  The silo reader uses
+    m = len(x_cb) - 1 (= number of cells) which differs by one, but
+    assembly code only uses x_cb lengths and n > 0 / p > 0 for
+    dimensionality, so both conventions work correctly.
+    """
     m: int
     n: int
     p: int
@@ -43,23 +50,6 @@ class AssembledData:
     z_cc: np.ndarray
     variables: Dict[str, np.ndarray] = field(default_factory=dict)
 
-
-def read_record(f) -> bytes:
-    """Read one Fortran unformatted record, returning the payload bytes."""
-    raw = f.read(4)
-    if len(raw) < 4:
-        raise EOFError("Unexpected end of file reading record marker")
-    rec_len = struct.unpack('<i', raw)[0]
-    if rec_len < 0:
-        # Try big-endian
-        rec_len = struct.unpack('>i', raw)[0]
-        if rec_len < 0:
-            raise ValueError(f"Invalid record length: {rec_len}")
-    payload = f.read(rec_len)
-    if len(payload) < rec_len:
-        raise EOFError("Unexpected end of file reading record payload")
-    f.read(4)  # trailing marker
-    return payload
 
 
 def _detect_endianness(path: str) -> str:
@@ -121,12 +111,12 @@ def read_binary_file(path: str, var_filter: Optional[str] = None) -> ProcessorDa
             n_vals = m + 2
 
         # Auto-detect grid precision from record size
-        bytes_per_val = grid_bytes / n_vals
-        if abs(bytes_per_val - 8.0) < 0.5:
+        if grid_bytes == n_vals * 8:
             grid_dtype = np.dtype(f'{endian}f8')
-        elif abs(bytes_per_val - 4.0) < 0.5:
+        elif grid_bytes == n_vals * 4:
             grid_dtype = np.dtype(f'{endian}f4')
         else:
+            bytes_per_val = grid_bytes / n_vals if n_vals else 0
             raise ValueError(
                 f"Cannot determine grid precision: {grid_bytes} bytes for {n_vals} values "
                 f"({bytes_per_val:.1f} bytes/value)"
@@ -161,12 +151,12 @@ def read_binary_file(path: str, var_filter: Optional[str] = None) -> ProcessorDa
 
             # Auto-detect variable data precision from record size
             data_bytes = len(var_raw) - NAME_LEN
-            var_bpv = data_bytes / data_size
-            if abs(var_bpv - 8.0) < 0.5:
+            if data_bytes == data_size * 8:
                 var_dtype = np.dtype(f'{endian}f8')
-            elif abs(var_bpv - 4.0) < 0.5:
+            elif data_bytes == data_size * 4:
                 var_dtype = np.dtype(f'{endian}f4')
             else:
+                var_bpv = data_bytes / data_size if data_size else 0
                 raise ValueError(
                     f"Cannot determine variable precision for '{varname}': "
                     f"{data_bytes} bytes for {data_size} values ({var_bpv:.1f} bytes/value)"
@@ -261,55 +251,34 @@ def _is_1d(case_dir: str) -> bool:
     return os.path.isdir(os.path.join(case_dir, 'binary', 'root'))
 
 
-def assemble(case_dir: str, step: int, fmt: str = 'binary',  # pylint: disable=too-many-locals,too-many-statements
-             var: Optional[str] = None) -> AssembledData:
+def assemble_from_proc_data(  # pylint: disable=too-many-locals
+    proc_data: List[Tuple[int, ProcessorData]],
+) -> AssembledData:
     """
-    Read and assemble multi-processor data for a given timestep.
+    Assemble multi-processor data into a single global grid.
 
-    For 1D, reads the root file directly.
-    For 2D/3D, reads all processor files and assembles into global arrays.
+    Shared helper used by both binary and silo assembly paths.
+    Handles ghost/buffer cell overlap between processors by using
+    per-cell coordinate lookup (np.unique + np.searchsorted + np.ix_).
     """
-    if fmt != 'binary':
-        raise ValueError(f"Format '{fmt}' not supported by binary reader. Use silo_reader.")
+    if not proc_data:
+        raise ValueError("No processor data to assemble")
 
-    # 1D case: read root file directly
-    if _is_1d(case_dir):
-        root_path = os.path.join(case_dir, 'binary', 'root', f'{step}.dat')
-        if not os.path.isfile(root_path):
-            raise FileNotFoundError(f"Root file not found: {root_path}")
-        pdata = read_binary_file(root_path, var_filter=var)
-        x_cc = (pdata.x_cb[:-1] + pdata.x_cb[1:]) / 2.0
+    # Single processor — fast path
+    if len(proc_data) == 1:
+        _, pd = proc_data[0]
+        x_cc = (pd.x_cb[:-1] + pd.x_cb[1:]) / 2.0
+        y_cc = (pd.y_cb[:-1] + pd.y_cb[1:]) / 2.0 if pd.n > 0 else np.array([0.0])
+        z_cc = (pd.z_cb[:-1] + pd.z_cb[1:]) / 2.0 if pd.p > 0 else np.array([0.0])
+        ndim = 1 + (pd.n > 0) + (pd.p > 0)
         return AssembledData(
-            ndim=1, x_cc=x_cc,
-            y_cc=np.array([0.0]), z_cc=np.array([0.0]),
-            variables=pdata.variables,
+            ndim=ndim, x_cc=x_cc, y_cc=y_cc, z_cc=z_cc,
+            variables=pd.variables,
         )
 
-    # Multi-dimensional: read all processor files
-    ranks = _discover_processors(case_dir, fmt)
-    if not ranks:
-        raise FileNotFoundError(f"No processor directories found in {case_dir}/binary/")
-
-    # Read all processor data
-    proc_data: List[Tuple[int, ProcessorData]] = []
-    for rank in ranks:
-        fpath = os.path.join(case_dir, 'binary', f'p{rank}', f'{step}.dat')
-        if not os.path.isfile(fpath):
-            continue
-        pdata = read_binary_file(fpath, var_filter=var)
-        if pdata.m == 0 and pdata.n == 0 and pdata.p == 0:
-            continue
-        proc_data.append((rank, pdata))
-
-    if not proc_data:
-        raise FileNotFoundError(f"No valid processor data found for step {step}")
-
-    ndim = 1
+    # Multi-processor assembly
     sample = proc_data[0][1]
-    if sample.n > 0:
-        ndim = 2
-    if sample.p > 0:
-        ndim = 3
+    ndim = 1 + (sample.n > 0) + (sample.p > 0)
 
     # Compute cell centers for each processor
     proc_centers = []
@@ -346,7 +315,6 @@ def assemble(case_dir: str, step: int, fmt: str = 'binary',  # pylint: disable=t
             global_vars[vn] = np.zeros(nx)
 
     # Place each processor's data using per-cell coordinate lookup
-    # (handles ghost/buffer cell overlap between processors)
     for _rank, pd, x_cc, y_cc, z_cc in proc_centers:
         xi = np.searchsorted(global_x, np.round(x_cc, 12))
         yi = np.searchsorted(global_y, np.round(y_cc, 12)) if ndim >= 2 else np.array([0])
@@ -366,3 +334,52 @@ def assemble(case_dir: str, step: int, fmt: str = 'binary',  # pylint: disable=t
         ndim=ndim, x_cc=global_x, y_cc=global_y, z_cc=global_z,
         variables=global_vars,
     )
+
+
+def assemble(case_dir: str, step: int, fmt: str = 'binary',  # pylint: disable=too-many-locals
+             var: Optional[str] = None) -> AssembledData:
+    """
+    Read and assemble multi-processor data for a given timestep.
+
+    For 1D, reads the root file directly.
+    For 2D/3D, reads all processor files and assembles into global arrays.
+    """
+    if fmt != 'binary':
+        raise ValueError(f"Format '{fmt}' not supported by binary reader. Use silo_reader.")
+
+    # 1D case: read root file directly
+    if _is_1d(case_dir):
+        root_path = os.path.join(case_dir, 'binary', 'root', f'{step}.dat')
+        if not os.path.isfile(root_path):
+            raise FileNotFoundError(f"Root file not found: {root_path}")
+        pdata = read_binary_file(root_path, var_filter=var)
+        x_cc = (pdata.x_cb[:-1] + pdata.x_cb[1:]) / 2.0
+        return AssembledData(
+            ndim=1, x_cc=x_cc,
+            y_cc=np.array([0.0]), z_cc=np.array([0.0]),
+            variables=pdata.variables,
+        )
+
+    # Multi-dimensional: read all processor files
+    ranks = _discover_processors(case_dir, fmt)
+    if not ranks:
+        raise FileNotFoundError(f"No processor directories found in {case_dir}/binary/")
+
+    proc_data: List[Tuple[int, ProcessorData]] = []
+    for rank in ranks:
+        fpath = os.path.join(case_dir, 'binary', f'p{rank}', f'{step}.dat')
+        if not os.path.isfile(fpath):
+            import warnings  # pylint: disable=import-outside-toplevel
+            warnings.warn(f"Processor file not found, skipping: {fpath}")
+            continue
+        pdata = read_binary_file(fpath, var_filter=var)
+        if pdata.m == 0 and pdata.n == 0 and pdata.p == 0:
+            import warnings  # pylint: disable=import-outside-toplevel
+            warnings.warn(f"Processor p{rank} has zero dimensions, skipping")
+            continue
+        proc_data.append((rank, pdata))
+
+    if not proc_data:
+        raise FileNotFoundError(f"No valid processor data found for step {step}")
+
+    return assemble_from_proc_data(proc_data)

@@ -31,7 +31,10 @@ def _parse_steps(step_arg, available_steps):
         requested = list(range(start, end + 1, stride))
         return [s for s in requested if s in set(available_steps)]
 
-    return [int(step_arg)]
+    single = int(step_arg)
+    if available_steps and single not in set(available_steps):
+        return []
+    return [single]
 
 
 def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branches
@@ -185,6 +188,9 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
                              fps=int(fps), read_func=read_step, **render_opts)
         if success:
             cons.print(f"[bold green]Done:[/bold green] {mp4_path}")
+        else:
+            cons.print(f"[bold red]Error:[/bold red] Failed to generate {mp4_path}. "
+                       "Ensure imageio and imageio-ffmpeg are installed.")
         return
 
     # Single or multiple PNG frames
