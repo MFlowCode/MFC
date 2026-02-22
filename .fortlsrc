@@ -10,6 +10,10 @@
         "benchmarks/",
         "examples/",
         "tests/",
+        "misc/",
+        "src/pre_process/include/2dHardcodedIC.fpp",
+        "src/pre_process/include/3dHardcodedIC.fpp",
+        "src/pre_process/include/ExtrusionHardcodedIC.fpp",
         "**/m_nvtx*",
         "**/syscheck.fpp"
     ],
@@ -76,4 +80,4 @@
         "**/m_nvtx*",
         "**/syscheck.fpp"
     ]
-} 
+}
