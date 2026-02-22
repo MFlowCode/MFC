@@ -2,13 +2,133 @@
 
 # Flow visualization
 
-A post-processed database in Silo-HDF5 format can be visualized and analyzed using Paraview and VisIt.
-After the post-processing of simulation data (see section @ref running "Running"), a directory named `silo_hdf5` contains a silo-HDF5 database.
-Here, `silo_hdf5/` includes a directory named `root/` that contains index files for flow field data at each saved time step.
+After running `post_process` on a simulation (see @ref running "Running"), MFC produces output in either Silo-HDF5 format (`format=1`) or binary format (`format=2`).
+These can be visualized using MFC's built-in CLI tool or external tools like ParaView and VisIt.
 
-### Visualizing with Paraview
+---
 
-Paraview is an open-source interactive parallel visualization and graphical analysis tool for viewing scientific data.
+## Quick visualization with `./mfc.sh viz`
+
+MFC includes a built-in visualization command that renders PNG images and MP4 videos directly from post-processed output — no external GUI tools needed.
+
+### Basic usage
+
+```bash
+# Plot pressure at timestep 1000
+./mfc.sh viz case_dir/ --var pres --step 1000
+
+# Plot density at all available timesteps
+./mfc.sh viz case_dir/ --var rho --step all
+```
+
+The command auto-detects the output format (binary or Silo-HDF5) and dimensionality (1D, 2D, or 3D).
+Output images are saved to `case_dir/viz/` by default.
+
+### Exploring available data
+
+Before plotting, you can inspect what data is available:
+
+```bash
+# List all available timesteps
+./mfc.sh viz case_dir/ --list-steps
+
+# List all available variables at a given timestep
+./mfc.sh viz case_dir/ --list-vars --step 0
+```
+
+### Timestep selection
+
+The `--step` argument accepts several formats:
+
+| Format | Example | Description |
+|--------|---------|-------------|
+| Single | `--step 1000` | One timestep |
+| Range | `--step 0:10000:500` | Start:end:stride |
+| All | `--step all` | Every available timestep |
+
+### Rendering options
+
+Customize the appearance of plots:
+
+```bash
+# Custom colormap and color range
+./mfc.sh viz case_dir/ --var rho --step 1000 --cmap RdBu --vmin 0.5 --vmax 2.0
+
+# Higher resolution
+./mfc.sh viz case_dir/ --var pres --step 500 --dpi 300
+
+# Logarithmic color scale
+./mfc.sh viz case_dir/ --var schlieren --step 1000 --log-scale
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--cmap` | Matplotlib colormap name | `viridis` |
+| `--vmin` | Minimum color scale value | auto |
+| `--vmax` | Maximum color scale value | auto |
+| `--dpi` | Image resolution (dots per inch) | 150 |
+| `--log-scale` | Use logarithmic color scale | off |
+| `--output` | Output directory for images | `case_dir/viz/` |
+
+### 3D slicing
+
+For 3D simulations, `viz` extracts a 2D slice for plotting.
+By default, it slices at the midplane along the z-axis:
+
+```bash
+# Default z-midplane slice
+./mfc.sh viz case_dir/ --var pres --step 500
+
+# Slice along the x-axis at x=0.25
+./mfc.sh viz case_dir/ --var pres --step 500 --slice-axis x --slice-value 0.25
+
+# Slice by array index
+./mfc.sh viz case_dir/ --var pres --step 500 --slice-axis y --slice-index 50
+```
+
+### Video generation
+
+Generate MP4 videos from a range of timesteps:
+
+```bash
+# Basic video (10 fps)
+./mfc.sh viz case_dir/ --var pres --step 0:10000:100 --mp4
+
+# Custom frame rate
+./mfc.sh viz case_dir/ --var schlieren --step all --mp4 --fps 24
+
+# Video with fixed color range
+./mfc.sh viz case_dir/ --var rho --step 0:5000:50 --mp4 --vmin 0.1 --vmax 1.0
+```
+
+Videos are saved as `case_dir/viz/<varname>.mp4`.
+The color range is automatically computed from the first, middle, and last frames unless `--vmin`/`--vmax` are specified.
+
+### Format selection
+
+The output format is auto-detected from the case directory.
+To override:
+
+```bash
+./mfc.sh viz case_dir/ --var pres --step 0 --format binary
+./mfc.sh viz case_dir/ --var pres --step 0 --format silo
+```
+
+> [!NOTE]
+> Reading Silo-HDF5 files requires the `h5py` Python package.
+> If it is not installed, you will see a clear error message with installation instructions.
+> Alternatively, use `format=2` (binary) in your case file to produce binary output, which has no extra dependencies.
+
+### Complete option reference
+
+Run `./mfc.sh viz -h` for a full list of options.
+
+---
+
+## Visualizing with ParaView
+
+ParaView is an open-source interactive parallel visualization and graphical analysis tool for viewing scientific data.
+Post-processed data in Silo-HDF5 format (`format=1`) can be opened directly in ParaView.
 Paraview 5.11.0 has been confirmed to work with the MFC databases for some parallel environments.
 Nevertheless, the installation and configuration of Paraview can be environment-dependent and are left to the user.
 
