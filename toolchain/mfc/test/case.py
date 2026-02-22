@@ -5,7 +5,7 @@ from typing import List, Set, Union, Callable, Optional
 from ..      import case, common
 from ..state import ARG
 from ..run   import input
-from ..build import MFCTarget, get_target
+from ..build import MFCTarget, SIMULATION, get_target
 
 Tend = 0.25
 Nt   = 50
@@ -158,18 +158,26 @@ class TestCase(case.Case):
             if result1.returncode != 0:
                 return result1
 
-            # Delete output data but keep restart_data/
+            # Keep D/ (has steps 0 and mid_step) and p_all/ (restart data).
             dirpath = self.get_dirpath()
-            common.delete_directory(os.path.join(dirpath, "D"))
-            common.delete_directory(os.path.join(dirpath, "p_all"))
             common.delete_directory(os.path.join(dirpath, "silo_hdf5"))
 
-            # Phase 2: Restart from midpoint
-            self.params = {**orig, 'old_ic': 'T', 'old_grid': 'T',
-                           't_step_start': mid_step,
+            # Phase 2: Restart simulation from midpoint.  Only the simulation
+            # is run — it reads grid + IC directly from p_all/p0/<mid_step>/.
+            self.params = {**orig, 't_step_start': mid_step,
                            't_step_save': orig['t_step_stop'] - mid_step}
             self.create_directory()
-            return self.run(targets, gpus)
+            result2 = self.run([SIMULATION], gpus)
+
+            # Remove intermediate step files from D/ so only step 0 and
+            # t_step_stop remain, matching the straight run's output.
+            if result2.returncode == 0:
+                d_dir = os.path.join(dirpath, "D")
+                mid_tag = f"{mid_step:06d}"
+                for f in glob.glob(os.path.join(d_dir, f"*.{mid_tag}.dat")):
+                    os.remove(f)
+
+            return result2
         finally:
             self.params = orig
             self.create_directory()

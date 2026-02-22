@@ -1213,6 +1213,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         # Hypoelasticity with 2 MPI ranks
         stack.push('MPI Consistency -> 3D -> Hypoelasticity', {**base_3d,
+            'dt': 1e-06,
             'hypoelasticity': 'T', 'riemann_solver': 1, 'fd_order': 4,
             'fluid_pp(1)%gamma': 0.3, 'fluid_pp(1)%pi_inf': 7.8E+05,
             'fluid_pp(1)%G': 1.E+05,
@@ -1321,11 +1322,25 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             'patch_icpp(3)%z_centroid': 0.9,  'patch_icpp(3)%length_z': 0.2,
         })
 
-        # 3D grid stretching in all directions
+        # 3D grid stretching in all directions.
+        # The cosh-based stretching expands the domain beyond the original
+        # bounds (e.g., [0,1] → ~[0,1.39] with a=2, x_a=0.3, x_b=0.7).
+        # Patches must be enlarged to cover the stretched domain, otherwise
+        # cells beyond the original bounds are uninitialized (zero density),
+        # causing ICFL blowup.
         stack.push('Kernel -> 3D -> Grid Stretching', {**base_3d,
-            'stretch_x': 'T', 'a_x': 2.0, 'x_a': -0.3, 'x_b': 0.3, 'loops_x': 1,
-            'stretch_y': 'T', 'a_y': 2.0, 'y_a': -0.3, 'y_b': 0.3, 'loops_y': 1,
-            'stretch_z': 'T', 'a_z': 2.0, 'z_a': -0.3, 'z_b': 0.3, 'loops_z': 1,
+            'stretch_x': 'T', 'a_x': 2.0, 'x_a': 0.3, 'x_b': 0.7, 'loops_x': 1,
+            'stretch_y': 'T', 'a_y': 2.0, 'y_a': 0.3, 'y_b': 0.7, 'loops_y': 1,
+            'stretch_z': 'T', 'a_z': 2.0, 'z_a': 0.3, 'z_b': 0.7, 'loops_z': 1,
+            # Enlarge x/y coverage for all patches (stretched domain reaches ~1.39)
+            'patch_icpp(1)%x_centroid': 0.75, 'patch_icpp(1)%length_x': 1.5,
+            'patch_icpp(1)%y_centroid': 0.75, 'patch_icpp(1)%length_y': 1.5,
+            'patch_icpp(2)%x_centroid': 0.75, 'patch_icpp(2)%length_x': 1.5,
+            'patch_icpp(2)%y_centroid': 0.75, 'patch_icpp(2)%length_y': 1.5,
+            'patch_icpp(3)%x_centroid': 0.75, 'patch_icpp(3)%length_x': 1.5,
+            'patch_icpp(3)%y_centroid': 0.75, 'patch_icpp(3)%length_y': 1.5,
+            # Extend last z-patch to cover stretched z range
+            'patch_icpp(3)%z_centroid': 1.15,  'patch_icpp(3)%length_z': 0.7,
         })
         cases.append(define_case_d(stack, '', {}))
         stack.pop()
