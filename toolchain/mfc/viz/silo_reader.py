@@ -145,6 +145,8 @@ def assemble_silo(
     _check_h5py()
 
     base = os.path.join(case_dir, "silo_hdf5")
+    if not os.path.isdir(base):
+        raise FileNotFoundError(f"Silo-HDF5 directory not found: {base}")
     ranks: List[int] = []
     for entry in os.listdir(base):
         if entry.startswith("p") and entry[1:].isdigit():

@@ -63,7 +63,11 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
     if fmt_arg:
         fmt = fmt_arg
     else:
-        fmt = discover_format(case_dir)
+        try:
+            fmt = discover_format(case_dir)
+        except FileNotFoundError as exc:
+            cons.print(f"[bold red]Error:[/bold red] {exc}")
+            sys.exit(1)
 
     cons.print(f"[bold]Format:[/bold] {fmt}")
 

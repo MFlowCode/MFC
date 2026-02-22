@@ -73,6 +73,8 @@ def _read_record_endian(f, endian: str) -> bytes:
     if len(raw) < 4:
         raise EOFError("Unexpected end of file reading record marker")
     rec_len = struct.unpack(f'{endian}i', raw)[0]
+    if rec_len < 0:
+        raise ValueError(f"Invalid Fortran record length: {rec_len}")
     payload = f.read(rec_len)
     if len(payload) < rec_len:
         raise EOFError("Unexpected end of file reading record payload")
@@ -316,9 +318,9 @@ def assemble_from_proc_data(  # pylint: disable=too-many-locals
 
     # Place each processor's data using per-cell coordinate lookup
     for _rank, pd, x_cc, y_cc, z_cc in proc_centers:
-        xi = np.searchsorted(global_x, np.round(x_cc, 12))
-        yi = np.searchsorted(global_y, np.round(y_cc, 12)) if ndim >= 2 else np.array([0])
-        zi = np.searchsorted(global_z, np.round(z_cc, 12)) if ndim >= 3 else np.array([0])
+        xi = np.clip(np.searchsorted(global_x, np.round(x_cc, 12)), 0, nx - 1)
+        yi = np.clip(np.searchsorted(global_y, np.round(y_cc, 12)), 0, ny - 1) if ndim >= 2 else np.array([0])
+        zi = np.clip(np.searchsorted(global_z, np.round(z_cc, 12)), 0, nz - 1) if ndim >= 3 else np.array([0])
 
         for vn, data in pd.variables.items():
             if vn not in global_vars:
