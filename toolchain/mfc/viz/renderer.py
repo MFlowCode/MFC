@@ -47,9 +47,9 @@ def render_2d(x_cc, y_cc, data, varname, step, output, **opts):  # pylint: disab
     if log_scale:
         lo = vmin if vmin is not None else np.nanmin(data[data > 0]) if np.any(data > 0) else 1e-10
         hi = vmax if vmax is not None else np.nanmax(data)
-        if hi <= 0:
+        if not np.isfinite(hi) or hi <= 0:
             hi = 1.0
-        if lo <= 0 or lo >= hi:
+        if not np.isfinite(lo) or lo <= 0 or lo >= hi:
             lo = hi * 1e-10
         norm = LogNorm(vmin=lo, vmax=hi)
         vmin = None
@@ -117,9 +117,9 @@ def render_3d_slice(assembled, varname, step, output, slice_axis='z',  # pylint:
     if log_scale:
         lo = vmin if vmin is not None else np.nanmin(sliced[sliced > 0]) if np.any(sliced > 0) else 1e-10
         hi = vmax if vmax is not None else np.nanmax(sliced)
-        if hi <= 0:
+        if not np.isfinite(hi) or hi <= 0:
             hi = 1.0
-        if lo <= 0 or lo >= hi:
+        if not np.isfinite(lo) or lo <= 0 or lo >= hi:
             lo = hi * 1e-10
         norm = LogNorm(vmin=lo, vmax=hi)
         vmin = None
@@ -204,7 +204,10 @@ def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-argum
     if os.path.isdir(viz_dir):
         for stale in os.listdir(viz_dir):
             if stale.endswith('.png'):
-                os.remove(os.path.join(viz_dir, stale))
+                try:
+                    os.remove(os.path.join(viz_dir, stale))
+                except OSError:
+                    pass
     os.makedirs(viz_dir, exist_ok=True)
 
     try:
@@ -260,8 +263,10 @@ def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-argum
     if success:
         for fname in frame_files:
             fpath = os.path.join(viz_dir, fname)
-            if os.path.isfile(fpath):
+            try:
                 os.remove(fpath)
+            except OSError:
+                pass
         try:
             os.rmdir(viz_dir)
         except OSError:
