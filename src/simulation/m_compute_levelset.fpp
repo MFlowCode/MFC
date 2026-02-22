@@ -81,6 +81,11 @@ contains
 
         end if
 
+        $:GPU_UPDATE(host='[gps]')
+        do i = 1, num_gps
+            print *, gps(i)%loc, gps(i)%levelset, gps(i)%levelset_norm
+        end do
+
     end subroutine s_apply_levelset
 
     !> @brief Computes the signed distance and outward normal from a ghost point to a circular immersed boundary.

@@ -851,7 +851,7 @@ contains
         real(wp), dimension(1:3), intent(out) :: normals
         real(wp), intent(out) :: distance
 
-        integer :: i, j
+        integer :: i, j, l
         real(wp) :: dist_min, dist_proj, dist_v, dist_e, t
         real(wp) :: v1(1:3), v2(1:3), v3(1:3)
         real(wp) :: e0(1:3), e1(1:3), pv(1:3)
@@ -935,10 +935,14 @@ contains
 
                         if (dist_e < dist_min) then
                             dist_min = dist_e
-                            norm_vec(:) = point(:) - verts(:, j)
-                            norm_mag = sqrt(dot_product(norm_vec, norm_vec))
-                            if (norm_mag > 0._wp) norm_vec = norm_vec/norm_mag
-                            normals(:) = norm_vec(:)
+                            norm_vec(:) = proj(:) - point(:)
+                            if (dist_e > 0._wp) norm_vec = norm_vec/dist_e
+                            ! Snap to triangle normal if nearly parallel
+                            if (f_approx_equal(dot_product(norm_vec, n), 1._wp)) then
+                                normals(:) = n(:)
+                            else
+                                normals(:) = norm_vec(:)
+                            end if
                         end if
                     else if (t < 0._wp) then
                         dist_v = sqrt((point(1) - verts(1, j))**2 + &
@@ -947,7 +951,7 @@ contains
 
                         if (dist_v < dist_min) then
                             dist_min = dist_v
-                            norm_vec(:) = point(:) - verts(:, j)
+                            norm_vec(:) = verts(:, j) - point(:)
                             norm_mag = sqrt(dot_product(norm_vec, norm_vec))
                             if (norm_mag > 0._wp) norm_vec = norm_vec/norm_mag
                             normals(:) = norm_vec(:)
@@ -959,7 +963,7 @@ contains
 
                         if (dist_v < dist_min) then
                             dist_min = dist_v
-                            norm_vec(:) = point(:) - verts(:, mod(j, 3) + 1)
+                            norm_vec(:) = verts(:, mod(j, 3) + 1) - point(:)
                             norm_mag = sqrt(dot_product(norm_vec, norm_vec))
                             if (norm_mag > 0._wp) norm_vec = norm_vec/norm_mag
                             normals(:) = norm_vec(:)
