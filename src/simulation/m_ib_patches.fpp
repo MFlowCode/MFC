@@ -1035,8 +1035,10 @@ contains
                 stl_bounding_boxes(patch_id, 3, 1:3) = [bbox%min(3), (bbox%min(3) + bbox%max(3))/2._wp, bbox%max(3)]
 
                 models(patch_id)%model = model
-                models(patch_id)%boundary_v = boundary_v
-                models(patch_id)%boundary_edge_count = boundary_edge_count
+                if (p == 0) then
+                    models(patch_id)%boundary_v = boundary_v
+                    models(patch_id)%boundary_edge_count = boundary_edge_count
+                end if
             end if
         end do
 
@@ -1100,6 +1102,8 @@ contains
                 end if
             end if
         end block
+
+        print *, "Finished reading models"
 
     end subroutine s_instantiate_STL_models
 
