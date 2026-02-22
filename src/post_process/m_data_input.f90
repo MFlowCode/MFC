@@ -2,9 +2,7 @@
 !! @file
 !> @brief Contains module m_data_input
 
-!> @brief This module features procedures, which for a specific time-step,
-!!             read in the raw simulation data for the grid and the conservative
-!!             variables and fill out their buffer regions.
+!> @brief Reads raw simulation grid and conservative-variable data for a given time-step and fills buffer regions
 module m_data_input
 
 #ifdef MFC_MPI
@@ -145,6 +143,7 @@ contains
 
     !> Helper subroutine to read IB data files
     !!  @param file_loc_base Base file location for IB data
+    !!  @param t_step Time step index
     impure subroutine s_read_ib_data_files(file_loc_base, t_step)
 
         character(len=*), intent(in) :: file_loc_base
@@ -313,7 +312,6 @@ contains
                       STATUS='old', ACTION='read')
                 read (1) q_cons_vf(i)%sf(0:m, 0:n, 0:p)
                 close (1)
-                print *, q_cons_vf(i)%sf(:, 0, 0)
             else
                 call s_mpi_abort('File q_cons_vf'//trim(file_num)// &
                                  '.dat is missing in '//trim(t_step_dir)// &

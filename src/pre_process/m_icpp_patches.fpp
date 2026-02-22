@@ -1,6 +1,6 @@
 !>
 !! @file
-!! @brief Contains module m_patches
+!! @brief Contains module m_icpp_patches
 
 #:include 'case.fpp'
 #:include 'ExtrusionHardcodedIC.fpp'
@@ -9,6 +9,7 @@
 #:include '3dHardcodedIC.fpp'
 #:include 'macros.fpp'
 
+!> @brief Constructs initial condition patch geometries (lines, circles, rectangles, spheres, etc.) on the grid
 module m_icpp_patches
 
     use m_model                 ! Subroutine(s) related to STL files
@@ -64,6 +65,7 @@ module m_icpp_patches
 
 contains
 
+    !> @brief Dispatches each initial condition patch to its geometry-specific initialization routine.
     impure subroutine s_apply_icpp_patches(patch_id_fp, q_prim_vf)
 
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
@@ -479,6 +481,7 @@ contains
 
     end subroutine s_icpp_varcircle
 
+    !> @brief Initializes a 3D variable-thickness circular annulus patch extruded along the z-axis.
     !! @param patch_id is the patch identifier
     !! @param patch_id_fp Array to track patch ids
     !! @param q_prim_vf Array of primitive variables
@@ -972,6 +975,7 @@ contains
 
     end subroutine s_icpp_2D_TaylorGreen_Vortex
 
+    !> @brief Initializes a 1D bubble-pulse patch with analytical primitive variable profiles.
         !! @param patch_id is the patch identifier
         !! @param patch_id_fp Array to track patch ids
         !! @param q_prim_vf Array of primitive variables
@@ -1746,6 +1750,7 @@ contains
 
     end subroutine s_icpp_model
 
+    !> @brief Converts cylindrical (r, theta) coordinates to Cartesian (y, z) module variables.
     subroutine s_convert_cylindrical_to_cartesian_coord(cyl_y, cyl_z)
         $:GPU_ROUTINE(parallelism='[seq]')
 
@@ -1756,6 +1761,7 @@ contains
 
     end subroutine s_convert_cylindrical_to_cartesian_coord
 
+    !> @brief Returns a 3D Cartesian coordinate vector from a cylindrical (x, r, theta) input vector.
     function f_convert_cyl_to_cart(cyl) result(cart)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -1769,6 +1775,7 @@ contains
 
     end function f_convert_cyl_to_cart
 
+    !> @brief Computes the spherical azimuthal angle from cylindrical (x, r) coordinates.
     subroutine s_convert_cylindrical_to_spherical_coord(cyl_x, cyl_y)
         $:GPU_ROUTINE(parallelism='[seq]')
 

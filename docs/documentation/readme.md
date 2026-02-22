@@ -24,6 +24,7 @@ Welcome to the Multi-component Flow Code (MFC) documentation.
 
 ## Advanced Topics
 
+- @ref architecture "Code Architecture" - How the source code is organized, data flow, and module map
 - @ref expectedPerformance "Performance" - Optimization and benchmarks
 - @ref gpuParallelization "GPU Parallelization" - GPU macro API (developer reference)
 - @ref docker "Containers" - Docker usage
@@ -32,9 +33,13 @@ Welcome to the Multi-component Flow Code (MFC) documentation.
 ## Development
 
 - @ref contributing "Contributing" - Developer guide and coding standards
+- [API Documentation](../api/index.html) - Source code reference for all three components
 
 ## About
 
 - @ref papers "Papers" - Publications using MFC
 - \ref citelist "Bibliography" - Cited references
 - @ref authors "Authors" - Contributors
+
+
+<div style='text-align:center; font-size:0.75rem; color:#888; padding:16px 0 0;'>Page last updated: 2026-02-19</div>

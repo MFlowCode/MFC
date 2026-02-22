@@ -2,11 +2,7 @@
 !! @file
 !! @brief Contains module m_derived_variables
 
-!> @brief This module features subroutines that allow for the derivation of
-!!              numerous flow variables from the conservative and primitive ones.
-!!              Currently, the available derived variables include the unadvected
-!!              volume fraction, specific heat ratio, liquid stiffness, speed of
-!!              sound, vorticity and the numerical Schlieren function.
+!> @brief Derives diagnostic flow quantities (vorticity, speed of sound, numerical Schlieren, etc.) from conservative and primitive variables
 #:include 'macros.fpp'
 
 module m_derived_variables
@@ -118,6 +114,9 @@ contains
 
     !> Writes coherent body information, communication files, and probes.
         !!  @param t_step Current time-step
+        !!  @param q_cons_vf Conservative variables
+        !!  @param q_prim_ts1 Primitive variables at time-stage 1
+        !!  @param q_prim_ts2 Primitive variables at time-stage 2
     subroutine s_compute_derived_variables(t_step, q_cons_vf, q_prim_ts1, q_prim_ts2)
 
         integer, intent(in) :: t_step
@@ -420,7 +419,7 @@ contains
     !!      of the center of mass for each fluid from the inputted
     !!      primitive variables, q_prim_vf. The computed location
     !!      is then written to a formatted data file by the root process.
-    !!  @param q_prim_vf Primitive variables
+    !!  @param q_vf Primitive variables
     !!  @param c_m Mass,x-location,y-location,z-location
     impure subroutine s_derive_center_of_mass(q_vf, c_m)
         type(scalar_field), dimension(sys_size), intent(IN) :: q_vf

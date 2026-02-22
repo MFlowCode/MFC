@@ -1,4 +1,4 @@
-import os, sys, uuid, subprocess, dataclasses, typing, math, traceback
+import os, sys, uuid, subprocess, dataclasses, typing, math, traceback, time
 
 import rich.table
 
@@ -16,7 +16,7 @@ class BenchCase:
     path: str
     args: typing.List[str]
 
-# pylint: disable=too-many-locals, too-many-branches, too-many-statements
+# pylint: disable=too-many-locals, too-many-branches, too-many-statements, too-many-nested-blocks
 def bench(targets = None):
     if targets is None:
         targets = ARG("targets")
@@ -53,6 +53,8 @@ def bench(targets = None):
 
         failed_cases = []
 
+        max_attempts = 2
+
         for i, case in enumerate(CASES):
             summary_filepath = os.path.join(bench_dirpath, f"{case.slug}.yaml")
             log_filepath     = os.path.join(bench_dirpath, f"{case.slug}.out")
@@ -64,71 +66,94 @@ def bench(targets = None):
             cons.print(f"> Summary: [bold]{os.path.relpath(summary_filepath)}[/bold]")
 
             try:
-                with open(log_filepath, "w") as log_file:
-                    result = system(
-                        ["./mfc.sh", "run", case.path, "--case-optimization"] +
-                        ["--targets"] + [t.name for t in targets] +
-                        ["--output-summary", summary_filepath] +
-                        case.args +
-                        ["--", "--gbpp", str(ARG('mem'))],
-                        stdout=log_file,
-                        stderr=subprocess.STDOUT)
+                for attempt in range(1, max_attempts + 1):
+                    try:
+                        with open(log_filepath, "w") as log_file:
+                            result = system(
+                                ["./mfc.sh", "run", case.path, "--case-optimization"] +
+                                ["--targets"] + [t.name for t in targets] +
+                                ["--output-summary", summary_filepath] +
+                                case.args +
+                                ["--", "--gbpp", str(ARG('mem'))],
+                                stdout=log_file,
+                                stderr=subprocess.STDOUT)
 
-                # Check return code (handle CompletedProcess or int defensively)
-                rc = result.returncode if hasattr(result, "returncode") else result
-                if rc != 0:
-                    cons.print(f"[bold red]ERROR[/bold red]: Case {case.slug} failed with exit code {rc}")
-                    cons.print(f"[bold red]      Check log at: {log_filepath}[/bold red]")
-                    failed_cases.append(case.slug)
-                    continue
+                        # Check return code (handle CompletedProcess or int defensively)
+                        rc = result.returncode if hasattr(result, "returncode") else result
+                        if rc != 0:
+                            if attempt < max_attempts:
+                                cons.print(f"[bold yellow]WARNING[/bold yellow]: Case {case.slug} failed with exit code {rc} (attempt {attempt}/{max_attempts})")
+                                cons.print(f"Retrying in 5s...")
+                                time.sleep(5)
+                                continue
+                            cons.print(f"[bold red]ERROR[/bold red]: Case {case.slug} failed with exit code {rc}")
+                            cons.print(f"[bold red]      Check log at: {log_filepath}[/bold red]")
+                            failed_cases.append(case.slug)
+                            break
 
-                # Validate summary file exists
-                if not os.path.exists(summary_filepath):
-                    cons.print(f"[bold red]ERROR[/bold red]: Summary file not created for {case.slug}")
-                    cons.print(f"[bold red]      Expected: {summary_filepath}[/bold red]")
-                    failed_cases.append(case.slug)
-                    continue
+                        # Validate summary file exists
+                        if not os.path.exists(summary_filepath):
+                            if attempt < max_attempts:
+                                cons.print(f"[bold yellow]WARNING[/bold yellow]: Summary file not created for {case.slug} (attempt {attempt}/{max_attempts})")
+                                cons.print(f"Retrying in 5s...")
+                                time.sleep(5)
+                                continue
+                            cons.print(f"[bold red]ERROR[/bold red]: Summary file not created for {case.slug}")
+                            cons.print(f"[bold red]      Expected: {summary_filepath}[/bold red]")
+                            failed_cases.append(case.slug)
+                            break
 
-                # Load summary
-                summary = file_load_yaml(summary_filepath)
+                        # Load summary
+                        summary = file_load_yaml(summary_filepath)
 
-                # Validate all targets have required data
-                validation_failed = False
-                for target in targets:
-                    if target.name not in summary:
-                        cons.print(f"[bold red]ERROR[/bold red]: Target {target.name} missing from summary for {case.slug}")
-                        validation_failed = True
+                        # Validate all targets have required data
+                        validation_failed = False
+                        for target in targets:
+                            if target.name not in summary:
+                                cons.print(f"[bold red]ERROR[/bold red]: Target {target.name} missing from summary for {case.slug}")
+                                validation_failed = True
+                                break
+
+                            if "exec" not in summary[target.name]:
+                                cons.print(f"[bold red]ERROR[/bold red]: 'exec' time missing for {target.name} in {case.slug}")
+                                validation_failed = True
+                                break
+
+                            if target.name == "simulation" and "grind" not in summary[target.name]:
+                                cons.print(f"[bold red]ERROR[/bold red]: 'grind' time missing for simulation in {case.slug}")
+                                validation_failed = True
+                                break
+
+                        if validation_failed:
+                            failed_cases.append(case.slug)
+                            break
+
+                        # Add to results
+                        results["cases"][case.slug] = {
+                            "description":    dataclasses.asdict(case),
+                            "output_summary": summary,
+                        }
+                        cons.print(f"[bold green]✓[/bold green] Case {case.slug} completed successfully")
                         break
 
-                    if "exec" not in summary[target.name]:
-                        cons.print(f"[bold red]ERROR[/bold red]: 'exec' time missing for {target.name} in {case.slug}")
-                        validation_failed = True
-                        break
+                    except Exception as e:
+                        if attempt < max_attempts:
+                            cons.print(f"[bold yellow]WARNING[/bold yellow]: Unexpected error running {case.slug} (attempt {attempt}/{max_attempts}): {e}")
+                            cons.print(f"Retrying in 5s...")
+                            time.sleep(5)
+                            continue
+                        cons.print(f"[bold red]ERROR[/bold red]: Unexpected error running {case.slug}: {e}")
+                        cons.print(f"[dim]{traceback.format_exc()}[/dim]")
+                        failed_cases.append(case.slug)
 
-                    if target.name == "simulation" and "grind" not in summary[target.name]:
-                        cons.print(f"[bold red]ERROR[/bold red]: 'grind' time missing for simulation in {case.slug}")
-                        validation_failed = True
-                        break
-
-                if validation_failed:
-                    failed_cases.append(case.slug)
-                    continue
-
-                # Add to results
-                results["cases"][case.slug] = {
-                    "description":    dataclasses.asdict(case),
-                    "output_summary": summary,
-                }
-                cons.print(f"[bold green]✓[/bold green] Case {case.slug} completed successfully")
-
-            except Exception as e:
-                cons.print(f"[bold red]ERROR[/bold red]: Unexpected error running {case.slug}: {e}")
-                cons.print(f"[dim]{traceback.format_exc()}[/dim]")
-                failed_cases.append(case.slug)
             finally:
                 cons.unindent()
 
-        # Report results
+        # Always write results (even partial) so diff() can compare the intersection
+        file_dump_yaml(ARG("output"), results)
+        cons.print(f"Wrote results to [bold magenta]{os.path.relpath(ARG('output'))}[/bold magenta].")
+
+        # Report failures after writing results
         if failed_cases:
             cons.print()
             cons.print(f"[bold red]Failed cases ({len(failed_cases)}):[/bold red]")
@@ -136,11 +161,6 @@ def bench(targets = None):
                 cons.print(f"  - {slug}")
             cons.print()
             raise MFCException(f"Benchmarking failed: {len(failed_cases)}/{len(CASES)} cases failed")
-
-        # Write output
-        file_dump_yaml(ARG("output"), results)
-
-        cons.print(f"Wrote results to [bold magenta]{os.path.relpath(ARG('output'))}[/bold magenta].")
 
     finally:
         cons.unindent()
