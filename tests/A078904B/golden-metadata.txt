@@ -1,87 +1,19 @@
-This file was created on 2025-11-27 00:35:59.266574.
+This file was created on 2026-02-21 21:38:47.630597.
 
 mfc.sh:
 
-    Invocation: test -o A078904B --generate
-    Lock:       mpi=Yes & gpu=Acc & debug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        384d0b161360ac4b41f52be317846746fd1b5d33 on threeNewExamples (clean)
-
-post_process:
-
-    CMake Configuration:
-    
-        CMake v3.26.5 on login-phoenix-gnr-3.pace.gatech.edu
-    
-        C       : NVHPC v24.5.0 (/usr/local/pace-apps/manual/packages/nvhpc/24.5/Linux_x86_64/24.5/compilers/bin/nvc)
-        Fortran : NVHPC v24.5.0 (/usr/local/pace-apps/manual/packages/nvhpc/24.5/Linux_x86_64/24.5/compilers/bin/nvfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : ON
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : ON
-        OpenMP  : OFF
-    
-        Fypp    : /storage/home/hcoda1/7/mzhang775/r-sbryngelson3-0/MFCMarkZhang/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /usr/local/pace-apps/manual/packages/nvhpc/24.5/Linux_x86_64/24.5/compilers/bin/nvc
-        CXX      : /usr/local/pace-apps/manual/packages/nvhpc/24.5/Linux_x86_64/24.5/compilers/bin/nvc++
-        FC       : /usr/local/pace-apps/manual/packages/nvhpc/24.5/Linux_x86_64/24.5/compilers/bin/nvfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
-simulation:
-
-    CMake Configuration:
-    
-        CMake v3.26.5 on login-phoenix-gnr-3.pace.gatech.edu
-    
-        C       : NVHPC v24.5.0 (/usr/local/pace-apps/manual/packages/nvhpc/24.5/Linux_x86_64/24.5/compilers/bin/nvc)
-        Fortran : NVHPC v24.5.0 (/usr/local/pace-apps/manual/packages/nvhpc/24.5/Linux_x86_64/24.5/compilers/bin/nvfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : ON
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : ON
-        OpenMP  : OFF
-    
-        Fypp    : /storage/home/hcoda1/7/mzhang775/r-sbryngelson3-0/MFCMarkZhang/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /usr/local/pace-apps/manual/packages/nvhpc/24.5/Linux_x86_64/24.5/compilers/bin/nvc
-        CXX      : /usr/local/pace-apps/manual/packages/nvhpc/24.5/Linux_x86_64/24.5/compilers/bin/nvc++
-        FC       : /usr/local/pace-apps/manual/packages/nvhpc/24.5/Linux_x86_64/24.5/compilers/bin/nvfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
+    Invocation: test --only A078904B --generate -j 1
+    Lock:       mpi=No & gpu=No & debug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
+    Git:        c9cff0655061b66969305f06a0db63138eeda7e4 on fix/time-stepping-order (dirty)
 
 pre_process:
 
     CMake Configuration:
     
-        CMake v3.26.5 on login-phoenix-gnr-3.pace.gatech.edu
+        CMake v3.26.5 on atl1-1-02-008-30-1.pace.gatech.edu
     
-        C       : NVHPC v24.5.0 (/usr/local/pace-apps/manual/packages/nvhpc/24.5/Linux_x86_64/24.5/compilers/bin/nvc)
-        Fortran : NVHPC v24.5.0 (/usr/local/pace-apps/manual/packages/nvhpc/24.5/Linux_x86_64/24.5/compilers/bin/nvfortran)
+        C       : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc)
+        Fortran : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran)
     
         PRE_PROCESS   : ON
         SIMULATION    : OFF
@@ -90,20 +22,88 @@ pre_process:
         DOCUMENTATION : OFF
         ALL           : OFF
     
-        MPI     : ON
-        OpenACC : ON
+        MPI     : OFF
+        OpenACC : OFF
         OpenMP  : OFF
     
-        Fypp    : /storage/home/hcoda1/7/mzhang775/r-sbryngelson3-0/MFCMarkZhang/build/venv/bin/fypp
+        Fypp    : /storage/home/hcoda1/6/sbryngelson3/scratch/MFC-prs/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
     
     Configuration Environment:
     
-        CC       : /usr/local/pace-apps/manual/packages/nvhpc/24.5/Linux_x86_64/24.5/compilers/bin/nvc
-        CXX      : /usr/local/pace-apps/manual/packages/nvhpc/24.5/Linux_x86_64/24.5/compilers/bin/nvc++
-        FC       : /usr/local/pace-apps/manual/packages/nvhpc/24.5/Linux_x86_64/24.5/compilers/bin/nvfortran
+        CC       : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc
+        CXX      : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/g++
+        FC       : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+simulation:
+
+    CMake Configuration:
+    
+        CMake v3.26.5 on atl1-1-02-008-30-1.pace.gatech.edu
+    
+        C       : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc)
+        Fortran : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : OFF
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /storage/home/hcoda1/6/sbryngelson3/scratch/MFC-prs/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc
+        CXX      : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/g++
+        FC       : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+post_process:
+
+    CMake Configuration:
+    
+        CMake v3.26.5 on atl1-1-02-008-30-1.pace.gatech.edu
+    
+        C       : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc)
+        Fortran : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : ON
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : OFF
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /storage/home/hcoda1/6/sbryngelson3/scratch/MFC-prs/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc
+        CXX      : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/g++
+        FC       : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -112,10 +112,10 @@ syscheck:
 
     CMake Configuration:
     
-        CMake v3.26.5 on login-phoenix-gnr-3.pace.gatech.edu
+        CMake v3.26.5 on atl1-1-02-008-30-1.pace.gatech.edu
     
-        C       : NVHPC v24.5.0 (/usr/local/pace-apps/manual/packages/nvhpc/24.5/Linux_x86_64/24.5/compilers/bin/nvc)
-        Fortran : NVHPC v24.5.0 (/usr/local/pace-apps/manual/packages/nvhpc/24.5/Linux_x86_64/24.5/compilers/bin/nvfortran)
+        C       : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc)
+        Fortran : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran)
     
         PRE_PROCESS   : OFF
         SIMULATION    : OFF
@@ -124,20 +124,20 @@ syscheck:
         DOCUMENTATION : OFF
         ALL           : OFF
     
-        MPI     : ON
-        OpenACC : ON
+        MPI     : OFF
+        OpenACC : OFF
         OpenMP  : OFF
     
-        Fypp    : /storage/home/hcoda1/7/mzhang775/r-sbryngelson3-0/MFCMarkZhang/build/venv/bin/fypp
+        Fypp    : /storage/home/hcoda1/6/sbryngelson3/scratch/MFC-prs/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
     
     Configuration Environment:
     
-        CC       : /usr/local/pace-apps/manual/packages/nvhpc/24.5/Linux_x86_64/24.5/compilers/bin/nvc
-        CXX      : /usr/local/pace-apps/manual/packages/nvhpc/24.5/Linux_x86_64/24.5/compilers/bin/nvc++
-        FC       : /usr/local/pace-apps/manual/packages/nvhpc/24.5/Linux_x86_64/24.5/compilers/bin/nvfortran
+        CC       : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc
+        CXX      : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/g++
+        FC       : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -160,7 +160,7 @@ CPU:
     Core(s) per socket:                      12
     Socket(s):                               2
     Stepping:                                7
-    CPU(s) scaling MHz:                      70%
+    CPU(s) scaling MHz:                      100%
     CPU max MHz:                             2700.0000
     CPU min MHz:                             1200.0000
     BogoMIPS:                                5400.00
@@ -187,5 +187,7 @@ CPU:
     Vulnerability Spectre v1:                Vulnerable: __user pointer sanitization and usercopy barriers only; no swapgs barriers
     Vulnerability Spectre v2:                Vulnerable; IBPB: disabled; STIBP: disabled; PBRSB-eIBRS: Vulnerable; BHI: Vulnerable
     Vulnerability Srbds:                     Not affected
+    Vulnerability Tsa:                       Not affected
     Vulnerability Tsx async abort:           Mitigation; TSX disabled
+    Vulnerability Vmscape:                   Vulnerable
 
