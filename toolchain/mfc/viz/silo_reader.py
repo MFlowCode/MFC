@@ -41,7 +41,7 @@ def _check_h5py():
 
 
 def _resolve_path(h5file, path_bytes):
-    """Resolve a silo internal path (e.g. b'/.silo/#000003') to a dataset."""
+    """Resolve a silo internal path (e.g. b'/.silo/#000003') and return its data as a numpy array."""
     path = path_bytes.decode() if isinstance(path_bytes, bytes) else str(path_bytes)
     return np.array(h5file[path])
 
@@ -160,6 +160,8 @@ def assemble_silo(
     for rank in ranks:
         silo_file = os.path.join(base, f"p{rank}", f"{step}.silo")
         if not os.path.isfile(silo_file):
+            import warnings  # pylint: disable=import-outside-toplevel
+            warnings.warn(f"Processor file not found, skipping: {silo_file}", stacklevel=2)
             continue
         pdata = read_silo_file(silo_file, var_filter=var)
         proc_data.append((rank, pdata))

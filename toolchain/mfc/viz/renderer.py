@@ -156,7 +156,9 @@ def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-argum
     if not steps:
         raise ValueError("No timesteps provided for MP4 generation")
 
-    # Pre-compute vmin/vmax from first and last frames if not provided
+    opts = dict(opts)  # avoid mutating the caller's dict
+
+    # Pre-compute vmin/vmax from first, middle, and last frames if not provided
     auto_vmin = opts.get('vmin')
     auto_vmax = opts.get('vmax')
 
@@ -229,9 +231,14 @@ def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-argum
         if writer is not None:
             writer.close()
 
-    # Clean up frames
+    # Clean up only the frames we created
     if success:
-        for fname in os.listdir(viz_dir):
-            os.remove(os.path.join(viz_dir, fname))
-        os.rmdir(viz_dir)
+        for fname in frame_files:
+            fpath = os.path.join(viz_dir, fname)
+            if os.path.isfile(fpath):
+                os.remove(fpath)
+        try:
+            os.rmdir(viz_dir)
+        except OSError:
+            pass  # directory not empty (pre-existing files)
     return success
