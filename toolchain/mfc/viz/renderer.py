@@ -47,6 +47,10 @@ def render_2d(x_cc, y_cc, data, varname, step, output, **opts):  # pylint: disab
     if log_scale:
         lo = vmin if vmin is not None else np.nanmin(data[data > 0]) if np.any(data > 0) else 1e-10
         hi = vmax if vmax is not None else np.nanmax(data)
+        if hi <= 0:
+            hi = 1.0
+        if lo <= 0 or lo >= hi:
+            lo = hi * 1e-10
         norm = LogNorm(vmin=lo, vmax=hi)
         vmin = None
         vmax = None
@@ -109,6 +113,10 @@ def render_3d_slice(assembled, varname, step, output, slice_axis='z',  # pylint:
     if log_scale:
         lo = vmin if vmin is not None else np.nanmin(sliced[sliced > 0]) if np.any(sliced > 0) else 1e-10
         hi = vmax if vmax is not None else np.nanmax(sliced)
+        if hi <= 0:
+            hi = 1.0
+        if lo <= 0 or lo >= hi:
+            lo = hi * 1e-10
         norm = LogNorm(vmin=lo, vmax=hi)
         vmin = None
         vmax = None
