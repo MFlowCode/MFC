@@ -124,9 +124,10 @@ contains
     end subroutine s_initialize_acoustic_src
 
     !> This subroutine updates the rhs by computing the mass, mom, energy sources
-    !! @param t_step Current time step
+    !! @param q_cons_vf Conservative variables
+    !! @param q_prim_vf Primitive variables
     !! @param rhs_vf rhs variables
-    impure subroutine s_acoustic_src_calculations(q_cons_vf, q_prim_vf, t_step, rhs_vf)
+    impure subroutine s_acoustic_src_calculations(q_cons_vf, q_prim_vf, rhs_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf !<
         !! This variable contains the WENO-reconstructed values of the cell-average
@@ -140,7 +141,6 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
 
-        integer, intent(in) :: t_step
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: myalpha, myalpha_rho
         #:else
