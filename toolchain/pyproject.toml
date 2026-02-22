@@ -37,6 +37,10 @@ dependencies = [
     "seaborn",
     "matplotlib",
 
+    # Visualization (video rendering)
+    "imageio",
+    "imageio-ffmpeg",
+
     # Chemistry
     "cantera>=3.1.0",
     #"pyrometheus == 1.0.5",
