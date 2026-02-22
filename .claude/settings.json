@@ -1,0 +1,4 @@
+{
+  "enableAllProjectMcpServers": true,
+  "allowedTools": ["Bash"]
+}
