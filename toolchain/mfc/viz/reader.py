@@ -319,58 +319,22 @@ def assemble(case_dir: str, step: int, fmt: str = 'binary',  # pylint: disable=t
         z_cc = (pd.z_cb[:-1] + pd.z_cb[1:]) / 2.0 if pd.p > 0 else np.array([0.0])
         proc_centers.append((rank, pd, x_cc, y_cc, z_cc))
 
-    # Build global coordinate arrays
-    # For each unique origin in each dimension, accumulate sizes
-    x_chunks: Dict[float, Tuple[int, np.ndarray]] = {}
-    y_chunks: Dict[float, Tuple[int, np.ndarray]] = {}
-    z_chunks: Dict[float, Tuple[int, np.ndarray]] = {}
+    # Build unique sorted global coordinate arrays (handles ghost overlap)
+    all_x = np.concatenate([xc for _, _, xc, _, _ in proc_centers])
+    global_x = np.unique(np.round(all_x, 12))
+    if ndim >= 2:
+        all_y = np.concatenate([yc for _, _, _, yc, _ in proc_centers])
+        global_y = np.unique(np.round(all_y, 12))
+    else:
+        global_y = np.array([0.0])
+    if ndim >= 3:
+        all_z = np.concatenate([zc for _, _, _, _, zc in proc_centers])
+        global_z = np.unique(np.round(all_z, 12))
+    else:
+        global_z = np.array([0.0])
 
-    for rank, pd, x_cc, y_cc, z_cc in proc_centers:
-        x_key = round(x_cc[0], 12)
-        y_key = round(y_cc[0], 12) if ndim >= 2 else 0.0
-        z_key = round(z_cc[0], 12) if ndim >= 3 else 0.0
-        if x_key not in x_chunks:
-            x_chunks[x_key] = (len(x_cc), x_cc)
-        if y_key not in y_chunks:
-            y_chunks[y_key] = (len(y_cc), y_cc)
-        if z_key not in z_chunks:
-            z_chunks[z_key] = (len(z_cc), z_cc)
-
-    # Build global coordinate arrays by concatenating sorted chunks
-    sorted_x_keys = sorted(x_chunks.keys())
-    sorted_y_keys = sorted(y_chunks.keys())
-    sorted_z_keys = sorted(z_chunks.keys())
-
-    global_x = np.concatenate([x_chunks[k][1] for k in sorted_x_keys])
-    global_y = np.concatenate([y_chunks[k][1] for k in sorted_y_keys]) if ndim >= 2 else np.array([0.0])
-    global_z = np.concatenate([z_chunks[k][1] for k in sorted_z_keys]) if ndim >= 3 else np.array([0.0])
-
-    # Compute offsets for each origin
-    x_offsets: Dict[float, int] = {}
-    off = 0
-    for k in sorted_x_keys:
-        x_offsets[k] = off
-        off += x_chunks[k][0]
-
-    y_offsets: Dict[float, int] = {}
-    off = 0
-    for k in sorted_y_keys:
-        y_offsets[k] = off
-        off += y_chunks[k][0]
-
-    z_offsets: Dict[float, int] = {}
-    off = 0
-    for k in sorted_z_keys:
-        z_offsets[k] = off
-        off += z_chunks[k][0]
-
-    # Get all variable names from first processor
     varnames = list(proc_data[0][1].variables.keys())
-
-    # Allocate global arrays
-    nx = len(global_x)
-    ny = len(global_y)
-    nz = len(global_z)
+    nx, ny, nz = len(global_x), len(global_y), len(global_z)
 
     global_vars: Dict[str, np.ndarray] = {}
     for vn in varnames:
@@ -381,25 +345,22 @@ def assemble(case_dir: str, step: int, fmt: str = 'binary',  # pylint: disable=t
         else:
             global_vars[vn] = np.zeros(nx)
 
-    # Place each processor's data at the correct offset
-    for rank, pd, x_cc, y_cc, z_cc in proc_centers:
-        x_key = round(x_cc[0], 12)
-        y_key = round(y_cc[0], 12) if ndim >= 2 else 0.0
-        z_key = round(z_cc[0], 12) if ndim >= 3 else 0.0
-
-        xi = x_offsets[x_key]
-        yi = y_offsets[y_key] if ndim >= 2 else 0
-        zi = z_offsets[z_key] if ndim >= 3 else 0
+    # Place each processor's data using per-cell coordinate lookup
+    # (handles ghost/buffer cell overlap between processors)
+    for _rank, pd, x_cc, y_cc, z_cc in proc_centers:
+        xi = np.searchsorted(global_x, np.round(x_cc, 12))
+        yi = np.searchsorted(global_y, np.round(y_cc, 12)) if ndim >= 2 else np.array([0])
+        zi = np.searchsorted(global_z, np.round(z_cc, 12)) if ndim >= 3 else np.array([0])
 
         for vn, data in pd.variables.items():
             if vn not in global_vars:
                 continue
             if ndim == 3:
-                global_vars[vn][xi:xi + pd.m + 1, yi:yi + pd.n + 1, zi:zi + pd.p + 1] = data
+                global_vars[vn][np.ix_(xi, yi, zi)] = data
             elif ndim == 2:
-                global_vars[vn][xi:xi + pd.m + 1, yi:yi + pd.n + 1] = data
+                global_vars[vn][np.ix_(xi, yi)] = data
             else:
-                global_vars[vn][xi:xi + pd.m + 1] = data
+                global_vars[vn][xi] = data
 
     return AssembledData(
         ndim=ndim, x_cc=global_x, y_cc=global_y, z_cc=global_z,

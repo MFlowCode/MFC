@@ -198,7 +198,7 @@ def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-argum
         elif assembled.ndim == 3:
             render_3d_slice(assembled, varname, step, frame_path, **opts)
 
-    # Combine frames into MP4 using ffmpeg
+    # Combine frames into MP4 using ffmpeg, or fall back to GIF via Pillow
     frame_pattern = os.path.join(viz_dir, '%06d.png')
     ffmpeg_cmd = [
         'ffmpeg', '-y',
@@ -210,20 +210,41 @@ def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-argum
         output,
     ]
 
+    success = False
     try:
         subprocess.run(ffmpeg_cmd, check=True, capture_output=True)
+        success = True
     except FileNotFoundError:
-        print(f"ffmpeg not found. Frames saved to {viz_dir}/")
-        print(f"To create video manually: ffmpeg -framerate {fps} "
-              f"-i {frame_pattern} -c:v libx264 -pix_fmt yuv420p {output}")
-        return False
+        pass
     except subprocess.CalledProcessError as e:
         print(f"ffmpeg failed: {e.stderr.decode()}")
-        print(f"Frames saved to {viz_dir}/")
-        return False
+
+    if not success:
+        # Fall back to GIF via Pillow
+        gif_output = output.rsplit('.', 1)[0] + '.gif'
+        try:
+            from PIL import Image  # pylint: disable=import-outside-toplevel
+            frames = []
+            frame_files = sorted(f for f in os.listdir(viz_dir) if f.endswith('.png'))
+            for fname in frame_files:
+                img = Image.open(os.path.join(viz_dir, fname))
+                frames.append(img.copy())
+                img.close()
+            if frames:
+                duration = max(int(1000 / fps), 1)
+                frames[0].save(gif_output, save_all=True, append_images=frames[1:],
+                               duration=duration, loop=0)
+                output = gif_output
+                success = True
+                print(f"ffmpeg not found; saved GIF to {gif_output}")
+        except ImportError:
+            print(f"Neither ffmpeg nor Pillow available. Frames saved to {viz_dir}/")
+            print(f"To create video: ffmpeg -framerate {fps} "
+                  f"-i {frame_pattern} -c:v libx264 -pix_fmt yuv420p {output}")
 
     # Clean up frames
-    for fname in os.listdir(viz_dir):
-        os.remove(os.path.join(viz_dir, fname))
-    os.rmdir(viz_dir)
-    return True
+    if success:
+        for fname in os.listdir(viz_dir):
+            os.remove(os.path.join(viz_dir, fname))
+        os.rmdir(viz_dir)
+    return success

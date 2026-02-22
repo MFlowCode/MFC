@@ -123,11 +123,12 @@ def read_silo_file(  # pylint: disable=too-many-locals
             data_path = attr["value0"]
             data = _resolve_path(f, data_path).astype(np.float64)
 
-            # Silo stores zone-centered data as (ny, nx) for 2-D — but MFC's
-            # DBPUTQV1 call passes the array in Fortran column-major order,
-            # which HDF5 writes row-major.  The resulting shape in the file
-            # is (dims[0], dims[1]) = (nx, ny).  We keep it that way so it
-            # matches the binary reader's (m, n) convention.
+            # MFC's DBPUTQV1 passes the Fortran column-major array as a
+            # flat buffer.  HDF5 stores it row-major.  Reinterpret the
+            # bytes in Fortran order so data[i,j,k] = value at (x_i,y_j,z_k),
+            # matching the binary reader convention.
+            if data.ndim >= 2:
+                data = np.ascontiguousarray(data).ravel().reshape(data.shape, order='F')
             variables[key] = data
 
     return ProcessorData(
@@ -204,6 +205,7 @@ def assemble_silo(  # pylint: disable=too-many-locals,too-many-statements,too-ma
     sample = proc_data[0][1]
     ndim = 1 + (sample.n > 0) + (sample.p > 0)
 
+    # Compute cell centers for each processor
     proc_centers: list = []
     for rank, pd in proc_data:
         x_cc = (pd.x_cb[:-1] + pd.x_cb[1:]) / 2.0
@@ -215,52 +217,19 @@ def assemble_silo(  # pylint: disable=too-many-locals,too-many-statements,too-ma
         )
         proc_centers.append((rank, pd, x_cc, y_cc, z_cc))
 
-    # Build global coordinate arrays from unique chunks
-    x_chunks: dict = {}
-    y_chunks: dict = {}
-    z_chunks: dict = {}
-
-    for _rank, _pd, x_cc, y_cc, z_cc in proc_centers:
-        xk = round(float(x_cc[0]), 12)
-        yk = round(float(y_cc[0]), 12) if ndim >= 2 else 0.0
-        zk = round(float(z_cc[0]), 12) if ndim >= 3 else 0.0
-        if xk not in x_chunks:
-            x_chunks[xk] = x_cc
-        if yk not in y_chunks:
-            y_chunks[yk] = y_cc
-        if zk not in z_chunks:
-            z_chunks[zk] = z_cc
-
-    global_x = np.concatenate([x_chunks[k] for k in sorted(x_chunks)])
-    global_y = (
-        np.concatenate([y_chunks[k] for k in sorted(y_chunks)])
-        if ndim >= 2
-        else np.array([0.0])
-    )
-    global_z = (
-        np.concatenate([z_chunks[k] for k in sorted(z_chunks)])
-        if ndim >= 3
-        else np.array([0.0])
-    )
-
-    # Compute offsets for each chunk
-    x_offsets: dict = {}
-    off = 0
-    for k in sorted(x_chunks):
-        x_offsets[k] = off
-        off += len(x_chunks[k])
-
-    y_offsets: dict = {}
-    off = 0
-    for k in sorted(y_chunks):
-        y_offsets[k] = off
-        off += len(y_chunks[k])
-
-    z_offsets: dict = {}
-    off = 0
-    for k in sorted(z_chunks):
-        z_offsets[k] = off
-        off += len(z_chunks[k])
+    # Build unique sorted global coordinate arrays (handles ghost overlap)
+    all_x = np.concatenate([xc for _, _, xc, _, _ in proc_centers])
+    global_x = np.unique(np.round(all_x, 12))
+    if ndim >= 2:
+        all_y = np.concatenate([yc for _, _, _, yc, _ in proc_centers])
+        global_y = np.unique(np.round(all_y, 12))
+    else:
+        global_y = np.array([0.0])
+    if ndim >= 3:
+        all_z = np.concatenate([zc for _, _, _, _, zc in proc_centers])
+        global_z = np.unique(np.round(all_z, 12))
+    else:
+        global_z = np.array([0.0])
 
     varnames = list(proc_data[0][1].variables.keys())
     nx, ny, nz = len(global_x), len(global_y), len(global_z)
@@ -274,28 +243,22 @@ def assemble_silo(  # pylint: disable=too-many-locals,too-many-statements,too-ma
         else:
             global_vars[vn] = np.zeros(nx)
 
+    # Place each processor's data using per-cell coordinate lookup
+    # (handles ghost/buffer cell overlap between processors)
     for _rank, pd, x_cc, y_cc, z_cc in proc_centers:
-        xk = round(float(x_cc[0]), 12)
-        yk = round(float(y_cc[0]), 12) if ndim >= 2 else 0.0
-        zk = round(float(z_cc[0]), 12) if ndim >= 3 else 0.0
-
-        xi = x_offsets[xk]
-        yi = y_offsets[yk] if ndim >= 2 else 0
-        zi = z_offsets[zk] if ndim >= 3 else 0
-
-        lx = len(x_cc)
-        ly = len(y_cc) if ndim >= 2 else 1
-        lz = len(z_cc) if ndim >= 3 else 1
+        xi = np.searchsorted(global_x, np.round(x_cc, 12))
+        yi = np.searchsorted(global_y, np.round(y_cc, 12)) if ndim >= 2 else np.array([0])
+        zi = np.searchsorted(global_z, np.round(z_cc, 12)) if ndim >= 3 else np.array([0])
 
         for vn, data in pd.variables.items():
             if vn not in global_vars:
                 continue
             if ndim == 3:
-                global_vars[vn][xi : xi + lx, yi : yi + ly, zi : zi + lz] = data
+                global_vars[vn][np.ix_(xi, yi, zi)] = data
             elif ndim == 2:
-                global_vars[vn][xi : xi + lx, yi : yi + ly] = data
+                global_vars[vn][np.ix_(xi, yi)] = data
             else:
-                global_vars[vn][xi : xi + lx] = data
+                global_vars[vn][xi] = data
 
     return AssembledData(
         ndim=ndim,
