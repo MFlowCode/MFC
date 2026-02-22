@@ -26,11 +26,14 @@ NAME_LEN = 50  # Fortran character length for variable names
 class ProcessorData:
     """Data from a single processor file.
 
-    m, n, p follow the Fortran header convention: x_cb has m+2 elements,
-    data arrays have (m+1) cells per dimension.  The silo reader uses
-    m = len(x_cb) - 1 (= number of cells) which differs by one, but
-    assembly code only uses x_cb lengths and n > 0 / p > 0 for
-    dimensionality, so both conventions work correctly.
+    m, n, p store dimension metadata but their exact semantics differ
+    between readers:
+      - Binary: m = Fortran header value, x_cb has m+2 elements,
+        cell count is m+1.
+      - Silo: m = cell count = len(x_cb) - 1.
+    Assembly code intentionally avoids using m/n/p for array sizing —
+    it derives everything from x_cb/y_cb/z_cb lengths.  If future code
+    needs m directly, this discrepancy must be resolved.
     """
     m: int
     n: int
@@ -53,7 +56,11 @@ class AssembledData:
 
 
 def _detect_endianness(path: str) -> str:
-    """Detect endianness from the first record marker (should be 16 for header)."""
+    """Detect endianness from the first record marker.
+
+    The header record contains 4 int32s (m, n, p, dbvars) = 16 bytes,
+    so the leading Fortran record marker must be 16.
+    """
     with open(path, 'rb') as f:
         raw = f.read(4)
     if len(raw) < 4:
@@ -80,7 +87,15 @@ def _read_record_endian(f, endian: str) -> bytes:
     payload = f.read(rec_len)
     if len(payload) < rec_len:
         raise EOFError("Unexpected end of file reading record payload")
-    f.read(4)  # trailing marker
+    trail = f.read(4)
+    if len(trail) < 4:
+        raise EOFError("Unexpected end of file reading trailing record marker")
+    trail_len = struct.unpack(f'{endian}i', trail)[0]
+    if trail_len != rec_len:
+        raise ValueError(
+            f"Fortran record marker mismatch: leading={rec_len}, trailing={trail_len}. "
+            "File may be corrupted."
+        )
     return payload
 
 
@@ -197,6 +212,9 @@ def discover_format(case_dir: str) -> str:
 
 def discover_timesteps(case_dir: str, fmt: str) -> List[int]:
     """Return sorted list of available timesteps."""
+    if fmt not in ('binary', 'silo'):
+        raise ValueError(f"Unknown format '{fmt}'. Supported: 'binary', 'silo'.")
+
     if fmt == 'binary':
         # Check root/ first (1D), then p0/
         root_dir = os.path.join(case_dir, 'binary', 'root')
@@ -235,7 +253,7 @@ def discover_timesteps(case_dir: str, fmt: str) -> List[int]:
                         pass
             return sorted(steps)
 
-    return []
+    return []  # no timestep files found in expected directories
 
 
 def _discover_processors(case_dir: str, fmt: str) -> List[int]:

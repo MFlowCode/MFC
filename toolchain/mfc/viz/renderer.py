@@ -75,6 +75,10 @@ def render_3d_slice(assembled, varname, step, output, slice_axis='z',  # pylint:
     data_3d = assembled.variables[varname]
 
     axis_map = {'x': 0, 'y': 1, 'z': 2}
+    if slice_axis not in axis_map:
+        raise ValueError(
+            f"Invalid slice_axis '{slice_axis}'. Must be one of: 'x', 'y', 'z'."
+        )
     axis_idx = axis_map[slice_axis]
 
     coords = [assembled.x_cc, assembled.y_cc, assembled.z_cc]
@@ -149,6 +153,10 @@ def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-argum
         read_func: Callable(step) -> AssembledData for loading each frame.
         **opts: Rendering options (cmap, vmin, vmax, dpi, log_scale, figsize,
                 slice_axis, slice_index, slice_value).
+
+    Returns:
+        True if the MP4 was successfully written, False on failure
+        (e.g., missing imageio dependency or encoding error).
     """
     if read_func is None:
         raise ValueError("read_func must be provided for MP4 rendering")
@@ -170,12 +178,19 @@ def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-argum
             sample_steps.append(steps[len(steps) // 2])
 
         all_mins, all_maxs = [], []
+        log_scale = opts.get('log_scale', False)
         for s in sample_steps:
             ad = read_func(s)
             d = ad.variables.get(varname)
             if d is not None:
-                all_mins.append(np.nanmin(d))
-                all_maxs.append(np.nanmax(d))
+                if log_scale:
+                    pos = d[d > 0]
+                    if pos.size > 0:
+                        all_mins.append(np.nanmin(pos))
+                        all_maxs.append(np.nanmax(pos))
+                else:
+                    all_mins.append(np.nanmin(d))
+                    all_maxs.append(np.nanmax(d))
 
         if auto_vmin is None and all_mins:
             opts['vmin'] = min(all_mins)
@@ -185,6 +200,11 @@ def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-argum
     # Write frames as images to a temp directory next to the output file
     output_dir = os.path.dirname(os.path.abspath(output))
     viz_dir = os.path.join(output_dir, '_frames')
+    # Clean stale frames from any interrupted previous run
+    if os.path.isdir(viz_dir):
+        for stale in os.listdir(viz_dir):
+            if stale.endswith('.png'):
+                os.remove(os.path.join(viz_dir, stale))
     os.makedirs(viz_dir, exist_ok=True)
 
     try:
@@ -206,6 +226,11 @@ def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-argum
                       varname, step, frame_path, **opts)
         elif assembled.ndim == 3:
             render_3d_slice(assembled, varname, step, frame_path, **opts)
+        else:
+            raise ValueError(
+                f"Unsupported dimensionality ndim={assembled.ndim} for step {step}. "
+                "Expected 1, 2, or 3."
+            )
 
     # Combine frames into MP4 using imageio + imageio-ffmpeg (bundled ffmpeg)
     frame_files = sorted(f for f in os.listdir(viz_dir) if f.endswith('.png'))
@@ -225,7 +250,7 @@ def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-argum
         for fname in frame_files:
             writer.append_data(imageio.imread(os.path.join(viz_dir, fname)))
         success = True
-    except Exception as exc:  # pylint: disable=broad-except
+    except (OSError, ValueError, RuntimeError) as exc:
         print(f"imageio MP4 write failed: {exc}")
     finally:
         if writer is not None:

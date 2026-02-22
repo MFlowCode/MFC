@@ -61,6 +61,10 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
     # Auto-detect or use specified format
     fmt_arg = ARG('format')
     if fmt_arg:
+        if fmt_arg not in ('binary', 'silo'):
+            cons.print(f"[bold red]Error:[/bold red] Unknown format '{fmt_arg}'. "
+                       "Supported formats: 'binary', 'silo'.")
+            sys.exit(1)
         fmt = fmt_arg
     else:
         try:
@@ -138,6 +142,9 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
     requested_steps = _parse_steps(step_arg, steps)
     if not requested_steps:
         cons.print(f"[bold red]Error:[/bold red] No matching timesteps for --step {step_arg}")
+        if steps:
+            cons.print(f"[bold]Available range:[/bold] {steps[0]} to {steps[-1]} "
+                       f"({len(steps)} timesteps)")
         sys.exit(1)
 
     # Collect rendering options
@@ -206,6 +213,7 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
         else:
             cons.print(f"[bold red]Error:[/bold red] Failed to generate {mp4_path}. "
                        "Ensure imageio and imageio-ffmpeg are installed.")
+            sys.exit(1)
         return
 
     # Single or multiple PNG frames
@@ -215,8 +223,15 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
     except ImportError:
         step_iter = requested_steps
 
+    failures = []
     for step in step_iter:
-        assembled = read_step(step)
+        try:
+            assembled = read_step(step)
+        except (FileNotFoundError, EOFError, ValueError) as exc:
+            cons.print(f"[yellow]Warning:[/yellow] Skipping step {step}: {exc}")
+            failures.append(step)
+            continue
+
         output_path = os.path.join(output_base, f'{varname}_{step}.png')
 
         if assembled.ndim == 1:
@@ -228,9 +243,18 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
                       varname, step, output_path, **render_opts)
         elif assembled.ndim == 3:
             render_3d_slice(assembled, varname, step, output_path, **render_opts)
+        else:
+            cons.print(f"[yellow]Warning:[/yellow] Unsupported ndim={assembled.ndim} "
+                       f"for step {step}, skipping.")
+            failures.append(step)
+            continue
 
         if len(requested_steps) == 1:
             cons.print(f"[bold green]Saved:[/bold green] {output_path}")
 
-    if len(requested_steps) > 1:
-        cons.print(f"[bold green]Saved {len(requested_steps)} frames to:[/bold green] {output_base}/")
+    rendered = len(requested_steps) - len(failures)
+    if failures:
+        cons.print(f"[yellow]Warning:[/yellow] {len(failures)} step(s) failed: "
+                   f"{failures[:10]}{'...' if len(failures) > 10 else ''}")
+    if rendered > 1:
+        cons.print(f"[bold green]Saved {rendered} frames to:[/bold green] {output_base}/")
