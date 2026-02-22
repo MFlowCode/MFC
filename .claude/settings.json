@@ -1,4 +1,1 @@
-{
-  "enableAllProjectMcpServers": true,
-  "allowedTools": ["Bash"]
-}
+{ "allowedTools": ["Bash(*)"] }
