@@ -1,1 +1,3 @@
-{ "allowedTools": ["Bash(*)"] }
+{
+  "allowedTools": ["Bash(*)"]
+}
