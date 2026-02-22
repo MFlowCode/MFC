@@ -176,12 +176,15 @@ class TestCase(case.Case):
                 d_dir = os.path.join(dirpath, "D")
                 mid_tag = f"{mid_step:06d}"
                 for f in glob.glob(os.path.join(d_dir, f"*.{mid_tag}.dat")):
-                    os.remove(f)
+                    common.delete_file(f)
 
             return result2
         finally:
             self.params = orig
-            self.create_directory()
+            try:
+                self.create_directory()
+            except Exception:
+                pass
 
     def get_trace(self) -> str:
         return self.trace

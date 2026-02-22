@@ -449,7 +449,7 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
 
         # Restart roundtrip verification: run to midpoint, restart,
         # and compare restarted output against the straight run.
-        if getattr(case, 'restart_check', False) and not ARG("add_new_variables"):
+        if case.restart_check and not ARG("add_new_variables"):
             straight_pack = pack
 
             if timeout_flag.is_set():
