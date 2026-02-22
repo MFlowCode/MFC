@@ -37,9 +37,13 @@ fi
 echo "[$dir] Job ID: $job_id, monitoring output file: $output_file"
 
 # Use the monitoring script from PR (where this script lives)
-bash "${SCRIPT_DIR}/monitor_slurm_job.sh" "$job_id" "$output_file"
-
-echo "[$dir] Monitoring complete for job $job_id"
+monitor_exit=0
+bash "${SCRIPT_DIR}/monitor_slurm_job.sh" "$job_id" "$output_file" || monitor_exit=$?
+if [ "$monitor_exit" -ne 0 ]; then
+  echo "[$dir] WARNING: SLURM job exited with code $monitor_exit"
+else
+  echo "[$dir] Monitoring complete for job $job_id"
+fi
 
 # Verify the YAML output file was created
 yaml_file="${job_slug}.yaml"
