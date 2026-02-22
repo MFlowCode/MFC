@@ -152,7 +152,8 @@ class TestCase(case.Case):
             self.delete_output()
 
             # Phase 1: Run to midpoint (generates restart data)
-            self.params = {**orig, 't_step_stop': mid_step, 't_step_save': mid_step}
+            self.params = {**orig, 't_step_stop': mid_step,
+                           't_step_save': mid_step - orig.get('t_step_start', 0)}
             self.create_directory()
             result1 = self.run(targets, gpus)
             if result1.returncode != 0:
