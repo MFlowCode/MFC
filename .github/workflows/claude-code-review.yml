@@ -1,7 +1,9 @@
 name: Claude Code Review
 
 on:
-  pull_request:
+  # Use pull_request_target so this works for fork PRs and can mint an OIDC token.
+  # IMPORTANT: do NOT checkout or run fork code in this workflow.
+  pull_request_target:
     types: [opened, synchronize, ready_for_review, reopened]
     # Optional: Only run on specific file changes
     # paths:
@@ -12,11 +14,10 @@ on:
 
 jobs:
   claude-review:
-    # Optional: Filter by PR author
+    # Optional: Filter by PR author / association
     # if: |
-    #   github.event.pull_request.user.login == 'external-contributor' ||
-    #   github.event.pull_request.user.login == 'new-developer' ||
-    #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
+    #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR' ||
+    #   github.event.pull_request.author_association == 'CONTRIBUTOR'
 
     runs-on: ubuntu-latest
     permissions:
@@ -26,10 +27,8 @@ jobs:
       id-token: write
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
+      # NOTE: No checkout step on purpose.
+      # With pull_request_target, checking out PR code from forks can expose secrets.
 
       - name: Run Claude Code Review
         id: claude-review
@@ -41,4 +40,3 @@ jobs:
           prompt: '/code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }}'
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options
-
