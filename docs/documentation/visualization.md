@@ -43,7 +43,7 @@ The `--step` argument accepts several formats:
 | Format | Example | Description |
 |--------|---------|-------------|
 | Single | `--step 1000` | One timestep |
-| Range | `--step 0:10000:500` | Start:end:stride |
+| Range | `--step 0:10000:500` | Start:end:stride (inclusive) |
 | All | `--step all` | Every available timestep |
 
 ### Rendering options

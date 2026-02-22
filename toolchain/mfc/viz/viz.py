@@ -23,15 +23,21 @@ def _parse_steps(step_arg, available_steps):
     if step_arg is None or step_arg == 'all':
         return available_steps
 
-    if ':' in str(step_arg):
-        parts = str(step_arg).split(':')
-        start = int(parts[0])
-        end = int(parts[1])
-        stride = int(parts[2]) if len(parts) > 2 else 1
-        requested = list(range(start, end + 1, stride))
-        return [s for s in requested if s in set(available_steps)]
+    try:
+        if ':' in str(step_arg):
+            parts = str(step_arg).split(':')
+            start = int(parts[0])
+            end = int(parts[1])
+            stride = int(parts[2]) if len(parts) > 2 else 1
+            requested = list(range(start, end + 1, stride))
+            return [s for s in requested if s in set(available_steps)]
 
-    single = int(step_arg)
+        single = int(step_arg)
+    except ValueError:
+        cons.print(f"[bold red]Error:[/bold red] Invalid --step value '{step_arg}'. "
+                   "Expected an integer, a range (start:end:stride), or 'all'.")
+        sys.exit(1)
+
     if available_steps and single not in set(available_steps):
         return []
     return [single]
@@ -87,11 +93,16 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
             cons.print("[bold red]Error:[/bold red] No timesteps found.")
             sys.exit(1)
 
-        if step_arg is None:
+        if step_arg is None or step_arg == 'all':
             step = steps[0]
             cons.print(f"[dim]Using first available timestep: {step}[/dim]")
         else:
-            step = int(step_arg)
+            try:
+                step = int(step_arg)
+            except ValueError:
+                cons.print(f"[bold red]Error:[/bold red] Invalid --step value '{step_arg}'. "
+                           "Expected an integer or 'all'.")
+                sys.exit(1)
 
         if fmt == 'silo':
             from .silo_reader import assemble_silo  # pylint: disable=import-outside-toplevel
