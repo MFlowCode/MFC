@@ -229,11 +229,11 @@ def discover_timesteps(case_dir: str, fmt: str) -> List[int]:
         p0_dir = os.path.join(case_dir, 'silo_hdf5', 'p0')
         if os.path.isdir(p0_dir):
             steps = set()
-            for dname in os.listdir(p0_dir):
-                if dname.startswith('t_step='):
+            for fname in os.listdir(p0_dir):
+                if fname.endswith('.silo') and not fname.startswith('collection'):
                     try:
-                        steps.add(int(dname.split('=')[1]))
-                    except (ValueError, IndexError):
+                        steps.add(int(fname[:-5]))
+                    except ValueError:
                         pass
             return sorted(steps)
 
