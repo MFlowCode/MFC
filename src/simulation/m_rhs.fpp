@@ -1,22 +1,11 @@
 !>
-!! @file m_rhs.f90
+!! @file
 !! @brief Contains module m_rhs
 
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
-!> @brief The module contains the subroutines used to calculate the right-
-!!              hane-side (RHS) in the quasi-conservative, shock- and interface-
-!!              capturing finite-volume framework for the multicomponent Navier-
-!!              Stokes equations supplemented by appropriate advection equations
-!!              used to capture the material interfaces. The system of equations
-!!              is closed by the stiffened gas equation of state, as well as any
-!!              required mixture relationships. Capillarity effects are included
-!!              and are modeled by the means of a volume force acting across the
-!!              diffuse material interface region. The implementation details of
-!!              surface tension may be found in Perigaud and Saurel (2005). Note
-!!              that both viscous and surface tension effects are only available
-!!              in the volume fraction model.
+!> @brief Assembles the right-hand side of the governing equations using finite-volume flux differencing, Riemann solvers, and physical source terms
 module m_rhs
 
     use m_derived_types        !< Definitions of the derived types
@@ -64,8 +53,6 @@ module m_rhs
     use m_body_forces
 
     use m_chemistry
-
-    use m_mhd
 
     use m_igr
 
@@ -160,6 +147,7 @@ module m_rhs
     $:GPU_DECLARE(create='[irx,iry,irz]')
 
     type(int_bounds_info) :: is1, is2, is3
+    !> @}
     $:GPU_DECLARE(create='[is1,is2,is3]')
 
     !> @name Saved fluxes for testing
@@ -243,6 +231,13 @@ contains
                 q_cons_qp%vf(c_idx)%sf
             $:GPU_ENTER_DATA(copyin='[q_prim_qp%vf(c_idx)%sf]')
             $:GPU_ENTER_DATA(attach='[q_prim_qp%vf(c_idx)%sf]')
+        end if
+
+        if (hyper_cleaning) then
+            q_prim_qp%vf(psi_idx)%sf => &
+                q_cons_qp%vf(psi_idx)%sf
+            $:GPU_ENTER_DATA(copyin='[q_prim_qp%vf(psi_idx)%sf]')
+            $:GPU_ENTER_DATA(attach='[q_prim_qp%vf(psi_idx)%sf]')
         end if
 
         ! Allocation/Association of flux_n, flux_src_n, and flux_gsrc_n
@@ -339,7 +334,7 @@ contains
             ! END: Allocation/Association of flux_n, flux_src_n, and flux_gsrc_n
         end if
 
-        if (.not. igr) then
+        if ((.not. igr) .or. dummy) then
 
             ! Allocation of dq_prim_ds_qp
             @:ALLOCATE(dq_prim_dx_qp(1:1))
@@ -636,6 +631,7 @@ contains
 
     end subroutine s_initialize_rhs_module
 
+    !> @brief Computes the right-hand side of the semi-discrete governing equations for a single time stage.
     impure subroutine s_compute_rhs(q_cons_vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_in, rhs_pb, mv_in, rhs_mv, t_step, time_avg, stage)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
@@ -659,7 +655,7 @@ contains
 
         call cpu_time(t_start)
 
-        if (.not. igr) then
+        if (.not. igr .or. dummy) then
             ! Association/Population of Working Variables
             $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
             do i = 1, sys_size
@@ -697,11 +693,12 @@ contains
             end if
         end if
 
-        if (igr) then
+        if (igr .or. dummy) then
             call nvtxStartRange("RHS-COMMUNICATION")
             call s_populate_variables_buffers(bc_type, q_cons_vf, pb_in, mv_in)
             call nvtxEndRange
-        else
+        end if
+        if (.not. igr .or. dummy) then
             call nvtxStartRange("RHS-CONVERT")
             call s_convert_conservative_to_primitive_variables( &
                 q_cons_qp%vf, &
@@ -727,7 +724,7 @@ contains
 
         if (qbmm) call s_mom_inv(q_cons_qp%vf, q_prim_qp%vf, mom_sp, mom_3d, pb_in, rhs_pb, mv_in, rhs_mv, idwbuff(1), idwbuff(2), idwbuff(3))
 
-        if (viscous .and. .not. igr) then
+        if ((viscous .and. .not. igr) .or. dummy) then
             call nvtxStartRange("RHS-VISCOUS")
             call s_get_viscous(qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
                                dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n, &
@@ -750,7 +747,7 @@ contains
         ! Dimensional Splitting Loop
         do id = 1, num_dims
 
-            if (igr) then
+            if (igr .or. dummy) then
 
                 if (id == 1) then
                     $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
@@ -779,8 +776,8 @@ contains
                     call s_igr_sigma_x(q_cons_vf, rhs_vf)
                     call nvtxEndRange
                 end if
-
-            else ! Finite volume solve
+            end if
+            if ((.not. igr) .or. dummy) then! Finite volume solve
 
                 ! Reconstructing Primitive/Conservative Variables
                 call nvtxStartRange("RHS-WENO")
@@ -966,7 +963,6 @@ contains
                 end if
 
                 ! RHS additions for qbmm bubbles
-
                 if (qbmm) then
                     call nvtxStartRange("RHS-QBMM")
                     call s_compute_qbmm_rhs(id, &
@@ -980,9 +976,18 @@ contains
                 end if
                 ! END: Additional physics and source terms
 
-                call nvtxStartRange("RHS-MHD")
-                if (mhd .and. powell) call s_compute_mhd_powell_rhs(q_prim_qp%vf, rhs_vf)
-                call nvtxEndRange
+                if (hyper_cleaning) then
+                    $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                rhs_vf(psi_idx)%sf(j, k, l) = rhs_vf(psi_idx)%sf(j, k, l) - &
+                                                              q_prim_vf(psi_idx)%sf(j, k, l)/hyper_cleaning_tau
+                            end do
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+                end if
 
                 ! END: Additional physics and source terms
             end if
@@ -1056,7 +1061,7 @@ contains
         ! END: Additional pphysics and source terms
 
         if (run_time_info .or. probe_wrt .or. ib .or. bubbles_lagrange) then
-            if (.not. igr) then
+            if (.not. igr .or. dummy) then
                 $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
                 do i = 1, sys_size
                     do l = idwbuff(3)%beg, idwbuff(3)%end
@@ -1083,6 +1088,7 @@ contains
 
     end subroutine s_compute_rhs
 
+    !> @brief Accumulates advection source contributions from a given coordinate direction into the RHS.
     subroutine s_compute_advection_source_term(idir, rhs_vf, q_cons_vf, q_prim_vf, flux_src_n_vf)
 
         integer, intent(in) :: idir
@@ -1323,6 +1329,7 @@ contains
 
     contains
 
+        !> @brief Adds the advection source flux-difference terms for a single coordinate direction to the RHS.
         subroutine s_add_directional_advection_source_terms(current_idir, rhs_vf_arg, q_cons_vf_arg, &
                                                             q_prim_vf_arg, flux_src_n_vf_arg, Kterm_arg)
             integer, intent(in) :: current_idir
@@ -1548,6 +1555,7 @@ contains
 
     end subroutine s_compute_advection_source_term
 
+    !> @brief Adds viscous, surface-tension, and species-diffusion source flux contributions to the RHS for a given direction.
     subroutine s_compute_additional_physics_rhs(idir, q_prim_vf, rhs_vf, flux_src_n_in, &
                                                 dq_prim_dx_vf, dq_prim_dy_vf, dq_prim_dz_vf)
 
@@ -1633,21 +1641,21 @@ contains
             end if
 
             if (cyl_coord .and. ((bc_y%beg == -2) .or. (bc_y%beg == -14))) then
-                if (viscous) then
+                if (viscous .or. dummy) then
                     if (p > 0) then
-                        call s_compute_viscous_stress_tensor(q_prim_vf, &
-                                                             dq_prim_dx_vf(mom_idx%beg:mom_idx%end), &
-                                                             dq_prim_dy_vf(mom_idx%beg:mom_idx%end), &
-                                                             dq_prim_dz_vf(mom_idx%beg:mom_idx%end), &
-                                                             tau_Re_vf, &
-                                                             idwbuff(1), idwbuff(2), idwbuff(3))
+                        call s_compute_viscous_stress_cylindrical_boundary(q_prim_vf, &
+                                                                           dq_prim_dx_vf(mom_idx%beg:mom_idx%end), &
+                                                                           dq_prim_dy_vf(mom_idx%beg:mom_idx%end), &
+                                                                           dq_prim_dz_vf(mom_idx%beg:mom_idx%end), &
+                                                                           tau_Re_vf, &
+                                                                           idwbuff(1), idwbuff(2), idwbuff(3))
                     else
-                        call s_compute_viscous_stress_tensor(q_prim_vf, &
-                                                             dq_prim_dx_vf(mom_idx%beg:mom_idx%end), &
-                                                             dq_prim_dy_vf(mom_idx%beg:mom_idx%end), &
-                                                             dq_prim_dy_vf(mom_idx%beg:mom_idx%end), &
-                                                             tau_Re_vf, &
-                                                             idwbuff(1), idwbuff(2), idwbuff(3))
+                        call s_compute_viscous_stress_cylindrical_boundary(q_prim_vf, &
+                                                                           dq_prim_dx_vf(mom_idx%beg:mom_idx%end), &
+                                                                           dq_prim_dy_vf(mom_idx%beg:mom_idx%end), &
+                                                                           dq_prim_dy_vf(mom_idx%beg:mom_idx%end), &
+                                                                           tau_Re_vf, &
+                                                                           idwbuff(1), idwbuff(2), idwbuff(3))
                     end if
 
                     $:GPU_PARALLEL_LOOP(private='[i,j,l]', collapse=2)
@@ -1742,7 +1750,7 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
 
-                    if (viscous) then
+                    if (viscous .or. dummy) then
                         $:GPU_PARALLEL_LOOP(private='[i,j,l]', collapse=2)
                         do l = 0, p
                             do j = 0, m
@@ -1858,10 +1866,12 @@ contains
         !!      at the Gaussian quadrature points, from the cell-averaged
         !!      variables.
         !!  @param v_vf Cell-average variables
-        !!  @param vL_qp Left WENO-reconstructed, cell-boundary values including
-        !!          the values at the quadrature points, of the cell-average variables
-        !!  @param vR_qp Right WENO-reconstructed, cell-boundary values including
-        !!          the values at the quadrature points, of the cell-average variables
+        !!  @param vL_x Left reconstructed cell-boundary values in x
+        !!  @param vL_y Left reconstructed cell-boundary values in y
+        !!  @param vL_z Left reconstructed cell-boundary values in z
+        !!  @param vR_x Right reconstructed cell-boundary values in x
+        !!  @param vR_y Right reconstructed cell-boundary values in y
+        !!  @param vR_z Right reconstructed cell-boundary values in z
         !!  @param norm_dir Splitting coordinate direction
     subroutine s_reconstruct_cell_boundary_values(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, &
                                                   norm_dir)
@@ -1876,7 +1886,7 @@ contains
         integer :: i, j, k, l
 
         #:for SCHEME, TYPE in [('weno','WENO_TYPE'), ('muscl','MUSCL_TYPE')]
-            if (recon_type == ${TYPE}$) then
+            if (recon_type == ${TYPE}$ .or. dummy) then
                 ! Reconstruction in s1-direction
                 if (norm_dir == 1) then
                     is1 = idwbuff(1); is2 = idwbuff(2); is3 = idwbuff(3)
@@ -1917,6 +1927,7 @@ contains
         #:endfor
     end subroutine s_reconstruct_cell_boundary_values
 
+    !> @brief Performs first-order (piecewise constant) reconstruction of left and right cell-boundary values.
     subroutine s_reconstruct_cell_boundary_values_first_order(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, &
                                                               norm_dir)
 
@@ -1931,7 +1942,7 @@ contains
         ! Reconstruction in s1-direction
 
         #:for SCHEME, TYPE in [('weno','WENO_TYPE'), ('muscl', 'MUSCL_TYPE')]
-            if (recon_type == ${TYPE}$) then
+            if (recon_type == ${TYPE}$ .or. dummy) then
                 if (norm_dir == 1) then
                     is1 = idwbuff(1); is2 = idwbuff(2); is3 = idwbuff(3)
                     recon_dir = 1; is1%beg = is1%beg + ${SCHEME}$_polyn
@@ -1950,49 +1961,49 @@ contains
                 end if
 
                 $:GPU_UPDATE(device='[is1,is2,is3,iv]')
-
-                if (recon_dir == 1) then
-                    $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
-                    do i = iv%beg, iv%end
-                        do l = is3%beg, is3%end
-                            do k = is2%beg, is2%end
-                                do j = is1%beg, is1%end
-                                    vL_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
-                                    vR_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
-                                end do
-                            end do
-                        end do
-                    end do
-                    $:END_GPU_PARALLEL_LOOP()
-                else if (recon_dir == 2) then
-                    $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
-                    do i = iv%beg, iv%end
-                        do l = is3%beg, is3%end
-                            do k = is2%beg, is2%end
-                                do j = is1%beg, is1%end
-                                    vL_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
-                                    vR_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
-                                end do
-                            end do
-                        end do
-                    end do
-                    $:END_GPU_PARALLEL_LOOP()
-                else if (recon_dir == 3) then
-                    $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
-                    do i = iv%beg, iv%end
-                        do l = is3%beg, is3%end
-                            do k = is2%beg, is2%end
-                                do j = is1%beg, is1%end
-                                    vL_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
-                                    vR_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
-                                end do
-                            end do
-                        end do
-                    end do
-                    $:END_GPU_PARALLEL_LOOP()
-                end if
             end if
         #:endfor
+
+        if (recon_dir == 1) then
+            $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
+            do i = iv%beg, iv%end
+                do l = is3%beg, is3%end
+                    do k = is2%beg, is2%end
+                        do j = is1%beg, is1%end
+                            vL_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
+                            vR_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
+                        end do
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        else if (recon_dir == 2) then
+            $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
+            do i = iv%beg, iv%end
+                do l = is3%beg, is3%end
+                    do k = is2%beg, is2%end
+                        do j = is1%beg, is1%end
+                            vL_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
+                            vR_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
+                        end do
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        else if (recon_dir == 3) then
+            $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
+            do i = iv%beg, iv%end
+                do l = is3%beg, is3%end
+                    do k = is2%beg, is2%end
+                        do j = is1%beg, is1%end
+                            vL_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
+                            vR_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
+                        end do
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
 
     end subroutine s_reconstruct_cell_boundary_values_first_order
 

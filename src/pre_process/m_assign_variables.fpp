@@ -1,10 +1,11 @@
 !>
-!! @file m_assign_variables.f90
+!! @file
 !! @brief Contains module m_assign_variables
 
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
+!> @brief Assigns initial primitive variables to computational cells based on patch geometry
 module m_assign_variables
 
     use m_derived_types         ! Definitions of the derived types
@@ -71,6 +72,7 @@ module m_assign_variables
 
 contains
 
+    !> @brief Allocates volume fraction sum and sets the patch primitive variable assignment procedure pointer.
     impure subroutine s_initialize_assign_variables_module
 
         if (.not. igr) then
@@ -196,7 +198,7 @@ contains
 
     end subroutine s_assign_patch_mixture_primitive_variables
 
-    !Stable perturbation in pressure (Ando)
+    !> @brief Applies a stable pressure perturbation following Ando's method for bubble-laden flows.
     !! @param j the x-dir node index
     !! @param k the y-dir node index
     !! @param l the z-dir node index
@@ -222,7 +224,7 @@ contains
 
         if (qbmm) then
             do i = 1, nb
-                q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l) = q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)*((p0 - fluid_pp(1)%pv)/(q_prim_vf(E_idx)%sf(j, k, l)*p0 - fluid_pp(1)%pv))**(1._wp/3._wp)
+                q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l) = q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)*((p0 - bub_pp%pv)/(q_prim_vf(E_idx)%sf(j, k, l)*p0 - bub_pp%pv))**(1._wp/3._wp)
             end do
         end if
 
@@ -420,7 +422,7 @@ contains
         ! Bubbles euler variables
         if (bubbles_euler) then
             do i = 1, nb
-                muR = R0(i)*patch_icpp(smooth_patch_id)%r0
+                muR = R0(i)*patch_icpp(smooth_patch_id)%r0/R0ref
                 muV = patch_icpp(smooth_patch_id)%v0
                 if (qbmm) then
                     ! Initialize the moment set
@@ -428,16 +430,16 @@ contains
                         q_prim_vf(bub_idx%fullmom(i, 0, 0))%sf(j, k, l) = 1._wp
                         q_prim_vf(bub_idx%fullmom(i, 1, 0))%sf(j, k, l) = muR
                         q_prim_vf(bub_idx%fullmom(i, 0, 1))%sf(j, k, l) = muV
-                        q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = muR**2 + sigR**2
-                        q_prim_vf(bub_idx%fullmom(i, 1, 1))%sf(j, k, l) = muR*muV + rhoRV*sigR*sigV
-                        q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + sigV**2
+                        q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = muR**2 + (sigR*R0ref)**2
+                        q_prim_vf(bub_idx%fullmom(i, 1, 1))%sf(j, k, l) = muR*muV + rhoRV*(sigR*R0ref)*(sigV*sqrt(p0ref/rho0ref))
+                        q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + (sigV*sqrt(p0ref/rho0ref))**2
                     else if (dist_type == 2) then
                         q_prim_vf(bub_idx%fullmom(i, 0, 0))%sf(j, k, l) = 1._wp
                         q_prim_vf(bub_idx%fullmom(i, 1, 0))%sf(j, k, l) = exp((sigR**2)/2._wp)*muR
                         q_prim_vf(bub_idx%fullmom(i, 0, 1))%sf(j, k, l) = muV
                         q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = exp((sigR**2)*2._wp)*(muR**2)
                         q_prim_vf(bub_idx%fullmom(i, 1, 1))%sf(j, k, l) = exp((sigR**2)/2._wp)*muR*muV
-                        q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + sigV**2
+                        q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + (sigV*sqrt(p0ref/rho0ref))**2
                     end if
                 else
                     q_prim_vf(bub_idx%rs(i))%sf(j, k, l) = muR
@@ -627,7 +629,7 @@ contains
         ! Smoothed bubble variables
         if (bubbles_euler) then
             do i = 1, nb
-                muR = R0(i)*patch_icpp(patch_id)%r0
+                muR = R0(i)*patch_icpp(patch_id)%r0/R0ref
                 muV = patch_icpp(patch_id)%v0
                 if (qbmm) then
                     ! Initialize the moment set
@@ -635,16 +637,16 @@ contains
                         q_prim_vf(bub_idx%fullmom(i, 0, 0))%sf(j, k, l) = 1._wp
                         q_prim_vf(bub_idx%fullmom(i, 1, 0))%sf(j, k, l) = muR
                         q_prim_vf(bub_idx%fullmom(i, 0, 1))%sf(j, k, l) = muV
-                        q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = muR**2 + sigR**2
-                        q_prim_vf(bub_idx%fullmom(i, 1, 1))%sf(j, k, l) = muR*muV + rhoRV*sigR*sigV
-                        q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + sigV**2
+                        q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = muR**2 + (sigR*R0ref)**2
+                        q_prim_vf(bub_idx%fullmom(i, 1, 1))%sf(j, k, l) = muR*muV + rhoRV*(sigR*R0ref)*(sigV*sqrt(p0ref/rho0ref))
+                        q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + (sigV*sqrt(p0ref/rho0ref))**2
                     else if (dist_type == 2) then
                         q_prim_vf(bub_idx%fullmom(i, 0, 0))%sf(j, k, l) = 1._wp
                         q_prim_vf(bub_idx%fullmom(i, 1, 0))%sf(j, k, l) = exp((sigR**2)/2._wp)*muR
                         q_prim_vf(bub_idx%fullmom(i, 0, 1))%sf(j, k, l) = muV
                         q_prim_vf(bub_idx%fullmom(i, 2, 0))%sf(j, k, l) = exp((sigR**2)*2._wp)*(muR**2)
                         q_prim_vf(bub_idx%fullmom(i, 1, 1))%sf(j, k, l) = exp((sigR**2)/2._wp)*muR*muV
-                        q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + sigV**2
+                        q_prim_vf(bub_idx%fullmom(i, 0, 2))%sf(j, k, l) = muV**2 + (sigV*sqrt(p0ref/rho0ref))**2
                     end if
                 else
                     q_prim_vf(bub_idx%rs(i))%sf(j, k, l) = muR
@@ -701,8 +703,18 @@ contains
         ! Updating the patch identities bookkeeping variable
         if (1._wp - eta < 1.e-16_wp) patch_id_fp(j, k, l) = patch_id
 
+        ! if (j == 1) then
+        !     print *, (q_prim_vf(bub_idx%rs(i))%sf(j, k, l), i = 1, nb)
+        !     print *, (q_prim_vf(bub_idx%fullmom(i, 1, 0))%sf(j, k, l), i = 1, nb)
+        !     print *, (R0(i), i = 1, nb)
+        !     print *, patch_icpp(patch_id)%r0
+        !     print *, (bub_idx%rs(i), i = 1, nb)
+        !     print *, (bub_idx%fullmom(i, 1, 0), i = 1, nb)
+        ! end if
+
     end subroutine s_assign_patch_species_primitive_variables
 
+    !> @brief Nullifies the patch primitive variable assignment procedure pointer.
     impure subroutine s_finalize_assign_variables_module
 
         ! Nullifying procedure pointer to the subroutine assigning either

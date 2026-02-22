@@ -1,7 +1,9 @@
+@page visualization Flow visualization
+
 # Flow visualization
 
 A post-processed database in Silo-HDF5 format can be visualized and analyzed using Paraview and VisIt.
-After the post-processing of simulation data (see section [Running](running.md)), a directory named `silo_hdf5` contains a silo-HDF5 database.
+After the post-processing of simulation data (see section @ref running "Running"), a directory named `silo_hdf5` contains a silo-HDF5 database.
 Here, `silo_hdf5/` includes a directory named `root/` that contains index files for flow field data at each saved time step.
 
 ### Visualizing with Paraview
@@ -38,7 +40,7 @@ For many cases, this step will require resizing the render view window.
 VisIt is an alternative open-source interactive parallel visualization and graphical analysis tool for viewing scientific data.
 Versions of VisIt after 2.6.0 have been confirmed to work with the MFC databases for some parallel environments.
 Nevertheless, installation and configuration of VisIt can be environment-dependent and are left to the user.
-Further remarks on parallel flow visualization, analysis, and processing of the MFC database using VisIt can also be found in [Coralic (2015)](references.md) and [Meng (2016)](references.md).
+Further remarks on parallel flow visualization, analysis, and processing of the MFC database using VisIt can also be found in \cite Coralic15 and \cite Meng16.
 
 The user can launch VisIt and open the index files under `/silo_hdf5/root`.
 Once the database is loaded, flow field variables contained in the database can be added to the plot.
@@ -52,17 +54,17 @@ For analysis and processing of the database using VisIt's capability, the user i
 ## Serial data output
 
 If ``parallel_io = 'F'``, MFC will output the conservative variables to a directory `D/`. 
-If multiple cores are used ($\mathtt{ppn > 1}$), then a separate file is created for each core.
+If multiple cores are used (\f$\mathtt{ppn > 1}\f$), then a separate file is created for each core.
 If only one coordinate dimension (`n = 0` and `p = 0`) exists, the primitive variables will also be written to `D/`.
 The file names correspond to the variables associated with each equation solved by MFC.
 They are written at every `t_step_save` time step.
 The conservative variables are
 
-$$ {(\rho \alpha)}\_{1}, \dots, (\rho\alpha)\_{N\_c}, \rho u\_{1}, \dots, \rho u\_{N\_d}, E, \alpha\_1, \dots, \alpha\_{N\_c} $$
+\f[ (\rho \alpha)_{1}, \dots, (\rho\alpha)_{N_c}, \rho u_{1}, \dots, \rho u_{N_d}, E, \alpha_1, \dots, \alpha_{N_c} \f]
 
 and the primitive variables are
 
-$$ {(\rho \alpha)}\_1, \dots, (\rho\alpha)\_{N\_c}, u\_1, \dots, u\_{N\_d}, p, \alpha\_1, \dots, \alpha\_{N\_c} $$
+\f[ (\rho \alpha)_1, \dots, (\rho\alpha)_{N_c}, u_1, \dots, u_{N_d}, p, \alpha_1, \dots, \alpha_{N_c} \f]
 
 where $N_c$ are the number of components `num_fluids` and $N_d$ is the number of spatial dimensions. 
 There are exceptions: if `model_eqns = 3`, then the six-equation model appends these variables with the internal energies of each component.
@@ -70,12 +72,12 @@ If there are sub-grid bubbles `bubbles = T`, then the bubble variables are also 
 These depend on the bubble dynamics model used.
 If ``polytropic = 'T'``, then the conservative variables are appended by 
 
-$$ n\_b R\_1, n\_b {\\dot R}\_1, \dots, n\_b R\_{N\_b}, n\_b {\\dot R}\_{N\_b} $$
+\f[ n_b R_1, n_b \dot{R}_1, \dots, n_b R_{N_b}, n_b \dot{R}_{N_b} \f]
 
 where $n_B$ is the bubble number density, and $N_b$ is the number of bubble sizes (see the matching variable in the input file, `Nb`).
 The primitive bubble variables do not include $n_B$:
 
-$$ R\_1, {\\dot R}\_1, \dots, R\_{N\_b}, {\\dot R}\_{N\_b} $$
+\f[ R_1, \dot{R}_1, \dots, R_{N_b}, \dot{R}_{N_b} \f]
 
 ## Remote Visualization on PACE Phoenix
 
@@ -138,3 +140,6 @@ Below is a slightly altered version of that dialogue:
 * Click `Add Server` If you have not set up the PACE connection.
 This will create a new dialogue box where you can specify a configuration name and set the `Port` to `8722`.
 Once this is done, click `configure` and then `save` on the next dialogue box.
+
+
+<div style='text-align:center; font-size:0.75rem; color:#888; padding:16px 0 0;'>Page last updated: 2026-02-13</div>

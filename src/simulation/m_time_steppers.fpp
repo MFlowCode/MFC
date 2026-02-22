@@ -1,15 +1,11 @@
 !>
-!! @file m_time_steppers.f90
+!! @file
 !! @brief Contains module m_time_steppers
 
 #:include 'macros.fpp'
+#:include 'case.fpp'
 
-!> @brief The following module features a variety of time-stepping schemes.
-!!              Currently, it includes the following Runge-Kutta (RK) algorithms:
-!!                   1) 1st Order TVD RK
-!!                   2) 2nd Order TVD RK
-!!                   3) 3rd Order TVD RK
-!!              where TVD designates a total-variation-diminishing time-stepper.
+!> @brief Total-variation-diminishing (TVD) Runge--Kutta time integrators (1st-, 2nd-, and 3rd-order SSP)
 module m_time_steppers
 
     use m_derived_types        !< Definitions of the derived types
@@ -46,6 +42,8 @@ module m_time_steppers
 
     use m_body_forces
 
+    use m_derived_variables
+
     implicit none
 
     type(vector_field), allocatable, dimension(:) :: q_cons_ts !<
@@ -81,6 +79,7 @@ module m_time_steppers
 
     $:GPU_DECLARE(create='[q_cons_ts,q_prim_vf,q_T_sf,rhs_vf,q_prim_ts1,q_prim_ts2,rhs_mv,rhs_pb,max_dt,rk_coef,stor,bc_type]')
 
+!> @cond
 #if defined(__NVCOMPILER_GPU_UNIFIED_MEM)
     real(stp), allocatable, dimension(:, :, :, :), pinned, target :: q_cons_ts_pool_host
 #elif defined(FRONTIER_UNIFIED)
@@ -89,6 +88,7 @@ module m_time_steppers
     integer(kind=8) :: pool_size
     type(c_ptr) :: cptr_host, cptr_device
 #endif
+!> @endcond
 
 contains
 
@@ -126,6 +126,7 @@ contains
             @:PREFER_GPU(q_cons_ts(i)%vf)
         end do
 
+!> @cond
 #if defined(__NVCOMPILER_GPU_UNIFIED_MEM)
         if (num_ts == 2 .and. nv_uvm_out_of_core) then
             ! host allocation for q_cons_ts(2)%vf(j)%sf for all j
@@ -215,6 +216,7 @@ contains
             end do
         end do
 #else
+!> @endcond
         do i = 1, num_ts
             do j = 1, sys_size
                 @:ALLOCATE(q_cons_ts(i)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
@@ -223,7 +225,9 @@ contains
             end do
             @:ACC_SETUP_VFs(q_cons_ts(i))
         end do
+!> @cond
 #endif
+!> @endcond
 
         ! Allocating the cell-average primitive ts variables
         if (probe_wrt) then
@@ -316,6 +320,13 @@ contains
                     idwbuff(2)%beg:idwbuff(2)%end, &
                     idwbuff(3)%beg:idwbuff(3)%end))
                 @:ACC_SETUP_SFs(q_prim_vf(damage_idx))
+            end if
+
+            if (hyper_cleaning) then
+                @:ALLOCATE(q_prim_vf(psi_idx)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                    idwbuff(2)%beg:idwbuff(2)%end, &
+                    idwbuff(3)%beg:idwbuff(3)%end))
+                @:ACC_SETUP_SFs(q_prim_vf(psi_idx))
             end if
 
             if (model_eqns == 3) then
@@ -461,14 +472,18 @@ contains
 
         @:ALLOCATE(bc_type(1,1)%sf(0:0,0:n,0:p))
         @:ALLOCATE(bc_type(1,2)%sf(0:0,0:n,0:p))
-        if (n > 0) then
-            @:ALLOCATE(bc_type(2,1)%sf(-buff_size:m+buff_size,0:0,0:p))
-            @:ALLOCATE(bc_type(2,2)%sf(-buff_size:m+buff_size,0:0,0:p))
-            if (p > 0) then
-                @:ALLOCATE(bc_type(3,1)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,0:0))
-                @:ALLOCATE(bc_type(3,2)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,0:0))
+        #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
+            if (n > 0) then
+                @:ALLOCATE(bc_type(2,1)%sf(-buff_size:m+buff_size,0:0,0:p))
+                @:ALLOCATE(bc_type(2,2)%sf(-buff_size:m+buff_size,0:0,0:p))
+                #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                    if (p > 0) then
+                        @:ALLOCATE(bc_type(3,1)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,0:0))
+                        @:ALLOCATE(bc_type(3,2)%sf(-buff_size:m+buff_size,-buff_size:n+buff_size,0:0))
+                    end if
+                #:endif
             end if
-        end if
+        #:endif
 
         do i = 1, num_dims
             do j = 1, 2
@@ -501,6 +516,7 @@ contains
 
     end subroutine s_initialize_time_steppers_module
 
+    !> @brief Advances the solution one full step using a TVD Runge-Kutta time integrator.
     impure subroutine s_tvd_rk(t_step, time_avg, nstage)
 #ifdef _CRAYFTN
         !DIR$ OPTIMIZE (-haggress)
@@ -524,15 +540,17 @@ contains
 
             if (s == 1) then
                 if (run_time_info) then
-                    if (igr) then
+                    if (igr .or. dummy) then
                         call s_write_run_time_information(q_cons_ts(1)%vf, t_step)
-                    else
+                    end if
+                    if (.not. igr .or. dummy) then
                         call s_write_run_time_information(q_prim_vf, t_step)
                     end if
                 end if
 
                 if (probe_wrt) then
                     call s_time_step_cycling(t_step)
+                    call s_compute_derived_variables(t_step, q_cons_ts(1)%vf, q_prim_ts1, q_prim_ts2)
                 end if
 
                 if (cfl_dt) then
@@ -611,39 +629,17 @@ contains
             if (ib) then
                 ! check if any IBMS are moving, and if so, update the markers, ghost points, levelsets, and levelset norms
                 if (moving_immersed_boundary_flag) then
-                    do i = 1, num_ibs
-                        if (s == 1) then
-                            patch_ib(i)%step_vel = patch_ib(i)%vel
-                            patch_ib(i)%step_angular_vel = patch_ib(i)%angular_vel
-                            patch_ib(i)%step_angles = patch_ib(i)%angles
-                            patch_ib(i)%step_x_centroid = patch_ib(i)%x_centroid
-                            patch_ib(i)%step_y_centroid = patch_ib(i)%y_centroid
-                            patch_ib(i)%step_z_centroid = patch_ib(i)%z_centroid
-                        end if
-
-                        if (patch_ib(i)%moving_ibm == 1) then
-                            do j = 1, 3
-                                patch_ib(i)%vel(j) = (rk_coef(s, 1)*patch_ib(i)%step_vel(j) + rk_coef(s, 2)*patch_ib(i)%vel(j) + rk_coef(s, 3)*0._wp*dt)/rk_coef(s, 4) ! 0.0 is a placeholder for accelerations
-                                patch_ib(i)%angular_vel(j) = (rk_coef(s, 1)*patch_ib(i)%step_angular_vel(j) + rk_coef(s, 2)*patch_ib(i)%angular_vel(j) + rk_coef(s, 3)*0._wp*dt)/rk_coef(s, 4)
-
-                                ! Update the angle of the IB
-                                patch_ib(i)%angles(j) = (rk_coef(s, 1)*patch_ib(i)%step_angles(j) + rk_coef(s, 2)*patch_ib(i)%angles(j) + rk_coef(s, 3)*patch_ib(i)%angular_vel(j)*dt)/rk_coef(s, 4)
-                            end do
-
-                            ! Update the position of the IB
-                            patch_ib(i)%x_centroid = (rk_coef(s, 1)*patch_ib(i)%step_x_centroid + rk_coef(s, 2)*patch_ib(i)%x_centroid + rk_coef(s, 3)*patch_ib(i)%vel(1)*dt)/rk_coef(s, 4)
-                            patch_ib(i)%y_centroid = (rk_coef(s, 1)*patch_ib(i)%step_y_centroid + rk_coef(s, 2)*patch_ib(i)%y_centroid + rk_coef(s, 3)*patch_ib(i)%vel(2)*dt)/rk_coef(s, 4)
-                            patch_ib(i)%z_centroid = (rk_coef(s, 1)*patch_ib(i)%step_z_centroid + rk_coef(s, 2)*patch_ib(i)%z_centroid + rk_coef(s, 3)*patch_ib(i)%vel(3)*dt)/rk_coef(s, 4)
-                        end if
-                    end do
-                    call s_update_mib(num_ibs, levelset, levelset_norm)
+                    call s_propagate_immersed_boundaries(s)
                 end if
+
+                ! update the ghost fluid properties point values based on IB state
                 if (qbmm .and. .not. polytropic) then
                     call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
                 else
                     call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
                 end if
             end if
+
         end do
 
         ! Adaptive dt: final stage
@@ -663,7 +659,7 @@ contains
     end subroutine s_tvd_rk
 
     !> Bubble source part in Strang operator splitting scheme
-        !! @param t_step Current time-step
+        !! @param stage Current time-stage
     impure subroutine s_adaptive_dt_bubble(stage)
 
         integer, intent(in) :: stage
@@ -700,13 +696,19 @@ contains
 
     end subroutine s_adaptive_dt_bubble
 
+    !> @brief Computes the global time step size from CFL stability constraints across all cells.
     impure subroutine s_compute_dt()
 
         real(wp) :: rho        !< Cell-avg. density
-        real(wp), dimension(num_vels) :: vel        !< Cell-avg. velocity
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3) :: vel        !< Cell-avg. velocity
+            real(wp), dimension(3) :: alpha      !< Cell-avg. volume fraction
+        #:else
+            real(wp), dimension(num_vels) :: vel        !< Cell-avg. velocity
+            real(wp), dimension(num_fluids) :: alpha      !< Cell-avg. volume fraction
+        #:endif
         real(wp) :: vel_sum    !< Cell-avg. velocity sum
         real(wp) :: pres       !< Cell-avg. pressure
-        real(wp), dimension(num_fluids) :: alpha      !< Cell-avg. volume fraction
         real(wp) :: gamma      !< Cell-avg. sp. heat ratio
         real(wp) :: pi_inf     !< Cell-avg. liquid stiffness function
         real(wp) :: qv         !< Cell-avg. fluid reference energy
@@ -718,7 +720,7 @@ contains
         real(wp) :: dt_local
         integer :: j, k, l !< Generic loop iterators
 
-        if (.not. igr) then
+        if (.not. igr .or. dummy) then
             call s_convert_conservative_to_primitive_variables( &
                 q_cons_ts(1)%vf, &
                 q_T_sf, &
@@ -761,6 +763,9 @@ contains
 
     !> This subroutine applies the body forces source term at each
         !! Runge-Kutta stage
+        !! @param q_cons_vf Conservative variables
+        !! @param q_prim_vf_in Primitive variables
+        !! @param rhs_vf_in Right-hand side variables
     subroutine s_apply_bodyforces(q_cons_vf, q_prim_vf_in, rhs_vf_in, ldt)
 
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_cons_vf
@@ -790,6 +795,62 @@ contains
         call nvtxEndRange
 
     end subroutine s_apply_bodyforces
+
+    !> @brief Updates immersed boundary positions and velocities at the current Runge-Kutta stage.
+    subroutine s_propagate_immersed_boundaries(s)
+
+        integer, intent(in) :: s
+        integer :: i
+        logical :: forces_computed
+
+        forces_computed = .false.
+
+        do i = 1, num_ibs
+            if (s == 1) then
+                patch_ib(i)%step_vel = patch_ib(i)%vel
+                patch_ib(i)%step_angular_vel = patch_ib(i)%angular_vel
+                patch_ib(i)%step_angles = patch_ib(i)%angles
+                patch_ib(i)%step_x_centroid = patch_ib(i)%x_centroid
+                patch_ib(i)%step_y_centroid = patch_ib(i)%y_centroid
+                patch_ib(i)%step_z_centroid = patch_ib(i)%z_centroid
+            end if
+
+            if (patch_ib(i)%moving_ibm > 0) then
+                patch_ib(i)%vel = (rk_coef(s, 1)*patch_ib(i)%step_vel + rk_coef(s, 2)*patch_ib(i)%vel)/rk_coef(s, 4)
+                patch_ib(i)%angular_vel = (rk_coef(s, 1)*patch_ib(i)%step_angular_vel + rk_coef(s, 2)*patch_ib(i)%angular_vel)/rk_coef(s, 4)
+
+                if (patch_ib(i)%moving_ibm == 1) then
+                    ! plug in analytic velocities for 1-way coupling, if it exists
+                    @:mib_analytical()
+                else if (patch_ib(i)%moving_ibm == 2) then ! if we are using two-way coupling, apply force and torque
+                    ! compute the force and torque on the IB from the fluid
+                    if (.not. forces_computed) then
+                        call s_compute_ib_forces(q_prim_vf, fluid_pp)
+                        forces_computed = .true.
+                    end if
+
+                    ! update the velocity from the force value
+                    patch_ib(i)%vel = patch_ib(i)%vel + rk_coef(s, 3)*dt*(patch_ib(i)%force/patch_ib(i)%mass)/rk_coef(s, 4)
+
+                    ! update the angular velocity with the torque value
+                    patch_ib(i)%angular_vel = (patch_ib(i)%angular_vel*patch_ib(i)%moment) + (rk_coef(s, 3)*dt*patch_ib(i)%torque/rk_coef(s, 4)) ! add the torque to the angular momentum
+                    call s_compute_moment_of_inertia(i, patch_ib(i)%angular_vel) ! update the moment of inertia to be based on the direction of the angular momentum
+                    patch_ib(i)%angular_vel = patch_ib(i)%angular_vel/patch_ib(i)%moment ! convert back to angular velocity with the new moment of inertia
+                end if
+
+                ! Update the angle of the IB
+                patch_ib(i)%angles = (rk_coef(s, 1)*patch_ib(i)%step_angles + rk_coef(s, 2)*patch_ib(i)%angles + rk_coef(s, 3)*patch_ib(i)%angular_vel*dt)/rk_coef(s, 4)
+
+                ! Update the position of the IB
+                patch_ib(i)%x_centroid = (rk_coef(s, 1)*patch_ib(i)%step_x_centroid + rk_coef(s, 2)*patch_ib(i)%x_centroid + rk_coef(s, 3)*patch_ib(i)%vel(1)*dt)/rk_coef(s, 4)
+                patch_ib(i)%y_centroid = (rk_coef(s, 1)*patch_ib(i)%step_y_centroid + rk_coef(s, 2)*patch_ib(i)%y_centroid + rk_coef(s, 3)*patch_ib(i)%vel(2)*dt)/rk_coef(s, 4)
+                patch_ib(i)%z_centroid = (rk_coef(s, 1)*patch_ib(i)%step_z_centroid + rk_coef(s, 2)*patch_ib(i)%z_centroid + rk_coef(s, 3)*patch_ib(i)%vel(3)*dt)/rk_coef(s, 4)
+            end if
+        end do
+
+        call s_update_mib(num_ibs)
+
+    end subroutine s_propagate_immersed_boundaries
 
     !> This subroutine saves the temporary q_prim_vf vector
         !!      into the q_prim_ts vector that is then used in p_main
@@ -956,6 +1017,10 @@ contains
 
             if (cont_damage) then
                 @:DEALLOCATE(q_prim_vf(damage_idx)%sf)
+            end if
+
+            if (hyper_cleaning) then
+                @:DEALLOCATE(q_prim_vf(psi_idx)%sf)
             end if
 
             if (bubbles_euler) then

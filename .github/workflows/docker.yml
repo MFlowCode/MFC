@@ -54,7 +54,7 @@ jobs:
           TAG="${{ github.event.inputs.tag || github.ref_name }}"
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "TAG=$TAG" >> $GITHUB_ENV
-          git clone --branch "$TAG" --depth 1 https://github.com/MFlowCode/MFC.git mfc
+          git clone --branch "$TAG" --depth 1 ${{ github.server_url }}/${{ github.repository }}.git mfc
 
       - name: Stage
         run: |

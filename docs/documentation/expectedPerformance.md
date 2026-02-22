@@ -1,9 +1,95 @@
+@page expectedPerformance Performance
+
 # Performance
 
-MFC has been benchmarked on several CPUs and GPU devices.
-This page is a summary of these results.
+This page covers how to achieve maximum performance with MFC, including optimization techniques and benchmark results across various hardware platforms.
 
-## Figure of merit: Grind time performance
+---
+
+## Achieving Maximum Performance
+
+### Case Optimization (Recommended)
+
+The single most impactful optimization is **case optimization**, which can provide **up to 10x speedup** for both CPU and GPU runs.
+
+Case optimization works by hard-coding your simulation parameters at compile time, enabling aggressive compiler optimizations (loop unrolling, constant propagation, dead code elimination).
+
+**Basic usage:**
+```shell
+./mfc.sh run case.py --case-optimization -j 8
+```
+
+This automatically:
+1. Generates optimized source code with your parameters hard-coded
+2. Builds an optimized binary for your specific case
+3. Runs the simulation with the optimized binary
+4. Caches the build for repeated runs with the same parameters
+
+**For batch jobs:**
+```shell
+./mfc.sh run case.py --case-optimization -j 8 -e batch -N 4 -n 8
+```
+
+**Build separately (optional):**
+```shell
+./mfc.sh build -i case.py --case-optimization -j 8
+./mfc.sh run case.py
+```
+
+#### When to use case optimization
+
+| Use Case | Recommended? |
+|----------|--------------|
+| Production simulations | **Yes** |
+| Large-scale HPC runs | **Yes** |
+| Benchmarking | **Yes** |
+| Rapid iteration/debugging | No (rebuilds on parameter changes) |
+| Parameter sweeps | No (many different configurations) |
+
+### Other Optimization Flags
+
+| Flag | Description |
+|------|-------------|
+| `--gpu` | Enable GPU acceleration |
+| `-j N` | Parallel build with N threads |
+| `--fastmath` | Faster (less precise) floating-point math |
+
+### Profiling for Optimization
+
+Use profiling tools to identify bottlenecks:
+
+**NVIDIA GPUs:**
+```shell
+./mfc.sh run case.py --nsys    # Timeline profiling (Nsight Systems)
+./mfc.sh run case.py --ncu     # Kernel profiling (Nsight Compute)
+```
+
+**AMD GPUs:**
+```shell
+./mfc.sh run case.py --rsys    # Timeline profiling (rocprof-systems)
+./mfc.sh run case.py --rcu     # Kernel profiling (rocprof-compute)
+```
+
+See @ref running "Running" for detailed profiling instructions.
+
+### Performance Checklist
+
+Before running large simulations:
+
+1. **Build with optimization:** Use `--case-optimization` for production runs
+2. **Use GPU acceleration:** Build with `--gpu` on GPU systems
+3. **Match ranks to hardware:** One MPI rank per GPU, or match CPU cores
+4. **Verify GPU usage:** Check with `nvidia-smi` or `rocm-smi` during runs
+5. **Profile first:** Run a short simulation with profiling to identify issues
+
+---
+
+## Benchmark Results
+
+MFC has been benchmarked on several CPUs and GPU devices.
+This section summarizes these results.
+
+### Figure of merit: Grind time performance
 
 The following table outlines observed performance as nanoseconds per grid point (ns/gp) per equation (eq) per right-hand side (rhs) evaluation (lower is better), also known as the grind time.
 We solve an example 3D, inviscid, 5-equation model problem with two advected species (8 PDEs) and 8M grid points (158-cubed uniform grid).
@@ -79,22 +165,24 @@ __All grind times are in nanoseconds (ns) per grid point (gp) per equation (eq) 
 
 Weak scaling results are obtained by increasing the problem size with the number of processes so that work per process remains constant.
 
-### AMD MI250X GPU
+### GPU weak scaling
 
-MFC weask scales to (at least) 65,536 AMD MI250X GPUs on OLCF Frontier with 96% efficiency.
-This corresponds to 87% of the entire machine.
+MFC weak scales on multiple exascale GPU platforms with high efficiency:
+- **LLNL El Capitan**: AMD MI300A APUs
+- **OLCF Frontier**: AMD MI250X GPUs (65,536 GCDs, 87% of the machine, 96% efficiency)
+- **CSCS Alps**: NVIDIA GH200 GPUs
 
-<img src="../res/weakScaling/frontier.svg" style="height: 50%; width:50%; border-radius: 10pt"/>
+<img src="../res/weakScaling/weakscaling-dark.png" style="width:60%; border-radius: 10pt"/>
 
-### NVIDIA V100 GPU
+### NVIDIA V100 GPU (historical)
 
-MFC weak scales to (at least) 13,824 V100 NVIDIA V100 GPUs on OLCF Summit with 97% efficiency.
+MFC weak scales to (at least) 13,824 NVIDIA V100 GPUs on OLCF Summit with 97% efficiency.
 This corresponds to 50% of the entire machine.
 
 <img src="../res/weakScaling/summit.svg" style="height: 50%; width:50%; border-radius: 10pt"/>
 
-### IBM Power9 CPU
-MFC Weak scales to 13,824 Power9 CPU cores on OLCF Summit to within 1% of ideal scaling.
+### IBM Power9 CPU (historical)
+MFC weak scales to 13,824 Power9 CPU cores on OLCF Summit to within 1% of ideal scaling.
 
 <img src="../res/weakScaling/cpuScaling.svg" style="height: 50%; width:50%; border-radius: 10pt"/>
 
@@ -120,3 +208,6 @@ The "base case" uses 2M and 8M grid points per process.
 CPU strong scaling tests are done with problem sizes of 16, 32, and 64M grid points, with the base case using 2, 4, and 8M cells per process.
 
 <img src="../res/strongScaling/cpuStrongScaling.svg" style="width: 50%; border-radius: 10pt"/>
+
+
+<div style='text-align:center; font-size:0.75rem; color:#888; padding:16px 0 0;'>Page last updated: 2026-02-16</div>

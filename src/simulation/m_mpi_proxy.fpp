@@ -1,15 +1,11 @@
 !>
-!! @file m_mpi_proxy.f90
+!! @file
 !! @brief Contains module m_mpi_proxy
 
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
-!> @brief The module serves as a proxy to the parameters and subroutines
-!!          available in the MPI implementation's MPI module. Specifically,
-!!          the purpose of the proxy is to harness basic MPI commands into
-!!          more complicated procedures as to accomplish the communication
-!!          goals for the simulation.
+!> @brief MPI halo exchange, domain decomposition, and buffer packing/unpacking for the simulation solver
 module m_mpi_proxy
 
 #ifdef MFC_MPI
@@ -47,6 +43,7 @@ module m_mpi_proxy
 
 contains
 
+    !> @brief Allocates immersed boundary communication buffers for MPI halo exchanges.
     subroutine s_initialize_mpi_proxy_module()
 
 #ifdef MFC_MPI
@@ -105,7 +102,7 @@ contains
         #:endfor
 
         #:for VAR in [ 'run_time_info','cyl_coord', 'mpp_lim',     &
-            &  'mp_weno', 'rdma_mpi', 'powell', 'cont_damage', 'bc_io', &
+            &  'mp_weno', 'rdma_mpi', 'cont_damage', 'bc_io', &
             & 'weno_Re_flux', 'alt_soundspeed', 'null_weights', 'mixture_err',   &
             & 'parallel_io', 'hypoelasticity', 'bubbles_euler', 'polytropic',    &
             & 'polydisperse', 'qbmm', 'acoustic_source', 'probe_wrt', 'integral_wrt',   &
@@ -116,7 +113,8 @@ contains
             & 'bc_z%grcbc_in', 'bc_z%grcbc_out', 'bc_z%grcbc_vel_out',          &
             & 'cfl_adap_dt', 'cfl_const_dt', 'cfl_dt', 'surface_tension',       &
             & 'shear_stress', 'bulk_stress', 'bubbles_lagrange',                &
-            & 'hyperelasticity', 'down_sample', 'int_comp','fft_wrt' ]
+            & 'hyperelasticity', 'down_sample', 'int_comp','fft_wrt', &
+            & 'hyper_cleaning' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -125,7 +123,7 @@ contains
                 call MPI_BCAST(chem_params%${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 
-            #:for VAR in [ 'gamma_method' ]
+            #:for VAR in [ 'gamma_method', 'transport_model' ]
                 call MPI_BCAST(chem_params%${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             #:endfor
         end if
@@ -140,8 +138,7 @@ contains
                 call MPI_BCAST(lag_params%${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 
-            #:for VAR in [ 'c0', 'rho0', 'T0', 'x0', 'epsilonb','charwidth', &
-                & 'valmaxvoid', 'Thost']
+            #:for VAR in ['epsilonb','charwidth','valmaxvoid']
                 call MPI_BCAST(lag_params%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
         end if
@@ -156,7 +153,8 @@ contains
             & 'z_domain%beg', 'z_domain%end', 'x_a', 'x_b', 'y_a', 'y_b', 'z_a', &
             & 'z_b', 't_stop', 't_save', 'cfl_target', 'Bx0', 'alf_factor',  &
             & 'tau_star', 'cont_damage_s', 'alpha_bar', 'adap_dt_tol', &
-            & 'ic_eps', 'ic_beta' ]
+            & 'ic_eps', 'ic_beta', 'hyper_cleaning_speed', &
+            & 'hyper_cleaning_tau' ]
             call MPI_BCAST(${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -188,12 +186,19 @@ contains
         #:endif
 
         do i = 1, num_fluids_max
-            #:for VAR in [ 'gamma','pi_inf','mul0','ss','pv','gamma_v','M_v',  &
-                & 'mu_v','k_v', 'cp_v','G', 'cv', 'qv', 'qvp', 'D_v' ]
+            #:for VAR in [ 'gamma','pi_inf','G','cv','qv','qvp' ]
                 call MPI_BCAST(fluid_pp(i)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
             call MPI_BCAST(fluid_pp(i)%Re(1), 2, mpi_p, 0, MPI_COMM_WORLD, ierr)
         end do
+
+        if (bubbles_euler .or. bubbles_lagrange) then
+            #:for VAR in [ 'R0ref','p0ref','rho0ref','T0ref', &
+                'ss','pv','vd','mu_l','mu_v','mu_g','gam_v','gam_g',&
+                'M_v','M_g','k_v','k_g','cp_v','cp_g','R_v','R_g']
+                call MPI_BCAST(bub_pp%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
+        end if
 
         do i = 1, num_fluids_max
             #:for VAR in ['bc_x%alpha_rho_in','bc_x%alpha_in','bc_y%alpha_rho_in','bc_y%alpha_in','bc_z%alpha_rho_in','bc_z%alpha_in']
@@ -203,7 +208,7 @@ contains
 
         do i = 1, num_ibs
             #:for VAR in [ 'radius', 'length_x', 'length_y', 'length_z', &
-                & 'x_centroid', 'y_centroid', 'z_centroid', 'c', 'm', 'p', 't', 'theta', 'slip']
+                & 'x_centroid', 'y_centroid', 'z_centroid', 'c', 'm', 'p', 't', 'theta', 'slip', 'mass']
                 call MPI_BCAST(patch_ib(i)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
             #:for VAR in ['vel', 'angular_vel', 'angles']
@@ -250,6 +255,7 @@ contains
 
     end subroutine s_mpi_bcast_user_inputs
 
+    !> @brief Packs, exchanges, and unpacks immersed boundary marker buffers between neighboring MPI ranks.
     subroutine s_mpi_sendrecv_ib_buffers(ib_markers, mpi_dir, pbc_loc)
 
         type(integer_field), intent(inout) :: ib_markers
@@ -434,6 +440,7 @@ contains
 
     end subroutine s_mpi_sendrecv_ib_buffers
 
+    !> @brief Broadcasts random phase numbers from rank 0 to all MPI processes.
     impure subroutine s_mpi_send_random_number(phi_rn, num_freq)
         integer, intent(in) :: num_freq
         real(wp), intent(inout), dimension(1:num_freq) :: phi_rn
@@ -445,6 +452,7 @@ contains
 
     end subroutine s_mpi_send_random_number
 
+    !> @brief Deallocates immersed boundary MPI communication buffers.
     subroutine s_finalize_mpi_proxy_module()
 
 #ifdef MFC_MPI

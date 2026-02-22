@@ -1,10 +1,11 @@
 !>
-!! @file   m_model.fpp
+!! @file
 !! @author Henry Le Berre <hberre3@gatech.edu>
 !! @brief  Contains module m_model
 
 #:include 'macros.fpp'
 
+!> @brief Binary STL file reader and processor for immersed boundary geometry
 module m_model
 
     use m_helper
@@ -461,6 +462,7 @@ contains
 
     end function f_read_line
 
+    !> @brief Reads the next non-comment line from a model file, using a buffered look-ahead mechanism.
     impure subroutine s_skip_ignored_lines(iunit, buffered_line, is_buffered)
         integer, intent(in) :: iunit
         character(80), intent(inout) :: buffered_line
@@ -487,6 +489,8 @@ contains
     !! @return True if the point is inside the octree, false otherwise.
     impure function f_model_is_inside(model, point, spacing, spc) result(fraction)
 
+        ! $:GPU_ROUTINE(parallelism='[seq]')
+
         type(t_model), intent(in) :: model
         real(wp), dimension(1:3), intent(in) :: point
         real(wp), dimension(1:3), intent(in) :: spacing
@@ -498,6 +502,15 @@ contains
         integer :: i, j, nInOrOut, nHits
 
         real(wp), dimension(1:spc, 1:3) :: ray_origins, ray_dirs
+
+        ! TODO :: The random number generation prohibits GPU compute due to the subroutine not being able to be called in kernels
+        ! This should be swapped out with something that allows GPU compute. I recommend the fibonacci sphere:
+        ! do i = 1, spc
+        !   phi = acos(1.0 - 2.0*(i-1.0)/(spc-1.0))
+        !   theta = pi * (1.0 + sqrt(5.0)) * (i-1.0)
+        !   ray_dirs(i,:) = [cos(theta)*sin(phi), sin(theta)*sin(phi), cos(phi)]
+        !   ray_origins(i,:) = point
+        ! end do
 
         do i = 1, spc
             call random_number(ray_origins(i, :))
@@ -589,9 +602,7 @@ contains
 
     !> This procedure checks and labels edges shared by two or more triangles facets of the 2D STL model.
     !! @param model                      Model to search in.
-    !! @param boundary_v                 Output boundary vertices/normals.
     !! @param boundary_vertex_count      Output total boundary vertex count
-    !! @param boundary_edge_count        Output total boundary edge counts
     subroutine f_check_boundary(model, boundary_v, boundary_vertex_count, boundary_edge_count)
 
         type(t_model), intent(in) :: model
@@ -678,7 +689,7 @@ contains
         do i = 1, boundary_edge_count
             boundary_edge(1) = boundary_v(i, 2, 1) - boundary_v(i, 1, 1)
             boundary_edge(2) = boundary_v(i, 2, 2) - boundary_v(i, 1, 2)
-            edgetan = boundary_edge(1)/boundary_edge(2)
+            edgetan = boundary_edge(1)/sign(max(sgm_eps, abs(boundary_edge(2))), boundary_edge(2))
 
             if (abs(boundary_edge(2)) < threshold_vector_zero) then
                 if (edgetan > 0._wp) then
@@ -702,10 +713,6 @@ contains
     end subroutine f_check_boundary
 
     !> This procedure appends the edge end vertices to a temporary buffer.
-    !! @param temp_boundary_v      Temporary edge end vertex buffer
-    !! @param edge                 Edges end points to be registered
-    !! @param edge_index           Edge index iterator
-    !! @param edge_count           Total number of edges
     subroutine f_register_edge(temp_boundary_v, edge, edge_index, edge_count)
 
         integer, intent(inout) :: edge_index !< Edge index iterator
@@ -722,9 +729,7 @@ contains
 
     !> This procedure check if interpolates is needed for 2D models.
     !! @param boundary_v                Temporary edge end vertex buffer
-    !! @param boundary_edge_count       Output total number of boundary edges
     !! @param spacing                   Dimensions of the current levelset cell
-    !! @param interpolate               Logical output
     subroutine f_check_interpolation_2D(boundary_v, boundary_edge_count, spacing, interpolate)
 
         logical, intent(inout) :: interpolate !< Logical indicator of interpolation
@@ -739,7 +744,6 @@ contains
         interpolate = .false.
 
         do j = 1, boundary_edge_count
-
             l1 = sqrt((boundary_v(j, 2, 1) - boundary_v(j, 1, 1))**2 + &
                       (boundary_v(j, 2, 2) - boundary_v(j, 1, 2))**2)
 
@@ -1049,6 +1053,8 @@ contains
     !! @param distance     The output levelset distance
     subroutine f_distance_normals_3D(model, point, normals, distance)
 
+        $:GPU_ROUTINE(parallelism='[seq]')
+
         type(t_model), intent(IN) :: model
         real(wp), dimension(1:3), intent(in) :: point
         real(wp), dimension(1:3), intent(out) :: normals
@@ -1105,15 +1111,16 @@ contains
 
     !> This procedure determines the levelset distance of 2D models without interpolation.
     !! @param boundary_v                   Group of all the boundary vertices of the 2D model without interpolation
-    !! @param boundary_vertex_count        Output the total number of boundary vertices
     !! @param boundary_edge_count          Output the total number of boundary edges
     !! @param point                        The cell centers of the current levelset cell
-    !! @param spacing                      Dimensions of the current levelset cell
     !! @return                             Distance which the levelset distance without interpolation
     function f_distance(boundary_v, boundary_edge_count, point) result(distance)
 
+        $:GPU_ROUTINE(parallelism='[seq]')
+
         integer, intent(in) :: boundary_edge_count
-        real(wp), intent(in), dimension(1:boundary_edge_count, 1:3, 1:2) :: boundary_v
+        real(wp), intent(in), dimension(:, :, :) :: boundary_v
+        ! real(wp), intent(in), dimension(1:boundary_edge_count, 1:3, 1:2) :: boundary_v
         real(wp), dimension(1:3), intent(in) :: point
 
         integer :: i
@@ -1143,8 +1150,10 @@ contains
     !! @param normals                      Output levelset normals without interpolation
     subroutine f_normals(boundary_v, boundary_edge_count, point, normals)
 
+        $:GPU_ROUTINE(parallelism='[seq]')
+
         integer, intent(in) :: boundary_edge_count
-        real(wp), intent(in), dimension(1:boundary_edge_count, 1:3, 1:2) :: boundary_v
+        real(wp), intent(in), dimension(:, :, :) :: boundary_v
         real(wp), dimension(1:3), intent(in) :: point
         real(wp), dimension(1:3), intent(out) :: normals
 
@@ -1203,8 +1212,10 @@ contains
     !! @return                             Distance which the levelset distance without interpolation
     function f_interpolated_distance(interpolated_boundary_v, total_vertices, point) result(distance)
 
+        $:GPU_ROUTINE(parallelism='[seq]')
+
         integer, intent(in) :: total_vertices
-        real(wp), intent(in), dimension(1:total_vertices, 1:3) :: interpolated_boundary_v
+        real(wp), intent(in), dimension(:, :) :: interpolated_boundary_v
         real(wp), dimension(1:3), intent(in) :: point
 
         integer :: i !< Loop iterator

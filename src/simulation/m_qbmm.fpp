@@ -1,11 +1,11 @@
 !>
-!! @file m_qbmm.f90
+!! @file
 !! @brief Contains module m_qbmm
 
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
-!> @brief This module is used to compute moment inversion via qbmm
+!> @brief Quadrature-based moment methods (QBMM) for polydisperse bubble moment inversion and transport
 module m_qbmm
 
     use m_derived_types        !< Definitions of the derived types
@@ -43,6 +43,7 @@ module m_qbmm
 
 contains
 
+    !> @brief Allocates and initializes moment coefficient arrays for the QBMM module.
     impure subroutine s_initialize_qbmm_module
 
         integer :: i1, i2, q, i, j
@@ -411,6 +412,7 @@ contains
 
     end subroutine s_initialize_qbmm_module
 
+    !> @brief Computes the QBMM right-hand side source terms for bubble moment transport equations.
     subroutine s_compute_qbmm_rhs(idir, q_cons_vf, q_prim_vf, rhs_vf, flux_n_vf, pb, rhs_pb)
 
         integer, intent(in) :: idir
@@ -445,12 +447,13 @@ contains
                                 nR2 = q_cons_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
                                 R = q_prim_vf(bubxb + 1 + (i - 1)*nmom)%sf(j, k, l)
                                 R2 = q_prim_vf(bubxb + 3 + (i - 1)*nmom)%sf(j, k, l)
-                                var = max(R2 - R**2._wp, verysmall)
+                                var = max(R2 - R**2._wp, sgm_eps)
                                 if (q <= 2) then
                                     AX = R - sqrt(var)
                                 else
                                     AX = R + sqrt(var)
                                 end if
+
                                 select case (idir)
                                 case (1)
                                     nb_dot = flux_n_vf(bubxb + (i - 1)*nmom)%sf(j - 1, k, l) - flux_n_vf(bubxb + (i - 1)*nmom)%sf(j, k, l)
@@ -564,17 +567,21 @@ contains
 
     end subroutine s_compute_qbmm_rhs
 
-    !Coefficient array for non-polytropic model (pb and mv values are accounted in wght_pb and wght_mv)
+    !> @brief Builds the coefficient array for the non-polytropic bubble model.
     subroutine s_coeff_nonpoly(pres, rho, c, coeffs)
         $:GPU_ROUTINE(function_name='s_coeff_nonpoly',parallelism='[seq]', &
             & cray_inline=True)
 
         real(wp), intent(in) :: pres, rho, c
-        real(wp), dimension(nterms, 0:2, 0:2), intent(out) :: coeffs
+        #:if USING_AMD
+            real(wp), dimension(32, 0:2, 0:2), intent(out) :: coeffs
+        #:else
+            real(wp), dimension(nterms, 0:2, 0:2), intent(out) :: coeffs
+        #:endif
 
         integer :: i1, i2
 
-        coeffs = 0._wp
+        coeffs(:, :, :) = 0._wp
 
         do i2 = 0, 2; do i1 = 0, 2
                 if ((i1 + i2) <= 2) then
@@ -639,23 +646,27 @@ contains
 
     end subroutine s_coeff_nonpoly
 
-!Coefficient array for polytropic model (pb for each R0 bin accounted for in wght_pb)
+    !> @brief Builds the coefficient array for the polytropic bubble model.
     subroutine s_coeff(pres, rho, c, coeffs)
         $:GPU_ROUTINE(function_name='s_coeff',parallelism='[seq]', &
             & cray_inline=True)
 
         real(wp), intent(in) :: pres, rho, c
-        real(wp), dimension(nterms, 0:2, 0:2), intent(out) :: coeffs
+        #:if USING_AMD
+            real(wp), dimension(32, 0:2, 0:2), intent(out) :: coeffs
+        #:else
+            real(wp), dimension(nterms, 0:2, 0:2), intent(out) :: coeffs
+        #:endif
 
         integer :: i1, i2
 
-        coeffs = 0._wp
+        coeffs(:, :, :) = 0._wp
 
         do i2 = 0, 2; do i1 = 0, 2
                 if ((i1 + i2) <= 2) then
                     if (bubble_model == 3) then
                         ! RPE
-                        #:if not MFC_CASE_OPTIMIZATION or nterms > 7
+                        #:if not MFC_CASE_OPTIMIZATION or nterms > 1
                             coeffs(1, i1, i2) = -1._wp*i2*pres/rho
                             coeffs(2, i1, i2) = -3._wp*i2/2._wp
                             coeffs(3, i1, i2) = i2/rho
@@ -704,6 +715,7 @@ contains
 
     end subroutine s_coeff
 
+    !> @brief Performs moment inversion to recover quadrature weights and abscissas and evaluates bubble source terms.
     subroutine s_mom_inv(q_cons_vf, q_prim_vf, momsp, moms3d, pb, rhs_pb, mv, rhs_mv, ix, iy, iz)
 
         type(scalar_field), dimension(:), intent(inout) :: q_cons_vf, q_prim_vf
@@ -714,18 +726,26 @@ contains
         real(stp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: mv
         real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:, 1:), intent(inout) :: rhs_mv
         type(int_bounds_info), intent(in) :: ix, iy, iz
-
-        real(wp), dimension(nmom) :: moms, msum
-        real(wp), dimension(nnode, nb) :: wght, abscX, abscY, wght_pb, wght_mv, wght_ht, ht
-        real(wp), dimension(nterms, 0:2, 0:2) :: coeff
-        real(wp) :: pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(6) :: moms, msum
+            real(wp), dimension(4, 3) :: wght, abscX, abscY, wght_pb, wght_mv, wght_ht, ht
+        #:else
+            real(wp), dimension(nmom) :: moms, msum
+            real(wp), dimension(nnode, nb) :: wght, abscX, abscY, wght_pb, wght_mv, wght_ht, ht
+        #:endif
+        #:if USING_AMD
+            real(wp), dimension(32, 0:2, 0:2) :: coeff
+        #:else
+            real(wp), dimension(nterms, 0:2, 0:2) :: coeff
+        #:endif
+        real(wp) :: pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, grad_T
         real(wp) :: n_tait, B_tait
         integer :: id1, id2, id3, i1, i2, j, q, r
 
         is1_qbmm = ix; is2_qbmm = iy; is3_qbmm = iz
         $:GPU_UPDATE(device='[is1_qbmm,is2_qbmm,is3_qbmm]')
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[id1,id2,id3,moms, msum, wght, abscX, abscY, wght_pb, wght_mv, wght_ht, coeff, ht, r, q, n_tait, B_tait, pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, T_bar, grad_T, i1, i2, j]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[id1,id2,id3,moms, msum, wght, abscX, abscY, wght_pb, wght_mv, wght_ht, coeff, ht, r, q, n_tait, B_tait, pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, grad_T, i1, i2, j]')
         do id3 = is3_qbmm%beg, is3_qbmm%end
             do id2 = is2_qbmm%beg, is2_qbmm%end
                 do id1 = is1_qbmm%beg, is1_qbmm%end
@@ -763,14 +783,13 @@ contains
                             else
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do j = 1, nnode
-                                    chi_vw = 1._wp/(1._wp + R_v/R_n*(pb(id1, id2, id3, j, q)/pv - 1._wp))
-                                    x_vw = M_n*chi_vw/(M_v + (M_n - M_v)*chi_vw)
-                                    k_mw = x_vw*k_v(q)/(x_vw + (1._wp - x_vw)*phi_vn) + (1._wp - x_vw)*k_n(q)/(x_vw*phi_nv + 1._wp - x_vw)
+                                    chi_vw = 1._wp/(1._wp + R_v/R_g*(pb(id1, id2, id3, j, q)/pv - 1._wp))
+                                    x_vw = M_g*chi_vw/(M_v + (M_g - M_v)*chi_vw)
+                                    k_mw = x_vw*k_v(q)/(x_vw + (1._wp - x_vw)*phi_vg) + (1._wp - x_vw)*k_g(q)/(x_vw*phi_gv + 1._wp - x_vw)
                                     rho_mw = pv/(chi_vw*R_v*Tw)
-                                    rhs_mv(id1, id2, id3, j, q) = -Re_trans_c(q)*((mv(id1, id2, id3, j, q)/(mv(id1, id2, id3, j, q) + mass_n0(q))) - chi_vw)
+                                    rhs_mv(id1, id2, id3, j, q) = -Re_trans_c(q)*((mv(id1, id2, id3, j, q)/(mv(id1, id2, id3, j, q) + mass_g0(q))) - chi_vw)
                                     rhs_mv(id1, id2, id3, j, q) = rho_mw*rhs_mv(id1, id2, id3, j, q)/Pe_c/(1._wp - chi_vw)/abscX(j, q)
-                                    T_bar = Tw*(pb(id1, id2, id3, j, q)/pb0(q))*(abscX(j, q)/R0(q))**3*(mass_n0(q) + mass_v0(q))/(mass_n0(q) + mv(id1, id2, id3, j, q))
-                                    grad_T = -Re_trans_T(q)*(T_bar - Tw)
+                                    grad_T = -Re_trans_T(q)*((pb(id1, id2, id3, j, q)/pb0(q))*(abscX(j, q)/R0(q))**3*(mass_g0(q) + mass_v0(q))/(mass_g0(q) + mv(id1, id2, id3, j, q)) - 1._wp)
                                     ht(j, q) = pb0(q)*k_mw*grad_T/Pe_T(q)/abscX(j, q)
                                     wght_pb(j, q) = wght(j, q)*(pb(id1, id2, id3, j, q))
                                     wght_mv(j, q) = wght(j, q)*(rhs_mv(id1, id2, id3, j, q))
@@ -819,13 +838,14 @@ contains
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do j = 1, nnode
                                     drdt = msum(2)
-                                    drdt2 = merge(-1._wp, 1._wp, j == 1 .or. j == 2)/(2._wp*sqrt(merge(moms(4) - moms(2)**2._wp, verysmall, moms(4) - moms(2)**2._wp > 0._wp)))
+                                    drdt2 = merge(-1._wp, 1._wp, j == 1 .or. j == 2)/(2._wp*sqrt(merge(moms(4) - moms(2)**2._wp, sgm_eps, moms(4) - moms(2)**2._wp > 0._wp)))
                                     drdt2 = drdt2*(msum(3) - 2._wp*moms(2)*msum(2))
                                     drdt = drdt + drdt2
                                     rhs_pb(id1, id2, id3, j, q) = (-3._wp*gam*drdt/abscX(j, q))*(pb(id1, id2, id3, j, q))
                                     rhs_pb(id1, id2, id3, j, q) = rhs_pb(id1, id2, id3, j, q) + (3._wp*gam/abscX(j, q))*rhs_mv(id1, id2, id3, j, q)*R_v*Tw
                                     rhs_pb(id1, id2, id3, j, q) = rhs_pb(id1, id2, id3, j, q) + (3._wp*gam/abscX(j, q))*ht(j, q)
                                     rhs_mv(id1, id2, id3, j, q) = rhs_mv(id1, id2, id3, j, q)*(4._wp*pi*abscX(j, q)**2._wp)
+
                                 end do
                             end if
                         end do
@@ -865,12 +885,16 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
     contains
-        ! Helper to select the correct coefficient routine
+        !> @brief Selects the polytropic or non-polytropic coefficient routine.
         subroutine s_coeff_selector(pres, rho, c, coeff, polytropic)
             $:GPU_ROUTINE(function_name='s_coeff_selector',parallelism='[seq]', &
                 & cray_inline=True)
             real(wp), intent(in) :: pres, rho, c
-            real(wp), dimension(nterms, 0:2, 0:2), intent(out) :: coeff
+            #:if USING_AMD
+                real(wp), dimension(32, 0:2, 0:2), intent(out) :: coeff
+            #:else
+                real(wp), dimension(nterms, 0:2, 0:2), intent(out) :: coeff
+            #:endif
             logical, intent(in) :: polytropic
             if (polytropic) then
                 call s_coeff(pres, rho, c, coeff)
@@ -879,6 +903,7 @@ contains
             end if
         end subroutine s_coeff_selector
 
+        !> @brief Performs conditional hyperbolic QMOM (CHyQMOM) inversion for bivariate moments.
         subroutine s_chyqmom(momin, wght, abscX, abscY)
             $:GPU_ROUTINE(function_name='s_chyqmom',parallelism='[seq]', &
                 & cray_inline=True)
@@ -937,6 +962,7 @@ contains
 
         end subroutine s_chyqmom
 
+        !> @brief Performs hyperbolic QMOM (HyQMOM) inversion for univariate moments.
         subroutine s_hyqmom(frho, fup, fmom)
             $:GPU_ROUTINE(function_name='s_hyqmom',parallelism='[seq]', &
                 & cray_inline=True)
@@ -951,36 +977,56 @@ contains
             c2 = d2 - bu**2._wp
             frho(1) = fmom(1)/2._wp; 
             frho(2) = fmom(1)/2._wp; 
-            c2 = maxval((/c2, verysmall/))
+            c2 = maxval((/c2, sgm_eps/))
             fup(1) = bu - sqrt(c2)
             fup(2) = bu + sqrt(c2)
 
         end subroutine s_hyqmom
 
+        !> @brief Evaluates a weighted quadrature sum over all bubble size bins and nodes.
         function f_quad(abscX, abscY, wght_in, q, r, s)
             $:GPU_ROUTINE(parallelism='[seq]')
-            real(wp), dimension(nnode, nb), intent(in) :: abscX, abscY, wght_in
+            #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+                real(wp), dimension(4, 3), intent(in) :: abscX, abscY, wght_in
+            #:else
+                real(wp), dimension(nnode, nb), intent(in) :: abscX, abscY, wght_in
+            #:endif
             real(wp), intent(in) :: q, r, s
 
             real(wp) :: f_quad_RV, f_quad
-            integer :: i
+            integer :: i, i1
 
             f_quad = 0._wp
+            $:GPU_LOOP(parallelism='[seq]')
             do i = 1, nb
-                f_quad_RV = sum(wght_in(:, i)*(abscX(:, i)**q)*(abscY(:, i)**r))
+                f_quad_RV = 0._wp
+                $:GPU_LOOP(parallelism='[seq]')
+                do i1 = 1, nnode
+                    f_quad_RV = f_quad_RV + wght_in(i1, i)*(abscX(i1, i)**q)*(abscY(i1, i)**r)
+                end do
                 f_quad = f_quad + weight(i)*(R0(i)**s)*f_quad_RV
             end do
 
         end function f_quad
 
+        !> @brief Evaluates a weighted 2D quadrature sum over quadrature nodes for a single size bin.
         function f_quad2D(abscX, abscY, wght_in, pow)
             $:GPU_ROUTINE(parallelism='[seq]')
-            real(wp), dimension(nnode), intent(in) :: abscX, abscY, wght_in
+            #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+                real(wp), dimension(4), intent(in) :: abscX, abscY, wght_in
+            #:else
+                real(wp), dimension(nnode), intent(in) :: abscX, abscY, wght_in
+            #:endif
             real(wp), dimension(3), intent(in) :: pow
 
             real(wp) :: f_quad2D
+            integer :: i
 
-            f_quad2D = sum(wght_in(:)*(abscX(:)**pow(1))*(abscY(:)**pow(2)))
+            f_quad2D = 0._wp
+            $:GPU_LOOP(parallelism='[seq]')
+            do i = 1, nnode
+                f_quad2D = f_quad2D + wght_in(i)*(abscX(i)**pow(1))*(abscY(i)**pow(2))
+            end do
         end function f_quad2D
 
     end subroutine s_mom_inv

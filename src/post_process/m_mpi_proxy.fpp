@@ -1,12 +1,8 @@
 !>
-!! @file m_mpi_proxy.f90
+!! @file
 !! @brief Contains module m_mpi_proxy
 
-!> @brief  This module serves as a proxy to the parameters and subroutines
-!!              available in the MPI implementation's MPI module. Specifically,
-!!              the role of the proxy is to harness basic MPI commands into more
-!!              complex procedures as to achieve the required communication goals
-!!              for the post-process.
+!> @brief MPI gather and scatter operations for distributing post-process grid and flow-variable data
 module m_mpi_proxy
 
 #ifdef MFC_MPI
@@ -105,7 +101,7 @@ contains
             & 'adv_n', 'ib', 'cfl_adap_dt', 'cfl_const_dt', 'cfl_dt',          &
             & 'surface_tension', 'hyperelasticity', 'bubbles_lagrange',        &
             & 'output_partial_domain', 'relativity', 'cont_damage', 'bc_io',   &
-            & 'down_sample','fft_wrt' ]
+            & 'down_sample','fft_wrt', 'hyper_cleaning' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
@@ -134,8 +130,16 @@ contains
             call MPI_BCAST(fluid_pp(i)%qv, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(fluid_pp(i)%qvp, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(fluid_pp(i)%G, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(fluid_pp(i)%D_v, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
         end do
+
+        ! Subgrid bubble parameters
+        if (bubbles_euler .or. bubbles_lagrange) then
+            #:for VAR in [ 'R0ref','p0ref','rho0ref','T0ref', &
+                'ss','pv','vd','mu_l','mu_v','mu_g','gam_v','gam_g', &
+                'M_v','M_g','k_v','k_g','cp_v','cp_g','R_v','R_g']
+                call MPI_BCAST(bub_pp%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
+        end if
 
         #:for VAR in [ 'pref', 'rhoref', 'R0ref', 'poly_sigma', 'Web', 'Ca', &
             & 'Re_inv', 'Bx0', 'sigma', 't_save', 't_stop',   &
@@ -160,6 +164,7 @@ contains
 
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
+        real(wp) :: ext_temp(0:num_procs - 1)
 
         ! Simulation is 3D
         if (p > 0) then
@@ -265,17 +270,20 @@ contains
             ! Simulation is 1D
         else
 
+            ! For 1D, recvcounts/displs are sized for grid defragmentation
+            ! (m+1 per rank), not for scalar gathers. Use MPI_GATHER instead.
+
             ! Minimum spatial extent in the x-direction
-            call MPI_GATHERV(minval(x_cb), 1, mpi_p, &
-                             spatial_extents(1, 0), recvcounts, 4*displs, &
-                             mpi_p, 0, MPI_COMM_WORLD, &
-                             ierr)
+            call MPI_GATHER(minval(x_cb), 1, mpi_p, &
+                            ext_temp, 1, mpi_p, 0, &
+                            MPI_COMM_WORLD, ierr)
+            if (proc_rank == 0) spatial_extents(1, :) = ext_temp
 
             ! Maximum spatial extent in the x-direction
-            call MPI_GATHERV(maxval(x_cb), 1, mpi_p, &
-                             spatial_extents(2, 0), recvcounts, 4*displs, &
-                             mpi_p, 0, MPI_COMM_WORLD, &
-                             ierr)
+            call MPI_GATHER(maxval(x_cb), 1, mpi_p, &
+                            ext_temp, 1, mpi_p, 0, &
+                            MPI_COMM_WORLD, ierr)
+            if (proc_rank == 0) spatial_extents(2, :) = ext_temp
         end if
 
 #endif
@@ -331,16 +339,35 @@ contains
 
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
+        real(wp) :: ext_temp(0:num_procs - 1)
 
-        ! Minimum flow variable extent
-        call MPI_GATHERV(minval(q_sf), 1, mpi_p, &
-                         data_extents(1, 0), recvcounts, 2*displs, &
-                         mpi_p, 0, MPI_COMM_WORLD, ierr)
+        if (n > 0) then
+            ! Multi-D: recvcounts = 1, so strided MPI_GATHERV works correctly
+            ! Minimum flow variable extent
+            call MPI_GATHERV(minval(q_sf), 1, mpi_p, &
+                             data_extents(1, 0), recvcounts, 2*displs, &
+                             mpi_p, 0, MPI_COMM_WORLD, ierr)
 
-        ! Maximum flow variable extent
-        call MPI_GATHERV(maxval(q_sf), 1, mpi_p, &
-                         data_extents(2, 0), recvcounts, 2*displs, &
-                         mpi_p, 0, MPI_COMM_WORLD, ierr)
+            ! Maximum flow variable extent
+            call MPI_GATHERV(maxval(q_sf), 1, mpi_p, &
+                             data_extents(2, 0), recvcounts, 2*displs, &
+                             mpi_p, 0, MPI_COMM_WORLD, ierr)
+        else
+            ! 1D: recvcounts/displs are sized for grid defragmentation
+            ! (m+1 per rank), not for scalar gathers. Use MPI_GATHER instead.
+
+            ! Minimum flow variable extent
+            call MPI_GATHER(minval(q_sf), 1, mpi_p, &
+                            ext_temp, 1, mpi_p, 0, &
+                            MPI_COMM_WORLD, ierr)
+            if (proc_rank == 0) data_extents(1, :) = ext_temp
+
+            ! Maximum flow variable extent
+            call MPI_GATHER(maxval(q_sf), 1, mpi_p, &
+                            ext_temp, 1, mpi_p, 0, &
+                            MPI_COMM_WORLD, ierr)
+            if (proc_rank == 0) data_extents(2, :) = ext_temp
+        end if
 
 #endif
 

@@ -9,8 +9,8 @@ NPx = 2
 NPy = 2
 NPz = 2
 
-x0 = 0
-x1 = 2 * NPx
+x0 = 0.0
+x1 = 2.0 * NPx
 y0 = -1.0 * NPy
 y1 = 1.0 * NPy
 z0 = -1.0 * NPz

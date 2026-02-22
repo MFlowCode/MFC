@@ -1,6 +1,11 @@
+!>
+!! @file
+!! @brief Contains module m_sim_helpers
+
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
+!> @brief Simulation helper routines for enthalpy computation, CFL calculation, and stability checks
 module m_sim_helpers
 
     use m_derived_types        !< Definitions of the derived types
@@ -89,6 +94,7 @@ contains
         !! @param alpha component alphas
         !! @param vel directional velocities
         !! @param vel_sum squard sum of velocity components
+        !! @param qv Fluid reference energy
         !! @param j x index
         !! @param k y index
         !! @param l z index
@@ -97,45 +103,31 @@ contains
             & cray_inline=True)
 
         type(scalar_field), intent(in), dimension(sys_size) :: q_prim_vf
-        real(wp), intent(inout), dimension(num_fluids) :: alpha
-        real(wp), intent(inout), dimension(num_vels) :: vel
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), intent(inout), dimension(3) :: alpha
+            real(wp), intent(inout), dimension(3) :: vel
+        #:else
+            real(wp), intent(inout), dimension(num_fluids) :: alpha
+            real(wp), intent(inout), dimension(num_vels) :: vel
+        #:endif
         real(wp), intent(inout) :: rho, gamma, pi_inf, vel_sum, H, pres
         real(wp), intent(out) :: qv
         integer, intent(in) :: j, k, l
         real(wp), dimension(2), intent(inout) :: Re
-
-        real(wp), dimension(num_fluids) :: alpha_rho, Gs
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3) :: alpha_rho, Gs
+        #:else
+            real(wp), dimension(num_fluids) :: alpha_rho, Gs
+        #:endif
         real(wp) :: E, G_local
 
         integer :: i
 
-        if (igr) then
-            if (num_fluids == 1) then
-                alpha_rho(1) = q_prim_vf(contxb)%sf(j, k, l)
-                alpha(1) = 1._wp
-            else
-                $:GPU_LOOP(parallelism='[seq]')
-                do i = 1, num_fluids - 1
-                    alpha_rho(i) = q_prim_vf(i)%sf(j, k, l)
-                    alpha(i) = q_prim_vf(advxb + i - 1)%sf(j, k, l)
-                end do
-
-                alpha_rho(num_fluids) = q_prim_vf(num_fluids)%sf(j, k, l)
-                alpha(num_fluids) = 1._wp - sum(alpha(1:num_fluids - 1))
-            end if
-        else
-            $:GPU_LOOP(parallelism='[seq]')
-            do i = 1, num_fluids
-                alpha_rho(i) = q_prim_vf(i)%sf(j, k, l)
-                alpha(i) = q_prim_vf(advxb + i - 1)%sf(j, k, l)
-            end do
-        end if
+        call s_compute_species_fraction(q_prim_vf, j, k, l, alpha_rho, alpha)
 
         if (elasticity) then
             call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha, &
                                                             alpha_rho, Re, G_local, Gs)
-        elseif (bubbles_euler) then
-            call s_convert_species_to_mixture_variables_bubbles_acc(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re)
         else
             call s_convert_species_to_mixture_variables_acc(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re)
         end if
@@ -178,6 +170,7 @@ contains
     !> Computes stability criterion for a specified dt
         !! @param vel directional velocities
         !! @param c mixture speed of sound
+        !! @param rho Density
         !! @param Re_l mixture Reynolds number
         !! @param j x index
         !! @param k y index
@@ -244,6 +237,7 @@ contains
 
     !> Computes dt for a specified CFL number
         !! @param vel directional velocities
+        !! @param c Speed of sound
         !! @param max_dt cell centered maximum dt
         !! @param rho cell centered density
         !! @param Re_l cell centered Reynolds number
@@ -277,17 +271,17 @@ contains
                 if (grid_geometry == 3) then
                     fltr_dtheta = f_compute_filtered_dtheta(k, l)
                     vcfl_dt = cfl_target*(min(dx(j), dy(k), fltr_dtheta)**2._wp) &
-                              /minval(1/(rho*Re_l))
+                              /maxval(1/(rho*Re_l))
                 else
                     vcfl_dt = cfl_target*(min(dx(j), dy(k), dz(l))**2._wp) &
-                              /minval(1/(rho*Re_l))
+                              /maxval(1/(rho*Re_l))
                 end if
             elseif (n > 0) then
                 !2D
                 vcfl_dt = cfl_target*(min(dx(j), dy(k))**2._wp)/maxval((1/Re_l)/rho)
             else
                 !1D
-                vcfl_dt = cfl_target*(dx(j)**2._wp)/minval(1/(rho*Re_l))
+                vcfl_dt = cfl_target*(dx(j)**2._wp)/maxval(1/(rho*Re_l))
             end if
         end if
 

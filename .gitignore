@@ -19,6 +19,16 @@ __pycache__
 
 *.egg-info
 
+# Auto-generated version file
+toolchain/mfc/_version.py
+
+# Auto-generated toolchain files (regenerate with: ./mfc.sh generate)
+toolchain/completions/mfc.bash
+toolchain/completions/_mfc
+toolchain/mfc-case-schema.json
+docs/documentation/cli-reference.md
+docs/documentation/parameters.md
+
 .DS_Store
 
 /tests/*/**
@@ -33,6 +43,13 @@ docs/*/initial*
 docs/*/result*
 docs/documentation/*-example.png
 docs/documentation/examples.md
+docs/documentation/case_constraints.md
+docs/documentation/physics_constraints.md
+docs/documentation/architecture.md
+docs/pre_process/readme.md
+docs/simulation/readme.md
+docs/post_process/readme.md
+docs/api/readme.md
 
 examples/*batch/*/
 examples/**/D/*
@@ -87,5 +104,5 @@ benchmarks/*.png
 *.mkv
 *.avi
 
-packaging/spack/spack-test
-.spack 
+**isolation_rules/
+**.supercode/

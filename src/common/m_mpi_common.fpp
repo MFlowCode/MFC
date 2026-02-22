@@ -1,11 +1,11 @@
+!>
+!! @file
+!! @brief Contains module m_mpi_common
+
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
-!> @brief The module serves as a proxy to the parameters and subroutines
-!!          available in the MPI implementation's MPI module. Specifically,
-!!          the purpose of the proxy is to harness basic MPI commands into
-!!          more complicated procedures as to accomplish the communication
-!!          goals for the simulation.
+!> @brief MPI communication layer: domain decomposition, halo exchange, reductions, and parallel I/O setup
 module m_mpi_common
 
 #ifdef MFC_MPI
@@ -124,15 +124,11 @@ contains
 
     !! @param q_cons_vf Conservative variables
     !! @param ib_markers track if a cell is within the immersed boundary
-    !! @param levelset closest distance from every cell to the IB
-    !! @param levelset_norm normalized vector from every cell to the closest point to the IB
     !! @param beta Eulerian void fraction from lagrangian bubbles
-    impure subroutine s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm, beta)
+    impure subroutine s_initialize_mpi_data(q_cons_vf, ib_markers, beta)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         type(integer_field), optional, intent(in) :: ib_markers
-        type(levelset_field), optional, intent(IN) :: levelset
-        type(levelset_norm_field), optional, intent(IN) :: levelset_norm
         type(scalar_field), intent(in), optional :: beta
 
         integer, dimension(num_dims) :: sizes_glb, sizes_loc
@@ -203,73 +199,13 @@ contains
         end if
 #endif
 
+#ifndef MFC_PRE_PROCESS
         if (present(ib_markers)) then
-
-#ifdef MFC_PRE_PROCESS
-            MPI_IO_IB_DATA%var%sf => ib_markers%sf
-            MPI_IO_levelset_DATA%var%sf => levelset%sf
-            MPI_IO_levelsetnorm_DATA%var%sf => levelset_norm%sf
-#else
             MPI_IO_IB_DATA%var%sf => ib_markers%sf(0:m, 0:n, 0:p)
 
-#ifndef MFC_POST_PROCESS
-            MPI_IO_levelset_DATA%var%sf => levelset%sf(0:m, 0:n, 0:p, 1:num_ibs)
-            MPI_IO_levelsetnorm_DATA%var%sf => levelset_norm%sf(0:m, 0:n, 0:p, 1:num_ibs, 1:3)
-#endif
-
-#endif
             call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, &
                                           MPI_ORDER_FORTRAN, MPI_INTEGER, MPI_IO_IB_DATA%view, ierr)
             call MPI_TYPE_COMMIT(MPI_IO_IB_DATA%view, ierr)
-
-#ifndef MFC_POST_PROCESS
-            call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, &
-                                          MPI_ORDER_FORTRAN, mpi_p, MPI_IO_levelset_DATA%view, ierr)
-            call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, &
-                                          MPI_ORDER_FORTRAN, mpi_p, MPI_IO_levelsetnorm_DATA%view, ierr)
-
-            call MPI_TYPE_COMMIT(MPI_IO_levelset_DATA%view, ierr)
-            call MPI_TYPE_COMMIT(MPI_IO_levelsetnorm_DATA%view, ierr)
-#endif
-        end if
-
-#ifndef MFC_POST_PROCESS
-        if (present(ib_markers)) then
-            do j = 1, num_ibs
-                if (patch_ib(j)%c > 0) then
-
-#ifdef MFC_PRE_PROCESS
-                    allocate (MPI_IO_airfoil_IB_DATA%var(1:2*Np))
-#endif
-
-                    airfoil_glb(1) = 3*Np*num_procs
-                    airfoil_loc(1) = 3*Np
-                    airfoil_start(1) = 3*proc_rank*Np
-
-#ifdef MFC_PRE_PROCESS
-                    do i = 1, Np
-                        MPI_IO_airfoil_IB_DATA%var(i)%x = airfoil_grid_l(i)%x
-                        MPI_IO_airfoil_IB_DATA%var(i)%y = airfoil_grid_l(i)%y
-                    end do
-#endif
-
-                    call MPI_TYPE_CREATE_SUBARRAY(1, airfoil_glb, airfoil_loc, airfoil_start, &
-                                                  MPI_ORDER_FORTRAN, mpi_p, MPI_IO_airfoil_IB_DATA%view(1), ierr)
-                    call MPI_TYPE_COMMIT(MPI_IO_airfoil_IB_DATA%view(1), ierr)
-
-#ifdef MFC_PRE_PROCESS
-                    do i = 1, Np
-                        MPI_IO_airfoil_IB_DATA%var(Np + i)%x = airfoil_grid_u(i)%x
-                        MPI_IO_airfoil_IB_DATA%var(Np + i)%y = airfoil_grid_u(i)%y
-                    end do
-#endif
-                    call MPI_TYPE_CREATE_SUBARRAY(1, airfoil_glb, airfoil_loc, airfoil_start, &
-                                                  MPI_ORDER_FORTRAN, mpi_p, MPI_IO_airfoil_IB_DATA%view(2), ierr)
-                    call MPI_TYPE_COMMIT(MPI_IO_airfoil_IB_DATA%view(2), ierr)
-
-                end if
-            end do
-
         end if
 #endif
 
@@ -328,6 +264,7 @@ contains
 
     end subroutine s_initialize_mpi_data_ds
 
+    !> @brief Gathers variable-length real vectors from all MPI ranks onto the root process.
     impure subroutine s_mpi_gather_data(my_vector, counts, gathered_vector, root)
 
         integer, intent(in) :: counts          ! Array of vector lengths for each process
@@ -360,6 +297,7 @@ contains
 #endif
     end subroutine s_mpi_gather_data
 
+    !> @brief Gathers per-rank time step wall-clock times onto rank 0 for performance reporting.
     impure subroutine mpi_bcast_time_step_values(proc_time, time_avg)
 
         real(wp), dimension(0:num_procs - 1), intent(inout) :: proc_time
@@ -374,6 +312,7 @@ contains
 
     end subroutine mpi_bcast_time_step_values
 
+    !> @brief Prints a case file error with the prohibited condition and message, then aborts execution.
     impure subroutine s_prohibit_abort(condition, message)
         character(len=*), intent(in) :: condition, message
 
@@ -471,6 +410,32 @@ contains
 #endif
 
     end subroutine s_mpi_allreduce_sum
+
+    !>  This subroutine follows the behavior of the s_mpi_allreduce_sum subroutine
+    !>  with the additional feature that it reduces an array of vectors.
+    impure subroutine s_mpi_allreduce_vectors_sum(var_loc, var_glb, num_vectors, vector_length)
+
+        integer, intent(in) :: num_vectors, vector_length
+        real(wp), dimension(:, :), intent(in) :: var_loc
+        real(wp), dimension(:, :), intent(out) :: var_glb
+
+#ifdef MFC_MPI
+        integer :: ierr !< Generic flag used to identify and report MPI errors
+
+        ! Performing the reduction procedure
+        if (loc(var_loc) == loc(var_glb)) then
+            call MPI_Allreduce(MPI_IN_PLACE, var_glb, num_vectors*vector_length, &
+                               mpi_p, MPI_SUM, MPI_COMM_WORLD, ierr)
+        else
+            call MPI_Allreduce(var_loc, var_glb, num_vectors*vector_length, &
+                               mpi_p, MPI_SUM, MPI_COMM_WORLD, ierr)
+        end if
+
+#else
+        var_glb(1:num_vectors, 1:vector_length) = var_loc(1:num_vectors, 1:vector_length)
+#endif
+
+    end subroutine s_mpi_allreduce_vectors_sum
 
     !>  The following subroutine takes the input local variable
         !!      from all processors and reduces to the sum of all
@@ -611,6 +576,7 @@ contains
 
     !> The subroutine terminates the MPI execution environment.
         !! @param prnt error message to be printed
+        !! @param code optional exit code
     impure subroutine s_mpi_abort(prnt, code)
 
         character(len=*), intent(in), optional :: prnt
@@ -672,9 +638,12 @@ contains
     !>  The goal of this procedure is to populate the buffers of
         !!      the cell-average conservative variables by communicating
         !!      with the neighboring processors.
-        !!  @param q_cons_vf Cell-average conservative variables
+        !!  @param q_comm Cell-average conservative variables
         !!  @param mpi_dir MPI communication coordinate direction
         !!  @param pbc_loc Processor boundary condition (PBC) location
+        !!  @param nVar Number of variables to communicate
+        !!  @param pb_in Optional internal bubble pressure
+        !!  @param mv_in Optional bubble mass velocity
     subroutine s_mpi_sendrecv_variables_buffers(q_comm, &
                                                 mpi_dir, &
                                                 pbc_loc, &
@@ -958,176 +927,176 @@ contains
         #:for mpi_dir in [1, 2, 3]
             if (mpi_dir == ${mpi_dir}$) then
                 #:if mpi_dir == 1
-                    #:call GPU_PARALLEL_LOOP_OLD(collapse=4,private='[r]')
+                    $:GPU_PARALLEL_LOOP(collapse=4,private='[r]')
+                    do l = 0, p
+                        do k = 0, n
+                            do j = -buff_size, -1
+                                do i = 1, nVar
+                                    r = (i - 1) + v_size* &
+                                        (j + buff_size*((k + 1) + (n + 1)*l))
+                                    q_comm(i)%sf(j + unpack_offset, k, l) = real(buff_recv(r), kind=stp)
+#if defined(__INTEL_COMPILER)
+                                    if (ieee_is_nan(q_comm(i)%sf(j, k, l))) then
+                                        print *, "Error", j, k, l, i
+                                        error stop "NaN(s) in recv"
+                                    end if
+#endif
+                                end do
+                            end do
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+
+                    if (qbmm_comm) then
+                        $:GPU_PARALLEL_LOOP(collapse=5,private='[r]')
                         do l = 0, p
                             do k = 0, n
                                 do j = -buff_size, -1
-                                    do i = 1, nVar
-                                        r = (i - 1) + v_size* &
-                                            (j + buff_size*((k + 1) + (n + 1)*l))
-                                        q_comm(i)%sf(j + unpack_offset, k, l) = real(buff_recv(r), kind=stp)
-#if defined(__INTEL_COMPILER)
-                                        if (ieee_is_nan(q_comm(i)%sf(j, k, l))) then
-                                            print *, "Error", j, k, l, i
-                                            error stop "NaN(s) in recv"
-                                        end if
-#endif
+                                    do i = nVar + 1, nVar + 4
+                                        do q = 1, nb
+                                            r = (i - 1) + (q - 1)*4 + v_size* &
+                                                (j + buff_size*((k + 1) + (n + 1)*l))
+                                            pb_in(j + unpack_offset, k, l, i - nVar, q) = real(buff_recv(r), kind=stp)
+                                        end do
                                     end do
                                 end do
                             end do
                         end do
-                    #:endcall GPU_PARALLEL_LOOP_OLD
+                        $:END_GPU_PARALLEL_LOOP()
 
-                    if (qbmm_comm) then
-                        #:call GPU_PARALLEL_LOOP_OLD(collapse=5,private='[r]')
-                            do l = 0, p
-                                do k = 0, n
-                                    do j = -buff_size, -1
-                                        do i = nVar + 1, nVar + 4
-                                            do q = 1, nb
-                                                r = (i - 1) + (q - 1)*4 + v_size* &
-                                                    (j + buff_size*((k + 1) + (n + 1)*l))
-                                                pb_in(j + unpack_offset, k, l, i - nVar, q) = real(buff_recv(r), kind=stp)
-                                            end do
+                        $:GPU_PARALLEL_LOOP(collapse=5,private='[r]')
+                        do l = 0, p
+                            do k = 0, n
+                                do j = -buff_size, -1
+                                    do i = nVar + 1, nVar + 4
+                                        do q = 1, nb
+                                            r = (i - 1) + (q - 1)*4 + nb*4 + v_size* &
+                                                (j + buff_size*((k + 1) + (n + 1)*l))
+                                            mv_in(j + unpack_offset, k, l, i - nVar, q) = real(buff_recv(r), kind=stp)
                                         end do
                                     end do
                                 end do
                             end do
-                        #:endcall GPU_PARALLEL_LOOP_OLD
-
-                        #:call GPU_PARALLEL_LOOP_OLD(collapse=5,private='[r]')
-                            do l = 0, p
-                                do k = 0, n
-                                    do j = -buff_size, -1
-                                        do i = nVar + 1, nVar + 4
-                                            do q = 1, nb
-                                                r = (i - 1) + (q - 1)*4 + nb*4 + v_size* &
-                                                    (j + buff_size*((k + 1) + (n + 1)*l))
-                                                mv_in(j + unpack_offset, k, l, i - nVar, q) = real(buff_recv(r), kind=stp)
-                                            end do
-                                        end do
-                                    end do
-                                end do
-                            end do
-                        #:endcall GPU_PARALLEL_LOOP_OLD
+                        end do
+                        $:END_GPU_PARALLEL_LOOP()
                     end if
                 #:elif mpi_dir == 2
-                    #:call GPU_PARALLEL_LOOP_OLD(collapse=4,private='[r]')
-                        do i = 1, nVar
+                    $:GPU_PARALLEL_LOOP(collapse=4,private='[r]')
+                    do i = 1, nVar
+                        do l = 0, p
+                            do k = -buff_size, -1
+                                do j = -buff_size, m + buff_size
+                                    r = (i - 1) + v_size* &
+                                        ((j + buff_size) + (m + 2*buff_size + 1)* &
+                                         ((k + buff_size) + buff_size*l))
+                                    q_comm(i)%sf(j, k + unpack_offset, l) = real(buff_recv(r), kind=stp)
+#if defined(__INTEL_COMPILER)
+                                    if (ieee_is_nan(q_comm(i)%sf(j, k, l))) then
+                                        print *, "Error", j, k, l, i
+                                        error stop "NaN(s) in recv"
+                                    end if
+#endif
+                                end do
+                            end do
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+
+                    if (qbmm_comm) then
+                        $:GPU_PARALLEL_LOOP(collapse=5,private='[r]')
+                        do i = nVar + 1, nVar + 4
                             do l = 0, p
                                 do k = -buff_size, -1
                                     do j = -buff_size, m + buff_size
-                                        r = (i - 1) + v_size* &
-                                            ((j + buff_size) + (m + 2*buff_size + 1)* &
-                                             ((k + buff_size) + buff_size*l))
-                                        q_comm(i)%sf(j, k + unpack_offset, l) = real(buff_recv(r), kind=stp)
-#if defined(__INTEL_COMPILER)
-                                        if (ieee_is_nan(q_comm(i)%sf(j, k, l))) then
-                                            print *, "Error", j, k, l, i
-                                            error stop "NaN(s) in recv"
-                                        end if
-#endif
+                                        do q = 1, nb
+                                            r = (i - 1) + (q - 1)*4 + v_size* &
+                                                ((j + buff_size) + (m + 2*buff_size + 1)* &
+                                                 ((k + buff_size) + buff_size*l))
+                                            pb_in(j, k + unpack_offset, l, i - nVar, q) = real(buff_recv(r), kind=stp)
+                                        end do
                                     end do
                                 end do
                             end do
                         end do
-                    #:endcall GPU_PARALLEL_LOOP_OLD
+                        $:END_GPU_PARALLEL_LOOP()
 
-                    if (qbmm_comm) then
-                        #:call GPU_PARALLEL_LOOP_OLD(collapse=5,private='[r]')
-                            do i = nVar + 1, nVar + 4
-                                do l = 0, p
-                                    do k = -buff_size, -1
-                                        do j = -buff_size, m + buff_size
-                                            do q = 1, nb
-                                                r = (i - 1) + (q - 1)*4 + v_size* &
-                                                    ((j + buff_size) + (m + 2*buff_size + 1)* &
-                                                     ((k + buff_size) + buff_size*l))
-                                                pb_in(j, k + unpack_offset, l, i - nVar, q) = real(buff_recv(r), kind=stp)
-                                            end do
+                        $:GPU_PARALLEL_LOOP(collapse=5,private='[r]')
+                        do i = nVar + 1, nVar + 4
+                            do l = 0, p
+                                do k = -buff_size, -1
+                                    do j = -buff_size, m + buff_size
+                                        do q = 1, nb
+                                            r = (i - 1) + (q - 1)*4 + nb*4 + v_size* &
+                                                ((j + buff_size) + (m + 2*buff_size + 1)* &
+                                                 ((k + buff_size) + buff_size*l))
+                                            mv_in(j, k + unpack_offset, l, i - nVar, q) = real(buff_recv(r), kind=stp)
                                         end do
                                     end do
                                 end do
                             end do
-                        #:endcall GPU_PARALLEL_LOOP_OLD
-
-                        #:call GPU_PARALLEL_LOOP_OLD(collapse=5,private='[r]')
-                            do i = nVar + 1, nVar + 4
-                                do l = 0, p
-                                    do k = -buff_size, -1
-                                        do j = -buff_size, m + buff_size
-                                            do q = 1, nb
-                                                r = (i - 1) + (q - 1)*4 + nb*4 + v_size* &
-                                                    ((j + buff_size) + (m + 2*buff_size + 1)* &
-                                                     ((k + buff_size) + buff_size*l))
-                                                mv_in(j, k + unpack_offset, l, i - nVar, q) = real(buff_recv(r), kind=stp)
-                                            end do
-                                        end do
-                                    end do
-                                end do
-                            end do
-                        #:endcall GPU_PARALLEL_LOOP_OLD
+                        end do
+                        $:END_GPU_PARALLEL_LOOP()
                     end if
                 #:else
                     ! Unpacking buffer from bc_z%beg
-                    #:call GPU_PARALLEL_LOOP_OLD(collapse=4,private='[r]')
-                        do i = 1, nVar
+                    $:GPU_PARALLEL_LOOP(collapse=4,private='[r]')
+                    do i = 1, nVar
+                        do l = -buff_size, -1
+                            do k = -buff_size, n + buff_size
+                                do j = -buff_size, m + buff_size
+                                    r = (i - 1) + v_size* &
+                                        ((j + buff_size) + (m + 2*buff_size + 1)* &
+                                         ((k + buff_size) + (n + 2*buff_size + 1)* &
+                                          (l + buff_size)))
+                                    q_comm(i)%sf(j, k, l + unpack_offset) = real(buff_recv(r), kind=stp)
+#if defined(__INTEL_COMPILER)
+                                    if (ieee_is_nan(q_comm(i)%sf(j, k, l))) then
+                                        print *, "Error", j, k, l, i
+                                        error stop "NaN(s) in recv"
+                                    end if
+#endif
+                                end do
+                            end do
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+
+                    if (qbmm_comm) then
+                        $:GPU_PARALLEL_LOOP(collapse=5,private='[r]')
+                        do i = nVar + 1, nVar + 4
                             do l = -buff_size, -1
                                 do k = -buff_size, n + buff_size
                                     do j = -buff_size, m + buff_size
-                                        r = (i - 1) + v_size* &
-                                            ((j + buff_size) + (m + 2*buff_size + 1)* &
-                                             ((k + buff_size) + (n + 2*buff_size + 1)* &
-                                              (l + buff_size)))
-                                        q_comm(i)%sf(j, k, l + unpack_offset) = real(buff_recv(r), kind=stp)
-#if defined(__INTEL_COMPILER)
-                                        if (ieee_is_nan(q_comm(i)%sf(j, k, l))) then
-                                            print *, "Error", j, k, l, i
-                                            error stop "NaN(s) in recv"
-                                        end if
-#endif
+                                        do q = 1, nb
+                                            r = (i - 1) + (q - 1)*4 + v_size* &
+                                                ((j + buff_size) + (m + 2*buff_size + 1)* &
+                                                 ((k + buff_size) + (n + 2*buff_size + 1)* &
+                                                  (l + buff_size)))
+                                            pb_in(j, k, l + unpack_offset, i - nVar, q) = real(buff_recv(r), kind=stp)
+                                        end do
                                     end do
                                 end do
                             end do
                         end do
-                    #:endcall GPU_PARALLEL_LOOP_OLD
+                        $:END_GPU_PARALLEL_LOOP()
 
-                    if (qbmm_comm) then
-                        #:call GPU_PARALLEL_LOOP_OLD(collapse=5,private='[r]')
-                            do i = nVar + 1, nVar + 4
-                                do l = -buff_size, -1
-                                    do k = -buff_size, n + buff_size
-                                        do j = -buff_size, m + buff_size
-                                            do q = 1, nb
-                                                r = (i - 1) + (q - 1)*4 + v_size* &
-                                                    ((j + buff_size) + (m + 2*buff_size + 1)* &
-                                                     ((k + buff_size) + (n + 2*buff_size + 1)* &
-                                                      (l + buff_size)))
-                                                pb_in(j, k, l + unpack_offset, i - nVar, q) = real(buff_recv(r), kind=stp)
-                                            end do
+                        $:GPU_PARALLEL_LOOP(collapse=5,private='[r]')
+                        do i = nVar + 1, nVar + 4
+                            do l = -buff_size, -1
+                                do k = -buff_size, n + buff_size
+                                    do j = -buff_size, m + buff_size
+                                        do q = 1, nb
+                                            r = (i - 1) + (q - 1)*4 + nb*4 + v_size* &
+                                                ((j + buff_size) + (m + 2*buff_size + 1)* &
+                                                 ((k + buff_size) + (n + 2*buff_size + 1)* &
+                                                  (l + buff_size)))
+                                            mv_in(j, k, l + unpack_offset, i - nVar, q) = real(buff_recv(r), kind=stp)
                                         end do
                                     end do
                                 end do
                             end do
-                        #:endcall GPU_PARALLEL_LOOP_OLD
-
-                        #:call GPU_PARALLEL_LOOP_OLD(collapse=5,private='[r]')
-                            do i = nVar + 1, nVar + 4
-                                do l = -buff_size, -1
-                                    do k = -buff_size, n + buff_size
-                                        do j = -buff_size, m + buff_size
-                                            do q = 1, nb
-                                                r = (i - 1) + (q - 1)*4 + nb*4 + v_size* &
-                                                    ((j + buff_size) + (m + 2*buff_size + 1)* &
-                                                     ((k + buff_size) + (n + 2*buff_size + 1)* &
-                                                      (l + buff_size)))
-                                                mv_in(j, k, l + unpack_offset, i - nVar, q) = real(buff_recv(r), kind=stp)
-                                            end do
-                                        end do
-                                    end do
-                                end do
-                            end do
-                        #:endcall GPU_PARALLEL_LOOP_OLD
+                        end do
+                        $:END_GPU_PARALLEL_LOOP()
                     end if
                 #:endif
             end if

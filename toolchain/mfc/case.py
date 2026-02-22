@@ -1,18 +1,26 @@
-import re, json, math, copy, dataclasses, fastjsonschema
+# pylint: disable=import-outside-toplevel
+import re, json, math, copy, dataclasses, difflib, fastjsonschema
 
 from . import common
-from . import build
 from .printer import cons
 
 from .state import ARG
 from .run   import case_dicts
 
 
+def _suggest_similar_params(unknown_key: str, valid_keys: list, n: int = 3) -> list:
+    """Find similar parameter names for typo suggestions."""
+    return difflib.get_close_matches(unknown_key, valid_keys, n=n, cutoff=0.6)
+
 QPVF_IDX_VARS = {
     'alpha_rho': 'contxb', 'vel'  : 'momxb',         'pres': 'E_idx', 
     'alpha':     'advxb',  'tau_e': 'stress_idx%beg', 'Y':   'chemxb',
     'cf_val': 'c_idx', 'Bx': 'B_idx%beg', 'By': 'B_idx%end-1', 'Bz': 'B_idx%end',
 }
+
+MIBM_ANALYTIC_VARS = [
+    'vel(1)', 'vel(2)', 'vel(3)', 'angular_vel(1)', 'angular_vel(2)', 'angular_vel(3)'
+]
 # "B_idx%end - 1" not "B_idx%beg + 1" must be used because 1D does not have Bx
 
 @dataclasses.dataclass(init=False)
@@ -35,6 +43,7 @@ class Case:
         return json.dumps(self.params, indent=4)
 
     def get_inp(self, _target) -> str:
+        from . import build  # pylint: disable=import-outside-toplevel
         target = build.get_target(_target)
 
         cons.print(f"Generating [magenta]{target.name}.inp[/magenta]:")
@@ -48,7 +57,7 @@ class Case:
         dict_str = ""
         for key, val in self.params.items():
             if key in MASTER_KEYS and key not in case_dicts.IGNORE:
-                if self.__is_ic_analytical(key, val):
+                if self.__is_ic_analytical(key, val) or self.__is_mib_analytical(key, val):
                     dict_str += f"{key} = 0d0\n"
                     ignored.append(key)
                     continue
@@ -61,7 +70,9 @@ class Case:
                 ignored.append(key)
 
             if key not in case_dicts.ALL:
-                raise common.MFCException(f"MFCInputFile::dump: Case parameter '{key}' is not used by any MFC code. Please check your spelling or add it as a new parameter.")
+                suggestions = _suggest_similar_params(key, list(case_dicts.ALL.keys()))
+                hint = f" Did you mean: {', '.join(suggestions)}?" if suggestions else ""
+                raise common.MFCException(f"Unknown parameter '{key}'.{hint}")
 
         cons.print(f"[yellow]INFO:[/yellow] Forwarded {len(self.params)-len(ignored)}/{len(self.params)} parameters.")
         cons.unindent()
@@ -69,16 +80,36 @@ class Case:
         return f"&user_inputs\n{dict_str}&end/\n"
 
     def validate_params(self, origin_txt: str = None):
-        '''Typechecks parameters read from case file. If a parameter
-        is assigned a vlaie of the wrong type, this method throws an exception
-        highlighting the violating parameter and specifying what it expects.'''
+        '''Validates parameters read from case file:
+        1. Type checking via JSON schema
+        2. Constraint validation (valid values, ranges)
+        3. Dependency checking (required/recommended params)
+        '''
+        # Type checking
         try:
             case_dicts.get_validator()(self.params)
         except fastjsonschema.JsonSchemaException as e:
             if origin_txt:
                 raise common.MFCException(f"{origin_txt}: {e}")
-
             raise common.MFCException(f"{e}")
+
+        # Constraint and dependency validation
+        from .params.validate import validate_case
+
+        errors, warnings = validate_case(self.params)
+
+        # Show warnings (non-fatal)
+        if warnings:
+            cons.print()
+            for w in warnings:
+                cons.print(f"[yellow]Warning:[/yellow] {w}")
+
+        # Raise errors (fatal)
+        if errors:
+            error_msg = "\n".join(f"  - {e}" for e in errors)
+            if origin_txt:
+                raise common.MFCException(f"{origin_txt}:\n{error_msg}")
+            raise common.MFCException(f"Validation errors:\n{error_msg}")
 
     def __get_ndims(self) -> int:
         return 1 + min(int(self.params.get("n", 0)), 1) + min(int(self.params.get("p", 0)), 1)
@@ -95,8 +126,20 @@ class Case:
 
         return False
 
+    def __is_mib_analytical(self, key: str, val: str) -> bool:
+        '''Is this initial condition analytical?
+        More precisely, is this an arbitrary expression or a string representing a number?'''
+        if common.is_number(val) or not isinstance(val, str):
+            return False
+
+        for variable in MIBM_ANALYTIC_VARS:
+            if re.match(fr'^patch_ib\([0-9]+\)%{re.escape(variable)}', key):
+                return True
+
+        return False
+
     # pylint: disable=too-many-locals
-    def __get_pre_fpp(self, print: bool) -> str:
+    def __get_analytic_ic_fpp(self, print: bool) -> str:
         # generates the content of an FFP file that will hold the functions for
         # some initial condition
         DATA = {
@@ -142,7 +185,7 @@ class Case:
                     'r':     f'patch_icpp({pid})%radius',  'eps':   f'patch_icpp({pid})%epsilon', 'beta':  f'patch_icpp({pid})%beta',
                     'tau_e': f'patch_icpp({pid})%tau_e',   'radii': f'patch_icpp({pid})%radii',
 
-                    'e' : f'{math.e}', 'pi': f'{math.pi}',
+                    'e' : f'{math.e}',
                 }.get(match.group(), match.group())
 
             lines = []
@@ -179,6 +222,72 @@ class Case:
 ! expressions that are evaluated at runtime from the input file.
 
 #:def analytical()
+{f'{chr(10)}{chr(10)}'.join(srcs)}
+#:enddef
+"""
+        return content
+
+    # gets the analytic description of a moving IB's velocity and rotation rate
+    def __get_analytic_mib_fpp(self, print: bool) -> str:
+        # iterates over the parameters and checks if they are defined as an
+        # analytical function. If so, append it to the `patches`` object
+        ib_patches = {}
+
+        for key, val in self.params.items():
+            if not self.__is_mib_analytical(key, val):
+                continue
+
+            patch_id = re.search(r'[0-9]+', key).group(0)
+
+            if patch_id not in ib_patches:
+                ib_patches[patch_id] = []
+
+            ib_patches[patch_id].append((key, val))
+
+        srcs = []
+
+        # for each analytical patch that is required to be added, generate
+        # the string that contains that function.
+        for pid, items in ib_patches.items():
+
+            # function that defines how we will replace variable names with
+            # values from the case file
+            def rhs_replace(match):
+                return {
+                    'x': 'x_cc(i)', 'y': 'y_cc(j)', 'z': 'z_cc(k)',
+                    't': 'mytime',
+
+                    'r':     f'patch_ib({pid})%radius',
+
+                    'e' : f'{math.e}',
+                }.get(match.group(), match.group())
+
+            lines = []
+            # perform the replacement of strings for each analytic function
+            # to generate some fortran string representing the code passed in
+            for attribute, expr in items:
+                if print:
+                    cons.print(f"* Codegen: {attribute} = {expr}")
+
+                lhs = attribute
+                rhs = re.sub(r"[a-zA-Z]+", rhs_replace, expr)
+
+                lines.append(f"        {lhs} = {rhs}")
+
+            # concatenates all of the analytic lines into a single string with
+            # each element separated by new line characters. Then write those
+            # new lines as a fully concatenated string with fortran syntax
+            srcs.append(f"""\
+    if (i == {pid}) then
+{f'{chr(10)}'.join(lines)}
+    end if\
+""")
+
+        content = f"""\
+! This file was generated by MFC. It is only used when we analytically
+! parameterize the velocity and rotation rate of a moving IB.
+
+#:def mib_analytical()
 {f'{chr(10)}{chr(10)}'.join(srcs)}
 #:enddef
 """
@@ -240,8 +349,8 @@ class Case:
 #:set recon_type            = {recon_type}
 #:set weno_order            = {weno_order}
 #:set weno_polyn            = {weno_polyn}
-#:set muscl_order           = {int(self.params.get("muscl_order", 0))}
-#:set muscl_polyn           = {int(self.params.get("muscl_order", 0))}
+#:set muscl_order           = {int(self.params.get("muscl_order", 1))}
+#:set muscl_polyn           = {int(self.params.get("muscl_order", 1))}
 #:set muscl_lim             = {int(self.params.get("muscl_lim", 1))}
 #:set weno_num_stencils     = {weno_num_stencils}
 #:set nb                    = {int(self.params.get("nb", 1))}
@@ -266,10 +375,19 @@ class Case:
         else:
             out = ""
 
+        out = out + self.__get_analytic_mib_fpp(print)
+
         # We need to also include the pre_processing includes so that common subroutines have access to the @:analytical function
         return out + f"\n{self.__get_pre_fpp(print)}"
 
+
+    def __get_pre_fpp(self, print: bool) -> str:
+        out = self.__get_analytic_ic_fpp(print)
+        return out
+
     def get_fpp(self, target, print = True) -> str:
+        from . import build  # pylint: disable=import-outside-toplevel
+
         def _prepend() -> str:
             return f"""\
 #:set chemistry             = {self.params.get("chemistry", 'F') == 'T'}

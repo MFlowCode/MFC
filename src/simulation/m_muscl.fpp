@@ -1,4 +1,10 @@
+!>
+!! @file
+!! @brief Contains module m_muscl
+
 #:include 'macros.fpp'
+
+!> @brief MUSCL reconstruction with interface sharpening for contact-preserving advection
 module m_muscl
 
     use m_derived_types        !< Definitions of the derived types
@@ -92,6 +98,7 @@ contains
 
     end subroutine s_initialize_muscl_module
 
+    !> @brief Performs MUSCL reconstruction of left and right cell-boundary values from cell-averaged variables.
     subroutine s_muscl(v_vf, vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, &
                        muscl_dir, &
                        is1_muscl_d, is2_muscl_d, is3_muscl_d)
@@ -112,11 +119,11 @@ contains
 
         $:GPU_UPDATE(device='[is1_muscl,is2_muscl,is3_muscl]')
 
-        if (muscl_order /= 1) then
+        if (muscl_order /= 1 .or. dummy) then
             call s_initialize_muscl(v_vf, muscl_dir)
         end if
 
-        if (muscl_order == 1) then
+        if (muscl_order == 1 .or. dummy) then
             if (muscl_dir == 1) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
                 do i = 1, ubound(v_vf, 1)
@@ -157,8 +164,9 @@ contains
                 end do
                 $:END_GPU_PARALLEL_LOOP()
             end if
+        end if
 
-        else if (muscl_order == 2) then
+        if (muscl_order == 2 .or. dummy) then
             ! MUSCL Reconstruction
             #:for MUSCL_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
                 if (muscl_dir == ${MUSCL_DIR}$) then
@@ -225,6 +233,7 @@ contains
 
     end subroutine s_muscl
 
+    !> @brief Applies THINC interface-compression to sharpen volume-fraction reconstructions at material interfaces.
     subroutine s_interface_compression(vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, &
                                        muscl_dir, &
                                        is1_muscl_d, is2_muscl_d, is3_muscl_d)
@@ -302,6 +311,7 @@ contains
 
     end subroutine s_interface_compression
 
+    !> @brief Reshapes cell-averaged variable data into direction-local work arrays for MUSCL reconstruction.
     subroutine s_initialize_muscl(v_vf, muscl_dir)
 
         type(scalar_field), dimension(:), intent(in) :: v_vf
@@ -366,6 +376,7 @@ contains
 
     end subroutine s_initialize_muscl
 
+    !> @brief Deallocates the MUSCL direction-local work arrays.
     subroutine s_finalize_muscl_module()
 
         @:DEALLOCATE(v_rs_ws_x_muscl)

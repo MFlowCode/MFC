@@ -1,8 +1,57 @@
 name: 'Test Suite'
 
-on: [push, pull_request, workflow_dispatch]
-    
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  lint-gate:
+    name: Lint Gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Initialize MFC
+        run: ./mfc.sh init
+
+      - name: Check Formatting
+        run: |
+          ./mfc.sh format -j $(nproc)
+          git diff --exit-code || (echo "::error::Code is not formatted. Run './mfc.sh format' locally." && exit 1)
+
+      - name: Spell Check
+        run: ./mfc.sh spelling
+
+      - name: Lint Toolchain
+        run: ./mfc.sh lint
+
+      - name: Lint Source - No Raw Directives
+        run: |
+          ! grep -iR '!\$acc\|!\$omp' --exclude="parallel_macros.fpp" --exclude="acc_macros.fpp" --exclude="omp_macros.fpp" --exclude="shared_parallel_macros.fpp" --exclude="syscheck.fpp" ./src/*
+
+      - name: Lint Source - No Double Precision Intrinsics
+        run: |
+          ! grep -iR 'double_precision\|dsqrt\|dexp\|dlog\|dble\|dabs\|double\ precision\|real(8)\|real(4)\|dprod\|dmin\|dmax\|dfloat\|dreal\|dcos\|dsin\|dtan\|dsign\|dtanh\|dsinh\|dcosh\|d0' --exclude-dir=syscheck --exclude="*nvtx*" --exclude="*precision_select*" ./src/*
+
+      - name: Lint Source - No Junk Code
+        run: |
+          ! grep -iR -e '\.\.\.' -e '\-\-\-' -e '===' ./src/*
+
+      - name: Lint Docs
+        run: python3 toolchain/mfc/lint_docs.py
+
   file-changes:
     name: Detect File Changes
     runs-on: 'ubuntu-latest'
@@ -21,7 +70,7 @@ jobs:
   github:
     name: Github
     if: needs.file-changes.outputs.checkall == 'true'
-    needs: file-changes
+    needs: [lint-gate, file-changes]
     strategy:
       matrix:
         os:    ['ubuntu', 'macos']
@@ -48,10 +97,11 @@ jobs:
       - name: Clone
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.13
-        uses: actions/setup-python@v5
+      - name: Restore Build Cache
+        uses: actions/cache@v4
         with:
-          python-version: '3.13'
+          path: build
+          key: mfc-build-${{ matrix.os }}-${{ matrix.mpi }}-${{ matrix.debug }}-${{ matrix.precision }}-${{ matrix.intel }}-${{ hashFiles('CMakeLists.txt', 'toolchain/dependencies/**', 'toolchain/cmake/**', 'src/**/*.fpp', 'src/**/*.f90') }}
 
       - name: Setup MacOS
         if:   matrix.os == 'macos'
@@ -81,58 +131,95 @@ jobs:
           source /opt/intel/oneapi/setvars.sh
           printenv >> $GITHUB_ENV
 
+      - name: Set up Python 3.14
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
 
       - name: Build
         run:  |
-          /bin/bash mfc.sh test --dry-run -j $(nproc) --${{ matrix.debug }} --${{ matrix.mpi }} --${{ matrix.precision }} 
+          /bin/bash mfc.sh test -v --dry-run -j $(nproc) --${{ matrix.debug }} --${{ matrix.mpi }} --${{ matrix.precision }} $TEST_ALL
+        env:
+          TEST_ALL: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
 
       - name: Test
         run:  |
-          /bin/bash mfc.sh test --max-attempts 3 -j $(nproc) $OPT1 $OPT2
+          /bin/bash mfc.sh test -v --max-attempts 3 -j $(nproc) $TEST_ALL $TEST_PCT
         env:
-          OPT1: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
-          OPT2: ${{ matrix.debug == 'debug' && '-% 20' || '' }}
+          TEST_ALL: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
+          TEST_PCT: ${{ matrix.debug == 'debug' && '-% 20' || '' }}
 
   self:
-    name: Self Hosted
+    name: "${{ matrix.cluster_name }} (${{ matrix.device }}${{ matrix.interface != 'none' && format('-{0}', matrix.interface) || '' }})"
     if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true'
-    needs: file-changes
+    needs: [lint-gate, file-changes]
     continue-on-error: false
-    timeout-minutes: 1400
+    timeout-minutes: 480
     strategy:
       matrix:
-        device: ['gpu']
-        interface: ['acc', 'omp']
-        lbl: ['gt', 'frontier']
         include:
-          - device: 'cpu'
+          # Phoenix (GT) — build+test combined in SLURM job
+          - runner:       'gt'
+            cluster:      'phoenix'
+            cluster_name: 'Georgia Tech | Phoenix'
+            device: 'gpu'
+            interface: 'acc'
+          - runner:       'gt'
+            cluster:      'phoenix'
+            cluster_name: 'Georgia Tech | Phoenix'
+            device: 'gpu'
+            interface: 'omp'
+          - runner:       'gt'
+            cluster:      'phoenix'
+            cluster_name: 'Georgia Tech | Phoenix'
+            device: 'cpu'
             interface: 'none'
-            lbl: 'gt'
-          - device: 'cpu'
+          # Frontier (ORNL) — build on login node, test via SLURM
+          - runner:       'frontier'
+            cluster:      'frontier'
+            cluster_name: 'Oak Ridge | Frontier'
+            device: 'gpu'
+            interface: 'acc'
+          - runner:       'frontier'
+            cluster:      'frontier'
+            cluster_name: 'Oak Ridge | Frontier'
+            device: 'gpu'
+            interface: 'omp'
+          - runner:       'frontier'
+            cluster:      'frontier'
+            cluster_name: 'Oak Ridge | Frontier'
+            device: 'cpu'
             interface: 'none'
-            lbl: 'frontier'
+          # Frontier AMD — build on login node, test via SLURM
+          - runner:       'frontier'
+            cluster:      'frontier_amd'
+            cluster_name: 'Oak Ridge | Frontier (AMD)'
+            device: 'gpu'
+            interface: 'omp'
+          - runner:       'frontier'
+            cluster:      'frontier_amd'
+            cluster_name: 'Oak Ridge | Frontier (AMD)'
+            device: 'cpu'
+            interface: 'none'
     runs-on:
       group:  phoenix
-      labels: ${{ matrix.lbl }}
+      labels: ${{ matrix.runner }}
     env:
-      NODE_OPTIONS: ${{ matrix.lbl == 'gt' && '--max-old-space-size=2048' || '' }}
+      NODE_OPTIONS: ${{ matrix.cluster == 'phoenix' && '--max-old-space-size=2048' || '' }}
       ACTIONS_RUNNER_FORCE_ACTIONS_NODE_VERSION: node16
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
     steps:
       - name: Clone
         uses: actions/checkout@v4
-
-      - name: Build & Test
-        if:   matrix.lbl == 'gt'
-        run:  bash .github/workflows/phoenix/submit.sh .github/workflows/phoenix/test.sh ${{ matrix.device }} ${{ matrix.interface }}
+        with:
+          clean: false
 
       - name: Build
-        if:   matrix.lbl == 'frontier'
-        run:  bash .github/workflows/frontier/build.sh ${{ matrix.device }} ${{ matrix.interface }}
+        if:   matrix.cluster != 'phoenix'
+        run:  bash .github/workflows/${{ matrix.cluster }}/build.sh ${{ matrix.device }} ${{ matrix.interface }}
 
       - name: Test
-        if:   matrix.lbl == 'frontier'
-        run:  bash .github/workflows/frontier/submit.sh .github/workflows/frontier/test.sh ${{matrix.device}} ${{ matrix.interface }}
+        run:  bash .github/workflows/${{ matrix.cluster }}/submit.sh .github/workflows/${{ matrix.cluster }}/test.sh ${{ matrix.device }} ${{ matrix.interface }}
 
       - name: Print Logs
         if:   always()
@@ -140,7 +227,7 @@ jobs:
 
       - name: Archive Logs
         uses: actions/upload-artifact@v4
-        if:   matrix.lbl == 'frontier'
+        if:   matrix.cluster != 'phoenix'
         with:
           name: logs-${{ strategy.job-index }}-${{ matrix.device }}-${{ matrix.interface }}
           path: test-${{ matrix.device }}-${{ matrix.interface }}.out

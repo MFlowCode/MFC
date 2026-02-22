@@ -1,10 +1,10 @@
 !>
-!! @file m_bubbles_EL.fpp
-!! @brief Contains module m_bubbles_EL
+!! @file
+!! @brief Contains module @ref m_bubbles_el "m_bubbles_EL"
 
 #:include 'macros.fpp'
 
-!> @brief This module is used to to compute the volume-averaged bubble model
+!> @brief Tracks Lagrangian bubbles and couples their dynamics to the Eulerian flow via volume averaging
 module m_bubbles_EL
 
     use m_global_parameters             !< Definitions of the global parameters
@@ -146,53 +146,9 @@ contains
         if (adap_dt .and. f_is_default(adap_dt_tol)) adap_dt_tol = dflt_adap_dt_tol
 
         ! Starting bubbles
-        call s_start_lagrange_inputs()
         call s_read_input_bubbles(q_cons_vf)
 
     end subroutine s_initialize_bubbles_EL_module
-
-    !> The purpose of this procedure is to start lagrange bubble parameters applying nondimensionalization if needed
-    impure subroutine s_start_lagrange_inputs()
-
-        integer :: id_bubbles, id_host
-        real(wp) :: rho0, c0, T0, x0, p0
-
-        id_bubbles = num_fluids
-        id_host = num_fluids - 1
-
-        !Reference values
-        rho0 = lag_params%rho0
-        c0 = lag_params%c0
-        T0 = lag_params%T0
-        x0 = lag_params%x0
-        p0 = rho0*c0*c0
-
-        !Update inputs
-        Tw = lag_params%Thost/T0
-        pv = fluid_pp(id_host)%pv/p0
-        gamma_v = fluid_pp(id_bubbles)%gamma_v
-        gamma_n = fluid_pp(id_host)%gamma_v
-        k_vl = fluid_pp(id_bubbles)%k_v*(T0/(x0*rho0*c0*c0*c0))
-        k_nl = fluid_pp(id_host)%k_v*(T0/(x0*rho0*c0*c0*c0))
-        cp_v = fluid_pp(id_bubbles)%cp_v*(T0/(c0*c0))
-        cp_n = fluid_pp(id_host)%cp_v*(T0/(c0*c0))
-        R_v = (R_uni/fluid_pp(id_bubbles)%M_v)*(T0/(c0*c0))
-        R_n = (R_uni/fluid_pp(id_host)%M_v)*(T0/(c0*c0))
-        fluid_pp(id_bubbles)%D_v = fluid_pp(id_bubbles)%D_v/(x0*c0)
-        ss = fluid_pp(id_host)%ss/(rho0*x0*c0*c0)
-        mul0 = fluid_pp(id_host)%mul0/(rho0*x0*c0)
-
-        ! Parameters used in bubble_model
-        Web = 1._wp/ss
-        Re_inv = mul0
-
-        ! Need improvements to accept polytropic gas compression, isothermal and adiabatic thermal models, and
-        ! the Gilmore and RP bubble models.
-        polytropic = .false.    ! Forcing no polytropic model
-        thermal = 3             ! Forcing constant transfer coefficient model based on Preston et al., 2007
-        ! If Keller-Miksis model is not selected, then no radial motion
-
-    end subroutine s_start_lagrange_inputs
 
     !> The purpose of this procedure is to obtain the initial bubbles' information
         !! @param q_cons_vf Conservative variables
@@ -364,7 +320,7 @@ contains
         ! Initial particle mass
         volparticle = 4._wp/3._wp*pi*bub_R0(bub_id)**3._wp ! volume
         gas_mv(bub_id, 1) = pv*volparticle*(1._wp/(R_v*Tw))*(massflag) ! vapermass
-        gas_mg(bub_id) = (gas_p(bub_id, 1) - pv*(massflag))*volparticle*(1._wp/(R_n*Tw)) ! gasmass
+        gas_mg(bub_id) = (gas_p(bub_id, 1) - pv*(massflag))*volparticle*(1._wp/(R_g*Tw)) ! gasmass
         if (gas_mg(bub_id) <= 0._wp) then
             call s_mpi_abort("The initial mass of gas inside the bubble is negative. Check the initial conditions.")
         end if
@@ -378,17 +334,17 @@ contains
         end if
         omegaN_local = sqrt(omegaN_local/bub_R0(bub_id)**2._wp)
 
-        cpparticle = concvap*cp_v + (1._wp - concvap)*cp_n
-        kparticle = concvap*k_vl + (1._wp - concvap)*k_nl
+        cpparticle = concvap*cp_v + (1._wp - concvap)*cp_g
+        kparticle = concvap*k_vl + (1._wp - concvap)*k_gl
 
         ! Mass and heat transfer coefficients (based on Preston 2007)
         PeT = totalmass/volparticle*cpparticle*bub_R0(bub_id)**2._wp*omegaN_local/kparticle
         call s_transcoeff(1._wp, PeT, Re_trans, Im_trans)
         gas_betaT(bub_id) = Re_trans*(heatflag)*kparticle
 
-        PeG = bub_R0(bub_id)**2._wp*omegaN_local/fluid_pp(num_fluids)%D_v
+        PeG = bub_R0(bub_id)**2._wp*omegaN_local/vd
         call s_transcoeff(1._wp, PeG, Re_trans, Im_trans)
-        gas_betaC(bub_id) = Re_trans*(massflag)*fluid_pp(num_fluids)%D_v
+        gas_betaC(bub_id) = Re_trans*(massflag)*vd
 
         if (gas_mg(bub_id) <= 0._wp) then
             call s_mpi_abort("Negative gas mass in the bubble, check if the bubble is in the domain.")
@@ -565,10 +521,7 @@ contains
     end subroutine s_restart_bubbles
 
     !>  Contains the bubble dynamics subroutines.
-        !! @param q_cons_vf Conservative variables
         !! @param q_prim_vf Primitive variables
-        !! @param rhs_vf Calculated change of conservative variables
-        !! @param t_step Current time step
         !! @param stage Current stage in the time-stepper algorithm
     subroutine s_compute_bubble_EL_dynamics(q_prim_vf, stage)
 
@@ -581,7 +534,11 @@ contains
         real(wp) :: myR, myV, myBeta_c, myBeta_t, myR0, myPbdot, myMvdot
         real(wp) :: myPinf, aux1, aux2, myCson, myRho
         real(wp) :: gamma, pi_inf, qv
-        real(wp), dimension(contxe) :: myalpha_rho, myalpha
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3) :: myalpha_rho, myalpha
+        #:else
+            real(wp), dimension(num_fluids) :: myalpha_rho, myalpha
+        #:endif
         real(wp), dimension(2) :: Re
         integer, dimension(3) :: cell
 
@@ -595,7 +552,7 @@ contains
         ! Subgrid p_inf model based on Maeda and Colonius (2018).
         if (lag_params%pressure_corrector) then
             ! Calculate velocity potentials (valid for one bubble per cell)
-            $:GPU_PARALLEL_LOOP(private='[k,cell]')
+            $:GPU_PARALLEL_LOOP(private='[k,cell,paux,preterm1,term2,Romega,myR0,myR,myV,myPb,pint,term1_fac]')
             do k = 1, nBubs
                 call s_get_pinf(k, q_prim_vf, 2, paux, cell, preterm1, term2, Romega)
                 myR0 = bub_R0(k)
@@ -617,7 +574,7 @@ contains
 
         ! Radial motion model
         adap_dt_stop_max = 0
-        $:GPU_PARALLEL_LOOP(private='[k,i,myalpha_rho,myalpha,Re,cell]', &
+        $:GPU_PARALLEL_LOOP(private='[k,i,myalpha_rho,myalpha,Re,cell,myVapFlux,preterm1, term2, paux, pint, Romega, term1_fac,myR_m, mygamma_m, myPb, myMass_n, myMass_v,myR, myV, myBeta_c, myBeta_t, myR0, myPbdot, myMvdot,myPinf, aux1, aux2, myCson, myRho,gamma,pi_inf,qv,dmalf, dmntait, dmBtait, dm_bub_adv_src, dm_divu,adap_dt_stop]', &
             & reduction='[[adap_dt_stop_max]]',reductionOp='[MAX]', &
             & copy='[adap_dt_stop_max]',copyin='[stage]')
         do k = 1, nBubs
@@ -642,11 +599,7 @@ contains
             call s_get_pinf(k, q_prim_vf, 1, myPinf, cell, aux1, aux2)
 
             ! Obtain liquid density and computing speed of sound from pinf
-            $:GPU_LOOP(parallelism='[seq]')
-            do i = 1, num_fluids
-                myalpha_rho(i) = q_prim_vf(i)%sf(cell(1), cell(2), cell(3))
-                myalpha(i) = q_prim_vf(E_idx + i)%sf(cell(1), cell(2), cell(3))
-            end do
+            call s_compute_species_fraction(q_prim_vf, cell(1), cell(2), cell(3), myalpha_rho, myalpha)
             call s_convert_species_to_mixture_variables_acc(myRho, gamma, pi_inf, qv, myalpha, &
                                                             myalpha_rho, Re)
             call s_compute_cson_from_pinf(q_prim_vf, myPinf, cell, myRho, gamma, pi_inf, myCson)
@@ -808,7 +761,6 @@ contains
     end subroutine s_compute_bubbles_EL_source
 
     !>  This procedure computes the speed of sound from a given driving pressure
-        !! @param bub_id Bubble id
         !! @param q_prim_vf Primitive variables
         !! @param pinf Driving pressure
         !! @param cell Bubble cell
@@ -826,9 +778,14 @@ contains
         real(wp), intent(out) :: cson
 
         real(wp) :: E, H
-        real(wp), dimension(num_dims) :: vel
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3) :: vel
+        #:else
+            real(wp), dimension(num_dims) :: vel
+        #:endif
         integer :: i
 
+        vel(:) = 0._wp
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_dims
             vel(i) = q_prim_vf(i + contxe)%sf(cell(1), cell(2), cell(3))
@@ -885,6 +842,8 @@ contains
         !! @param ptype 1: p at infinity, 2: averaged P at the bubble location
         !! @param f_pinfl Driving pressure
         !! @param cell Bubble cell
+        !! @param preterm1 Pre-computed term 1
+        !! @param term2 Computed term 2
         !! @param Romega Control volume radius
     subroutine s_get_pinf(bub_id, q_prim_vf, ptype, f_pinfl, cell, preterm1, term2, Romega)
         $:GPU_ROUTINE(function_name='s_get_pinf',parallelism='[seq]', &
@@ -1423,7 +1382,7 @@ contains
     end subroutine s_gradient_dir
 
     !> Subroutine that writes on each time step the changes of the lagrangian bubbles.
-        !!  @param q_time Current time
+        !!  @param qtime Current time
     impure subroutine s_write_lag_particles(qtime)
 
         real(wp), intent(in) :: qtime
@@ -1481,7 +1440,7 @@ contains
     !>  Subroutine that writes some useful statistics related to the volume fraction
             !!       of the particles (void fraction) in the computatioational domain
             !!       on each time step.
-            !!  @param q_time Current time
+            !!  @param qtime Current time
     impure subroutine s_write_void_evol(qtime)
 
         real(wp), intent(in) :: qtime

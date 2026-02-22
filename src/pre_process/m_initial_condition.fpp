@@ -1,19 +1,8 @@
 !>
-!! @file m_initial_condition.f90
+!! @file
 !! @brief Contains module m_initial_condition
 
-!> @brief This module provides a platform that is analogous to constructive
-!!              solid geometry techniques and in this way allows for the creation
-!!              of a wide variety of initial conditions. Several 1D, 2D and 3D
-!!              fundamental geometries are included that may further be combined
-!!              into more complex shapes. This is achieved by carefully setting
-!!              up the order in which the patches are laid out in the domain and
-!!              specifying the priority that each patch has over the preceding
-!!              ones. The resulting shapes may be identified both by the values
-!!              of their primitive variables and the associated patch identities.
-!!              Note that the user may choose to read in and modify a preexisting
-!!              initial condition. The module m_start_up.f90 is responsible for
-!!             reading in the relevant data files.
+!> @brief Assembles initial conditions by layering prioritized patches via constructive solid geometry
 module m_initial_condition
 
     use m_derived_types         ! Definitions of the derived types
@@ -26,8 +15,6 @@ module m_initial_condition
 
     use m_variables_conversion  ! Subroutines to change the state variables from
     ! one form to another
-
-    use m_ib_patches
 
     use m_icpp_patches
 
@@ -53,23 +40,15 @@ module m_initial_condition
 
     type(integer_field), dimension(:, :), allocatable :: bc_type !< bc_type fields
 
+!> @cond
 #ifdef MFC_MIXED_PRECISION
     integer(kind=1), allocatable, dimension(:, :, :) :: patch_id_fp
 #else
+!> @endcond
     integer, allocatable, dimension(:, :, :) :: patch_id_fp
+!> @cond
 #endif
-
-    !! Bookkepping variable used to track the patch identities (id) associated
-    !! with each of the cells in the computational domain. Note that only one
-    !! patch identity may be associated with any one cell.
-
-    type(integer_field) :: ib_markers !<
-    !! Bookkepping variable used to track whether a given cell is within an
-    !! immersed boundary. The default is 0, otherwise the value is assigned
-    !! to the patch ID of the immersed boundary.
-
-    type(levelset_field) :: levelset
-    type(levelset_norm_field) :: levelset_norm
+!> @endcond
 
 contains
 
@@ -98,13 +77,6 @@ contains
 
         ! Allocating the patch identities bookkeeping variable
         allocate (patch_id_fp(0:m, 0:n, 0:p))
-
-        if (ib) then
-            allocate (ib_markers%sf(0:m, 0:n, 0:p))
-            allocate (levelset%sf(0:m, 0:n, 0:p, 1:num_ibs))
-            allocate (levelset_norm%sf(0:m, 0:n, 0:p, 1:num_ibs, 1:3))
-            ib_markers%sf = 0
-        end if
 
         if (qbmm .and. .not. polytropic) then
             !Allocate bubble pressure pb and vapor mass mv for non-polytropic qbmm at all quad nodes and R0 bins
@@ -169,6 +141,13 @@ contains
             q_prim_vf(damage_idx)%sf = 0._wp
         end if
 
+        ! Initial hyper_cleaning state is always zero
+        ! TODO more general
+        if (hyper_cleaning) then
+            q_cons_vf(psi_idx)%sf = 0._wp
+            q_prim_vf(psi_idx)%sf = 0._wp
+        end if
+
         ! Setting default values for patch identities bookkeeping variable.
         ! This is necessary to avoid any confusion in the assessment of the
         ! extent of application that the overwrite permissions give a patch
@@ -196,12 +175,6 @@ contains
                                                                idwbuff)
         end if
 
-        if (ib) then
-            do i = 1, num_ibs
-                call s_update_ib_rotation_matrix(i)
-            end do
-            call s_apply_ib_patches(ib_markers%sf, levelset, levelset_norm)
-        end if
         call s_apply_icpp_patches(patch_id_fp, q_prim_vf)
 
         if (num_bc_patches > 0) call s_apply_boundary_patches(q_prim_vf, bc_type)
@@ -245,10 +218,6 @@ contains
 
         ! Deallocating the patch identities bookkeeping variable
         deallocate (patch_id_fp)
-
-        if (ib) then
-            deallocate (ib_markers%sf, levelset%sf, levelset_norm%sf)
-        end if
 
         deallocate (bc_type(1, 1)%sf)
         deallocate (bc_type(1, 2)%sf)

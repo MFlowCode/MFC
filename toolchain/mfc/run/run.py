@@ -7,7 +7,7 @@ from mako.template import Template
 
 from ..build   import get_targets, build, REQUIRED_TARGETS, SIMULATION
 from ..printer import cons
-from ..state   import ARG, ARGS, CFG
+from ..state   import ARG, ARGS, CFG, gpuConfigOptions
 from ..common  import MFCException, isspace, file_read, does_command_exist
 from ..common  import MFC_TEMPLATE_DIR, file_write, system, MFC_ROOT_DIR
 from ..common  import format_list_to_string, file_dump_yaml
@@ -99,6 +99,20 @@ def __generate_job_script(targets, case: input.MFCInputFile):
             'HIP_VISIBLE_DEVICES':  gpu_ids
         })
 
+    # Compute GPU mode booleans for templates
+    gpu_mode = ARG('gpu')
+
+    # Validate gpu_mode is one of the expected values
+    valid_gpu_modes = {e.value for e in gpuConfigOptions}
+    if gpu_mode not in valid_gpu_modes:
+        raise MFCException(
+            f"Invalid GPU mode '{gpu_mode}'. Must be one of: {', '.join(sorted(valid_gpu_modes))}"
+        )
+
+    gpu_enabled = gpu_mode != gpuConfigOptions.NONE.value
+    gpu_acc = gpu_mode == gpuConfigOptions.ACC.value
+    gpu_mp = gpu_mode == gpuConfigOptions.MP.value
+
     content = __get_template().render(
         **{**ARGS(), 'targets': targets},
         ARG=ARG,
@@ -107,7 +121,10 @@ def __generate_job_script(targets, case: input.MFCInputFile):
         MFC_ROOT_DIR=MFC_ROOT_DIR,
         SIMULATION=SIMULATION,
         qsystem=queues.get_system(),
-        profiler=shlex.join(__profiler_prepend())
+        profiler=shlex.join(__profiler_prepend()),
+        gpu_enabled=gpu_enabled,
+        gpu_acc=gpu_acc,
+        gpu_mp=gpu_mp
     )
 
     file_write(__job_script_filepath(), content)
@@ -117,9 +134,7 @@ def __generate_input_files(targets, case: input.MFCInputFile):
     for target in targets:
         cons.print(f"Generating input files for [magenta]{target.name}[/magenta]...")
         cons.indent()
-        cons.print()
-        case.generate_inp(target)
-        cons.print()
+        case.generate(target)
         cons.unindent()
 
 
@@ -129,7 +144,18 @@ def __execute_job_script(qsystem: queues.QueueSystem):
     # in the correct directory.
     cmd = qsystem.gen_submit_cmd(__job_script_filepath())
 
-    if system(cmd, cwd=os.path.dirname(ARG("input"))).returncode != 0:
+    verbosity = ARG('verbose')
+
+    # At verbosity >= 1, show the command being executed
+    if verbosity >= 1:
+        cons.print(f"  [dim]$ {' '.join(str(c) for c in cmd)}[/dim]")
+        cons.print()
+
+    # Execute the job script with appropriate output handling
+    # At verbosity >= 2, show print_cmd=True for system() calls
+    print_cmd = verbosity >= 2
+
+    if system(cmd, cwd=os.path.dirname(ARG("input")), print_cmd=print_cmd).returncode != 0:
         raise MFCException(f"Submitting batch file for {qsystem.name} failed. It can be found here: {__job_script_filepath()}. Please check the file for errors.")
 
 
@@ -138,6 +164,8 @@ def run(targets = None, case = None):
     case    = case or input.load(ARG("input"), ARG("--"))
 
     build(targets)
+
+    verbosity = ARG('verbose')
 
     cons.print("[bold]Run[/bold]")
     cons.indent()
@@ -151,9 +179,19 @@ def run(targets = None, case = None):
     qsystem = queues.get_system()
     cons.print(f"Using queue system [magenta]{qsystem.name}[/magenta].")
 
+    # At verbosity >= 1, show more details about what's happening
+    if verbosity >= 1:
+        cons.print(f"  [dim]Targets: {', '.join(t.name for t in targets)}[/dim]")
+        cons.print(f"  [dim]Input file: {ARG('input')}[/dim]")
+        if ARG("nodes") > 1 or ARG("tasks_per_node") > 1:
+            cons.print(f"  [dim]MPI: {ARG('nodes')} nodes × {ARG('tasks_per_node')} tasks/node = {ARG('nodes') * ARG('tasks_per_node')} total ranks[/dim]")
+
     __generate_job_script(targets, case)
     __validate_job_options()
     __generate_input_files(targets, case)
+
+    if verbosity >= 2:
+        cons.print(f"  [dim]Job script: {__job_script_filepath()}[/dim]")
 
     if not ARG("dry_run"):
         if ARG("output_summary") is not None:
@@ -161,4 +199,9 @@ def run(targets = None, case = None):
                 "invocation": sys.argv[1:],
                 "lock":       dataclasses.asdict(CFG())
             })
+
+        if verbosity >= 1:
+            cons.print()
+            cons.print("[bold]Executing simulation...[/bold]")
+
         __execute_job_script(qsystem)

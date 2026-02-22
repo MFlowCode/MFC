@@ -1,8 +1,12 @@
+!>
+!! @file
+!! @brief Contains module m_surface_tension
+
 #:include 'case.fpp'
 #:include 'macros.fpp'
 #:include 'inline_capillary.fpp'
 
-!> @brief This module is used to compute source terms for surface tension model
+!> @brief Computes capillary source fluxes and color-function gradients for the diffuse-interface surface tension model
 module m_surface_tension
 
     use m_derived_types        !< Definitions of the derived types
@@ -32,7 +36,7 @@ module m_surface_tension
     !> @name color function gradient components and magnitude
     !> @{
     type(scalar_field), allocatable, dimension(:) :: c_divs
-    !> @)
+    !> @}
     $:GPU_DECLARE(create='[c_divs]')
 
     !> @name cell boundary reconstructed gradient components and magnitude
@@ -69,6 +73,7 @@ contains
         end if
     end subroutine s_initialize_surface_tension_module
 
+    !> @brief Computes the capillary (surface-tension) source flux from reconstructed color-gradient fields.
     subroutine s_compute_capillary_source_flux( &
         vSrc_rsx_vf, vSrc_rsy_vf, vSrc_rsz_vf, &
         flux_src_vf, &
@@ -82,8 +87,11 @@ contains
             intent(inout) :: flux_src_vf
         integer, intent(in) :: id
         type(int_bounds_info), intent(in) :: isx, isy, isz
-
-        real(wp), dimension(num_dims, num_dims) :: Omega
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3, 3) :: Omega
+        #:else
+            real(wp), dimension(num_dims, num_dims) :: Omega
+        #:endif
         real(wp) :: w1L, w1R, w2L, w2R, w3L, w3R, w1, w2, w3
         real(wp) :: normWL, normWR, normW
         integer :: j, k, l, i
@@ -134,50 +142,51 @@ contains
             $:END_GPU_PARALLEL_LOOP()
 
         elseif (id == 2) then
+            #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[Omega, w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW]')
+                do l = isz%beg, isz%end
+                    do k = isy%beg, isy%end
+                        do j = isx%beg, isx%end
 
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[Omega, w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW]')
-            do l = isz%beg, isz%end
-                do k = isy%beg, isy%end
-                    do j = isx%beg, isx%end
+                            w1L = gL_y(k, j, l, 1)
+                            w2L = gL_y(k, j, l, 2)
+                            w3L = 0._wp
+                            if (p > 0) w3L = gL_y(k, j, l, 3)
 
-                        w1L = gL_y(k, j, l, 1)
-                        w2L = gL_y(k, j, l, 2)
-                        w3L = 0._wp
-                        if (p > 0) w3L = gL_y(k, j, l, 3)
+                            w1R = gR_y(k + 1, j, l, 1)
+                            w2R = gR_y(k + 1, j, l, 2)
+                            w3R = 0._wp
+                            if (p > 0) w3R = gR_y(k + 1, j, l, 3)
 
-                        w1R = gR_y(k + 1, j, l, 1)
-                        w2R = gR_y(k + 1, j, l, 2)
-                        w3R = 0._wp
-                        if (p > 0) w3R = gR_y(k + 1, j, l, 3)
+                            normWL = gL_y(k, j, l, num_dims + 1)
+                            normWR = gR_y(k + 1, j, l, num_dims + 1)
 
-                        normWL = gL_y(k, j, l, num_dims + 1)
-                        normWR = gR_y(k + 1, j, l, num_dims + 1)
+                            w1 = (w1L + w1R)/2._wp
+                            w2 = (w2L + w2R)/2._wp
+                            w3 = (w3L + w3R)/2._wp
+                            normW = (normWL + normWR)/2._wp
 
-                        w1 = (w1L + w1R)/2._wp
-                        w2 = (w2L + w2R)/2._wp
-                        w3 = (w3L + w3R)/2._wp
-                        normW = (normWL + normWR)/2._wp
+                            if (normW > capillary_cutoff) then
+                                @:compute_capillary_stress_tensor()
 
-                        if (normW > capillary_cutoff) then
-                            @:compute_capillary_stress_tensor()
+                                do i = 1, num_dims
 
-                            do i = 1, num_dims
+                                    flux_src_vf(momxb + i - 1)%sf(j, k, l) = &
+                                        flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(2, i)
 
-                                flux_src_vf(momxb + i - 1)%sf(j, k, l) = &
-                                    flux_src_vf(momxb + i - 1)%sf(j, k, l) + Omega(2, i)
+                                    flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + &
+                                                                     Omega(2, i)*vSrc_rsy_vf(k, j, l, i)
+
+                                end do
 
                                 flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + &
-                                                                 Omega(2, i)*vSrc_rsy_vf(k, j, l, i)
-
-                            end do
-
-                            flux_src_vf(E_idx)%sf(j, k, l) = flux_src_vf(E_idx)%sf(j, k, l) + &
-                                                             sigma*c_divs(num_dims + 1)%sf(j, k, l)*vSrc_rsy_vf(k, j, l, 2)
-                        end if
+                                                                 sigma*c_divs(num_dims + 1)%sf(j, k, l)*vSrc_rsy_vf(k, j, l, 2)
+                            end if
+                        end do
                     end do
                 end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
+                $:END_GPU_PARALLEL_LOOP()
+            #:endif
 
         elseif (id == 3) then
             #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
@@ -230,6 +239,7 @@ contains
 
     end subroutine s_compute_capillary_source_flux
 
+    !> @brief Computes color-function gradients and their norms, then reconstructs them at cell boundaries.
     impure subroutine s_get_capillary(q_prim_vf, bc_type)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
@@ -311,6 +321,7 @@ contains
 
     end subroutine s_get_capillary
 
+    !> @brief Reconstructs left and right cell-boundary values of capillary (color-gradient) variables using WENO or MUSCL.
     subroutine s_reconstruct_cell_boundary_values_capillary(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, &
                                                             norm_dir)
         type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
@@ -324,7 +335,7 @@ contains
         integer :: i, j, k, l
 
         #:for SCHEME, TYPE in [('weno', 'WENO_TYPE'),('muscl', 'MUSCL_TYPE')]
-            if (recon_type == ${TYPE}$) then
+            if (recon_type == ${TYPE}$ .or. dummy) then
                 ! Reconstruction in s1-direction
 
                 if (norm_dir == 1) then
@@ -345,52 +356,53 @@ contains
                 end if
 
                 $:GPU_UPDATE(device='[is1,is2,is3,iv]')
-
-                if (recon_dir == 1) then
-                    $:GPU_PARALLEL_LOOP(collapse=4)
-                    do i = iv%beg, iv%end
-                        do l = is3%beg, is3%end
-                            do k = is2%beg, is2%end
-                                do j = is1%beg, is1%end
-                                    vL_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
-                                    vR_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
-                                end do
-                            end do
-                        end do
-                    end do
-                    $:END_GPU_PARALLEL_LOOP()
-                else if (recon_dir == 2) then
-                    $:GPU_PARALLEL_LOOP(collapse=4)
-                    do i = iv%beg, iv%end
-                        do l = is3%beg, is3%end
-                            do k = is2%beg, is2%end
-                                do j = is1%beg, is1%end
-                                    vL_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
-                                    vR_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
-                                end do
-                            end do
-                        end do
-                    end do
-                    $:END_GPU_PARALLEL_LOOP()
-                else if (recon_dir == 3) then
-                    $:GPU_PARALLEL_LOOP(collapse=4)
-                    do i = iv%beg, iv%end
-                        do l = is3%beg, is3%end
-                            do k = is2%beg, is2%end
-                                do j = is1%beg, is1%end
-                                    vL_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
-                                    vR_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
-                                end do
-                            end do
-                        end do
-                    end do
-                    $:END_GPU_PARALLEL_LOOP()
-                end if
             end if
         #:endfor
 
+        if (recon_dir == 1) then
+            $:GPU_PARALLEL_LOOP(collapse=4)
+            do i = iv%beg, iv%end
+                do l = is3%beg, is3%end
+                    do k = is2%beg, is2%end
+                        do j = is1%beg, is1%end
+                            vL_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
+                            vR_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
+                        end do
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        else if (recon_dir == 2) then
+            $:GPU_PARALLEL_LOOP(collapse=4)
+            do i = iv%beg, iv%end
+                do l = is3%beg, is3%end
+                    do k = is2%beg, is2%end
+                        do j = is1%beg, is1%end
+                            vL_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
+                            vR_y(j, k, l, i) = v_vf(i)%sf(k, j, l)
+                        end do
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        else if (recon_dir == 3) then
+            $:GPU_PARALLEL_LOOP(collapse=4)
+            do i = iv%beg, iv%end
+                do l = is3%beg, is3%end
+                    do k = is2%beg, is2%end
+                        do j = is1%beg, is1%end
+                            vL_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
+                            vR_z(j, k, l, i) = v_vf(i)%sf(l, k, j)
+                        end do
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+
     end subroutine s_reconstruct_cell_boundary_values_capillary
 
+    !> @brief Deallocates the color-gradient divergence and reconstructed boundary arrays for surface tension.
     impure subroutine s_finalize_surface_tension_module
         integer :: j
 

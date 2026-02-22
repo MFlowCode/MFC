@@ -1,10 +1,10 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
 name = "mfc"
-version = "4.9.6"
+dynamic = ["version"]
 dependencies = [
     # General
     "rich",
@@ -14,6 +14,7 @@ dependencies = [
     "argparse",
     "dataclasses",
     "fastjsonschema",
+    "rapidfuzz",  # For "did you mean?" typo suggestions
 
     # Build System
     "fypp",
@@ -25,7 +26,7 @@ dependencies = [
     "typos",
     "pylint",
     "fprettify",
-    "black",
+    "autopep8",   # Python formatter (black has issues with Python 3.12.5)
     "ansi2txt",
 
     # Profiling
@@ -37,9 +38,9 @@ dependencies = [
     "matplotlib",
 
     # Chemistry
-    "cantera==3.1.0",
+    "cantera>=3.1.0",
     #"pyrometheus == 1.0.5",
-    "pyrometheus @ git+https://github.com/wilfonba/pyrometheus-wilfong.git@OpenMPTest",
+    "pyrometheus @ git+https://github.com/pyrometheus/pyrometheus.git",
 
     # Frontier Profiling
     "astunparse==1.6.2",
@@ -56,3 +57,14 @@ dependencies = [
 
 [tool.hatch.metadata]
 allow-direct-references = true
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.version.raw-options]
+root = ".."
+relative_to = "pyproject.toml"
+version_file = "mfc/_version.py"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "mfc/_version.py"

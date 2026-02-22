@@ -1,11 +1,8 @@
 !>
-!! @file m_start_up.f90
+!! @file
 !! @brief Contains module m_start_up
 
-!> @brief This module contains subroutines that read, and check consistency
-!!              of, the user provided inputs, grid and data. This module also allocates
-!!                and initializes the relevant variables sets up the mpi decomposition and
-!!                initial condition procedures.
+!> @brief Reads and validates user inputs, loads existing grid/IC data, and initializes pre-process modules
 module m_start_up
 
     use m_derived_types         !< Definitions of the derived types
@@ -27,8 +24,6 @@ module m_start_up
                                 !! conservative variables to files
 
     use m_compile_specific      !< Compile-specific procedures
-
-    use m_ib_patches
 
     use m_icpp_patches
 
@@ -78,22 +73,20 @@ module m_start_up
 
     abstract interface
 
+        !> @brief Abstract interface for reading grid data files in serial or parallel.
         impure subroutine s_read_abstract_grid_data_files
 
         end subroutine s_read_abstract_grid_data_files
 
+        !> @brief Abstract interface for reading initial condition data files in serial or parallel.
         !! @param q_cons_vf Conservative variables
-        !! @param ib_markers track if a cell is within the immersed boundary
-        impure subroutine s_read_abstract_ic_data_files(q_cons_vf_in, ib_markers_in)
+        impure subroutine s_read_abstract_ic_data_files(q_cons_vf_in)
 
             import :: scalar_field, integer_field, sys_size, pres_field
 
             type(scalar_field), &
                 dimension(sys_size), &
                 intent(inout) :: q_cons_vf_in
-
-            type(integer_field), &
-                intent(inout) :: ib_markers_in
 
         end subroutine s_read_abstract_ic_data_files
 
@@ -135,8 +128,8 @@ contains
             a_z, x_a, y_a, z_a, x_b, y_b, z_b, &
             model_eqns, num_fluids, mpp_lim, &
             weno_order, bc_x, bc_y, bc_z, num_patches, &
-            hypoelasticity, mhd, patch_icpp, fluid_pp, precision, parallel_io, &
-            mixlayer_vel_profile, mixlayer_vel_coef, &
+            hypoelasticity, mhd, patch_icpp, fluid_pp, bub_pp, &
+            precision, parallel_io, mixlayer_vel_profile, mixlayer_vel_coef, &
             mixlayer_perturb, mixlayer_perturb_nk, mixlayer_perturb_k0, &
             pi_fac, perturb_flow, perturb_flow_fluid, perturb_flow_mag, &
             perturb_sph, perturb_sph_fluid, fluid_rho, &
@@ -150,9 +143,9 @@ contains
             sigma, adv_n, cfl_adap_dt, cfl_const_dt, n_start, &
             n_start_old, surface_tension, hyperelasticity, pre_stress, &
             elliptic_smoothing, elliptic_smoothing_iters, &
-            viscous, bubbles_lagrange, bc_x, bc_y, bc_z, num_bc_patches, &
+            viscous, bubbles_lagrange, num_bc_patches, &
             patch_bc, Bx0, relativity, cont_damage, igr, igr_order, &
-            down_sample, recon_type, muscl_order, &
+            down_sample, recon_type, muscl_order, hyper_cleaning, &
             simplex_perturb, simplex_params, fft_wrt
 
         ! Inquiring the status of the pre_process.inp file
@@ -411,16 +404,12 @@ contains
         !!      initial condition data files so that they may be used by
         !!      the pre-process as a starting point in the creation of an
         !!      all new initial condition.
-        !! @param q_cons_vf Conservative variables
-        !! @param ib_markers track if a cell is within the immersed boundary
-    impure subroutine s_read_serial_ic_data_files(q_cons_vf_in, ib_markers_in)
+        !! @param q_cons_vf_in Conservative variables
+    impure subroutine s_read_serial_ic_data_files(q_cons_vf_in)
 
         type(scalar_field), &
             dimension(sys_size), &
             intent(inout) :: q_cons_vf_in
-
-        type(integer_field), &
-            intent(inout) :: ib_markers_in
 
         character(LEN=len_trim(case_dir) + 3*name_len) :: file_loc !<
         ! Generic string used to store the address of a particular file
@@ -509,25 +498,6 @@ contains
                 end do
 
             end do
-        end if
-
-        ! Reading the IB markers
-        if (ib) then
-            write (file_num, '(I0)') i
-            file_loc = trim(t_step_dir)//'/ib.dat'
-            inquire (FILE=trim(file_loc), EXIST=file_check)
-
-            ! If it exists, the data file is read
-            if (file_check) then
-                open (1, FILE=trim(file_loc), FORM='unformatted', &
-                      STATUS='old', ACTION='read')
-                read (1) ib_markers_in%sf(0:m, 0:n, 0:p)
-                close (1)
-            else
-                call s_mpi_abort('File ib.dat is missing in ' &
-                                 //trim(t_step_dir)// &
-                                 '. Exiting.')
-            end if
         end if
 
         ! Since the preexisting grid and initial condition data files have
@@ -647,16 +617,12 @@ contains
         !!      initial condition data files so that they may be used by
         !!      the pre-process as a starting point in the creation of an
         !!      all new initial condition.
-        !! @param q_cons_vf Conservative variables
-        !! @param ib_markers track if a cell is within the immersed boundary
-    impure subroutine s_read_parallel_ic_data_files(q_cons_vf_in, ib_markers_in)
+        !! @param q_cons_vf_in Conservative variables
+    impure subroutine s_read_parallel_ic_data_files(q_cons_vf_in)
 
         type(scalar_field), &
             dimension(sys_size), &
             intent(inout) :: q_cons_vf_in
-
-        type(integer_field), &
-            intent(inout) :: ib_markers_in
 
 #ifdef MFC_MPI
 
@@ -685,12 +651,7 @@ contains
         if (file_exist) then
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
-            ! Initialize MPI data I/O
-            if (ib) then
-                call s_initialize_mpi_data(q_cons_vf_in, ib_markers_in, levelset, levelset_norm)
-            else
-                call s_initialize_mpi_data(q_cons_vf_in)
-            end if
+            call s_initialize_mpi_data(q_cons_vf_in)
 
             ! Size of local arrays
             data_size = (m + 1)*(n + 1)*(p + 1)
@@ -739,52 +700,19 @@ contains
             call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting. ')
         end if
 
-        if (ib) then
-
-            write (file_loc, '(A)') 'ib.dat'
-            file_loc = trim(restart_dir)//trim(mpiiofs)//trim(file_loc)
-            inquire (FILE=trim(file_loc), EXIST=file_exist)
-
-            if (file_exist) then
-
-                call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
-
-                disp = 0
-
-                call MPI_FILE_SET_VIEW(ifile, disp, MPI_INTEGER, MPI_IO_IB_DATA%view, &
-                                       'native', mpi_info_int, ierr)
-                call MPI_FILE_READ(ifile, MPI_IO_IB_DATA%var%sf, data_size, &
-                                   MPI_INTEGER, status, ierr)
-
-            else
-                call s_mpi_abort('File '//trim(file_loc)//' is missing. Exiting.')
-            end if
-
-        end if
-
         call s_mpi_barrier()
 
 #endif
 
     end subroutine s_read_parallel_ic_data_files
 
+    !> @brief Initializes all pre-process modules, allocates data structures, and sets I/O procedure pointers.
     impure subroutine s_initialize_modules
         ! Computation of parameters, allocation procedures, and/or any other tasks
         ! needed to properly setup the modules
         call s_initialize_global_parameters_module()
-        !Quadrature weights and nodes for polydisperse simulations
-        if (bubbles_euler .and. nb > 1) then
-            call s_simpson(weight, R0)
-        end if
-        !Initialize variables for non-polytropic (Preston) model
-        if (bubbles_euler .and. .not. polytropic) then
-            call s_initialize_nonpoly()
-        end if
-        !Initialize pb based on surface tension for qbmm (polytropic)
-        if (qbmm .and. polytropic .and. (.not. f_is_default(Web))) then
-            pb0(:) = pref + 2._wp*fluid_pp(1)%ss/(R0(:)*R0ref)
-            pb0(:) = pb0(:)/pref
-            pref = 1._wp
+        if (bubbles_euler .or. bubbles_lagrange) then
+            call s_initialize_bubbles_model()
         end if
         call s_initialize_mpi_common_module()
         call s_initialize_data_output_module()
@@ -815,6 +743,7 @@ contains
 
     end subroutine s_initialize_modules
 
+    !> @brief Reads an existing grid from data files or generates a new grid from user inputs.
     impure subroutine s_read_grid()
 
         if (old_grid) then
@@ -833,9 +762,12 @@ contains
 
     end subroutine s_read_grid
 
+    !> @brief Generates or reads the initial condition, applies relaxation if needed, and writes output data files.
     impure subroutine s_apply_initial_condition(start, finish)
 
         real(wp), intent(inout) :: start, finish
+
+        integer :: j, k
 
         ! Setting up the grid and the initial condition. If the grid is read in from
         ! preexisting grid data files, it is checked for consistency. If the grid is
@@ -849,9 +781,19 @@ contains
         ! Setting up grid and initial condition
         call cpu_time(start)
 
-        if (old_ic) call s_read_ic_data_files(q_cons_vf, ib_markers)
+        if (old_ic) call s_read_ic_data_files(q_cons_vf)
 
         call s_generate_initial_condition()
+
+        ! hard-coded psi
+        if (hyper_cleaning) then
+            do j = 0, m
+                do k = 0, n
+                    q_cons_vf(psi_idx)%sf(j, k, 0) = 1d-2*exp(-(x_cc(j)**2 + y_cc(k)**2)/(2.0*0.05**2))
+                    q_prim_vf(psi_idx)%sf(j, k, 0) = q_cons_vf(psi_idx)%sf(j, k, 0)
+                end do
+            end do
+        end if
 
         if (relax) then
             if (proc_rank == 0) then
@@ -862,15 +804,12 @@ contains
             call s_infinite_relaxation_k(q_cons_vf)
         end if
 
-        if (ib) then
-            call s_write_data_files(q_cons_vf, q_prim_vf, bc_type, ib_markers, levelset, levelset_norm)
-        else
-            call s_write_data_files(q_cons_vf, q_prim_vf, bc_type)
-        end if
+        call s_write_data_files(q_cons_vf, q_prim_vf, bc_type)
 
         call cpu_time(finish)
     end subroutine s_apply_initial_condition
 
+    !> @brief Gathers processor timing data and writes elapsed wall-clock time to a summary file.
     impure subroutine s_save_data(proc_time, time_avg, time_final, file_exists)
 
         real(wp), dimension(:), intent(inout) :: proc_time
@@ -905,6 +844,7 @@ contains
         end if
     end subroutine s_save_data
 
+    !> @brief Initializes MPI, reads and validates user inputs on rank 0, and decomposes the computational domain.
     impure subroutine s_initialize_mpi_domain
         ! Initialization of the MPI environment
 
@@ -931,6 +871,7 @@ contains
         call s_mpi_decompose_computational_domain()
     end subroutine s_initialize_mpi_domain
 
+    !> @brief Finalizes all pre-process modules, deallocates resources, and shuts down MPI.
     impure subroutine s_finalize_modules
         ! Disassociate pointers for serial and parallel I/O
         s_generate_grid => null()

@@ -1,7 +1,8 @@
 !>
-!! @file m_constants.f90
+!! @file
 !! @brief Contains constant values used throughout the code(s).
 
+!> @brief Compile-time constant parameters: default values, tolerances, and physical constants
 module m_constants
 
     use m_precision_select

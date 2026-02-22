@@ -1,13 +1,10 @@
 #:include 'macros.fpp'
 
 !>
-!! @file m_start_up.f90
+!! @file
 !! @brief  Contains module m_start_up
 
-!> @brief This module contains the subroutines that read in and check the
-!!              consistency of the user provided inputs. This module also allocates, initializes and
-!!              deallocates the relevant variables and sets up the time stepping,
-!!              MPI decomposition and I/O procedures
+!> @brief Reads and validates user inputs, allocates variables, and configures MPI decomposition and I/O for post-processing
 
 module m_start_up
 
@@ -95,7 +92,7 @@ contains
             t_step_stop, t_step_save, model_eqns, &
             num_fluids, mpp_lim, &
             weno_order, bc_x, &
-            bc_y, bc_z, fluid_pp, format, precision, &
+            bc_y, bc_z, fluid_pp, bub_pp, format, precision, &
             output_partial_domain, x_output, y_output, z_output, &
             hypoelasticity, G, mhd, &
             chem_wrt_Y, chem_wrt_T, avg_state, &
@@ -112,7 +109,7 @@ contains
             relax_model, cf_wrt, sigma, adv_n, ib, num_ibs, &
             cfl_adap_dt, cfl_const_dt, t_save, t_stop, n_start, &
             cfl_target, surface_tension, bubbles_lagrange, &
-            sim_data, hyperelasticity, Bx0, relativity, cont_damage, &
+            sim_data, hyperelasticity, Bx0, relativity, cont_damage, hyper_cleaning, &
             num_bc_patches, igr, igr_order, down_sample, recon_type, &
             muscl_order, lag_header, lag_txt_wrt, lag_db_wrt, &
             lag_id_wrt, lag_pos_wrt, lag_pos_prev_wrt, lag_vel_wrt, &
@@ -200,6 +197,7 @@ contains
 
     end subroutine s_check_input_file
 
+    !> @brief Load grid and conservative data for a time step, fill ghost-cell buffers, and convert to primitive variables.
     impure subroutine s_perform_time_step(t_step)
 
         integer, intent(inout) :: t_step
@@ -234,6 +232,7 @@ contains
 
     end subroutine s_perform_time_step
 
+    !> @brief Derive requested flow quantities from primitive variables and write them to the formatted database files.
     impure subroutine s_save_data(t_step, varname, pres, c, H)
 
         integer, intent(inout) :: t_step
@@ -510,7 +509,9 @@ contains
                 end do
             end do
 
+#ifdef MFC_MPI
             call MPI_ALLREDUCE(MPI_IN_PLACE, En, Nf, mpi_p, MPI_SUM, MPI_COMM_WORLD, ierr)
+#endif
 
             if (proc_rank == 0) then
                 call s_create_directory('En_FFT_DATA')
@@ -593,6 +594,14 @@ contains
         if (cont_damage) then
             q_sf(:, :, :) = q_cons_vf(damage_idx)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
             write (varname, '(A)') 'damage_state'
+            call s_write_variable_to_formatted_database_file(varname, t_step)
+
+            varname(:) = ' '
+        end if
+
+        if (hyper_cleaning) then
+            q_sf = q_cons_vf(psi_idx)%sf(x_beg:x_end, y_beg:y_end, z_beg:z_end)
+            write (varname, '(A)') 'psi'
             call s_write_variable_to_formatted_database_file(varname, t_step)
 
             varname(:) = ' '
@@ -710,7 +719,7 @@ contains
                         pres = q_prim_vf(E_idx)%sf(i, j, k)
 
                         H = ((gamma_sf(i, j, k) + 1._wp)*pres + &
-                             pi_inf_sf(i, j, k))/rho_sf(i, j, k)
+                             pi_inf_sf(i, j, k) + qv_sf(i, j, k))/rho_sf(i, j, k)
 
                         call s_compute_speed_of_sound(pres, rho_sf(i, j, k), &
                                                       gamma_sf(i, j, k), pi_inf_sf(i, j, k), &
@@ -883,10 +892,13 @@ contains
 
     end subroutine s_save_data
 
+    !> @brief Transpose 3-D complex data from x-pencil to y-pencil layout via MPI_Alltoall.
     subroutine s_mpi_transpose_x2y
         complex(c_double_complex), allocatable :: sendbuf(:), recvbuf(:)
         integer :: dest_rank, src_rank
         integer :: i, j, k, l
+
+#ifdef MFC_MPI
 
         allocate (sendbuf(Nx*Nyloc*Nzloc))
         allocate (recvbuf(Nx*Nyloc*Nzloc))
@@ -917,12 +929,17 @@ contains
         deallocate (sendbuf)
         deallocate (recvbuf)
 
+#endif
+
     end subroutine s_mpi_transpose_x2y
 
+    !> @brief Transpose 3-D complex data from y-pencil to z-pencil layout via MPI_Alltoall.
     subroutine s_mpi_transpose_y2z
         complex(c_double_complex), allocatable :: sendbuf(:), recvbuf(:)
         integer :: dest_rank, src_rank
         integer :: j, k, l
+
+#ifdef MFC_MPI
 
         allocate (sendbuf(Ny*Nxloc*Nzloc))
         allocate (recvbuf(Ny*Nxloc*Nzloc))
@@ -953,19 +970,19 @@ contains
         deallocate (sendbuf)
         deallocate (recvbuf)
 
+#endif
+
     end subroutine s_mpi_transpose_y2z
 
+    !> @brief Initialize all post-process sub-modules, set up I/O pointers, and prepare FFTW plans and MPI communicators.
     impure subroutine s_initialize_modules
         ! Computation of parameters, allocation procedures, and/or any other tasks
         ! needed to properly setup the modules
         integer :: size_n(1), inembed(1), onembed(1)
 
         call s_initialize_global_parameters_module()
-        if (bubbles_euler .and. nb > 1) then
-            call s_simpson(weight, R0)
-        end if
-        if (bubbles_euler .and. .not. polytropic) then
-            call s_initialize_nonpoly()
+        if (bubbles_euler .or. bubbles_lagrange) then
+            call s_initialize_bubbles_model()
         end if
         if (num_procs > 1) then
             call s_initialize_mpi_proxy_module()
@@ -984,6 +1001,7 @@ contains
             s_read_data_files => s_read_parallel_data_files
         end if
 
+#ifdef MFC_MPI
         if (fft_wrt) then
 
             num_procs_x = (m_glb + 1)/(m + 1)
@@ -1054,11 +1072,15 @@ contains
             call MPI_CART_COORDS(MPI_COMM_CART13, proc_rank13, 2, cart2d13_coords, ierr)
 
         end if
+#endif
     end subroutine s_initialize_modules
 
+    !> @brief Perform a distributed forward 3-D FFT using pencil decomposition with FFTW and MPI transposes.
     subroutine s_mpi_FFT_fwd
 
         integer :: j, k, l
+
+#ifdef MFC_MPI
 
         do l = 1, Nzloc
             do k = 1, Nyloc
@@ -1118,9 +1140,16 @@ contains
             end do
         end do
 
+#endif
+
     end subroutine s_mpi_FFT_fwd
 
+    !> @brief Set up the MPI environment, read and broadcast user inputs, and decompose the computational domain.
     impure subroutine s_initialize_mpi_domain
+
+        num_dims = 1 + min(1, n) + min(1, p)
+
+#ifdef MFC_MPI
         ! Initialization of the MPI environment
         call s_mpi_initialize()
 
@@ -1144,8 +1173,11 @@ contains
         call s_mpi_decompose_computational_domain()
         call s_check_inputs_fft()
 
+#endif
+
     end subroutine s_initialize_mpi_domain
 
+    !> @brief Destroy FFTW plans, free MPI communicators, and finalize all post-process sub-modules.
     impure subroutine s_finalize_modules
         ! Disassociate pointers for serial and parallel I/O
         s_read_data_files => null()
@@ -1169,11 +1201,13 @@ contains
             call fftw_cleanup()
         end if
 
+#ifdef MFC_MPI
         if (fft_wrt) then
             if (MPI_COMM_CART12 /= MPI_COMM_NULL) call MPI_Comm_free(MPI_COMM_CART12, ierr)
             if (MPI_COMM_CART13 /= MPI_COMM_NULL) call MPI_Comm_free(MPI_COMM_CART13, ierr)
             if (MPI_COMM_CART /= MPI_COMM_NULL) call MPI_Comm_free(MPI_COMM_CART, ierr)
         end if
+#endif
 
         ! Deallocation procedures for the modules
         call s_finalize_data_output_module()

@@ -1,3 +1,5 @@
+@page getting-started Getting Started
+
 # Getting Started
 
 ## Fetching MFC
@@ -68,7 +70,7 @@ for a Linux experience.
 
  <details>
 
-   <summary><h3>Windows + WSL (Recommended)</h3></summary>
+   <summary><b>Windows + WSL (Recommended)</b></summary>
 
 Install [Windows Subsystem for Linux (WSL)](https://docs.microsoft.com/en-us/windows/wsl/) on Windows 11:
 Either
@@ -90,7 +92,7 @@ Once you have WSL installed, you can follow the instructions for *nix systems ab
 
   <details>
 
-   <summary><h3>Native Windows (Intel)</h3></summary>
+   <summary><b>Native Windows (Intel)</b></summary>
 
 Install the latest version of:
 - [Microsoft Visual Studio Community](https://visualstudio.microsoft.com/)
@@ -116,7 +118,9 @@ You will also have access to the `.sln` Microsoft Visual Studio solution files f
 
   </details>
 
-  <summary><h3>MacOS</h3></summary>
+  <details>
+
+  <summary><b>MacOS</b></summary>
 
 Using [Homebrew](https://brew.sh/) you can install the necessary dependencies
 before configuring your environment:
@@ -139,13 +143,13 @@ MFC can be built with support for various (compile-time) features:
 | Feature            | Enable      | Disable        | Default | Description                                                     |
 | :----------------: | :---------: | :------------: | :-----: | --------------------------------------------------------------- |
 | **MPI**            | `--mpi`     | `--no-mpi`     | On      | Allows MFC to run on multiple processors (and nodes). |
-| **GPU**            | `--gpu`     | `--no-gpu`     | Off     | Enables GPU acceleration via OpenACC.                           |
+| **GPU**            | `--gpu`     | `--no-gpu`     | Off     | Enables GPU acceleration via OpenACC or OpenMP offload.         |
 | **Debug**          | `--debug`   | `--no-debug`   | Off     | Requests the compiler build MFC in debug mode.                  |
 | **GCov**           | `--gcov`    | `--no-gcov`    | Off     | Build MFC with coverage flags on.                              |
 | **Unified Memory** | `--unified` | `--no-unified` | Off     | Build MFC with unified CPU/GPU memory (GH200 superchip only)  |
-| **Single**         | `--single`  | `--no-single`  | Off     | Build MFC in single precision     
+| **Single**         | `--single`  | `--no-single`  | Off     | Build MFC in single precision                                   |
 
-_⚠️ The `--gpu` option requires that your compiler supports OpenACC for Fortran for your target GPU architecture._
+_⚠️ The `--gpu` option requires a supported compiler: NVHPC for NVIDIA GPUs (OpenACC or OpenMP), Cray for AMD GPUs (OpenACC or OpenMP), or AMD compilers for AMD GPUs (OpenMP only)._
 
 When these options are given to `mfc.sh`, they will be remembered when you issue future commands.
 You can enable and disable features anytime by passing any of the arguments above.
@@ -173,7 +177,7 @@ In brief, you can run the latest MFC container:
 ```bash
 docker run -it --rm --entrypoint bash sbryngelson/mfc:latest-cpu
 ```
-Please refer to the [Docker](https://mflowcode.github.io/documentation/docker.html) document for more information.
+Please refer to the @ref docker "Docker" document for more information.
 
 ## Running the Test Suite
 
@@ -182,7 +186,7 @@ Run MFC's test suite with 8 threads:
 ./mfc.sh test -j 8
 ```
 
-Please refer to the [Testing](testing.md) document for more information.
+Please refer to the @ref testing "Testing" document for more information.
 
 ## Running an Example Case
 
@@ -192,4 +196,51 @@ MFC has example cases in the `examples` folder. You can run such a case interact
 ./mfc.sh run examples/2D_shockbubble/case.py -n 2
 ```
 
-Please refer to the [Running](running.md) document for more information on `case.py` files and how to run them.
+Please refer to the @ref running "Running" document for more information on `case.py` files and how to run them.
+
+## Units and Dimensions
+
+MFC is **unit-agnostic**: the solver performs no internal unit conversions. Whatever units you provide for initial conditions, boundary conditions, and material properties, the same units appear in the output.
+
+The only requirement is **consistency** — all inputs must use the same unit system. Note that some parameters use **transformed stored forms** rather than standard physical values (e.g., `gamma` expects \f$1/(\gamma-1)\f$, not \f$\gamma\f$ itself). See @ref sec-stored-forms for details.
+
+## Helpful Tools
+
+### Parameter Lookup
+
+MFC has over 3,000 case parameters. Use the `params` command to search and explore them:
+
+```shell
+./mfc.sh params dt          # Search for parameters matching "dt"
+./mfc.sh params -d dt       # Show parameter with description
+./mfc.sh params patch       # Find all patch-related parameters
+./mfc.sh params --family    # List all parameter families
+```
+
+### Creating a New Case
+
+Generate a case file template to get started quickly:
+
+```shell
+./mfc.sh new my_case.py     # Create a new case file from template
+```
+
+### Shell Completion
+
+Enable tab-completion for `./mfc.sh` commands:
+
+**Bash** (add to `~/.bashrc`):
+```bash
+source /path/to/MFC/toolchain/completions/mfc.bash
+```
+
+**Zsh** (add to `~/.zshrc`):
+```zsh
+fpath=(/path/to/MFC/toolchain/completions $fpath)
+autoload -Uz compinit && compinit
+```
+
+After reloading your shell, press Tab to complete commands and options.
+
+
+<div style='text-align:center; font-size:0.75rem; color:#888; padding:16px 0 0;'>Page last updated: 2026-02-15</div>

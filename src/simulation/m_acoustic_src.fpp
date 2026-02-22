@@ -1,10 +1,10 @@
 !>
-!! @file m_acoustic_src.fpp
+!! @file
 !! @brief Contains module m_acoustic_src
 
 #:include 'macros.fpp'
 
-!> @brief The module contains the subroutines used to create a acoustic source pressure source term
+!> @brief Applies acoustic pressure source terms including focused, planar, and broadband transducers
 module m_acoustic_src
 
     use m_derived_types        !< Definitions of the derived types
@@ -124,8 +124,6 @@ contains
     end subroutine s_initialize_acoustic_src
 
     !> This subroutine updates the rhs by computing the mass, mom, energy sources
-    !! @param q_cons_vf Conservative variables
-    !! @param q_prim_vf Primitive variables
     !! @param t_step Current time step
     !! @param rhs_vf rhs variables
     impure subroutine s_acoustic_src_calculations(q_cons_vf, q_prim_vf, t_step, rhs_vf)
@@ -143,8 +141,11 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
 
         integer, intent(in) :: t_step
-
-        real(wp), dimension(num_fluids) :: myalpha, myalpha_rho
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3) :: myalpha, myalpha_rho
+        #:else
+            real(wp), dimension(num_fluids) :: myalpha, myalpha_rho
+        #:endif
         real(wp) :: myRho, B_tait
         real(wp) :: sim_time, c, small_gamma
         real(wp) :: frequency_local, gauss_sigma_time_local
@@ -349,6 +350,7 @@ contains
     !! @param frequency_local Frequency at the spatial location for sine and square waves
     !! @param gauss_sigma_time_local sigma in time for Gaussian pulse
     !! @param source Source term amplitude
+    !! @param sum_bb Sum of basis functions
     elemental subroutine s_source_temporal(sim_time, c, ai, term_index, frequency_local, gauss_sigma_time_local, source, sum_BB)
         $:GPU_ROUTINE(parallelism='[seq]')
         integer, intent(in) :: ai, term_index

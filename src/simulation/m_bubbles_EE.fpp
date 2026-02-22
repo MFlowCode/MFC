@@ -1,10 +1,10 @@
 !>
-!! @file m_bubbles_EE.f90
-!! @brief Contains module m_bubbles_EE
+!! @file
+!! @brief Contains module @ref m_bubbles_ee "m_bubbles_EE"
 
 #:include 'macros.fpp'
 
-!> @brief This module is used to compute the ensemble-averaged bubble dynamic variables
+!> @brief Computes ensemble-averaged (Euler--Euler) bubble source terms for radius, velocity, pressure, and mass transfer
 module m_bubbles_EE
 
     use m_derived_types        !< Definitions of the derived types
@@ -31,6 +31,7 @@ module m_bubbles_EE
 
 contains
 
+    !> @brief Allocates and initializes arrays for the Euler-Euler bubble model.
     impure subroutine s_initialize_bubbles_EE_module
 
         integer :: l
@@ -68,7 +69,7 @@ contains
 
     end subroutine s_initialize_bubbles_EE_module
 
-    ! Compute the bubble volume fraction alpha from the bubble number density n
+    !> @brief Computes the bubble volume fraction alpha from the bubble number density.
         !! @param q_cons_vf is the conservative variable
     subroutine s_comp_alpha_from_n(q_cons_vf)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
@@ -92,6 +93,9 @@ contains
 
     end subroutine s_comp_alpha_from_n
 
+    !>  Compute the right-hand side for Euler-Euler bubble transport
+        !! @param idir Direction index
+        !! @param q_prim_vf Primitive variables
     subroutine s_compute_bubbles_EE_rhs(idir, q_prim_vf, divu_in)
 
         integer, intent(in) :: idir
@@ -156,6 +160,7 @@ contains
         !!      that are needed for the bubble modeling
         !!  @param q_prim_vf Primitive variables
         !!  @param q_cons_vf Conservative variables
+        !!  @param rhs_vf Right-hand side variables
     impure subroutine s_compute_bubble_EE_source(q_cons_vf, q_prim_vf, rhs_vf, divu_in)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
@@ -165,9 +170,14 @@ contains
         real(wp) :: rddot
         real(wp) :: pb_local, mv_local, vflux, pbdot
         real(wp) :: n_tait, B_tait
-        real(wp), dimension(nb) :: Rtmp, Vtmp
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3) :: Rtmp, Vtmp
+            real(wp), dimension(3) :: myalpha, myalpha_rho
+        #:else
+            real(wp), dimension(nb) :: Rtmp, Vtmp
+            real(wp), dimension(num_fluids) :: myalpha, myalpha_rho
+        #:endif
         real(wp) :: myR, myV, alf, myP, myRho, R2Vav, R3
-        real(wp), dimension(num_fluids) :: myalpha, myalpha_rho
         real(wp) :: nbub !< Bubble number density
         real(wp) :: my_divu
 
@@ -242,86 +252,74 @@ contains
                             myalpha(ii) = q_cons_vf(advxb + ii - 1)%sf(j, k, l)
                         end do
 
-                        myRho = 0._wp
-                        n_tait = 0._wp
-                        B_tait = 0._wp
+                        if (num_fluids == 1) then
+                            myRho = myalpha_rho(1)
+                            n_tait = gammas(1)
+                            B_tait = pi_infs(1)/pi_fac
+                        else
+                            myRho = 0._wp
+                            n_tait = 0._wp
+                            B_tait = 0._wp
 
-                        if (mpp_lim .and. (num_fluids > 2)) then
                             $:GPU_LOOP(parallelism='[seq]')
                             do ii = 1, num_fluids
                                 myRho = myRho + myalpha_rho(ii)
                                 n_tait = n_tait + myalpha(ii)*gammas(ii)
-                                B_tait = B_tait + myalpha(ii)*pi_infs(ii)
+                                B_tait = B_tait + myalpha(ii)*pi_infs(ii)/pi_fac
                             end do
-                        else if (num_fluids > 2) then
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do ii = 1, num_fluids - 1
-                                myRho = myRho + myalpha_rho(ii)
-                                n_tait = n_tait + myalpha(ii)*gammas(ii)
-                                B_tait = B_tait + myalpha(ii)*pi_infs(ii)
-                            end do
-                        else
-                            myRho = myalpha_rho(1)
-                            n_tait = gammas(1)
-                            B_tait = pi_infs(1)/pi_fac
                         end if
 
                         n_tait = 1._wp/n_tait + 1._wp !make this the usual little 'gamma'
                         B_tait = B_tait*(n_tait - 1)/n_tait ! make this the usual pi_inf
 
-                        myRho = q_prim_vf(1)%sf(j, k, l)
                         myP = q_prim_vf(E_idx)%sf(j, k, l)
                         alf = q_prim_vf(alf_idx)%sf(j, k, l)
                         myR = q_prim_vf(rs(q))%sf(j, k, l)
                         myV = q_prim_vf(vs(q))%sf(j, k, l)
 
-                        if (.not. polytropic) then
-                            pb_local = q_prim_vf(ps(q))%sf(j, k, l)
-                            mv_local = q_prim_vf(ms(q))%sf(j, k, l)
-                            call s_bwproperty(pb_local, q, chi_vw, k_mw, rho_mw)
-                            call s_vflux(myR, myV, pb_local, mv_local, q, vflux)
-                            pbdot = f_bpres_dot(vflux, myR, myV, pb_local, mv_local, q)
-
-                            bub_p_src(j, k, l, q) = nbub*pbdot
-                            bub_m_src(j, k, l, q) = nbub*vflux*4._wp*pi*(myR**2._wp)
-                        else
-                            pb_local = 0._wp; mv_local = 0._wp; vflux = 0._wp; pbdot = 0._wp
-                        end if
-
-                        ! Adaptive time stepping
-                        adap_dt_stop = 0
-
-                        if (adap_dt) then
-
-                            my_divu = real(divu_in%sf(j, k, l), kind=wp)
-                            call s_advance_step(myRho, myP, myR, myV, R0(q), &
-                                                pb_local, pbdot, alf, n_tait, B_tait, &
-                                                bub_adv_src(j, k, l), my_divu, &
-                                                dmBub_id, dmMass_v, dmMass_n, dmBeta_c, &
-                                                dmBeta_t, dmCson, adap_dt_stop)
-
-                            q_cons_vf(rs(q))%sf(j, k, l) = nbub*myR
-                            q_cons_vf(vs(q))%sf(j, k, l) = nbub*myV
-
-                        else
-                            my_divu = real(divu_in%sf(j, k, l), kind=wp)
-                            rddot = f_rddot(myRho, myP, myR, myV, R0(q), &
-                                            pb_local, pbdot, alf, n_tait, B_tait, &
-                                            bub_adv_src(j, k, l), my_divu, &
-                                            dmCson)
-                            bub_v_src(j, k, l, q) = nbub*rddot
-                            bub_r_src(j, k, l, q) = q_cons_vf(vs(q))%sf(j, k, l)
-                        end if
-
-                        adap_dt_stop_max = max(adap_dt_stop_max, adap_dt_stop)
-
-                        if (alf < 1.e-11_wp) then
+                        if (alf < small_alf) then
                             bub_adv_src(j, k, l) = 0._wp
                             bub_r_src(j, k, l, q) = 0._wp
                             bub_v_src(j, k, l, q) = 0._wp
                             if (.not. polytropic) then
                                 bub_p_src(j, k, l, q) = 0._wp
                                 bub_m_src(j, k, l, q) = 0._wp
+                            end if
+                        else
+                            if (.not. polytropic) then
+                                pb_local = q_prim_vf(ps(q))%sf(j, k, l)
+                                mv_local = q_prim_vf(ms(q))%sf(j, k, l)
+                                call s_bwproperty(pb_local, q, chi_vw, k_mw, rho_mw)
+                                call s_vflux(myR, myV, pb_local, mv_local, q, vflux)
+                                pbdot = f_bpres_dot(vflux, myR, myV, pb_local, mv_local, q)
+                                bub_p_src(j, k, l, q) = nbub*pbdot
+                                bub_m_src(j, k, l, q) = nbub*vflux*4._wp*pi*(myR**2._wp)
+                            else
+                                pb_local = 0._wp; mv_local = 0._wp; vflux = 0._wp; pbdot = 0._wp
+                            end if
+
+                            ! Adaptive time stepping
+                            if (adap_dt) then
+                                adap_dt_stop = 0
+
+                                call s_advance_step(myRho, myP, myR, myV, R0(q), &
+                                                    pb_local, pbdot, alf, n_tait, B_tait, &
+                                                    bub_adv_src(j, k, l), divu_in%sf(j, k, l), &
+                                                    dmBub_id, dmMass_v, dmMass_n, dmBeta_c, &
+                                                    dmBeta_t, dmCson, adap_dt_stop)
+
+                                q_cons_vf(rs(q))%sf(j, k, l) = nbub*myR
+                                q_cons_vf(vs(q))%sf(j, k, l) = nbub*myV
+
+                                adap_dt_stop_max = max(adap_dt_stop_max, adap_dt_stop)
+
+                            else
+                                rddot = f_rddot(myRho, myP, myR, myV, R0(q), &
+                                                pb_local, pbdot, alf, n_tait, B_tait, &
+                                                bub_adv_src(j, k, l), divu_in%sf(j, k, l), &
+                                                dmCson)
+                                bub_v_src(j, k, l, q) = nbub*rddot
+                                bub_r_src(j, k, l, q) = q_cons_vf(vs(q))%sf(j, k, l)
                             end if
                         end if
                     end do
