@@ -33,7 +33,7 @@ contains
 
         integer :: i, patch_id, patch_geometry
 
-        print *, "num_gps: ", num_gps
+        print *, num_gps
 
         !  3D Patch Geometries
         if (p > 0) then
@@ -82,11 +82,6 @@ contains
             $:END_GPU_PARALLEL_LOOP()
 
         end if
-
-        $:GPU_UPDATE(host='[gps]')
-        do i = 1, num_gps
-            print *, gps(i)%loc, gps(i)%levelset, gps(i)%levelset_norm
-        end do
 
     end subroutine s_apply_levelset
 

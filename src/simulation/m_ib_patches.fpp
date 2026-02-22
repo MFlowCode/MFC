@@ -867,7 +867,7 @@ contains
                                              patch_id, xy_local)
 
                 ! Reading STL boundary vertices and compute the levelset and levelset_norm
-                if (eta > 0.5_wp) then
+                if (eta > threshold) then
                     ib_markers%sf(i, j, 0) = patch_id
                 end if
             end do
@@ -929,8 +929,7 @@ contains
                                                  gpu_trs_v, gpu_trs_n, &
                                                  patch_id, xyz_local)
 
-                    ! if (eta > patch_ib(patch_id)%model_threshold) then
-                    if (eta > 0.5_wp) then
+                    if (eta > patch_ib(patch_id)%model_threshold) then
                         ib_markers%sf(i, j, k) = patch_id
                     end if
                 end do
@@ -1102,8 +1101,6 @@ contains
                 end if
             end if
         end block
-
-        print *, "Finished reading models"
 
     end subroutine s_instantiate_STL_models
 

@@ -1032,16 +1032,14 @@ contains
                 norm(2) = boundary_v(i, 3, 2, pid)
             else if (t < 0._wp) then ! negative t means that v1 is the closest point on the edge
                 dist = sqrt((point(1) - v1(1))**2 + (point(2) - v1(2))**2)
-                norm(1) = point(1) - v1(1)
-                norm(2) = point(2) - v1(2)
-                norm_mag = sqrt(dot_product(norm, norm))
-                norm = norm/norm_mag
+                norm(1) = v1(1) - point(1)
+                norm(2) = v1(2) - point(2)
+                norm = norm/dist
             else ! t > 1 means that v2 is the closest point on the line edge
                 dist = sqrt((point(1) - v2(1))**2 + (point(2) - v2(2))**2)
-                norm(1) = point(1) - v2(1)
-                norm(2) = point(2) - v2(2)
-                norm_mag = sqrt(dot_product(norm, norm))
-                norm = norm/norm_mag
+                norm(1) = v2(1) - point(1)
+                norm(2) = v2(2) - point(2)
+                norm = norm/dist
             end if
 
             if (dist < dist_min) then
