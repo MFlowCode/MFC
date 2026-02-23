@@ -892,7 +892,7 @@ contains
         real(wp), dimension(1:3, 1:3) :: inverse_rotation, rotation
         integer :: cx, cy, cz
         real(wp) :: lx(2), ly(2), lz(2)
-        real(wp), dimension(1:3) :: bbox_min, bbox_max, local_corner, world_corner
+        real(wp), dimension(1:3) :: bbox_min, bbox_max, local_corner, world_corner, test
 
         center = 0._wp
         center(1) = patch_ib(patch_id)%x_centroid
@@ -1120,9 +1120,9 @@ contains
                     end if
                 end do
 
-                $:GPU_ENTER_DATA(copyin='[gpu_ntrs, gpu_trs_v, gpu_trs_n, gpu_boundary_edge_count, gpu_total_vertices]')
+                $:GPU_UPDATE(device='[gpu_ntrs, gpu_trs_v, gpu_trs_n, gpu_boundary_edge_count, gpu_total_vertices]')
                 if (allocated(gpu_boundary_v)) then
-                    $:GPU_ENTER_DATA(copyin='[gpu_boundary_v]')
+                    $:GPU_UPDATE(device='[gpu_boundary_v]')
                 end if
             end if
         end block
