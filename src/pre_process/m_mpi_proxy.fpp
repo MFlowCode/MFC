@@ -118,7 +118,7 @@ contains
             end if
             ! Broadcast IB variables
             #:for VAR in ['vel', 'angular_vel', 'angles']
-                call MPI_BCAST(patch_ib(i)%${VAR}$, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
+                call MPI_BCAST(patch_ib(i)%${VAR}$, size(patch_ib(i)%${VAR}$), mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
             call MPI_BCAST(patch_ib(i)%geometry, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(patch_ib(i)%model_filepath, len(patch_ib(i)%model_filepath), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
