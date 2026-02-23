@@ -36,7 +36,7 @@ module m_model
     integer, allocatable :: gpu_boundary_edge_count(:)
     integer, allocatable :: gpu_total_vertices(:)
     real(wp), allocatable :: stl_bounding_boxes(:, :, :)
-    $:GPU_DECLARE(create='[gpu_trs_v,gpu_trs_n,gpu_boundary_v]')
+    $:GPU_DECLARE(create='[gpu_ntrs,gpu_trs_v,gpu_trs_n,gpu_boundary_v,gpu_boundary_edge_count,gpu_total_vertices]')
 
 contains
 

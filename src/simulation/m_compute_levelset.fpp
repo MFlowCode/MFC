@@ -678,10 +678,6 @@ contains
         end if
         xyz_local = matmul(inverse_rotation, xyz_local)
 
-        if (grid_geometry == 3) then
-            xyz_local = f_convert_cyl_to_cart(xyz_local)
-        end if
-
         ! 3D models
         if (p > 0) then
             ! Get the boundary normals and shortest distance between the cell center and the model boundary
