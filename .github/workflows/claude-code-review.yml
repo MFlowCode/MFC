@@ -20,7 +20,25 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 1
-
+          
+      - name: Remove prior Claude review comment (so review runs again)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pr=${{ github.event.pull_request.number }}
+          repo=${{ github.repository }}
+      
+          # Find first issue comment whose body starts with "## Claude Code Review"
+          comment_id=$(gh api repos/$repo/issues/$pr/comments \
+            --jq '.[] | select(.body | startswith("## Claude Code Review")) | .id' | head -n 1)
+      
+          if [ -n "$comment_id" ]; then
+            echo "Deleting prior Claude review comment id=$comment_id"
+            gh api -X DELETE repos/$repo/issues/comments/$comment_id
+          else
+            echo "No prior Claude review comment found."
+          fi
+          
       - name: Run Claude Code Review
         id: claude-review
         uses: anthropics/claude-code-action@v1
@@ -58,6 +76,15 @@ jobs:
 
             If you cannot access the diff/files, say exactly what is blocked.
             If posting a PR comment is blocked, write the full review to the GitHub Actions job summary instead.
+
+            IMPORTANT:
+            - Do NOT stop just because a previous "Claude Code Review" comment exists.
+            - If a prior Claude review exists, post a NEW comment titled "Claude Code Review (updated)" that includes:
+              - current head SHA: ${{ github.event.pull_request.head.sha }}
+              - files changed count + up to 15 file paths
+              - 3–6 bullet summary of changes
+              - findings or at least 3 improvement opportunities with file paths
+            Post as ONE top-level PR comment.
 
           additional_permissions: |
             actions: read
