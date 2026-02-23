@@ -31,11 +31,11 @@ jobs:
           plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
           plugins: 'code-review@claude-code-plugins'
 
-          # IMPORTANT: allow exactly what the review flow uses
           claude_args: >
             --allowedTools
             "Bash(gh pr view:*)"
             "Bash(gh pr diff:*)"
+            "Bash(gh pr comment:*)"
             "Bash(gh api:*)"
             "Bash(gh search code:*)"
             "Bash(cat:*)"
@@ -46,8 +46,18 @@ jobs:
 
           prompt: |
             /code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }}
-            Post the results as one top-level PR comment titled "Claude Code Review".
-            If you cannot access the diff/files, say so explicitly and explain what is blocking access.
+
+            Post the results as ONE top-level PR comment titled "Claude Code Review".
+
+            Output requirements (even if no issues):
+            - Start with: files changed count + list up to 15 changed file paths
+            - Then: a short summary of what the PR changes (3–6 bullets)
+            - Then: findings:
+              - If issues: list them with file path + line numbers when possible
+              - If no issues: list at least 3 concrete "improvement opportunities" with file paths
+
+            If you cannot access the diff/files, say exactly what is blocked.
+            If posting a PR comment is blocked, write the full review to the GitHub Actions job summary instead.
 
           additional_permissions: |
             actions: read
