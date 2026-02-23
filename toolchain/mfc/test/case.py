@@ -183,8 +183,8 @@ class TestCase(case.Case):
             self.params = orig
             try:
                 self.create_directory()
-            except Exception:
-                pass
+            except Exception as exc:
+                print(f"Warning: failed to restore test directory: {exc}")
 
     def get_trace(self) -> str:
         return self.trace
