@@ -253,7 +253,7 @@ contains
         #:for MUSCL_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (muscl_dir == ${MUSCL_DIR}$) then
 
-                $:GPU_PARALLEL_LOOP(collapse=3,private='[j,k,l,aCL,aC,aCR,aTHINC,moncon,sign,qmin,qmax,rho_b,rho_e]')
+                $:GPU_PARALLEL_LOOP(collapse=3,private='[j,k,l,aCL,aC,aCR,aTHINC,moncon,sign,qmin,qmax,A,B,C,rho_b,rho_e]')
                 do l = is3_muscl%beg, is3_muscl%end
                     do k = is2_muscl%beg, is2_muscl%end
                         do j = is1_muscl%beg, is1_muscl%end
