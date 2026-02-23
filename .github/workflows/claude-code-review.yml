@@ -28,17 +28,26 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ github.token }}
 
-          show_full_output: true
-
           plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
           plugins: 'code-review@claude-code-plugins'
 
-          claude_args: |
-            --allowedTools "Bash(*)"
+          # IMPORTANT: allow exactly what the review flow uses
+          claude_args: >
+            --allowedTools
+            "Bash(gh pr view:*)"
+            "Bash(gh pr diff:*)"
+            "Bash(gh api:*)"
+            "Bash(gh search code:*)"
+            "Bash(cat:*)"
+            "Bash(ls:*)"
+            "Bash(grep:*)"
+            "Bash(python3:*)"
+            "Bash(git:*)"
 
           prompt: |
             /code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }}
             Post the results as one top-level PR comment titled "Claude Code Review".
+            If you cannot access the diff/files, say so explicitly and explain what is blocking access.
 
           additional_permissions: |
             actions: read
