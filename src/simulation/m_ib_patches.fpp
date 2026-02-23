@@ -890,7 +890,10 @@ contains
         real(wp) :: eta, threshold, corner_distance
         real(wp), dimension(1:3) :: point, local_point, offset
         real(wp), dimension(1:3) :: center, xyz_local
-        real(wp), dimension(1:3, 1:3) :: inverse_rotation
+        real(wp), dimension(1:3, 1:3) :: inverse_rotation, rotation
+        integer :: cx, cy, cz
+        real(wp) :: lx(2), ly(2), lz(2)
+        real(wp), dimension(1:3) :: bbox_min, bbox_max, local_corner, world_corner
 
         center = 0._wp
         center(1) = patch_ib(patch_id)%x_centroid
@@ -900,6 +903,7 @@ contains
         offset(:) = patch_ib(patch_id)%centroid_offset(:)
         spc = patch_ib(patch_id)%model_spc
         threshold = patch_ib(patch_id)%model_threshold
+        rotation(:, :) = patch_ib(patch_id)%rotation_matrix(:, :)
 
         il = -gp_layers
         jl = -gp_layers
@@ -907,14 +911,37 @@ contains
         ir = m + gp_layers
         jr = n + gp_layers
         kr = p + gp_layers
-        corner_distance = 0._wp
-        do i = 1, 3
-            corner_distance = corner_distance + maxval(abs(stl_bounding_boxes(patch_id, i, 1:3)))**2 ! distance to rim of cylinder
+
+        ! Local-space bounding box extents (min=1, max=2 in the third index)
+        lx(1) = stl_bounding_boxes(patch_id, 1, 1) + offset(1)
+        lx(2) = stl_bounding_boxes(patch_id, 1, 3) + offset(1)
+        ly(1) = stl_bounding_boxes(patch_id, 2, 1) + offset(2)
+        ly(2) = stl_bounding_boxes(patch_id, 2, 3) + offset(2)
+        lz(1) = stl_bounding_boxes(patch_id, 3, 1) + offset(3)
+        lz(2) = stl_bounding_boxes(patch_id, 3, 3) + offset(3)
+
+        bbox_min = 1e12
+        bbox_max = -1e12
+        ! Enumerate all 8 corners of the local bounding box,
+        ! rotate to world space, track world-space AABB
+        do cx = 1, 2
+            do cy = 1, 2
+                do cz = 1, 2
+                    local_corner = [lx(cx), ly(cy), lz(cz)]
+                    world_corner = matmul(rotation, local_corner) + center
+                    bbox_min(1) = min(bbox_min(1), world_corner(1))
+                    bbox_min(2) = min(bbox_min(2), world_corner(2))
+                    bbox_min(3) = min(bbox_min(3), world_corner(3))
+                    bbox_max(1) = max(bbox_max(1), world_corner(1))
+                    bbox_max(2) = max(bbox_max(2), world_corner(2))
+                    bbox_max(3) = max(bbox_max(3), world_corner(3))
+                end do
+            end do
         end do
-        corner_distance = sqrt(corner_distance)
-        call get_bounding_indices(center(1) - corner_distance, center(1) + corner_distance, x_cc, il, ir)
-        call get_bounding_indices(center(2) - corner_distance, center(2) + corner_distance, y_cc, jl, jr)
-        call get_bounding_indices(center(3) - corner_distance, center(3) + corner_distance, z_cc, kl, kr)
+
+        call get_bounding_indices(bbox_min(1), bbox_max(1), x_cc, il, ir)
+        call get_bounding_indices(bbox_min(2), bbox_max(2), y_cc, jl, jr)
+        call get_bounding_indices(bbox_min(3), bbox_max(3), z_cc, kl, kr)
 
         $:GPU_PARALLEL_LOOP(private='[i,j,k, xyz_local, eta]',&
                   & copyin='[patch_id,center,inverse_rotation, offset, spc, threshold]', collapse=3)

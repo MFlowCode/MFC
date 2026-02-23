@@ -598,7 +598,7 @@ contains
         real(wp) :: fraction
         type(t_ray) :: ray
         type(t_triangle) :: tri
-        integer :: i, j, k, q, nInOrOut, nHits
+        integer :: i, j, k, q, nInOrOut, nHits, spc
 
         ! cast 26 rays from the point and count the number at leave the boundary
         nInOrOut = 0
