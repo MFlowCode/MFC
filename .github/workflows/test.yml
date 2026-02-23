@@ -97,6 +97,12 @@ jobs:
       - name: Clone
         uses: actions/checkout@v4
 
+      - name: Restore Build Cache
+        uses: actions/cache@v4
+        with:
+          path: build
+          key: mfc-build-${{ matrix.os }}-${{ matrix.mpi }}-${{ matrix.debug }}-${{ matrix.precision }}-${{ matrix.intel }}-${{ hashFiles('CMakeLists.txt', 'toolchain/dependencies/**', 'toolchain/cmake/**', 'src/**/*.fpp', 'src/**/*.f90') }}
+
       - name: Setup MacOS
         if:   matrix.os == 'macos'
         run:  |
@@ -205,6 +211,8 @@ jobs:
     steps:
       - name: Clone
         uses: actions/checkout@v4
+        with:
+          clean: false
 
       - name: Build
         if:   matrix.cluster != 'phoenix'

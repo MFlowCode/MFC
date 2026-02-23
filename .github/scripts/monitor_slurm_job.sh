@@ -4,10 +4,16 @@
 
 set -euo pipefail
 
-# Cleanup handler to prevent orphaned tail processes
+# Cleanup handler to prevent orphaned tail processes and cancel orphaned jobs
 cleanup() {
   if [ -n "${tail_pid:-}" ]; then
     kill "${tail_pid}" 2>/dev/null || true
+  fi
+  # Cancel the SLURM job if the monitor is exiting due to an error
+  # (e.g., the CI runner is being killed). Don't cancel on success.
+  if [ "${monitor_success:-0}" -ne 1 ] && [ -n "${job_id:-}" ]; then
+    echo "Monitor exiting abnormally — cancelling SLURM job $job_id"
+    scancel "$job_id" 2>/dev/null || true
   fi
 }
 trap cleanup EXIT
@@ -23,30 +29,78 @@ output_file="$2"
 echo "Submitted batch job $job_id"
 echo "Monitoring output file: $output_file"
 
-# Wait for file to appear with retry logic for transient squeue failures
+# Robustly check SLURM job state using squeue with sacct fallback.
+# Returns the state string (PENDING, RUNNING, COMPLETED, FAILED, etc.)
+# or "UNKNOWN" if both commands fail.
+get_job_state() {
+  local jid="$1"
+  local state
+
+  # Try squeue first (fast, works for active jobs)
+  state=$(squeue -j "$jid" -h -o '%T' 2>/dev/null | head -n1 | tr -d ' ' || true)
+  if [ -n "$state" ]; then
+    echo "$state"
+    return
+  fi
+
+  # Fallback to sacct (works for completed/historical jobs)
+  if command -v sacct >/dev/null 2>&1; then
+    state=$(sacct -j "$jid" -n -X -P -o State 2>/dev/null | head -n1 | cut -d'|' -f1 || true)
+    if [ -n "$state" ]; then
+      echo "$state"
+      return
+    fi
+  fi
+
+  echo "UNKNOWN"
+}
+
+# Check if a state is terminal (job is done, for better or worse)
+is_terminal_state() {
+  case "$1" in
+    COMPLETED|FAILED|CANCELLED|CANCELLED+|TIMEOUT|OUT_OF_MEMORY|NODE_FAIL|BOOT_FAIL|DEADLINE|PREEMPTED|REVOKED)
+      return 0 ;;
+    *)
+      return 1 ;;
+  esac
+}
+
+# Wait for file to appear, using robust state checking.
+# Never give up due to transient squeue/sacct failures — the CI job timeout
+# is the ultimate backstop.
 echo "Waiting for job to start..."
-squeue_retries=0
-max_squeue_retries=5
+unknown_count=0
 while [ ! -f "$output_file" ]; do
-  # Check if job is still queued/running
-  if squeue -j "$job_id" &>/dev/null; then
-    squeue_retries=0  # Reset on success
-    sleep 5
-  else
-    squeue_retries=$((squeue_retries + 1))
-    if [ $squeue_retries -ge $max_squeue_retries ]; then
-      # Job not in queue and output file doesn't exist
-      if [ ! -f "$output_file" ]; then
-        echo "ERROR: Job $job_id not in queue and output file not created"
+  state=$(get_job_state "$job_id")
+
+  case "$state" in
+    PENDING|CONFIGURING)
+      unknown_count=0
+      sleep 5
+      ;;
+    RUNNING|COMPLETING)
+      unknown_count=0
+      # Job is running but output file not yet visible (NFS delay)
+      sleep 2
+      ;;
+    UNKNOWN)
+      unknown_count=$((unknown_count + 1))
+      # Only print warning periodically to avoid log spam
+      if [ $((unknown_count % 12)) -eq 1 ]; then
+        echo "Warning: Could not query job $job_id state (SLURM may be temporarily unavailable)..."
+      fi
+      sleep 5
+      ;;
+    *)
+      # Terminal state — job finished without creating output
+      if is_terminal_state "$state"; then
+        echo "ERROR: Job $job_id reached terminal state ($state) without creating output file"
         exit 1
       fi
-      break
-    fi
-    # Exponential backoff
-    sleep_time=$((2 ** squeue_retries))
-    echo "Warning: squeue check failed, retrying in ${sleep_time}s..."
-    sleep $sleep_time
-  fi
+      # Unrecognized state, keep waiting
+      sleep 5
+      ;;
+  esac
 done
 
 echo "=== Streaming output for job $job_id ==="
@@ -57,14 +111,13 @@ exec 3< <(stdbuf -oL -eL tail -f "$output_file" 2>&1)
 tail_pid=$!
 
 # Monitor job status and stream output simultaneously
-squeue_failures=0
 last_heartbeat=$(date +%s)
 
 while true; do
   # Try to read from tail output (non-blocking via timeout)
   # Read multiple lines if available to avoid falling behind
   lines_read=0
-  while IFS= read -r -t 0.1 line <&3 2>/dev/null; do
+  while IFS= read -r -t 1 line <&3 2>/dev/null; do
     echo "$line"
     lines_read=$((lines_read + 1))
     last_heartbeat=$(date +%s)
@@ -73,41 +126,22 @@ while true; do
       break
     fi
   done
-  
+
   # Check job status
   current_time=$(date +%s)
-  if ! squeue -j "$job_id" &>/dev/null; then
-    squeue_failures=$((squeue_failures + 1))
-    # Check if job actually completed using sacct (if available)
-    if [ $squeue_failures -ge 3 ]; then
-      if command -v sacct >/dev/null 2>&1; then
-        state=$(sacct -j "$job_id" --format=State --noheader 2>/dev/null | head -n1 | awk '{print $1}')
-        # Consider job done only if it reached a terminal state
-        case "$state" in
-          COMPLETED|FAILED|CANCELLED|TIMEOUT|OUT_OF_MEMORY)
-            echo "[$(date +%H:%M:%S)] Job $job_id reached terminal state: $state"
-            break
-            ;;
-          *)
-            # treat as transient failure, reset failures and continue polling
-            squeue_failures=0
-            ;;
-        esac
-      else
-        # No sacct: assume job completed after 3 failures
-        echo "[$(date +%H:%M:%S)] Job $job_id no longer in queue"
-        break
-      fi
-    fi
+  state=$(get_job_state "$job_id")
+
+  if is_terminal_state "$state"; then
+    echo "[$(date +%H:%M:%S)] Job $job_id reached terminal state: $state"
+    break
   else
-    squeue_failures=0
     # Print heartbeat if no output for 60 seconds
     if [ $((current_time - last_heartbeat)) -ge 60 ]; then
-      echo "[$(date +%H:%M:%S)] Job $job_id still running (no new output for 60s)..."
+      echo "[$(date +%H:%M:%S)] Job $job_id state=$state (no new output for 60s)..."
       last_heartbeat=$current_time
     fi
   fi
-  
+
   # Sleep briefly between status checks
   sleep 1
 done
@@ -115,7 +149,7 @@ done
 # Drain any remaining output from tail after job completes
 echo "Draining remaining output..."
 drain_count=0
-while IFS= read -r -t 0.5 line <&3 2>/dev/null; do
+while IFS= read -r -t 1 line <&3 2>/dev/null; do
   echo "$line"
   drain_count=$((drain_count + 1))
   # Safety limit to avoid infinite loop
@@ -128,8 +162,9 @@ done
 # Close the file descriptor and kill tail
 exec 3<&-
 kill "${tail_pid}" 2>/dev/null || true
+tail_pid=""
 
-# Wait for output file to finish growing (stabilize) before stopping tail
+# Wait for output file to stabilize (NFS flush) before final read
 if [ -f "$output_file" ]; then
   last_size=-1
   same_count=0
@@ -148,9 +183,6 @@ if [ -f "$output_file" ]; then
     sleep 5
   done
 fi
-
-# Stop tailing (trap will also handle this on exit)
-kill "${tail_pid}" 2>/dev/null || true
 
 echo ""
 echo "=== Final output ==="
@@ -187,6 +219,6 @@ if [ "$exit_code" != "0:0" ]; then
   exit 1
 fi
 
+monitor_success=1
 echo "Job $job_id completed successfully"
 exit 0
-
