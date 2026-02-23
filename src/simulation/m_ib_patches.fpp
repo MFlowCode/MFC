@@ -892,7 +892,7 @@ contains
         real(wp), dimension(1:3, 1:3) :: inverse_rotation, rotation
         integer :: cx, cy, cz
         real(wp) :: lx(2), ly(2), lz(2)
-        real(wp), dimension(1:3) :: bbox_min, bbox_max, local_corner, world_corner, test
+        real(wp), dimension(1:3) :: bbox_min, bbox_max, local_corner, world_corner
 
         center = 0._wp
         center(1) = patch_ib(patch_id)%x_centroid
