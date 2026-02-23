@@ -36,6 +36,7 @@ module m_model
     integer, allocatable :: gpu_boundary_edge_count(:)
     integer, allocatable :: gpu_total_vertices(:)
     real(wp), allocatable :: stl_bounding_boxes(:, :, :)
+    $:GPU_DECLARE(create='[gpu_trs_v,gpu_trs_n,gpu_boundary_v]')
 
 contains
 
@@ -580,8 +581,6 @@ contains
 
     !> This procedure, given a cell center will determine if a point exists instide a surface
     !! @param ntrs     Number of triangles in the model
-    !! @param trs_v    Model vertices of each triangle
-    !! @param trs_n    Model normal vectors of each triangle
     !! @param pid      Patch ID od this model
     !! @param point    Point to test.
     !! @return fraction The perfentage of candidate rays cast indicate that we are inside the model
@@ -838,12 +837,10 @@ contains
     !! @param point                 The cell center of the current levelset cell
     !! @param normals               Output levelset normals
     !! @param distance              Output levelset distance
-    subroutine s_distance_normals_3D(ntrs, trs_v, trs_n, pid, point, normals, distance)
+    subroutine s_distance_normals_3D(ntrs, pid, point, normals, distance)
         $:GPU_ROUTINE(parallelism='[seq]')
 
         integer, intent(in) :: ntrs
-        real(wp), dimension(:, :, :, :), intent(in) :: trs_v
-        real(wp), dimension(:, :, :), intent(in) :: trs_n
         integer, intent(in) :: pid
         real(wp), dimension(1:3), intent(in) :: point
         real(wp), dimension(1:3), intent(out) :: normals
@@ -865,12 +862,12 @@ contains
 
         do i = 1, ntrs
             ! Triangle vertices
-            v1(:) = trs_v(1, :, i, pid)
-            v2(:) = trs_v(2, :, i, pid)
-            v3(:) = trs_v(3, :, i, pid)
+            v1(:) = gpu_trs_v(1, :, i, pid)
+            v2(:) = gpu_trs_v(2, :, i, pid)
+            v3(:) = gpu_trs_v(3, :, i, pid)
 
             ! Triangle normal
-            n(:) = trs_n(:, i, pid)
+            n(:) = gpu_trs_n(:, i, pid)
 
             ! Project point onto triangle plane
             pv(:) = point(:) - v1(:)
@@ -983,10 +980,9 @@ contains
     !! @param point                 The cell center of the current levelset cell
     !! @param normals               Output levelset normals
     !! @param distance              Output levelset distance
-    subroutine s_distance_normals_2D(boundary_v, pid, boundary_edge_count, point, normals, distance)
+    subroutine s_distance_normals_2D(pid, boundary_edge_count, point, normals, distance)
         $:GPU_ROUTINE(parallelism='[seq]')
 
-        real(wp), dimension(:, :, :, :), intent(in) :: boundary_v
         integer, intent(in) :: pid
         integer, intent(in) :: boundary_edge_count
         real(wp), dimension(1:3), intent(in) :: point
@@ -1004,10 +1000,10 @@ contains
 
         do i = 1, boundary_edge_count
             ! Edge endpoints
-            v1(1) = boundary_v(i, 1, 1, pid)
-            v1(2) = boundary_v(i, 1, 2, pid)
-            v2(1) = boundary_v(i, 2, 1, pid)
-            v2(2) = boundary_v(i, 2, 2, pid)
+            v1(1) = gpu_boundary_v(i, 1, 1, pid)
+            v1(2) = gpu_boundary_v(i, 1, 2, pid)
+            v2(1) = gpu_boundary_v(i, 2, 1, pid)
+            v2(2) = gpu_boundary_v(i, 2, 2, pid)
 
             ! Edge vector and point-to-v1 vector
             edge = v2 - v1
@@ -1026,8 +1022,8 @@ contains
             if (t >= 0._wp .and. t <= 1._wp) then
                 proj = v1 + t*edge
                 dist = sqrt((point(1) - proj(1))**2 + (point(2) - proj(2))**2)
-                norm(1) = boundary_v(i, 3, 1, pid)
-                norm(2) = boundary_v(i, 3, 2, pid)
+                norm(1) = gpu_boundary_v(i, 3, 1, pid)
+                norm(2) = gpu_boundary_v(i, 3, 2, pid)
             else if (t < 0._wp) then ! negative t means that v1 is the closest point on the edge
                 dist = sqrt((point(1) - v1(1))**2 + (point(2) - v1(2))**2)
                 norm(1) = v1(1) - point(1)

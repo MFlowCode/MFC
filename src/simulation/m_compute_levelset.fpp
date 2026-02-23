@@ -685,7 +685,7 @@ contains
         ! 3D models
         if (p > 0) then
             ! Get the boundary normals and shortest distance between the cell center and the model boundary
-            call s_distance_normals_3D(gpu_ntrs(patch_id), gpu_trs_v, gpu_trs_n, patch_id, xyz_local, normals, distance)
+            call s_distance_normals_3D(gpu_ntrs(patch_id), patch_id, xyz_local, normals, distance)
 
             ! Get the shortest distance between the cell center and the model boundary
             gp%levelset = distance
@@ -695,7 +695,7 @@ contains
             gp%levelset_norm = matmul(rotation, normals(1:3))
         else
             ! 2D models
-            call s_distance_normals_2D(gpu_boundary_v, patch_id, &
+            call s_distance_normals_2D(patch_id, &
                                        boundary_edge_count, &
                                        xyz_local, normals, distance)
             gp%levelset = -abs(distance)
