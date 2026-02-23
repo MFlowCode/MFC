@@ -863,7 +863,6 @@ contains
                 xy_local = xy_local - offset
 
                 eta = f_model_is_inside_flat(gpu_ntrs(patch_id), &
-                                             gpu_trs_v, gpu_trs_n, &
                                              patch_id, xy_local)
 
                 ! Reading STL boundary vertices and compute the levelset and levelset_norm
@@ -953,7 +952,6 @@ contains
                     xyz_local = xyz_local - offset
 
                     eta = f_model_is_inside_flat(gpu_ntrs(patch_id), &
-                                                 gpu_trs_v, gpu_trs_n, &
                                                  patch_id, xyz_local)
 
                     if (eta > patch_ib(patch_id)%model_threshold) then

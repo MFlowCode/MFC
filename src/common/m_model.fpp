@@ -503,7 +503,7 @@ contains
     !! from GPU routines/functions
     function f_model_random_number(seed) result(rval)
 
-        $:GPU_ROUTINE(parallelism='[seq]')
+        ! $:GPU_ROUTINE(parallelism='[seq]')
 
         integer, intent(inout) :: seed
         real(wp) :: rval
@@ -585,20 +585,18 @@ contains
     !! @param pid      Patch ID od this model
     !! @param point    Point to test.
     !! @return fraction The perfentage of candidate rays cast indicate that we are inside the model
-    impure function f_model_is_inside_flat(ntrs, trs_v, trs_n, pid, point) result(fraction)
+    function f_model_is_inside_flat(ntrs, pid, point) result(fraction)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
         integer, intent(in) :: ntrs
-        real(wp), dimension(:, :, :, :), intent(in) :: trs_v
-        real(wp), dimension(:, :, :), intent(in) :: trs_n
         integer, intent(in) :: pid
         real(wp), dimension(1:3), intent(in) :: point
 
         real(wp) :: fraction
         type(t_ray) :: ray
         type(t_triangle) :: tri
-        integer :: i, j, k, q, nInOrOut, nHits, spc
+        integer :: i, j, k, q, nInOrOut, nHits
 
         ! cast 26 rays from the point and count the number at leave the boundary
         nInOrOut = 0
@@ -617,8 +615,8 @@ contains
                         ! count the number of intersections
                         nHits = 0
                         do q = 1, ntrs
-                            tri%v(:, :) = trs_v(:, :, q, pid)
-                            tri%n(:) = trs_n(:, q, pid)
+                            tri%v(:, :) = gpu_trs_v(:, :, q, pid)
+                            tri%n(:) = gpu_trs_n(:, q, pid)
                             if (f_intersects_triangle(ray, tri)) then
                                 nHits = nHits + 1
                             end if
