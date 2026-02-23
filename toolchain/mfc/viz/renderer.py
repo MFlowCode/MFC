@@ -218,14 +218,17 @@ def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-argum
 
     for i, step in enumerate(step_iter):
         assembled = read_func(step)
+        var_data = assembled.variables.get(varname)
+        if var_data is None:
+            continue
         frame_path = os.path.join(viz_dir, f'{i:06d}.png')
 
         if assembled.ndim == 1:
-            render_1d(assembled.x_cc, assembled.variables[varname],
+            render_1d(assembled.x_cc, var_data,
                       varname, step, frame_path, **opts)
         elif assembled.ndim == 2:
             render_2d(assembled.x_cc, assembled.y_cc,
-                      assembled.variables[varname],
+                      var_data,
                       varname, step, frame_path, **opts)
         elif assembled.ndim == 3:
             render_3d_slice(assembled, varname, step, frame_path, **opts)

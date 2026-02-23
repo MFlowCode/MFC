@@ -134,6 +134,11 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
                    "Use --list-vars to see available variables.")
         sys.exit(1)
 
+    if step_arg is None:
+        cons.print("[bold red]Error:[/bold red] --step is required for rendering. "
+                   "Use --list-steps to see available timesteps, or pass --step all.")
+        sys.exit(1)
+
     steps = discover_timesteps(case_dir, fmt)
     if not steps:
         cons.print("[bold red]Error:[/bold red] No timesteps found.")
