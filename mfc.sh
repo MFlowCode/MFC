@@ -83,6 +83,20 @@ fi
 
 echo
 
+# Run the main.py bootstrap script
+# If only flags given (no command), show help without passing flags
+has_command=false
+for arg in "$@"; do
+    case "$arg" in -*) ;; *) has_command=true; break ;; esac
+done
+if [ "$has_command" = true ]; then
+    python3 "$(pwd)/toolchain/main.py" "$@"
+else
+    python3 "$(pwd)/toolchain/main.py"
+fi
+code=$?
+
+echo
 
 if [ $code -ne 0 ]; then
     error "main.py finished with a $code exit code."
