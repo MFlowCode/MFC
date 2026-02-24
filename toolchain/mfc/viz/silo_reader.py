@@ -7,37 +7,20 @@ carries the metadata (mesh name, data-array path, dimensions, etc.).
 Actual data lives in numbered datasets under the ``.silo/`` group.
 
 This reader uses h5py to navigate that structure.
-
-Requires: h5py (optional dependency).
 """
 
 import os
 import warnings
 from typing import Dict, List, Optional, Tuple
 
+import h5py
 import numpy as np
 
 from .reader import AssembledData, ProcessorData, assemble_from_proc_data
 
-try:
-    import h5py
-
-    HAS_H5PY = True
-except ImportError:
-    HAS_H5PY = False
-
 # Silo type constants (from silo.h)
 _DB_QUADMESH = 130
 _DB_QUADVAR = 501
-
-
-def _check_h5py():
-    if not HAS_H5PY:
-        raise ImportError(
-            "h5py is required to read Silo-HDF5 files.\n"
-            "Install it with: pip install h5py\n"
-            "Or re-run post_process with format=2 to produce binary output."
-        )
 
 
 
@@ -60,7 +43,6 @@ def read_silo_file(  # pylint: disable=too-many-locals
     Returns:
         ProcessorData with grid coordinates and variable arrays.
     """
-    _check_h5py()
 
     with h5py.File(path, "r") as f:
         # --- locate the mesh ------------------------------------------------
@@ -146,7 +128,6 @@ def assemble_silo(
     """
     Read and assemble multi-processor Silo-HDF5 data for a given timestep.
     """
-    _check_h5py()
 
     base = os.path.join(case_dir, "silo_hdf5")
     if not os.path.isdir(base):

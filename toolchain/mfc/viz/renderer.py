@@ -10,6 +10,9 @@ import os
 import tempfile
 
 import numpy as np
+
+import imageio.v2 as imageio
+
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt  # pylint: disable=wrong-import-position
@@ -234,12 +237,6 @@ def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-argum
     frame_files = sorted(f for f in os.listdir(viz_dir) if f.endswith('.png'))
 
     success = False
-    try:
-        import imageio  # pylint: disable=import-outside-toplevel
-    except ImportError:
-        print("imageio is not installed. Install it with: pip install imageio imageio-ffmpeg")
-        return False
-
     try:
         imageio.mimwrite(
             output,

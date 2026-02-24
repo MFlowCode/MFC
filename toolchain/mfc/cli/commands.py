@@ -911,6 +911,12 @@ VIZ_COMMAND = Command(
             type=str,
             default=None,
             metavar="CMAP",
+            completion=Completion(type=CompletionType.CHOICES, choices=[
+                "viridis", "plasma", "magma", "inferno", "cividis",
+                "hot", "cool", "jet", "rainbow", "turbo",
+                "RdBu", "seismic", "bwr", "coolwarm",
+                "gray", "bone", "pink",
+            ]),
         ),
         Argument(
             name="vmin",

@@ -70,6 +70,25 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
 
     cons.print(f"[bold]Format:[/bold] {fmt}")
 
+    # Quick guide when no action is specified
+    if not ARG('list_steps') and not ARG('list_vars') and ARG('var') is None:
+        cons.print()
+        d = case_dir
+        cons.print("[bold]Quick start:[/bold]")
+        cons.print(f"  [green]./mfc.sh viz {d} --list-steps[/green]"
+                   "                   [dim]see available timesteps[/dim]")
+        cons.print(f"  [green]./mfc.sh viz {d} --list-vars --step 0[/green]"
+                   "            [dim]see available variables[/dim]")
+        cons.print(f"  [green]./mfc.sh viz {d} --var pres --step 0[/green]"
+                   "             [dim]render a PNG[/dim]")
+        cons.print(f"  [green]./mfc.sh viz {d} --var pres --step all --mp4[/green]"
+                   "     [dim]render an MP4[/dim]")
+        cons.print(f"  [green]./mfc.sh viz {d} --var pres --step 0 --slice-axis z[/green]"
+                   " [dim]3D midplane slice[/dim]")
+        cons.print()
+        cons.print("[dim]Run [bold]./mfc.sh viz --help[/bold] for all options.[/dim]")
+        return
+
     # Handle --list-steps
     if ARG('list_steps'):
         steps = discover_timesteps(case_dir, fmt)
