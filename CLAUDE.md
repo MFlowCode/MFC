@@ -29,7 +29,7 @@ All commands run from the repo root via `./mfc.sh`.
 ./mfc.sh run case.py -e batch -N 2 -n 4 -c phoenix -a ACCOUNT  # Batch submit on Phoenix
 
 # Testing
-./mfc.sh test -j 8                         # Run full test suite (500+ tests)
+./mfc.sh test -j 8                         # Run full test suite (560+ tests)
 ./mfc.sh test --only 1D -j 8              # Only 1D tests
 ./mfc.sh test --only 2D Bubbles -j 8      # Only 2D bubble tests
 ./mfc.sh test --only <UUID> -j 8          # Run one specific test by UUID
@@ -50,7 +50,7 @@ source ./mfc.sh load -c p -m c             # Load Phoenix CPU modules
 
 # Other
 ./mfc.sh validate case.py                  # Validate case file without running
-./mfc.sh params <query>                    # Search ~3300 case parameters
+./mfc.sh params <query>                    # Search ~3,400 case parameters
 ./mfc.sh clean                             # Remove build artifacts
 ./mfc.sh new <name>                        # Create new case from template
 ```
@@ -117,11 +117,11 @@ src/
   simulation/     # CFD solver (GPU-accelerated via OpenACC / OpenMP target offload)
   post_process/   # Data output and visualization
 toolchain/        # Python CLI, build system, testing, parameter management
-  mfc/params/definitions.py   # ~3300 parameter definitions (source of truth)
+  mfc/params/definitions.py   # ~3,400 parameter definitions (source of truth)
   mfc/case_validator.py       # Physics constraint validation
   mfc/test/                   # Test runner and case generation
 examples/         # Example simulation cases (case.py files)
-tests/            # 500+ regression test golden files
+tests/            # 560+ regression test golden files
 ```
 
 Source files are `.fpp` (Fortran + Fypp macros), preprocessed to `.f90` by CMake.
@@ -137,11 +137,11 @@ NEVER use `stop` or `error stop`. Use `call s_mpi_abort()` or `@:PROHIBIT()`/`@:
 NEVER use `goto`, `COMMON` blocks, or global `save` variables.
 
 Every `@:ALLOCATE(...)` MUST have a matching `@:DEALLOCATE(...)`.
-Every new parameter MUST be added in 4 places:
+Every new parameter MUST be added in at least 3 places (4 if it has constraints):
   1. `toolchain/mfc/params/definitions.py` (parameter definition)
   2. Fortran variable declaration in `src/*/m_global_parameters.fpp`
   3. Fortran namelist in `src/*/m_start_up.fpp` (namelist binding)
-  4. `toolchain/mfc/case_validator.py` (if constraints exist)
+  4. `toolchain/mfc/case_validator.py` (only if parameter has physics constraints)
 
 Changes to `src/common/` affect ALL three executables. Test comprehensively.
 

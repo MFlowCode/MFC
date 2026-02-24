@@ -1,9 +1,27 @@
 # Common Pitfalls
 
-## Array Bounds
-- Arrays use non-unity lower bounds with ghost cells
+## Array Bounds & Ghost Cells
+- Grid dimensions: `m`, `n`, `p` (cells in x, y, z). 1D: n=p=0. 2D: p=0.
+- Interior domain: `0:m`, `0:n`, `0:p`
+- Buffer/ghost region: `-buff_size:m+buff_size` (similar for n, p in multi-D)
+- `buff_size` depends on WENO order and features (typically `2*weno_polyn + 2`)
+- Domain bounds: `idwint(1:3)` (interior `0:m`), `idwbuff(1:3)` (with ghost cells)
+- Cell-center coords: `x_cc(-buff_size:m+buff_size)`, `y_cc(...)`, `z_cc(...)`
+- Cell-boundary coords: `x_cb(-1-buff_size:m+buff_size)`
 - Riemann solver indexing: left state at `j`, right state at `j+1`
 - Off-by-one errors in ghost cell regions are a common source of bugs
+
+## Field Variable Indexing
+- Conserved variables: `q_cons_vf(1:sys_size)`. Primitive: `q_prim_vf(1:sys_size)`.
+- Index ranges depend on `model_eqns` and enabled features (set in `m_global_parameters.fpp`):
+  - `cont_idx` — continuity (partial densities, one per fluid)
+  - `mom_idx` — momentum components
+  - `E_idx` — total energy (scalar)
+  - `adv_idx` — volume fractions (advection equations)
+  - `bub_idx`, `stress_idx`, `xi_idx`, `species_idx`, `B_idx`, `c_idx` — optional
+- Shorthand scalars: `momxb`/`momxe`, `contxb`/`contxe`, `advxb`/`advxe`, etc.
+- `sys_size` = total number of conserved variables (computed at startup)
+- Changing `model_eqns` or enabling features changes ALL index positions
 
 ## Blast Radius
 - `src/common/` is shared by ALL three executables (pre_process, simulation, post_process)
@@ -23,12 +41,15 @@
 - Fypp macros must expand correctly for both GPU and CPU builds
 - GPU builds only work with nvfortran, Cray ftn, and AMD flang
 
-## Test Golden Files
-- Tests compare output against golden files in `tests/<hash>/golden.txt`
+## Test System
+- Tests are generated **programmatically** in `toolchain/mfc/test/cases.py`, not standalone files
+- Each test is a parameter modification on top of `BASE_CFG` defaults
+- Test UUID = CRC32 hash of the test's trace string; `./mfc.sh test -l` lists all
+- To add a test: modify `cases.py` using `CaseGeneratorStack` push/pop pattern
+- Golden files: `tests/<UUID>/golden.txt` — tolerance-based comparison, not exact match
 - If your change intentionally modifies output, regenerate golden files:
   `./mfc.sh test --generate --only <affected_tests> -j 8`
 - Do not regenerate ALL golden files unless you understand every output change
-- Golden file diffs are compared with tolerance, not exact match
 
 ## PR Checklist
 Before submitting a PR:

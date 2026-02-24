@@ -50,6 +50,11 @@ Enforced by convention/code review (not automated):
 - Always use generic intrinsics: `sqrt` not `dsqrt`, `abs` not `dabs`.
 - Cast with `real(..., wp)` or `real(..., stp)`, never `dble(...)`.
 
+Key derived types (`m_derived_types.fpp`):
+- `scalar_field` — `real(stp), pointer :: sf(:,:,:)`. Uses `stp`, NOT `wp`.
+- `vector_field` — allocatable array of `scalar_field` components.
+- New field arrays MUST use `stp` for storage precision consistency.
+
 ## Size Guidelines (soft)
 - Subroutine: ≤500 lines
 - Helper routine: ≤150 lines

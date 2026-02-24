@@ -1,7 +1,7 @@
 # Parameter System
 
 ## Overview
-MFC has ~3,300 simulation parameters defined in Python and read by Fortran via namelist files.
+MFC has ~3,400 simulation parameters defined in Python and read by Fortran via namelist files.
 
 ## Parameter Flow: Python → Fortran
 
@@ -17,7 +17,7 @@ MFC has ~3,300 simulation parameters defined in Python and read by Fortran via n
 
 3. **Input Generation**: `toolchain/mfc/run/input.py`
    - Python case dict → Fortran namelist `.inp` file
-   - Format: `&user_inputs / ... / &end`
+   - Format: `&user_inputs` ... `&end/`
 
 4. **Fortran Reading**: `src/*/m_start_up.fpp`
    - Reads `&user_inputs` namelist
@@ -25,7 +25,8 @@ MFC has ~3,300 simulation parameters defined in Python and read by Fortran via n
 
 ## Adding a New Parameter (4-location checklist)
 
-YOU MUST update all 4 locations. Missing any causes silent failures or compile errors.
+YOU MUST update the first 3 locations. Missing any causes silent failures or compile errors.
+Location 4 is required only if the parameter has physics constraints.
 
 1. **`toolchain/mfc/params/definitions.py`**: Add parameter with type, default, constraints
 2. **`src/*/m_global_parameters.fpp`**: Declare the Fortran variable in the relevant
@@ -52,3 +53,14 @@ add Fortran-side checks here in addition to `case_validator.py`.
 ## Analytical Initial Conditions
 String expressions in parameters become Fortran code via `case.py.__get_analytic_ic_fpp()`.
 These are compiled into the binary, so syntax errors cause build failures, not runtime errors.
+
+Available variables in analytical IC expressions:
+- `x`, `y`, `z` — cell-center coordinates (mapped to `x_cc(i)`, `y_cc(j)`, `z_cc(k)`)
+- `xc`, `yc`, `zc` — patch centroid coordinates
+- `lx`, `ly`, `lz` — patch lengths
+- `r` — patch radius; `eps`, `beta` — vortex parameters
+- `e` — Euler's number (2.71828...)
+- Standard Fortran math intrinsics available: `sin`, `cos`, `exp`, `sqrt`, `abs`, etc.
+- For moving immersed boundaries: `t` (simulation time) is also available
+
+Example: `'patch_icpp(1)%vel(2)': '(x - xc) * exp(-((x-xc)**2 + (y-yc)**2))'`
