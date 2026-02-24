@@ -10,44 +10,74 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-      issues: read
+      issues: write
       actions: read
       id-token: write
 
     steps:
-      - name: Checkout PR head (fork)
+      # IMPORTANT: checkout BASE repo only (safe on forks)
+      - name: Checkout base repo (safe)
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 1
 
       - name: Run Claude Code Review
-        id: claude-review
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ github.token }}
 
-          plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
-          plugins: 'code-review@claude-code-plugins'
+          plugin_marketplaces: "https://github.com/anthropics/claude-code.git"
+          plugins: "code-review@claude-code-plugins"
 
-          # IMPORTANT: allow exactly what the review flow uses
           claude_args: >
+            --dangerously-skip-permissions
+            --max-turns 30
             --allowedTools
             "Bash(gh pr view:*)"
             "Bash(gh pr diff:*)"
+            "Bash(gh pr comment:*)"
+            "Bash(gh pr list:*)"
+            "Bash(gh pr status:*)"
+            "Bash(gh issue comment:*)"
             "Bash(gh api:*)"
-            "Bash(gh search code:*)"
             "Bash(cat:*)"
             "Bash(ls:*)"
             "Bash(grep:*)"
+            "Bash(find:*)"
+            "Bash(sed:*)"
+            "Bash(awk:*)"
+            "Bash(head:*)"
+            "Bash(tail:*)"
+            "Bash(wc:*)"
+            "Bash(sort:*)"
+            "Bash(uniq:*)"
+            "Bash(cut:*)"
+            "Bash(xargs:*)"
+            "Bash(jq:*)"
             "Bash(python3:*)"
-            "Bash(git:*)"
 
           prompt: |
-            /code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }}
-            Post the results as one top-level PR comment titled "Claude Code Review".
-            If you cannot access the diff/files, say so explicitly and explain what is blocking access.
+            You are running in pull_request_target. DO NOT execute or inspect the fork's checked-out code.
+            Review ONLY via GitHub API/gh commands.
+
+            Always use numeric PR form with --repo:
+            - gh pr view ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --json files,title,body
+            - gh pr diff ${{ github.event.pull_request.number }} --repo ${{ github.repository }}
+
+            If CLAUDE.md exists in the base repo checkout, read it with:
+            - cat CLAUDE.md
+            Prefer jq/python3 for JSON parsing instead of shell loops.
+
+            Output requirements (even if no issues):
+            - Files changed count + list up to 15 file paths
+            - Summary (3–6 bullets)
+            - Findings:
+              - If issues: include file + line numbers when possible
+              - If no issues: at least 3 concrete improvement opportunities with file paths
+
+            Post ONE top-level PR comment titled "Claude Code Review".
+            If posting a PR comment is blocked, write the full review to the GitHub Actions job summary instead.
 
           additional_permissions: |
             actions: read
