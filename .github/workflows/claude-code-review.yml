@@ -15,7 +15,6 @@ jobs:
       id-token: write
 
     steps:
-      # IMPORTANT: checkout BASE repo only (safe on forks)
       - name: Checkout base repo (safe)
         uses: actions/checkout@v4
         with:
@@ -32,16 +31,14 @@ jobs:
 
           claude_args: >
             --dangerously-skip-permissions
-            --max-turns 30
+            --max-turns 60
             --allowedTools
             "Bash(gh pr view:*)"
             "Bash(gh pr diff:*)"
             "Bash(gh pr comment:*)"
-            "Bash(gh pr list:*)"
-            "Bash(gh pr status:*)"
-            "Bash(gh issue comment:*)"
             "Bash(gh api:*)"
-            "Bash(cat:*)"
+            "Bash(cat CLAUDE.md:*)"
+            "Bash(cat .claude/rules/*:*)"
             "Bash(ls:*)"
             "Bash(grep:*)"
             "Bash(find:*)"
@@ -58,26 +55,31 @@ jobs:
             "Bash(python3:*)"
 
           prompt: |
-            You are running in pull_request_target. DO NOT execute or inspect the fork's checked-out code.
+            You are running in pull_request_target. DO NOT execute or inspect PR fork code.
             Review ONLY via GitHub API/gh commands.
 
-            Always use numeric PR form with --repo:
-            - gh pr view ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --json files,title,body
-            - gh pr diff ${{ github.event.pull_request.number }} --repo ${{ github.repository }}
+            Read local guidance ONLY from:
+            - CLAUDE.md (root) if present
+            - .claude/rules/*.md if present
+            Do NOT read any other workspace files.
 
-            If CLAUDE.md exists in the base repo checkout, read it with:
-            - cat CLAUDE.md
-            Prefer jq/python3 for JSON parsing instead of shell loops.
+            Keep tool calls minimal:
+            1) ls .claude/rules || true
+            2) If CLAUDE.md exists: cat CLAUDE.md
+            3) If .claude/rules exists: cat each .md file directly (no loops; at most 10 files)
+            4) gh pr view ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --json title,body,files,changedFiles,additions,deletions,headRefOid
+            5) gh pr diff ${{ github.event.pull_request.number }} --repo ${{ github.repository }}
+            6) Post ONE top-level comment.
 
-            Output requirements (even if no issues):
-            - Files changed count + list up to 15 file paths
+            Output format:
+            - Head SHA
+            - Files changed count + list up to 10 file paths
             - Summary (3–6 bullets)
-            - Findings:
-              - If issues: include file + line numbers when possible
-              - If no issues: at least 3 concrete improvement opportunities with file paths
+            - Findings with file + line numbers when possible
+            - If no issues: 0–3 improvement opportunities (only if confident)
 
             Post ONE top-level PR comment titled "Claude Code Review".
-            If posting a PR comment is blocked, write the full review to the GitHub Actions job summary instead.
+            Then stop.
 
           additional_permissions: |
             actions: read
