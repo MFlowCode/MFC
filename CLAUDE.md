@@ -39,7 +39,7 @@ All commands run from the repo root via `./mfc.sh`.
 ./mfc.sh test --generate --only <feature>  # Regenerate golden files after intentional output change
 
 # Verification (pre-commit CI checks)
-./mfc.sh precheck -j 8                     # Run all 5 lint checks (same as CI gate)
+./mfc.sh precheck -j 8                     # Run all 6 lint checks (same as CI gate)
 ./mfc.sh format -j 8                       # Auto-format Fortran (.fpp/.f90) + Python
 ./mfc.sh lint                              # Pylint + Python unit tests
 ./mfc.sh spelling                          # Spell check
@@ -99,7 +99,7 @@ IMPORTANT: Follow this loop for ALL code changes. Do not skip steps.
 2. **Plan** — For multi-file changes, outline your approach before implementing.
 3. **Implement** — Make small, focused changes. One logical change per commit.
 4. **Format** — Run `./mfc.sh format -j 8` to auto-format.
-5. **Verify** — Run `./mfc.sh precheck -j 8` (same 5 checks as CI lint gate).
+5. **Verify** — Run `./mfc.sh precheck -j 8` (same 6 checks as CI lint gate).
 6. **Build** — Run `./mfc.sh build -j 8` to verify compilation.
 7. **Test** — Run relevant tests: `./mfc.sh test --only <feature> -j 8`.
    For changes to `src/common/`, test ALL three targets: `./mfc.sh test -j 8`.
