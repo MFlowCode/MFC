@@ -788,6 +788,7 @@ contains
 
         ! hard-coded psi
         if (hyper_cleaning) then
+            @:ASSERT(psi_idx > 0, "hyper_cleaning requires psi_idx to be set")
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
