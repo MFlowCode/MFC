@@ -1030,6 +1030,7 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         relativity = self.get('relativity', 'F') == 'T'
         hyper_cleaning = self.get('hyper_cleaning', 'F') == 'T'
         n = self.get('n', 0)
+        p = self.get('p', 0)
 
         self.prohibit(mhd and riemann_solver is not None and riemann_solver not in [1, 4],
                      "MHD simulations require riemann_solver = 1 (HLL) or riemann_solver = 4 (HLLD)")
@@ -1041,6 +1042,8 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
                      "Hyperbolic cleaning requires mhd to be enabled")
         self.prohibit(hyper_cleaning and n is not None and n == 0,
                      "Hyperbolic cleaning is not supported for 1D simulations")
+        self.prohibit(hyper_cleaning and p is not None and p == 0,
+                     "Hyperbolic cleaning is not supported for 2D simulations")
 
 
     def check_igr_simulation(self):  # pylint: disable=too-many-locals
