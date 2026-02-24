@@ -33,7 +33,7 @@ These are caught by `./mfc.sh precheck` (source lint step 4/5):
 - `wp` (working precision): used for computation. Double by default.
 - `stp` (storage precision): used for I/O. Double by default.
 - In single-precision mode (`--single`): both become single.
-- In mixed-precision mode (`--mixed`): wp=double, stp=single.
+- In mixed-precision mode (`--mixed`): wp=double, stp=half.
 - MPI type matching: `mpi_p` must match `wp`, `mpi_io_p` must match `stp`.
 - Always use generic intrinsics: `sqrt` not `dsqrt`, `abs` not `dabs`.
 - Cast with `real(..., wp)` or `real(..., stp)`, never `dble(...)`.

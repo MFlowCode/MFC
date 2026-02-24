@@ -154,7 +154,7 @@ Changes to `src/common/` affect ALL three executables. Test comprehensively.
 ## Precision System
 
 - `wp` = working precision (computation). `stp` = storage precision (I/O).
-- Default: both double. Single mode: both single. Mixed: wp=double, stp=single.
+- Default: both double. Single mode: both single. Mixed: wp=double, stp=half.
 - MPI types must match: `mpi_p` ↔ `wp`, `mpi_io_p` ↔ `stp`.
 
 ## Code Review Priorities
