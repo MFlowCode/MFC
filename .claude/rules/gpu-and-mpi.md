@@ -38,19 +38,26 @@ Inline macros (use `$:` prefix):
 - `$:GPU_WAIT()` — Synchronization barrier.
 
 Block macros (use `#:call`/`#:endcall`):
-- `GPU_PARALLEL(...)` — GPU parallel region wrapping a code block.
+- `GPU_PARALLEL(...)` — GPU parallel region (used for scalar reductions like `maxval`/`minval`).
 - `GPU_DATA(copy=..., create=..., ...)` — Scoped data region.
 - `GPU_HOST_DATA(use_device_addr=[...])` — Host code with device pointers.
 
-Block macro usage:
+Typical GPU loop pattern (used 750+ times in the codebase):
 ```
-#:call GPU_PARALLEL(copyin='[var1]', copyout='[var2]')
-  $:GPU_LOOP(collapse=N)
-  do k = 0, n; do j = 0, m
-    ! loop body
-  end do; end do
-#:endcall GPU_PARALLEL
+$:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=3)
+do l = idwbuff(3)%beg, idwbuff(3)%end
+    do k = idwbuff(2)%beg, idwbuff(2)%end
+        do j = idwbuff(1)%beg, idwbuff(1)%end
+            ! loop body
+        end do
+    end do
+end do
+$:END_GPU_PARALLEL_LOOP()
 ```
+
+WARNING: Do NOT use `GPU_PARALLEL` wrapping `GPU_LOOP` for spatial loops. `GPU_LOOP`
+emits empty directives on Cray and AMD compilers, causing silent serial execution.
+Use `GPU_PARALLEL_LOOP` / `END_GPU_PARALLEL_LOOP` for all parallel spatial loops.
 
 NEVER write raw `!$acc` or `!$omp` directives. Always use `GPU_*` Fypp macros.
 The precheck source lint will catch raw directives and fail.
@@ -67,13 +74,17 @@ The precheck source lint will catch raw directives and fail.
 - These compile only for Cray (`_CRAYFTN`); other compilers skip them
 
 ### Compiler-Backend Matrix
-| Compiler        | `--gpu acc` (OpenACC) | `--gpu mp` (OpenMP) | CPU-only |
-|-----------------|----------------------|---------------------|----------|
-| GNU gfortran    | No                   | No                  | Yes      |
-| NVIDIA nvfortran| Yes (primary)        | Yes                 | Yes      |
-| Cray ftn (CCE)  | Yes                  | Yes (primary)       | Yes      |
-| Intel ifx       | No                   | No                  | Yes      |
-| AMD flang       | No                   | Yes                 | Yes      |
+
+CI-gated compilers (must always pass): gfortran, nvfortran, Cray ftn, Intel ifx.
+AMD flang is additionally supported for GPU builds but not in the CI matrix.
+
+| Compiler        | `--gpu acc` (OpenACC) | `--gpu mp` (OpenMP)    | CPU-only |
+|-----------------|----------------------|------------------------|----------|
+| GNU gfortran    | No                   | Experimental (AMD GCN) | Yes      |
+| NVIDIA nvfortran| Yes (primary)        | Yes                    | Yes      |
+| Cray ftn (CCE)  | Yes                  | Yes (primary)          | Yes      |
+| Intel ifx       | No                   | Experimental (SPIR64)  | Yes      |
+| AMD flang       | No                   | Yes                    | Yes      |
 
 ## Preprocessor Defines (`#ifdef` / `#ifndef`)
 
