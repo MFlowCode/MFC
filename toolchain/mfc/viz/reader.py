@@ -13,6 +13,7 @@ File layout per processor:
 
 import os
 import struct
+import warnings
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
@@ -395,12 +396,10 @@ def assemble(case_dir: str, step: int, fmt: str = 'binary',  # pylint: disable=t
     for rank in ranks:
         fpath = os.path.join(case_dir, 'binary', f'p{rank}', f'{step}.dat')
         if not os.path.isfile(fpath):
-            import warnings  # pylint: disable=import-outside-toplevel
             warnings.warn(f"Processor file not found, skipping: {fpath}", stacklevel=2)
             continue
         pdata = read_binary_file(fpath, var_filter=var)
         if pdata.m == 0 and pdata.n == 0 and pdata.p == 0:
-            import warnings  # pylint: disable=import-outside-toplevel
             warnings.warn(f"Processor p{rank} has zero dimensions, skipping", stacklevel=2)
             continue
         proc_data.append((rank, pdata))

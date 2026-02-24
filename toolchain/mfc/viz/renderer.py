@@ -7,9 +7,9 @@ for headless rendering.
 """
 
 import os
+import tempfile
 
 import numpy as np
-
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt  # pylint: disable=wrong-import-position
@@ -197,18 +197,10 @@ def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-argum
         if auto_vmax is None and all_maxs:
             opts['vmax'] = max(all_maxs)
 
-    # Write frames as images to a temp directory next to the output file
+    # Write frames to a unique temp directory to avoid concurrent-run conflicts
     output_dir = os.path.dirname(os.path.abspath(output))
-    viz_dir = os.path.join(output_dir, '_frames')
-    # Clean stale frames from any interrupted previous run
-    if os.path.isdir(viz_dir):
-        for stale in os.listdir(viz_dir):
-            if stale.endswith('.png'):
-                try:
-                    os.remove(os.path.join(viz_dir, stale))
-                except OSError:
-                    pass
-    os.makedirs(viz_dir, exist_ok=True)
+    os.makedirs(output_dir, exist_ok=True)
+    viz_dir = tempfile.mkdtemp(dir=output_dir, prefix='_frames_')
 
     try:
         from tqdm import tqdm  # pylint: disable=import-outside-toplevel
@@ -246,7 +238,6 @@ def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-argum
         import imageio  # pylint: disable=import-outside-toplevel
     except ImportError:
         print("imageio is not installed. Install it with: pip install imageio imageio-ffmpeg")
-        print(f"Frames saved to {viz_dir}/")
         return False
 
     writer = None
@@ -261,17 +252,14 @@ def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-argum
     finally:
         if writer is not None:
             writer.close()
-
-    # Clean up only the frames we created
-    if success:
+        # Always clean up temporary frame files
         for fname in frame_files:
-            fpath = os.path.join(viz_dir, fname)
             try:
-                os.remove(fpath)
+                os.remove(os.path.join(viz_dir, fname))
             except OSError:
                 pass
         try:
             os.rmdir(viz_dir)
         except OSError:
-            pass  # directory not empty (pre-existing files)
+            pass
     return success

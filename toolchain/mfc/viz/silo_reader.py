@@ -12,6 +12,7 @@ Requires: h5py (optional dependency).
 """
 
 import os
+import warnings
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
@@ -115,7 +116,10 @@ def read_silo_file(  # pylint: disable=too-many-locals
             if "silo" not in obj.attrs:
                 continue
             attr = obj.attrs["silo"]
-            data_path = attr["value0"]
+            data_path = attr.get("value0")
+            if data_path is None:
+                warnings.warn(f"Variable '{key}' missing 'value0' in silo attr, skipping", stacklevel=2)
+                continue
             data = _resolve_path(f, data_path).astype(np.float64)
 
             # MFC's DBPUTQV1 passes the Fortran column-major array as a
@@ -160,7 +164,6 @@ def assemble_silo(
     for rank in ranks:
         silo_file = os.path.join(base, f"p{rank}", f"{step}.silo")
         if not os.path.isfile(silo_file):
-            import warnings  # pylint: disable=import-outside-toplevel
             warnings.warn(f"Processor file not found, skipping: {silo_file}", stacklevel=2)
             continue
         pdata = read_silo_file(silo_file, var_filter=var)
