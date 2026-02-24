@@ -938,7 +938,7 @@ contains
 #if defined(__INTEL_COMPILER)
                                     if (ieee_is_nan(q_comm(i)%sf(j + unpack_offset, k, l))) then
                                         print *, "Error", j, k, l, i
-                                        error stop "NaN(s) in recv"
+                                        call s_mpi_abort("NaN(s) in recv")
                                     end if
 #endif
                                 end do
@@ -993,7 +993,7 @@ contains
 #if defined(__INTEL_COMPILER)
                                     if (ieee_is_nan(q_comm(i)%sf(j, k + unpack_offset, l))) then
                                         print *, "Error", j, k, l, i
-                                        error stop "NaN(s) in recv"
+                                        call s_mpi_abort("NaN(s) in recv")
                                     end if
 #endif
                                 end do
@@ -1052,7 +1052,7 @@ contains
 #if defined(__INTEL_COMPILER)
                                     if (ieee_is_nan(q_comm(i)%sf(j, k, l + unpack_offset))) then
                                         print *, "Error", j, k, l, i
-                                        error stop "NaN(s) in recv"
+                                        call s_mpi_abort("NaN(s) in recv")
                                     end if
 #endif
                                 end do
