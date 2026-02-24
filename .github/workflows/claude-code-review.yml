@@ -1,26 +1,3 @@
-name: Claude Code Review
-
-on:
-  pull_request_target:
-    types: [opened, synchronize, ready_for_review, reopened]
-
-jobs:
-  claude-review:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
-      issues: read
-      actions: read
-      id-token: write
-
-    steps:
-      - name: Checkout PR head (fork)
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 1
-
       - name: Run Claude Code Review
         id: claude-review
         uses: anthropics/claude-code-action@v1
@@ -32,7 +9,7 @@ jobs:
           plugins: 'code-review@claude-code-plugins'
 
           claude_args: >
-            --dangerouslyDisableSandbox
+            --dangerously-skip-permissions
             --max-turns 10
             --allowedTools
             "Bash(gh pr view:*)"
@@ -59,19 +36,4 @@ jobs:
             - Then: findings:
               - If issues: list them with file path + line numbers when possible
               - If no issues: list at least 3 concrete "improvement opportunities" with file paths
-
             Post the results as ONE top-level PR comment titled "Claude Code Review".
-            If you cannot access the diff/files, say exactly what is blocked.
-            If posting a PR comment is blocked, write the full review to the GitHub Actions job summary instead.
-
-            IMPORTANT:
-            - Do NOT stop just because a previous "Claude Code Review" comment exists.
-            - If a prior Claude review exists, post a NEW comment titled "Claude Code Review (updated)" that includes:
-              - current head SHA: ${{ github.event.pull_request.head.sha }}
-              - files changed count + up to 15 file paths
-              - 3–6 bullet summary of changes
-              - findings or at least 3 improvement opportunities with file paths
-            Post as ONE top-level PR comment.
-
-          additional_permissions: |
-            actions: read
