@@ -5,9 +5,9 @@ Dispatches to reader + renderer based on CLI arguments.
 """
 
 import os
-import sys
 
 from mfc.state import ARG
+from mfc.common import MFCException
 from mfc.printer import cons
 
 
@@ -33,10 +33,9 @@ def _parse_steps(step_arg, available_steps):
             return [s for s in requested if s in set(available_steps)]
 
         single = int(step_arg)
-    except ValueError:
-        cons.print(f"[bold red]Error:[/bold red] Invalid --step value '{step_arg}'. "
-                   "Expected an integer, a range (start:end:stride), or 'all'.")
-        sys.exit(1)
+    except ValueError as exc:
+        raise MFCException(f"Invalid --step value '{step_arg}'. "
+                           "Expected an integer, a range (start:end:stride), or 'all'.") from exc
 
     if available_steps and single not in set(available_steps):
         return []
@@ -50,28 +49,24 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
 
     case_dir = ARG('input')
     if case_dir is None:
-        cons.print("[bold red]Error:[/bold red] Please specify a case directory.")
-        sys.exit(1)
+        raise MFCException("Please specify a case directory.")
 
     # Resolve case directory
     if not os.path.isdir(case_dir):
-        cons.print(f"[bold red]Error:[/bold red] Directory not found: {case_dir}")
-        sys.exit(1)
+        raise MFCException(f"Directory not found: {case_dir}")
 
     # Auto-detect or use specified format
     fmt_arg = ARG('format')
     if fmt_arg:
         if fmt_arg not in ('binary', 'silo'):
-            cons.print(f"[bold red]Error:[/bold red] Unknown format '{fmt_arg}'. "
-                       "Supported formats: 'binary', 'silo'.")
-            sys.exit(1)
+            raise MFCException(f"Unknown format '{fmt_arg}'. "
+                               "Supported formats: 'binary', 'silo'.")
         fmt = fmt_arg
     else:
         try:
             fmt = discover_format(case_dir)
         except FileNotFoundError as exc:
-            cons.print(f"[bold red]Error:[/bold red] {exc}")
-            sys.exit(1)
+            raise MFCException(str(exc)) from exc
 
     cons.print(f"[bold]Format:[/bold] {fmt}")
 
@@ -98,8 +93,7 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
         step_arg = ARG('step')
         steps = discover_timesteps(case_dir, fmt)
         if not steps:
-            cons.print("[bold red]Error:[/bold red] No timesteps found.")
-            sys.exit(1)
+            raise MFCException("No timesteps found.")
 
         if step_arg is None or step_arg == 'all':
             step = steps[0]
@@ -107,10 +101,9 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
         else:
             try:
                 step = int(step_arg)
-            except ValueError:
-                cons.print(f"[bold red]Error:[/bold red] Invalid --step value '{step_arg}'. "
-                           "Expected an integer or 'all'.")
-                sys.exit(1)
+            except ValueError as exc:
+                raise MFCException(f"Invalid --step value '{step_arg}'. "
+                                   "Expected an integer or 'all'.") from exc
 
         if fmt == 'silo':
             from .silo_reader import assemble_silo  # pylint: disable=import-outside-toplevel
@@ -130,27 +123,23 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
     step_arg = ARG('step')
 
     if varname is None:
-        cons.print("[bold red]Error:[/bold red] --var is required for rendering. "
-                   "Use --list-vars to see available variables.")
-        sys.exit(1)
+        raise MFCException("--var is required for rendering. "
+                           "Use --list-vars to see available variables.")
 
     if step_arg is None:
-        cons.print("[bold red]Error:[/bold red] --step is required for rendering. "
-                   "Use --list-steps to see available timesteps, or pass --step all.")
-        sys.exit(1)
+        raise MFCException("--step is required for rendering. "
+                           "Use --list-steps to see available timesteps, or pass --step all.")
 
     steps = discover_timesteps(case_dir, fmt)
     if not steps:
-        cons.print("[bold red]Error:[/bold red] No timesteps found.")
-        sys.exit(1)
+        raise MFCException("No timesteps found.")
 
     requested_steps = _parse_steps(step_arg, steps)
     if not requested_steps:
-        cons.print(f"[bold red]Error:[/bold red] No matching timesteps for --step {step_arg}")
+        msg = f"No matching timesteps for --step {step_arg}"
         if steps:
-            cons.print(f"[bold]Available range:[/bold] {steps[0]} to {steps[-1]} "
-                       f"({len(steps)} timesteps)")
-        sys.exit(1)
+            msg += f". Available range: {steps[0]} to {steps[-1]} ({len(steps)} timesteps)"
+        raise MFCException(msg)
 
     # Collect rendering options
     render_opts = {}
@@ -196,9 +185,8 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
     test_assembled = read_step_all_vars(requested_steps[0])
     if varname not in test_assembled.variables:
         avail = sorted(test_assembled.variables.keys())
-        cons.print(f"[bold red]Error:[/bold red] Variable '{varname}' not found.")
-        cons.print(f"[bold]Available variables:[/bold] {', '.join(avail)}")
-        sys.exit(1)
+        raise MFCException(f"Variable '{varname}' not found. "
+                           f"Available variables: {', '.join(avail)}")
 
     # Create output directory
     output_base = ARG('output')
@@ -216,9 +204,8 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
         if success:
             cons.print(f"[bold green]Done:[/bold green] {mp4_path}")
         else:
-            cons.print(f"[bold red]Error:[/bold red] Failed to generate {mp4_path}. "
-                       "Ensure imageio and imageio-ffmpeg are installed.")
-            sys.exit(1)
+            raise MFCException(f"Failed to generate {mp4_path}. "
+                               "Ensure imageio and imageio-ffmpeg are installed.")
         return
 
     # Single or multiple PNG frames

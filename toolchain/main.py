@@ -125,7 +125,7 @@ def __print_greeting():
 
 
 def __checks():
-    if ARG("command") in ("viz", "params", "completion", "help"):
+    if ARG("command") == "viz":
         return
     if not does_command_exist("cmake"):
         raise MFCException("CMake is required to build MFC but couldn't be located on your system. Please ensure it installed and discoverable (e.g in your system's $PATH).")
