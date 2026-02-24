@@ -32,7 +32,7 @@ jobs:
 
           claude_args: >
             --dangerously-skip-permissions
-            --max-turns 10
+            --max-turns 30
             --allowedTools
             "Bash(gh pr view:*)"
             "Bash(gh pr diff:*)"
