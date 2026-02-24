@@ -240,18 +240,16 @@ def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-argum
         print("imageio is not installed. Install it with: pip install imageio imageio-ffmpeg")
         return False
 
-    writer = None
     try:
-        writer = imageio.get_writer(output, fps=fps, codec='libx264',
-                                    pixelformat='yuv420p', macro_block_size=2)
-        for fname in frame_files:
-            writer.append_data(imageio.imread(os.path.join(viz_dir, fname)))
+        imageio.mimwrite(
+            output,
+            [imageio.imread(os.path.join(viz_dir, fname)) for fname in frame_files],
+            fps=fps, codec='libx264', pixelformat='yuv420p', macro_block_size=2,
+        )
         success = True
     except (OSError, ValueError, RuntimeError) as exc:
         print(f"imageio MP4 write failed: {exc}")
     finally:
-        if writer is not None:
-            writer.close()
         # Always clean up temporary frame files
         for fname in frame_files:
             try:
