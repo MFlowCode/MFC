@@ -1079,7 +1079,7 @@ contains
                 call s_compute_particles_EL_source( &
                     q_cons_qp%vf(1:sys_size), &
                     q_prim_qp%vf(1:sys_size), &
-                    rhs_vf)
+                    rhs_vf, stage)
                 call nvtxEndRange
             end if
         end if

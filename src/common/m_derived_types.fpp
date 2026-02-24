@@ -479,14 +479,15 @@ module m_derived_types
         logical :: write_bubbles            !< Write files to track the bubble evolution each time step
         logical :: write_bubbles_stats      !< Write the maximum and minimum radius of each bubble
         integer :: nBubs_glb                !< Global number of bubbles
-        integer :: nParticles_glb                !< Global number of particles
+        integer :: nParticles_glb           !< Global number of particles
         integer :: vel_model                !< Particle velocity model
         integer :: drag_model               !< Particle drag model
         logical :: pressure_force           !< Include pressure force translational motion
         logical :: gravity_force            !< Include gravity force in translational motion
         integer :: qs_drag_model            !< Particle QS drag model
         integer :: stokes_drag              !< Particle stokes drag
-        integer :: added_mass_model              !< Particle added mass model
+        integer :: added_mass_model         !< Particle added mass model
+        integer :: interpolation_order      !< Fluid-to-Particle barycentric interpolation order
 
         character(LEN=pathlen_max) :: input_path !< Path to lag_bubbles.dat
         real(wp) :: epsilonb         !< Standard deviation scaling for the gaussian function

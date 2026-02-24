@@ -17,7 +17,7 @@ module m_particles_EL_kernels
 contains
 
     !> The purpose of this subroutine is to smear the strength of the lagrangian
-            !!      particles into the Eulerian framework using different approaches.
+            !!      particles into the Eulerian framework using a gaussian approach.
             !! @param nParticles Number of lagrangian particles in the current domain
             !! @param lbk_rad Radius of the particles
             !! @param lbk_s Computational coordinates of the particles
@@ -32,235 +32,11 @@ contains
         type(scalar_field), dimension(:), intent(inout) :: updatedvar
         real(wp), dimension(1:lag_params%nParticles_glb, 1:3), intent(in) :: lbk_f_p
 
-        call s_trilinear_projection(nParticles, lbk_rad, lbk_s, lbk_pos, updatedvar, lbk_f_p)
+        call s_gaussian(nParticles, lbk_rad, lbk_s, lbk_pos, updatedvar, lbk_f_p)
 
     end subroutine s_smoothfunction
 
-    !> The purpose of this procedure is to use trilinear projection to map the effect of the particles to the fluid.
-    subroutine s_trilinear_projection(nParticles, lbk_rad, lbk_s, lbk_pos, updatedvar, lbk_f_p)
-
-        integer, intent(in) :: nParticles
-        real(wp), dimension(1:lag_params%nParticles_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_pos
-        real(wp), dimension(1:lag_params%nParticles_glb, 1:2), intent(in) :: lbk_rad
-        real(wp), dimension(1:lag_params%nParticles_glb, 1:3), intent(in) :: lbk_f_p
-        type(scalar_field), dimension(:), intent(inout) :: updatedvar
-
-        real(wp), dimension(3) :: center
-        integer, dimension(3) :: cell
-        real(wp) :: addFun1, addFun2_x, addFun2_y, addFun2_z, addFun_E
-        real(wp) :: volpart, Vol
-        real(wp) :: fp_x, fp_y, fp_z
-        real(wp) :: vol_frac
-        real(wp), dimension(3) :: s_coord
-        real(wp) :: wx, wy, wz, w
-        integer :: l, i, j, k, nx, ny, nz, iL, jL, kL, kL_max, cx, cy, cz
-
-        $:GPU_PARALLEL_LOOP(private='[l,s_coord,cell,center,fp_x,fp_y,fp_z,i,j,k]')
-        do l = 1, nParticles
-
-            fp_x = -lbk_f_p(l, 1)
-            fp_y = -lbk_f_p(l, 2)
-            fp_z = -lbk_f_p(l, 3)
-
-            center(1:3) = 0._wp
-            volpart = 4._wp/3._wp*pi*lbk_rad(l, 2)**3._wp
-            s_coord(1:3) = lbk_s(l, 1:3, 2)
-            center(1:2) = lbk_pos(l, 1:2, 2)
-
-            if (p > 0) center(3) = lbk_pos(l, 3, 2)
-            call s_get_cell(s_coord, cell)
-
-            if (num_dims == 2) then
-                Vol = dx(cell(1))*dy(cell(2))*lag_params%charwidth
-                if (cyl_coord) Vol = dx(cell(1))*dy(cell(2))*y_cc(cell(2))*2._wp*pi
-            else
-                Vol = dx(cell(1))*dy(cell(2))*dz(cell(3))
-            end if
-            vol_frac = volpart/Vol
-
-            i = cell(1)
-            j = cell(2)
-            k = cell(3)
-
-            if (center(1) >= x_cc(i)) then
-                iL = i
-            else
-                iL = i - 1
-            end if
-            if (center(2) >= y_cc(j)) then
-                jL = j
-            else
-                jL = j - 1
-            end if
-            kL = 0
-            kL_max = -1
-            if (p > 0) then
-                if (center(3) >= z_cc(k)) then
-                    kL = k
-                    kL_max = kL
-                else
-                    kL = k - 1
-                    kL_max = kL
-                end if
-            end if
-            wx = (center(1) - x_cc(iL))/(x_cc(iL + 1) - x_cc(iL))
-            wy = (center(2) - y_cc(jL))/(y_cc(jL + 1) - y_cc(jL))
-            wz = 0._wp
-            if (p > 0) wz = (center(3) - z_cc(kL))/(z_cc(kL + 1) - z_cc(kL))
-
-            ! $:GPU_ATOMIC(atomic='update')
-            ! updatedvar(1)%sf(i, j, k) = updatedvar(1)%sf(i, j, k) &
-            !                             + real(vol_frac, kind=stp)
-
-            $:GPU_LOOP(collapse=3,private='[w]')
-            do nx = iL, iL + 1
-                do ny = jL, jL + 1
-                    do nz = kL, kL_max + 1
-                        cx = nx - iL
-                        cy = ny - jL
-                        cz = nz - kL
-                        ! Compute weight for this corner
-                        w = ((1.0_wp - wx)*(1 - cx) + wx*cx)* &
-                            ((1.0_wp - wy)*(1 - cy) + wy*cy)* &
-                            ((1.0_wp - wz)*(1 - cz) + wz*cz)
-
-                        addFun1 = (w*vol_frac)
-                        $:GPU_ATOMIC(atomic='update')
-                        updatedvar(1)%sf(nx, ny, nz) = updatedvar(1)%sf(nx, ny, nz) &
-                                                       + real(addFun1, kind=stp)
-
-                        if (lag_params%solver_approach == 2) then
-                            ! Add particle force to the grid cell
-                            addFun2_x = (w*fp_x)/Vol
-                            $:GPU_ATOMIC(atomic='update')
-                            updatedvar(2)%sf(nx, ny, nz) = &
-                                updatedvar(2)%sf(nx, ny, nz) &
-                                + real(addFun2_x, kind=stp)
-
-                            addFun2_y = (w*fp_y)/Vol
-                            $:GPU_ATOMIC(atomic='update')
-                            updatedvar(3)%sf(nx, ny, nz) = &
-                                updatedvar(3)%sf(nx, ny, nz) &
-                                + real(addFun2_y, kind=stp)
-
-                            if (num_dims == 3) then
-                                addFun2_z = (w*fp_z)/Vol
-                                $:GPU_ATOMIC(atomic='update')
-                                updatedvar(4)%sf(nx, ny, nz) = &
-                                    updatedvar(4)%sf(nx, ny, nz) &
-                                    + real(addFun2_z, kind=stp)
-
-                                addFun_E = 0._wp*w
-                                $:GPU_ATOMIC(atomic='update')
-                                updatedvar(5)%sf(nx, ny, nz) = &
-                                    updatedvar(5)%sf(nx, ny, nz) &
-                                    + real(addFun_E, kind=stp)
-                            else
-                                addFun_E = 0._wp*w
-                                $:GPU_ATOMIC(atomic='update')
-                                updatedvar(4)%sf(nx, ny, nz) = &
-                                    updatedvar(4)%sf(nx, ny, nz) &
-                                    + real(addFun_E, kind=stp)
-                            end if
-                        end if
-                    end do
-                end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-    end subroutine s_trilinear_projection
-
-    !> The purpose of this procedure contains the algorithm to use the delta kernel function to map the effect of the particles.
-            !!      The effect of the particles only affects the cell where the particle is located.
-    subroutine s_deltafunc(nParticles, lbk_rad, lbk_s, updatedvar, lbk_f_p)
-
-        integer, intent(in) :: nParticles
-        real(wp), dimension(1:lag_params%nParticles_glb, 1:3, 1:2), intent(in) :: lbk_s
-        real(wp), dimension(1:lag_params%nParticles_glb, 1:2), intent(in) :: lbk_rad
-        real(wp), dimension(1:lag_params%nParticles_glb, 1:3), intent(in) :: lbk_f_p
-        type(scalar_field), dimension(:), intent(inout) :: updatedvar
-
-        integer, dimension(3) :: cell
-        real(wp) :: strength_vol
-
-        real(wp) :: addFun1, addFun2_x, addFun2_y, addFun2_z, addFun_E
-        real(wp) :: volpart, Vol
-        real(wp), dimension(3) :: s_coord
-        integer :: l
-        real(wp) :: fp_x, fp_y, fp_z
-
-        $:GPU_PARALLEL_LOOP(private='[l,s_coord,cell]')
-        do l = 1, nParticles
-
-            fp_x = lbk_f_p(l, 1)
-            fp_y = lbk_f_p(l, 2)
-            fp_z = lbk_f_p(l, 3)
-
-            volpart = 4._wp/3._wp*pi*lbk_rad(l, 2)**3._wp
-            s_coord(1:3) = lbk_s(l, 1:3, 2)
-            call s_get_cell(s_coord, cell)
-
-            strength_vol = volpart
-
-            if (num_dims == 2) then
-                Vol = dx(cell(1))*dy(cell(2))*lag_params%charwidth
-                if (cyl_coord) Vol = dx(cell(1))*dy(cell(2))*y_cc(cell(2))*2._wp*pi
-            else
-                Vol = dx(cell(1))*dy(cell(2))*dz(cell(3))
-            end if
-
-            !Update void fraction field
-            addFun1 = strength_vol/Vol
-            $:GPU_ATOMIC(atomic='update')
-            updatedvar(1)%sf(cell(1), cell(2), cell(3)) = updatedvar(1)%sf(cell(1), cell(2), cell(3)) + real(addFun1, kind=stp)
-
-            if (lag_params%solver_approach == 2) then
-
-                !Update x-momentum source term
-                addFun2_x = -fp_x/Vol
-                $:GPU_ATOMIC(atomic='update')
-                updatedvar(2)%sf(cell(1), cell(2), cell(3)) = &
-                    updatedvar(2)%sf(cell(1), cell(2), cell(3)) &
-                    + real(addFun2_x, kind=stp)
-
-                !Update y-momentum source term
-                addFun2_y = -fp_y/Vol
-                $:GPU_ATOMIC(atomic='update')
-                updatedvar(3)%sf(cell(1), cell(2), cell(3)) = &
-                    updatedvar(3)%sf(cell(1), cell(2), cell(3)) &
-                    + real(addFun2_y, kind=stp)
-
-                if (num_dims == 3) then
-                    !Update z-momentum source term
-                    addFun2_z = -fp_z/Vol
-                    $:GPU_ATOMIC(atomic='update')
-                    updatedvar(4)%sf(cell(1), cell(2), cell(3)) = &
-                        updatedvar(4)%sf(cell(1), cell(2), cell(3)) &
-                        + real(addFun2_z, kind=stp)
-                    !Update energy source term
-                    addFun_E = 0._wp
-                    $:GPU_ATOMIC(atomic='update')
-                    updatedvar(5)%sf(cell(1), cell(2), cell(3)) = &
-                        updatedvar(5)%sf(cell(1), cell(2), cell(3)) &
-                        + real(addFun_E, kind=stp)
-                else
-                    !Update energy source term
-                    addFun_E = 0._wp
-                    $:GPU_ATOMIC(atomic='update')
-                    updatedvar(4)%sf(cell(1), cell(2), cell(3)) = &
-                        updatedvar(4)%sf(cell(1), cell(2), cell(3)) &
-                        + real(addFun_E, kind=stp)
-                end if
-            end if
-
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-    end subroutine s_deltafunc
-
     !> The purpose of this procedure contains the algorithm to use the gaussian kernel function to map the effect of the particles.
-            !!      The effect of the particles affects the 3X3x3 cells that surround the particle.
     subroutine s_gaussian(nParticles, lbk_rad, lbk_s, lbk_pos, updatedvar, lbk_f_p)
 
         integer, intent(in) :: nParticles
@@ -271,35 +47,35 @@ contains
 
         real(wp), dimension(3) :: center
         integer, dimension(3) :: cell
+        integer, dimension(3) :: cellaux
         real(wp) :: stddsv
-        real(wp) :: strength_vol
 
         real(wp), dimension(3) :: nodecoord
         real(wp) :: addFun1, addFun2_x, addFun2_y, addFun2_z, addFun_E, func_sum
-        real(wp) :: func, volpart, Vol
-        integer, dimension(3) :: cellaux
+        real(wp) :: func, volpart, Vol, Vol_loc, rad
         real(wp), dimension(3) :: s_coord
         integer :: l, i, j, k
         logical :: celloutside
-        integer :: smearGrid, smearGridz
         real(wp) :: fp_x, fp_y, fp_z
 
-        smearGrid = mapCells - (-mapCells) + 1 ! Include the cell that contains the particle (3+1+3)
-        smearGridz = smearGrid
-        if (p == 0) smearGridz = 1
+        real(wp) :: rc, r2, weight, alpha_cut, vol_frac, g, chardist
+        integer :: d
+        integer :: ncx, ncy, ncz, ix, jy, kz
 
-        $:GPU_PARALLEL_LOOP(private='[cellaux,nodecoord,l,s_coord,cell,center]', copyin='[smearGrid,smearGridz]')
+        d = 2
+        if (num_dims == 3) d = 3
+
+        $:GPU_PARALLEL_LOOP(private='[nodecoord,l,s_coord,cell,center,volpart,rad,cellaux]', copyin='[d]')
         do l = 1, nParticles
             nodecoord(1:3) = 0
             center(1:3) = 0._wp
             volpart = 4._wp/3._wp*pi*lbk_rad(l, 2)**3._wp
             s_coord(1:3) = lbk_s(l, 1:3, 2)
             center(1:2) = lbk_pos(l, 1:2, 2)
+            rad = lbk_rad(l, 2)
 
             if (p > 0) center(3) = lbk_pos(l, 3, 2)
             call s_get_cell(s_coord, cell)
-            call s_compute_stddsv(cell, volpart, stddsv)
-            strength_vol = volpart
 
             if (num_dims == 2) then
                 Vol = dx(cell(1))*dy(cell(2))*lag_params%charwidth
@@ -308,103 +84,125 @@ contains
                 Vol = dx(cell(1))*dy(cell(2))*dz(cell(3))
             end if
 
-            fp_x = lbk_f_p(l, 1)
-            fp_y = lbk_f_p(l, 2)
-            fp_z = lbk_f_p(l, 3)
+            !< Characteristic cell length
+            chardist = sqrt(dx(cell(1))*dy(cell(2)))
+            if (num_dims == 3) chardist = (dx(cell(1))*dy(cell(2))*dz(cell(3)))**(1._wp/3._wp)
+
+            vol_frac = volpart/Vol
+
+            ! !< Update void fraction field
+            ! addFun1 = vol_frac
+            ! $:GPU_ATOMIC(atomic='update')
+            ! updatedvar(1)%sf(cell(1), cell(2), cell(3)) = &
+            !     updatedvar(1)%sf(cell(1), cell(2), cell(3)) &
+            !     + real(addFun1, kind=stp)
+
+            fp_x = -lbk_f_p(l, 1)
+            fp_y = -lbk_f_p(l, 2)
+            fp_z = -lbk_f_p(l, 3)
+
+            sigma = lag_params%epsilonb*chardist
+            ! sigma = max(sigma, 0.5_wp * chardist)
+
+            ! alpha_cut = 1.e-4_wp
+            rc = sigma
+            ! rc = sigma * sqrt(-2.0_wp*log(alpha_cut))
+            ncx = max(1, int(rc/dx(cell(1)))) !min(3,ceiling(rc/dx(cell(1))))
+            ncy = max(1, int(rc/dx(cell(1)))) !ceiling(rc/dy(cell(2))) !min(3,ceiling(rc/dy(cell(2))))
+            ncz = 0
+            if (num_dims == 3) ncz = max(1, int(rc/dx(cell(1)))) !ceiling(rc/dz(cell(3))) !min(3,ceiling(rc/dz(cell(3)))) !p
+
+            i = cell(1)
+            j = cell(2)
+            k = cell(3)
 
             func_sum = 0._wp
-            do i = 1, smearGrid
-                do j = 1, smearGrid
-                    do k = 1, smearGridz
-                        cellaux(1) = cell(1) + i - (mapCells + 1)
-                        cellaux(2) = cell(2) + j - (mapCells + 1)
-                        cellaux(3) = cell(3) + k - (mapCells + 1)
-                        if (p == 0) cellaux(3) = 0
+            $:GPU_LOOP(collapse=3,private='[ix,jy,kz,r2,cellaux]')
+            do ix = i - ncx, i + ncx
+                do jy = j - ncy, j + ncy
+                    do kz = k - ncz, k + ncz
 
-                        !Check if the cells intended to smear the particles in are in the computational domain
-                        !and redefine the cells for symmetric boundary
-                        call s_check_celloutside(cellaux, celloutside)
-
-                        if (.not. celloutside) then
-                            nodecoord(1) = x_cc(cellaux(1))
-                            nodecoord(2) = y_cc(cellaux(2))
-                            if (p > 0) nodecoord(3) = z_cc(cellaux(3))
-                            call s_applygaussian(center, cellaux, nodecoord, stddsv, 0._wp, func)
-                            func_sum = func_sum + func
+                        cellaux(1) = ix
+                        cellaux(2) = jy
+                        cellaux(3) = kz
+                        ! Relocate cells for particles intersecting symmetric boundaries
+                        if (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == BC_REFLECTIVE)) then
+                            call s_shift_cell_symmetric_bc(cellaux, cell)
                         end if
+
+                        Vol_loc = dx(cellaux(1))*dy(cellaux(2))
+                        if (num_dims == 3) Vol_loc = Vol_loc*dz(cellaux(3))
+                        r2 = (x_cc(cellaux(1)) - center(1))**2 + (y_cc(cellaux(2)) - center(2))**2
+                        if (num_dims == 3) r2 = r2 + (z_cc(cellaux(3)) - center(3))**2
+                        g = exp(-r2/(2*sigma**2))/(sigma*sqrt(2*pi))**d
+                        func_sum = func_sum + g*Vol_loc
                     end do
                 end do
             end do
 
-            $:GPU_LOOP(collapse=3,private='[cellaux,nodecoord]')
-            do i = 1, smearGrid
-                do j = 1, smearGrid
-                    do k = 1, smearGridz
-                        cellaux(1) = cell(1) + i - (mapCells + 1)
-                        cellaux(2) = cell(2) + j - (mapCells + 1)
-                        cellaux(3) = cell(3) + k - (mapCells + 1)
-                        if (p == 0) cellaux(3) = 0
+            $:GPU_LOOP(collapse=3,private='[ix,jy,kz,r2,weight,g]')
+            do ix = i - ncx, i + ncx
+                do jy = j - ncy, j + ncy
+                    do kz = k - ncz, k + ncz
 
-                        !Check if the cells intended to smear the particles in are in the computational domain
-                        !and redefine the cells for symmetric boundary
-                        call s_check_celloutside(cellaux, celloutside)
+                        cellaux(1) = ix
+                        cellaux(2) = jy
+                        cellaux(3) = kz
+                        ! Relocate cells for particles intersecting symmetric boundaries
+                        if (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == BC_REFLECTIVE)) then
+                            call s_shift_cell_symmetric_bc(cellaux, cell)
+                        end if
 
-                        if (.not. celloutside) then
-                            nodecoord(1) = x_cc(cellaux(1))
-                            nodecoord(2) = y_cc(cellaux(2))
-                            if (p > 0) nodecoord(3) = z_cc(cellaux(3))
-                            call s_applygaussian(center, cellaux, nodecoord, stddsv, 0._wp, func)
-                            func = func/func_sum
+                        r2 = (x_cc(cellaux(1)) - center(1))**2 + (y_cc(cellaux(2)) - center(2))**2
+                        if (num_dims == 3) r2 = r2 + (z_cc(cellaux(3)) - center(3))**2
+                        ! Vol_loc = dx(cellaux(1))*dy(cellaux(2))
+                        ! if (num_dims==3) Vol_loc = Vol_loc * dz(cellaux(3))
+                        g = exp(-r2/(2*sigma**2))/(sigma*sqrt(2*pi))**d
+                        weight = g/func_sum
 
-                            ! Relocate cells for particles intersecting symmetric boundaries
-                            if (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == BC_REFLECTIVE)) then
-                                call s_shift_cell_symmetric_bc(cellaux, cell)
-                            end if
+                        !Update volume fraction field
+                        addFun1 = weight*volpart
+                        $:GPU_ATOMIC(atomic='update')
+                        updatedvar(1)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
+                            updatedvar(1)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                            + real(addFun1, kind=stp)
 
-                            !Update void fraction field
-                            addFun1 = func*strength_vol !strength_vol/Vol
+                        if (lag_params%solver_approach == 2) then
+
+                            !Update x-momentum source term
+                            addFun2_x = weight*fp_x
                             $:GPU_ATOMIC(atomic='update')
-                            updatedvar(1)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                                updatedvar(1)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                + real(addFun1, kind=stp)
+                            updatedvar(2)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
+                                updatedvar(2)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                                + real(addFun2_x, kind=stp)
 
-                            if (lag_params%solver_approach == 2) then
+                            !Update y-momentum source term
+                            addFun2_y = weight*fp_y
+                            $:GPU_ATOMIC(atomic='update')
+                            updatedvar(3)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
+                                updatedvar(3)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                                + real(addFun2_y, kind=stp)
 
-                                !Update x-momentum source term
-                                addFun2_x = -func*fp_x
+                            if (num_dims == 3) then
+                                !Update z-momentum source term
+                                addFun2_z = weight*fp_z
                                 $:GPU_ATOMIC(atomic='update')
-                                updatedvar(2)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                                    updatedvar(2)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                    + real(addFun2_x, kind=stp)
-
-                                !Update y-momentum source term
-                                addFun2_y = -func*fp_y
+                                updatedvar(4)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
+                                    updatedvar(4)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                                    + real(addFun2_z, kind=stp)
+                                !Update energy source term
+                                addFun_E = 0._wp
                                 $:GPU_ATOMIC(atomic='update')
-                                updatedvar(3)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                                    updatedvar(3)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                    + real(addFun2_y, kind=stp)
-
-                                if (num_dims == 3) then
-                                    !Update z-momentum source term
-                                    addFun2_z = -func*fp_z
-                                    $:GPU_ATOMIC(atomic='update')
-                                    updatedvar(4)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                                        updatedvar(4)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                        + real(addFun2_z, kind=stp)
-                                    !Update energy source term
-                                    addFun_E = 0._wp
-                                    $:GPU_ATOMIC(atomic='update')
-                                    updatedvar(5)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                                        updatedvar(5)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                        + real(addFun_E, kind=stp)
-                                else
-                                    !Update energy source term
-                                    addFun_E = 0._wp
-                                    $:GPU_ATOMIC(atomic='update')
-                                    updatedvar(4)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                                        updatedvar(4)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                        + real(addFun_E, kind=stp)
-                                end if
+                                updatedvar(5)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
+                                    updatedvar(5)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                                    + real(addFun_E, kind=stp)
+                            else
+                                !Update energy source term
+                                addFun_E = 0._wp
+                                $:GPU_ATOMIC(atomic='update')
+                                updatedvar(4)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
+                                    updatedvar(4)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                                    + real(addFun_E, kind=stp)
                             end if
                         end if
                     end do
@@ -414,104 +212,6 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_gaussian
-
-    !> The purpose of this subroutine is to apply the gaussian kernel function for each bubble (Maeda and Colonius, 2018)).
-    subroutine s_applygaussian(center, cellaux, nodecoord, stddsv, strength_idx, func)
-        $:GPU_ROUTINE(function_name='s_applygaussian',parallelism='[seq]', &
-            & cray_inline=True)
-
-        real(wp), dimension(3), intent(in) :: center
-        integer, dimension(3), intent(in) :: cellaux
-        real(wp), dimension(3), intent(in) :: nodecoord
-        real(wp), intent(in) :: stddsv
-        real(wp), intent(in) :: strength_idx
-        real(wp), intent(out) :: func
-
-        real(wp) :: distance
-        real(wp) :: theta, dtheta, L2, dzp, Lz2
-        real(wp) :: Nr, Nr_count
-
-        distance = sqrt((center(1) - nodecoord(1))**2._wp + (center(2) - nodecoord(2))**2._wp + (center(3) - nodecoord(3))**2._wp)
-
-        if (num_dims == 3) then
-            !< 3D gaussian function
-            func = exp(-0.5_wp*(distance/stddsv)**2._wp)/(sqrt(2._wp*pi)*stddsv)**3._wp
-        else
-            if (cyl_coord) then
-                !< 2D cylindrical function:
-                ! We smear particles in the azimuthal direction for given r
-                theta = 0._wp
-                Nr = ceiling(2._wp*pi*nodecoord(2)/(y_cb(cellaux(2)) - y_cb(cellaux(2) - 1)))
-                dtheta = 2._wp*pi/Nr
-                L2 = center(2)**2._wp + nodecoord(2)**2._wp - 2._wp*center(2)*nodecoord(2)*cos(theta)
-                distance = sqrt((center(1) - nodecoord(1))**2._wp + L2)
-                ! Factor 2._wp is for symmetry (upper half of the 2D field (+r) is considered)
-                func = dtheta/2._wp/pi*exp(-0.5_wp*(distance/stddsv)**2._wp)/(sqrt(2._wp*pi)*stddsv)**3._wp
-                Nr_count = 0._wp
-                do while (Nr_count < Nr - 1._wp)
-                    Nr_count = Nr_count + 1._wp
-                    theta = Nr_count*dtheta
-                    ! trigonometric relation
-                    L2 = center(2)**2._wp + nodecoord(2)**2._wp - 2._wp*center(2)*nodecoord(2)*cos(theta)
-                    distance = sqrt((center(1) - nodecoord(1))**2._wp + L2)
-                    ! nodecoord(2)*dtheta is the azimuthal width of the cell
-                    func = func + &
-                           dtheta/2._wp/pi*exp(-0.5_wp*(distance/stddsv)**2._wp)/(sqrt(2._wp*pi)*stddsv)**(3._wp*(strength_idx + 1._wp))
-                end do
-            else
-                !< 2D cartesian function:
-                ! We smear particles considering a virtual depth (lag_params%charwidth)
-                theta = 0._wp
-                Nr = ceiling(lag_params%charwidth/(y_cb(cellaux(2)) - y_cb(cellaux(2) - 1)))
-                Nr_count = 1._wp - mapCells*1._wp
-                dzp = y_cb(cellaux(2)) - y_cb(cellaux(2) - 1)
-                Lz2 = (center(3) - (dzp*(0.5_wp + Nr_count) - lag_params%charwidth/2._wp))**2._wp
-                distance = sqrt((center(1) - nodecoord(1))**2._wp + (center(2) - nodecoord(2))**2._wp + Lz2)
-                func = dzp/lag_params%charwidth*exp(-0.5_wp*(distance/stddsv)**2._wp)/(sqrt(2._wp*pi)*stddsv)**3._wp
-
-                do while (Nr_count < Nr - 1._wp + ((mapCells - 1)*1._wp))
-                    Nr_count = Nr_count + 1._wp
-                    Lz2 = (center(3) - (dzp*(0.5_wp + Nr_count) - lag_params%charwidth/2._wp))**2._wp
-                    distance = sqrt((center(1) - nodecoord(1))**2._wp + (center(2) - nodecoord(2))**2._wp + Lz2)
-                    func = func + &
-                           dzp/lag_params%charwidth*exp(-0.5_wp*(distance/stddsv)**2._wp)/(sqrt(2._wp*pi)*stddsv)**(3._wp*(strength_idx + 1._wp))
-                end do
-            end if
-        end if
-
-    end subroutine s_applygaussian
-
-    !> The purpose of this subroutine is to check if the current cell is outside the computational domain or not (including ghost cells).
-            !! @param cellaux Tested cell to smear the particle effect in.
-            !! @param celloutside If true, then cellaux is outside the computational domain.
-    subroutine s_check_celloutside(cellaux, celloutside)
-        $:GPU_ROUTINE(function_name='s_check_celloutside',parallelism='[seq]', &
-            & cray_inline=True)
-
-        integer, dimension(3), intent(inout) :: cellaux
-        logical, intent(out) :: celloutside
-
-        celloutside = .false.
-
-        if (num_dims == 2) then
-            if ((cellaux(1) < -buff_size) .or. (cellaux(2) < -buff_size)) then
-                celloutside = .true.
-            end if
-
-            if ((cellaux(1) > m + buff_size) .or. (cellaux(2) > n + buff_size)) then
-                celloutside = .true.
-            end if
-        else
-            if ((cellaux(1) < -buff_size) .or. (cellaux(2) < -buff_size) .or. (cellaux(3) < -buff_size)) then
-                celloutside = .true.
-            end if
-
-            if ((cellaux(1) > m + buff_size) .or. (cellaux(2) > n + buff_size) .or. (cellaux(3) > p + buff_size)) then
-                celloutside = .true.
-            end if
-        end if
-
-    end subroutine s_check_celloutside
 
     !> This subroutine relocates the current cell, if it intersects a symmetric boundary.
             !! @param cell Cell of the current particle
@@ -551,45 +251,24 @@ contains
 
     end subroutine s_shift_cell_symmetric_bc
 
-    !> Calculates the standard deviation of the particle being smeared in the Eulerian framework.
-            !! @param cell Cell where the particle is located
-            !! @param volpart Volume of the particle
-            !! @param stddsv Standard deviaton
-    subroutine s_compute_stddsv(cell, volpart, stddsv)
-        $:GPU_ROUTINE(function_name='s_compute_stddsv',parallelism='[seq]', &
+    !> This subroutine transforms the computational coordinates of the particle from
+            !!      real type into integer.
+            !! @param s Computational coordinates of the particle, real type
+            !! @param get_cell Computational coordinates of the particle, integer type
+    subroutine s_get_cell(s_cell, get_cell)
+        $:GPU_ROUTINE(function_name='s_get_cell',parallelism='[seq]', &
             & cray_inline=True)
 
-        integer, dimension(3), intent(in) :: cell
-        real(wp), intent(in) :: volpart
-        real(wp), intent(out) :: stddsv
+        real(wp), dimension(3), intent(in) :: s_cell
+        integer, dimension(3), intent(out) :: get_cell
+        integer :: i
 
-        real(wp) :: chardist, charvol
-        real(wp) :: rad
+        get_cell(:) = int(s_cell(:))
+        do i = 1, num_dims
+            if (s_cell(i) < 0._wp) get_cell(i) = get_cell(i) - 1
+        end do
 
-        !< Compute characteristic distance
-        chardist = sqrt(dx(cell(1))*dy(cell(2)))
-        if (p > 0) chardist = (dx(cell(1))*dy(cell(2))*dz(cell(3)))**(1._wp/3._wp)
-
-        !< Compute characteristic volume
-        if (p > 0) then
-            charvol = dx(cell(1))*dy(cell(2))*dz(cell(3))
-        else
-            if (cyl_coord) then
-                charvol = dx(cell(1))*dy(cell(2))*y_cc(cell(2))*2._wp*pi
-            else
-                charvol = dx(cell(1))*dy(cell(2))*lag_params%charwidth
-            end if
-        end if
-
-        !< Compute Standard deviaton
-        if (((volpart/charvol) > 0.5_wp*lag_params%valmaxvoid) .or. (lag_params%smooth_type == 1)) then
-            rad = (3._wp*volpart/(4._wp*pi))**(1._wp/3._wp)
-            stddsv = 1._wp*lag_params%epsilonb*max(chardist, rad)
-        else
-            stddsv = 0._wp
-        end if
-
-    end subroutine s_compute_stddsv
+    end subroutine s_get_cell
 
     !> The purpose of this procedure is to calculate the characteristic cell volume
             !! @param cell Computational coordinates (x, y, z)
@@ -613,90 +292,6 @@ contains
 
     end subroutine s_get_char_vol
 
-    !> This subroutine transforms the computational coordinates of the particle from
-            !!      real type into integer.
-            !! @param s Computational coordinates of the particle, real type
-            !! @param get_cell Computational coordinates of the particle, integer type
-    subroutine s_get_cell(s_cell, get_cell)
-        $:GPU_ROUTINE(function_name='s_get_cell',parallelism='[seq]', &
-            & cray_inline=True)
-
-        real(wp), dimension(3), intent(in) :: s_cell
-        integer, dimension(3), intent(out) :: get_cell
-        integer :: i
-
-        get_cell(:) = int(s_cell(:))
-        do i = 1, num_dims
-            if (s_cell(i) < 0._wp) get_cell(i) = get_cell(i) - 1
-        end do
-
-    end subroutine s_get_cell
-
-    function f_interp_prim_trilinear(pos, cell, field_vf, field_index) result(val)
-        $:GPU_ROUTINE(parallelism='[seq]')
-
-        real(wp), dimension(3), intent(in) :: pos
-        integer, dimension(3), intent(in) :: cell
-        type(scalar_field), dimension(:), intent(in) :: field_vf
-        integer, intent(in) :: field_index
-
-        real(wp) :: val
-        real(wp) :: wx, wy, wz, x_lo, y_lo, z_lo
-        real(wp) :: fx0, fx1, fy0, fy1
-        integer :: i, j, k, iL, jL, kL
-
-        i = cell(1)
-        j = cell(2)
-        k = cell(3)
-
-        if (pos(1) >= x_cc(i)) then
-            iL = i
-        else
-            iL = i - 1
-        end if
-
-        if (pos(2) >= y_cc(j)) then
-            jL = j
-        else
-            jL = j - 1
-        end if
-
-        wx = (pos(1) - x_cc(iL))/(x_cc(iL + 1) - x_cc(iL))
-        wy = (pos(2) - y_cc(jL))/(y_cc(jL + 1) - y_cc(jL))
-
-        ! 2D case bilinear
-        if (num_dims == 2) then
-
-            fx0 = (1 - wx)*field_vf(field_index)%sf(iL, jL, 0) + &
-                  wx*field_vf(field_index)%sf(iL + 1, jL, 0)
-
-            fx1 = (1 - wx)*field_vf(field_index)%sf(iL, jL + 1, 0) + &
-                  wx*field_vf(field_index)%sf(iL + 1, jL + 1, 0)
-
-            val = (1 - wy)*fx0 + wy*fx1
-            return
-        end if
-
-        ! 3D case trilinear
-        if (pos(3) >= z_cc(k)) then
-            kL = k
-        else
-            kL = k - 1
-        end if
-        wz = (pos(3) - z_cc(kL))/(z_cc(kL + 1) - z_cc(kL))
-
-        fx0 = (1 - wx)*field_vf(field_index)%sf(iL, jL, kL) + wx*field_vf(field_index)%sf(iL + 1, jL, kL)
-        fx1 = (1 - wx)*field_vf(field_index)%sf(iL, jL + 1, kL) + wx*field_vf(field_index)%sf(iL + 1, jL + 1, kL)
-        fy0 = (1 - wy)*fx0 + wy*fx1
-
-        fx0 = (1 - wx)*field_vf(field_index)%sf(iL, jL, kL + 1) + wx*field_vf(field_index)%sf(iL + 1, jL, kL + 1)
-        fx1 = (1 - wx)*field_vf(field_index)%sf(iL, jL + 1, kL + 1) + wx*field_vf(field_index)%sf(iL + 1, jL + 1, kL + 1)
-        fy1 = (1 - wy)*fx0 + wy*fx1
-
-        val = (1 - wz)*fy0 + wz*fy1
-
-    end function
-
     !! This function calculates the force on a particle
             !!      based on the pressure gradient, velocity, and drag model.
             !! @param pos Position of the particle
@@ -709,15 +304,13 @@ contains
             !! @param cell Computational coordinates of the particle
             !! @param q_prim_vf Eulerian field with primitive variables
             !! @return a Acceleration of the particle in direction i
-    subroutine f_get_particle_force(pos, rad, vel_p, mass_p, Re, gamm, vol_frac, cell, &
+    subroutine s_get_particle_force(pos, rad, vel_p, mass_p, Re, gamm, vol_frac, cell, &
                                     q_prim_vf, fieldvars, force, rmass_add)
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: rad, mass_p, Re, gamm, vol_frac
         real(wp), dimension(3), intent(in) :: pos
         integer, dimension(3), intent(in) :: cell
         real(wp), dimension(3), intent(in) :: vel_p
-        ! real(stp), intent(in) :: pressure_gradient(:,:,:,:)
-        ! real(stp), intent(in) :: density_gradient(:,:,:,:)
         type(scalar_field), dimension(:), intent(in) :: fieldvars
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
 
@@ -747,22 +340,20 @@ contains
         rhoDuDt = 0._wp
 
         !!Interpolation - either tri-linear or 0th order
-        if (fd_order > 1) then
-            ! alpha_fluid = f_interp_prim_trilinear(pos, cell, q_prim_vf, E_idx + 1)
-            rho_fluid = f_interp_prim_trilinear(pos, cell, q_prim_vf, 1)
-            pressure_fluid = f_interp_prim_trilinear(pos, cell, q_prim_vf, E_idx)
+        if (lag_params%interpolation_order > 1) then
+            rho_fluid = f_interp_barycentric(pos, cell, q_prim_vf, 1)
+            pressure_fluid = f_interp_barycentric(pos, cell, q_prim_vf, E_idx)
             do dir = 1, num_dims
                 if (lag_params%pressure_force .or. lag_params%added_mass_model > 0) then
-                    dp(dir) = f_interp_prim_trilinear(pos, cell, fieldvars, dir)
+                    dp(dir) = f_interp_barycentric(pos, cell, fieldvars, dir)
                 end if
                 if (lag_params%added_mass_model > 0) then
-                    grad_rho(dir) = f_interp_prim_trilinear(pos, cell, fieldvars, 3 + dir)
-                    drhodt = drhodt + f_interp_prim_trilinear(pos, cell, fieldvars, 6 + dir)
+                    grad_rho(dir) = f_interp_barycentric(pos, cell, fieldvars, 3 + dir)
+                    drhodt = drhodt + f_interp_barycentric(pos, cell, fieldvars, 6 + dir)
                 end if
-                fluid_vel(dir) = f_interp_prim_trilinear(pos, cell, q_prim_vf, momxb + dir - 1)
+                fluid_vel(dir) = f_interp_barycentric(pos, cell, q_prim_vf, momxb + dir - 1)
             end do
         else
-            ! alpha_fluid = q_prim_vf(E_idx + 1)%sf(cell(1), cell(2), cell(3))
             rho_fluid = q_prim_vf(1)%sf(cell(1), cell(2), cell(3))
             pressure_fluid = q_prim_vf(E_idx)%sf(cell(1), cell(2), cell(3))
             do dir = 1, num_dims
@@ -777,7 +368,6 @@ contains
             end do
         end if
 
-        ! rho_fluid = rho_fluid/alpha_fluid
         drhodt = -drhodt
 
         v_rel = vel_p - fluid_vel
@@ -802,7 +392,7 @@ contains
             rhoDuDt = -dp
             udot_grad_rho = dot_product(fluid_vel, grad_rho)
             vgradrho = dot_product(vel_p, grad_rho)
-            SDrho = (drhodt + udot_grad_rho)/(1._wp - vol_frac)
+            SDrho = (drhodt + udot_grad_rho) !/(1._wp - vol_frac)
             mach = vmag/cson
         end if
 
@@ -854,7 +444,7 @@ contains
             end if
 
             Cam = 0.5_wp*Cam*(1._wp + 0.68_wp*vol_frac**2)
-            rmass_add = rho_fluid*vol*Cam
+            rmass_add = rho_fluid*vol*Cam !(1._wp-vol_frac)*rho_fluid*vol*Cam
 
             fam = Cam*vol*(vel_p*SDrho + rhoDuDt + &
                            fluid_vel*(vgradrho))
@@ -876,7 +466,133 @@ contains
             end if
         end do
 
-    end subroutine f_get_particle_force
+    end subroutine s_get_particle_force
+
+    function f_interp_barycentric(pos, cell, field_vf, field_index) result(val)
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), dimension(3), intent(in) :: pos
+        integer, dimension(3), intent(in) :: cell
+        type(scalar_field), dimension(:), intent(in) :: field_vf
+        integer, intent(in) :: field_index
+
+        integer :: i, j, k, ix, jy, kz, npts, npts_z, N, a, b
+        real(wp) :: weight, numerator, denominator, xBar, eps
+        real(wp) :: val, local_min, local_max, prod_x, prod_y, prod_z, dx_l, dy_l, dz_l
+        real(wp) :: wx(-2:2), wy(-2:2), wz(-2:2)
+
+        i = cell(1)
+        j = cell(2)
+        k = cell(3)
+
+        dx_l = x_cc(i) - x_cc(i - 1)
+        dy_l = y_cc(j) - y_cc(j - 1)
+        dz_l = z_cc(k) - z_cc(k - 1)
+
+        wx = 0._wp; wy = 0._wp; wz = 0._wp
+
+        N = lag_params%interpolation_order
+        npts = N/2
+        npts_z = npts
+        if (num_dims == 2) npts_z = 0
+        eps = 1.e-12_wp
+        numerator = 0._wp
+        denominator = 0._wp
+
+        if (abs(pos(1) - x_cc(i)) <= eps .and. &
+            abs(pos(2) - y_cc(j)) <= eps .and. &
+            abs(pos(3) - z_cc(k)) <= eps) then
+            val = field_vf(field_index)%sf(i, j, k)
+            return
+        end if
+
+        ! do a = -npts, npts
+        !   prod_x = 1._wp
+        !   prod_y = 1._wp
+        !   prod_z = 1._wp
+        !   do b = -npts, npts
+        !     if (a /= b) then
+        !       prod_x = prod_x * (x_cc(i+a) - x_cc(i+b))
+        !       prod_y = prod_y * (y_cc(j+a) - y_cc(j+b))
+        !       if (num_dims == 3) then
+        !         prod_z = prod_z * (z_cc(k+a) - z_cc(k+b))
+        !       endif
+        !     endif
+        !   enddo
+        !   wx(a) = 1._wp / prod_x
+        !   wy(a) = 1._wp / prod_y
+        !   if (num_dims == 3) then
+        !     wz(a) = 1._wp / prod_z
+        !   endif
+        ! enddo
+
+        if (N == 2) then
+            wx(-1) = 1._wp/(2*(dx_l)**2)
+            wx(0) = -1._wp/((dx_l)**2)
+            wx(1) = 1._wp/(2*(dx_l)**2)
+
+            wy(-1) = 1._wp/(2*(dy_l)**2)
+            wy(0) = -1._wp/((dy_l)**2)
+            wy(1) = 1._wp/(2*(dy_l)**2)
+
+            wz(-1) = 1._wp/(2*(dz_l)**2)
+            wz(0) = -1._wp/((dz_l)**2)
+            wz(1) = 1._wp/(2*(dz_l)**2)
+
+        elseif (N == 4) then
+            wx(-2) = 1._wp/(24*(dx_l)**4)
+            wx(-1) = -1._wp/(6*(dx_l)**4)
+            wx(0) = 1._wp/(4*(dx_l)**4)
+            wx(1) = -1._wp/(6*(dx_l)**4)
+            wx(2) = 1._wp/(24*(dx_l)**4)
+
+            wy(-2) = 1._wp/(24*(dy_l)**4)
+            wy(-1) = -1._wp/(6*(dy_l)**4)
+            wy(0) = 1._wp/(4*(dy_l)**4)
+            wy(1) = -1._wp/(6*(dy_l)**4)
+            wy(2) = 1._wp/(24*(dy_l)**4)
+
+            wz(-2) = 1._wp/(24*(dz_l)**4)
+            wz(-1) = -1._wp/(6*(dz_l)**4)
+            wz(0) = 1._wp/(4*(dz_l)**4)
+            wz(1) = -1._wp/(6*(dz_l)**4)
+            wz(2) = 1._wp/(24*(dz_l)**4)
+        end if
+
+        do ix = i - npts, i + npts
+            do jy = j - npts, j + npts
+                do kz = k - npts_z, k + npts_z
+                    if (num_dims == 3) then
+                        xBar = (pos(1) - x_cc(ix))*(pos(2) - y_cc(jy))*(pos(3) - z_cc(kz))
+                        weight = wx(i - ix)*wy(j - jy)*wz(k - kz)
+                    else
+                        xBar = (pos(1) - x_cc(ix))*(pos(2) - y_cc(jy))
+                        weight = wx(i - ix)*wy(j - jy)
+                    end if
+                    weight = weight/xBar
+                    numerator = numerator + weight*field_vf(field_index)%sf(ix, jy, kz)
+                    denominator = denominator + weight
+                end do
+            end do
+        end do
+
+        val = numerator/denominator
+
+        if (num_dims == 3) then
+            local_min = minval(field_vf(field_index)%sf(i - npts:i + npts, j - npts:j + npts, k - npts:k + npts))
+            local_max = maxval(field_vf(field_index)%sf(i - npts:i + npts, j - npts:j + npts, k - npts:k + npts))
+        else
+            local_min = minval(field_vf(field_index)%sf(i - npts:i + npts, j - npts:j + npts, k))
+            local_max = maxval(field_vf(field_index)%sf(i - npts:i + npts, j - npts:j + npts, k))
+        end if
+
+        ! if ((val .lt. local_min) .or. (val .gt. local_max)) then
+        !   val = field_vf(field_index)%sf(i,j,k)
+        ! endif
+
+        val = max(local_min, min(local_max, val))
+
+    end function
 
     ! Quasi-steady force (Re_p and Ma_p corrections):
     !   Improved Drag Correlation for Spheres and Application
