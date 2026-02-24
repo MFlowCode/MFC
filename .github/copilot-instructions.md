@@ -16,7 +16,7 @@ Formatting and linting are enforced by pre-commit hooks. Focus review effort on 
   * Sources in `src/`, tests in `tests/`, examples in `examples/`, Python toolchain in `toolchain/`.
   * Most source files are `.fpp` (Fypp templates); CMake transpiles them to `.f90`.
 * **Fypp macros** are in `src/<subprogram>/include/`, where `<subprogram>` is `simulation`, `common`, `pre_process`, or `post_process`.
-* Only `simulation` (plus its `common` dependencies) is GPU-accelerated via **OpenACC**.
+* Only `simulation` (plus its `common` dependencies) is GPU-accelerated via **OpenACC** or **OpenMP target offload** (`--gpu acc` or `--gpu mp`). GPU code uses backend-agnostic `GPU_*` Fypp macros (in `src/common/include/parallel_macros.fpp`) that dispatch to the correct backend at compile time.
 * Code must compile with **GNU gfortran**, **NVIDIA nvfortran**, **Cray ftn**, and **Intel ifx**.
 * Precision modes: double (default), single, and mixed (`wp` = working precision, `stp` = storage precision).
 * **Python toolchain** requires **Python 3.10+** — do not suggest `from __future__` imports or other backwards-compatibility shims.
