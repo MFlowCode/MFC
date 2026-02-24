@@ -22,12 +22,15 @@ Every Fortran module follows this pattern:
 - Constants: descriptive names, not ALL_CAPS
 
 ## Forbidden Patterns
-These are caught by `./mfc.sh precheck` (source lint step 4/5):
+
+Caught by `./mfc.sh precheck` (source lint step 4/5):
 - `dsqrt`, `dexp`, `dlog`, `dble`, `dabs` → use `sqrt`, `exp`, `log`, `real(..., wp)`
 - `real(8)`, `real(4)` → use `wp` or `stp` kind parameters
+- Raw `!$acc` or `!$omp` directives → use Fypp GPU_* macros from `parallel_macros.fpp`
+
+Enforced by convention/code review (not automated):
 - `goto`, `COMMON` blocks, global `save` variables
 - `stop`, `error stop` → use `call s_mpi_abort()`
-- Raw `!$acc` or `!$omp` directives → use Fypp GPU_* macros from `parallel_macros.fpp`
 
 ## Precision Types
 - `wp` (working precision): used for computation. Double by default.

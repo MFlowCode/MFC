@@ -22,21 +22,36 @@ compiles to either OpenACC or OpenMP target offload depending on the build flag:
 - `shared_parallel_macros.fpp` — Shared helpers (collapse, private, reduction generators)
 
 ### Key GPU Macros (always use the `GPU_*` prefix)
-- `@:GPU_PARALLEL_LOOP(collapse=N, private=[...], reduction=[...], reductionOp='+')` —
+
+Inline macros (use `$:` prefix):
+- `$:GPU_PARALLEL_LOOP(collapse=N, private=[...], reduction=[...], reductionOp='+')` —
   Parallel loop over GPU threads. Most common GPU macro.
-- `@:END_GPU_PARALLEL_LOOP()` — Required closing for GPU_PARALLEL_LOOP.
-- `@:GPU_PARALLEL(code, ...)` — GPU parallel region (wraps code block).
-- `@:GPU_LOOP(collapse=N, ...)` — Inner loop within a GPU parallel region.
-- `@:GPU_DATA(code, copy=..., create=..., ...)` — Scoped data region.
-- `@:GPU_ENTER_DATA(create=[...])` — Allocate device memory (unscoped).
-- `@:GPU_EXIT_DATA(delete=[...])` — Free device memory.
-- `@:GPU_UPDATE(host=[...])` — Copy device → host (before MPI send).
-- `@:GPU_UPDATE(device=[...])` — Copy host → device (after MPI receive).
-- `@:GPU_ROUTINE(function_name=..., nohost=True/False)` — Mark routine for device.
-- `@:GPU_DECLARE(copyin=[...], link=[...])` — Declare device-resident data.
-- `@:GPU_ATOMIC(atomic='update')` — Atomic operation on device.
-- `@:GPU_WAIT()` — Synchronization barrier.
-- `@:GPU_HOST_DATA(code, use_device_addr=[...])` — Host code with device pointers.
+- `$:END_GPU_PARALLEL_LOOP()` — Required closing for GPU_PARALLEL_LOOP.
+- `$:GPU_LOOP(collapse=N, ...)` — Inner loop within a GPU parallel region.
+- `$:GPU_ENTER_DATA(create=[...])` — Allocate device memory (unscoped).
+- `$:GPU_EXIT_DATA(delete=[...])` — Free device memory.
+- `$:GPU_UPDATE(host=[...])` — Copy device → host (before MPI send).
+- `$:GPU_UPDATE(device=[...])` — Copy host → device (after MPI receive).
+- `$:GPU_ROUTINE(parallelism='[seq]')` — Mark routine for device compilation.
+- `$:GPU_DECLARE(create=[...])` — Declare device-resident data.
+- `$:GPU_ATOMIC(atomic='update')` — Atomic operation on device.
+- `$:GPU_WAIT()` — Synchronization barrier.
+
+Block macros (use `#:call`/`#:endcall`):
+- `GPU_PARALLEL(...)` — GPU parallel region wrapping a code block.
+- `GPU_DATA(copy=..., create=..., ...)` — Scoped data region.
+- `GPU_HOST_DATA(use_device_addr=[...])` — Host code with device pointers.
+
+Block macro usage:
+```
+#:call GPU_PARALLEL(copyin='[var1]', copyout='[var2]')
+  $:GPU_LOOP(collapse=N)
+  do k = 0, n; do j = 0, m
+    ! loop body
+  end do; end do
+  $:END_GPU_LOOP()
+#:endcall GPU_PARALLEL
+```
 
 NEVER write raw `!$acc` or `!$omp` directives. Always use `GPU_*` Fypp macros.
 The precheck source lint will catch raw directives and fail.
