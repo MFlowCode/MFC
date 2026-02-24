@@ -75,7 +75,7 @@ Supported systems and their slugs (full list in `toolchain/modules`):
 | Slug | System | GPU Backend | Example |
 |------|--------|-------------|---------|
 | `p` | GT Phoenix | OpenACC (nvfortran) | `source ./mfc.sh load -c p -m g` |
-| `f` | OLCF Frontier | OpenACC (Cray ftn) | `source ./mfc.sh load -c f -m g` |
+| `f` | OLCF Frontier | OpenACC/OpenMP (Cray ftn) | `source ./mfc.sh load -c f -m g` |
 | `tuo` | LLNL Tuolumne | OpenMP (Cray ftn) | `source ./mfc.sh load -c tuo -m g` |
 | `d` | NCSA Delta | OpenACC (nvfortran) | `source ./mfc.sh load -c d -m g` |
 | `b` | PSC Bridges2 | OpenACC (nvfortran) | `source ./mfc.sh load -c b -m g` |
@@ -132,7 +132,8 @@ NEVER use raw OpenACC/OpenMP pragmas (`!$acc`, `!$omp`). Use `GPU_*` Fypp macros
   Raw `#ifdef`/`#ifndef` preprocessor guards for feature/compiler/library gating ARE normal.
 NEVER use double-precision intrinsics: `dsqrt`, `dexp`, `dlog`, `dble`, `dabs`, `real(8)`, `real(4)`.
   Use generic intrinsics (`sqrt`, `exp`, `log`) and precision types (`wp`, `stp`).
-NEVER use `stop` or `error stop`. Use `call s_mpi_abort()`.
+NEVER use `d` exponent literals (`1.0d0`). Use `1.0_wp` instead.
+NEVER use `stop` or `error stop`. Use `call s_mpi_abort()` or `@:PROHIBIT()`/`@:ASSERT()`.
 NEVER use `goto`, `COMMON` blocks, or global `save` variables.
 
 Every `@:ALLOCATE(...)` MUST have a matching `@:DEALLOCATE(...)`.
@@ -153,7 +154,7 @@ Changes to `src/common/` affect ALL three executables. Test comprehensively.
 
 ## Precision System
 
-- `wp` = working precision (computation). `stp` = storage precision (I/O).
+- `wp` = working precision (computation). `stp` = storage precision (field data arrays and I/O).
 - Default: both double. Single mode: both single. Mixed: wp=double, stp=half.
 - MPI types must match: `mpi_p` ↔ `wp`, `mpi_io_p` ↔ `stp`.
 

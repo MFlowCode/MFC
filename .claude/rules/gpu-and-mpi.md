@@ -49,7 +49,6 @@ Block macro usage:
   do k = 0, n; do j = 0, m
     ! loop body
   end do; end do
-  $:END_GPU_LOOP()
 #:endcall GPU_PARALLEL
 ```
 
@@ -59,6 +58,7 @@ The precheck source lint will catch raw directives and fail.
 ### Memory Management Macros (from macros.fpp)
 - `@:ALLOCATE(var1, var2, ...)` — Fortran allocate + `GPU_ENTER_DATA(create=...)`
 - `@:DEALLOCATE(var1, var2, ...)` — `GPU_EXIT_DATA(delete=...)` + Fortran deallocate
+- `@:PREFER_GPU(var1, var2, ...)` — NVIDIA unified memory page placement hint
 - Every `@:ALLOCATE` MUST have a matching `@:DEALLOCATE` in finalization
 - Conditional allocation MUST have conditional deallocation
 
