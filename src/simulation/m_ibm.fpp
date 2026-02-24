@@ -1127,7 +1127,7 @@ contains
                                 viscous_stress_div(3, 1:3) = (viscous_stress_div_2(3, 1:3) - viscous_stress_div_1(3, 1:3))/(2._wp*dz) ! get z derivative of the second-row of viscous stress tensor
                                 local_force_contribution(1:3) = local_force_contribution(1:3) + viscous_stress_div(3, 1:3) ! add the z components of the divergence to the force
                             end if
-                            
+
                         end if
 
                         call s_cross_product(radial_vector, local_force_contribution, local_torque_contribution)
