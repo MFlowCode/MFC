@@ -1100,7 +1100,7 @@ contains
         m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
         n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
         p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
-        WP_MOK = int(storage_size(0._wp)/8, MPI_OFFSET_KIND)
+        WP_MOK = int(storage_size(0)/8, MPI_OFFSET_KIND)
         MOK = int(1._wp, MPI_OFFSET_KIND)
 
         write (file_loc, '(A)') 'ib.dat'
