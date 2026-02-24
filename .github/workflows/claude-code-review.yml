@@ -20,25 +20,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 1
-          
-      - name: Remove prior Claude review comment (so review runs again)
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          pr=${{ github.event.pull_request.number }}
-          repo=${{ github.repository }}
-      
-          # Find first issue comment whose body starts with "## Claude Code Review"
-          comment_id=$(gh api repos/$repo/issues/$pr/comments \
-            --jq '.[] | select(.body | startswith("## Claude Code Review")) | .id' | head -n 1)
-      
-          if [ -n "$comment_id" ]; then
-            echo "Deleting prior Claude review comment id=$comment_id"
-            gh api -X DELETE repos/$repo/issues/comments/$comment_id
-          else
-            echo "No prior Claude review comment found."
-          fi
-          
+
       - name: Run Claude Code Review
         id: claude-review
         uses: anthropics/claude-code-action@v1
@@ -50,22 +32,26 @@ jobs:
           plugins: 'code-review@claude-code-plugins'
 
           claude_args: >
+            --dangerouslyDisableSandbox
+            --max-turns 10
             --allowedTools
             "Bash(gh pr view:*)"
             "Bash(gh pr diff:*)"
             "Bash(gh pr comment:*)"
-            "Bash(gh api:*)"
-            "Bash(gh search code:*)"
+            "Bash(gh api repos/*/pulls/*:*)"
+            "Bash(gh api repos/*/issues/*/comments:*)"
             "Bash(cat:*)"
             "Bash(ls:*)"
             "Bash(grep:*)"
-            "Bash(python3:*)"
-            "Bash(git:*)"
+            "Bash(find:*)"
 
           prompt: |
             /code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }}
 
-            Post the results as ONE top-level PR comment titled "Claude Code Review".
+            Always use the numeric PR form with --repo, e.g.:
+            - gh pr view ${{ github.event.pull_request.number }} --repo ${{ github.repository }} ...
+            - gh pr diff ${{ github.event.pull_request.number }} --repo ${{ github.repository }} ...
+            - gh pr comment ${{ github.event.pull_request.number }} --repo ${{ github.repository }} ...
 
             Output requirements (even if no issues):
             - Start with: files changed count + list up to 15 changed file paths
@@ -74,6 +60,7 @@ jobs:
               - If issues: list them with file path + line numbers when possible
               - If no issues: list at least 3 concrete "improvement opportunities" with file paths
 
+            Post the results as ONE top-level PR comment titled "Claude Code Review".
             If you cannot access the diff/files, say exactly what is blocked.
             If posting a PR comment is blocked, write the full review to the GitHub Actions job summary instead.
 
