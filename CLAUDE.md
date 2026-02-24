@@ -3,7 +3,8 @@
 MFC is an exascale multi-physics CFD solver written in modern Fortran 2008+ with Fypp
 preprocessing. It has three executables (pre_process, simulation, post_process), a Python
 toolchain for building/running/testing, and supports GPU acceleration via OpenACC and
-OpenMP target offload. It must compile with gfortran, nvfortran, Cray ftn, and Intel ifx.
+OpenMP target offload. It must compile with gfortran, nvfortran, Cray ftn, and Intel ifx (CI-gated).
+AMD flang is additionally supported for OpenMP target offload GPU builds.
 
 ## Commands
 
@@ -167,4 +168,4 @@ When reviewing PRs, prioritize in this order:
 4. MPI correctness (halo exchange, buffer sizing, GPU_UPDATE calls)
 5. GPU code (GPU_* Fypp macros only, no raw pragmas)
 6. Physics consistency (pressure formula matches model_eqns)
-7. Compiler portability (all four compilers)
+7. Compiler portability (4 CI-gated compilers + AMD flang for GPU)

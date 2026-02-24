@@ -36,10 +36,10 @@
 - Boundary condition symmetry requirements must be maintained
 
 ## Compiler-Specific Issues
-- Code must compile on gfortran, nvfortran, Cray ftn, and Intel ifx
+- CI-gated compilers (must always pass): gfortran, nvfortran, Cray ftn, and Intel ifx
+- AMD flang is additionally supported for `--gpu mp` builds but not in the CI matrix
 - Each compiler has different strictness levels and warning behavior
 - Fypp macros must expand correctly for both GPU and CPU builds
-- GPU builds only work with nvfortran, Cray ftn, and AMD flang
 
 ## Test System
 - Tests are generated **programmatically** in `toolchain/mfc/test/cases.py`, not standalone files
