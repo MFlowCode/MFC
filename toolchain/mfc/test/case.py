@@ -146,6 +146,12 @@ class TestCase(case.Case):
     def run_restart(self, targets, gpus):
         """Run a restart roundtrip: simulate to midpoint, then restart to end."""
         mid_step = (self.params['t_step_start'] + self.params['t_step_stop']) // 2
+        if mid_step <= self.params['t_step_start']:
+            raise common.MFCException(
+                f"run_restart: t_step_stop ({self.params['t_step_stop']}) is too close "
+                f"to t_step_start ({self.params['t_step_start']}) for a restart roundtrip "
+                f"(need t_step_stop - t_step_start >= 2)."
+            )
         orig = dict(self.params)
 
         try:
