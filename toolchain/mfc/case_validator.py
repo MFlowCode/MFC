@@ -1042,7 +1042,7 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
                      "Hyperbolic cleaning requires mhd to be enabled")
         self.prohibit(hyper_cleaning and n is not None and n == 0,
                      "Hyperbolic cleaning is not supported for 1D simulations")
-        self.prohibit(hyper_cleaning and p is not None and p == 0,
+        self.prohibit(hyper_cleaning and n is not None and n > 0 and p is not None and p == 0,
                      "Hyperbolic cleaning is not supported for 2D simulations")
 
 
