@@ -136,10 +136,11 @@ NEVER use `stop` or `error stop`. Use `call s_mpi_abort()`.
 NEVER use `goto`, `COMMON` blocks, or global `save` variables.
 
 Every `@:ALLOCATE(...)` MUST have a matching `@:DEALLOCATE(...)`.
-Every new parameter MUST be added in 3 places:
+Every new parameter MUST be added in 4 places:
   1. `toolchain/mfc/params/definitions.py` (parameter definition)
-  2. Fortran namelist in `src/*/m_start_up.fpp` (namelist binding)
-  3. `toolchain/mfc/case_validator.py` (if constraints exist)
+  2. Fortran variable declaration in `src/*/m_global_parameters.fpp`
+  3. Fortran namelist in `src/*/m_start_up.fpp` (namelist binding)
+  4. `toolchain/mfc/case_validator.py` (if constraints exist)
 
 Changes to `src/common/` affect ALL three executables. Test comprehensively.
 
