@@ -71,7 +71,8 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
     cons.print(f"[bold]Format:[/bold] {fmt}")
 
     # Quick guide when no action is specified
-    if not ARG('list_steps') and not ARG('list_vars') and ARG('var') is None:
+    if not ARG('list_steps') and not ARG('list_vars') and ARG('var') is None \
+            and not ARG('interactive'):
         cons.print()
         d = case_dir
         cons.print("[bold]Quick start:[/bold]")
@@ -141,7 +142,7 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
     varname = ARG('var')
     step_arg = ARG('step')
 
-    if varname is None:
+    if varname is None and not ARG('interactive'):
         raise MFCException("--var is required for rendering. "
                            "Use --list-vars to see available variables.")
 
@@ -190,31 +191,30 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
     if slice_value is not None:
         render_opts['slice_value'] = float(slice_value)
 
-    # Choose read function based on format
+    interactive = ARG('interactive')
+
+    # Interactive mode always loads all variables (user can switch in UI).
+    # Non-interactive mode can filter to just the requested variable for speed.
     def read_step(step):
         if fmt == 'silo':
             from .silo_reader import assemble_silo  # pylint: disable=import-outside-toplevel
-            return assemble_silo(case_dir, step, var=varname)
-        return assemble(case_dir, step, fmt, var=varname)
+            return assemble_silo(case_dir, step, var=None if interactive else varname)
+        return assemble(case_dir, step, fmt, var=None if interactive else varname)
 
-    # Validate variable name by reading the first timestep (without var filter)
-    def read_step_all_vars(step):
-        if fmt == 'silo':
-            from .silo_reader import assemble_silo  # pylint: disable=import-outside-toplevel
-            return assemble_silo(case_dir, step)
-        return assemble(case_dir, step, fmt)
-
-    test_assembled = read_step_all_vars(requested_steps[0])
-    if varname not in test_assembled.variables:
-        avail = sorted(test_assembled.variables.keys())
+    # Validate variable name / discover available variables
+    test_assembled = read_step(requested_steps[0])
+    avail = sorted(test_assembled.variables.keys())
+    if not interactive and varname not in test_assembled.variables:
         raise MFCException(f"Variable '{varname}' not found. "
                            f"Available variables: {', '.join(avail)}")
 
     # Interactive mode — launch Dash web server
-    if ARG('interactive'):
+    if interactive:
         from .interactive import run_interactive  # pylint: disable=import-outside-toplevel
         port = ARG('port') or 8050
-        run_interactive(varname, requested_steps, read_step, port=int(port))
+        # Default to first available variable if --var was not specified
+        init_var = varname if varname in avail else (avail[0] if avail else None)
+        run_interactive(init_var, requested_steps, read_step, port=int(port))
         return
 
     # Create output directory

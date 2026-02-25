@@ -208,15 +208,15 @@ def run_interactive(  # pylint: disable=too-many-locals,too-many-statements
         suppress_callback_exceptions=True,
     )
 
-    # Load first step to know dimensionality and initial range
+    # Load first step to know dimensionality and available variables
     init = _load(steps[0], read_func)
     ndim = init.ndim
-    d0 = init.variables[varname]
-    pos0 = d0[d0 > 0] if np.any(d0 > 0) else d0
-    init_min = float(np.nanmin(pos0))
-    init_max = float(np.nanmax(d0))
+    all_varnames = sorted(init.variables.keys())
+    if varname not in all_varnames:
+        varname = all_varnames[0] if all_varnames else varname
 
     step_opts = [{'label': str(s), 'value': s} for s in steps]
+    var_opts  = [{'label': v, 'value': v} for v in all_varnames]
     cmap_opts = [{'label': c, 'value': c} for c in _CMAPS]
 
     if ndim == 3:
@@ -241,8 +241,17 @@ def run_interactive(  # pylint: disable=too-many-locals,too-many-statements
             'fontSize': '16px', 'fontWeight': 'bold', 'color': _ACCENT,
         }),
         html.Div(
-            f'var: {varname}  ·  {ndim}D  ·  {len(steps)} step{"s" if len(steps) != 1 else ""}',
+            f'{ndim}D  ·  {len(steps)} step{"s" if len(steps) != 1 else ""}',
             style={'fontSize': '11px', 'color': _MUTED},
+        ),
+
+        # ── Variable ──────────────────────────────────────────────────
+        _section('Variable',
+            dcc.Dropdown(
+                id='var-sel', options=var_opts, value=varname, clearable=False,
+                style={'fontSize': '12px', 'backgroundColor': _OVER,
+                       'border': f'1px solid {_BORD}'},
+            ),
         ),
 
         # ── Timestep ──────────────────────────────────────────────────
@@ -454,14 +463,16 @@ def run_interactive(  # pylint: disable=too-many-locals,too-many-statements
         Output('vmin-inp', 'value'),
         Output('vmax-inp', 'value'),
         Input('reset-btn', 'n_clicks'),
+        Input('var-sel',   'value'),
         prevent_initial_call=True,
     )
-    def _reset_range(_):
+    def _reset_range(_reset, _var):
         return None, None
 
     @app.callback(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,too-many-branches,too-many-statements
         Output('viz-graph',  'figure'),
         Output('status-bar', 'children'),
+        Input('var-sel',     'value'),
         Input('step-sel',    'value'),
         Input('mode-sel',    'value'),
         Input('slice-axis',  'value'),
@@ -479,14 +490,15 @@ def run_interactive(  # pylint: disable=too-many-locals,too-many-statements
         Input('vmin-inp',    'value'),
         Input('vmax-inp',    'value'),
     )
-    def _update(step, mode,
+    def _update(var_sel, step, mode,
                 slice_axis, slice_pos,
                 iso_min_frac, iso_max_frac, iso_n, iso_caps,
                 vol_opacity, vol_nsurf, vol_min_frac, vol_max_frac,
                 cmap, log_chk, vmin_in, vmax_in):
 
+        selected_var = var_sel or varname
         ad  = _load(step, read_func)
-        raw = ad.variables[varname]
+        raw = ad.variables[selected_var]
         log = bool(log_chk and 'log' in log_chk)
         cmap = cmap or 'viridis'
 
@@ -508,18 +520,18 @@ def run_interactive(  # pylint: disable=too-many-locals,too-many-statements
                 return np.where(arr > 0, np.log10(np.maximum(arr, 1e-300)), np.nan)
             cmin = float(np.log10(max(vmin, 1e-300)))
             cmax = float(np.log10(max(vmax, 1e-300)))
-            cbar_title = f'log\u2081\u2080({varname})'
+            cbar_title = f'log\u2081\u2080({selected_var})'
         else:
             def _tf(arr): return arr
             cmin, cmax = vmin, vmax
-            cbar_title = varname
+            cbar_title = selected_var
 
         fig = go.Figure()
         title = ''
 
         if ad.ndim == 3:
             trace, title = _build_3d(
-                ad, raw, varname, step, mode, cmap, _tf, cmin, cmax, cbar_title,
+                ad, raw, selected_var, step, mode, cmap, _tf, cmin, cmax, cbar_title,
                 slice_axis or 'z', float(slice_pos or 0.5),
                 float(iso_min_frac or 0.2), float(iso_max_frac or 0.8),
                 int(iso_n or 3), bool(iso_caps and 'caps' in iso_caps),
@@ -557,13 +569,13 @@ def run_interactive(  # pylint: disable=too-many-locals,too-many-statements
                 yaxis=dict(title='y', color=_TEXT, gridcolor=_OVER),
                 plot_bgcolor=_BG,
             )
-            title = f'{varname}  ·  step {step}'
+            title = f'{selected_var}  ·  step {step}'
 
         else:                            # 1D
             plot_y = _tf(raw) if log else raw
             fig.add_trace(go.Scatter(
                 x=ad.x_cc, y=plot_y, mode='lines',
-                line=dict(color=_ACCENT, width=2), name=varname,
+                line=dict(color=_ACCENT, width=2), name=selected_var,
             ))
             fig.update_layout(
                 xaxis=dict(title='x', color=_TEXT, gridcolor=_OVER),
@@ -571,7 +583,7 @@ def run_interactive(  # pylint: disable=too-many-locals,too-many-statements
                            range=[cmin, cmax] if (vmin_in or vmax_in) else None),
                 plot_bgcolor=_BG,
             )
-            title = f'{varname}  ·  step {step}'
+            title = f'{selected_var}  ·  step {step}'
 
         fig.update_layout(
             title=dict(text=title, font=dict(color=_TEXT, size=13, family='monospace')),
