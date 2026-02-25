@@ -28,7 +28,7 @@ jobs:
 
   self:
     name: "${{ matrix.name }} (${{ matrix.device }}${{ matrix.interface != 'none' && format('-{0}', matrix.interface) || '' }})"
-    if: ${{ github.repository=='MFlowCode/MFC' && needs.file-changes.outputs.checkall=='true' && ((github.event_name=='pull_request_review' && github.event.review.state=='approved') || (github.event_name=='pull_request' && (github.event.pull_request.user.login=='sbryngelson' || github.event.pull_request.user.login=='wilfonba')) || github.event_name=='workflow_dispatch') }}
+    if: ${{ github.repository=='MFlowCode/MFC' && needs.file-changes.outputs.checkall=='true' && github.event.pull_request.draft != true && ((github.event_name=='pull_request_review' && github.event.review.state=='approved') || (github.event_name=='pull_request' && (github.event.pull_request.user.login=='sbryngelson' || github.event.pull_request.user.login=='wilfonba')) || github.event_name=='workflow_dispatch') }}
     needs: file-changes
     strategy:
       fail-fast: false

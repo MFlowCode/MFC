@@ -10,68 +10,78 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-      issues: read
+      issues: write
       actions: read
       id-token: write
 
     steps:
-      - name: Checkout PR head (fork)
+      - name: Checkout base repo (safe)
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 1
-
+          
+      - name: Ensure ~/.local/bin exists and is on PATH
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          
       - name: Run Claude Code Review
-        id: claude-review
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ github.token }}
 
-          plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
-          plugins: 'code-review@claude-code-plugins'
+          plugin_marketplaces: "https://github.com/anthropics/claude-code.git"
+          plugins: "code-review@claude-code-plugins"
+
+          show_full_output: true
 
           claude_args: >
-            --dangerouslyDisableSandbox
-            --max-turns 10
+            --dangerously-skip-permissions
+            --max-turns 60
             --allowedTools
-            "Bash(gh pr view:*)"
-            "Bash(gh pr diff:*)"
-            "Bash(gh pr comment:*)"
-            "Bash(gh api repos/*/pulls/*:*)"
-            "Bash(gh api repos/*/issues/*/comments:*)"
+            "Bash(gh:*)"
             "Bash(cat:*)"
             "Bash(ls:*)"
             "Bash(grep:*)"
-            "Bash(find:*)"
+            "Bash(sed:*)"
+            "Bash(awk:*)"
+            "Bash(head:*)"
+            "Bash(tail:*)"
+            "Bash(wc:*)"
+            "Bash(sort:*)"
+            "Bash(uniq:*)"
+            "Bash(cut:*)"
+            "Bash(xargs:*)"
+            "Bash(jq:*)"
+            "Bash(python3:*)"
 
           prompt: |
-            /code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }}
+            You are running in pull_request_target. DO NOT execute or inspect PR fork code.
+            Review ONLY via GitHub API/gh commands.
 
-            Always use the numeric PR form with --repo, e.g.:
-            - gh pr view ${{ github.event.pull_request.number }} --repo ${{ github.repository }} ...
-            - gh pr diff ${{ github.event.pull_request.number }} --repo ${{ github.repository }} ...
-            - gh pr comment ${{ github.event.pull_request.number }} --repo ${{ github.repository }} ...
+            Read local guidance ONLY from:
+            - CLAUDE.md (root) if present
+            - .claude/rules/*.md if present
+            Do NOT read any other workspace files.
 
-            Output requirements (even if no issues):
-            - Start with: files changed count + list up to 15 changed file paths
-            - Then: a short summary of what the PR changes (3–6 bullets)
-            - Then: findings:
-              - If issues: list them with file path + line numbers when possible
-              - If no issues: list at least 3 concrete "improvement opportunities" with file paths
+            Keep tool calls minimal:
+            1) ls .claude/rules || true
+            2) If CLAUDE.md exists: cat CLAUDE.md
+            3) If .claude/rules exists: cat each .md file directly (no loops; at most 10 files)
+            4) gh pr view ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --json title,body,files,changedFiles,additions,deletions,headRefOid
+            5) gh pr diff ${{ github.event.pull_request.number }} --repo ${{ github.repository }}
+            6) Post ONE top-level comment.
 
-            Post the results as ONE top-level PR comment titled "Claude Code Review".
-            If you cannot access the diff/files, say exactly what is blocked.
-            If posting a PR comment is blocked, write the full review to the GitHub Actions job summary instead.
+            Output format:
+            - Head SHA
+            - Files changed count + list up to 10 file paths
+            - Summary (3–6 bullets)
+            - Findings with file + line numbers when possible
+            - If no issues: 0–3 improvement opportunities (only if confident)
 
-            IMPORTANT:
-            - Do NOT stop just because a previous "Claude Code Review" comment exists.
-            - If a prior Claude review exists, post a NEW comment titled "Claude Code Review (updated)" that includes:
-              - current head SHA: ${{ github.event.pull_request.head.sha }}
-              - files changed count + up to 15 file paths
-              - 3–6 bullet summary of changes
-              - findings or at least 3 improvement opportunities with file paths
-            Post as ONE top-level PR comment.
+            Post ONE top-level PR comment titled "Claude Code Review".
+            Then stop.
 
           additional_permissions: |
             actions: read

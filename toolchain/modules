@@ -57,9 +57,9 @@ tuo-gpu craype-accel-amd-gfx942
 tuo-gpu HSA_XNACK=0
 
 d     NCSA Delta
-d-all python/3.11.6
+d-all python
 d-cpu gcc/11.4.0 openmpi
-d-gpu nvhpc/24.1 cuda/12.3.0 openmpi/4.1.5+cuda cmake
+d-gpu PrgEnv-nvidia/8.6.0
 d-gpu CC=nvc CXX=nvc++ FC=nvfortran
 d-gpu MFC_CUDA_CC=80,86
 
