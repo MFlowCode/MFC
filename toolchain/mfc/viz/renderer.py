@@ -242,6 +242,7 @@ def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-argum
             output,
             [imageio.imread(os.path.join(viz_dir, fname)) for fname in frame_files],
             fps=fps, codec='libx264', pixelformat='yuv420p', macro_block_size=2,
+            ffmpeg_log_level='error',
         )
         success = True
     except (OSError, ValueError, RuntimeError) as exc:
