@@ -280,10 +280,8 @@ contains
                                 A = (B/cosh(ic_beta) - 1._wp)/tanh(ic_beta)
 
                                 ! Save original density ratios before THINC overwrites them
-                                rho_b = vL_rs_vf_${XYZ}$ (j, k, l, contxb)/ &
-                                        max(vL_rs_vf_${XYZ}$ (j, k, l, advxb), sgm_eps)
-                                rho_e = vL_rs_vf_${XYZ}$ (j, k, l, contxe)/ &
-                                        max(1._wp - vL_rs_vf_${XYZ}$ (j, k, l, advxb), sgm_eps)
+                                rho_b = vL_rs_vf_${XYZ}$ (j, k, l, contxb)/vL_rs_vf_${XYZ}$ (j, k, l, advxb)
+                                rho_e = vL_rs_vf_${XYZ}$ (j, k, l, contxe)/(1._wp - vL_rs_vf_${XYZ}$ (j, k, l, advxb))
 
                                 ! Left reconstruction
                                 aTHINC = qmin + 5e-1_wp*qmax*(1._wp + sign*A)
