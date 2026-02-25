@@ -59,7 +59,7 @@ contains
         logical :: celloutside
         real(wp) :: fp_x, fp_y, fp_z, vp_x, vp_y, vp_z
 
-        real(wp) :: rc, r2, weight, alpha_cut, vol_frac, g, chardist
+        real(wp) :: rc, r2, weight, g, chardist
         integer :: d
         integer :: ncx, ncy, ncz, ix, jy, kz
 
@@ -86,17 +86,8 @@ contains
             end if
 
             !< Characteristic cell length
-            chardist = sqrt(dx(cell(1))*dy(cell(2)))
-            if (num_dims == 3) chardist = (dx(cell(1))*dy(cell(2))*dz(cell(3)))**(1._wp/3._wp)
-
-            vol_frac = volpart/Vol
-
-            ! !< Update void fraction field
-            ! addFun1 = vol_frac
-            ! $:GPU_ATOMIC(atomic='update')
-            ! updatedvar(1)%sf(cell(1), cell(2), cell(3)) = &
-            !     updatedvar(1)%sf(cell(1), cell(2), cell(3)) &
-            !     + real(addFun1, kind=stp)
+            chardist = max(dx(cell(1)), dy(cell(2)))
+            if (num_dims == 3) chardist = max(dx(cell(1)), dy(cell(2)), dz(cell(3)))
 
             fp_x = -lbk_f_p(l, 1)
             fp_y = -lbk_f_p(l, 2)
@@ -107,15 +98,12 @@ contains
             vp_z = lbk_vel(l, 3, 2)
 
             sigma = lag_params%epsilonb*chardist
-            ! sigma = max(sigma, 0.5_wp * chardist)
 
-            ! alpha_cut = 1.e-4_wp
             rc = sigma
-            ! rc = sigma * sqrt(-2.0_wp*log(alpha_cut))
-            ncx = max(1, int(rc/dx(cell(1)))) !min(3,ceiling(rc/dx(cell(1))))
-            ncy = max(1, int(rc/dx(cell(1)))) !ceiling(rc/dy(cell(2))) !min(3,ceiling(rc/dy(cell(2))))
+            ncx = max(1, nint(rc/dx(cell(1))))
+            ncy = max(1, nint(rc/dy(cell(2))))
             ncz = 0
-            if (num_dims == 3) ncz = max(1, int(rc/dx(cell(1)))) !ceiling(rc/dz(cell(3))) !min(3,ceiling(rc/dz(cell(3)))) !p
+            if (num_dims == 3) ncz = max(1, nint(rc/dz(cell(3))))
 
             i = cell(1)
             j = cell(2)
