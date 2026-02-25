@@ -98,7 +98,6 @@ benchmarks/*.png
 
 *.mod
 
-# Video Files
 *.mp4
 *.mov
 *.mkv
