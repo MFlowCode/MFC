@@ -24,7 +24,11 @@ module m_model
 
     ! Subroutines for STL immersed boundaries
     public :: s_check_boundary, s_register_edge, f_model_is_inside_flat, &
-              s_distance_normals_3D, s_distance_normals_2D, s_instantiate_STL_models, s_pack_model_for_gpu
+              s_distance_normals_3D, s_distance_normals_2D, s_pack_model_for_gpu
+
+#ifdef MFC_SIMULATION
+    public :: s_instantiate_STL_models
+#endif
 
     !! array of STL models that can be allocated and then used in IB marker and levelset compute
     type(t_model_array), allocatable, target :: models(:)
