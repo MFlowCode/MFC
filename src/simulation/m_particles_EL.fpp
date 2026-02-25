@@ -67,6 +67,9 @@ module m_particles_EL
     !< Projection of the lagrangian particles in the Eulerian framework
     type(scalar_field), dimension(:), allocatable :: q_particles
     integer :: q_particles_idx                     !< Size of the q vector field for particle cell (q)uantities
+    integer, parameter :: alphap_upx_id = 6 !< x particle momentum index
+    integer, parameter :: alphap_upy_id = 7 !< y particle momentum index
+    integer, parameter :: alphap_upz_id = 8 !< z particle momentum index
 
     type(scalar_field), dimension(:), allocatable :: field_vars !< For cell quantities (field gradients, etc.)
     integer, parameter :: dPx_id = 1 !< Spatial pressure gradient in x, y, and z
@@ -78,9 +81,27 @@ module m_particles_EL
     integer, parameter :: dRhoux_id = 7 !< Spatial momentum flux gradient in x, y, and z
     integer, parameter :: dRhouy_id = 8
     integer, parameter :: dRhouz_id = 9
-    integer, parameter :: nField_vars = 9
+    integer, parameter :: dalphafx_id = 10 !< Spatial volume fraction gradient in x, y, and z
+    integer, parameter :: dalphafy_id = 11
+    integer, parameter :: dalphafz_id = 12
+    integer, parameter :: dalphap_upx_id = 13 !< Spatial particle momentum gradient in x, y, and z
+    integer, parameter :: dalphap_upy_id = 14
+    integer, parameter :: dalphap_upz_id = 15
+    integer, parameter :: nField_vars = 15
+
+    type(scalar_field), dimension(:), allocatable :: weights_x_interp !< For precomputing weights
+    type(scalar_field), dimension(:), allocatable :: weights_y_interp !< For precomputing weights
+    type(scalar_field), dimension(:), allocatable :: weights_z_interp !< For precomputing weights
+    integer :: nWeights_interp
+
+    type(scalar_field), dimension(:), allocatable :: weights_x_grad !< For precomputing weights
+    type(scalar_field), dimension(:), allocatable :: weights_y_grad !< For precomputing weights
+    type(scalar_field), dimension(:), allocatable :: weights_z_grad !< For precomputing weights
+    integer :: nWeights_grad
 
     $:GPU_DECLARE(create='[Rmax_glb,Rmin_glb,q_particles,q_particles_idx,field_vars]')
+    $:GPU_DECLARE(create='[weights_x_interp,weights_y_interp,weights_z_interp,nWeights_interp]')
+    $:GPU_DECLARE(create='[weights_x_grad,weights_y_grad,weights_z_grad,nWeights_grad]')
 
     !Particle Source terms for fluid coupling
     real(wp), allocatable, dimension(:, :) :: f_p !< force on each particle
@@ -103,7 +124,7 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
 
-        integer :: nParticles_glb, i, j, k, nf, l
+        integer :: nParticles_glb, i, j, k, nf, l, npts
 
         !PRIM TO CONS VARIABLES
         real(wp) :: dyn_pres, pi_inf, qv, gamma, pres, T
@@ -120,16 +141,16 @@ contains
         ! Allocate space for the Eulerian fields needed to map the effect of the particles
         if (lag_params%solver_approach == 1) then
             ! One-way coupling
-            q_particles_idx = 1 + 1 !For tracking volume fraction and old volume fraction
+            q_particles_idx = 1 !For tracking volume fraction
         elseif (lag_params%solver_approach == 2) then
-            ! Two-way coupling
-            q_particles_idx = 4 + 1 !For tracking volume fraction, x-mom, y-mom, and energy sources
-            if (p > 0) then
-                q_particles_idx = 5 + 1 !For tracking volume fraction, x-mom, y-mom, z-mom, and energy sources
-            end if
+            !Two-way coupling
+            q_particles_idx = 8 !For tracking volume fraction(1), x-mom(2), y-mom(3), z-mom(4), and energy(5) sources, and alpha_p u_p (x(6),y(7),z(8))
         else
             call s_mpi_abort('Please check the lag_params%solver_approach input')
         end if
+
+        nWeights_interp = lag_params%interpolation_order + 1
+        nWeights_grad = fd_order + 1
 
         pcomm_coords(1)%beg = x_cb(-1)
         pcomm_coords(1)%end = x_cb(m)
@@ -161,6 +182,42 @@ contains
                 idwbuff(2)%beg:idwbuff(2)%end, &
                 idwbuff(3)%beg:idwbuff(3)%end))
             @:ACC_SETUP_SFs(field_vars(i))
+        end do
+
+        @:ALLOCATE(weights_x_interp(1:nWeights_interp))
+        do i = 1, nWeights_interp
+            @:ALLOCATE(weights_x_interp(i)%sf(idwbuff(1)%beg:idwbuff(1)%end,1:1,1:1))
+            @:ACC_SETUP_SFs(weights_x_interp(i))
+        end do
+
+        @:ALLOCATE(weights_y_interp(1:nWeights_interp))
+        do i = 1, nWeights_interp
+            @:ALLOCATE(weights_y_interp(i)%sf(idwbuff(2)%beg:idwbuff(2)%end,1:1,1:1))
+            @:ACC_SETUP_SFs(weights_y_interp(i))
+        end do
+
+        @:ALLOCATE(weights_z_interp(1:nWeights_interp))
+        do i = 1, nWeights_interp
+            @:ALLOCATE(weights_z_interp(i)%sf(idwbuff(3)%beg:idwbuff(3)%end,1:1,1:1))
+            @:ACC_SETUP_SFs(weights_z_interp(i))
+        end do
+
+        @:ALLOCATE(weights_x_grad(1:nWeights_grad))
+        do i = 1, nWeights_grad
+            @:ALLOCATE(weights_x_grad(i)%sf(idwbuff(1)%beg:idwbuff(1)%end,1:1,1:1))
+            @:ACC_SETUP_SFs(weights_x_grad(i))
+        end do
+
+        @:ALLOCATE(weights_y_grad(1:nWeights_grad))
+        do i = 1, nWeights_grad
+            @:ALLOCATE(weights_y_grad(i)%sf(idwbuff(2)%beg:idwbuff(2)%end,1:1,1:1))
+            @:ACC_SETUP_SFs(weights_y_grad(i))
+        end do
+
+        @:ALLOCATE(weights_z_grad(1:nWeights_grad))
+        do i = 1, nWeights_grad
+            @:ALLOCATE(weights_z_grad(i)%sf(idwbuff(3)%beg:idwbuff(3)%end,1:1,1:1))
+            @:ACC_SETUP_SFs(weights_z_grad(i))
         end do
 
         ! Allocating space for lagrangian variables
@@ -205,6 +262,12 @@ contains
             & lag_gravity_force, lag_vel_model, lag_drag_model]')
 
         call s_read_input_particles(q_cons_vf)
+
+        npts = (nWeights_interp - 1)/2
+        call s_compute_barycentric_weights(npts) !For interpolation
+
+        npts = (nWeights_grad - 1)/2
+        call s_compute_fornberg_fd_weights(npts) !For finite differences
 
         !> Correcting initial conditions
         $:GPU_PARALLEL_LOOP(private='[i,j,k,dyn_pres,fluid_vel,rho_f,alpharho,rhou,alpharhou]', collapse=3, copyin = '[pi_inf, qv, gamma, rhoYks]')
@@ -254,11 +317,10 @@ contains
         real(wp) :: qtime
         integer :: id, particle_id, save_count
         integer :: i, ios
-        logical :: file_exist, indomain, init_old
+        logical :: file_exist, indomain
         integer, dimension(3) :: cell
 
         character(LEN=path_len + 2*name_len) :: path_D_dir !<
-        init_old = .true.
 
         ! Initialize number of particles
         particle_id = 0
@@ -330,7 +392,7 @@ contains
 
         !Populate temporal variables
         call s_transfer_data_to_tmp_particles()
-        call s_smear_particle_sources(init_old)
+        call s_smear_particle_sources()
 
         if (save_count == 0) then
             ! Create ./D directory
@@ -608,14 +670,14 @@ contains
 
         if (lag_params%pressure_force .or. lag_params%added_mass_model > 0) then
             do l = 1, num_dims
-                call s_gradient_dir(q_prim_vf(E_idx)%sf, field_vars(dPx_id + l - 1)%sf, l)
+                call s_gradient_dir_fornberg(q_prim_vf(E_idx)%sf, field_vars(dPx_id + l - 1)%sf, l)
             end do
         end if
 
         if (lag_params%added_mass_model > 0) then
             do l = 1, num_dims
-                call s_gradient_dir(q_prim_vf(1)%sf, field_vars(dRhox_id + l - 1)%sf, l)
-                call s_gradient_dir(q_cons_vf(momxb + l - 1)%sf, field_vars(dRhoux_id + l - 1)%sf, l)
+                call s_gradient_dir_fornberg(q_prim_vf(1)%sf, field_vars(dRhox_id + l - 1)%sf, l)
+                call s_gradient_dir_fornberg(q_cons_vf(momxb + l - 1)%sf, field_vars(dRhoux_id + l - 1)%sf, l)
             end do
         end if
 
@@ -646,7 +708,8 @@ contains
             particle_draddt(k, stage) = 0._wp
 
             call s_get_particle_force(myPos, myR, myVel, myMass, myRe, myGamma, myVolumeFrac, cell, &
-                                      q_prim_vf, field_vars, force_vec, rmass_add)
+                                      q_prim_vf, field_vars, weights_x_interp, weights_y_interp, weights_z_interp, &
+                                      force_vec, rmass_add)
 
             f_p(k, :) = force_vec(:)
 
@@ -679,79 +742,79 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
 
         integer :: i, j, k, l, nf, stage
-        real(wp) :: dalphapdt, dt_loc, alpha_p, alpha_p_old, alpha_f
-        logical :: init_old = .false.
+        real(wp) :: dalphapdt, alpha_f, udot_gradalpha
 
-        call s_smear_particle_sources(init_old) !To fill in q_particles with volume fraction and source term contributions
+        call s_smear_particle_sources() !To fill in q_particles with volume fraction and source term contributions
 
-        if (lag_num_ts == 1) then
-            dt_loc = dt
+        !Spatial derivative of the fluid volume fraction. q_particles(1) is fluid volume fraction.
+        do l = 1, num_dims
+            call s_gradient_dir_fornberg(q_particles(1)%sf, field_vars(dalphafx_id + l - 1)%sf, l)
+        end do
 
-        elseif (lag_num_ts == 2) then
-            if (stage == 1) then
-                dt_loc = dt
-            elseif (stage == 2) then
-                dt_loc = dt/2._wp
-            end if
-
-        elseif (lag_num_ts == 3) then
-            if (stage == 1) then
-                dt_loc = dt
-            elseif (stage == 2) then
-                dt_loc = dt/4._wp
-            elseif (stage == 3) then
-                dt_loc = (2._wp/3._wp)*dt
-            end if
-
-        end if
+        !Spatial derivative of the eulerian particle momentum. q_particles(-3:-1) is alpha_p u_p components
+        do l = 1, num_dims
+            call s_gradient_dir_fornberg(q_particles(alphap_upx_id + l - 1)%sf, field_vars(dalphap_upx_id + l - 1)%sf, l)
+        end do
 
         !> Apply particle sources to the Eulerian RHS
-        $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3, copyin='[dt_loc]')
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,alpha_f,dalphapdt,udot_gradalpha]', collapse=3, copyin='[dalphap_upx_id,dalphafx_id]')
         do k = idwint(3)%beg, idwint(3)%end
             do j = idwint(2)%beg, idwint(2)%end
                 do i = idwint(1)%beg, idwint(1)%end
                     if (q_particles(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
 
-                        alpha_p = 1._wp - q_particles(1)%sf(i, j, k) !This is at time n
-                        alpha_p_old = 1._wp - q_particles(q_particles_idx)%sf(i, j, k) !This is at time n-1
-                        alpha_f = q_particles(1)%sf(i, j, k) !This is at time n
-                        dalphapdt = (alpha_p - alpha_p_old)/dt_loc
+                        alpha_f = q_particles(1)%sf(i, j, k)
 
-                        do l = 1, E_idx
-                            rhs_vf(l)%sf(i, j, k) = (1._wp/alpha_f)* &
-                                                    (rhs_vf(l)%sf(i, j, k) - q_cons_vf(l)%sf(i, j, k)*dalphapdt)
-
+                        dalphapdt = 0
+                        do l = 1, num_dims
+                            dalphapdt = dalphapdt + field_vars(dalphap_upx_id + l - 1)%sf(i, j, k)
                         end do
+                        dalphapdt = -dalphapdt
+                        !Add any contribution to dalphapdt from particles growing or shrinking
+
+                        udot_gradalpha = 0._wp
+                        do l = 1, num_dims
+                            udot_gradalpha = udot_gradalpha + q_prim_vf(momxb + l - 1)%sf(i, j, k)*field_vars(dalphafx_id + l - 1)%sf(i, j, k)
+                        end do
+
+                        !> Step 1: Source terms for volume fraction corrections
+                        !cons_var/alpha_f * (dalpha_p/dt - u dot grad(alpha_f))
+                        do l = 1, E_idx
+                            rhs_vf(l)%sf(i, j, k) = rhs_vf(l)%sf(i, j, k) + &
+                                                    (q_cons_vf(l)%sf(i, j, k)/alpha_f)*(dalphapdt - udot_gradalpha)
+                        end do
+
+                        !momentum term -1/alpha_f * (p*grad(alpha_f) - Tau^v dot grad(alpha_f)) !Viscous term not implemented
+                        do l = 1, num_dims
+                            rhs_vf(momxb + l - 1)%sf(i, j, k) = rhs_vf(momxb + l - 1)%sf(i, j, k) - &
+                                                                ((1._wp/alpha_f)* &
+                                                                 (q_prim_vf(E_idx)%sf(i, j, k)*field_vars(dalphafx_id + l - 1)%sf(i, j, k)))
+                        end do
+
+                        !energy term -1/alpha_f * (p*u dot grad(alpha_f) - (Tau^v dot u) dot grad(alpha_f)) !Viscous term not implemented
+                        rhs_vf(E_idx)%sf(i, j, k) = rhs_vf(E_idx)%sf(i, j, k) - &
+                                                    ((1._wp/alpha_f)* &
+                                                     (q_prim_vf(E_idx)%sf(i, j, k)*udot_gradalpha))
+
+                        !> Step 2: Add the drag/pressure/added mass forces to the fluid
 
                         rhs_vf(momxb)%sf(i, j, k) = rhs_vf(momxb)%sf(i, j, k) + q_particles(2)%sf(i, j, k)*(1._wp/alpha_f)
                         rhs_vf(momxb + 1)%sf(i, j, k) = rhs_vf(momxb + 1)%sf(i, j, k) + q_particles(3)%sf(i, j, k)*(1._wp/alpha_f)
+
+                        ! Energy source
+                        rhs_vf(E_idx)%sf(i, j, k) = rhs_vf(E_idx)%sf(i, j, k) + &
+                                                    (q_particles(2)%sf(i, j, k)*q_prim_vf(momxb)%sf(i, j, k) &
+                                                     + q_particles(3)%sf(i, j, k)*q_prim_vf(momxb + 1)%sf(i, j, k) &
+                                                     + q_particles(5)%sf(i, j, k))*(1._wp/alpha_f)
 
                         if (num_dims == 3) then
                             rhs_vf(momxb + 2)%sf(i, j, k) = rhs_vf(momxb + 2)%sf(i, j, k) + q_particles(4)%sf(i, j, k)*(1._wp/alpha_f)
                             ! Energy source
                             rhs_vf(E_idx)%sf(i, j, k) = rhs_vf(E_idx)%sf(i, j, k) + &
-                                                        (q_particles(2)%sf(i, j, k)*q_prim_vf(momxb)%sf(i, j, k) &
-                                                         + q_particles(3)%sf(i, j, k)*q_prim_vf(momxb + 1)%sf(i, j, k) &
-                                                         + q_particles(4)%sf(i, j, k)*q_prim_vf(momxb + 2)%sf(i, j, k) &
-                                                         + q_particles(5)%sf(i, j, k))*(1._wp/alpha_f)
-                        else
-                            ! Energy source
-                            rhs_vf(E_idx)%sf(i, j, k) = rhs_vf(E_idx)%sf(i, j, k) + &
-                                                        (q_particles(2)%sf(i, j, k)*q_prim_vf(momxb)%sf(i, j, k) &
-                                                         + q_particles(3)%sf(i, j, k)*q_prim_vf(momxb + 1)%sf(i, j, k) &
-                                                         + q_particles(4)%sf(i, j, k))*(1._wp/alpha_f)
+                                                        (q_particles(4)%sf(i, j, k)*q_prim_vf(momxb + 2)%sf(i, j, k))*(1._wp/alpha_f)
                         end if
-                    end if
-                end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
 
-        $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
-        do l = idwbuff(3)%beg, idwbuff(3)%end
-            do k = idwbuff(2)%beg, idwbuff(2)%end
-                do j = idwbuff(1)%beg, idwbuff(1)%end
-                    q_particles(q_particles_idx)%sf(j, k, l) = q_particles(1)%sf(j, k, l)
+                    end if
                 end do
             end do
         end do
@@ -760,9 +823,8 @@ contains
     end subroutine s_compute_particles_EL_source
 
     !>  The purpose of this subroutine is to smear the effect of the particles in the Eulerian framework
-    subroutine s_smear_particle_sources(init_old)
+    subroutine s_smear_particle_sources()
 
-        logical, intent(in) :: init_old
         integer :: i, j, k, l
 
         $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
@@ -779,7 +841,7 @@ contains
 
         call nvtxStartRange("BUBBLES-LAGRANGE-KERNELS")
         $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
-        do i = 1, q_particles_idx - 1
+        do i = 1, q_particles_idx
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
@@ -791,7 +853,7 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
         call s_smoothfunction(n_el_particles_loc, particle_rad, &
-                              particle_s, particle_pos, q_particles, f_p)
+                              particle_s, particle_pos, particle_vel, q_particles, f_p)
 
         !Store 1-q_particles(1)
         $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
@@ -802,9 +864,6 @@ contains
                     ! Limiting void fraction given max value
                     q_particles(1)%sf(j, k, l) = max(q_particles(1)%sf(j, k, l), &
                                                      1._wp - lag_params%valmaxvoid)
-                    if (init_old) then
-                        q_particles(q_particles_idx)%sf(j, k, l) = q_particles(1)%sf(j, k, l)
-                    end if
                 end do
             end do
         end do
@@ -964,7 +1023,6 @@ contains
         real(wp) :: offset
         integer, dimension(3) :: cell
         integer, intent(in) :: nstage
-        logical :: init_old = .false.
 
         call nvtxStartRange("LAG-BC")
         call nvtxStartRange("LAG-BC-DEV2HOST")
@@ -1181,7 +1239,7 @@ contains
         end do
 
         ! Update void fraction and communicate buffers
-        call s_smear_particle_sources(init_old)
+        call s_smear_particle_sources()
 
         call nvtxEndRange ! LAG-BC
 
@@ -1337,100 +1395,235 @@ contains
 
     end function particle_in_domain_physical
 
-    !> The purpose of this procedure is to calculate the gradient of a scalar field along the x, y and z directions
+    !> The purpose of this procedure is to calculate the gradient of a scalar field along the x, y and z directions using Fornberg's method
         !! @param q Input scalar field
         !! @param dq Output gradient of q
         !! @param dir Gradient spatial direction
-    subroutine s_gradient_dir(q, dq, dir)
+    subroutine s_gradient_dir_fornberg(q, dq, dir)
 
         real(stp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:), intent(in) :: q
         real(stp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:), intent(out) :: dq
         integer, intent(in) :: dir
 
-        integer :: i, j, k
+        integer :: i, j, k, a, npts, s_idx
 
-        if (fd_order == 4) then
-            if (dir == 1) then
-                $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3)
-                do k = idwbuff(3)%beg, idwbuff(3)%end
-                    do j = idwbuff(2)%beg, idwbuff(2)%end
-                        do i = idwbuff(1)%beg + 2, idwbuff(1)%end - 2
-                            dq(i, j, k) = (-q(i + 2, j, k) + 8*q(i + 1, j, k) - 8*q(i - 1, j, k) + q(i - 2, j, k))/(12*dx(i))
+        npts = (nWeights_grad - 1)/2
+
+        if (dir == 1) then
+            $:GPU_PARALLEL_LOOP(private='[i,j,k,s_idx,a]', collapse=3,copyin='[npts]')
+            do k = idwbuff(3)%beg, idwbuff(3)%end
+                do j = idwbuff(2)%beg, idwbuff(2)%end
+                    do i = idwbuff(1)%beg + 2, idwbuff(1)%end - 2
+                        dq(i, j, k) = 0._wp
+                        do a = -npts, npts
+                            s_idx = a + npts + 1
+                            dq(i, j, k) = dq(i, j, k) + weights_x_grad(s_idx)%sf(i, 1, 1)*q(i + a, j, k)
                         end do
                     end do
                 end do
-                $:END_GPU_PARALLEL_LOOP()
-            elseif (dir == 2) then
-                $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3)
-                do k = idwbuff(3)%beg, idwbuff(3)%end
-                    do j = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
-                        do i = idwbuff(1)%beg, idwbuff(1)%end
-                            dq(i, j, k) = (-q(i, j + 2, k) + 8*q(i, j + 1, k) - 8*q(i, j - 1, k) + q(i, j - 2, k))/(12*dy(j))
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        elseif (dir == 2) then
+            $:GPU_PARALLEL_LOOP(private='[i,j,k,s_idx,a]', collapse=3,copyin='[npts]')
+            do k = idwbuff(3)%beg, idwbuff(3)%end
+                do j = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
+                    do i = idwbuff(1)%beg, idwbuff(1)%end
+                        dq(i, j, k) = 0._wp
+                        do a = -npts, npts
+                            s_idx = a + npts + 1
+                            dq(i, j, k) = dq(i, j, k) + weights_y_grad(s_idx)%sf(j, 1, 1)*q(i, j + a, k)
                         end do
                     end do
                 end do
-                $:END_GPU_PARALLEL_LOOP()
-            elseif (dir == 3) then
-                $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3)
-                do k = idwbuff(3)%beg + 2, idwbuff(3)%end - 2
-                    do j = idwbuff(2)%beg, idwbuff(2)%end
-                        do i = idwbuff(1)%beg, idwbuff(1)%end
-                            dq(i, j, k) = (-q(i, j, k + 2) + 8*q(i, j, k + 1) - 8*q(i, j, k - 1) + q(i, j, k - 2))/(12*dz(k))
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        elseif (dir == 3) then
+            $:GPU_PARALLEL_LOOP(private='[i,j,k,s_idx,a]', collapse=3,copyin='[npts]')
+            do k = idwbuff(3)%beg + 2, idwbuff(3)%end - 2
+                do j = idwbuff(2)%beg, idwbuff(2)%end
+                    do i = idwbuff(1)%beg, idwbuff(1)%end
+                        dq(i, j, k) = 0._wp
+                        do a = -npts, npts
+                            s_idx = a + npts + 1
+                            dq(i, j, k) = dq(i, j, k) + weights_z_grad(s_idx)%sf(k, 1, 1)*q(i, j, k + a)
                         end do
                     end do
                 end do
-                $:END_GPU_PARALLEL_LOOP()
-            end if
-        else
-            if (dir == 1) then
-                ! Gradient in x dir.
-                $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3)
-                do k = idwbuff(3)%beg, idwbuff(3)%end
-                    do j = idwbuff(2)%beg, idwbuff(2)%end
-                        do i = idwbuff(1)%beg + 1, idwbuff(1)%end - 1
-                            dq(i, j, k) = q(i, j, k)*(dx(i + 1) - dx(i - 1)) &
-                                          + q(i + 1, j, k)*(dx(i) + dx(i - 1)) &
-                                          - q(i - 1, j, k)*(dx(i) + dx(i + 1))
-                            dq(i, j, k) = dq(i, j, k)/ &
-                                          ((dx(i) + dx(i - 1))*(dx(i) + dx(i + 1)))
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            elseif (dir == 2) then
-                ! Gradient in y dir.
-                $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3)
-                do k = idwbuff(3)%beg, idwbuff(3)%end
-                    do j = idwbuff(2)%beg + 1, idwbuff(2)%end - 1
-                        do i = idwbuff(1)%beg, idwbuff(1)%end
-                            dq(i, j, k) = q(i, j, k)*(dy(j + 1) - dy(j - 1)) &
-                                          + q(i, j + 1, k)*(dy(j) + dy(j - 1)) &
-                                          - q(i, j - 1, k)*(dy(j) + dy(j + 1))
-                            dq(i, j, k) = dq(i, j, k)/ &
-                                          ((dy(j) + dy(j - 1))*(dy(j) + dy(j + 1)))
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            elseif (dir == 3) then
-                ! Gradient in z dir.
-                $:GPU_PARALLEL_LOOP(private='[i,j,k]', collapse=3)
-                do k = idwbuff(3)%beg + 1, idwbuff(3)%end - 1
-                    do j = idwbuff(2)%beg, idwbuff(2)%end
-                        do i = idwbuff(1)%beg, idwbuff(1)%end
-                            dq(i, j, k) = q(i, j, k)*(dz(k + 1) - dz(k - 1)) &
-                                          + q(i, j, k + 1)*(dz(k) + dz(k - 1)) &
-                                          - q(i, j, k - 1)*(dz(k) + dz(k + 1))
-                            dq(i, j, k) = dq(i, j, k)/ &
-                                          ((dz(k) + dz(k - 1))*(dz(k) + dz(k + 1)))
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            end if
+            end do
+            $:END_GPU_PARALLEL_LOOP()
         end if
 
-    end subroutine s_gradient_dir
+    end subroutine s_gradient_dir_fornberg
+
+    !> The purpose of this procedure is to compute the Fornberg finite difference weights for derivatives (only done once at start time)
+    impure subroutine s_compute_fornberg_fd_weights(npts)
+
+        integer, intent(in) :: npts
+        integer :: i, j, k, a, m_order
+        integer :: s_idx
+        real(wp) :: x0, y0, z0
+        real(wp) :: x_stencil(nWeights_grad)
+        real(wp) :: c(nWeights_grad, 0:1)
+
+        m_order = 1   ! first derivative
+
+        $:GPU_PARALLEL_LOOP(private='[i,a,x_stencil,c,s_idx,x0]', copyin='[npts,m_order]')
+        do i = idwbuff(1)%beg + npts, idwbuff(1)%end - npts
+            do a = -npts, npts
+                s_idx = a + npts + 1
+                x_stencil(s_idx) = x_cc(i + a)
+            end do
+            x0 = x_cc(i)
+
+            call s_fornberg_weights(x0, x_stencil, nWeights_grad, m_order, c)
+
+            do a = -npts, npts
+                s_idx = a + npts + 1
+                weights_x_grad(s_idx)%sf(i, 1, 1) = c(s_idx, 1)
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        $:GPU_PARALLEL_LOOP(private='[j,a,x_stencil,c,s_idx,y0]', copyin='[npts,m_order]')
+        do j = idwbuff(2)%beg + npts, idwbuff(2)%end - npts
+            do a = -npts, npts
+                s_idx = a + npts + 1
+                x_stencil(s_idx) = y_cc(j + a)
+            end do
+            y0 = y_cc(j)
+
+            call s_fornberg_weights(y0, x_stencil, nWeights_grad, m_order, c)
+
+            do a = -npts, npts
+                s_idx = a + npts + 1
+                weights_y_grad(s_idx)%sf(j, 1, 1) = c(s_idx, 1)
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        if (num_dims == 3) then
+
+            $:GPU_PARALLEL_LOOP(private='[k,a,x_stencil,c,s_idx,z0]', copyin='[npts,m_order]')
+            do k = idwbuff(3)%beg + npts, idwbuff(3)%end - npts
+                do a = -npts, npts
+                    s_idx = a + npts + 1
+                    x_stencil(s_idx) = z_cc(k + a)
+                end do
+                z0 = z_cc(k)
+
+                call s_fornberg_weights(z0, x_stencil, nWeights_grad, m_order, c)
+
+                do a = -npts, npts
+                    s_idx = a + npts + 1
+                    weights_z_grad(s_idx)%sf(k, 1, 1) = c(s_idx, 1)
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+
+        end if
+
+    end subroutine s_compute_fornberg_fd_weights
+
+    !> The purpose of this procedure is to compute the Fornberg finite difference weights on a local stencil
+    subroutine s_fornberg_weights(x0, stencil, npts, m_order, coeffs)
+        ! $:GPU_ROUTINE(parallelism='[seq]')
+
+        integer, intent(in) :: npts       ! number of stencil points
+        integer, intent(in) :: m_order       ! highest derivative order
+        real(wp), intent(in) :: x0     ! evaluation point
+        real(wp), intent(in) :: stencil(npts)   ! stencil coordinates
+        real(wp), intent(out) :: coeffs(npts, 0:m_order)
+
+        integer :: i, j, k, mn
+        real(wp) :: c1, c2, c3, c4, c5
+
+        coeffs = 0.0_wp
+        c1 = 1.0_wp
+        c4 = stencil(1) - x0
+        coeffs(1, 0) = 1.0_wp
+
+        do i = 2, npts
+            mn = min(i - 1, m_order)
+            c2 = 1.0_wp
+            c5 = c4
+            c4 = stencil(i) - x0
+
+            do j = 1, i - 1
+                c3 = stencil(i) - stencil(j)
+                c2 = c2*c3
+
+                if (j == i - 1) then
+                    do k = mn, 1, -1
+                        coeffs(i, k) = c1*(k*coeffs(i - 1, k - 1) - c5*coeffs(i - 1, k))/c2
+                    end do
+                    coeffs(i, 0) = -c1*c5*coeffs(i - 1, 0)/c2
+                end if
+
+                do k = mn, 1, -1
+                    coeffs(j, k) = (c4*coeffs(j, k) - k*coeffs(j, k - 1))/c3
+                end do
+                coeffs(j, 0) = c4*coeffs(j, 0)/c3
+            end do
+
+            c1 = c2
+        end do
+
+    end subroutine s_fornberg_weights
+
+    !> The purpose of this procedure is to compute the barycentric weights for interpolation (only done once at start time)
+    impure subroutine s_compute_barycentric_weights(npts)
+
+        integer, intent(in) :: npts
+        integer :: i, j, k, l, a, b
+        real(wp) :: prod_x, prod_y, prod_z, dx_loc, dy_loc, dz_loc
+
+        $:GPU_PARALLEL_LOOP(private='[i,a,b,prod_x,dx_loc]', copyin = '[npts]')
+        do i = idwbuff(1)%beg + npts, idwbuff(1)%end - npts
+            do a = -npts, npts
+                prod_x = 1._wp
+                do b = -npts, npts
+                    if (a /= b) then
+                        dx_loc = x_cc(i + a) - x_cc(i + b)
+                        prod_x = prod_x*dx_loc
+                    end if
+                end do
+                weights_x_interp(a + npts + 1)%sf(i, 1, 1) = 1._wp/prod_x
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        $:GPU_PARALLEL_LOOP(private='[j,a,b,prod_y,dy_loc]', copyin = '[npts]')
+        do j = idwbuff(2)%beg + npts, idwbuff(2)%end - npts
+            do a = -npts, npts
+                prod_y = 1._wp
+                do b = -npts, npts
+                    if (a /= b) then
+                        dy_loc = y_cc(j + a) - y_cc(j + b)
+                        prod_y = prod_y*dy_loc
+                    end if
+                end do
+                weights_y_interp(a + npts + 1)%sf(j, 1, 1) = 1._wp/prod_y
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        if (num_dims == 3) then
+            $:GPU_PARALLEL_LOOP(private='[k,a,b,prod_z,dz_loc]', copyin = '[npts]')
+            do k = idwbuff(3)%beg + npts, idwbuff(3)%end - npts
+                do a = -npts, npts
+                    prod_z = 1._wp
+                    do b = -npts, npts
+                        if (a /= b) then
+                            dz_loc = z_cc(k + a) - z_cc(k + b)
+                            prod_z = prod_z*dz_loc
+                        end if
+                    end do
+                    weights_z_interp(a + npts + 1)%sf(k, 1, 1) = 1._wp/prod_z
+                end do
+            end do
+        end if
+
+    end subroutine s_compute_barycentric_weights
 
     impure subroutine s_open_lag_bubble_evol
 
@@ -1858,6 +2051,36 @@ contains
             @:DEALLOCATE(field_vars(i)%sf)
         end do
         @:DEALLOCATE(field_vars)
+
+        do i = 1, nWeights_interp
+            @:DEALLOCATE(weights_x_interp(i)%sf)
+        end do
+        @:DEALLOCATE(weights_x_interp)
+
+        do i = 1, nWeights_interp
+            @:DEALLOCATE(weights_y_interp(i)%sf)
+        end do
+        @:DEALLOCATE(weights_y_interp)
+
+        do i = 1, nWeights_interp
+            @:DEALLOCATE(weights_z_interp(i)%sf)
+        end do
+        @:DEALLOCATE(weights_z_interp)
+
+        do i = 1, nWeights_grad
+            @:DEALLOCATE(weights_x_grad(i)%sf)
+        end do
+        @:DEALLOCATE(weights_x_grad)
+
+        do i = 1, nWeights_grad
+            @:DEALLOCATE(weights_y_grad(i)%sf)
+        end do
+        @:DEALLOCATE(weights_y_grad)
+
+        do i = 1, nWeights_grad
+            @:DEALLOCATE(weights_z_grad(i)%sf)
+        end do
+        @:DEALLOCATE(weights_z_grad)
 
         !Deallocating space
         @:DEALLOCATE(lag_part_id)

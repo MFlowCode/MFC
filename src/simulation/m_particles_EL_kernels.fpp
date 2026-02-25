@@ -24,23 +24,23 @@ contains
             !! @param lbk_pos Spatial coordinates of the particles
             !! @param updatedvar Eulerian variable to be updated
             !! @param lbk_f_p Forces on the particles
-    subroutine s_smoothfunction(nParticles, lbk_rad, lbk_s, lbk_pos, updatedvar, lbk_f_p)
+    subroutine s_smoothfunction(nParticles, lbk_rad, lbk_s, lbk_pos, lbk_vel, updatedvar, lbk_f_p)
 
         integer, intent(in) :: nParticles
-        real(wp), dimension(1:lag_params%nParticles_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_pos
+        real(wp), dimension(1:lag_params%nParticles_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_pos, lbk_vel
         real(wp), dimension(1:lag_params%nParticles_glb, 1:2), intent(in) :: lbk_rad
         type(scalar_field), dimension(:), intent(inout) :: updatedvar
         real(wp), dimension(1:lag_params%nParticles_glb, 1:3), intent(in) :: lbk_f_p
 
-        call s_gaussian(nParticles, lbk_rad, lbk_s, lbk_pos, updatedvar, lbk_f_p)
+        call s_gaussian(nParticles, lbk_rad, lbk_s, lbk_pos, lbk_vel, updatedvar, lbk_f_p)
 
     end subroutine s_smoothfunction
 
     !> The purpose of this procedure contains the algorithm to use the gaussian kernel function to map the effect of the particles.
-    subroutine s_gaussian(nParticles, lbk_rad, lbk_s, lbk_pos, updatedvar, lbk_f_p)
+    subroutine s_gaussian(nParticles, lbk_rad, lbk_s, lbk_pos, lbk_vel, updatedvar, lbk_f_p)
 
         integer, intent(in) :: nParticles
-        real(wp), dimension(1:lag_params%nParticles_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_pos
+        real(wp), dimension(1:lag_params%nParticles_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_pos, lbk_vel
         real(wp), dimension(1:lag_params%nParticles_glb, 1:2), intent(in) :: lbk_rad
         real(wp), dimension(1:lag_params%nParticles_glb, 1:3), intent(in) :: lbk_f_p
         type(scalar_field), dimension(:), intent(inout) :: updatedvar
@@ -52,11 +52,12 @@ contains
 
         real(wp), dimension(3) :: nodecoord
         real(wp) :: addFun1, addFun2_x, addFun2_y, addFun2_z, addFun_E, func_sum
+        real(wp) :: addFun_alphap_vp_x, addFun_alphap_vp_y, addFun_alphap_vp_z
         real(wp) :: func, volpart, Vol, Vol_loc, rad
         real(wp), dimension(3) :: s_coord
         integer :: l, i, j, k
         logical :: celloutside
-        real(wp) :: fp_x, fp_y, fp_z
+        real(wp) :: fp_x, fp_y, fp_z, vp_x, vp_y, vp_z
 
         real(wp) :: rc, r2, weight, alpha_cut, vol_frac, g, chardist
         integer :: d
@@ -100,6 +101,10 @@ contains
             fp_x = -lbk_f_p(l, 1)
             fp_y = -lbk_f_p(l, 2)
             fp_z = -lbk_f_p(l, 3)
+
+            vp_x = lbk_vel(l, 1, 2)
+            vp_y = lbk_vel(l, 2, 2)
+            vp_z = lbk_vel(l, 3, 2)
 
             sigma = lag_params%epsilonb*chardist
             ! sigma = max(sigma, 0.5_wp * chardist)
@@ -190,19 +195,33 @@ contains
                                 updatedvar(4)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
                                     updatedvar(4)%sf(cellaux(1), cellaux(2), cellaux(3)) &
                                     + real(addFun2_z, kind=stp)
-                                !Update energy source term
-                                addFun_E = 0._wp
+                            end if
+                            !Update energy source term
+                            addFun_E = 0._wp
+                            $:GPU_ATOMIC(atomic='update')
+                            updatedvar(5)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
+                                updatedvar(5)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                                + real(addFun_E, kind=stp)
+
+                            !Update particle momentum field(x)
+                            addFun_alphap_vp_x = weight*volpart*vp_x
+                            $:GPU_ATOMIC(atomic='update')
+                            updatedvar(6)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
+                                updatedvar(6)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                                + real(addFun_alphap_vp_x, kind=stp)
+                            !Update particle momentum field(y)
+                            addFun_alphap_vp_y = weight*volpart*vp_y
+                            $:GPU_ATOMIC(atomic='update')
+                            updatedvar(7)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
+                                updatedvar(7)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                                + real(addFun_alphap_vp_y, kind=stp)
+                            if (num_dims == 3) then
+                                !Update particle momentum field(z)
+                                addFun_alphap_vp_z = weight*volpart*vp_z
                                 $:GPU_ATOMIC(atomic='update')
-                                updatedvar(5)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                                    updatedvar(5)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                    + real(addFun_E, kind=stp)
-                            else
-                                !Update energy source term
-                                addFun_E = 0._wp
-                                $:GPU_ATOMIC(atomic='update')
-                                updatedvar(4)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                                    updatedvar(4)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                    + real(addFun_E, kind=stp)
+                                updatedvar(8)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
+                                    updatedvar(8)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                                    + real(addFun_alphap_vp_z, kind=stp)
                             end if
                         end if
                     end do
@@ -305,13 +324,14 @@ contains
             !! @param q_prim_vf Eulerian field with primitive variables
             !! @return a Acceleration of the particle in direction i
     subroutine s_get_particle_force(pos, rad, vel_p, mass_p, Re, gamm, vol_frac, cell, &
-                                    q_prim_vf, fieldvars, force, rmass_add)
+                                    q_prim_vf, fieldvars, wx, wy, wz, force, rmass_add)
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: rad, mass_p, Re, gamm, vol_frac
         real(wp), dimension(3), intent(in) :: pos
         integer, dimension(3), intent(in) :: cell
         real(wp), dimension(3), intent(in) :: vel_p
         type(scalar_field), dimension(:), intent(in) :: fieldvars
+        type(scalar_field), dimension(:), intent(in) :: wx, wy, wz
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
 
         real(wp), dimension(3), intent(out) :: force
@@ -339,19 +359,19 @@ contains
         v_rel = 0._wp
         rhoDuDt = 0._wp
 
-        !!Interpolation - either tri-linear or 0th order
+        !!Interpolation - either even ordered barycentric or 0th order
         if (lag_params%interpolation_order > 1) then
-            rho_fluid = f_interp_barycentric(pos, cell, q_prim_vf, 1)
-            pressure_fluid = f_interp_barycentric(pos, cell, q_prim_vf, E_idx)
+            rho_fluid = f_interp_barycentric(pos, cell, q_prim_vf, 1, wx, wy, wz)
+            pressure_fluid = f_interp_barycentric(pos, cell, q_prim_vf, E_idx, wx, wy, wz)
             do dir = 1, num_dims
                 if (lag_params%pressure_force .or. lag_params%added_mass_model > 0) then
-                    dp(dir) = f_interp_barycentric(pos, cell, fieldvars, dir)
+                    dp(dir) = f_interp_barycentric(pos, cell, fieldvars, dir, wx, wy, wz)
                 end if
                 if (lag_params%added_mass_model > 0) then
-                    grad_rho(dir) = f_interp_barycentric(pos, cell, fieldvars, 3 + dir)
-                    drhodt = drhodt + f_interp_barycentric(pos, cell, fieldvars, 6 + dir)
+                    grad_rho(dir) = f_interp_barycentric(pos, cell, fieldvars, 3 + dir, wx, wy, wz)
+                    drhodt = drhodt + f_interp_barycentric(pos, cell, fieldvars, 6 + dir, wx, wy, wz)
                 end if
-                fluid_vel(dir) = f_interp_barycentric(pos, cell, q_prim_vf, momxb + dir - 1)
+                fluid_vel(dir) = f_interp_barycentric(pos, cell, q_prim_vf, momxb + dir - 1, wx, wy, wz)
             end do
         else
             rho_fluid = q_prim_vf(1)%sf(cell(1), cell(2), cell(3))
@@ -468,28 +488,23 @@ contains
 
     end subroutine s_get_particle_force
 
-    function f_interp_barycentric(pos, cell, field_vf, field_index) result(val)
+    function f_interp_barycentric(pos, cell, field_vf, field_index, wx, wy, wz) result(val)
         $:GPU_ROUTINE(parallelism='[seq]')
 
         real(wp), dimension(3), intent(in) :: pos
         integer, dimension(3), intent(in) :: cell
         type(scalar_field), dimension(:), intent(in) :: field_vf
+        type(scalar_field), dimension(:), intent(in) :: wx, wy, wz
         integer, intent(in) :: field_index
 
         integer :: i, j, k, ix, jy, kz, npts, npts_z, N, a, b
+        integer :: ix_count, jy_count, kz_count
         real(wp) :: weight, numerator, denominator, xBar, eps
-        real(wp) :: val, local_min, local_max, prod_x, prod_y, prod_z, dx_l, dy_l, dz_l
-        real(wp) :: wx(-2:2), wy(-2:2), wz(-2:2)
+        real(wp) :: val, local_min, local_max, prod_x, prod_y, prod_z
 
         i = cell(1)
         j = cell(2)
         k = cell(3)
-
-        dx_l = x_cc(i) - x_cc(i - 1)
-        dy_l = y_cc(j) - y_cc(j - 1)
-        dz_l = z_cc(k) - z_cc(k - 1)
-
-        wx = 0._wp; wy = 0._wp; wz = 0._wp
 
         N = lag_params%interpolation_order
         npts = N/2
@@ -506,68 +521,21 @@ contains
             return
         end if
 
-        ! do a = -npts, npts
-        !   prod_x = 1._wp
-        !   prod_y = 1._wp
-        !   prod_z = 1._wp
-        !   do b = -npts, npts
-        !     if (a /= b) then
-        !       prod_x = prod_x * (x_cc(i+a) - x_cc(i+b))
-        !       prod_y = prod_y * (y_cc(j+a) - y_cc(j+b))
-        !       if (num_dims == 3) then
-        !         prod_z = prod_z * (z_cc(k+a) - z_cc(k+b))
-        !       endif
-        !     endif
-        !   enddo
-        !   wx(a) = 1._wp / prod_x
-        !   wy(a) = 1._wp / prod_y
-        !   if (num_dims == 3) then
-        !     wz(a) = 1._wp / prod_z
-        !   endif
-        ! enddo
-
-        if (N == 2) then
-            wx(-1) = 1._wp/(2*(dx_l)**2)
-            wx(0) = -1._wp/((dx_l)**2)
-            wx(1) = 1._wp/(2*(dx_l)**2)
-
-            wy(-1) = 1._wp/(2*(dy_l)**2)
-            wy(0) = -1._wp/((dy_l)**2)
-            wy(1) = 1._wp/(2*(dy_l)**2)
-
-            wz(-1) = 1._wp/(2*(dz_l)**2)
-            wz(0) = -1._wp/((dz_l)**2)
-            wz(1) = 1._wp/(2*(dz_l)**2)
-
-        elseif (N == 4) then
-            wx(-2) = 1._wp/(24*(dx_l)**4)
-            wx(-1) = -1._wp/(6*(dx_l)**4)
-            wx(0) = 1._wp/(4*(dx_l)**4)
-            wx(1) = -1._wp/(6*(dx_l)**4)
-            wx(2) = 1._wp/(24*(dx_l)**4)
-
-            wy(-2) = 1._wp/(24*(dy_l)**4)
-            wy(-1) = -1._wp/(6*(dy_l)**4)
-            wy(0) = 1._wp/(4*(dy_l)**4)
-            wy(1) = -1._wp/(6*(dy_l)**4)
-            wy(2) = 1._wp/(24*(dy_l)**4)
-
-            wz(-2) = 1._wp/(24*(dz_l)**4)
-            wz(-1) = -1._wp/(6*(dz_l)**4)
-            wz(0) = 1._wp/(4*(dz_l)**4)
-            wz(1) = -1._wp/(6*(dz_l)**4)
-            wz(2) = 1._wp/(24*(dz_l)**4)
-        end if
-
+        ix_count = 0
         do ix = i - npts, i + npts
+            ix_count = ix_count + 1
+            jy_count = 0
             do jy = j - npts, j + npts
+                jy_count = jy_count + 1
+                kz_count = 0
                 do kz = k - npts_z, k + npts_z
+                    kz_count = kz_count + 1
                     if (num_dims == 3) then
                         xBar = (pos(1) - x_cc(ix))*(pos(2) - y_cc(jy))*(pos(3) - z_cc(kz))
-                        weight = wx(i - ix)*wy(j - jy)*wz(k - kz)
+                        weight = wx(ix_count)%sf(i, 1, 1)*wy(jy_count)%sf(j, 1, 1)*wz(kz_count)%sf(k, 1, 1)
                     else
                         xBar = (pos(1) - x_cc(ix))*(pos(2) - y_cc(jy))
-                        weight = wx(i - ix)*wy(j - jy)
+                        weight = wx(ix_count)%sf(i, 1, 1)*wy(jy_count)%sf(j, 1, 1)
                     end if
                     weight = weight/xBar
                     numerator = numerator + weight*field_vf(field_index)%sf(ix, jy, kz)
@@ -578,19 +546,15 @@ contains
 
         val = numerator/denominator
 
-        if (num_dims == 3) then
-            local_min = minval(field_vf(field_index)%sf(i - npts:i + npts, j - npts:j + npts, k - npts:k + npts))
-            local_max = maxval(field_vf(field_index)%sf(i - npts:i + npts, j - npts:j + npts, k - npts:k + npts))
-        else
-            local_min = minval(field_vf(field_index)%sf(i - npts:i + npts, j - npts:j + npts, k))
-            local_max = maxval(field_vf(field_index)%sf(i - npts:i + npts, j - npts:j + npts, k))
-        end if
+        ! if (num_dims == 3) then
+        !     local_min = minval(field_vf(field_index)%sf(i - npts:i + npts, j - npts:j + npts, k - npts:k + npts))
+        !     local_max = maxval(field_vf(field_index)%sf(i - npts:i + npts, j - npts:j + npts, k - npts:k + npts))
+        ! else
+        !     local_min = minval(field_vf(field_index)%sf(i - npts:i + npts, j - npts:j + npts, k))
+        !     local_max = maxval(field_vf(field_index)%sf(i - npts:i + npts, j - npts:j + npts, k))
+        ! end if
 
-        ! if ((val .lt. local_min) .or. (val .gt. local_max)) then
-        !   val = field_vf(field_index)%sf(i,j,k)
-        ! endif
-
-        val = max(local_min, min(local_max, val))
+        ! val = max(local_min, min(local_max, val))
 
     end function
 
