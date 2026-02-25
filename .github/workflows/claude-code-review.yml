@@ -19,7 +19,12 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
-
+          
+      - name: Ensure ~/.local/bin exists and is on PATH
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          
       - name: Run Claude Code Review
         uses: anthropics/claude-code-action@v1
         with:
@@ -29,19 +34,16 @@ jobs:
           plugin_marketplaces: "https://github.com/anthropics/claude-code.git"
           plugins: "code-review@claude-code-plugins"
 
+          show_full_output: true
+
           claude_args: >
             --dangerously-skip-permissions
             --max-turns 60
             --allowedTools
-            "Bash(gh pr view:*)"
-            "Bash(gh pr diff:*)"
-            "Bash(gh pr comment:*)"
-            "Bash(gh api:*)"
-            "Bash(cat CLAUDE.md:*)"
-            "Bash(cat .claude/rules/*:*)"
+            "Bash(gh:*)"
+            "Bash(cat:*)"
             "Bash(ls:*)"
             "Bash(grep:*)"
-            "Bash(find:*)"
             "Bash(sed:*)"
             "Bash(awk:*)"
             "Bash(head:*)"
