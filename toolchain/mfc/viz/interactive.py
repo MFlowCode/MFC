@@ -86,7 +86,7 @@ def _lbl(text):
 def _slider(sid, lo, hi, step, val, marks=None):
     return dcc.Slider(
         id=sid, min=lo, max=hi, step=step, value=val,
-        marks=marks or {}, updatemode='drag',
+        marks=marks or {}, updatemode='mouseup',
         tooltip={'placement': 'bottom', 'always_visible': True},
     )
 
