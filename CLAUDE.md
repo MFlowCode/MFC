@@ -51,7 +51,7 @@ source ./mfc.sh load -c p -m c             # Load Phoenix CPU modules
 
 # Other
 ./mfc.sh validate case.py                  # Validate case file without running
-./mfc.sh params <query>                    # Search ~3,400 case parameters
+./mfc.sh params <query>                    # Search 3,400 case parameters
 ./mfc.sh clean                             # Remove build artifacts
 ./mfc.sh new <name>                        # Create new case from template
 ```
