@@ -803,7 +803,7 @@ contains
         integer :: i
         logical :: forces_computed
 
-        call nvtxStartRange("PROPAGATE-IMERSED-BOUNDARIES")
+        call nvtxStartRange("PROPAGATE-IMMERSED-BOUNDARIES")
 
         forces_computed = .false.
 
