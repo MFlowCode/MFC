@@ -912,10 +912,29 @@ VIZ_COMMAND = Command(
             default=None,
             metavar="CMAP",
             completion=Completion(type=CompletionType.CHOICES, choices=[
-                "viridis", "plasma", "magma", "inferno", "cividis",
-                "hot", "cool", "jet", "rainbow", "turbo",
-                "RdBu", "seismic", "bwr", "coolwarm",
-                "gray", "bone", "pink",
+                # Perceptually uniform sequential
+                "viridis", "plasma", "inferno", "magma", "cividis",
+                # Diverging
+                "RdBu", "RdYlBu", "RdYlGn", "RdGy", "coolwarm", "bwr", "seismic",
+                "PiYG", "PRGn", "BrBG", "PuOr", "Spectral",
+                # Sequential
+                "Blues", "Greens", "Oranges", "Reds", "Purples", "Greys",
+                "YlOrRd", "YlOrBr", "YlGn", "YlGnBu", "GnBu", "BuGn",
+                "BuPu", "PuBu", "PuBuGn", "PuRd", "RdPu",
+                # Sequential 2
+                "hot", "afmhot", "gist_heat", "copper",
+                "bone", "gray", "pink", "spring", "summer", "autumn", "winter", "cool",
+                "binary", "gist_yarg", "gist_gray",
+                # Cyclic
+                "twilight", "twilight_shifted", "hsv",
+                # Qualitative
+                "tab10", "tab20", "tab20b", "tab20c",
+                "Set1", "Set2", "Set3", "Paired", "Accent", "Dark2", "Pastel1", "Pastel2",
+                # Miscellaneous
+                "turbo", "jet", "rainbow", "nipy_spectral", "gist_ncar",
+                "gist_rainbow", "gist_stern", "gist_earth", "ocean", "terrain",
+                "gnuplot", "gnuplot2", "CMRmap", "cubehelix", "brg", "flag", "prism",
+                "berlin", "managua", "vanimo", "Wistia",
             ]),
         ),
         Argument(
