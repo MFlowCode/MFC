@@ -741,7 +741,7 @@ contains
         end do
 
         ! Check all edges and count repeated edges
-        $:GPU_PARALLEL_LOOP(private='[i,j]', copy='[temp_boundary_v,edge_occurrence]', copyin='[threshold_edge_zero]', collapse=2)
+        $:GPU_PARALLEL_LOOP(private='[i,j]', copy='[temp_boundary_v,edge_occurrence]', collapse=2)
         do i = 1, edge_count
             do j = 1, edge_count
                 if (i /= j) then
