@@ -28,8 +28,6 @@ jobs:
 
       - name: Run Claude Code Review
         uses: anthropics/claude-code-action@v1
-        env:
-          PATH: /home/runner/.local/bin:${{ env.PATH }}
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ github.token }}
@@ -37,10 +35,11 @@ jobs:
           plugin_marketplaces: "https://github.com/anthropics/claude-code.git"
           plugins: "code-review@claude-code-plugins"
 
+          # NOTE: do NOT use --dangerouslyDisableSandbox (it can crash the CLI).
+          # This flag is for non-interactive CI runs (bypasses approval prompts).
           claude_args: >
             --dangerously-skip-permissions
-            --dangerouslyDisableSandbox
-            --max-turns 80
+            --max-turns 10
             --allowedTools
             "Bash"
 
@@ -58,7 +57,7 @@ jobs:
             3) find .claude/rules -maxdepth 1 -name "*.md" -print | head -n 10 | xargs -I{} cat "{}" 2>/dev/null || true
             4) gh pr view ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --json title,body,files,changedFiles,additions,deletions,headRefOid
             5) gh pr diff ${{ github.event.pull_request.number }} --repo ${{ github.repository }}
-            6) Post ONE top-level PR comment, then STOP.
+            6) Post ONE top-level PR comment titled "Claude Code Review", then STOP.
 
             Output format:
             - Head SHA
@@ -67,7 +66,6 @@ jobs:
             - Findings with file + line numbers when possible
             - If no issues: 0–3 improvement opportunities (only if confident)
 
-            Post ONE top-level PR comment titled "Claude Code Review".
             If posting is blocked, write the full review to the GitHub Actions job summary instead, then STOP.
 
           additional_permissions: |
