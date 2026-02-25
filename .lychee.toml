@@ -16,8 +16,11 @@ accept = ["200", "429", "502"]
 
 verbose = "error"
 
-# Exclude sitemap file from scanning (it contains pre-publish production URLs)
-exclude_path = ["sitemap\\.xml"]
+# Exclude files from scanning
+exclude_path = [
+    "sitemap\\.xml",  # Contains pre-publish production URLs
+    "404\\.html",     # Root-relative links (/, /documentation/) can't resolve in local checks
+]
 
 # Exclude URLs that fail due to external issues (broken SSL, pre-deploy only, etc.)
 exclude = [
