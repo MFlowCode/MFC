@@ -1120,9 +1120,9 @@ contains
                     end if
                 end do
 
-                $:GPU_ENTER_DATA(copyin='[gpu_ntrs, gpu_trs_v, gpu_trs_n, gpu_boundary_edge_count, gpu_total_vertices]')
+                $:GPU_UPDATE(device='[gpu_ntrs, gpu_trs_v, gpu_trs_n, gpu_boundary_edge_count, gpu_total_vertices]')
                 if (allocated(gpu_boundary_v)) then
-                    $:GPU_ENTER_DATA(copyin='[gpu_boundary_v]')
+                    $:GPU_UPDATE(device='[gpu_boundary_v]')
                 end if
             end if
         end block
