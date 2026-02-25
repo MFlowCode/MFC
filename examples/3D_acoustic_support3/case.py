@@ -46,7 +46,7 @@ print(
             "bc_z%beg": -6,
             "bc_z%end": -6,
             # Formatted Database Files Structure Parameters
-            "format": 2,
+            "format": 1,
             "precision": 2,
             "prim_vars_wrt": "T",
             "parallel_io": "T",
