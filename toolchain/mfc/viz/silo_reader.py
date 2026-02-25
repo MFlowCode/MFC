@@ -98,8 +98,9 @@ def read_silo_file(  # pylint: disable=too-many-locals
             if "silo" not in obj.attrs:
                 continue
             attr = obj.attrs["silo"]
-            data_path = attr.get("value0")
-            if data_path is None:
+            try:
+                data_path = attr["value0"]
+            except (KeyError, ValueError):
                 warnings.warn(f"Variable '{key}' missing 'value0' in silo attr, skipping", stacklevel=2)
                 continue
             data = _resolve_path(f, data_path).astype(np.float64)
