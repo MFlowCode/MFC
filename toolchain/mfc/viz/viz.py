@@ -146,8 +146,11 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
                            "Use --list-vars to see available variables.")
 
     if step_arg is None:
-        raise MFCException("--step is required for rendering. "
-                           "Use --list-steps to see available timesteps, or pass --step all.")
+        if ARG('interactive'):
+            step_arg = 'all'   # default to all steps in interactive mode
+        else:
+            raise MFCException("--step is required for rendering. "
+                               "Use --list-steps to see available timesteps, or pass --step all.")
 
     steps = discover_timesteps(case_dir, fmt)
     if not steps:
@@ -206,6 +209,13 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
         avail = sorted(test_assembled.variables.keys())
         raise MFCException(f"Variable '{varname}' not found. "
                            f"Available variables: {', '.join(avail)}")
+
+    # Interactive mode — launch Dash web server
+    if ARG('interactive'):
+        from .interactive import run_interactive  # pylint: disable=import-outside-toplevel
+        port = ARG('port') or 8050
+        run_interactive(varname, requested_steps, read_step, port=int(port))
+        return
 
     # Create output directory
     output_base = ARG('output')

@@ -1017,6 +1017,20 @@ VIZ_COMMAND = Command(
             default=False,
             dest="log_scale",
         ),
+        Argument(
+            name="interactive",
+            short="i",
+            help="Launch an interactive Dash web UI instead of saving PNG/MP4.",
+            action=ArgAction.STORE_TRUE,
+            default=False,
+        ),
+        Argument(
+            name="port",
+            help="Port for the interactive web server (default: 8050).",
+            type=int,
+            default=8050,
+            metavar="PORT",
+        ),
     ],
     examples=[
         Example("./mfc.sh viz case_dir/ --var pres --step 1000", "Plot pressure at step 1000"),
@@ -1031,6 +1045,7 @@ VIZ_COMMAND = Command(
         ("--list-vars", "List available variables"),
         ("--list-steps", "List available timesteps"),
         ("--mp4", "Generate MP4 video"),
+        ("--interactive / -i", "Launch interactive Dash web UI"),
         ("--cmap NAME", "Matplotlib colormap"),
         ("--slice-axis x|y|z", "Axis for 3D slice"),
     ],
