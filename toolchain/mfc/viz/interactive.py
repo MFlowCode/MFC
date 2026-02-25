@@ -527,6 +527,12 @@ def run_interactive(  # pylint: disable=too-many-locals,too-many-statements
                 float(vol_min_frac or 0.0), float(vol_max_frac or 1.0),
             )
             fig.add_trace(trace)
+            # Compute aspect ratio from domain extents so slices (which
+            # have a constant coordinate on one axis) don't collapse that axis.
+            dx = float(ad.x_cc[-1] - ad.x_cc[0]) if len(ad.x_cc) > 1 else 1.0
+            dy = float(ad.y_cc[-1] - ad.y_cc[0]) if len(ad.y_cc) > 1 else 1.0
+            dz = float(ad.z_cc[-1] - ad.z_cc[0]) if len(ad.z_cc) > 1 else 1.0
+            max_d = max(dx, dy, dz, 1e-30)
             fig.update_layout(scene=dict(
                 xaxis=dict(title='x', backgroundcolor=_SURF,
                            gridcolor=_OVER, color=_TEXT),
@@ -534,7 +540,9 @@ def run_interactive(  # pylint: disable=too-many-locals,too-many-statements
                            gridcolor=_OVER, color=_TEXT),
                 zaxis=dict(title='z', backgroundcolor=_SURF,
                            gridcolor=_OVER, color=_TEXT),
-                bgcolor=_BG, aspectmode='data',
+                bgcolor=_BG,
+                aspectmode='manual',
+                aspectratio=dict(x=dx/max_d, y=dy/max_d, z=dz/max_d),
             ))
 
         elif ad.ndim == 2:
