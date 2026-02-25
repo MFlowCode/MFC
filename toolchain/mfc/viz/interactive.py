@@ -6,6 +6,7 @@ Opens a dark-themed web UI in your browser (or via SSH tunnel) with live
 controls for slice position, isosurface thresholds, volume opacity,
 colormap, log scale, vmin/vmax, and timestep playback.
 """
+# pylint: disable=use-dict-literal
 
 from typing import List, Callable
 
@@ -37,7 +38,7 @@ _CMAPS = [
 _BG     = '#181825'
 _SURF   = '#1e1e2e'
 _OVER   = '#313244'
-_BORD   = '#45475a'
+_BORDER   = '#45475a'
 _TEXT   = '#cdd6f4'
 _SUB    = '#a6adc8'
 _MUTED  = '#6c7086'
@@ -83,7 +84,7 @@ def _lbl(text):
     })
 
 
-def _slider(sid, lo, hi, step, val, marks=None):
+def _slider(sid, lo, hi, step, val, marks=None):  # pylint: disable=too-many-arguments,too-many-positional-arguments
     return dcc.Slider(
         id=sid, min=lo, max=hi, step=step, value=val,
         marks=marks or {}, updatemode='mouseup',
@@ -95,7 +96,7 @@ def _btn(bid, label, color=_TEXT):
     return html.Button(label, id=bid, n_clicks=0, style={
         'flex': '1', 'padding': '5px 8px', 'fontSize': '12px',
         'backgroundColor': _OVER, 'color': color,
-        'border': f'1px solid {_BORD}', 'borderRadius': '4px',
+        'border': f'1px solid {_BORDER}', 'borderRadius': '4px',
         'cursor': 'pointer', 'fontFamily': 'monospace',
     })
 
@@ -105,7 +106,7 @@ def _num(sid, placeholder='auto'):
         id=sid, type='number', placeholder=placeholder, debounce=True,
         style={
             'width': '100%', 'backgroundColor': _OVER, 'color': _TEXT,
-            'border': f'1px solid {_BORD}', 'borderRadius': '4px',
+            'border': f'1px solid {_BORDER}', 'borderRadius': '4px',
             'padding': '4px 6px', 'fontSize': '12px', 'fontFamily': 'monospace',
             'boxSizing': 'border-box',
         },
@@ -250,7 +251,7 @@ def run_interactive(  # pylint: disable=too-many-locals,too-many-statements
             dcc.Dropdown(
                 id='var-sel', options=var_opts, value=varname, clearable=False,
                 style={'fontSize': '12px', 'backgroundColor': _OVER,
-                       'border': f'1px solid {_BORD}'},
+                       'border': f'1px solid {_BORDER}'},
             ),
         ),
 
@@ -259,7 +260,7 @@ def run_interactive(  # pylint: disable=too-many-locals,too-many-statements
             dcc.Dropdown(
                 id='step-sel', options=step_opts, value=steps[0], clearable=False,
                 style={'fontSize': '12px', 'backgroundColor': _OVER,
-                       'border': f'1px solid {_BORD}'},
+                       'border': f'1px solid {_BORDER}'},
             ),
             html.Div([
                 _btn('play-btn', '▶  Play', _GREEN),
@@ -346,7 +347,7 @@ def run_interactive(  # pylint: disable=too-many-locals,too-many-statements
             dcc.Dropdown(
                 id='cmap-sel', options=cmap_opts, value='viridis', clearable=False,
                 style={'fontSize': '12px', 'backgroundColor': _OVER,
-                       'border': f'1px solid {_BORD}'},
+                       'border': f'1px solid {_BORDER}'},
             ),
             dcc.Checklist(
                 id='log-chk',
@@ -362,7 +363,7 @@ def run_interactive(  # pylint: disable=too-many-locals,too-many-statements
             html.Button('↺  Auto range', id='reset-btn', n_clicks=0, style={
                 'marginTop': '8px', 'padding': '4px 8px', 'fontSize': '11px',
                 'width': '100%', 'backgroundColor': _OVER, 'color': _TEAL,
-                'border': f'1px solid {_BORD}', 'borderRadius': '4px',
+                'border': f'1px solid {_BORDER}', 'borderRadius': '4px',
                 'cursor': 'pointer', 'fontFamily': 'monospace',
             }),
         ),
@@ -469,7 +470,7 @@ def run_interactive(  # pylint: disable=too-many-locals,too-many-statements
     def _reset_range(_reset, _var):
         return None, None
 
-    @app.callback(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,too-many-branches,too-many-statements
+    @app.callback(
         Output('viz-graph',  'figure'),
         Output('status-bar', 'children'),
         Input('var-sel',     'value'),
@@ -490,7 +491,7 @@ def run_interactive(  # pylint: disable=too-many-locals,too-many-statements
         Input('vmin-inp',    'value'),
         Input('vmax-inp',    'value'),
     )
-    def _update(var_sel, step, mode,
+    def _update(var_sel, step, mode,  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,too-many-branches,too-many-statements
                 slice_axis, slice_pos,
                 iso_min_frac, iso_max_frac, iso_n, iso_caps,
                 vol_opacity, vol_nsurf, vol_min_frac, vol_max_frac,
