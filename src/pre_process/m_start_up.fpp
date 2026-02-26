@@ -798,7 +798,7 @@ contains
         if (relax) then
             if (proc_rank == 0) then
                 print *, 'initial condition might have been altered due to enforcement of &
-&                pTg-equilirium (relax = "T" activated)'
+&                pTg-equilibrium (relax = "T" activated)'
             end if
 
             call s_infinite_relaxation_k(q_cons_vf)
