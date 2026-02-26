@@ -96,6 +96,8 @@ class MFCPlot(PlotextPlot):  # pylint: disable=too-many-instance-attributes
                     plot_y = data
                     ylabel = self._varname
                     title_tag = ""
+                if self._vmin is not None or self._vmax is not None:
+                    title_tag += "  [frozen]"
                 finite = plot_y[np.isfinite(plot_y)]
                 self._last_vmin = float(finite.min()) if finite.size else 0.0
                 self._last_vmax = float(finite.max()) if finite.size else 1.0
@@ -182,9 +184,10 @@ class MFCPlot(PlotextPlot):  # pylint: disable=too-many-instance-attributes
 
         y_cc = self._y_cc if self._y_cc is not None else np.array([0.0, 1.0])
         log_tag = "  [log]" if log_active else ("  [log n/a]" if self._log_scale else "")
+        frozen_tag = "  [frozen]" if self._vmin is not None else ""
         header = RichText(
             f" {self._varname}  (step {self._step})"
-            f"   [{vmin:.3g}, {vmax:.3g}]{log_tag}",
+            f"   [{vmin:.3g}, {vmax:.3g}]{log_tag}{frozen_tag}",
             style="bold"
         )
         footer = RichText(
