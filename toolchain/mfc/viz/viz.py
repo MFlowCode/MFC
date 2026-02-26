@@ -81,14 +81,68 @@ def _steps_hint(steps, n=8):
     return f"{head}, ... [{len(steps)} total] ..., {tail}"
 
 
+def _parse_step_list(s, available_steps):
+    """
+    Parse a comma-separated step list, with optional '...' ellipsis expansion.
+
+    Examples:
+      "0,100,200,1000"        -> [0, 100, 200, 1000] (intersection with available)
+      "0,100,200,...,1000"    -> range(0, 1001, 100) (infers stride=100 from last pair)
+    """
+    parts = [p.strip() for p in s.split(',')]
+    avail_set = set(available_steps)
+
+    if '...' in parts:
+        idx = parts.index('...')
+        if idx < 2:
+            raise MFCException(
+                f"Invalid --step value '{s}'. "
+                "Ellipsis '...' requires at least two values before it, "
+                "e.g. '0,100,...,1000'."
+            )
+        if idx != len(parts) - 2:
+            raise MFCException(
+                f"Invalid --step value '{s}'. "
+                "Ellipsis '...' must be the second-to-last item, "
+                "e.g. '0,100,...,1000'."
+            )
+        try:
+            prefix = [int(p) for p in parts[:idx]]
+            end = int(parts[idx + 1])
+        except ValueError as exc:
+            raise MFCException(
+                f"Invalid --step value '{s}': all values must be integers."
+            ) from exc
+
+        stride = prefix[-1] - prefix[-2]
+        if stride <= 0:
+            raise MFCException(
+                f"Invalid --step value '{s}': "
+                f"ellipsis stride must be positive (got {stride})."
+            )
+        requested = list(range(prefix[0], end + 1, stride))
+    else:
+        try:
+            requested = [int(p) for p in parts]
+        except ValueError as exc:
+            raise MFCException(
+                f"Invalid --step value '{s}': all values must be integers."
+            ) from exc
+
+    return [t for t in requested if t in avail_set]
+
+
 def _parse_steps(step_arg, available_steps):
     """
     Parse the --step argument into a list of timestep integers.
 
     Formats:
-      - Single int: "1000"
-      - Range: "0:10000:500"  (start:end:stride)
-      - "all": all available timesteps
+      - Single int:       "1000"
+      - Range:            "0:10000:500"  (start:end:stride)
+      - Comma list:       "0,100,200,1000"
+      - Ellipsis list:    "0,100,200,...,1000"  (stride inferred from last pair)
+      - "last":           last available timestep
+      - "all":            all available timesteps
     """
     if step_arg is None or step_arg == 'all':
         return available_steps
@@ -96,20 +150,27 @@ def _parse_steps(step_arg, available_steps):
     if step_arg == 'last':
         return [available_steps[-1]] if available_steps else []
 
+    s = str(step_arg)
+
+    if ',' in s:
+        return _parse_step_list(s, available_steps)
+
     try:
-        if ':' in str(step_arg):
-            parts = str(step_arg).split(':')
+        if ':' in s:
+            parts = s.split(':')
             start = int(parts[0])
             end = int(parts[1])
             stride = int(parts[2]) if len(parts) > 2 else 1
             requested = list(range(start, end + 1, stride))
-            return [s for s in requested if s in set(available_steps)]
+            return [t for t in requested if t in set(available_steps)]
 
-        single = int(step_arg)
+        single = int(s)
     except ValueError as exc:
         raise MFCException(
             f"Invalid --step value '{step_arg}'. "
-            "Expected an integer, a range (start:end:stride), 'last', or 'all'."
+            "Expected an integer, a range (start:end:stride), "
+            "a comma list (0,100,200), an ellipsis list (0,100,...,1000), "
+            "'last', or 'all'."
         ) from exc
 
     if available_steps and single not in set(available_steps):

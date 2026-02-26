@@ -68,6 +68,41 @@ class TestParseSteps(unittest.TestCase):
         result = self._parse('0:2', [0, 1, 2, 3])
         self.assertEqual(result, [0, 1, 2])
 
+    def test_comma_list(self):
+        """Comma-separated list selects the intersection with available steps."""
+        result = self._parse('0,100,200,1000', [0, 100, 200, 300, 1000])
+        self.assertEqual(result, [0, 100, 200, 1000])
+
+    def test_comma_list_filters_unavailable(self):
+        """Comma list silently drops steps not in available."""
+        result = self._parse('0,999', [0, 100, 200])
+        self.assertEqual(result, [0])
+
+    def test_ellipsis_expansion(self):
+        """Ellipsis infers stride and expands the range."""
+        result = self._parse('0,100,200,...,1000',
+                             list(range(0, 1001, 100)))
+        self.assertEqual(result, list(range(0, 1001, 100)))
+
+    def test_ellipsis_partial_available(self):
+        """Ellipsis expansion filters to only available steps."""
+        # only even-numbered hundreds available
+        avail = [0, 200, 400, 600, 800, 1000]
+        result = self._parse('0,100,...,1000', avail)
+        self.assertEqual(result, [0, 200, 400, 600, 800, 1000])
+
+    def test_ellipsis_requires_two_prefix_values(self):
+        """Ellipsis with only one prefix value raises MFCException."""
+        from mfc.common import MFCException
+        with self.assertRaises(MFCException):
+            self._parse('0,...,1000', [0, 100, 1000])
+
+    def test_ellipsis_must_be_second_to_last(self):
+        """Ellipsis not in second-to-last position raises MFCException."""
+        from mfc.common import MFCException
+        with self.assertRaises(MFCException):
+            self._parse('0,100,...,500,1000', [0, 100, 500, 1000])
+
     def test_invalid_value(self):
         """Non-numeric, non-keyword input raises MFCException."""
         from mfc.common import MFCException
