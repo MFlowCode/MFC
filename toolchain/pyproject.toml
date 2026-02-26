@@ -5,11 +5,11 @@ build-backend = "hatchling.build"
 [project]
 name = "mfc"
 dynamic = ["version"]
+requires-python = ">=3.10"
 dependencies = [
     # General
     "rich",
     "wheel",
-    "typos",
     "PyYAML",
     "argparse",
     "dataclasses",
@@ -53,7 +53,7 @@ dependencies = [
     # Frontier Profiling
     "astunparse==1.6.2",
     "colorlover",
-    "dash>=1.12.0",
+    "dash>=2.0",
     "pymongo",
     "tabulate",
     "tqdm",

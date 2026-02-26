@@ -13,7 +13,7 @@ import tempfile
 
 import numpy as np
 
-import imageio.v2 as imageio
+import imageio
 
 import matplotlib
 matplotlib.use('Agg')

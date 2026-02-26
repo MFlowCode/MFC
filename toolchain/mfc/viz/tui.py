@@ -110,7 +110,7 @@ class MFCPlot(PlotextPlot):  # pylint: disable=too-many-instance-attributes
             return super().render()
 
         # 2D: pure-Rich heatmap with vertical colorbar.
-        import matplotlib.cm as mcm          # pylint: disable=import-outside-toplevel
+        import matplotlib                     # pylint: disable=import-outside-toplevel
         import matplotlib.colors as mcolors  # pylint: disable=import-outside-toplevel
 
         # Content area = widget size minus 1-char border on each side.
@@ -132,7 +132,7 @@ class MFCPlot(PlotextPlot):  # pylint: disable=too-many-instance-attributes
             vmax = vmin + 1e-10
         self._last_vmin = vmin
         self._last_vmax = vmax
-        cmap = mcm.get_cmap(self._cmap_name)
+        cmap = matplotlib.colormaps[self._cmap_name]
         if self._log_scale and vmin > 0:
             norm = mcolors.LogNorm(vmin=vmin, vmax=vmax)
         else:
