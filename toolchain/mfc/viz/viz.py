@@ -11,6 +11,39 @@ from mfc.common import MFCException
 from mfc.printer import cons
 
 
+_CMAP_POPULAR = (
+    'viridis, plasma, inferno, magma, turbo, '
+    'coolwarm, RdBu_r, bwr, hot, jet, gray, seismic'
+)
+
+
+def _validate_cmap(name):
+    """Raise a helpful MFCException if *name* is not a known matplotlib colormap."""
+    import matplotlib  # pylint: disable=import-outside-toplevel
+    if name in matplotlib.colormaps:
+        return
+    try:
+        from rapidfuzz import process  # pylint: disable=import-outside-toplevel
+        matches = process.extract(name, list(matplotlib.colormaps), limit=3)
+        suggestions = ', '.join(m[0] for m in matches)
+        hint = f" Did you mean: {suggestions}?"
+    except ImportError:
+        hint = f" Popular choices: {_CMAP_POPULAR}."
+    raise MFCException(f"Unknown colormap '{name}'.{hint}")
+
+
+def _steps_hint(steps, n=8):
+    """Short inline preview of available steps for error messages."""
+    if not steps:
+        return "none found"
+    if len(steps) <= n:
+        return ', '.join(str(s) for s in steps)
+    half = n // 2
+    head = ', '.join(str(s) for s in steps[:half])
+    tail = ', '.join(str(s) for s in steps[-half:])
+    return f"{head}, ... [{len(steps)} total] ..., {tail}"
+
+
 def _parse_steps(step_arg, available_steps):
     """
     Parse the --step argument into a list of timestep integers.
@@ -37,8 +70,10 @@ def _parse_steps(step_arg, available_steps):
 
         single = int(step_arg)
     except ValueError as exc:
-        raise MFCException(f"Invalid --step value '{step_arg}'. "
-                           "Expected an integer, a range (start:end:stride), 'last', or 'all'.") from exc
+        raise MFCException(
+            f"Invalid --step value '{step_arg}'. "
+            "Expected an integer, a range (start:end:stride), 'last', or 'all'."
+        ) from exc
 
     if available_steps and single not in set(available_steps):
         return []
@@ -69,7 +104,11 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
         try:
             fmt = discover_format(case_dir)
         except FileNotFoundError as exc:
-            raise MFCException(str(exc)) from exc
+            msg = str(exc)
+            if os.path.isfile(os.path.join(case_dir, 'case.py')):
+                msg += (" This looks like an MFC case directory. "
+                        "Did you forget to run post_process first?")
+            raise MFCException(msg) from exc
 
     cons.print(f"[bold]Format:[/bold] {fmt}")
 
@@ -96,7 +135,9 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
         step_arg = ARG('step')
         steps = discover_timesteps(case_dir, fmt)
         if not steps:
-            raise MFCException("No timesteps found.")
+            raise MFCException(
+                f"No timesteps found in '{case_dir}' ({fmt} format). "
+                "Ensure post_process has been run and produced output files.")
 
         if step_arg is None or step_arg == 'all':
             step = steps[0]
@@ -112,8 +153,8 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
                                    "Expected an integer, 'last', or 'all'.") from exc
             if step not in steps:
                 raise MFCException(
-                    f"Timestep {step} not found. Available range: "
-                    f"{steps[0]} to {steps[-1]} ({len(steps)} timesteps)")
+                    f"Timestep {step} not found. "
+                    f"Available steps: {_steps_hint(steps)}")
 
         if fmt == 'silo':
             from .silo_reader import assemble_silo  # pylint: disable=import-outside-toplevel
@@ -138,14 +179,15 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
 
     steps = discover_timesteps(case_dir, fmt)
     if not steps:
-        raise MFCException("No timesteps found.")
+        raise MFCException(
+            f"No timesteps found in '{case_dir}' ({fmt} format). "
+            "Ensure post_process has been run and produced output files.")
 
     requested_steps = _parse_steps(step_arg, steps)
     if not requested_steps:
-        msg = f"No matching timesteps for --step {step_arg}"
-        if steps:
-            msg += f". Available range: {steps[0]} to {steps[-1]} ({len(steps)} timesteps)"
-        raise MFCException(msg)
+        raise MFCException(
+            f"No matching timesteps for --step {step_arg!r}. "
+            f"Available steps: {_steps_hint(steps)}")
 
     # Collect rendering options
     render_opts = {
@@ -221,6 +263,11 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
         init_var = varname if varname in avail else (avail[0] if avail else None)
         run_interactive(init_var, requested_steps, read_step, port=int(port))
         return
+
+    # Validate colormap before any rendering
+    cmap_name = ARG('cmap')
+    if cmap_name:
+        _validate_cmap(cmap_name)
 
     # Create output directory
     output_base = ARG('output')
