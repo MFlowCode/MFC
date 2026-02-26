@@ -53,7 +53,7 @@ def _load(step: int, read_func: Callable) -> object:
 # Plot widget
 # ---------------------------------------------------------------------------
 
-class MFCPlot(PlotextPlot):
+class MFCPlot(PlotextPlot):  # pylint: disable=too-many-instance-attributes
     """Plotext plot widget.  Caller sets ._x_cc / ._y_cc / ._data / ._ndim /
     ._varname / ._step before calling .refresh()."""
 
@@ -74,8 +74,13 @@ class MFCPlot(PlotextPlot):
         self._varname: str = ""
         self._step: int = 0
         self._cmap_name: str = _CMAPS[0]
+        self._log_scale: bool = False
+        self._vmin: Optional[float] = None
+        self._vmax: Optional[float] = None
+        self._last_vmin: float = 0.0
+        self._last_vmax: float = 1.0
 
-    def render(self):  # pylint: disable=too-many-branches,too-many-locals
+    def render(self):  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
         data = self._data
         x_cc = self._x_cc
         self.plt.clear_figure()
@@ -83,10 +88,23 @@ class MFCPlot(PlotextPlot):
         # 1D: use normal plotext path — gives proper axes and title for free.
         if data is None or x_cc is None or self._ndim == 1:
             if data is not None and x_cc is not None:
-                self.plt.plot(x_cc.tolist(), data.tolist())
+                if self._log_scale:
+                    plot_y = np.where(data > 0, np.log10(np.maximum(data, 1e-300)), np.nan)
+                    ylabel = f"log\u2081\u2080({self._varname})"
+                else:
+                    plot_y = data
+                    ylabel = self._varname
+                finite = plot_y[np.isfinite(plot_y)]
+                self._last_vmin = float(finite.min()) if finite.size else 0.0
+                self._last_vmax = float(finite.max()) if finite.size else 1.0
+                self.plt.plot(x_cc.tolist(), plot_y.tolist())
                 self.plt.xlabel("x")
-                self.plt.ylabel(self._varname)
+                self.plt.ylabel(ylabel)
                 self.plt.title(f"{self._varname}  (step {self._step})")
+                if self._vmin is not None or self._vmax is not None:
+                    lo = self._vmin if self._vmin is not None else self._last_vmin
+                    hi = self._vmax if self._vmax is not None else self._last_vmax
+                    self.plt.ylim(lo, hi)
             else:
                 self.plt.title("No data loaded")
             return super().render()
@@ -108,9 +126,17 @@ class MFCPlot(PlotextPlot):
         iy = np.linspace(0, data.shape[1] - 1, h_plot, dtype=int)
         ds = data[np.ix_(ix, iy)]  # pylint: disable=unsubscriptable-object
 
-        vmin, vmax = float(ds.min()), float(ds.max())
+        vmin = self._vmin if self._vmin is not None else float(ds.min())
+        vmax = self._vmax if self._vmax is not None else float(ds.max())
+        if vmax <= vmin:
+            vmax = vmin + 1e-10
+        self._last_vmin = vmin
+        self._last_vmax = vmax
         cmap = mcm.get_cmap(self._cmap_name)
-        norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
+        if self._log_scale and vmin > 0:
+            norm = mcolors.LogNorm(vmin=vmin, vmax=vmax)
+        else:
+            norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
         # Transpose + flip so y=0 appears at the bottom of the display.
         rgba = cmap(norm(ds.T[::-1]))  # (h_plot, w_map, 4)
 
@@ -137,7 +163,8 @@ class MFCPlot(PlotextPlot):
             elif row == h_plot - 1:
                 lbl = f" {vmin:.3g}"
             elif row == h_plot // 2:
-                lbl = f" {(vmin + vmax) / 2:.3g}"
+                mid = np.sqrt(vmin * vmax) if (self._log_scale and vmin > 0) else (vmin + vmax) / 2
+                lbl = f" {mid:.3g}"
             else:
                 lbl = ""
             line.append(lbl.ljust(_CB_LBL)[:_CB_LBL])
@@ -205,12 +232,17 @@ class MFCTuiApp(App):  # pylint: disable=too-many-instance-attributes
         Binding("period", "next_step", "step ▶"),
         Binding("left", "prev_step", "◀ step", show=False),
         Binding("right", "next_step", "step ▶", show=False),
+        Binding("space", "toggle_play", "▶/⏸"),
         Binding("c", "cycle_cmap", "cmap"),
+        Binding("l", "toggle_log", "log"),
+        Binding("f", "toggle_freeze", "freeze"),
     ]
 
     step_idx: reactive[int] = reactive(0, always_update=True)
     var_name: reactive[str] = reactive("", always_update=True)
     cmap_name: reactive[str] = reactive(_CMAPS[0], always_update=True)
+    log_scale: reactive[bool] = reactive(False, always_update=True)
+    playing: reactive[bool] = reactive(False, always_update=True)
 
     def __init__(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
@@ -229,6 +261,8 @@ class MFCTuiApp(App):  # pylint: disable=too-many-instance-attributes
         # Store init_var but don't set the reactive yet — the DOM doesn't exist
         # until on_mount, and the watcher calls query_one which needs the DOM.
         self._init_var = init_var or (varnames[0] if varnames else "")
+        self._frozen_range: Optional[tuple] = None
+        self._play_timer = None
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
@@ -266,6 +300,17 @@ class MFCTuiApp(App):  # pylint: disable=too-many-instance-attributes
     def watch_cmap_name(self, _old: str, _new: str) -> None:
         self._push_data()
 
+    def watch_log_scale(self, _old: bool, _new: bool) -> None:
+        self._push_data()
+
+    def watch_playing(self, _old: bool, new: bool) -> None:
+        if new:
+            self._play_timer = self.set_interval(0.5, self._auto_advance)
+        else:
+            if self._play_timer is not None:
+                self._play_timer.stop()
+                self._play_timer = None
+
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
@@ -273,11 +318,19 @@ class MFCTuiApp(App):  # pylint: disable=too-many-instance-attributes
     def _status_text(self) -> str:
         step = self._steps[self.step_idx] if self._steps else 0
         total = len(self._steps)
+        flags = []
+        if self.log_scale:
+            flags.append("log")
+        if self._frozen_range is not None:
+            flags.append("frozen")
+        if self.playing:
+            flags.append("▶")
+        flag_str = ("  " + "  ".join(flags)) if flags else ""
         return (
             f" step {step}  [{self.step_idx + 1}/{total}]"
             f"  var: {self.var_name}"
             f"  cmap: {self.cmap_name}"
-            f"  [,] prev  [.] next  [c] cmap"
+            f"{flag_str}"
         )
 
     def _push_data(self) -> None:
@@ -302,6 +355,12 @@ class MFCTuiApp(App):  # pylint: disable=too-many-instance-attributes
         plot._varname = self.var_name      # pylint: disable=protected-access
         plot._step = step                  # pylint: disable=protected-access
         plot._cmap_name = self.cmap_name   # pylint: disable=protected-access
+        plot._log_scale = self.log_scale   # pylint: disable=protected-access
+        if self._frozen_range is not None:
+            plot._vmin, plot._vmax = self._frozen_range  # pylint: disable=protected-access
+        else:
+            plot._vmin = None              # pylint: disable=protected-access
+            plot._vmax = None              # pylint: disable=protected-access
         plot.refresh()
 
         self.query_one("#status", Static).update(self._status_text())
@@ -327,6 +386,23 @@ class MFCTuiApp(App):  # pylint: disable=too-many-instance-attributes
     def action_cycle_cmap(self) -> None:
         idx = (_CMAPS.index(self.cmap_name) + 1) % len(_CMAPS)
         self.cmap_name = _CMAPS[idx]
+
+    def action_toggle_log(self) -> None:
+        self.log_scale = not self.log_scale
+
+    def action_toggle_freeze(self) -> None:
+        if self._frozen_range is not None:
+            self._frozen_range = None
+        else:
+            plot = self.query_one("#plot", MFCPlot)
+            self._frozen_range = (plot._last_vmin, plot._last_vmax)  # pylint: disable=protected-access
+        self._push_data()
+
+    def action_toggle_play(self) -> None:
+        self.playing = not self.playing
+
+    def _auto_advance(self) -> None:
+        self.step_idx = (self.step_idx + 1) % len(self._steps)
 
 
 # ---------------------------------------------------------------------------
@@ -358,7 +434,7 @@ def run_tui(
         f"[bold]Launching TUI[/bold] — {len(steps)} step(s), "
         f"{len(varnames)} variable(s)"
     )
-    cons.print("[dim]  ,/. or ←/→  prev/next step  •  ↑↓ select variable  •  q quit[/dim]")
+    cons.print("[dim]  ,/. or ←/→  prev/next step  •  space play  •  l log  •  f freeze  •  ↑↓ variable  •  q quit[/dim]")
 
     _cache.clear()
     _cache[steps[0]] = first
