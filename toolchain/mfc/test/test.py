@@ -42,6 +42,40 @@ abort_tests = threading.Event()
 class TestTimeoutError(MFCException):
     pass
 
+def _filter_only(cases, skipped_cases):
+    """Filter cases by --only terms using AND for labels, OR for UUIDs.
+
+    Labels (non-UUID terms): case must match ALL labels (AND logic).
+    UUIDs (8-char hex terms): case must match ANY UUID (OR logic).
+    Mixed: keep case if all labels match OR any UUID matches.
+    """
+    def is_uuid(term):
+        return len(term) == 8 and all(c in '0123456789abcdefABCDEF' for c in term)
+
+    uuids  = [t for t in ARG("only") if is_uuid(t)]
+    labels = [t for t in ARG("only") if not is_uuid(t)]
+
+    for case in cases[:]:
+        check = set(case.trace.split(" -> "))
+        check.add(case.get_uuid())
+
+        label_ok = all(l in check for l in labels) if labels else True
+        uuid_ok  = any(u in check for u in uuids)  if uuids  else True
+
+        if labels and uuids:
+            keep = label_ok or uuid_ok
+        elif labels:
+            keep = label_ok
+        else:
+            keep = uuid_ok
+
+        if not keep:
+            cases.remove(case)
+            skipped_cases.append(case)
+
+    return cases, skipped_cases
+
+
 # pylint: disable=too-many-branches, too-many-statements, trailing-whitespace
 def __filter(cases_) -> typing.List[TestCase]:
     cases = cases_[:]
@@ -66,14 +100,7 @@ def __filter(cases_) -> typing.List[TestCase]:
         raise MFCException("Testing: Your specified range [--from,--to] is incorrect. Please ensure both IDs exist and are in the correct order.")
 
     if len(ARG("only")) > 0:
-        for case in cases[:]:
-            case: TestCase
-
-            checkCase = case.trace.split(" -> ")
-            checkCase.append(case.get_uuid())
-            if not set(ARG("only")).intersection(set(checkCase)):
-                cases.remove(case)
-                skipped_cases.append(case)
+        cases, skipped_cases = _filter_only(cases, skipped_cases)
 
         if not cases:
             raise MFCException(
