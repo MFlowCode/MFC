@@ -30,3 +30,13 @@ See the [developer guide](https://mflowcode.github.io/documentation/contributing
 - [ ] Tested on NVIDIA GPU or AMD GPU
 
 </details>
+
+<details>
+<summary><strong>AI code reviews</strong></summary>
+
+Reviews are not triggered automatically. To request a review, comment on the PR:
+- `@coderabbitai review` — incremental review (new changes only)
+- `@coderabbitai full review` — full review from scratch
+- `/review` — Qodo review
+
+</details>
