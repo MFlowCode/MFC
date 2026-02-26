@@ -151,7 +151,7 @@ jobs:
 
   self:
     name: "${{ matrix.cluster_name }} (${{ matrix.device }}${{ matrix.interface != 'none' && format('-{0}', matrix.interface) || '' }})"
-    if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true'
+    if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true' && github.event.pull_request.draft != true
     needs: [lint-gate, file-changes]
     continue-on-error: false
     timeout-minutes: 480
