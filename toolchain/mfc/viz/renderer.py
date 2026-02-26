@@ -13,6 +13,8 @@ import numpy as np
 
 import imageio.v2 as imageio
 
+import math
+
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt  # pylint: disable=wrong-import-position
@@ -26,6 +28,8 @@ def render_1d(x_cc, data, varname, step, output, **opts):  # pylint: disable=too
     ax.set_xlabel('x')
     ax.set_ylabel(varname)
     ax.set_title(f'{varname} (step {step})')
+    ax.grid(True, alpha=0.3)
+    ax.ticklabel_format(axis='y', style='sci', scilimits=(-3, 4), useMathText=True)
 
     vmin = opts.get('vmin')
     vmax = opts.get('vmax')
@@ -37,9 +41,65 @@ def render_1d(x_cc, data, varname, step, output, **opts):  # pylint: disable=too
     plt.close(fig)
 
 
+def render_1d_tiled(x_cc, variables, step, output, **opts):  # pylint: disable=too-many-locals
+    """Render all 1D variables in a tiled subplot grid and save as PNG."""
+    varnames = sorted(variables.keys())
+    n = len(varnames)
+    if n == 0:
+        return
+    if n == 1:
+        render_1d(x_cc, variables[varnames[0]], varnames[0], step, output, **opts)
+        return
+
+    ncols = 2 if n <= 8 else 3
+    nrows = math.ceil(n / ncols)
+    fig_w = 5 * ncols
+    fig_h = 2.8 * nrows
+    fig, axes = plt.subplots(nrows, ncols,
+                             figsize=opts.get('figsize', (fig_w, fig_h)),
+                             sharex=True, squeeze=False)
+
+    for idx, vn in enumerate(varnames):
+        row, col = divmod(idx, ncols)
+        ax = axes[row][col]
+        ax.plot(x_cc, variables[vn], linewidth=1.2)
+        ax.set_ylabel(vn, fontsize=9)
+        ax.tick_params(labelsize=8)
+        ax.grid(True, alpha=0.3)
+
+    # Hide unused subplots
+    for idx in range(n, nrows * ncols):
+        row, col = divmod(idx, ncols)
+        axes[row][col].set_visible(False)
+
+    # X-label only on bottom row
+    for col in range(ncols):
+        bottom_row = min(nrows - 1, (n - 1) // ncols) if col < (n % ncols or ncols) else nrows - 2
+        axes[bottom_row][col].set_xlabel('x', fontsize=9)
+
+    fig.suptitle(f'step {step}', fontsize=11, y=0.99)
+    fig.tight_layout(rect=[0, 0, 1, 0.97])
+    fig.savefig(output, dpi=opts.get('dpi', 150))
+    plt.close(fig)
+
+
+def _figsize_for_domain(x_cc, y_cc, base=10):
+    """Compute figure size that matches the physical domain aspect ratio."""
+    dx = float(x_cc[-1] - x_cc[0]) if len(x_cc) > 1 else 1.0
+    dy = float(y_cc[-1] - y_cc[0]) if len(y_cc) > 1 else 1.0
+    aspect = dy / dx if dx > 0 else 1.0
+    # Clamp to avoid extremely tall/wide figures
+    aspect = max(0.2, min(aspect, 5.0))
+    # Extra width for colorbar
+    fig_w = base + 1.5
+    fig_h = max(base * aspect, 3.0)
+    return (fig_w, fig_h)
+
+
 def render_2d(x_cc, y_cc, data, varname, step, output, **opts):  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
     """Render a 2D colormap via pcolormesh and save as PNG."""
-    fig, ax = plt.subplots(figsize=opts.get('figsize', (10, 8)))
+    default_size = _figsize_for_domain(x_cc, y_cc)
+    fig, ax = plt.subplots(figsize=opts.get('figsize', default_size))
 
     cmap = opts.get('cmap', 'viridis')
     vmin = opts.get('vmin')
@@ -109,7 +169,8 @@ def render_3d_slice(assembled, varname, step, output, slice_axis='z',  # pylint:
         x_plot, y_plot = assembled.x_cc, assembled.y_cc
         xlabel, ylabel = 'x', 'y'
 
-    fig, ax = plt.subplots(figsize=opts.get('figsize', (10, 8)))
+    default_size = _figsize_for_domain(x_plot, y_plot)
+    fig, ax = plt.subplots(figsize=opts.get('figsize', default_size))
 
     cmap = opts.get('cmap', 'viridis')
     vmin = opts.get('vmin')
@@ -144,16 +205,17 @@ def render_3d_slice(assembled, varname, step, output, slice_axis='z',  # pylint:
 
 
 def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,too-many-statements
-               read_func=None, **opts):
+               read_func=None, tiled=False, **opts):
     """
     Generate an MP4 video by iterating over timesteps.
 
     Args:
-        varname: Variable name to plot.
+        varname: Variable name to plot (ignored when tiled=True).
         steps: List of timestep integers.
         output: Output MP4 file path.
         fps: Frames per second.
         read_func: Callable(step) -> AssembledData for loading each frame.
+        tiled: If True, render all 1D variables in a tiled layout per frame.
         **opts: Rendering options (cmap, vmin, vmax, dpi, log_scale, figsize,
                 slice_axis, slice_index, slice_value).
 
@@ -170,10 +232,11 @@ def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-argum
     opts = dict(opts)  # avoid mutating the caller's dict
 
     # Pre-compute vmin/vmax from first, middle, and last frames if not provided
+    # (not needed for tiled mode — each subplot auto-scales independently)
     auto_vmin = opts.get('vmin')
     auto_vmax = opts.get('vmax')
 
-    if auto_vmin is None or auto_vmax is None:
+    if not tiled and (auto_vmin is None or auto_vmax is None):
         sample_steps = [steps[0]]
         if len(steps) > 1:
             sample_steps.append(steps[-1])
@@ -213,19 +276,28 @@ def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-argum
 
     for i, step in enumerate(step_iter):
         assembled = read_func(step)
-        var_data = assembled.variables.get(varname)
-        if var_data is None:
-            continue
         frame_path = os.path.join(viz_dir, f'{i:06d}.png')
 
-        if assembled.ndim == 1:
+        if tiled and assembled.ndim == 1:
+            render_1d_tiled(assembled.x_cc, assembled.variables,
+                            step, frame_path, **opts)
+        elif assembled.ndim == 1:
+            var_data = assembled.variables.get(varname)
+            if var_data is None:
+                continue
             render_1d(assembled.x_cc, var_data,
                       varname, step, frame_path, **opts)
         elif assembled.ndim == 2:
+            var_data = assembled.variables.get(varname)
+            if var_data is None:
+                continue
             render_2d(assembled.x_cc, assembled.y_cc,
                       var_data,
                       varname, step, frame_path, **opts)
         elif assembled.ndim == 3:
+            var_data = assembled.variables.get(varname)
+            if var_data is None:
+                continue
             render_3d_slice(assembled, varname, step, frame_path, **opts)
         else:
             raise ValueError(

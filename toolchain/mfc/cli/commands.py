@@ -875,7 +875,7 @@ VIZ_COMMAND = Command(
     arguments=[
         Argument(
             name="var",
-            help="Variable name to visualize (e.g. pres, rho, schlieren).",
+            help="Variable name to visualize (e.g. pres, rho). Omit or pass 'all' for tiled 1D plots.",
             type=str,
             default=None,
             metavar="VAR",

@@ -45,7 +45,7 @@ def _parse_steps(step_arg, available_steps):
 def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branches
     """Main viz command dispatcher."""
     from .reader import discover_format, discover_timesteps, assemble  # pylint: disable=import-outside-toplevel
-    from .renderer import render_1d, render_2d, render_3d_slice, render_mp4  # pylint: disable=import-outside-toplevel
+    from .renderer import render_1d, render_1d_tiled, render_2d, render_3d_slice, render_mp4  # pylint: disable=import-outside-toplevel
 
     case_dir = ARG('input')
     if case_dir is None:
@@ -72,7 +72,7 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
 
     # Quick guide when no action is specified
     if not ARG('list_steps') and not ARG('list_vars') and ARG('var') is None \
-            and not ARG('interactive'):
+            and not ARG('interactive') and ARG('step') is None:
         cons.print()
         d = case_dir
         cons.print("[bold]Quick start:[/bold]")
@@ -138,13 +138,10 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
             cons.print(f"  {vn:<20s}  min={data.min():.6g}  max={data.max():.6g}")
         return
 
-    # For rendering, --var and --step are required
+    # For rendering, --step is required; --var is optional for 1D (shows all)
     varname = ARG('var')
     step_arg = ARG('step')
-
-    if varname is None and not ARG('interactive'):
-        raise MFCException("--var is required for rendering. "
-                           "Use --list-vars to see available variables.")
+    tiled = varname is None or varname == 'all'
 
     if step_arg is None:
         if ARG('interactive'):
@@ -193,18 +190,26 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
 
     interactive = ARG('interactive')
 
-    # Interactive mode always loads all variables (user can switch in UI).
-    # Non-interactive mode can filter to just the requested variable for speed.
+    # Load all variables when tiled or interactive; filter otherwise.
+    load_all = tiled or interactive
+
     def read_step(step):
         if fmt == 'silo':
             from .silo_reader import assemble_silo  # pylint: disable=import-outside-toplevel
-            return assemble_silo(case_dir, step, var=None if interactive else varname)
-        return assemble(case_dir, step, fmt, var=None if interactive else varname)
+            return assemble_silo(case_dir, step, var=None if load_all else varname)
+        return assemble(case_dir, step, fmt, var=None if load_all else varname)
 
     # Validate variable name / discover available variables
     test_assembled = read_step(requested_steps[0])
     avail = sorted(test_assembled.variables.keys())
-    if not interactive and varname not in test_assembled.variables:
+
+    # Tiled mode only works for 1D
+    if tiled and not interactive:
+        if test_assembled.ndim != 1:
+            raise MFCException("--var is required for 2D/3D rendering. "
+                               "Use --list-vars to see available variables.")
+
+    if not tiled and not interactive and varname not in test_assembled.variables:
         raise MFCException(f"Variable '{varname}' not found. "
                            f"Available variables: {', '.join(avail)}")
 
@@ -226,10 +231,12 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
     # MP4 mode
     if ARG('mp4'):
         fps = ARG('fps') or 10
-        mp4_path = os.path.join(output_base, f'{varname}.mp4')
+        label = 'all' if tiled else varname
+        mp4_path = os.path.join(output_base, f'{label}.mp4')
         cons.print(f"[bold]Generating MP4:[/bold] {mp4_path} ({len(requested_steps)} frames)")
         success = render_mp4(varname, requested_steps, mp4_path,
-                             fps=int(fps), read_func=read_step, **render_opts)
+                             fps=int(fps), read_func=read_step,
+                             tiled=tiled, **render_opts)
         if success:
             cons.print(f"[bold green]Done:[/bold green] {mp4_path}")
         else:
@@ -245,6 +252,7 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
         step_iter = requested_steps
 
     failures = []
+    label = 'all' if tiled else varname
     for step in step_iter:
         try:
             assembled = read_step(step)
@@ -253,9 +261,12 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
             failures.append(step)
             continue
 
-        output_path = os.path.join(output_base, f'{varname}_{step}.png')
+        output_path = os.path.join(output_base, f'{label}_{step}.png')
 
-        if assembled.ndim == 1:
+        if tiled and assembled.ndim == 1:
+            render_1d_tiled(assembled.x_cc, assembled.variables,
+                            step, output_path, **render_opts)
+        elif assembled.ndim == 1:
             render_1d(assembled.x_cc, assembled.variables[varname],
                       varname, step, output_path, **render_opts)
         elif assembled.ndim == 2:
