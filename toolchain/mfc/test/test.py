@@ -140,6 +140,12 @@ def __filter(cases_) -> typing.List[TestCase]:
         skipped_cases += [c for i, c in enumerate(cases) if i % shard_count != shard_idx - 1]
         cases = [c for i, c in enumerate(cases) if i % shard_count == shard_idx - 1]
 
+        if not cases:
+            raise MFCException(
+                f"--shard {ARG('shard')} matched zero test cases. "
+                f"Total cases before sharding may be less than shard count."
+            )
+
     if ARG("percent") == 100:
         return cases, skipped_cases
 
