@@ -617,8 +617,33 @@ class TestMultiRankAssembly(unittest.TestCase):
         """Deduplication works correctly for large-extent domains (>1e6)."""
         import numpy as np
         from .reader import assemble_from_proc_data
-        # Scale up by 1e7 to exercise the negative-decimals code path
+        # Scale up by 1e7: extent=1e7, decimals = ceil(-log10(1e7)) + 12 = 5
         scale = 1e7
+        p0 = self._make_proc(
+            [0.00 * scale, 0.25 * scale, 0.50 * scale, 0.75 * scale],
+            [1.0, 2.0, 3.0],
+        )
+        p1 = self._make_proc(
+            [0.25 * scale, 0.50 * scale, 0.75 * scale, 1.00 * scale],
+            [2.0, 3.0, 4.0],
+        )
+        result = assemble_from_proc_data([(0, p0), (1, p1)])
+        self.assertEqual(len(result.x_cc), 4)
+        np.testing.assert_allclose(
+            result.variables['pres'], [1.0, 2.0, 3.0, 4.0]
+        )
+
+    def test_very_large_extent_dedup_negative_decimals(self):
+        """Deduplication works for extent ~1e13 where decimals becomes negative.
+
+        At scale=1e13: extent = 1e13, decimals = ceil(-log10(1e13)) + 12 = -1.
+        np.round with negative decimals rounds to the nearest 10^|d|, so
+        np.round(x, -1) rounds to the nearest 10.  Cell widths of 2.5e12
+        are >> 10, so distinct cell-centers must not be collapsed.
+        """
+        import numpy as np
+        from .reader import assemble_from_proc_data
+        scale = 1e13
         p0 = self._make_proc(
             [0.00 * scale, 0.25 * scale, 0.50 * scale, 0.75 * scale],
             [1.0, 2.0, 3.0],

@@ -453,23 +453,35 @@ def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-argum
         if not frame_files:
             return False
 
+        def _to_rgb(arr):
+            """Normalise an image array to uint8 RGB (3-channel).
+
+            imageio may return RGBA (4-ch) or even grayscale depending on the
+            PNG source.  libx264/yuv420p requires consistent 3-channel input.
+            """
+            if arr.ndim == 2:                        # grayscale → RGB
+                arr = np.stack([arr, arr, arr], axis=-1)
+            elif arr.shape[2] == 4:                  # RGBA → RGB (drop alpha)
+                arr = arr[:, :, :3]
+            return arr.astype(np.uint8)
+
         # First pass: find the maximum frame dimensions across all frames.
         # Round up to the nearest even pixel: yuv420p requires even width and height.
-        max_h, max_w, n_ch = 0, 0, 3
+        max_h, max_w = 0, 0
         for fname in frame_files:
             arr = imageio.imread(os.path.join(viz_dir, fname))
             max_h = max(max_h, arr.shape[0])
             max_w = max(max_w, arr.shape[1])
-            n_ch  = arr.shape[2] if arr.ndim == 3 else 1
         ref_h = max_h + max_h % 2
         ref_w = max_w + max_w % 2
 
         def _uniform_frame(arr):
-            """Pad with white to (ref_h, ref_w) so all frames are identical in size."""
+            """Convert to RGB and pad with white to (ref_h, ref_w)."""
+            arr = _to_rgb(arr)
             h, w = arr.shape[:2]
             if h == ref_h and w == ref_w:
                 return arr
-            out = np.full((ref_h, ref_w, n_ch), 255, dtype=arr.dtype)
+            out = np.full((ref_h, ref_w, 3), 255, dtype=np.uint8)
             out[:h, :w] = arr
             return out
 
