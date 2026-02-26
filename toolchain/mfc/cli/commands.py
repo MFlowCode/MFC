@@ -882,9 +882,9 @@ VIZ_COMMAND = Command(
         ),
         Argument(
             name="step",
-            help="Timestep(s): single int, start:end:stride, or 'all'.",
+            help="Timestep(s): single int, start:end:stride, 'last', or 'all' (default: last).",
             type=str,
-            default=None,
+            default='last',
             metavar="STEP",
         ),
         Argument(
@@ -909,7 +909,7 @@ VIZ_COMMAND = Command(
             name="cmap",
             help="Matplotlib colormap name (default: viridis).",
             type=str,
-            default=None,
+            default='viridis',
             metavar="CMAP",
             completion=Completion(type=CompletionType.CHOICES, choices=[
                 # Perceptually uniform sequential
@@ -934,7 +934,7 @@ VIZ_COMMAND = Command(
                 "turbo", "jet", "rainbow", "nipy_spectral", "gist_ncar",
                 "gist_rainbow", "gist_stern", "gist_earth", "ocean", "terrain",
                 "gnuplot", "gnuplot2", "CMRmap", "cubehelix", "brg", "flag", "prism",
-                "berlin", "managua", "vanimo", "Wistia",
+                "Wistia",
             ]),
         ),
         Argument(
@@ -955,14 +955,14 @@ VIZ_COMMAND = Command(
             name="dpi",
             help="Image resolution in DPI (default: 150).",
             type=int,
-            default=None,
+            default=150,
             metavar="DPI",
         ),
         Argument(
             name="slice-axis",
             help="Axis for 3D slice: x, y, or z (default: z).",
             type=str,
-            default=None,
+            default='z',
             choices=["x", "y", "z"],
             dest="slice_axis",
             completion=Completion(type=CompletionType.CHOICES, choices=["x", "y", "z"]),
@@ -993,7 +993,7 @@ VIZ_COMMAND = Command(
             name="fps",
             help="Frames per second for MP4 output (default: 10).",
             type=int,
-            default=None,
+            default=10,
             metavar="FPS",
         ),
         Argument(

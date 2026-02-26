@@ -73,28 +73,6 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
 
     cons.print(f"[bold]Format:[/bold] {fmt}")
 
-    # Quick guide when no action is specified
-    no_action = (not ARG('list_steps') and not ARG('list_vars')
-                 and ARG('var') is None and ARG('step') is None
-                 and not ARG('interactive') and not ARG('tui'))
-    if no_action:
-        cons.print()
-        d = case_dir
-        cons.print("[bold]Quick start:[/bold]")
-        cons.print(f"  [green]./mfc.sh viz {d} --list-steps[/green]"
-                   "                   [dim]see available timesteps[/dim]")
-        cons.print(f"  [green]./mfc.sh viz {d} --list-vars --step 0[/green]"
-                   "            [dim]see available variables[/dim]")
-        cons.print(f"  [green]./mfc.sh viz {d} --var pres --step last[/green]"
-                   "            [dim]render a PNG[/dim]")
-        cons.print(f"  [green]./mfc.sh viz {d} --var pres --step all --mp4[/green]"
-                   "     [dim]render an MP4[/dim]")
-        cons.print(f"  [green]./mfc.sh viz {d} --var pres --step 0 --slice-axis z[/green]"
-                   " [dim]3D midplane slice[/dim]")
-        cons.print()
-        cons.print("[dim]Run [bold]./mfc.sh viz --help[/bold] for all options.[/dim]")
-        return
-
     # Handle --list-steps
     if ARG('list_steps'):
         steps = discover_timesteps(case_dir, fmt)
@@ -155,12 +133,8 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
     step_arg = ARG('step')
     tiled = varname is None or varname == 'all'
 
-    if step_arg is None:
-        if ARG('interactive') or ARG('tui'):
-            step_arg = 'all'   # default to all steps in interactive/TUI mode
-        else:
-            raise MFCException("--step is required for rendering. "
-                               "Use --list-steps to see available timesteps, or pass --step all.")
+    if ARG('interactive') or ARG('tui'):
+        step_arg = 'all'   # always load all steps in interactive/TUI mode
 
     steps = discover_timesteps(case_dir, fmt)
     if not steps:
@@ -174,31 +148,21 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
         raise MFCException(msg)
 
     # Collect rendering options
-    render_opts = {}
-    cmap = ARG('cmap')
-    if cmap:
-        render_opts['cmap'] = cmap
-    vmin = ARG('vmin')
-    if vmin is not None:
-        render_opts['vmin'] = float(vmin)
-    vmax = ARG('vmax')
-    if vmax is not None:
-        render_opts['vmax'] = float(vmax)
-    dpi = ARG('dpi')
-    if dpi is not None:
-        render_opts['dpi'] = int(dpi)
+    render_opts = {
+        'cmap':  ARG('cmap'),
+        'dpi':   ARG('dpi'),
+        'slice_axis': ARG('slice_axis'),
+    }
+    if ARG('vmin') is not None:
+        render_opts['vmin'] = float(ARG('vmin'))
+    if ARG('vmax') is not None:
+        render_opts['vmax'] = float(ARG('vmax'))
     if ARG('log_scale'):
         render_opts['log_scale'] = True
-
-    slice_axis = ARG('slice_axis')
-    slice_index = ARG('slice_index')
-    slice_value = ARG('slice_value')
-    if slice_axis:
-        render_opts['slice_axis'] = slice_axis
-    if slice_index is not None:
-        render_opts['slice_index'] = int(slice_index)
-    if slice_value is not None:
-        render_opts['slice_value'] = float(slice_value)
+    if ARG('slice_index') is not None:
+        render_opts['slice_index'] = int(ARG('slice_index'))
+    if ARG('slice_value') is not None:
+        render_opts['slice_value'] = float(ARG('slice_value'))
 
     interactive = ARG('interactive')
 
@@ -222,11 +186,16 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
             f"Refusing to load {len(requested_steps)} timesteps for 3D data "
             "(limit is 500). Use --step with a range or stride to reduce.")
 
-    # Tiled mode for non-TUI, non-interactive rendering only works for 1D
+    # Tiled mode for non-TUI, non-interactive rendering only works for 1D.
+    # For 2D/3D, auto-select the first available variable.
     if tiled and not interactive and not ARG('tui'):
         if test_assembled.ndim != 1:
-            raise MFCException("--var is required for 2D/3D rendering. "
-                               "Use --list-vars to see available variables.")
+            varname = avail[0] if avail else None
+            if varname is None:
+                raise MFCException("No variables found in output.")
+            tiled = False
+            cons.print(f"[dim]Auto-selected variable: [bold]{varname}[/bold]"
+                       " (use --var to specify)[/dim]")
 
     if not tiled and not interactive and not ARG('tui') and varname not in test_assembled.variables:
         raise MFCException(f"Variable '{varname}' not found. "
@@ -247,7 +216,7 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
     # Interactive mode — launch Dash web server
     if interactive:
         from .interactive import run_interactive  # pylint: disable=import-outside-toplevel
-        port = ARG('port') or 8050
+        port = ARG('port')
         # Default to first available variable if --var was not specified
         init_var = varname if varname in avail else (avail[0] if avail else None)
         run_interactive(init_var, requested_steps, read_step, port=int(port))
@@ -261,7 +230,7 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
 
     # MP4 mode
     if ARG('mp4'):
-        fps = ARG('fps') or 10
+        fps = ARG('fps')
         label = 'all' if tiled else varname
         mp4_path = os.path.join(output_base, f'{label}.mp4')
         cons.print(f"[bold]Generating MP4:[/bold] {mp4_path} ({len(requested_steps)} frames)")
