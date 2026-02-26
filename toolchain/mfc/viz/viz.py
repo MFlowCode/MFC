@@ -122,7 +122,7 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
     _ensure_viz_deps()
 
     from .reader import discover_format, discover_timesteps, assemble  # pylint: disable=import-outside-toplevel
-    from .renderer import render_1d, render_1d_tiled, render_2d, render_3d_slice, render_mp4  # pylint: disable=import-outside-toplevel
+    from .renderer import render_1d, render_1d_tiled, render_2d, render_2d_tiled, render_3d_slice, render_mp4  # pylint: disable=import-outside-toplevel
 
     case_dir = ARG('input')
     if case_dir is None:
@@ -267,10 +267,9 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
             f"Refusing to load {len(requested_steps)} timesteps for 3D data "
             "(limit is 500). Use --step with a range or stride to reduce.")
 
-    # Tiled mode for non-TUI, non-interactive rendering only works for 1D.
-    # For 2D/3D, auto-select the first available variable.
+    # Tiled mode works for 1D and 2D.  For 3D, auto-select the first variable.
     if tiled and not interactive and not ARG('tui'):
-        if test_assembled.ndim != 1:
+        if test_assembled.ndim == 3:
             varname = avail[0] if avail else None
             if varname is None:
                 raise MFCException("No variables found in output.")
@@ -355,6 +354,8 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
         if tiled and assembled.ndim == 1:
             render_1d_tiled(assembled.x_cc, assembled.variables,
                             step, output_path, **render_opts)
+        elif tiled and assembled.ndim == 2:
+            render_2d_tiled(assembled, step, output_path, **render_opts)
         elif assembled.ndim == 1:
             render_1d(assembled.x_cc, assembled.variables[varname],
                       varname, step, output_path, **render_opts)

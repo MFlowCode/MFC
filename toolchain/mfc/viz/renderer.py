@@ -200,6 +200,59 @@ def render_2d(x_cc, y_cc, data, varname, step, output, **opts):  # pylint: disab
     plt.close(fig)
 
 
+def render_2d_tiled(assembled, step, output, **opts):  # pylint: disable=too-many-locals
+    """Render all 2D variables in a tiled subplot grid and save as PNG."""
+    varnames = sorted(assembled.variables.keys())
+    n = len(varnames)
+    if n == 0:
+        return
+    if n == 1:
+        render_2d(assembled.x_cc, assembled.y_cc,
+                  assembled.variables[varnames[0]], varnames[0], step, output, **opts)
+        return
+
+    ncols = min(n, 3)
+    nrows = math.ceil(n / ncols)
+    cell_w, cell_h = _figsize_for_domain(assembled.x_cc, assembled.y_cc, base=4)
+    fig, axes = plt.subplots(nrows, ncols,
+                             figsize=opts.get('figsize', (cell_w * ncols, cell_h * nrows)),
+                             squeeze=False)
+
+    cmap = opts.get('cmap', 'viridis')
+    log_scale = opts.get('log_scale', False)
+    for idx, vn in enumerate(varnames):
+        row, col = divmod(idx, ncols)
+        ax = axes[row][col]
+        data = assembled.variables[vn]
+        norm = None
+        vmin = opts.get('vmin')
+        vmax = opts.get('vmax')
+        if log_scale and np.any(data > 0):
+            lo = float(np.nanmin(data[data > 0]))
+            hi = float(np.nanmax(data))
+            if np.isfinite(lo) and np.isfinite(hi) and lo < hi:
+                norm = LogNorm(vmin=lo, vmax=hi)
+                vmin = None
+                vmax = None
+        pcm = ax.pcolormesh(assembled.x_cc, assembled.y_cc, data.T,
+                            cmap=cmap, vmin=vmin, vmax=vmax,
+                            norm=norm, shading='auto')
+        label = pretty_label(vn)
+        fig.colorbar(pcm, ax=ax, label=label)
+        ax.set_title(label, fontsize=9)
+        ax.set_aspect('equal', adjustable='box')
+        ax.tick_params(labelsize=7)
+
+    for idx in range(n, nrows * ncols):
+        row, col = divmod(idx, ncols)
+        axes[row][col].set_visible(False)
+
+    fig.suptitle(f'step {step}', fontsize=11, y=1.01)
+    fig.tight_layout()
+    fig.savefig(output, dpi=opts.get('dpi', 150), bbox_inches='tight')
+    plt.close(fig)
+
+
 def render_3d_slice(assembled, varname, step, output, slice_axis='z',  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,too-many-statements,too-many-branches
                     slice_index=None, slice_value=None, **opts):
     """Extract a 2D slice from 3D data and render as a colormap."""
@@ -363,6 +416,8 @@ def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-argum
             if tiled and assembled.ndim == 1:
                 render_1d_tiled(assembled.x_cc, assembled.variables,
                                 step, frame_path, **opts)
+            elif tiled and assembled.ndim == 2:
+                render_2d_tiled(assembled, step, frame_path, **opts)
             elif assembled.ndim == 1:
                 var_data = assembled.variables.get(varname)
                 if var_data is None:
