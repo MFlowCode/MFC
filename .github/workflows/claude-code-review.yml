@@ -15,6 +15,11 @@ jobs:
       id-token: write
 
     steps:
+      - name: Install unzip (required by bun setup)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unzip
+
       # IMPORTANT: checkout BASE repo only (safe on forks)
       - name: Checkout base repo (safe)
         uses: actions/checkout@v4
@@ -30,54 +35,38 @@ jobs:
           plugin_marketplaces: "https://github.com/anthropics/claude-code.git"
           plugins: "code-review@claude-code-plugins"
 
+          # NOTE: do NOT use --dangerouslyDisableSandbox (it can crash the CLI).
+          # This flag is for non-interactive CI runs (bypasses approval prompts).
           claude_args: >
             --dangerously-skip-permissions
-            --max-turns 30
+            --max-turns 10
             --allowedTools
-            "Bash(gh pr view:*)"
-            "Bash(gh pr diff:*)"
-            "Bash(gh pr comment:*)"
-            "Bash(gh pr list:*)"
-            "Bash(gh pr status:*)"
-            "Bash(gh issue comment:*)"
-            "Bash(gh api:*)"
-            "Bash(cat:*)"
-            "Bash(ls:*)"
-            "Bash(grep:*)"
-            "Bash(find:*)"
-            "Bash(sed:*)"
-            "Bash(awk:*)"
-            "Bash(head:*)"
-            "Bash(tail:*)"
-            "Bash(wc:*)"
-            "Bash(sort:*)"
-            "Bash(uniq:*)"
-            "Bash(cut:*)"
-            "Bash(xargs:*)"
-            "Bash(jq:*)"
-            "Bash(python3:*)"
+            "Bash"
 
           prompt: |
-            You are running in pull_request_target. DO NOT execute or inspect the fork's checked-out code.
-            Review ONLY via GitHub API/gh commands.
+            You are running in pull_request_target.
+            DO NOT read or inspect any checked-out PR/fork code. Review ONLY using GitHub API/gh commands.
 
-            Always use numeric PR form with --repo:
-            - gh pr view ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --json files,title,body
-            - gh pr diff ${{ github.event.pull_request.number }} --repo ${{ github.repository }}
+            You may read local guidance ONLY from:
+            - ./CLAUDE.md (root) if present
+            - ./.claude/rules/*.md if present (max 10 files)
 
-            If CLAUDE.md exists in the base repo checkout, read it with:
-            - cat CLAUDE.md
-            Prefer jq/python3 for JSON parsing instead of shell loops.
+            Keep tool calls minimal and in this order:
+            1) ls -1 .claude/rules 2>/dev/null || true
+            2) cat CLAUDE.md 2>/dev/null || true
+            3) find .claude/rules -maxdepth 1 -name "*.md" -print | head -n 10 | xargs -I{} cat "{}" 2>/dev/null || true
+            4) gh pr view ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --json title,body,files,changedFiles,additions,deletions,headRefOid
+            5) gh pr diff ${{ github.event.pull_request.number }} --repo ${{ github.repository }}
+            6) Post ONE top-level PR comment titled "Claude Code Review", then STOP.
 
-            Output requirements (even if no issues):
-            - Files changed count + list up to 15 file paths
-            - Summary (3–6 bullets)
-            - Findings:
-              - If issues: include file + line numbers when possible
-              - If no issues: at least 3 concrete improvement opportunities with file paths
+            Output format:
+            - Head SHA
+            - Files changed count + list up to 10 file paths
+            - Summary (3–6 bullets, minimal)
+            - Findings with file + line numbers when possible
+            - If no issues: 0–3 improvement opportunities (only if confident)
 
-            Post ONE top-level PR comment titled "Claude Code Review".
-            If posting a PR comment is blocked, write the full review to the GitHub Actions job summary instead.
+            If posting is blocked, write the full review to the GitHub Actions job summary instead, then STOP.
 
           additional_permissions: |
             actions: read
