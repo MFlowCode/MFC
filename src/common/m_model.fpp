@@ -219,7 +219,7 @@ contains
     end subroutine s_read_stl
 
     !> This procedure reads an OBJ file.
-    !! @param filepath Path to the odj file.
+    !! @param filepath Path to the obj file.
     !! @param model The obj file.
     impure subroutine s_read_obj(filepath, model)
 
