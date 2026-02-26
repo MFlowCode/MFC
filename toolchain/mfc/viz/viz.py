@@ -23,6 +23,9 @@ def _parse_steps(step_arg, available_steps):
     if step_arg is None or step_arg == 'all':
         return available_steps
 
+    if step_arg == 'last':
+        return [available_steps[-1]] if available_steps else []
+
     try:
         if ':' in str(step_arg):
             parts = str(step_arg).split(':')
@@ -35,7 +38,7 @@ def _parse_steps(step_arg, available_steps):
         single = int(step_arg)
     except ValueError as exc:
         raise MFCException(f"Invalid --step value '{step_arg}'. "
-                           "Expected an integer, a range (start:end:stride), or 'all'.") from exc
+                           "Expected an integer, a range (start:end:stride), 'last', or 'all'.") from exc
 
     if available_steps and single not in set(available_steps):
         return []
@@ -80,8 +83,8 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
                    "                   [dim]see available timesteps[/dim]")
         cons.print(f"  [green]./mfc.sh viz {d} --list-vars --step 0[/green]"
                    "            [dim]see available variables[/dim]")
-        cons.print(f"  [green]./mfc.sh viz {d} --var pres --step 0[/green]"
-                   "             [dim]render a PNG[/dim]")
+        cons.print(f"  [green]./mfc.sh viz {d} --var pres --step last[/green]"
+                   "            [dim]render a PNG[/dim]")
         cons.print(f"  [green]./mfc.sh viz {d} --var pres --step all --mp4[/green]"
                    "     [dim]render an MP4[/dim]")
         cons.print(f"  [green]./mfc.sh viz {d} --var pres --step 0 --slice-axis z[/green]"
@@ -118,12 +121,15 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
         if step_arg is None or step_arg == 'all':
             step = steps[0]
             cons.print(f"[dim]Using first available timestep: {step}[/dim]")
+        elif step_arg == 'last':
+            step = steps[-1]
+            cons.print(f"[dim]Using last available timestep: {step}[/dim]")
         else:
             try:
                 step = int(step_arg)
             except ValueError as exc:
                 raise MFCException(f"Invalid --step value '{step_arg}'. "
-                                   "Expected an integer or 'all'.") from exc
+                                   "Expected an integer, 'last', or 'all'.") from exc
             if step not in steps:
                 raise MFCException(
                     f"Timestep {step} not found. Available range: "

@@ -14,8 +14,8 @@ MFC includes a built-in visualization command that renders images and videos dir
 ### Basic usage
 
 ```bash
-# Plot pressure at timestep 1000
-./mfc.sh viz case_dir/ --var pres --step 1000
+# Plot pressure at the last available timestep
+./mfc.sh viz case_dir/ --var pres --step last
 
 # Plot density at all available timesteps
 ./mfc.sh viz case_dir/ --var rho --step all
@@ -44,6 +44,7 @@ The `--step` argument accepts several formats:
 |--------|---------|-------------|
 | Single | `--step 1000` | One timestep |
 | Range | `--step 0:10000:500` | Start:end:stride (inclusive) |
+| Last | `--step last` | Most recent available timestep |
 | All | `--step all` | Every available timestep |
 
 ### Rendering options
@@ -103,6 +104,45 @@ Generate MP4 videos from a range of timesteps:
 
 Videos are saved as `case_dir/viz/<varname>.mp4`.
 The color range is automatically computed from the first, middle, and last frames unless `--vmin`/`--vmax` are specified.
+
+### Tiled 1D rendering
+
+For 1D cases, omitting `--var` (or passing `--var all`) renders all variables in a single tiled figure:
+
+```bash
+# Tiled plot of all variables at the last timestep
+./mfc.sh viz case_dir/ --step last
+
+# Equivalent explicit form
+./mfc.sh viz case_dir/ --var all --step last
+```
+
+Each variable gets its own subplot with automatic LaTeX-style axis labels.
+Tiled mode is only available for 1D data.
+
+### Interactive mode
+
+Launch a browser-based interactive viewer with `--interactive`:
+
+```bash
+./mfc.sh viz case_dir/ --interactive
+
+# Custom port
+./mfc.sh viz case_dir/ --interactive --port 9000
+```
+
+The interactive viewer provides a Dash web UI with:
+- Variable and timestep selection
+- Live plot updates
+- Pan, zoom, and hover inspection
+
+> [!NOTE]
+> Interactive mode requires the `dash` Python package.
+
+### Plot styling
+
+Axis labels use LaTeX-style math notation — for example, `pres` is labeled as \f$p\f$, `vel1` as \f$u\f$, and `alpha1` as \f$\alpha_1\f$.
+Plots use serif fonts and the Computer Modern math font for consistency with publication figures.
 
 ### Format selection
 
