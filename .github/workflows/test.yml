@@ -151,7 +151,7 @@ jobs:
           # Retry only if a small number of tests failed (sporadic failures)
           if [ -s tests/failed_uuids.txt ]; then
             NUM_FAILED=$(wc -l < tests/failed_uuids.txt)
-            if [ "$NUM_FAILED" -gt 0 ] && [ "$NUM_FAILED" -le 5 ]; then
+            if [ "$NUM_FAILED" -le 5 ]; then
               FAILED=$(cat tests/failed_uuids.txt | tr '\n' ' ')
               echo ""
               echo "=== Retrying $NUM_FAILED failed test(s): $FAILED ==="
