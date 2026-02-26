@@ -28,8 +28,7 @@ _CMAPS = [
     "Blues", "Greens", "Oranges", "Reds", "Purples", "Greys",
     "twilight", "twilight_shifted", "hsv",
     "tab10", "tab20", "terrain", "ocean", "gist_earth",
-    "gnuplot", "gnuplot2", "CMRmap", "cubehelix",
-    "berlin", "managua", "vanimo", "Wistia",
+    "gnuplot", "gnuplot2", "CMRmap", "cubehelix", "Wistia",
 ]
 
 # ---------------------------------------------------------------------------

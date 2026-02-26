@@ -374,12 +374,12 @@ def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-argum
 
     success = False
     try:
-        imageio.mimwrite(
-            output,
-            [imageio.imread(os.path.join(viz_dir, fname)) for fname in frame_files],
-            fps=fps, codec='libx264', pixelformat='yuv420p', macro_block_size=2,
-            ffmpeg_log_level='error',
-        )
+        with imageio.get_writer(
+            output, fps=fps, codec='libx264', pixelformat='yuv420p',
+            macro_block_size=2, ffmpeg_log_level='error',
+        ) as writer:
+            for fname in frame_files:
+                writer.append_data(imageio.imread(os.path.join(viz_dir, fname)))
         success = True
     except (OSError, ValueError, RuntimeError) as exc:
         print(f"imageio MP4 write failed: {exc}")
