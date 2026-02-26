@@ -124,6 +124,10 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
             except ValueError as exc:
                 raise MFCException(f"Invalid --step value '{step_arg}'. "
                                    "Expected an integer or 'all'.") from exc
+            if step not in steps:
+                raise MFCException(
+                    f"Timestep {step} not found. Available range: "
+                    f"{steps[0]} to {steps[-1]} ({len(steps)} timesteps)")
 
         if fmt == 'silo':
             from .silo_reader import assemble_silo  # pylint: disable=import-outside-toplevel
