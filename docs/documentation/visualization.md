@@ -14,8 +14,8 @@ MFC includes a built-in visualization command that renders images and videos dir
 ### Basic usage
 
 ```bash
-# Plot pressure at the last available timestep
-./mfc.sh viz case_dir/ --var pres --step last
+# Plot pressure at the last available timestep (--step defaults to 'last')
+./mfc.sh viz case_dir/ --var pres
 
 # Plot density at all available timesteps
 ./mfc.sh viz case_dir/ --var rho --step all
@@ -23,6 +23,7 @@ MFC includes a built-in visualization command that renders images and videos dir
 
 The command auto-detects the output format (binary or Silo-HDF5) and dimensionality (1D, 2D, or 3D).
 Output images are saved to `case_dir/viz/` by default.
+The default colormap is `viridis`, default DPI is 150, and `--step` defaults to `last`.
 
 ### Exploring available data
 
@@ -138,6 +139,35 @@ The interactive viewer provides a Dash web UI with:
 
 > [!NOTE]
 > Interactive mode requires the `dash` Python package.
+
+### Terminal UI (TUI)
+
+For environments without a browser — such as SSH sessions or HPC login nodes — use `--tui` to launch a live terminal UI:
+
+```bash
+./mfc.sh viz case_dir/ --tui
+
+# Start with a specific variable pre-selected
+./mfc.sh viz case_dir/ --var pres --tui
+```
+
+The TUI loads all timesteps and renders plots directly in the terminal using Unicode block characters.
+It supports 1D and 2D data only (use `--interactive` for 3D).
+
+**Keyboard shortcuts:**
+
+| Key | Action |
+|-----|--------|
+| `n` / `→` | Next timestep |
+| `p` / `←` | Previous timestep |
+| `Space` | Toggle autoplay |
+| `l` | Toggle logarithmic scale |
+| `f` | Freeze / unfreeze color range |
+| `v` | Cycle to next variable |
+| `q` / `Escape` | Quit |
+
+> [!NOTE]
+> The TUI requires the `textual` and `textual-plotext` Python packages (included in MFC's default dependencies).
 
 ### Plot styling
 
