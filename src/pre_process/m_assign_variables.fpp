@@ -38,9 +38,9 @@ module m_assign_variables
         !> Skeleton of s_assign_patch_mixture_primitive_variables
         !!      and s_assign_patch_species_primitive_variables
         !! @param patch_id is the patch identifier
-        !! @param j (x) cell index in which the mixture or species primitive variables from the indicated patch areassigned
-        !! @param k (y,th) cell index in which the mixture or species primitive variables from the indicated patch areassigned
-        !! @param l (z) cell index in which the mixture or species primitive variables from the indicated patch areassigned
+        !! @param j (x) cell index in which the mixture or species primitive variables from the indicated patch are assigned
+        !! @param k (y,th) cell index in which the mixture or species primitive variables from the indicated patch are assigned
+        !! @param l (z) cell index in which the mixture or species primitive variables from the indicated patch are assigned
         !! @param eta pseudo volume fraction
         !! @param q_prim_vf Primitive variables
         !! @param patch_id_fp Array to track patch ids
