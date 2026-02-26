@@ -3,12 +3,19 @@ language: en-US
 
 reviews:
   profile: chill
+  review_status: false
+  enable_prompt_for_ai_agents: false
 
   auto_review:
     enabled: true                  # initial PR-open review
     auto_incremental_review: false # no re-run on every push
 
   path_instructions:
+    - path: "**/*"
+      instructions: |
+        IMPORTANT: Only comment on code that is within this PR’s diff (changed lines / files).
+        Do not add feedback that requires commenting outside the diff range.
+
     - path: "src/**/*.fpp"
       instructions: |
         Fortran source (Fypp-preprocessed). Follow the coding standards in
