@@ -8,6 +8,7 @@ for headless rendering.
 
 import math
 import os
+import re
 import tempfile
 
 import numpy as np
@@ -24,14 +25,70 @@ matplotlib.rcParams.update({
     'font.family': 'serif',
 })
 
+# LaTeX-style labels for known MFC variable names
+_LABEL_MAP = {
+    'pres':     r'$p$',
+    'rho':      r'$\rho$',
+    'E':        r'$E$',
+    'T':        r'$T$',
+    'D':        r'$D$',
+    'c':        r'$c$',
+    'gamma':    r'$\gamma$',
+    'pi_inf':   r'$\pi_\infty$',
+    'pres_inf': r'$p_\infty$',
+    'heat_ratio': r'$\gamma$',
+    'schlieren':  r'$|\nabla \rho|$',
+    'psi':        r'$\psi$',
+    'n':          r'$n$',
+    'qm':         r'$q_m$',
+    'Bx': r'$B_x$', 'By': r'$B_y$', 'Bz': r'$B_z$',
+    'voidFraction': r'void fraction',
+    'liutex_mag':   r'$|\lambda|$',
+    'damage_state': r'damage',
+}
+
+_INDEXED_PATTERNS = [
+    (r'^vel(\d+)$',        lambda m: [r'$u$', r'$v$', r'$w$'][int(m.group(1)) - 1]
+     if int(m.group(1)) <= 3 else rf'$v_{m.group(1)}$'),
+    (r'^mom(\d+)$',        lambda m: rf'$\rho {["u", "v", "w"][int(m.group(1)) - 1]}$'
+     if int(m.group(1)) <= 3 else rf'$m_{m.group(1)}$'),
+    (r'^alpha(\d+)$',      lambda m: rf'$\alpha_{m.group(1)}$'),
+    (r'^alpha_rho(\d+)$',  lambda m: rf'$\alpha_{m.group(1)}\rho_{m.group(1)}$'),
+    (r'^alpha_rho_e(\d+)$', lambda m: rf'$\alpha_{m.group(1)}\rho_{m.group(1)}e_{m.group(1)}$'),
+    (r'^omega(\d+)$',      lambda m: rf'$\omega_{m.group(1)}$'),
+    (r'^tau(\d+)$',        lambda m: rf'$\tau_{m.group(1)}$'),
+    (r'^xi(\d+)$',         lambda m: rf'$\xi_{m.group(1)}$'),
+    (r'^flux(\d+)$',       lambda m: rf'$F_{m.group(1)}$'),
+    (r'^liutex_axis(\d+)$', lambda m: rf'$\lambda_{m.group(1)}$'),
+    (r'^rho(\d+)$',        lambda m: rf'$\rho_{m.group(1)}$'),
+    (r'^Y_(.+)$',          lambda m: rf'$Y_{{\mathrm{{{m.group(1)}}}}}$'),
+    (r'^nR(\d+)$',         lambda m: rf'$nR_{{{m.group(1)}}}$'),
+    (r'^nV(\d+)$',         lambda m: rf'$nV_{{{m.group(1)}}}$'),
+    (r'^nP(\d+)$',         lambda m: rf'$nP_{{{m.group(1)}}}$'),
+    (r'^nM(\d+)$',         lambda m: rf'$nM_{{{m.group(1)}}}$'),
+    (r'^color_function(\d+)$', lambda m: rf'color $f_{m.group(1)}$'),
+]
+
+
+def pretty_label(varname):
+    """Map an MFC variable name to a LaTeX-style label for plots."""
+    if varname in _LABEL_MAP:
+        return _LABEL_MAP[varname]
+    for pattern, formatter in _INDEXED_PATTERNS:
+        m = re.match(pattern, varname)
+        if m:
+            return formatter(m)
+    return varname
+
 
 def render_1d(x_cc, data, varname, step, output, **opts):  # pylint: disable=too-many-arguments,too-many-positional-arguments
     """Render a 1D line plot and save as PNG."""
     fig, ax = plt.subplots(figsize=opts.get('figsize', (10, 6)))
+    label = pretty_label(varname)
     ax.plot(x_cc, data, linewidth=1.5)
     ax.set_xlabel(r'$x$')
-    ax.set_ylabel(varname)
-    ax.set_title(f'{varname} (step {step})')
+    ax.set_ylabel(label)
+    ax.set_title(f'{label} (step {step})')
     ax.grid(True, alpha=0.3)
     ax.ticklabel_format(axis='y', style='sci', scilimits=(-3, 4), useMathText=True)
 
@@ -67,7 +124,7 @@ def render_1d_tiled(x_cc, variables, step, output, **opts):  # pylint: disable=t
         row, col = divmod(idx, ncols)
         ax = axes[row][col]
         ax.plot(x_cc, variables[vn], linewidth=1.2)
-        ax.set_ylabel(vn, fontsize=9)
+        ax.set_ylabel(pretty_label(vn), fontsize=9)
         ax.tick_params(labelsize=8)
         ax.grid(True, alpha=0.3)
 
@@ -125,10 +182,11 @@ def render_2d(x_cc, y_cc, data, varname, step, output, **opts):  # pylint: disab
     # data shape is (nx, ny), pcolormesh expects (ny, nx) when using x_cc, y_cc
     pcm = ax.pcolormesh(x_cc, y_cc, data.T, cmap=cmap, vmin=vmin, vmax=vmax,
                         norm=norm, shading='auto')
-    fig.colorbar(pcm, ax=ax, label=varname)
+    label = pretty_label(varname)
+    fig.colorbar(pcm, ax=ax, label=label)
     ax.set_xlabel(r'$x$')
     ax.set_ylabel(r'$y$')
-    ax.set_title(f'{varname} (step {step})')
+    ax.set_title(f'{label} (step {step})')
     ax.set_aspect('equal', adjustable='box')
 
     fig.tight_layout()
@@ -197,11 +255,12 @@ def render_3d_slice(assembled, varname, step, output, slice_axis='z',  # pylint:
     # sliced shape depends on axis: need to transpose appropriately
     pcm = ax.pcolormesh(x_plot, y_plot, sliced.T, cmap=cmap, vmin=vmin,
                         vmax=vmax, norm=norm, shading='auto')
-    fig.colorbar(pcm, ax=ax, label=varname)
+    label = pretty_label(varname)
+    fig.colorbar(pcm, ax=ax, label=label)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     slice_coord = coord_along[idx]
-    ax.set_title(f'{varname} (step {step}, {slice_axis}={slice_coord:.4g})')
+    ax.set_title(f'{label} (step {step}, {slice_axis}={slice_coord:.4g})')
     ax.set_aspect('equal', adjustable='box')
 
     fig.tight_layout()
