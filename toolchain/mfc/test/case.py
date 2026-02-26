@@ -145,6 +145,10 @@ class TestCase(case.Case):
 
     def run_restart(self, targets, gpus):
         """Run a restart roundtrip: simulate to midpoint, then restart to end."""
+        # NOTE: This method overrides t_step_save to produce exactly one save
+        # per phase (at the boundary step). Tests using restart_check=True
+        # must not rely on custom t_step_save values, as the straight run's
+        # save points would not match the restart run's.
         mid_step = (self.params['t_step_start'] + self.params['t_step_stop']) // 2
         if mid_step <= self.params['t_step_start']:
             raise common.MFCException(
