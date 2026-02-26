@@ -1084,6 +1084,50 @@ contains
 
     end subroutine get_bounding_indices
 
+    !> @brief encodes the patch id with a unique offset that contains information on how the IB marker wrapps periodically
+    subroutine encode_patch_periodicity(patch_id, x_periodicty, y_periodicity, z_periodicity, encoded_patch_id)
+
+      integer, intent(in) :: patch_id, x_periodicty, y_periodicity, z_periodicity
+      integer, intent(out) :: encoded_patch_id
+
+      integer :: temp_x_per, temp_y_per, temp_z_per, offset
+
+      encoded_patch_id = patch_id
+
+      temp_x_per = mod(x_periodicity, 3)
+      temp_y_per = mod(y_periodicity, 3)
+      temp_z_per = mod(z_periodicity, 3)
+
+      offset = (num_ibs + 1) * temp_x_per + 3 * (num_ibs + 1) * temp_y_per + 9 * (num_ibs + 1) * temp_z_per
+      encoded_patch_id = patch_id + offset
+
+    end subroutine encode_patch_periodicity
+
+    !> @brief decodes the encoded id to get out the original id and the way in which it is periodic
+    subroutine decode_patch_periodicity(encoded_patch_id, patch_id, x_periodicty, y_periodicity, z_periodicity)
+
+      integer, intent(in) :: encoded_patch_id
+      integer, intent(out) :: patch_id, x_periodicity, y_periodicity, z_periodicity
+      
+      integer :: offset, remainder, xp, yp, zp, base
+
+      base = num_ibs + 1
+
+      patch_id = mod(encoded_patch_id - 1, base) + 1
+      offset = (encoded_patch_id - patch_id) / base
+
+      xp = mod(offset, 3)
+      remainder = offset / 3
+      yp = mod(remainder, 3)
+      zp = remainder / 3
+
+      ! Reverse map: 2 -> -1, 0 -> 0, 1 -> 1
+      x_periodicity = xp; if (xp == 2) x_periodicity = -1
+      y_periodicity = yp; if (yp == 2) y_periodicity = -1
+      z_periodicity = zp; if (zp == 2) z_periodicity = -1
+
+    end subroutine decode_patch_periodicity
+
     !> Archimedes spiral function
     !! @param myth Angle
     !! @param offset Thickness

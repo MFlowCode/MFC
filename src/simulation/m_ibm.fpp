@@ -1262,6 +1262,33 @@ contains
 
     end subroutine s_compute_moment_of_inertia
 
+    !> @breif Checks for periodic boundary conditions in all directions, and if so, moves patch location if it left the domain
+    subroutine wrap_periodic_ibs()
+
+      integer :: patch_id
+
+      ! iterate over all immersed boundaries to correct position
+      $:GPU_PARALLEL_LOOP(private='[patch_id]')
+      do patch_id = 1, num_ibs
+          ! check domain wraps in x, y, z
+          #:for X in [('x'), ('y'), ('z')]
+              ! check for periodicity
+              if (bc_${X}$ == BC_PERIODIC) then
+                  ! check if the boundary has left the domain, and then correct
+                  if (patch_ib(patch_id)%${X}$_centroid < ${X}$_domain%beg) then
+                      ! if the boundary exited "left", wrap it back around to the "right"
+                      patch_ib(patch_id)%${X}$_centroid = patch_ib(patch_id)%${X}$_centroid + (${X}$_domain%end - ${X}$_domain%beg)
+                  else if (patch_ib(patch_id)%${X}$_centroid > ${X}$_domain%end) then
+                      ! if the boundary exited "right", wrap it back around to the "left"
+                      patch_ib(patch_id)%${X}$_centroid = patch_ib(patch_id)%${X}$_centroid - (${X}$_domain%end - ${X}$_domain%beg)
+                  end if
+              end if
+          #endfor
+      end do
+      $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine wrap_periodic_ibs
+
     !> @brief Computes the cross product c = a x b of two 3D vectors.
     subroutine s_cross_product(a, b, c)
         $:GPU_ROUTINE(parallelism='[seq]')
