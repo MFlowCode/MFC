@@ -33,18 +33,6 @@ dependencies = [
     "numpy",
     "pandas",
 
-    # Plotting
-    "seaborn",
-    "matplotlib",
-
-    # Visualization
-    "h5py",
-    "imageio>=2.33",
-    "imageio-ffmpeg>=0.5.0",
-    "plotext>=5.2.0",
-    "textual>=0.47.0",
-    "textual-plotext>=0.2.0",
-
     # Chemistry
     "cantera>=3.1.0",
     #"pyrometheus == 1.0.5",
@@ -53,14 +41,38 @@ dependencies = [
     # Frontier Profiling
     "astunparse==1.6.2",
     "colorlover",
-    "dash>=2.0",
     "pymongo",
     "tabulate",
-    "tqdm",
     "dash-svg",
     "dash-bootstrap-components",
     "kaleido",
     "plotille"
+]
+
+[project.optional-dependencies]
+viz = [
+    # 2D/3D plotting (renderer, TUI)
+    "matplotlib",
+    "seaborn",
+
+    # Silo-HDF5 reader
+    "h5py",
+
+    # MP4 export
+    "imageio>=2.33",
+    "imageio-ffmpeg>=0.5.0",
+
+    # Terminal UI (--tui)
+    "plotext>=5.2.0",
+    "textual>=0.47.0",
+    "textual-plotext>=0.2.0",
+
+    # Interactive web UI (--interactive)
+    "dash>=2.0",
+    "plotly",
+
+    # Progress bar (PNG/MP4 batch rendering)
+    "tqdm",
 ]
 
 [tool.hatch.metadata]
