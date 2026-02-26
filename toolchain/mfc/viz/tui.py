@@ -41,6 +41,16 @@ _CMAPS: List[str] = [
 _load = _step_cache.load
 _CACHE_MAX = _step_cache.CACHE_MAX
 
+# Terminal character cells are approximately twice as tall as they are wide in
+# pixels (e.g. 8 px wide × 16 px tall).  A square physical domain should
+# therefore occupy a ~2:1 (col:row) character grid to look correct.
+_CELL_RATIO: float = 2.0
+
+# Physical domain aspect ratio is clamped to this range so that very elongated
+# domains don't produce unusable slivers.
+_ASPECT_MIN: float = 0.2
+_ASPECT_MAX: float = 5.0
+
 
 # ---------------------------------------------------------------------------
 # Plot widget
@@ -113,11 +123,31 @@ class MFCPlot(PlotextPlot):  # pylint: disable=too-many-instance-attributes
         # Content area = widget size minus 1-char border on each side.
         # Reserve 1 row each for header and footer → h_plot rows for the image.
         w_plot = max(self.size.width - 2, 4)
-        h_plot = max(self.size.height - 4, 4)  # -2 border, -2 header+footer
+        h_plot_avail = max(self.size.height - 4, 4)  # -2 border, -2 header+footer
 
         # Right side: gap + gradient strip + value labels
         _CB_GAP, _CB_W, _CB_LBL = 1, 2, 9
-        w_map = max(w_plot - _CB_GAP - _CB_W - _CB_LBL, 4)
+        w_map_avail = max(w_plot - _CB_GAP - _CB_W - _CB_LBL, 4)
+
+        # Preserve the physical x/y aspect ratio so the heatmap is not
+        # stretched to fill the terminal.  The domain ratio is clamped to
+        # avoid extremely wide or tall slivers.
+        y_cc_2d = self._y_cc if self._y_cc is not None else np.array([0.0, 1.0])
+        x_extent = max(abs(float(x_cc[-1]) - float(x_cc[0])), 1e-30)  # pylint: disable=unsubscriptable-object
+        y_extent = max(abs(float(y_cc_2d[-1]) - float(y_cc_2d[0])), 1e-30)
+        domain_ratio = float(np.clip(x_extent / y_extent, _ASPECT_MIN, _ASPECT_MAX))
+        # Convert to character-grid ratio: 1 row ≈ _CELL_RATIO columns wide.
+        char_ratio = domain_ratio * _CELL_RATIO  # desired w_map / h_plot
+
+        # Fit within the available character budget: try height-constrained first,
+        # fall back to width-constrained if the ideal width exceeds w_map_avail.
+        w_ideal = int(round(h_plot_avail * char_ratio))
+        if w_ideal <= w_map_avail:
+            w_map  = max(w_ideal, 4)
+            h_plot = h_plot_avail
+        else:
+            h_plot = max(int(round(w_map_avail / char_ratio)), 4)
+            w_map  = w_map_avail
 
         ix = np.linspace(0, data.shape[0] - 1, w_map, dtype=int)
         iy = np.linspace(0, data.shape[1] - 1, h_plot, dtype=int)
