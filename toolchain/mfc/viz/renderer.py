@@ -450,12 +450,35 @@ def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-argum
 
     success = False
     try:
+        if not frame_files:
+            return False
+
+        # Determine reference dimensions from the first frame.
+        # Round up to the nearest even pixel: yuv420p requires even width and height.
+        first_arr = imageio.imread(os.path.join(viz_dir, frame_files[0]))
+        ref_h = first_arr.shape[0] + first_arr.shape[0] % 2
+        ref_w = first_arr.shape[1] + first_arr.shape[1] % 2
+        n_ch  = first_arr.shape[2] if first_arr.ndim == 3 else 1
+
+        def _uniform_frame(arr):
+            """Pad with white to (ref_h, ref_w) so all frames are identical in size."""
+            h, w = arr.shape[:2]
+            if h == ref_h and w == ref_w:
+                return arr
+            out = np.full((ref_h, ref_w, n_ch), 255, dtype=arr.dtype)
+            out[:h, :w] = arr
+            return out
+
+        # macro_block_size=1 disables imageio's own resize — we handle even dims above.
         with imageio.get_writer(
             output, fps=fps, codec='libx264', pixelformat='yuv420p',
-            macro_block_size=2, ffmpeg_log_level='error',
+            macro_block_size=1, ffmpeg_log_level='error',
         ) as writer:
-            for fname in frame_files:
-                writer.append_data(imageio.imread(os.path.join(viz_dir, fname)))
+            writer.append_data(_uniform_frame(first_arr))
+            for fname in frame_files[1:]:
+                writer.append_data(_uniform_frame(
+                    imageio.imread(os.path.join(viz_dir, fname))
+                ))
         success = True
     except (OSError, ValueError, RuntimeError) as exc:
         print(f"imageio MP4 write failed: {exc}")
