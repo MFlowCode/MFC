@@ -879,7 +879,7 @@ contains
             patch_ib(i)%model_spc = num_ray
             patch_ib(i)%model_threshold = ray_tracing_threshold
 
-            ! Variables to handle moving imersed boundaries, defaulting to no movement
+            ! Variables to handle moving immersed boundaries, defaulting to no movement
             patch_ib(i)%moving_ibm = 0
             patch_ib(i)%vel(:) = 0._wp
             patch_ib(i)%angles(:) = 0._wp
