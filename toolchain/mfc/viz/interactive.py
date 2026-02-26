@@ -611,4 +611,4 @@ def run_interactive(  # pylint: disable=too-many-locals,too-many-statements
                f'[bold]http://localhost:{port}[/bold]')
     cons.print(f'[dim]SSH tunnel:  ssh -L {port}:localhost:{port} <hostname>[/dim]')
     cons.print('[dim]Ctrl+C to stop.[/dim]\n')
-    app.run(debug=False, port=port, host='0.0.0.0')
+    app.run(debug=False, port=port, host='127.0.0.1')

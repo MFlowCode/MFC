@@ -213,6 +213,12 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
     test_assembled = read_step(requested_steps[0])
     avail = sorted(test_assembled.variables.keys())
 
+    # Guard against loading too many 3D timesteps (memory)
+    if test_assembled.ndim == 3 and len(requested_steps) > 500:
+        raise MFCException(
+            f"Refusing to load {len(requested_steps)} timesteps for 3D data "
+            "(limit is 500). Use --step with a range or stride to reduce.")
+
     # Tiled mode only works for 1D
     if tiled and not interactive:
         if test_assembled.ndim != 1:

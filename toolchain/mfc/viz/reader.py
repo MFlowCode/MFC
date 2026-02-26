@@ -278,7 +278,7 @@ def _is_1d(case_dir: str) -> bool:
     return os.path.isdir(os.path.join(case_dir, 'binary', 'root'))
 
 
-def assemble_from_proc_data(  # pylint: disable=too-many-locals
+def assemble_from_proc_data(  # pylint: disable=too-many-locals,too-many-statements
     proc_data: List[Tuple[int, ProcessorData]],
 ) -> AssembledData:
     """
@@ -315,19 +315,29 @@ def assemble_from_proc_data(  # pylint: disable=too-many-locals
         z_cc = (pd.z_cb[:-1] + pd.z_cb[1:]) / 2.0 if pd.p > 0 else np.array([0.0])
         proc_centers.append((rank, pd, x_cc, y_cc, z_cc))
 
-    # Build unique sorted global coordinate arrays (handles ghost overlap)
+    # Build unique sorted global coordinate arrays (handles ghost overlap).
+    # Use scale-aware rounding: 12 significant digits relative to the domain
+    # extent, so precision is preserved for both micro-scale and large domains.
+    def _dedup(arr):
+        extent = arr.max() - arr.min()
+        if extent > 0:
+            decimals = max(0, int(np.ceil(-np.log10(extent))) + 12)
+        else:
+            decimals = 12
+        return np.unique(np.round(arr, decimals)), decimals
+
     all_x = np.concatenate([xc for _, _, xc, _, _ in proc_centers])
-    global_x = np.unique(np.round(all_x, 12))
+    global_x, xdec = _dedup(all_x)
     if ndim >= 2:
         all_y = np.concatenate([yc for _, _, _, yc, _ in proc_centers])
-        global_y = np.unique(np.round(all_y, 12))
+        global_y, ydec = _dedup(all_y)
     else:
-        global_y = np.array([0.0])
+        global_y, ydec = np.array([0.0]), 12
     if ndim >= 3:
         all_z = np.concatenate([zc for _, _, _, _, zc in proc_centers])
-        global_z = np.unique(np.round(all_z, 12))
+        global_z, zdec = _dedup(all_z)
     else:
-        global_z = np.array([0.0])
+        global_z, zdec = np.array([0.0]), 12
 
     varnames = sorted({vn for _, pd in proc_data for vn in pd.variables})
     nx, ny, nz = len(global_x), len(global_y), len(global_z)
@@ -343,9 +353,9 @@ def assemble_from_proc_data(  # pylint: disable=too-many-locals
 
     # Place each processor's data using per-cell coordinate lookup
     for _rank, pd, x_cc, y_cc, z_cc in proc_centers:
-        xi = np.clip(np.searchsorted(global_x, np.round(x_cc, 12)), 0, nx - 1)
-        yi = np.clip(np.searchsorted(global_y, np.round(y_cc, 12)), 0, ny - 1) if ndim >= 2 else np.array([0])
-        zi = np.clip(np.searchsorted(global_z, np.round(z_cc, 12)), 0, nz - 1) if ndim >= 3 else np.array([0])
+        xi = np.clip(np.searchsorted(global_x, np.round(x_cc, xdec)), 0, nx - 1)
+        yi = np.clip(np.searchsorted(global_y, np.round(y_cc, ydec)), 0, ny - 1) if ndim >= 2 else np.array([0])
+        zi = np.clip(np.searchsorted(global_z, np.round(z_cc, zdec)), 0, nz - 1) if ndim >= 3 else np.array([0])
 
         for vn, data in pd.variables.items():
             if vn not in global_vars:
