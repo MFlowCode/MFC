@@ -152,7 +152,7 @@ jobs:
           if [ -s tests/failed_uuids.txt ]; then
             NUM_FAILED=$(wc -l < tests/failed_uuids.txt)
             if [ "$NUM_FAILED" -le 5 ]; then
-              FAILED=$(cat tests/failed_uuids.txt | tr '\n' ' ')
+              FAILED=$(tr '\n' ' ' < tests/failed_uuids.txt)
               echo ""
               echo "=== Retrying $NUM_FAILED failed test(s): $FAILED ==="
               echo ""
@@ -183,19 +183,16 @@ jobs:
             cluster_name: 'Georgia Tech | Phoenix'
             device: 'gpu'
             interface: 'acc'
-            shard: ''
           - runner:       'gt'
             cluster:      'phoenix'
             cluster_name: 'Georgia Tech | Phoenix'
             device: 'gpu'
             interface: 'omp'
-            shard: ''
           - runner:       'gt'
             cluster:      'phoenix'
             cluster_name: 'Georgia Tech | Phoenix'
             device: 'cpu'
             interface: 'none'
-            shard: ''
           # Frontier (ORNL) — build on login node, GPU tests sharded for batch partition
           - runner:       'frontier'
             cluster:      'frontier'
@@ -226,7 +223,6 @@ jobs:
             cluster_name: 'Oak Ridge | Frontier'
             device: 'cpu'
             interface: 'none'
-            shard: ''
           # Frontier AMD — build on login node, GPU tests sharded for batch partition
           - runner:       'frontier'
             cluster:      'frontier_amd'
@@ -245,7 +241,6 @@ jobs:
             cluster_name: 'Oak Ridge | Frontier (AMD)'
             device: 'cpu'
             interface: 'none'
-            shard: ''
     runs-on:
       group:  phoenix
       labels: ${{ matrix.runner }}
@@ -270,13 +265,24 @@ jobs:
       - name: Test
         run:  bash .github/workflows/${{ matrix.cluster }}/submit.sh .github/workflows/${{ matrix.cluster }}/test.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.shard }}
 
+      - name: Compute Log Slug
+        if:   always()
+        id:   log
+        run:  |
+          SLUG="test-${{ matrix.device }}-${{ matrix.interface }}"
+          SHARD="${{ matrix.shard }}"
+          if [ -n "$SHARD" ]; then
+            SLUG="${SLUG}-$(echo "$SHARD" | sed 's|/|-of-|')"
+          fi
+          echo "slug=${SLUG}" >> "$GITHUB_OUTPUT"
+
       - name: Print Logs
         if:   always()
-        run:  cat test-${{ matrix.device }}-${{ matrix.interface }}.out
+        run:  cat ${{ steps.log.outputs.slug }}.out
 
       - name: Archive Logs
         uses: actions/upload-artifact@v4
         if:   matrix.cluster != 'phoenix'
         with:
-          name: logs-${{ strategy.job-index }}-${{ matrix.device }}-${{ matrix.interface }}
-          path: test-${{ matrix.device }}-${{ matrix.interface }}.out
+          name: logs-${{ strategy.job-index }}-${{ steps.log.outputs.slug }}
+          path: ${{ steps.log.outputs.slug }}.out

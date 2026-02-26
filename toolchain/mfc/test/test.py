@@ -42,7 +42,7 @@ abort_tests = threading.Event()
 class TestTimeoutError(MFCException):
     pass
 
-# pylint: disable=too-many-branches, trailing-whitespace
+# pylint: disable=too-many-branches, too-many-statements, trailing-whitespace
 def __filter(cases_) -> typing.List[TestCase]:
     cases = cases_[:]
     selected_cases = []
@@ -74,6 +74,12 @@ def __filter(cases_) -> typing.List[TestCase]:
             if not set(ARG("only")).intersection(set(checkCase)):
                 cases.remove(case)
                 skipped_cases.append(case)
+
+        if not cases:
+            raise MFCException(
+                f"--only filter matched zero test cases. "
+                f"Specified: {ARG('only')}. Check that UUIDs/names are valid."
+            )
 
     for case in cases[:]:
         if case.ppn > 1 and not ARG("mpi"):
@@ -123,6 +129,7 @@ def test():
     global errors, failed_tests, test_start_time
 
     test_start_time = time.time()  # Start timing
+    failed_uuids_path = os.path.join(common.MFC_TEST_DIR, "failed_uuids.txt")
     cases = list_cases()
 
     # Delete UUIDs that are not in the list of cases from tests/
@@ -191,7 +198,6 @@ def test():
     # Check if we aborted due to high failure rate
     if abort_tests.is_set():
         # Clean up stale failed_uuids.txt so CI doesn't retry wrong tests
-        failed_uuids_path = os.path.join(common.MFC_TEST_DIR, "failed_uuids.txt")
         try:
             if os.path.exists(failed_uuids_path):
                 os.remove(failed_uuids_path)
@@ -223,7 +229,6 @@ def test():
     _print_test_summary(nPASS, nFAIL, nSKIP, minutes, seconds, failed_tests, skipped_cases)
 
     # Write failed UUIDs to file for CI retry logic
-    failed_uuids_path = os.path.join(common.MFC_TEST_DIR, "failed_uuids.txt")
     if failed_tests:
         with open(failed_uuids_path, "w") as f:
             for test_info in failed_tests:
