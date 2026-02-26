@@ -92,6 +92,9 @@ def render_1d(x_cc, data, varname, step, output, **opts):  # pylint: disable=too
     ax.grid(True, alpha=0.3)
     ax.ticklabel_format(axis='y', style='sci', scilimits=(-3, 4), useMathText=True)
 
+    log_scale = opts.get('log_scale', False)
+    if log_scale:
+        ax.set_yscale('log')
     vmin = opts.get('vmin')
     vmax = opts.get('vmax')
     if vmin is not None or vmax is not None:
@@ -120,6 +123,7 @@ def render_1d_tiled(x_cc, variables, step, output, **opts):  # pylint: disable=t
                              figsize=opts.get('figsize', (fig_w, fig_h)),
                              sharex=True, squeeze=False)
 
+    log_scale = opts.get('log_scale', False)
     for idx, vn in enumerate(varnames):
         row, col = divmod(idx, ncols)
         ax = axes[row][col]
@@ -127,6 +131,8 @@ def render_1d_tiled(x_cc, variables, step, output, **opts):  # pylint: disable=t
         ax.set_ylabel(pretty_label(vn), fontsize=9)
         ax.tick_params(labelsize=8)
         ax.grid(True, alpha=0.3)
+        if log_scale:
+            ax.set_yscale('log')
 
     # Hide unused subplots
     for idx in range(n, nrows * ncols):
@@ -183,7 +189,8 @@ def render_2d(x_cc, y_cc, data, varname, step, output, **opts):  # pylint: disab
     pcm = ax.pcolormesh(x_cc, y_cc, data.T, cmap=cmap, vmin=vmin, vmax=vmax,
                         norm=norm, shading='auto')
     label = pretty_label(varname)
-    fig.colorbar(pcm, ax=ax, label=label)
+    cb_label = f'{label} [log]' if log_scale else label
+    fig.colorbar(pcm, ax=ax, label=cb_label)
     ax.set_xlabel(r'$x$')
     ax.set_ylabel(r'$y$')
     ax.set_title(f'{label} (step {step})')
@@ -256,7 +263,8 @@ def render_3d_slice(assembled, varname, step, output, slice_axis='z',  # pylint:
     pcm = ax.pcolormesh(x_plot, y_plot, sliced.T, cmap=cmap, vmin=vmin,
                         vmax=vmax, norm=norm, shading='auto')
     label = pretty_label(varname)
-    fig.colorbar(pcm, ax=ax, label=label)
+    cb_label = f'{label} [log]' if log_scale else label
+    fig.colorbar(pcm, ax=ax, label=cb_label)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     slice_coord = coord_along[idx]

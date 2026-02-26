@@ -91,16 +91,18 @@ class MFCPlot(PlotextPlot):  # pylint: disable=too-many-instance-attributes
                 if self._log_scale:
                     plot_y = np.where(data > 0, np.log10(np.maximum(data, 1e-300)), np.nan)
                     ylabel = f"log\u2081\u2080({self._varname})"
+                    title_tag = "  [log]"
                 else:
                     plot_y = data
                     ylabel = self._varname
+                    title_tag = ""
                 finite = plot_y[np.isfinite(plot_y)]
                 self._last_vmin = float(finite.min()) if finite.size else 0.0
                 self._last_vmax = float(finite.max()) if finite.size else 1.0
                 self.plt.plot(x_cc.tolist(), plot_y.tolist())
                 self.plt.xlabel("x")
                 self.plt.ylabel(ylabel)
-                self.plt.title(f"{self._varname}  (step {self._step})")
+                self.plt.title(f"{self._varname}  (step {self._step}){title_tag}")
                 if self._vmin is not None or self._vmax is not None:
                     lo = self._vmin if self._vmin is not None else self._last_vmin
                     hi = self._vmax if self._vmax is not None else self._last_vmax
@@ -130,13 +132,21 @@ class MFCPlot(PlotextPlot):  # pylint: disable=too-many-instance-attributes
         vmax = self._vmax if self._vmax is not None else float(ds.max())
         if vmax <= vmin:
             vmax = vmin + 1e-10
-        self._last_vmin = vmin
-        self._last_vmax = vmax
         cmap = matplotlib.colormaps[self._cmap_name]
-        if self._log_scale and vmin > 0:
-            norm = mcolors.LogNorm(vmin=vmin, vmax=vmax)
+        log_active = False
+        if self._log_scale:
+            pos = ds[ds > 0]
+            lo = float(np.nanmin(pos)) if pos.size > 0 else None
+            if lo is not None and lo < vmax:
+                norm = mcolors.LogNorm(vmin=lo, vmax=vmax)
+                vmin = lo
+                log_active = True
+            else:
+                norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
         else:
             norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
+        self._last_vmin = vmin
+        self._last_vmax = vmax
         # Transpose + flip so y=0 appears at the bottom of the display.
         rgba = cmap(norm(ds.T[::-1]))  # (h_plot, w_map, 4)
 
@@ -171,9 +181,10 @@ class MFCPlot(PlotextPlot):  # pylint: disable=too-many-instance-attributes
             lines.append(line)
 
         y_cc = self._y_cc if self._y_cc is not None else np.array([0.0, 1.0])
+        log_tag = "  [log]" if log_active else ("  [log n/a]" if self._log_scale else "")
         header = RichText(
             f" {self._varname}  (step {self._step})"
-            f"   [{vmin:.3g}, {vmax:.3g}]",
+            f"   [{vmin:.3g}, {vmax:.3g}]{log_tag}",
             style="bold"
         )
         footer = RichText(
