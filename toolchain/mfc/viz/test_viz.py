@@ -5,7 +5,7 @@ Covers step parsing, label formatting, format/timestep discovery,
 data assembly (binary + silo, 1D/2D/3D), and 1D rendering.
 Uses checked-in fixture data generated from minimal MFC runs.
 """
-# pylint: disable=import-outside-toplevel
+# pylint: disable=import-outside-toplevel,protected-access
 
 import os
 import tempfile
@@ -378,6 +378,153 @@ class TestRender3DSlice(unittest.TestCase):
             out = f.name
         try:
             render_3d_slice(data, 'pres', 0, out)
+            self.assertTrue(os.path.isfile(out))
+            self.assertGreater(os.path.getsize(out), 0)
+        finally:
+            os.unlink(out)
+
+
+# ---------------------------------------------------------------------------
+# Tests: _steps_hint
+# ---------------------------------------------------------------------------
+
+class TestStepsHint(unittest.TestCase):
+    """Test _steps_hint() step preview for error messages."""
+
+    def _hint(self, steps, n=8):
+        from .viz import _steps_hint
+        return _steps_hint(steps, n)
+
+    def test_empty(self):
+        """Empty steps returns 'none found'."""
+        self.assertEqual(self._hint([]), "none found")
+
+    def test_short_list_shows_all(self):
+        """Short list shows all steps without truncation."""
+        result = self._hint([0, 100, 200])
+        self.assertIn('0', result)
+        self.assertIn('200', result)
+        self.assertNotIn('...', result)
+
+    def test_long_list_truncated(self):
+        """Long list includes count and truncation marker."""
+        steps = list(range(0, 2000, 100))   # 20 steps
+        result = self._hint(steps, n=8)
+        self.assertIn('...', result)
+        self.assertIn('[20 total]', result)
+        self.assertIn('0', result)      # head present
+        self.assertIn('1900', result)   # tail present
+
+
+# ---------------------------------------------------------------------------
+# Tests: _validate_cmap
+# ---------------------------------------------------------------------------
+
+class TestValidateCmap(unittest.TestCase):
+    """Test _validate_cmap() colormap validation."""
+
+    def _validate(self, name):
+        from .viz import _validate_cmap
+        _validate_cmap(name)
+
+    def test_known_cmaps_pass(self):
+        """Known colormaps do not raise."""
+        for name in ('viridis', 'plasma', 'coolwarm', 'gray'):
+            with self.subTest(name=name):
+                self._validate(name)
+
+    def test_unknown_cmap_raises(self):
+        """Unknown colormap raises MFCException."""
+        from mfc.common import MFCException
+        with self.assertRaises(MFCException):
+            self._validate('notacolormap_xyz_1234')
+
+    def test_typo_suggests_correct(self):
+        """Typo in colormap name suggests the correct spelling."""
+        from mfc.common import MFCException
+        try:
+            self._validate('virids')   # typo of viridis
+        except MFCException as exc:
+            self.assertIn('viridis', str(exc))
+
+
+# ---------------------------------------------------------------------------
+# Tests: bounded TUI cache
+# ---------------------------------------------------------------------------
+
+class TestTuiCache(unittest.TestCase):
+    """Test that the TUI step cache respects CACHE_MAX."""
+
+    def setUp(self):
+        import mfc.viz.tui as tui_mod
+        self._mod = tui_mod
+        tui_mod._cache.clear()
+        tui_mod._cache_order.clear()
+
+    def tearDown(self):
+        self._mod._cache.clear()
+        self._mod._cache_order.clear()
+
+    def _read(self, step):
+        return f"data_{step}"
+
+    def test_cache_stores_entry(self):
+        """Loaded step is stored in cache."""
+        self._mod._load(0, self._read)
+        self.assertIn(0, self._mod._cache)
+
+    def test_cache_hit_avoids_reload(self):
+        """Second load of same step does not call read_func again."""
+        calls = [0]
+        def counting(step):
+            calls[0] += 1
+            return step
+        self._mod._load(5, counting)
+        self._mod._load(5, counting)
+        self.assertEqual(calls[0], 1)
+
+    def test_cache_evicts_oldest_at_cap(self):
+        """Oldest entry is evicted when CACHE_MAX is exceeded."""
+        cap = self._mod._CACHE_MAX
+        for i in range(cap + 3):
+            self._mod._load(i, self._read)
+        self.assertLessEqual(len(self._mod._cache), cap)
+        self.assertNotIn(0, self._mod._cache)         # first evicted
+        self.assertIn(cap + 2, self._mod._cache)      # most recent kept
+
+
+# ---------------------------------------------------------------------------
+# Tests: log scale rendering (new feature smoke tests)
+# ---------------------------------------------------------------------------
+
+class TestRenderLogScale(unittest.TestCase):
+    """Smoke test: log scale option produces valid PNG output."""
+
+    def test_render_1d_log_scale(self):
+        """render_1d with log_scale=True produces a non-empty PNG."""
+        from .reader import assemble
+        from .renderer import render_1d
+        data = assemble(FIX_1D_BIN, 0, 'binary')
+        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as f:
+            out = f.name
+        try:
+            render_1d(data.x_cc, data.variables['pres'], 'pres', 0, out,
+                      log_scale=True)
+            self.assertTrue(os.path.isfile(out))
+            self.assertGreater(os.path.getsize(out), 0)
+        finally:
+            os.unlink(out)
+
+    def test_render_2d_log_scale(self):
+        """render_2d with log_scale=True produces a non-empty PNG."""
+        from .reader import assemble
+        from .renderer import render_2d
+        data = assemble(FIX_2D_BIN, 0, 'binary')
+        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as f:
+            out = f.name
+        try:
+            render_2d(data.x_cc, data.y_cc, data.variables['pres'],
+                      'pres', 0, out, log_scale=True)
             self.assertTrue(os.path.isfile(out))
             self.assertGreater(os.path.getsize(out), 0)
         finally:
