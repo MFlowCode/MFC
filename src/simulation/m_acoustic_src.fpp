@@ -129,15 +129,8 @@ contains
     !! @param rhs_vf rhs variables
     impure subroutine s_acoustic_src_calculations(q_cons_vf, q_prim_vf, rhs_vf)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf !<
-        !! This variable contains the WENO-reconstructed values of the cell-average
-        !! conservative variables, which are located in q_cons_vf, at cell-interior
-        !! Gaussian quadrature points (QP).
-
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf !<
-        !! The primitive variables at cell-interior Gaussian quadrature points. These
-        !! are calculated from the conservative variables and gradient magnitude (GM)
-        !! of the volume fractions, q_cons_qp and gm_alpha_qp, respectively.
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf !< Conservative variables
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf !< Primitive variables
 
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
 
@@ -165,7 +158,7 @@ contains
 
         integer, parameter :: mass_label = 1, mom_label = 2
 
-        sim_time = mytime
+        sim_time = mytime ! Accumulated time, correct under adaptive dt
 
         $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
         do l = 0, p
@@ -181,7 +174,7 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        ! Keep outer loop sequel because different sources can have very different number of points
+        ! Keep outer loop sequential because different sources can have very different number of points
         do ai = 1, num_source
             ! Skip if the pulse has not started yet for sine and square waves
             if (.not. (sim_time < delay(ai) .and. (pulse(ai) == 1 .or. pulse(ai) == 3))) then
