@@ -453,13 +453,13 @@ class TestValidateCmap(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 class TestTuiCache(unittest.TestCase):
-    """Test that the TUI step cache respects CACHE_MAX."""
+    """Test that the shared step cache respects CACHE_MAX."""
 
     def setUp(self):
-        import mfc.viz.tui as tui_mod
-        self._mod = tui_mod
-        tui_mod._cache.clear()
-        tui_mod._cache_order.clear()
+        import mfc.viz._step_cache as cache_mod
+        self._mod = cache_mod
+        cache_mod._cache.clear()
+        cache_mod._cache_order.clear()
 
     def tearDown(self):
         self._mod._cache.clear()
@@ -470,7 +470,7 @@ class TestTuiCache(unittest.TestCase):
 
     def test_cache_stores_entry(self):
         """Loaded step is stored in cache."""
-        self._mod._load(0, self._read)
+        self._mod.load(0, self._read)
         self.assertIn(0, self._mod._cache)
 
     def test_cache_hit_avoids_reload(self):
@@ -479,18 +479,25 @@ class TestTuiCache(unittest.TestCase):
         def counting(step):
             calls[0] += 1
             return step
-        self._mod._load(5, counting)
-        self._mod._load(5, counting)
+        self._mod.load(5, counting)
+        self._mod.load(5, counting)
         self.assertEqual(calls[0], 1)
 
     def test_cache_evicts_oldest_at_cap(self):
         """Oldest entry is evicted when CACHE_MAX is exceeded."""
-        cap = self._mod._CACHE_MAX
+        cap = self._mod.CACHE_MAX
         for i in range(cap + 3):
-            self._mod._load(i, self._read)
+            self._mod.load(i, self._read)
         self.assertLessEqual(len(self._mod._cache), cap)
         self.assertNotIn(0, self._mod._cache)         # first evicted
         self.assertIn(cap + 2, self._mod._cache)      # most recent kept
+
+    def test_seed_clears_and_populates(self):
+        """seed() clears existing cache and pre-loads one entry."""
+        self._mod.load(99, self._read)   # put something in first
+        self._mod.seed(0, "preloaded")
+        self.assertEqual(len(self._mod._cache), 1)
+        self.assertEqual(self._mod._cache[0], "preloaded")
 
 
 # ---------------------------------------------------------------------------

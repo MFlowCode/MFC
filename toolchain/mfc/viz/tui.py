@@ -11,7 +11,7 @@ Requires: textual, textual-plotext, plotext
 """
 from __future__ import annotations
 
-from typing import Callable, Dict, List, Optional
+from typing import Callable, List, Optional
 
 import numpy as np
 
@@ -30,6 +30,7 @@ from textual.widgets import Footer, Header, Label, ListItem, ListView, Static
 from textual_plotext import PlotextPlot
 
 from mfc.printer import cons
+from . import _step_cache
 
 # Colormaps available via [c] cycling
 _CMAPS: List[str] = [
@@ -37,22 +38,8 @@ _CMAPS: List[str] = [
     'coolwarm', 'RdBu_r', 'seismic', 'gray',
 ]
 
-# ---------------------------------------------------------------------------
-# Step cache  {step -> AssembledData}  (bounded to avoid OOM)
-# ---------------------------------------------------------------------------
-_CACHE_MAX = 50
-_cache: Dict[int, object] = {}
-_cache_order: List[int] = []
-
-
-def _load(step: int, read_func: Callable) -> object:
-    if step not in _cache:
-        if len(_cache) >= _CACHE_MAX:
-            evict = _cache_order.pop(0)
-            _cache.pop(evict, None)
-        _cache[step] = read_func(step)
-        _cache_order.append(step)
-    return _cache[step]
+_load = _step_cache.load
+_CACHE_MAX = _step_cache.CACHE_MAX
 
 
 # ---------------------------------------------------------------------------
@@ -456,8 +443,7 @@ def run_tui(
     )
     cons.print("[dim]  ,/. or ←/→  prev/next step  •  space play  •  l log  •  f freeze  •  ↑↓ variable  •  q quit[/dim]")
 
-    _cache.clear()
-    _cache[steps[0]] = first
+    _step_cache.seed(steps[0], first)
 
     app = MFCTuiApp(
         steps=steps,

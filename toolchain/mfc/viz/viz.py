@@ -6,6 +6,7 @@ Dispatches to reader + renderer based on CLI arguments.
 
 import os
 import importlib
+import importlib.util
 import shutil
 import subprocess
 import sys
@@ -18,15 +19,13 @@ from mfc.printer import cons
 def _ensure_viz_deps() -> None:
     """Install the [viz] optional extras on first use.
 
-    Checks for matplotlib as the sentinel package.  If it is missing the
-    whole viz extra is assumed to be absent and gets installed via uv (or pip
-    as a fallback) from the local toolchain directory.
+    Checks one sentinel per feature group so that a user who has matplotlib
+    pre-installed (e.g. via Anaconda) but lacks imageio, textual, or h5py
+    still triggers the install.
     """
-    try:
-        import matplotlib  # noqa: F401  # pylint: disable=import-outside-toplevel,unused-import
-        return  # already installed
-    except ImportError:
-        pass
+    _SENTINELS = ("matplotlib", "imageio", "h5py", "textual", "dash")
+    if all(importlib.util.find_spec(p) is not None for p in _SENTINELS):
+        return  # all present
 
     toolchain_path = os.path.join(MFC_ROOT_DIR, "toolchain")
     cons.print("[bold]Installing viz dependencies[/bold] "
