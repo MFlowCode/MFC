@@ -259,9 +259,11 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
     if interactive:
         from .interactive import run_interactive  # pylint: disable=import-outside-toplevel
         port = ARG('port')
+        host = ARG('host')
         # Default to first available variable if --var was not specified
         init_var = varname if varname in avail else (avail[0] if avail else None)
-        run_interactive(init_var, requested_steps, read_step, port=int(port))
+        run_interactive(init_var, requested_steps, read_step,
+                        port=int(port), host=str(host))
         return
 
     # Validate colormap before any rendering

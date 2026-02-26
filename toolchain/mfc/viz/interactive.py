@@ -206,6 +206,7 @@ def run_interactive(  # pylint: disable=too-many-locals,too-many-statements
         steps: List[int],
         read_func: Callable,
         port: int = 8050,
+        host: str = '127.0.0.1',
 ):
     """Launch the interactive Dash visualization server."""
     app = Dash(
@@ -613,7 +614,8 @@ def run_interactive(  # pylint: disable=too-many-locals,too-many-statements
 
     # ------------------------------------------------------------------
     cons.print(f'\n[bold green]Interactive viz server:[/bold green] '
-               f'[bold]http://localhost:{port}[/bold]')
-    cons.print(f'[dim]SSH tunnel:  ssh -L {port}:localhost:{port} <hostname>[/dim]')
+               f'[bold]http://{host}:{port}[/bold]')
+    if host in ('127.0.0.1', 'localhost'):
+        cons.print(f'[dim]SSH tunnel:  ssh -L {port}:localhost:{port} <hostname>[/dim]')
     cons.print('[dim]Ctrl+C to stop.[/dim]\n')
-    app.run(debug=False, port=port, host='127.0.0.1')
+    app.run(debug=False, port=port, host=host)

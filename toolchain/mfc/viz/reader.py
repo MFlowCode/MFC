@@ -318,10 +318,12 @@ def assemble_from_proc_data(  # pylint: disable=too-many-locals,too-many-stateme
     # Build unique sorted global coordinate arrays (handles ghost overlap).
     # Use scale-aware rounding: 12 significant digits relative to the domain
     # extent, so precision is preserved for both micro-scale and large domains.
+    # np.round supports negative decimals (rounds to tens, hundreds, etc.),
+    # which is correct for large-extent domains (e.g. extent > 1e12).
     def _dedup(arr):
         extent = arr.max() - arr.min()
         if extent > 0:
-            decimals = max(0, int(np.ceil(-np.log10(extent))) + 12)
+            decimals = int(np.ceil(-np.log10(extent))) + 12
         else:
             decimals = 12
         return np.unique(np.round(arr, decimals)), decimals

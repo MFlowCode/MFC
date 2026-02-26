@@ -1032,6 +1032,12 @@ VIZ_COMMAND = Command(
             metavar="PORT",
         ),
         Argument(
+            name="host",
+            help="Host address for the interactive web server (default: 127.0.0.1).",
+            default="127.0.0.1",
+            metavar="HOST",
+        ),
+        Argument(
             name="tui",
             help="Launch an interactive terminal UI (1D/2D only). Works over SSH with no browser.",
             action=ArgAction.STORE_TRUE,

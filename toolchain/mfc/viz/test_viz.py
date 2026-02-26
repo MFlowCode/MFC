@@ -531,5 +531,66 @@ class TestRenderLogScale(unittest.TestCase):
             os.unlink(out)
 
 
+# ---------------------------------------------------------------------------
+# Tests: multi-rank assembly (ghost-cell deduplication)
+# ---------------------------------------------------------------------------
+
+class TestMultiRankAssembly(unittest.TestCase):
+    """Test assemble_from_proc_data with synthetic multi-processor data."""
+
+    def _make_proc(self, x_cb, pres):
+        """Build a minimal 1D ProcessorData from boundary coordinates."""
+        import numpy as np
+        from .reader import ProcessorData
+        return ProcessorData(
+            m=len(x_cb) - 1,
+            n=0,
+            p=0,
+            x_cb=np.array(x_cb, dtype=np.float64),
+            y_cb=np.array([0.0]),
+            z_cb=np.array([0.0]),
+            variables={'pres': np.array(pres, dtype=np.float64)},
+        )
+
+    def test_two_rank_1d_dedup(self):
+        """Two processors with one overlapping ghost cell assemble correctly."""
+        import numpy as np
+        from .reader import assemble_from_proc_data
+        # Domain: 4 cells with centers at 0.125, 0.375, 0.625, 0.875
+        # Proc 0 sees cells 0-2 (center 0.625 is ghost from proc 1)
+        # Proc 1 sees cells 1-3 (center 0.375 is ghost from proc 0)
+        p0 = self._make_proc([0.00, 0.25, 0.50, 0.75],
+                             [1.0, 2.0, 3.0])   # centers: 0.125, 0.375, 0.625
+        p1 = self._make_proc([0.25, 0.50, 0.75, 1.00],
+                             [2.0, 3.0, 4.0])   # centers: 0.375, 0.625, 0.875
+
+        result = assemble_from_proc_data([(0, p0), (1, p1)])
+
+        self.assertEqual(result.ndim, 1)
+        self.assertEqual(len(result.x_cc), 4)
+        np.testing.assert_allclose(result.x_cc, [0.125, 0.375, 0.625, 0.875])
+        np.testing.assert_allclose(result.variables['pres'], [1.0, 2.0, 3.0, 4.0])
+
+    def test_large_extent_dedup(self):
+        """Deduplication works correctly for large-extent domains (>1e6)."""
+        import numpy as np
+        from .reader import assemble_from_proc_data
+        # Scale up by 1e7 to exercise the negative-decimals code path
+        scale = 1e7
+        p0 = self._make_proc(
+            [0.00 * scale, 0.25 * scale, 0.50 * scale, 0.75 * scale],
+            [1.0, 2.0, 3.0],
+        )
+        p1 = self._make_proc(
+            [0.25 * scale, 0.50 * scale, 0.75 * scale, 1.00 * scale],
+            [2.0, 3.0, 4.0],
+        )
+        result = assemble_from_proc_data([(0, p0), (1, p1)])
+        self.assertEqual(len(result.x_cc), 4)
+        np.testing.assert_allclose(
+            result.variables['pres'], [1.0, 2.0, 3.0, 4.0]
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
