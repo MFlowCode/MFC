@@ -406,8 +406,10 @@ def assemble(case_dir: str, step: int, fmt: str = 'binary',  # pylint: disable=t
     for rank in ranks:
         fpath = os.path.join(case_dir, 'binary', f'p{rank}', f'{step}.dat')
         if not os.path.isfile(fpath):
-            warnings.warn(f"Processor file not found, skipping: {fpath}", stacklevel=2)
-            continue
+            raise FileNotFoundError(
+                f"Processor file not found: {fpath}. "
+                "Incomplete output (missing rank) would produce incorrect data."
+            )
         pdata = read_binary_file(fpath, var_filter=var)
         if pdata.m == 0 and pdata.n == 0 and pdata.p == 0:
             warnings.warn(f"Processor p{rank} has zero dimensions, skipping", stacklevel=2)

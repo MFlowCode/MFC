@@ -146,8 +146,10 @@ def assemble_silo(
     for rank in ranks:
         silo_file = os.path.join(base, f"p{rank}", f"{step}.silo")
         if not os.path.isfile(silo_file):
-            warnings.warn(f"Processor file not found, skipping: {silo_file}", stacklevel=2)
-            continue
+            raise FileNotFoundError(
+                f"Processor file not found: {silo_file}. "
+                "Incomplete output (missing rank) would produce incorrect data."
+            )
         pdata = read_silo_file(silo_file, var_filter=var)
         proc_data.append((rank, pdata))
 
