@@ -2,6 +2,8 @@
 !! @file
 !! @brief Contains module m_start_up
 
+#:include 'macros.fpp'
+
 !> @brief Reads and validates user inputs, loads existing grid/IC data, and initializes pre-process modules
 module m_start_up
 
