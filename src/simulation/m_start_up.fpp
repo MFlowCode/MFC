@@ -965,7 +965,7 @@ contains
                     do j = 0, m
                         if (ieee_is_nan(real(q_cons_ts(stor)%vf(i)%sf(j, k, l), kind=wp))) then
                             print *, "NaN(s) in timestep output.", j, k, l, i, proc_rank, t_step, m, n, p
-                            error stop "NaN(s) in timestep output."
+                            call s_mpi_abort("NaN(s) in timestep output.")
                         end if
                     end do
                 end do
