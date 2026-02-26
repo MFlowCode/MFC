@@ -53,7 +53,7 @@ else
     sbatch_account="#SBATCH -A CFD154"
     sbatch_time="#SBATCH -t 01:59:00"
     sbatch_partition="#SBATCH -p batch"
-    sbatch_extra="#SBATCH --qos=hackathon"
+    sbatch_extra="#SBATCH --qos=normal"
 fi
 
 shard_suffix=""
