@@ -16,17 +16,34 @@ else
     exit 1
 fi
 
+# Detect job type from submitted script basename
+script_basename="$(basename "$1" .sh)"
+case "$script_basename" in
+    bench*) job_type="bench" ;;
+    *)      job_type="test"  ;;
+esac
+
 sbatch_cpu_opts="\
 #SBATCH -p cpu-small               # partition
 #SBATCH --ntasks-per-node=24       # Number of cores per node required
 #SBATCH --mem-per-cpu=2G           # Memory per core\
 "
 
-sbatch_gpu_opts="\
+if [ "$job_type" = "bench" ]; then
+    sbatch_gpu_opts="\
+#SBATCH -CL40S
+#SBATCH --ntasks-per-node=4       # Number of cores per node required
+#SBATCH -G2\
+"
+    sbatch_time="#SBATCH -t 04:00:00"
+else
+    sbatch_gpu_opts="\
 #SBATCH -p gpu-v100,gpu-a100,gpu-h100,gpu-l40s
 #SBATCH --ntasks-per-node=4       # Number of cores per node required
 #SBATCH -G2\
 "
+    sbatch_time="#SBATCH -t 03:00:00"
+fi
 
 if [ "$2" = "cpu" ]; then
     sbatch_device_opts="$sbatch_cpu_opts"
@@ -46,7 +63,7 @@ submit_output=$(sbatch <<EOT
 #SBATCH --account=gts-sbryngelson3 # charge account
 #SBATCH -N1                        # Number of nodes required
 $sbatch_device_opts
-#SBATCH -t 03:00:00                # Duration of the job (Ex: 15 mins)
+$sbatch_time
 #SBATCH -q embers                  # QOS Name
 #SBATCH --requeue                  # Auto-requeue on preemption
 #SBATCH -o$output_file             # Combined output and error messages file

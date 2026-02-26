@@ -3,6 +3,15 @@
 # Ignore SIGHUP to survive login node session drops
 trap '' HUP
 
+# Determine compiler flag from directory name
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cluster_name="$(basename "$SCRIPT_DIR")"
+case "$cluster_name" in
+    frontier)     compiler_flag="f" ;;
+    frontier_amd) compiler_flag="famd" ;;
+    *) echo "ERROR: Unknown cluster '$cluster_name'"; exit 1 ;;
+esac
+
 job_device=$1
 job_interface=$2
 run_bench=$3
@@ -16,11 +25,11 @@ if [ "$job_device" = "gpu" ]; then
   fi
 fi
 
-. ./mfc.sh load -c famd -m g
+. ./mfc.sh load -c $compiler_flag -m g
 
 # Only set up build cache for test suite, not benchmarks
 if [ "$run_bench" != "bench" ]; then
-    source .github/scripts/setup-build-cache.sh frontier_amd "$job_device" "$job_interface"
+    source .github/scripts/setup-build-cache.sh "$cluster_name" "$job_device" "$job_interface"
 fi
 
 max_attempts=3
@@ -37,7 +46,7 @@ while [ $attempt -le $max_attempts ]; do
             fi
         done
     else
-        if ./mfc.sh test -v -a --dry-run -j 8 $build_opts; then
+        if ./mfc.sh test -v -a --dry-run $([ "$cluster_name" = "frontier" ] && echo "--rdma-mpi") -j 8 $build_opts; then
             build_cmd_ok=true
         else
             build_cmd_ok=false

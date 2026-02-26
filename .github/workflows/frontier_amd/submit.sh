@@ -25,6 +25,13 @@ else
     exit 1
 fi
 
+# Detect job type from submitted script basename
+script_basename="$(basename "$1" .sh)"
+case "$script_basename" in
+    bench*) job_type="bench" ;;
+    *)      job_type="test"  ;;
+esac
+
 if [ "$2" = "cpu" ]; then
     sbatch_device_opts="\
 #SBATCH -n 32                       # Number of cores required"
@@ -34,6 +41,19 @@ elif [ "$2" = "gpu" ]; then
 else
     usage
     exit 1
+fi
+
+# Select SBATCH params based on job type
+if [ "$job_type" = "bench" ]; then
+    sbatch_account="#SBATCH -A ENG160"
+    sbatch_time="#SBATCH -t 05:59:00"
+    sbatch_partition="#SBATCH -p extended"
+    sbatch_extra=""
+else
+    sbatch_account="#SBATCH -A CFD154"
+    sbatch_time="#SBATCH -t 01:59:00"
+    sbatch_partition="#SBATCH -p batch"
+    sbatch_extra="#SBATCH --qos=hackathon"
 fi
 
 shard_suffix=""
@@ -46,13 +66,13 @@ output_file="$job_slug.out"
 submit_output=$(sbatch <<EOT
 #!/bin/bash
 #SBATCH -J MFC-$job_slug            # Job name
-#SBATCH -A CFD154                  # charge account
+$sbatch_account
 #SBATCH -N 1                       # Number of nodes required
 $sbatch_device_opts
-#SBATCH -t 01:59:00                # Duration of the job
+$sbatch_time
 #SBATCH -o$output_file             # Combined output and error messages file
-#SBATCH -p batch                   # Batch partition (concurrent jobs)
-#SBATCH --qos=hackathon            # Hackathon QOS for batch access
+$sbatch_partition
+$sbatch_extra
 
 set -e
 set -x
