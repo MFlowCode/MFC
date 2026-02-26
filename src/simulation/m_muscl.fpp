@@ -321,7 +321,7 @@ contains
         integer :: j, k, l, q !< Generic loop iterators
 
         ! Determining the number of cell-average variables which will be
-        ! muscl-reconstructed and mapping their indical bounds in the x-,
+        ! muscl-reconstructed and mapping their index bounds in the x-,
         ! y- and z-directions to those in the s1-, s2- and s3-directions
         ! as to reshape the inputted data in the coordinate direction of
         ! the muscl reconstruction
