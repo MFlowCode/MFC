@@ -6,6 +6,7 @@ from assembled MFC data. Uses matplotlib with the Agg backend
 for headless rendering.
 """
 
+import math
 import os
 import tempfile
 
@@ -13,19 +14,22 @@ import numpy as np
 
 import imageio.v2 as imageio
 
-import math
-
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt  # pylint: disable=wrong-import-position
 from matplotlib.colors import LogNorm  # pylint: disable=wrong-import-position
+
+matplotlib.rcParams.update({
+    'mathtext.fontset': 'cm',
+    'font.family': 'serif',
+})
 
 
 def render_1d(x_cc, data, varname, step, output, **opts):  # pylint: disable=too-many-arguments,too-many-positional-arguments
     """Render a 1D line plot and save as PNG."""
     fig, ax = plt.subplots(figsize=opts.get('figsize', (10, 6)))
     ax.plot(x_cc, data, linewidth=1.5)
-    ax.set_xlabel('x')
+    ax.set_xlabel(r'$x$')
     ax.set_ylabel(varname)
     ax.set_title(f'{varname} (step {step})')
     ax.grid(True, alpha=0.3)
@@ -75,7 +79,7 @@ def render_1d_tiled(x_cc, variables, step, output, **opts):  # pylint: disable=t
     # X-label only on bottom row
     for col in range(ncols):
         bottom_row = min(nrows - 1, (n - 1) // ncols) if col < (n % ncols or ncols) else nrows - 2
-        axes[bottom_row][col].set_xlabel('x', fontsize=9)
+        axes[bottom_row][col].set_xlabel(r'$x$', fontsize=9)
 
     fig.suptitle(f'step {step}', fontsize=11, y=0.99)
     fig.tight_layout(rect=[0, 0, 1, 0.97])
@@ -122,8 +126,8 @@ def render_2d(x_cc, y_cc, data, varname, step, output, **opts):  # pylint: disab
     pcm = ax.pcolormesh(x_cc, y_cc, data.T, cmap=cmap, vmin=vmin, vmax=vmax,
                         norm=norm, shading='auto')
     fig.colorbar(pcm, ax=ax, label=varname)
-    ax.set_xlabel('x')
-    ax.set_ylabel('y')
+    ax.set_xlabel(r'$x$')
+    ax.set_ylabel(r'$y$')
     ax.set_title(f'{varname} (step {step})')
     ax.set_aspect('equal', adjustable='box')
 
@@ -159,15 +163,15 @@ def render_3d_slice(assembled, varname, step, output, slice_axis='z',  # pylint:
     if axis_idx == 0:
         sliced = data_3d[idx, :, :]
         x_plot, y_plot = assembled.y_cc, assembled.z_cc
-        xlabel, ylabel = 'y', 'z'
+        xlabel, ylabel = r'$y$', r'$z$'
     elif axis_idx == 1:
         sliced = data_3d[:, idx, :]
         x_plot, y_plot = assembled.x_cc, assembled.z_cc
-        xlabel, ylabel = 'x', 'z'
+        xlabel, ylabel = r'$x$', r'$z$'
     else:
         sliced = data_3d[:, :, idx]
         x_plot, y_plot = assembled.x_cc, assembled.y_cc
-        xlabel, ylabel = 'x', 'y'
+        xlabel, ylabel = r'$x$', r'$y$'
 
     default_size = _figsize_for_domain(x_plot, y_plot)
     fig, ax = plt.subplots(figsize=opts.get('figsize', default_size))
@@ -179,7 +183,8 @@ def render_3d_slice(assembled, varname, step, output, slice_axis='z',  # pylint:
 
     norm = None
     if log_scale:
-        lo = vmin if vmin is not None else np.nanmin(sliced[sliced > 0]) if np.any(sliced > 0) else 1e-10
+        pos = sliced[sliced > 0]
+        lo = vmin if vmin is not None else np.nanmin(pos) if pos.size > 0 else 1e-10
         hi = vmax if vmax is not None else np.nanmax(sliced)
         if not np.isfinite(hi) or hi <= 0:
             hi = 1.0
@@ -204,7 +209,7 @@ def render_3d_slice(assembled, varname, step, output, slice_axis='z',  # pylint:
     plt.close(fig)
 
 
-def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,too-many-statements
+def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,too-many-statements,too-many-branches
                read_func=None, tiled=False, **opts):
     """
     Generate an MP4 video by iterating over timesteps.
