@@ -453,12 +453,16 @@ def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-argum
         if not frame_files:
             return False
 
-        # Determine reference dimensions from the first frame.
+        # First pass: find the maximum frame dimensions across all frames.
         # Round up to the nearest even pixel: yuv420p requires even width and height.
-        first_arr = imageio.imread(os.path.join(viz_dir, frame_files[0]))
-        ref_h = first_arr.shape[0] + first_arr.shape[0] % 2
-        ref_w = first_arr.shape[1] + first_arr.shape[1] % 2
-        n_ch  = first_arr.shape[2] if first_arr.ndim == 3 else 1
+        max_h, max_w, n_ch = 0, 0, 3
+        for fname in frame_files:
+            arr = imageio.imread(os.path.join(viz_dir, fname))
+            max_h = max(max_h, arr.shape[0])
+            max_w = max(max_w, arr.shape[1])
+            n_ch  = arr.shape[2] if arr.ndim == 3 else 1
+        ref_h = max_h + max_h % 2
+        ref_w = max_w + max_w % 2
 
         def _uniform_frame(arr):
             """Pad with white to (ref_h, ref_w) so all frames are identical in size."""
@@ -469,13 +473,13 @@ def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-argum
             out[:h, :w] = arr
             return out
 
-        # macro_block_size=1 disables imageio's own resize — we handle even dims above.
+        # Second pass: encode.  macro_block_size=1 disables imageio's own resize
+        # since we already ensured even dimensions above.
         with imageio.get_writer(
             output, fps=fps, codec='libx264', pixelformat='yuv420p',
             macro_block_size=1, ffmpeg_log_level='error',
         ) as writer:
-            writer.append_data(_uniform_frame(first_arr))
-            for fname in frame_files[1:]:
+            for fname in frame_files:
                 writer.append_data(_uniform_frame(
                     imageio.imread(os.path.join(viz_dir, fname))
                 ))
