@@ -41,6 +41,9 @@ dependencies = [
     "h5py",
     "imageio>=2.33",
     "imageio-ffmpeg>=0.5.0",
+    "plotext>=5.2.0",
+    "textual>=0.47.0",
+    "textual-plotext>=0.2.0",
 
     # Chemistry
     "cantera>=3.1.0",

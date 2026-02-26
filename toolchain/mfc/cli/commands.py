@@ -1031,6 +1031,12 @@ VIZ_COMMAND = Command(
             default=8050,
             metavar="PORT",
         ),
+        Argument(
+            name="tui",
+            help="Launch an interactive terminal UI (1D/2D only). Works over SSH with no browser.",
+            action=ArgAction.STORE_TRUE,
+            default=False,
+        ),
     ],
     examples=[
         Example("./mfc.sh viz case_dir/ --var pres --step 1000", "Plot pressure at step 1000"),
@@ -1038,6 +1044,7 @@ VIZ_COMMAND = Command(
         Example("./mfc.sh viz case_dir/ --list-steps", "List available timesteps"),
         Example("./mfc.sh viz case_dir/ --var schlieren --step 0:10000:500 --mp4", "Generate video"),
         Example("./mfc.sh viz case_dir/ --var pres --step 500 --slice-axis z", "3D slice at z midplane"),
+        Example("./mfc.sh viz case_dir/ --var pres --tui", "Terminal UI over SSH (1D/2D)"),
     ],
     key_options=[
         ("--var NAME", "Variable to visualize"),
@@ -1046,6 +1053,7 @@ VIZ_COMMAND = Command(
         ("--list-steps", "List available timesteps"),
         ("--mp4", "Generate MP4 video"),
         ("--interactive / -i", "Launch interactive Dash web UI"),
+        ("--tui", "Launch terminal UI (1D/2D, works over SSH)"),
         ("--cmap NAME", "Matplotlib colormap"),
         ("--slice-axis x|y|z", "Axis for 3D slice"),
     ],

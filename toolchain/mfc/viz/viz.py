@@ -74,8 +74,10 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
     cons.print(f"[bold]Format:[/bold] {fmt}")
 
     # Quick guide when no action is specified
-    if not ARG('list_steps') and not ARG('list_vars') and ARG('var') is None \
-            and not ARG('interactive') and ARG('step') is None:
+    no_action = (not ARG('list_steps') and not ARG('list_vars')
+                 and ARG('var') is None and ARG('step') is None
+                 and not ARG('interactive') and not ARG('tui'))
+    if no_action:
         cons.print()
         d = case_dir
         cons.print("[bold]Quick start:[/bold]")
@@ -154,8 +156,8 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
     tiled = varname is None or varname == 'all'
 
     if step_arg is None:
-        if ARG('interactive'):
-            step_arg = 'all'   # default to all steps in interactive mode
+        if ARG('interactive') or ARG('tui'):
+            step_arg = 'all'   # default to all steps in interactive/TUI mode
         else:
             raise MFCException("--step is required for rendering. "
                                "Use --list-steps to see available timesteps, or pass --step all.")
@@ -200,8 +202,9 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
 
     interactive = ARG('interactive')
 
-    # Load all variables when tiled or interactive; filter otherwise.
-    load_all = tiled or interactive
+    # Load all variables when tiled, interactive, or TUI; filter otherwise.
+    # TUI needs all vars loaded so the sidebar can switch between them.
+    load_all = tiled or interactive or ARG('tui')
 
     def read_step(step):
         if fmt == 'silo':
@@ -219,15 +222,27 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
             f"Refusing to load {len(requested_steps)} timesteps for 3D data "
             "(limit is 500). Use --step with a range or stride to reduce.")
 
-    # Tiled mode only works for 1D
-    if tiled and not interactive:
+    # Tiled mode for non-TUI, non-interactive rendering only works for 1D
+    if tiled and not interactive and not ARG('tui'):
         if test_assembled.ndim != 1:
             raise MFCException("--var is required for 2D/3D rendering. "
                                "Use --list-vars to see available variables.")
 
-    if not tiled and not interactive and varname not in test_assembled.variables:
+    if not tiled and not interactive and not ARG('tui') and varname not in test_assembled.variables:
         raise MFCException(f"Variable '{varname}' not found. "
                            f"Available variables: {', '.join(avail)}")
+
+    # TUI mode — launch Textual terminal UI (1D/2D only)
+    if ARG('tui'):
+        if test_assembled.ndim == 3:
+            raise MFCException(
+                "--tui only supports 1D and 2D data. "
+                "Use --interactive for 3D data."
+            )
+        from .tui import run_tui  # pylint: disable=import-outside-toplevel
+        init_var = varname if varname in avail else (avail[0] if avail else None)
+        run_tui(init_var, requested_steps, read_step, ndim=test_assembled.ndim)
+        return
 
     # Interactive mode — launch Dash web server
     if interactive:
