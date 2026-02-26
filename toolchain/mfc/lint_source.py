@@ -128,7 +128,7 @@ def check_hardcoded_byte_size(repo_root: Path) -> list[str]:
 
     When MFC is built in single precision (``wp = real32``), reals are
     4 bytes. Hard-coding 8 makes MPI I/O read/write the wrong amount.
-    Use ``storage_size(0._wp)/8`` instead.
+    Use ``storage_size(0._stp)/8`` instead.
     """
     errors: list[str] = []
     src_dir = repo_root / SRC_DIR
@@ -145,7 +145,7 @@ def check_hardcoded_byte_size(repo_root: Path) -> list[str]:
             if byte_re.search(stripped.split("!")[0]):
                 errors.append(
                     f"  {rel}:{i + 1} hard-codes 8-byte real size."
-                    " Fix: use 'storage_size(0._wp)/8' instead of"
+                    " Fix: use 'storage_size(0._stp)/8' instead of"
                     " '8._wp'"
                 )
 
