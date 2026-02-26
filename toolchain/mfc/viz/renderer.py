@@ -189,8 +189,7 @@ def render_2d(x_cc, y_cc, data, varname, step, output, **opts):  # pylint: disab
     pcm = ax.pcolormesh(x_cc, y_cc, data.T, cmap=cmap, vmin=vmin, vmax=vmax,
                         norm=norm, shading='auto')
     label = pretty_label(varname)
-    cb_label = f'{label} [log]' if log_scale else label
-    fig.colorbar(pcm, ax=ax, label=cb_label)
+    fig.colorbar(pcm, ax=ax, label=label)
     ax.set_xlabel(r'$x$')
     ax.set_ylabel(r'$y$')
     ax.set_title(f'{label} (step {step})')
@@ -263,8 +262,7 @@ def render_3d_slice(assembled, varname, step, output, slice_axis='z',  # pylint:
     pcm = ax.pcolormesh(x_plot, y_plot, sliced.T, cmap=cmap, vmin=vmin,
                         vmax=vmax, norm=norm, shading='auto')
     label = pretty_label(varname)
-    cb_label = f'{label} [log]' if log_scale else label
-    fig.colorbar(pcm, ax=ax, label=cb_label)
+    fig.colorbar(pcm, ax=ax, label=label)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     slice_coord = coord_along[idx]
