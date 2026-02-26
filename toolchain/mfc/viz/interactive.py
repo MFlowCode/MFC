@@ -49,14 +49,20 @@ _TEAL   = '#94e2d5'
 _YELLOW = '#f9e2af'
 
 # ---------------------------------------------------------------------------
-# Server-side data cache  {step -> AssembledData}
+# Server-side data cache  {step -> AssembledData}  (bounded to avoid OOM)
 # ---------------------------------------------------------------------------
+_CACHE_MAX = 50
 _cache: dict = {}
+_cache_order: list = []
 
 
 def _load(step: int, read_func: Callable):
     if step not in _cache:
+        if len(_cache) >= _CACHE_MAX:
+            evict = _cache_order.pop(0)
+            _cache.pop(evict, None)
         _cache[step] = read_func(step)
+        _cache_order.append(step)
     return _cache[step]
 
 

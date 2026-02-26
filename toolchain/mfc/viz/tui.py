@@ -38,14 +38,20 @@ _CMAPS: List[str] = [
 ]
 
 # ---------------------------------------------------------------------------
-# Step cache  {step -> AssembledData}
+# Step cache  {step -> AssembledData}  (bounded to avoid OOM)
 # ---------------------------------------------------------------------------
+_CACHE_MAX = 50
 _cache: Dict[int, object] = {}
+_cache_order: List[int] = []
 
 
 def _load(step: int, read_func: Callable) -> object:
     if step not in _cache:
+        if len(_cache) >= _CACHE_MAX:
+            evict = _cache_order.pop(0)
+            _cache.pop(evict, None)
         _cache[step] = read_func(step)
+        _cache_order.append(step)
     return _cache[step]
 
 

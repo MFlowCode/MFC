@@ -302,7 +302,8 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
     label = 'all' if tiled else varname
     for step in step_iter:
         try:
-            assembled = read_step(step)
+            # Reuse the already-loaded probe data for the first step
+            assembled = test_assembled if step == requested_steps[0] else read_step(step)
         except (FileNotFoundError, EOFError, ValueError) as exc:
             cons.print(f"[yellow]Warning:[/yellow] Skipping step {step}: {exc}")
             failures.append(step)

@@ -338,42 +338,57 @@ def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-argum
     os.makedirs(output_dir, exist_ok=True)
     viz_dir = tempfile.mkdtemp(dir=output_dir, prefix='_frames_')
 
+    def _cleanup():
+        for fname in sorted(f for f in os.listdir(viz_dir) if f.endswith('.png')):
+            try:
+                os.remove(os.path.join(viz_dir, fname))
+            except OSError:
+                pass
+        try:
+            os.rmdir(viz_dir)
+        except OSError:
+            pass
+
     try:
         from tqdm import tqdm  # pylint: disable=import-outside-toplevel
         step_iter = tqdm(steps, desc='Rendering frames')
     except ImportError:
         step_iter = steps
 
-    for i, step in enumerate(step_iter):
-        assembled = read_func(step)
-        frame_path = os.path.join(viz_dir, f'{i:06d}.png')
+    try:
+        for i, step in enumerate(step_iter):
+            assembled = read_func(step)
+            frame_path = os.path.join(viz_dir, f'{i:06d}.png')
 
-        if tiled and assembled.ndim == 1:
-            render_1d_tiled(assembled.x_cc, assembled.variables,
-                            step, frame_path, **opts)
-        elif assembled.ndim == 1:
-            var_data = assembled.variables.get(varname)
-            if var_data is None:
-                continue
-            render_1d(assembled.x_cc, var_data,
-                      varname, step, frame_path, **opts)
-        elif assembled.ndim == 2:
-            var_data = assembled.variables.get(varname)
-            if var_data is None:
-                continue
-            render_2d(assembled.x_cc, assembled.y_cc,
-                      var_data,
-                      varname, step, frame_path, **opts)
-        elif assembled.ndim == 3:
-            var_data = assembled.variables.get(varname)
-            if var_data is None:
-                continue
-            render_3d_slice(assembled, varname, step, frame_path, **opts)
-        else:
-            raise ValueError(
-                f"Unsupported dimensionality ndim={assembled.ndim} for step {step}. "
-                "Expected 1, 2, or 3."
-            )
+            if tiled and assembled.ndim == 1:
+                render_1d_tiled(assembled.x_cc, assembled.variables,
+                                step, frame_path, **opts)
+            elif assembled.ndim == 1:
+                var_data = assembled.variables.get(varname)
+                if var_data is None:
+                    continue
+                render_1d(assembled.x_cc, var_data,
+                          varname, step, frame_path, **opts)
+            elif assembled.ndim == 2:
+                var_data = assembled.variables.get(varname)
+                if var_data is None:
+                    continue
+                render_2d(assembled.x_cc, assembled.y_cc,
+                          var_data,
+                          varname, step, frame_path, **opts)
+            elif assembled.ndim == 3:
+                var_data = assembled.variables.get(varname)
+                if var_data is None:
+                    continue
+                render_3d_slice(assembled, varname, step, frame_path, **opts)
+            else:
+                raise ValueError(
+                    f"Unsupported dimensionality ndim={assembled.ndim} for step {step}. "
+                    "Expected 1, 2, or 3."
+                )
+    except Exception:
+        _cleanup()
+        raise
 
     # Combine frames into MP4 using imageio + imageio-ffmpeg (bundled ffmpeg)
     frame_files = sorted(f for f in os.listdir(viz_dir) if f.endswith('.png'))
@@ -390,14 +405,5 @@ def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-argum
     except (OSError, ValueError, RuntimeError) as exc:
         print(f"imageio MP4 write failed: {exc}")
     finally:
-        # Always clean up temporary frame files
-        for fname in frame_files:
-            try:
-                os.remove(os.path.join(viz_dir, fname))
-            except OSError:
-                pass
-        try:
-            os.rmdir(viz_dir)
-        except OSError:
-            pass
+        _cleanup()
     return success
