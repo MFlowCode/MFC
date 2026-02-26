@@ -31,12 +31,10 @@ See the [developer guide](https://mflowcode.github.io/documentation/contributing
 
 </details>
 
-<details>
-<summary><strong>AI code reviews</strong></summary>
+## AI code reviews
 
 Reviews are not triggered automatically. To request a review, comment on the PR:
 - `@coderabbitai review` — incremental review (new changes only)
 - `@coderabbitai full review` — full review from scratch
 - `/review` — Qodo review
-
-</details>
+- `/improve` — Qodo code suggestions
