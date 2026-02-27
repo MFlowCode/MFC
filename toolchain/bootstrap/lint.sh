@@ -13,7 +13,7 @@ for arg in "$@"; do
 done
 
 log "(venv) Installing$MAGENTA viz$COLOR_RESET optional dependencies for linting..."
-uv pip install -q "$(pwd)/toolchain[viz]" 2>/dev/null || pip install -q "$(pwd)/toolchain[viz]"
+uv pip install -q "$(pwd)/toolchain[viz]" || pip install -q "$(pwd)/toolchain[viz]"
 
 log "(venv) Running$MAGENTA pylint$COLOR_RESET on$MAGENTA MFC$COLOR_RESET's $MAGENTA""toolchain$COLOR_RESET."
 

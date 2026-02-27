@@ -29,6 +29,7 @@ from textual.widgets import Footer, Header, Label, ListItem, ListView, Static
 
 from textual_plotext import PlotextPlot
 
+from mfc.common import MFCException
 from mfc.printer import cons
 from . import _step_cache
 
@@ -454,7 +455,7 @@ def run_tui(
 ) -> None:
     """Launch the Textual TUI for MFC visualization (1D/2D only)."""
     if ndim not in (1, 2):
-        raise ValueError(
+        raise MFCException(
             f"--tui only supports 1D and 2D data (got ndim={ndim}). "
             "Use --interactive for 3D data."
         )
@@ -463,7 +464,7 @@ def run_tui(
     first = _load(steps[0], read_func)
     varnames = sorted(first.variables.keys())
     if not varnames:
-        raise ValueError("No variables found in data")
+        raise MFCException("No variables found in data")
     if init_var not in varnames:
         init_var = varnames[0]
 
