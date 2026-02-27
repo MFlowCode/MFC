@@ -16,6 +16,24 @@ reviews:
   sequence_diagrams: false
   changed_files_summary: false
 
+  # Further reduce walkthrough noise (footer itself isn't currently configurable)
+  collapse_walkthrough: true
+  review_details: false
+  estimate_code_review_effort: false
+  assess_linked_issues: false
+  related_prs: false
+  suggested_labels: false
+  suggested_reviewers: false
+  in_progress_fortune: false
+  poem: false
+
+  # Remove "Finishing Touches" section content
+  finishing_touches:
+    docstrings:
+      enabled: false
+    unit_tests:
+      enabled: false
+
   auto_review:
     enabled: true                  # initial PR-open review
     auto_incremental_review: false # no re-run on every push
