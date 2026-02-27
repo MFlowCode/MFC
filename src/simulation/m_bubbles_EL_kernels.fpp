@@ -147,7 +147,7 @@ contains
                     ! Loop over bubbles in this cell
                     $:GPU_LOOP(parallelism='[seq]')
                     do lb = cell_list_start(i, j, k), &
-                            cell_list_start(i, j, k) + cell_list_count(i, j, k) - 1
+                        cell_list_start(i, j, k) + cell_list_count(i, j, k) - 1
 
                         bub_idx = cell_list_idx(lb)
 
@@ -246,7 +246,7 @@ contains
                             do di = di_beg, di_end
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do lb = cell_list_start(di, dj, dk), &
-                                        cell_list_start(di, dj, dk) + cell_list_count(di, dj, dk) - 1
+                                    cell_list_start(di, dj, dk) + cell_list_count(di, dj, dk) - 1
 
                                     bub_idx = cell_list_idx(lb)
 
@@ -344,11 +344,11 @@ contains
             else
                 !< 2D cartesian function: Equation (48) from Madea and Colonius 2018
                 ! We smear particles considering a virtual depth (lag_params%charwidth) with lag_params%charNz cells
-                dzp = (lag_params%charwidth / (lag_params%charNz + 1._wp))
+                dzp = (lag_params%charwidth/(lag_params%charNz + 1._wp))
 
                 func = 0._wp
                 do i = 0, lag_params%charNz
-                    zc = (-lag_params%charwidth/2._wp + dzp * (0.5_wp + i)) ! Center of virtual cell i in z-direction
+                    zc = (-lag_params%charwidth/2._wp + dzp*(0.5_wp + i)) ! Center of virtual cell i in z-direction
                     Lz2 = (center(3) - zc)**2._wp
                     distance = sqrt((center(1) - nodecoord(1))**2._wp + (center(2) - nodecoord(2))**2._wp + Lz2)
                     func = func + dzp/lag_params%charwidth*exp(-0.5_wp*(distance/stddsv)**2._wp)/(sqrt(2._wp*pi)*stddsv)**3._wp
