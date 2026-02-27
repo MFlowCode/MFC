@@ -76,9 +76,10 @@ module m_bubbles_EL
     real(wp) :: Rmax_glb, Rmin_glb       !< Maximum and minimum bubbe size in the local domain
     !< Projection of the lagrangian particles in the Eulerian framework
     type(scalar_field), dimension(:), allocatable :: q_beta
+    type(scalar_field), dimension(:), allocatable :: kahan_comp !< Kahan compensation for q_beta accumulation
     integer :: q_beta_idx                       !< Size of the q_beta vector field
 
-    $:GPU_DECLARE(create='[Rmax_glb,Rmin_glb,q_beta,q_beta_idx]')
+    $:GPU_DECLARE(create='[Rmax_glb,Rmin_glb,q_beta,kahan_comp,q_beta_idx]')
 
     integer, parameter :: LAG_EVOL_ID = 11 ! File id for lag_bubbles_evol_*.dat
     integer, parameter :: LAG_STATS_ID = 12 ! File id for stats_lag_bubbles_*.dat
@@ -135,12 +136,17 @@ contains
         $:GPU_UPDATE(device='[lag_num_ts, q_beta_idx]')
 
         @:ALLOCATE(q_beta(1:q_beta_idx))
+        @:ALLOCATE(kahan_comp(1:q_beta_idx))
 
         do i = 1, q_beta_idx
             @:ALLOCATE(q_beta(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                 idwbuff(2)%beg:idwbuff(2)%end, &
                 idwbuff(3)%beg:idwbuff(3)%end))
             @:ACC_SETUP_SFs(q_beta(i))
+            @:ALLOCATE(kahan_comp(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                idwbuff(2)%beg:idwbuff(2)%end, &
+                idwbuff(3)%beg:idwbuff(3)%end))
+            @:ACC_SETUP_SFs(kahan_comp(i))
         end do
 
         ! Allocating space for lagrangian variables
@@ -969,6 +975,7 @@ contains
                 do k = idwbuff(2)%beg, idwbuff(2)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
                         q_beta(i)%sf(j, k, l) = 0._wp
+                        kahan_comp(i)%sf(j, k, l) = 0._wp
                     end do
                 end do
             end do
@@ -979,7 +986,7 @@ contains
         call s_build_cell_list(n_el_bubs_loc, mtn_s)
 
         call s_smoothfunction(n_el_bubs_loc, intfc_rad, intfc_vel, &
-                              mtn_s, mtn_pos, q_beta)
+                              mtn_s, mtn_pos, q_beta, kahan_comp)
 
         ! DEBUG: checksum after Gaussian smearing (before communication)
         ! all_cells = sum over entire grid (interior + buffer) per rank, then MPI_SUM.
@@ -2337,8 +2344,10 @@ contains
 
         do i = 1, q_beta_idx
             @:DEALLOCATE(q_beta(i)%sf)
+            @:DEALLOCATE(kahan_comp(i)%sf)
         end do
         @:DEALLOCATE(q_beta)
+        @:DEALLOCATE(kahan_comp)
 
         !Deallocating space
         @:DEALLOCATE(lag_id)

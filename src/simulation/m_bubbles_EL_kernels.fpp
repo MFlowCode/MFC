@@ -38,18 +38,19 @@ contains
             !! @param lbk_s Computational coordinates of the bubbles
             !! @param lbk_pos Spatial coordinates of the bubbles
             !! @param updatedvar Eulerian variable to be updated
-    subroutine s_smoothfunction(nBubs, lbk_rad, lbk_vel, lbk_s, lbk_pos, updatedvar)
+    subroutine s_smoothfunction(nBubs, lbk_rad, lbk_vel, lbk_s, lbk_pos, updatedvar, kcomp)
 
         integer, intent(in) :: nBubs
         real(wp), dimension(1:lag_params%nBubs_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_pos
         real(wp), dimension(1:lag_params%nBubs_glb, 1:2), intent(in) :: lbk_rad, lbk_vel
         type(scalar_field), dimension(:), intent(inout) :: updatedvar
+        type(scalar_field), dimension(:), intent(inout) :: kcomp
 
         smoothfunc:select case(lag_params%smooth_type)
         case (1)
-        call s_gaussian(nBubs, lbk_rad, lbk_vel, lbk_s, lbk_pos, updatedvar)
+        call s_gaussian(nBubs, lbk_rad, lbk_vel, lbk_s, lbk_pos, updatedvar, kcomp)
         case (2)
-        call s_deltafunc(nBubs, lbk_rad, lbk_vel, lbk_s, updatedvar)
+        call s_deltafunc(nBubs, lbk_rad, lbk_vel, lbk_s, updatedvar, kcomp)
         end select smoothfunc
 
     end subroutine s_smoothfunction
@@ -118,18 +119,20 @@ contains
     !> Cell-centric delta-function smearing using the cell list (no GPU atomics).
     !!      Each bubble only affects the cell it resides in. The outer GPU loop
     !!      iterates over interior cells and sums contributions from resident bubbles.
-    subroutine s_deltafunc(nBubs, lbk_rad, lbk_vel, lbk_s, updatedvar)
+    subroutine s_deltafunc(nBubs, lbk_rad, lbk_vel, lbk_s, updatedvar, kcomp)
 
         integer, intent(in) :: nBubs
         real(wp), dimension(1:lag_params%nBubs_glb, 1:3, 1:2), intent(in) :: lbk_s
         real(wp), dimension(1:lag_params%nBubs_glb, 1:2), intent(in) :: lbk_rad, lbk_vel
         type(scalar_field), dimension(:), intent(inout) :: updatedvar
+        type(scalar_field), dimension(:), intent(inout) :: kcomp
 
         real(wp) :: strength_vel, strength_vol
         real(wp) :: volpart, Vol
+        real(wp) :: y_kahan, t_kahan
         integer :: i, j, k, lb, bub_idx
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[i,j,k,lb,bub_idx,volpart,Vol,strength_vel,strength_vol]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[i,j,k,lb,bub_idx,volpart,Vol,strength_vel,strength_vol,y_kahan,t_kahan]')
         do k = 0, p
             do j = 0, n
                 do i = 0, m
@@ -153,16 +156,24 @@ contains
                         strength_vol = volpart
                         strength_vel = 4._wp*pi*lbk_rad(bub_idx, 2)**2._wp*lbk_vel(bub_idx, 2)
 
-                        ! Update void fraction field — no atomics needed
-                        updatedvar(1)%sf(i, j, k) = updatedvar(1)%sf(i, j, k) + real(strength_vol/Vol, kind=stp)
+                        ! Kahan summation for void fraction
+                        y_kahan = real(strength_vol/Vol, kind=wp) - kcomp(1)%sf(i, j, k)
+                        t_kahan = updatedvar(1)%sf(i, j, k) + y_kahan
+                        kcomp(1)%sf(i, j, k) = (t_kahan - updatedvar(1)%sf(i, j, k)) - y_kahan
+                        updatedvar(1)%sf(i, j, k) = t_kahan
 
-                        ! Update time derivative of void fraction
-                        updatedvar(2)%sf(i, j, k) = updatedvar(2)%sf(i, j, k) + real(strength_vel/Vol, kind=stp)
+                        ! Kahan summation for time derivative of void fraction
+                        y_kahan = real(strength_vel/Vol, kind=wp) - kcomp(2)%sf(i, j, k)
+                        t_kahan = updatedvar(2)%sf(i, j, k) + y_kahan
+                        kcomp(2)%sf(i, j, k) = (t_kahan - updatedvar(2)%sf(i, j, k)) - y_kahan
+                        updatedvar(2)%sf(i, j, k) = t_kahan
 
                         ! Product of two smeared functions
                         if (lag_params%cluster_type >= 4) then
-                            updatedvar(5)%sf(i, j, k) = updatedvar(5)%sf(i, j, k) + &
-                                real((strength_vol*strength_vel)/Vol, kind=stp)
+                            y_kahan = real((strength_vol*strength_vel)/Vol, kind=wp) - kcomp(5)%sf(i, j, k)
+                            t_kahan = updatedvar(5)%sf(i, j, k) + y_kahan
+                            kcomp(5)%sf(i, j, k) = (t_kahan - updatedvar(5)%sf(i, j, k)) - y_kahan
+                            updatedvar(5)%sf(i, j, k) = t_kahan
                         end if
                     end do
 
@@ -176,18 +187,20 @@ contains
     !> Cell-centric gaussian smearing using the cell list (no GPU atomics).
     !!      Each grid cell accumulates contributions from nearby bubbles looked up
     !!      via cell_list_start/count/idx.
-    subroutine s_gaussian(nBubs, lbk_rad, lbk_vel, lbk_s, lbk_pos, updatedvar)
+    subroutine s_gaussian(nBubs, lbk_rad, lbk_vel, lbk_s, lbk_pos, updatedvar, kcomp)
 
         integer, intent(in) :: nBubs
         real(wp), dimension(1:lag_params%nBubs_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_pos
         real(wp), dimension(1:lag_params%nBubs_glb, 1:2), intent(in) :: lbk_rad, lbk_vel
         type(scalar_field), dimension(:), intent(inout) :: updatedvar
+        type(scalar_field), dimension(:), intent(inout) :: kcomp
 
         real(wp), dimension(3) :: center, nodecoord, s_coord
         integer, dimension(3) :: cell, cellijk
         real(wp) :: stddsv, volpart
         real(wp) :: strength_vel, strength_vol
         real(wp) :: func, func2
+        real(wp) :: y_kahan, t_kahan
         integer :: i, j, k, di, dj, dk, lb, bub_idx
         integer :: di_beg, di_end, dj_beg, dj_end, dk_beg, dk_end
         integer :: smear_x_beg, smear_x_end
@@ -203,7 +216,7 @@ contains
         smear_z_end = merge(p + mapCells + 1, p, p > 0)
 
         $:GPU_PARALLEL_LOOP(collapse=3, &
-            & private='[i,j,k,di,dj,dk,lb,bub_idx,center,nodecoord,s_coord,cell,cellijk,stddsv,volpart,strength_vel,strength_vol,func,func2,di_beg,di_end,dj_beg,dj_end,dk_beg,dk_end]', &
+            & private='[i,j,k,di,dj,dk,lb,bub_idx,center,nodecoord,s_coord,cell,cellijk,stddsv,volpart,strength_vel,strength_vol,func,func2,y_kahan,t_kahan,di_beg,di_end,dj_beg,dj_end,dk_beg,dk_end]', &
             & copyin='[smear_x_beg,smear_x_end,smear_y_beg,smear_y_end,smear_z_beg,smear_z_end]')
         do k = smear_z_beg, smear_z_end
             do j = smear_y_beg, smear_y_end
@@ -253,14 +266,24 @@ contains
 
                                     call s_applygaussian(center, cellijk, nodecoord, stddsv, 0._wp, func)
 
-                                    ! Accumulate — no atomics needed (each thread owns its (i,j,k))
-                                    updatedvar(1)%sf(i, j, k) = updatedvar(1)%sf(i, j, k) + real(func*strength_vol, kind=stp)
-                                    updatedvar(2)%sf(i, j, k) = updatedvar(2)%sf(i, j, k) + real(func*strength_vel, kind=stp)
+                                    ! Kahan summation for void fraction
+                                    y_kahan = real(func*strength_vol, kind=wp) - kcomp(1)%sf(i, j, k)
+                                    t_kahan = updatedvar(1)%sf(i, j, k) + y_kahan
+                                    kcomp(1)%sf(i, j, k) = (t_kahan - updatedvar(1)%sf(i, j, k)) - y_kahan
+                                    updatedvar(1)%sf(i, j, k) = t_kahan
+
+                                    ! Kahan summation for time derivative of void fraction
+                                    y_kahan = real(func*strength_vel, kind=wp) - kcomp(2)%sf(i, j, k)
+                                    t_kahan = updatedvar(2)%sf(i, j, k) + y_kahan
+                                    kcomp(2)%sf(i, j, k) = (t_kahan - updatedvar(2)%sf(i, j, k)) - y_kahan
+                                    updatedvar(2)%sf(i, j, k) = t_kahan
 
                                     if (lag_params%cluster_type >= 4) then
                                         call s_applygaussian(center, cellijk, nodecoord, stddsv, 1._wp, func2)
-                                        updatedvar(5)%sf(i, j, k) = updatedvar(5)%sf(i, j, k) + &
-                                            real(func2*strength_vol*strength_vel, kind=stp)
+                                        y_kahan = real(func2*strength_vol*strength_vel, kind=wp) - kcomp(5)%sf(i, j, k)
+                                        t_kahan = updatedvar(5)%sf(i, j, k) + y_kahan
+                                        kcomp(5)%sf(i, j, k) = (t_kahan - updatedvar(5)%sf(i, j, k)) - y_kahan
+                                        updatedvar(5)%sf(i, j, k) = t_kahan
                                     end if
 
                                 end do
