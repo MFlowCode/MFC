@@ -411,12 +411,22 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
 
     # MP4 mode
     if ARG('mp4'):
-        fps = ARG('fps')
+        fps = float(ARG('fps'))
+        _FPS_DEFAULT = 10.0
+        _MIN_DURATION = 5.0  # seconds
+        n_frames = len(requested_steps)
+        if fps == _FPS_DEFAULT and n_frames / fps < _MIN_DURATION:
+            fps = max(1.0, n_frames / _MIN_DURATION)
+            cons.print(
+                f"[dim]Auto-adjusted fps to {fps:.2g} "
+                f"so video is at least {_MIN_DURATION:.0f}s "
+                f"(use --fps to override).[/dim]"
+            )
         label = 'all' if tiled else varname
         mp4_path = os.path.join(output_base, f'{label}.mp4')
-        cons.print(f"[bold]Generating MP4:[/bold] {mp4_path} ({len(requested_steps)} frames)")
+        cons.print(f"[bold]Generating MP4:[/bold] {mp4_path} ({n_frames} frames @ {fps:.2g} fps = {n_frames/fps:.1f}s)")
         success = render_mp4(varname, requested_steps, mp4_path,
-                             fps=int(fps), read_func=read_step,
+                             fps=fps, read_func=read_step,
                              tiled=tiled, bubble_func=bubble_func, **render_opts)
         if success:
             cons.print(f"[bold green]Done:[/bold green] {mp4_path}")
