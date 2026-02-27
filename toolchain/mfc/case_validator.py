@@ -2357,7 +2357,7 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         cyl_coord = self.get('cyl_coord', 'F') == 'T'
         p = self.get('p', 0)
         self.prohibit(
-            CFG().single and cyl_coord and p is not None and p > 0,
+            CFG().single and cyl_coord and p > 0,
             "Fully 3D cylindrical geometry (cyl_coord = T, p > 0) is not supported "
             "in single precision (--single)"
         )
