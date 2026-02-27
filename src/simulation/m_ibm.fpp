@@ -576,6 +576,7 @@ contains
         type(ghost_point), dimension(num_gps), intent(INOUT) :: ghost_points_in
         type(ghost_point), dimension(num_inner_gps), intent(INOUT) :: inner_points_in
         integer :: i, j, k, ii, jj, kk, gp_layers_z !< Iterator variables
+        integer :: xp, yp, zp !< periodicities
         integer :: count, count_i, local_idx
         integer :: patch_id
         logical :: is_gp
@@ -585,7 +586,7 @@ contains
         gp_layers_z = gp_layers
         if (p == 0) gp_layers_z = 0
 
-        $:GPU_PARALLEL_LOOP(private='[i,j,k,ii,jj,kk,is_gp,local_idx]', copyin='[count,count_i, x_domain, y_domain, z_domain]', firstprivate='[gp_layers,gp_layers_z]', collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,ii,jj,kk,is_gp,local_idx,patch_id,encoded_patch_id,xp,yp,zp]', copyin='[count,count_i, x_domain, y_domain, z_domain]', firstprivate='[gp_layers,gp_layers_z]', collapse=3)
         do i = 0, m
             do j = 0, n
                 do k = 0, p
@@ -610,9 +611,12 @@ contains
                             $:END_GPU_ATOMIC_CAPTURE()
 
                             ghost_points_in(local_idx)%loc = [i, j, k]
-                            patch_id = ib_markers%sf(i, j, k)
+                            encoded_patch_id = ib_markers%sf(i, j, k)
+                            call decode_patch_periodicity(encoded_patch_id, patch_id, xp, yp, zp)
                             ghost_points_in(local_idx)%ib_patch_id = patch_id
-
+                            ghost_points_in(local_idx)%x_periodicity = xp
+                            ghost_points_in(local_idx)%y_periodicity = yp
+                            ghost_points_in(local_idx)%z_periodicity = zp
                             ghost_points_in(local_idx)%slip = patch_ib(patch_id)%slip
 
                             if ((x_cc(i) - dx(i)) < x_domain%beg) then
@@ -924,12 +928,16 @@ contains
 
         integer, intent(in) :: num_ibs
 
-        integer :: i, ierr
+        integer :: i, j, k, ierr
 
         call nvtxStartRange("UPDATE-MIBM")
 
         ! Clears the existing immersed boundary indices
-        ib_markers%sf = 0._wp
+        $:GPU_PARALLEL_LOOP(private='[i,j,k]')
+        do i = 0, m; do j = 0, n; do k = 0, p
+                    ib_markers%sf(i, j, k) = 0._wp
+                end do; end do; end do
+        $:END_GPU_PARALLEL_LOOP
 
         ! recalulcate the rotation matrix based upon the new angles
         do i = 1, num_ibs
@@ -942,7 +950,6 @@ contains
 
         ! recompute the new ib_patch locations and broadcast them.
         call nvtxStartRange("APPLY-IB-PATCHES")
-        $:GPU_UPDATE(device='[ib_markers%sf]')
         call s_apply_ib_patches(ib_markers)
         call nvtxEndRange
 
@@ -1262,30 +1269,30 @@ contains
 
     end subroutine s_compute_moment_of_inertia
 
-    !> @breif Checks for periodic boundary conditions in all directions, and if so, moves patch location if it left the domain
+    !> @brief Checks for periodic boundary conditions in all directions, and if so, moves patch location if it left the domain
     subroutine wrap_periodic_ibs()
 
-      integer :: patch_id
+        integer :: patch_id
 
-      ! iterate over all immersed boundaries to correct position
-      $:GPU_PARALLEL_LOOP(private='[patch_id]')
-      do patch_id = 1, num_ibs
-          ! check domain wraps in x, y, z
-          #:for X in [('x'), ('y'), ('z')]
-              ! check for periodicity
-              if (bc_${X}$ == BC_PERIODIC) then
-                  ! check if the boundary has left the domain, and then correct
-                  if (patch_ib(patch_id)%${X}$_centroid < ${X}$_domain%beg) then
-                      ! if the boundary exited "left", wrap it back around to the "right"
-                      patch_ib(patch_id)%${X}$_centroid = patch_ib(patch_id)%${X}$_centroid + (${X}$_domain%end - ${X}$_domain%beg)
-                  else if (patch_ib(patch_id)%${X}$_centroid > ${X}$_domain%end) then
-                      ! if the boundary exited "right", wrap it back around to the "left"
-                      patch_ib(patch_id)%${X}$_centroid = patch_ib(patch_id)%${X}$_centroid - (${X}$_domain%end - ${X}$_domain%beg)
-                  end if
-              end if
-          #endfor
-      end do
-      $:END_GPU_PARALLEL_LOOP()
+        ! iterate over all immersed boundaries to correct position
+        $:GPU_PARALLEL_LOOP(private='[patch_id]')
+        do patch_id = 1, num_ibs
+            ! check domain wraps in x, y, z
+            #:for X in [('x'), ('y'), ('z')]
+                ! check for periodicity
+                if (bc_${X}$ == BC_PERIODIC) then
+                    ! check if the boundary has left the domain, and then correct
+                    if (patch_ib(patch_id)%${X}$_centroid < ${X}$_domain%beg) then
+                        ! if the boundary exited "left", wrap it back around to the "right"
+                        patch_ib(patch_id)%${X}$_centroid = patch_ib(patch_id)%${X}$_centroid + (${X}$_domain%end - ${X}$_domain%beg)
+                    else if (patch_ib(patch_id)%${X}$_centroid > ${X}$_domain%end) then
+                        ! if the boundary exited "right", wrap it back around to the "left"
+                        patch_ib(patch_id)%${X}$_centroid = patch_ib(patch_id)%${X}$_centroid - (${X}$_domain%end - ${X}$_domain%beg)
+                    end if
+                end if
+            #:endfor
+        end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine wrap_periodic_ibs
 

@@ -456,6 +456,7 @@ module m_derived_types
         real(wp), dimension(1:3) :: levelset_norm
         logical :: slip
         integer, dimension(3) :: DB
+        integer :: x_periodicity, y_periodicity, z_periodicity
     end type ghost_point
 
     !> Species parameters

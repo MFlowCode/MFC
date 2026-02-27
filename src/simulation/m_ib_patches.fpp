@@ -143,8 +143,8 @@ contains
 
         ! Transferring the circular patch's radius, centroid, smearing patch
         ! identity and smearing coefficient information
-        center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp) * (x_domain%end - x_domain%beg)
-        center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp) * (y_domain%end - y_domain%beg)
+        center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
+        center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg)
         radius = patch_ib(patch_id)%radius
 
         ! encode the periodicity information into the patch_id
@@ -187,7 +187,6 @@ contains
         type(integer_field), intent(inout) :: ib_markers
         integer, intent(in) :: xp, yp !< integers containing the periodicity projection information
 
-
         real(wp) :: f, ca_in, pa, ma, ta
         real(wp) :: xa, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
         integer :: i, j, k, il, ir, jl, jr
@@ -198,8 +197,8 @@ contains
         real(wp), dimension(1:2) :: center !< x and y coordinates in local IB frame
         real(wp), dimension(1:3, 1:3) :: inverse_rotation
 
-        center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp) * (x_domain%end - x_domain%beg)
-        center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp) * (y_domain%end - y_domain%beg)
+        center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
+        center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg)
         ca_in = patch_ib(patch_id)%c
         pa = patch_ib(patch_id)%p
         ma = patch_ib(patch_id)%m
@@ -361,9 +360,9 @@ contains
         real(wp), dimension(1:3) :: xyz_local, center, offset !< x, y, z coordinates in local IB frame
         real(wp), dimension(1:3, 1:3) :: inverse_rotation
 
-        center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp) * (x_domain%end - x_domain%beg)
-        center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp) * (y_domain%end - y_domain%beg)
-        center(3) = patch_ib(patch_id)%z_centroid + real(zp, wp) * (z_domain%end - z_domain%beg)
+        center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
+        center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg)
+        center(3) = patch_ib(patch_id)%z_centroid + real(zp, wp)*(z_domain%end - z_domain%beg)
         lz = patch_ib(patch_id)%length_z
         ca_in = patch_ib(patch_id)%c
         pa = patch_ib(patch_id)%p
@@ -534,8 +533,8 @@ contains
         real(wp), dimension(1:3, 1:3) :: inverse_rotation
 
         ! Transferring the rectangle's centroid and length information
-        center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp) * (x_domain%end - x_domain%beg)
-        center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp) * (y_domain%end - y_domain%beg)
+        center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
+        center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg)
         length(1) = patch_ib(patch_id)%length_x
         length(2) = patch_ib(patch_id)%length_y
         inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
@@ -605,9 +604,9 @@ contains
 
         ! Transferring spherical patch's radius, centroid, smoothing patch
         ! identity and smoothing coefficient information
-        center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp) * (x_domain%end - x_domain%beg)
-        center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp) * (y_domain%end - y_domain%beg)
-        center(3) = patch_ib(patch_id)%z_centroid + real(zp, wp) * (z_domain%end - z_domain%beg)
+        center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
+        center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg)
+        center(3) = patch_ib(patch_id)%z_centroid + real(zp, wp)*(z_domain%end - z_domain%beg)
         radius = patch_ib(patch_id)%radius
 
         ! encode the periodicity information into the patch_id
@@ -676,9 +675,9 @@ contains
         real(wp) :: corner_distance
 
         ! Transferring the cuboid's centroid and length information
-        center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp) * (x_domain%end - x_domain%beg)
-        center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp) * (y_domain%end - y_domain%beg)
-        center(3) = patch_ib(patch_id)%z_centroid + real(zp, wp) * (z_domain%end - z_domain%beg)
+        center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
+        center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg)
+        center(3) = patch_ib(patch_id)%z_centroid + real(zp, wp)*(z_domain%end - z_domain%beg)
         length(1) = patch_ib(patch_id)%length_x
         length(2) = patch_ib(patch_id)%length_y
         length(3) = patch_ib(patch_id)%length_z
@@ -761,9 +760,9 @@ contains
         real(wp) :: corner_distance
 
         ! Transferring the cylindrical patch's centroid, length, radius,
-        center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp) * (x_domain%end - x_domain%beg)
-        center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp) * (y_domain%end - y_domain%beg)
-        center(3) = patch_ib(patch_id)%z_centroid + real(zp, wp) * (z_domain%end - z_domain%beg)
+        center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
+        center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg)
+        center(3) = patch_ib(patch_id)%z_centroid + real(zp, wp)*(z_domain%end - z_domain%beg)
         length(1) = patch_ib(patch_id)%length_x
         length(2) = patch_ib(patch_id)%length_y
         length(3) = patch_ib(patch_id)%length_z
@@ -846,8 +845,8 @@ contains
         real(wp), dimension(1:3, 1:3) :: inverse_rotation
 
         ! Transferring the ellipse's centroid and length information
-        center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp) * (x_domain%end - x_domain%beg)
-        center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp) * (y_domain%end - y_domain%beg)
+        center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
+        center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg)
         ellipse_coeffs(1) = 0.5_wp*patch_ib(patch_id)%length_x
         ellipse_coeffs(2) = 0.5_wp*patch_ib(patch_id)%length_y
         inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
@@ -860,8 +859,8 @@ contains
         jl = -gp_layers
         ir = m + gp_layers
         jr = n + gp_layers
-        call get_bounding_indices(center(1) - maxval(ellipse_coeffs) * 2._wp, center(1) + maxval(ellipse_coeffs) * 2._wp, x_cc, il, ir)
-        call get_bounding_indices(center(2) - maxval(ellipse_coeffs) * 2._wp, center(2) + maxval(ellipse_coeffs) * 2._wp, y_cc, jl, jr)
+        call get_bounding_indices(center(1) - maxval(ellipse_coeffs)*2._wp, center(1) + maxval(ellipse_coeffs)*2._wp, x_cc, il, ir)
+        call get_bounding_indices(center(2) - maxval(ellipse_coeffs)*2._wp, center(2) + maxval(ellipse_coeffs)*2._wp, y_cc, jl, jr)
 
         ! Checking whether the ellipse covers a particular cell in the
         ! domain
@@ -906,8 +905,8 @@ contains
         real(wp), dimension(1:3, 1:3) :: inverse_rotation, rotation
 
         center = 0._wp
-        center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp) * (x_domain%end - x_domain%beg)
-        center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp) * (y_domain%end - y_domain%beg)
+        center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
+        center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg)
         inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
         rotation(:, :) = patch_ib(patch_id)%rotation_matrix(:, :)
         offset(:) = patch_ib(patch_id)%centroid_offset(:)
@@ -988,9 +987,9 @@ contains
         real(wp), dimension(1:3) :: bbox_min, bbox_max, local_corner, world_corner
 
         center = 0._wp
-        center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp) * (x_domain%end - x_domain%beg)
-        center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp) * (y_domain%end - y_domain%beg)
-        center(3) = patch_ib(patch_id)%z_centroid + real(zp, wp) * (z_domain%end - z_domain%beg)
+        center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(x_domain%end - x_domain%beg)
+        center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(y_domain%end - y_domain%beg)
+        center(3) = patch_ib(patch_id)%z_centroid + real(zp, wp)*(z_domain%end - z_domain%beg)
         inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
         offset(:) = patch_ib(patch_id)%centroid_offset(:)
         spc = patch_ib(patch_id)%model_spc
@@ -1180,7 +1179,7 @@ contains
 
     end subroutine get_bounding_indices
 
-    !> @brief encodes the patch id with a unique offset that contains information on how the IB marker wrapps periodically
+    !> @brief encodes the patch id with a unique offset that contains information on how the IB marker wraps periodically
     subroutine encode_patch_periodicity(patch_id, x_periodicity, y_periodicity, z_periodicity, encoded_patch_id)
 
         integer, intent(in) :: patch_id, x_periodicity, y_periodicity, z_periodicity
@@ -1194,7 +1193,7 @@ contains
         temp_y_per = y_periodicity; if (y_periodicity == -1) temp_y_per = 2
         temp_z_per = z_periodicity; if (z_periodicity == -1) temp_z_per = 2
 
-        offset = (num_ibs + 1) * temp_x_per + 3 * (num_ibs + 1) * temp_y_per + 9 * (num_ibs + 1) * temp_z_per
+        offset = (num_ibs + 1)*temp_x_per + 3*(num_ibs + 1)*temp_y_per + 9*(num_ibs + 1)*temp_z_per
         encoded_patch_id = patch_id + offset
 
     end subroutine encode_patch_periodicity
@@ -1204,18 +1203,18 @@ contains
 
         integer, intent(in) :: encoded_patch_id
         integer, intent(out) :: patch_id, x_periodicity, y_periodicity, z_periodicity
-        
+
         integer :: offset, remainder, xp, yp, zp, base
 
         base = num_ibs + 1
 
         patch_id = mod(encoded_patch_id - 1, base) + 1
-        offset = (encoded_patch_id - patch_id) / base
+        offset = (encoded_patch_id - patch_id)/base
 
         xp = mod(offset, 3)
-        remainder = offset / 3
+        remainder = offset/3
         yp = mod(remainder, 3)
-        zp = remainder / 3
+        zp = remainder/3
 
         ! Reverse map: 2 -> -1, 0 -> 0, 1 -> 1
         x_periodicity = xp; if (xp == 2) x_periodicity = -1
@@ -1241,7 +1240,7 @@ contains
                 ${X}$p_lower = 0
                 ${X}$p_upper = 0
             end if
-        #endfor
+        #:endfor
 
         ! z only if 3D
         if (present(zp_lower)) then
@@ -1252,6 +1251,9 @@ contains
                 zp_lower = 0
                 zp_upper = 0
             end if
+        else
+            zp_lower = 0
+            zp_upper = 0
         end if
 
     end subroutine get_periodicities

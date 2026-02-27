@@ -102,8 +102,8 @@ contains
 
         radius = patch_ib(ib_patch_id)%radius
 
-        dist_vec(1) = x_cc(i) - patch_ib(ib_patch_id)%x_centroid
-        dist_vec(2) = y_cc(j) - patch_ib(ib_patch_id)%y_centroid
+        dist_vec(1) = x_cc(i) - patch_ib(ib_patch_id)%x_centroid - real(gp%x_periodicity, wp)*(x_domain%end - x_domain%beg)
+        dist_vec(2) = y_cc(j) - patch_ib(ib_patch_id)%y_centroid - real(gp%y_periodicity, wp)*(y_domain%end - y_domain%beg)
         dist_vec(3) = 0._wp
         dist = sqrt(sum(dist_vec**2))
 
@@ -137,8 +137,8 @@ contains
         i = gp%loc(1)
         j = gp%loc(2)
 
-        center(1) = patch_ib(ib_patch_id)%x_centroid
-        center(2) = patch_ib(ib_patch_id)%y_centroid
+        center(1) = patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(x_domain%end - x_domain%beg)
+        center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(y_domain%end - y_domain%beg)
         inverse_rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:, :)
         rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix(:, :)
         offset(:) = patch_ib(ib_patch_id)%centroid_offset(:)
@@ -223,9 +223,9 @@ contains
         j = gp%loc(2)
         l = gp%loc(3)
 
-        center(1) = patch_ib(ib_patch_id)%x_centroid
-        center(2) = patch_ib(ib_patch_id)%y_centroid
-        center(3) = patch_ib(ib_patch_id)%z_centroid
+        center(1) = patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(x_domain%end - x_domain%beg)
+        center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(y_domain%end - y_domain%beg)
+        center(3) = patch_ib(ib_patch_id)%z_centroid + real(gp%z_periodicity, wp)*(z_domain%end - z_domain%beg)
         lz = patch_ib(ib_patch_id)%length_z
         inverse_rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:, :)
         rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix(:, :)
@@ -328,8 +328,8 @@ contains
 
         length_x = patch_ib(ib_patch_id)%length_x
         length_y = patch_ib(ib_patch_id)%length_y
-        center(1) = patch_ib(ib_patch_id)%x_centroid
-        center(2) = patch_ib(ib_patch_id)%y_centroid
+        center(1) = patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(x_domain%end - x_domain%beg)
+        center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(y_domain%end - y_domain%beg)
         inverse_rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:, :)
         rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix(:, :)
 
@@ -399,8 +399,8 @@ contains
 
         length_x = patch_ib(ib_patch_id)%length_x
         length_y = patch_ib(ib_patch_id)%length_y
-        center(1) = patch_ib(ib_patch_id)%x_centroid
-        center(2) = patch_ib(ib_patch_id)%y_centroid
+        center(1) = patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(x_domain%end - x_domain%beg)
+        center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(y_domain%end - y_domain%beg)
         inverse_rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:, :)
         rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix(:, :)
 
@@ -453,9 +453,9 @@ contains
         length_y = patch_ib(ib_patch_id)%length_y
         length_z = patch_ib(ib_patch_id)%length_z
 
-        center(1) = patch_ib(ib_patch_id)%x_centroid
-        center(2) = patch_ib(ib_patch_id)%y_centroid
-        center(3) = patch_ib(ib_patch_id)%z_centroid
+        center(1) = patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(x_domain%end - x_domain%beg)
+        center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(y_domain%end - y_domain%beg)
+        center(3) = patch_ib(ib_patch_id)%z_centroid + real(gp%z_periodicity, wp)*(z_domain%end - z_domain%beg)
 
         inverse_rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:, :)
         rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix(:, :)
@@ -479,15 +479,6 @@ contains
 
         min_dist = min(abs(dist_left), abs(dist_right), abs(dist_bottom), &
                        abs(dist_top), abs(dist_back), abs(dist_front))
-
-        ! TODO :: The way that this is written, it looks like we will
-        ! trigger at the first size that is close to the minimum distance,
-        ! meaning corners where side_dists are the same will
-        ! trigger on what may not actually be the minimum,
-        ! leading to undesired behavior. This should be resolved
-        ! and this code should be cleaned up. It also means that
-        ! rotating the box 90 degrees will cause tests to fail.
-
         dist_vec = 0._wp
 
         if (f_approx_equal(min_dist, abs(dist_left))) then
@@ -544,9 +535,9 @@ contains
         k = gp%loc(3)
 
         radius = patch_ib(ib_patch_id)%radius
-        center(1) = patch_ib(ib_patch_id)%x_centroid
-        center(2) = patch_ib(ib_patch_id)%y_centroid
-        center(3) = patch_ib(ib_patch_id)%z_centroid
+        center(1) = patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(x_domain%end - x_domain%beg)
+        center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(y_domain%end - y_domain%beg)
+        center(3) = patch_ib(ib_patch_id)%z_centroid + real(gp%z_periodicity, wp)*(z_domain%end - z_domain%beg)
 
         dist_vec(1) = x_cc(i) - center(1)
         dist_vec(2) = y_cc(j) - center(2)
@@ -584,9 +575,9 @@ contains
         k = gp%loc(3)
 
         radius = patch_ib(ib_patch_id)%radius
-        center(1) = patch_ib(ib_patch_id)%x_centroid
-        center(2) = patch_ib(ib_patch_id)%y_centroid
-        center(3) = patch_ib(ib_patch_id)%z_centroid
+        center(1) = patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(x_domain%end - x_domain%beg)
+        center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(y_domain%end - y_domain%beg)
+        center(3) = patch_ib(ib_patch_id)%z_centroid + real(gp%z_periodicity, wp)*(z_domain%end - z_domain%beg)
         length(1) = patch_ib(ib_patch_id)%length_x
         length(2) = patch_ib(ib_patch_id)%length_y
         length(3) = patch_ib(ib_patch_id)%length_z
@@ -642,6 +633,7 @@ contains
     !> The STL patch is a 2/3D geometry that is imported from an STL file.
     !! @param gp Ghost point to compute levelset for
     subroutine s_model_levelset(gp)
+
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(ghost_point), intent(inout) :: gp
@@ -662,10 +654,10 @@ contains
         total_vertices = gpu_total_vertices(patch_id)
 
         center = 0._wp
-        if (.not. f_is_default(patch_ib(patch_id)%x_centroid)) center(1) = patch_ib(patch_id)%x_centroid
-        if (.not. f_is_default(patch_ib(patch_id)%y_centroid)) center(2) = patch_ib(patch_id)%y_centroid
+        if (.not. f_is_default(patch_ib(patch_id)%x_centroid)) center(1) = patch_ib(patch_id)%x_centroid + real(gp%x_periodicity, wp)*(x_domain%end - x_domain%beg)
+        if (.not. f_is_default(patch_ib(patch_id)%y_centroid)) center(2) = patch_ib(patch_id)%y_centroid + real(gp%y_periodicity, wp)*(y_domain%end - y_domain%beg)
         if (p > 0) then
-            if (.not. f_is_default(patch_ib(patch_id)%z_centroid)) center(3) = patch_ib(patch_id)%z_centroid
+            if (.not. f_is_default(patch_ib(patch_id)%z_centroid)) center(3) = patch_ib(patch_id)%z_centroid + real(gp%z_periodicity, wp)*(z_domain%end - z_domain%beg)
         end if
 
         inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
