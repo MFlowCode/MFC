@@ -75,7 +75,12 @@ Customize the appearance of plots:
 ### 3D slicing
 
 For 3D simulations, `viz` extracts a 2D slice for plotting.
-By default, it slices at the midplane along the z-axis:
+By default, it slices at the midplane along the z-axis.
+
+> [!NOTE]
+> To limit memory use, 3D batch rendering is capped at 500 timesteps and
+> `--interactive` mode at 50. Use `--step start:end:stride` to stay within
+> these limits when processing many steps.
 
 ```bash
 # Default z-midplane slice
@@ -158,13 +163,14 @@ It supports 1D and 2D data only (use `--interactive` for 3D).
 
 | Key | Action |
 |-----|--------|
-| `n` / `→` | Next timestep |
-| `p` / `←` | Previous timestep |
+| `.` / `→` | Next timestep |
+| `,` / `←` | Previous timestep |
 | `Space` | Toggle autoplay |
 | `l` | Toggle logarithmic scale |
 | `f` | Freeze / unfreeze color range |
-| `v` | Cycle to next variable |
-| `q` / `Escape` | Quit |
+| `↑` / `↓` | Select variable (in sidebar) |
+| `c` | Cycle colormap |
+| `q` | Quit |
 
 > [!NOTE]
 > The TUI requires the `textual` and `textual-plotext` Python packages (included in MFC's default dependencies).

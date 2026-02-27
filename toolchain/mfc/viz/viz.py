@@ -23,7 +23,7 @@ def _ensure_viz_deps() -> None:
     pre-installed (e.g. via Anaconda) but lacks imageio, textual, or h5py
     still triggers the install.
     """
-    _SENTINELS = ("matplotlib", "imageio", "h5py", "textual", "dash")
+    _SENTINELS = ("matplotlib", "imageio", "h5py", "textual", "dash", "plotext", "plotly")
     if all(importlib.util.find_spec(p) is not None for p in _SENTINELS):
         return  # all present
 
@@ -328,11 +328,13 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
     test_assembled = read_step(requested_steps[0])
     avail = sorted(test_assembled.variables.keys())
 
-    # Guard against loading too many 3D timesteps (memory)
-    if test_assembled.ndim == 3 and len(requested_steps) > 500:
+    # Guard against loading too many 3D timesteps (memory).
+    # Interactive mode caches all steps simultaneously, so use a tighter limit.
+    _3d_limit = 50 if interactive else 500
+    if test_assembled.ndim == 3 and len(requested_steps) > _3d_limit:
         raise MFCException(
             f"Refusing to load {len(requested_steps)} timesteps for 3D data "
-            "(limit is 500). Use --step with a range or stride to reduce.")
+            f"(limit is {_3d_limit}). Use --step with a range or stride to reduce.")
 
     # Tiled mode works for 1D and 2D.  For 3D, auto-select the first variable.
     if tiled and not interactive and not ARG('tui'):

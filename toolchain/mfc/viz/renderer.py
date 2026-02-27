@@ -16,7 +16,10 @@ import numpy as np
 import imageio
 
 import matplotlib
-matplotlib.use('Agg')
+try:
+    matplotlib.use('Agg')
+except Exception:  # pylint: disable=broad-except
+    pass
 import matplotlib.pyplot as plt  # pylint: disable=wrong-import-position
 from matplotlib.colors import LogNorm  # pylint: disable=wrong-import-position
 

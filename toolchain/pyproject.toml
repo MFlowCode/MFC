@@ -40,20 +40,14 @@ dependencies = [
 
     # Frontier Profiling
     "astunparse==1.6.2",
-    "colorlover",
     "pymongo",
-    "tabulate",
-    "dash-svg",
-    "dash-bootstrap-components",
-    "kaleido",
-    "plotille"
+    "tabulate"
 ]
 
 [project.optional-dependencies]
 viz = [
     # 2D/3D plotting (renderer, TUI)
     "matplotlib",
-    "seaborn",
 
     # Silo-HDF5 reader
     "h5py",
