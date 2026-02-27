@@ -316,30 +316,38 @@ def assemble_from_proc_data(  # pylint: disable=too-many-locals,too-many-stateme
         proc_centers.append((rank, pd, x_cc, y_cc, z_cc))
 
     # Build unique sorted global coordinate arrays (handles ghost overlap).
-    # Use scale-aware rounding: 12 significant digits relative to the domain
-    # extent, so precision is preserved for both micro-scale and large domains.
-    # np.round supports negative decimals (rounds to tens, hundreds, etc.),
-    # which is correct for large-extent domains (e.g. extent > 1e12).
+    # Normalize each axis by its extent before rounding so that precision is
+    # always 12 significant digits *relative to the domain size*.  This is
+    # correct for both micro-scale domains (extent ~ 1e-10) and large-scale
+    # domains (extent > 1e12) where the old formula (decimals = -log10(extent)
+    # + 12) could go negative, causing np.round to round to the nearest 10 or
+    # 100 and incorrectly merging distinct cell centers.
     def _dedup(arr):
         extent = arr.max() - arr.min()
         if extent > 0:
-            decimals = int(np.ceil(-np.log10(extent))) + 12
-        else:
-            decimals = 12
-        return np.unique(np.round(arr, decimals)), decimals
+            origin = arr.min()
+            norm = np.round((arr - origin) / extent, 12)
+            return origin + np.unique(norm) * extent, origin, extent
+        return np.unique(arr), arr.min(), 0.0
+
+    def _norm_round(arr, origin, extent):
+        """Round *arr* with the same relative tolerance used by _dedup."""
+        if extent > 0:
+            return origin + np.round((arr - origin) / extent, 12) * extent
+        return arr
 
     all_x = np.concatenate([xc for _, _, xc, _, _ in proc_centers])
-    global_x, xdec = _dedup(all_x)
+    global_x, x_orig, x_ext = _dedup(all_x)
     if ndim >= 2:
         all_y = np.concatenate([yc for _, _, _, yc, _ in proc_centers])
-        global_y, ydec = _dedup(all_y)
+        global_y, y_orig, y_ext = _dedup(all_y)
     else:
-        global_y, ydec = np.array([0.0]), 12
+        global_y, y_orig, y_ext = np.array([0.0]), 0.0, 0.0
     if ndim >= 3:
         all_z = np.concatenate([zc for _, _, _, _, zc in proc_centers])
-        global_z, zdec = _dedup(all_z)
+        global_z, z_orig, z_ext = _dedup(all_z)
     else:
-        global_z, zdec = np.array([0.0]), 12
+        global_z, z_orig, z_ext = np.array([0.0]), 0.0, 0.0
 
     varnames = sorted({vn for _, pd in proc_data for vn in pd.variables})
     nx, ny, nz = len(global_x), len(global_y), len(global_z)
@@ -353,11 +361,13 @@ def assemble_from_proc_data(  # pylint: disable=too-many-locals,too-many-stateme
         else:
             global_vars[vn] = np.zeros(nx)
 
-    # Place each processor's data using per-cell coordinate lookup
+    # Place each processor's data using per-cell coordinate lookup.
+    # Apply the same normalized rounding used by _dedup so that lookup
+    # coordinates match the global grid entries exactly.
     for _rank, pd, x_cc, y_cc, z_cc in proc_centers:
-        xi = np.clip(np.searchsorted(global_x, np.round(x_cc, xdec)), 0, nx - 1)
-        yi = np.clip(np.searchsorted(global_y, np.round(y_cc, ydec)), 0, ny - 1) if ndim >= 2 else np.array([0])
-        zi = np.clip(np.searchsorted(global_z, np.round(z_cc, zdec)), 0, nz - 1) if ndim >= 3 else np.array([0])
+        xi = np.clip(np.searchsorted(global_x, _norm_round(x_cc, x_orig, x_ext)), 0, nx - 1)
+        yi = np.clip(np.searchsorted(global_y, _norm_round(y_cc, y_orig, y_ext)), 0, ny - 1) if ndim >= 2 else np.array([0])
+        zi = np.clip(np.searchsorted(global_z, _norm_round(z_cc, z_orig, z_ext)), 0, nz - 1) if ndim >= 3 else np.array([0])
 
         for vn, data in pd.variables.items():
             if vn not in global_vars:

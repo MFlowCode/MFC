@@ -124,7 +124,7 @@ For 1D cases, omitting `--var` (or passing `--var all`) renders all variables in
 ```
 
 Each variable gets its own subplot with automatic LaTeX-style axis labels.
-Tiled mode is only available for 1D data.
+Tiled mode is available for 1D and 2D data. For 3D data, omitting `--var` auto-selects the first variable.
 
 ### Interactive mode
 

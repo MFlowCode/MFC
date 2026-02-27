@@ -475,12 +475,11 @@ class TestValidateCmap(unittest.TestCase):
             self._validate('notacolormap_xyz_1234')
 
     def test_typo_suggests_correct(self):
-        """Typo in colormap name suggests the correct spelling."""
+        """Typo in colormap name raises MFCException suggesting the correct spelling."""
         from mfc.common import MFCException
-        try:
+        with self.assertRaises(MFCException) as ctx:
             self._validate('virids')   # typo of viridis
-        except MFCException as exc:
-            self.assertIn('viridis', str(exc))
+        self.assertIn('viridis', str(ctx.exception))
 
 
 # ---------------------------------------------------------------------------

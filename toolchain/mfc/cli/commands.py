@@ -1049,7 +1049,7 @@ VIZ_COMMAND = Command(
         Example("./mfc.sh viz case_dir/ --list-vars --step 0", "List available variables"),
         Example("./mfc.sh viz case_dir/ --list-steps", "List available timesteps"),
         Example("./mfc.sh viz case_dir/ --var schlieren --step 0:10000:500 --mp4", "Generate video from range"),
-        Example("./mfc.sh viz case_dir/ --step 0,100,200,...,1000", "Tile all vars at specific steps"),
+        Example("./mfc.sh viz case_dir/ --step 0,100,200,...,1000", "Render steps 0–1000 (stride inferred from ellipsis)"),
         Example("./mfc.sh viz case_dir/ --var pres --step 500 --slice-axis z", "3D slice at z midplane"),
         Example("./mfc.sh viz case_dir/ --var pres --tui", "Terminal UI over SSH (1D/2D)"),
     ],

@@ -26,7 +26,7 @@ _DB_QUADVAR = 501
 
 def _resolve_path(h5file, path_bytes):
     """Resolve a silo internal path (e.g. b'/.silo/#000003') and return its data as a numpy array."""
-    path = path_bytes.decode() if isinstance(path_bytes, bytes) else str(path_bytes)
+    path = path_bytes.decode() if isinstance(path_bytes, (bytes, np.bytes_)) else str(path_bytes)
     return np.array(h5file[path])
 
 

@@ -275,13 +275,16 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
             cons.print(f"  {vn:<20s}  min={data.min():.6g}  max={data.max():.6g}")
         return
 
-    # For rendering, --step is required; --var is optional for 1D (shows all)
+    # For rendering, --step is required; --var is optional for 1D/2D (shows all in tiled layout)
     varname = ARG('var')
     step_arg = ARG('step')
     tiled = varname is None or varname == 'all'
 
     if ARG('interactive') or ARG('tui'):
-        step_arg = 'all'   # always load all steps in interactive/TUI mode
+        # Load all steps by default; honour an explicit --step so users can
+        # reduce the set for large 3D cases before hitting the step limit.
+        if step_arg == 'last':
+            step_arg = 'all'
 
     steps = discover_timesteps(case_dir, fmt)
     if not steps:

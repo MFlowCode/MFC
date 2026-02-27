@@ -494,7 +494,16 @@ def run_interactive(  # pylint: disable=too-many-locals,too-many-statements
                 cmap, log_chk, vmin_in, vmax_in):
 
         selected_var = var_sel or varname
-        ad  = _load(step, read_func)
+        try:
+            ad = _load(step, read_func)
+        except Exception as exc:  # pylint: disable=broad-except
+            return no_update, [html.Span(f' Error loading step {step}: {exc}',
+                                         style={'color': _RED})]
+        if selected_var not in ad.variables:
+            avail = ', '.join(sorted(ad.variables))
+            return no_update, [html.Span(
+                f' Variable {selected_var!r} not in step {step} '
+                f'(available: {avail})', style={'color': _RED})]
         raw = ad.variables[selected_var]
         log = bool(log_chk and 'log' in log_chk)
         cmap = cmap or 'viridis'
