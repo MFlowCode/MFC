@@ -476,6 +476,19 @@ contains
             write (2) q_cons_vf(i)%sf(0:m, 0:n, 0:p); close (2)
         end do
 
+        ! Lagrangian beta (void fraction) written as q_cons_vf(sys_size+1) to
+        ! match the parallel I/O path and allow post_process to read it.
+        if (bubbles_lagrange) then
+            write (file_path, '(A,I0,A)') trim(t_step_dir)//'/q_cons_vf', &
+                sys_size + 1, '.dat'
+
+            open (2, FILE=trim(file_path), &
+                  FORM='unformatted', &
+                  STATUS='new')
+
+            write (2) beta%sf(0:m, 0:n, 0:p); close (2)
+        end if
+
         if (qbmm .and. .not. polytropic) then
             do i = 1, nb
                 do r = 1, nnode
