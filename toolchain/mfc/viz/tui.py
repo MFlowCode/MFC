@@ -83,6 +83,7 @@ class MFCPlot(PlotextPlot):  # pylint: disable=too-many-instance-attributes,too-
         self._vmax: Optional[float] = None
         self._last_vmin: float = 0.0
         self._last_vmax: float = 1.0
+        self._bubbles: Optional[np.ndarray] = None  # (N,4) x,y,z,r
 
     def render(self):  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
         data = self._data
@@ -154,6 +155,44 @@ class MFCPlot(PlotextPlot):  # pylint: disable=too-many-instance-attributes,too-
         iy = np.linspace(0, data.shape[1] - 1, h_plot, dtype=int)
         ds = data[np.ix_(ix, iy)]  # pylint: disable=unsubscriptable-object
 
+        # Compute which screen cells to stamp with an open-circle glyph.
+        # col → x_cc[ix[col]], row 0 = y_max (flipped), row h_plot-1 = y_min.
+        bubble_cells: set = set()
+        bubbles = self._bubbles
+        if bubbles is not None and len(bubbles) > 0:
+            x_phys = x_cc[ix]   # type: ignore[index]  # pylint: disable=unsubscriptable-object
+            y_phys = y_cc_2d[iy]
+            x_min, x_max = float(x_phys[0]),  float(x_phys[-1])
+            y_min, y_max = float(y_phys[0]),  float(y_phys[-1])
+            x_range = max(abs(x_max - x_min), 1e-30)
+            y_range = max(abs(y_max - y_min), 1e-30)
+            for b in bubbles:  # pylint: disable=not-an-iterable
+                bx, by, br = float(b[0]), float(b[1]), float(b[3])
+                if bx < x_min - br or bx > x_max + br:
+                    continue
+                if by < y_min - br or by > y_max + br:
+                    continue
+                # Screen centre (col increases right, row 0 = top = y_max)
+                col_c = (bx - x_min) / x_range * (w_map - 1)
+                row_c = (y_max - by) / y_range * (h_plot - 1)
+                # Screen radius in character units
+                col_r = br / x_range * (w_map - 1)
+                row_r = br / y_range * (h_plot - 1)
+                if col_r < 0.5 and row_r < 0.5:
+                    # Sub-cell bubble — mark centre only
+                    c, r = int(round(col_c)), int(round(row_c))
+                    if 0 <= r < h_plot and 0 <= c < w_map:
+                        bubble_cells.add((r, c))
+                else:
+                    # Parametric circle outline
+                    n_pts = min(max(12, int(2 * np.pi * max(col_r, row_r))), 72)
+                    for ti in range(n_pts):
+                        angle = 2 * np.pi * ti / n_pts
+                        c = int(round(col_c + col_r * np.cos(angle)))
+                        r = int(round(row_c + row_r * np.sin(angle)))
+                        if 0 <= r < h_plot and 0 <= c < w_map:
+                            bubble_cells.add((r, c))
+
         vmin = self._vmin if self._vmin is not None else float(ds.min())
         vmax = self._vmax if self._vmax is not None else float(ds.max())
         if vmax <= vmin:
@@ -184,7 +223,11 @@ class MFCPlot(PlotextPlot):  # pylint: disable=too-many-instance-attributes,too-
                 r = int(rgba[row, col, 0] * 255)
                 g = int(rgba[row, col, 1] * 255)
                 b = int(rgba[row, col, 2] * 255)
-                line.append(" ", style=Style(bgcolor=RichColor.from_rgb(r, g, b)))
+                bg = RichColor.from_rgb(r, g, b)
+                if (row, col) in bubble_cells:
+                    line.append("○", style=Style(bgcolor=bg, color="white", bold=True))
+                else:
+                    line.append(" ", style=Style(bgcolor=bg))
             # Gap
             line.append(" " * _CB_GAP)
             # Colorbar gradient strip (t=1 at top = vmax, t=0 at bottom = vmin)
@@ -289,6 +332,7 @@ class MFCTuiApp(App):  # pylint: disable=too-many-instance-attributes
         read_func: Callable,
         ndim: int,
         init_var: Optional[str] = None,
+        bubble_func: Optional[Callable] = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -296,6 +340,7 @@ class MFCTuiApp(App):  # pylint: disable=too-many-instance-attributes
         self._varnames = varnames
         self._read_func = read_func
         self._ndim = ndim
+        self._bubble_func = bubble_func
         # Store init_var but don't set the reactive yet — the DOM doesn't exist
         # until on_mount, and the watcher calls query_one which needs the DOM.
         self._init_var = init_var or (varnames[0] if varnames else "")
@@ -394,6 +439,13 @@ class MFCTuiApp(App):  # pylint: disable=too-many-instance-attributes
         plot._step = step                  # pylint: disable=protected-access
         plot._cmap_name = self.cmap_name   # pylint: disable=protected-access
         plot._log_scale = self.log_scale   # pylint: disable=protected-access
+        if self._bubble_func is not None and self._ndim == 2:
+            try:
+                plot._bubbles = self._bubble_func(step)  # pylint: disable=protected-access
+            except Exception:  # pylint: disable=broad-except
+                plot._bubbles = None  # pylint: disable=protected-access
+        else:
+            plot._bubbles = None  # pylint: disable=protected-access
         if self._frozen_range is not None:
             plot._vmin, plot._vmax = self._frozen_range  # pylint: disable=protected-access
         else:
@@ -452,6 +504,7 @@ def run_tui(
     steps: List[int],
     read_func: Callable,
     ndim: int,
+    bubble_func: Optional[Callable] = None,
 ) -> None:
     """Launch the Textual TUI for MFC visualization (1D/2D only)."""
     if ndim not in (1, 2):
@@ -482,5 +535,6 @@ def run_tui(
         read_func=read_func,
         ndim=ndim,
         init_var=init_var,
+        bubble_func=bubble_func,
     )
     app.run()

@@ -382,7 +382,8 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
             )
         from .tui import run_tui  # pylint: disable=import-outside-toplevel
         init_var = varname if varname in avail else (avail[0] if avail else None)
-        run_tui(init_var, requested_steps, read_step, ndim=test_assembled.ndim)
+        run_tui(init_var, requested_steps, read_step, ndim=test_assembled.ndim,
+                bubble_func=bubble_func)
         return
 
     # Interactive mode — launch Dash web server
