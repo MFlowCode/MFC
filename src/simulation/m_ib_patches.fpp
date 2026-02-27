@@ -26,7 +26,7 @@ module m_ib_patches
 
     implicit none
 
-    private; public :: s_apply_ib_patches, s_update_ib_rotation_matrix, f_convert_cyl_to_cart, s_instantiate_STL_models
+    private; public :: s_apply_ib_patches, s_update_ib_rotation_matrix, f_convert_cyl_to_cart, s_instantiate_STL_models, decode_patch_periodicity
 
     real(wp) :: x_centroid, y_centroid, z_centroid
     real(wp) :: length_x, length_y, length_z
@@ -613,12 +613,12 @@ contains
         call encode_patch_periodicity(patch_id, xp, yp, zp, encoded_patch_id)
 
         ! find the indices to the left and right of the IB in i, j, k
-        il = -gp_layers
-        jl = -gp_layers
-        kl = -gp_layers
-        ir = m + gp_layers
-        jr = n + gp_layers
-        kr = p + gp_layers
+        il = -gp_layers-1
+        jl = -gp_layers-1
+        kl = -gp_layers-1
+        ir = m + gp_layers+1
+        jr = n + gp_layers+1
+        kr = p + gp_layers+1
         call get_bounding_indices(center(1) - radius, center(1) + radius, x_cc, il, ir)
         call get_bounding_indices(center(2) - radius, center(2) + radius, y_cc, jl, jr)
         call get_bounding_indices(center(3) - radius, center(3) + radius, z_cc, kl, kr)
@@ -892,7 +892,7 @@ contains
         type(integer_field), intent(inout) :: ib_markers
         integer, intent(in) :: xp, yp !< integers containing the periodicity projection information
 
-        integer :: i, j, k  !< Generic loop iterators
+        integer :: i, j, k, il, ir, jl, jr  !< Generic loop iterators
         integer :: spc, encoded_patch_id
         integer :: cx, cy
         real(wp) :: lx(2), ly(2)
@@ -1234,7 +1234,7 @@ contains
         ! check domain wraps in x, y
         #:for X in [('x'), ('y')]
             ! check for periodicity
-            if (bc_${X}$ == BC_PERIODIC) then
+            if (bc_${X}$%beg == BC_PERIODIC) then
                 ${X}$p_lower = -1
                 ${X}$p_upper = 1
             else
@@ -1246,7 +1246,7 @@ contains
 
         ! z only if 3D
         if (present(zp_lower)) then
-            if (bc_z == BC_PERIODIC) then
+            if (bc_z%beg == BC_PERIODIC) then
                 zp_lower = -1
                 zp_upper = 1
             else

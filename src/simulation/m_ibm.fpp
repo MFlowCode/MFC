@@ -99,9 +99,9 @@ contains
         $:GPU_UPDATE(device='[patch_ib(1:num_ibs)]')
 
         ! GPU routines require updated cell centers
-        $:GPU_UPDATE(device='[x_cc, y_cc, dx, dy]')
+        $:GPU_UPDATE(device='[num_ibs, x_cc, y_cc, dx, dy, x_domain, y_domain]')
         if (p /= 0) then
-            $:GPU_UPDATE(device='[z_cc, dz]')
+            $:GPU_UPDATE(device='[z_cc, dz, z_domain]')
         end if
 
         ! allocate STL models
@@ -578,7 +578,7 @@ contains
         integer :: i, j, k, ii, jj, kk, gp_layers_z !< Iterator variables
         integer :: xp, yp, zp !< periodicities
         integer :: count, count_i, local_idx
-        integer :: patch_id
+        integer :: patch_id, encoded_patch_id
         logical :: is_gp
 
         count = 0
@@ -652,7 +652,8 @@ contains
                             $:END_GPU_ATOMIC_CAPTURE()
 
                             inner_points_in(local_idx)%loc = [i, j, k]
-                            patch_id = ib_markers%sf(i, j, k)
+                            encoded_patch_id = ib_markers%sf(i, j, k)
+                            call decode_patch_periodicity(encoded_patch_id, patch_id, xp, yp, zp)
                             inner_points_in(local_idx)%ib_patch_id = patch_id
                             inner_points_in(local_idx)%slip = patch_ib(patch_id)%slip
 
@@ -680,7 +681,7 @@ contains
         integer :: patch_id
         logical is_cell_center
 
-        $:GPU_PARALLEL_LOOP(private='[q,i,j,k,ii,jj,kk,dist,buf,gp,interp_coeffs,eta,alpha,patch_id,is_cell_center]')
+        $:GPU_PARALLEL_LOOP(private='[q,i,j,k,ii,jj,kk,dist,buf,gp,interp_coeffs,eta,alpha,patch_id,is_cell_center]', parallelism='[seq]')
         do q = 1, num_gps
             gp = ghost_points_in(q)
             ! Get the interpolation points
@@ -737,10 +738,12 @@ contains
                 ! if we are not arbitrarily close, interpolate
                 alpha = 1._wp
                 patch_id = gp%ib_patch_id
+                ! print *, "Grabbed Patch ID"
                 if (ib_markers%sf(i, j, k) /= 0) alpha(1, 1, 1) = 0._wp
                 if (ib_markers%sf(i + 1, j, k) /= 0) alpha(2, 1, 1) = 0._wp
                 if (ib_markers%sf(i, j + 1, k) /= 0) alpha(1, 2, 1) = 0._wp
                 if (ib_markers%sf(i + 1, j + 1, k) /= 0) alpha(2, 2, 1) = 0._wp
+                ! print *, "First half of stencil"
 
                 if (p == 0) then
                     eta(:, :, 1) = 1._wp/dist(:, :, 1)**2
@@ -934,10 +937,10 @@ contains
 
         ! Clears the existing immersed boundary indices
         $:GPU_PARALLEL_LOOP(private='[i,j,k]')
-        do i = 0, m; do j = 0, n; do k = 0, p
+        do i = -gp_layers-1, m+gp_layers+1; do j = -gp_layers-1, n+gp_layers+1; do k = -gp_layers-1, p+gp_layers+1
                     ib_markers%sf(i, j, k) = 0._wp
                 end do; end do; end do
-        $:END_GPU_PARALLEL_LOOP
+        $:END_GPU_PARALLEL_LOOP()
 
         ! recalulcate the rotation matrix based upon the new angles
         do i = 1, num_ibs
@@ -1274,13 +1277,11 @@ contains
 
         integer :: patch_id
 
-        ! iterate over all immersed boundaries to correct position
-        $:GPU_PARALLEL_LOOP(private='[patch_id]')
         do patch_id = 1, num_ibs
             ! check domain wraps in x, y, z
             #:for X in [('x'), ('y'), ('z')]
                 ! check for periodicity
-                if (bc_${X}$ == BC_PERIODIC) then
+                if (bc_${X}$%beg == BC_PERIODIC) then
                     ! check if the boundary has left the domain, and then correct
                     if (patch_ib(patch_id)%${X}$_centroid < ${X}$_domain%beg) then
                         ! if the boundary exited "left", wrap it back around to the "right"
@@ -1288,11 +1289,11 @@ contains
                     else if (patch_ib(patch_id)%${X}$_centroid > ${X}$_domain%end) then
                         ! if the boundary exited "right", wrap it back around to the "left"
                         patch_ib(patch_id)%${X}$_centroid = patch_ib(patch_id)%${X}$_centroid - (${X}$_domain%end - ${X}$_domain%beg)
+                        ! print *, "wrapping ${X}$: ", ${X}$_domain%beg, ${X}$_domain%end, (${X}$_domain%end - ${X}$_domain%beg), patch_ib(patch_id)%${X}$_centroid
                     end if
                 end if
             #:endfor
         end do
-        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine wrap_periodic_ibs
 

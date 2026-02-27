@@ -525,7 +525,7 @@ contains
         type(ghost_point), intent(inout) :: gp
 
         real(wp) :: radius, dist
-        real(wp), dimension(3) :: dist_vec, center
+        real(wp), dimension(3) :: dist_vec, center, periodicity
 
         integer :: i, j, k, ib_patch_id !< Loop index variables
 
@@ -535,9 +535,13 @@ contains
         k = gp%loc(3)
 
         radius = patch_ib(ib_patch_id)%radius
-        center(1) = patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(x_domain%end - x_domain%beg)
-        center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(y_domain%end - y_domain%beg)
-        center(3) = patch_ib(ib_patch_id)%z_centroid + real(gp%z_periodicity, wp)*(z_domain%end - z_domain%beg)
+        periodicity(1) = real(gp%x_periodicity, wp)*(x_domain%end - x_domain%beg)
+        periodicity(2) = real(gp%y_periodicity, wp)*(y_domain%end - y_domain%beg)
+        periodicity(3) = real(gp%z_periodicity, wp)*(z_domain%end - z_domain%beg)
+        center(1) = patch_ib(ib_patch_id)%x_centroid
+        center(2) = patch_ib(ib_patch_id)%y_centroid
+        center(3) = patch_ib(ib_patch_id)%z_centroid
+        center = center + periodicity
 
         dist_vec(1) = x_cc(i) - center(1)
         dist_vec(2) = y_cc(j) - center(2)
