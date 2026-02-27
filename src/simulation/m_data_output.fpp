@@ -37,17 +37,20 @@ module m_data_output
               s_open_run_time_information_file, &
               s_open_com_files, &
               s_open_probe_files, &
+              s_open_ib_force_file, &
               s_write_run_time_information, &
               s_write_data_files, &
               s_write_serial_data_files, &
               s_write_parallel_data_files, &
+              s_write_ib_data_file, &
               s_write_com_files, &
               s_write_probe_files, &
+              s_write_ib_force_file, &
               s_close_run_time_information_file, &
               s_close_com_files, &
               s_close_probe_files, &
-              s_finalize_data_output_module, &
-              s_write_ib_data_file
+              s_close_ib_force_file, &
+              s_finalize_data_output_module
 
     real(wp), allocatable, dimension(:, :, :) :: icfl_sf  !< ICFL stability criterion
     real(wp), allocatable, dimension(:, :, :) :: vcfl_sf  !< VCFL stability criterion
@@ -253,6 +256,18 @@ contains
         end if
 
     end subroutine s_open_probe_files
+
+    impure subroutine s_open_ib_force_file
+        character(LEN=path_len + 2*name_len) :: file_loc
+
+        write (file_loc, '(A)') 'ib_force.dat'
+        file_loc = trim(case_dir)//'/D/'//trim(file_loc)
+        open (92, FILE=trim(file_loc), &
+              FORM='unformatted', &
+              ACCESS='stream', &
+              STATUS='replace', &
+              POSITION='append')
+    end subroutine s_open_ib_force_file
 
     !>  The goal of the procedure is to output to the run-time
         !!      information file the stability criteria extrema in the
@@ -1058,7 +1073,7 @@ contains
         write (t_step_dir, '(A,I0,A,I0)') trim(case_dir)//'/p_all'
         write (t_step_dir, '(a,i0,a,i0)') trim(case_dir)//'/p_all/p', &
             proc_rank, '/', time_step
-        write (file_path, '(A,I0,A)') trim(t_step_dir)//'/ib.dat'
+        write (file_path, '(A,I0,A)') trim(t_step_dir)//'/ib_data.dat'
 
         open (2, FILE=trim(file_path), &
               FORM='unformatted', &
@@ -1105,23 +1120,6 @@ contains
                                 MPI_INTEGER, status, ierr)
         call MPI_FILE_CLOSE(ifile, ierr)
 
-        if (proc_rank == 0) then
-            write (file_loc, '(A)') 'ib.dat'
-            file_loc = trim(case_dir)//'/D/'//trim(file_loc)
-            open (2, FILE=trim(file_loc), &
-                  FORM='unformatted', &
-                  ACCESS='stream', &
-                  STATUS='unknown', &
-                  POSITION='append')
-            block
-                integer :: i
-                do i = 1, num_ibs
-                    write (2) time_step, mytime, i, patch_ib(i)%force, patch_ib(i)%torque
-                end do
-            end block
-            close (2)
-        end if
-
 #endif
 
     end subroutine s_write_parallel_ib_data
@@ -1137,7 +1135,22 @@ contains
             call s_write_serial_ib_data(time_step)
         end if
 
-    end subroutine
+    end subroutine s_write_ib_data_file
+
+    !> @brief Writes IB force/torque records to D/ib_force.dat on rank 0.
+    impure subroutine s_write_ib_force_file(time_step)
+
+        integer, intent(in) :: time_step
+        if (proc_rank == 0) then
+            block
+                integer :: i
+                do i = 1, num_ibs
+                    write (92) time_step, mytime, i, patch_ib(i)%force, patch_ib(i)%torque
+                end do
+            end block
+        end if
+
+    end subroutine s_write_ib_force_file
 
     !>  This writes a formatted data file where the root processor
     !!      can write out the CoM information
@@ -1907,6 +1920,12 @@ contains
         end do
 
     end subroutine s_close_probe_files
+
+    impure subroutine s_close_ib_force_file
+
+        close (92)
+
+    end subroutine s_close_ib_force_file
 
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any

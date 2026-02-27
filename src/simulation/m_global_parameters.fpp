@@ -395,6 +395,7 @@ module m_global_parameters
     !> @{
     logical :: ib
     integer :: num_ibs
+    logical :: ib_force_wrt
 
     type(ib_patch_parameters), dimension(num_patches_max) :: patch_ib
     type(vec3_dt), allocatable, dimension(:) :: airfoil_grid_u, airfoil_grid_l
@@ -714,6 +715,7 @@ contains
         ! Immersed Boundaries
         ib = .false.
         num_ibs = dflt_int
+        ib_force_wrt = .false.
 
         ! Bubble modeling
         bubbles_euler = .false.
