@@ -56,7 +56,7 @@ _ASPECT_MAX: float = 5.0
 # Plot widget
 # ---------------------------------------------------------------------------
 
-class MFCPlot(PlotextPlot):  # pylint: disable=too-many-instance-attributes
+class MFCPlot(PlotextPlot):  # pylint: disable=too-many-instance-attributes,too-few-public-methods
     """Plotext plot widget.  Caller sets ._x_cc / ._y_cc / ._data / ._ndim /
     ._varname / ._step before calling .refresh()."""
 
