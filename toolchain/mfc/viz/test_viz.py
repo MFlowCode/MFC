@@ -492,12 +492,10 @@ class TestTuiCache(unittest.TestCase):
     def setUp(self):
         import mfc.viz._step_cache as cache_mod
         self._mod = cache_mod
-        cache_mod._cache.clear()
-        cache_mod._cache_order.clear()
+        cache_mod.clear()
 
     def tearDown(self):
-        self._mod._cache.clear()
-        self._mod._cache_order.clear()
+        self._mod.clear()
 
     def _read(self, step):
         return f"data_{step}"

@@ -48,3 +48,10 @@ def seed(step: int, data: object) -> None:
         _cache_order.clear()
         _cache[step] = data
         _cache_order.append(step)
+
+
+def clear() -> None:
+    """Reset the cache to empty (useful for test teardown)."""
+    with _lock:
+        _cache.clear()
+        _cache_order.clear()

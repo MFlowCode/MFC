@@ -499,9 +499,8 @@ def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-argum
                     imageio.imread(os.path.join(viz_dir, fname))
                 ))
         success = True
-    except Exception as exc:  # pylint: disable=broad-except
-        import warnings  # pylint: disable=import-outside-toplevel
-        warnings.warn(f"imageio MP4 write failed: {exc}", stacklevel=2)
+    except Exception:  # pylint: disable=broad-except
+        pass
     finally:
         _cleanup()
     return success
