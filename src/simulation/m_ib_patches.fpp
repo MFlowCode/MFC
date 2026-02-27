@@ -1201,6 +1201,8 @@ contains
     !> @brief decodes the encoded id to get out the original id and the way in which it is periodic
     subroutine decode_patch_periodicity(encoded_patch_id, patch_id, x_periodicity, y_periodicity, z_periodicity)
 
+        $:GPU_ROUTINE(parallelism='[seq]')
+
         integer, intent(in) :: encoded_patch_id
         integer, intent(out) :: patch_id, x_periodicity, y_periodicity, z_periodicity
 
