@@ -59,7 +59,7 @@ def _filter_only(cases, skipped_cases):
         check = set(case.trace.split(" -> "))
         check.add(case.get_uuid())
 
-        label_ok = all(l in check for l in labels) if labels else True
+        label_ok = all(label in check for label in labels) if labels else True
         uuid_ok  = any(u in check for u in uuids)  if uuids  else True
 
         if labels and uuids:
