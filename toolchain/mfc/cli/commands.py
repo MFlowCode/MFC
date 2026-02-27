@@ -864,7 +864,23 @@ COUNT_DIFF_COMMAND = Command(
 VIZ_COMMAND = Command(
     name="viz",
     help="Visualize post-processed MFC output.",
-    description="Render 2D colormaps, 3D slices, 1D line plots, and MP4 videos from MFC post-processed output (binary or Silo-HDF5).",
+    description=(
+        "Render post-processed MFC output as PNG images or MP4 video, or explore "
+        "interactively. Supports 1D line plots, 2D colormaps, 3D midplane slices, "
+        "and tiled all-variable views. PNG files are saved to case_dir/viz/ by default.\n\n"
+        "Output modes:\n"
+        "  (default)      Save PNG image(s) to case_dir/viz/\n"
+        "  --mp4          Encode frames into an MP4 video\n"
+        "  --interactive  Launch a Dash web UI in your browser\n"
+        "  --tui          Launch a terminal UI (works over SSH, no browser needed)\n\n"
+        "Variable selection:\n"
+        "  --var NAME     Plot a single variable\n"
+        "  (omit --var)   1D/2D: tiled layout of all variables; 3D: first variable\n\n"
+        "Quick-start workflow:\n"
+        "  1. ./mfc.sh viz case_dir/ --list-steps\n"
+        "  2. ./mfc.sh viz case_dir/ --list-vars --step 0\n"
+        "  3. ./mfc.sh viz case_dir/ --var pres --step 1000"
+    ),
     positionals=[
         Positional(
             name="input",
@@ -875,14 +891,26 @@ VIZ_COMMAND = Command(
     arguments=[
         Argument(
             name="var",
-            help="Variable name to visualize (e.g. pres, rho). Omit or pass 'all' for tiled 1D plots.",
+            help=(
+                "Variable to visualize (e.g. pres, rho, vel1, schlieren). "
+                "Omit (or pass 'all') for a tiled layout of all variables "
+                "(1D and 2D data) or the first variable (3D data). "
+                "Use --list-vars to see available names."
+            ),
             type=str,
             default=None,
             metavar="VAR",
         ),
         Argument(
             name="step",
-            help="Timestep(s): int, start:end:stride, 0,100,200, 0,100,...,1000, 'last', or 'all' (default: last).",
+            help=(
+                "Timestep(s) to render. Formats: a single integer (e.g. 1000), "
+                "a range start:end:stride (e.g. 0:5000:500), "
+                "a comma list (e.g. 0,100,200), "
+                "an ellipsis list (e.g. 0,100,...,1000), "
+                "'last' (default — renders the final step only), or 'all'. "
+                "Use --list-steps to see available timesteps."
+            ),
             type=str,
             default='last',
             metavar="STEP",
@@ -890,7 +918,7 @@ VIZ_COMMAND = Command(
         Argument(
             name="format",
             short="f",
-            help="Output format: binary or silo (auto-detected if omitted).",
+            help="Input data format: binary or silo (auto-detected from directory structure if omitted).",
             type=str,
             default=None,
             choices=["binary", "silo"],
@@ -899,7 +927,7 @@ VIZ_COMMAND = Command(
         Argument(
             name="output",
             short="o",
-            help="Output directory for rendered images/videos.",
+            help="Directory for saved PNG images or MP4 video (default: case_dir/viz/).",
             type=str,
             default=None,
             metavar="DIR",
@@ -985,7 +1013,7 @@ VIZ_COMMAND = Command(
         ),
         Argument(
             name="mp4",
-            help="Generate an MP4 video instead of individual images.",
+            help="Encode all rendered frames into an MP4 video (requires --step with multiple timesteps).",
             action=ArgAction.STORE_TRUE,
             default=False,
         ),
@@ -998,21 +1026,21 @@ VIZ_COMMAND = Command(
         ),
         Argument(
             name="list-vars",
-            help="List available variable names and exit.",
+            help="Print the variable names available at the given timestep and exit.",
             action=ArgAction.STORE_TRUE,
             default=False,
             dest="list_vars",
         ),
         Argument(
             name="list-steps",
-            help="List available timesteps and exit.",
+            help="Print all available timesteps and exit.",
             action=ArgAction.STORE_TRUE,
             default=False,
             dest="list_steps",
         ),
         Argument(
             name="log-scale",
-            help="Use logarithmic color scale.",
+            help="Use a logarithmic color/y scale (skips non-positive values).",
             action=ArgAction.STORE_TRUE,
             default=False,
             dest="log_scale",
@@ -1020,7 +1048,11 @@ VIZ_COMMAND = Command(
         Argument(
             name="interactive",
             short="i",
-            help="Launch an interactive Dash web UI instead of saving PNG/MP4.",
+            help=(
+                "Launch an interactive Dash web UI in your browser. "
+                "Loads all timesteps (or the set given by --step) and lets you "
+                "scrub through them and switch variables live."
+            ),
             action=ArgAction.STORE_TRUE,
             default=False,
         ),
@@ -1033,36 +1065,53 @@ VIZ_COMMAND = Command(
         ),
         Argument(
             name="host",
-            help="Host address for the interactive web server (default: 127.0.0.1).",
+            help="Host/bind address for the interactive web server (default: 127.0.0.1).",
             default="127.0.0.1",
             metavar="HOST",
         ),
         Argument(
             name="tui",
-            help="Launch an interactive terminal UI (1D/2D only). Works over SSH with no browser.",
+            help=(
+                "Launch an interactive terminal UI (1D/2D only). "
+                "Works over SSH with no browser required. "
+                "Use arrow keys to step through timesteps."
+            ),
             action=ArgAction.STORE_TRUE,
             default=False,
         ),
     ],
     examples=[
-        Example("./mfc.sh viz case_dir/ --var pres --step 1000", "Plot pressure at step 1000"),
-        Example("./mfc.sh viz case_dir/ --list-vars --step 0", "List available variables"),
-        Example("./mfc.sh viz case_dir/ --list-steps", "List available timesteps"),
-        Example("./mfc.sh viz case_dir/ --var schlieren --step 0:10000:500 --mp4", "Generate video from range"),
-        Example("./mfc.sh viz case_dir/ --step 0,100,200,...,1000", "Render steps 0–1000 (stride inferred from ellipsis)"),
-        Example("./mfc.sh viz case_dir/ --var pres --step 500 --slice-axis z", "3D slice at z midplane"),
-        Example("./mfc.sh viz case_dir/ --var pres --tui", "Terminal UI over SSH (1D/2D)"),
+        Example("./mfc.sh viz case_dir/ --list-steps", "Discover available timesteps"),
+        Example("./mfc.sh viz case_dir/ --list-vars --step 0", "Discover available variables at step 0"),
+        Example("./mfc.sh viz case_dir/ --var pres --step 1000", "Save pressure PNG at step 1000 → case_dir/viz/"),
+        Example("./mfc.sh viz case_dir/ --step 1000", "Save tiled PNG of all variables (1D/2D) at step 1000"),
+        Example("./mfc.sh viz case_dir/ --var schlieren --step 0:10000:500 --mp4", "Encode schlieren MP4 from range"),
+        Example("./mfc.sh viz case_dir/ --step 0,100,200,...,1000", "Render all steps 0–1000 (stride inferred)"),
+        Example("./mfc.sh viz case_dir/ --var pres --step 500 --slice-axis x", "3D: x-plane slice of pressure"),
+        Example("./mfc.sh viz case_dir/ --var pres --interactive", "Browser UI — scrub timesteps and switch vars"),
+        Example("./mfc.sh viz case_dir/ --var pres --tui", "Terminal UI over SSH (1D/2D, no browser)"),
     ],
     key_options=[
-        ("--var NAME", "Variable to visualize"),
-        ("--step STEP", "Timestep(s): int, start:end:stride, 0,100,...,1000, or 'all'"),
-        ("--list-vars", "List available variables"),
-        ("--list-steps", "List available timesteps"),
-        ("--mp4", "Generate MP4 video"),
-        ("--interactive / -i", "Launch interactive Dash web UI"),
-        ("--tui", "Launch terminal UI (1D/2D, works over SSH)"),
-        ("--cmap NAME", "Matplotlib colormap"),
-        ("--slice-axis x|y|z", "Axis for 3D slice"),
+        ("-- Discovery --", ""),
+        ("--list-steps", "Print available timesteps and exit"),
+        ("--list-vars", "Print available variable names and exit"),
+        ("-- Variable / step selection --", ""),
+        ("--var NAME", "Variable to plot (omit for tiled all-vars layout)"),
+        ("--step STEP", "last (default), int, start:stop:stride, list, or 'all'"),
+        ("-- Output modes --", ""),
+        ("(default)", "Save PNG to case_dir/viz/; use -o DIR to change"),
+        ("--mp4", "Encode frames into an MP4 video"),
+        ("--interactive / -i", "Dash web UI in browser (supports 1D/2D/3D)"),
+        ("--tui", "Terminal UI over SSH — no browser needed (1D/2D)"),
+        ("-- Appearance --", ""),
+        ("--cmap NAME", "Matplotlib colormap (default: viridis)"),
+        ("--vmin / --vmax", "Fix color-scale limits"),
+        ("--log-scale", "Logarithmic color/y axis"),
+        ("--dpi N", "Image resolution (default: 150)"),
+        ("-- 3D options --", ""),
+        ("--slice-axis x|y|z", "Plane to slice (default: z midplane)"),
+        ("--slice-value VAL", "Slice at coordinate value"),
+        ("--slice-index IDX", "Slice at array index"),
     ],
 )
 
