@@ -1,5 +1,6 @@
 """Check that file paths, cite keys, parameters, and @ref targets in docs still exist."""
 
+import json
 import re
 import sys
 from pathlib import Path
@@ -55,11 +56,11 @@ CASE_MD_SKIP = {
 
 # Docs to check for parameter references, with per-file skip sets
 PARAM_DOCS = {
-    "docs/documentation/equations.md": set(),
+    "docs/documentation/equations.md": {"bub_pp%%"},
     "docs/documentation/case.md": CASE_MD_SKIP,
 }
 
-# Match @ref page_id patterns
+# Match @ref page_id patterns (page IDs may contain hyphens)
 REF_RE = re.compile(r"@ref\s+([\w-]+)")
 
 
@@ -368,14 +369,25 @@ def check_page_refs(repo_root: Path) -> list[str]:
     if not doc_dir.exists():
         return []
 
-    # Collect all @page identifiers
+    # Collect all @page identifiers (IDs may contain hyphens)
     # Include Doxygen built-ins and auto-generated pages (created by ./mfc.sh generate)
-    page_ids = {"citelist", "parameters", "case_constraints", "physics_constraints", "examples", "cli-reference"}
+    page_ids = {"citelist", "parameters", "case_constraints", "physics_constraints", "examples", "cli-reference", "architecture"}
     for md_file in doc_dir.glob("*.md"):
         text = md_file.read_text(encoding="utf-8")
         m = re.search(r"^\s*@page\s+([\w-]+)", text, flags=re.MULTILINE)
         if m:
             page_ids.add(m.group(1))
+
+    # Also collect {#id} anchors (valid @ref targets across files)
+    for md_file in doc_dir.glob("*.md"):
+        text = md_file.read_text(encoding="utf-8")
+        in_code = False
+        for line in text.split("\n"):
+            if line.strip().startswith("```"):
+                in_code = not in_code
+                continue
+            if not in_code:
+                page_ids.update(re.findall(r"\{#([\w-]+)\}", line))
 
     errors = []
     for md_file in sorted(doc_dir.glob("*.md")):
@@ -411,6 +423,8 @@ def check_physics_docs_coverage(repo_root: Path) -> list[str]:
         "check_output_format",       # output format selection
         "check_restart",             # restart file logistics
         "check_parallel_io_pre_process",  # parallel I/O settings
+        "check_build_flags",              # build-flag compatibility (no physics meaning)
+        "check_geometry_precision_simulation",  # build-flag compatibility (no physics meaning)
         "check_misc_pre_process",    # miscellaneous pre-process flags
         "check_bc_patches",          # boundary patch geometry
         "check_grid_stretching",     # grid stretching parameters
@@ -549,6 +563,306 @@ def check_cli_refs(repo_root: Path) -> list[str]:
     return errors
 
 
+def check_unpaired_math(repo_root: Path) -> list[str]:
+    """Check for unpaired \\f$ inline math and unbalanced \\f[/\\f] display math."""
+    doc_dir = repo_root / "docs" / "documentation"
+    if not doc_dir.exists():
+        return []
+
+    ignored = _gitignored_docs(repo_root)
+    errors = []
+
+    for md_file in sorted(doc_dir.glob("*.md")):
+        if md_file.name in ignored:
+            continue
+        text = md_file.read_text(encoding="utf-8")
+        rel = md_file.relative_to(repo_root)
+        in_code = False
+        display_math_open = 0  # line number where \f[ was opened, 0 = closed
+
+        for i, line in enumerate(text.split("\n"), 1):
+            if line.strip().startswith("```"):
+                in_code = not in_code
+                continue
+            if in_code:
+                continue
+
+            # Count \f$ occurrences (should be even per line for inline math)
+            inline_count = len(re.findall(r"\\f\$", line))
+            if inline_count % 2 != 0:
+                errors.append(
+                    f"  {rel}:{i} has {inline_count} \\f$ delimiter(s) (odd)."
+                    " Fix: ensure every \\f$ has a matching closing \\f$"
+                )
+
+            # Track \f[ / \f] balance
+            opens = len(re.findall(r"\\f\[", line))
+            closes = len(re.findall(r"\\f\]", line))
+            for _ in range(opens):
+                if display_math_open:
+                    errors.append(
+                        f"  {rel}:{i} opens \\f[ but previous \\f["
+                        f" from line {display_math_open} is still open."
+                        " Fix: add missing \\f]"
+                    )
+                display_math_open = i
+            for _ in range(closes):
+                if not display_math_open:
+                    errors.append(
+                        f"  {rel}:{i} has \\f] without a preceding \\f[."
+                        " Fix: add missing \\f[ or remove extra \\f]"
+                    )
+                else:
+                    display_math_open = 0
+
+        if display_math_open:
+            errors.append(
+                f"  {rel}:{display_math_open} opens \\f[ that is never closed."
+                " Fix: add \\f] to close the display math block"
+            )
+
+    return errors
+
+
+# Doxygen block commands that are incorrectly processed inside backtick
+# code spans (known Doxygen bug, see github.com/doxygen/doxygen/issues/6054).
+_DOXYGEN_BLOCK_CMDS = {
+    "code", "endcode", "verbatim", "endverbatim",
+    "dot", "enddot", "msc", "endmsc",
+    "startuml", "enduml",
+    "latexonly", "endlatexonly", "htmlonly", "endhtmlonly",
+    "xmlonly", "endxmlonly", "rtfonly", "endrtfonly",
+    "manonly", "endmanonly", "docbookonly", "enddocbookonly",
+    "todo", "deprecated", "bug", "test",
+    "note", "warning", "attention", "remark",
+    "brief", "details", "param", "return", "returns",
+}
+
+
+def check_doxygen_commands_in_backticks(repo_root: Path) -> list[str]:  # pylint: disable=too-many-locals
+    """Check for Doxygen @/\\ commands inside backtick code spans.
+
+    Doxygen processes certain block commands even inside backtick code
+    spans, which can break rendering.  Flag these so authors can
+    restructure or use fenced code blocks instead.
+    """
+    doc_dir = repo_root / "docs" / "documentation"
+    if not doc_dir.exists():
+        return []
+
+    ignored = _gitignored_docs(repo_root)
+    code_span_re = re.compile(r"``([^`\n]+)``|`([^`\n]+)`")
+    # Match @cmd or \cmd where cmd is a known Doxygen block command
+    cmd_pattern = "|".join(re.escape(c) for c in sorted(_DOXYGEN_BLOCK_CMDS))
+    doxy_cmd_re = re.compile(rf"(?:@|\\)({cmd_pattern})\b")
+
+    errors = []
+    for md_file in sorted(doc_dir.glob("*.md")):
+        if md_file.name in ignored:
+            continue
+        text = md_file.read_text(encoding="utf-8")
+        rel = md_file.relative_to(repo_root)
+        in_code = False
+        for i, line in enumerate(text.split("\n"), 1):
+            if line.strip().startswith("```"):
+                in_code = not in_code
+                continue
+            if in_code:
+                continue
+            for m in code_span_re.finditer(line):
+                span = m.group(1) or m.group(2)
+                cmd_match = doxy_cmd_re.search(span)
+                if cmd_match:
+                    cmd = cmd_match.group(0)
+                    errors.append(
+                        f"  {rel}:{i} backtick span contains Doxygen"
+                        f" command '{cmd}' which may be processed."
+                        " Fix: use a fenced code block or rephrase"
+                    )
+
+    return errors
+
+
+def check_single_quote_in_backtick(repo_root: Path) -> list[str]:
+    """Check for single quotes inside single-backtick code spans.
+
+    Doxygen treats a single quote inside a single-backtick code span as
+    ending the span (backward-compat quirk).  Use double backticks instead.
+    """
+    doc_dir = repo_root / "docs" / "documentation"
+    if not doc_dir.exists():
+        return []
+
+    ignored = _gitignored_docs(repo_root)
+    # Match single-backtick spans (not double-backtick)
+    single_bt_re = re.compile(r"(?<!`)`([^`\n]+)`(?!`)")
+
+    errors = []
+    for md_file in sorted(doc_dir.glob("*.md")):
+        if md_file.name in ignored:
+            continue
+        text = md_file.read_text(encoding="utf-8")
+        rel = md_file.relative_to(repo_root)
+        in_code = False
+        for i, line in enumerate(text.split("\n"), 1):
+            if line.strip().startswith("```"):
+                in_code = not in_code
+                continue
+            if in_code:
+                continue
+            for m in single_bt_re.finditer(line):
+                span = m.group(1)
+                if "'" in span:
+                    errors.append(
+                        f"  {rel}:{i} single-backtick span `{span}` contains"
+                        " a single quote, which Doxygen treats as ending the"
+                        f" span. Fix: use double backticks ``{span}``"
+                    )
+
+    return errors
+
+
+# LaTeX commands that require AMSmath but are not reliably loaded by the
+# MathJax configuration (config.js).  Use the standard alternatives instead.
+_AMSMATH_ONLY_CMDS = {
+    "dfrac": "frac",
+    "tfrac": "frac",
+    "dbinom": "binom",
+    "tbinom": "binom",
+    "dddot": "dot",
+    "ddddot": "dot",
+}
+
+
+def check_amsmath_in_doxygen_math(repo_root: Path) -> list[str]:  # pylint: disable=too-many-locals
+    """Flag AMSmath-only commands in Doxygen math that may not render."""
+    doc_dir = repo_root / "docs" / "documentation"
+    if not doc_dir.exists():
+        return []
+
+    ignored = _gitignored_docs(repo_root)
+    # Match \f$...\f$ inline or content between \f[ and \f]
+    inline_re = re.compile(r"\\f\$(.*?)\\f\$")
+    cmd_names = "|".join(re.escape(c) for c in sorted(_AMSMATH_ONLY_CMDS))
+    ams_re = re.compile(rf"\\({cmd_names})\b")
+
+    errors = []
+    for md_file in sorted(doc_dir.glob("*.md")):
+        if md_file.name in ignored:
+            continue
+        text = md_file.read_text(encoding="utf-8")
+        rel = md_file.relative_to(repo_root)
+        in_code = False
+        in_display = False
+
+        for i, line in enumerate(text.split("\n"), 1):
+            if line.strip().startswith("```"):
+                in_code = not in_code
+                continue
+            if in_code:
+                continue
+
+            # Check inline math \f$...\f$
+            for m in inline_re.finditer(line):
+                for cm in ams_re.finditer(m.group(1)):
+                    alt = _AMSMATH_ONLY_CMDS[cm.group(1)]
+                    errors.append(
+                        f"  {rel}:{i} uses \\{cm.group(1)} (AMSmath) in"
+                        f" math. Fix: use \\{alt} instead"
+                    )
+
+            # Check display math lines between \f[ and \f]
+            if "\\f[" in line:
+                in_display = True
+            if in_display:
+                for cm in ams_re.finditer(line):
+                    alt = _AMSMATH_ONLY_CMDS[cm.group(1)]
+                    errors.append(
+                        f"  {rel}:{i} uses \\{cm.group(1)} (AMSmath) in"
+                        f" math. Fix: use \\{alt} instead"
+                    )
+            if "\\f]" in line:
+                in_display = False
+
+    return errors
+
+
+_MODULE_RE = re.compile(r"^\s*module\s+(m_\w+)\s*$", re.IGNORECASE)
+_BRIEF_LINE_RE = re.compile(r"^!>\s*@brief\s+(.+)", re.IGNORECASE)
+_CONTAINS_RE = re.compile(r"^Contains\s+(module|program)\s+\w+", re.IGNORECASE)
+
+
+def check_module_briefs(repo_root: Path) -> list[str]:
+    """Check that every m_*.fpp/.f90 has a module-level !> @brief before the module declaration."""
+    src_dir = repo_root / "src"
+    if not src_dir.exists():
+        return []
+
+    errors = []
+    for fpp in sorted(src_dir.rglob("m_*.[fF]*")):
+        if fpp.suffix not in (".fpp", ".f90", ".F90"):
+            continue
+
+        lines = fpp.read_text(encoding="utf-8").splitlines()
+        # Find the "module m_xxx" declaration
+        mod_idx = None
+        for i, line in enumerate(lines[:80]):
+            if _MODULE_RE.match(line):
+                mod_idx = i
+                break
+        if mod_idx is None:
+            continue
+
+        # Scan lines before the module declaration for !> @brief
+        found_brief = False
+        for i in range(mod_idx):
+            m = _BRIEF_LINE_RE.match(lines[i].strip())
+            if m and not _CONTAINS_RE.match(m.group(1)):
+                found_brief = True
+                break
+
+        if not found_brief:
+            rel = fpp.relative_to(repo_root)
+            errors.append(
+                f"  {rel} has no module-level !> @brief before the module declaration."
+                " Fix: add '!> @brief <description>' on the line before 'module ...'"
+            )
+
+    return errors
+
+
+def check_module_categories(repo_root: Path) -> list[str]:
+    """Check that every m_*.fpp/.f90 module is listed in module_categories.json."""
+    categories_file = repo_root / "docs" / "module_categories.json"
+    if not categories_file.exists():
+        return []
+
+    categories = json.loads(categories_file.read_text(encoding="utf-8"))
+    categorized = set()
+    for entry in categories:
+        categorized.update(entry["modules"])
+
+    src_dir = repo_root / "src"
+    if not src_dir.exists():
+        return []
+
+    errors = []
+    for fpp in sorted(src_dir.rglob("m_*.[fF]*")):
+        if fpp.suffix not in (".fpp", ".f90", ".F90"):
+            continue
+        name = fpp.stem
+        if name not in categorized:
+            rel = fpp.relative_to(repo_root)
+            cats = ", ".join(e["category"] for e in categories)
+            errors.append(
+                f"  {rel}: module {name} is not in docs/module_categories.json.\n"
+                f"    Fix: open docs/module_categories.json and add \"{name}\" to one of: {cats}.\n"
+                f"    This ensures it appears on the Code Architecture page."
+            )
+
+    return errors
+
+
 def main():
     repo_root = Path(__file__).resolve().parents[2]
 
@@ -558,11 +872,17 @@ def main():
     all_errors.extend(check_param_refs(repo_root))
     all_errors.extend(check_page_refs(repo_root))
     all_errors.extend(check_math_syntax(repo_root))
+    all_errors.extend(check_unpaired_math(repo_root))
     all_errors.extend(check_doxygen_percent(repo_root))
+    all_errors.extend(check_doxygen_commands_in_backticks(repo_root))
+    all_errors.extend(check_single_quote_in_backtick(repo_root))
+    all_errors.extend(check_amsmath_in_doxygen_math(repo_root))
     all_errors.extend(check_section_anchors(repo_root))
     all_errors.extend(check_physics_docs_coverage(repo_root))
     all_errors.extend(check_identifier_refs(repo_root))
     all_errors.extend(check_cli_refs(repo_root))
+    all_errors.extend(check_module_briefs(repo_root))
+    all_errors.extend(check_module_categories(repo_root))
 
     if all_errors:
         print("Doc reference check failed:")

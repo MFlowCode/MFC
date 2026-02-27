@@ -3,15 +3,52 @@ language: en-US
 
 reviews:
   profile: chill
+
+  # Hide the “Review skipped / Draft detected” status message
+  review_status: false
+
+  # Remove the “Prompt for all review comments with AI agents” block
+  enable_prompt_for_ai_agents: false
+
+  # Disable extra/non-default summary sections
+  high_level_summary: false
+  related_issues: false
+  sequence_diagrams: false
+  changed_files_summary: false
+
+  # Further reduce walkthrough noise (footer itself isn't currently configurable)
+  collapse_walkthrough: true
+  review_details: false
+  estimate_code_review_effort: false
+  assess_linked_issues: false
+  related_prs: false
+  suggested_labels: false
+  suggested_reviewers: false
+  in_progress_fortune: false
+  poem: false
+
+  # Remove "Finishing Touches" section content
+  finishing_touches:
+    docstrings:
+      enabled: false
+    unit_tests:
+      enabled: false
+
+  auto_review:
+    enabled: true                  # initial PR-open review
+    auto_incremental_review: false # no re-run on every push
+
   path_instructions:
+    - path: "**/*"
+      instructions: |
+        IMPORTANT: Only comment on code that is within this PR’s diff (changed lines / files).
+        Do not add feedback that requires commenting outside the diff range.
+
     - path: "src/**/*.fpp"
       instructions: |
         Fortran source (Fypp-preprocessed). Follow the coding standards in
         docs/documentation/contributing.md and the GPU macro API in
-        docs/documentation/gpuParallelization.md.
-    - path: "src/**/*.f90"
-      instructions: |
-        Fortran source. Follow the coding standards in
+        docs/documentation/gpuParallelization.md and the coding standards in
         docs/documentation/contributing.md.
     - path: "toolchain/**/*.py"
       instructions: |

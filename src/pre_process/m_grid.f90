@@ -2,16 +2,7 @@
 !! @file
 !! @brief Contains module m_grid
 
-!> @brief  This module takes care of creating the rectilinear grid on which
-!!              the data for the initial condition will be laid out and on which
-!!              the simulation will eventually be computed. The grid may either
-!!              be uniform or non-uniform. Non-uniform grids are generated using
-!!              the hyperbolic tangent function, see Johnsen (2007) for details.
-!!              Alternatively to synthesizing a new grid, the user may select to
-!!              read in a preexisting one. This is carried out through the module
-!!              m_start_up.f90. In such a case, the responsibility of this module
-!!              becomes only to allocate/deallocate the necessary grid variables
-!!              for the cell-centers and cell-boundaries locations.
+!> @brief Generates uniform or stretched rectilinear grids with hyperbolic-tangent spacing
 module m_grid
 
     use m_derived_types         ! Definitions of the derived types
@@ -37,6 +28,7 @@ module m_grid
 
     abstract interface
 
+        !> @brief Abstract interface for generating a rectilinear computational grid.
         impure subroutine s_generate_abstract_grid
 
         end subroutine s_generate_abstract_grid

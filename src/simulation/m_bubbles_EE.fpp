@@ -1,10 +1,10 @@
 !>
 !! @file
-!! @brief Contains module m_bubbles_EE
+!! @brief Contains module @ref m_bubbles_ee "m_bubbles_EE"
 
 #:include 'macros.fpp'
 
-!> @brief This module is used to compute the ensemble-averaged bubble dynamic variables
+!> @brief Computes ensemble-averaged (Euler--Euler) bubble source terms for radius, velocity, pressure, and mass transfer
 module m_bubbles_EE
 
     use m_derived_types        !< Definitions of the derived types
@@ -31,6 +31,7 @@ module m_bubbles_EE
 
 contains
 
+    !> @brief Allocates and initializes arrays for the Euler-Euler bubble model.
     impure subroutine s_initialize_bubbles_EE_module
 
         integer :: l
@@ -68,7 +69,7 @@ contains
 
     end subroutine s_initialize_bubbles_EE_module
 
-    ! Compute the bubble volume fraction alpha from the bubble number density n
+    !> @brief Computes the bubble volume fraction alpha from the bubble number density.
         !! @param q_cons_vf is the conservative variable
     subroutine s_comp_alpha_from_n(q_cons_vf)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
@@ -92,6 +93,9 @@ contains
 
     end subroutine s_comp_alpha_from_n
 
+    !>  Compute the right-hand side for Euler-Euler bubble transport
+        !! @param idir Direction index
+        !! @param q_prim_vf Primitive variables
     subroutine s_compute_bubbles_EE_rhs(idir, q_prim_vf, divu_in)
 
         integer, intent(in) :: idir
@@ -156,6 +160,7 @@ contains
         !!      that are needed for the bubble modeling
         !!  @param q_prim_vf Primitive variables
         !!  @param q_cons_vf Conservative variables
+        !!  @param rhs_vf Right-hand side variables
     impure subroutine s_compute_bubble_EE_source(q_cons_vf, q_prim_vf, rhs_vf, divu_in)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf

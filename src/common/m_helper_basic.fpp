@@ -1,9 +1,10 @@
-
+!>
 !! @file
 !! @brief Contains module m_helper_basic
 
 #:include 'macros.fpp'
 
+!> @brief Basic floating-point utilities: approximate equality, default detection, and coordinate bounds
 module m_helper_basic
 
     use m_derived_types        !< Definitions of the derived types

@@ -4,7 +4,7 @@
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
-!> @brief The module contains the subroutines used to compute viscous terms.
+!> @brief Computes viscous stress tensors and diffusive flux contributions for the Navier--Stokes equations
 module m_viscous
 
     use m_derived_types        !< Definitions of the derived types
@@ -36,6 +36,7 @@ module m_viscous
 
 contains
 
+    !> @brief Allocates and populates the viscous Reynolds number arrays and transfers data to the GPU.
     impure subroutine s_initialize_viscous_module
 
         integer :: i, j !< generic loop iterators
@@ -530,9 +531,27 @@ contains
     end subroutine s_compute_viscous_stress_cylindrical_boundary
 
     !>  Computes viscous terms
-    !!  @param q_cons_vf Cell-averaged conservative variables
-    !!  @param q_prim_vf Cell-averaged primitive variables
-    !!  @param rhs_vf Cell-averaged RHS variables
+    !!  @param qL_prim_rsx_vf Left reconstructed primitive variables in x
+    !!  @param qL_prim_rsy_vf Left reconstructed primitive variables in y
+    !!  @param qL_prim_rsz_vf Left reconstructed primitive variables in z
+    !!  @param dqL_prim_dx_n Left primitive x-derivative
+    !!  @param dqL_prim_dy_n Left primitive y-derivative
+    !!  @param dqL_prim_dz_n Left primitive z-derivative
+    !!  @param qL_prim Left cell-boundary primitive variables
+    !!  @param qR_prim_rsx_vf Right reconstructed primitive variables in x
+    !!  @param qR_prim_rsy_vf Right reconstructed primitive variables in y
+    !!  @param qR_prim_rsz_vf Right reconstructed primitive variables in z
+    !!  @param dqR_prim_dx_n Right primitive x-derivative
+    !!  @param dqR_prim_dy_n Right primitive y-derivative
+    !!  @param dqR_prim_dz_n Right primitive z-derivative
+    !!  @param qR_prim Right cell-boundary primitive variables
+    !!  @param q_prim_qp Cell-averaged primitive variables
+    !!  @param dq_prim_dx_qp Cell-averaged primitive x-derivative
+    !!  @param dq_prim_dy_qp Cell-averaged primitive y-derivative
+    !!  @param dq_prim_dz_qp Cell-averaged primitive z-derivative
+    !!  @param ix Index bounds in the x-direction
+    !!  @param iy Index bounds in the y-direction
+    !!  @param iz Index bounds in the z-direction
     subroutine s_get_viscous(qL_prim_rsx_vf, qL_prim_rsy_vf, qL_prim_rsz_vf, &
                              dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n, &
                              qL_prim, &
@@ -1005,6 +1024,7 @@ contains
 
     end subroutine s_get_viscous
 
+    !> @brief Reconstructs left and right cell-boundary values of viscous primitive variables using WENO or MUSCL.
     subroutine s_reconstruct_cell_boundary_values_visc(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, &
                                                        norm_dir, vL_prim_vf, vR_prim_vf, ix, iy, iz)
 
@@ -1109,6 +1129,7 @@ contains
 
     end subroutine s_reconstruct_cell_boundary_values_visc
 
+    !> @brief Reconstructs left and right cell-boundary values of viscous primitive variable derivatives using WENO or MUSCL.
     subroutine s_reconstruct_cell_boundary_values_visc_deriv(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, &
                                                              norm_dir, vL_prim_vf, vR_prim_vf, ix, iy, iz)
         type(scalar_field), dimension(iv%beg:iv%end), intent(in) :: v_vf
@@ -1221,6 +1242,13 @@ contains
         !!  @param vR_vf Right cell-boundary integral averages
         !!  @param dv_ds_vf Cell-average first-order spatial derivatives
         !!  @param norm_dir Splitting coordinate direction
+        !!  @param ix Index bounds in the x-direction
+        !!  @param iy Index bounds in the y-direction
+        !!  @param iz Index bounds in the z-direction
+        !!  @param iv_in Variable index bounds
+        !!  @param dL Cell width array
+        !!  @param dim Dimension size
+        !!  @param buff_size_in Buffer layer size
     subroutine s_apply_scalar_divergence_theorem(vL_vf, vR_vf, &
                                                  dv_ds_vf, &
                                                  norm_dir, &
@@ -1345,7 +1373,6 @@ contains
         !!  @param grad_x First coordinate direction component of the derivative
         !!  @param grad_y Second coordinate direction component of the derivative
         !!  @param grad_z Third coordinate direction component of the derivative
-        !!  @param norm Norm of the gradient vector
     subroutine s_compute_fd_gradient(var, grad_x, grad_y, grad_z)
 
         type(scalar_field), intent(in) :: var
@@ -1523,7 +1550,7 @@ contains
 
     end subroutine s_compute_fd_gradient
 
-    ! computes the viscous stress tensor at a particule i, j, k element
+    !> @brief Computes the viscous stress tensor at a single grid cell using finite-difference velocity gradients.
     subroutine s_compute_viscous_stress_tensor(viscous_stress_tensor, q_prim_vf, dynamic_viscosity, i, j, k)
         $:GPU_ROUTINE(parallelism='[seq]')
 
@@ -1585,6 +1612,7 @@ contains
 
     end subroutine s_compute_viscous_stress_tensor
 
+    !> @brief Deallocates the viscous Reynolds number arrays.
     impure subroutine s_finalize_viscous_module()
 
         @:DEALLOCATE(Res_viscous)

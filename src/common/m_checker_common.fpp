@@ -5,8 +5,7 @@
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
-!> @brief The purpose of the module is to check for compatible input files for.
-!!              inputs common to pre-processing, post-processing and simulation
+!> @brief Shared input validation checks for grid dimensions and AMD GPU compiler limits
 module m_checker_common
 
     use m_global_parameters    !< Definitions of the global parameters
@@ -38,6 +37,7 @@ contains
 
 #ifndef MFC_SIMULATION
 
+    !> @brief Verifies that the total number of grid cells meets the minimum required by the number of dimensions and MPI ranks.
     impure subroutine s_check_total_cells
         character(len=18) :: numStr !< for int to string conversion
         integer(kind=8) :: min_cells
@@ -52,6 +52,7 @@ contains
 
 #endif
 
+    !> @brief Checks that simulation parameters stay within AMD GPU compiler limits when case optimization is disabled.
     impure subroutine s_check_amd
 
         #:if not MFC_CASE_OPTIMIZATION

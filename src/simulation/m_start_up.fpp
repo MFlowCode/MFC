@@ -5,18 +5,7 @@
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
-!> @brief The purpose of the module is primarily to read in the files that
-!!              contain the inputs, the initial condition data and the grid data
-!!              that are provided by the user. The module is additionally tasked
-!!              with verifying the consistency of the user inputs and completing
-!!              the grid variablesThe purpose of the module is primarily to read
-!!              in the files that
-!!              contain the inputs, the initial condition data and the grid data
-!!              that are provided by the user. The module is additionally tasked
-!!              with verifying the consistency of the user inputs and completing
-!!              the grid variables. This module also also allocating, initializing
-!!              I/O, and deallocating the relevant variables on both cpus and gpus as well as
-!!              setting up the time stepping, domain decomposition and I/O procedures.
+!> @brief Reads input files, loads initial conditions and grid data, and orchestrates solver initialization and finalization
 module m_start_up
 
     use m_derived_types        !< Definitions of the derived types
@@ -260,11 +249,7 @@ contains
 
     end subroutine s_check_input_file
 
-        !!              initial condition and grid data files. The cell-average
-        !!              conservative variables constitute the former, while the
-        !!              cell-boundary locations in x-, y- and z-directions make
-        !!              up the latter. This procedure also calculates the cell-
-        !!              width distributions from the cell-boundary locations.
+    !> @brief Reads serial initial condition and grid data files and computes cell-width distributions.
         !! @param q_cons_vf Cell-averaged conservative variables
     impure subroutine s_read_serial_data_files(q_cons_vf)
 
@@ -429,6 +414,7 @@ contains
 
     end subroutine s_read_serial_data_files
 
+    !> @brief Reads parallel initial condition and grid data files via MPI I/O.
         !! @param q_cons_vf Conservative variables
     impure subroutine s_read_parallel_data_files(q_cons_vf)
 
@@ -801,6 +787,7 @@ contains
 
     end subroutine s_initialize_internal_energy_equations
 
+    !> @brief Advances the simulation by one time step, handling CFL-based dt and time-stepper dispatch.
     impure subroutine s_perform_time_step(t_step, time_avg)
         integer, intent(inout) :: t_step
         real(wp), intent(inout) :: time_avg
@@ -874,6 +861,7 @@ contains
 
     end subroutine s_perform_time_step
 
+    !> @brief Collects per-process wall-clock times and writes aggregate performance metrics to file.
     impure subroutine s_save_performance_metrics(time_avg, time_final, io_time_avg, io_time_final, proc_time, io_proc_time, file_exists)
 
         real(wp), intent(inout) :: time_avg, time_final
@@ -935,6 +923,7 @@ contains
 
     end subroutine s_save_performance_metrics
 
+    !> @brief Saves conservative variable data to disk at the current time step.
     impure subroutine s_save_data(t_step, start, finish, io_time_avg, nt)
         integer, intent(inout) :: t_step
         real(wp), intent(inout) :: start, finish, io_time_avg
@@ -978,7 +967,7 @@ contains
                     do j = 0, m
                         if (ieee_is_nan(real(q_cons_ts(stor)%vf(i)%sf(j, k, l), kind=wp))) then
                             print *, "NaN(s) in timestep output.", j, k, l, i, proc_rank, t_step, m, n, p
-                            error stop "NaN(s) in timestep output."
+                            call s_mpi_abort("NaN(s) in timestep output.")
                         end if
                     end do
                 end do
@@ -1031,6 +1020,7 @@ contains
 
     end subroutine s_save_data
 
+    !> @brief Initializes all simulation sub-modules in the required dependency order.
     impure subroutine s_initialize_modules
 
         integer :: m_ds, n_ds, p_ds
@@ -1140,6 +1130,7 @@ contains
 
     end subroutine s_initialize_modules
 
+    !> @brief Sets up the MPI execution environment, binds GPUs, and decomposes the computational domain.
     impure subroutine s_initialize_mpi_domain
         integer :: ierr
 #ifdef MFC_GPU
@@ -1219,6 +1210,7 @@ print*, proc_rank, lag_params%charwidth, lag_params%charNz
 
     end subroutine s_initialize_mpi_domain
 
+    !> @brief Transfers initial conservative variable and model parameter data to the GPU device.
     subroutine s_initialize_gpu_vars
         integer :: i
         !Update GPU DATA
@@ -1294,6 +1286,7 @@ print*, proc_rank, lag_params%charwidth, lag_params%charNz
 
     end subroutine s_initialize_gpu_vars
 
+    !> @brief Finalizes and deallocates all simulation sub-modules in reverse initialization order.
     impure subroutine s_finalize_modules
 
         call s_finalize_time_steppers_module()

@@ -5,11 +5,7 @@
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
-!> @brief The module serves as a proxy to the parameters and subroutines
-!!          available in the MPI implementation's MPI module. Specifically,
-!!          the purpose of the proxy is to harness basic MPI commands into
-!!          more complicated procedures as to accomplish the communication
-!!          goals for the simulation.
+!> @brief MPI halo exchange, domain decomposition, and buffer packing/unpacking for the simulation solver
 module m_mpi_proxy
 
 #ifdef MFC_MPI
@@ -59,6 +55,7 @@ module m_mpi_proxy
 
 contains
 
+    !> @brief Allocates immersed boundary communication buffers for MPI halo exchanges.
     subroutine s_initialize_mpi_proxy_module()
 
 #ifdef MFC_MPI
@@ -199,7 +196,7 @@ contains
 
         #:for VAR in [ 'dt','weno_eps','teno_CT','pref','rhoref','R0ref','Web','Ca', 'sigma', &
             & 'Re_inv', 'poly_sigma', 'palpha_eps', 'ptgalpha_eps', 'pi_fac',    &
-            & 'bc_x%vb1','bc_x%vb2','bc_x%vb3','bc_x%ve1','bc_x%ve2','bc_x%ve2', &
+            & 'bc_x%vb1','bc_x%vb2','bc_x%vb3','bc_x%ve1','bc_x%ve2','bc_x%ve3', &
             & 'bc_y%vb1','bc_y%vb2','bc_y%vb3','bc_y%ve1','bc_y%ve2','bc_y%ve3', &
             & 'bc_z%vb1','bc_z%vb2','bc_z%vb3','bc_z%ve1','bc_z%ve2','bc_z%ve3', &
             & 'bc_x%pres_in','bc_x%pres_out','bc_y%pres_in','bc_y%pres_out', 'bc_z%pres_in','bc_z%pres_out', &
@@ -310,6 +307,7 @@ contains
 
     end subroutine s_mpi_bcast_user_inputs
 
+    !> @brief Packs, exchanges, and unpacks immersed boundary marker buffers between neighboring MPI ranks.
     subroutine s_mpi_sendrecv_ib_buffers(ib_markers, mpi_dir, pbc_loc)
 
         type(integer_field), intent(inout) :: ib_markers
@@ -494,6 +492,7 @@ contains
 
     end subroutine s_mpi_sendrecv_ib_buffers
 
+<<<<<<< HEAD
     !> This subroutine adds particles to the transfer list for the MPI
         !! communication.
         !! @param nBub Current LOCAL number of bubbles
@@ -969,6 +968,7 @@ contains
 
     end subroutine s_wrap_particle_positions
 
+    !> @brief Broadcasts random phase numbers from rank 0 to all MPI processes.
     impure subroutine s_mpi_send_random_number(phi_rn, num_freq)
         integer, intent(in) :: num_freq
         real(wp), intent(inout), dimension(1:num_freq) :: phi_rn
@@ -980,6 +980,7 @@ contains
 
     end subroutine s_mpi_send_random_number
 
+    !> @brief Deallocates immersed boundary MPI communication buffers.
     subroutine s_finalize_mpi_proxy_module()
 
 #ifdef MFC_MPI

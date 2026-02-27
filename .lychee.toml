@@ -12,9 +12,20 @@ retry_wait_time = 4
 
 # Comma-separated list of accepted status codes for valid links.
 # accept = ["200", "206", "403", "429"]
-accept = ["200", "429"]
+accept = ["200", "429", "502", "504"]
 
 verbose = "error"
 
-# Exclude sitemap from link checking (it contains pre-publish production URLs)
-exclude_path = ["**/sitemap.txt"]
+# Exclude files from scanning
+exclude_path = [
+    "sitemap\\.xml",  # Contains pre-publish production URLs
+    "404\\.html",     # Root-relative links (/, /documentation/) can't resolve in local checks
+]
+
+# Exclude URLs that fail due to external issues (broken SSL, pre-deploy only, etc.)
+exclude = [
+    "https://mflowcode\\.github\\.io/sitemap\\.xml",  # Only exists after deployment
+    "https://cpe\\.ext\\.hpe\\.com",                   # HPE Cray docs have broken SSL cert
+    "https://sc22\\.supercomputing\\.org",              # Returns 415 to automated requests
+    "https://strawberryperl\\.com",                    # Frequently times out
+]

@@ -165,22 +165,24 @@ __All grind times are in nanoseconds (ns) per grid point (gp) per equation (eq) 
 
 Weak scaling results are obtained by increasing the problem size with the number of processes so that work per process remains constant.
 
-### AMD MI250X GPU
+### GPU weak scaling
 
-MFC weask scales to (at least) 65,536 AMD MI250X GPUs on OLCF Frontier with 96% efficiency.
-This corresponds to 87% of the entire machine.
+MFC weak scales on multiple exascale GPU platforms with high efficiency:
+- **LLNL El Capitan**: AMD MI300A APUs
+- **OLCF Frontier**: AMD MI250X GPUs (65,536 GCDs, 87% of the machine, 96% efficiency)
+- **CSCS Alps**: NVIDIA GH200 GPUs
 
-<img src="../res/weakScaling/frontier.svg" style="height: 50%; width:50%; border-radius: 10pt"/>
+<img src="../res/weakScaling/weakscaling-dark.png" style="width:60%; border-radius: 10pt"/>
 
-### NVIDIA V100 GPU
+### NVIDIA V100 GPU (historical)
 
-MFC weak scales to (at least) 13,824 V100 NVIDIA V100 GPUs on OLCF Summit with 97% efficiency.
+MFC weak scales to (at least) 13,824 NVIDIA V100 GPUs on OLCF Summit with 97% efficiency.
 This corresponds to 50% of the entire machine.
 
 <img src="../res/weakScaling/summit.svg" style="height: 50%; width:50%; border-radius: 10pt"/>
 
-### IBM Power9 CPU
-MFC Weak scales to 13,824 Power9 CPU cores on OLCF Summit to within 1% of ideal scaling.
+### IBM Power9 CPU (historical)
+MFC weak scales to 13,824 Power9 CPU cores on OLCF Summit to within 1% of ideal scaling.
 
 <img src="../res/weakScaling/cpuScaling.svg" style="height: 50%; width:50%; border-radius: 10pt"/>
 
@@ -206,3 +208,6 @@ The "base case" uses 2M and 8M grid points per process.
 CPU strong scaling tests are done with problem sizes of 16, 32, and 64M grid points, with the base case using 2, 4, and 8M cells per process.
 
 <img src="../res/strongScaling/cpuStrongScaling.svg" style="width: 50%; border-radius: 10pt"/>
+
+
+<div style='text-align:center; font-size:0.75rem; color:#888; padding:16px 0 0;'>Page last updated: 2026-02-16</div>

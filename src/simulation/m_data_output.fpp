@@ -1,16 +1,11 @@
+!>
 !! @file
 !! @brief Contains module m_data_output
 
 #:include 'macros.fpp'
 #:include 'case.fpp'
 
-!> @brief The primary purpose of this module is to output the grid and the
-!!              conservative variables data at the chosen time-step interval. In
-!!              addition, this module is also in charge of outputting a run-time
-!!              information file which summarizes the time-dependent behavior !of
-!!              the stability criteria. The latter include the inviscid Courant–
-!!              Friedrichs–Lewy (ICFL), viscous CFL (VCFL), capillary CFL (CCFL)
-!!              and cell Reynolds (Rc) numbers.
+!> @brief Writes solution data, run-time stability diagnostics (ICFL, VCFL, CCFL, Rc), and probe/center-of-mass files
 module m_data_output
 
     use m_derived_types        !< Definitions of the derived types
@@ -71,8 +66,11 @@ contains
 
     !> Write data files. Dispatch subroutine that replaces procedure pointer.
         !! @param q_cons_vf Conservative variables
+        !! @param q_T_sf Temperature scalar field
         !! @param q_prim_vf Primitive variables
         !! @param t_step Current time step
+        !! @param bc_type Boundary condition type
+        !! @param beta Eulerian void fraction from lagrangian bubbles
     impure subroutine s_write_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, bc_type, beta)
 
         type(scalar_field), &
@@ -384,8 +382,11 @@ contains
     !>  The goal of this subroutine is to output the grid and
         !!      conservative variables data files for given time-step.
         !!  @param q_cons_vf Cell-average conservative variables
+        !!  @param q_T_sf Temperature scalar field
         !!  @param q_prim_vf Cell-average primitive variables
         !!  @param t_step Current time-step
+        !!  @param bc_type Boundary condition type
+        !!  @param beta Eulerian void fraction from lagrangian bubbles
     impure subroutine s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, bc_type, beta)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
@@ -464,6 +465,19 @@ contains
 
             write (2) q_cons_vf(i)%sf(0:m, 0:n, 0:p); close (2)
         end do
+
+        ! Lagrangian beta (void fraction) written as q_cons_vf(sys_size+1) to
+        ! match the parallel I/O path and allow post_process to read it.
+        if (bubbles_lagrange) then
+            write (file_path, '(A,I0,A)') trim(t_step_dir)//'/q_cons_vf', &
+                sys_size + 1, '.dat'
+
+            open (2, FILE=trim(file_path), &
+                  FORM='unformatted', &
+                  STATUS='new')
+
+            write (2) beta%sf(0:m, 0:n, 0:p); close (2)
+        end if
 
         if (qbmm .and. .not. polytropic) then
             do i = 1, nb
@@ -782,6 +796,7 @@ contains
         !!      conservative variables data files for given time-step.
         !!  @param q_cons_vf Cell-average conservative variables
         !!  @param t_step Current time-step
+        !!  @param bc_type Boundary condition type
         !!  @param beta Eulerian void fraction from lagrangian bubbles
     impure subroutine s_write_parallel_data_files(q_cons_vf, t_step, bc_type, beta)
 
@@ -1035,6 +1050,7 @@ contains
 
     end subroutine s_write_parallel_data_files
 
+    !> @brief Writes immersed boundary marker data to a serial (per-processor) unformatted file.
     subroutine s_write_serial_ib_data(time_step)
 
         integer, intent(in) :: time_step
@@ -1055,6 +1071,7 @@ contains
 
     end subroutine
 
+    !> @brief Writes immersed boundary marker data in parallel using MPI I/O.
     subroutine s_write_parallel_ib_data(time_step)
 
         integer, intent(in) :: time_step
@@ -1095,6 +1112,7 @@ contains
 
     end subroutine s_write_parallel_ib_data
 
+    !> @brief Dispatches immersed boundary data output to the serial or parallel writer.
     subroutine s_write_ib_data_file(time_step)
 
         integer, intent(in) :: time_step
@@ -1110,8 +1128,7 @@ contains
     !>  This writes a formatted data file where the root processor
     !!      can write out the CoM information
     !!  @param t_step Current time-step
-    !!  @param q_com Center of mass information
-    !!  @param moments Higher moment information
+    !!  @param c_mass_in Center of mass information
     impure subroutine s_write_com_files(t_step, c_mass_in)
 
         integer, intent(in) :: t_step

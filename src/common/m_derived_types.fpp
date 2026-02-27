@@ -4,8 +4,7 @@
 
 #:include "macros.fpp"
 
-!> @brief This file contains the definitions of all of the custom-defined
-!!              types used in the pre-process code.
+!> @brief Shared derived types for field data, patch geometry, bubble dynamics, and MPI I/O structures
 module m_derived_types
 
     use m_constants  !< Constants

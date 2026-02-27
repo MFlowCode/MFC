@@ -380,7 +380,7 @@ $:END_GPU_PARALLEL_LOOP()
 Key rules:
 - Always pair `$:GPU_PARALLEL_LOOP(...)` with `$:END_GPU_PARALLEL_LOOP()`
 - Use `collapse(n)` to fuse nested loops when the loop bounds are independent
-- Declare all loop-local temporaries in `private='[...]'`
+- Declare all loop-local temporaries in ``private='[...]'``
 - Never use `stop` or `error stop` inside a GPU loop
 
 ### How to Allocate and Manage GPU Arrays
@@ -535,6 +535,10 @@ contains
 
 end module m_my_feature
 ```
+
+**Step 3: Register the module in the architecture docs**
+
+Add your module name to the appropriate category in `docs/module_categories.json`. This ensures it appears on the @ref architecture "Code Architecture" page. The precheck linter will fail if a module is missing from this file.
 
 Key conventions:
 - `private` by default, explicitly `public` for the module API
@@ -767,3 +771,6 @@ If your change touches GPU code (`src/simulation/`), see the GPU checklist in th
 - A maintainer will merge your PR once all reviews are approved and CI is green
 
 If your PR is large or architectural, consider opening an issue first to discuss the approach.
+
+
+<div style='text-align:center; font-size:0.75rem; color:#888; padding:16px 0 0;'>Page last updated: 2026-02-15</div>

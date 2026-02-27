@@ -5,6 +5,7 @@
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
+!> @brief Assigns initial primitive variables to computational cells based on patch geometry
 module m_assign_variables
 
     use m_derived_types         ! Definitions of the derived types
@@ -71,6 +72,7 @@ module m_assign_variables
 
 contains
 
+    !> @brief Allocates volume fraction sum and sets the patch primitive variable assignment procedure pointer.
     impure subroutine s_initialize_assign_variables_module
 
         if (.not. igr) then
@@ -196,7 +198,7 @@ contains
 
     end subroutine s_assign_patch_mixture_primitive_variables
 
-    !Stable perturbation in pressure (Ando)
+    !> @brief Applies a stable pressure perturbation following Ando's method for bubble-laden flows.
     !! @param j the x-dir node index
     !! @param k the y-dir node index
     !! @param l the z-dir node index
@@ -712,6 +714,7 @@ contains
 
     end subroutine s_assign_patch_species_primitive_variables
 
+    !> @brief Nullifies the patch primitive variable assignment procedure pointer.
     impure subroutine s_finalize_assign_variables_module
 
         ! Nullifying procedure pointer to the subroutine assigning either

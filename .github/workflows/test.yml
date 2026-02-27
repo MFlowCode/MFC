@@ -4,6 +4,7 @@ on:
   push:
     branches: [master]
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 concurrency:
@@ -49,6 +50,9 @@ jobs:
         run: |
           ! grep -iR -e '\.\.\.' -e '\-\-\-' -e '===' ./src/*
 
+      - name: Lint Docs
+        run: python3 toolchain/mfc/lint_docs.py
+
   file-changes:
     name: Detect File Changes
     runs-on: 'ubuntu-latest'
@@ -93,6 +97,12 @@ jobs:
     steps:
       - name: Clone
         uses: actions/checkout@v4
+
+      - name: Restore Build Cache
+        uses: actions/cache@v4
+        with:
+          path: build
+          key: mfc-build-${{ matrix.os }}-${{ matrix.mpi }}-${{ matrix.debug }}-${{ matrix.precision }}-${{ matrix.intel }}-${{ hashFiles('CMakeLists.txt', 'toolchain/dependencies/**', 'toolchain/cmake/**', 'src/**/*.fpp', 'src/**/*.f90') }}
 
       - name: Setup MacOS
         if:   matrix.os == 'macos'
@@ -142,7 +152,7 @@ jobs:
 
   self:
     name: "${{ matrix.cluster_name }} (${{ matrix.device }}${{ matrix.interface != 'none' && format('-{0}', matrix.interface) || '' }})"
-    if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true'
+    if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true' && github.event.pull_request.draft != true
     needs: [lint-gate, file-changes]
     continue-on-error: false
     timeout-minutes: 480
@@ -202,6 +212,8 @@ jobs:
     steps:
       - name: Clone
         uses: actions/checkout@v4
+        with:
+          clean: false
 
       - name: Build
         if:   matrix.cluster != 'phoenix'

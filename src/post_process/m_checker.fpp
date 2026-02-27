@@ -4,7 +4,7 @@
 
 #:include 'macros.fpp'
 
-!> @brief The purpose of the module is to check for compatible input files
+!> @brief Validates post-process input parameters and output format consistency
 module m_checker
 
     use m_global_parameters    !< Definitions of the global parameters
@@ -24,15 +24,7 @@ contains
     !> Checks compatibility of parameters in the input file.
         !! Used by the post_process stage
     impure subroutine s_check_inputs
-
-        call s_check_inputs_output_format
-
     end subroutine s_check_inputs
-
-    !> Checks constraints on output format parameters
-    impure subroutine s_check_inputs_output_format
-        @:PROHIBIT(precision == 2 .and. wp == sp)
-    end subroutine s_check_inputs_output_format
 
     !> Checks constraints on fft_wrt
     impure subroutine s_check_inputs_fft

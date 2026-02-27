@@ -2,11 +2,7 @@
 !! @file
 !! @brief Contains module m_mpi_proxy
 
-!> @brief This module serves as a proxy to the parameters and subroutines
-!!              available in the MPI implementation's MPI module. Specifically,
-!!              the role of the proxy is to harness basic MPI commands into more
-!!              complex procedures as to achieve the required pre-processing
-!!              communication goals.
+!> @brief Broadcasts user inputs and decomposes the domain across MPI ranks for pre-processing
 module m_mpi_proxy
 
 #ifdef MFC_MPI
@@ -62,7 +58,7 @@ contains
             & 'igr', 'down_sample', 'simplex_perturb','fft_wrt', 'hyper_cleaning' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
-        call MPI_BCAST(fluid_rho(1), num_fluids_max, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(fluid_rho(1), num_fluids_max, mpi_p, 0, MPI_COMM_WORLD, ierr)
 
         #:for VAR in [ 'x_domain%beg', 'x_domain%end', 'y_domain%beg',         &
             & 'y_domain%end', 'z_domain%beg', 'z_domain%end', 'a_x', 'a_y',    &

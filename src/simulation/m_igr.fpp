@@ -1,6 +1,11 @@
+!>
+!! @file
+!! @brief Contains module m_igr
+
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
+!> @brief Iterative ghost rasterization (IGR) for sharp immersed boundary treatment
 module m_igr
 
     use m_derived_types        !< Definitions of the derived types
@@ -130,6 +135,7 @@ module m_igr
 
 contains
 
+    !> @brief Allocates and initializes arrays, coefficients, and GPU data structures for the implicit gradient reconstruction module.
     subroutine s_initialize_igr_module()
 
         if (viscous) then
@@ -267,6 +273,7 @@ contains
 
     end subroutine s_initialize_igr_module
 
+    !> @brief Iteratively solves the implicit gradient reconstruction system using Jacobi or Gauss-Seidel relaxation.
     subroutine s_igr_iterative_solve(q_cons_vf, bc_type, t_step)
 #ifdef _CRAYFTN
         !DIR$ OPTIMIZE (-haggress)
@@ -368,6 +375,7 @@ contains
 
     end subroutine s_igr_iterative_solve
 
+    !> @brief Computes the IGR viscous stress contribution in the x-direction and accumulates it into the RHS.
     subroutine s_igr_sigma_x(q_cons_vf, rhs_vf)
 #ifdef _CRAYFTN
         !DIR$ OPTIMIZE (-haggress)
@@ -453,6 +461,7 @@ contains
 
     end subroutine s_igr_sigma_x
 
+    !> @brief Evaluates the approximate Riemann solver for the IGR scheme along a given coordinate direction.
     subroutine s_igr_riemann_solver(q_cons_vf, rhs_vf, idir)
 #ifdef _CRAYFTN
         !DIR$ OPTIMIZE (-haggress)
@@ -2786,6 +2795,7 @@ contains
 
     end subroutine s_igr_riemann_solver
 
+    !> @brief Computes pressure and maximum wavespeed from left and right reconstructed states for the IGR Riemann solver.
     subroutine s_get_derived_states(E_L, gamma_L, pi_inf_L, rho_L, vel_L, &
                                     E_R, gamma_R, pi_inf_R, rho_R, vel_R, &
                                     pres_L, pres_R, cfl)
@@ -2834,6 +2844,7 @@ contains
 
     end subroutine s_get_derived_states
 
+    !> @brief Accumulates the IGR numerical flux divergence into the right-hand side along the specified coordinate direction.
     subroutine s_igr_flux_add(q_cons_vf, rhs_vf, flux_vf, idir)
 
         type(scalar_field), &
@@ -2890,6 +2901,7 @@ contains
 
     end subroutine s_igr_flux_add
 
+    !> @brief Deallocates all arrays and GPU resources allocated by the IGR module.
     subroutine s_finalize_igr_module()
 
         if (viscous) then

@@ -5,7 +5,7 @@
 #:include 'macros.fpp'
 #:include 'case.fpp'
 
-!> @brief The purpose of the module is to check for compatible input files
+!> @brief Validates simulation input parameters for consistency and supported configurations
 module m_checker
 
     use m_global_parameters    !< Definitions of the global parameters
@@ -36,7 +36,6 @@ contains
             else if (recon_type == MUSCL_TYPE) then
                 call s_check_inputs_muscl
             end if
-            call s_check_inputs_geometry_precision
         end if
 
         call s_check_inputs_time_stepping
@@ -63,6 +62,7 @@ contains
             "For 3D simulation, p must be greater than or equal to (num_stcls_min*weno_order - 1), whose value is "//trim(numStr))
     end subroutine s_check_inputs_weno
 
+    !> @brief Validates that the grid resolution is sufficient for the MUSCL reconstruction order.
     impure subroutine s_check_inputs_muscl
         character(len=5) :: numStr !< for int to string conversion
 
@@ -74,14 +74,6 @@ contains
         @:PROHIBIT(p + 1 < min(1, p)*num_stcls_min*muscl_order, &
             "For 3D simulation, p must be greater than or equal to (num_stcls_min*muscl_order - 1), whose value is "//trim(numStr))
     end subroutine s_check_inputs_muscl
-
-    !> Checks constraints on geometry and precision
-    impure subroutine s_check_inputs_geometry_precision
-        ! Prevent spherical geometry in single precision
-#ifdef MFC_SINGLE_PRECISION
-        @:PROHIBIT(.not. (cyl_coord .neqv. .true. .or. (cyl_coord .and. p == 0)), "Fully 3D cylindrical grid (geometry = 3) is not supported in single precision.")
-#endif
-    end subroutine s_check_inputs_geometry_precision
 
     !> Checks constraints on time stepping parameters
     impure subroutine s_check_inputs_time_stepping
