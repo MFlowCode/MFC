@@ -173,7 +173,7 @@ It supports 1D and 2D data only (use `--interactive` for 3D).
 | `q` | Quit |
 
 > [!NOTE]
-> The TUI requires the `textual` and `textual-plotext` Python packages (included in MFC's default dependencies).
+> The TUI requires the `textual` and `textual-plotext` Python packages, which are part of the optional `[viz]` extras and are auto-installed on the first `./mfc.sh viz --tui` run.
 
 ### Plot styling
 

@@ -121,7 +121,7 @@ def parse(config: MFCConfig):
         try:
             # Commands with required positional input need a dummy value
             if name in ["run", "validate", "viz"]:
-                vals, _ = subparser.parse_known_args(["dummy_input.py"])
+                vals, _ = subparser.parse_known_args(["dummy_dir/"])
             elif name == "build":
                 vals, _ = subparser.parse_known_args([])
             else:
