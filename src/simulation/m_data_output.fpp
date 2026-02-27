@@ -1105,6 +1105,23 @@ contains
                                 MPI_INTEGER, status, ierr)
         call MPI_FILE_CLOSE(ifile, ierr)
 
+        if (proc_rank == 0) then
+            write (file_loc, '(A)') 'ib.dat'
+            file_loc = trim(case_dir)//'/D/'//trim(file_loc)
+            open (2, FILE=trim(file_loc), &
+                  FORM='unformatted', &
+                  ACCESS='stream', &
+                  STATUS='unknown', &
+                  POSITION='append')
+            block
+                integer :: i
+                do i = 1, num_ibs
+                    write (2) time_step, mytime, i, patch_ib(i)%force, patch_ib(i)%torque
+                end do
+            end block
+            close (2)
+        end if
+
 #endif
 
     end subroutine s_write_parallel_ib_data

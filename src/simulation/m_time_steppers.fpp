@@ -630,6 +630,8 @@ contains
                 ! check if any IBMS are moving, and if so, update the markers, ghost points, levelsets, and levelset norms
                 if (moving_immersed_boundary_flag) then
                     call s_propagate_immersed_boundaries(s)
+                else
+                    call s_fixed_immersed_boundaries()
                 end if
 
                 ! update the ghost fluid properties point values based on IB state
@@ -851,6 +853,22 @@ contains
         call s_update_mib(num_ibs)
 
     end subroutine s_propagate_immersed_boundaries
+
+    subroutine s_fixed_immersed_boundaries()
+
+        integer :: i
+        logical :: forces_computed
+
+        forces_computed = .false.
+
+        do i = 1, num_ibs
+            if (.not. forces_computed) then
+                call s_compute_ib_forces(q_prim_vf, fluid_pp)
+                forces_computed = .true.
+            end if
+        end do
+
+    end subroutine s_fixed_immersed_boundaries
 
     !> This subroutine saves the temporary q_prim_vf vector
         !!      into the q_prim_ts vector that is then used in p_main
