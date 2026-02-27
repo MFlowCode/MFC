@@ -860,6 +860,7 @@ contains
         lag_params%gravity_force = .false.
         lag_params%epsilonb = 1._wp
         lag_params%charwidth = dflt_real
+        lag_params%charNz = dflt_int
         lag_params%valmaxvoid = dflt_real
         lag_params%input_path = 'input/lag_bubbles.dat'
         moving_lag_bubbles = .false.

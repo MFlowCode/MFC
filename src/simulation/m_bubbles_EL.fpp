@@ -214,6 +214,11 @@ contains
             end if
         end if
 
+        ! Allocate cell list arrays for atomic-free Gaussian smearing
+        @:ALLOCATE(cell_list_start(0:m, 0:n, 0:p))
+        @:ALLOCATE(cell_list_count(0:m, 0:n, 0:p))
+        @:ALLOCATE(cell_list_idx(1:lag_params%nBubs_glb))
+
         call s_read_input_bubbles(q_cons_vf, bc_type)
 
     end subroutine s_initialize_bubbles_EL_module
@@ -611,7 +616,7 @@ contains
         !! @param stage Current stage in the time-stepper algorithm
     subroutine s_compute_bubble_EL_dynamics(q_prim_vf, bc_type, stage)
 #ifdef MFC_OpenMP
-        !DIR$ OPTIMIZE (-O1)
+    !DIR$ OPTIMIZE (-O1)
 #endif
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         type(integer_field), dimension(1:num_dims, 1:2), intent(in) :: bc_type
@@ -797,7 +802,7 @@ contains
 
         call nvtxStartRange("LAGRANGE-BUBBLE-EL-SOURCE")
         ! (q / (1 - beta)) * d(beta)/dt source
-        if (p == 0) then
+        if (lag_params%cluster_type >= 4) then
             $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
             do k = idwint(3)%beg, idwint(3)%end
                 do j = idwint(2)%beg, idwint(2)%end
@@ -821,7 +826,7 @@ contains
                         do l = 1, E_idx
                             if (q_beta(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
                                 rhs_vf(l)%sf(i, j, k) = rhs_vf(l)%sf(i, j, k) + &
-                                                        q_cons_vf(l)%sf(i, j, k)/q_beta(1)%sf(i, j, k)* &
+                                                        (q_cons_vf(l)%sf(i, j, k)/q_beta(1)%sf(i, j, k)) * &
                                                         q_beta(2)%sf(i, j, k)
                             end if
                         end do
@@ -925,6 +930,37 @@ contains
 
         type(integer_field), dimension(1:num_dims, 1:2), intent(in) :: bc_type
         integer :: i, j, k, l
+        integer, save :: smear_call_count = 0
+
+        smear_call_count = smear_call_count + 1
+
+        ! DEBUG: bubble state checksum before smearing
+        $:GPU_UPDATE(host='[intfc_rad, intfc_vel, mtn_pos, n_el_bubs_loc]')
+        block
+            real(wp) :: rad_loc, rad_glb, vel_loc, vel_glb
+            real(wp) :: posx_loc, posx_glb, posy_loc, posy_glb, posz_loc, posz_glb
+            integer :: kk, ierr2, nbubs_glb_chk
+            rad_loc = 0._wp; vel_loc = 0._wp
+            posx_loc = 0._wp; posy_loc = 0._wp; posz_loc = 0._wp
+            do kk = 1, n_el_bubs_loc
+                rad_loc = rad_loc + intfc_rad(kk, 2)
+                vel_loc = vel_loc + intfc_vel(kk, 2)
+                posx_loc = posx_loc + mtn_pos(kk, 1, 2)
+                posy_loc = posy_loc + mtn_pos(kk, 2, 2)
+                posz_loc = posz_loc + mtn_pos(kk, 3, 2)
+            end do
+            call MPI_Allreduce(rad_loc, rad_glb, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, ierr2)
+            call MPI_Allreduce(vel_loc, vel_glb, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, ierr2)
+            call MPI_Allreduce(posx_loc, posx_glb, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, ierr2)
+            call MPI_Allreduce(posy_loc, posy_glb, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, ierr2)
+            call MPI_Allreduce(posz_loc, posz_glb, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, ierr2)
+            call MPI_Allreduce(n_el_bubs_loc, nbubs_glb_chk, 1, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, ierr2)
+            if (proc_rank == 0) print *, "DEBUG BUBSTATE call=", smear_call_count, &
+                " n_bubs=", nbubs_glb_chk, &
+                " sum_R=", rad_glb, " sum_Rdot=", vel_glb, &
+                " sum_x=", posx_glb, " sum_y=", posy_glb, " sum_z=", posz_glb
+        end block
+        $:GPU_UPDATE(device='[intfc_rad, intfc_vel, mtn_pos, n_el_bubs_loc]')
 
         call nvtxStartRange("BUBBLES-LAGRANGE-SMEARING")
         $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
@@ -939,8 +975,51 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
+        ! Build cell list before smearing (CPU-side counting sort)
+        call s_build_cell_list(n_el_bubs_loc, mtn_s)
+
         call s_smoothfunction(n_el_bubs_loc, intfc_rad, intfc_vel, &
                               mtn_s, mtn_pos, q_beta)
+
+        ! DEBUG: checksum after Gaussian smearing (before communication)
+        ! all_cells = sum over entire grid (interior + buffer) per rank, then MPI_SUM.
+        !   This is the total Gaussian integral and MUST be decomposition-invariant.
+        !   If it differs between 1-rank and multi-rank, the smearing kernel itself is wrong.
+        ! interior = sum over interior cells only (0:m, 0:n, 0:p).
+        $:GPU_UPDATE(host='[q_beta(1)%sf]')
+        block
+            real(wp) :: all_loc, all_glb
+            real(wp) :: int_loc, int_glb
+            real(wp) :: max_loc, max_glb
+            integer :: ierr2
+
+            all_loc = 0._wp
+            int_loc = 0._wp
+            max_loc = 0._wp
+
+            do l = idwbuff(3)%beg, idwbuff(3)%end
+                do k = idwbuff(2)%beg, idwbuff(2)%end
+                    do j = idwbuff(1)%beg, idwbuff(1)%end
+                        all_loc = all_loc + real(q_beta(1)%sf(j, k, l), kind=wp)
+                        if (j >= 0 .and. j <= m .and. k >= 0 .and. k <= n .and. &
+                            l >= 0 .and. l <= p) then
+                            int_loc = int_loc + real(q_beta(1)%sf(j, k, l), kind=wp)
+                            max_loc = max(max_loc, abs(real(q_beta(1)%sf(j, k, l), kind=wp)))
+                        end if
+                    end do
+                end do
+            end do
+
+            call MPI_Allreduce(all_loc, all_glb, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, ierr2)
+            call MPI_Allreduce(int_loc, int_glb, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, ierr2)
+            call MPI_Allreduce(max_loc, max_glb, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, ierr2)
+
+            if (proc_rank == 0) print *, "DEBUG PRE_COMM call=", smear_call_count, &
+                " all_cells=", all_glb, " interior=", int_glb, &
+                " buf=", all_glb - int_glb, " max=", max_glb, &
+                " n_bubs=", n_el_bubs_glb
+        end block
+        $:GPU_UPDATE(device='[q_beta(1)%sf]')
 
         call nvtxStartRange("BUBBLES-LAGRANGE-BETA-COMM")
         if (lag_params%cluster_type >= 4) then
@@ -949,6 +1028,48 @@ contains
             call s_populate_beta_buffers(q_beta, bc_type, 2)
         end if
         call nvtxEndRange
+
+        ! DEBUG: checksum after communication (before 1-beta conversion)
+        ! interior = sum over interior cells — this is what the source term uses.
+        ! weighted = position-weighted checksum to detect spatial redistribution errors.
+        $:GPU_UPDATE(host='[q_beta(1)%sf, q_beta(2)%sf]')
+        block
+            real(wp) :: int_loc, int_glb
+            real(wp) :: weighted_loc, weighted_glb
+            real(wp) :: max_loc, max_glb
+            real(wp) :: dbeta_loc, dbeta_glb
+            integer :: gj, gk, gl, ierr2
+
+            int_loc = 0._wp
+            weighted_loc = 0._wp
+            max_loc = 0._wp
+            dbeta_loc = 0._wp
+
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        int_loc = int_loc + real(q_beta(1)%sf(j, k, l), kind=wp)
+                        max_loc = max(max_loc, abs(real(q_beta(1)%sf(j, k, l), kind=wp)))
+                        dbeta_loc = dbeta_loc + real(q_beta(2)%sf(j, k, l), kind=wp)
+                        gj = j + start_idx(1)
+                        gk = k + merge(start_idx(2), 0, num_dims >= 2)
+                        gl = l + merge(start_idx(num_dims), 0, num_dims >= 3)
+                        weighted_loc = weighted_loc + &
+                            real(q_beta(1)%sf(j, k, l), kind=wp) * real(gj + gk*1000 + gl*1000000, kind=wp)
+                    end do
+                end do
+            end do
+
+            call MPI_Allreduce(int_loc, int_glb, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, ierr2)
+            call MPI_Allreduce(max_loc, max_glb, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, ierr2)
+            call MPI_Allreduce(weighted_loc, weighted_glb, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, ierr2)
+            call MPI_Allreduce(dbeta_loc, dbeta_glb, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, ierr2)
+
+            if (proc_rank == 0) print *, "DEBUG POST_COMM call=", smear_call_count, &
+                " interior=", int_glb, " max=", max_glb, " weighted=", weighted_glb, &
+                " dbeta_dt=", dbeta_glb
+        end block
+        $:GPU_UPDATE(device='[q_beta(1)%sf, q_beta(2)%sf]')
 
         !Store 1-beta
         $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
@@ -1686,7 +1807,7 @@ contains
         end if
 
         ! 3D
-        if (p > 1) then
+        if (p > 0) then
             particle_in_domain = ((pos_part(1) < x_cb(m + buff_size - fd_number)) .and. &
                                   (pos_part(1) >= x_cb(fd_number - buff_size - 1)) .and. &
                                   (pos_part(2) < y_cb(n + buff_size - fd_number)) .and. &
@@ -2256,6 +2377,11 @@ contains
                 end if
             end if
         end if
+
+        ! Deallocate cell list arrays
+        @:DEALLOCATE(cell_list_start)
+        @:DEALLOCATE(cell_list_count)
+        @:DEALLOCATE(cell_list_idx)
 
     end subroutine s_finalize_lagrangian_solver
 

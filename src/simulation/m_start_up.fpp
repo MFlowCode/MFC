@@ -1212,7 +1212,7 @@ contains
         ! carried out if the simulation is in fact not truly executed in parallel.
 
         call s_mpi_bcast_user_inputs()
-
+print*, proc_rank, lag_params%charwidth, lag_params%charNz
         call s_initialize_parallel_io()
 
         call s_mpi_decompose_computational_domain()

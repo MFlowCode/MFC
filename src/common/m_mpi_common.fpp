@@ -1169,12 +1169,16 @@ contains
         call nvtxStartRange("BETA-COMM-PACKBUF")
 
         ! Set bounds for each dimension
-        comm_coords(1)%beg = merge(-mapcells - 1, 0, bc_x%beg >= 0)
-        comm_coords(1)%end = merge(m + mapcells + 1, m, bc_x%end >= 0)
-        comm_coords(2)%beg = merge(-mapcells - 1, 0, bc_y%beg >= 0)
-        comm_coords(2)%end = merge(n + mapcells + 1, n, bc_y%end >= 0)
-        comm_coords(3)%beg = merge(-mapcells - 1, 0, (bc_z%beg >= 0 .and. p > 0))
-        comm_coords(3)%end = merge(p + mapcells + 1, p, (bc_z%end >= 0 .and. p > 0))
+        ! Always include the full buffer range for each existing dimension.
+        ! The Gaussian smearing kernel writes to buffer cells even at physical
+        ! boundaries, and these contributions must be communicated to neighbors
+        ! in other directions via ADD operations.
+        comm_coords(1)%beg = -mapcells - 1
+        comm_coords(1)%end = m + mapcells + 1
+        comm_coords(2)%beg = merge(-mapcells - 1, 0, n > 0)
+        comm_coords(2)%end = merge(n + mapcells + 1, n, n > 0)
+        comm_coords(3)%beg = merge(-mapcells - 1, 0, p > 0)
+        comm_coords(3)%end = merge(p + mapcells + 1, p, p > 0)
 
         ! Compute sizes
         comm_size(1) = comm_coords(1)%end - comm_coords(1)%beg + 1

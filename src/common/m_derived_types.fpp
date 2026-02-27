@@ -492,6 +492,7 @@ module m_derived_types
         character(LEN=pathlen_max) :: input_path !< Path to lag_bubbles.dat
         real(wp) :: epsilonb         !< Standard deviation scaling for the gaussian function
         real(wp) :: charwidth        !< Domain virtual depth (z direction, for 2D simulations)
+        integer :: charNz           !< Number of grid cells in characteristic depth
         real(wp) :: valmaxvoid       !< Maximum void fraction permitted
 
     end type bubbles_lagrange_parameters

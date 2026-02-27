@@ -186,7 +186,7 @@ contains
             #:endfor
 
             #:for VAR in ['solver_approach', 'cluster_type', 'smooth_type', 'nBubs_glb', 'vel_model', &
-                & 'drag_model']
+                & 'drag_model', 'charNz']
                 call MPI_BCAST(lag_params%${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 
@@ -915,7 +915,7 @@ contains
         real(wp), dimension(:, :, :) :: pos, posPrev
         integer :: nbubs, dest
         integer :: i, q
-        real :: offset
+        real(wp) :: offset
 
         do i = 1, nbubs
             if (periodic_bc(1)) then

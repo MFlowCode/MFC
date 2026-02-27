@@ -476,6 +476,7 @@ PATTERNS = [
     (r"lag_params%nBubs_glb", "Global number of Lagrangian bubbles"),
     (r"lag_params%epsilonb", "Standard deviation scaling for Gaussian smoothing"),
     (r"lag_params%charwidth", "Domain virtual depth for 2D simulations"),
+    (r"lag_params%charNz", "Number of cells in virtual depth"),
     (r"lag_params%valmaxvoid", "Maximum permitted void fraction"),
     (r"lag_params%vel_model", "Model for translational motion"),
     (r"lag_params%drag_model", "Drag model for translational motion"),

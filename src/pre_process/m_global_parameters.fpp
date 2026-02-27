@@ -461,6 +461,7 @@ contains
         lag_params%drag_model = dflt_int
         lag_params%epsilonb = 1._wp
         lag_params%charwidth = dflt_real
+        lag_params%charNz = dflt_int
         lag_params%valmaxvoid = dflt_real
 
         do i = 1, num_patches_max
