@@ -63,28 +63,33 @@ contains
 
         type(integer_field), intent(inout) :: ib_markers
 
-        integer :: i
+        integer :: i, xp, yp, zp ! iterators
+        integer :: xp_lower, xp_upper, yp_lower, yp_upper, zp_lower, zp_upper ! periodic bounds
 
         !  3D Patch Geometries
         if (p > 0) then
 
             !> IB Patches
             !> @{
-            ! Spherical patch
-            do i = 1, num_ibs
-
-                if (patch_ib(i)%geometry == 8) then
-                    call s_ib_sphere(i, ib_markers)
-                elseif (patch_ib(i)%geometry == 9) then
-                    call s_ib_cuboid(i, ib_markers)
-                elseif (patch_ib(i)%geometry == 10) then
-                    call s_ib_cylinder(i, ib_markers)
-                elseif (patch_ib(i)%geometry == 11) then
-                    call s_ib_3D_airfoil(i, ib_markers)
-                    ! STL+IBM patch
-                elseif (patch_ib(i)%geometry == 12) then
-                    call s_ib_3d_model(i, ib_markers)
-                end if
+            call get_periodicities(xp_lower, xp_upper, yp_lower, yp_upper, zp_lower, zp_upper)
+            do xp = xp_lower, xp_upper
+                do yp = yp_lower, yp_upper
+                    do zp = zp_lower, zp_upper
+                        do i = 1, num_ibs
+                            if (patch_ib(i)%geometry == 8) then
+                                call s_ib_sphere(i, ib_markers, xp, yp, zp)
+                            elseif (patch_ib(i)%geometry == 9) then
+                                call s_ib_cuboid(i, ib_markers, xp, yp, zp)
+                            elseif (patch_ib(i)%geometry == 10) then
+                                call s_ib_cylinder(i, ib_markers, xp, yp, zp)
+                            elseif (patch_ib(i)%geometry == 11) then
+                                call s_ib_3D_airfoil(i, ib_markers, xp, yp, zp)
+                            elseif (patch_ib(i)%geometry == 12) then
+                                call s_ib_3d_model(i, ib_markers, xp, yp, zp)
+                            end if
+                        end do
+                    end do
+                end do
             end do
             !> @}
 
@@ -93,19 +98,23 @@ contains
 
             !> IB Patches
             !> @{
-            do i = 1, num_ibs
-                if (patch_ib(i)%geometry == 2) then
-                    call s_ib_circle(i, ib_markers)
-                elseif (patch_ib(i)%geometry == 3) then
-                    call s_ib_rectangle(i, ib_markers)
-                elseif (patch_ib(i)%geometry == 4) then
-                    call s_ib_airfoil(i, ib_markers)
-                    ! STL+IBM patch
-                elseif (patch_ib(i)%geometry == 5) then
-                    call s_ib_model(i, ib_markers)
-                elseif (patch_ib(i)%geometry == 6) then
-                    call s_ib_ellipse(i, ib_markers)
-                end if
+            call get_periodicities(xp_lower, xp_upper, yp_lower, yp_upper)
+            do xp = xp_lower, xp_upper
+                do yp = yp_lower, yp_upper
+                    do i = 1, num_ibs
+                        if (patch_ib(i)%geometry == 2) then
+                            call s_ib_circle(i, ib_markers, xp, yp)
+                        elseif (patch_ib(i)%geometry == 3) then
+                            call s_ib_rectangle(i, ib_markers, xp, yp)
+                        elseif (patch_ib(i)%geometry == 4) then
+                            call s_ib_airfoil(i, ib_markers, xp, yp)
+                        elseif (patch_ib(i)%geometry == 5) then
+                            call s_ib_model(i, ib_markers, xp, yp)
+                        elseif (patch_ib(i)%geometry == 6) then
+                            call s_ib_ellipse(i, ib_markers, xp, yp)
+                        end if
+                    end do
+                end do
             end do
             !> @}
 
@@ -121,22 +130,25 @@ contains
         !! @param patch_id is the patch identifier
         !! @param ib_markers Array to track patch ids
         !! @param ib True if this patch is an immersed boundary
-    subroutine s_ib_circle(patch_id, ib_markers)
+    subroutine s_ib_circle(patch_id, ib_markers, xp, yp)
 
         integer, intent(in) :: patch_id
+        integer, intent(in) :: xp, yp !< integers containing the periodicity projection information
         type(integer_field), intent(inout) :: ib_markers
 
         real(wp), dimension(1:2) :: center
         real(wp) :: radius
-
         integer :: i, j, il, ir, jl, jr !< Generic loop iterators
+        integer :: encoded_patch_id
 
         ! Transferring the circular patch's radius, centroid, smearing patch
         ! identity and smearing coefficient information
-
-        center(1) = patch_ib(patch_id)%x_centroid
-        center(2) = patch_ib(patch_id)%y_centroid
+        center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp) * (x_domain%end - x_domain%beg)
+        center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp) * (y_domain%end - y_domain%beg)
         radius = patch_ib(patch_id)%radius
+
+        ! encode the periodicity information into the patch_id
+        call encode_patch_periodicity(patch_id, xp, yp, 0, encoded_patch_id)
 
         ! find the indices to the left and right of the IB in i, j, k
         il = -gp_layers
@@ -152,13 +164,13 @@ contains
         ! the current patch are assigned to this cell.
 
         $:GPU_PARALLEL_LOOP(private='[i,j]',&
-                  & copyin='[patch_id,center,radius]', collapse=2)
+                  & copyin='[encoded_patch_id,center,radius]', collapse=2)
         do j = jl, jr
             do i = il, ir
                 if ((x_cc(i) - center(1))**2 &
                     + (y_cc(j) - center(2))**2 <= radius**2) &
                     then
-                    ib_markers%sf(i, j, 0) = patch_id
+                    ib_markers%sf(i, j, 0) = encoded_patch_id
                 end if
             end do
         end do
@@ -169,22 +181,25 @@ contains
     !> @brief Marks cells inside a 2D NACA 4-digit airfoil immersed boundary using upper and lower surface grids.
     !! @param patch_id is the patch identifier
     !! @param ib_markers Array to track patch ids
-    subroutine s_ib_airfoil(patch_id, ib_markers)
+    subroutine s_ib_airfoil(patch_id, ib_markers, xp, yp)
 
         integer, intent(in) :: patch_id
         type(integer_field), intent(inout) :: ib_markers
+        integer, intent(in) :: xp, yp !< integers containing the periodicity projection information
+
 
         real(wp) :: f, ca_in, pa, ma, ta
         real(wp) :: xa, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
         integer :: i, j, k, il, ir, jl, jr
         integer :: Np1, Np2
+        integer :: encoded_patch_id
 
         real(wp), dimension(1:3) :: xy_local, offset !< x and y coordinates in local IB frame
         real(wp), dimension(1:2) :: center !< x and y coordinates in local IB frame
         real(wp), dimension(1:3, 1:3) :: inverse_rotation
 
-        center(1) = patch_ib(patch_id)%x_centroid
-        center(2) = patch_ib(patch_id)%y_centroid
+        center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp) * (x_domain%end - x_domain%beg)
+        center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp) * (y_domain%end - y_domain%beg)
         ca_in = patch_ib(patch_id)%c
         pa = patch_ib(patch_id)%p
         ma = patch_ib(patch_id)%m
@@ -256,6 +271,9 @@ contains
 
         end if
 
+        ! encode the periodicity information into the patch_id
+        call encode_patch_periodicity(patch_id, xp, yp, 0, encoded_patch_id)
+
         ! find the indices to the left and right of the IB in i, j, k
         il = -gp_layers
         jl = -gp_layers
@@ -266,7 +284,7 @@ contains
         call get_bounding_indices(center(2) - ca_in, center(2) + ca_in, y_cc, jl, jr)
 
         $:GPU_PARALLEL_LOOP(private='[i,j,xy_local,k,f]', &
-                  & copyin='[patch_id,center,inverse_rotation,offset,ma,ca_in,airfoil_grid_u,airfoil_grid_l]', collapse=2)
+                  & copyin='[encoded_patch_id,center,inverse_rotation,offset,ma,ca_in,airfoil_grid_u,airfoil_grid_l]', collapse=2)
         do j = jl, jr
             do i = il, ir
                 xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp] ! get coordinate frame centered on IB
@@ -290,13 +308,13 @@ contains
                         if (f_approx_equal(airfoil_grid_u(k)%x, xy_local(1))) then
                             if (xy_local(2) <= airfoil_grid_u(k)%y) then
                                 !!IB
-                                ib_markers%sf(i, j, 0) = patch_id
+                                ib_markers%sf(i, j, 0) = encoded_patch_id
                             end if
                         else
                             f = (airfoil_grid_u(k)%x - xy_local(1))/(airfoil_grid_u(k)%x - airfoil_grid_u(k - 1)%x)
                             if (xy_local(2) <= ((1._wp - f)*airfoil_grid_u(k)%y + f*airfoil_grid_u(k - 1)%y)) then
                                 !!IB
-                                ib_markers%sf(i, j, 0) = patch_id
+                                ib_markers%sf(i, j, 0) = encoded_patch_id
                             end if
                         end if
                     else
@@ -307,14 +325,14 @@ contains
                         if (f_approx_equal(airfoil_grid_l(k)%x, xy_local(1))) then
                             if (xy_local(2) >= airfoil_grid_l(k)%y) then
                                 !!IB
-                                ib_markers%sf(i, j, 0) = patch_id
+                                ib_markers%sf(i, j, 0) = encoded_patch_id
                             end if
                         else
                             f = (airfoil_grid_l(k)%x - xy_local(1))/(airfoil_grid_l(k)%x - airfoil_grid_l(k - 1)%x)
 
                             if (xy_local(2) >= ((1._wp - f)*airfoil_grid_l(k)%y + f*airfoil_grid_l(k - 1)%y)) then
                                 !!IB
-                                ib_markers%sf(i, j, 0) = patch_id
+                                ib_markers%sf(i, j, 0) = encoded_patch_id
                             end if
                         end if
                     end if
@@ -329,21 +347,23 @@ contains
     !! @param patch_id is the patch identifier
     !! @param ib_markers Array to track patch ids
     !! @param ib True if this patch is an immersed boundary
-    subroutine s_ib_3D_airfoil(patch_id, ib_markers)
+    subroutine s_ib_3D_airfoil(patch_id, ib_markers, xp, yp, zp)
 
         integer, intent(in) :: patch_id
         type(integer_field), intent(inout) :: ib_markers
+        integer, intent(in) :: xp, yp, zp !< integers containing the periodicity projection information
 
         real(wp) :: lz, z_max, z_min, f, ca_in, pa, ma, ta, xa, yt, xu, yu, xl, yl, xc, yc, dycdxc, sin_c, cos_c
         integer :: i, j, k, l, il, ir, jl, jr, ll, lr
         integer :: Np1, Np2
+        integer :: encoded_patch_id
 
         real(wp), dimension(1:3) :: xyz_local, center, offset !< x, y, z coordinates in local IB frame
         real(wp), dimension(1:3, 1:3) :: inverse_rotation
 
-        center(1) = patch_ib(patch_id)%x_centroid
-        center(2) = patch_ib(patch_id)%y_centroid
-        center(3) = patch_ib(patch_id)%z_centroid
+        center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp) * (x_domain%end - x_domain%beg)
+        center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp) * (y_domain%end - y_domain%beg)
+        center(3) = patch_ib(patch_id)%z_centroid + real(zp, wp) * (z_domain%end - z_domain%beg)
         lz = patch_ib(patch_id)%length_z
         ca_in = patch_ib(patch_id)%c
         pa = patch_ib(patch_id)%p
@@ -417,6 +437,9 @@ contains
             $:GPU_UPDATE(device='[airfoil_grid_l,airfoil_grid_u]')
         end if
 
+        ! encode the periodicity information into the patch_id
+        call encode_patch_periodicity(patch_id, xp, yp, zp, encoded_patch_id)
+
         ! find the indices to the left and right of the IB in i, j, k
         il = -gp_layers
         jl = -gp_layers
@@ -430,7 +453,7 @@ contains
         call get_bounding_indices(center(3) - ca_in, center(3) + ca_in, z_cc, ll, lr)
 
         $:GPU_PARALLEL_LOOP(private='[i,j,l,xyz_local,k,f]',&
-                  & copyin='[patch_id,center,inverse_rotation,offset,ma,ca_in,airfoil_grid_u,airfoil_grid_l,z_min,z_max]', collapse=3)
+                  & copyin='[encoded_patch_id,center,inverse_rotation,offset,ma,ca_in,airfoil_grid_u,airfoil_grid_l,z_min,z_max]', collapse=3)
         do l = ll, lr
             do j = jl, jr
                 do i = il, ir
@@ -449,13 +472,13 @@ contains
                                 if (f_approx_equal(airfoil_grid_u(k)%x, xyz_local(1))) then
                                     if (xyz_local(2) <= airfoil_grid_u(k)%y) then
                                         !IB
-                                        ib_markers%sf(i, j, l) = patch_id
+                                        ib_markers%sf(i, j, l) = encoded_patch_id
                                     end if
                                 else
                                     f = (airfoil_grid_u(k)%x - xyz_local(1))/(airfoil_grid_u(k)%x - airfoil_grid_u(k - 1)%x)
                                     if (xyz_local(2) <= ((1._wp - f)*airfoil_grid_u(k)%y + f*airfoil_grid_u(k - 1)%y)) then
                                         !!IB
-                                        ib_markers%sf(i, j, l) = patch_id
+                                        ib_markers%sf(i, j, l) = encoded_patch_id
                                     end if
                                 end if
                             else
@@ -466,14 +489,14 @@ contains
                                 if (f_approx_equal(airfoil_grid_l(k)%x, xyz_local(1))) then
                                     if (xyz_local(2) >= airfoil_grid_l(k)%y) then
                                         !!IB
-                                        ib_markers%sf(i, j, l) = patch_id
+                                        ib_markers%sf(i, j, l) = encoded_patch_id
                                     end if
                                 else
                                     f = (airfoil_grid_l(k)%x - xyz_local(1))/(airfoil_grid_l(k)%x - airfoil_grid_l(k - 1)%x)
 
                                     if (xyz_local(2) >= ((1._wp - f)*airfoil_grid_l(k)%y + f*airfoil_grid_l(k - 1)%y)) then
                                         !!IB
-                                        ib_markers%sf(i, j, l) = patch_id
+                                        ib_markers%sf(i, j, l) = encoded_patch_id
                                     end if
                                 end if
                             end if
@@ -497,23 +520,28 @@ contains
         !! @param patch_id is the patch identifier
         !! @param ib_markers Array to track patch ids
         !! @param ib True if this patch is an immersed boundary
-    subroutine s_ib_rectangle(patch_id, ib_markers)
+    subroutine s_ib_rectangle(patch_id, ib_markers, xp, yp)
 
         integer, intent(in) :: patch_id
         type(integer_field), intent(inout) :: ib_markers
+        integer, intent(in) :: xp, yp !< integers containing the periodicity projection information
 
         integer :: i, j, il, ir, jl, jr !< generic loop iterators
+        integer :: encoded_patch_id
         real(wp) :: corner_distance !< Equation of state parameters
         real(wp), dimension(1:3) :: xy_local !< x and y coordinates in local IB frame
         real(wp), dimension(1:2) :: length, center !< x and y coordinates in local IB frame
         real(wp), dimension(1:3, 1:3) :: inverse_rotation
 
         ! Transferring the rectangle's centroid and length information
-        center(1) = patch_ib(patch_id)%x_centroid
-        center(2) = patch_ib(patch_id)%y_centroid
+        center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp) * (x_domain%end - x_domain%beg)
+        center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp) * (y_domain%end - y_domain%beg)
         length(1) = patch_ib(patch_id)%length_x
         length(2) = patch_ib(patch_id)%length_y
         inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
+
+        ! encode the periodicity information into the patch_id
+        call encode_patch_periodicity(patch_id, xp, yp, 0, encoded_patch_id)
 
         ! find the indices to the left and right of the IB in i, j, k
         il = -gp_layers
@@ -529,7 +557,7 @@ contains
         ! to write to that cell. If both queries check out, the primitive
         ! variables of the current patch are assigned to this cell.
         $:GPU_PARALLEL_LOOP(private='[i,j, xy_local]',&
-                  & copyin='[patch_id,center,length,inverse_rotation,x_cc,y_cc]', collapse=2)
+                  & copyin='[encoded_patch_id,center,length,inverse_rotation,x_cc,y_cc]', collapse=2)
         do j = jl, jr
             do i = il, ir
                 ! get the x and y coordinates in the local IB frame
@@ -542,7 +570,7 @@ contains
                     0.5_wp*length(2) >= xy_local(2)) then
 
                     ! Updating the patch identities bookkeeping variable
-                    ib_markers%sf(i, j, 0) = patch_id
+                    ib_markers%sf(i, j, 0) = encoded_patch_id
 
                 end if
             end do
@@ -559,14 +587,16 @@ contains
         !! @param patch_id is the patch identifier
         !! @param ib_markers Array to track patch ids
         !! @param ib True if this patch is an immersed boundary
-    subroutine s_ib_sphere(patch_id, ib_markers)
+    subroutine s_ib_sphere(patch_id, ib_markers, xp, yp, zp)
 
         integer, intent(in) :: patch_id
         type(integer_field), intent(inout) :: ib_markers
+        integer, intent(in) :: xp, yp, zp !< integers containing the periodicity projection information
 
         ! Generic loop iterators
         integer :: i, j, k
         integer :: il, ir, jl, jr, kl, kr
+        integer :: encoded_patch_id
         real(wp) :: radius
         real(wp), dimension(1:3) :: center
 
@@ -575,10 +605,13 @@ contains
 
         ! Transferring spherical patch's radius, centroid, smoothing patch
         ! identity and smoothing coefficient information
-        center(1) = patch_ib(patch_id)%x_centroid
-        center(2) = patch_ib(patch_id)%y_centroid
-        center(3) = patch_ib(patch_id)%z_centroid
+        center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp) * (x_domain%end - x_domain%beg)
+        center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp) * (y_domain%end - y_domain%beg)
+        center(3) = patch_ib(patch_id)%z_centroid + real(zp, wp) * (z_domain%end - z_domain%beg)
         radius = patch_ib(patch_id)%radius
+
+        ! encode the periodicity information into the patch_id
+        call encode_patch_periodicity(patch_id, xp, yp, zp, encoded_patch_id)
 
         ! find the indices to the left and right of the IB in i, j, k
         il = -gp_layers
@@ -596,7 +629,7 @@ contains
         ! that cell. If both queries check out, the primitive variables of
         ! the current patch are assigned to this cell.
         $:GPU_PARALLEL_LOOP(private='[i,j,k,cart_y,cart_z]',&
-                  & copyin='[patch_id,center,radius]', collapse=3)
+                  & copyin='[encoded_patch_id,center,radius]', collapse=3)
         do k = kl, kr
             do j = jl, jr
                 do i = il, ir
@@ -611,7 +644,7 @@ contains
                     if (((x_cc(i) - center(1))**2 &
                          + (cart_y - center(2))**2 &
                          + (cart_z - center(3))**2 <= radius**2)) then
-                        ib_markers%sf(i, j, k) = patch_id
+                        ib_markers%sf(i, j, k) = encoded_patch_id
                     end if
                 end do
             end do
@@ -630,24 +663,29 @@ contains
         !!              boundaries.
         !! @param patch_id is the patch identifier
         !! @param ib_markers Array to track patch ids
-    subroutine s_ib_cuboid(patch_id, ib_markers)
+    subroutine s_ib_cuboid(patch_id, ib_markers, xp, yp, zp)
 
         integer, intent(in) :: patch_id
         type(integer_field), intent(inout) :: ib_markers
+        integer, intent(in) :: xp, yp, zp !< integers containing the periodicity projection information
 
         integer :: i, j, k, ir, il, jr, jl, kr, kl !< Generic loop iterators
+        integer :: encoded_patch_id
         real(wp), dimension(1:3) :: xyz_local, center, length !< x and y coordinates in local IB frame
         real(wp), dimension(1:3, 1:3) :: inverse_rotation
         real(wp) :: corner_distance
 
         ! Transferring the cuboid's centroid and length information
-        center(1) = patch_ib(patch_id)%x_centroid
-        center(2) = patch_ib(patch_id)%y_centroid
-        center(3) = patch_ib(patch_id)%z_centroid
+        center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp) * (x_domain%end - x_domain%beg)
+        center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp) * (y_domain%end - y_domain%beg)
+        center(3) = patch_ib(patch_id)%z_centroid + real(zp, wp) * (z_domain%end - z_domain%beg)
         length(1) = patch_ib(patch_id)%length_x
         length(2) = patch_ib(patch_id)%length_y
         length(3) = patch_ib(patch_id)%length_z
         inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
+
+        ! encode the periodicity information into the patch_id
+        call encode_patch_periodicity(patch_id, xp, yp, zp, encoded_patch_id)
 
         ! find the indices to the left and right of the IB in i, j, k
         il = -gp_layers
@@ -666,7 +704,7 @@ contains
         ! to that cell. If both queries check out, the primitive variables
         ! of the current patch are assigned to this cell.
         $:GPU_PARALLEL_LOOP(private='[i,j,k,xyz_local,cart_y,cart_z]',&
-                  & copyin='[patch_id,center,length,inverse_rotation]', collapse=3)
+                  & copyin='[encoded_patch_id,center,length,inverse_rotation]', collapse=3)
         do k = kl, kr
             do j = jl, jr
                 do i = il, ir
@@ -689,7 +727,7 @@ contains
                         0.5*length(3) >= xyz_local(3)) then
 
                         ! Updating the patch identities bookkeeping variable
-                        ib_markers%sf(i, j, k) = patch_id
+                        ib_markers%sf(i, j, k) = encoded_patch_id
                     end if
                 end do
             end do
@@ -709,28 +747,31 @@ contains
         !! @param patch_id is the patch identifier
         !! @param ib_markers Array to track patch ids
         !! @param ib True if this patch is an immersed boundary
-    subroutine s_ib_cylinder(patch_id, ib_markers)
+    subroutine s_ib_cylinder(patch_id, ib_markers, xp, yp, zp)
 
         integer, intent(in) :: patch_id
         type(integer_field), intent(inout) :: ib_markers
+        integer, intent(in) :: xp, yp, zp !< integers containing the periodicity projection information
 
         integer :: i, j, k, il, ir, jl, jr, kl, kr !< Generic loop iterators
+        integer :: encoded_patch_id
         real(wp) :: radius
         real(wp), dimension(1:3) :: xyz_local, center, length !< x and y coordinates in local IB frame
         real(wp), dimension(1:3, 1:3) :: inverse_rotation
         real(wp) :: corner_distance
 
         ! Transferring the cylindrical patch's centroid, length, radius,
-        ! smoothing patch identity and smoothing coefficient information
-
-        center(1) = patch_ib(patch_id)%x_centroid
-        center(2) = patch_ib(patch_id)%y_centroid
-        center(3) = patch_ib(patch_id)%z_centroid
+        center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp) * (x_domain%end - x_domain%beg)
+        center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp) * (y_domain%end - y_domain%beg)
+        center(3) = patch_ib(patch_id)%z_centroid + real(zp, wp) * (z_domain%end - z_domain%beg)
         length(1) = patch_ib(patch_id)%length_x
         length(2) = patch_ib(patch_id)%length_y
         length(3) = patch_ib(patch_id)%length_z
         radius = patch_ib(patch_id)%radius
         inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
+
+        ! encode the periodicity information into the patch_id
+        call encode_patch_periodicity(patch_id, xp, yp, zp, encoded_patch_id)
 
         il = -gp_layers
         jl = -gp_layers
@@ -748,7 +789,7 @@ contains
         ! to write to that cell. If both queries check out, the primitive
         ! variables of the current patch are assigned to this cell.
         $:GPU_PARALLEL_LOOP(private='[i,j,k,xyz_local,cart_y,cart_z]',&
-                  & copyin='[patch_id,center,length,radius,inverse_rotation]', collapse=3)
+                  & copyin='[encoded_patch_id,center,length,radius,inverse_rotation]', collapse=3)
         do k = kl, kr
             do j = jl, jr
                 do i = il, ir
@@ -781,7 +822,7 @@ contains
                           0.5_wp*length(3) >= xyz_local(3)))) then
 
                         ! Updating the patch identities bookkeeping variable
-                        ib_markers%sf(i, j, k) = patch_id
+                        ib_markers%sf(i, j, k) = encoded_patch_id
                     end if
                 end do
             end do
@@ -791,28 +832,41 @@ contains
     end subroutine s_ib_cylinder
 
     !> @brief Marks cells inside a 2D elliptical immersed boundary defined by semi-axis lengths and rotation.
-    subroutine s_ib_ellipse(patch_id, ib_markers)
+    subroutine s_ib_ellipse(patch_id, ib_markers, xp, yp)
 
         integer, intent(in) :: patch_id
         type(integer_field), intent(inout) :: ib_markers
+        integer, intent(in) :: xp, yp !< integers containing the periodicity projection information
 
-        integer :: i, j, k !< generic loop iterators
+        integer :: i, j, il, ir, jl, jr !< Generic loop iterators
+        integer :: encoded_patch_id
         real(wp), dimension(1:3) :: xy_local !< x and y coordinates in local IB frame
         real(wp), dimension(1:2) :: ellipse_coeffs !< a and b in the ellipse coefficients
         real(wp), dimension(1:2) :: center !< x and y coordinates in local IB frame
         real(wp), dimension(1:3, 1:3) :: inverse_rotation
 
         ! Transferring the ellipse's centroid and length information
-        center(1) = patch_ib(patch_id)%x_centroid
-        center(2) = patch_ib(patch_id)%y_centroid
+        center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp) * (x_domain%end - x_domain%beg)
+        center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp) * (y_domain%end - y_domain%beg)
         ellipse_coeffs(1) = 0.5_wp*patch_ib(patch_id)%length_x
         ellipse_coeffs(2) = 0.5_wp*patch_ib(patch_id)%length_y
         inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
 
+        ! encode the periodicity information into the patch_id
+        call encode_patch_periodicity(patch_id, xp, yp, 0, encoded_patch_id)
+
+        ! find the indices to the left and right of the IB in i, j, k
+        il = -gp_layers
+        jl = -gp_layers
+        ir = m + gp_layers
+        jr = n + gp_layers
+        call get_bounding_indices(center(1) - maxval(ellipse_coeffs) * 2._wp, center(1) + maxval(ellipse_coeffs) * 2._wp, x_cc, il, ir)
+        call get_bounding_indices(center(2) - maxval(ellipse_coeffs) * 2._wp, center(2) + maxval(ellipse_coeffs) * 2._wp, y_cc, jl, jr)
+
         ! Checking whether the ellipse covers a particular cell in the
         ! domain
         $:GPU_PARALLEL_LOOP(private='[i,j, xy_local]',&
-                  & copyin='[patch_id,center,ellipse_coeffs,inverse_rotation,x_cc,y_cc]', collapse=2)
+                  & copyin='[encoded_patch_id,center,ellipse_coeffs,inverse_rotation,x_cc,y_cc]', collapse=2)
         do j = -gp_layers, n + gp_layers
             do i = -gp_layers, m + gp_layers
                 ! get the x and y coordinates in the local IB frame
@@ -822,7 +876,7 @@ contains
                 ! Ellipse condition (x/a)^2 + (y/b)^2 <= 1
                 if ((xy_local(1)/ellipse_coeffs(1))**2 + (xy_local(2)/ellipse_coeffs(2))**2 <= 1._wp) then
                     ! Updating the patch identities bookkeeping variable
-                    ib_markers%sf(i, j, 0) = patch_id
+                    ib_markers%sf(i, j, 0) = encoded_patch_id
                 end if
             end do
         end do
@@ -833,31 +887,69 @@ contains
     !> The STL patch is a 2D geometry that is imported from an STL file.
     !! @param patch_id is the patch identifier
     !! @param ib_markers Array to track patch ids
-    subroutine s_ib_model(patch_id, ib_markers)
+    subroutine s_ib_model(patch_id, ib_markers, xp, yp)
 
         integer, intent(in) :: patch_id
         type(integer_field), intent(inout) :: ib_markers
+        integer, intent(in) :: xp, yp !< integers containing the periodicity projection information
 
         integer :: i, j, k  !< Generic loop iterators
-        integer :: spc
+        integer :: spc, encoded_patch_id
+        integer :: cx, cy
+        real(wp) :: lx(2), ly(2)
+        real(wp), dimension(1:2) :: bbox_min, bbox_max
+        real(wp), dimension(1:3) :: local_corner, world_corner
 
         real(wp) :: eta, threshold
         real(wp), dimension(1:3) :: point, local_point, offset
         real(wp), dimension(1:3) :: center, xy_local
-        real(wp), dimension(1:3, 1:3) :: inverse_rotation
+        real(wp), dimension(1:3, 1:3) :: inverse_rotation, rotation
 
         center = 0._wp
-        center(1) = patch_ib(patch_id)%x_centroid
-        center(2) = patch_ib(patch_id)%y_centroid
+        center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp) * (x_domain%end - x_domain%beg)
+        center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp) * (y_domain%end - y_domain%beg)
         inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
+        rotation(:, :) = patch_ib(patch_id)%rotation_matrix(:, :)
         offset(:) = patch_ib(patch_id)%centroid_offset(:)
         spc = patch_ib(patch_id)%model_spc
         threshold = patch_ib(patch_id)%model_threshold
 
+        ! encode the periodicity information into the patch_id
+        call encode_patch_periodicity(patch_id, xp, yp, 0, encoded_patch_id)
+
+        il = -gp_layers
+        jl = -gp_layers
+        ir = m + gp_layers
+        jr = n + gp_layers
+
+        ! Local-space bounding box extents (min=1, max=2 in the third index)
+        lx(1) = stl_bounding_boxes(patch_id, 1, 1) + offset(1)
+        lx(2) = stl_bounding_boxes(patch_id, 1, 3) + offset(1)
+        ly(1) = stl_bounding_boxes(patch_id, 2, 1) + offset(2)
+        ly(2) = stl_bounding_boxes(patch_id, 2, 3) + offset(2)
+
+        bbox_min = 1e12
+        bbox_max = -1e12
+        ! Enumerate all 8 corners of the local bounding box,
+        ! rotate to world space, track world-space AABB
+        do cx = 1, 2
+            do cy = 1, 2
+                local_corner = [lx(cx), ly(cy), 0._wp]
+                world_corner = matmul(rotation, local_corner) + center
+                bbox_min(1) = min(bbox_min(1), world_corner(1))
+                bbox_min(2) = min(bbox_min(2), world_corner(2))
+                bbox_max(1) = max(bbox_max(1), world_corner(1))
+                bbox_max(2) = max(bbox_max(2), world_corner(2))
+            end do
+        end do
+
+        call get_bounding_indices(bbox_min(1), bbox_max(1), x_cc, il, ir)
+        call get_bounding_indices(bbox_min(2), bbox_max(2), y_cc, jl, jr)
+
         $:GPU_PARALLEL_LOOP(private='[i,j, xy_local, eta]',&
-                  & copyin='[patch_id,center,inverse_rotation, offset, spc, threshold]', collapse=2)
-        do i = -gp_layers, m + gp_layers
-            do j = -gp_layers, n + gp_layers
+                  & copyin='[patch_id,encoded_patch_id,center,inverse_rotation, offset, spc, threshold]', collapse=2)
+        do i = il, ir
+            do j = jl, jr
                 xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]
                 xy_local = matmul(inverse_rotation, xy_local)
                 xy_local = xy_local - offset
@@ -867,7 +959,7 @@ contains
 
                 ! Reading STL boundary vertices and compute the levelset and levelset_norm
                 if (eta > threshold) then
-                    ib_markers%sf(i, j, 0) = patch_id
+                    ib_markers%sf(i, j, 0) = encoded_patch_id
                 end if
             end do
         end do
@@ -878,13 +970,14 @@ contains
     !> The STL patch is a 3D geometry that is imported from an STL file.
     !! @param patch_id is the patch identifier
     !! @param ib_markers Array to track patch ids
-    subroutine s_ib_3d_model(patch_id, ib_markers)
+    subroutine s_ib_3d_model(patch_id, ib_markers, xp, yp, zp)
 
         integer, intent(in) :: patch_id
         type(integer_field), intent(inout) :: ib_markers
+        integer, intent(in) :: xp, yp, zp !< integers containing the periodicity projection information
 
         integer :: i, j, k, il, ir, jl, jr, kl, kr !< Generic loop iterators
-        integer :: spc
+        integer :: spc, encoded_patch_id
 
         real(wp) :: eta, threshold, corner_distance
         real(wp), dimension(1:3) :: point, local_point, offset
@@ -895,14 +988,17 @@ contains
         real(wp), dimension(1:3) :: bbox_min, bbox_max, local_corner, world_corner
 
         center = 0._wp
-        center(1) = patch_ib(patch_id)%x_centroid
-        center(2) = patch_ib(patch_id)%y_centroid
-        center(3) = patch_ib(patch_id)%z_centroid
+        center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp) * (x_domain%end - x_domain%beg)
+        center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp) * (y_domain%end - y_domain%beg)
+        center(3) = patch_ib(patch_id)%z_centroid + real(zp, wp) * (z_domain%end - z_domain%beg)
         inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
         offset(:) = patch_ib(patch_id)%centroid_offset(:)
         spc = patch_ib(patch_id)%model_spc
         threshold = patch_ib(patch_id)%model_threshold
         rotation(:, :) = patch_ib(patch_id)%rotation_matrix(:, :)
+
+        ! encode the periodicity information into the patch_id
+        call encode_patch_periodicity(patch_id, xp, yp, zp, encoded_patch_id)
 
         il = -gp_layers
         jl = -gp_layers
@@ -943,7 +1039,7 @@ contains
         call get_bounding_indices(bbox_min(3), bbox_max(3), z_cc, kl, kr)
 
         $:GPU_PARALLEL_LOOP(private='[i,j,k, xyz_local, eta]',&
-                  & copyin='[patch_id,center,inverse_rotation, offset, spc, threshold]', collapse=3)
+                  & copyin='[patch_id,encoded_patch_id,center,inverse_rotation, offset, spc, threshold]', collapse=3)
         do i = il, ir
             do j = jl, jr
                 do k = kl, kr
@@ -955,7 +1051,7 @@ contains
                                                  patch_id, xyz_local)
 
                     if (eta > patch_ib(patch_id)%model_threshold) then
-                        ib_markers%sf(i, j, k) = patch_id
+                        ib_markers%sf(i, j, k) = encoded_patch_id
                     end if
                 end do
             end do
@@ -1085,48 +1181,80 @@ contains
     end subroutine get_bounding_indices
 
     !> @brief encodes the patch id with a unique offset that contains information on how the IB marker wrapps periodically
-    subroutine encode_patch_periodicity(patch_id, x_periodicty, y_periodicity, z_periodicity, encoded_patch_id)
+    subroutine encode_patch_periodicity(patch_id, x_periodicity, y_periodicity, z_periodicity, encoded_patch_id)
 
-      integer, intent(in) :: patch_id, x_periodicty, y_periodicity, z_periodicity
-      integer, intent(out) :: encoded_patch_id
+        integer, intent(in) :: patch_id, x_periodicity, y_periodicity, z_periodicity
+        integer, intent(out) :: encoded_patch_id
 
-      integer :: temp_x_per, temp_y_per, temp_z_per, offset
+        integer :: temp_x_per, temp_y_per, temp_z_per, offset
 
-      encoded_patch_id = patch_id
+        encoded_patch_id = patch_id
 
-      temp_x_per = mod(x_periodicity, 3)
-      temp_y_per = mod(y_periodicity, 3)
-      temp_z_per = mod(z_periodicity, 3)
+        temp_x_per = x_periodicity; if (x_periodicity == -1) temp_x_per = 2
+        temp_y_per = y_periodicity; if (y_periodicity == -1) temp_y_per = 2
+        temp_z_per = z_periodicity; if (z_periodicity == -1) temp_z_per = 2
 
-      offset = (num_ibs + 1) * temp_x_per + 3 * (num_ibs + 1) * temp_y_per + 9 * (num_ibs + 1) * temp_z_per
-      encoded_patch_id = patch_id + offset
+        offset = (num_ibs + 1) * temp_x_per + 3 * (num_ibs + 1) * temp_y_per + 9 * (num_ibs + 1) * temp_z_per
+        encoded_patch_id = patch_id + offset
 
     end subroutine encode_patch_periodicity
 
     !> @brief decodes the encoded id to get out the original id and the way in which it is periodic
-    subroutine decode_patch_periodicity(encoded_patch_id, patch_id, x_periodicty, y_periodicity, z_periodicity)
+    subroutine decode_patch_periodicity(encoded_patch_id, patch_id, x_periodicity, y_periodicity, z_periodicity)
 
-      integer, intent(in) :: encoded_patch_id
-      integer, intent(out) :: patch_id, x_periodicity, y_periodicity, z_periodicity
-      
-      integer :: offset, remainder, xp, yp, zp, base
+        integer, intent(in) :: encoded_patch_id
+        integer, intent(out) :: patch_id, x_periodicity, y_periodicity, z_periodicity
+        
+        integer :: offset, remainder, xp, yp, zp, base
 
-      base = num_ibs + 1
+        base = num_ibs + 1
 
-      patch_id = mod(encoded_patch_id - 1, base) + 1
-      offset = (encoded_patch_id - patch_id) / base
+        patch_id = mod(encoded_patch_id - 1, base) + 1
+        offset = (encoded_patch_id - patch_id) / base
 
-      xp = mod(offset, 3)
-      remainder = offset / 3
-      yp = mod(remainder, 3)
-      zp = remainder / 3
+        xp = mod(offset, 3)
+        remainder = offset / 3
+        yp = mod(remainder, 3)
+        zp = remainder / 3
 
-      ! Reverse map: 2 -> -1, 0 -> 0, 1 -> 1
-      x_periodicity = xp; if (xp == 2) x_periodicity = -1
-      y_periodicity = yp; if (yp == 2) y_periodicity = -1
-      z_periodicity = zp; if (zp == 2) z_periodicity = -1
+        ! Reverse map: 2 -> -1, 0 -> 0, 1 -> 1
+        x_periodicity = xp; if (xp == 2) x_periodicity = -1
+        y_periodicity = yp; if (yp == 2) y_periodicity = -1
+        z_periodicity = zp; if (zp == 2) z_periodicity = -1
 
     end subroutine decode_patch_periodicity
+
+    !> @brief Determines if we should wrap periodically
+    subroutine get_periodicities(xp_lower, xp_upper, yp_lower, yp_upper, zp_lower, zp_upper)
+
+        integer, intent(out) :: xp_lower, xp_upper, yp_lower, yp_upper
+        integer, intent(out), optional :: zp_lower, zp_upper
+
+        ! check domain wraps in x, y
+        #:for X in [('x'), ('y')]
+            ! check for periodicity
+            if (bc_${X}$ == BC_PERIODIC) then
+                ${X}$p_lower = -1
+                ${X}$p_upper = 1
+            else
+                !if it is not periodic, then both elements are 0
+                ${X}$p_lower = 0
+                ${X}$p_upper = 0
+            end if
+        #endfor
+
+        ! z only if 3D
+        if (present(zp_lower)) then
+            if (bc_z == BC_PERIODIC) then
+                zp_lower = -1
+                zp_upper = 1
+            else
+                zp_lower = 0
+                zp_upper = 0
+            end if
+        end if
+
+    end subroutine get_periodicities
 
     !> Archimedes spiral function
     !! @param myth Angle
