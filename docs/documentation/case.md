@@ -676,7 +676,7 @@ If `file_per_process` is true, then pre_process, simulation, and post_process mu
 
 - `probe_wrt` activates the output of state variables at coordinates specified by `probe(i)%[x;y,z]`.
 
-- `ib_force_wrt` activates the output of data specified by patch_ib(i)%force(:) and patch_ib(i)%torque(:) into a single datafile for all IBs at all timesteps
+- `ib_force_wrt` activates the output of data specified by patch_ib(i)%force(:) and patch_ib(i)%torque(:) into a single binary datafile for all IBs at all timesteps. During post_processing, this file is converted into separate force/torque time histories for each IB.
 
 - `output_partial_domain` activates the output of part of the domain specified by `[x,y,z]_output%%beg` and `[x,y,z]_output%%end`.
 This is useful for large domains where only a portion of the domain is of interest.
