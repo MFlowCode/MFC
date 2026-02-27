@@ -3,8 +3,18 @@ language: en-US
 
 reviews:
   profile: chill
+
+  # Hide the “Review skipped / Draft detected” status message
   review_status: false
+
+  # Remove the “Prompt for all review comments with AI agents” block
   enable_prompt_for_ai_agents: false
+
+  # Disable extra/non-default summary sections
+  high_level_summary: false
+  related_issues: false
+  sequence_diagrams: false
+  changed_files_summary: false
 
   auto_review:
     enabled: true                  # initial PR-open review
