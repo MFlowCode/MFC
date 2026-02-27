@@ -280,7 +280,7 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
     step_arg = ARG('step')
     tiled = varname is None or varname == 'all'
 
-    if ARG('interactive') or ARG('tui'):
+    if ARG('interactive') or ARG('tui') or ARG('mp4'):
         # Load all steps by default; honour an explicit --step so users can
         # reduce the set for large 3D cases before hitting the step limit.
         if step_arg == 'last':
