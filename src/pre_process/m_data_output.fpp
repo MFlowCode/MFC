@@ -483,6 +483,8 @@ contains
         integer :: m_glb_ds, n_glb_ds, p_glb_ds
         integer :: m_glb_save, n_glb_save, p_glb_save ! Size of array being saved
 
+        loc_violations = 0._wp
+
         if (down_sample) then
             if ((mod(m + 1, 3) > 0) .or. (mod(n + 1, 3) > 0) .or. (mod(p + 1, 3) > 0)) then
                 loc_violations = 1._wp

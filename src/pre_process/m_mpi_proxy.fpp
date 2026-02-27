@@ -58,7 +58,7 @@ contains
             & 'igr', 'down_sample', 'simplex_perturb','fft_wrt', 'hyper_cleaning' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
-        call MPI_BCAST(fluid_rho(1), num_fluids_max, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(fluid_rho(1), num_fluids_max, mpi_p, 0, MPI_COMM_WORLD, ierr)
 
         #:for VAR in [ 'x_domain%beg', 'x_domain%end', 'y_domain%beg',         &
             & 'y_domain%end', 'z_domain%beg', 'z_domain%end', 'a_x', 'a_y',    &

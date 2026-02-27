@@ -936,9 +936,9 @@ contains
                                         (j + buff_size*((k + 1) + (n + 1)*l))
                                     q_comm(i)%sf(j + unpack_offset, k, l) = real(buff_recv(r), kind=stp)
 #if defined(__INTEL_COMPILER)
-                                    if (ieee_is_nan(q_comm(i)%sf(j, k, l))) then
+                                    if (ieee_is_nan(q_comm(i)%sf(j + unpack_offset, k, l))) then
                                         print *, "Error", j, k, l, i
-                                        error stop "NaN(s) in recv"
+                                        call s_mpi_abort("NaN(s) in recv")
                                     end if
 #endif
                                 end do
@@ -991,9 +991,9 @@ contains
                                          ((k + buff_size) + buff_size*l))
                                     q_comm(i)%sf(j, k + unpack_offset, l) = real(buff_recv(r), kind=stp)
 #if defined(__INTEL_COMPILER)
-                                    if (ieee_is_nan(q_comm(i)%sf(j, k, l))) then
+                                    if (ieee_is_nan(q_comm(i)%sf(j, k + unpack_offset, l))) then
                                         print *, "Error", j, k, l, i
-                                        error stop "NaN(s) in recv"
+                                        call s_mpi_abort("NaN(s) in recv")
                                     end if
 #endif
                                 end do
@@ -1050,9 +1050,9 @@ contains
                                           (l + buff_size)))
                                     q_comm(i)%sf(j, k, l + unpack_offset) = real(buff_recv(r), kind=stp)
 #if defined(__INTEL_COMPILER)
-                                    if (ieee_is_nan(q_comm(i)%sf(j, k, l))) then
+                                    if (ieee_is_nan(q_comm(i)%sf(j, k, l + unpack_offset))) then
                                         print *, "Error", j, k, l, i
-                                        error stop "NaN(s) in recv"
+                                        call s_mpi_abort("NaN(s) in recv")
                                     end if
 #endif
                                 end do
@@ -1153,8 +1153,6 @@ contains
 
         if (igr) then
             recon_order = igr_order
-        else
-            recon_order = weno_order
         end if
 
         ! 3D Cartesian Processor Topology
