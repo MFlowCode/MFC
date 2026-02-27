@@ -24,16 +24,6 @@ contains
     !> Checks compatibility of parameters in the input file.
         !! Used by the pre_process stage
     impure subroutine s_check_inputs
-
-        call s_check_parallel_io
-
     end subroutine s_check_inputs
-
-    !> Checks if mpi is enabled with parallel_io
-    impure subroutine s_check_parallel_io
-#ifndef MFC_MPI
-        @:PROHIBIT(parallel_io, "MFC built with --no-mpi requires parallel_io=F")
-#endif
-    end subroutine s_check_parallel_io
 
 end module m_checker
