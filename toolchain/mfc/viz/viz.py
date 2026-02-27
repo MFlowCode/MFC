@@ -37,7 +37,13 @@ def _ensure_viz_deps() -> None:
     else:
         cmd = [sys.executable, "-m", "pip", "install", f"{toolchain_path}[viz]"]
 
-    result = subprocess.run(cmd, env=env, check=False)
+    try:
+        result = subprocess.run(cmd, env=env, check=False, timeout=300)
+    except subprocess.TimeoutExpired as exc:
+        raise MFCException(
+            "Timed out installing viz dependencies (network may be restricted). "
+            f"Try manually: pip install '{toolchain_path}[viz]'"
+        ) from exc
     if result.returncode != 0:
         raise MFCException(
             "Failed to install viz dependencies. "
