@@ -658,5 +658,142 @@ class TestMultiRankAssembly(unittest.TestCase):
         )
 
 
+# ---------------------------------------------------------------------------
+# Tests: render_2d_tiled
+# ---------------------------------------------------------------------------
+
+class TestRender2DTiled(unittest.TestCase):
+    """Smoke test: render_2d_tiled produces a valid PNG from 2D fixture data."""
+
+    def test_render_2d_tiled_png(self):
+        """Tiled render of all 2D variables produces a non-empty PNG."""
+        from .reader import assemble
+        from .renderer import render_2d_tiled
+        data = assemble(FIX_2D_BIN, 0, 'binary')
+        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as f:
+            out = f.name
+        try:
+            render_2d_tiled(data, 0, out)
+            self.assertTrue(os.path.isfile(out))
+            self.assertGreater(os.path.getsize(out), 0)
+        finally:
+            os.unlink(out)
+
+
+# ---------------------------------------------------------------------------
+# Tests: render_3d_slice non-default axes and selectors
+# ---------------------------------------------------------------------------
+
+class TestRender3DSliceAxes(unittest.TestCase):
+    """Test render_3d_slice with non-default slice axes and selectors."""
+
+    def setUp(self):
+        from .reader import assemble
+        self._data = assemble(FIX_3D_BIN, 0, 'binary')
+
+    def _render(self, **kwargs):
+        from .renderer import render_3d_slice
+        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as f:
+            out = f.name
+        try:
+            render_3d_slice(self._data, 'pres', 0, out, **kwargs)
+            self.assertTrue(os.path.isfile(out))
+            self.assertGreater(os.path.getsize(out), 0)
+        finally:
+            os.unlink(out)
+
+    def test_x_axis_slice(self):
+        """X-axis midplane slice produces a non-empty PNG."""
+        self._render(slice_axis='x')
+
+    def test_y_axis_slice(self):
+        """Y-axis midplane slice produces a non-empty PNG."""
+        self._render(slice_axis='y')
+
+    def test_slice_by_index(self):
+        """slice_index=0 selects first plane along default z axis."""
+        self._render(slice_index=0)
+
+    def test_slice_by_value(self):
+        """slice_value selects the plane nearest the given coordinate."""
+        z_mid = float(self._data.z_cc[len(self._data.z_cc) // 2])
+        self._render(slice_value=z_mid)
+
+
+# ---------------------------------------------------------------------------
+# Tests: render_mp4
+# ---------------------------------------------------------------------------
+
+class TestRenderMp4(unittest.TestCase):
+    """Smoke test: render_mp4 exercises frame rendering and returns a bool."""
+
+    def _make_read_func(self, case_dir, fmt):
+        from .reader import assemble
+        def _read(step):
+            return assemble(case_dir, step, fmt)
+        return _read
+
+    def test_mp4_1d_returns_bool(self):
+        """render_mp4 with 1D data returns True or False without raising."""
+        from .reader import discover_timesteps
+        from .renderer import render_mp4
+        steps = discover_timesteps(FIX_1D_BIN, 'binary')[:2]
+        read_func = self._make_read_func(FIX_1D_BIN, 'binary')
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out = os.path.join(tmpdir, 'test.mp4')
+            result = render_mp4('pres', steps, out, fps=2, read_func=read_func)
+            self.assertIsInstance(result, bool)
+
+    def test_mp4_tiled_1d_returns_bool(self):
+        """render_mp4 with tiled=True returns True or False without raising."""
+        from .reader import discover_timesteps
+        from .renderer import render_mp4
+        steps = discover_timesteps(FIX_1D_BIN, 'binary')[:2]
+        read_func = self._make_read_func(FIX_1D_BIN, 'binary')
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out = os.path.join(tmpdir, 'test_tiled.mp4')
+            result = render_mp4('pres', steps, out, fps=2,
+                                read_func=read_func, tiled=True)
+            self.assertIsInstance(result, bool)
+
+    def test_mp4_no_read_func_raises(self):
+        """render_mp4 with read_func=None raises ValueError."""
+        from .renderer import render_mp4
+        with self.assertRaises(ValueError):
+            render_mp4('pres', [0], '/tmp/unused.mp4', read_func=None)
+
+    def test_mp4_empty_steps_raises(self):
+        """render_mp4 with empty steps raises ValueError."""
+        from .renderer import render_mp4
+        with self.assertRaises(ValueError):
+            render_mp4('pres', [], '/tmp/unused.mp4',
+                       read_func=lambda s: None)
+
+
+# ---------------------------------------------------------------------------
+# Tests: silo assemble_silo var_filter
+# ---------------------------------------------------------------------------
+
+class TestAssembleSiloVarFilter(unittest.TestCase):
+    """Test assemble_silo with var= filter to cover the silo var_filter path."""
+
+    def test_1d_var_filter_includes_only_requested(self):
+        """Silo 1D: var='pres' loads pres and excludes vel1."""
+        from .silo_reader import assemble_silo
+        data = assemble_silo(FIX_1D_SILO, 0, var='pres')
+        self.assertIn('pres', data.variables)
+        self.assertNotIn('vel1', data.variables)
+
+    def test_2d_var_filter_includes_only_requested(self):
+        """Silo 2D: var='pres' loads pres and excludes other variables."""
+        from .silo_reader import assemble_silo
+        filtered = assemble_silo(FIX_2D_SILO, 0, var='pres')
+        all_data = assemble_silo(FIX_2D_SILO, 0)
+        self.assertIn('pres', filtered.variables)
+        other_vars = [v for v in all_data.variables if v != 'pres']
+        if other_vars:
+            self.assertNotIn(other_vars[0], filtered.variables)
+
+
 if __name__ == "__main__":
     unittest.main()
