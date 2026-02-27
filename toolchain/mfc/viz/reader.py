@@ -274,8 +274,9 @@ def _discover_processors(case_dir: str, fmt: str) -> List[int]:
 
 
 def _is_1d(case_dir: str) -> bool:
-    """Check if the output is 1D (has binary/root/ directory)."""
-    return os.path.isdir(os.path.join(case_dir, 'binary', 'root'))
+    """Check if the output is 1D (binary/root/ directory exists and contains .dat files)."""
+    root = os.path.join(case_dir, 'binary', 'root')
+    return os.path.isdir(root) and any(f.endswith('.dat') for f in os.listdir(root))
 
 
 def assemble_from_proc_data(  # pylint: disable=too-many-locals,too-many-statements

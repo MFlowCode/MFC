@@ -350,8 +350,22 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
                        " (use --var to specify)[/dim]")
 
     if not tiled and not interactive and not ARG('tui') and varname not in test_assembled.variables:
-        raise MFCException(f"Variable '{varname}' not found. "
-                           f"Available variables: {', '.join(avail)}")
+        # test_assembled was loaded with var_filter=varname so its variables dict
+        # may be empty. Re-read without filter (errors only, so extra I/O is fine)
+        # to build a useful "available variables" list for the error message.
+        if not avail:
+            if fmt == 'silo':
+                from .silo_reader import assemble_silo  # pylint: disable=import-outside-toplevel
+                _full = assemble_silo(case_dir, requested_steps[0])
+            else:
+                _full = assemble(case_dir, requested_steps[0], fmt)
+            avail = sorted(_full.variables.keys())
+        avail_str = ', '.join(avail) if avail else '(none — check post_process output)'
+        raise MFCException(
+            f"Variable '{varname}' not found. "
+            f"Available: {avail_str}. "
+            f"Use --list-vars to see variables at a given step."
+        )
 
     # TUI mode — launch Textual terminal UI (1D/2D only)
     if ARG('tui'):

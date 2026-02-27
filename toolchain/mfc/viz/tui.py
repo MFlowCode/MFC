@@ -199,7 +199,7 @@ class MFCPlot(PlotextPlot):  # pylint: disable=too-many-instance-attributes,too-
             elif row == h_plot - 1:
                 lbl = f" {vmin:.3g}"
             elif row == h_plot // 2:
-                mid = np.sqrt(vmin * vmax) if (self._log_scale and vmin > 0) else (vmin + vmax) / 2
+                mid = np.sqrt(vmin * vmax) if (log_active and vmin > 0) else (vmin + vmax) / 2
                 lbl = f" {mid:.3g}"
             else:
                 lbl = ""
