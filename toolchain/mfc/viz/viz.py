@@ -188,7 +188,7 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
     """Main viz command dispatcher."""
     _ensure_viz_deps()
 
-    from .reader import discover_format, discover_timesteps, assemble  # pylint: disable=import-outside-toplevel
+    from .reader import discover_format, discover_timesteps, assemble, has_lag_bubble_evol, read_lag_bubbles_at_step  # pylint: disable=import-outside-toplevel
     from .renderer import render_1d, render_1d_tiled, render_2d, render_2d_tiled, render_3d_slice, render_mp4  # pylint: disable=import-outside-toplevel
 
     case_dir = ARG('input')
@@ -317,6 +317,12 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
 
     interactive = ARG('interactive')
 
+    # Lagrange bubble overlay: auto-detect D/lag_bubble_evol_*.dat files
+    bubble_func = None
+    if has_lag_bubble_evol(case_dir):
+        bubble_func = lambda s: read_lag_bubbles_at_step(case_dir, s)  # noqa: E731
+        cons.print("[dim]Lagrange bubble positions detected — overlaying on plots.[/dim]")
+
     # Load all variables when tiled, interactive, or TUI; filter otherwise.
     # TUI needs all vars loaded so the sidebar can switch between them.
     load_all = tiled or interactive or ARG('tui')
@@ -409,7 +415,7 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
         cons.print(f"[bold]Generating MP4:[/bold] {mp4_path} ({len(requested_steps)} frames)")
         success = render_mp4(varname, requested_steps, mp4_path,
                              fps=int(fps), read_func=read_step,
-                             tiled=tiled, **render_opts)
+                             tiled=tiled, bubble_func=bubble_func, **render_opts)
         if success:
             cons.print(f"[bold green]Done:[/bold green] {mp4_path}")
         else:
@@ -437,20 +443,28 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
 
         output_path = os.path.join(output_base, f'{label}_{step}.png')
 
+        # Inject bubble positions for this step
+        step_opts = render_opts
+        if bubble_func is not None:
+            try:
+                step_opts = dict(render_opts, bubbles=bubble_func(step))
+            except Exception:  # pylint: disable=broad-except
+                pass
+
         if tiled and assembled.ndim == 1:
             render_1d_tiled(assembled.x_cc, assembled.variables,
-                            step, output_path, **render_opts)
+                            step, output_path, **step_opts)
         elif tiled and assembled.ndim == 2:
-            render_2d_tiled(assembled, step, output_path, **render_opts)
+            render_2d_tiled(assembled, step, output_path, **step_opts)
         elif assembled.ndim == 1:
             render_1d(assembled.x_cc, assembled.variables[varname],
-                      varname, step, output_path, **render_opts)
+                      varname, step, output_path, **step_opts)
         elif assembled.ndim == 2:
             render_2d(assembled.x_cc, assembled.y_cc,
                       assembled.variables[varname],
-                      varname, step, output_path, **render_opts)
+                      varname, step, output_path, **step_opts)
         elif assembled.ndim == 3:
-            render_3d_slice(assembled, varname, step, output_path, **render_opts)
+            render_3d_slice(assembled, varname, step, output_path, **step_opts)
         else:
             cons.print(f"[yellow]Warning:[/yellow] Unsupported ndim={assembled.ndim} "
                        f"for step {step}, skipping.")

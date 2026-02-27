@@ -73,6 +73,24 @@ _INDEXED_PATTERNS = [
 ]
 
 
+def _overlay_bubbles(ax, bubbles, scale: float = 1.0) -> None:
+    """Overlay Lagrange bubble positions as circles on *ax*.
+
+    Args:
+        ax: matplotlib Axes to draw on.
+        bubbles: (N, 4) array of (x, y, z, r) in simulation-normalized units.
+        scale: Multiply rendered radius by this factor for visibility.
+    """
+    if bubbles is None or len(bubbles) == 0:
+        return
+    from matplotlib.patches import Circle          # pylint: disable=import-outside-toplevel
+    from matplotlib.collections import PatchCollection  # pylint: disable=import-outside-toplevel
+    circles = [Circle((b[0], b[1]), b[3] * scale) for b in bubbles]
+    pc = PatchCollection(circles, facecolors='none', edgecolors='white',
+                         linewidths=0.5, alpha=0.8)
+    ax.add_collection(pc)
+
+
 def pretty_label(varname):
     """Map an MFC variable name to a LaTeX-style label for plots."""
     if varname in _LABEL_MAP:
@@ -198,6 +216,8 @@ def render_2d(x_cc, y_cc, data, varname, step, output, **opts):  # pylint: disab
     ax.set_title(f'{label} (step {step})')
     ax.set_aspect('equal', adjustable='box')
 
+    _overlay_bubbles(ax, opts.get('bubbles'), scale=opts.get('bubble_scale', 1.0))
+
     fig.tight_layout()
     fig.savefig(output, dpi=opts.get('dpi', 150))
     plt.close(fig)
@@ -245,6 +265,7 @@ def render_2d_tiled(assembled, step, output, **opts):  # pylint: disable=too-man
         ax.set_title(label, fontsize=9)
         ax.set_aspect('equal', adjustable='box')
         ax.tick_params(labelsize=7)
+        _overlay_bubbles(ax, opts.get('bubbles'), scale=opts.get('bubble_scale', 1.0))
 
     for idx in range(n, nrows * ncols):
         row, col = divmod(idx, ncols)
@@ -325,13 +346,24 @@ def render_3d_slice(assembled, varname, step, output, slice_axis='z',  # pylint:
     ax.set_title(f'{label} (step {step}, {slice_axis}={slice_coord:.4g})')
     ax.set_aspect('equal', adjustable='box')
 
+    # Overlay bubbles that lie within one radius of the slice plane
+    bubbles = opts.get('bubbles')
+    if bubbles is not None and len(bubbles) > 0:
+        slice_col = {'x': 0, 'y': 1, 'z': 2}[slice_axis]
+        plot_cols = [c for c in (0, 1, 2) if c != slice_col]
+        near = np.abs(bubbles[:, slice_col] - slice_coord) <= bubbles[:, 3]
+        _overlay_bubbles(ax,
+                         bubbles[near][:, [plot_cols[0], plot_cols[1], slice_col, 3]]
+                         if near.any() else None,
+                         scale=opts.get('bubble_scale', 1.0))
+
     fig.tight_layout()
     fig.savefig(output, dpi=opts.get('dpi', 150))
     plt.close(fig)
 
 
 def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,too-many-statements,too-many-branches
-               read_func=None, tiled=False, **opts):
+               read_func=None, tiled=False, bubble_func=None, **opts):
     """
     Generate an MP4 video by iterating over timesteps.
 
@@ -342,6 +374,8 @@ def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-argum
         fps: Frames per second.
         read_func: Callable(step) -> AssembledData for loading each frame.
         tiled: If True, render all 1D variables in a tiled layout per frame.
+        bubble_func: Optional callable ``(step: int) -> ndarray`` returning
+            ``(N, 4)`` bubble positions ``(x, y, z, r)`` for each frame.
         **opts: Rendering options (cmap, vmin, vmax, dpi, log_scale, figsize,
                 slice_axis, slice_index, slice_value).
 
@@ -416,29 +450,37 @@ def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-argum
             assembled = read_func(step)
             frame_path = os.path.join(viz_dir, f'{i:06d}.png')
 
+            # Inject per-step bubble positions into opts if bubble_func provided
+            frame_opts = opts
+            if bubble_func is not None:
+                try:
+                    frame_opts = dict(opts, bubbles=bubble_func(step))
+                except Exception:  # pylint: disable=broad-except
+                    pass
+
             if tiled and assembled.ndim == 1:
                 render_1d_tiled(assembled.x_cc, assembled.variables,
-                                step, frame_path, **opts)
+                                step, frame_path, **frame_opts)
             elif tiled and assembled.ndim == 2:
-                render_2d_tiled(assembled, step, frame_path, **opts)
+                render_2d_tiled(assembled, step, frame_path, **frame_opts)
             elif assembled.ndim == 1:
                 var_data = assembled.variables.get(varname)
                 if var_data is None:
                     continue
                 render_1d(assembled.x_cc, var_data,
-                          varname, step, frame_path, **opts)
+                          varname, step, frame_path, **frame_opts)
             elif assembled.ndim == 2:
                 var_data = assembled.variables.get(varname)
                 if var_data is None:
                     continue
                 render_2d(assembled.x_cc, assembled.y_cc,
                           var_data,
-                          varname, step, frame_path, **opts)
+                          varname, step, frame_path, **frame_opts)
             elif assembled.ndim == 3:
                 var_data = assembled.variables.get(varname)
                 if var_data is None:
                     continue
-                render_3d_slice(assembled, varname, step, frame_path, **opts)
+                render_3d_slice(assembled, varname, step, frame_path, **frame_opts)
             else:
                 raise ValueError(
                     f"Unsupported dimensionality ndim={assembled.ndim} for step {step}. "

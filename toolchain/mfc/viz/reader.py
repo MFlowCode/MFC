@@ -11,10 +11,13 @@ File layout per processor:
   Records 3..N (vars): varname(50-char) + data((m+1)*(n+1)*(p+1) floats)
 """
 
+import glob
+import itertools
 import os
 import struct
 import warnings
 from dataclasses import dataclass, field
+from functools import lru_cache
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
@@ -433,3 +436,83 @@ def assemble(case_dir: str, step: int, fmt: str = 'binary',  # pylint: disable=t
         raise FileNotFoundError(f"No valid processor data found for step {step}")
 
     return assemble_from_proc_data(proc_data)
+
+
+# ---------------------------------------------------------------------------
+# Lagrange bubble position reader
+# ---------------------------------------------------------------------------
+
+@lru_cache(maxsize=32)
+def _nBubs_per_step(path: str) -> int:
+    """Count how many bubble rows share the first time value in *path*.
+
+    The result is cached so repeated calls for the same file (across
+    different steps in an MP4 render) only scan the file once.
+    """
+    with open(path) as f:
+        f.readline()  # skip header
+        first = f.readline()
+        if not first.strip():
+            return 0
+        t0 = first.split()[0]
+        n = 1
+        for line in f:
+            parts = line.split()
+            if parts and parts[0] == t0:
+                n += 1
+            else:
+                break
+    return n
+
+
+def read_lag_bubbles_at_step(case_dir: str, step: int) -> Optional[np.ndarray]:
+    """Read Lagrange bubble positions at a given save-step index.
+
+    Reads ``D/lag_bubble_evol_<rank>.dat`` files written by MFC when
+    ``lag_params%write_bubbles = T``.  Each file contains one row per
+    bubble per simulation time-step (appended after every completed RK
+    stage).  This function seeks efficiently to the block for *step* by
+    counting the fixed number of bubbles per rank.
+
+    Returns an ``(N, 4)`` float64 array of ``(x, y, z, r)`` in
+    simulation-normalized units across all MPI ranks, or ``None`` when
+    no bubble data is found.
+    """
+    d_dir = os.path.join(case_dir, 'D')
+    if not os.path.isdir(d_dir):
+        return None
+
+    files = sorted(glob.glob(os.path.join(d_dir, 'lag_bubble_evol_*.dat')))
+    if not files:
+        return None
+
+    chunks: List[np.ndarray] = []
+    for fpath in files:
+        try:
+            nBubs = _nBubs_per_step(fpath)
+            if nBubs == 0:
+                continue
+            # Line layout: 1 header + step * nBubs prior data rows
+            skip = 1 + step * nBubs
+            rows = []
+            with open(fpath) as f:
+                for _ in itertools.islice(f, skip):
+                    pass
+                for line in itertools.islice(f, nBubs):
+                    parts = line.split()
+                    if len(parts) >= 8:
+                        # cols: time id x y z mv conc r [rdot p]
+                        rows.append((float(parts[2]), float(parts[3]),
+                                     float(parts[4]), float(parts[7])))
+            if rows:
+                chunks.append(np.array(rows, dtype=np.float64))
+        except (OSError, ValueError):
+            continue
+
+    return np.concatenate(chunks, axis=0) if chunks else None
+
+
+def has_lag_bubble_evol(case_dir: str) -> bool:
+    """Return True if ``D/lag_bubble_evol_*.dat`` files exist in *case_dir*."""
+    d_dir = os.path.join(case_dir, 'D')
+    return bool(glob.glob(os.path.join(d_dir, 'lag_bubble_evol_*.dat')))
