@@ -1840,6 +1840,34 @@ contains
             open (LAG_EVOL_ID, FILE=trim(file_loc), FORM='formatted', position='append')
         end if
 
+    end subroutine s_write_lag_particles
+
+    !> @Brief Subroutine that opens the file to write the evolution of the lagrangian bubbles on each time step.
+    impure subroutine s_open_lag_bubble_evol()
+
+        character(LEN=path_len + 2*name_len) :: file_loc
+        logical file_exist
+        character(LEN=25) :: FMT
+
+        write (file_loc, '(A,I0,A)') 'lag_bubble_evol_', proc_rank, '.dat'
+        file_loc = trim(case_dir)//'/D/'//trim(file_loc)
+        call my_inquire(trim(file_loc), file_exist)
+
+        if (precision == 1) then
+            FMT = "(A16,A14,8A16)"
+        else
+            FMT = "(A24,A14,8A24)"
+        end if
+
+        if (.not. file_exist) then
+            open (LAG_EVOL_ID, FILE=trim(file_loc), FORM='formatted', position='rewind')
+            write (LAG_EVOL_ID, FMT) 'currentTime', 'particleID', 'x', 'y', 'z', &
+                'coreVaporMass', 'coreVaporConcentration', 'radius', 'interfaceVelocity', &
+                'corePressure'
+        else
+            open (LAG_EVOL_ID, FILE=trim(file_loc), FORM='formatted', position='append')
+        end if
+
     end subroutine s_open_lag_bubble_evol
 
     !> Subroutine that writes on each time step the changes of the lagrangian bubbles.

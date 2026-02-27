@@ -1202,7 +1202,6 @@ contains
 
     end subroutine s_qbmm_extrapolation
 
-<<<<<<< HEAD
     impure subroutine s_populate_beta_buffers(q_beta, bc_type, nvar, kcomp)
 
         type(scalar_field), dimension(:), intent(inout) :: q_beta

@@ -492,7 +492,6 @@ contains
 
     end subroutine s_mpi_sendrecv_ib_buffers
 
-<<<<<<< HEAD
     !> This subroutine adds particles to the transfer list for the MPI
         !! communication.
         !! @param nBub Current LOCAL number of bubbles
