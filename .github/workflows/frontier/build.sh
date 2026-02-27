@@ -37,14 +37,11 @@ attempt=1
 while [ $attempt -le $max_attempts ]; do
     echo "Build attempt $attempt of $max_attempts..."
     if [ "$run_bench" == "bench" ]; then
-        build_cmd_ok=true
-        for dir in benchmarks/*/; do
-            dirname=$(basename "$dir")
-            if ! ./mfc.sh run -v "$dir/case.py" --case-optimization -j 8 --dry-run $build_opts; then
-                build_cmd_ok=false
-                break
-            fi
-        done
+        if ./mfc.sh build -j 8 $build_opts; then
+            build_cmd_ok=true
+        else
+            build_cmd_ok=false
+        fi
     else
         if ./mfc.sh test -v -a --dry-run $([ "$cluster_name" = "frontier" ] && echo "--rdma-mpi") -j 8 $build_opts; then
             build_cmd_ok=true
