@@ -393,7 +393,8 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
         # Default to first available variable if --var was not specified
         init_var = varname if varname in avail else (avail[0] if avail else None)
         run_interactive(init_var, requested_steps, read_step,
-                        port=int(port), host=str(host))
+                        port=int(port), host=str(host),
+                        bubble_func=bubble_func)
         return
 
     # Validate colormap before any rendering

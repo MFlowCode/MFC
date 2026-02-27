@@ -8,7 +8,7 @@ colormap, log scale, vmin/vmax, and timestep playback.
 """
 # pylint: disable=use-dict-literal
 
-from typing import List, Callable
+from typing import List, Callable, Optional
 
 import numpy as np
 import plotly.graph_objects as go
@@ -191,12 +191,13 @@ def _build_3d(ad, raw, varname, step, mode, cmap,  # pylint: disable=too-many-ar
 # Main entry point
 # ---------------------------------------------------------------------------
 
-def run_interactive(  # pylint: disable=too-many-locals,too-many-statements
+def run_interactive(  # pylint: disable=too-many-locals,too-many-statements,too-many-arguments,too-many-positional-arguments
         varname: str,
         steps: List[int],
         read_func: Callable,
         port: int = 8050,
         host: str = '127.0.0.1',
+        bubble_func: Optional[Callable] = None,
 ):
     """Launch the interactive Dash visualization server."""
     app = Dash(
@@ -545,6 +546,30 @@ def run_interactive(  # pylint: disable=too-many-locals,too-many-statements
                 float(vol_min_frac or 0.0), float(vol_max_frac or 1.0),
             )
             fig.add_trace(trace)
+            # Bubble overlay for 3D
+            if bubble_func is not None:
+                try:
+                    bubbles = bubble_func(step)
+                    if bubbles is not None and len(bubbles) > 0:
+                        if mode == 'slice':
+                            s_axis = slice_axis or 'z'
+                            s_col = {'x': 0, 'y': 1, 'z': 2}[s_axis]
+                            ax_coords = {'x': ad.x_cc, 'y': ad.y_cc, 'z': ad.z_cc}[s_axis]
+                            s_coord = ax_coords[0] + (ax_coords[-1] - ax_coords[0]) * float(slice_pos or 0.5)
+                            near = np.abs(bubbles[:, s_col] - s_coord) <= bubbles[:, 3]
+                            vis = bubbles[near] if near.any() else None
+                        else:
+                            vis = bubbles
+                        if vis is not None and len(vis) > 0:
+                            fig.add_trace(go.Scatter3d(
+                                x=vis[:, 0], y=vis[:, 1], z=vis[:, 2],
+                                mode='markers',
+                                marker=dict(size=4, color='white', opacity=0.6, symbol='circle'),
+                                showlegend=False,
+                                hovertemplate='x=%{x:.3g}<br>y=%{y:.3g}<br>z=%{z:.3g}<extra>bubble</extra>',
+                            ))
+                except Exception:  # pylint: disable=broad-except
+                    pass
             # Compute aspect ratio from domain extents so slices (which
             # have a constant coordinate on one axis) don't collapse that axis.
             dx = float(ad.x_cc[-1] - ad.x_cc[0]) if len(ad.x_cc) > 1 else 1.0
@@ -575,6 +600,25 @@ def run_interactive(  # pylint: disable=too-many-locals,too-many-statements
                 yaxis=dict(title='y', color=_TEXT, gridcolor=_OVER),
                 plot_bgcolor=_BG,
             )
+            # Bubble overlay for 2D
+            if bubble_func is not None:
+                try:
+                    bubbles = bubble_func(step)
+                    if bubbles is not None and len(bubbles) > 0:
+                        shapes = [
+                            dict(
+                                type='circle',
+                                xref='x', yref='y',
+                                x0=float(b[0] - b[3]), y0=float(b[1] - b[3]),
+                                x1=float(b[0] + b[3]), y1=float(b[1] + b[3]),
+                                line=dict(color='white', width=0.8),
+                                fillcolor='rgba(0,0,0,0)',
+                            )
+                            for b in bubbles
+                        ]
+                        fig.update_layout(shapes=shapes)
+                except Exception:  # pylint: disable=broad-except
+                    pass
             title = f'{selected_var}  ·  step {step}'
 
         else:                            # 1D
