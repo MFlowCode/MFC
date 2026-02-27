@@ -937,7 +937,7 @@ contains
 
         ! Clears the existing immersed boundary indices
         $:GPU_PARALLEL_LOOP(private='[i,j,k]')
-        do i = -gp_layers-1, m+gp_layers+1; do j = -gp_layers-1, n+gp_layers+1; do k = -gp_layers-1, p+gp_layers+1
+        do i = -gp_layers - 1, m + gp_layers + 1; do j = -gp_layers - 1, n + gp_layers + 1; do k = -gp_layers - 1, p + gp_layers + 1
                     ib_markers%sf(i, j, k) = 0._wp
                 end do; end do; end do
         $:END_GPU_PARALLEL_LOOP()

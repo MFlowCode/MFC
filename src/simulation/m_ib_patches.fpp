@@ -613,12 +613,12 @@ contains
         call encode_patch_periodicity(patch_id, xp, yp, zp, encoded_patch_id)
 
         ! find the indices to the left and right of the IB in i, j, k
-        il = -gp_layers-1
-        jl = -gp_layers-1
-        kl = -gp_layers-1
-        ir = m + gp_layers+1
-        jr = n + gp_layers+1
-        kr = p + gp_layers+1
+        il = -gp_layers - 1
+        jl = -gp_layers - 1
+        kl = -gp_layers - 1
+        ir = m + gp_layers + 1
+        jr = n + gp_layers + 1
+        kr = p + gp_layers + 1
         call get_bounding_indices(center(1) - radius, center(1) + radius, x_cc, il, ir)
         call get_bounding_indices(center(2) - radius, center(2) + radius, y_cc, jl, jr)
         call get_bounding_indices(center(3) - radius, center(3) + radius, z_cc, kl, kr)
