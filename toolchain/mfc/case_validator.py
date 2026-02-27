@@ -19,6 +19,7 @@ from typing import Dict, Any, List, Set
 from functools import lru_cache
 from .common import MFCException
 from .params.definitions import CONSTRAINTS
+from .state import CFG
 
 
 # Physics documentation for check methods.
@@ -1794,6 +1795,10 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         if precision is not None:
             self.prohibit(precision not in [1, 2],
                          "precision must be 1 or 2")
+            self.prohibit(
+                precision == 2 and CFG().single,
+                "precision = 2 (double output) requires MFC built without --single"
+            )
 
     def check_vorticity(self):
         """Checks vorticity parameters (post-process)"""
@@ -2331,12 +2336,40 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
                                  f"patch_icpp({i})%vel(3) = {vel3} but p = 0 (1D/2D simulation)")
 
     # ===================================================================
+    # Build-Flag Compatibility Checks
+    # ===================================================================
+
+    def check_build_flags(self):
+        """Checks case parameters against the active build configuration.
+
+        These catch incompatibilities between case settings and how the
+        MFC binaries were compiled (--mpi/--no-mpi, --single, etc.)
+        before any binary is invoked.
+        """
+        parallel_io = self.get('parallel_io', 'F') == 'T'
+        self.prohibit(
+            parallel_io and not CFG().mpi,
+            "parallel_io = T requires MFC built with --mpi"
+        )
+
+    def check_geometry_precision_simulation(self):
+        """Checks that 3D cylindrical geometry is not used with --single builds."""
+        cyl_coord = self.get('cyl_coord', 'F') == 'T'
+        p = self.get('p', 0)
+        self.prohibit(
+            CFG().single and cyl_coord and p is not None and p > 0,
+            "Fully 3D cylindrical geometry (cyl_coord = T, p > 0) is not supported "
+            "in single precision (--single)"
+        )
+
+    # ===================================================================
     # Main Validation Entry Points
     # ===================================================================
 
     def validate_common(self):
         """Validate parameters common to all stages"""
         self.check_parameter_types()  # Type validation first
+        self.check_build_flags()
         self.check_simulation_domain()
         self.check_domain_bounds()
         self.check_model_eqns_and_num_fluids()
@@ -2359,6 +2392,7 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
     def validate_simulation(self):
         """Validate simulation-specific parameters"""
         self.validate_common()
+        self.check_geometry_precision_simulation()
         self.check_finite_difference()
         self.check_time_stepping()
         self.check_riemann_solver()
