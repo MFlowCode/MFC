@@ -15,16 +15,17 @@ jobs:
       id-token: write
 
     steps:
+      - name: Install unzip (required by bun setup)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unzip
+
+      # IMPORTANT: checkout BASE repo only (safe on forks)
       - name: Checkout base repo (safe)
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
-          
-      - name: Ensure ~/.local/bin exists and is on PATH
-        run: |
-          mkdir -p "$HOME/.local/bin"
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-          
+
       - name: Run Claude Code Review
         uses: anthropics/claude-code-action@v1
         with:
@@ -34,54 +35,38 @@ jobs:
           plugin_marketplaces: "https://github.com/anthropics/claude-code.git"
           plugins: "code-review@claude-code-plugins"
 
-          show_full_output: true
-
+          # NOTE: do NOT use --dangerouslyDisableSandbox (it can crash the CLI).
+          # This flag is for non-interactive CI runs (bypasses approval prompts).
           claude_args: >
             --dangerously-skip-permissions
-            --max-turns 60
+            --max-turns 90
             --allowedTools
-            "Bash(gh:*)"
-            "Bash(cat:*)"
-            "Bash(ls:*)"
-            "Bash(grep:*)"
-            "Bash(sed:*)"
-            "Bash(awk:*)"
-            "Bash(head:*)"
-            "Bash(tail:*)"
-            "Bash(wc:*)"
-            "Bash(sort:*)"
-            "Bash(uniq:*)"
-            "Bash(cut:*)"
-            "Bash(xargs:*)"
-            "Bash(jq:*)"
-            "Bash(python3:*)"
+            "Bash"
 
           prompt: |
-            You are running in pull_request_target. DO NOT execute or inspect PR fork code.
-            Review ONLY via GitHub API/gh commands.
+            You are running in pull_request_target.
+            DO NOT read or inspect any checked-out PR/fork code. Review ONLY using GitHub API/gh commands.
 
-            Read local guidance ONLY from:
-            - CLAUDE.md (root) if present
-            - .claude/rules/*.md if present
-            Do NOT read any other workspace files.
+            You may read local guidance ONLY from:
+            - ./CLAUDE.md (root) if present
+            - ./.claude/rules/*.md if present (max 10 files)
 
-            Keep tool calls minimal:
-            1) ls .claude/rules || true
-            2) If CLAUDE.md exists: cat CLAUDE.md
-            3) If .claude/rules exists: cat each .md file directly (no loops; at most 10 files)
+            Keep tool calls minimal and in this order:
+            1) ls -1 .claude/rules 2>/dev/null || true
+            2) cat CLAUDE.md 2>/dev/null || true
+            3) find .claude/rules -maxdepth 1 -name "*.md" -print | head -n 10 | xargs -I{} cat "{}" 2>/dev/null || true
             4) gh pr view ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --json title,body,files,changedFiles,additions,deletions,headRefOid
             5) gh pr diff ${{ github.event.pull_request.number }} --repo ${{ github.repository }}
-            6) Post ONE top-level comment.
+            6) Post ONE top-level PR comment titled "Claude Code Review", then STOP.
 
             Output format:
             - Head SHA
             - Files changed count + list up to 10 file paths
-            - Summary (3–6 bullets)
+            - Summary (3–6 bullets, minimal)
             - Findings with file + line numbers when possible
             - If no issues: 0–3 improvement opportunities (only if confident)
 
-            Post ONE top-level PR comment titled "Claude Code Review".
-            Then stop.
+            If posting is blocked, write the full review to the GitHub Actions job summary instead, then STOP.
 
           additional_permissions: |
             actions: read
