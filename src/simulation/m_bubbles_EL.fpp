@@ -1030,9 +1030,9 @@ contains
 
         call nvtxStartRange("BUBBLES-LAGRANGE-BETA-COMM")
         if (lag_params%cluster_type >= 4) then
-            call s_populate_beta_buffers(q_beta, bc_type, 3)
+            call s_populate_beta_buffers(q_beta, bc_type, 3, kahan_comp)
         else
-            call s_populate_beta_buffers(q_beta, bc_type, 2)
+            call s_populate_beta_buffers(q_beta, bc_type, 2, kahan_comp)
         end if
         call nvtxEndRange
 
