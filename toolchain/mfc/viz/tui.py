@@ -7,11 +7,12 @@ browser or port-forwarding required.
 
 Supports 1D line plots and 2D heatmaps only.
 
-Requires: textual, textual-plotext, plotext
+Requires: textual>=0.43, textual-plotext, plotext
 """
 from __future__ import annotations
 
-from typing import Callable, List, Optional
+from collections import deque
+from typing import Callable, Deque, List, Optional, Tuple
 
 import numpy as np
 
@@ -24,8 +25,13 @@ from textual import on
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
+from textual.message import Message
 from textual.reactive import reactive
-from textual.widgets import Footer, Header, Label, ListItem, ListView, Static
+from textual.widgets import (
+    Digits, Footer, Header, Label, ListItem, ListView, Sparkline, Static,
+)
+from textual import work
+from textual.worker import get_current_worker
 
 from textual_plotext import PlotextPlot
 
@@ -52,6 +58,15 @@ _CELL_RATIO: float = 2.0
 _ASPECT_MIN: float = 0.2
 _ASPECT_MAX: float = 5.0
 
+# Maximum sparkline history entries (one per step visited).
+_HISTORY_MAX: int = 60
+
+# Textual mouse events give coordinates relative to the widget top-left corner
+# (including the border).  Our widget has a 1-char solid border on every side,
+# and the 2D render always emits a 1-row header above the heatmap.
+_BORDER: int = 1
+_HEADER_ROWS: int = 1
+
 
 # ---------------------------------------------------------------------------
 # Plot widget
@@ -69,6 +84,15 @@ class MFCPlot(PlotextPlot):  # pylint: disable=too-many-instance-attributes,too-
     }
     """
 
+    class Clicked(Message):
+        """Posted when the user clicks on the 2D heatmap."""
+
+        def __init__(self, x_phys: float, y_phys: float, value: float) -> None:
+            super().__init__()
+            self.x_phys = x_phys
+            self.y_phys = y_phys
+            self.value = value
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._x_cc: Optional[np.ndarray] = None
@@ -84,6 +108,102 @@ class MFCPlot(PlotextPlot):  # pylint: disable=too-many-instance-attributes,too-
         self._last_vmin: float = 0.0
         self._last_vmax: float = 1.0
         self._bubbles: Optional[np.ndarray] = None  # (N,4) x,y,z,r
+        # Zoom state: (x_frac0, x_frac1, y_frac0, y_frac1) all in [0,1].
+        self._zoom: Tuple[float, float, float, float] = (0.0, 1.0, 0.0, 1.0)
+        # Last-render dimensions — used to map click/scroll coords back to data.
+        self._last_w_map: int = 0
+        self._last_h_plot: int = 0
+        self._last_ix: Optional[np.ndarray] = None
+        self._last_iy: Optional[np.ndarray] = None
+
+    # ------------------------------------------------------------------
+    # Zoom helpers (Feature 6)
+    # ------------------------------------------------------------------
+
+    def reset_zoom(self) -> None:
+        """Reset to full view."""
+        self._zoom = (0.0, 1.0, 0.0, 1.0)
+        self.refresh()
+
+    def _zoom_around(  # pylint: disable=too-many-locals
+        self, cx_frac: float, cy_frac: float, factor: float
+    ) -> None:
+        """Zoom by *factor* centred at *(cx_frac, cy_frac)* in [0,1]² of current view."""
+        x0, x1, y0, y1 = self._zoom
+        x_span = x1 - x0
+        y_span = y1 - y0
+        new_x_span = x_span * factor
+        new_y_span = y_span * factor
+        # Enforce minimum zoom (2 % of full range per axis).
+        if new_x_span < 0.02 or new_y_span < 0.02:
+            return
+        cx = x0 + cx_frac * x_span
+        cy = y0 + cy_frac * y_span
+        new_x0 = max(0.0, cx - cx_frac * new_x_span)
+        new_x1 = min(1.0, cx + (1.0 - cx_frac) * new_x_span)
+        new_y0 = max(0.0, cy - cy_frac * new_y_span)
+        new_y1 = min(1.0, cy + (1.0 - cy_frac) * new_y_span)
+        if new_x1 - new_x0 < 0.02 or new_y1 - new_y0 < 0.02:
+            return
+        self._zoom = (new_x0, new_x1, new_y0, new_y1)
+
+    def _cursor_frac(self, event_x: int, event_y: int) -> Tuple[float, float]:
+        """Convert a widget-relative mouse position to [0,1]² fractions within the
+        current zoom window.  The display is y-flipped (row 0 = y_max), so
+        cy_frac=0 maps to the top of the visible y range."""
+        col = event_x - _BORDER
+        row = event_y - _BORDER - _HEADER_ROWS
+        w = max(self._last_w_map, 1)
+        h = max(self._last_h_plot, 1)
+        cx_frac = max(0.0, min(1.0, col / (w - 1) if w > 1 else 0.5))
+        # Row 0 = top = y_max → data cy_frac = 1; row h-1 = bottom = y_min → 0.
+        cy_frac = max(0.0, min(1.0, 1.0 - row / (h - 1) if h > 1 else 0.5))
+        return cx_frac, cy_frac
+
+    # ------------------------------------------------------------------
+    # Mouse event handlers (Features 5 & 6)
+    # ------------------------------------------------------------------
+
+    def on_mouse_scroll_up(self, event) -> None:  # type: ignore[override]
+        if self._data is None or self._ndim != 2:
+            return
+        cx_frac, cy_frac = self._cursor_frac(event.x, event.y)
+        self._zoom_around(cx_frac, cy_frac, factor=0.75)
+        event.stop()
+        self.refresh()
+
+    def on_mouse_scroll_down(self, event) -> None:  # type: ignore[override]
+        if self._data is None or self._ndim != 2:
+            return
+        cx_frac, cy_frac = self._cursor_frac(event.x, event.y)
+        self._zoom_around(cx_frac, cy_frac, factor=1.0 / 0.75)
+        event.stop()
+        self.refresh()
+
+    def on_mouse_down(self, event) -> None:  # type: ignore[override]
+        """Feature 5 — show the data value at the clicked grid cell."""
+        if self._data is None or self._ndim != 2:
+            return
+        if self._last_w_map == 0 or self._last_ix is None or self._last_iy is None:
+            return
+        col = event.x - _BORDER
+        row = event.y - _BORDER - _HEADER_ROWS
+        if not (0 <= col < self._last_w_map and 0 <= row < self._last_h_plot):
+            return
+        # Map screen column → _last_ix index → data x-index.
+        n_ix = len(self._last_ix)
+        n_iy = len(self._last_iy)
+        ix_pos = int(np.round(col * (n_ix - 1) / max(self._last_w_map - 1, 1)))
+        # Display is y-flipped: row 0 = top = last_iy[-1] (y_max).
+        iy_pos_flip = int(np.round(row * (n_iy - 1) / max(self._last_h_plot - 1, 1)))
+        iy_pos = n_iy - 1 - iy_pos_flip
+        xi = int(self._last_ix[np.clip(ix_pos, 0, n_ix - 1)])  # pylint: disable=unsubscriptable-object
+        yi = int(self._last_iy[np.clip(iy_pos, 0, n_iy - 1)])  # pylint: disable=unsubscriptable-object
+        y_cc_click = self._y_cc if self._y_cc is not None else np.array([0.0, 1.0])
+        x_val = float(self._x_cc[xi])   # type: ignore[index]  # pylint: disable=unsubscriptable-object
+        y_val = float(y_cc_click[yi])
+        val = float(self._data[xi, yi])  # type: ignore[index]  # pylint: disable=unsubscriptable-object
+        self.post_message(MFCPlot.Clicked(x_val, y_val, val))
 
     def render(self):  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
         data = self._data
@@ -131,18 +251,13 @@ class MFCPlot(PlotextPlot):  # pylint: disable=too-many-instance-attributes,too-
         _CB_GAP, _CB_W, _CB_LBL = 1, 2, 9
         w_map_avail = max(w_plot - _CB_GAP - _CB_W - _CB_LBL, 4)
 
-        # Preserve the physical x/y aspect ratio so the heatmap is not
-        # stretched to fill the terminal.  The domain ratio is clamped to
-        # avoid extremely wide or tall slivers.
+        # Preserve the physical x/y aspect ratio.
         y_cc_2d = self._y_cc if self._y_cc is not None else np.array([0.0, 1.0])
         x_extent = max(abs(float(x_cc[-1]) - float(x_cc[0])), 1e-30)  # pylint: disable=unsubscriptable-object
         y_extent = max(abs(float(y_cc_2d[-1]) - float(y_cc_2d[0])), 1e-30)
         domain_ratio = float(np.clip(x_extent / y_extent, _ASPECT_MIN, _ASPECT_MAX))
-        # Convert to character-grid ratio: 1 row ≈ _CELL_RATIO columns wide.
-        char_ratio = domain_ratio * _CELL_RATIO  # desired w_map / h_plot
+        char_ratio = domain_ratio * _CELL_RATIO
 
-        # Fit within the available character budget: try height-constrained first,
-        # fall back to width-constrained if the ideal width exceeds w_map_avail.
         w_ideal = int(round(h_plot_avail * char_ratio))
         if w_ideal <= w_map_avail:
             w_map  = max(w_ideal, 4)
@@ -151,12 +266,24 @@ class MFCPlot(PlotextPlot):  # pylint: disable=too-many-instance-attributes,too-
             h_plot = max(int(round(w_map_avail / char_ratio)), 4)
             w_map  = w_map_avail
 
-        ix = np.linspace(0, data.shape[0] - 1, w_map, dtype=int)
-        iy = np.linspace(0, data.shape[1] - 1, h_plot, dtype=int)
+        # Apply zoom window to data index ranges (Feature 6).
+        x0_f, x1_f, y0_f, y1_f = self._zoom
+        x0_i = int(x0_f * (data.shape[0] - 1))
+        x1_i = max(x0_i + 1, int(x1_f * (data.shape[0] - 1)))
+        y0_i = int(y0_f * (data.shape[1] - 1))
+        y1_i = max(y0_i + 1, int(y1_f * (data.shape[1] - 1)))
+        ix = np.linspace(x0_i, x1_i, w_map, dtype=int)
+        iy = np.linspace(y0_i, y1_i, h_plot, dtype=int)
+
+        # Cache for click/scroll coordinate mapping (Features 5 & 6).
+        self._last_w_map = w_map
+        self._last_h_plot = h_plot
+        self._last_ix = ix
+        self._last_iy = iy
+
         ds = data[np.ix_(ix, iy)]  # pylint: disable=unsubscriptable-object
 
         # Compute which screen cells to stamp with an open-circle glyph.
-        # col → x_cc[ix[col]], row 0 = y_max (flipped), row h_plot-1 = y_min.
         bubble_cells: set = set()
         bubbles = self._bubbles
         if bubbles is not None and len(bubbles) > 0:
@@ -172,19 +299,15 @@ class MFCPlot(PlotextPlot):  # pylint: disable=too-many-instance-attributes,too-
                     continue
                 if by < y_min - br or by > y_max + br:
                     continue
-                # Screen centre (col increases right, row 0 = top = y_max)
                 col_c = (bx - x_min) / x_range * (w_map - 1)
                 row_c = (y_max - by) / y_range * (h_plot - 1)
-                # Screen radius in character units
                 col_r = br / x_range * (w_map - 1)
                 row_r = br / y_range * (h_plot - 1)
                 if col_r < 0.5 and row_r < 0.5:
-                    # Sub-cell bubble — mark centre only
                     c, r = int(round(col_c)), int(round(row_c))
                     if 0 <= r < h_plot and 0 <= c < w_map:
                         bubble_cells.add((r, c))
                 else:
-                    # Parametric circle outline
                     n_pts = min(max(12, int(2 * np.pi * max(col_r, row_r))), 72)
                     for ti in range(n_pts):
                         angle = 2 * np.pi * ti / n_pts
@@ -218,7 +341,6 @@ class MFCPlot(PlotextPlot):  # pylint: disable=too-many-instance-attributes,too-
         lines = []
         for row in range(h_plot):
             line = RichText()
-            # Heatmap cells — one terminal character per data point.
             for col in range(w_map):
                 r = int(rgba[row, col, 0] * 255)
                 g = int(rgba[row, col, 1] * 255)
@@ -249,17 +371,21 @@ class MFCPlot(PlotextPlot):  # pylint: disable=too-many-instance-attributes,too-
             line.append(lbl.ljust(_CB_LBL)[:_CB_LBL])
             lines.append(line)
 
-        y_cc = self._y_cc if self._y_cc is not None else np.array([0.0, 1.0])
         log_tag = "  [log]" if log_active else ("  [log n/a]" if self._log_scale else "")
         frozen_tag = "  [frozen]" if self._vmin is not None else ""
+        zoomed_tag = "  [zoom]" if self._zoom != (0.0, 1.0, 0.0, 1.0) else ""
         header = RichText(
             f" {self._varname}  (step {self._step})"
-            f"   [{vmin:.3g}, {vmax:.3g}]{log_tag}{frozen_tag}",
+            f"   [{vmin:.3g}, {vmax:.3g}]{log_tag}{frozen_tag}{zoomed_tag}",
             style="bold"
         )
+        # Show the visible coordinate range (reflects zoom when active).
+        x_lo = float(x_cc[ix[0]])   # type: ignore[index]  # pylint: disable=unsubscriptable-object
+        x_hi = float(x_cc[ix[-1]])  # type: ignore[index]  # pylint: disable=unsubscriptable-object
+        y_vis = y_cc_2d[iy]
         footer = RichText(
-            f" x: [{x_cc[0]:.3f} \u2026 {x_cc[-1]:.3f}]"  # pylint: disable=unsubscriptable-object
-            f"   y: [{y_cc[0]:.3f} \u2026 {y_cc[-1]:.3f}]",
+            f" x: [{x_lo:.3f} \u2026 {x_hi:.3f}]"
+            f"   y: [{float(y_vis[0]):.3f} \u2026 {float(y_vis[-1]):.3f}]",
             style="dim"
         )
         return RichGroup(header, *lines, footer)
@@ -288,6 +414,12 @@ class MFCTuiApp(App):  # pylint: disable=too-many-instance-attributes
         padding: 0 1;
     }
 
+    #step-counter {
+        width: 1fr;
+        height: 4;
+        color: $accent;
+    }
+
     #var-title {
         text-style: bold;
         color: $accent;
@@ -296,6 +428,17 @@ class MFCTuiApp(App):  # pylint: disable=too-many-instance-attributes
 
     #var-list {
         height: 1fr;
+    }
+
+    #hist-title {
+        text-style: dim;
+        padding: 1 0 0 0;
+        height: 1;
+    }
+
+    #sparkline {
+        height: 3;
+        width: 1fr;
     }
 
     #status {
@@ -317,6 +460,7 @@ class MFCTuiApp(App):  # pylint: disable=too-many-instance-attributes
         Binding("c", "cycle_cmap", "cmap"),
         Binding("l", "toggle_log", "log"),
         Binding("f", "toggle_freeze", "freeze"),
+        Binding("r", "reset_zoom", "zoom↺", show=False),
     ]
 
     step_idx: reactive[int] = reactive(0, always_update=True)
@@ -341,21 +485,24 @@ class MFCTuiApp(App):  # pylint: disable=too-many-instance-attributes
         self._read_func = read_func
         self._ndim = ndim
         self._bubble_func = bubble_func
-        # Store init_var but don't set the reactive yet — the DOM doesn't exist
-        # until on_mount, and the watcher calls query_one which needs the DOM.
         self._init_var = init_var or (varnames[0] if varnames else "")
-        self._frozen_range: Optional[tuple] = None
+        self._frozen_range: Optional[Tuple[float, float]] = None
         self._play_timer = None
+        # Per-variable max-value history for the sparkline (Feature 3).
+        self._vmax_history: Deque[float] = deque(maxlen=_HISTORY_MAX)
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
         with Horizontal(id="content"):
             with Vertical(id="sidebar"):
+                yield Digits("0", id="step-counter")          # Feature 2
                 yield Label("Variables", id="var-title")
                 yield ListView(
                     *[ListItem(Label(v), id=f"var-{v}") for v in self._varnames],
                     id="var-list",
                 )
+                yield Label("peak", id="hist-title")
+                yield Sparkline([], summary_function=max, id="sparkline")  # Feature 3
             yield MFCPlot(id="plot")
         yield Static(self._status_text(), id="status")
         yield Footer()
@@ -363,7 +510,6 @@ class MFCTuiApp(App):  # pylint: disable=too-many-instance-attributes
     def on_mount(self) -> None:
         # DOM is ready — now safe to set the reactive (fires watcher → _push_data)
         self.var_name = self._init_var
-        # Highlight the initial variable in the sidebar list
         lv = self.query_one("#var-list", ListView)
         for i, v in enumerate(self._varnames):
             if v == self.var_name:
@@ -378,6 +524,7 @@ class MFCTuiApp(App):  # pylint: disable=too-many-instance-attributes
         self._push_data()
 
     def watch_var_name(self, _old: str, _new: str) -> None:
+        self._vmax_history.clear()  # reset sparkline when variable changes
         self._push_data()
 
     def watch_cmap_name(self, _old: str, _new: str) -> None:
@@ -393,6 +540,100 @@ class MFCTuiApp(App):  # pylint: disable=too-many-instance-attributes
             if self._play_timer is not None:
                 self._play_timer.stop()
                 self._play_timer = None
+
+    # ------------------------------------------------------------------
+    # Message handlers
+    # ------------------------------------------------------------------
+
+    def on_mfc_plot_clicked(self, event: MFCPlot.Clicked) -> None:
+        """Feature 5 — show the data value at the clicked grid coordinate."""
+        self.query_one("#status", Static).update(
+            f" x={event.x_phys:.4f}  y={event.y_phys:.4f}  val={event.value:.6g}"
+        )
+
+    # ------------------------------------------------------------------
+    # Background data loading (Feature 4)
+    # ------------------------------------------------------------------
+
+    @work(exclusive=True, thread=True)
+    def _push_data(self) -> None:
+        """Load the current step/var in a background thread and push to the plot."""
+        if not self._steps or not self.var_name:
+            return
+        # Snapshot all reactive state before entering the thread to avoid
+        # reading stale values if the user changes something mid-load.
+        step_idx = min(self.step_idx, len(self._steps) - 1)
+        step = self._steps[step_idx]
+        var = self.var_name
+        cmap = self.cmap_name
+        log = self.log_scale
+        frozen = self._frozen_range
+
+        try:
+            assembled = _load(step, self._read_func)
+        except Exception as exc:  # pylint: disable=broad-except
+            self.call_from_thread(
+                self.query_one("#status", Static).update,
+                f" [red]Error loading step {step}: {exc}[/red]",
+            )
+            return
+
+        worker = get_current_worker()
+        if worker.is_cancelled:
+            return
+
+        data = assembled.variables.get(var)
+        bubbles = None
+        if self._bubble_func is not None and self._ndim == 2:
+            try:
+                bubbles = self._bubble_func(step)
+            except Exception:  # pylint: disable=broad-except
+                pass
+
+        self.call_from_thread(
+            self._apply_data, assembled, data, step, var, cmap, log, frozen, bubbles,
+        )
+
+    def _apply_data(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+        self,
+        assembled,
+        data: Optional[np.ndarray],
+        step: int,
+        var: str,
+        cmap: str,
+        log: bool,
+        frozen: Optional[Tuple[float, float]],
+        bubbles: Optional[np.ndarray],
+    ) -> None:
+        """Apply loaded data to the plot widget.  Runs on the main thread."""
+        plot = self.query_one("#plot", MFCPlot)
+        plot._x_cc = assembled.x_cc        # pylint: disable=protected-access
+        plot._y_cc = assembled.y_cc        # pylint: disable=protected-access
+        plot._data = data                  # pylint: disable=protected-access
+        plot._ndim = self._ndim            # pylint: disable=protected-access
+        plot._varname = var                # pylint: disable=protected-access
+        plot._step = step                  # pylint: disable=protected-access
+        plot._cmap_name = cmap             # pylint: disable=protected-access
+        plot._log_scale = log              # pylint: disable=protected-access
+        plot._bubbles = bubbles            # pylint: disable=protected-access
+        if frozen is not None:
+            plot._vmin, plot._vmax = frozen  # pylint: disable=protected-access
+        else:
+            plot._vmin = None              # pylint: disable=protected-access
+            plot._vmax = None              # pylint: disable=protected-access
+        plot.refresh()
+
+        # Feature 2 — update the large step counter.
+        self.query_one("#step-counter", Digits).update(str(step))
+
+        # Feature 3 — append to sparkline history and refresh.
+        if data is not None and data.size > 0:
+            finite = data[np.isfinite(data)]
+            if finite.size > 0:
+                self._vmax_history.append(float(finite.max()))
+                self.query_one("#sparkline", Sparkline).data = list(self._vmax_history)
+
+        self.query_one("#status", Static).update(self._status_text())
 
     # ------------------------------------------------------------------
     # Helpers
@@ -415,45 +656,6 @@ class MFCTuiApp(App):  # pylint: disable=too-many-instance-attributes
             f"  cmap: {self.cmap_name}"
             f"{flag_str}"
         )
-
-    def _push_data(self) -> None:
-        """Load the current step/var and push data into the plot widget."""
-        if not self._steps or not self.var_name:
-            return
-        step = self._steps[self.step_idx]
-        try:
-            assembled = _load(step, self._read_func)
-        except Exception as exc:  # pylint: disable=broad-except
-            self.query_one("#status", Static).update(
-                f" [red]Error loading step {step}: {exc}[/red]"
-            )
-            return
-
-        data = assembled.variables.get(self.var_name)
-        plot = self.query_one("#plot", MFCPlot)
-        plot._x_cc = assembled.x_cc        # pylint: disable=protected-access
-        plot._y_cc = assembled.y_cc        # pylint: disable=protected-access
-        plot._data = data                  # pylint: disable=protected-access
-        plot._ndim = self._ndim            # pylint: disable=protected-access
-        plot._varname = self.var_name      # pylint: disable=protected-access
-        plot._step = step                  # pylint: disable=protected-access
-        plot._cmap_name = self.cmap_name   # pylint: disable=protected-access
-        plot._log_scale = self.log_scale   # pylint: disable=protected-access
-        if self._bubble_func is not None and self._ndim == 2:
-            try:
-                plot._bubbles = self._bubble_func(step)  # pylint: disable=protected-access
-            except Exception:  # pylint: disable=broad-except
-                plot._bubbles = None  # pylint: disable=protected-access
-        else:
-            plot._bubbles = None  # pylint: disable=protected-access
-        if self._frozen_range is not None:
-            plot._vmin, plot._vmax = self._frozen_range  # pylint: disable=protected-access
-        else:
-            plot._vmin = None              # pylint: disable=protected-access
-            plot._vmax = None              # pylint: disable=protected-access
-        plot.refresh()
-
-        self.query_one("#status", Static).update(self._status_text())
 
     # ------------------------------------------------------------------
     # Actions
@@ -491,6 +693,10 @@ class MFCTuiApp(App):  # pylint: disable=too-many-instance-attributes
     def action_toggle_play(self) -> None:
         self.playing = not self.playing
 
+    def action_reset_zoom(self) -> None:
+        """Feature 6 — reset 2D zoom to full view."""
+        self.query_one("#plot", MFCPlot).reset_zoom()
+
     def _auto_advance(self) -> None:
         self.step_idx = (self.step_idx + 1) % len(self._steps)
 
@@ -525,7 +731,10 @@ def run_tui(
         f"[bold]Launching TUI[/bold] — {len(steps)} step(s), "
         f"{len(varnames)} variable(s)"
     )
-    cons.print("[dim]  ,/. or ←/→  prev/next step  •  space play  •  l log  •  f freeze  •  ↑↓ variable  •  q quit[/dim]")
+    cons.print(
+        "[dim]  ,/. or ←/→  step  •  space play  •  l log  •  f freeze"
+        "  •  c cmap  •  ↑↓ var  •  scroll zoom  •  r reset zoom  •  click value  •  q quit[/dim]"
+    )
 
     _step_cache.seed(steps[0], first)
 
