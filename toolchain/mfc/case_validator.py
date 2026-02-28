@@ -686,7 +686,7 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         self.prohibit(ib and n <= 0,
                      "Immersed Boundaries do not work in 1D (requires n > 0)")
         self.prohibit(ib and (num_ibs <= 0 or num_ibs > 1000),
-                     "num_ibs must be between 1 and num_patches_max (10)")
+                     "num_ibs must be between 1 and num_patches_max (1000)")
         self.prohibit(not ib and num_ibs > 0,
                      "num_ibs is set, but ib is not enabled")
 

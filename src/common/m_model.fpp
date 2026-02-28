@@ -555,7 +555,7 @@ contains
                 ! random jitter in the origin helps us estimate volume fraction instead of only at the cell center
                 ray_origins(i, k) = point(k) + (f_model_random_number(rand_seed) - 0.5_wp)*spacing(k)
                 ! cast sample rays in all directions
-                ray_dirs(i, k) = point(k) + f_model_random_number(rand_seed) - 0.5_wp
+                ray_dirs(i, k) = f_model_random_number(rand_seed) - 0.5_wp
             end do
             ray_dirs(i, :) = ray_dirs(i, :)/sqrt(sum(ray_dirs(i, :)*ray_dirs(i, :)))
         end do
@@ -1070,6 +1070,8 @@ contains
         dx_local = minval(dx); dy_local = minval(dy)
         if (p /= 0) dz_local = minval(dz)
 
+        allocate (stl_bounding_boxes(num_ibs, 1:3, 1:3))
+
         do patch_id = 1, num_ibs
             if (patch_ib(patch_id)%geometry == 5 .or. patch_ib(patch_id)%geometry == 12) then
                 allocate (models(patch_id)%model)
@@ -1135,7 +1137,6 @@ contains
                     write (*, "(A, 3(2X, F20.10))") "    >         Max:", grid_mm(:, 2)
                 end if
 
-                allocate (stl_bounding_boxes(patch_id, 1:3, 1:3))
                 stl_bounding_boxes(patch_id, 1, 1:3) = [bbox%min(1), (bbox%min(1) + bbox%max(1))/2._wp, bbox%max(1)]
                 stl_bounding_boxes(patch_id, 2, 1:3) = [bbox%min(2), (bbox%min(2) + bbox%max(2))/2._wp, bbox%max(2)]
                 stl_bounding_boxes(patch_id, 3, 1:3) = [bbox%min(3), (bbox%min(3) + bbox%max(3))/2._wp, bbox%max(3)]

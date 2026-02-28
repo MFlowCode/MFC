@@ -866,8 +866,8 @@ contains
         ! domain
         $:GPU_PARALLEL_LOOP(private='[i,j, xy_local]',&
                   & copyin='[encoded_patch_id,center,ellipse_coeffs,inverse_rotation,x_cc,y_cc]', collapse=2)
-        do j = -gp_layers, n + gp_layers
-            do i = -gp_layers, m + gp_layers
+        do j = jl, jr
+            do i = il, ir
                 ! get the x and y coordinates in the local IB frame
                 xy_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]
                 xy_local = matmul(inverse_rotation, xy_local)
@@ -1002,7 +1002,7 @@ contains
         il = -gp_layers - 1
         jl = -gp_layers - 1
         kl = -gp_layers - 1
-        ir = m + gp_layers - 1
+        ir = m + gp_layers + 1
         jr = n + gp_layers + 1
         kr = p + gp_layers + 1
 

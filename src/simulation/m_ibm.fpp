@@ -491,19 +491,26 @@ contains
                     do while ((temp_loc < s_cc(index) &
                                .or. temp_loc > s_cc(index + 1)))
                         index = index + dir
-#if !defined(MFC_OpenACC) && !defined(MFC_OpenMP)
                         if (index < -buff_size .or. index > bound) then
+#if !defined('MFC_OpenACC') && !defined('MFC_OpenMP')
                             print *, "A required image point is not located in this computational domain."
-                            print *, "Ghost Point is located at ", [x_cc(i), y_cc(j), z_cc(k)], " while moving in dimension ", dim
-                            print *, "We are searching for image point at ", ghost_points_in(q)%ip_loc(:)
-                            print *, "We can only support points located inside the box from ", [x_cc(-buff_size), y_cc(-buff_size), z_cc(-buff_size)]
-                            print *, "To ", [x_cc(m + buff_size - 1), y_cc(n + buff_size - 1), z_cc(p + buff_size - 1)]
+                            print *, "Ghost Point is located at :"
+                            if (p == 0) then
+                                print *, [x_cc(i), y_cc(j)]
+                            else
+                                print *, [x_cc(i), y_cc(j), z_cc(k)]
+                            end if
+                            print *, "We are searching in dimension ", dim, " for image point at ", ghost_points_in(q)%ip_loc(:)
+                            print *, "Domain size: ", [x_cc(-buff_size), y_cc(-buff_size), z_cc(-buff_size)]
+                            print *, "x: ", x_cc(-buff_size), " to: ", x_cc(m + buff_size - 1)
+                            print *, "y: ", y_cc(-buff_size), " to: ", y_cc(n + buff_size - 1)
+                            if (p /= 0) print *, "z: ", z_cc(-buff_size), " to: ", z_cc(p + buff_size - 1)
                             print *, "Image point is located approximately ", (ghost_points_in(q)%loc(dim) - ghost_points_in(q)%ip_loc(dim))/(s_cc(1) - s_cc(0)), " grid cells away"
                             print *, "Levelset ", dist, " and Norm: ", norm(:)
                             print *, "A short term fix may include increasing buff_size further in m_helper_basic (currently set to a minimum of 10)"
+#endif
                             error stop "Ghost Point and Image Point on Different Processors"
                         end if
-#endif
                     end do
                     ghost_points_in(q)%ip_grid(dim) = index
                     if (ghost_points_in(q)%DB(dim) == -1) then
