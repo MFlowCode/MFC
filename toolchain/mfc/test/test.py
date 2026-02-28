@@ -42,7 +42,41 @@ abort_tests = threading.Event()
 class TestTimeoutError(MFCException):
     pass
 
-# pylint: disable=too-many-branches, trailing-whitespace
+def _filter_only(cases, skipped_cases):
+    """Filter cases by --only terms using AND for labels, OR for UUIDs.
+
+    Labels (non-UUID terms): case must match ALL labels (AND logic).
+    UUIDs (8-char hex terms): case must match ANY UUID (OR logic).
+    Mixed: keep case if all labels match OR any UUID matches.
+    """
+    def is_uuid(term):
+        return len(term) == 8 and all(c in '0123456789abcdefABCDEF' for c in term)
+
+    uuids  = [t for t in ARG("only") if is_uuid(t)]
+    labels = [t for t in ARG("only") if not is_uuid(t)]
+
+    for case in cases[:]:
+        check = set(case.trace.split(" -> "))
+        check.add(case.get_uuid())
+
+        label_ok = all(label in check for label in labels) if labels else True
+        uuid_ok  = any(u in check for u in uuids)  if uuids  else True
+
+        if labels and uuids:
+            keep = label_ok or uuid_ok
+        elif labels:
+            keep = label_ok
+        else:
+            keep = uuid_ok
+
+        if not keep:
+            cases.remove(case)
+            skipped_cases.append(case)
+
+    return cases, skipped_cases
+
+
+# pylint: disable=too-many-branches, too-many-statements, trailing-whitespace
 def __filter(cases_) -> typing.List[TestCase]:
     cases = cases_[:]
     selected_cases = []
@@ -66,14 +100,13 @@ def __filter(cases_) -> typing.List[TestCase]:
         raise MFCException("Testing: Your specified range [--from,--to] is incorrect. Please ensure both IDs exist and are in the correct order.")
 
     if len(ARG("only")) > 0:
-        for case in cases[:]:
-            case: TestCase
+        cases, skipped_cases = _filter_only(cases, skipped_cases)
 
-            checkCase = case.trace.split(" -> ")
-            checkCase.append(case.get_uuid())
-            if not set(ARG("only")).issubset(set(checkCase)):
-                cases.remove(case)
-                skipped_cases.append(case)
+        if not cases:
+            raise MFCException(
+                f"--only filter matched zero test cases. "
+                f"Specified: {ARG('only')}. Check that UUIDs/names are valid."
+            )
 
     for case in cases[:]:
         if case.ppn > 1 and not ARG("mpi"):
@@ -99,6 +132,20 @@ def __filter(cases_) -> typing.List[TestCase]:
         skipped_cases += example_cases
         cases = [case for case in cases if case not in example_cases]
 
+    if ARG("shard") is not None:
+        parts = ARG("shard").split("/")
+        if len(parts) != 2 or not all(p.isdigit() for p in parts) or int(parts[1]) < 1 or not 1 <= int(parts[0]) <= int(parts[1]):
+            raise MFCException(f"Invalid --shard '{ARG('shard')}': expected 'i/n' with 1 <= i <= n (e.g., '1/2').")
+        shard_idx, shard_count = int(parts[0]), int(parts[1])
+        skipped_cases += [c for i, c in enumerate(cases) if i % shard_count != shard_idx - 1]
+        cases = [c for i, c in enumerate(cases) if i % shard_count == shard_idx - 1]
+
+        if not cases:
+            raise MFCException(
+                f"--shard {ARG('shard')} matched zero test cases. "
+                f"Total cases before sharding may be less than shard count."
+            )
+
     if ARG("percent") == 100:
         return cases, skipped_cases
 
@@ -115,6 +162,7 @@ def test():
     global errors, failed_tests, test_start_time
 
     test_start_time = time.time()  # Start timing
+    failed_uuids_path = os.path.join(common.MFC_TEST_DIR, "failed_uuids.txt")
     cases = list_cases()
 
     # Delete UUIDs that are not in the list of cases from tests/
@@ -182,6 +230,13 @@ def test():
 
     # Check if we aborted due to high failure rate
     if abort_tests.is_set():
+        # Clean up stale failed_uuids.txt so CI doesn't retry wrong tests
+        try:
+            if os.path.exists(failed_uuids_path):
+                os.remove(failed_uuids_path)
+        except OSError:
+            pass
+
         total_completed = nFAIL + nPASS
         cons.print()
         cons.unindent()
@@ -205,6 +260,14 @@ def test():
 
     # Build the summary report
     _print_test_summary(nPASS, nFAIL, nSKIP, minutes, seconds, failed_tests, skipped_cases)
+
+    # Write failed UUIDs to file for CI retry logic
+    if failed_tests:
+        with open(failed_uuids_path, "w") as f:
+            for test_info in failed_tests:
+                f.write(test_info['uuid'] + "\n")
+    elif os.path.exists(failed_uuids_path):
+        os.remove(failed_uuids_path)
 
     exit(nFAIL)
 
