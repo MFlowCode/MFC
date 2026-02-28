@@ -172,9 +172,6 @@ It supports 1D and 2D data only (use `--interactive` for 3D).
 | `c` | Cycle colormap |
 | `q` | Quit |
 
-> [!NOTE]
-> The TUI requires the `textual` and `textual-plotext` Python packages, which are part of the optional `[viz]` extras and are auto-installed on the first `./mfc.sh viz --tui` run.
-
 ### Plot styling
 
 Axis labels use LaTeX-style math notation — for example, `pres` is labeled as \f$p\f$, `vel1` as \f$u\f$, and `alpha1` as \f$\alpha_1\f$.

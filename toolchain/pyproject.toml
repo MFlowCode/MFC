@@ -40,31 +40,18 @@ dependencies = [
     # Frontier Profiling
     "astunparse==1.6.2",
     "pymongo",
-    "tabulate"
-]
+    "tabulate",
 
-[project.optional-dependencies]
-viz = [
-    # 2D/3D plotting (renderer, TUI)
+    # Visualization (./mfc.sh viz)
     "matplotlib",
-
-    # Silo-HDF5 reader
     "h5py",
-
-    # MP4 export
     "imageio>=2.33",
     "imageio-ffmpeg>=0.5.0",
-
-    # Terminal UI (--tui)
     "plotext>=5.2.0",
     "textual>=0.47.0",
     "textual-plotext>=0.2.0",
-
-    # Interactive web UI (--interactive)
     "dash>=2.0",
     "plotly",
-
-    # Progress bar (PNG/MP4 batch rendering)
     "tqdm",
 ]
 

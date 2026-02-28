@@ -16,8 +16,7 @@ MFC writes species as Y_{name} (e.g. Y_OH) and density as alpha_rho1.
 Run `./mfc.sh viz . --list-vars` to verify variable names in your output.
 """
 from case import dt, Tend, SAVE_COUNT, sol
-from mfc.viz.silo_reader import assemble_silo
-from mfc.viz.reader import discover_timesteps
+from mfc.viz import assemble_silo, discover_timesteps
 from tqdm import tqdm
 import cantera as ct
 import matplotlib.pyplot as plt

@@ -209,6 +209,11 @@ def read_binary_file(path: str, var_filter: Optional[str] = None) -> ProcessorDa
                 var_dtype = np.dtype(f'{endian}f8')
             elif data_bytes == data_size * 4:
                 var_dtype = np.dtype(f'{endian}f4')
+            elif data_bytes == data_size * 2:
+                raise ValueError(
+                    f"Variable '{varname}' appears to be half-precision (2 bytes/value). "
+                    "This is typical of --mixed builds. Half-precision viz is not yet supported."
+                )
             else:
                 var_bpv = data_bytes / data_size if data_size else 0
                 raise ValueError(

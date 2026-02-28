@@ -5,54 +5,12 @@ Dispatches to reader + renderer based on CLI arguments.
 """
 
 import os
-import importlib
-import importlib.util
-import shutil
-import subprocess
-import sys
 import warnings
 
 from mfc.state import ARG
-from mfc.common import MFC_ROOT_DIR, MFCException
+from mfc.common import MFCException
 from mfc.printer import cons
 
-
-def _ensure_viz_deps() -> None:
-    """Install the [viz] optional extras on first use.
-
-    Checks one sentinel per feature group so that a user who has matplotlib
-    pre-installed (e.g. via Anaconda) but lacks imageio, textual, or h5py
-    still triggers the install.
-    """
-    _SENTINELS = ("matplotlib", "imageio", "h5py", "textual", "dash", "plotext", "plotly")
-    if all(importlib.util.find_spec(p) is not None for p in _SENTINELS):
-        return  # all present
-
-    toolchain_path = os.path.join(MFC_ROOT_DIR, "toolchain")
-    cons.print("[bold]Installing viz dependencies[/bold] "
-               "(first run — this may take a minute)...")
-
-    env = {**os.environ, "UV_LINK_MODE": "copy"}
-    if shutil.which("uv"):
-        cmd = ["uv", "pip", "install", f"{toolchain_path}[viz]"]
-    else:
-        cmd = [sys.executable, "-m", "pip", "install", f"{toolchain_path}[viz]"]
-
-    try:
-        result = subprocess.run(cmd, env=env, check=False, timeout=300)
-    except subprocess.TimeoutExpired as exc:
-        raise MFCException(
-            "Timed out installing viz dependencies (network may be restricted). "
-            f"Try manually: pip install '{toolchain_path}[viz]'"
-        ) from exc
-    if result.returncode != 0:
-        raise MFCException(
-            "Failed to install viz dependencies. "
-            f"Try manually: pip install '{toolchain_path}[viz]'"
-        )
-
-    importlib.invalidate_caches()
-    cons.print("[bold green]Viz dependencies installed.[/bold green]\n")
 
 
 _CMAP_POPULAR = (
@@ -184,6 +142,10 @@ def _parse_steps(step_arg, available_steps):
     try:
         if ':' in s:
             parts = s.split(':')
+            if len(parts) > 3:
+                raise MFCException(
+                    f"Invalid range '{step_arg}': expected start:end or start:end:stride."
+                )
             start = int(parts[0])
             end = int(parts[1])
             stride = int(parts[2]) if len(parts) > 2 else 1
@@ -206,7 +168,6 @@ def _parse_steps(step_arg, available_steps):
 
 def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branches
     """Main viz command dispatcher."""
-    _ensure_viz_deps()
 
     from .reader import discover_format, discover_timesteps, assemble, has_lag_bubble_evol, read_lag_bubbles_at_step  # pylint: disable=import-outside-toplevel
     from .renderer import render_1d, render_1d_tiled, render_2d, render_2d_tiled, render_3d_slice, render_mp4  # pylint: disable=import-outside-toplevel
