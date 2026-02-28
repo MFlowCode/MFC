@@ -12,9 +12,8 @@ Run from this directory after post_process has been executed:
 All dependencies (cantera, matplotlib, tqdm, h5py) are installed automatically
 by the MFC toolchain.
 
-Variable names in MFC's Silo output follow the convention: prim.1 = rho,
-prim.{5+i} = Y_i (species mass fraction).  Run `./mfc.sh viz . --list-vars`
-to verify the names present in your output files.
+MFC writes species as Y_{name} (e.g. Y_OH) and density as alpha_rho1.
+Run `./mfc.sh viz . --list-vars` to verify variable names in your output.
 """
 from case import dt, Tend, SAVE_COUNT, sol
 from mfc.viz.silo_reader import assemble_silo
@@ -39,11 +38,6 @@ oh_idx = sol.species_index('OH')
 skinner_induction_time = 0.052e-3   # Skinner & Ringrose (1965)
 
 
-def _species_var(name):
-    """MFC Silo variable name for species mass fraction Y_{name}."""
-    return f'prim.{5 + sol.species_index(name)}'
-
-
 # ---------------------------------------------------------------------------
 # Load MFC output
 # ---------------------------------------------------------------------------
@@ -60,9 +54,10 @@ for step in tqdm(steps, desc='Loading MFC output'):
     # Perfectly stirred reactor: spatially uniform — take the midpoint cell.
     mid = assembled.x_cc.size // 2
     mfc_times.append(step * dt)
-    mfc_rhos.append(float(assembled.variables['prim.1'][mid]))
+    # alpha_rho1 = partial density of fluid 1; equals total density for single-fluid cases.
+    mfc_rhos.append(float(assembled.variables['alpha_rho1'][mid]))
     for y in Y_VARS:
-        mfc_Ys[y].append(float(assembled.variables[_species_var(y)][mid]))
+        mfc_Ys[y].append(float(assembled.variables[f'Y_{y}'][mid]))
 
 # ---------------------------------------------------------------------------
 # Cantera 0-D reference
@@ -71,18 +66,19 @@ time_save = Tend / SAVE_COUNT
 
 
 def generate_ct_saves():
-    reactor = ct.IdealGasReactor(sol)
+    reactor = ct.IdealGasReactor(sol, clone=True)
     net = ct.ReactorNet([reactor])
+    phase = reactor.phase
     ct_time = 0.0
     ct_ts = [0.0]
-    ct_Ys = [reactor.thermo.Y.copy()]
-    ct_rhos = [reactor.thermo.density]
+    ct_Ys = [phase.Y.copy()]
+    ct_rhos = [phase.density]
     while ct_time < Tend:
         net.advance(ct_time + time_save)
         ct_time += time_save
         ct_ts.append(ct_time)
-        ct_Ys.append(reactor.thermo.Y.copy())
-        ct_rhos.append(reactor.thermo.density)
+        ct_Ys.append(phase.Y.copy())
+        ct_rhos.append(phase.density)
     return ct_ts, ct_Ys, ct_rhos
 
 
