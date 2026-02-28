@@ -24,7 +24,7 @@ from textual import on, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
-from textual.events import Click
+from textual.message import Message
 from textual.reactive import reactive
 from textual.widgets import (
     Digits, Footer, Header, Label, ListItem, ListView, Static,
@@ -67,6 +67,18 @@ _HEADER_ROWS: int = 1
 class MFCPlot(PlotextPlot):  # pylint: disable=too-many-instance-attributes,too-few-public-methods
     """Plotext plot widget.  Caller sets ._x_cc / ._y_cc / ._data / ._ndim /
     ._varname / ._step before calling .refresh()."""
+
+    # Disable text-selection so Textual doesn't intercept left-button events
+    # before they bubble to our on_mouse_up handler.
+    ALLOW_SELECT = False
+
+    class Clicked(Message):
+        """Posted when the user clicks a heatmap cell (Feature 5)."""
+        def __init__(self, x_val: float, y_val: float, val: float) -> None:
+            self.x_val = x_val
+            self.y_val = y_val
+            self.val = val
+            super().__init__()
 
     DEFAULT_CSS = """
     MFCPlot {
@@ -156,6 +168,35 @@ class MFCPlot(PlotextPlot):  # pylint: disable=too-many-instance-attributes,too-
 
     def on_mouse_scroll_down(self, event) -> None:  # type: ignore[override]
         self._scroll_zoom(event, factor=1.0 / 0.75)
+
+    def on_mouse_up(self, event) -> None:  # pylint: disable=too-many-locals
+        """Feature 5 — post Clicked message with the data value at the heatmap cell."""
+        if event.button != 1:
+            return
+        if self._data is None or self._ndim != 2:
+            return
+        if self._last_w_map == 0 or self._last_ix is None or self._last_iy is None:
+            return
+        # Offset relative to this widget's content area (inside the border).
+        offset = event.get_content_offset_capture(self)
+        col = offset.x
+        row = offset.y - _HEADER_ROWS
+        col = max(0, min(col, self._last_w_map - 1))
+        row = max(0, min(row, self._last_h_plot - 1))
+        n_ix = len(self._last_ix)
+        n_iy = len(self._last_iy)
+        ix_pos = int(np.round(col * (n_ix - 1) / max(self._last_w_map - 1, 1)))
+        # Display is y-flipped: row 0 = top = y_max.
+        iy_pos = n_iy - 1 - int(np.round(row * (n_iy - 1) / max(self._last_h_plot - 1, 1)))
+        xi = int(self._last_ix[np.clip(ix_pos, 0, n_ix - 1)])  # pylint: disable=unsubscriptable-object
+        yi = int(self._last_iy[np.clip(iy_pos, 0, n_iy - 1)])  # pylint: disable=unsubscriptable-object
+        x_cc = self._x_cc
+        y_cc = self._y_cc if self._y_cc is not None else np.array([0.0, 1.0])
+        data = self._data
+        x_val = float(x_cc[xi])   # type: ignore[index]  # pylint: disable=unsubscriptable-object
+        y_val = float(y_cc[yi])
+        val = float(data[xi, yi])  # type: ignore[index]  # pylint: disable=unsubscriptable-object
+        self.post_message(MFCPlot.Clicked(x_val, y_val, val))
 
     def render(self):  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
         data = self._data
@@ -383,7 +424,6 @@ class MFCTuiApp(App):  # pylint: disable=too-many-instance-attributes
     }
 
     #status {
-        dock: bottom;
         height: 1;
         background: $panel;
         color: $text-muted;
@@ -429,6 +469,7 @@ class MFCTuiApp(App):  # pylint: disable=too-many-instance-attributes
         self._init_var = init_var or (varnames[0] if varnames else "")
         self._frozen_range: Optional[Tuple[float, float]] = None
         self._play_timer = None
+        self._click_info: str = ""  # last clicked cell; included in status bar
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
@@ -458,6 +499,7 @@ class MFCTuiApp(App):  # pylint: disable=too-many-instance-attributes
     # ------------------------------------------------------------------
 
     def watch_step_idx(self, _old: int, _new: int) -> None:
+        self._click_info = ""
         self._push_data()
 
     def watch_var_name(self, _old: str, _new: str) -> None:
@@ -478,46 +520,15 @@ class MFCTuiApp(App):  # pylint: disable=too-many-instance-attributes
                 self._play_timer = None
 
     # ------------------------------------------------------------------
-    # Click handler — show value at cursor (Feature 5)
+    # MFCPlot.Clicked handler — update status bar (Feature 5)
     # ------------------------------------------------------------------
 
-    @on(Click, "#plot")
-    def on_plot_click(self, event: Click) -> None:  # pylint: disable=too-many-locals
-        """Feature 5 — show the data value at the clicked 2D heatmap cell.
-
-        Uses screen coordinates (``event.screen_x/y``) and ``plot.content_region``
-        (both in screen space) to avoid any ambiguity about border offsets.
-        """
-        plot = self.query_one("#plot", MFCPlot)
-        if plot._data is None or plot._ndim != 2:  # pylint: disable=protected-access
-            return
-        if plot._last_w_map == 0 or plot._last_ix is None or plot._last_iy is None:  # pylint: disable=protected-access
-            return
-        # content_region is the widget's inner area in screen coordinates.
-        cr = plot.content_region
-        col = event.screen_x - cr.x
-        row = event.screen_y - cr.y - _HEADER_ROWS
-        # Clamp — clicking on the colorbar / footer still shows a value.
-        col = max(0, min(col, plot._last_w_map - 1))  # pylint: disable=protected-access
-        row = max(0, min(row, plot._last_h_plot - 1))  # pylint: disable=protected-access
-        last_ix = plot._last_ix  # pylint: disable=protected-access
-        last_iy = plot._last_iy  # pylint: disable=protected-access
-        n_ix = len(last_ix)
-        n_iy = len(last_iy)
-        ix_pos = int(np.round(col * (n_ix - 1) / max(plot._last_w_map - 1, 1)))  # pylint: disable=protected-access
-        # Display is y-flipped: row 0 = top = y_max.
-        iy_pos = n_iy - 1 - int(np.round(row * (n_iy - 1) / max(plot._last_h_plot - 1, 1)))  # pylint: disable=protected-access
-        xi = int(last_ix[np.clip(ix_pos, 0, n_ix - 1)])  # pylint: disable=unsubscriptable-object
-        yi = int(last_iy[np.clip(iy_pos, 0, n_iy - 1)])  # pylint: disable=unsubscriptable-object
-        x_cc = plot._x_cc  # pylint: disable=protected-access
-        y_cc = plot._y_cc if plot._y_cc is not None else np.array([0.0, 1.0])  # pylint: disable=protected-access
-        data = plot._data  # pylint: disable=protected-access
-        x_val = float(x_cc[xi])   # type: ignore[index]  # pylint: disable=unsubscriptable-object
-        y_val = float(y_cc[yi])
-        val = float(data[xi, yi])  # type: ignore[index]  # pylint: disable=unsubscriptable-object
-        self.query_one("#status", Static).update(
-            f" x={x_val:.4f}  y={y_val:.4f}  val={val:.6g}"
+    def on_mfcplot_clicked(self, event: MFCPlot.Clicked) -> None:
+        """Receive the heatmap click message and update the status bar."""
+        self._click_info = (
+            f"  │  x={event.x_val:.4f}  y={event.y_val:.4f}  val={event.val:.6g}"
         )
+        self.query_one("#status", Static).update(self._status_text())
 
     # ------------------------------------------------------------------
     # Background data loading (Feature 4)
@@ -615,6 +626,7 @@ class MFCTuiApp(App):  # pylint: disable=too-many-instance-attributes
             f"  var: {self.var_name}"
             f"  cmap: {self.cmap_name}"
             f"{flag_str}"
+            f"{self._click_info}"
         )
 
     # ------------------------------------------------------------------
