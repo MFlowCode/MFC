@@ -16,7 +16,7 @@ done
 # networks where PyPI is unreachable the install may fail; in that case we skip the
 # viz-specific lint and tests rather than aborting the entire precheck.
 VIZ_LINT=true
-if ! python3 -c "import matplotlib, dash, textual, imageio, h5py" 2>/dev/null; then
+if ! python3 -c "import matplotlib, dash, textual, imageio, h5py, plotext, plotly" 2>/dev/null; then
     log "(venv) Installing$MAGENTA viz$COLOR_RESET optional dependencies for linting..."
     if ! { uv pip install -q "$(pwd)/toolchain[viz]" 2>/dev/null \
            || python3 -m pip install -q "$(pwd)/toolchain[viz]" 2>/dev/null; }; then

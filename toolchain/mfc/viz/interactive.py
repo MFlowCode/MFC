@@ -199,7 +199,14 @@ def run_interactive(  # pylint: disable=too-many-locals,too-many-statements,too-
         host: str = '127.0.0.1',
         bubble_func: Optional[Callable] = None,
 ):
-    """Launch the interactive Dash visualization server."""
+    """Launch the interactive Dash visualization server.
+
+    Args:
+        bubble_func: Optional callable ``(step: int) -> np.ndarray | None``.
+            Must return a float64 array of shape ``(N, 4)`` with columns
+            ``[x, y, z, radius]`` in simulation-normalized units, or ``None``
+            when no bubble data is available for that step.
+    """
     app = Dash(
         __name__,
         title=f'MFC viz · {varname}',

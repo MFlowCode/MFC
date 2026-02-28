@@ -18,7 +18,7 @@ import imageio
 import matplotlib
 try:
     matplotlib.use('Agg')
-except Exception:  # pylint: disable=broad-except
+except ValueError:
     pass
 import matplotlib.pyplot as plt  # pylint: disable=wrong-import-position
 from matplotlib.colors import LogNorm  # pylint: disable=wrong-import-position
@@ -541,8 +541,9 @@ def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-argum
                     imageio.imread(os.path.join(viz_dir, fname))
                 ))
         success = True
-    except Exception:  # pylint: disable=broad-except
-        pass
+    except Exception as exc:  # pylint: disable=broad-except
+        import warnings  # pylint: disable=import-outside-toplevel
+        warnings.warn(f"MP4 encoding error: {exc}", stacklevel=2)
     finally:
         _cleanup()
     return success

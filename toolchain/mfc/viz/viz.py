@@ -373,6 +373,11 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
             f"Use --list-vars to see variables at a given step."
         )
 
+    # Validate colormap early so all modes get a clean error for bad --cmap
+    cmap_name = ARG('cmap')
+    if cmap_name:
+        _validate_cmap(cmap_name)
+
     # TUI mode — launch Textual terminal UI (1D/2D only)
     if ARG('tui'):
         if test_assembled.ndim == 3:
@@ -397,11 +402,6 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
                         port=int(port), host=str(host),
                         bubble_func=bubble_func)
         return
-
-    # Validate colormap before any rendering
-    cmap_name = ARG('cmap')
-    if cmap_name:
-        _validate_cmap(cmap_name)
 
     # Create output directory
     output_base = ARG('output')

@@ -449,7 +449,7 @@ def _nBubs_per_step(path: str) -> int:
     The result is cached so repeated calls for the same file (across
     different steps in an MP4 render) only scan the file once.
     """
-    with open(path) as f:
+    with open(path, encoding='ascii', errors='replace') as f:
         f.readline()  # skip header
         first = f.readline()
         if not first.strip():
@@ -492,10 +492,16 @@ def read_lag_bubbles_at_step(case_dir: str, step: int) -> Optional[np.ndarray]:
             nBubs = _nBubs_per_step(fpath)
             if nBubs == 0:
                 continue
-            # Line layout: 1 header + step * nBubs prior data rows
+            # Line layout: 1 header + step * nBubs prior data rows.
+            # MFC writes one bubble block per simulation timestep (at the last
+            # RK stage), so block index == MFC timestep integer.  This is
+            # correct for fresh runs (t_step_start=0).  For restarts where
+            # t_step_start>0 the lag file starts at 0 but step numbers begin
+            # at t_step_start — seeking would overshoot; restart support is
+            # not yet implemented.
             skip = 1 + step * nBubs
             rows = []
-            with open(fpath) as f:
+            with open(fpath, encoding='ascii', errors='replace') as f:
                 for _ in itertools.islice(f, skip):
                     pass
                 for line in itertools.islice(f, nBubs):
