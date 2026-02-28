@@ -70,7 +70,7 @@ def bench(targets = None):
                     try:
                         with open(log_filepath, "w") as log_file:
                             result = system(
-                                ["./mfc.sh", "run", case.path, "--case-optimization"] +
+                                ["./mfc.sh", "run", case.path] +
                                 ["--targets"] + [t.name for t in targets] +
                                 ["--output-summary", summary_filepath] +
                                 case.args +

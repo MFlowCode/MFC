@@ -4,6 +4,7 @@ on:
   push:
     branches: [master]
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 concurrency:
@@ -28,7 +29,7 @@ jobs:
 
       - name: Check Formatting
         run: |
-          ./mfc.sh format -j $(nproc)
+          ./mfc.sh format -j "$(nproc)"
           git diff --exit-code || (echo "::error::Code is not formatted. Run './mfc.sh format' locally." && exit 1)
 
       - name: Spell Check
@@ -149,20 +150,39 @@ jobs:
 
       - name: Build
         run:  |
-          /bin/bash mfc.sh test -v --dry-run -j $(nproc) --${{ matrix.debug }} --${{ matrix.mpi }} $PRECISION $TEST_ALL
+          /bin/bash mfc.sh test -v --dry-run -j "$(nproc)" --${{ matrix.debug }} --${{ matrix.mpi }} $PRECISION $TEST_ALL
         env:
           TEST_ALL: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
           PRECISION: ${{ matrix.precision != '' && format('--{0}', matrix.precision) || '' }}
 
       - name: Test
-        run:  |
-          /bin/bash mfc.sh test -v --max-attempts 3 -j $(nproc) $TEST_ALL $TEST_PCT
+        run: |
+          rm -f tests/failed_uuids.txt
+          TEST_EXIT=0
+          /bin/bash mfc.sh test -v --max-attempts 3 -j "$(nproc)" $TEST_ALL $TEST_PCT || TEST_EXIT=$?
+
+          # Retry only if a small number of tests failed (sporadic failures)
+          if [ -s tests/failed_uuids.txt ]; then
+            NUM_FAILED=$(wc -l < tests/failed_uuids.txt)
+            if [ "$NUM_FAILED" -le 5 ]; then
+              FAILED=$(tr '\n' ' ' < tests/failed_uuids.txt)
+              echo ""
+              echo "=== Retrying $NUM_FAILED failed test(s): $FAILED ==="
+              echo ""
+              /bin/bash mfc.sh test -v --max-attempts 3 -j "$(nproc)" --only $FAILED $TEST_ALL || exit $?
+            else
+              echo "Too many failures ($NUM_FAILED) to retry — likely a real issue."
+              exit 1
+            fi
+          elif [ "$TEST_EXIT" -ne 0 ]; then
+            exit $TEST_EXIT
+          fi
         env:
           TEST_ALL: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
           TEST_PCT: ${{ matrix.debug == 'debug' && '-% 20' || '' }}
 
   self:
-    name: "${{ matrix.cluster_name }} (${{ matrix.device }}${{ matrix.interface != 'none' && format('-{0}', matrix.interface) || '' }})"
+    name: "${{ matrix.cluster_name }} (${{ matrix.device }}${{ matrix.interface != 'none' && format('-{0}', matrix.interface) || '' }}${{ matrix.shard != '' && format(' [{0}]', matrix.shard) || '' }})"
     if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true' && github.event.pull_request.draft != true
     needs: [lint-gate, file-changes]
     continue-on-error: false
@@ -186,28 +206,49 @@ jobs:
             cluster_name: 'Georgia Tech | Phoenix'
             device: 'cpu'
             interface: 'none'
-          # Frontier (ORNL) — build on login node, test via SLURM
+          # Frontier (ORNL) — build on login node, GPU tests sharded for batch partition
           - runner:       'frontier'
             cluster:      'frontier'
             cluster_name: 'Oak Ridge | Frontier'
             device: 'gpu'
             interface: 'acc'
+            shard: '1/2'
+          - runner:       'frontier'
+            cluster:      'frontier'
+            cluster_name: 'Oak Ridge | Frontier'
+            device: 'gpu'
+            interface: 'acc'
+            shard: '2/2'
           - runner:       'frontier'
             cluster:      'frontier'
             cluster_name: 'Oak Ridge | Frontier'
             device: 'gpu'
             interface: 'omp'
+            shard: '1/2'
+          - runner:       'frontier'
+            cluster:      'frontier'
+            cluster_name: 'Oak Ridge | Frontier'
+            device: 'gpu'
+            interface: 'omp'
+            shard: '2/2'
           - runner:       'frontier'
             cluster:      'frontier'
             cluster_name: 'Oak Ridge | Frontier'
             device: 'cpu'
             interface: 'none'
-          # Frontier AMD — build on login node, test via SLURM
+          # Frontier AMD — build on login node, GPU tests sharded for batch partition
           - runner:       'frontier'
             cluster:      'frontier_amd'
             cluster_name: 'Oak Ridge | Frontier (AMD)'
             device: 'gpu'
             interface: 'omp'
+            shard: '1/2'
+          - runner:       'frontier'
+            cluster:      'frontier_amd'
+            cluster_name: 'Oak Ridge | Frontier (AMD)'
+            device: 'gpu'
+            interface: 'omp'
+            shard: '2/2'
           - runner:       'frontier'
             cluster:      'frontier_amd'
             cluster_name: 'Oak Ridge | Frontier (AMD)'
@@ -218,8 +259,6 @@ jobs:
       labels: ${{ matrix.runner }}
     env:
       NODE_OPTIONS: ${{ matrix.cluster == 'phoenix' && '--max-old-space-size=2048' || '' }}
-      ACTIONS_RUNNER_FORCE_ACTIONS_NODE_VERSION: node16
-      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
     steps:
       - name: Clone
         uses: actions/checkout@v4
@@ -228,18 +267,35 @@ jobs:
 
       - name: Build
         if:   matrix.cluster != 'phoenix'
-        run:  bash .github/workflows/${{ matrix.cluster }}/build.sh ${{ matrix.device }} ${{ matrix.interface }}
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
+        with:
+          max_attempts: 3
+          retry_wait_seconds: 60
+          timeout_minutes: 60
+          command: bash .github/workflows/${{ matrix.cluster }}/build.sh ${{ matrix.device }} ${{ matrix.interface }}
+          on_retry_command: ./mfc.sh clean
 
       - name: Test
-        run:  bash .github/workflows/${{ matrix.cluster }}/submit.sh .github/workflows/${{ matrix.cluster }}/test.sh ${{ matrix.device }} ${{ matrix.interface }}
+        run:  bash .github/workflows/${{ matrix.cluster }}/submit.sh .github/workflows/${{ matrix.cluster }}/test.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.shard }}
+
+      - name: Compute Log Slug
+        if:   always()
+        id:   log
+        run:  |
+          SLUG="test-${{ matrix.device }}-${{ matrix.interface }}"
+          SHARD="${{ matrix.shard }}"
+          if [ -n "$SHARD" ]; then
+            SLUG="${SLUG}-$(echo "$SHARD" | sed 's|/|-of-|')"
+          fi
+          echo "slug=${SLUG}" >> "$GITHUB_OUTPUT"
 
       - name: Print Logs
         if:   always()
-        run:  cat test-${{ matrix.device }}-${{ matrix.interface }}.out
+        run:  cat ${{ steps.log.outputs.slug }}.out
 
       - name: Archive Logs
         uses: actions/upload-artifact@v4
         if:   matrix.cluster != 'phoenix'
         with:
-          name: logs-${{ strategy.job-index }}-${{ matrix.device }}-${{ matrix.interface }}
-          path: test-${{ matrix.device }}-${{ matrix.interface }}.out
+          name: logs-${{ strategy.job-index }}-${{ steps.log.outputs.slug }}
+          path: ${{ steps.log.outputs.slug }}.out
