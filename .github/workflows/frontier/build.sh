@@ -19,9 +19,9 @@ fi
 . ./mfc.sh load -c f -m g
 
 # Only set up build cache for test suite, not benchmarks
-if [ "$run_bench" != "bench" ]; then
-    source .github/scripts/setup-build-cache.sh frontier "$job_device" "$job_interface"
-fi
+# if [ "$run_bench" != "bench" ]; then
+#     source .github/scripts/setup-build-cache.sh frontier "$job_device" "$job_interface"
+# fi
 
 max_attempts=3
 attempt=1
