@@ -123,6 +123,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y intel-oneapi-compiler-fortran intel-oneapi-mpi intel-oneapi-mpi-devel
           source /opt/intel/oneapi/setvars.sh
+          echo "FC=ifx" >> $GITHUB_ENV
+          echo "CC=icx" >> $GITHUB_ENV
           printenv >> $GITHUB_ENV
 
       - name: Set up Python 3.14
