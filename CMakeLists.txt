@@ -222,19 +222,15 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
     endif()
 endif()
 
-option(MFC_NATIVE_CPU "Enable -march=native/-mcpu=native CPU tuning" ON)
-
 if (CMAKE_BUILD_TYPE STREQUAL "Release")
     # Processor tuning: Check if we can target the host's native CPU's ISA.
-    if (MFC_NATIVE_CPU)
-        CHECK_FORTRAN_COMPILER_FLAG("-march=native" SUPPORTS_MARCH_NATIVE)
-        if (SUPPORTS_MARCH_NATIVE)
-            add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-march=native>)
-        else()
-            CHECK_FORTRAN_COMPILER_FLAG("-mcpu=native" SUPPORTS_MCPU_NATIVE)
-            if (SUPPORTS_MCPU_NATIVE)
-                add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-mcpu=native>)
-            endif()
+    CHECK_FORTRAN_COMPILER_FLAG("-march=native" SUPPORTS_MARCH_NATIVE)
+    if (SUPPORTS_MARCH_NATIVE)
+        add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-march=native>)
+    else()
+    	CHECK_FORTRAN_COMPILER_FLAG("-mcpu=native" SUPPORTS_MCPU_NATIVE)
+        if (SUPPORTS_MCPU_NATIVE)
+            add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-mcpu=native>)
         endif()
     endif()
 

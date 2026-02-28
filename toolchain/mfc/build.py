@@ -430,7 +430,6 @@ class MFCTarget:
             flags.append(f"-DMFC_GCov={   'ON' if ARG('gcov') else 'OFF'}")
             flags.append(f"-DMFC_Unified={'ON' if ARG('unified') else 'OFF'}")
             flags.append(f"-DMFC_Fastmath={'ON' if ARG('fastmath') else 'OFF'}")
-            flags.append(f"-DMFC_NATIVE_CPU={'OFF' if os.environ.get('MFC_NO_MARCH_NATIVE') else 'ON'}")
 
         command = ["cmake"] + flags + ["-S", cmake_dirpath, "-B", build_dirpath]
 

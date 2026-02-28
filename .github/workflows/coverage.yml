@@ -35,11 +35,22 @@ jobs:
       - name: Checkouts
         uses: actions/checkout@v4
 
+      - name: Get system info for cache key
+        id: sys-info
+        run: |
+          {
+            uname -m
+            cat /proc/cpuinfo 2>/dev/null | grep 'model name' | head -1 || sysctl -n machdep.cpu.brand_string 2>/dev/null || true
+            ${FC:-gfortran} --version 2>/dev/null | head -1 || true
+            ${CC:-gcc} --version 2>/dev/null | head -1 || true
+          } | (sha256sum 2>/dev/null || shasum -a 256) | cut -c1-16 > /tmp/sys-hash
+          echo "sys-hash=$(cat /tmp/sys-hash)" >> "$GITHUB_OUTPUT"
+
       - name: Restore Build Cache
         uses: actions/cache@v4
         with:
           path: build
-          key: mfc-coverage-${{ hashFiles('CMakeLists.txt', 'toolchain/dependencies/**', 'toolchain/cmake/**', 'src/**/*.fpp', 'src/**/*.f90') }}
+          key: mfc-coverage-${{ steps.sys-info.outputs.sys-hash }}-${{ hashFiles('CMakeLists.txt', 'toolchain/dependencies/**', 'toolchain/cmake/**', 'src/**/*.fpp', 'src/**/*.f90') }}
 
       - name: Setup Ubuntu
         run: |
@@ -50,13 +61,9 @@ jobs:
 
       - name: Build
         run: /bin/bash mfc.sh build -v -j $(nproc) --gcov
-        env:
-          MFC_NO_MARCH_NATIVE: 1
 
       - name: Test
         run: /bin/bash mfc.sh test -v -a -j $(nproc)
-        env:
-          MFC_NO_MARCH_NATIVE: 1
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v4
