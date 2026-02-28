@@ -240,8 +240,27 @@ class MFCPlot(PlotextPlot):  # pylint: disable=too-many-instance-attributes,too-
         w_plot = max(self.size.width - 2, 4)
         h_plot_avail = max(self.size.height - 4, 4)  # -2 border, -2 header+footer
 
-        # Right side: gap + gradient strip + value labels
-        _CB_GAP, _CB_W, _CB_LBL = 1, 2, 9
+        # Right side: gap + gradient strip + value labels.
+        # Compute label width dynamically so long labels (e.g. "-2.26e-05")
+        # are never truncated.  Use the full-data range as a conservative
+        # estimate — it is always ≥ the zoomed-window range.
+        if self._vmin is not None and self._vmax is not None:
+            _vmin_est, _vmax_est = self._vmin, self._vmax
+        elif self._data is not None:
+            _finite = self._data[np.isfinite(self._data)]
+            _vmin_est = float(_finite.min()) if _finite.size else 0.0
+            _vmax_est = float(_finite.max()) if _finite.size else 1.0
+        else:
+            _vmin_est, _vmax_est = 0.0, 1.0
+        if _vmax_est <= _vmin_est:
+            _vmax_est = _vmin_est + 1e-10
+        _mid_est = (_vmin_est + _vmax_est) / 2
+        _CB_LBL = max(
+            len(f" {_vmax_est:.3g}"),
+            len(f" {_vmin_est:.3g}"),
+            len(f" {_mid_est:.3g}"),
+        )
+        _CB_GAP, _CB_W = 1, 2
         w_map_avail = max(w_plot - _CB_GAP - _CB_W - _CB_LBL, 4)
 
         # Preserve the physical x/y aspect ratio.
