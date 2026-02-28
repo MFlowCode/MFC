@@ -440,8 +440,11 @@ contains
         integer :: patch_id !< IB Patch ID
         integer :: dir
         integer :: index
+        logical :: bounds_error
 
-        $:GPU_PARALLEL_LOOP(private='[q,gp,i,j,k,physical_loc,patch_id,dist,norm,dim,bound,dir,index,temp_loc,s_cc]')
+        bounds_error = .false.
+
+        $:GPU_PARALLEL_LOOP(private='[q,gp,i,j,k,physical_loc,patch_id,dist,norm,dim,bound,dir,index,temp_loc,s_cc]', copy='[bounds_error]')
         do q = 1, num_gps
             gp = ghost_points_in(q)
             i = gp%loc(1)
@@ -489,10 +492,10 @@ contains
                     index = ghost_points_in(q)%loc(dim)
                     temp_loc = ghost_points_in(q)%ip_loc(dim)
                     do while ((temp_loc < s_cc(index) &
-                               .or. temp_loc > s_cc(index + 1)))
+                               .or. temp_loc > s_cc(index + 1)) .and. (.not. bounds_error))
                         index = index + dir
                         if (index < -buff_size .or. index > bound) then
-#if !defined('MFC_OpenACC') && !defined('MFC_OpenMP')
+#if !defined(MFC_OpenACC) && !defined(MFC_OpenMP)
                             print *, "A required image point is not located in this computational domain."
                             print *, "Ghost Point is located at :"
                             if (p == 0) then
@@ -509,9 +512,10 @@ contains
                             print *, "Levelset ", dist, " and Norm: ", norm(:)
                             print *, "A short term fix may include increasing buff_size further in m_helper_basic (currently set to a minimum of 10)"
 #endif
-                            error stop "Ghost Point and Image Point on Different Processors"
+                            bounds_error = .true.
                         end if
                     end do
+
                     ghost_points_in(q)%ip_grid(dim) = index
                     if (ghost_points_in(q)%DB(dim) == -1) then
                         ghost_points_in(q)%ip_grid(dim) = ghost_points_in(q)%loc(dim) + 1
@@ -522,6 +526,8 @@ contains
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
+
+        if (bounds_error) error stop "Ghost Point and Image Point on Different Processors. Exiting"
 
     end subroutine s_compute_image_points
 
