@@ -25,7 +25,7 @@ mkdir -p $currentdir
 export TMPDIR=$currentdir
 
 if [ "$job_device" = "gpu" ]; then
-    bench_opts="--mem 12"
+    bench_opts="--mem 4"
 else
     bench_opts="--mem 1"
 fi
@@ -34,15 +34,7 @@ max_attempts=3
 attempt=1
 while [ $attempt -le $max_attempts ]; do
     echo "Build attempt $attempt of $max_attempts..."
-    build_cmd_ok=true
-    for dir in benchmarks/*/; do
-        if ! ./mfc.sh run -v "$dir/case.py" --case-optimization -j $(nproc) --dry-run $build_opts; then
-            build_cmd_ok=false
-            break
-        fi
-    done
-
-    if [ "$build_cmd_ok" = true ]; then
+    if ./mfc.sh build -j $(nproc) $build_opts; then
         echo "Build succeeded on attempt $attempt."
         break
     fi
