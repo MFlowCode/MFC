@@ -103,7 +103,7 @@ def _num(sid, placeholder='auto'):
             'width': '100%', 'backgroundColor': _OVER, 'color': _TEXT,
             'border': f'1px solid {_BORDER}', 'borderRadius': '4px',
             'padding': '4px 6px', 'fontSize': '12px', 'fontFamily': 'monospace',
-            'boxSizing': 'border-box',
+            'boxSizing': 'border-box', 'colorScheme': 'dark',
         },
     )
 
@@ -121,6 +121,7 @@ def _build_3d(ad, raw, varname, step, mode, cmap,  # pylint: disable=too-many-ar
     cbar = dict(
         title=dict(text=cbar_title, font=dict(color=_TEXT)),
         tickfont=dict(color=_TEXT),
+        tickformat='.2e',
     )
     rng = cmax - cmin if cmax > cmin else 1.0
 
@@ -211,6 +212,62 @@ def run_interactive(  # pylint: disable=too-many-locals,too-many-statements,too-
         __name__,
         title=f'MFC viz · {varname}',
         suppress_callback_exceptions=True,
+    )
+
+    # Override Dash's internal component styles for dark theme.
+    # Dash components (Dropdown, Input, Slider) render internal DOM that
+    # ignores inline style props.  We inject CSS via app.index_string.
+    # Build CSS using %-formatting to avoid f-string brace conflicts.
+    _V = {'bg': _OVER, 'tx': _TEXT, 'bd': _BORDER, 'ac': _ACCENT}
+    _dark_css = """
+* { color-scheme: dark; }
+/* Dropdowns — target by known IDs + universal child selectors */
+#var-sel *, #step-sel *, #cmap-sel *,
+#var-sel > div, #step-sel > div, #cmap-sel > div {
+    background-color: %(bg)s !important;
+    color: %(tx)s !important;
+    border-color: %(bd)s !important;
+}
+#var-sel input, #step-sel input, #cmap-sel input {
+    background-color: %(bg)s !important;
+    color: %(tx)s !important;
+}
+/* Inputs */
+input, input[type=number], input[type=text] {
+    background-color: %(bg)s !important;
+    color: %(tx)s !important;
+    border: 1px solid %(bd)s !important;
+    border-radius: 4px;
+}
+/* Number input spinner buttons (browser chrome) */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+input[type=number] { -moz-appearance: textfield; }
+/* Slider tooltip bubble */
+.rc-slider-tooltip-inner {
+    background-color: %(tx)s !important;
+    color: #11111b !important;
+    border: none !important;
+}
+.rc-slider-mark-text { color: %(tx)s !important; }
+.rc-slider-rail { background-color: %(bd)s !important; }
+.rc-slider-track { background-color: %(ac)s !important; }
+.rc-slider-handle {
+    border-color: %(ac)s !important;
+    background-color: %(ac)s !important;
+}
+.rc-slider-dot { background-color: %(bd)s !important; border-color: %(bd)s !important; }
+""" % _V
+    app.index_string = (
+        '<!DOCTYPE html>\n<html>\n<head>\n'
+        '{%metas%}\n<title>{%title%}</title>\n{%favicon%}\n{%css%}\n'
+        '<style>\n' + _dark_css + '\n</style>\n'
+        '</head>\n<body>\n'
+        '{%app_entry%}\n<footer>\n{%config%}\n{%scripts%}\n{%renderer%}\n'
+        '</footer>\n</body>\n</html>'
     )
 
     # Load first step to know dimensionality and available variables
@@ -597,14 +654,14 @@ def run_interactive(  # pylint: disable=too-many-locals,too-many-statements,too-
 
         elif ad.ndim == 2:
             cbar = dict(title=dict(text=cbar_title, font=dict(color=_TEXT)),
-                        tickfont=dict(color=_TEXT))
+                        tickfont=dict(color=_TEXT), tickformat='.2e')
             fig.add_trace(go.Heatmap(
                 x=ad.x_cc, y=ad.y_cc, z=_tf(raw).T,
                 zmin=cmin, zmax=cmax, colorscale=cmap, colorbar=cbar,
             ))
             fig.update_layout(
-                xaxis=dict(title='x', color=_TEXT, gridcolor=_OVER, scaleanchor='y'),
-                yaxis=dict(title='y', color=_TEXT, gridcolor=_OVER),
+                xaxis=dict(title='x', color=_TEXT, gridcolor=_OVER, scaleanchor='y', exponentformat='e'),
+                yaxis=dict(title='y', color=_TEXT, gridcolor=_OVER, exponentformat='e'),
                 plot_bgcolor=_BG,
             )
             # Bubble overlay for 2D
@@ -635,8 +692,9 @@ def run_interactive(  # pylint: disable=too-many-locals,too-many-statements,too-
                 line=dict(color=_ACCENT, width=2), name=selected_var,
             ))
             fig.update_layout(
-                xaxis=dict(title='x', color=_TEXT, gridcolor=_OVER),
+                xaxis=dict(title='x', color=_TEXT, gridcolor=_OVER, exponentformat='e'),
                 yaxis=dict(title=cbar_title, color=_TEXT, gridcolor=_OVER,
+                           tickformat='.2e',
                            range=[cmin, cmax] if (vmin_in is not None or vmax_in is not None) else None),
                 plot_bgcolor=_BG,
             )
@@ -646,7 +704,7 @@ def run_interactive(  # pylint: disable=too-many-locals,too-many-statements,too-
             title=dict(text=title, font=dict(color=_TEXT, size=13, family='monospace')),
             paper_bgcolor=_BG,
             font=dict(color=_TEXT, family='monospace'),
-            margin=dict(l=0, r=0, t=36, b=0),
+            margin=dict(l=0, r=80, t=36, b=0),
             uirevision=mode,   # preserve camera angle within a mode
         )
 
@@ -666,6 +724,19 @@ def run_interactive(  # pylint: disable=too-many-locals,too-many-statements,too-
     cons.print(f'\n[bold green]Interactive viz server:[/bold green] '
                f'[bold]http://{host}:{port}[/bold]')
     if host in ('127.0.0.1', 'localhost'):
-        cons.print(f'[dim]SSH tunnel:  ssh -L {port}:localhost:{port} <hostname>[/dim]')
-    cons.print('[dim]Ctrl+C to stop.[/dim]\n')
+        cons.print(
+            f'\n[dim]To view from your laptop/desktop:[/dim]\n'
+            f'[dim]  1. Open a [bold]new terminal[/bold] on your [bold]local[/bold] machine (not the cluster)[/dim]\n'
+            f'[dim]  2. Run:[/dim]  [bold]ssh -L {port}:localhost:{port} <cluster-hostname>[/bold]\n'
+            f'[dim]     (replace <cluster-hostname> with the host you SSH into, e.g. login-phoenix.pace.gatech.edu)[/dim]\n'
+            f'[dim]  3. Open [bold]http://localhost:{port}[/bold] in your local browser[/dim]\n'
+            f'[dim]  If your cluster requires 2FA, add to your ~/.ssh/config:[/dim]\n'
+            f'[dim]     Host <cluster-hostname>[/dim]\n'
+            f'[dim]       ControlMaster auto[/dim]\n'
+            f'[dim]       ControlPath ~/.ssh/sockets/%r@%h-%p[/dim]\n'
+            f'[dim]       ControlPersist 600[/dim]\n'
+            f'[dim]  Then your first SSH session handles 2FA; the tunnel reuses it without re-authenticating.[/dim]\n'
+            f'[dim]  (Run [bold]mkdir -p ~/.ssh/sockets[/bold] once if the directory does not exist.)[/dim]'
+        )
+    cons.print('[dim]\nCtrl+C to stop.[/dim]\n')
     app.run(debug=False, port=port, host=host)
