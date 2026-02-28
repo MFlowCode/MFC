@@ -50,9 +50,6 @@ if [ "$RUN_TESTS" = true ]; then
     cd "$(pwd)/toolchain"
     python3 -m unittest mfc.params_tests.test_registry mfc.params_tests.test_definitions mfc.params_tests.test_validate mfc.params_tests.test_integration -v
     python3 -m unittest mfc.cli.test_cli -v
-    if [ "$VIZ_LINT" = true ]; then
-        python3 -m unittest mfc.viz.test_viz -v
-    fi
     cd - > /dev/null
 fi
 

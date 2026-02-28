@@ -25,6 +25,9 @@ jobs:
     - name: Lint and test the toolchain
       run: ./mfc.sh lint
 
+    - name: Test viz module
+      run: cd toolchain && python3 -m unittest mfc.viz.test_viz -v
+
     - name: Generate toolchain files
       run: ./mfc.sh generate
 
