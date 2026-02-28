@@ -26,7 +26,7 @@ module m_ib_patches
 
     implicit none
 
-    private; public :: s_apply_ib_patches, s_update_ib_rotation_matrix, f_convert_cyl_to_cart, s_instantiate_STL_models, decode_patch_periodicity
+    private; public :: s_apply_ib_patches, s_update_ib_rotation_matrix, f_convert_cyl_to_cart, s_instantiate_STL_models, s_decode_patch_periodicity
 
     real(wp) :: x_centroid, y_centroid, z_centroid
     real(wp) :: length_x, length_y, length_z
@@ -71,7 +71,7 @@ contains
 
             !> IB Patches
             !> @{
-            call get_periodicities(xp_lower, xp_upper, yp_lower, yp_upper, zp_lower, zp_upper)
+            call s_get_periodicities(xp_lower, xp_upper, yp_lower, yp_upper, zp_lower, zp_upper)
             do xp = xp_lower, xp_upper
                 do yp = yp_lower, yp_upper
                     do zp = zp_lower, zp_upper
@@ -98,7 +98,8 @@ contains
 
             !> IB Patches
             !> @{
-            call get_periodicities(xp_lower, xp_upper, yp_lower, yp_upper)
+            call s_get_periodicities(xp_lower, xp_upper, yp_lower, yp_upper)
+            print *, xp_lower, xp_upper, yp_lower, yp_upper
             do xp = xp_lower, xp_upper
                 do yp = yp_lower, yp_upper
                     do i = 1, num_ibs
@@ -148,7 +149,7 @@ contains
         radius = patch_ib(patch_id)%radius
 
         ! encode the periodicity information into the patch_id
-        call encode_patch_periodicity(patch_id, xp, yp, 0, encoded_patch_id)
+        call s_encode_patch_periodicity(patch_id, xp, yp, 0, encoded_patch_id)
 
         ! find the indices to the left and right of the IB in i, j, k
         il = -gp_layers
@@ -271,7 +272,7 @@ contains
         end if
 
         ! encode the periodicity information into the patch_id
-        call encode_patch_periodicity(patch_id, xp, yp, 0, encoded_patch_id)
+        call s_encode_patch_periodicity(patch_id, xp, yp, 0, encoded_patch_id)
 
         ! find the indices to the left and right of the IB in i, j, k
         il = -gp_layers
@@ -437,7 +438,7 @@ contains
         end if
 
         ! encode the periodicity information into the patch_id
-        call encode_patch_periodicity(patch_id, xp, yp, zp, encoded_patch_id)
+        call s_encode_patch_periodicity(patch_id, xp, yp, zp, encoded_patch_id)
 
         ! find the indices to the left and right of the IB in i, j, k
         il = -gp_layers
@@ -540,7 +541,7 @@ contains
         inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
 
         ! encode the periodicity information into the patch_id
-        call encode_patch_periodicity(patch_id, xp, yp, 0, encoded_patch_id)
+        call s_encode_patch_periodicity(patch_id, xp, yp, 0, encoded_patch_id)
 
         ! find the indices to the left and right of the IB in i, j, k
         il = -gp_layers
@@ -610,7 +611,7 @@ contains
         radius = patch_ib(patch_id)%radius
 
         ! encode the periodicity information into the patch_id
-        call encode_patch_periodicity(patch_id, xp, yp, zp, encoded_patch_id)
+        call s_encode_patch_periodicity(patch_id, xp, yp, zp, encoded_patch_id)
 
         ! find the indices to the left and right of the IB in i, j, k
         il = -gp_layers - 1
@@ -684,7 +685,7 @@ contains
         inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
 
         ! encode the periodicity information into the patch_id
-        call encode_patch_periodicity(patch_id, xp, yp, zp, encoded_patch_id)
+        call s_encode_patch_periodicity(patch_id, xp, yp, zp, encoded_patch_id)
 
         ! find the indices to the left and right of the IB in i, j, k
         il = -gp_layers
@@ -770,7 +771,7 @@ contains
         inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
 
         ! encode the periodicity information into the patch_id
-        call encode_patch_periodicity(patch_id, xp, yp, zp, encoded_patch_id)
+        call s_encode_patch_periodicity(patch_id, xp, yp, zp, encoded_patch_id)
 
         il = -gp_layers
         jl = -gp_layers
@@ -852,7 +853,7 @@ contains
         inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
 
         ! encode the periodicity information into the patch_id
-        call encode_patch_periodicity(patch_id, xp, yp, 0, encoded_patch_id)
+        call s_encode_patch_periodicity(patch_id, xp, yp, 0, encoded_patch_id)
 
         ! find the indices to the left and right of the IB in i, j, k
         il = -gp_layers
@@ -914,7 +915,7 @@ contains
         threshold = patch_ib(patch_id)%model_threshold
 
         ! encode the periodicity information into the patch_id
-        call encode_patch_periodicity(patch_id, xp, yp, 0, encoded_patch_id)
+        call s_encode_patch_periodicity(patch_id, xp, yp, 0, encoded_patch_id)
 
         il = -gp_layers
         jl = -gp_layers
@@ -997,7 +998,7 @@ contains
         rotation(:, :) = patch_ib(patch_id)%rotation_matrix(:, :)
 
         ! encode the periodicity information into the patch_id
-        call encode_patch_periodicity(patch_id, xp, yp, zp, encoded_patch_id)
+        call s_encode_patch_periodicity(patch_id, xp, yp, zp, encoded_patch_id)
 
         il = -gp_layers
         jl = -gp_layers
@@ -1180,7 +1181,7 @@ contains
     end subroutine get_bounding_indices
 
     !> @brief encodes the patch id with a unique offset that contains information on how the IB marker wraps periodically
-    subroutine encode_patch_periodicity(patch_id, x_periodicity, y_periodicity, z_periodicity, encoded_patch_id)
+    subroutine s_encode_patch_periodicity(patch_id, x_periodicity, y_periodicity, z_periodicity, encoded_patch_id)
 
         integer, intent(in) :: patch_id, x_periodicity, y_periodicity, z_periodicity
         integer, intent(out) :: encoded_patch_id
@@ -1196,10 +1197,10 @@ contains
         offset = (num_ibs + 1)*temp_x_per + 3*(num_ibs + 1)*temp_y_per + 9*(num_ibs + 1)*temp_z_per
         encoded_patch_id = patch_id + offset
 
-    end subroutine encode_patch_periodicity
+    end subroutine s_encode_patch_periodicity
 
     !> @brief decodes the encoded id to get out the original id and the way in which it is periodic
-    subroutine decode_patch_periodicity(encoded_patch_id, patch_id, x_periodicity, y_periodicity, z_periodicity)
+    subroutine s_decode_patch_periodicity(encoded_patch_id, patch_id, x_periodicity, y_periodicity, z_periodicity)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
@@ -1223,10 +1224,10 @@ contains
         y_periodicity = yp; if (yp == 2) y_periodicity = -1
         z_periodicity = zp; if (zp == 2) z_periodicity = -1
 
-    end subroutine decode_patch_periodicity
+    end subroutine s_decode_patch_periodicity
 
     !> @brief Determines if we should wrap periodically
-    subroutine get_periodicities(xp_lower, xp_upper, yp_lower, yp_upper, zp_lower, zp_upper)
+    subroutine s_get_periodicities(xp_lower, xp_upper, yp_lower, yp_upper, zp_lower, zp_upper)
 
         integer, intent(out) :: xp_lower, xp_upper, yp_lower, yp_upper
         integer, intent(out), optional :: zp_lower, zp_upper
@@ -1245,7 +1246,7 @@ contains
         #:endfor
 
         ! z only if 3D
-        if (present(zp_lower)) then
+        if (present(zp_lower) .and. p /= 0) then
             if (bc_z%beg == BC_PERIODIC) then
                 zp_lower = -1
                 zp_upper = 1
@@ -1253,12 +1254,9 @@ contains
                 zp_lower = 0
                 zp_upper = 0
             end if
-        else
-            zp_lower = 0
-            zp_upper = 0
         end if
 
-    end subroutine get_periodicities
+    end subroutine s_get_periodicities
 
     !> Archimedes spiral function
     !! @param myth Angle

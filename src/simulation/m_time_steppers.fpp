@@ -642,7 +642,7 @@ contains
 
         end do
 
-        if (moving_immersed_boundary_flag) call wrap_periodic_ibs()
+        if (moving_immersed_boundary_flag) call s_wrap_periodic_ibs()
 
         ! Adaptive dt: final stage
         if (adap_dt) call s_adaptive_dt_bubble(3)
