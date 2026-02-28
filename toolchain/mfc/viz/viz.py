@@ -452,9 +452,12 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
         label = 'all' if tiled else varname
         mp4_path = os.path.join(output_base, f'{label}.mp4')
         cons.print(f"[bold]Generating MP4:[/bold] {mp4_path} ({n_frames} frames @ {fps:.2g} fps = {n_frames/fps:.1f}s)")
-        success = render_mp4(varname, requested_steps, mp4_path,
-                             fps=fps, read_func=read_step,
-                             tiled=tiled, bubble_func=bubble_func, **render_opts)
+        try:
+            success = render_mp4(varname, requested_steps, mp4_path,
+                                 fps=fps, read_func=read_step,
+                                 tiled=tiled, bubble_func=bubble_func, **render_opts)
+        except ValueError as exc:
+            raise MFCException(str(exc)) from exc
         if success:
             cons.print(f"[bold green]Done:[/bold green] {mp4_path}")
         else:
@@ -487,7 +490,7 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
         if bubble_func is not None:
             try:
                 step_opts = dict(render_opts, bubbles=bubble_func(step))
-            except Exception as exc:  # pylint: disable=broad-except
+            except (OSError, ValueError) as exc:
                 cons.print(f"[yellow]Warning:[/yellow] Skipping bubble overlay for step {step}: {exc}")
 
         if tiled and assembled.ndim == 1:

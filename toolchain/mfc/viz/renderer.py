@@ -455,8 +455,9 @@ def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-argum
             if bubble_func is not None:
                 try:
                     frame_opts = dict(opts, bubbles=bubble_func(step))
-                except Exception:  # pylint: disable=broad-except
-                    pass
+                except (OSError, ValueError) as exc:
+                    import warnings  # pylint: disable=import-outside-toplevel
+                    warnings.warn(f"Skipping bubble overlay for step {step}: {exc}", stacklevel=2)
 
             if tiled and assembled.ndim == 1:
                 render_1d_tiled(assembled.x_cc, assembled.variables,
@@ -493,10 +494,15 @@ def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-argum
     # Combine frames into MP4 using imageio + imageio-ffmpeg (bundled ffmpeg)
     frame_files = sorted(f for f in os.listdir(viz_dir) if f.endswith('.png'))
 
+    if not frame_files:
+        _cleanup()
+        raise ValueError(
+            f"No frames were rendered for '{varname}'. "
+            "The variable may not exist in the loaded timesteps."
+        )
+
     success = False
     try:
-        if not frame_files:
-            return False
 
         def _to_rgb(arr):
             """Normalise an image array to uint8 RGB (3-channel).

@@ -504,7 +504,7 @@ def run_interactive(  # pylint: disable=too-many-locals,too-many-statements,too-
         selected_var = var_sel or varname
         try:
             ad = _load(step, read_func)
-        except Exception as exc:  # pylint: disable=broad-except
+        except (OSError, ValueError, EOFError) as exc:
             return no_update, [html.Span(f' Error loading step {step}: {exc}',
                                          style={'color': _RED})]
         if selected_var not in ad.variables:
@@ -575,8 +575,8 @@ def run_interactive(  # pylint: disable=too-many-locals,too-many-statements,too-
                                 showlegend=False,
                                 hovertemplate='x=%{x:.3g}<br>y=%{y:.3g}<br>z=%{z:.3g}<extra>bubble</extra>',
                             ))
-                except Exception:  # pylint: disable=broad-except
-                    pass
+                except (OSError, ValueError):
+                    pass  # bubble overlay is best-effort; skip on read errors
             # Compute aspect ratio from domain extents so slices (which
             # have a constant coordinate on one axis) don't collapse that axis.
             dx = float(ad.x_cc[-1] - ad.x_cc[0]) if len(ad.x_cc) > 1 else 1.0
@@ -624,8 +624,8 @@ def run_interactive(  # pylint: disable=too-many-locals,too-many-statements,too-
                             for b in bubbles
                         ]
                         fig.update_layout(shapes=shapes)
-                except Exception:  # pylint: disable=broad-except
-                    pass
+                except (OSError, ValueError):
+                    pass  # bubble overlay is best-effort; skip on read errors
             title = f'{selected_var}  ·  step {step}'
 
         else:                            # 1D
@@ -637,7 +637,7 @@ def run_interactive(  # pylint: disable=too-many-locals,too-many-statements,too-
             fig.update_layout(
                 xaxis=dict(title='x', color=_TEXT, gridcolor=_OVER),
                 yaxis=dict(title=cbar_title, color=_TEXT, gridcolor=_OVER,
-                           range=[cmin, cmax] if (vmin_in or vmax_in) else None),
+                           range=[cmin, cmax] if (vmin_in is not None or vmax_in is not None) else None),
                 plot_bgcolor=_BG,
             )
             title = f'{selected_var}  ·  step {step}'

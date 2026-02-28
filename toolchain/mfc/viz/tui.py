@@ -550,7 +550,7 @@ class MFCTuiApp(App):  # pylint: disable=too-many-instance-attributes
 
         try:
             assembled = _load(step, self._read_func)
-        except Exception as exc:  # pylint: disable=broad-except
+        except (OSError, ValueError, EOFError) as exc:
             self.call_from_thread(
                 self.query_one("#status", Static).update,
                 f" [red]Error loading step {step}: {exc}[/red]",
@@ -566,8 +566,8 @@ class MFCTuiApp(App):  # pylint: disable=too-many-instance-attributes
         if self._bubble_func is not None and self._ndim == 2:
             try:
                 bubbles = self._bubble_func(step)
-            except Exception:  # pylint: disable=broad-except
-                pass
+            except (OSError, ValueError):
+                pass  # bubble overlay is best-effort; skip on read errors
 
         self.call_from_thread(
             self._apply_data, assembled, data, step, var, cmap, log, frozen, bubbles,
