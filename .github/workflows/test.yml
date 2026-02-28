@@ -123,7 +123,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y intel-oneapi-compiler-fortran intel-oneapi-mpi intel-oneapi-mpi-devel
           source /opt/intel/oneapi/setvars.sh
-          echo "FC=ifx" >> $GITHUB_ENV
           printenv >> $GITHUB_ENV
 
       - name: Set up Python 3.14
@@ -137,7 +136,7 @@ jobs:
           {
             uname -m
             cat /proc/cpuinfo 2>/dev/null | grep 'model name' | head -1 || sysctl -n machdep.cpu.brand_string 2>/dev/null || true
-            ${FC:-gfortran} --version 2>/dev/null | head -1 || true
+            if command -v ifx &>/dev/null; then ifx --version 2>/dev/null | head -1; else ${FC:-gfortran} --version 2>/dev/null | head -1 || true; fi
             ${CC:-gcc} --version 2>/dev/null | head -1 || true
           } | (sha256sum 2>/dev/null || shasum -a 256) | cut -c1-16 > /tmp/sys-hash
           echo "sys-hash=$(cat /tmp/sys-hash)" >> "$GITHUB_OUTPUT"
