@@ -99,7 +99,6 @@ contains
             !> IB Patches
             !> @{
             call s_get_periodicities(xp_lower, xp_upper, yp_lower, yp_upper)
-            print *, xp_lower, xp_upper, yp_lower, yp_upper
             do xp = xp_lower, xp_upper
                 do yp = yp_lower, yp_upper
                     do i = 1, num_ibs
@@ -152,10 +151,10 @@ contains
         call s_encode_patch_periodicity(patch_id, xp, yp, 0, encoded_patch_id)
 
         ! find the indices to the left and right of the IB in i, j, k
-        il = -gp_layers
-        jl = -gp_layers
-        ir = m + gp_layers
-        jr = n + gp_layers
+        il = -gp_layers - 1
+        jl = -gp_layers - 1
+        ir = m + gp_layers + 1
+        jr = n + gp_layers + 1
         call get_bounding_indices(center(1) - radius, center(1) + radius, x_cc, il, ir)
         call get_bounding_indices(center(2) - radius, center(2) + radius, y_cc, jl, jr)
 
@@ -275,10 +274,10 @@ contains
         call s_encode_patch_periodicity(patch_id, xp, yp, 0, encoded_patch_id)
 
         ! find the indices to the left and right of the IB in i, j, k
-        il = -gp_layers
-        jl = -gp_layers
-        ir = m + gp_layers
-        jr = n + gp_layers
+        il = -gp_layers - 1
+        jl = -gp_layers - 1
+        ir = m + gp_layers + 1
+        jr = n + gp_layers + 1
         ! maximum distance any marker can be from the center is the length of the airfoil
         call get_bounding_indices(center(1) - ca_in, center(1) + ca_in, x_cc, il, ir)
         call get_bounding_indices(center(2) - ca_in, center(2) + ca_in, y_cc, jl, jr)
@@ -441,12 +440,12 @@ contains
         call s_encode_patch_periodicity(patch_id, xp, yp, zp, encoded_patch_id)
 
         ! find the indices to the left and right of the IB in i, j, k
-        il = -gp_layers
-        jl = -gp_layers
-        ll = -gp_layers
-        ir = m + gp_layers
-        jr = n + gp_layers
-        lr = p + gp_layers
+        il = -gp_layers - 1
+        jl = -gp_layers - 1
+        ll = -gp_layers - 1
+        ir = m + gp_layers + 1
+        jr = n + gp_layers + 1
+        lr = p + gp_layers + 1
         ! maximum distance any marker can be from the center is the length of the airfoil
         call get_bounding_indices(center(1) - ca_in, center(1) + ca_in, x_cc, il, ir)
         call get_bounding_indices(center(2) - ca_in, center(2) + ca_in, y_cc, jl, jr)
@@ -544,10 +543,10 @@ contains
         call s_encode_patch_periodicity(patch_id, xp, yp, 0, encoded_patch_id)
 
         ! find the indices to the left and right of the IB in i, j, k
-        il = -gp_layers
-        jl = -gp_layers
-        ir = m + gp_layers
-        jr = n + gp_layers
+        il = -gp_layers - 1
+        jl = -gp_layers - 1
+        ir = m + gp_layers + 1
+        jr = n + gp_layers + 1
         corner_distance = sqrt(dot_product(length, length))/2._wp ! maximum distance any marker can be from the center
         call get_bounding_indices(center(1) - corner_distance, center(1) + corner_distance, x_cc, il, ir)
         call get_bounding_indices(center(2) - corner_distance, center(2) + corner_distance, y_cc, jl, jr)
@@ -688,12 +687,12 @@ contains
         call s_encode_patch_periodicity(patch_id, xp, yp, zp, encoded_patch_id)
 
         ! find the indices to the left and right of the IB in i, j, k
-        il = -gp_layers
-        jl = -gp_layers
-        kl = -gp_layers
-        ir = m + gp_layers
-        jr = n + gp_layers
-        kr = p + gp_layers
+        il = -gp_layers - 1
+        jl = -gp_layers - 1
+        kl = -gp_layers - 1
+        ir = m + gp_layers + 1
+        jr = n + gp_layers + 1
+        kr = p + gp_layers + 1
         corner_distance = sqrt(dot_product(length, length))/2._wp ! maximum distance any marker can be from the center
         call get_bounding_indices(center(1) - corner_distance, center(1) + corner_distance, x_cc, il, ir)
         call get_bounding_indices(center(2) - corner_distance, center(2) + corner_distance, y_cc, jl, jr)
@@ -773,12 +772,12 @@ contains
         ! encode the periodicity information into the patch_id
         call s_encode_patch_periodicity(patch_id, xp, yp, zp, encoded_patch_id)
 
-        il = -gp_layers
-        jl = -gp_layers
-        kl = -gp_layers
-        ir = m + gp_layers
-        jr = n + gp_layers
-        kr = p + gp_layers
+        il = -gp_layers - 1
+        jl = -gp_layers - 1
+        kl = -gp_layers - 1
+        ir = m + gp_layers + 1
+        jr = n + gp_layers + 1
+        kr = p + gp_layers + 1
         corner_distance = sqrt(radius**2 + maxval(length)**2) ! distance to rim of cylinder
         call get_bounding_indices(center(1) - corner_distance, center(1) + corner_distance, x_cc, il, ir)
         call get_bounding_indices(center(2) - corner_distance, center(2) + corner_distance, y_cc, jl, jr)
@@ -856,10 +855,10 @@ contains
         call s_encode_patch_periodicity(patch_id, xp, yp, 0, encoded_patch_id)
 
         ! find the indices to the left and right of the IB in i, j, k
-        il = -gp_layers
-        jl = -gp_layers
-        ir = m + gp_layers
-        jr = n + gp_layers
+        il = -gp_layers - 1
+        jl = -gp_layers - 1
+        ir = m + gp_layers + 1
+        jr = n + gp_layers + 1
         call get_bounding_indices(center(1) - maxval(ellipse_coeffs)*2._wp, center(1) + maxval(ellipse_coeffs)*2._wp, x_cc, il, ir)
         call get_bounding_indices(center(2) - maxval(ellipse_coeffs)*2._wp, center(2) + maxval(ellipse_coeffs)*2._wp, y_cc, jl, jr)
 
@@ -917,10 +916,10 @@ contains
         ! encode the periodicity information into the patch_id
         call s_encode_patch_periodicity(patch_id, xp, yp, 0, encoded_patch_id)
 
-        il = -gp_layers
-        jl = -gp_layers
-        ir = m + gp_layers
-        jr = n + gp_layers
+        il = -gp_layers - 1
+        jl = -gp_layers - 1
+        ir = m + gp_layers + 1
+        jr = n + gp_layers + 1
 
         ! Local-space bounding box extents (min=1, max=2 in the third index)
         lx(1) = stl_bounding_boxes(patch_id, 1, 1) + offset(1)
@@ -1000,12 +999,12 @@ contains
         ! encode the periodicity information into the patch_id
         call s_encode_patch_periodicity(patch_id, xp, yp, zp, encoded_patch_id)
 
-        il = -gp_layers
-        jl = -gp_layers
-        kl = -gp_layers
-        ir = m + gp_layers
-        jr = n + gp_layers
-        kr = p + gp_layers
+        il = -gp_layers - 1
+        jl = -gp_layers - 1
+        kl = -gp_layers - 1
+        ir = m + gp_layers - 1
+        jr = n + gp_layers + 1
+        kr = p + gp_layers + 1
 
         ! Local-space bounding box extents (min=1, max=2 in the third index)
         lx(1) = stl_bounding_boxes(patch_id, 1, 1) + offset(1)

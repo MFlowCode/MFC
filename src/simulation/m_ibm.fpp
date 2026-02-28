@@ -738,12 +738,10 @@ contains
                 ! if we are not arbitrarily close, interpolate
                 alpha = 1._wp
                 patch_id = gp%ib_patch_id
-                ! print *, "Grabbed Patch ID"
                 if (ib_markers%sf(i, j, k) /= 0) alpha(1, 1, 1) = 0._wp
                 if (ib_markers%sf(i + 1, j, k) /= 0) alpha(2, 1, 1) = 0._wp
                 if (ib_markers%sf(i, j + 1, k) /= 0) alpha(1, 2, 1) = 0._wp
                 if (ib_markers%sf(i + 1, j + 1, k) /= 0) alpha(2, 2, 1) = 0._wp
-                ! print *, "First half of stencil"
 
                 if (p == 0) then
                     eta(:, :, 1) = 1._wp/dist(:, :, 1)**2
@@ -931,13 +929,14 @@ contains
 
         integer, intent(in) :: num_ibs
 
-        integer :: i, j, k, ierr
+        integer :: i, j, k, ierr, z_gp_layers
 
         call nvtxStartRange("UPDATE-MIBM")
 
         ! Clears the existing immersed boundary indices
+        z_gp_layers = 0; if (p /= 0) z_gp_layers = gp_layers + 1
         $:GPU_PARALLEL_LOOP(private='[i,j,k]')
-        do i = -gp_layers - 1, m + gp_layers + 1; do j = -gp_layers - 1, n + gp_layers + 1; do k = -gp_layers - 1, p + gp_layers + 1
+        do i = -gp_layers - 1, m + gp_layers + 1; do j = -gp_layers - 1, n + gp_layers + 1; do k = -z_gp_layers, p + z_gp_layers
                     ib_markers%sf(i, j, k) = 0._wp
                 end do; end do; end do
         $:END_GPU_PARALLEL_LOOP()
