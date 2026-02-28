@@ -725,18 +725,20 @@ input[type=number] { -moz-appearance: textfield; }
                f'[bold]http://{host}:{port}[/bold]')
     if host in ('127.0.0.1', 'localhost'):
         cons.print(
-            f'\n[dim]To view from your laptop/desktop:[/dim]\n'
-            f'[dim]  1. Open a [bold]new terminal[/bold] on your [bold]local[/bold] machine (not the cluster)[/dim]\n'
-            f'[dim]  2. Run:[/dim]  [bold]ssh -L {port}:localhost:{port} <cluster-hostname>[/bold]\n'
-            f'[dim]     (replace <cluster-hostname> with the host you SSH into, e.g. login-phoenix.pace.gatech.edu)[/dim]\n'
-            f'[dim]  3. Open [bold]http://localhost:{port}[/bold] in your local browser[/dim]\n'
-            f'[dim]  If your cluster requires 2FA, add to your ~/.ssh/config:[/dim]\n'
-            f'[dim]     Host <cluster-hostname>[/dim]\n'
+            f'\n[dim]To view from your laptop/desktop, open a [bold]new terminal on your local machine[/bold] and run:[/dim]\n'
+            f'\n  [bold]ssh -L {port}:localhost:{port} <host>[/bold]\n'
+            f'\n[dim]  Replace [bold]<host>[/bold] with whatever you normally pass to [bold]ssh[/bold] to reach this cluster.[/dim]\n'
+            f'[dim]  This can be a full hostname (e.g. [bold]login-phoenix.pace.gatech.edu[/bold])[/dim]\n'
+            f'[dim]  or an alias from your [bold]~/.ssh/config[/bold] (e.g. [bold]ssh -L {port}:localhost:{port} delta[/bold]).[/dim]\n'
+            f'[dim]  Then open [bold]http://localhost:{port}[/bold] in your local browser.[/dim]\n'
+            f'\n[dim]  [bold]2FA clusters:[/bold] if your cluster requires two-factor auth and you don\'t[/dim]\n'
+            f'[dim]  want to authenticate twice, add [bold]ControlMaster[/bold] to your [bold]~/.ssh/config[/bold]:[/dim]\n'
+            f'[dim]     Host <host>[/dim]\n'
             f'[dim]       ControlMaster auto[/dim]\n'
             f'[dim]       ControlPath ~/.ssh/sockets/%r@%h-%p[/dim]\n'
             f'[dim]       ControlPersist 600[/dim]\n'
-            f'[dim]  Then your first SSH session handles 2FA; the tunnel reuses it without re-authenticating.[/dim]\n'
-            f'[dim]  (Run [bold]mkdir -p ~/.ssh/sockets[/bold] once if the directory does not exist.)[/dim]'
+            f'[dim]  Then your first SSH session handles 2FA; the tunnel reuses it.[/dim]\n'
+            f'[dim]  (Run [bold]mkdir -p ~/.ssh/sockets && chmod 700 ~/.ssh/sockets[/bold] once if the dir does not exist.)[/dim]'
         )
     cons.print('[dim]\nCtrl+C to stop.[/dim]\n')
     app.run(debug=False, port=port, host=host)
