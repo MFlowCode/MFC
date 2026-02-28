@@ -109,6 +109,12 @@ class TestParseSteps(unittest.TestCase):
         with self.assertRaises(MFCException):
             self._parse('bogus', [0, 100])
 
+    def test_hyphen_range_raises_clean_error(self):
+        """'0-100' (hyphen instead of colon) raises MFCException, not raw ValueError."""
+        from mfc.common import MFCException
+        with self.assertRaises(MFCException):
+            self._parse('0-100', [0, 100])
+
 
 # ---------------------------------------------------------------------------
 # Tests: pretty_label
@@ -344,6 +350,23 @@ class TestBinarySiloConsistency(unittest.TestCase):
         silo_data = assemble_silo(FIX_1D_SILO, 0)
         self.assertEqual(sorted(bin_data.variables.keys()),
                          sorted(silo_data.variables.keys()))
+
+    def test_1d_same_values(self):
+        """Binary and silo 1D fixtures have the same variable values."""
+        import numpy as np
+        from .reader import assemble
+        from .silo_reader import assemble_silo
+        bin_data = assemble(FIX_1D_BIN, 0, 'binary')
+        silo_data = assemble_silo(FIX_1D_SILO, 0)
+        common = sorted(set(bin_data.variables) & set(silo_data.variables))
+        self.assertGreater(len(common), 0, "No common variables to compare")
+        for vname in common:
+            np.testing.assert_allclose(
+                bin_data.variables[vname],
+                silo_data.variables[vname],
+                rtol=1e-5, atol=1e-10,
+                err_msg=f"Variable '{vname}' differs between binary and silo",
+            )
 
 
 # ---------------------------------------------------------------------------
