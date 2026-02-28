@@ -310,6 +310,8 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
         render_opts['vmax'] = float(ARG('vmax'))
     if ARG('log_scale'):
         render_opts['log_scale'] = True
+    if ARG('slice_index') is not None and ARG('slice_value') is not None:
+        raise MFCException("--slice-index and --slice-value are mutually exclusive.")
     if ARG('slice_index') is not None:
         render_opts['slice_index'] = int(ARG('slice_index'))
     if ARG('slice_value') is not None:
@@ -460,8 +462,8 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
         if bubble_func is not None:
             try:
                 step_opts = dict(render_opts, bubbles=bubble_func(step))
-            except Exception:  # pylint: disable=broad-except
-                pass
+            except Exception as exc:  # pylint: disable=broad-except
+                cons.print(f"[yellow]Warning:[/yellow] Skipping bubble overlay for step {step}: {exc}")
 
         if tiled and assembled.ndim == 1:
             render_1d_tiled(assembled.x_cc, assembled.variables,

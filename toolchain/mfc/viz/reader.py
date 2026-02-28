@@ -170,14 +170,41 @@ def read_binary_file(path: str, var_filter: Optional[str] = None) -> ProcessorDa
         data_size = (m + 1) * max(n + 1, 1) * max(p + 1, 1)
 
         for _ in range(dbvars):
-            var_raw = _read_record_endian(f, endian)
-            varname = var_raw[:NAME_LEN].decode('ascii', errors='replace').strip()
+            # Read leading record-length marker and variable name only.
+            # If this variable is filtered out we can seek past the data
+            # instead of reading the full payload into memory.
+            raw_len = f.read(4)
+            if len(raw_len) < 4:
+                raise EOFError("Unexpected end of file reading variable record marker")
+            rec_len = struct.unpack(f'{endian}i', raw_len)[0]
+            if rec_len < NAME_LEN:
+                raise ValueError(f"Variable record too short: {rec_len} bytes")
 
+            name_raw = f.read(NAME_LEN)
+            if len(name_raw) < NAME_LEN:
+                raise EOFError("Unexpected end of file reading variable name")
+            varname = name_raw.decode('ascii', errors='replace').strip()
+
+            data_bytes = rec_len - NAME_LEN
             if var_filter is not None and varname != var_filter:
+                # Seek past remaining data + trailing record-length marker.
+                f.seek(data_bytes + 4, 1)
                 continue
 
+            data_raw = f.read(data_bytes)
+            if len(data_raw) < data_bytes:
+                raise EOFError("Unexpected end of file reading variable data")
+            trail = f.read(4)
+            if len(trail) < 4:
+                raise EOFError("Unexpected end of file reading trailing variable record marker")
+            trail_len = struct.unpack(f'{endian}i', trail)[0]
+            if trail_len != rec_len:
+                raise ValueError(
+                    f"Fortran record marker mismatch for '{varname}': "
+                    f"leading={rec_len}, trailing={trail_len}"
+                )
+
             # Auto-detect variable data precision from record size
-            data_bytes = len(var_raw) - NAME_LEN
             if data_bytes == data_size * 8:
                 var_dtype = np.dtype(f'{endian}f8')
             elif data_bytes == data_size * 4:
@@ -189,7 +216,7 @@ def read_binary_file(path: str, var_filter: Optional[str] = None) -> ProcessorDa
                     f"{data_bytes} bytes for {data_size} values ({var_bpv:.1f} bytes/value)"
                 )
 
-            data = np.frombuffer(var_raw[NAME_LEN:], dtype=var_dtype).astype(np.float64)
+            data = np.frombuffer(data_raw, dtype=var_dtype).astype(np.float64)
 
             # Reshape for multi-dimensional data (Fortran column-major order)
             if p > 0:
@@ -277,9 +304,12 @@ def _discover_processors(case_dir: str, fmt: str) -> List[int]:
 
 
 def _is_1d(case_dir: str) -> bool:
-    """Check if the output is 1D (binary/root/ directory exists and contains .dat files)."""
+    """Check if the output is 1D (binary/root/ exists with .dat files, no p0/ present)."""
     root = os.path.join(case_dir, 'binary', 'root')
-    return os.path.isdir(root) and any(f.endswith('.dat') for f in os.listdir(root))
+    p0 = os.path.join(case_dir, 'binary', 'p0')
+    return (os.path.isdir(root)
+            and any(f.endswith('.dat') for f in os.listdir(root))
+            and not os.path.isdir(p0))
 
 
 def assemble_from_proc_data(  # pylint: disable=too-many-locals,too-many-statements
