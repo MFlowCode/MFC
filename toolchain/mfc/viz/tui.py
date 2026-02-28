@@ -11,8 +11,7 @@ Requires: textual>=0.43, textual-plotext, plotext
 """
 from __future__ import annotations
 
-from collections import deque
-from typing import Callable, Deque, List, Optional, Tuple
+from typing import Callable, List, Optional, Tuple
 
 import numpy as np
 
@@ -21,16 +20,14 @@ from rich.console import Group as RichGroup
 from rich.style import Style
 from rich.text import Text as RichText
 
-from textual import on
+from textual import on, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
-from textual.message import Message
 from textual.reactive import reactive
 from textual.widgets import (
-    Digits, Footer, Header, Label, ListItem, ListView, Sparkline, Static,
+    Digits, Footer, Header, Label, ListItem, ListView, Static,
 )
-from textual import work
 from textual.worker import get_current_worker
 
 from textual_plotext import PlotextPlot
@@ -58,13 +55,7 @@ _CELL_RATIO: float = 2.0
 _ASPECT_MIN: float = 0.2
 _ASPECT_MAX: float = 5.0
 
-# Maximum sparkline history entries (one per step visited).
-_HISTORY_MAX: int = 60
-
-# Textual mouse events give coordinates relative to the widget top-left corner
-# (including the border).  Our widget has a 1-char solid border on every side,
-# and the 2D render always emits a 1-row header above the heatmap.
-_BORDER: int = 1
+# Rows of header above the heatmap inside the content area.
 _HEADER_ROWS: int = 1
 
 
@@ -83,15 +74,6 @@ class MFCPlot(PlotextPlot):  # pylint: disable=too-many-instance-attributes,too-
         height: 1fr;
     }
     """
-
-    class Clicked(Message):
-        """Posted when the user clicks on the 2D heatmap."""
-
-        def __init__(self, x_phys: float, y_phys: float, value: float) -> None:
-            super().__init__()
-            self.x_phys = x_phys
-            self.y_phys = y_phys
-            self.value = value
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -147,16 +129,20 @@ class MFCPlot(PlotextPlot):  # pylint: disable=too-many-instance-attributes,too-
             return
         self._zoom = (new_x0, new_x1, new_y0, new_y1)
 
-    def _cursor_frac(self, event_x: int, event_y: int) -> Tuple[float, float]:
-        """Convert a widget-relative mouse position to [0,1]² fractions within the
-        current zoom window.  The display is y-flipped (row 0 = y_max), so
-        cy_frac=0 maps to the top of the visible y range."""
-        col = event_x - _BORDER
-        row = event_y - _BORDER - _HEADER_ROWS
+    def _cursor_frac(self, event) -> Tuple[float, float]:
+        """Map a mouse event to [0,1]² fractions within the current heatmap view.
+
+        Uses ``event.get_content_offset_capture(self)`` so the result is valid even
+        when the cursor sits on the border.  The display is y-flipped (row 0 = y_max),
+        so ``cy_frac=0`` maps to the top of the visible y range.
+        """
+        offset = event.get_content_offset_capture(self)
+        col = offset.x
+        row = offset.y - _HEADER_ROWS  # skip header row inside content area
         w = max(self._last_w_map, 1)
         h = max(self._last_h_plot, 1)
         cx_frac = max(0.0, min(1.0, col / (w - 1) if w > 1 else 0.5))
-        # Row 0 = top = y_max → data cy_frac = 1; row h-1 = bottom = y_min → 0.
+        # Row 0 = top = y_max → cy_frac = 1; row h-1 = bottom = y_min → 0.
         cy_frac = max(0.0, min(1.0, 1.0 - row / (h - 1) if h > 1 else 0.5))
         return cx_frac, cy_frac
 
@@ -167,7 +153,7 @@ class MFCPlot(PlotextPlot):  # pylint: disable=too-many-instance-attributes,too-
     def on_mouse_scroll_up(self, event) -> None:  # type: ignore[override]
         if self._data is None or self._ndim != 2:
             return
-        cx_frac, cy_frac = self._cursor_frac(event.x, event.y)
+        cx_frac, cy_frac = self._cursor_frac(event)
         self._zoom_around(cx_frac, cy_frac, factor=0.75)
         event.stop()
         self.refresh()
@@ -175,22 +161,26 @@ class MFCPlot(PlotextPlot):  # pylint: disable=too-many-instance-attributes,too-
     def on_mouse_scroll_down(self, event) -> None:  # type: ignore[override]
         if self._data is None or self._ndim != 2:
             return
-        cx_frac, cy_frac = self._cursor_frac(event.x, event.y)
+        cx_frac, cy_frac = self._cursor_frac(event)
         self._zoom_around(cx_frac, cy_frac, factor=1.0 / 0.75)
         event.stop()
         self.refresh()
 
-    def on_mouse_down(self, event) -> None:  # type: ignore[override]
+    def on_click(self, event) -> None:  # type: ignore[override]  # pylint: disable=too-many-locals
         """Feature 5 — show the data value at the clicked grid cell."""
         if self._data is None or self._ndim != 2:
             return
         if self._last_w_map == 0 or self._last_ix is None or self._last_iy is None:
             return
-        col = event.x - _BORDER
-        row = event.y - _BORDER - _HEADER_ROWS
-        if not (0 <= col < self._last_w_map and 0 <= row < self._last_h_plot):
+        # get_content_offset returns None if the click is on the border/padding.
+        offset = event.get_content_offset(self)
+        if offset is None:
             return
-        # Map screen column → _last_ix index → data x-index.
+        col = offset.x
+        row = offset.y - _HEADER_ROWS  # skip header row
+        # Clamp to heatmap area (click on colorbar or footer is fine — just clamp).
+        col = max(0, min(col, self._last_w_map - 1))
+        row = max(0, min(row, self._last_h_plot - 1))
         n_ix = len(self._last_ix)
         n_iy = len(self._last_iy)
         ix_pos = int(np.round(col * (n_ix - 1) / max(self._last_w_map - 1, 1)))
@@ -203,7 +193,10 @@ class MFCPlot(PlotextPlot):  # pylint: disable=too-many-instance-attributes,too-
         x_val = float(self._x_cc[xi])   # type: ignore[index]  # pylint: disable=unsubscriptable-object
         y_val = float(y_cc_click[yi])
         val = float(self._data[xi, yi])  # type: ignore[index]  # pylint: disable=unsubscriptable-object
-        self.post_message(MFCPlot.Clicked(x_val, y_val, val))
+        # Update status bar directly — no message routing needed.
+        self.app.query_one("#status", Static).update(
+            f" x={x_val:.4f}  y={y_val:.4f}  val={val:.6g}"
+        )
 
     def render(self):  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
         data = self._data
@@ -430,17 +423,6 @@ class MFCTuiApp(App):  # pylint: disable=too-many-instance-attributes
         height: 1fr;
     }
 
-    #hist-title {
-        text-style: dim;
-        padding: 1 0 0 0;
-        height: 1;
-    }
-
-    #sparkline {
-        height: 3;
-        width: 1fr;
-    }
-
     #status {
         dock: bottom;
         height: 1;
@@ -488,21 +470,17 @@ class MFCTuiApp(App):  # pylint: disable=too-many-instance-attributes
         self._init_var = init_var or (varnames[0] if varnames else "")
         self._frozen_range: Optional[Tuple[float, float]] = None
         self._play_timer = None
-        # Per-variable max-value history for the sparkline (Feature 3).
-        self._vmax_history: Deque[float] = deque(maxlen=_HISTORY_MAX)
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
         with Horizontal(id="content"):
             with Vertical(id="sidebar"):
-                yield Digits("0", id="step-counter")          # Feature 2
+                yield Digits("0", id="step-counter")
                 yield Label("Variables", id="var-title")
                 yield ListView(
                     *[ListItem(Label(v), id=f"var-{v}") for v in self._varnames],
                     id="var-list",
                 )
-                yield Label("peak", id="hist-title")
-                yield Sparkline([], summary_function=max, id="sparkline")  # Feature 3
             yield MFCPlot(id="plot")
         yield Static(self._status_text(), id="status")
         yield Footer()
@@ -524,7 +502,6 @@ class MFCTuiApp(App):  # pylint: disable=too-many-instance-attributes
         self._push_data()
 
     def watch_var_name(self, _old: str, _new: str) -> None:
-        self._vmax_history.clear()  # reset sparkline when variable changes
         self._push_data()
 
     def watch_cmap_name(self, _old: str, _new: str) -> None:
@@ -542,16 +519,6 @@ class MFCTuiApp(App):  # pylint: disable=too-many-instance-attributes
                 self._play_timer = None
 
     # ------------------------------------------------------------------
-    # Message handlers
-    # ------------------------------------------------------------------
-
-    def on_mfc_plot_clicked(self, event: MFCPlot.Clicked) -> None:
-        """Feature 5 — show the data value at the clicked grid coordinate."""
-        self.query_one("#status", Static).update(
-            f" x={event.x_phys:.4f}  y={event.y_phys:.4f}  val={event.value:.6g}"
-        )
-
-    # ------------------------------------------------------------------
     # Background data loading (Feature 4)
     # ------------------------------------------------------------------
 
@@ -560,8 +527,7 @@ class MFCTuiApp(App):  # pylint: disable=too-many-instance-attributes
         """Load the current step/var in a background thread and push to the plot."""
         if not self._steps or not self.var_name:
             return
-        # Snapshot all reactive state before entering the thread to avoid
-        # reading stale values if the user changes something mid-load.
+        # Snapshot all reactive state before entering the thread.
         step_idx = min(self.step_idx, len(self._steps) - 1)
         step = self._steps[step_idx]
         var = self.var_name
@@ -623,15 +589,8 @@ class MFCTuiApp(App):  # pylint: disable=too-many-instance-attributes
             plot._vmax = None              # pylint: disable=protected-access
         plot.refresh()
 
-        # Feature 2 — update the large step counter.
+        # Update step counter (Feature 2).
         self.query_one("#step-counter", Digits).update(str(step))
-
-        # Feature 3 — append to sparkline history and refresh.
-        if data is not None and data.size > 0:
-            finite = data[np.isfinite(data)]
-            if finite.size > 0:
-                self._vmax_history.append(float(finite.max()))
-                self.query_one("#sparkline", Sparkline).data = list(self._vmax_history)
 
         self.query_one("#status", Static).update(self._status_text())
 
