@@ -24,6 +24,7 @@ from textual import on, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
+from textual.events import Click
 from textual.reactive import reactive
 from textual.widgets import (
     Digits, Footer, Header, Label, ListItem, ListView, Static,
@@ -129,74 +130,32 @@ class MFCPlot(PlotextPlot):  # pylint: disable=too-many-instance-attributes,too-
             return
         self._zoom = (new_x0, new_x1, new_y0, new_y1)
 
-    def _cursor_frac(self, event) -> Tuple[float, float]:
-        """Map a mouse event to [0,1]² fractions within the current heatmap view.
+    # ------------------------------------------------------------------
+    # Mouse scroll handlers — zoom (Feature 6)
+    # ------------------------------------------------------------------
 
-        Uses ``event.get_content_offset_capture(self)`` so the result is valid even
-        when the cursor sits on the border.  The display is y-flipped (row 0 = y_max),
-        so ``cy_frac=0`` maps to the top of the visible y range.
-        """
+    def _scroll_zoom(self, event, factor: float) -> None:
+        """Zoom by *factor* centred on the scroll cursor position."""
+        if self._data is None or self._ndim != 2:
+            return
+        # get_content_offset_capture never returns None — safe at border too.
         offset = event.get_content_offset_capture(self)
         col = offset.x
-        row = offset.y - _HEADER_ROWS  # skip header row inside content area
+        row = offset.y - _HEADER_ROWS
         w = max(self._last_w_map, 1)
         h = max(self._last_h_plot, 1)
         cx_frac = max(0.0, min(1.0, col / (w - 1) if w > 1 else 0.5))
-        # Row 0 = top = y_max → cy_frac = 1; row h-1 = bottom = y_min → 0.
+        # Row 0 = top = y_max → cy_frac = 1 in zoom space; row h-1 = 0.
         cy_frac = max(0.0, min(1.0, 1.0 - row / (h - 1) if h > 1 else 0.5))
-        return cx_frac, cy_frac
-
-    # ------------------------------------------------------------------
-    # Mouse event handlers (Features 5 & 6)
-    # ------------------------------------------------------------------
+        self._zoom_around(cx_frac, cy_frac, factor=factor)
+        event.stop()
+        self.refresh()
 
     def on_mouse_scroll_up(self, event) -> None:  # type: ignore[override]
-        if self._data is None or self._ndim != 2:
-            return
-        cx_frac, cy_frac = self._cursor_frac(event)
-        self._zoom_around(cx_frac, cy_frac, factor=0.75)
-        event.stop()
-        self.refresh()
+        self._scroll_zoom(event, factor=0.75)
 
     def on_mouse_scroll_down(self, event) -> None:  # type: ignore[override]
-        if self._data is None or self._ndim != 2:
-            return
-        cx_frac, cy_frac = self._cursor_frac(event)
-        self._zoom_around(cx_frac, cy_frac, factor=1.0 / 0.75)
-        event.stop()
-        self.refresh()
-
-    def on_click(self, event) -> None:  # type: ignore[override]  # pylint: disable=too-many-locals
-        """Feature 5 — show the data value at the clicked grid cell."""
-        if self._data is None or self._ndim != 2:
-            return
-        if self._last_w_map == 0 or self._last_ix is None or self._last_iy is None:
-            return
-        # get_content_offset returns None if the click is on the border/padding.
-        offset = event.get_content_offset(self)
-        if offset is None:
-            return
-        col = offset.x
-        row = offset.y - _HEADER_ROWS  # skip header row
-        # Clamp to heatmap area (click on colorbar or footer is fine — just clamp).
-        col = max(0, min(col, self._last_w_map - 1))
-        row = max(0, min(row, self._last_h_plot - 1))
-        n_ix = len(self._last_ix)
-        n_iy = len(self._last_iy)
-        ix_pos = int(np.round(col * (n_ix - 1) / max(self._last_w_map - 1, 1)))
-        # Display is y-flipped: row 0 = top = last_iy[-1] (y_max).
-        iy_pos_flip = int(np.round(row * (n_iy - 1) / max(self._last_h_plot - 1, 1)))
-        iy_pos = n_iy - 1 - iy_pos_flip
-        xi = int(self._last_ix[np.clip(ix_pos, 0, n_ix - 1)])  # pylint: disable=unsubscriptable-object
-        yi = int(self._last_iy[np.clip(iy_pos, 0, n_iy - 1)])  # pylint: disable=unsubscriptable-object
-        y_cc_click = self._y_cc if self._y_cc is not None else np.array([0.0, 1.0])
-        x_val = float(self._x_cc[xi])   # type: ignore[index]  # pylint: disable=unsubscriptable-object
-        y_val = float(y_cc_click[yi])
-        val = float(self._data[xi, yi])  # type: ignore[index]  # pylint: disable=unsubscriptable-object
-        # Update status bar directly — no message routing needed.
-        self.app.query_one("#status", Static).update(
-            f" x={x_val:.4f}  y={y_val:.4f}  val={val:.6g}"
-        )
+        self._scroll_zoom(event, factor=1.0 / 0.75)
 
     def render(self):  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
         data = self._data
@@ -517,6 +476,48 @@ class MFCTuiApp(App):  # pylint: disable=too-many-instance-attributes
             if self._play_timer is not None:
                 self._play_timer.stop()
                 self._play_timer = None
+
+    # ------------------------------------------------------------------
+    # Click handler — show value at cursor (Feature 5)
+    # ------------------------------------------------------------------
+
+    @on(Click, "#plot")
+    def on_plot_click(self, event: Click) -> None:  # pylint: disable=too-many-locals
+        """Feature 5 — show the data value at the clicked 2D heatmap cell.
+
+        Uses screen coordinates (``event.screen_x/y``) and ``plot.content_region``
+        (both in screen space) to avoid any ambiguity about border offsets.
+        """
+        plot = self.query_one("#plot", MFCPlot)
+        if plot._data is None or plot._ndim != 2:  # pylint: disable=protected-access
+            return
+        if plot._last_w_map == 0 or plot._last_ix is None or plot._last_iy is None:  # pylint: disable=protected-access
+            return
+        # content_region is the widget's inner area in screen coordinates.
+        cr = plot.content_region
+        col = event.screen_x - cr.x
+        row = event.screen_y - cr.y - _HEADER_ROWS
+        # Clamp — clicking on the colorbar / footer still shows a value.
+        col = max(0, min(col, plot._last_w_map - 1))  # pylint: disable=protected-access
+        row = max(0, min(row, plot._last_h_plot - 1))  # pylint: disable=protected-access
+        last_ix = plot._last_ix  # pylint: disable=protected-access
+        last_iy = plot._last_iy  # pylint: disable=protected-access
+        n_ix = len(last_ix)
+        n_iy = len(last_iy)
+        ix_pos = int(np.round(col * (n_ix - 1) / max(plot._last_w_map - 1, 1)))  # pylint: disable=protected-access
+        # Display is y-flipped: row 0 = top = y_max.
+        iy_pos = n_iy - 1 - int(np.round(row * (n_iy - 1) / max(plot._last_h_plot - 1, 1)))  # pylint: disable=protected-access
+        xi = int(last_ix[np.clip(ix_pos, 0, n_ix - 1)])  # pylint: disable=unsubscriptable-object
+        yi = int(last_iy[np.clip(iy_pos, 0, n_iy - 1)])  # pylint: disable=unsubscriptable-object
+        x_cc = plot._x_cc  # pylint: disable=protected-access
+        y_cc = plot._y_cc if plot._y_cc is not None else np.array([0.0, 1.0])  # pylint: disable=protected-access
+        data = plot._data  # pylint: disable=protected-access
+        x_val = float(x_cc[xi])   # type: ignore[index]  # pylint: disable=unsubscriptable-object
+        y_val = float(y_cc[yi])
+        val = float(data[xi, yi])  # type: ignore[index]  # pylint: disable=unsubscriptable-object
+        self.query_one("#status", Static).update(
+            f" x={x_val:.4f}  y={y_val:.4f}  val={val:.6g}"
+        )
 
     # ------------------------------------------------------------------
     # Background data loading (Feature 4)
