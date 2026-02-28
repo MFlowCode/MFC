@@ -32,7 +32,8 @@ class TestParseSteps(unittest.TestCase):
 
     def _parse(self, arg, available):
         from .viz import _parse_steps
-        return _parse_steps(arg, available)
+        matched, _ = _parse_steps(arg, available)
+        return matched
 
     def test_all_keyword(self):
         """'all' returns every available step."""

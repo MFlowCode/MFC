@@ -230,10 +230,22 @@ def read_binary_file(path: str, var_filter: Optional[str] = None) -> ProcessorDa
 
 
 def discover_format(case_dir: str) -> str:
-    """Detect whether case has binary or silo_hdf5 output."""
-    if os.path.isdir(os.path.join(case_dir, 'binary')):
+    """Detect whether case has binary or silo_hdf5 output.
+
+    Returns 'binary' or 'silo'.  Raises FileNotFoundError if neither exists.
+    When both exist, emits a warnings.warn so callers can surface it.
+    """
+    has_binary = os.path.isdir(os.path.join(case_dir, 'binary'))
+    has_silo   = os.path.isdir(os.path.join(case_dir, 'silo_hdf5'))
+    if has_binary and has_silo:
+        warnings.warn(
+            "Both binary/ and silo_hdf5/ found; using binary. "
+            "Pass --format silo to override.",
+            stacklevel=2,
+        )
+    if has_binary:
         return 'binary'
-    if os.path.isdir(os.path.join(case_dir, 'silo_hdf5')):
+    if has_silo:
         return 'silo'
     raise FileNotFoundError(
         f"No 'binary/' or 'silo_hdf5/' directory found in {case_dir}. "

@@ -10,6 +10,7 @@ import importlib.util
 import shutil
 import subprocess
 import sys
+import warnings
 
 from mfc.state import ARG
 from mfc.common import MFC_ROOT_DIR, MFCException
@@ -140,7 +141,11 @@ def _parse_step_list(s, available_steps):
 
 def _parse_steps(step_arg, available_steps):
     """
-    Parse the --step argument into a list of timestep integers.
+    Parse the --step argument into (matched_steps, n_requested).
+
+    matched_steps — list of ints present in available_steps
+    n_requested   — how many steps were in the raw request before filtering
+                    (0 when the format doesn't generate a finite count, e.g. 'all')
 
     Formats:
       - Single int:       "1000"
@@ -151,15 +156,23 @@ def _parse_steps(step_arg, available_steps):
       - "all":            all available timesteps
     """
     if step_arg is None or step_arg == 'all':
-        return available_steps
+        return available_steps, 0
 
     if step_arg == 'last':
-        return [available_steps[-1]] if available_steps else []
+        return ([available_steps[-1]] if available_steps else []), 0
 
     s = str(step_arg)
 
     if ',' in s:
-        return _parse_step_list(s, available_steps)
+        matched = _parse_step_list(s, available_steps)
+        # n_requested: count of explicit values (ellipsis form expands to a range)
+        parts = [p.strip() for p in s.split(',')]
+        if '...' in parts:
+            # approximate from the parsed result + unmatched
+            n_req = len(matched)  # conservative; exact count needs re-parsing
+        else:
+            n_req = len(parts)
+        return matched, n_req
 
     try:
         if ':' in s:
@@ -168,7 +181,7 @@ def _parse_steps(step_arg, available_steps):
             end = int(parts[1])
             stride = int(parts[2]) if len(parts) > 2 else 1
             requested = list(range(start, end + 1, stride))
-            return [t for t in requested if t in set(available_steps)]
+            return [t for t in requested if t in set(available_steps)], len(requested)
 
         single = int(s)
     except ValueError as exc:
@@ -180,8 +193,8 @@ def _parse_steps(step_arg, available_steps):
         ) from exc
 
     if available_steps and single not in set(available_steps):
-        return []
-    return [single]
+        return [], 1
+    return [single], 1
 
 
 def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branches
@@ -208,7 +221,11 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
         fmt = fmt_arg
     else:
         try:
-            fmt = discover_format(case_dir)
+            with warnings.catch_warnings(record=True) as _w:
+                warnings.simplefilter("always")
+                fmt = discover_format(case_dir)
+            for _warning in _w:
+                cons.print(f"[yellow]Warning:[/yellow] {_warning.message}")
         except FileNotFoundError as exc:
             msg = str(exc)
             if os.path.isfile(os.path.join(case_dir, 'case.py')):
@@ -292,10 +309,11 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
             f"No timesteps found in '{case_dir}' ({fmt} format). "
             "Ensure post_process has been run and produced output files.")
 
-    requested_steps = _parse_steps(step_arg, steps)
+    requested_steps, n_requested = _parse_steps(step_arg, steps)
     if not requested_steps:
+        detail = (f" ({n_requested} requested, 0 matched)" if n_requested > 1 else "")
         raise MFCException(
-            f"No matching timesteps for --step {step_arg!r}. "
+            f"No matching timesteps for --step {step_arg!r}{detail}. "
             f"Available steps: {_steps_hint(steps)}")
 
     # Collect rendering options
