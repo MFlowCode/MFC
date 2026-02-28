@@ -730,7 +730,9 @@ input[type=number] { -moz-appearance: textfield; }
             f'\n[dim]  Replace [bold]user@cluster-hostname[/bold] with whatever you normally pass to [bold]ssh[/bold][/dim]\n'
             f'[dim]  to reach this cluster (e.g. [bold]jdoe@login.delta.ncsa.illinois.edu[/bold] or an[/dim]\n'
             f'[dim]  alias from your [bold]~/.ssh/config[/bold]).[/dim]\n'
-            f'[dim]  Then open [bold]http://localhost:{port}[/bold] in your local browser.[/dim]'
+            f'[dim]  Then open [bold]http://localhost:{port}[/bold] in your local browser.[/dim]\n'
+            f'[dim]  If you see [bold]Address already in use[/bold], free the port with:[/dim]\n'
+            f'  [bold]lsof -ti :{port} | xargs kill[/bold]'
         )
     cons.print('[dim]\nCtrl+C to stop.[/dim]\n')
     app.run(debug=False, port=port, host=host)
