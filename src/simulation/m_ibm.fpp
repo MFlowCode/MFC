@@ -681,7 +681,7 @@ contains
         integer :: patch_id
         logical is_cell_center
 
-        $:GPU_PARALLEL_LOOP(private='[q,i,j,k,ii,jj,kk,dist,buf,gp,interp_coeffs,eta,alpha,patch_id,is_cell_center]', parallelism='[seq]')
+        $:GPU_PARALLEL_LOOP(private='[q,i,j,k,ii,jj,kk,dist,buf,gp,interp_coeffs,eta,alpha,patch_id,is_cell_center]')
         do q = 1, num_gps
             gp = ghost_points_in(q)
             ! Get the interpolation points
