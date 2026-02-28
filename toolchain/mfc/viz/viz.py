@@ -168,8 +168,15 @@ def _parse_steps(step_arg, available_steps):
         # n_requested: count of explicit values (ellipsis form expands to a range)
         parts = [p.strip() for p in s.split(',')]
         if '...' in parts:
-            # approximate from the parsed result + unmatched
-            n_req = len(matched)  # conservative; exact count needs re-parsing
+            # Compute the expanded range length independently of filtering.
+            try:
+                idx = parts.index('...')
+                prefix = [int(p) for p in parts[:idx]]
+                end_val = int(parts[-1])
+                stride = prefix[-1] - prefix[-2]
+                n_req = len(range(prefix[0], end_val + 1, stride)) if stride > 0 else len(matched)
+            except (ValueError, IndexError):
+                n_req = len(matched)
         else:
             n_req = len(parts)
         return matched, n_req

@@ -21,6 +21,7 @@ FIX_2D_BIN = os.path.join(FIXTURES, '2d_binary')
 FIX_2D_SILO = os.path.join(FIXTURES, '2d_silo')
 FIX_3D_BIN = os.path.join(FIXTURES, '3d_binary')
 FIX_3D_SILO = os.path.join(FIXTURES, '3d_silo')
+FIX_1D_BIN_2RANK = os.path.join(FIXTURES, '1d_binary_2rank')
 
 
 # ---------------------------------------------------------------------------
@@ -103,6 +104,14 @@ class TestParseSteps(unittest.TestCase):
         from mfc.common import MFCException
         with self.assertRaises(MFCException):
             self._parse('0,100,...,500,1000', [0, 100, 500, 1000])
+
+    def test_ellipsis_n_requested_is_expanded_range(self):
+        """Ellipsis n_requested reflects the expanded range, not the matched count."""
+        from .viz import _parse_steps
+        # Range 0,100,...,1000 expands to 11 steps; only 3 are available.
+        matched, n_req = _parse_steps('0,100,...,1000', [0, 200, 1000])
+        self.assertEqual(n_req, 11)
+        self.assertEqual(matched, [0, 200, 1000])
 
     def test_invalid_value(self):
         """Non-numeric, non-keyword input raises MFCException."""
@@ -228,6 +237,44 @@ class TestAssembleBinary1D(unittest.TestCase):
         data = assemble(FIX_1D_BIN, 0, 'binary', var='pres')
         self.assertIn('pres', data.variables)
         self.assertNotIn('vel1', data.variables)
+
+
+class TestAssembleBinary1DMultiRank(unittest.TestCase):
+    """Test multi-rank assembly with overlapping ghost cells (1D, 2 ranks)."""
+
+    def test_ndim(self):
+        """2-rank 1D fixture assembles with ndim=1."""
+        from .reader import assemble
+        data = assemble(FIX_1D_BIN_2RANK, 0, 'binary')
+        self.assertEqual(data.ndim, 1)
+
+    def test_cell_count_after_dedup(self):
+        """Ghost cell overlap is deduplicated: 16 unique cells from two overlapping ranks."""
+        from .reader import assemble
+        data = assemble(FIX_1D_BIN_2RANK, 0, 'binary')
+        self.assertEqual(len(data.x_cc), 16)
+
+    def test_grid_is_sorted_and_unique(self):
+        """Assembled global grid is strictly increasing with no duplicates."""
+        import numpy as np
+        from .reader import assemble
+        data = assemble(FIX_1D_BIN_2RANK, 0, 'binary')
+        diffs = np.diff(data.x_cc)
+        self.assertTrue(bool(np.all(diffs > 0)), "x_cc is not strictly increasing")
+
+    def test_variable_values_match_position(self):
+        """pres values (== x_cc position) are placed at the correct global cells."""
+        import numpy as np
+        from .reader import assemble
+        data = assemble(FIX_1D_BIN_2RANK, 0, 'binary')
+        np.testing.assert_allclose(data.variables['pres'], data.x_cc, atol=1e-10)
+
+    def test_all_vars_present(self):
+        """Both variables written by both ranks appear in the assembled output."""
+        from .reader import assemble
+        data = assemble(FIX_1D_BIN_2RANK, 0, 'binary')
+        self.assertIn('pres', data.variables)
+        self.assertIn('rho', data.variables)
 
 
 class TestAssembleBinary2D(unittest.TestCase):
