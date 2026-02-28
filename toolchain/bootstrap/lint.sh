@@ -4,10 +4,14 @@ set -o pipefail
 
 # Parse arguments
 RUN_TESTS=true
+RUN_VIZ_TESTS=true
 for arg in "$@"; do
     case $arg in
         --no-test)
             RUN_TESTS=false
+            ;;
+        --no-viz-test)
+            RUN_VIZ_TESTS=false
             ;;
     esac
 done
@@ -50,6 +54,9 @@ if [ "$RUN_TESTS" = true ]; then
     cd "$(pwd)/toolchain"
     python3 -m unittest mfc.params_tests.test_registry mfc.params_tests.test_definitions mfc.params_tests.test_validate mfc.params_tests.test_integration -v
     python3 -m unittest mfc.cli.test_cli -v
+    if [ "$RUN_VIZ_TESTS" = true ] && [ "$VIZ_LINT" = true ]; then
+        python3 -m unittest mfc.viz.test_viz -v
+    fi
     cd - > /dev/null
 fi
 

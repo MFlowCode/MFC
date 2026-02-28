@@ -92,7 +92,7 @@ fi
 
 # 3. Lint toolchain (Python)
 log "[$CYAN 3/5$COLOR_RESET] Running$MAGENTA toolchain lint$COLOR_RESET..."
-if ./mfc.sh lint > /dev/null 2>&1; then
+if ./mfc.sh lint --no-viz-test > /dev/null 2>&1; then
     ok "Toolchain lint passed."
 else
     error "Toolchain lint failed. Run$MAGENTA ./mfc.sh lint$COLOR_RESET for details."

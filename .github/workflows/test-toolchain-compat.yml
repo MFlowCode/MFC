@@ -23,6 +23,3 @@ jobs:
         run: ./mfc.sh init
       - name: Lint and test toolchain
         run: ./mfc.sh lint
-
-      - name: Test viz module
-        run: cd toolchain && python3 -m unittest mfc.viz.test_viz -v
