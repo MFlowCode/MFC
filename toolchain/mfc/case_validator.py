@@ -1029,10 +1029,13 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
         riemann_solver = self.get('riemann_solver')
         relativity = self.get('relativity', 'F') == 'T'
         hyper_cleaning = self.get('hyper_cleaning', 'F') == 'T'
+        wave_speeds = self.get('wave_speeds')
         n = self.get('n', 0)
 
         self.prohibit(mhd and riemann_solver is not None and riemann_solver not in [1, 4],
                      "MHD simulations require riemann_solver = 1 (HLL) or riemann_solver = 4 (HLLD)")
+        self.prohibit(mhd and wave_speeds is not None and wave_speeds == 2,
+                     "MHD requires wave_speeds = 1")
         self.prohibit(riemann_solver == 4 and not mhd,
                      "HLLD (riemann_solver = 4) is only available for MHD simulations")
         self.prohibit(riemann_solver == 4 and relativity,
