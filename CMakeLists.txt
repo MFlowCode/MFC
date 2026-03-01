@@ -237,8 +237,11 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release")
         endif()
     endif()
 
-    # Enable LTO/IPO if supported
-    if (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC")
+    # Enable LTO/IPO if supported (skip for gcov — LTO interferes with coverage
+    # instrumentation and can trigger assembler errors on newer architectures).
+    if (MFC_GCov)
+        message(STATUS "LTO/IPO disabled for gcov build")
+    elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC")
         if (MFC_Unified)
             message(STATUS "LTO/IPO is not available with NVHPC using Unified Memory")
         elseif (CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER "24.11" AND CMAKE_Fortran_COMPILER_VERSION VERSION_LESS "25.9")
