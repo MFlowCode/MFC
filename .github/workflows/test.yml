@@ -364,7 +364,9 @@ jobs:
   commit-cache:
     name: Commit Coverage Cache
     needs: [rebuild-cache]
-    if: needs.rebuild-cache.result == 'success'
+    if: >-
+      needs.rebuild-cache.result == 'success' &&
+      github.repository == 'MFlowCode/MFC'
     runs-on: ubuntu-latest
     permissions:
       contents: write

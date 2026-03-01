@@ -233,32 +233,6 @@ def _find_matching_gcno(root_dir: str) -> list:
     return matching
 
 
-def _gcda_path_to_fpp(gcda_rel: str) -> str:
-    """
-    Map a .gcda relative path to the corresponding .fpp source path.
-
-    Build tree layout:
-        CMakeFiles/<target>.dir/fypp/<target>/<name>.fpp.f90.gcda -> src/<target>/<name>.fpp
-
-    Returns empty string for non-.fpp files (plain .f90, modules/, ltrans).
-    """
-    # Extract path after CMakeFiles/<target>.dir/
-    m = re.match(r'.*?CMakeFiles/[^/]+\.dir/(.*)', gcda_rel)
-    if not m:
-        return ""
-    inner = m.group(1)  # e.g. fypp/simulation/m_rhs.fpp.f90.gcda
-
-    # Only .fpp files: inner must contain ".fpp.f90.gcda"
-    if ".fpp.f90.gcda" not in inner:
-        return ""
-
-    # fypp/<target>/<name>.fpp.f90.gcda -> src/<target>/<name>.fpp
-    path = inner.replace(".f90.gcda", "")  # fypp/<target>/<name>.fpp
-    if path.startswith("fypp/"):
-        path = "src/" + path[5:]  # src/<target>/<name>.fpp
-    return path
-
-
 def _compute_gcov_prefix_strip(root_dir: str) -> str:
     """
     Compute GCOV_PREFIX_STRIP so .gcda files preserve the build/ tree.

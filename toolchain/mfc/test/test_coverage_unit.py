@@ -105,7 +105,6 @@ try:
     _parse_diff_files = _coverage_mod._parse_diff_files
     _parse_gcov_json_output = _coverage_mod._parse_gcov_json_output
     _normalize_cache = _coverage_mod._normalize_cache
-    _gcda_path_to_fpp = _coverage_mod._gcda_path_to_fpp
     should_run_all_tests = _coverage_mod.should_run_all_tests
     filter_tests_by_coverage = _coverage_mod.filter_tests_by_coverage
     ALWAYS_RUN_ALL = _coverage_mod.ALWAYS_RUN_ALL
@@ -138,7 +137,6 @@ except AttributeError:
     _parse_diff_files = _globals["_parse_diff_files"]
     _parse_gcov_json_output = _globals["_parse_gcov_json_output"]
     _normalize_cache = _globals["_normalize_cache"]
-    _gcda_path_to_fpp = _globals["_gcda_path_to_fpp"]
     should_run_all_tests = _globals["should_run_all_tests"]
     filter_tests_by_coverage = _globals["filter_tests_by_coverage"]
     ALWAYS_RUN_ALL = _globals["ALWAYS_RUN_ALL"]
@@ -591,45 +589,6 @@ class TestCachePath(unittest.TestCase):
     def test_cache_path_is_gzipped(self):
         """Cache file must use .json.gz so it can be committed to the repo."""
         assert str(COVERAGE_CACHE_PATH).endswith(".json.gz")
-
-
-# ===========================================================================
-# Group 8: _gcda_path_to_fpp — .gcda path to .fpp source mapping
-# ===========================================================================
-
-class TestGcdaPathToFpp(unittest.TestCase):
-
-    def test_fypp_simulation_file(self):
-        path = "build/staging/abc123/CMakeFiles/simulation.dir/fypp/simulation/m_rhs.fpp.f90.gcda"
-        assert _gcda_path_to_fpp(path) == "src/simulation/m_rhs.fpp"
-
-    def test_fypp_pre_process_file(self):
-        path = "build/staging/abc123/CMakeFiles/pre_process.dir/fypp/pre_process/m_grid.fpp.f90.gcda"
-        assert _gcda_path_to_fpp(path) == "src/pre_process/m_grid.fpp"
-
-    def test_fypp_common_file_in_simulation(self):
-        """Common .fpp compiled into simulation: path says simulation, not common."""
-        path = "build/staging/abc123/CMakeFiles/simulation.dir/fypp/simulation/m_helper.fpp.f90.gcda"
-        assert _gcda_path_to_fpp(path) == "src/simulation/m_helper.fpp"
-
-    def test_plain_f90_returns_empty(self):
-        """Non-.fpp files (plain .f90) should be excluded."""
-        path = "build/staging/abc123/CMakeFiles/simulation.dir/src/common/m_compile_specific.f90.gcda"
-        assert _gcda_path_to_fpp(path) == ""
-
-    def test_module_file_returns_empty(self):
-        """Generated module files should be excluded."""
-        path = "build/staging/abc123/CMakeFiles/simulation.dir/modules/simulation/m_thermochem.f90.gcda"
-        assert _gcda_path_to_fpp(path) == ""
-
-    def test_ltrans_file_returns_empty(self):
-        """LTO artifacts should be excluded."""
-        path = "build/staging/abc123/simulation.ltrans0.ltrans.gcda"
-        assert _gcda_path_to_fpp(path) == ""
-
-    def test_syscheck_fpp(self):
-        path = "build/staging/abc123/CMakeFiles/syscheck.dir/fypp/syscheck/syscheck.fpp.f90.gcda"
-        assert _gcda_path_to_fpp(path) == "src/syscheck/syscheck.fpp"
 
 
 if __name__ == "__main__":

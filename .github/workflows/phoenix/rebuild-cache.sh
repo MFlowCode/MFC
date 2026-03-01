@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 # Number of parallel jobs: use SLURM allocation or default to 24.
 # Cap at 64 to avoid overwhelming MPI's ORTE daemons with concurrent launches.
