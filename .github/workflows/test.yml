@@ -108,7 +108,7 @@ jobs:
       always() &&
       needs.lint-gate.result == 'success' &&
       needs.file-changes.result == 'success' &&
-      (needs.rebuild-cache.result == 'success' || needs.rebuild-cache.result == 'skipped') &&
+      needs.rebuild-cache.result != 'cancelled' &&
       needs.file-changes.outputs.checkall == 'true'
     strategy:
       matrix:
@@ -234,7 +234,7 @@ jobs:
       always() &&
       needs.lint-gate.result == 'success' &&
       needs.file-changes.result == 'success' &&
-      (needs.rebuild-cache.result == 'success' || needs.rebuild-cache.result == 'skipped') &&
+      needs.rebuild-cache.result != 'cancelled' &&
       github.repository == 'MFlowCode/MFC' &&
       needs.file-changes.outputs.checkall == 'true' &&
       github.event.pull_request.draft != true

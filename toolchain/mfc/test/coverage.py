@@ -167,8 +167,6 @@ def _parse_gcov_json_output(raw_bytes: bytes, root_dir: str) -> set:
             data = json.loads(raw_bytes)
         except (json.JSONDecodeError, ValueError):
             return set()
-    except Exception:
-        return set()
 
     result = set()
     real_root = os.path.realpath(root_dir)
@@ -277,7 +275,7 @@ def _run_single_test_direct(test_info: dict, gcda_dir: str, strip: str) -> tuple
     rendering, no shell script generation).  Input files and binary paths are
     pre-computed by the caller.
 
-    Returns (uuid, test_gcda_path).
+    Returns (uuid, test_gcda_path, failures).
     """
     uuid = test_info["uuid"]
     test_dir = test_info["dir"]
@@ -296,7 +294,12 @@ def _run_single_test_direct(test_info: dict, gcda_dir: str, strip: str) -> tuple
     elif shutil.which("srun"):
         mpi_cmd = ["srun", "--ntasks", str(ppn)]
     else:
-        mpi_cmd = []
+        raise MFCException(
+            "No MPI launcher found (mpirun or srun). "
+            "MFC binaries require an MPI launcher.\n"
+            "  On Ubuntu: sudo apt install openmpi-bin\n"
+            "  On macOS:  brew install open-mpi"
+        )
 
     failures = []
     for target_name, bin_path in binaries:
@@ -326,15 +329,17 @@ def _prepare_test(case, root_dir: str) -> dict:  # pylint: disable=unused-argume
     try:
         case.delete_output()
         case.create_directory()
-    except Exception:
-        pass
+    except OSError as exc:
+        cons.print(f"[yellow]Warning: Failed to prepare test directory for "
+                   f"{case.get_uuid()}: {exc}[/yellow]")
 
     # Lagrange bubble tests need input files generated before running.
     if case.params.get("bubbles_lagrange", 'F') == 'T':
         try:
             input_bubbles_lagrange(case)
-        except Exception:
-            pass
+        except Exception as exc:
+            cons.print(f"[yellow]Warning: Failed to generate Lagrange bubble input "
+                       f"for {case.get_uuid()}: {exc}[/yellow]")
 
     test_dir = case.get_dirpath()
     input_file = case.to_input_file()
@@ -457,6 +462,17 @@ def build_coverage_cache(  # pylint: disable=unused-argument,too-many-locals,too
 
     # Clean up temp directory.
     shutil.rmtree(gcda_dir, ignore_errors=True)
+
+    # Sanity check: at least some tests should have non-empty coverage.
+    tests_with_coverage = sum(1 for v in cache.values() if v)
+    if tests_with_coverage == 0:
+        raise MFCException(
+            "Coverage cache build produced zero coverage for all tests. "
+            "Check that the build was done with --gcov and gcov is working correctly."
+        )
+    if tests_with_coverage < len(cases) // 2:
+        cons.print(f"[bold yellow]Warning: Only {tests_with_coverage}/{len(cases)} tests "
+                   f"have coverage data. Cache may be incomplete.[/bold yellow]")
 
     cases_py_path = Path(root_dir) / "toolchain/mfc/test/cases.py"
     cases_hash = hashlib.sha256(cases_py_path.read_bytes()).hexdigest()
