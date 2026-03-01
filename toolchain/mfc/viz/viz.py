@@ -360,6 +360,13 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
 
     # Interactive mode — launch Dash web server
     if interactive:
+        ignored = [f for f in ('slice_index', 'slice_value')
+                   if ARG(f) is not None]
+        if ARG('slice_axis') != 'z':
+            ignored.insert(0, 'slice_axis')
+        if ignored:
+            cons.print(f"[yellow]Warning:[/yellow] {', '.join('--' + f.replace('_', '-') for f in ignored)} "
+                       "ignored in --interactive mode (use the UI controls instead).")
         from .interactive import run_interactive  # pylint: disable=import-outside-toplevel
         port = ARG('port')
         host = ARG('host')
