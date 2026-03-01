@@ -867,19 +867,19 @@ VIZ_COMMAND = Command(
     description=(
         "Render post-processed MFC output as PNG images or MP4 video, or explore "
         "interactively. Supports 1D line plots, 2D colormaps, 3D midplane slices, "
-        "and tiled all-variable views. PNG files are saved to case_dir/viz/ by default.\n\n"
+        "and tiled all-variable views.\n\n"
         "Output modes:\n"
-        "  (default)      Save PNG image(s) to case_dir/viz/\n"
-        "  --mp4          Encode frames into an MP4 video\n"
+        "  (default)      Launch a terminal UI (works over SSH, no browser needed)\n"
         "  --interactive  Launch a Dash web UI in your browser\n"
-        "  --tui          Launch a terminal UI (works over SSH, no browser needed)\n\n"
+        "  --png          Save PNG image(s) to case_dir/viz/\n"
+        "  --mp4          Encode frames into an MP4 video\n\n"
         "Variable selection:\n"
         "  --var NAME     Plot a single variable\n"
         "  (omit --var)   1D/2D: tiled layout of all variables; 3D: first variable\n\n"
         "Quick-start workflow:\n"
         "  1. ./mfc.sh viz case_dir/ --list-steps\n"
         "  2. ./mfc.sh viz case_dir/ --list-vars --step 0\n"
-        "  3. ./mfc.sh viz case_dir/ --var pres --step 1000"
+        "  3. ./mfc.sh viz case_dir/"
     ),
     positionals=[
         Positional(
@@ -927,7 +927,7 @@ VIZ_COMMAND = Command(
         Argument(
             name="output",
             short="o",
-            help="Directory for saved PNG images or MP4 video (default: case_dir/viz/).",
+            help="Directory for saved PNG images or MP4 video.",
             type=str,
             default=None,
             metavar="DIR",
@@ -935,7 +935,7 @@ VIZ_COMMAND = Command(
         ),
         Argument(
             name="cmap",
-            help="Matplotlib colormap name (default: viridis).",
+            help="Matplotlib colormap name.",
             type=str,
             default='viridis',
             metavar="CMAP",
@@ -981,14 +981,14 @@ VIZ_COMMAND = Command(
         ),
         Argument(
             name="dpi",
-            help="Image resolution in DPI (default: 150).",
+            help="Image resolution in DPI.",
             type=int,
             default=150,
             metavar="DPI",
         ),
         Argument(
             name="slice-axis",
-            help="Axis for 3D slice: x, y, or z (default: z).",
+            help="Axis for 3D slice.",
             type=str,
             default='z',
             choices=["x", "y", "z"],
@@ -1019,7 +1019,7 @@ VIZ_COMMAND = Command(
         ),
         Argument(
             name="fps",
-            help="Frames per second for MP4 output (default: 10).",
+            help="Frames per second for MP4 output.",
             type=int,
             default=10,
             metavar="FPS",
@@ -1058,38 +1058,36 @@ VIZ_COMMAND = Command(
         ),
         Argument(
             name="port",
-            help="Port for the interactive web server (default: 8050).",
+            help="Port for the interactive web server.",
             type=int,
             default=8050,
             metavar="PORT",
         ),
         Argument(
             name="host",
-            help="Host/bind address for the interactive web server (default: 127.0.0.1).",
+            help="Host/bind address for the interactive web server.",
             default="127.0.0.1",
             metavar="HOST",
         ),
         Argument(
-            name="tui",
+            name="png",
             help=(
-                "Launch an interactive terminal UI (1D/2D only). "
-                "Works over SSH with no browser required. "
-                "Use arrow keys to step through timesteps."
+                "Save PNG image(s) to the output directory instead of "
+                "launching the terminal UI."
             ),
             action=ArgAction.STORE_TRUE,
             default=False,
         ),
     ],
     examples=[
+        Example("./mfc.sh viz case_dir/", "Launch terminal UI (default mode)"),
         Example("./mfc.sh viz case_dir/ --list-steps", "Discover available timesteps"),
         Example("./mfc.sh viz case_dir/ --list-vars --step 0", "Discover available variables at step 0"),
-        Example("./mfc.sh viz case_dir/ --var pres --step 1000", "Save pressure PNG at step 1000 → case_dir/viz/"),
-        Example("./mfc.sh viz case_dir/ --step 1000", "Save tiled PNG of all variables (1D/2D) at step 1000"),
-        Example("./mfc.sh viz case_dir/ --var schlieren --step 0:10000:500 --mp4", "Encode schlieren MP4 from range"),
-        Example("./mfc.sh viz case_dir/ --step 0,100,200,...,1000", "Render all steps 0–1000 (stride inferred)"),
-        Example("./mfc.sh viz case_dir/ --var pres --step 500 --slice-axis x", "3D: x-plane slice of pressure"),
         Example("./mfc.sh viz case_dir/ --var pres --interactive", "Browser UI — scrub timesteps and switch vars"),
-        Example("./mfc.sh viz case_dir/ --var pres --tui", "Terminal UI over SSH (1D/2D, no browser)"),
+        Example("./mfc.sh viz case_dir/ --var pres --step 1000 --png", "Save pressure PNG at step 1000"),
+        Example("./mfc.sh viz case_dir/ --var schlieren --step 0:10000:500 --mp4", "Encode schlieren MP4 from range"),
+        Example("./mfc.sh viz case_dir/ --step 0,100,200,...,1000 --png", "Render all steps 0–1000 as images"),
+        Example("./mfc.sh viz case_dir/ --var pres --step 500 --slice-axis x --png", "3D: x-plane slice of pressure"),
     ],
     key_options=[
         ("-- Discovery --", ""),
@@ -1099,10 +1097,10 @@ VIZ_COMMAND = Command(
         ("--var NAME", "Variable to plot (omit for tiled all-vars layout)"),
         ("--step STEP", "last (default), int, start:stop:stride, list, or 'all'"),
         ("-- Output modes --", ""),
-        ("(default)", "Save PNG to case_dir/viz/; use -o DIR to change"),
-        ("--mp4", "Encode frames into an MP4 video"),
+        ("(default)", "Terminal UI — works over SSH, no browser needed (1D/2D)"),
         ("--interactive / -i", "Dash web UI in browser (supports 1D/2D/3D)"),
-        ("--tui", "Terminal UI over SSH — no browser needed (1D/2D)"),
+        ("--png", "Save PNG image(s) to case_dir/viz/; use -o DIR to change"),
+        ("--mp4", "Encode frames into an MP4 video"),
         ("-- Appearance --", ""),
         ("--cmap NAME", "Matplotlib colormap (default: viridis)"),
         ("--vmin / --vmax", "Fix color-scale limits"),

@@ -14,16 +14,16 @@ MFC includes a built-in visualization command that renders images and videos dir
 ### Basic usage
 
 ```bash
-# Plot pressure at the last available timestep (--step defaults to 'last')
-./mfc.sh viz case_dir/ --var pres
+# Launch the terminal UI (default mode)
+./mfc.sh viz case_dir/
 
-# Plot density at all available timesteps
-./mfc.sh viz case_dir/ --var rho --step all
+# Launch with a specific variable pre-selected
+./mfc.sh viz case_dir/ --var pres
 ```
 
 The command auto-detects the output format (binary or Silo-HDF5) and dimensionality (1D, 2D, or 3D).
-Output images are saved to `case_dir/viz/` by default.
-The default colormap is `viridis`, default DPI is 150, and `--step` defaults to `last`.
+By default it launches an interactive terminal UI that works over SSH.
+Use `--interactive` for a browser-based UI (supports 3D), `--png` to save images, or `--mp4` for video.
 
 ### Exploring available data
 
@@ -54,13 +54,13 @@ Customize the appearance of plots:
 
 ```bash
 # Custom colormap and color range
-./mfc.sh viz case_dir/ --var rho --step 1000 --cmap RdBu --vmin 0.5 --vmax 2.0
+./mfc.sh viz case_dir/ --var rho --step 1000 --png --cmap RdBu --vmin 0.5 --vmax 2.0
 
 # Higher resolution
-./mfc.sh viz case_dir/ --var pres --step 500 --dpi 300
+./mfc.sh viz case_dir/ --var pres --step 500 --png --dpi 300
 
 # Logarithmic color scale
-./mfc.sh viz case_dir/ --var schlieren --step 1000 --log-scale
+./mfc.sh viz case_dir/ --var schlieren --step 1000 --png --log-scale
 ```
 
 | Option | Description | Default |
@@ -84,13 +84,13 @@ By default, it slices at the midplane along the z-axis.
 
 ```bash
 # Default z-midplane slice
-./mfc.sh viz case_dir/ --var pres --step 500
+./mfc.sh viz case_dir/ --var pres --step 500 --png
 
 # Slice along the x-axis at x=0.25
-./mfc.sh viz case_dir/ --var pres --step 500 --slice-axis x --slice-value 0.25
+./mfc.sh viz case_dir/ --var pres --step 500 --png --slice-axis x --slice-value 0.25
 
 # Slice by array index
-./mfc.sh viz case_dir/ --var pres --step 500 --slice-axis y --slice-index 50
+./mfc.sh viz case_dir/ --var pres --step 500 --png --slice-axis y --slice-index 50
 ```
 
 ### Video generation
@@ -117,10 +117,10 @@ For 1D cases, omitting `--var` (or passing `--var all`) renders all variables in
 
 ```bash
 # Tiled plot of all variables at the last timestep
-./mfc.sh viz case_dir/ --step last
+./mfc.sh viz case_dir/ --step last --png
 
 # Equivalent explicit form
-./mfc.sh viz case_dir/ --var all --step last
+./mfc.sh viz case_dir/ --var all --step last --png
 ```
 
 Each variable gets its own subplot with automatic LaTeX-style axis labels.
@@ -147,13 +147,13 @@ The interactive viewer provides a Dash web UI with:
 
 ### Terminal UI (TUI)
 
-For environments without a browser — such as SSH sessions or HPC login nodes — use `--tui` to launch a live terminal UI:
+The default mode launches a live terminal UI that works over SSH with no browser or port-forwarding needed:
 
 ```bash
-./mfc.sh viz case_dir/ --tui
+./mfc.sh viz case_dir/
 
 # Start with a specific variable pre-selected
-./mfc.sh viz case_dir/ --var pres --tui
+./mfc.sh viz case_dir/ --var pres
 ```
 
 The TUI loads all timesteps and renders plots directly in the terminal using Unicode block characters.

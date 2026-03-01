@@ -1,7 +1,7 @@
 """
 Terminal UI (TUI) for MFC visualization using Textual + plotext.
 
-Launched via ``./mfc.sh viz <dir> --tui [--var VAR] [--step STEP]``.
+Launched via ``./mfc.sh viz <dir> [--var VAR] [--step STEP]``.
 Opens a full-terminal interactive viewer that works over SSH with no
 browser or port-forwarding required.
 
@@ -688,7 +688,7 @@ def run_tui(
     """Launch the Textual TUI for MFC visualization (1D/2D only)."""
     if ndim not in (1, 2):
         raise MFCException(
-            f"--tui only supports 1D and 2D data (got ndim={ndim}). "
+            f"Terminal UI only supports 1D and 2D data (got ndim={ndim}). "
             "Use --interactive for 3D data."
         )
 

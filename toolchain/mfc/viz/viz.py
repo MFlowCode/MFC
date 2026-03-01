@@ -265,7 +265,10 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
     step_arg = ARG('step')
     tiled = varname is None or varname == 'all'
 
-    if ARG('interactive') or ARG('tui') or ARG('mp4'):
+    # TUI is the default mode; --interactive, --png, and --mp4 are explicit.
+    use_tui = not ARG('interactive') and not ARG('png') and not ARG('mp4')
+
+    if ARG('interactive') or use_tui or ARG('mp4'):
         # Load all steps by default; honour an explicit --step so users can
         # reduce the set for large 3D cases before hitting the step limit.
         if step_arg == 'last':
@@ -313,7 +316,7 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
 
     # Load all variables when tiled, interactive, or TUI; filter otherwise.
     # TUI needs all vars loaded so the sidebar can switch between them.
-    load_all = tiled or interactive or ARG('tui')
+    load_all = tiled or interactive or use_tui
 
     def read_step(step):
         if fmt == 'silo':
@@ -334,7 +337,7 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
             f"(limit is {_3d_limit}). Use --step with a range or stride to reduce.")
 
     # Tiled mode works for 1D and 2D.  For 3D, auto-select the first variable.
-    if tiled and not interactive and not ARG('tui'):
+    if tiled and not interactive and not use_tui:
         if test_assembled.ndim == 3:
             varname = avail[0] if avail else None
             if varname is None:
@@ -343,7 +346,7 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
             cons.print(f"[dim]Auto-selected variable: [bold]{varname}[/bold]"
                        " (use --var to specify)[/dim]")
 
-    if not tiled and not interactive and not ARG('tui') and varname not in test_assembled.variables:
+    if not tiled and not interactive and not use_tui and varname not in test_assembled.variables:
         # test_assembled was loaded with var_filter=varname so its variables dict
         # may be empty. Re-read without filter (errors only, so extra I/O is fine)
         # to build a useful "available variables" list for the error message.
@@ -367,10 +370,10 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
         _validate_cmap(cmap_name)
 
     # TUI mode — launch Textual terminal UI (1D/2D only)
-    if ARG('tui'):
+    if use_tui:
         if test_assembled.ndim == 3:
             raise MFCException(
-                "--tui only supports 1D and 2D data. "
+                "Terminal UI only supports 1D and 2D data. "
                 "Use --interactive for 3D data."
             )
         from .tui import run_tui  # pylint: disable=import-outside-toplevel
