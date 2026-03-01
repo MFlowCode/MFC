@@ -287,25 +287,6 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
             f"No matching timesteps for --step {step_arg!r}{detail}. "
             f"Available steps: {_steps_hint(steps)}")
 
-    # Collect rendering options
-    render_opts = {
-        'cmap':  ARG('cmap'),
-        'dpi':   ARG('dpi'),
-        'slice_axis': ARG('slice_axis'),
-    }
-    if ARG('vmin') is not None:
-        render_opts['vmin'] = float(ARG('vmin'))
-    if ARG('vmax') is not None:
-        render_opts['vmax'] = float(ARG('vmax'))
-    if ARG('log_scale'):
-        render_opts['log_scale'] = True
-    if ARG('slice_index') is not None and ARG('slice_value') is not None:
-        raise MFCException("--slice-index and --slice-value are mutually exclusive.")
-    if ARG('slice_index') is not None:
-        render_opts['slice_index'] = int(ARG('slice_index'))
-    if ARG('slice_value') is not None:
-        render_opts['slice_value'] = float(ARG('slice_value'))
-
     interactive = ARG('interactive')
 
     # Lagrange bubble overlay: auto-detect D/lag_bubble_evol_*.dat files
@@ -364,11 +345,6 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
             f"Use --list-vars to see variables at a given step."
         )
 
-    # Validate colormap early so all modes get a clean error for bad --cmap
-    cmap_name = ARG('cmap')
-    if cmap_name:
-        _validate_cmap(cmap_name)
-
     # TUI mode — launch Textual terminal UI (1D/2D only)
     if use_tui:
         if test_assembled.ndim == 3:
@@ -393,6 +369,29 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
                         port=int(port), host=str(host),
                         bubble_func=bubble_func)
         return
+
+    # --- PNG / MP4 rendering options (not used by TUI or interactive) ---
+    render_opts = {
+        'cmap':  ARG('cmap'),
+        'dpi':   ARG('dpi'),
+        'slice_axis': ARG('slice_axis'),
+    }
+    if ARG('vmin') is not None:
+        render_opts['vmin'] = float(ARG('vmin'))
+    if ARG('vmax') is not None:
+        render_opts['vmax'] = float(ARG('vmax'))
+    if ARG('log_scale'):
+        render_opts['log_scale'] = True
+    if ARG('slice_index') is not None and ARG('slice_value') is not None:
+        raise MFCException("--slice-index and --slice-value are mutually exclusive.")
+    if ARG('slice_index') is not None:
+        render_opts['slice_index'] = int(ARG('slice_index'))
+    if ARG('slice_value') is not None:
+        render_opts['slice_value'] = float(ARG('slice_value'))
+
+    cmap_name = ARG('cmap')
+    if cmap_name:
+        _validate_cmap(cmap_name)
 
     # Create output directory
     output_base = ARG('output')
