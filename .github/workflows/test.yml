@@ -90,18 +90,26 @@ jobs:
     name: Rebuild Coverage Cache
     needs: [lint-gate, file-changes]
     if: >-
-      github.event_name == 'pull_request' &&
-      (needs.file-changes.outputs.cases_py == 'true' ||
-       needs.file-changes.outputs.dep_changed == 'true') &&
-      github.repository == 'MFlowCode/MFC'
+      github.repository == 'MFlowCode/MFC' &&
+      (
+        (github.event_name == 'pull_request' &&
+         (needs.file-changes.outputs.cases_py == 'true' ||
+          needs.file-changes.outputs.dep_changed == 'true')) ||
+        (github.event_name == 'push' &&
+         needs.file-changes.outputs.cases_py == 'true') ||
+        github.event_name == 'workflow_dispatch'
+      )
     timeout-minutes: 240
     runs-on:
       group:  phoenix
       labels: gt
+    permissions:
+      contents: write
     steps:
       - name: Clone
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           clean: false
 
       - name: Rebuild Cache via SLURM
@@ -112,11 +120,25 @@ jobs:
         run:  cat rebuild-cache-cpu-none.out
 
       - name: Upload Cache Artifact
+        if: github.event_name == 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: coverage-cache
           path: toolchain/mfc/test/test_coverage_cache.json.gz
           retention-days: 1
+
+      - name: Commit Cache to Master
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add toolchain/mfc/test/test_coverage_cache.json.gz
+          if git diff --cached --quiet; then
+            echo "Coverage cache unchanged."
+          else
+            git commit -m "Regenerate gcov coverage cache [skip ci]"
+            git push
+          fi
 
   github:
     name: Github
@@ -385,55 +407,3 @@ jobs:
           name: logs-${{ strategy.job-index }}-${{ steps.log.outputs.slug }}
           path: ${{ steps.log.outputs.slug }}.out
 
-  commit-cache:
-    name: Commit Coverage Cache
-    needs: [rebuild-cache]
-    if: >-
-      needs.rebuild-cache.result == 'success' &&
-      github.repository == 'MFlowCode/MFC' &&
-      github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
-    steps:
-      - name: Clone
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref }}
-
-      - name: Download Coverage Cache
-        uses: actions/download-artifact@v4
-        with:
-          name: coverage-cache
-          path: toolchain/mfc/test
-
-      - name: Commit Updated Cache
-        id: commit
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add toolchain/mfc/test/test_coverage_cache.json.gz
-          if git diff --cached --quiet; then
-            echo "Coverage cache unchanged."
-            echo "pushed=false" >> "$GITHUB_OUTPUT"
-          else
-            git commit -m "Regenerate gcov coverage cache
-
-          Automatically rebuilt because cases.py changed."
-            pushed=false
-            for i in 1 2 3; do
-              git pull --rebase && git push && { pushed=true; break; }
-              echo "Push attempt $i failed, retrying in 5s..."
-              sleep 5
-            done
-            echo "pushed=$pushed" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Post PR Comment
-        if: steps.commit.outputs.pushed == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh pr comment ${{ github.event.pull_request.number }} \
-            --body "Coverage cache auto-updated: a bot commit was pushed to this branch because \`cases.py\` changed."
