@@ -61,7 +61,7 @@ log "Running$MAGENTA precheck$COLOR_RESET (same checks as CI lint-gate)..."
 echo ""
 
 # 1. Check formatting
-log "[$CYAN 1/5$COLOR_RESET] Checking$MAGENTA formatting$COLOR_RESET..."
+log "[$CYAN 1/6$COLOR_RESET] Checking$MAGENTA formatting$COLOR_RESET..."
 # Capture state before formatting
 BEFORE_HASH=$(git diff -- '*.f90' '*.fpp' '*.py' 2>/dev/null | compute_hash)
 if ! ./mfc.sh format -j "$JOBS" > /dev/null 2>&1; then
@@ -82,7 +82,7 @@ else
 fi
 
 # 2. Spell check
-log "[$CYAN 2/5$COLOR_RESET] Running$MAGENTA spell check$COLOR_RESET..."
+log "[$CYAN 2/6$COLOR_RESET] Running$MAGENTA spell check$COLOR_RESET..."
 if ./mfc.sh spelling > /dev/null 2>&1; then
     ok "Spell check passed."
 else
@@ -91,7 +91,7 @@ else
 fi
 
 # 3. Lint toolchain (Python)
-log "[$CYAN 3/5$COLOR_RESET] Running$MAGENTA toolchain lint$COLOR_RESET..."
+log "[$CYAN 3/6$COLOR_RESET] Running$MAGENTA toolchain lint$COLOR_RESET..."
 if ./mfc.sh lint > /dev/null 2>&1; then
     ok "Toolchain lint passed."
 else
@@ -100,7 +100,7 @@ else
 fi
 
 # 4. Source code lint checks
-log "[$CYAN 4/5$COLOR_RESET] Running$MAGENTA source lint$COLOR_RESET checks..."
+log "[$CYAN 4/6$COLOR_RESET] Running$MAGENTA source lint$COLOR_RESET checks..."
 SOURCE_FAILED=0
 
 # Check for raw OpenACC/OpenMP directives
@@ -127,8 +127,17 @@ else
     FAILED=1
 fi
 
-# 5. Doc reference check
-log "[$CYAN 5/5$COLOR_RESET] Checking$MAGENTA doc references$COLOR_RESET..."
+# 5. Fortran/Fypp static analysis
+log "[$CYAN 5/6$COLOR_RESET] Running$MAGENTA Fortran/Fypp analysis$COLOR_RESET..."
+if python3 toolchain/mfc/lint_source.py 2>&1; then
+    ok "Fortran/Fypp analysis passed."
+else
+    error "Fortran/Fypp analysis failed. Run$MAGENTA python3 toolchain/mfc/lint_source.py$COLOR_RESET for details."
+    FAILED=1
+fi
+
+# 6. Doc reference check
+log "[$CYAN 6/6$COLOR_RESET] Checking$MAGENTA doc references$COLOR_RESET..."
 if python3 toolchain/mfc/lint_docs.py 2>&1; then
     ok "Doc references are valid."
 else
