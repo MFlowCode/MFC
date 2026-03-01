@@ -137,7 +137,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Fetch master for coverage diff
-        run: git fetch origin master:master --depth=1
+        run: |
+          git fetch origin master:master --depth=1
+          git fetch --deepen=200
         continue-on-error: true
 
       - name: Download Coverage Cache
