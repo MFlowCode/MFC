@@ -404,12 +404,13 @@ jobs:
             git commit -m "Regenerate gcov coverage cache
 
           Automatically rebuilt because cases.py changed."
+            pushed=false
             for i in 1 2 3; do
-              git pull --rebase && git push && break
+              git pull --rebase && git push && { pushed=true; break; }
               echo "Push attempt $i failed, retrying in 5s..."
               sleep 5
             done
-            echo "pushed=true" >> "$GITHUB_OUTPUT"
+            echo "pushed=$pushed" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Post PR Comment

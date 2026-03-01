@@ -254,6 +254,26 @@ class TestShouldRunAllTests(unittest.TestCase):
             {"CMakeLists.txt"}
         ) is True
 
+    def test_case_fpp_triggers_all(self):
+        assert should_run_all_tests(
+            {"src/common/include/case.fpp"}
+        ) is True
+
+    def test_coverage_py_triggers_all(self):
+        assert should_run_all_tests(
+            {"toolchain/mfc/test/coverage.py"}
+        ) is True
+
+    def test_cmake_dir_triggers_all(self):
+        assert should_run_all_tests(
+            {"toolchain/cmake/FindFFTW.cmake"}
+        ) is True
+
+    def test_cmake_subdir_triggers_all(self):
+        assert should_run_all_tests(
+            {"toolchain/cmake/some/nested/file.cmake"}
+        ) is True
+
     def test_simulation_module_does_not_trigger_all(self):
         assert should_run_all_tests(
             {"src/simulation/m_rhs.fpp"}

@@ -45,13 +45,20 @@ ALWAYS_RUN_ALL = frozenset([
     "src/common/include/omp_macros.fpp",
     "src/common/include/shared_parallel_macros.fpp",
     "src/common/include/macros.fpp",
+    "src/common/include/case.fpp",
     "toolchain/mfc/test/cases.py",
     "toolchain/mfc/test/case.py",
     "toolchain/mfc/params/definitions.py",
     "toolchain/mfc/run/input.py",
     "toolchain/mfc/case_validator.py",
+    "toolchain/mfc/test/coverage.py",
     "CMakeLists.txt",
 ])
+
+# Directory prefixes: any changed file under these paths triggers full suite.
+ALWAYS_RUN_ALL_PREFIXES = (
+    "toolchain/cmake/",
+)
 
 
 def _get_gcov_version(gcov_binary: str) -> str:
@@ -304,6 +311,8 @@ def _run_single_test_direct(test_info: dict, gcda_dir: str, strip: str) -> tuple
     failures = []
     for target_name, bin_path in binaries:
         if not os.path.isfile(bin_path):
+            cons.print(f"[yellow]Warning: binary {target_name} not found "
+                       f"at {bin_path} for test {uuid}[/yellow]")
             continue
         cmd = mpi_cmd + [bin_path]
         try:
@@ -574,12 +583,16 @@ def get_changed_files(root_dir: str, compare_branch: str = "master") -> Optional
 
 def should_run_all_tests(changed_files: set) -> bool:
     """
-    Return True if any changed file is in ALWAYS_RUN_ALL.
+    Return True if any changed file is in ALWAYS_RUN_ALL or under
+    ALWAYS_RUN_ALL_PREFIXES.
 
-    GPU macro files and toolchain files cannot be correctly analyzed by CPU
-    coverage — changes to them must always trigger the full test suite.
+    GPU macro files, Fypp includes, and build system files cannot be
+    correctly analyzed by CPU coverage — changes to them must always
+    trigger the full test suite.
     """
-    return bool(changed_files & ALWAYS_RUN_ALL)
+    if changed_files & ALWAYS_RUN_ALL:
+        return True
+    return any(f.startswith(ALWAYS_RUN_ALL_PREFIXES) for f in changed_files)
 
 
 def filter_tests_by_coverage(
