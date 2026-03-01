@@ -1100,9 +1100,6 @@ contains
                             end if
                         end do
 
-                        ! Update the force values atomically to prevent race conditions
-                        call s_cross_product(radial_vector, local_force_contribution, local_torque_contribution)
-
                         ! get the viscous stress and add its contribution if that is considered
                         ! TODO :: This is really bad code
                         if (viscous) then
@@ -1113,46 +1110,29 @@ contains
                                 dynamic_viscosity = dynamic_viscosity + (q_prim_vf(fluid_idx + advxb - 1)%sf(i, j, k)*dynamic_viscosities(fluid_idx))
                             end do
 
-                            ! get the linear force component first
+                            ! get the linear force components first
                             call s_compute_viscous_stress_tensor(viscous_stress_div_1, q_prim_vf, dynamic_viscosity, i - 1, j, k)
                             call s_compute_viscous_stress_tensor(viscous_stress_div_2, q_prim_vf, dynamic_viscosity, i + 1, j, k)
-                            viscous_stress_div = (viscous_stress_div_2 - viscous_stress_div_1)/(2._wp*dx) ! get the x derivative of the viscous stress tensor
-                            local_force_contribution(1:3) = local_force_contribution(1:3) + viscous_stress_div(1, 1:3) ! add te x components of the derivative to the force
-                            do l = 1, 3
-                                ! take the cross products for the torque component
-                                call s_cross_product(radial_vector, viscous_stress_div_1(l, 1:3), viscous_cross_1(l, 1:3))
-                                call s_cross_product(radial_vector, viscous_stress_div_2(l, 1:3), viscous_cross_2(l, 1:3))
-                            end do
-
-                            viscous_stress_div = (viscous_cross_2 - viscous_cross_1)/(2._wp*dx) ! get the x derivative of the cross product
-                            local_torque_contribution(1:3) = local_torque_contribution(1:3) + viscous_stress_div(1, 1:3) ! apply the cross product derivative to the torque
+                            viscous_stress_div(1, 1:3) = (viscous_stress_div_2(1, 1:3) - viscous_stress_div_1(1, 1:3))/(2._wp*dx) ! get x derivative of the first-row of viscous stress tensor
+                            local_force_contribution(1:3) = local_force_contribution(1:3) + viscous_stress_div(1, 1:3) ! add the x components of the divergence to the force
 
                             call s_compute_viscous_stress_tensor(viscous_stress_div_1, q_prim_vf, dynamic_viscosity, i, j - 1, k)
                             call s_compute_viscous_stress_tensor(viscous_stress_div_2, q_prim_vf, dynamic_viscosity, i, j + 1, k)
-                            viscous_stress_div = (viscous_stress_div_2 - viscous_stress_div_1)/(2._wp*dy)
-                            local_force_contribution(1:3) = local_force_contribution(1:3) + viscous_stress_div(2, 1:3)
-                            do l = 1, 3
-                                call s_cross_product(radial_vector, viscous_stress_div_1(l, 1:3), viscous_cross_1(l, 1:3))
-                                call s_cross_product(radial_vector, viscous_stress_div_2(l, 1:3), viscous_cross_2(l, 1:3))
-                            end do
-
-                            viscous_stress_div = (viscous_cross_2 - viscous_cross_1)/(2._wp*dy)
-                            local_torque_contribution(1:3) = local_torque_contribution(1:3) + viscous_stress_div(2, 1:3)
+                            viscous_stress_div(2, 1:3) = (viscous_stress_div_2(2, 1:3) - viscous_stress_div_1(2, 1:3))/(2._wp*dy) ! get y derivative of the second-row of viscous stress tensor
+                            local_force_contribution(1:3) = local_force_contribution(1:3) + viscous_stress_div(2, 1:3) ! add the y components of the divergence to the force
 
                             if (num_dims == 3) then
                                 call s_compute_viscous_stress_tensor(viscous_stress_div_1, q_prim_vf, dynamic_viscosity, i, j, k - 1)
                                 call s_compute_viscous_stress_tensor(viscous_stress_div_2, q_prim_vf, dynamic_viscosity, i, j, k + 1)
-                                viscous_stress_div = (viscous_stress_div_2 - viscous_stress_div_1)/(2._wp*dz)
-                                local_force_contribution(1:3) = local_force_contribution(1:3) + viscous_stress_div(3, 1:3)
-                                do l = 1, 3
-                                    call s_cross_product(radial_vector, viscous_stress_div_1(l, 1:3), viscous_cross_1(l, 1:3))
-                                    call s_cross_product(radial_vector, viscous_stress_div_2(l, 1:3), viscous_cross_2(l, 1:3))
-                                end do
-                                viscous_stress_div = (viscous_cross_2 - viscous_cross_1)/(2._wp*dz)
-                                local_torque_contribution(1:3) = local_torque_contribution(1:3) + viscous_stress_div(3, 1:3)
+                                viscous_stress_div(3, 1:3) = (viscous_stress_div_2(3, 1:3) - viscous_stress_div_1(3, 1:3))/(2._wp*dz) ! get z derivative of the second-row of viscous stress tensor
+                                local_force_contribution(1:3) = local_force_contribution(1:3) + viscous_stress_div(3, 1:3) ! add the z components of the divergence to the force
                             end if
+
                         end if
 
+                        call s_cross_product(radial_vector, local_force_contribution, local_torque_contribution)
+
+                        ! Update the force values atomically to prevent race conditions
                         do l = 1, 3
                             $:GPU_ATOMIC(atomic='update')
                             forces(ib_idx, l) = forces(ib_idx, l) + (local_force_contribution(l)*cell_volume)
