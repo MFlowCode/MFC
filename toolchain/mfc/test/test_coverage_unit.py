@@ -559,6 +559,48 @@ class TestParseGcovJsonOutput(unittest.TestCase):
         result = _parse_gcov_json_output(compressed, "/repo")
         assert result == {"src/simulation/m_rhs.fpp", "src/simulation/m_weno.fpp"}
 
+    def test_concatenated_json_from_batched_gcov(self):
+        """Batched gcov calls produce concatenated JSON objects (gcov 12)."""
+        obj1 = json.dumps({
+            "format_version": "1",
+            "gcc_version": "12.3.0",
+            "files": [{
+                "file": "/repo/src/simulation/m_rhs.fpp",
+                "lines": [{"line_number": 45, "count": 3}],
+            }],
+        })
+        obj2 = json.dumps({
+            "format_version": "1",
+            "gcc_version": "12.3.0",
+            "files": [{
+                "file": "/repo/src/simulation/m_weno.fpp",
+                "lines": [{"line_number": 10, "count": 1}],
+            }],
+        })
+        raw = (obj1 + "\n" + obj2).encode()
+        result = _parse_gcov_json_output(raw, "/repo")
+        assert result == {"src/simulation/m_rhs.fpp", "src/simulation/m_weno.fpp"}
+
+    def test_concatenated_json_skips_zero_coverage(self):
+        """Batched gcov: files with zero coverage are excluded."""
+        obj1 = json.dumps({
+            "format_version": "1",
+            "files": [{
+                "file": "/repo/src/simulation/m_rhs.fpp",
+                "lines": [{"line_number": 45, "count": 3}],
+            }],
+        })
+        obj2 = json.dumps({
+            "format_version": "1",
+            "files": [{
+                "file": "/repo/src/simulation/m_weno.fpp",
+                "lines": [{"line_number": 10, "count": 0}],
+            }],
+        })
+        raw = (obj1 + "\n" + obj2).encode()
+        result = _parse_gcov_json_output(raw, "/repo")
+        assert result == {"src/simulation/m_rhs.fpp"}
+
 
 # ===========================================================================
 # Group 6: _normalize_cache — old format conversion

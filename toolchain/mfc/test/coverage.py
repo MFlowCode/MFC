@@ -147,95 +147,52 @@ def find_gcno_files(root_dir: str) -> list:
     return gcno_files
 
 
-def zero_gcda_files(root_dir: str) -> None:
-    """
-    Delete all .gcda files under build/ (excluding venv).
-    Called before each test run during cache building to isolate per-test coverage.
-    """
-    build_dir = Path(root_dir) / "build"
-    for gcda in build_dir.rglob("*.gcda"):
-        if "venv" not in gcda.parts:
-            try:
-                gcda.unlink()
-            except OSError:
-                pass
-
 
 def _parse_gcov_json_output(raw_bytes: bytes, root_dir: str) -> set:
     """
     Parse gcov JSON output and return the set of .fpp file paths with coverage.
     Handles both gzip-compressed (gcov 13+) and raw JSON (gcov 12) formats.
+    Handles concatenated JSON objects from batched gcov calls (multiple .gcno
+    files passed to a single gcov invocation).
     Only .fpp files with at least one executed line are included.
     """
     try:
-        data = json.loads(gzip.decompress(raw_bytes))
+        text = gzip.decompress(raw_bytes).decode("utf-8", errors="replace")
     except (gzip.BadGzipFile, OSError):
         try:
-            data = json.loads(raw_bytes)
-        except (json.JSONDecodeError, ValueError):
+            text = raw_bytes.decode("utf-8", errors="replace")
+        except (UnicodeDecodeError, ValueError):
             return set()
 
     result = set()
     real_root = os.path.realpath(root_dir)
-    for file_entry in data.get("files", []):
-        file_path = file_entry.get("file", "")
-        if not file_path.endswith(".fpp"):
-            continue
-        if any(line.get("count", 0) > 0 for line in file_entry.get("lines", [])):
-            try:
-                rel_path = os.path.relpath(os.path.realpath(file_path), real_root)
-            except ValueError:
-                rel_path = file_path
-            result.add(rel_path)
+
+    # Parse potentially concatenated JSON objects (one per .gcno file).
+    decoder = json.JSONDecoder()
+    pos = 0
+    while pos < len(text):
+        while pos < len(text) and text[pos] in " \t\n\r":
+            pos += 1
+        if pos >= len(text):
+            break
+        try:
+            data, end_pos = decoder.raw_decode(text, pos)
+            pos = end_pos
+        except json.JSONDecodeError:
+            break
+
+        for file_entry in data.get("files", []):
+            file_path = file_entry.get("file", "")
+            if not file_path.endswith(".fpp"):
+                continue
+            if any(line.get("count", 0) > 0 for line in file_entry.get("lines", [])):
+                try:
+                    rel_path = os.path.relpath(os.path.realpath(file_path), real_root)
+                except ValueError:
+                    rel_path = file_path
+                result.add(rel_path)
 
     return result
-
-
-def collect_coverage_for_test(gcno_files: list, root_dir: str, gcov_binary: str) -> set:
-    """
-    Run gcov on all .gcno files and return the set of .fpp files with coverage.
-
-    Expects .gcda files to be in their normal locations next to the .gcno files.
-    """
-    merged = set()
-
-    for gcno_file in gcno_files:
-        try:
-            cmd = [gcov_binary, "--json-format", "--stdout", str(gcno_file)]
-            proc = subprocess.run(
-                cmd, capture_output=True, cwd=root_dir, timeout=60,
-                check=False
-            )
-        except subprocess.TimeoutExpired:
-            continue
-        except (subprocess.SubprocessError, OSError):
-            continue
-
-        if proc.returncode != 0 or not proc.stdout:
-            continue
-
-        merged.update(_parse_gcov_json_output(proc.stdout, root_dir))
-
-    return merged
-
-
-def _find_matching_gcno(root_dir: str) -> list:
-    """
-    Find .gcno files that have a matching .gcda in the build tree.
-
-    After installing a test's .gcda files, only .gcno files with a sibling
-    .gcda need gcov processing.  This typically reduces 414 .gcno files
-    to ~50, giving an ~8x speedup.
-    """
-    build_dir = Path(root_dir) / "build"
-    matching = []
-    for gcda in build_dir.rglob("*.gcda"):
-        if "venv" in gcda.parts:
-            continue
-        gcno = gcda.with_suffix(".gcno")
-        if gcno.exists():
-            matching.append(gcno)
-    return matching
 
 
 def _compute_gcov_prefix_strip(root_dir: str) -> str:
@@ -250,28 +207,60 @@ def _compute_gcov_prefix_strip(root_dir: str) -> str:
     return str(len(Path(real_root).parts) - 1)  # -1 excludes root '/'
 
 
-def _install_gcda_files(prefix_dir: str, root_dir: str) -> int:
+def _collect_single_test_coverage(
+    uuid: str, test_gcda: str, root_dir: str, gcov_bin: str,
+) -> tuple:
     """
-    Copy .gcda files from a GCOV_PREFIX tree into the build directory.
+    Collect file-level coverage for a single test, fully self-contained.
 
-    The prefix tree mirrors the build layout (e.g. ``<prefix>/build/staging/…``).
-    Returns the number of files copied.
+    Creates a temp directory with copies of .gcda files and their matching
+    .gcno files, then runs a single batched gcov call.  This avoids touching
+    the shared build tree, making it safe to call concurrently.
     """
-    build_subdir = os.path.join(prefix_dir, "build")
+    build_subdir = os.path.join(test_gcda, "build")
     if not os.path.isdir(build_subdir):
-        return 0
-    count = 0
-    for dirpath, _dirnames, filenames in os.walk(build_subdir):
-        for fname in filenames:
-            if not fname.endswith(".gcda"):
-                continue
-            src = os.path.join(dirpath, fname)
-            rel = os.path.relpath(src, prefix_dir)
-            dst = os.path.join(root_dir, rel)
-            os.makedirs(os.path.dirname(dst), exist_ok=True)
-            shutil.copy2(src, dst)
-            count += 1
-    return count
+        return uuid, []
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        matching_gcno = []
+
+        for dirpath, _, filenames in os.walk(build_subdir):
+            for fname in filenames:
+                if not fname.endswith(".gcda"):
+                    continue
+                gcda_src = os.path.join(dirpath, fname)
+                rel = os.path.relpath(gcda_src, test_gcda)
+
+                # Copy .gcda into temp dir
+                gcda_dst = os.path.join(tmpdir, rel)
+                os.makedirs(os.path.dirname(gcda_dst), exist_ok=True)
+                shutil.copy2(gcda_src, gcda_dst)
+
+                # Copy matching .gcno from real build tree
+                gcno_rel = rel[:-5] + ".gcno"
+                gcno_src = os.path.join(root_dir, gcno_rel)
+                if os.path.isfile(gcno_src):
+                    gcno_dst = os.path.join(tmpdir, gcno_rel)
+                    shutil.copy2(gcno_src, gcno_dst)
+                    matching_gcno.append(gcno_dst)
+
+        if not matching_gcno:
+            return uuid, []
+
+        # Batch: single gcov call for all .gcno files in this test.
+        cmd = [gcov_bin, "--json-format", "--stdout"] + matching_gcno
+        try:
+            proc = subprocess.run(
+                cmd, capture_output=True, cwd=tmpdir, timeout=120, check=False
+            )
+        except (subprocess.TimeoutExpired, subprocess.SubprocessError, OSError):
+            return uuid, []
+
+        if proc.returncode != 0 or not proc.stdout:
+            return uuid, []
+
+        coverage = _parse_gcov_json_output(proc.stdout, root_dir)
+        return uuid, sorted(coverage)
 
 
 def _run_single_test_direct(test_info: dict, gcda_dir: str, strip: str) -> tuple:  # pylint: disable=too-many-locals
@@ -444,30 +433,26 @@ def build_coverage_cache(  # pylint: disable=unused-argument,too-many-locals,too
                 cons.print(f"  [yellow]{uuid}[/yellow]: {fail_str}")
 
         # Phase 2: Collect gcov coverage from each test's isolated .gcda directory.
-        # For each test, copy its .gcda files into the build tree, run gcov only
-        # on matching .gcno files (not all 414), then clean up.  Targeting matching
-        # .gcno files gives ~8x speedup over the full scan.
+        # Each test is processed in its own temp dir (copied .gcda + .gcno files)
+        # with a single batched gcov call, so tests can run in parallel.
         cons.print()
         cons.print("[bold]Phase 2/2: Collecting coverage...[/bold]")
         cache: dict = {}
-        for i, (uuid, test_gcda) in enumerate(sorted(test_results.items())):
-            zero_gcda_files(root_dir)
-            n_copied = _install_gcda_files(test_gcda, root_dir)
-
-            if n_copied == 0:
-                coverage = set()
-            else:
-                # Only run gcov on .gcno files that have a matching .gcda installed.
-                matching = _find_matching_gcno(root_dir)
-                coverage = collect_coverage_for_test(
-                    matching or gcno_files, root_dir, gcov_bin
-                )
-
-            cache[uuid] = sorted(coverage)
-            if (i + 1) % 50 == 0 or (i + 1) == len(cases):
-                cons.print(f"  [{i+1:3d}/{len(cases):3d}] tests processed")
-
-        zero_gcda_files(root_dir)
+        completed = 0
+        with ThreadPoolExecutor(max_workers=n_jobs) as pool:
+            futures = {
+                pool.submit(
+                    _collect_single_test_coverage,
+                    uuid, test_gcda, root_dir, gcov_bin,
+                ): uuid
+                for uuid, test_gcda in test_results.items()
+            }
+            for future in as_completed(futures):
+                uuid, coverage = future.result()
+                cache[uuid] = coverage
+                completed += 1
+                if completed % 50 == 0 or completed == len(cases):
+                    cons.print(f"  [{completed:3d}/{len(cases):3d}] tests processed")
     finally:
         shutil.rmtree(gcda_dir, ignore_errors=True)
 
