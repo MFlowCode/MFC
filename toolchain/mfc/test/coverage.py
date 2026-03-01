@@ -207,7 +207,7 @@ def _compute_gcov_prefix_strip(root_dir: str) -> str:
     return str(len(Path(real_root).parts) - 1)  # -1 excludes root '/'
 
 
-def _collect_single_test_coverage(
+def _collect_single_test_coverage(  # pylint: disable=too-many-locals
     uuid: str, test_gcda: str, root_dir: str, gcov_bin: str,
 ) -> tuple:
     """

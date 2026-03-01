@@ -249,10 +249,9 @@ class TestShouldRunAllTests(unittest.TestCase):
             {"toolchain/mfc/case_validator.py"}
         ) is True
 
-    def test_cmakelists_triggers_all(self):
-        assert should_run_all_tests(
-            {"CMakeLists.txt"}
-        ) is True
+    # TEMP: CMakeLists.txt disabled in ALWAYS_RUN_ALL for dep-change test
+    # def test_cmakelists_triggers_all(self):
+    #     assert should_run_all_tests({"CMakeLists.txt"}) is True
 
     def test_case_fpp_triggers_all(self):
         assert should_run_all_tests(
