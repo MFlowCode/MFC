@@ -397,6 +397,7 @@ jobs:
             git commit -m "Regenerate gcov coverage cache
 
           Automatically rebuilt because cases.py changed."
+            git pull --rebase
             git push
             echo "pushed=true" >> "$GITHUB_OUTPUT"
           fi
