@@ -452,6 +452,12 @@ TEST_COMMAND = Command(
             default=False,
             dest="dry_run",
         ),
+        Argument(
+            name="shard",
+            help="Run only a subset of tests (e.g., '1/2' for first half, '2/2' for second half).",
+            type=str,
+            default=None,
+        ),
     ],
     mutually_exclusive=[
         MutuallyExclusiveGroup(arguments=[

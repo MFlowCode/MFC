@@ -312,6 +312,10 @@ contains
                       STATUS='old', ACTION='read')
                 read (1) q_cons_vf(i)%sf(0:m, 0:n, 0:p)
                 close (1)
+            else if (bubbles_lagrange .and. i == beta_idx) then
+                ! beta (Lagrangian void fraction) is not written by pre_process
+                ! for t_step_start; initialize to zero.
+                q_cons_vf(i)%sf(0:m, 0:n, 0:p) = 0._wp
             else
                 call s_mpi_abort('File q_cons_vf'//trim(file_num)// &
                                  '.dat is missing in '//trim(t_step_dir)// &
