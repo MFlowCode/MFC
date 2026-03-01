@@ -4,6 +4,7 @@ on:
   push:
     branches: [master]
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 concurrency:
@@ -28,7 +29,7 @@ jobs:
 
   run:
     name: Coverage Test on CodeCov
-    if: needs.file-changes.outputs.checkall == 'true'
+    if: needs.file-changes.outputs.checkall == 'true' && github.event.pull_request.draft != true
     needs: file-changes
     runs-on: "ubuntu-latest"
     steps:
