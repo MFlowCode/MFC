@@ -56,8 +56,9 @@ jobs:
   file-changes:
     name: Detect File Changes
     runs-on: 'ubuntu-latest'
-    outputs: 
+    outputs:
       checkall: ${{ steps.changes.outputs.checkall }}
+      cases_py: ${{ steps.changes.outputs.cases_py }}
     steps:
       - name: Clone
         uses: actions/checkout@v4
@@ -68,10 +69,47 @@ jobs:
         with: 
           filters: ".github/file-filter.yml"
 
+  rebuild-cache:
+    name: Rebuild Coverage Cache
+    needs: [lint-gate, file-changes]
+    if: >-
+      github.event_name == 'pull_request' &&
+      needs.file-changes.outputs.cases_py == 'true' &&
+      github.repository == 'MFlowCode/MFC' &&
+      github.event.pull_request.draft != true
+    timeout-minutes: 240
+    runs-on:
+      group:  phoenix
+      labels: gt
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
+        with:
+          clean: false
+
+      - name: Rebuild Cache via SLURM
+        run: bash .github/workflows/phoenix/submit.sh .github/workflows/phoenix/rebuild-cache.sh cpu none
+
+      - name: Print Logs
+        if:   always()
+        run:  cat rebuild-cache-cpu-none.out
+
+      - name: Upload Cache Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-cache
+          path: toolchain/mfc/test/test_coverage_cache.json.gz
+          retention-days: 1
+
   github:
     name: Github
-    if: needs.file-changes.outputs.checkall == 'true'
-    needs: [lint-gate, file-changes]
+    needs: [lint-gate, file-changes, rebuild-cache]
+    if: >-
+      always() &&
+      needs.lint-gate.result == 'success' &&
+      needs.file-changes.result == 'success' &&
+      (needs.rebuild-cache.result == 'success' || needs.rebuild-cache.result == 'skipped') &&
+      needs.file-changes.outputs.checkall == 'true'
     strategy:
       matrix:
         os:    ['ubuntu', 'macos']
@@ -97,6 +135,14 @@ jobs:
     steps:
       - name: Clone
         uses: actions/checkout@v4
+
+      - name: Download Coverage Cache
+        if: needs.rebuild-cache.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-cache
+          path: toolchain/mfc/test
+        continue-on-error: true
 
       - name: Setup MacOS
         if:   matrix.os == 'macos'
@@ -183,8 +229,15 @@ jobs:
 
   self:
     name: "${{ matrix.cluster_name }} (${{ matrix.device }}${{ matrix.interface != 'none' && format('-{0}', matrix.interface) || '' }}${{ matrix.shard != '' && format(' [{0}]', matrix.shard) || '' }})"
-    if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true' && github.event.pull_request.draft != true
-    needs: [lint-gate, file-changes]
+    needs: [lint-gate, file-changes, rebuild-cache]
+    if: >-
+      always() &&
+      needs.lint-gate.result == 'success' &&
+      needs.file-changes.result == 'success' &&
+      (needs.rebuild-cache.result == 'success' || needs.rebuild-cache.result == 'skipped') &&
+      github.repository == 'MFlowCode/MFC' &&
+      needs.file-changes.outputs.checkall == 'true' &&
+      github.event.pull_request.draft != true
     continue-on-error: false
     timeout-minutes: 480
     strategy:
@@ -265,6 +318,14 @@ jobs:
         with:
           clean: false
 
+      - name: Download Coverage Cache
+        if: needs.rebuild-cache.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-cache
+          path: toolchain/mfc/test
+        continue-on-error: true
+
       - name: Build
         if:   matrix.cluster != 'phoenix'
         uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
@@ -299,3 +360,36 @@ jobs:
         with:
           name: logs-${{ strategy.job-index }}-${{ steps.log.outputs.slug }}
           path: ${{ steps.log.outputs.slug }}.out
+
+  commit-cache:
+    name: Commit Coverage Cache
+    needs: [rebuild-cache]
+    if: needs.rebuild-cache.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Download Coverage Cache
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-cache
+          path: toolchain/mfc/test
+
+      - name: Commit Updated Cache
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add toolchain/mfc/test/test_coverage_cache.json.gz
+          if git diff --cached --quiet; then
+            echo "Coverage cache unchanged."
+          else
+            git commit -m "Regenerate gcov coverage cache
+
+          Automatically rebuilt because cases.py changed."
+            git push
+          fi

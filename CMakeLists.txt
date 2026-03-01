@@ -381,6 +381,7 @@ macro(HANDLE_SOURCES target useCommon)
                                  --no-folding
 								 --line-length=999
 		 						 --line-numbering-mode=nocontlines
+                                 --line-marker-format=gfortran5
                                  "${fpp}" "${f90}"
             DEPENDS  "${fpp};${${target}_incs}"
             COMMENT  "Preprocessing (Fypp) ${fpp_filename}"

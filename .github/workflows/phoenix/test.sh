@@ -51,7 +51,9 @@ while [ $attempt -le $max_attempts ]; do
     attempt=$((attempt + 1))
 done
 
-n_test_threads=8
+# Use up to 64 parallel test threads on CPU (GNR nodes have 192 cores).
+# Cap at 64 to avoid overwhelming MPI's ORTE daemons with concurrent launches.
+n_test_threads=$(( SLURM_CPUS_ON_NODE > 64 ? 64 : ${SLURM_CPUS_ON_NODE:-8} ))
 
 if [ "$job_device" = "gpu" ]; then
     gpu_count=$(nvidia-smi -L | wc -l)        # number of GPUs on node
