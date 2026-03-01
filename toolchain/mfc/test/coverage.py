@@ -52,7 +52,7 @@ ALWAYS_RUN_ALL = frozenset([
     "toolchain/mfc/run/input.py",
     "toolchain/mfc/case_validator.py",
     "toolchain/mfc/test/coverage.py",
-    "CMakeLists.txt",
+    # "CMakeLists.txt",  # TEMP: disabled to test dep-change cache rebuild trigger
 ])
 
 # Directory prefixes: any changed file under these paths triggers full suite.

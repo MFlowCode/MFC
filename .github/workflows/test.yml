@@ -59,6 +59,7 @@ jobs:
     outputs:
       checkall: ${{ steps.changes.outputs.checkall }}
       cases_py: ${{ steps.changes.outputs.cases_py }}
+      dep_changed: ${{ steps.dep-check.outputs.dep_changed }}
     steps:
       - name: Clone
         uses: actions/checkout@v4
@@ -66,15 +67,32 @@ jobs:
       - name: Detect Changes
         uses: dorny/paths-filter@v3
         id: changes
-        with: 
+        with:
           filters: ".github/file-filter.yml"
+
+      - name: Check for Fortran dependency changes
+        if: github.event_name == 'pull_request'
+        id: dep-check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Detect added/removed use/include statements that change the
+          # Fortran dependency graph, which would make the coverage cache stale.
+          if gh pr diff ${{ github.event.pull_request.number }} | \
+             grep -qP '^\+\s*(use[\s,]+\w|#:include\s|include\s+['"'"'"])'; then
+            echo "dep_changed=true" >> "$GITHUB_OUTPUT"
+            echo "Fortran dependency change detected — will rebuild coverage cache."
+          else
+            echo "dep_changed=false" >> "$GITHUB_OUTPUT"
+          fi
 
   rebuild-cache:
     name: Rebuild Coverage Cache
     needs: [lint-gate, file-changes]
     if: >-
       github.event_name == 'pull_request' &&
-      needs.file-changes.outputs.cases_py == 'true' &&
+      (needs.file-changes.outputs.cases_py == 'true' ||
+       needs.file-changes.outputs.dep_changed == 'true') &&
       github.repository == 'MFlowCode/MFC' &&
       github.event.pull_request.draft != true
     timeout-minutes: 240
