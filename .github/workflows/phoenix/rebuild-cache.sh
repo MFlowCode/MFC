@@ -6,6 +6,10 @@ set -e
 NJOBS="${SLURM_CPUS_ON_NODE:-24}"
 if [ "$NJOBS" -gt 64 ]; then NJOBS=64; fi
 
+# Clean stale build artifacts: the self-hosted runner may have a cached
+# GPU build (e.g. --gpu mp) whose CMake flags are incompatible with gcov.
+./mfc.sh clean
+
 # Build MFC with gcov coverage instrumentation (CPU-only, gfortran).
 # -j 8 for compilation (memory-heavy, more cores doesn't help much).
 ./mfc.sh build --gcov -j 8
