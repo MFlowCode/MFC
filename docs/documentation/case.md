@@ -651,7 +651,7 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 
 The table lists formatted database output parameters. The parameters define variables that are outputted from simulation and file types and formats of data as well as options for post-processing.
 
-- `format` specifies the choice of the file format of data file outputted by MFC by an integer of 1 and 2. `format = 1` and `2` correspond to Silo-HDF5 format and binary format, respectively.
+- `format` specifies the choice of the file format of data file outputted by MFC by an integer of 1 and 2. `format = 1` and `2` correspond to Silo-HDF5 format and binary format, respectively. Both formats are supported by `./mfc.sh viz` (see @ref visualization "Flow Visualization"). Silo-HDF5 requires the h5py Python package; binary has no extra dependencies.
 
 - `precision` specifies the choice of the floating-point format of the data file outputted by MFC by an integer of 1 and 2. `precision = 1` and `2` correspond to single-precision and double-precision formats, respectively.
 
