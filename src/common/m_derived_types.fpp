@@ -183,12 +183,18 @@ module m_derived_types
     end type t_model
 
     type :: t_model_array
+        ! Original CPU-side fields (unchanged)
         type(t_model), allocatable :: model
         real(wp), allocatable, dimension(:, :, :) :: boundary_v
         real(wp), allocatable, dimension(:, :) :: interpolated_boundary_v
         integer :: boundary_edge_count
         integer :: total_vertices
-        logical :: interpolate
+        integer :: interpolate
+
+        ! GPU-friendly flattened arrays
+        integer :: ntrs  ! copy of model%ntrs
+        real(wp), allocatable, dimension(:, :, :) :: trs_v  ! (3, 3, ntrs) - triangle vertices
+        real(wp), allocatable, dimension(:, :) :: trs_n  ! (3, ntrs)    - triangle normals
     end type t_model_array
 
     !> Derived type adding initial condition (ic) patch parameters as attributes
@@ -450,6 +456,7 @@ module m_derived_types
         real(wp), dimension(1:3) :: levelset_norm
         logical :: slip
         integer, dimension(3) :: DB
+        integer :: x_periodicity, y_periodicity, z_periodicity
     end type ghost_point
 
     !> Species parameters

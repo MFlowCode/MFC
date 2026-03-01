@@ -33,12 +33,6 @@ contains
 
         integer :: i, patch_id, patch_geometry
 
-        if (num_gps < 1) then
-            return
-        end if
-
-        $:GPU_UPDATE(device='[gps(1:num_gps)]')
-
         !  3D Patch Geometries
         if (p > 0) then
 
@@ -56,6 +50,8 @@ contains
                     call s_cylinder_levelset(gps(i))
                 elseif (patch_geometry == 11) then
                     call s_3d_airfoil_levelset(gps(i))
+                elseif (patch_geometry == 12) then
+                    call s_model_levelset(gps(i))
                 end if
             end do
             $:END_GPU_PARALLEL_LOOP()
@@ -75,6 +71,8 @@ contains
                     call s_rectangle_levelset(gps(i))
                 elseif (patch_geometry == 4) then
                     call s_airfoil_levelset(gps(i))
+                elseif (patch_geometry == 5) then
+                    call s_model_levelset(gps(i))
                 elseif (patch_geometry == 6) then
                     call s_ellipse_levelset(gps(i))
                 end if
@@ -82,19 +80,6 @@ contains
             $:END_GPU_PARALLEL_LOOP()
 
         end if
-
-        ! STL models computed on the CPU for now
-        do i = 1, num_gps
-            patch_id = gps(i)%ib_patch_id
-            patch_geometry = patch_ib(patch_id)%geometry
-
-            if (patch_geometry == 5 .or. patch_geometry == 12) then
-                call s_model_levelset(gps(i))
-                $:GPU_UPDATE(device='[gps(i)]')
-            end if
-        end do
-
-        $:GPU_UPDATE(host='[gps(1:num_gps)]')
 
     end subroutine s_apply_levelset
 
@@ -117,8 +102,8 @@ contains
 
         radius = patch_ib(ib_patch_id)%radius
 
-        dist_vec(1) = x_cc(i) - patch_ib(ib_patch_id)%x_centroid
-        dist_vec(2) = y_cc(j) - patch_ib(ib_patch_id)%y_centroid
+        dist_vec(1) = x_cc(i) - patch_ib(ib_patch_id)%x_centroid - real(gp%x_periodicity, wp)*(x_domain%end - x_domain%beg)
+        dist_vec(2) = y_cc(j) - patch_ib(ib_patch_id)%y_centroid - real(gp%y_periodicity, wp)*(y_domain%end - y_domain%beg)
         dist_vec(3) = 0._wp
         dist = sqrt(sum(dist_vec**2))
 
@@ -152,8 +137,8 @@ contains
         i = gp%loc(1)
         j = gp%loc(2)
 
-        center(1) = patch_ib(ib_patch_id)%x_centroid
-        center(2) = patch_ib(ib_patch_id)%y_centroid
+        center(1) = patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(x_domain%end - x_domain%beg)
+        center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(y_domain%end - y_domain%beg)
         inverse_rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:, :)
         rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix(:, :)
         offset(:) = patch_ib(ib_patch_id)%centroid_offset(:)
@@ -238,9 +223,9 @@ contains
         j = gp%loc(2)
         l = gp%loc(3)
 
-        center(1) = patch_ib(ib_patch_id)%x_centroid
-        center(2) = patch_ib(ib_patch_id)%y_centroid
-        center(3) = patch_ib(ib_patch_id)%z_centroid
+        center(1) = patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(x_domain%end - x_domain%beg)
+        center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(y_domain%end - y_domain%beg)
+        center(3) = patch_ib(ib_patch_id)%z_centroid + real(gp%z_periodicity, wp)*(z_domain%end - z_domain%beg)
         lz = patch_ib(ib_patch_id)%length_z
         inverse_rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:, :)
         rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix(:, :)
@@ -343,8 +328,8 @@ contains
 
         length_x = patch_ib(ib_patch_id)%length_x
         length_y = patch_ib(ib_patch_id)%length_y
-        center(1) = patch_ib(ib_patch_id)%x_centroid
-        center(2) = patch_ib(ib_patch_id)%y_centroid
+        center(1) = patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(x_domain%end - x_domain%beg)
+        center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(y_domain%end - y_domain%beg)
         inverse_rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:, :)
         rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix(:, :)
 
@@ -414,8 +399,8 @@ contains
 
         length_x = patch_ib(ib_patch_id)%length_x
         length_y = patch_ib(ib_patch_id)%length_y
-        center(1) = patch_ib(ib_patch_id)%x_centroid
-        center(2) = patch_ib(ib_patch_id)%y_centroid
+        center(1) = patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(x_domain%end - x_domain%beg)
+        center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(y_domain%end - y_domain%beg)
         inverse_rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:, :)
         rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix(:, :)
 
@@ -468,9 +453,9 @@ contains
         length_y = patch_ib(ib_patch_id)%length_y
         length_z = patch_ib(ib_patch_id)%length_z
 
-        center(1) = patch_ib(ib_patch_id)%x_centroid
-        center(2) = patch_ib(ib_patch_id)%y_centroid
-        center(3) = patch_ib(ib_patch_id)%z_centroid
+        center(1) = patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(x_domain%end - x_domain%beg)
+        center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(y_domain%end - y_domain%beg)
+        center(3) = patch_ib(ib_patch_id)%z_centroid + real(gp%z_periodicity, wp)*(z_domain%end - z_domain%beg)
 
         inverse_rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:, :)
         rotation(:, :) = patch_ib(ib_patch_id)%rotation_matrix(:, :)
@@ -494,15 +479,6 @@ contains
 
         min_dist = min(abs(dist_left), abs(dist_right), abs(dist_bottom), &
                        abs(dist_top), abs(dist_back), abs(dist_front))
-
-        ! TODO :: The way that this is written, it looks like we will
-        ! trigger at the first size that is close to the minimum distance,
-        ! meaning corners where side_dists are the same will
-        ! trigger on what may not actually be the minimum,
-        ! leading to undesired behavior. This should be resolved
-        ! and this code should be cleaned up. It also means that
-        ! rotating the box 90 degrees will cause tests to fail.
-
         dist_vec = 0._wp
 
         if (f_approx_equal(min_dist, abs(dist_left))) then
@@ -549,7 +525,7 @@ contains
         type(ghost_point), intent(inout) :: gp
 
         real(wp) :: radius, dist
-        real(wp), dimension(3) :: dist_vec, center
+        real(wp), dimension(3) :: dist_vec, center, periodicity
 
         integer :: i, j, k, ib_patch_id !< Loop index variables
 
@@ -559,9 +535,13 @@ contains
         k = gp%loc(3)
 
         radius = patch_ib(ib_patch_id)%radius
+        periodicity(1) = real(gp%x_periodicity, wp)*(x_domain%end - x_domain%beg)
+        periodicity(2) = real(gp%y_periodicity, wp)*(y_domain%end - y_domain%beg)
+        periodicity(3) = real(gp%z_periodicity, wp)*(z_domain%end - z_domain%beg)
         center(1) = patch_ib(ib_patch_id)%x_centroid
         center(2) = patch_ib(ib_patch_id)%y_centroid
         center(3) = patch_ib(ib_patch_id)%z_centroid
+        center = center + periodicity
 
         dist_vec(1) = x_cc(i) - center(1)
         dist_vec(2) = y_cc(j) - center(2)
@@ -599,9 +579,9 @@ contains
         k = gp%loc(3)
 
         radius = patch_ib(ib_patch_id)%radius
-        center(1) = patch_ib(ib_patch_id)%x_centroid
-        center(2) = patch_ib(ib_patch_id)%y_centroid
-        center(3) = patch_ib(ib_patch_id)%z_centroid
+        center(1) = patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(x_domain%end - x_domain%beg)
+        center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(y_domain%end - y_domain%beg)
+        center(3) = patch_ib(ib_patch_id)%z_centroid + real(gp%z_periodicity, wp)*(z_domain%end - z_domain%beg)
         length(1) = patch_ib(ib_patch_id)%length_x
         length(2) = patch_ib(ib_patch_id)%length_y
         length(3) = patch_ib(ib_patch_id)%length_z
@@ -657,12 +637,12 @@ contains
     !> The STL patch is a 2/3D geometry that is imported from an STL file.
     !! @param gp Ghost point to compute levelset for
     subroutine s_model_levelset(gp)
+
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(ghost_point), intent(inout) :: gp
 
         integer :: i, j, k, patch_id, boundary_edge_count, total_vertices
-        logical :: interpolate
         real(wp), dimension(1:3) :: center, xyz_local
         real(wp) :: normals(1:3) !< Boundary normal buffer
         real(wp) :: distance
@@ -674,16 +654,16 @@ contains
         k = gp%loc(3)
 
         ! load in model values
-        interpolate = models(patch_id)%interpolate
-        boundary_edge_count = models(patch_id)%boundary_edge_count
-        total_vertices = models(patch_id)%total_vertices
+        boundary_edge_count = gpu_boundary_edge_count(patch_id)
+        total_vertices = gpu_total_vertices(patch_id)
 
         center = 0._wp
-        if (.not. f_is_default(patch_ib(patch_id)%x_centroid)) center(1) = patch_ib(patch_id)%x_centroid
-        if (.not. f_is_default(patch_ib(patch_id)%y_centroid)) center(2) = patch_ib(patch_id)%y_centroid
+        if (.not. f_is_default(patch_ib(patch_id)%x_centroid)) center(1) = patch_ib(patch_id)%x_centroid + real(gp%x_periodicity, wp)*(x_domain%end - x_domain%beg)
+        if (.not. f_is_default(patch_ib(patch_id)%y_centroid)) center(2) = patch_ib(patch_id)%y_centroid + real(gp%y_periodicity, wp)*(y_domain%end - y_domain%beg)
         if (p > 0) then
-            if (.not. f_is_default(patch_ib(patch_id)%z_centroid)) center(3) = patch_ib(patch_id)%z_centroid
+            if (.not. f_is_default(patch_ib(patch_id)%z_centroid)) center(3) = patch_ib(patch_id)%z_centroid + real(gp%z_periodicity, wp)*(z_domain%end - z_domain%beg)
         end if
+
         inverse_rotation(:, :) = patch_ib(patch_id)%rotation_matrix_inverse(:, :)
         rotation(:, :) = patch_ib(patch_id)%rotation_matrix(:, :)
 
@@ -694,50 +674,24 @@ contains
         end if
         xyz_local = matmul(inverse_rotation, xyz_local)
 
-        if (grid_geometry == 3) then
-            xyz_local = f_convert_cyl_to_cart(xyz_local)
-        end if
-
         ! 3D models
         if (p > 0) then
-
             ! Get the boundary normals and shortest distance between the cell center and the model boundary
-            call f_distance_normals_3D(models(patch_id)%model, xyz_local, normals, distance)
+            call s_distance_normals_3D(gpu_ntrs(patch_id), patch_id, xyz_local, normals, distance)
 
-            ! Get the shortest distance between the cell center and the interpolated model boundary
-            if (interpolate) then
-                gp%levelset = f_interpolated_distance(models(patch_id)%interpolated_boundary_v, total_vertices, xyz_local)
-            else
-                gp%levelset = distance
-            end if
-
-            ! Correct the sign of the levelset
+            ! Get the shortest distance between the cell center and the model boundary
+            gp%levelset = distance
             gp%levelset = -abs(gp%levelset)
 
             ! Assign the levelset_norm
             gp%levelset_norm = matmul(rotation, normals(1:3))
         else
             ! 2D models
-            if (interpolate) then
-                ! Get the shortest distance between the cell center and the model boundary
-                gp%levelset = f_interpolated_distance(models(patch_id)%interpolated_boundary_v, total_vertices, xyz_local)
-            else
-                ! Get the shortest distance between the cell center and the interpolated model boundary
-                gp%levelset = f_distance(models(patch_id)%boundary_v, boundary_edge_count, xyz_local)
-            end if
-
-            ! Correct the sign of the levelset
-            gp%levelset = -abs(gp%levelset)
-
-            ! Get the boundary normals
-            call f_normals(models(patch_id)%boundary_v, &
-                           boundary_edge_count, &
-                           xyz_local, &
-                           normals)
-
-            ! Assign the levelset_norm
+            call s_distance_normals_2D(patch_id, &
+                                       boundary_edge_count, &
+                                       xyz_local, normals, distance)
+            gp%levelset = -abs(distance)
             gp%levelset_norm = matmul(rotation, normals(1:3))
-
         end if
 
     end subroutine s_model_levelset

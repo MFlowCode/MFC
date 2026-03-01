@@ -25,7 +25,7 @@ if [ "$job_device" = "gpu" ]; then
   fi
 fi
 
-. ./mfc.sh load -c $compiler_flag -m g
+. ./mfc.sh load -c $compiler_flag -m $([ "$job_device" = "gpu" ] && echo "g" || echo "c")
 
 # Only set up build cache for test suite, not benchmarks
 if [ "$run_bench" != "bench" ]; then
