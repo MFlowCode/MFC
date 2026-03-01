@@ -32,7 +32,7 @@ module m_start_up
 
     use m_acoustic_src      !< Acoustic source calculations
 
-    use m_rhs                  !< Right-hane-side (RHS) evaluation procedures
+    use m_rhs                  !< Right-hand-side (RHS) evaluation procedures
 
     use m_chemistry            !< Chemistry module
 
@@ -845,12 +845,13 @@ contains
             end do
         end if
 
-        mytime = mytime + dt
-
         ! Total-variation-diminishing (TVD) Runge-Kutta (RK) time-steppers
         if (any(time_stepper == (/1, 2, 3/))) then
             call s_tvd_rk(t_step, time_avg, time_stepper)
         end if
+
+        ! Advance time after RK so source terms see current-step time
+        mytime = mytime + dt
 
         if (relax) call s_infinite_relaxation_k(q_cons_ts(1)%vf)
 
