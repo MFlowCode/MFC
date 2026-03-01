@@ -28,4 +28,5 @@ exclude = [
     "https://cpe\\.ext\\.hpe\\.com",                   # HPE Cray docs have broken SSL cert
     "https://sc22\\.supercomputing\\.org",              # Returns 415 to automated requests
     "https://strawberryperl\\.com",                    # Frequently times out
+    "https://www\\.olcf\\.ornl\\.gov/summit",            # Returns 503 to automated requests
 ]
