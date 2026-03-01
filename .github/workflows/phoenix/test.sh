@@ -62,4 +62,4 @@ if [ "$job_device" = "gpu" ]; then
     n_test_threads=`expr $gpu_count \* 2`
 fi
 
-./mfc.sh test -v --max-attempts 3 -a -j $n_test_threads $device_opts -- -c phoenix
+./mfc.sh test -v --max-attempts 3 --only-changes -a -j $n_test_threads $device_opts -- -c phoenix

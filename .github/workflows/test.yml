@@ -136,6 +136,10 @@ jobs:
       - name: Clone
         uses: actions/checkout@v4
 
+      - name: Fetch master for coverage diff
+        run: git fetch origin master:master --depth=1
+        continue-on-error: true
+
       - name: Download Coverage Cache
         if: needs.rebuild-cache.result == 'success'
         uses: actions/download-artifact@v4
@@ -205,7 +209,7 @@ jobs:
         run: |
           rm -f tests/failed_uuids.txt
           TEST_EXIT=0
-          /bin/bash mfc.sh test -v --max-attempts 3 -j "$(nproc)" $TEST_ALL $TEST_PCT || TEST_EXIT=$?
+          /bin/bash mfc.sh test -v --max-attempts 3 -j "$(nproc)" --only-changes $TEST_ALL $TEST_PCT || TEST_EXIT=$?
 
           # Retry only if a small number of tests failed (sporadic failures)
           if [ -s tests/failed_uuids.txt ]; then
