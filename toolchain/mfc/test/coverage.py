@@ -409,59 +409,58 @@ def build_coverage_cache(  # pylint: disable=unused-argument,too-many-locals,too
     cons.print()
 
     gcda_dir = tempfile.mkdtemp(prefix="mfc_gcov_")
+    try:
+        # Phase 1: Run all tests in parallel via direct binary invocation.
+        cons.print("[bold]Phase 1/2: Running tests...[/bold]")
+        test_results: dict = {}
+        all_failures: dict = {}
+        with ThreadPoolExecutor(max_workers=n_jobs) as pool:
+            futures = {
+                pool.submit(_run_single_test_direct, info, gcda_dir, strip): info
+                for info in test_infos
+            }
+            for i, future in enumerate(as_completed(futures)):
+                uuid, test_gcda, failures = future.result()
+                test_results[uuid] = test_gcda
+                if failures:
+                    all_failures[uuid] = failures
+                if (i + 1) % 50 == 0 or (i + 1) == len(cases):
+                    cons.print(f"  [{i+1:3d}/{len(cases):3d}] tests completed")
 
-    # Phase 1: Run all tests in parallel via direct binary invocation.
-    cons.print("[bold]Phase 1/2: Running tests...[/bold]")
-    test_results: dict = {}
-    all_failures: dict = {}
-    with ThreadPoolExecutor(max_workers=n_jobs) as pool:
-        futures = {
-            pool.submit(_run_single_test_direct, info, gcda_dir, strip): info
-            for info in test_infos
-        }
-        for i, future in enumerate(as_completed(futures)):
-            uuid, test_gcda, failures = future.result()
-            test_results[uuid] = test_gcda
-            if failures:
-                all_failures[uuid] = failures
-            if (i + 1) % 50 == 0 or (i + 1) == len(cases):
-                cons.print(f"  [{i+1:3d}/{len(cases):3d}] tests completed")
+        if all_failures:
+            cons.print()
+            cons.print(f"[bold yellow]Warning: {len(all_failures)} tests had target failures:[/bold yellow]")
+            for uuid, fails in sorted(all_failures.items()):
+                fail_str = ", ".join(f"{t}={rc}" for t, rc in fails)
+                cons.print(f"  [yellow]{uuid}[/yellow]: {fail_str}")
 
-    if all_failures:
+        # Phase 2: Collect gcov coverage from each test's isolated .gcda directory.
+        # For each test, copy its .gcda files into the build tree, run gcov only
+        # on matching .gcno files (not all 414), then clean up.  Targeting matching
+        # .gcno files gives ~8x speedup over the full scan.
         cons.print()
-        cons.print(f"[bold yellow]Warning: {len(all_failures)} tests had target failures:[/bold yellow]")
-        for uuid, fails in sorted(all_failures.items()):
-            fail_str = ", ".join(f"{t}={rc}" for t, rc in fails)
-            cons.print(f"  [yellow]{uuid}[/yellow]: {fail_str}")
+        cons.print("[bold]Phase 2/2: Collecting coverage...[/bold]")
+        cache: dict = {}
+        for i, (uuid, test_gcda) in enumerate(sorted(test_results.items())):
+            zero_gcda_files(root_dir)
+            n_copied = _install_gcda_files(test_gcda, root_dir)
 
-    # Phase 2: Collect gcov coverage from each test's isolated .gcda directory.
-    # For each test, copy its .gcda files into the build tree, run gcov only
-    # on matching .gcno files (not all 414), then clean up.  Targeting matching
-    # .gcno files gives ~8x speedup over the full scan.
-    cons.print()
-    cons.print("[bold]Phase 2/2: Collecting coverage...[/bold]")
-    cache: dict = {}
-    for i, (uuid, test_gcda) in enumerate(sorted(test_results.items())):
+            if n_copied == 0:
+                coverage = set()
+            else:
+                # Only run gcov on .gcno files that have a matching .gcda installed.
+                matching = _find_matching_gcno(root_dir)
+                coverage = collect_coverage_for_test(
+                    matching or gcno_files, root_dir, gcov_bin
+                )
+
+            cache[uuid] = sorted(coverage)
+            if (i + 1) % 50 == 0 or (i + 1) == len(cases):
+                cons.print(f"  [{i+1:3d}/{len(cases):3d}] tests processed")
+
         zero_gcda_files(root_dir)
-        n_copied = _install_gcda_files(test_gcda, root_dir)
-
-        if n_copied == 0:
-            coverage = set()
-        else:
-            # Only run gcov on .gcno files that have a matching .gcda installed.
-            matching = _find_matching_gcno(root_dir)
-            coverage = collect_coverage_for_test(
-                matching or gcno_files, root_dir, gcov_bin
-            )
-
-        cache[uuid] = sorted(coverage)
-        if (i + 1) % 50 == 0 or (i + 1) == len(cases):
-            cons.print(f"  [{i+1:3d}/{len(cases):3d}] tests processed")
-
-    zero_gcda_files(root_dir)
-
-    # Clean up temp directory.
-    shutil.rmtree(gcda_dir, ignore_errors=True)
+    finally:
+        shutil.rmtree(gcda_dir, ignore_errors=True)
 
     # Sanity check: at least some tests should have non-empty coverage.
     tests_with_coverage = sum(1 for v in cache.values() if v)
