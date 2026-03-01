@@ -1653,7 +1653,7 @@ contains
                         call s_compute_viscous_stress_cylindrical_boundary(q_prim_vf, &
                                                                            dq_prim_dx_vf(mom_idx%beg:mom_idx%end), &
                                                                            dq_prim_dy_vf(mom_idx%beg:mom_idx%end), &
-                                                                           dq_prim_dz_vf(mom_idx%beg:mom_idx%end), &
+                                                                           dq_prim_dy_vf(mom_idx%beg:mom_idx%end), &
                                                                            tau_Re_vf, &
                                                                            idwbuff(1), idwbuff(2), idwbuff(3))
                     end if
