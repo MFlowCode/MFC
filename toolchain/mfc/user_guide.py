@@ -399,7 +399,7 @@ def print_help():
     cons.print("[bold]Commands:[/bold]")
 
     # Primary commands (shown prominently with aliases)
-    primary = ["build", "run", "test", "validate", "new", "clean"]
+    primary = ["build", "run", "test", "viz", "validate", "new", "clean"]
     for cmd in primary:
         if cmd not in COMMANDS:
             continue
