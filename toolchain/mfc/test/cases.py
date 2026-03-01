@@ -442,19 +442,21 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             stack.pop()
 
-        cases.append(define_case_d(stack, 'IBM -> Periodic Circle', {
-            'ib': 'T', 'num_ibs': 1,
-            'bc_x%beg': -1, 'bc_x%end': -1,
-            'bc_y%beg': -1, 'bc_y%end': -1,
-            'patch_ib(1)%geometry': 2,
-            'patch_ib(1)%x_centroid': 0.,
-            'patch_ib(1)%y_centroid': 0.,
-            'patch_ib(1)%radius': 0.1,
-            'patch_icpp(1)%vel(1)': 0.001,
-            'patch_icpp(2)%vel(1)': 0.001,
-            'patch_icpp(3)%vel(1)': 0.001,
-            'patch_ib(1)%slip': 'F',
-        }))
+        if len(dimInfo[0]) == 2:
+            cases.append(define_case_d(stack, 'IBM -> Periodic Circle', {
+                'ib': 'T', 'num_ibs': 1,
+                'bc_x%beg': -1, 'bc_x%end': -1,
+                'bc_y%beg': -1, 'bc_y%end': -1,
+                'patch_ib(1)%geometry': 2,
+                'patch_ib(1)%x_centroid': 0.,
+                'patch_ib(1)%y_centroid': 0.,
+                'patch_ib(1)%radius': 0.1,
+                'patch_icpp(1)%vel(1)': 0.001,
+                'patch_icpp(2)%vel(1)': 0.001,
+                'patch_icpp(3)%vel(1)': 0.001,
+                'patch_ib(1)%slip': 'F',
+                'n': 49
+            }))
 
     def ibm_stl():
         common_mods = {
