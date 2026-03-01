@@ -476,10 +476,10 @@ contains
             end do
 
             do i = 1, nb
-                do r = 1, 4
+                do r = 1, nnode
                     ! Checking whether data file associated with variable position
                     ! of the currently manipulated bubble variable exists
-                    write (file_num, '(I0)') sys_size + r + (i - 1)*4
+                    write (file_num, '(I0)') sys_size + r + (i - 1)*nnode
                     file_loc = trim(t_step_dir)//'/mv'// &
                                trim(file_num)//'.dat'
                     inquire (FILE=trim(file_loc), EXIST=file_check)
@@ -679,7 +679,7 @@ contains
             end do
 
             if (qbmm .and. .not. polytropic) then
-                do i = sys_size + 1, sys_size + 2*nb*4
+                do i = sys_size + 1, sys_size + 2*nb*nnode
                     var_MOK = int(i, MPI_OFFSET_KIND)
 
                     ! Initial displacement to skip at beginning of file
