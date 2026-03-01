@@ -125,6 +125,8 @@ def __print_greeting():
 
 
 def __checks():
+    if ARG("command") == "viz":
+        return
     if not does_command_exist("cmake"):
         raise MFCException("CMake is required to build MFC but couldn't be located on your system. Please ensure it installed and discoverable (e.g in your system's $PATH).")
 
@@ -175,6 +177,9 @@ def __run():  # pylint: disable=too-many-branches
     elif cmd == "generate":
         from mfc import generate  # pylint: disable=import-outside-toplevel
         generate.generate()
+    elif cmd == "viz":
+        from mfc.viz import viz  # pylint: disable=import-outside-toplevel
+        viz.viz()
     elif cmd == "params":
         from mfc import params_cmd  # pylint: disable=import-outside-toplevel
         params_cmd.params()
