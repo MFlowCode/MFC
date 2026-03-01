@@ -56,8 +56,10 @@ jobs:
   file-changes:
     name: Detect File Changes
     runs-on: 'ubuntu-latest'
-    outputs: 
+    outputs:
       checkall: ${{ steps.changes.outputs.checkall }}
+      cases_py: ${{ steps.changes.outputs.cases_py }}
+      dep_changed: ${{ steps.dep-check.outputs.dep_changed }}
     steps:
       - name: Clone
         uses: actions/checkout@v4
@@ -65,13 +67,66 @@ jobs:
       - name: Detect Changes
         uses: dorny/paths-filter@v3
         id: changes
-        with: 
+        with:
           filters: ".github/file-filter.yml"
+
+      - name: Check for Fortran dependency changes
+        if: github.event_name == 'pull_request'
+        id: dep-check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Detect added/removed use/include statements that change the
+          # Fortran dependency graph, which would make the coverage cache stale.
+          if gh pr diff ${{ github.event.pull_request.number }} | \
+             grep -qP '^\+\s*(use[\s,]+\w|#:include\s|include\s+['"'"'"])'; then
+            echo "dep_changed=true" >> "$GITHUB_OUTPUT"
+            echo "Fortran dependency change detected — will rebuild coverage cache."
+          else
+            echo "dep_changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  rebuild-cache:
+    name: Rebuild Coverage Cache
+    needs: [lint-gate, file-changes]
+    if: >-
+      github.event_name == 'pull_request' &&
+      (needs.file-changes.outputs.cases_py == 'true' ||
+       needs.file-changes.outputs.dep_changed == 'true') &&
+      github.repository == 'MFlowCode/MFC'
+    timeout-minutes: 240
+    runs-on:
+      group:  phoenix
+      labels: gt
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
+        with:
+          clean: false
+
+      - name: Rebuild Cache via SLURM
+        run: bash .github/workflows/phoenix/submit.sh .github/workflows/phoenix/rebuild-cache.sh cpu none
+
+      - name: Print Logs
+        if:   always()
+        run:  cat rebuild-cache-cpu-none.out
+
+      - name: Upload Cache Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-cache
+          path: toolchain/mfc/test/test_coverage_cache.json.gz
+          retention-days: 1
 
   github:
     name: Github
-    if: needs.file-changes.outputs.checkall == 'true'
-    needs: [lint-gate, file-changes]
+    needs: [lint-gate, file-changes, rebuild-cache]
+    if: >-
+      always() &&
+      needs.lint-gate.result == 'success' &&
+      needs.file-changes.result == 'success' &&
+      needs.rebuild-cache.result != 'cancelled' &&
+      needs.file-changes.outputs.checkall == 'true'
     strategy:
       matrix:
         os:    ['ubuntu', 'macos']
@@ -97,6 +152,20 @@ jobs:
     steps:
       - name: Clone
         uses: actions/checkout@v4
+
+      - name: Fetch master for coverage diff
+        run: |
+          git fetch origin master:master --depth=1
+          git fetch --deepen=200
+        continue-on-error: true
+
+      - name: Download Coverage Cache
+        if: needs.rebuild-cache.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-cache
+          path: toolchain/mfc/test
+        continue-on-error: true
 
       - name: Setup MacOS
         if:   matrix.os == 'macos'
@@ -159,7 +228,7 @@ jobs:
         run: |
           rm -f tests/failed_uuids.txt
           TEST_EXIT=0
-          /bin/bash mfc.sh test -v --max-attempts 3 -j "$(nproc)" $TEST_ALL $TEST_PCT || TEST_EXIT=$?
+          /bin/bash mfc.sh test -v --max-attempts 3 -j "$(nproc)" $ONLY_CHANGES $TEST_ALL $TEST_PCT || TEST_EXIT=$?
 
           # Retry only if a small number of tests failed (sporadic failures)
           if [ -s tests/failed_uuids.txt ]; then
@@ -180,11 +249,19 @@ jobs:
         env:
           TEST_ALL: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
           TEST_PCT: ${{ matrix.debug == 'debug' && '-% 20' || '' }}
+          ONLY_CHANGES: ${{ github.event_name == 'pull_request' && '--only-changes' || '' }}
 
   self:
     name: "${{ matrix.cluster_name }} (${{ matrix.device }}${{ matrix.interface != 'none' && format('-{0}', matrix.interface) || '' }}${{ matrix.shard != '' && format(' [{0}]', matrix.shard) || '' }})"
-    if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true' && github.event.pull_request.draft != true
-    needs: [lint-gate, file-changes]
+    needs: [lint-gate, file-changes, rebuild-cache]
+    if: >-
+      always() &&
+      needs.lint-gate.result == 'success' &&
+      needs.file-changes.result == 'success' &&
+      needs.rebuild-cache.result != 'cancelled' &&
+      github.repository == 'MFlowCode/MFC' &&
+      needs.file-changes.outputs.checkall == 'true' &&
+      github.event.pull_request.draft != true
     continue-on-error: false
     timeout-minutes: 480
     strategy:
@@ -265,6 +342,14 @@ jobs:
         with:
           clean: false
 
+      - name: Download Coverage Cache
+        if: needs.rebuild-cache.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-cache
+          path: toolchain/mfc/test
+        continue-on-error: true
+
       - name: Build
         if:   matrix.cluster != 'phoenix'
         uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
@@ -299,3 +384,56 @@ jobs:
         with:
           name: logs-${{ strategy.job-index }}-${{ steps.log.outputs.slug }}
           path: ${{ steps.log.outputs.slug }}.out
+
+  commit-cache:
+    name: Commit Coverage Cache
+    needs: [rebuild-cache]
+    if: >-
+      needs.rebuild-cache.result == 'success' &&
+      github.repository == 'MFlowCode/MFC' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Download Coverage Cache
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-cache
+          path: toolchain/mfc/test
+
+      - name: Commit Updated Cache
+        id: commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add toolchain/mfc/test/test_coverage_cache.json.gz
+          if git diff --cached --quiet; then
+            echo "Coverage cache unchanged."
+            echo "pushed=false" >> "$GITHUB_OUTPUT"
+          else
+            git commit -m "Regenerate gcov coverage cache
+
+          Automatically rebuilt because cases.py changed."
+            pushed=false
+            for i in 1 2 3; do
+              git pull --rebase && git push && { pushed=true; break; }
+              echo "Push attempt $i failed, retrying in 5s..."
+              sleep 5
+            done
+            echo "pushed=$pushed" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Post PR Comment
+        if: steps.commit.outputs.pushed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr comment ${{ github.event.pull_request.number }} \
+            --body "Coverage cache auto-updated: a bot commit was pushed to this branch because \`cases.py\` changed."

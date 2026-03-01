@@ -458,6 +458,27 @@ TEST_COMMAND = Command(
             type=str,
             default=None,
         ),
+        Argument(
+            name="build-coverage-cache",
+            help="Run all tests with gcov instrumentation to build the file-level coverage cache. Requires a prior --gcov build: ./mfc.sh build --gcov -j 8",
+            action=ArgAction.STORE_TRUE,
+            default=False,
+            dest="build_coverage_cache",
+        ),
+        Argument(
+            name="only-changes",
+            help="Only run tests whose covered files overlap with files changed since branching from master (uses file-level gcov coverage cache).",
+            action=ArgAction.STORE_TRUE,
+            default=False,
+            dest="only_changes",
+        ),
+        Argument(
+            name="changes-branch",
+            help="Branch to compare against for --only-changes (default: master).",
+            type=str,
+            default="master",
+            dest="changes_branch",
+        ),
     ],
     mutually_exclusive=[
         MutuallyExclusiveGroup(arguments=[
@@ -488,6 +509,8 @@ TEST_COMMAND = Command(
         Example("./mfc.sh test -j 4", "Run with 4 parallel jobs"),
         Example("./mfc.sh test --only 3D", "Run only 3D tests"),
         Example("./mfc.sh test --generate", "Regenerate golden files"),
+        Example("./mfc.sh test --only-changes -j 4", "Run tests affected by changed files"),
+        Example("./mfc.sh build --gcov -j 8 && ./mfc.sh test --build-coverage-cache", "One-time: build file-coverage cache"),
     ],
     key_options=[
         ("-j, --jobs N", "Number of parallel test jobs"),
@@ -495,6 +518,8 @@ TEST_COMMAND = Command(
         ("-f, --from UUID", "Start from specific test"),
         ("--generate", "Generate/update golden files"),
         ("--no-build", "Skip rebuilding MFC"),
+        ("--build-coverage-cache", "Build file-level gcov coverage cache (one-time)"),
+        ("--only-changes", "Run tests affected by changed files (requires cache)"),
     ],
 )
 
