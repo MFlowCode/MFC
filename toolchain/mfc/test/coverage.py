@@ -259,31 +259,6 @@ def _gcda_path_to_fpp(gcda_rel: str) -> str:
     return path
 
 
-def collect_coverage_from_gcda(prefix_dir: str) -> set:
-    """
-    Infer file-level coverage from .gcda file existence in a GCOV_PREFIX tree.
-
-    This is much faster than running gcov (instant vs minutes) because we
-    only need to list files and map paths.  A .gcda file is created by
-    gfortran's runtime for each compilation unit that executed at least one
-    function, so its existence implies the source file had coverage.
-    """
-    result = set()
-    build_subdir = os.path.join(prefix_dir, "build")
-    if not os.path.isdir(build_subdir):
-        return result
-    for dirpath, _dirnames, filenames in os.walk(build_subdir):
-        for fname in filenames:
-            if not fname.endswith(".gcda"):
-                continue
-            full = os.path.join(dirpath, fname)
-            rel = os.path.relpath(full, prefix_dir)
-            fpp = _gcda_path_to_fpp(rel)
-            if fpp:
-                result.add(fpp)
-    return result
-
-
 def _compute_gcov_prefix_strip(root_dir: str) -> str:
     """
     Compute GCOV_PREFIX_STRIP so .gcda files preserve the build/ tree.
@@ -320,7 +295,7 @@ def _install_gcda_files(prefix_dir: str, root_dir: str) -> int:
     return count
 
 
-def _run_single_test_direct(test_info: dict, gcda_dir: str, strip: str) -> tuple:
+def _run_single_test_direct(test_info: dict, gcda_dir: str, strip: str) -> tuple:  # pylint: disable=too-many-locals
     """
     Run a single test by invoking Fortran executables directly.
 
@@ -349,18 +324,23 @@ def _run_single_test_direct(test_info: dict, gcda_dir: str, strip: str) -> tuple
     else:
         mpi_cmd = []
 
-    for _, bin_path in binaries:
+    failures = []
+    for target_name, bin_path in binaries:
         if not os.path.isfile(bin_path):
             continue
         cmd = mpi_cmd + [bin_path]
         try:
-            subprocess.run(cmd, check=False, text=True,
-                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                           env=env, cwd=test_dir, timeout=300)
-        except Exception:
-            pass
+            result = subprocess.run(cmd, check=False, text=True,
+                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                    env=env, cwd=test_dir, timeout=300)
+            if result.returncode != 0:
+                failures.append((target_name, result.returncode))
+        except subprocess.TimeoutExpired:
+            failures.append((target_name, "timeout"))
+        except Exception as exc:
+            failures.append((target_name, str(exc)))
 
-    return uuid, test_gcda
+    return uuid, test_gcda, failures
 
 
 def _prepare_test(case, root_dir: str) -> dict:  # pylint: disable=unused-argument
@@ -409,7 +389,7 @@ def _prepare_test(case, root_dir: str) -> dict:  # pylint: disable=unused-argume
     }
 
 
-def build_coverage_cache(  # pylint: disable=unused-argument,too-many-locals
+def build_coverage_cache(  # pylint: disable=unused-argument,too-many-locals,too-many-statements
     root_dir: str, cases: list, extra_args: list = None, n_jobs: int = None,
 ) -> None:
     """
@@ -454,16 +434,26 @@ def build_coverage_cache(  # pylint: disable=unused-argument,too-many-locals
     # Phase 1: Run all tests in parallel via direct binary invocation.
     cons.print("[bold]Phase 1/2: Running tests...[/bold]")
     test_results: dict = {}
+    all_failures: dict = {}
     with ThreadPoolExecutor(max_workers=n_jobs) as pool:
         futures = {
             pool.submit(_run_single_test_direct, info, gcda_dir, strip): info
             for info in test_infos
         }
         for i, future in enumerate(as_completed(futures)):
-            uuid, test_gcda = future.result()
+            uuid, test_gcda, failures = future.result()
             test_results[uuid] = test_gcda
+            if failures:
+                all_failures[uuid] = failures
             if (i + 1) % 50 == 0 or (i + 1) == len(cases):
                 cons.print(f"  [{i+1:3d}/{len(cases):3d}] tests completed")
+
+    if all_failures:
+        cons.print()
+        cons.print(f"[bold yellow]Warning: {len(all_failures)} tests had target failures:[/bold yellow]")
+        for uuid, fails in sorted(all_failures.items()):
+            fail_str = ", ".join(f"{t}={rc}" for t, rc in fails)
+            cons.print(f"  [yellow]{uuid}[/yellow]: {fail_str}")
 
     # Phase 2: Collect gcov coverage from each test's isolated .gcda directory.
     # For each test, copy its .gcda files into the build tree, run gcov only

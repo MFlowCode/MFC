@@ -138,6 +138,9 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
             $<$<COMPILE_LANGUAGE:Fortran>:-lgcov>
             $<$<COMPILE_LANGUAGE:Fortran>:--coverage>
         )
+
+        # Use gfortran5 line markers so gcov can map coverage to .fpp sources.
+        set(FYPP_GCOV_OPTS "--line-marker-format=gfortran5")
     endif()
 
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -381,7 +384,7 @@ macro(HANDLE_SOURCES target useCommon)
                                  --no-folding
 								 --line-length=999
 		 						 --line-numbering-mode=nocontlines
-                                 --line-marker-format=gfortran5
+                                 ${FYPP_GCOV_OPTS}
                                  "${fpp}" "${f90}"
             DEPENDS  "${fpp};${${target}_incs}"
             COMMENT  "Preprocessing (Fypp) ${fpp_filename}"
