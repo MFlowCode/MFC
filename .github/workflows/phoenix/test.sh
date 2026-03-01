@@ -62,4 +62,10 @@ if [ "$job_device" = "gpu" ]; then
     n_test_threads=`expr $gpu_count \* 2`
 fi
 
-./mfc.sh test -v --max-attempts 3 --only-changes -a -j $n_test_threads $device_opts -- -c phoenix
+# Only prune tests on PRs; master pushes must run the full suite.
+prune_flag=""
+if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+    prune_flag="--only-changes"
+fi
+
+./mfc.sh test -v --max-attempts 3 $prune_flag -a -j $n_test_threads $device_opts -- -c phoenix

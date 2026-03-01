@@ -211,7 +211,7 @@ jobs:
         run: |
           rm -f tests/failed_uuids.txt
           TEST_EXIT=0
-          /bin/bash mfc.sh test -v --max-attempts 3 -j "$(nproc)" --only-changes $TEST_ALL $TEST_PCT || TEST_EXIT=$?
+          /bin/bash mfc.sh test -v --max-attempts 3 -j "$(nproc)" $ONLY_CHANGES $TEST_ALL $TEST_PCT || TEST_EXIT=$?
 
           # Retry only if a small number of tests failed (sporadic failures)
           if [ -s tests/failed_uuids.txt ]; then
@@ -232,6 +232,7 @@ jobs:
         env:
           TEST_ALL: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
           TEST_PCT: ${{ matrix.debug == 'debug' && '-% 20' || '' }}
+          ONLY_CHANGES: ${{ github.event_name == 'pull_request' && '--only-changes' || '' }}
 
   self:
     name: "${{ matrix.cluster_name }} (${{ matrix.device }}${{ matrix.interface != 'none' && format('-{0}', matrix.interface) || '' }}${{ matrix.shard != '' && format(' [{0}]', matrix.shard) || '' }})"
@@ -403,8 +404,11 @@ jobs:
             git commit -m "Regenerate gcov coverage cache
 
           Automatically rebuilt because cases.py changed."
-            git pull --rebase
-            git push
+            for i in 1 2 3; do
+              git pull --rebase && git push && break
+              echo "Push attempt $i failed, retrying in 5s..."
+              sleep 5
+            done
             echo "pushed=true" >> "$GITHUB_OUTPUT"
           fi
 
