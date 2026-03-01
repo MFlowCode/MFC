@@ -93,8 +93,7 @@ jobs:
       github.event_name == 'pull_request' &&
       (needs.file-changes.outputs.cases_py == 'true' ||
        needs.file-changes.outputs.dep_changed == 'true') &&
-      github.repository == 'MFlowCode/MFC' &&
-      github.event.pull_request.draft != true
+      github.repository == 'MFlowCode/MFC'
     timeout-minutes: 240
     runs-on:
       group:  phoenix
