@@ -579,7 +579,8 @@ contains
             InvJac = InvJac/(Jac(1, 1)*Jac(2, 2) - Jac(1, 2)*Jac(2, 1))
 
             ! calculating correction array for Newton's method
-            DeltamP = -1.0_wp*(matmul(InvJac, R2D))
+            DeltamP(1) = -1.0_wp*(InvJac(1, 1)*R2D(1) + InvJac(1, 2)*R2D(2))
+            DeltamP(2) = -1.0_wp*(InvJac(2, 1)*R2D(1) + InvJac(2, 2)*R2D(2))
 
             ! updating two reacting 'masses'. Recall that inert 'masses' do not change during the phase change
             ! liquid
