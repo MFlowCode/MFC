@@ -21,7 +21,6 @@ module m_derived_variables
     private; public :: s_initialize_derived_variables_module, &
  s_derive_specific_heat_ratio, &
  s_derive_liquid_stiffness, &
- s_derive_sound_speed, &
  s_derive_flux_limiter, &
  s_derive_vorticity_component, &
  s_derive_qm, &
@@ -163,62 +162,6 @@ contains
 
     end subroutine s_derive_liquid_stiffness
 
-    !> This subroutine admits as inputs the primitive variables,
-        !!      the density, the specific heat ratio function and liquid
-        !!      stiffness function. It then computes from those variables
-        !!      the values of the speed of sound, which are stored in the
-        !!      derived flow quantity storage variable, q_sf.
-        !! @param q_prim_vf Primitive variables
-        !! @param q_sf Speed of sound
-    subroutine s_derive_sound_speed(q_prim_vf, q_sf)
-
-        type(scalar_field), &
-            dimension(sys_size), &
-            intent(in) :: q_prim_vf
-
-        real(wp), &
-            dimension(-offset_x%beg:m + offset_x%end, &
-                      -offset_y%beg:n + offset_y%end, &
-                      -offset_z%beg:p + offset_z%end), &
-            intent(inout) :: q_sf
-
-        integer :: i, j, k !< Generic loop iterators
-
-        ! Fluid bulk modulus for alternate sound speed
-        real(wp) :: blkmod1, blkmod2
-
-        ! Computing speed of sound values from those of pressure, density,
-        ! specific heat ratio function and the liquid stiffness function
-        do k = -offset_z%beg, p + offset_z%end
-            do j = -offset_y%beg, n + offset_y%end
-                do i = -offset_x%beg, m + offset_x%end
-
-                    ! Compute mixture sound speed
-                    if (alt_soundspeed .neqv. .true.) then
-                        q_sf(i, j, k) = (((gamma_sf(i, j, k) + 1._wp)* &
-                                          q_prim_vf(E_idx)%sf(i, j, k) + &
-                                          pi_inf_sf(i, j, k))/(gamma_sf(i, j, k)* &
-                                                               rho_sf(i, j, k)))
-                    else
-                        blkmod1 = ((gammas(1) + 1._wp)*q_prim_vf(E_idx)%sf(i, j, k) + &
-                                   pi_infs(1))/gammas(1)
-                        blkmod2 = ((gammas(2) + 1._wp)*q_prim_vf(E_idx)%sf(i, j, k) + &
-                                   pi_infs(2))/gammas(2)
-                        q_sf(i, j, k) = (1._wp/(rho_sf(i, j, k)*(q_prim_vf(adv_idx%beg)%sf(i, j, k)/blkmod1 + &
-                                                                 (1._wp - q_prim_vf(adv_idx%beg)%sf(i, j, k))/blkmod2)))
-                    end if
-
-                    if (mixture_err .and. q_sf(i, j, k) < 0._wp) then
-                        q_sf(i, j, k) = 1.e-16_wp
-                    else
-                        q_sf(i, j, k) = sqrt(q_sf(i, j, k))
-                    end if
-                end do
-            end do
-        end do
-
-    end subroutine s_derive_sound_speed
-
     !>  This subroutine derives the flux_limiter at cell boundary
         !!      i+1/2. This is an approximation because the velocity used
         !!      to determine the upwind direction is the velocity at the
@@ -315,52 +258,6 @@ contains
             end do
         end do
     end subroutine s_derive_flux_limiter
-
-    !>  Computes the solution to the linear system Ax=b w/ sol = x
-        !!  @param A Input matrix
-        !!  @param b right-hane-side
-        !!  @param sol Solution
-        !!  @param ndim Problem size
-    subroutine s_solve_linear_system(A, b, sol, ndim)
-
-        integer, intent(in) :: ndim
-        real(wp), dimension(ndim, ndim), intent(inout) :: A
-        real(wp), dimension(ndim), intent(inout) :: b
-        real(wp), dimension(ndim), intent(out) :: sol
-
-        !EXTERNAL DGESV
-
-        integer :: i, j, k
-
-        ! Solve linear system using own linear solver (Thomson/Darter/Comet/Stampede)
-        ! Forward elimination
-        do i = 1, ndim
-            ! Pivoting
-            j = i - 1 + maxloc(abs(A(i:ndim, i)), 1)
-            sol = A(i, :)
-            A(i, :) = A(j, :)
-            A(j, :) = sol
-            sol(1) = b(i)
-            b(i) = b(j)
-            b(j) = sol(1)
-            ! Elimination
-            b(i) = b(i)/A(i, i)
-            A(i, :) = A(i, :)/A(i, i)
-            do k = i + 1, ndim
-                b(k) = b(k) - A(k, i)*b(i)
-                A(k, :) = A(k, :) - A(k, i)*A(i, :)
-            end do
-        end do
-
-        ! Backward substitution
-        do i = ndim, 1, -1
-            sol(i) = b(i)
-            do k = i + 1, ndim
-                sol(i) = sol(i) - A(i, k)*sol(k)
-            end do
-        end do
-
-    end subroutine s_solve_linear_system
 
     !>  This subroutine receives as inputs the indicator of the
         !!      component of the vorticity that should be outputted and

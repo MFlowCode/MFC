@@ -980,6 +980,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         for name, path, param in case_specs:
             cases.append(define_case_f(name, path, mods=param))
 
+
+
+
+    def alter_flux_wrt():
+        stack.push("Flux WRT", {'flux_wrt': 'T'})
+        
+        cases.append(define_case_d(stack, '', {}))
+        cases.append(define_case_d(stack, 'format=2', {'format': 2}))        
+        stack.pop()
+
     def foreach_dimension():
         for dimInfo, dimParams in get_dimensions():
             stack.push(f"{len(dimInfo[0])}D", dimParams)
@@ -1004,6 +1014,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             alter_body_forces(dimInfo)
             alter_mixlayer_perturb(dimInfo)
             alter_bc_patches(dimInfo)
+            alter_flux_wrt()
+
+
             stack.pop()
             stack.pop()
 
