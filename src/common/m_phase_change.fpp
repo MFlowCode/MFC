@@ -717,7 +717,7 @@ contains
 
             ! underrelaxation factor
             Om = 1.0e-3_wp
-            do while ((abs(FT) > ptgalpha_eps) .or. (ns == 0))
+            do
                 ! increasing counter
                 ns = ns + 1
 
@@ -738,6 +738,7 @@ contains
                 ! updating saturation temperature
                 TSat = TSat - Om*FT/dFdT
 
+                if (abs(FT) <= ptgalpha_eps) exit
             end do
 
         end if
