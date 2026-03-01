@@ -201,7 +201,7 @@ def collect_coverage_for_test(gcno_files: list, root_dir: str, gcov_binary: str)
             )
         except subprocess.TimeoutExpired:
             continue
-        except Exception:
+        except (subprocess.SubprocessError, OSError):
             continue
 
         if proc.returncode != 0 or not proc.stdout:

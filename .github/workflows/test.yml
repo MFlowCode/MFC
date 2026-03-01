@@ -366,7 +366,8 @@ jobs:
     needs: [rebuild-cache]
     if: >-
       needs.rebuild-cache.result == 'success' &&
-      github.repository == 'MFlowCode/MFC'
+      github.repository == 'MFlowCode/MFC' &&
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     permissions:
       contents: write
