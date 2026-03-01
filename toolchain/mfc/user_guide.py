@@ -459,7 +459,10 @@ def print_command_help(command: str, show_argparse: bool = True):
     if cmd.get("key_options"):
         cons.print("[bold]Key Options:[/bold]")
         for opt, desc in cmd["key_options"]:
-            cons.print(f"  [cyan]{opt:24}[/cyan] {desc}")
+            if opt.startswith("-- ") and opt.endswith(" --"):
+                cons.print(f"  [bold yellow]{opt}[/bold yellow]")
+            else:
+                cons.print(f"  [cyan]{opt:24}[/cyan] {desc}")
         cons.print()
         if show_argparse:
             cons.print("[dim]Run with --help for full option list[/dim]")
