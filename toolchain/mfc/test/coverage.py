@@ -50,7 +50,7 @@ ALWAYS_RUN_ALL = frozenset([
     "toolchain/mfc/params/definitions.py",
     "toolchain/mfc/run/input.py",
     "toolchain/mfc/case_validator.py",
-    # "CMakeLists.txt",  # TEMP: disabled to test pruning in CI — re-enable before merge
+    "CMakeLists.txt",
 ])
 
 

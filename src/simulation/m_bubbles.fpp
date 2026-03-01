@@ -26,7 +26,7 @@ module m_bubbles
 
 contains
 
-    !> Function that computes the bubble radial acceleration based on models
+    !> Function that computes the bubble radial acceleration based on bubble models
         !!  @param fRho Current density
         !!  @param fP Current driving pressure
         !!  @param fR Current bubble radius
