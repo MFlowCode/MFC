@@ -18,6 +18,8 @@ module m_icpp_patches
 
     use m_global_parameters     !< Definitions of the global parameters
 
+    use m_constants, only: max_2d_fourier_modes, max_sph_harm_degree, small_radius
+
     use m_helper_basic          !< Functions to compare floating point numbers
 
     use m_helper
@@ -102,9 +104,9 @@ contains
                     ! Ellipsoidal patch
                 elseif (patch_icpp(i)%geometry == 12) then
                     call s_icpp_ellipsoid(i, patch_id_fp, q_prim_vf)
-                    ! Spherical harmonic patch
+                    ! 3D spherical harmonic patch
                 elseif (patch_icpp(i)%geometry == 14) then
-                    call s_icpp_spherical_harmonic(i, patch_id_fp, q_prim_vf)
+                    call s_icpp_3d_spherical_harmonic(i, patch_id_fp, q_prim_vf)
                     ! 3D Modified circular patch
                 elseif (patch_icpp(i)%geometry == 19) then
                     call s_icpp_3dvarcircle(i, patch_id_fp, q_prim_vf)
@@ -142,9 +144,9 @@ contains
                 elseif (patch_icpp(i)%geometry == 6) then
                     call s_mpi_abort('This used to be the isentropic vortex patch, '// &
                                      'which no longer exists. See Examples. Exiting.')
-                    ! Spherical Harmonic Patch
-                elseif (patch_icpp(i)%geometry == 14) then
-                    call s_icpp_spherical_harmonic(i, patch_id_fp, q_prim_vf)
+                    ! 2D modal (Fourier) patch
+                elseif (patch_icpp(i)%geometry == 13) then
+                    call s_icpp_2d_modal(i, patch_id_fp, q_prim_vf)
                     ! Spiral patch
                 elseif (patch_icpp(i)%geometry == 17) then
                     call s_icpp_spiral(i, patch_id_fp, q_prim_vf)
@@ -1041,14 +1043,12 @@ contains
 
     end subroutine s_icpp_1D_bubble_pulse
 
-    !> This patch generates the shape of the spherical harmonics
-        !!      as a perturbation to a perfect sphere
-        !! @param patch_id is the patch identifier
-        !! @param patch_id_fp Array to track patch ids
-        !! @param q_prim_vf Array of primitive variables
-    subroutine s_icpp_spherical_harmonic(patch_id, patch_id_fp, q_prim_vf)
-
-        integer, intent(IN) :: patch_id
+    !>  2D modal (Fourier) patch. theta = atan2(y - y_centroid, x - x_centroid).
+    !!  Additive (modal_use_exp_form false): R = radius + sum_n [fourier_cos*cos(n*theta)+fourier_sin*sin(n*theta)];
+    !!    coefficients are absolute (same units as radius). R is clipped to max(R,0). If modal_clip_r_to_min, R = max(R, modal_r_min).
+    !!  Exponential (modal_use_exp_form true): R = radius*exp(sum); coefficients are relative (dimensionless).
+    subroutine s_icpp_2d_modal(patch_id, patch_id_fp, q_prim_vf)
+        integer, intent(in) :: patch_id
 #ifdef MFC_MIXED_PRECISION
         integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
 #else
@@ -1056,138 +1056,108 @@ contains
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
-        real(wp) :: r, x_p, eps, phi
-        real(wp), dimension(2:9) :: as, Ps
-        real(wp) :: radius, x_centroid_local, y_centroid_local, z_centroid_local, eta_local, smooth_coeff_local
-        logical :: non_axis_sym_in
+        real(wp) :: r, theta, R_boundary, sum_series
+        integer :: i, j, nn
 
-        integer :: i, j, k !< generic loop iterators
-
-        ! Transferring the patch's centroid and radius information
-        x_centroid_local = patch_icpp(patch_id)%x_centroid
-        y_centroid_local = patch_icpp(patch_id)%y_centroid
-        z_centroid_local = patch_icpp(patch_id)%z_centroid
+        x_centroid = patch_icpp(patch_id)%x_centroid
+        y_centroid = patch_icpp(patch_id)%y_centroid
         smooth_patch_id = patch_icpp(patch_id)%smooth_patch_id
-        smooth_coeff_local = patch_icpp(patch_id)%smooth_coeff
-        radius = patch_icpp(patch_id)%radius
-        as(2) = patch_icpp(patch_id)%a(2)
-        as(3) = patch_icpp(patch_id)%a(3)
-        as(4) = patch_icpp(patch_id)%a(4)
-        as(5) = patch_icpp(patch_id)%a(5)
-        as(6) = patch_icpp(patch_id)%a(6)
-        as(7) = patch_icpp(patch_id)%a(7)
-        as(8) = patch_icpp(patch_id)%a(8)
-        as(9) = patch_icpp(patch_id)%a(9)
-        non_axis_sym_in = patch_icpp(patch_id)%non_axis_sym
+        smooth_coeff = patch_icpp(patch_id)%smooth_coeff
+        eta = 1._wp
 
-        ! Since the analytical patch does not allow for its boundaries to get
-        ! smoothed out, the pseudo volume fraction is set to 1 to make sure
-        ! that only the current patch contributes to the fluid state in the
-        ! cells that this patch covers.
-        eta_local = 1._wp
-        eps = 1.e-32_wp
-
-        ! Checking whether the patch covers a particular cell in the domain
-        ! and verifying whether the current patch has permission to write to
-        ! to that cell. If both queries check out, the primitive variables
-        ! of the current patch are assigned to this cell.
-        if (p > 0 .and. .not. non_axis_sym_in) then
-            do k = 0, p
-                do j = 0, n
-                    do i = 0, m
-                        if (grid_geometry == 3) then
-                            call s_convert_cylindrical_to_cartesian_coord(y_cc(j), z_cc(k))
-                        else
-                            cart_y = y_cc(j)
-                            cart_z = z_cc(k)
-                        end if
-
-                        r = sqrt((x_cc(i) - x_centroid_local)**2 + (cart_y - y_centroid_local)**2 + (cart_z - z_centroid_local)**2) + eps
-                        if (x_cc(i) - x_centroid_local <= 0) then
-                            x_p = -1._wp*abs(x_cc(i) - x_centroid_local + eps)/r
-                        else
-                            x_p = abs(x_cc(i) - x_centroid_local + eps)/r
-                        end if
-
-                        Ps(2) = unassociated_legendre(x_p, 2)
-                        Ps(3) = unassociated_legendre(x_p, 3)
-                        Ps(4) = unassociated_legendre(x_p, 4)
-                        Ps(5) = unassociated_legendre(x_p, 5)
-                        Ps(6) = unassociated_legendre(x_p, 6)
-                        Ps(7) = unassociated_legendre(x_p, 7)
-                        if ((x_cc(i) - x_centroid_local >= 0 &
-                             .and. &
-                             r - as(2)*Ps(2) - as(3)*Ps(3) - as(4)*Ps(4) - as(5)*Ps(5) - as(6)*Ps(6) - as(7)*Ps(7) <= radius &
-                             .and. &
-                             patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) .or. &
-                            (patch_id_fp(i, j, k) == smooth_patch_id)) &
-                            then
-                            if (patch_icpp(patch_id)%smoothen) then
-                                eta_local = tanh(smooth_coeff_local/min(dx, dy, dz)* &
-                                                 ((r - as(2)*Ps(2) - as(3)*Ps(3) - as(4)*Ps(4) - as(5)*Ps(5) - as(6)*Ps(6) - as(7)*Ps(7)) &
-                                                  - radius))*(-0.5_wp) + 0.5_wp
-                            end if
-
-                            call s_assign_patch_primitive_variables(patch_id, i, j, k, &
-                                                                    eta_local, q_prim_vf, patch_id_fp)
-                        end if
-
-                    end do
+        do j = 0, n
+            do i = 0, m
+                r = sqrt((x_cc(i) - x_centroid)**2 + (y_cc(j) - y_centroid)**2)
+                if (r < small_radius) then
+                    theta = 0._wp
+                else
+                    theta = atan2(y_cc(j) - y_centroid, x_cc(i) - x_centroid)
+                end if
+                sum_series = 0._wp
+                do nn = 1, max_2d_fourier_modes
+                    sum_series = sum_series + patch_icpp(patch_id)%fourier_cos(nn)*cos(real(nn, wp)*theta) &
+                                 + patch_icpp(patch_id)%fourier_sin(nn)*sin(real(nn, wp)*theta)
                 end do
+                if (patch_icpp(patch_id)%modal_use_exp_form) then
+                    R_boundary = patch_icpp(patch_id)%radius*exp(sum_series)
+                else
+                    R_boundary = patch_icpp(patch_id)%radius + sum_series
+                    R_boundary = max(R_boundary, 0._wp)
+                    if (patch_icpp(patch_id)%modal_clip_r_to_min) then
+                        R_boundary = max(R_boundary, patch_icpp(patch_id)%modal_r_min)
+                    end if
+                end if
+                if (patch_icpp(patch_id)%smoothen) then
+                    eta = 0.5_wp + 0.5_wp*tanh(smooth_coeff/min(dx, dy)*(R_boundary - r))
+                end if
+                if ((r <= R_boundary .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) &
+                    .or. patch_id_fp(i, j, 0) == smooth_patch_id) then
+                    call s_assign_patch_primitive_variables(patch_id, i, j, 0, eta, q_prim_vf, patch_id_fp)
+                end if
             end do
+        end do
+    end subroutine s_icpp_2d_modal
 
-        else if (p == 0) then
+    !>  3D spherical harmonic patch. Surface r = radius + sum_lm sph_har_coeff(l,m)*Y_lm(theta,phi).
+    !!  theta = acos(z/r), phi = atan2(y,x) relative to centroid.
+    subroutine s_icpp_3d_spherical_harmonic(patch_id, patch_id_fp, q_prim_vf)
+        integer, intent(in) :: patch_id
+#ifdef MFC_MIXED_PRECISION
+        integer(kind=1), dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+#else
+        integer, dimension(0:m, 0:n, 0:p), intent(inout) :: patch_id_fp
+#endif
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+
+        real(wp) :: dx_loc, dy_loc, dz_loc, r, theta, phi, R_surface, eta_local
+        integer :: i, j, k, ll, mm
+
+        x_centroid = patch_icpp(patch_id)%x_centroid
+        y_centroid = patch_icpp(patch_id)%y_centroid
+        z_centroid = patch_icpp(patch_id)%z_centroid
+        smooth_patch_id = patch_icpp(patch_id)%smooth_patch_id
+        smooth_coeff = patch_icpp(patch_id)%smooth_coeff
+        eta_local = 1._wp
+
+        do k = 0, p
             do j = 0, n
                 do i = 0, m
-
-                    if (non_axis_sym_in) then
-                        phi = atan(((y_cc(j) - y_centroid_local) + eps)/((x_cc(i) - x_centroid_local) + eps))
-                        r = sqrt((x_cc(i) - x_centroid_local)**2._wp + (y_cc(j) - y_centroid_local)**2._wp) + eps
-                        x_p = (eps)/r
-                        Ps(2) = spherical_harmonic_func(x_p, phi, 2, 2)
-                        Ps(3) = spherical_harmonic_func(x_p, phi, 3, 3)
-                        Ps(4) = spherical_harmonic_func(x_p, phi, 4, 4)
-                        Ps(5) = spherical_harmonic_func(x_p, phi, 5, 5)
-                        Ps(6) = spherical_harmonic_func(x_p, phi, 6, 6)
-                        Ps(7) = spherical_harmonic_func(x_p, phi, 7, 7)
-                        Ps(8) = spherical_harmonic_func(x_p, phi, 8, 8)
-                        Ps(9) = spherical_harmonic_func(x_p, phi, 9, 9)
+                    if (grid_geometry == 3) then
+                        call s_convert_cylindrical_to_cartesian_coord(y_cc(j), z_cc(k))
+                        dx_loc = x_cc(i) - x_centroid
+                        dy_loc = cart_y - y_centroid
+                        dz_loc = cart_z - z_centroid
                     else
-                        r = sqrt((x_cc(i) - x_centroid_local)**2._wp + (y_cc(j) - y_centroid_local)**2._wp) + eps
-                        x_p = abs(x_cc(i) - x_centroid_local + eps)/r
-                        Ps(2) = unassociated_legendre(x_p, 2)
-                        Ps(3) = unassociated_legendre(x_p, 3)
-                        Ps(4) = unassociated_legendre(x_p, 4)
-                        Ps(5) = unassociated_legendre(x_p, 5)
-                        Ps(6) = unassociated_legendre(x_p, 6)
-                        Ps(7) = unassociated_legendre(x_p, 7)
-                        Ps(8) = unassociated_legendre(x_p, 8)
-                        Ps(9) = unassociated_legendre(x_p, 9)
+                        dx_loc = x_cc(i) - x_centroid
+                        dy_loc = y_cc(j) - y_centroid
+                        dz_loc = z_cc(k) - z_centroid
                     end if
-
-                    if (x_cc(i) - x_centroid_local >= 0 &
-                        .and. &
-                        r - as(2)*Ps(2) - as(3)*Ps(3) - as(4)*Ps(4) - as(5)*Ps(5) - as(6)*Ps(6) - as(7)*Ps(7) - as(8)*Ps(8) - as(9)*Ps(9) <= radius .and. &
-                        patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) &
-                        then
-                        call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
-                                                                eta_local, q_prim_vf, patch_id_fp)
-
-                    elseif (x_cc(i) - x_centroid_local < 0 &
-                            .and. &
-                            r - as(2)*Ps(2) + as(3)*Ps(3) - as(4)*Ps(4) + as(5)*Ps(5) - as(6)*Ps(6) + as(7)*Ps(7) - as(8)*Ps(8) + as(9)*Ps(9) <= radius &
-                            .and. &
-                            patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) &
-                        then
-                        call s_assign_patch_primitive_variables(patch_id, i, j, 0, &
-                                                                eta_local, q_prim_vf, patch_id_fp)
-
+                    r = sqrt(dx_loc**2 + dy_loc**2 + dz_loc**2)
+                    if (r < small_radius) then
+                        theta = 0._wp
+                        phi = 0._wp
+                    else
+                        theta = acos(min(1._wp, max(-1._wp, dz_loc/r)))
+                        phi = atan2(dy_loc, dx_loc)
+                    end if
+                    R_surface = patch_icpp(patch_id)%radius
+                    do ll = 0, max_sph_harm_degree
+                        do mm = -ll, ll
+                            if (patch_icpp(patch_id)%sph_har_coeff(ll, mm) == 0._wp) cycle
+                            R_surface = R_surface + patch_icpp(patch_id)%sph_har_coeff(ll, mm)*real_ylm(theta, phi, ll, mm)
+                        end do
+                    end do
+                    if (patch_icpp(patch_id)%smoothen) then
+                        eta_local = 0.5_wp + 0.5_wp*tanh(smooth_coeff/min(dx, dy, dz)*(R_surface - r))
+                    end if
+                    if ((r <= R_surface .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) &
+                        .or. patch_id_fp(i, j, k) == smooth_patch_id) then
+                        call s_assign_patch_primitive_variables(patch_id, i, j, k, eta_local, q_prim_vf, patch_id_fp)
                     end if
                 end do
             end do
-        end if
-
-    end subroutine s_icpp_spherical_harmonic
+        end do
+    end subroutine s_icpp_3d_spherical_harmonic
 
     !>          The spherical patch is a 3D geometry that may be used,
         !!              for example, in creating a bubble or a droplet. The patch

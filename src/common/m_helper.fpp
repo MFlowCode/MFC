@@ -34,9 +34,8 @@ module m_helper
               s_print_2D_array, &
               f_xor, &
               f_logical_to_int, &
-              unassociated_legendre, &
               associated_legendre, &
-              spherical_harmonic_func, &
+              real_ylm, &
               double_factorial, &
               factorial, &
               f_cut_on, &
@@ -522,72 +521,66 @@ contains
         end if
     end function f_logical_to_int
 
-    !> This function generates the unassociated legendre poynomials
-    !! @param x is the input value
-    !! @param l is the degree
-    !! @return P is the unassociated legendre polynomial evaluated at x
-    recursive function unassociated_legendre(x, l) result(result_P)
+    !> Real spherical harmonic Y_lm(theta, phi). theta = polar angle from +z (acos(z/r)),
+    !! phi = atan2(y,x). Uses associated Legendre P_l^|m|(cos theta). Standard normalisation.
+    function real_ylm(theta, phi, l, m) result(Y)
+        integer, intent(in) :: l, m
+        real(wp), intent(in) :: theta, phi
+        real(wp) :: Y, x, prefac
+        integer :: m_abs
 
-        integer, intent(in) :: l
-        real(wp), intent(in) :: x
-        real(wp) :: result_P
-
-        if (l == 0) then
-            result_P = 1._wp
-        else if (l == 1) then
-            result_P = x
+        m_abs = abs(m)
+        if (m_abs > l) then
+            Y = 0._wp
+            return
+        end if
+        x = cos(theta)
+        prefac = sqrt((2*l + 1)*real(factorial(l - m_abs), wp)/real(factorial(l + m_abs), wp)/(4._wp*pi))
+        if (m == 0) then
+            Y = prefac*associated_legendre(x, l, 0)
+        else if (m > 0) then
+            Y = prefac*sqrt(2._wp)*associated_legendre(x, l, m_abs)*cos(m*phi)
         else
-            result_P = ((2*l - 1)*x*unassociated_legendre(x, l - 1) - (l - 1)*unassociated_legendre(x, l - 2))/l
+            Y = prefac*sqrt(2._wp)*associated_legendre(x, l, m_abs)*sin(m_abs*phi)
         end if
+    end function real_ylm
 
-    end function unassociated_legendre
-
-    !> This function calculates the spherical harmonic function evaluated at x and phi
-    !! @param x is the x coordinate
-    !! @param phi is the phi coordinate
-    !! @param l is the degree
-    !! @param m_order is the order
-    !! @return Y is the spherical harmonic function evaluated at x and phi
-    recursive function spherical_harmonic_func(x, phi, l, m_order) result(Y)
-
-        integer, intent(in) :: l, m_order
-        real(wp), intent(in) :: x, phi
-        real(wp) :: Y, prefactor, local_pi
-
-        local_pi = acos(-1._wp)
-        prefactor = sqrt((2*l + 1)/(4*local_pi)*factorial(l - m_order)/factorial(l + m_order)); 
-        if (m_order == 0) then
-            Y = prefactor*associated_legendre(x, l, m_order); 
-        elseif (m_order > 0) then
-            Y = (-1._wp)**m_order*sqrt(2._wp)*prefactor*associated_legendre(x, l, m_order)*cos(m_order*phi); 
-        end if
-
-    end function spherical_harmonic_func
-
-    !> This function generates the associated legendre polynomials evaluated
-    !! at x with inputs l and m
-    !! @param x is the input value
-    !! @param l is the degree
-    !! @param m_order is the order
-    !! @return P is the associated legendre polynomial evaluated at x
+    !> Associated Legendre polynomial P_l^m(x) (Ferrers function, Condon-Shortley phase).
+    !! Valid for integer l >= 0, 0 <= m <= l, and x in [-1,1]. Returns 0 for |m| > l or l < 0.
+    !! Formulas: DLMF 14.10.3 (recurrence in degree), Wikipedia "Associated Legendre polynomials"
+    !! (P_l^l and P_l^{l-1} identities). Recurrence: (l-m)P_l^m = (2l-1)x P_{l-1}^m - (l+m-1)P_{l-2}^m.
+    !! @param x argument (typically cos(theta)), should be in [-1,1]
+    !! @param l degree (>= 0)
+    !! @param m_order order (0 <= m_order <= l)
+    !! @return result_P P_l^m(x)
     recursive function associated_legendre(x, l, m_order) result(result_P)
 
         integer, intent(in) :: l, m_order
         real(wp), intent(in) :: x
         real(wp) :: result_P
+        real(wp) :: one_minus_x2
+
+        ! Out-of-domain: P_l^m = 0 for |m| > l or l < 0 (standard convention)
+        if (l < 0 .or. m_order < 0 .or. m_order > l) then
+            result_P = 0._wp
+            return
+        end if
 
         if (m_order <= 0 .and. l <= 0) then
-            result_P = 1; 
+            result_P = 1._wp
         elseif (l == 1 .and. m_order <= 0) then
-            result_P = x; 
+            result_P = x
         elseif (l == 1 .and. m_order == 1) then
-            result_P = -(1 - x**2)**(1._wp/2._wp); 
+            one_minus_x2 = max(0._wp, 1._wp - x**2)
+            result_P = -sqrt(one_minus_x2)
         elseif (m_order == l) then
-            result_P = (-1)**l*double_factorial(2*l - 1)*(1 - x**2)**(l/2); 
+            ! P_l^l(x) = (-1)^l (2l-1)!! (1-x^2)^(l/2). Use real exponent for odd l
+            one_minus_x2 = max(0._wp, 1._wp - x**2)
+            result_P = (-1)**l*real(double_factorial(2*l - 1), wp)*one_minus_x2**(0.5_wp*real(l, wp))
         elseif (m_order == l - 1) then
-            result_P = x*(2*l - 1)*associated_legendre(x, l - 1, l - 1); 
+            result_P = x*(2*l - 1)*associated_legendre(x, l - 1, l - 1)
         else
-            result_P = ((2*l - 1)*x*associated_legendre(x, l - 1, m_order) - (l + m_order - 1)*associated_legendre(x, l - 2, m_order))/(l - m_order); 
+            result_P = ((2*l - 1)*x*associated_legendre(x, l - 1, m_order) - (l + m_order - 1)*associated_legendre(x, l - 2, m_order))/(l - m_order)
         end if
 
     end function associated_legendre

@@ -287,6 +287,12 @@ PATTERNS = [
     (r"patch_icpp\((\d+)\)%alpha_rho", "Partial density for patch {0}"),
     (r"patch_icpp\((\d+)\)%radii", "Radii for patch {0}"),
     (r"patch_icpp\((\d+)\)%normal", "Normal direction for patch {0}"),
+    (r"patch_icpp\((\d+)\)%fourier_cos\((\d+)\)", "Fourier cos mode {1} for 2D modal patch {0}"),
+    (r"patch_icpp\((\d+)\)%fourier_sin\((\d+)\)", "Fourier sin mode {1} for 2D modal patch {0}"),
+    (r"patch_icpp\((\d+)\)%modal_clip_r_to_min", "Clip boundary radius R(θ) to modal_r_min for 2D modal patch {0}"),
+    (r"patch_icpp\((\d+)\)%modal_r_min", "Min r when clipping for 2D modal patch {0}"),
+    (r"patch_icpp\((\d+)\)%modal_use_exp_form", "Use exp form for 2D modal patch {0}"),
+    (r"patch_icpp\((\d+)\)%sph_har_coeff\((\d+),(-?\d+)\)", "Spherical harmonic coeff (l={1}, m={2}) for patch {0}"),
 
     # fluid_pp patterns
     (r"fluid_pp\((\d+)\)%gamma", "Specific heat ratio for fluid {0}"),

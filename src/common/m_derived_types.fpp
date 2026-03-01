@@ -216,9 +216,18 @@ module m_derived_types
         !! domain of influence.
 
         real(wp), dimension(2:9) :: a !<
-        !! The parameters needed for the spherical harmonic patch
+        !! Used by hardcoded IC and as temporary variables.
 
         logical :: non_axis_sym
+
+        ! Geometry 13 (2D modal Fourier): fourier_cos(n), fourier_sin(n) for mode n
+        real(wp), dimension(1:max_2d_fourier_modes) :: fourier_cos, fourier_sin
+        logical :: modal_clip_r_to_min !< When true, clip boundary radius: R(theta) = max(R(theta), modal_r_min) (Non-exp form only)
+        real(wp) :: modal_r_min        !< Minimum boundary radius when modal_clip_r_to_min is true (Non-exp form only)
+        logical :: modal_use_exp_form  !< When true, boundary = radius*exp(Fourier series)
+
+        ! Geometry 14 (3D spherical harmonic): sph_har_coeff(l,m) for real Y_lm
+        real(wp), dimension(0:max_sph_harm_degree, -max_sph_harm_degree:max_sph_harm_degree) :: sph_har_coeff
 
         real(wp), dimension(3) :: normal !<
         !! Normal vector indicating the orientation of the patch. It is specified
