@@ -892,7 +892,7 @@ VIZ_COMMAND = Command(
         Argument(
             name="var",
             help=(
-                "Variable to visualize (e.g. pres, rho, vel1, schlieren). "
+                "Variable to visualize (e.g. pres, rho, vel1). "
                 "Omit (or pass 'all') for a tiled layout of all variables "
                 "(1D and 2D data) or the first variable (3D data). "
                 "Use --list-vars to see available names."
@@ -1085,7 +1085,7 @@ VIZ_COMMAND = Command(
         Example("./mfc.sh viz case_dir/ --list-vars --step 0", "Discover available variables at step 0"),
         Example("./mfc.sh viz case_dir/ --var pres --interactive", "Browser UI — scrub timesteps and switch vars"),
         Example("./mfc.sh viz case_dir/ --var pres --step 1000 --png", "Save pressure PNG at step 1000"),
-        Example("./mfc.sh viz case_dir/ --var schlieren --step 0:10000:500 --mp4", "Encode schlieren MP4 from range"),
+        Example("./mfc.sh viz case_dir/ --var pres --step 0:10000:500 --mp4", "Encode pressure MP4 from range"),
         Example("./mfc.sh viz case_dir/ --step 0,100,200,...,1000 --png", "Render all steps 0–1000 as images"),
         Example("./mfc.sh viz case_dir/ --var pres --step 500 --slice-axis x --png", "3D: x-plane slice of pressure"),
     ],

@@ -60,7 +60,7 @@ Customize the appearance of plots:
 ./mfc.sh viz case_dir/ --var pres --step 500 --png --dpi 300
 
 # Logarithmic color scale
-./mfc.sh viz case_dir/ --var schlieren --step 1000 --png --log-scale
+./mfc.sh viz case_dir/ --var pres --step 1000 --png --log-scale
 ```
 
 | Option | Description | Default |
@@ -102,7 +102,7 @@ Generate MP4 videos from a range of timesteps:
 ./mfc.sh viz case_dir/ --var pres --step 0:10000:100 --mp4
 
 # Custom frame rate
-./mfc.sh viz case_dir/ --var schlieren --step all --mp4 --fps 24
+./mfc.sh viz case_dir/ --var rho --step all --mp4 --fps 24
 
 # Video with fixed color range
 ./mfc.sh viz case_dir/ --var rho --step 0:5000:50 --mp4 --vmin 0.1 --vmax 1.0
