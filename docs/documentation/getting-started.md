@@ -204,6 +204,24 @@ MFC is **unit-agnostic**: the solver performs no internal unit conversions. What
 
 The only requirement is **consistency** — all inputs must use the same unit system. Note that some parameters use **transformed stored forms** rather than standard physical values (e.g., `gamma` expects \f$1/(\gamma-1)\f$, not \f$\gamma\f$ itself). See @ref sec-stored-forms for details.
 
+## Visualizing Results
+
+After running post_process, visualize the output directly from the command line:
+
+```shell
+# List available variables
+./mfc.sh viz examples/2D_shockbubble/ --list-vars --step 0
+
+# Render a pressure snapshot
+./mfc.sh viz examples/2D_shockbubble/ --var pres --step 1000
+
+# Generate a video
+./mfc.sh viz examples/2D_shockbubble/ --var pres --step all --mp4
+```
+
+Output images and videos are saved to the `viz/` subdirectory of the case.
+For more options, see @ref visualization "Flow Visualization" or run `./mfc.sh viz -h`.
+
 ## Helpful Tools
 
 ### Parameter Lookup

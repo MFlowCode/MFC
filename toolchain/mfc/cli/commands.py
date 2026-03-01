@@ -867,6 +867,265 @@ COUNT_DIFF_COMMAND = Command(
     include_common=["targets", "mfc_config", "jobs", "verbose", "debug_log"],
 )
 
+VIZ_COMMAND = Command(
+    name="viz",
+    help="Visualize post-processed MFC output.",
+    description=(
+        "Render post-processed MFC output as PNG images or MP4 video, or explore "
+        "interactively. Supports 1D line plots, 2D colormaps, 3D midplane slices, "
+        "and tiled all-variable views.\n\n"
+        "Output modes:\n"
+        "  (default)      Launch a terminal UI (works over SSH, no browser needed)\n"
+        "  --interactive  Launch a Dash web UI in your browser\n"
+        "  --png          Save PNG image(s) to case_dir/viz/\n"
+        "  --mp4          Encode frames into an MP4 video\n\n"
+        "Variable selection:\n"
+        "  --var NAME     Plot a single variable\n"
+        "  (omit --var)   1D/2D: tiled layout of all variables; 3D: first variable\n\n"
+        "Quick-start workflow:\n"
+        "  1. ./mfc.sh viz case_dir/ --list-steps\n"
+        "  2. ./mfc.sh viz case_dir/ --list-vars --step 0\n"
+        "  3. ./mfc.sh viz case_dir/"
+    ),
+    positionals=[
+        Positional(
+            name="input",
+            help="Path to the case directory containing binary/ or silo_hdf5/ output.",
+            completion=Completion(type=CompletionType.DIRECTORIES),
+        ),
+    ],
+    arguments=[
+        Argument(
+            name="var",
+            help=(
+                "Variable to visualize (e.g. pres, rho, vel1). "
+                "Omit (or pass 'all') for a tiled layout of all variables "
+                "(1D and 2D data) or the first variable (3D data). "
+                "Use --list-vars to see available names."
+            ),
+            type=str,
+            default=None,
+            metavar="VAR",
+        ),
+        Argument(
+            name="step",
+            help=(
+                "Timestep(s) to render. Formats: a single integer (e.g. 1000), "
+                "a range start:end:stride (e.g. 0:5000:500), "
+                "a comma list (e.g. 0,100,200), "
+                "an ellipsis list (e.g. 0,100,...,1000), "
+                "'last' (default — renders the final step only), or 'all'. "
+                "Use --list-steps to see available timesteps."
+            ),
+            type=str,
+            default='last',
+            metavar="STEP",
+        ),
+        Argument(
+            name="format",
+            short="f",
+            help="Input data format: binary or silo (auto-detected from directory structure if omitted).",
+            type=str,
+            default=None,
+            choices=["binary", "silo"],
+            completion=Completion(type=CompletionType.CHOICES, choices=["binary", "silo"]),
+        ),
+        Argument(
+            name="output",
+            short="o",
+            help="Output directory for --png and --mp4.",
+            type=str,
+            default=None,
+            metavar="DIR",
+            completion=Completion(type=CompletionType.DIRECTORIES),
+        ),
+        Argument(
+            name="cmap",
+            help="Matplotlib colormap name (--png, --mp4 only).",
+            type=str,
+            default='viridis',
+            metavar="CMAP",
+            completion=Completion(type=CompletionType.CHOICES, choices=[
+                # Perceptually uniform sequential
+                "viridis", "plasma", "inferno", "magma", "cividis",
+                # Diverging
+                "RdBu", "RdYlBu", "RdYlGn", "RdGy", "coolwarm", "bwr", "seismic",
+                "PiYG", "PRGn", "BrBG", "PuOr", "Spectral",
+                # Sequential
+                "Blues", "Greens", "Oranges", "Reds", "Purples", "Greys",
+                "YlOrRd", "YlOrBr", "YlGn", "YlGnBu", "GnBu", "BuGn",
+                "BuPu", "PuBu", "PuBuGn", "PuRd", "RdPu",
+                # Sequential 2
+                "hot", "afmhot", "gist_heat", "copper",
+                "bone", "gray", "pink", "spring", "summer", "autumn", "winter", "cool",
+                "binary", "gist_yarg", "gist_gray",
+                # Cyclic
+                "twilight", "twilight_shifted", "hsv",
+                # Qualitative
+                "tab10", "tab20", "tab20b", "tab20c",
+                "Set1", "Set2", "Set3", "Paired", "Accent", "Dark2", "Pastel1", "Pastel2",
+                # Miscellaneous
+                "turbo", "jet", "rainbow", "nipy_spectral", "gist_ncar",
+                "gist_rainbow", "gist_stern", "gist_earth", "ocean", "terrain",
+                "gnuplot", "gnuplot2", "CMRmap", "cubehelix", "brg", "flag", "prism",
+                "Wistia",
+            ]),
+        ),
+        Argument(
+            name="vmin",
+            help="Minimum value for color scale (--png, --mp4 only).",
+            type=float,
+            default=None,
+            metavar="VMIN",
+        ),
+        Argument(
+            name="vmax",
+            help="Maximum value for color scale (--png, --mp4 only).",
+            type=float,
+            default=None,
+            metavar="VMAX",
+        ),
+        Argument(
+            name="dpi",
+            help="Image resolution in DPI (--png, --mp4).",
+            type=int,
+            default=150,
+            metavar="DPI",
+        ),
+        Argument(
+            name="slice-axis",
+            help="Axis for 3D slice (--png, --mp4 only).",
+            type=str,
+            default='z',
+            choices=["x", "y", "z"],
+            dest="slice_axis",
+            completion=Completion(type=CompletionType.CHOICES, choices=["x", "y", "z"]),
+        ),
+        Argument(
+            name="slice-value",
+            help="Coordinate value at which to take the 3D slice (--png, --mp4 only).",
+            type=float,
+            default=None,
+            dest="slice_value",
+            metavar="VAL",
+        ),
+        Argument(
+            name="slice-index",
+            help="Array index at which to take the 3D slice (--png, --mp4 only).",
+            type=int,
+            default=None,
+            dest="slice_index",
+            metavar="IDX",
+        ),
+        Argument(
+            name="mp4",
+            help="Encode all rendered frames into an MP4 video (requires --step with multiple timesteps).",
+            action=ArgAction.STORE_TRUE,
+            default=False,
+        ),
+        Argument(
+            name="fps",
+            help="Frames per second for --mp4 output.",
+            type=int,
+            default=10,
+            metavar="FPS",
+        ),
+        Argument(
+            name="list-vars",
+            help="Print the variable names available at the given timestep and exit.",
+            action=ArgAction.STORE_TRUE,
+            default=False,
+            dest="list_vars",
+        ),
+        Argument(
+            name="list-steps",
+            help="Print all available timesteps and exit.",
+            action=ArgAction.STORE_TRUE,
+            default=False,
+            dest="list_steps",
+        ),
+        Argument(
+            name="log-scale",
+            help="Logarithmic color/y scale (--png, --mp4 only).",
+            action=ArgAction.STORE_TRUE,
+            default=False,
+            dest="log_scale",
+        ),
+        Argument(
+            name="interactive",
+            short="i",
+            help=(
+                "Launch an interactive Dash web UI in your browser. "
+                "Loads all timesteps (or the set given by --step) and lets you "
+                "scrub through them and switch variables live."
+            ),
+            action=ArgAction.STORE_TRUE,
+            default=False,
+        ),
+        Argument(
+            name="port",
+            help="Port for --interactive web server.",
+            type=int,
+            default=8050,
+            metavar="PORT",
+        ),
+        Argument(
+            name="host",
+            help="Bind address for --interactive web server.",
+            default="127.0.0.1",
+            metavar="HOST",
+        ),
+        Argument(
+            name="png",
+            help=(
+                "Save PNG image(s) to the output directory instead of "
+                "launching the terminal UI."
+            ),
+            action=ArgAction.STORE_TRUE,
+            default=False,
+        ),
+    ],
+    examples=[
+        Example("./mfc.sh viz case_dir/", "Launch terminal UI (default mode)"),
+        Example("./mfc.sh viz case_dir/ --list-steps", "Discover available timesteps"),
+        Example("./mfc.sh viz case_dir/ --list-vars --step 0", "Discover available variables at step 0"),
+        Example("./mfc.sh viz case_dir/ --var pres --interactive", "Browser UI — scrub timesteps and switch vars"),
+        Example("./mfc.sh viz case_dir/ --var pres --step 1000 --png", "Save pressure PNG at step 1000"),
+        Example("./mfc.sh viz case_dir/ --var pres --step 0:10000:500 --mp4", "Encode pressure MP4 from range"),
+        Example("./mfc.sh viz case_dir/ --step 0,100,200,...,1000 --png", "Render all steps 0–1000 as images"),
+        Example("./mfc.sh viz case_dir/ --var pres --step 500 --slice-axis x --png", "3D: x-plane slice of pressure"),
+    ],
+    key_options=[
+        ("-- Discovery (all modes) --", ""),
+        ("--list-steps", "Print available timesteps and exit"),
+        ("--list-vars", "Print available variable names and exit"),
+        ("-- Data selection (all modes) --", ""),
+        ("--var NAME", "Variable to plot (omit for tiled all-vars layout)"),
+        ("--step STEP", "last (default), int, start:stop:stride, list, or 'all'"),
+        ("-f, --format", "Force binary or silo (auto-detected if omitted)"),
+        ("-- Output mode --", ""),
+        ("(default)", "Terminal UI (1D/2D, works over SSH, no browser needed)"),
+        ("--interactive / -i", "Dash web UI (1D/2D/3D, needs browser or SSH tunnel)"),
+        ("--png", "Save PNG image(s) to case_dir/viz/"),
+        ("--mp4", "Encode frames into an MP4 video"),
+        ("-- Rendering (--png, --mp4 only) --", ""),
+        ("--cmap NAME", "Matplotlib colormap (default: viridis)"),
+        ("--vmin / --vmax", "Fix color-scale limits"),
+        ("--log-scale", "Logarithmic color/y axis"),
+        ("--dpi N", "Image resolution (default: 150)"),
+        ("-o, --output DIR", "Output directory (default: case_dir/viz/)"),
+        ("-- 3D slicing (--png, --mp4 only) --", ""),
+        ("--slice-axis x|y|z", "Plane to slice (default: z midplane)"),
+        ("--slice-value VAL", "Slice at coordinate value"),
+        ("--slice-index IDX", "Slice at array index"),
+        ("-- --mp4 only --", ""),
+        ("--fps N", "Frames per second (default: 10)"),
+        ("-- --interactive only --", ""),
+        ("--port PORT", "Web server port (default: 8050)"),
+        ("--host HOST", "Bind address (default: 127.0.0.1)"),
+    ],
+)
+
 PARAMS_COMMAND = Command(
     name="params",
     help="Search and explore MFC case parameters.",
@@ -1008,6 +1267,7 @@ started, run `./mfc.sh build -h`.""",
         CLEAN_COMMAND,
         VALIDATE_COMMAND,
         NEW_COMMAND,
+        VIZ_COMMAND,
         PARAMS_COMMAND,
         PACKER_COMMAND,
         COMPLETION_COMMAND,

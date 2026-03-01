@@ -9,7 +9,6 @@ dependencies = [
     # General
     "rich",
     "wheel",
-    "typos",
     "PyYAML",
     "argparse",
     "dataclasses",
@@ -33,10 +32,6 @@ dependencies = [
     "numpy",
     "pandas",
 
-    # Plotting
-    "seaborn",
-    "matplotlib",
-
     # Chemistry
     "cantera>=3.1.0",
     #"pyrometheus == 1.0.5",
@@ -44,15 +39,20 @@ dependencies = [
 
     # Frontier Profiling
     "astunparse==1.6.2",
-    "colorlover",
-    "dash>=1.12.0",
     "pymongo",
     "tabulate",
+
+    # Visualization (./mfc.sh viz)
+    "matplotlib",
+    "h5py",
+    "imageio>=2.33",
+    "imageio-ffmpeg>=0.5.0",
+    "plotext>=5.2.0",
+    "textual>=0.47.0",
+    "textual-plotext>=0.2.0",
+    "dash>=2.0",
+    "plotly",
     "tqdm",
-    "dash-svg",
-    "dash-bootstrap-components",
-    "kaleido",
-    "plotille"
 ]
 
 [tool.hatch.metadata]
