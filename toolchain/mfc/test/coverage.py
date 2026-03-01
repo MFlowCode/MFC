@@ -213,54 +213,56 @@ def _collect_single_test_coverage(  # pylint: disable=too-many-locals
     """
     Collect file-level coverage for a single test, fully self-contained.
 
-    Creates a temp directory with copies of .gcda files and their matching
-    .gcno files, then runs a single batched gcov call.  This avoids touching
-    the shared build tree, making it safe to call concurrently.
+    Copies .gcno files from the real build tree into the test's isolated
+    .gcda directory (alongside the .gcda files), runs a batched gcov call,
+    then removes the .gcno copies.  Each test has its own directory, so
+    this is safe to call concurrently without touching the shared build tree.
     """
     build_subdir = os.path.join(test_gcda, "build")
     if not os.path.isdir(build_subdir):
         return uuid, []
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        matching_gcno = []
+    gcno_copies = []
 
-        for dirpath, _, filenames in os.walk(build_subdir):
-            for fname in filenames:
-                if not fname.endswith(".gcda"):
-                    continue
-                gcda_src = os.path.join(dirpath, fname)
-                rel = os.path.relpath(gcda_src, test_gcda)
+    for dirpath, _, filenames in os.walk(build_subdir):
+        for fname in filenames:
+            if not fname.endswith(".gcda"):
+                continue
+            # Derive matching .gcno path in the real build tree
+            gcda_path = os.path.join(dirpath, fname)
+            rel = os.path.relpath(gcda_path, test_gcda)
+            gcno_rel = rel[:-5] + ".gcno"
+            gcno_src = os.path.join(root_dir, gcno_rel)
+            if os.path.isfile(gcno_src):
+                # Copy .gcno alongside .gcda in the test's isolated dir
+                gcno_dst = os.path.join(dirpath, fname[:-5] + ".gcno")
+                shutil.copy2(gcno_src, gcno_dst)
+                gcno_copies.append(gcno_dst)
 
-                # Copy .gcda into temp dir
-                gcda_dst = os.path.join(tmpdir, rel)
-                os.makedirs(os.path.dirname(gcda_dst), exist_ok=True)
-                shutil.copy2(gcda_src, gcda_dst)
+    if not gcno_copies:
+        return uuid, []
 
-                # Copy matching .gcno from real build tree
-                gcno_rel = rel[:-5] + ".gcno"
-                gcno_src = os.path.join(root_dir, gcno_rel)
-                if os.path.isfile(gcno_src):
-                    gcno_dst = os.path.join(tmpdir, gcno_rel)
-                    shutil.copy2(gcno_src, gcno_dst)
-                    matching_gcno.append(gcno_dst)
+    # Batch: single gcov call for all .gcno files in this test.
+    # Run from root_dir so source path resolution works correctly.
+    cmd = [gcov_bin, "--json-format", "--stdout"] + gcno_copies
+    try:
+        proc = subprocess.run(
+            cmd, capture_output=True, cwd=root_dir, timeout=120, check=False
+        )
+    except (subprocess.TimeoutExpired, subprocess.SubprocessError, OSError):
+        return uuid, []
+    finally:
+        for g in gcno_copies:
+            try:
+                os.remove(g)
+            except OSError:
+                pass
 
-        if not matching_gcno:
-            return uuid, []
+    if proc.returncode != 0 or not proc.stdout:
+        return uuid, []
 
-        # Batch: single gcov call for all .gcno files in this test.
-        cmd = [gcov_bin, "--json-format", "--stdout"] + matching_gcno
-        try:
-            proc = subprocess.run(
-                cmd, capture_output=True, cwd=tmpdir, timeout=120, check=False
-            )
-        except (subprocess.TimeoutExpired, subprocess.SubprocessError, OSError):
-            return uuid, []
-
-        if proc.returncode != 0 or not proc.stdout:
-            return uuid, []
-
-        coverage = _parse_gcov_json_output(proc.stdout, root_dir)
-        return uuid, sorted(coverage)
+    coverage = _parse_gcov_json_output(proc.stdout, root_dir)
+    return uuid, sorted(coverage)
 
 
 def _run_single_test_direct(test_info: dict, gcda_dir: str, strip: str) -> tuple:  # pylint: disable=too-many-locals
@@ -390,8 +392,11 @@ def build_coverage_cache(  # pylint: disable=unused-argument,too-many-locals,too
 
     if n_jobs is None:
         n_jobs = max(os.cpu_count() or 1, 1)
+    # Cap Phase 1 parallelism: each test spawns MPI processes (~500MB each),
+    # so too many concurrent tests cause OOM on large nodes.
+    phase1_jobs = min(n_jobs, 32)
     cons.print(f"[bold]Building coverage cache for {len(cases)} tests "
-               f"({n_jobs} parallel)...[/bold]")
+               f"({phase1_jobs} test workers, {n_jobs} gcov workers)...[/bold]")
     cons.print(f"[dim]Using gcov binary: {gcov_bin}[/dim]")
     cons.print(f"[dim]Found {len(gcno_files)} .gcno files[/dim]")
     cons.print(f"[dim]GCOV_PREFIX_STRIP={strip}[/dim]")
@@ -412,7 +417,7 @@ def build_coverage_cache(  # pylint: disable=unused-argument,too-many-locals,too
         cons.print("[bold]Phase 1/2: Running tests...[/bold]")
         test_results: dict = {}
         all_failures: dict = {}
-        with ThreadPoolExecutor(max_workers=n_jobs) as pool:
+        with ThreadPoolExecutor(max_workers=phase1_jobs) as pool:
             futures = {
                 pool.submit(_run_single_test_direct, info, gcda_dir, strip): info
                 for info in test_infos
@@ -432,9 +437,24 @@ def build_coverage_cache(  # pylint: disable=unused-argument,too-many-locals,too
                 fail_str = ", ".join(f"{t}={rc}" for t, rc in fails)
                 cons.print(f"  [yellow]{uuid}[/yellow]: {fail_str}")
 
+        # Diagnostic: verify .gcda files exist for at least one test.
+        sample_uuid = next(iter(test_results), None)
+        if sample_uuid:
+            sample_gcda = test_results[sample_uuid]
+            sample_build = os.path.join(sample_gcda, "build")
+            if os.path.isdir(sample_build):
+                gcda_count = sum(
+                    1 for _, _, fns in os.walk(sample_build)
+                    for f in fns if f.endswith(".gcda")
+                )
+                cons.print(f"[dim]Sample test {sample_uuid}: "
+                           f"{gcda_count} .gcda files in {sample_build}[/dim]")
+            else:
+                cons.print(f"[yellow]Sample test {sample_uuid}: "
+                           f"no build/ dir in {sample_gcda}[/yellow]")
+
         # Phase 2: Collect gcov coverage from each test's isolated .gcda directory.
-        # Each test is processed in its own temp dir (copied .gcda + .gcno files)
-        # with a single batched gcov call, so tests can run in parallel.
+        # .gcno files are temporarily copied alongside .gcda files, then removed.
         cons.print()
         cons.print("[bold]Phase 2/2: Collecting coverage...[/bold]")
         cache: dict = {}
