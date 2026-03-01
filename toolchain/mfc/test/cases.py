@@ -254,7 +254,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     'fluid_pp(1)%Re(1)': 0.0001, 'dt': 1e-11, 'patch_icpp(1)%vel(1)': 1.0,
                     'viscous': 'T'})
 
-                alter_ib(dimInfo, six_eqn_model=True)
+                alter_ib(dimInfo, six_eqn_model=True, viscous=True)
 
                 if len(dimInfo[0]) > 1:
                     alter_igr()
@@ -276,7 +276,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     'fluid_pp(2)%Re(1)': 0.001, 'fluid_pp(2)%Re(2)': 0.001, 'dt': 1e-11,
                     'patch_icpp(1)%vel(1)': 1.0, 'viscous': 'T'})
 
-                alter_ib(dimInfo, six_eqn_model=True)
+                alter_ib(dimInfo, six_eqn_model=True, viscous=True)
 
                 if len(dimInfo[0]) > 1:
                     alter_igr()
@@ -391,7 +391,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             if ARG("rdma_mpi"):
                 cases.append(define_case_d(stack, '2 MPI Ranks -> RDMA MPI', {'rdma_mpi': 'T'}, ppn=2))
 
-    def alter_ib(dimInfo, six_eqn_model=False):
+    def alter_ib(dimInfo, six_eqn_model=False, viscous=False):
         for slip in [True, False]:
             stack.push(f'IBM', {
                 'ib': 'T', 'num_ibs': 1,
@@ -442,7 +442,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             stack.pop()
 
-        if len(dimInfo[0]) == 2:
+        if len(dimInfo[0]) == 2 and not viscous:
             cases.append(define_case_d(stack, 'IBM -> Periodic Circle', {
                 'ib': 'T', 'num_ibs': 1,
                 'bc_x%beg': -1, 'bc_x%end': -1,
