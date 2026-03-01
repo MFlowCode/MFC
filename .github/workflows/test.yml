@@ -371,6 +371,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
     steps:
       - name: Clone
         uses: actions/checkout@v4
@@ -384,15 +385,26 @@ jobs:
           path: toolchain/mfc/test
 
       - name: Commit Updated Cache
+        id: commit
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add toolchain/mfc/test/test_coverage_cache.json.gz
           if git diff --cached --quiet; then
             echo "Coverage cache unchanged."
+            echo "pushed=false" >> "$GITHUB_OUTPUT"
           else
             git commit -m "Regenerate gcov coverage cache
 
           Automatically rebuilt because cases.py changed."
             git push
+            echo "pushed=true" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Post PR Comment
+        if: steps.commit.outputs.pushed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr comment ${{ github.event.pull_request.number }} \
+            --body "Coverage cache auto-updated: a bot commit was pushed to this branch because \`cases.py\` changed."
