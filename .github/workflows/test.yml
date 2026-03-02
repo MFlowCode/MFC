@@ -299,3 +299,81 @@ jobs:
         with:
           name: logs-${{ strategy.job-index }}-${{ steps.log.outputs.slug }}
           path: ${{ steps.log.outputs.slug }}.out
+
+  case-optimization:
+    name: "Case Opt | ${{ matrix.cluster_name }} (${{ matrix.device }}-${{ matrix.interface }})"
+    if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true' && github.event.pull_request.draft != true
+    needs: [lint-gate, file-changes]
+    continue-on-error: false
+    timeout-minutes: 480
+    strategy:
+      matrix:
+        include:
+          - runner:       'gt'
+            cluster:      'phoenix'
+            cluster_name: 'Georgia Tech | Phoenix'
+            flag: 'p'
+            device: 'gpu'
+            interface: 'acc'
+          - runner:       'gt'
+            cluster:      'phoenix'
+            cluster_name: 'Georgia Tech | Phoenix'
+            flag: 'p'
+            device: 'gpu'
+            interface: 'omp'
+          - runner:       'frontier'
+            cluster:      'frontier'
+            cluster_name: 'Oak Ridge | Frontier'
+            flag: 'f'
+            device: 'gpu'
+            interface: 'acc'
+          - runner:       'frontier'
+            cluster:      'frontier'
+            cluster_name: 'Oak Ridge | Frontier'
+            flag: 'f'
+            device: 'gpu'
+            interface: 'omp'
+          - runner:       'frontier'
+            cluster:      'frontier_amd'
+            cluster_name: 'Oak Ridge | Frontier (AMD)'
+            flag: 'famd'
+            device: 'gpu'
+            interface: 'omp'
+    runs-on:
+      group:  phoenix
+      labels: ${{ matrix.runner }}
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
+        with:
+          clean: false
+
+      - name: Pre-Build (Frontier)
+        if:   matrix.cluster != 'phoenix'
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
+        with:
+          max_attempts: 3
+          retry_wait_seconds: 60
+          timeout_minutes: 120
+          command: |
+            . ./mfc.sh load -c ${{ matrix.flag }} -m g
+            gpu_backend=${{ matrix.interface == 'omp' && 'mp' || 'acc' }}
+            for case in benchmarks/*/case.py; do
+              echo "=== Pre-building: $case ==="
+              ./mfc.sh build -i "$case" --case-optimization --gpu $gpu_backend -j 8
+            done
+          on_retry_command: ./mfc.sh clean
+
+      - name: Run Case-Optimization Tests
+        run:  bash .github/workflows/${{ matrix.cluster }}/submit.sh .github/scripts/run_case_optimization.sh ${{ matrix.device }} ${{ matrix.interface }}
+
+      - name: Print Logs
+        if:   always()
+        run:  cat run-case-optimization-${{ matrix.device }}-${{ matrix.interface }}.out
+
+      - name: Archive Logs
+        uses: actions/upload-artifact@v4
+        if:   always()
+        with:
+          name: case-opt-${{ strategy.job-index }}-${{ matrix.cluster }}-${{ matrix.interface }}
+          path: run-case-optimization-${{ matrix.device }}-${{ matrix.interface }}.out

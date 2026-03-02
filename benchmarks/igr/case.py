@@ -13,6 +13,7 @@ parser = argparse.ArgumentParser(prog="Benchmarking Case 5", description="This M
 
 parser.add_argument("--mfc", type=json.loads, default="{}", metavar="DICT", help="MFC's toolchain's internal state.")
 parser.add_argument("--gbpp", type=int, metavar="MEM", default=16, help="Adjusts the problem size per rank to fit into [MEM] GB of GPU memory per GPU.")
+parser.add_argument("--steps", type=int, default=None, help="Override t_step_stop/t_step_save.")
 
 ARGS = vars(parser.parse_args())
 DICT = ARGS["mfc"]
@@ -62,8 +63,8 @@ print(
             "cyl_coord": "F",
             "dt": dt,
             "t_step_start": 0,
-            "t_step_stop": int(7 * (5 * size + 5)),
-            "t_step_save": int(7 * (5 * size + 5)),
+            "t_step_stop": ARGS["steps"] if ARGS["steps"] is not None else int(7 * (5 * size + 5)),
+            "t_step_save": ARGS["steps"] if ARGS["steps"] is not None else int(7 * (5 * size + 5)),
             # Simulation Algorithm Parameters
             "num_patches": 1,
             "model_eqns": 2,
