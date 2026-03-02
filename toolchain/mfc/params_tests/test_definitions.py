@@ -161,10 +161,10 @@ class TestParameterCounts(unittest.TestCase):
     """Tests for expected parameter counts."""
 
     def test_total_param_count(self):
-        """Total parameter count should be around 3400."""
+        """Total parameter count should be around 40000."""
         count = len(REGISTRY.all_params)
-        self.assertGreater(count, 3000, "Too few parameters")
-        self.assertLess(count, 4000, "Too many parameters")
+        self.assertGreater(count, 39000, f"Too few parameters. Got {count}.")
+        self.assertLess(count, 41000, f"Too many parameters. Got {count}.")
 
     def test_log_params_count(self):
         """Should have many LOG type parameters."""
