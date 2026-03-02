@@ -423,6 +423,8 @@ def check_physics_docs_coverage(repo_root: Path) -> list[str]:
         "check_output_format",       # output format selection
         "check_restart",             # restart file logistics
         "check_parallel_io_pre_process",  # parallel I/O settings
+        "check_build_flags",              # build-flag compatibility (no physics meaning)
+        "check_geometry_precision_simulation",  # build-flag compatibility (no physics meaning)
         "check_misc_pre_process",    # miscellaneous pre-process flags
         "check_bc_patches",          # boundary patch geometry
         "check_grid_stretching",     # grid stretching parameters

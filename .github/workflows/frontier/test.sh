@@ -13,8 +13,17 @@ if [ "$job_device" = "gpu" ]; then
     fi
 fi
 
+shard_opts=""
+if [ -n "$job_shard" ]; then
+    shard_opts="--shard $job_shard"
+fi
+
 if [ "$job_device" = "gpu" ]; then
-    ./mfc.sh test -v -a --rdma-mpi --max-attempts 3 -j $ngpus $device_opts -- -c frontier
+    rdma_opts=""
+    if [ "$job_cluster" = "frontier" ]; then
+        rdma_opts="--rdma-mpi"
+    fi
+    ./mfc.sh test -v -a $rdma_opts --max-attempts 3 -j $ngpus $device_opts $shard_opts -- -c $job_cluster
 else
-    ./mfc.sh test -v -a --max-attempts 3 -j 32 --no-gpu -- -c frontier
+    ./mfc.sh test -v -a --max-attempts 3 -j 32 --no-gpu $shard_opts -- -c $job_cluster
 fi

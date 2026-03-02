@@ -39,7 +39,7 @@ jobs:
           # This flag is for non-interactive CI runs (bypasses approval prompts).
           claude_args: >
             --dangerously-skip-permissions
-            --max-turns 10
+            --max-turns 90
             --allowedTools
             "Bash"
 
