@@ -358,6 +358,78 @@ contains
 
     end subroutine s_applygaussian
 
+    !> The purpose of this subroutine is to check if the current cell is outside the computational domain or not (including ghost cells).
+            !! @param cellaux Tested cell to smear the bubble effect in.
+            !! @param celloutside If true, then cellaux is outside the computational domain.
+    subroutine s_check_celloutside(cellaux, celloutside)
+        $:GPU_ROUTINE(function_name='s_check_celloutside',parallelism='[seq]', &
+            & cray_inline=True)
+
+        integer, dimension(3), intent(inout) :: cellaux
+        logical, intent(out) :: celloutside
+
+        celloutside = .false.
+
+        if (num_dims == 2) then
+            if ((cellaux(1) < -buff_size) .or. (cellaux(2) < -buff_size)) then
+                celloutside = .true.
+            end if
+            if (cyl_coord .and. y_cc(cellaux(2)) < 0._wp) then
+                celloutside = .true.
+            end if
+            if ((cellaux(2) > n + buff_size) .or. (cellaux(1) > m + buff_size)) then
+                celloutside = .true.
+            end if
+        else
+            if ((cellaux(3) < -buff_size) .or. (cellaux(1) < -buff_size) .or. (cellaux(2) < -buff_size)) then
+                celloutside = .true.
+            end if
+
+            if ((cellaux(3) > p + buff_size) .or. (cellaux(2) > n + buff_size) .or. (cellaux(1) > m + buff_size)) then
+                celloutside = .true.
+            end if
+        end if
+
+    end subroutine s_check_celloutside
+
+    !> This subroutine relocates the current cell, if it intersects a symmetric boundary.
+            !! @param cell Cell of the current bubble
+            !! @param cellaux Cell to map the bubble effect in.
+    subroutine s_shift_cell_symmetric_bc(cellaux, cell)
+        $:GPU_ROUTINE(function_name='s_shift_cell_symmetric_bc', &
+            & parallelism='[seq]', cray_inline=True)
+
+        integer, dimension(3), intent(inout) :: cellaux
+        integer, dimension(3), intent(in) :: cell
+
+        ! x-dir
+        if (bc_x%beg == BC_REFLECTIVE .and. (cell(1) <= mapCells - 1)) then
+            cellaux(1) = abs(cellaux(1)) - 1
+        end if
+        if (bc_x%end == BC_REFLECTIVE .and. (cell(1) >= m + 1 - mapCells)) then
+            cellaux(1) = cellaux(1) - (2*(cellaux(1) - m) - 1)
+        end if
+
+        !y-dir
+        if (bc_y%beg == BC_REFLECTIVE .and. (cell(2) <= mapCells - 1)) then
+            cellaux(2) = abs(cellaux(2)) - 1
+        end if
+        if (bc_y%end == BC_REFLECTIVE .and. (cell(2) >= n + 1 - mapCells)) then
+            cellaux(2) = cellaux(2) - (2*(cellaux(2) - n) - 1)
+        end if
+
+        if (p > 0) then
+            !z-dir
+            if (bc_z%beg == BC_REFLECTIVE .and. (cell(3) <= mapCells - 1)) then
+                cellaux(3) = abs(cellaux(3)) - 1
+            end if
+            if (bc_z%end == BC_REFLECTIVE .and. (cell(3) >= p + 1 - mapCells)) then
+                cellaux(3) = cellaux(3) - (2*(cellaux(3) - p) - 1)
+            end if
+        end if
+
+    end subroutine s_shift_cell_symmetric_bc
+
     !> Calculates the standard deviation of the bubble being smeared in the Eulerian framework.
             !! @param cell Cell where the bubble is located
             !! @param volpart Volume of the bubble

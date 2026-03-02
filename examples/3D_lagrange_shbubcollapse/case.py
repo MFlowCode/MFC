@@ -58,7 +58,7 @@ Nz = 60  # number of elements into z direction
 
 dt = 4.0e-08  # time-step - sec
 stopTime = 60.0e-06  # stop time - sec
-saveTime = 5.0e-07  # save time - sec
+saveTime = 30.0e-06  # save time - sec
 
 # Configuring case dictionary
 print(
@@ -80,11 +80,10 @@ print(
             "n": Ny,
             "p": Nz,
             "dt": round(dt * c0 / x0, 6),
-            "t_step_start": 0,
-            "t_step_stop": int(stopTime / dt),
-            "t_step_save": int(saveTime / dt),
             "adap_dt": "T",
-            "adap_dt_max_iters": 1000,
+            "n_start": 0,
+            "t_save": saveTime * (c0 / x0),
+            "t_stop": stopTime * (c0 / x0),
             # Simulation Algorithm Parameters
             "model_eqns": 2,
             "num_fluids": 2,

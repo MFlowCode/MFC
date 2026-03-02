@@ -148,7 +148,7 @@ contains
             down_sample, recon_type, muscl_order, fft_wrt, &
             fd_order, lag_params, simplex_perturb, simplex_params, &
             interface_file, normFac, normMag, &
-            g0_ic, p0_ic, hyper_cleaning
+            g0_ic, p0_ic, hyper_cleaning, hyper_cleaning
 
         ! Inquiring the status of the pre_process.inp file
         file_loc = 'pre_process.inp'

@@ -310,6 +310,7 @@ contains
 
                                 q_cons_vf(rs(q))%sf(j, k, l) = nbub*myR
                                 q_cons_vf(vs(q))%sf(j, k, l) = nbub*myV
+
                             else
                                 rddot = f_rddot(myRho, myP, myR, myV, R0(q), &
                                                 pb_local, pbdot, alf, n_tait, B_tait, &

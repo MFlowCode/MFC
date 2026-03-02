@@ -190,19 +190,16 @@ contains
         real(wp) :: fltr_dtheta
 
         ! Inviscid CFL calculation
-        if (p > 0 .or. n > 0) then
-            ! 2D/3D
+        if (p > 0 .or. n > 0) then ! 2D/3D
             icfl = dt/f_compute_multidim_cfl_terms(vel, c, j, k, l)
-        else
-            ! 1D
+        else ! 1D
             icfl = (dt/dx(j))*(abs(vel(1)) + c)
         end if
 
         ! Viscous calculations
         if (viscous) then
-            if (p > 0) then
+            if (p > 0) then !3D
                 #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
-                    !3D
                     if (grid_geometry == 3) then
                         fltr_dtheta = f_compute_filtered_dtheta(k, l)
                         vcfl = maxval(dt/Re_l/rho) &
@@ -220,14 +217,12 @@ contains
                              /maxval(1._wp/Re_l)
                     end if
                 #:endif
-            elseif (n > 0) then
-                !2D
+            elseif (n > 0) then !2D
                 vcfl = maxval(dt/Re_l/rho)/min(dx(j), dy(k))**2._wp
                 Rc = min(dx(j)*(abs(vel(1)) + c), &
                          dy(k)*(abs(vel(2)) + c)) &
                      /maxval(1._wp/Re_l)
-            else
-                !1D
+             else !1D
                 vcfl = maxval(dt/Re_l/rho)/dx(j)**2._wp
                 Rc = dx(j)*(abs(vel(1)) + c)/maxval(1._wp/Re_l)
             end if

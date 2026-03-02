@@ -596,8 +596,7 @@ contains
 
         do i = 0, m
             do j = 0, n
-                if (p == 0) then
-                    ! 2D
+                if (p == 0) then ! 2D
                     if (ib_markers%sf(i, j, 0) /= 0) then
                         subsection_2D = ib_markers%sf( &
                                         i - gp_layers:i + gp_layers, &
@@ -639,8 +638,7 @@ contains
 
                         end if
                     end if
-                else
-                    ! 3D
+                else ! 3D
                     do k = 0, p
                         if (ib_markers%sf(i, j, k) /= 0) then
                             subsection_3D = ib_markers%sf( &
@@ -1337,7 +1335,6 @@ contains
     !> @brief Computes the cross product c = a x b of two 3D vectors.
     subroutine s_cross_product(a, b, c)
         $:GPU_ROUTINE(parallelism='[seq]')
-
         real(wp), intent(in) :: a(3), b(3)
         real(wp), intent(out) :: c(3)
 

@@ -555,7 +555,6 @@ contains
             end if
 
             if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(q_prim_vf, bc_type, stage=s)
-
             $:GPU_PARALLEL_LOOP(collapse=4)
             do i = 1, sys_size
                 do l = 0, p
@@ -581,7 +580,6 @@ contains
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
-
             !Evolve pb and mv for non-polytropic qbmm
             if (qbmm .and. (.not. polytropic)) then
                 $:GPU_PARALLEL_LOOP(collapse=5)
@@ -739,6 +737,7 @@ contains
                     call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, 0._wp, c, qv)
 
                     call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, j, k, l)
+
                     dt_local = min(dt_local, max_dt)
                 end do
             end do

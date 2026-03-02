@@ -1,0 +1,14 @@
+{
+  "review_configuration": {
+    "include": [
+      "src/**/*.fpp",
+      "src/**/*.f90",
+      "toolchain/**/*.py"
+    ],
+    "exclude": [
+      "tests/**",
+      "examples/**",
+      "docs/**"
+    ]
+  }
+}

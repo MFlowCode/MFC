@@ -222,6 +222,7 @@ module m_global_parameters
     integer :: num_bc_patches
     logical :: bc_io
     logical, dimension(3) :: periodic_bc
+
     !> @name Boundary conditions (BC) in the x-, y- and z-directions, respectively
     !> @{
     type(int_bounds_info) :: bc_x, bc_y, bc_z
@@ -682,9 +683,9 @@ contains
             #:endfor
         #:endfor
 
-        glb_bounds(1)%beg = dflt_int; glb_bounds(1)%end = dflt_int
-        glb_bounds(2)%beg = dflt_int; glb_bounds(2)%end = dflt_int
-        glb_bounds(3)%beg = dflt_int; glb_bounds(3)%end = dflt_int
+        glb_bounds(1)%beg = dflt_real; glb_bounds(1)%end = dflt_real
+        glb_bounds(2)%beg = dflt_real; glb_bounds(2)%end = dflt_real
+        glb_bounds(3)%beg = dflt_real; glb_bounds(3)%end = dflt_real
 
         ! Fluids physical parameters
         do i = 1, num_fluids_max
@@ -712,8 +713,8 @@ contains
         bub_pp%gam_g = dflt_real; gam_g = dflt_real
         bub_pp%M_v = dflt_real; M_v = dflt_real
         bub_pp%M_g = dflt_real; M_g = dflt_real
-        bub_pp%k_v = dflt_real; 
-        bub_pp%k_g = dflt_real; 
+        bub_pp%k_v = dflt_real;
+        bub_pp%k_g = dflt_real;
         bub_pp%cp_v = dflt_real; cp_v = dflt_real
         bub_pp%cp_g = dflt_real; cp_g = dflt_real
         bub_pp%R_v = dflt_real; R_v = dflt_real
@@ -1376,7 +1377,7 @@ contains
         @:PREFER_GPU(x_cc)
         @:PREFER_GPU(dx)
 
-        if (n == 0) return; 
+        if (n == 0) return;
         @:ALLOCATE(y_cb(-1 - buff_size:n + buff_size))
         @:ALLOCATE(y_cc(-buff_size:n + buff_size))
         @:ALLOCATE(dy(-buff_size:n + buff_size))
@@ -1384,7 +1385,7 @@ contains
         @:PREFER_GPU(y_cc)
         @:PREFER_GPU(dy)
 
-        if (p == 0) return; 
+        if (p == 0) return;
         @:ALLOCATE(z_cb(-1 - buff_size:p + buff_size))
         @:ALLOCATE(z_cc(-buff_size:p + buff_size))
         @:ALLOCATE(dz(-buff_size:p + buff_size))
@@ -1412,6 +1413,7 @@ contains
         #:endif
 
         allocate (proc_coords(1:num_dims))
+
         @:ALLOCATE(pcomm_coords(1:num_dims))
 
         if (parallel_io .neqv. .true.) return
@@ -1449,7 +1451,9 @@ contains
         end if
 
         deallocate (proc_coords)
+
         @:DEALLOCATE(pcomm_coords)
+
         if (parallel_io) then
             deallocate (start_idx)
 
@@ -1472,10 +1476,10 @@ contains
         ! Deallocating grid variables for the x-, y- and z-directions
         @:DEALLOCATE(x_cb, x_cc, dx)
 
-        if (n == 0) return; 
+        if (n == 0) return;
         @:DEALLOCATE(y_cb, y_cc, dy)
 
-        if (p == 0) return; 
+        if (p == 0) return;
         @:DEALLOCATE(z_cb, z_cc, dz)
 
     end subroutine s_finalize_global_parameters_module

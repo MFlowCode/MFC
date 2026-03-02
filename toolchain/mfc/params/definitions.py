@@ -992,6 +992,7 @@ def _load():  # pylint: disable=too-many-locals,too-many-statements
         _r(f"p_{d}", REAL, math=r"\f$\phi_" + d + r"\f$")
         _r(f"bf_{d}", LOG)
 
+    # Interfacial flow inputs
     _r("normMag", REAL)
     _r("p0_ic", REAL)
     _r("g0_ic", REAL)

@@ -1124,7 +1124,6 @@ contains
 
         call s_initialize_derived_variables()
         if (bubbles_lagrange) call s_initialize_bubbles_EL_module(q_cons_ts(1)%vf, bc_type)
-
         if (hypoelasticity) call s_initialize_hypoelastic_module()
         if (hyperelasticity) call s_initialize_hyperelastic_module()
 
@@ -1203,7 +1202,7 @@ contains
         ! carried out if the simulation is in fact not truly executed in parallel.
 
         call s_mpi_bcast_user_inputs()
-        print *, proc_rank, lag_params%charwidth, lag_params%charNz
+
         call s_initialize_parallel_io()
 
         call s_mpi_decompose_computational_domain()
@@ -1255,10 +1254,6 @@ contains
         $:GPU_UPDATE(device='[bc_x%vb1,bc_x%vb2,bc_x%vb3,bc_x%ve1,bc_x%ve2,bc_x%ve3]')
         $:GPU_UPDATE(device='[bc_y%vb1,bc_y%vb2,bc_y%vb3,bc_y%ve1,bc_y%ve2,bc_y%ve3]')
         $:GPU_UPDATE(device='[bc_z%vb1,bc_z%vb2,bc_z%vb3,bc_z%ve1,bc_z%ve2,bc_z%ve3]')
-
-        $:GPU_UPDATE(device='[bc_x%beg, bc_x%end]')
-        $:GPU_UPDATE(device='[bc_y%beg, bc_y%end]')
-        $:GPU_UPDATE(device='[bc_z%beg, bc_z%end]')
 
         $:GPU_UPDATE(device='[bc_x%grcbc_in,bc_x%grcbc_out,bc_x%grcbc_vel_out]')
         $:GPU_UPDATE(device='[bc_y%grcbc_in,bc_y%grcbc_out,bc_y%grcbc_vel_out]')
