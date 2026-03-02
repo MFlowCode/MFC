@@ -304,7 +304,7 @@ def _run_single_test_direct(test_info: dict, gcda_dir: str, strip: str) -> tuple
         try:
             result = subprocess.run(cmd, check=False, text=True,
                                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                    env=env, cwd=test_dir, timeout=300)
+                                    env=env, cwd=test_dir, timeout=600)
             if result.returncode != 0:
                 failures.append((target_name, result.returncode))
         except subprocess.TimeoutExpired:
