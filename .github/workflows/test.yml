@@ -111,7 +111,7 @@ jobs:
       group:  phoenix
       labels: gt
     permissions:
-      contents: write
+      contents: write   # Required for Commit Cache to Master on push events
     steps:
       - name: Clone
         uses: actions/checkout@v4

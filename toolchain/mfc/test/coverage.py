@@ -71,7 +71,7 @@ def _get_gcov_version(gcov_binary: str) -> str:
     return "unknown"
 
 
-def find_gcov_binary(_root_dir: str = "") -> str:  # pylint: disable=unused-argument
+def find_gcov_binary() -> str:
     """
     Find a GNU gcov binary compatible with the system gfortran.
 
@@ -368,25 +368,25 @@ def _prepare_test(case, root_dir: str) -> dict:  # pylint: disable=unused-argume
     }
 
 
-def build_coverage_cache(  # pylint: disable=unused-argument,too-many-locals,too-many-statements
-    root_dir: str, cases: list, extra_args: list = None, n_jobs: int = None,
+def build_coverage_cache(  # pylint: disable=too-many-locals,too-many-statements
+    root_dir: str, cases: list, n_jobs: int = None,
 ) -> None:
     """
     Build the file-level coverage cache by running tests in parallel.
 
-    Phase 0 — Prepare all tests: generate .inp files and resolve binary paths.
+    Phase 1 — Prepare all tests: generate .inp files and resolve binary paths.
     This happens single-threaded so the parallel phase has zero Python overhead.
 
-    Phase 1 — Run all tests concurrently.  Each worker invokes Fortran binaries
+    Phase 2 — Run all tests concurrently.  Each worker invokes Fortran binaries
     directly (no ``./mfc.sh run``, no shell scripts).  Each test's GCOV_PREFIX
     points to an isolated directory so .gcda files don't collide.
 
-    Phase 2 — For each test, copy its .gcda tree into the real build directory,
+    Phase 3 — For each test, copy its .gcda tree into the real build directory,
     run gcov to collect which .fpp files had coverage, then remove the .gcda files.
 
     Requires a prior ``--gcov`` build: ``./mfc.sh build --gcov -j 8``
     """
-    gcov_bin = find_gcov_binary(root_dir)
+    gcov_bin = find_gcov_binary()
     gcno_files = find_gcno_files(root_dir)
     strip = _compute_gcov_prefix_strip(root_dir)
 
@@ -402,8 +402,8 @@ def build_coverage_cache(  # pylint: disable=unused-argument,too-many-locals,too
     cons.print(f"[dim]GCOV_PREFIX_STRIP={strip}[/dim]")
     cons.print()
 
-    # Phase 0: Prepare all tests (single-threaded, ~30s for 555 tests).
-    cons.print("[bold]Phase 0/2: Preparing tests...[/bold]")
+    # Phase 1: Prepare all tests (single-threaded, ~30s for 555 tests).
+    cons.print("[bold]Phase 1/3: Preparing tests...[/bold]")
     test_infos = []
     for i, case in enumerate(cases):
         test_infos.append(_prepare_test(case, root_dir))
@@ -413,8 +413,8 @@ def build_coverage_cache(  # pylint: disable=unused-argument,too-many-locals,too
 
     gcda_dir = tempfile.mkdtemp(prefix="mfc_gcov_")
     try:
-        # Phase 1: Run all tests in parallel via direct binary invocation.
-        cons.print("[bold]Phase 1/2: Running tests...[/bold]")
+        # Phase 2: Run all tests in parallel via direct binary invocation.
+        cons.print("[bold]Phase 2/3: Running tests...[/bold]")
         test_results: dict = {}
         all_failures: dict = {}
         with ThreadPoolExecutor(max_workers=phase1_jobs) as pool:
@@ -453,10 +453,10 @@ def build_coverage_cache(  # pylint: disable=unused-argument,too-many-locals,too
                 cons.print(f"[yellow]Sample test {sample_uuid}: "
                            f"no build/ dir in {sample_gcda}[/yellow]")
 
-        # Phase 2: Collect gcov coverage from each test's isolated .gcda directory.
+        # Phase 3: Collect gcov coverage from each test's isolated .gcda directory.
         # .gcno files are temporarily copied alongside .gcda files, then removed.
         cons.print()
-        cons.print("[bold]Phase 2/2: Collecting coverage...[/bold]")
+        cons.print("[bold]Phase 3/3: Collecting coverage...[/bold]")
         cache: dict = {}
         completed = 0
         with ThreadPoolExecutor(max_workers=n_jobs) as pool:
@@ -535,7 +535,11 @@ def load_coverage_cache(root_dir: str) -> Optional[dict]:
         return None
 
     cases_py = Path(root_dir) / "toolchain/mfc/test/cases.py"
-    current_hash = hashlib.sha256(cases_py.read_bytes()).hexdigest()
+    try:
+        current_hash = hashlib.sha256(cases_py.read_bytes()).hexdigest()
+    except FileNotFoundError:
+        cons.print("[yellow]Warning: cases.py not found; cannot verify cache staleness.[/yellow]")
+        return None
     stored_hash = cache.get("_meta", {}).get("cases_hash", "")
 
     if current_hash != stored_hash:

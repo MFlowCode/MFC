@@ -238,7 +238,7 @@ def test():
                 unique_builds.add(slug)
 
         build_coverage_cache(common.MFC_ROOT_DIR, all_cases,
-                             extra_args=ARG("--"), n_jobs=int(ARG("jobs")))
+                             n_jobs=int(ARG("jobs")))
         return
 
     cases, skipped_cases = __filter(cases)
