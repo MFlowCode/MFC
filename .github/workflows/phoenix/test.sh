@@ -1,14 +1,7 @@
 #!/bin/bash
 
-build_opts=""
-if [ "$job_device" = "gpu" ]; then
-    build_opts="--gpu"
-    if [ "$job_interface" = "omp" ]; then
-      build_opts+=" mp"
-    elif [ "$job_interface" = "acc" ]; then
-      build_opts+=" acc"
-    fi
-fi
+source .github/scripts/gpu-opts.sh
+build_opts="$gpu_opts"
 
 # Set up persistent build cache
 source .github/scripts/setup-build-cache.sh phoenix "$job_device" "$job_interface"
@@ -54,10 +47,9 @@ done
 n_test_threads=8
 
 if [ "$job_device" = "gpu" ]; then
-    gpu_count=$(nvidia-smi -L | wc -l)        # number of GPUs on node
-    gpu_ids=$(seq -s ' ' 0 $(($gpu_count-1))) # 0,1,2,...,gpu_count-1
+    source .github/scripts/detect-gpus.sh
     device_opts="-g $gpu_ids"
-    n_test_threads=`expr $gpu_count \* 2`
+    n_test_threads=$((ngpus * 2))
 fi
 
 ./mfc.sh test -v --max-attempts 3 -a -j $n_test_threads $device_opts -- -c phoenix
