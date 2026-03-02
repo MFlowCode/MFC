@@ -5,8 +5,8 @@
 
 set -e
 
-source .github/scripts/gpu-opts.sh
 source .github/scripts/detect-gpus.sh
+source .github/scripts/gpu-opts.sh
 
 # Default to 1 GPU if detection found none but we're in GPU mode
 if [ "$job_device" = "gpu" ] && [ "$ngpus" -eq 0 ]; then

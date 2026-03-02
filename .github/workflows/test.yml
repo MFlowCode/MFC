@@ -156,27 +156,7 @@ jobs:
           PRECISION: ${{ matrix.precision != '' && format('--{0}', matrix.precision) || '' }}
 
       - name: Test
-        run: |
-          rm -f tests/failed_uuids.txt
-          TEST_EXIT=0
-          /bin/bash mfc.sh test -v --max-attempts 3 -j "$(nproc)" $TEST_ALL $TEST_PCT || TEST_EXIT=$?
-
-          # Retry only if a small number of tests failed (sporadic failures)
-          if [ -s tests/failed_uuids.txt ]; then
-            NUM_FAILED=$(wc -l < tests/failed_uuids.txt)
-            if [ "$NUM_FAILED" -le 5 ]; then
-              FAILED=$(tr '\n' ' ' < tests/failed_uuids.txt)
-              echo ""
-              echo "=== Retrying $NUM_FAILED failed test(s): $FAILED ==="
-              echo ""
-              /bin/bash mfc.sh test -v --max-attempts 3 -j "$(nproc)" --only $FAILED $TEST_ALL || exit $?
-            else
-              echo "Too many failures ($NUM_FAILED) to retry — likely a real issue."
-              exit 1
-            fi
-          elif [ "$TEST_EXIT" -ne 0 ]; then
-            exit $TEST_EXIT
-          fi
+        run: bash .github/scripts/run-tests-with-retry.sh -v --max-attempts 3 -j "$(nproc)" $TEST_ALL $TEST_PCT
         env:
           TEST_ALL: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
           TEST_PCT: ${{ matrix.debug == 'debug' && '-% 20' || '' }}
@@ -312,31 +292,26 @@ jobs:
           - runner:       'gt'
             cluster:      'phoenix'
             cluster_name: 'Georgia Tech | Phoenix'
-            flag: 'p'
             device: 'gpu'
             interface: 'acc'
           - runner:       'gt'
             cluster:      'phoenix'
             cluster_name: 'Georgia Tech | Phoenix'
-            flag: 'p'
             device: 'gpu'
             interface: 'omp'
           - runner:       'frontier'
             cluster:      'frontier'
             cluster_name: 'Oak Ridge | Frontier'
-            flag: 'f'
             device: 'gpu'
             interface: 'acc'
           - runner:       'frontier'
             cluster:      'frontier'
             cluster_name: 'Oak Ridge | Frontier'
-            flag: 'f'
             device: 'gpu'
             interface: 'omp'
           - runner:       'frontier'
             cluster:      'frontier_amd'
             cluster_name: 'Oak Ridge | Frontier (AMD)'
-            flag: 'famd'
             device: 'gpu'
             interface: 'omp'
     runs-on:
@@ -348,20 +323,13 @@ jobs:
         with:
           clean: false
 
-      - name: Pre-Build (Frontier)
-        if:   matrix.cluster != 'phoenix'
+      - name: Pre-Build
         uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
         with:
           max_attempts: 3
           retry_wait_seconds: 60
           timeout_minutes: 120
-          command: |
-            . ./mfc.sh load -c ${{ matrix.flag }} -m g
-            gpu_backend=${{ matrix.interface == 'omp' && 'mp' || 'acc' }}
-            for case in benchmarks/*/case.py; do
-              echo "=== Pre-building: $case ==="
-              ./mfc.sh build -i "$case" --case-optimization --gpu $gpu_backend -j 8
-            done
+          command: bash .github/scripts/prebuild-case-optimization.sh ${{ matrix.cluster }} ${{ matrix.device }} ${{ matrix.interface }}
           on_retry_command: ./mfc.sh clean
 
       - name: Run Case-Optimization Tests

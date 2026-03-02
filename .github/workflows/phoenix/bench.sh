@@ -1,16 +1,6 @@
 #!/bin/bash
 
-source .github/scripts/gpu-opts.sh
-source .github/scripts/detect-gpus.sh
-
-n_ranks=12
-echo "My interface is:" $job_interface
-build_opts="$gpu_opts"
-device_opts=""
-if [ "$job_device" = "gpu" ]; then
-    n_ranks=$ngpus
-    device_opts="$gpu_opts -g $gpu_ids"
-fi
+source .github/scripts/bench-preamble.sh
 
 tmpbuild=/storage/scratch1/6/sbryngelson3/mytmp_build
 currentdir=$tmpbuild/run-$(( RANDOM % 900 ))
