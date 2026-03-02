@@ -39,7 +39,7 @@ for case in "${benchmarks[@]}"; do
     # Build + run with --case-optimization, small grid, 10 timesteps
     if ./mfc.sh run "$case" --case-optimization $gpu_opts -n "$ngpus" -j "$(nproc)" -- --gbpp 1 --steps 10; then
         # Validate output
-        if python3 .github/scripts/check_case_optimization_output.py "$case_dir"; then
+        if build/venv/bin/python3 .github/scripts/check_case_optimization_output.py "$case_dir"; then
             echo "PASS: $case_name"
             passed=$((passed + 1))
         else

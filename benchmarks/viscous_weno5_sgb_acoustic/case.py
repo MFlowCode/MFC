@@ -125,7 +125,7 @@ print(
             "format": 1,
             "precision": 2,
             "prim_vars_wrt": "T",
-            "parallel_io": "T",
+            "parallel_io": "F",
             # Patch 1 _ Background
             "patch_icpp(1)%geometry": 9,
             "patch_icpp(1)%x_centroid": 0.0,

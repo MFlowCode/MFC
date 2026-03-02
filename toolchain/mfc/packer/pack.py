@@ -87,10 +87,10 @@ CPU:
 
         common.file_write(f"{filepath.rstrip('.txt')}-metadata.txt", metadata)
 
-    def has_NaNs(self) -> bool:
+    def has_bad_values(self) -> bool:
         for entry in self.entries.values():
             for double in entry.doubles:
-                if math.isnan(double):
+                if math.isnan(double) or math.isinf(double):
                     return True
 
         return False

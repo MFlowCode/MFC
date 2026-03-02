@@ -1,62 +1,31 @@
 #!/usr/bin/env python3
 
-"""Validate case-optimization output: check every value in D/*.dat for NaN/Inf."""
+"""Validate case-optimization output: check D/*.dat for NaN/Inf via the packer."""
 
-import math
-import os
-import re
 import sys
-from pathlib import Path
+import os
 
+# Allow importing from the repo root (toolchain.mfc.packer)
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
-def extract_doubles(s: str) -> list:
-    return [float(e) for e in re.sub(r"[\n\t\s]+", " ", s).strip().split(" ")]
+from toolchain.mfc.packer.pack import compile as pack_compile
 
+case_dir = sys.argv[1]
+if os.path.isfile(case_dir):
+    case_dir = os.path.dirname(case_dir)
 
-def check_case_dir(case_dir: str) -> bool:
-    D_dir = os.path.join(case_dir, "D")
-    if not os.path.isdir(D_dir):
-        print(f"ERROR: No D/ directory found in {case_dir}")
-        return False
+pack, err = pack_compile(case_dir)
+if err is not None:
+    print(f"ERROR: {err}")
+    sys.exit(1)
 
-    dat_files = list(Path(D_dir).rglob("*.dat"))
-    if not dat_files:
-        print(f"ERROR: No .dat files found in {D_dir}")
-        return False
+if not pack.entries:
+    print(f"ERROR: No data found in {case_dir}/D/")
+    sys.exit(1)
 
-    ok = True
-    total_values = 0
-    for filepath in sorted(dat_files):
-        with open(filepath, "r") as f:
-            content = f.read()
+if pack.has_bad_values():
+    print("ERROR: NaN or Inf detected in output")
+    sys.exit(1)
 
-        try:
-            doubles = extract_doubles(content)
-        except ValueError:
-            print(f"ERROR: Failed to parse {filepath} as floating point numbers")
-            ok = False
-            continue
-
-        total_values += len(doubles)
-        for i, val in enumerate(doubles):
-            if math.isnan(val) or math.isinf(val):
-                print(f"ERROR: {'NaN' if math.isnan(val) else 'Inf'} at index {i} in {filepath}")
-                ok = False
-                break
-
-    if ok:
-        print(f"OK: {len(dat_files)} files, {total_values} values — no NaN/Inf found")
-    return ok
-
-
-if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print(f"Usage: {sys.argv[0]} <case_directory>")
-        sys.exit(1)
-
-    case_dir = sys.argv[1]
-    if os.path.isfile(case_dir):
-        case_dir = os.path.dirname(case_dir)
-
-    if not check_case_dir(case_dir):
-        sys.exit(1)
+total = sum(len(e.doubles) for e in pack.entries.values())
+print(f"OK: {len(pack.entries)} files, {total} values — no NaN/Inf found")

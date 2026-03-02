@@ -92,7 +92,7 @@ print(
             "omega_wrt(3)": "T",
             "qm_wrt": "T",
             "fd_order": 4,
-            "parallel_io": "T",
+            "parallel_io": "F",
             # Patch 1: Background (AIR - 2)
             "patch_icpp(1)%geometry": 9,
             "patch_icpp(1)%x_centroid": 0,

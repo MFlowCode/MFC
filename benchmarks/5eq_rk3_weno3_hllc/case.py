@@ -219,7 +219,7 @@ print(
             "format": 1,
             "precision": 2,
             "prim_vars_wrt": "T",
-            "parallel_io": "T",
+            "parallel_io": "F",
             # I will use 1 for WATER properties, and 2 for AIR properties
             # Patch 1: Background (AIR - 2)
             "patch_icpp(1)%geometry": 9,
