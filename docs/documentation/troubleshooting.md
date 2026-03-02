@@ -37,6 +37,7 @@ This guide covers debugging tools, common issues, and troubleshooting workflows 
 ./mfc.sh run case.py -v        # Run with verbose output
 ./mfc.sh test --only <UUID>    # Run a specific test
 ./mfc.sh clean                 # Clean and start fresh
+./mfc.sh viz case_dir/ --list-vars --step 0  # Inspect post-processed data
 ```
 
 ---
@@ -454,6 +455,47 @@ Common issues:
 2. Try with fewer ranks: `./mfc.sh run case.py -n 1`
 3. Check for incompatible MPI/compiler combinations
 4. On clusters, ensure you're using the correct MPI for the interconnect
+
+---
+
+## Visualization Issues
+
+### "No 'binary/' or 'silo_hdf5/' directory found"
+
+**Cause:** Post-processing has not been run, or the case directory path is wrong.
+
+**Fix:**
+1. Run post_process first:
+   ```bash
+   ./mfc.sh run case.py -t post_process
+   ```
+2. Verify the path points to the case directory (containing `binary/` or `silo_hdf5/`)
+
+### "Variable 'X' not found"
+
+**Cause:** The requested variable was not written during post-processing.
+
+**Fix:**
+1. List available variables:
+   ```bash
+   ./mfc.sh viz case_dir/ --list-vars --step 0
+   ```
+2. Ensure your case file enables the desired output (e.g., ``prim_vars_wrt = 'T'``, ``cons_vars_wrt = 'T'``)
+
+### "h5py is required to read Silo-HDF5 files"
+
+**Cause:** The case was post-processed with `format=1` (Silo-HDF5) but `h5py` is not installed.
+
+**Fix:**
+- Install h5py: `pip install h5py`
+- Or re-run post_process with `format=2` in your case file to produce binary output
+
+### Visualization looks wrong or has artifacts
+
+**Possible causes and fixes:**
+1. **Color range:** Try setting explicit `--vmin` and `--vmax` values
+2. **Wrong variable:** Use `--list-vars` to check available variables
+3. **3D slice position:** Adjust `--slice-axis` and `--slice-value` to view the correct plane
 
 ---
 

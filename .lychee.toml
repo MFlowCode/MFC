@@ -16,8 +16,11 @@ accept = ["200", "429", "502", "504"]
 
 verbose = "error"
 
-# Exclude sitemap file from scanning (it contains pre-publish production URLs)
-exclude_path = ["sitemap\\.xml"]
+# Exclude files from scanning
+exclude_path = [
+    "sitemap\\.xml",  # Contains pre-publish production URLs
+    "404\\.html",     # Root-relative links (/, /documentation/) can't resolve in local checks
+]
 
 # Exclude URLs that fail due to external issues (broken SSL, pre-deploy only, etc.)
 exclude = [
@@ -25,4 +28,5 @@ exclude = [
     "https://cpe\\.ext\\.hpe\\.com",                   # HPE Cray docs have broken SSL cert
     "https://sc22\\.supercomputing\\.org",              # Returns 415 to automated requests
     "https://strawberryperl\\.com",                    # Frequently times out
+    "https://www\\.olcf\\.ornl\\.gov/summit",            # Returns 503 to automated requests
 ]

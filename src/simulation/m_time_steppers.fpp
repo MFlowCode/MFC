@@ -636,6 +636,8 @@ contains
 
         end do
 
+        if (moving_immersed_boundary_flag) call s_wrap_periodic_ibs()
+
         ! Adaptive dt: final stage
         if (adap_dt) call s_adaptive_dt_bubble(3)
 
@@ -796,6 +798,8 @@ contains
         integer :: i
         logical :: forces_computed
 
+        call nvtxStartRange("PROPAGATE-IMMERSED-BOUNDARIES")
+
         forces_computed = .false.
 
         do i = 1, num_ibs
@@ -842,6 +846,8 @@ contains
         end do
 
         call s_update_mib(num_ibs)
+
+        call nvtxEndRange
 
     end subroutine s_propagate_immersed_boundaries
 

@@ -11,7 +11,7 @@ from .schema import ParamDef, ParamType
 from .registry import REGISTRY
 
 # Index limits
-NP, NF, NI, NA, NPR, NB = 10, 10, 10, 4, 10, 10  # patches, fluids, ibs, acoustic, probes, bc_patches
+NP, NF, NI, NA, NPR, NB = 10, 10, 1000, 4, 10, 10  # patches, fluids, ibs, acoustic, probes, bc_patches
 
 
 # =============================================================================
@@ -672,7 +672,7 @@ CONSTRAINTS = {
     # Counts (must be positive)
     "num_fluids": {"min": 1, "max": 10},
     "num_patches": {"min": 0, "max": 10},
-    "num_ibs": {"min": 0, "max": 10},
+    "num_ibs": {"min": 0, "max": 1000},
     "num_source": {"min": 1},
     "num_probes": {"min": 1},
     "num_integrals": {"min": 1},
