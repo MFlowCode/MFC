@@ -347,11 +347,11 @@ Additional details on this specification can be found in [The Naca Airfoil Serie
 
 - Please see [Patch Parameters](#sec-patches) for the descriptions of `model_filepath`, `model_scale`, `model_rotate`, `model_translate`, `model_spc`, and `model_threshold`.
 
-- `moving_ibm` sets the method by which movement will be applied to the immersed boundary. Using 0 will result in no movement. Using 1 will result 1-way coupling where the boundary moves at a constant rate and applied forces to the fluid based upon it's own motion. In 1-way coupling, the fluid does not apply forces back onto the IB.
+- `moving_ibm` sets the method by which movement will be applied to the immersed boundary. Using 0 will result in no movement. Using 1 will result 1-way coupling where the boundary moves at a constant rate and applied forces to the fluid based upon it's own motion. In 1-way coupling, the fluid does not apply forces back onto the IB. Using 2 will result in 2-way coupling, where the boundary pushes on the fluid and the fluid pushes back on the boundary via pressure and viscous forces. If external forces are applied, the boundary will also experience those forces.
 
-- `vel(i)` is the initial linear velocity of the IB in the x, y, z direction for i=1, 2, 3. When `moving_ibm` equals 1, this velocity is constant.
+- `vel(i)` is the initial linear velocity of the IB in the x, y, z direction for i=1, 2, 3. When `moving_ibm` equals 2, this velocity is just the starting speed of the object, which will then accelerate due to external forces. If `moving_ibm` equals 1, then this is constant if it is a number, or can be described analytically with an expression. 
 
-- `angular_vel(i)` is the initial angular velocity of the IB about the x, y, z axes for i=1, 2, 3 in radians per second. When `moving_ibm` equals 1, this angular velocity is constant.
+- `angular_vel(i)` is the initial angular velocity of the IB about the x, y, z axes for i=1, 2, 3 in radians per second. When `moving_ibm` equals 2, this rotation rate is just the starting rate of the object, which will then change due to external torques. If `moving_ibm` equals 1, then this is constant if it is a number, or can be described analytically with an expression. 
 
 ### 5. Fluid Material's {#sec-fluid-materials}
 
