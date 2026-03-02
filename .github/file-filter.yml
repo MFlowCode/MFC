@@ -36,3 +36,6 @@ checkall: &checkall
   - *tests
   - *scripts
   - *yml
+
+cases_py:
+  - 'toolchain/mfc/test/cases.py'

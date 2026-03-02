@@ -51,7 +51,9 @@ while [ $attempt -le $max_attempts ]; do
     attempt=$((attempt + 1))
 done
 
-n_test_threads=8
+# Use up to 64 parallel test threads on CPU (GNR nodes have 192 cores).
+# Cap at 64 to avoid overwhelming MPI's ORTE daemons with concurrent launches.
+n_test_threads=$(( SLURM_CPUS_ON_NODE > 64 ? 64 : ${SLURM_CPUS_ON_NODE:-8} ))
 
 if [ "$job_device" = "gpu" ]; then
     gpu_count=$(nvidia-smi -L | wc -l)        # number of GPUs on node
@@ -60,4 +62,10 @@ if [ "$job_device" = "gpu" ]; then
     n_test_threads=`expr $gpu_count \* 2`
 fi
 
-./mfc.sh test -v --max-attempts 3 -a -j $n_test_threads $device_opts -- -c phoenix
+# Only prune tests on PRs; master pushes must run the full suite.
+prune_flag=""
+if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+    prune_flag="--only-changes"
+fi
+
+./mfc.sh test -v --max-attempts 3 $prune_flag -a -j $n_test_threads $device_opts -- -c phoenix
