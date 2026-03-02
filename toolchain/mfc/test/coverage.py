@@ -306,11 +306,13 @@ def _run_single_test_direct(test_info: dict, gcda_dir: str, strip: str) -> tuple
                                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                     env=env, cwd=test_dir, timeout=600)
             if result.returncode != 0:
-                failures.append((target_name, result.returncode))
+                # Save last few lines of output for debugging.
+                tail = "\n".join(result.stdout.strip().splitlines()[-5:])
+                failures.append((target_name, result.returncode, tail))
         except subprocess.TimeoutExpired:
-            failures.append((target_name, "timeout"))
+            failures.append((target_name, "timeout", ""))
         except Exception as exc:
-            failures.append((target_name, str(exc)))
+            failures.append((target_name, str(exc), ""))
 
     return uuid, test_gcda, failures
 
@@ -434,8 +436,13 @@ def build_coverage_cache(  # pylint: disable=too-many-locals,too-many-statements
             cons.print()
             cons.print(f"[bold yellow]Warning: {len(all_failures)} tests had target failures:[/bold yellow]")
             for uuid, fails in sorted(all_failures.items()):
-                fail_str = ", ".join(f"{t}={rc}" for t, rc in fails)
+                fail_str = ", ".join(f"{t}={rc}" for t, rc, _ in fails)
                 cons.print(f"  [yellow]{uuid}[/yellow]: {fail_str}")
+                for target_name, _rc, tail in fails:
+                    if tail:
+                        cons.print(f"    {target_name} output (last 5 lines):")
+                        for line in tail.splitlines():
+                            cons.print(f"      {line}")
 
         # Diagnostic: verify .gcda files exist for at least one test.
         sample_uuid = next(iter(test_results), None)
