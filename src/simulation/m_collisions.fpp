@@ -33,27 +33,77 @@ module m_collisions
 
 contains
 
-    subroutine s_detect_ib_wall_collisions(gps)
+    subroutine s_apply_collision_foprces()
+
+        integer :: patch_id, i
+        real(wp), dimension(num_ibs, (num_dims*2)) :: overlap_distances
+        real(wp) :: spring_stiffness, damping_parameter, coefficient_of_friction
+        real(wp), dimension(3) :: normal_force, tangental_force, normal_vector, normal_velocity, tangental_vector
+
+        spring_stiffness = 1._wp
+        damping_parameter = 1._wp
+        coefficient_of_friction = 1._wp
+
+        ! get is distance used in the force calculation with each IB and each wall 
+        call s_detect_ib_wall_collisions(ghost_points, overlap_distances)
+
+        do patch_id = 1, num_ibs
+            do i = 1, num_dims*2
+                ! only compute force contributions if there was an overlap
+                if (f_approx_equal(overlap_distances(patch_id, i), 0._wp)) cycle
+
+                select case (i)
+                    case(1) ! x domain left
+                        normal_vector = [-1._wp, 0._wp, 0._wp]
+                    case(2) ! x domain right
+                        normal_vector = [1._wp, 0._wp, 0._wp]
+                    case(3) ! y domain bottom
+                        normal_vector = [0._wp, -1._wp, 0._wp]
+                    case(4) ! y domain top
+                        normal_vector = [0._wp, 1._wp, 0._wp]
+                    case(5) ! z domain back
+                        normal_vector = [0._wp, 0._wp, 1._wp]
+                    case(6) ! z domain front
+                        normal_vector = [0._wp, 0._wp, -1._wp]
+                end select
+
+                normal_velocity = dot_product(patch_ib(patch_id)%vel, normal_vector)*normal_vector
+                tangental_vector = patch_ib(patch_id)%vel - normal_velocity
+                tangental_vector = tangental_vector / norm2(tangental_vector)
+                normal_force = -spring_stiffness * overlap_distances(patch_id, i)  * normal_vector - damping_parameter * normal_velocity
+                tangental_force = -coefficient_of_friction * norm2(normal_force) * tangental_vector
+                patch_ib(patch_id)%forces = patch_ib(patch_id)%forces + normal_force + tangental_force
+            end do
+        end do
+
+
+    end subroutine s_apply_collision_foprces()
+
+    subroutine s_detect_ib_wall_collisions(gps, overlap_distances)
 
         type(ghost_point), dimension(num_gps), intent(in) :: gps
-        real(wp), dimension(num_ibs, (num_dims*2)), intent(out) :: overlap_distances
+        real(wp), dimension(num_ibs, (num_dims*2) + 1), intent(out) :: overlap_distances
 
         integer :: gp_idx, i, j, k, patch_id
         real(wp) :: edge_location, overlap_distance
 
         collision_distances = 0._wp
 
+        ! iterate over all ghost points to detect the one that is most-overlapping in each direction
         do gp_idx = 1, num_gps
             i = gps(gp_idx)%loc(1)
             j = gps(gp_idx)%loc(2)
             if (p /= 0) k = gps(gp_idx)%loc(3)
             patch_id = gps(gp_idx)%ib_patch_id
 
+            ! check if the boundaries are either of the two conditions we should compute collisions with
             if (bc_x%beg == BC_SLIP_WALL .or. bc_x%beg == BC_NO_SLIP_WALL) then
+                ! get the location of the true IB surface towards the domain boundary
                 edge_location = x_cc(i) - abs(gps(gp_idx)%levelset * gps(gp_idx)%levelset_norm(1))
+                ! check if that edge actually extends out of the comutational domain
                 if (edge_location < x_domain%beg) then
-                    overlap_distance = x_domain%beg - edge_location
-                    overlap_distances(patch_id, 1) = max(overlap_distances(patch_id, 1), overlap_distance)
+                    overlap_distance = x_domain%beg - edge_location ! the distance that the IB extends out of the domain
+                    overlap_distances(patch_id, 1) = max(overlap_distances(patch_id, 1), overlap_distance) ! Save this distance if it is the new maximum distance
                 end if
             end if
 
