@@ -222,7 +222,7 @@ contains
                 Rc = min(dx(j)*(abs(vel(1)) + c), &
                          dy(k)*(abs(vel(2)) + c)) &
                      /maxval(1._wp/Re_l)
-             else !1D
+            else !1D
                 vcfl = maxval(dt/Re_l/rho)/dx(j)**2._wp
                 Rc = dx(j)*(abs(vel(1)) + c)/maxval(1._wp/Re_l)
             end if

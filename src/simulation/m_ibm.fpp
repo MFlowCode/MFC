@@ -706,7 +706,7 @@ contains
             if (p /= 0) then
                 k = gp%ip_grid(3)
             else
-                k = 0;
+                k = 0; 
             end if
 
             ! get the distance to a cell in each direction
