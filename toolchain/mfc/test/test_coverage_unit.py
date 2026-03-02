@@ -131,7 +131,8 @@ except AttributeError:
         .replace("from .. import common", "")
         .replace("from ..common import MFCException", "MFCException = _globals['MFCException']")
         .replace("from ..build import PRE_PROCESS, SIMULATION, POST_PROCESS, SYSCHECK", "")
-        .replace("from .case import input_bubbles_lagrange", "input_bubbles_lagrange = lambda case: None")
+        .replace("from .case import input_bubbles_lagrange, get_post_process_mods",
+                 "input_bubbles_lagrange = lambda case: None\nget_post_process_mods = lambda params: {}")
     )
     exec(compile(_src, _COVERAGE_PATH, "exec"), _globals)  # noqa: S102
 
@@ -220,58 +221,14 @@ class TestShouldRunAllTests(unittest.TestCase):
             {"src/common/include/shared_parallel_macros.fpp"}
         ) is True
 
-    def test_macros_fpp_triggers_all(self):
+    # TEMP: macros.fpp, cases.py, case.py, definitions.py, input.py,
+    # case_validator.py, case.fpp, coverage.py, cmake/ removed from
+    # ALWAYS_RUN_ALL to exercise pruning in CI. Restore before merge.
+
+    def test_macros_fpp_does_not_trigger_all(self):
         assert should_run_all_tests(
             {"src/common/include/macros.fpp"}
-        ) is True
-
-    def test_cases_py_triggers_all(self):
-        assert should_run_all_tests(
-            {"toolchain/mfc/test/cases.py"}
-        ) is True
-
-    def test_case_py_triggers_all(self):
-        assert should_run_all_tests(
-            {"toolchain/mfc/test/case.py"}
-        ) is True
-
-    def test_definitions_py_triggers_all(self):
-        assert should_run_all_tests(
-            {"toolchain/mfc/params/definitions.py"}
-        ) is True
-
-    def test_input_py_triggers_all(self):
-        assert should_run_all_tests(
-            {"toolchain/mfc/run/input.py"}
-        ) is True
-
-    def test_case_validator_triggers_all(self):
-        assert should_run_all_tests(
-            {"toolchain/mfc/case_validator.py"}
-        ) is True
-
-    def test_cmakelists_does_not_trigger_all(self):
-        assert should_run_all_tests({"CMakeLists.txt"}) is False
-
-    def test_case_fpp_triggers_all(self):
-        assert should_run_all_tests(
-            {"src/common/include/case.fpp"}
-        ) is True
-
-    def test_coverage_py_triggers_all(self):
-        assert should_run_all_tests(
-            {"toolchain/mfc/test/coverage.py"}
-        ) is True
-
-    def test_cmake_dir_triggers_all(self):
-        assert should_run_all_tests(
-            {"toolchain/cmake/FindFFTW.cmake"}
-        ) is True
-
-    def test_cmake_subdir_triggers_all(self):
-        assert should_run_all_tests(
-            {"toolchain/cmake/some/nested/file.cmake"}
-        ) is True
+        ) is False
 
     def test_simulation_module_does_not_trigger_all(self):
         assert should_run_all_tests(
@@ -284,7 +241,7 @@ class TestShouldRunAllTests(unittest.TestCase):
     def test_mixed_one_trigger_fires_all(self):
         assert should_run_all_tests({
             "src/simulation/m_rhs.fpp",
-            "src/common/include/macros.fpp",
+            "src/common/include/parallel_macros.fpp",
         }) is True
 
 
@@ -440,13 +397,8 @@ class TestDesignCornerCases(unittest.TestCase):
         assert len(to_run) == 0
         assert len(skipped) == 1
 
-    def test_non_fpp_always_run_all_detected(self):
-        """
-        End-to-end: diff lists only cases.py (non-.fpp) ->
-        _parse_diff_files includes it -> should_run_all_tests fires.
-        """
-        files = _parse_diff_files("toolchain/mfc/test/cases.py\n")
-        assert should_run_all_tests(files) is True
+    # TEMP: test_non_fpp_always_run_all_detected removed (cases.py not
+    # in ALWAYS_RUN_ALL during CI pruning test). Restore before merge.
 
     def test_niche_feature_pruning(self):
         """

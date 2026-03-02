@@ -39,28 +39,21 @@ COVERAGE_CACHE_PATH = Path(common.MFC_ROOT_DIR) / "toolchain/mfc/test/test_cover
 # Changes to these files trigger the full test suite.
 # CPU coverage cannot tell us about GPU directive changes (macro files), and
 # toolchain files define or change the set of tests themselves.
+# TEMP: stripped to GPU macros only so CI exercises the pruning logic.
+# Restore full list before merge.
 ALWAYS_RUN_ALL = frozenset([
     "src/common/include/parallel_macros.fpp",
     "src/common/include/acc_macros.fpp",
     "src/common/include/omp_macros.fpp",
     "src/common/include/shared_parallel_macros.fpp",
-    "src/common/include/macros.fpp",
-    "src/common/include/case.fpp",
-    "toolchain/mfc/test/cases.py",
-    "toolchain/mfc/test/case.py",
-    "toolchain/mfc/params/definitions.py",
-    "toolchain/mfc/run/input.py",
-    "toolchain/mfc/case_validator.py",
-    "toolchain/mfc/test/coverage.py",
 ])
 
 # Directory prefixes: any changed file under these paths triggers full suite.
 # Note: src/simulation/include/ (.fpp files like inline_riemann.fpp) is NOT
 # listed here — Fypp line markers (--line-marker-format=gfortran5) correctly
 # attribute included file paths, so gcov coverage tracks them accurately.
-ALWAYS_RUN_ALL_PREFIXES = (
-    "toolchain/cmake/",
-)
+# TEMP: cmake/ prefix removed to exercise pruning in CI. Restore before merge.
+ALWAYS_RUN_ALL_PREFIXES = ()
 
 
 def _get_gcov_version(gcov_binary: str) -> str:
