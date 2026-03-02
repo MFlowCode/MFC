@@ -22,6 +22,9 @@ __pycache__
 # Auto-generated version file
 toolchain/mfc/_version.py
 
+# Raw coverage cache — legacy, not tracked (the .json.gz version IS committed)
+toolchain/mfc/test/test_coverage_cache.json
+
 # Auto-generated toolchain files (regenerate with: ./mfc.sh generate)
 toolchain/completions/mfc.bash
 toolchain/completions/_mfc

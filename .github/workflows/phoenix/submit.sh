@@ -24,9 +24,9 @@ case "$script_basename" in
 esac
 
 sbatch_cpu_opts="\
-#SBATCH -p cpu-small               # partition
-#SBATCH --ntasks-per-node=24       # Number of cores per node required
-#SBATCH --mem-per-cpu=2G           # Memory per core\
+#SBATCH -p cpu-gnr                 # partition (full Granite Rapids node)
+#SBATCH --exclusive                # exclusive access to all cores
+#SBATCH -C graniterapids           # constrain to GNR architecture\
 "
 
 if [ "$job_type" = "bench" ]; then
