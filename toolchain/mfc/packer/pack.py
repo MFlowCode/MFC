@@ -20,8 +20,8 @@ class PackEntry:
         return f"{self.filepath} {' '.join([ str(d) for d in self.doubles ])}"
 
 
-# This class maps to the data contained in the entirety of D/: it is tush a list
-# of PackEntry classes.
+# This class maps to the data contained in the entirety of D/: a dictionary
+# of PackEntry instances keyed by filepath.
 class Pack:
     entries: typing.Dict[str, PackEntry]
 

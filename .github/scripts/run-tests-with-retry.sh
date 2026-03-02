@@ -3,6 +3,15 @@
 # of sporadic failures (up to 5). Exits non-zero on real failures.
 # Usage: bash .github/scripts/run-tests-with-retry.sh [mfc test args...]
 
+# Extract flags that should carry over to retries (retries build their own
+# argument list with --only, so we capture passthrough flags here).
+PASSTHROUGH=""
+for arg in "$@"; do
+    case "$arg" in
+        --test-all) PASSTHROUGH="$PASSTHROUGH --test-all" ;;
+    esac
+done
+
 rm -f tests/failed_uuids.txt
 TEST_EXIT=0
 /bin/bash mfc.sh test "$@" || TEST_EXIT=$?
@@ -15,7 +24,7 @@ if [ -s tests/failed_uuids.txt ]; then
         echo ""
         echo "=== Retrying $NUM_FAILED failed test(s): $FAILED ==="
         echo ""
-        /bin/bash mfc.sh test -v --max-attempts 3 -j "$(nproc)" --only $FAILED $TEST_ALL || exit $?
+        /bin/bash mfc.sh test -v --max-attempts 3 -j "$(nproc)" --only $FAILED $PASSTHROUGH || exit $?
     else
         echo "Too many failures ($NUM_FAILED) to retry — likely a real issue."
         exit 1

@@ -13,6 +13,13 @@ if [ "$job_device" = "gpu" ] && [ "$ngpus" -eq 0 ]; then
     ngpus=1
 fi
 
+# Verify the venv Python interpreter exists (created by ./mfc.sh build)
+if [ ! -x build/venv/bin/python3 ]; then
+    echo "ERROR: build/venv/bin/python3 not found."
+    echo "The MFC build venv may not have been created. Was the pre-build step successful?"
+    exit 1
+fi
+
 benchmarks=(
     benchmarks/5eq_rk3_weno3_hllc/case.py
     benchmarks/viscous_weno5_sgb_acoustic/case.py
@@ -43,7 +50,7 @@ for case in "${benchmarks[@]}"; do
             echo "PASS: $case_name"
             passed=$((passed + 1))
         else
-            echo "FAIL: $case_name (NaN/Inf in output)"
+            echo "FAIL: $case_name (validation error)"
             failed=$((failed + 1))
             failed_cases="$failed_cases $case_name"
         fi
@@ -65,4 +72,4 @@ if [ $failed -gt 0 ]; then
 fi
 echo "========================================"
 
-exit $failed
+[ $failed -eq 0 ] && exit 0 || exit 1
