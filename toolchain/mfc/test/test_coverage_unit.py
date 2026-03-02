@@ -72,6 +72,7 @@ _build_stub.SYSCHECK = "syscheck"
 
 _case_stub = sys.modules.get("toolchain.mfc.test.case", _make_stub("toolchain.mfc.test.case"))
 _case_stub.input_bubbles_lagrange = lambda case: None
+_case_stub.get_post_process_mods = lambda params: {}
 
 # Load coverage.py by injecting stubs into sys.modules so relative imports resolve.
 _COVERAGE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "coverage.py")

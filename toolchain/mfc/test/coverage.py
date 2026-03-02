@@ -31,7 +31,7 @@ from ..printer import cons
 from .. import common
 from ..common import MFCException
 from ..build import PRE_PROCESS, SIMULATION, POST_PROCESS, SYSCHECK
-from .case import input_bubbles_lagrange
+from .case import input_bubbles_lagrange, get_post_process_mods
 
 
 COVERAGE_CACHE_PATH = Path(common.MFC_ROOT_DIR) / "toolchain/mfc/test/test_coverage_cache.json.gz"
@@ -342,6 +342,11 @@ def _prepare_test(case, root_dir: str) -> dict:  # pylint: disable=unused-argume
         except Exception as exc:
             cons.print(f"[yellow]Warning: Failed to generate Lagrange bubble input "
                        f"for {case.get_uuid()}: {exc}[/yellow]")
+
+    # Apply post_process output params so simulation writes data files that
+    # post_process reads.  Mirrors the generated case.py logic that normally
+    # runs via ./mfc.sh run (see POST_PROCESS_OUTPUT_PARAMS in case.py).
+    case.params.update(get_post_process_mods(case.params))
 
     test_dir = case.get_dirpath()
     input_file = case.to_input_file()

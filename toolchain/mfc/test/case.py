@@ -1,4 +1,4 @@
-import os, glob, hashlib, binascii, subprocess, itertools, dataclasses, shutil
+import os, json, glob, hashlib, binascii, subprocess, itertools, dataclasses, shutil
 
 from typing import List, Set, Union, Callable, Optional
 
@@ -6,6 +6,44 @@ from ..      import case, common
 from ..state import ARG
 from ..run   import input
 from ..build import MFCTarget, get_target
+
+# Parameters that enable simulation output writing for post_process.
+# When post_process is a target, simulation must write field data so
+# post_process has something to read.  Used in the generated case.py
+# template and by the coverage cache builder.
+POST_PROCESS_OUTPUT_PARAMS = {
+    'parallel_io':  'T', 'cons_vars_wrt':   'T',
+    'prim_vars_wrt': 'T', 'alpha_rho_wrt(1)': 'T',
+    'rho_wrt':      'T', 'mom_wrt(1)':      'T',
+    'vel_wrt(1)':   'T', 'E_wrt':           'T',
+    'pres_wrt':     'T', 'alpha_wrt(1)':    'T',
+    'gamma_wrt':    'T', 'heat_ratio_wrt':  'T',
+    'pi_inf_wrt':   'T', 'pres_inf_wrt':    'T',
+    'c_wrt':        'T',
+}
+
+# Additional output parameters for 3D cases (p != 0).
+POST_PROCESS_3D_PARAMS = {
+    'fd_order':     1,
+    'omega_wrt(1)': 'T',
+    'omega_wrt(2)': 'T',
+    'omega_wrt(3)': 'T',
+}
+
+# Parameters set when post_process is NOT a target.
+POST_PROCESS_OFF_PARAMS = {
+    'parallel_io':   'F',
+    'prim_vars_wrt': 'F',
+}
+
+
+def get_post_process_mods(case_params: dict) -> dict:
+    """Return parameter modifications needed when post_process is a target."""
+    mods = dict(POST_PROCESS_OUTPUT_PARAMS)
+    if int(case_params.get('p', 0)) != 0:
+        mods.update(POST_PROCESS_3D_PARAMS)
+    return mods
+
 
 Tend = 0.25
 Nt   = 50
@@ -204,25 +242,11 @@ case = {self.gen_json_dict_str()}
 mods = {{}}
 
 if "post_process" in ARGS["mfc"]["targets"]:
-    mods = {{
-        'parallel_io'  : 'T', 'cons_vars_wrt'   : 'T',
-        'prim_vars_wrt': 'T', 'alpha_rho_wrt(1)': 'T',
-        'rho_wrt'      : 'T', 'mom_wrt(1)'      : 'T',
-        'vel_wrt(1)'   : 'T', 'E_wrt'           : 'T',
-        'pres_wrt'     : 'T', 'alpha_wrt(1)'    : 'T',
-        'gamma_wrt'    : 'T', 'heat_ratio_wrt'  : 'T',
-        'pi_inf_wrt'   : 'T', 'pres_inf_wrt'    : 'T',
-        'c_wrt'        : 'T',
-    }}
-
+    mods = {json.dumps(POST_PROCESS_OUTPUT_PARAMS)}
     if case['p'] != 0:
-        mods['fd_order']  = 1
-        mods['omega_wrt(1)'] = 'T'
-        mods['omega_wrt(2)'] = 'T'
-        mods['omega_wrt(3)'] = 'T'
+        mods.update({json.dumps(POST_PROCESS_3D_PARAMS)})
 else:
-    mods['parallel_io']   = 'F'
-    mods['prim_vars_wrt'] = 'F'
+    mods = {json.dumps(POST_PROCESS_OFF_PARAMS)}
 
 print(json.dumps({{**case, **mods}}))
 """)
