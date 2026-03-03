@@ -29,14 +29,57 @@ module m_collisions
 
     implicit none
 
-    private; public;
+    private; public :: s_apply_collision_forces;
+
+    ! arrays for holding collision lookups indices into the ib_overlap_distance array
+    integer, dimension(num_ibs) :: col_idx_lookup_1
+    integer, dimension(num_ibs) :: col_idx_lookup_2
+
+    ! overlap distances for computing collisions
+    integer, dimension(num_ibs * (num_ibs-1) / 2) :: collision_lookup
+    real(wp), dimension(num_ibs, (num_dims*2)) :: wall_overlap_distances
+
 
 contains
 
-    subroutine s_apply_collision_foprces()
+    subroutine s_apply_collision_forces(ghost_points, ib_markers)
+
+      type(ghost_point), dimension(num_gps), intent(in) :: ghost_points
+      type(integer_field), intent(in) :: ib_markers
+
+      integer :: num_considered_collisions
+
+      ! return if no collisions
+      if (collision_model == 0) return
+
+      $:GPU_UPDATE(host='[ghost_points]') ! TODO :: TEMPORARY UNTIL GPU SUPPORT ENABLED. REMOVE LATER
+
+      ! get is distance used in the force calculation with each IB and each wall 
+      call s_detect_ib_wall_collisions(ghost_points, wall_overlap_distances)
+      call s_detect_ib_ib_collisions(ghost_points, ib_markers, collision_lookup, num_considered_collisions)
+
+      select case (collision_model)
+          case(1) ! soft sphere model
+              call s_apply_wall_collision_forces_soft_sphere(wall_overlap_distances)
+              call s_appply_ib_ib_collision_forces_soft_sphere(collision_lookup, num_considered_collisions)
+      end select
+
+    end subroutine s_apply_collision_forces
+
+    !> @brief applyies collision forces to IBs assuming a soft-sphere collision model (all IBs are circles or spheres)
+    subroutine s_apply_wall_collision_forces_soft_sphere(collision_lookup, num_considered_collisions)
+
+      integer, intent(in) :: num_considered_collisions
+      integer, dimension(num_considered_collisions), intent(in) :: collision_lookup
+
+      end subroutine s_apply_wall_collision_forces_soft_sphere
+
+    !> @brief applyies collision forces to IBs assuming a soft-sphere collision model (all IBs are circles or spheres)
+    subroutine s_apply_wall_collision_forces_soft_sphere(wall_overlap_distances)
+
+        real(wp), dimension(num_ibs, (num_dims*2)), intent(in) :: wall_overlap_distances
 
         integer :: patch_id, i
-        real(wp), dimension(num_ibs, (num_dims*2)) :: overlap_distances
         real(wp) :: spring_stiffness, damping_parameter, coefficient_of_friction
         real(wp), dimension(3) :: normal_force, tangental_force, normal_vector, normal_velocity, tangental_vector
 
@@ -44,13 +87,10 @@ contains
         damping_parameter = 1._wp
         coefficient_of_friction = 1._wp
 
-        ! get is distance used in the force calculation with each IB and each wall 
-        call s_detect_ib_wall_collisions(ghost_points, overlap_distances)
-
         do patch_id = 1, num_ibs
             do i = 1, num_dims*2
                 ! only compute force contributions if there was an overlap
-                if (f_approx_equal(overlap_distances(patch_id, i), 0._wp)) cycle
+                if (f_approx_equal(wall_overlap_distances(patch_id, i), 0._wp)) cycle
 
                 select case (i)
                     case(1) ! x domain left
@@ -70,15 +110,75 @@ contains
                 normal_velocity = dot_product(patch_ib(patch_id)%vel, normal_vector)*normal_vector
                 tangental_vector = patch_ib(patch_id)%vel - normal_velocity
                 tangental_vector = tangental_vector / norm2(tangental_vector)
-                normal_force = -spring_stiffness * overlap_distances(patch_id, i)  * normal_vector - damping_parameter * normal_velocity
+                normal_force = -spring_stiffness * wall_overlap_distances(patch_id, i)  * normal_vector - damping_parameter * normal_velocity
                 tangental_force = -coefficient_of_friction * norm2(normal_force) * tangental_vector
                 patch_ib(patch_id)%forces = patch_ib(patch_id)%forces + normal_force + tangental_force
             end do
         end do
 
 
-    end subroutine s_apply_collision_foprces()
+    end subroutine s_apply_wall_collision_forces_soft_sphere()
 
+    !> uses ghost-point/image-point information to determine if it is possible if two IBs are colliding, effectively an optimized nearest neighbor search
+    subroutine s_detect_ib_ib_collisions(gps, ib_markers, ib_collision_distances, collision_lookup, num_considered_collisions)
+
+      type(ghost_point), dimension(num_gps), intent(in) :: gps
+      type(integer_field), intent(in) :: ib_markers
+      integer, dimension(num_ibs * (num_ibs-1) / 2), intent(out) :: collision_lookup
+      integer, intent(out) :: num_considered_collisions
+
+      integer :: i, j, k, col_idx_1, col_idx_2
+      integer gp_idx, gp_patch_id, ip_patch_id
+      integer :: max_pairs, pair_idx, out_idx
+      logical :: already_found
+
+      ! Temporary array to hold all detected pairs (with potential duplicates)
+      integer, dimension(num_gps, 2) :: raw_pairs
+      integer :: num_raw
+
+      max_pairs = num_ibs * (num_ibs - 1) / 2
+      num_raw = 0
+
+      do gp_idx = 1, num_ibs
+
+          gp_patch_id = gps(i)%ib_patch_id
+          i = gps(i)%loc(1)
+          h = gps(i)%loc(2)
+          k = gps(i)%loc(3)
+          ip_patch_id = ib_markers%sf(i, j, k)
+
+          ! Pass 1: Collect all candidate pairs (may contain duplicates)
+          if (ib_patch_id < ip_patch_id) then
+              num_raw = num_raw + 1
+              ! Store with smaller ID first for consistent ordering
+              raw_pairs(num_raw, 1) = gp_patch_id
+              raw_pairs(num_raw, 2) = ip_patch_id
+          end if
+      end do
+
+      ! Pass 2: Coalesce into unique pairs
+      num_considered_collisions = 0
+      collision_lookup = 0
+      do pair_idx = 1, num_raw
+        already_found = .false.
+        do out_idx = 1, num_considered_collisions
+            if (collision_lookup(out_idx, 1) == raw_pairs(pair_idx, 1) .and. &
+                collision_lookup(out_idx, 2) == raw_pairs(pair_idx, 2)) then
+                already_found = .true.
+                exit
+            end if
+        end do
+
+        if (.not. already_found) then
+            num_considered_collisions = num_considered_collisions + 1
+            collision_lookup(num_considered_collisions, 1) = raw_pairs(pair_idx, 1)
+            collision_lookup(num_considered_collisions, 2) = raw_pairs(pair_idx, 2)
+        end if
+    end do
+
+    end subroutine s_detect_ib_ib_collisions
+
+    !> @brief uses boundary conditions and particle lcoations to check for wall conditions
     subroutine s_detect_ib_wall_collisions(gps, overlap_distances)
 
         type(ghost_point), dimension(num_gps), intent(in) :: gps
