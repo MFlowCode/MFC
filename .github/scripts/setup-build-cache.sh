@@ -29,8 +29,8 @@ esac
 _cache_key="${_cache_cluster}-${_cache_device}-${_cache_interface}-${_cache_runner}"
 _cache_base="${_cache_root}/${_cache_key}/build"
 
-# Check if an NFS cache directory is healthy (readable, writable, no stale handles).
-_nfs_cache_healthy() {
+# Check if the cache directory is healthy (readable, writable, no stale handles).
+_cache_healthy() {
     local dir="$1"
     if ! ls "$dir" > /dev/null 2>&1; then
         echo "  Health check FAILED: cannot list $dir"
@@ -51,8 +51,8 @@ _nfs_cache_healthy() {
 
 # Nuclear recovery: rename stale cache out of the way and create a fresh one.
 # Uses mv (operates on parent directory entry) which works even when children
-# have stale NFS file handles that prevent rm -rf from succeeding.
-_nfs_cache_nuke() {
+# have stale file handles that prevent rm -rf from succeeding.
+_cache_nuke() {
     local base="${1:-$_cache_base}"
     local stale_name="${base}.stale.$(date +%s)"
     echo "  NFS cache nuke: parking stale dir -> $stale_name"
@@ -74,9 +74,9 @@ echo "  Cache key: $_cache_key"
 echo "  Cache dir: $_cache_dir"
 
 # Pre-flight: detect stale NFS handles before wasting a build attempt.
-if ! _nfs_cache_healthy "$_cache_dir"; then
+if ! _cache_healthy "$_cache_dir"; then
     echo "  Stale NFS cache detected — nuking and recreating."
-    _nfs_cache_nuke "$_cache_base"
+    _cache_nuke "$_cache_base"
     _cache_dir="$(cd "$_cache_base" && pwd -P)"
 fi
 
@@ -94,7 +94,7 @@ ln -s "$_cache_dir" "build"
 
 echo "  Symlink: build -> $_cache_dir"
 
-# Garbage-collect stale cache dirs parked by _nfs_cache_nuke more than 7 days ago.
+# Garbage-collect stale cache dirs parked by _cache_nuke more than 7 days ago.
 _cache_parent="$(dirname "$_cache_base")"
 find "$_cache_parent" -maxdepth 1 -name "*.stale.*" -mtime +7 -exec rm -rf {} + 2>/dev/null || true
 
