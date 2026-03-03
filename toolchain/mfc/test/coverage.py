@@ -31,7 +31,8 @@ from ..printer import cons
 from .. import common
 from ..common import MFCException
 from ..build import PRE_PROCESS, SIMULATION, POST_PROCESS, SYSCHECK
-from .case import input_bubbles_lagrange, get_post_process_mods
+from .case import (input_bubbles_lagrange, get_post_process_mods,
+                    POST_PROCESS_3D_PARAMS)
 
 
 COVERAGE_CACHE_PATH = Path(common.MFC_ROOT_DIR) / "toolchain/mfc/test/test_coverage_cache.json.gz"
@@ -306,8 +307,8 @@ def _run_single_test_direct(test_info: dict, gcda_dir: str, strip: str) -> tuple
                                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                     env=env, cwd=test_dir, timeout=600)
             if result.returncode != 0:
-                # Save last few lines of output for debugging.
-                tail = "\n".join(result.stdout.strip().splitlines()[-5:])
+                # Save last lines of output for debugging.
+                tail = "\n".join(result.stdout.strip().splitlines()[-15:])
                 failures.append((target_name, result.returncode, tail))
         except subprocess.TimeoutExpired:
             failures.append((target_name, "timeout", ""))
@@ -342,6 +343,24 @@ def _prepare_test(case, root_dir: str) -> dict:  # pylint: disable=unused-argume
     # post_process reads.  Mirrors the generated case.py logic that normally
     # runs via ./mfc.sh run (see POST_PROCESS_OUTPUT_PARAMS in case.py).
     case.params.update(get_post_process_mods(case.params))
+
+    # Adaptive-dt tests: post_process computes n_save = int(t_stop/t_save)+1
+    # and iterates over that many save indices.  But with small t_step_stop
+    # the simulation produces far fewer saves.  Clamp t_stop so post_process
+    # only reads saves that actually exist.
+    if case.params.get('cfl_adap_dt', 'F') == 'T':
+        t_save = float(case.params.get('t_save', 1.0))
+        case.params['t_stop'] = str(t_save)  # n_save = 2: indices 0 and 1
+
+    # Heavy 3D tests: remove vorticity output (omega_wrt + fd_order) for
+    # 3D QBMM tests.  Normal test execution never runs post_process (only
+    # PRE_PROCESS + SIMULATION; see test.py line ~469), so post_process on
+    # heavy 3D configs is untested.  Vorticity FD computation on large grids
+    # with many QBMM variables causes post_process to crash (exit code 2).
+    if (int(case.params.get('p', 0)) > 0 and
+            case.params.get('qbmm', 'F') == 'T'):
+        for key in POST_PROCESS_3D_PARAMS:
+            case.params.pop(key, None)
 
     test_dir = case.get_dirpath()
     input_file = case.to_input_file()

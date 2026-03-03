@@ -73,6 +73,9 @@ _build_stub.SYSCHECK = "syscheck"
 _case_stub = sys.modules.get("toolchain.mfc.test.case", _make_stub("toolchain.mfc.test.case"))
 _case_stub.input_bubbles_lagrange = lambda case: None
 _case_stub.get_post_process_mods = lambda params: {}
+_case_stub.POST_PROCESS_3D_PARAMS = {
+    'fd_order': 1, 'omega_wrt(1)': 'T', 'omega_wrt(2)': 'T', 'omega_wrt(3)': 'T',
+}
 
 # Load coverage.py by injecting stubs into sys.modules so relative imports resolve.
 _COVERAGE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "coverage.py")
@@ -131,8 +134,12 @@ except AttributeError:
         .replace("from .. import common", "")
         .replace("from ..common import MFCException", "MFCException = _globals['MFCException']")
         .replace("from ..build import PRE_PROCESS, SIMULATION, POST_PROCESS, SYSCHECK", "")
-        .replace("from .case import input_bubbles_lagrange, get_post_process_mods",
-                 "input_bubbles_lagrange = lambda case: None\nget_post_process_mods = lambda params: {}")
+        .replace("from .case import (input_bubbles_lagrange, get_post_process_mods,\n"
+                 "                    POST_PROCESS_3D_PARAMS)",
+                 "input_bubbles_lagrange = lambda case: None\n"
+                 "get_post_process_mods = lambda params: {}\n"
+                 "POST_PROCESS_3D_PARAMS = {'fd_order': 1, 'omega_wrt(1)': 'T', "
+                 "'omega_wrt(2)': 'T', 'omega_wrt(3)': 'T'}")
     )
     exec(compile(_src, _COVERAGE_PATH, "exec"), _globals)  # noqa: S102
 
