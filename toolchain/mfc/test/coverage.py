@@ -301,6 +301,15 @@ def _run_single_test_direct(test_info: dict, gcda_dir: str, strip: str) -> tuple
             cons.print(f"[yellow]Warning: binary {target_name} not found "
                        f"at {bin_path} for test {uuid}[/yellow]")
             continue
+
+        # Verify .inp file exists before running (diagnostic for transient
+        # filesystem issues where the file goes missing between phases).
+        inp_file = os.path.join(test_dir, f"{target_name}.inp")
+        if not os.path.isfile(inp_file):
+            failures.append((target_name, "missing-inp",
+                             f"{inp_file} not found before launch"))
+            continue
+
         cmd = mpi_cmd + [bin_path]
         try:
             result = subprocess.run(cmd, check=False, text=True,
@@ -350,7 +359,7 @@ def _prepare_test(case, root_dir: str) -> dict:  # pylint: disable=unused-argume
     # only reads saves that actually exist.
     if case.params.get('cfl_adap_dt', 'F') == 'T':
         t_save = float(case.params.get('t_save', 1.0))
-        case.params['t_stop'] = str(t_save)  # n_save = 2: indices 0 and 1
+        case.params['t_stop'] = t_save  # n_save = 2: indices 0 and 1
 
     # Heavy 3D tests: remove vorticity output (omega_wrt + fd_order) for
     # 3D QBMM tests.  Normal test execution never runs post_process (only
