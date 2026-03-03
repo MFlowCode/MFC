@@ -24,7 +24,7 @@ _retry_clean() {
 retry_build() {
     local clean_cmd="${RETRY_CLEAN_CMD:-rm -rf build/staging build/install build/lock.yaml}"
     local validate_cmd="${RETRY_VALIDATE_CMD:-}"
-    local max_attempts=1
+    local max_attempts=3
     local attempt=1
     while [ $attempt -le $max_attempts ]; do
         echo "Build attempt $attempt of $max_attempts..."

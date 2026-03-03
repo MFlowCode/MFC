@@ -249,7 +249,7 @@ jobs:
         if:   matrix.cluster != 'phoenix'
         uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
         with:
-          max_attempts: 1
+          max_attempts: 3
           retry_wait_seconds: 60
           timeout_minutes: 60
           command: bash .github/workflows/${{ matrix.cluster }}/build.sh ${{ matrix.device }} ${{ matrix.interface }}
@@ -323,10 +323,15 @@ jobs:
         with:
           clean: false
 
-      - name: Pre-Build
+      - name: Pre-Build (SLURM)
+        if:   matrix.cluster == 'phoenix'
+        run:  bash .github/workflows/phoenix/submit.sh .github/scripts/prebuild-case-optimization.sh ${{ matrix.device }} ${{ matrix.interface }}
+
+      - name: Pre-Build (login node)
+        if:   matrix.cluster != 'phoenix'
         uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
         with:
-          max_attempts: 1
+          max_attempts: 3
           retry_wait_seconds: 60
           timeout_minutes: 120
           command: bash .github/scripts/prebuild-case-optimization.sh ${{ matrix.cluster }} ${{ matrix.device }} ${{ matrix.interface }}
@@ -337,11 +342,17 @@ jobs:
 
       - name: Print Logs
         if:   always()
-        run:  cat run-case-optimization-${{ matrix.device }}-${{ matrix.interface }}.out
+        run:  |
+          for f in prebuild-case-optimization-${{ matrix.device }}-${{ matrix.interface }}.out \
+                   run-case-optimization-${{ matrix.device }}-${{ matrix.interface }}.out; do
+            [ -f "$f" ] && echo "=== $f ===" && cat "$f"
+          done
 
       - name: Archive Logs
         uses: actions/upload-artifact@v4
         if:   always()
         with:
           name: case-opt-${{ strategy.job-index }}-${{ matrix.cluster }}-${{ matrix.interface }}
-          path: run-case-optimization-${{ matrix.device }}-${{ matrix.interface }}.out
+          path: |
+            prebuild-case-optimization-${{ matrix.device }}-${{ matrix.interface }}.out
+            run-case-optimization-${{ matrix.device }}-${{ matrix.interface }}.out
