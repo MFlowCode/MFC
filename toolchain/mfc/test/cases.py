@@ -887,28 +887,28 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     stack.push("Lagrange Bubbles", {"bubbles_lagrange": 'T',
                                                     'dt': 1e-06, 'lag_params%pressure_corrector': 'T', 'bubble_model': 2,
                                                     'num_fluids': 2, 'lag_params%heatTransfer_model': 'T', 'lag_params%massTransfer_model': 'T',
-                                                    'fluid_pp(1)%gamma': 0.16, 'fluid_pp(1)%pi_inf': 3515.0, 'fluid_pp(2)%gamma': 2.5,
-                                                    'fluid_pp(2)%pi_inf': 0.0,
+                                                    'fluid_pp(1)%gamma' : 0.16, 'fluid_pp(1)%pi_inf': 3515.0, 'fluid_pp(2)%gamma': 2.5,
+                                                    'fluid_pp(2)%pi_inf': 0.0, 
                                                     'patch_icpp(1)%alpha_rho(1)': 0.96,
                                                     'patch_icpp(1)%alpha(1)': 4e-02, 'patch_icpp(1)%alpha_rho(2)': 0., 'patch_icpp(1)%alpha(2)': 0.,
                                                     'patch_icpp(2)%alpha_rho(1)': 0.96, 'patch_icpp(2)%alpha(1)': 4e-02, 'patch_icpp(2)%alpha_rho(2)': 0.,
                                                     'patch_icpp(2)%alpha(2)': 0.,  'patch_icpp(3)%alpha_rho(1)': 0.96, 'patch_icpp(3)%alpha(1)': 4e-02,
-                                                    'patch_icpp(3)%alpha_rho(2)': 0., 'patch_icpp(3)%alpha(2)': 0., 'patch_icpp(1)%pres': 1.0,
+                                                    'patch_icpp(3)%alpha_rho(2)': 0., 'patch_icpp(3)%alpha(2)': 0.,'patch_icpp(1)%pres': 1.0,
                                                     'patch_icpp(2)%pres': 1.0, 'patch_icpp(3)%pres': 1.0, 'acoustic_source': 'T', 'acoustic(1)%loc(2)': 0.5,
                                                     'acoustic(1)%wavelength': 0.25, 'acoustic(1)%mag': 2e+04, 't_step_start': 0, 't_step_stop': 50,
                                                     't_step_save': 50, 'lag_txt_wrt': "T", 'lag_header': "T", 'lag_db_wrt': "T", 'lag_id_wrt': "T",
                                                     'lag_pos_wrt': "T", 'lag_pos_prev_wrt': "T", 'lag_vel_wrt': "T", 'lag_rad_wrt': "T",
-                                                    'lag_rvel_wrt': "T", 'lag_r0_wrt': "T", 'lag_rmax_wrt': "T", 'lag_rmin_wrt': "T",
+                                                    'lag_rvel_wrt': "T",'lag_r0_wrt': "T", 'lag_rmax_wrt': "T", 'lag_rmin_wrt': "T",
                                                     'lag_dphidt_wrt': "T", 'lag_pres_wrt': "T", 'lag_mv_wrt': "T", 'lag_mg_wrt': "T",
                                                     'lag_betaT_wrt': "T", 'lag_betaC_wrt': "T", 'lag_params%write_bubbles': "T",
-                                                    'lag_params%write_bubbles_stats': "T", "polytropic": "F",
+                                                    'lag_params%write_bubbles_stats': "T", 'lag_params%write_void_evol':"T", "polytropic": "F",
                                                     'bub_pp%R0ref': 1.0, 'bub_pp%p0ref': 1.0, 'bub_pp%rho0ref': 1.0, 'bub_pp%T0ref': 1.0,
-                                                    'bub_pp%ss': 7.131653759435349e-07, 'bub_pp%pv': 0.02292716400352907, 'bub_pp%vd': 2.4752475247524753e-06,
+                                                    'bub_pp%ss': 7.131653759435349e-07, 'bub_pp%pv': 0.02292716400352907, 'bub_pp%vd': 2.4752475247524753e-06, 
                                                     'bub_pp%mu_l': 9.920792079207921e-08, 'bub_pp%gam_v': 1.33, 'bub_pp%gam_g': 1.4,
                                                     'bub_pp%M_v': 18.02, 'bub_pp%M_g': 28.97, 'bub_pp%k_v': 5.618695895665441e-06,
                                                     'bub_pp%k_g': 7.392868685947116e-06, 'bub_pp%R_v': 1347.810235139403, 'bub_pp%R_g': 838.3686723235085,
                                                     'bub_pp%cp_g': 2921.2822272326243, 'bub_pp%cp_v': 6134.692677188511
-                                                    })
+                                                })
 
                     if len(dimInfo[0]) == 2:
                         stack.push("", {'acoustic(1)%support': 2})

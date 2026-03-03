@@ -175,61 +175,56 @@ contains
         !! @param j x index
         !! @param k y index
         !! @param l z index
-        !! @param icfl_sf cell-centered inviscid cfl number
-        !! @param vcfl_sf (optional) cell-centered viscous CFL number
-        !! @param Rc_sf (optional) cell centered Rc
-    subroutine s_compute_stability_from_dt(vel, c, rho, Re_l, j, k, l, icfl_sf, vcfl_sf, Rc_sf)
+        !! @param icfl cell-centered inviscid cfl number
+        !! @param vcfl (optional) cell-centered viscous CFL number
+        !! @param Rc (optional) cell centered Rc
+    subroutine s_compute_stability_from_dt(vel, c, rho, Re_l, j, k, l, icfl, vcfl, Rc)
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in), dimension(num_vels) :: vel
         real(wp), intent(in) :: c, rho
-        real(wp), dimension(0:m, 0:n, 0:p), intent(inout) :: icfl_sf
-        real(wp), dimension(0:m, 0:n, 0:p), intent(inout), optional :: vcfl_sf, Rc_sf
+        real(wp), intent(inout) :: icfl
+        real(wp), intent(inout), optional :: vcfl, Rc
         real(wp), dimension(2), intent(in) :: Re_l
         integer, intent(in) :: j, k, l
 
         real(wp) :: fltr_dtheta
 
         ! Inviscid CFL calculation
-        if (p > 0 .or. n > 0) then
-            ! 2D/3D
-            icfl_sf(j, k, l) = dt/f_compute_multidim_cfl_terms(vel, c, j, k, l)
-        else
-            ! 1D
-            icfl_sf(j, k, l) = (dt/dx(j))*(abs(vel(1)) + c)
+        if (p > 0 .or. n > 0) then ! 2D/3D
+            icfl = dt/f_compute_multidim_cfl_terms(vel, c, j, k, l)
+        else ! 1D
+            icfl = (dt/dx(j))*(abs(vel(1)) + c)
         end if
 
         ! Viscous calculations
         if (viscous) then
-            if (p > 0) then
+            if (p > 0) then !3D
                 #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
-                    !3D
                     if (grid_geometry == 3) then
                         fltr_dtheta = f_compute_filtered_dtheta(k, l)
-                        vcfl_sf(j, k, l) = maxval(dt/Re_l/rho) &
-                                           /min(dx(j), dy(k), fltr_dtheta)**2._wp
-                        Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), &
-                                             dy(k)*(abs(vel(2)) + c), &
-                                             fltr_dtheta*(abs(vel(3)) + c)) &
-                                         /maxval(1._wp/Re_l)
+                        vcfl = maxval(dt/Re_l/rho) &
+                               /min(dx(j), dy(k), fltr_dtheta)**2._wp
+                        Rc = min(dx(j)*(abs(vel(1)) + c), &
+                                 dy(k)*(abs(vel(2)) + c), &
+                                 fltr_dtheta*(abs(vel(3)) + c)) &
+                             /maxval(1._wp/Re_l)
                     else
-                        vcfl_sf(j, k, l) = maxval(dt/Re_l/rho) &
-                                           /min(dx(j), dy(k), dz(l))**2._wp
-                        Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), &
-                                             dy(k)*(abs(vel(2)) + c), &
-                                             dz(l)*(abs(vel(3)) + c)) &
-                                         /maxval(1._wp/Re_l)
+                        vcfl = maxval(dt/Re_l/rho) &
+                               /min(dx(j), dy(k), dz(l))**2._wp
+                        Rc = min(dx(j)*(abs(vel(1)) + c), &
+                                 dy(k)*(abs(vel(2)) + c), &
+                                 dz(l)*(abs(vel(3)) + c)) &
+                             /maxval(1._wp/Re_l)
                     end if
                 #:endif
-            elseif (n > 0) then
-                !2D
-                vcfl_sf(j, k, l) = maxval(dt/Re_l/rho)/min(dx(j), dy(k))**2._wp
-                Rc_sf(j, k, l) = min(dx(j)*(abs(vel(1)) + c), &
-                                     dy(k)*(abs(vel(2)) + c)) &
-                                 /maxval(1._wp/Re_l)
-            else
-                !1D
-                vcfl_sf(j, k, l) = maxval(dt/Re_l/rho)/dx(j)**2._wp
-                Rc_sf(j, k, l) = dx(j)*(abs(vel(1)) + c)/maxval(1._wp/Re_l)
+            elseif (n > 0) then !2D
+                vcfl = maxval(dt/Re_l/rho)/min(dx(j), dy(k))**2._wp
+                Rc = min(dx(j)*(abs(vel(1)) + c), &
+                         dy(k)*(abs(vel(2)) + c)) &
+                     /maxval(1._wp/Re_l)
+            else !1D
+                vcfl = maxval(dt/Re_l/rho)/dx(j)**2._wp
+                Rc = dx(j)*(abs(vel(1)) + c)/maxval(1._wp/Re_l)
             end if
         end if
 
@@ -248,7 +243,7 @@ contains
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), dimension(num_vels), intent(in) :: vel
         real(wp), intent(in) :: c, rho
-        real(wp), dimension(0:m, 0:n, 0:p), intent(inout) :: max_dt
+        real(wp), intent(inout) :: max_dt
         real(wp), dimension(2), intent(in) :: Re_l
         integer, intent(in) :: j, k, l
 
@@ -256,18 +251,15 @@ contains
         real(wp) :: fltr_dtheta
 
         ! Inviscid CFL calculation
-        if (p > 0 .or. n > 0) then
-            ! 2D/3D cases
+        if (p > 0 .or. n > 0) then ! 2D/3D cases
             icfl_dt = cfl_target*f_compute_multidim_cfl_terms(vel, c, j, k, l)
-        else
-            ! 1D case
+        else ! 1D cases
             icfl_dt = cfl_target*(dx(j)/(abs(vel(1)) + c))
         end if
 
         ! Viscous calculations
         if (viscous) then
-            if (p > 0) then
-                !3D
+            if (p > 0) then !3D
                 if (grid_geometry == 3) then
                     fltr_dtheta = f_compute_filtered_dtheta(k, l)
                     vcfl_dt = cfl_target*(min(dx(j), dy(k), fltr_dtheta)**2._wp) &
@@ -276,19 +268,17 @@ contains
                     vcfl_dt = cfl_target*(min(dx(j), dy(k), dz(l))**2._wp) &
                               /maxval(1/(rho*Re_l))
                 end if
-            elseif (n > 0) then
-                !2D
+            elseif (n > 0) then !2D
                 vcfl_dt = cfl_target*(min(dx(j), dy(k))**2._wp)/maxval((1/Re_l)/rho)
-            else
-                !1D
+            else !1D
                 vcfl_dt = cfl_target*(dx(j)**2._wp)/maxval(1/(rho*Re_l))
             end if
         end if
 
-        if (any(Re_size > 0)) then
-            max_dt(j, k, l) = min(icfl_dt, vcfl_dt)
+        if (viscous) then
+            max_dt = min(icfl_dt, vcfl_dt)
         else
-            max_dt(j, k, l) = icfl_dt
+            max_dt = icfl_dt
         end if
 
     end subroutine s_compute_dt_from_cfl

@@ -99,10 +99,11 @@ contains
         $:GPU_UPDATE(device='[patch_ib(1:num_ibs)]')
 
         ! GPU routines require updated cell centers
-        $:GPU_UPDATE(device='[num_ibs, x_cc, y_cc, dx, dy, x_domain, y_domain]')
+        $:GPU_UPDATE(device='[num_ibs, x_cc, y_cc, dx, dy]')
         if (p /= 0) then
-            $:GPU_UPDATE(device='[z_cc, dz, z_domain]')
+            $:GPU_UPDATE(device='[z_cc, dz]')
         end if
+        $:GPU_UPDATE(device='[glb_bounds]')
 
         ! allocate STL models
         call s_instantiate_STL_models()
@@ -504,7 +505,7 @@ contains
                                 print *, [x_cc(i), y_cc(j), z_cc(k)]
                             end if
                             print *, "We are searching in dimension ", dim, " for image point at ", ghost_points_in(q)%ip_loc(:)
-                            print *, "Domain size: ", [x_cc(-buff_size), y_cc(-buff_size), z_cc(-buff_size)]
+                            print *, "Domain size: "
                             print *, "x: ", x_cc(-buff_size), " to: ", x_cc(m + buff_size - 1)
                             print *, "y: ", y_cc(-buff_size), " to: ", y_cc(n + buff_size - 1)
                             if (p /= 0) print *, "z: ", z_cc(-buff_size), " to: ", z_cc(p + buff_size - 1)
@@ -599,7 +600,7 @@ contains
         gp_layers_z = gp_layers
         if (p == 0) gp_layers_z = 0
 
-        $:GPU_PARALLEL_LOOP(private='[i,j,k,ii,jj,kk,is_gp,local_idx,patch_id,encoded_patch_id,xp,yp,zp]', copyin='[count,count_i, x_domain, y_domain, z_domain]', firstprivate='[gp_layers,gp_layers_z]', collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,ii,jj,kk,is_gp,local_idx,patch_id,encoded_patch_id,xp,yp,zp]', copyin='[count,count_i,glb_bounds]', firstprivate='[gp_layers,gp_layers_z]', collapse=3)
         do i = 0, m
             do j = 0, n
                 do k = 0, p
@@ -633,26 +634,26 @@ contains
                             ghost_points_in(local_idx)%z_periodicity = zp
                             ghost_points_in(local_idx)%slip = patch_ib(patch_id)%slip
 
-                            if ((x_cc(i) - dx(i)) < x_domain%beg) then
-                                ghost_points_in(local_idx)%DB(1) = -1
-                            else if ((x_cc(i) + dx(i)) > x_domain%end) then
-                                ghost_points_in(local_idx)%DB(1) = 1
+                            if ((x_cc(i) - dx(i)) < glb_bounds(1)%beg) then
+                                ghost_points_in(count)%DB(1) = -1
+                            else if ((x_cc(i) + dx(i)) > glb_bounds(1)%end) then
+                                ghost_points_in(count)%DB(1) = 1
                             else
                                 ghost_points_in(local_idx)%DB(1) = 0
                             end if
 
-                            if ((y_cc(j) - dy(j)) < y_domain%beg) then
-                                ghost_points_in(local_idx)%DB(2) = -1
-                            else if ((y_cc(j) + dy(j)) > y_domain%end) then
-                                ghost_points_in(local_idx)%DB(2) = 1
+                            if ((y_cc(j) - dy(j)) < glb_bounds(2)%beg) then
+                                ghost_points_in(count)%DB(2) = -1
+                            else if ((y_cc(j) + dy(j)) > glb_bounds(2)%end) then
+                                ghost_points_in(count)%DB(2) = 1
                             else
                                 ghost_points_in(local_idx)%DB(2) = 0
                             end if
 
                             if (p /= 0) then
-                                if ((z_cc(k) - dz(k)) < z_domain%beg) then
+                                if ((z_cc(k) - dz(k)) < glb_bounds(3)%beg) then
                                     ghost_points_in(local_idx)%DB(3) = -1
-                                else if ((z_cc(k) + dz(k)) > z_domain%end) then
+                                else if ((z_cc(k) + dz(k)) > glb_bounds(3)%end) then
                                     ghost_points_in(local_idx)%DB(3) = 1
                                 else
                                     ghost_points_in(local_idx)%DB(3) = 0
@@ -1293,16 +1294,16 @@ contains
 
         do patch_id = 1, num_ibs
             ! check domain wraps in x, y,
-            #:for X in [('x'), ('y')]
+            #:for X, ID in [('x', 1), ('y', 2)]
                 ! check for periodicity
                 if (bc_${X}$%beg == BC_PERIODIC) then
                     ! check if the boundary has left the domain, and then correct
-                    if (patch_ib(patch_id)%${X}$_centroid < ${X}$_domain%beg) then
+                    if (patch_ib(patch_id)%${X}$_centroid < glb_bounds(${ID}$)%beg) then
                         ! if the boundary exited "left", wrap it back around to the "right"
-                        patch_ib(patch_id)%${X}$_centroid = patch_ib(patch_id)%${X}$_centroid + (${X}$_domain%end - ${X}$_domain%beg)
-                    else if (patch_ib(patch_id)%${X}$_centroid > ${X}$_domain%end) then
+                        patch_ib(patch_id)%${X}$_centroid = patch_ib(patch_id)%${X}$_centroid + (glb_bounds(${ID}$)%end - glb_bounds(${ID}$)%beg)
+                    else if (patch_ib(patch_id)%${X}$_centroid > glb_bounds(${ID}$)%end) then
                         ! if the boundary exited "right", wrap it back around to the "left"
-                        patch_ib(patch_id)%${X}$_centroid = patch_ib(patch_id)%${X}$_centroid - (${X}$_domain%end - ${X}$_domain%beg)
+                        patch_ib(patch_id)%${X}$_centroid = patch_ib(patch_id)%${X}$_centroid - (glb_bounds(${ID}$)%end - glb_bounds(${ID}$)%beg)
                     end if
                 end if
             #:endfor
@@ -1311,12 +1312,12 @@ contains
                 ! check for periodicity
                 if (bc_z%beg == BC_PERIODIC) then
                     ! check if the boundary has left the domain, and then correct
-                    if (patch_ib(patch_id)%z_centroid < z_domain%beg) then
+                    if (patch_ib(patch_id)%z_centroid < glb_bounds(3)%beg) then
                         ! if the boundary exited "left", wrap it back around to the "right"
-                        patch_ib(patch_id)%z_centroid = patch_ib(patch_id)%z_centroid + (z_domain%end - z_domain%beg)
-                    else if (patch_ib(patch_id)%z_centroid > z_domain%end) then
+                        patch_ib(patch_id)%z_centroid = patch_ib(patch_id)%z_centroid + (glb_bounds(3)%end - glb_bounds(3)%beg)
+                    else if (patch_ib(patch_id)%z_centroid > glb_bounds(3)%end) then
                         ! if the boundary exited "right", wrap it back around to the "left"
-                        patch_ib(patch_id)%z_centroid = patch_ib(patch_id)%z_centroid - (z_domain%end - z_domain%beg)
+                        patch_ib(patch_id)%z_centroid = patch_ib(patch_id)%z_centroid - (glb_bounds(3)%end - glb_bounds(3)%beg)
                     end if
                 end if
             end if
