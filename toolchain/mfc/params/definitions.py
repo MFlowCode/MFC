@@ -854,6 +854,9 @@ def _load():  # pylint: disable=too-many-locals,too-many-statements
               "interpolation_order"]:
         _r(f"lag_params%{a}", INT, {'particles'})
 
+    for a in ["collision_force"]:
+        _r(f"lag_params%{a}", LOG, {'particles'})
+
     # --- chem_params ---
     for a in ["diffusion", "reactions"]:
         _r(f"chem_params%{a}", LOG, {"chemistry"})

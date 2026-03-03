@@ -488,6 +488,7 @@ module m_derived_types
         integer :: stokes_drag              !< Particle stokes drag
         integer :: added_mass_model         !< Particle added mass model
         integer :: interpolation_order      !< Fluid-to-Particle barycentric interpolation order
+        logical :: collision_force           !< Include collision forces
 
         character(LEN=pathlen_max) :: input_path !< Path to lag_bubbles.dat
         real(wp) :: epsilonb         !< Standard deviation scaling for the gaussian function

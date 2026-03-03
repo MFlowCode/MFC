@@ -884,6 +884,7 @@ contains
         lag_params%stokes_drag = dflt_int
         lag_params%added_mass_model = dflt_int
         lag_params%interpolation_order = dflt_int
+        lag_params%collision_force = .false.
 
         moving_lag_bubbles = .false.
         lag_vel_model = dflt_int

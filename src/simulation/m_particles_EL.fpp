@@ -31,6 +31,12 @@ module m_particles_EL
 
     use m_ibm
 
+    use m_weno                 !< Weighted and essentially non-oscillatory (WENO)
+                               !! schemes for spatial reconstruction of variables
+
+    use m_muscl                !< Monotonic Upstream-centered (MUSCL)
+                               !! schemes for conservation laws
+
     implicit none
 
     real(wp), save :: next_write_time = 0._wp
@@ -43,6 +49,9 @@ module m_particles_EL
 
     real(wp), allocatable, dimension(:) :: particle_mass            !< Particle Mass
     $:GPU_DECLARE(create='[particle_mass]')
+
+    integer, allocatable, dimension(:) :: linked_list            !< particle cell linked list
+    $:GPU_DECLARE(create='[linked_list]')
 
     !(nPart, 1 -> actual val or 2 -> temp val)
     real(wp), allocatable, dimension(:, :) :: particle_rad      !< Particle radius
@@ -67,9 +76,14 @@ module m_particles_EL
     !< Projection of the lagrangian particles in the Eulerian framework
     type(scalar_field), dimension(:), allocatable :: q_particles
     integer :: q_particles_idx                     !< Size of the q vector field for particle cell (q)uantities
-    integer, parameter :: alphap_upx_id = 6 !< x particle momentum index
-    integer, parameter :: alphap_upy_id = 7 !< y particle momentum index
-    integer, parameter :: alphap_upz_id = 8 !< z particle momentum index
+    integer, parameter :: alphaf_id = 1
+    integer, parameter :: alphaupx_id = 2 !< x particle momentum index
+    integer, parameter :: alphaupy_id = 3 !< y particle momentum index
+    integer, parameter :: alphaupz_id = 4 !< z particle momentum index
+    integer, parameter :: Smx_id = 5
+    integer, parameter :: Smy_id = 6
+    integer, parameter :: Smz_id = 7
+    integer, parameter :: SE_id = 8
 
     type(scalar_field), dimension(:), allocatable :: field_vars !< For cell quantities (field gradients, etc.)
     integer, parameter :: dPx_id = 1 !< Spatial pressure gradient in x, y, and z
@@ -99,9 +113,20 @@ module m_particles_EL
     type(scalar_field), dimension(:), allocatable :: weights_z_grad !< For precomputing weights
     integer :: nWeights_grad
 
+    type(integer_field), dimension(:), allocatable :: particle_head !< particle heads at each cell
+
     $:GPU_DECLARE(create='[Rmax_glb,Rmin_glb,q_particles,q_particles_idx,field_vars]')
     $:GPU_DECLARE(create='[weights_x_interp,weights_y_interp,weights_z_interp,nWeights_interp]')
     $:GPU_DECLARE(create='[weights_x_grad,weights_y_grad,weights_z_grad,nWeights_grad]')
+
+    real(wp), allocatable, dimension(:, :, :, :) :: myL_rsx_vf, myL_rsy_vf, myL_rsz_vf, myR_rsx_vf, myR_rsy_vf, myR_rsz_vf
+    $:GPU_DECLARE(create='[myL_rsx_vf,myL_rsy_vf,myL_rsz_vf,myR_rsx_vf,myR_rsy_vf,myR_rsz_vf]')
+    integer, parameter :: r_alphaf_id = 1 !< Reconstructed fluid volume fraction
+    integer, parameter :: r_alphaupx_id = 2 !< Reconstructed particle velocity in x, y, and z
+    integer, parameter :: r_alphaupy_id = 3
+    integer, parameter :: r_alphaupz_id = 4
+    integer, parameter :: r_rhouf_id = 5 !< Reconstructed fluid momentum
+    integer, parameter :: nRecon = 5
 
     !Particle Source terms for fluid coupling
     real(wp), allocatable, dimension(:, :) :: f_p !< force on each particle
@@ -115,6 +140,14 @@ module m_particles_EL
     integer, allocatable, dimension(:, :) :: wrap_bubble_loc, wrap_bubble_dir
     $:GPU_DECLARE(create='[keep_bubble]')
     $:GPU_DECLARE(create='[wrap_bubble_loc, wrap_bubble_dir]')
+
+    integer :: ncc
+
+    type(int_bounds_info) :: is1_loc, is2_loc, is3_loc
+    $:GPU_DECLARE(create='[is1_loc,is2_loc,is3_loc]')
+
+    type(int_bounds_info) :: iv_loc !< Vector field indical bounds
+    $:GPU_DECLARE(create='[iv_loc]')
 
 contains
 
@@ -131,6 +164,17 @@ contains
         real(wp) :: rhou, alpharhou, rho_f, alpharho
         real(wp), dimension(3) :: fluid_vel
         real(wp) :: rhoYks(1:num_species)
+        integer :: save_count
+        real(wp) :: qtime
+
+        if (cfl_dt) then
+            save_count = n_start
+            qtime = n_start*t_save
+        else
+            save_count = t_step_start
+            qtime = t_step_start*dt
+        end if
+
         pi_inf = 0._wp
         qv = 0._wp
         gamma = gammas(1)
@@ -152,16 +196,18 @@ contains
         nWeights_interp = lag_params%interpolation_order + 1
         nWeights_grad = fd_order + 1
 
-        pcomm_coords(1)%beg = x_cb(-1)
-        pcomm_coords(1)%end = x_cb(m)
+        ncc = 3 !max(1,fd_order,lag_params%interpolation_order,buff_size)
+
+        pcomm_coords(1)%beg = x_cb(-1 + ncc)
+        pcomm_coords(1)%end = x_cb(m - ncc)
         $:GPU_UPDATE(device='[pcomm_coords(1)]')
         if (n > 0) then
-            pcomm_coords(2)%beg = y_cb(-1)
-            pcomm_coords(2)%end = y_cb(n)
+            pcomm_coords(2)%beg = y_cb(-1 + ncc)
+            pcomm_coords(2)%end = y_cb(n - ncc)
             $:GPU_UPDATE(device='[pcomm_coords(2)]')
             if (p > 0) then
-                pcomm_coords(3)%beg = z_cb(-1)
-                pcomm_coords(3)%end = z_cb(p)
+                pcomm_coords(3)%beg = z_cb(-1 + ncc)
+                pcomm_coords(3)%end = z_cb(p - ncc)
                 $:GPU_UPDATE(device='[pcomm_coords(3)]')
             end if
         end if
@@ -176,6 +222,12 @@ contains
             @:ACC_SETUP_SFs(q_particles(i))
         end do
 
+        @:ALLOCATE(particle_head(1))
+        @:ALLOCATE(particle_head(1)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+            idwbuff(2)%beg:idwbuff(2)%end, &
+            idwbuff(3)%beg:idwbuff(3)%end))
+        @:ACC_SETUP_SFs(particle_head(1))
+
         @:ALLOCATE(field_vars(1:nField_vars))
         do i = 1, nField_vars
             @:ALLOCATE(field_vars(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
@@ -183,6 +235,28 @@ contains
                 idwbuff(3)%beg:idwbuff(3)%end))
             @:ACC_SETUP_SFs(field_vars(i))
         end do
+
+        @:ALLOCATE(myL_rsx_vf(idwbuff(1)%beg:idwbuff(1)%end, &
+            idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, 1:nRecon))
+        @:ALLOCATE(myR_rsx_vf(idwbuff(1)%beg:idwbuff(1)%end, &
+            idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, 1:nRecon))
+
+        @:ALLOCATE(myL_rsy_vf(idwbuff(2)%beg:idwbuff(2)%end, &
+            idwbuff(1)%beg:idwbuff(1)%end, idwbuff(3)%beg:idwbuff(3)%end, 1:nRecon))
+        @:ALLOCATE(myR_rsy_vf(idwbuff(2)%beg:idwbuff(2)%end, &
+            idwbuff(1)%beg:idwbuff(1)%end, idwbuff(3)%beg:idwbuff(3)%end, 1:nRecon))
+
+        if (p > 0) then
+            @:ALLOCATE(myL_rsz_vf(idwbuff(3)%beg:idwbuff(3)%end, &
+                idwbuff(2)%beg:idwbuff(2)%end, idwbuff(1)%beg:idwbuff(1)%end, 1:nRecon))
+            @:ALLOCATE(myR_rsz_vf(idwbuff(3)%beg:idwbuff(3)%end, &
+                idwbuff(2)%beg:idwbuff(2)%end, idwbuff(1)%beg:idwbuff(1)%end, 1:nRecon))
+        else
+            @:ALLOCATE(myL_rsz_vf(idwbuff(1)%beg:idwbuff(1)%end, &
+                idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, 1:nRecon))
+            @:ALLOCATE(myR_rsz_vf(idwbuff(1)%beg:idwbuff(1)%end, &
+                idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, 1:nRecon))
+        end if
 
         @:ALLOCATE(weights_x_interp(1:nWeights_interp))
         do i = 1, nWeights_interp
@@ -237,6 +311,7 @@ contains
         @:ALLOCATE(particle_dposdt(1:nParticles_glb, 1:3, 1:lag_num_ts))
         @:ALLOCATE(particle_dveldt(1:nParticles_glb, 1:3, 1:lag_num_ts))
         @:ALLOCATE(f_p(1:nParticles_glb, 1:3))
+        @:ALLOCATE(linked_list(1:nParticles_glb))
 
         @:ALLOCATE(keep_bubble(1:nParticles_glb))
         @:ALLOCATE(wrap_bubble_loc(1:nParticles_glb, 1:num_dims), wrap_bubble_dir(1:nParticles_glb, 1:num_dims))
@@ -269,41 +344,49 @@ contains
         npts = (nWeights_grad - 1)/2
         call s_compute_fornberg_fd_weights(npts) !For finite differences
 
-        !> Correcting initial conditions
-        $:GPU_PARALLEL_LOOP(private='[i,j,k,dyn_pres,fluid_vel,rho_f,alpharho,rhou,alpharhou]', collapse=3, copyin = '[pi_inf, qv, gamma, rhoYks]')
-        do k = idwint(3)%beg, idwint(3)%end
-            do j = idwint(2)%beg, idwint(2)%end
-                do i = idwint(1)%beg, idwint(1)%end
-                    !!!!!!!!! Mass
-                    do l = 1, num_fluids !num_fluid is just 1 right now
-                        rho_f = q_cons_vf(l)%sf(i, j, k)
-                        alpharho = q_particles(1)%sf(i, j, k)*rho_f
-                        q_cons_vf(l)%sf(i, j, k) = alpharho
+        call s_enforce_EL_particles_boundary_conditions(q_cons_vf, 0)
+
+        if (lag_params%solver_approach == 2) then
+            if (save_count == 0) then
+
+                !> Correcting initial conditions so they account for particles
+                $:GPU_PARALLEL_LOOP(private='[i,j,k,dyn_pres,fluid_vel,rho_f,alpharho,rhou,alpharhou]', collapse=3, copyin = '[pi_inf, qv, gamma, rhoYks]')
+                do k = idwint(3)%beg, idwint(3)%end
+                    do j = idwint(2)%beg, idwint(2)%end
+                        do i = idwint(1)%beg, idwint(1)%end
+                        !!!!!!!!! Mass
+                            do l = 1, num_fluids !num_fluid is just 1 right now
+                                rho_f = q_cons_vf(l)%sf(i, j, k)
+                                alpharho = q_particles(alphaf_id)%sf(i, j, k)*rho_f
+                                q_cons_vf(l)%sf(i, j, k) = alpharho
+                            end do
+
+                        !!!!!!!!! Momentum
+                            dyn_pres = 0._wp
+                            do l = momxb, momxe
+                                fluid_vel(l - momxb + 1) = q_cons_vf(l)%sf(i, j, k)/rho_f
+                                rhou = q_cons_vf(l)%sf(i, j, k)
+                                alpharhou = q_particles(alphaf_id)%sf(i, j, k)*rhou
+                                q_cons_vf(l)%sf(i, j, k) = alpharhou
+                                dyn_pres = dyn_pres + q_cons_vf(l)%sf(i, j, k)* &
+                                           fluid_vel(l - momxb + 1)/2._wp
+                            end do
+
+                        !!!!!!!!!Energy
+                            call s_compute_pressure(q_cons_vf(E_idx)%sf(i, j, k), &
+                                                    q_cons_vf(alf_idx)%sf(i, j, k), &
+                                                    dyn_pres, pi_inf, gamma, alpharho, &
+                                                    qv, rhoYks, pres, T)
+
+                            q_cons_vf(E_idx)%sf(i, j, k) = &
+                                gamma*pres + dyn_pres + pi_inf + qv !Updating energy in cons
+                        end do
                     end do
-
-                    !!!!!!!!! Momentum
-                    dyn_pres = 0._wp
-                    do l = momxb, momxe
-                        fluid_vel(l - momxb + 1) = q_cons_vf(l)%sf(i, j, k)/rho_f
-                        rhou = q_cons_vf(l)%sf(i, j, k)
-                        alpharhou = q_particles(1)%sf(i, j, k)*rhou
-                        q_cons_vf(l)%sf(i, j, k) = alpharhou
-                        dyn_pres = dyn_pres + q_cons_vf(l)%sf(i, j, k)* &
-                                   fluid_vel(l - momxb + 1)/2._wp
-                    end do
-
-                    !!!!!!!!!Energy
-                    call s_compute_pressure(q_cons_vf(E_idx)%sf(i, j, k), &
-                                            q_cons_vf(alf_idx)%sf(i, j, k), &
-                                            dyn_pres, pi_inf, gamma, alpharho, &
-                                            qv, rhoYks, pres, T)
-
-                    q_cons_vf(E_idx)%sf(i, j, k) = &
-                        gamma*pres + dyn_pres + pi_inf + qv !Updating energy in cons
                 end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
+                $:END_GPU_PARALLEL_LOOP()
+
+            end if
+        end if
 
     end subroutine s_initialize_particles_EL_module
 
@@ -392,7 +475,6 @@ contains
 
         !Populate temporal variables
         call s_transfer_data_to_tmp_particles()
-        call s_smear_particle_sources()
 
         if (save_count == 0) then
             ! Create ./D directory
@@ -654,31 +736,78 @@ contains
         !! @param rhs_vf Calculated change of conservative variables
         !! @param t_step Current time step
         !! @param stage Current stage in the time-stepper algorithm
-    subroutine s_compute_particle_EL_dynamics(q_prim_vf, stage, q_cons_vf)
+    subroutine s_compute_particle_EL_dynamics(q_prim_vf, stage, q_cons_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z)
 #ifdef MFC_OpenMP
         !DIR$ OPTIMIZE (-O1)
 #endif
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         integer, intent(in) :: stage
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vL_x, vL_y, vL_z
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vR_x, vR_y, vR_z
 
         integer, dimension(3) :: cell
         real(wp) :: myMass, myR, myBeta_c, myBeta_t, myR0, myRe, myVolumeFrac, myGamma, rmass_add
         real(wp), dimension(3) :: myVel, myPos, force_vec
 
-        integer :: k, l
+        integer :: k, l, i, j
+
+        $:GPU_PARALLEL_LOOP(private='[k]')
+        do k = 1, n_el_particles_loc
+            f_p(k, :) = 0._wp
+        end do
+        $:END_GPU_PARALLEL_LOOP()
 
         if (lag_params%pressure_force .or. lag_params%added_mass_model > 0) then
             do l = 1, num_dims
-                call s_gradient_dir_fornberg(q_prim_vf(E_idx)%sf, field_vars(dPx_id + l - 1)%sf, l)
+                if (l == 1) then
+                    call s_gradient_field(vL_x, vR_x, field_vars(dPx_id)%sf, l, E_idx)
+                elseif (l == 2) then
+                    call s_gradient_field(vL_y, vR_y, field_vars(dPy_id)%sf, l, E_idx)
+                elseif (l == 3) then
+                    call s_gradient_field(vL_z, vR_z, field_vars(dPz_id)%sf, l, E_idx)
+                end if
             end do
         end if
 
         if (lag_params%added_mass_model > 0) then
-            do l = 1, num_dims
-                call s_gradient_dir_fornberg(q_prim_vf(1)%sf, field_vars(dRhox_id + l - 1)%sf, l)
-                call s_gradient_dir_fornberg(q_cons_vf(momxb + l - 1)%sf, field_vars(dRhoux_id + l - 1)%sf, l)
+
+            $:GPU_PARALLEL_LOOP(private='[i,j,k]')
+            do i = idwbuff(1)%beg, idwbuff(1)%end
+                do j = idwbuff(2)%beg, idwbuff(2)%end
+                    do k = idwbuff(3)%beg, idwbuff(3)%end
+
+                        myL_rsx_vf(i, j, k, r_rhouf_id) = vL_x(i, j, k, 1)*vL_x(i, j, k, momxb)
+                        myL_rsy_vf(j, i, k, r_rhouf_id) = vL_y(j, i, k, 1)*vL_y(j, i, k, momxb + 1)
+                        myR_rsx_vf(i, j, k, r_rhouf_id) = vR_x(i, j, k, 1)*vR_x(i, j, k, momxb)
+                        myR_rsy_vf(j, i, k, r_rhouf_id) = vR_y(j, i, k, 1)*vR_y(j, i, k, momxb + 1)
+
+                        if (num_dims == 3) then
+                            myL_rsz_vf(k, j, i, r_rhouf_id) = vL_z(k, j, i, 1)*vL_z(k, j, i, momxb + 2)
+                            myR_rsz_vf(k, j, i, r_rhouf_id) = vR_z(k, j, i, 1)*vR_z(k, j, i, momxb + 2)
+                        else
+                            myL_rsz_vf(i, j, k, r_rhouf_id) = vL_z(i, j, k, 1)*vL_z(i, j, k, momxb + 2)
+                            myR_rsz_vf(i, j, k, r_rhouf_id) = vR_z(i, j, k, 1)*vR_z(i, j, k, momxb + 2)
+                        end if
+
+                    end do
+                end do
             end do
+            $:END_GPU_PARALLEL_LOOP()
+
+            do l = 1, num_dims
+                if (l == 1) then
+                    call s_gradient_field(vL_x, vR_x, field_vars(dRhox_id)%sf, l, 1)
+                    call s_gradient_field(myL_rsx_vf, myR_rsx_vf, field_vars(dRhoux_id)%sf, l, r_rhouf_id)
+                elseif (l == 2) then
+                    call s_gradient_field(vL_y, vR_y, field_vars(dRhoy_id)%sf, l, 1)
+                    call s_gradient_field(myL_rsy_vf, myR_rsy_vf, field_vars(dRhouy_id)%sf, l, r_rhouf_id)
+                elseif (l == 3) then
+                    call s_gradient_field(vL_z, vR_z, field_vars(dRhoz_id)%sf, l, 1)
+                    call s_gradient_field(myL_rsz_vf, myR_rsz_vf, field_vars(dRhouz_id)%sf, l, r_rhouf_id)
+                end if
+            end do
+
         end if
 
         myGamma = (1._wp/fluid_pp(1)%gamma) + 1._wp
@@ -686,9 +815,14 @@ contains
 
         call nvtxStartRange("LAGRANGE-PARTICLE-DYNAMICS")
 
+        if (lag_params%collision_force) then
+            !First compute collision forces
+            call s_compute_particle_EL_collisions(stage)
+        end if
+
+        !Then compute drag/pressure/added mass forces and convert to particle acceleration
         $:GPU_PARALLEL_LOOP(private='[k,l,cell,myMass,myR,myR0,myPos,myVel,myVolumeFrac,force_vec,rmass_add]',&
         & copyin='[stage, myGamma, myRe]')
-
         do k = 1, n_el_particles_loc
 
             cell = fd_number - buff_size
@@ -700,9 +834,8 @@ contains
             myR0 = particle_R0(k)
             myPos = particle_pos(k, :, 2)
             myVel = particle_vel(k, :, 2)
-            myVolumeFrac = 1._wp - q_particles(1)%sf(cell(1), cell(2), cell(3))
+            myVolumeFrac = 1._wp - q_particles(alphaf_id)%sf(cell(1), cell(2), cell(3))
 
-            f_p(k, :) = 0._wp
             particle_dposdt(k, :, stage) = 0._wp
             particle_dveldt(k, :, stage) = 0._wp
             particle_draddt(k, stage) = 0._wp
@@ -711,7 +844,7 @@ contains
                                       q_prim_vf, field_vars, weights_x_interp, weights_y_interp, weights_z_interp, &
                                       force_vec, rmass_add)
 
-            f_p(k, :) = force_vec(:)
+            f_p(k, :) = f_p(k, :) + force_vec(:)
 
             do l = 1, num_dims
                 particle_dposdt(k, l, stage) = myVel(l)
@@ -728,7 +861,257 @@ contains
         $:GPU_UPDATE(host='[f_p, particle_dposdt, particle_dveldt, particle_draddt]')
         call nvtxEndRange
 
+        ! call s_eliminate_ghost_particles()
+        ! call s_enforce_EL_particles_boundary_conditions(q_prim_vf, stage)
+
     end subroutine s_compute_particle_EL_dynamics
+
+    !>  Contains the particle collision force computation.
+    subroutine s_compute_particle_EL_collisions(stage)
+
+        integer, intent(in) :: stage
+        integer, dimension(3) :: cell
+        integer, dimension(3) :: cellaux
+        integer :: k, l, q, ip, jp, kp, ii, jj, kk
+        logical :: celloutside
+        real(wp) :: pidtksp2, ksp, nu1, nu2, Rp1, Rp2, E1, E2, Estar, cor, rmag, Rstar, dij, eta_n, kappa_n, mp1, mp2, dt_loc
+        real(wp), dimension(3) :: xp1, xp2, vp1, vp2, v_rel, rpij, nij, vnij, Fnpp_ij
+        integer :: kpz
+        integer :: newBubs
+
+        if (lag_num_ts == 1) then
+            dt_loc = dt
+        elseif (lag_num_ts == 2) then
+            if (stage == 1) then
+                dt_loc = dt
+            elseif (stage == 2) then
+                dt_loc = dt/2._wp
+            end if
+        elseif (lag_num_ts == 3) then
+            if (stage == 1) then
+                dt_loc = dt
+            elseif (stage == 2) then
+                dt_loc = dt/4._wp
+            elseif (stage == 3) then
+                dt_loc = (2._wp/3._wp)*dt
+            end if
+        end if
+
+        kpz = 0
+        if (num_dims == 3) kpz = 1
+
+        ksp = 10._wp
+        nu1 = 0.35
+        nu2 = 0.35
+        E1 = 1e9
+        E2 = 1e9
+        cor = 0.7
+
+        pidtksp2 = (pi**2)/((dt_loc*ksp)**2)
+
+        Estar = 1/(((1 - nu1**2)/E1) + ((1 - nu2**2)/E2))
+        Estar = (4._wp/3._wp)*Estar
+
+        call nvtxStartRange("LAGRANGE-PARTICLE-LINKED-LIST")
+
+        $:GPU_PARALLEL_LOOP(private='[k,cell]')
+        do k = 1, n_el_particles_loc
+
+            cell = fd_number - buff_size
+            call s_locate_cell(particle_pos(k, 1:3, 2), cell, particle_s(k, 1:3, 2))
+
+            !!!!! Particle linked list building
+            $:GPU_ATOMIC(atomic='capture')
+            linked_list(k) = particle_head(1)%sf(cell(1), cell(2), cell(3))
+            particle_head(1)%sf(cell(1), cell(2), cell(3)) = k
+            $:END_GPU_ATOMIC()
+
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        call nvtxEndRange
+
+        call nvtxStartRange("LAGRANGE-PARTICLE-COLLISIONS")
+
+        $:GPU_PARALLEL_LOOP(private='[k,cell,ip,jp,kp,Rp1,xp1,mp1,vp1,kk,jj,ii,cellaux,q,Rp2,xp2,mp2,vp2,v_rel,Rstar,rpij,rmag,nij,vnij,dij,kappa_n,eta_n,Fnpp_ij]',&
+        & copyin='[ksp,nu1,nu2,E1,E2,cor,pidtksp2,Estar,kpz,dt_loc]')
+        do k = 1, n_el_particles_loc
+
+            cell = fd_number - buff_size
+            call s_locate_cell(particle_pos(k, 1:3, 2), cell, particle_s(k, 1:3, 2))
+
+            ip = cell(1)
+            jp = cell(2)
+            kp = cell(3)
+
+            Rp1 = particle_rad(k, 2)
+            xp1 = particle_pos(k, :, 2)
+            mp1 = particle_mass(k)
+            vp1 = particle_vel(k, :, 2)
+
+            do kk = kp - kpz, kp + kpz
+                do jj = jp - 1, jp + 1
+                    do ii = ip - 1, ip + 1
+
+                        cellaux(1) = ii
+                        cellaux(2) = jj
+                        cellaux(3) = kk
+
+                        call s_check_celloutside_wbuff(cellaux, celloutside)
+
+                        if (.not. celloutside) then
+                            q = particle_head(1)%sf(ii, jj, kk)
+                            ! Traverse linked list in that cell
+                            do while (q /= -1)
+
+                                if (q > k) then
+
+                                    Rp2 = particle_rad(q, 2)
+                                    xp2 = particle_pos(q, :, 2)
+                                    mp2 = particle_mass(q)
+                                    vp2 = particle_vel(q, :, 2)
+                                    v_rel = vp2 - vp1
+
+                                    Rstar = (Rp1*Rp2)/(Rp1 + Rp2)
+                                    rpij = xp2 - xp1
+                                    rmag = sqrt(rpij(1)**2 + rpij(2)**2 + rpij(3)**2)
+                                    nij = rpij/rmag
+                                    vnij = dot_product(v_rel, nij)*nij
+                                    dij = (Rp1 + Rp2) - rmag
+
+                                    if (dij > 0._wp) then
+
+                                        kappa_n = min((pidtksp2*mp1), (Estar*sqrt(Rstar)*sqrt(abs(dij))))
+
+                                        eta_n = ((-2._wp*sqrt(kappa_n)*log(cor))/sqrt((log(cor))**2 + pi**2))*(1._wp/sqrt((1/mp1) + (1/mp2)))
+
+                                        Fnpp_ij = -kappa_n*dij*nij - eta_n*vnij
+
+                                        f_p(k, :) = f_p(k, :) + Fnpp_ij
+                                        f_p(q, :) = f_p(q, :) - Fnpp_ij
+
+                                        ! write(*,*) "pidtksp2 * mp1 = ", pidtksp2 * mp1
+                                        ! write(*,*) "(Estar * sqrt(Rstar) * sqrt(abs(dij))) = ", (Estar * sqrt(Rstar) * sqrt(abs(dij)))
+                                        ! write(*,*) "Colliding particles"
+                                        ! write(*,*) "Fnpp_ij = ", Fnpp_ij
+                                        ! write(*,*) "k = ", k
+                                        ! write(*,*) "f_p(k,:) = ", f_p(k,:)
+                                        ! write(*,*) "q = ", q
+                                        ! write(*,*) "f_p(q,:) = ", f_p(q,:)
+                                    end if
+
+                                end if
+
+                                q = linked_list(q)
+
+                            end do
+                        end if
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        call nvtxEndRange
+
+    end subroutine s_compute_particle_EL_collisions
+
+    !>  Contains deletion of ghost particles
+    subroutine s_eliminate_ghost_particles()
+
+        integer :: newBubs, k
+        !Remove ghost particles immediately after done using them
+
+        $:GPU_PARALLEL_LOOP(private='[k]')
+        do k = 1, n_el_particles_loc
+            keep_bubble(k) = 1
+
+            if (particle_pos(k, 1, 2) >= x_cb(m)) then
+                keep_bubble(k) = 0
+            elseif (particle_pos(k, 1, 2) < x_cb(-1)) then
+                keep_bubble(k) = 0
+            end if
+
+            if (particle_pos(k, 2, 2) >= y_cb(n)) then
+                keep_bubble(k) = 0
+            elseif (particle_pos(k, 2, 2) < y_cb(-1)) then
+                keep_bubble(k) = 0
+            end if
+
+            if (p > 0) then
+                if (particle_pos(k, 3, 2) >= z_cb(p)) then
+                    keep_bubble(k) = 0
+                elseif (particle_pos(k, 3, 2) < z_cb(-1)) then
+                    keep_bubble(k) = 0
+                end if
+            end if
+
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        if (n_el_particles_loc > 0) then
+            call nvtxStartRange("LAG-BC")
+            call nvtxStartRange("LAG-BC-DEV2HOST")
+            $:GPU_UPDATE(host='[particle_R0, Rmax_stats_part, Rmin_stats_part, particle_mass, f_p, &
+                & lag_part_id, particle_rad, &
+                & particle_pos, particle_posPrev, particle_vel, particle_s, particle_draddt, &
+                & particle_dposdt, particle_dveldt, keep_bubble, n_el_particles_loc, &
+                & wrap_bubble_dir, wrap_bubble_loc]')
+            call nvtxEndRange
+
+            newBubs = 0
+            do k = 1, n_el_particles_loc
+                if (keep_bubble(k) == 1) then
+                    newBubs = newBubs + 1
+                    if (newBubs /= k) then
+                        call s_copy_lag_particle(newBubs, k)
+                    end if
+                end if
+            end do
+
+            n_el_particles_loc = newBubs
+
+            call nvtxStartRange("LAG-BC-HOST2DEV")
+            $:GPU_UPDATE(device='[particle_R0, Rmax_stats_part, Rmin_stats_part, particle_mass, f_p, &
+            & lag_part_id, particle_rad, &
+            & particle_pos, particle_posPrev, particle_vel, particle_s, particle_draddt, &
+            & particle_dposdt, particle_dveldt, n_el_particles_loc]')
+            call nvtxEndRange
+        end if
+
+    end subroutine s_eliminate_ghost_particles
+
+    !> The purpose of this subroutine is to check if the current cell is outside the computational domain or not (including ghost cells).
+            !! @param cellaux Tested cell to smear the particle effect in.
+            !! @param celloutside If true, then cellaux is outside the computational domain.
+    subroutine s_check_celloutside_wbuff(cellaux, celloutside)
+        $:GPU_ROUTINE(function_name='s_check_celloutside_wbuff',parallelism='[seq]', &
+            & cray_inline=True)
+
+        integer, dimension(3), intent(inout) :: cellaux
+        logical, intent(out) :: celloutside
+
+        celloutside = .false.
+
+        if (num_dims == 2) then
+            if ((cellaux(1) < -buff_size) .or. (cellaux(2) < -buff_size)) then
+                celloutside = .true.
+            end if
+
+            if ((cellaux(1) > m + buff_size) .or. (cellaux(2) > n + buff_size)) then
+                celloutside = .true.
+            end if
+        else
+            if ((cellaux(1) < -buff_size) .or. (cellaux(2) < -buff_size) .or. (cellaux(3) < -buff_size)) then
+                celloutside = .true.
+            end if
+
+            if ((cellaux(1) > m + buff_size) .or. (cellaux(2) > n + buff_size) .or. (cellaux(3) > p + buff_size)) then
+                celloutside = .true.
+            end if
+        end if
+
+    end subroutine s_check_celloutside_wbuff
 
     !>  The purpose of this subroutine is to obtain the bubble source terms based on Maeda and Colonius (2018)
         !!      and add them to the RHS scalar field.
@@ -746,24 +1129,37 @@ contains
 
         call s_smear_particle_sources() !To fill in q_particles with volume fraction and source term contributions
 
-        !Spatial derivative of the fluid volume fraction. q_particles(1) is fluid volume fraction.
         do l = 1, num_dims
-            call s_gradient_dir_fornberg(q_particles(1)%sf, field_vars(dalphafx_id + l - 1)%sf, l)
+            iv_loc%beg = r_alphaf_id; iv_loc%end = r_alphaupz_id
+            call s_reconstruct_cell_boundary_values_loc( &
+                q_particles(iv_loc%beg:iv_loc%end), &
+                myL_rsx_vf, myL_rsy_vf, myL_rsz_vf, &
+                myR_rsx_vf, myR_rsy_vf, myR_rsz_vf, &
+                l)
+
         end do
 
-        !Spatial derivative of the eulerian particle momentum. q_particles(-3:-1) is alpha_p u_p components
         do l = 1, num_dims
-            call s_gradient_dir_fornberg(q_particles(alphap_upx_id + l - 1)%sf, field_vars(dalphap_upx_id + l - 1)%sf, l)
+            if (l == 1) then
+                call s_gradient_field(myL_rsx_vf, myR_rsx_vf, field_vars(dalphafx_id)%sf, l, r_alphaf_id)
+                call s_gradient_field(myL_rsx_vf, myR_rsx_vf, field_vars(dalphap_upx_id)%sf, l, r_alphaupx_id)
+            elseif (l == 2) then
+                call s_gradient_field(myL_rsy_vf, myR_rsy_vf, field_vars(dalphafy_id)%sf, l, r_alphaf_id)
+                call s_gradient_field(myL_rsy_vf, myR_rsy_vf, field_vars(dalphap_upy_id)%sf, l, r_alphaupy_id)
+            elseif (l == 3) then
+                call s_gradient_field(myL_rsz_vf, myR_rsz_vf, field_vars(dalphafz_id)%sf, l, r_alphaf_id)
+                call s_gradient_field(myL_rsz_vf, myR_rsz_vf, field_vars(dalphap_upz_id)%sf, l, r_alphaupz_id)
+            end if
         end do
 
         !> Apply particle sources to the Eulerian RHS
-        $:GPU_PARALLEL_LOOP(private='[i,j,k,alpha_f,dalphapdt,udot_gradalpha]', collapse=3, copyin='[dalphap_upx_id,dalphafx_id]')
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,alpha_f,dalphapdt,udot_gradalpha]', collapse=3)
         do k = idwint(3)%beg, idwint(3)%end
             do j = idwint(2)%beg, idwint(2)%end
                 do i = idwint(1)%beg, idwint(1)%end
-                    if (q_particles(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
+                    if (q_particles(alphaf_id)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
 
-                        alpha_f = q_particles(1)%sf(i, j, k)
+                        alpha_f = q_particles(alphaf_id)%sf(i, j, k)
 
                         dalphapdt = 0
                         do l = 1, num_dims
@@ -798,20 +1194,20 @@ contains
 
                         !> Step 2: Add the drag/pressure/added mass forces to the fluid
 
-                        rhs_vf(momxb)%sf(i, j, k) = rhs_vf(momxb)%sf(i, j, k) + q_particles(2)%sf(i, j, k)*(1._wp/alpha_f)
-                        rhs_vf(momxb + 1)%sf(i, j, k) = rhs_vf(momxb + 1)%sf(i, j, k) + q_particles(3)%sf(i, j, k)*(1._wp/alpha_f)
+                        rhs_vf(momxb)%sf(i, j, k) = rhs_vf(momxb)%sf(i, j, k) + q_particles(Smx_id)%sf(i, j, k)*(1._wp/alpha_f)
+                        rhs_vf(momxb + 1)%sf(i, j, k) = rhs_vf(momxb + 1)%sf(i, j, k) + q_particles(Smy_id)%sf(i, j, k)*(1._wp/alpha_f)
 
                         ! Energy source
                         rhs_vf(E_idx)%sf(i, j, k) = rhs_vf(E_idx)%sf(i, j, k) + &
-                                                    (q_particles(2)%sf(i, j, k)*q_prim_vf(momxb)%sf(i, j, k) &
-                                                     + q_particles(3)%sf(i, j, k)*q_prim_vf(momxb + 1)%sf(i, j, k) &
-                                                     + q_particles(5)%sf(i, j, k))*(1._wp/alpha_f)
+                                                    (q_particles(Smx_id)%sf(i, j, k)*q_prim_vf(momxb)%sf(i, j, k) &
+                                                     + q_particles(Smy_id)%sf(i, j, k)*q_prim_vf(momxb + 1)%sf(i, j, k) &
+                                                     + q_particles(SE_id)%sf(i, j, k))*(1._wp/alpha_f)
 
                         if (num_dims == 3) then
-                            rhs_vf(momxb + 2)%sf(i, j, k) = rhs_vf(momxb + 2)%sf(i, j, k) + q_particles(4)%sf(i, j, k)*(1._wp/alpha_f)
+                            rhs_vf(momxb + 2)%sf(i, j, k) = rhs_vf(momxb + 2)%sf(i, j, k) + q_particles(Smz_id)%sf(i, j, k)*(1._wp/alpha_f)
                             ! Energy source
                             rhs_vf(E_idx)%sf(i, j, k) = rhs_vf(E_idx)%sf(i, j, k) + &
-                                                        (q_particles(4)%sf(i, j, k)*q_prim_vf(momxb + 2)%sf(i, j, k))*(1._wp/alpha_f)
+                                                        (q_particles(Smz_id)%sf(i, j, k)*q_prim_vf(momxb + 2)%sf(i, j, k))*(1._wp/alpha_f)
                         end if
 
                     end if
@@ -826,6 +1222,16 @@ contains
     subroutine s_smear_particle_sources()
 
         integer :: i, j, k, l
+
+        $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
+        do l = idwbuff(3)%beg, idwbuff(3)%end
+            do k = idwbuff(2)%beg, idwbuff(2)%end
+                do j = idwbuff(1)%beg, idwbuff(1)%end
+                    particle_head(1)%sf(j, k, l) = -1
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
 
         $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
         do i = 1, nField_vars
@@ -853,17 +1259,17 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
         call s_smoothfunction(n_el_particles_loc, particle_rad, &
-                              particle_s, particle_pos, particle_vel, q_particles, f_p)
+                              particle_s, particle_pos, particle_vel, q_particles, f_p, ncc)
 
         !Store 1-q_particles(1)
         $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
         do l = idwbuff(3)%beg, idwbuff(3)%end
             do k = idwbuff(2)%beg, idwbuff(2)%end
                 do j = idwbuff(1)%beg, idwbuff(1)%end
-                    q_particles(1)%sf(j, k, l) = 1._wp - q_particles(1)%sf(j, k, l)
+                    q_particles(alphaf_id)%sf(j, k, l) = 1._wp - q_particles(alphaf_id)%sf(j, k, l)
                     ! Limiting void fraction given max value
-                    q_particles(1)%sf(j, k, l) = max(q_particles(1)%sf(j, k, l), &
-                                                     1._wp - lag_params%valmaxvoid)
+                    q_particles(alphaf_id)%sf(j, k, l) = max(q_particles(alphaf_id)%sf(j, k, l), &
+                                                             1._wp - lag_params%valmaxvoid)
                 end do
             end do
         end do
@@ -1023,6 +1429,7 @@ contains
         real(wp) :: offset
         integer, dimension(3) :: cell
         integer, intent(in) :: nstage
+        logical :: inc_ghost = .true.
 
         call nvtxStartRange("LAG-BC")
         call nvtxStartRange("LAG-BC-DEV2HOST")
@@ -1033,10 +1440,10 @@ contains
             & wrap_bubble_dir, wrap_bubble_loc]')
         call nvtxEndRange
 
-        ! Handle MPI transfer of bubbles going to another processor's local domain
+        ! Handle MPI transfer of particles going to another processor's local domain
         if (num_procs > 1) then
             call nvtxStartRange("LAG-BC-TRANSFER-LIST")
-            call s_add_particles_to_transfer_list(n_el_particles_loc, particle_pos(:, :, 2), particle_posPrev(:, :, 2))
+            call s_add_particles_to_transfer_list(n_el_particles_loc, particle_pos(:, :, 2), particle_posPrev(:, :, 2), inc_ghost)
             call nvtxEndRange
 
             call nvtxStartRange("LAG-BC-SENDRECV")
@@ -1083,9 +1490,9 @@ contains
                     particle_posPrev(k, 1, 2) <= pcomm_coords(1)%end) then
                 wrap_bubble_dir(k, 1) = 1
                 wrap_bubble_loc(k, 1) = 1
-            elseif (particle_pos(k, 1, 2) >= x_cb(m)) then
+            elseif (particle_pos(k, 1, 2) >= x_cb(m + ncc) .or. particle_pos(k, 1, 2) > glb_bounds(1)%end) then
                 keep_bubble(k) = 0
-            elseif (particle_pos(k, 1, 2) < x_cb(-1)) then
+            elseif (particle_pos(k, 1, 2) < x_cb(-1 - ncc) .or. particle_pos(k, 1, 2) < glb_bounds(1)%beg) then
                 keep_bubble(k) = 0
             end if
 
@@ -1109,9 +1516,9 @@ contains
                     particle_posPrev(k, 2, 2) <= pcomm_coords(2)%end) then
                 wrap_bubble_dir(k, 2) = 1
                 wrap_bubble_loc(k, 2) = 1
-            elseif (particle_pos(k, 2, 2) >= y_cb(n)) then
+            elseif (particle_pos(k, 2, 2) >= y_cb(n + ncc) .or. particle_pos(k, 2, 2) > glb_bounds(2)%end) then
                 keep_bubble(k) = 0
-            elseif (particle_pos(k, 2, 2) < y_cb(-1)) then
+            elseif (particle_pos(k, 2, 2) < y_cb(-1 - ncc) .or. particle_pos(k, 2, 2) < glb_bounds(2)%beg) then
                 keep_bubble(k) = 0
             end if
 
@@ -1136,9 +1543,9 @@ contains
                         particle_posPrev(k, 3, 2) <= pcomm_coords(3)%end) then
                     wrap_bubble_dir(k, 3) = 1
                     wrap_bubble_loc(k, 3) = 1
-                elseif (particle_pos(k, 3, 2) >= z_cb(p)) then
+                elseif (particle_pos(k, 3, 2) >= z_cb(p + ncc) .or. particle_pos(k, 3, 2) > glb_bounds(3)%end) then
                     keep_bubble(k) = 0
-                elseif (particle_pos(k, 3, 2) < z_cb(-1)) then
+                elseif (particle_pos(k, 3, 2) < z_cb(-1 - ncc) .or. particle_pos(k, 3, 2) < glb_bounds(3)%beg) then
                     keep_bubble(k) = 0
                 end if
             end if
@@ -1245,6 +1652,70 @@ contains
 
     end subroutine s_enforce_EL_particles_boundary_conditions
 
+    !>  The purpose of this subroutine is to WENO-reconstruct the
+        !!      left and the right cell-boundary values, including values
+        !!      at the Gaussian quadrature points, from the cell-averaged
+        !!      variables.
+        !!  @param v_vf Cell-average variables
+        !!  @param vL_qp Left WENO-reconstructed, cell-boundary values including
+        !!          the values at the quadrature points, of the cell-average variables
+        !!  @param vR_qp Right WENO-reconstructed, cell-boundary values including
+        !!          the values at the quadrature points, of the cell-average variables
+        !!  @param norm_dir Splitting coordinate direction
+    subroutine s_reconstruct_cell_boundary_values_loc(v_vf, vL_x, vL_y, vL_z, vR_x, vR_y, vR_z, &
+                                                      norm_dir)
+
+        type(scalar_field), dimension(iv_loc%beg:iv_loc%end), intent(in) :: v_vf
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vL_x, vL_y, vL_z
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vR_x, vR_y, vR_z
+        integer, intent(in) :: norm_dir
+
+        integer :: recon_dir !< Coordinate direction of the reconstruction
+
+        integer :: i, j, k, l
+
+        #:for SCHEME, TYPE in [('weno','WENO_TYPE'), ('muscl','MUSCL_TYPE')]
+            if (recon_type == ${TYPE}$ .or. dummy) then
+                ! Reconstruction in s1-direction
+                if (norm_dir == 1) then
+                    is1_loc = idwbuff(1); is2_loc = idwbuff(2); is3_loc = idwbuff(3)
+                    recon_dir = 1; is1_loc%beg = is1_loc%beg + ${SCHEME}$_polyn
+                    is1_loc%end = is1_loc%end - ${SCHEME}$_polyn
+
+                elseif (norm_dir == 2) then
+                    is1_loc = idwbuff(2); is2_loc = idwbuff(1); is3_loc = idwbuff(3)
+                    recon_dir = 2; is1_loc%beg = is1_loc%beg + ${SCHEME}$_polyn
+                    is1_loc%end = is1_loc%end - ${SCHEME}$_polyn
+
+                else
+                    is1_loc = idwbuff(3); is2_loc = idwbuff(2); is3_loc = idwbuff(1)
+                    recon_dir = 3; is1_loc%beg = is1_loc%beg + ${SCHEME}$_polyn
+                    is1_loc%end = is1_loc%end - ${SCHEME}$_polyn
+                end if
+
+                if (n > 0) then
+                    if (p > 0) then
+                        call s_${SCHEME}$ (v_vf(iv_loc%beg:iv_loc%end), &
+                                           vL_x(:, :, :, iv_loc%beg:iv_loc%end), vL_y(:, :, :, iv_loc%beg:iv_loc%end), vL_z(:, :, :, iv_loc%beg:iv_loc%end), vR_x(:, :, :, iv_loc%beg:iv_loc%end), vR_y(:, :, :, iv_loc%beg:iv_loc%end), vR_z(:, :, :, iv_loc%beg:iv_loc%end), &
+                                           recon_dir, &
+                                           is1_loc, is2_loc, is3_loc)
+                    else
+                        call s_${SCHEME}$ (v_vf(iv_loc%beg:iv_loc%end), &
+                                           vL_x(:, :, :, iv_loc%beg:iv_loc%end), vL_y(:, :, :, iv_loc%beg:iv_loc%end), vL_z(:, :, :, :), vR_x(:, :, :, iv_loc%beg:iv_loc%end), vR_y(:, :, :, iv_loc%beg:iv_loc%end), vR_z(:, :, :, :), &
+                                           recon_dir, &
+                                           is1_loc, is2_loc, is3_loc)
+                    end if
+                else
+
+                    call s_${SCHEME}$ (v_vf(iv_loc%beg:iv_loc%end), &
+                                       vL_x(:, :, :, iv_loc%beg:iv_loc%end), vL_y(:, :, :, :), vL_z(:, :, :, :), vR_x(:, :, :, iv_loc%beg:iv_loc%end), vR_y(:, :, :, :), vR_z(:, :, :, :), &
+                                       recon_dir, &
+                                       is1_loc, is2_loc, is3_loc)
+                end if
+            end if
+        #:endfor
+    end subroutine s_reconstruct_cell_boundary_values_loc
+
     !> This subroutine returns the computational coordinate of the cell for the given position.
           !! @param pos Input coordinates
           !! @param cell Computational coordinate of the cell
@@ -1318,6 +1789,23 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_transfer_data_to_tmp_particles
+
+    !> This subroutine transfer data into the actual variables.
+    impure subroutine s_transfer_data_to_actual_particles()
+
+        integer :: k
+
+        $:GPU_PARALLEL_LOOP(private='[k]')
+        do k = 1, n_el_particles_loc
+            particle_rad(k, 1) = particle_rad(k, 2)
+            particle_pos(k, 1:3, 1) = particle_pos(k, 1:3, 2)
+            particle_posPrev(k, 1:3, 1) = particle_posPrev(k, 1:3, 2)
+            particle_vel(k, 1:3, 1) = particle_vel(k, 1:3, 2)
+            particle_s(k, 1:3, 1) = particle_s(k, 1:3, 2)
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_transfer_data_to_actual_particles
 
     !> The purpose of this procedure is to determine if the global coordinates of the bubbles
         !!      are present in the current MPI processor (including ghost cells).
@@ -1395,65 +1883,63 @@ contains
 
     end function particle_in_domain_physical
 
-    !> The purpose of this procedure is to calculate the gradient of a scalar field along the x, y and z directions using Fornberg's method
+    !> The purpose of this procedure is to calculate the gradient from reconstructed states along the x, y and z
         !! @param q Input scalar field
         !! @param dq Output gradient of q
         !! @param dir Gradient spatial direction
-    subroutine s_gradient_dir_fornberg(q, dq, dir)
+    subroutine s_gradient_field(vL_field, vR_field, dq, dir, field_var)
 
-        real(stp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:), intent(in) :: q
+        ! real(stp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:), intent(in) :: q
         real(stp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:), intent(out) :: dq
-        integer, intent(in) :: dir
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vL_field
+        real(wp), dimension(idwbuff(1)%beg:, idwbuff(2)%beg:, idwbuff(3)%beg:, 1:), intent(inout) :: vR_field
+        integer, intent(in) :: dir, field_var
 
-        integer :: i, j, k, a, npts, s_idx
-
-        npts = (nWeights_grad - 1)/2
+        integer :: i, j, k
+        real(wp) :: mydx
 
         if (dir == 1) then
-            $:GPU_PARALLEL_LOOP(private='[i,j,k,s_idx,a]', collapse=3,copyin='[npts]')
+
+            $:GPU_PARALLEL_LOOP(private='[i,j,k,mydx]', collapse=3,copyin='[dir, field_var]')
             do k = idwbuff(3)%beg, idwbuff(3)%end
                 do j = idwbuff(2)%beg, idwbuff(2)%end
-                    do i = idwbuff(1)%beg + 2, idwbuff(1)%end - 2
-                        dq(i, j, k) = 0._wp
-                        do a = -npts, npts
-                            s_idx = a + npts + 1
-                            dq(i, j, k) = dq(i, j, k) + weights_x_grad(s_idx)%sf(i, 1, 1)*q(i + a, j, k)
-                        end do
+                    do i = idwbuff(1)%beg, idwbuff(1)%end
+                        mydx = dx(i)
+                        dq(i, j, k) = (vR_field(i, j, k, field_var) - vL_field(i, j, k, field_var))/mydx
                     end do
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
+
         elseif (dir == 2) then
-            $:GPU_PARALLEL_LOOP(private='[i,j,k,s_idx,a]', collapse=3,copyin='[npts]')
+
+            $:GPU_PARALLEL_LOOP(private='[i,j,k,mydx]', collapse=3,copyin='[dir, field_var]')
             do k = idwbuff(3)%beg, idwbuff(3)%end
-                do j = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
-                    do i = idwbuff(1)%beg, idwbuff(1)%end
-                        dq(i, j, k) = 0._wp
-                        do a = -npts, npts
-                            s_idx = a + npts + 1
-                            dq(i, j, k) = dq(i, j, k) + weights_y_grad(s_idx)%sf(j, 1, 1)*q(i, j + a, k)
-                        end do
+                do j = idwbuff(1)%beg, idwbuff(1)%end
+                    do i = idwbuff(2)%beg, idwbuff(2)%end
+                        mydx = dy(i)
+                        dq(j, i, k) = (vR_field(i, j, k, field_var) - vL_field(i, j, k, field_var))/mydx
                     end do
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
+
         elseif (dir == 3) then
-            $:GPU_PARALLEL_LOOP(private='[i,j,k,s_idx,a]', collapse=3,copyin='[npts]')
-            do k = idwbuff(3)%beg + 2, idwbuff(3)%end - 2
+
+            $:GPU_PARALLEL_LOOP(private='[i,j,k,mydx]', collapse=3,copyin='[dir, field_var]')
+            do k = idwbuff(1)%beg, idwbuff(1)%end
                 do j = idwbuff(2)%beg, idwbuff(2)%end
-                    do i = idwbuff(1)%beg, idwbuff(1)%end
-                        dq(i, j, k) = 0._wp
-                        do a = -npts, npts
-                            s_idx = a + npts + 1
-                            dq(i, j, k) = dq(i, j, k) + weights_z_grad(s_idx)%sf(k, 1, 1)*q(i, j, k + a)
-                        end do
+                    do i = idwbuff(3)%beg, idwbuff(3)%end
+                        mydx = dz(i)
+                        dq(k, j, i) = (vR_field(i, j, k, field_var) - vL_field(i, j, k, field_var))/mydx
                     end do
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
+
         end if
 
-    end subroutine s_gradient_dir_fornberg
+    end subroutine s_gradient_field
 
     !> The purpose of this procedure is to compute the Fornberg finite difference weights for derivatives (only done once at start time)
     impure subroutine s_compute_fornberg_fd_weights(npts)
@@ -1742,10 +2228,10 @@ contains
         do k = 0, p
             do j = 0, n
                 do i = 0, m
-                    lag_void_max = max(lag_void_max, 1._wp - q_particles(1)%sf(i, j, k))
+                    lag_void_max = max(lag_void_max, 1._wp - q_particles(alphaf_id)%sf(i, j, k))
                     call s_get_char_vol(i, j, k, volcell)
-                    if ((1._wp - q_particles(1)%sf(i, j, k)) > 5.0d-11) then
-                        lag_void_avg = lag_void_avg + (1._wp - q_particles(1)%sf(i, j, k))*volcell
+                    if ((1._wp - q_particles(alphaf_id)%sf(i, j, k)) > 5.0d-11) then
+                        lag_void_avg = lag_void_avg + (1._wp - q_particles(alphaf_id)%sf(i, j, k))*volcell
                         lag_vol = lag_vol + volcell
                     end if
                 end do

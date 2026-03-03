@@ -1070,7 +1070,9 @@ contains
             call nvtxStartRange("RHS-EL-PARTICLES-DYN")
             call s_compute_particle_EL_dynamics( &
                 q_prim_qp%vf(1:sys_size), &
-                stage, q_cons_qp%vf(1:sys_size))
+                stage, q_cons_qp%vf(1:sys_size), &
+                qL_rsx_vf, qL_rsy_vf, qL_rsz_vf, &
+                qR_rsx_vf, qR_rsy_vf, qR_rsz_vf)
             call nvtxEndRange
 
             ! RHS additions for sub-grid particles_lagrange
@@ -1082,6 +1084,8 @@ contains
                     rhs_vf, stage)
                 call nvtxEndRange
             end if
+
+            call s_eliminate_ghost_particles()
         end if
 
         if (chemistry .and. chem_params%reactions) then

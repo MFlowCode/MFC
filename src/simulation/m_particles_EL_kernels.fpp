@@ -24,26 +24,28 @@ contains
             !! @param lbk_pos Spatial coordinates of the particles
             !! @param updatedvar Eulerian variable to be updated
             !! @param lbk_f_p Forces on the particles
-    subroutine s_smoothfunction(nParticles, lbk_rad, lbk_s, lbk_pos, lbk_vel, updatedvar, lbk_f_p)
+    subroutine s_smoothfunction(nParticles, lbk_rad, lbk_s, lbk_pos, lbk_vel, updatedvar, lbk_f_p, ngh)
 
         integer, intent(in) :: nParticles
         real(wp), dimension(1:lag_params%nParticles_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_pos, lbk_vel
         real(wp), dimension(1:lag_params%nParticles_glb, 1:2), intent(in) :: lbk_rad
         type(scalar_field), dimension(:), intent(inout) :: updatedvar
         real(wp), dimension(1:lag_params%nParticles_glb, 1:3), intent(in) :: lbk_f_p
+        integer, intent(in) :: ngh
 
-        call s_gaussian(nParticles, lbk_rad, lbk_s, lbk_pos, lbk_vel, updatedvar, lbk_f_p)
+        call s_gaussian(nParticles, lbk_rad, lbk_s, lbk_pos, lbk_vel, updatedvar, lbk_f_p, ngh)
 
     end subroutine s_smoothfunction
 
     !> The purpose of this procedure contains the algorithm to use the gaussian kernel function to map the effect of the particles.
-    subroutine s_gaussian(nParticles, lbk_rad, lbk_s, lbk_pos, lbk_vel, updatedvar, lbk_f_p)
+    subroutine s_gaussian(nParticles, lbk_rad, lbk_s, lbk_pos, lbk_vel, updatedvar, lbk_f_p, ngh)
 
         integer, intent(in) :: nParticles
         real(wp), dimension(1:lag_params%nParticles_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_pos, lbk_vel
         real(wp), dimension(1:lag_params%nParticles_glb, 1:2), intent(in) :: lbk_rad
         real(wp), dimension(1:lag_params%nParticles_glb, 1:3), intent(in) :: lbk_f_p
         type(scalar_field), dimension(:), intent(inout) :: updatedvar
+        integer, intent(in) :: ngh
 
         real(wp), dimension(3) :: center
         integer, dimension(3) :: cell
@@ -51,7 +53,7 @@ contains
         real(wp) :: stddsv
 
         real(wp), dimension(3) :: nodecoord
-        real(wp) :: addFun1, addFun2_x, addFun2_y, addFun2_z, addFun_E, func_sum
+        real(wp) :: addFun1, addFun2_x, addFun2_y, addFun2_z, addFun_E, func_sum, func_sum_alpha
         real(wp) :: addFun_alphap_vp_x, addFun_alphap_vp_y, addFun_alphap_vp_z
         real(wp) :: func, volpart, Vol, Vol_loc, rad
         real(wp), dimension(3) :: s_coord
@@ -59,7 +61,7 @@ contains
         logical :: celloutside
         real(wp) :: fp_x, fp_y, fp_z, vp_x, vp_y, vp_z
 
-        real(wp) :: rc, r2, weight, g, chardist
+        real(wp) :: rc, r2, r2_alpha, weight, weight_alpha, g, g_alpha, chardist
         integer :: d
         integer :: ncx, ncy, ncz, ix, jy, kz
 
@@ -68,6 +70,7 @@ contains
 
         $:GPU_PARALLEL_LOOP(private='[nodecoord,l,s_coord,cell,center,volpart,rad,cellaux]', copyin='[d]')
         do l = 1, nParticles
+
             nodecoord(1:3) = 0
             center(1:3) = 0._wp
             volpart = 4._wp/3._wp*pi*lbk_rad(l, 2)**3._wp
@@ -76,6 +79,9 @@ contains
             rad = lbk_rad(l, 2)
 
             if (p > 0) center(3) = lbk_pos(l, 3, 2)
+
+            ! if (particle_in_domain_physical_kernels(center)) then
+
             call s_get_cell(s_coord, cell)
 
             if (num_dims == 2) then
@@ -100,16 +106,17 @@ contains
             sigma = lag_params%epsilonb*chardist
 
             rc = sigma
-            ncx = max(1, nint(rc/dx(cell(1))))
-            ncy = max(1, nint(rc/dy(cell(2))))
+            ncx = min(ngh, max(1, nint(rc/dx(cell(1)))))
+            ncy = min(ngh, max(1, nint(rc/dy(cell(2)))))
             ncz = 0
-            if (num_dims == 3) ncz = max(1, nint(rc/dz(cell(3))))
+            if (num_dims == 3) ncz = min(ngh, max(1, nint(rc/dz(cell(3)))))
 
             i = cell(1)
             j = cell(2)
             k = cell(3)
 
             func_sum = 0._wp
+            func_sum_alpha = 0._wp
             $:GPU_LOOP(collapse=3,private='[ix,jy,kz,r2,cellaux]')
             do ix = i - ncx, i + ncx
                 do jy = j - ncy, j + ncy
@@ -118,17 +125,23 @@ contains
                         cellaux(1) = ix
                         cellaux(2) = jy
                         cellaux(3) = kz
-                        ! Relocate cells for particles intersecting symmetric boundaries
-                        if (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == BC_REFLECTIVE)) then
-                            call s_shift_cell_symmetric_bc(cellaux, cell)
-                        end if
 
-                        Vol_loc = dx(cellaux(1))*dy(cellaux(2))
-                        if (num_dims == 3) Vol_loc = Vol_loc*dz(cellaux(3))
-                        r2 = (x_cc(cellaux(1)) - center(1))**2 + (y_cc(cellaux(2)) - center(2))**2
-                        if (num_dims == 3) r2 = r2 + (z_cc(cellaux(3)) - center(3))**2
-                        g = exp(-r2/(2*sigma**2))/(sigma*sqrt(2*pi))**d
-                        func_sum = func_sum + g*Vol_loc
+                        call s_check_celloutside(cellaux, celloutside)
+
+                        if (.not. celloutside) then
+
+                            ! Relocate cells for particles intersecting symmetric boundaries
+                            if (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == BC_REFLECTIVE)) then
+                                call s_shift_cell_symmetric_bc(cellaux, cell)
+                            end if
+
+                            Vol_loc = dx(cellaux(1))*dy(cellaux(2))
+                            if (num_dims == 3) Vol_loc = Vol_loc*dz(cellaux(3))
+                            r2 = (x_cc(cellaux(1)) - center(1))**2 + (y_cc(cellaux(2)) - center(2))**2
+                            if (num_dims == 3) r2 = r2 + (z_cc(cellaux(3)) - center(3))**2
+                            g = exp(-r2/(2*sigma**2))/(sigma*sqrt(2*pi))**d
+                            func_sum = func_sum + g*Vol_loc
+                        end if
                     end do
                 end do
             end do
@@ -141,84 +154,174 @@ contains
                         cellaux(1) = ix
                         cellaux(2) = jy
                         cellaux(3) = kz
-                        ! Relocate cells for particles intersecting symmetric boundaries
-                        if (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == BC_REFLECTIVE)) then
-                            call s_shift_cell_symmetric_bc(cellaux, cell)
-                        end if
 
-                        r2 = (x_cc(cellaux(1)) - center(1))**2 + (y_cc(cellaux(2)) - center(2))**2
-                        if (num_dims == 3) r2 = r2 + (z_cc(cellaux(3)) - center(3))**2
-                        ! Vol_loc = dx(cellaux(1))*dy(cellaux(2))
-                        ! if (num_dims==3) Vol_loc = Vol_loc * dz(cellaux(3))
-                        g = exp(-r2/(2*sigma**2))/(sigma*sqrt(2*pi))**d
-                        weight = g/func_sum
+                        call s_check_celloutside(cellaux, celloutside)
 
-                        !Update volume fraction field
-                        addFun1 = weight*volpart
-                        $:GPU_ATOMIC(atomic='update')
-                        updatedvar(1)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                            updatedvar(1)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                            + real(addFun1, kind=stp)
+                        if (.not. celloutside) then
 
-                        if (lag_params%solver_approach == 2) then
-
-                            !Update x-momentum source term
-                            addFun2_x = weight*fp_x
-                            $:GPU_ATOMIC(atomic='update')
-                            updatedvar(2)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                                updatedvar(2)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                + real(addFun2_x, kind=stp)
-
-                            !Update y-momentum source term
-                            addFun2_y = weight*fp_y
-                            $:GPU_ATOMIC(atomic='update')
-                            updatedvar(3)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                                updatedvar(3)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                + real(addFun2_y, kind=stp)
-
-                            if (num_dims == 3) then
-                                !Update z-momentum source term
-                                addFun2_z = weight*fp_z
-                                $:GPU_ATOMIC(atomic='update')
-                                updatedvar(4)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                                    updatedvar(4)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                    + real(addFun2_z, kind=stp)
+                            ! Relocate cells for particles intersecting symmetric boundaries
+                            if (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == BC_REFLECTIVE)) then
+                                call s_shift_cell_symmetric_bc(cellaux, cell)
                             end if
-                            !Update energy source term
-                            addFun_E = 0._wp
-                            $:GPU_ATOMIC(atomic='update')
-                            updatedvar(5)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                                updatedvar(5)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                + real(addFun_E, kind=stp)
 
-                            !Update particle momentum field(x)
-                            addFun_alphap_vp_x = weight*volpart*vp_x
+                            r2 = (x_cc(cellaux(1)) - center(1))**2 + (y_cc(cellaux(2)) - center(2))**2
+                            if (num_dims == 3) r2 = r2 + (z_cc(cellaux(3)) - center(3))**2
+                            g = exp(-r2/(2*sigma**2))/(sigma*sqrt(2*pi))**d
+                            weight = g/func_sum
+
+                            !Update volume fraction field
+                            addFun1 = weight*volpart
                             $:GPU_ATOMIC(atomic='update')
-                            updatedvar(6)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                                updatedvar(6)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                + real(addFun_alphap_vp_x, kind=stp)
-                            !Update particle momentum field(y)
-                            addFun_alphap_vp_y = weight*volpart*vp_y
-                            $:GPU_ATOMIC(atomic='update')
-                            updatedvar(7)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                                updatedvar(7)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                + real(addFun_alphap_vp_y, kind=stp)
-                            if (num_dims == 3) then
-                                !Update particle momentum field(z)
-                                addFun_alphap_vp_z = weight*volpart*vp_z
+                            updatedvar(1)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
+                                updatedvar(1)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                                + real(addFun1, kind=stp)
+
+                            if (lag_params%solver_approach == 2) then
+
+                                !Update particle momentum field(x)
+                                addFun_alphap_vp_x = weight*volpart*vp_x
+                                $:GPU_ATOMIC(atomic='update')
+                                updatedvar(2)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
+                                    updatedvar(2)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                                    + real(addFun_alphap_vp_x, kind=stp)
+
+                                !Update particle momentum field(y)
+                                addFun_alphap_vp_y = weight*volpart*vp_y
+                                $:GPU_ATOMIC(atomic='update')
+                                updatedvar(3)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
+                                    updatedvar(3)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                                    + real(addFun_alphap_vp_y, kind=stp)
+
+                                if (num_dims == 3) then
+                                    !Update particle momentum field(z)
+                                    addFun_alphap_vp_z = weight*volpart*vp_z
+                                    $:GPU_ATOMIC(atomic='update')
+                                    updatedvar(4)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
+                                        updatedvar(4)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                                        + real(addFun_alphap_vp_z, kind=stp)
+                                end if
+
+                                !Update x-momentum source term
+                                addFun2_x = weight*fp_x
+                                $:GPU_ATOMIC(atomic='update')
+                                updatedvar(5)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
+                                    updatedvar(5)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                                    + real(addFun2_x, kind=stp)
+
+                                !Update y-momentum source term
+                                addFun2_y = weight*fp_y
+                                $:GPU_ATOMIC(atomic='update')
+                                updatedvar(6)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
+                                    updatedvar(6)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                                    + real(addFun2_y, kind=stp)
+
+                                if (num_dims == 3) then
+                                    !Update z-momentum source term
+                                    addFun2_z = weight*fp_z
+                                    $:GPU_ATOMIC(atomic='update')
+                                    updatedvar(7)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
+                                        updatedvar(7)%sf(cellaux(1), cellaux(2), cellaux(3)) &
+                                        + real(addFun2_z, kind=stp)
+                                end if
+
+                                !Update energy source term
+                                addFun_E = 0._wp
                                 $:GPU_ATOMIC(atomic='update')
                                 updatedvar(8)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
                                     updatedvar(8)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                    + real(addFun_alphap_vp_z, kind=stp)
+                                    + real(addFun_E, kind=stp)
+
                             end if
                         end if
                     end do
                 end do
             end do
+            ! endif
         end do
         $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_gaussian
+
+    !> The purpose of this subroutine is to check if the current cell is outside the computational domain or not (including ghost cells).
+            !! @param cellaux Tested cell to smear the bubble effect in.
+            !! @param celloutside If true, then cellaux is outside the computational domain.
+    subroutine s_check_celloutside(cellaux, celloutside)
+        $:GPU_ROUTINE(function_name='s_check_celloutside',parallelism='[seq]', &
+            & cray_inline=True)
+
+        integer, dimension(3), intent(inout) :: cellaux
+        logical, intent(out) :: celloutside
+
+        celloutside = .false.
+
+        if (num_dims == 2) then
+            if ((cellaux(1) < -buff_size) .or. (cellaux(2) < -buff_size)) then
+                celloutside = .true.
+            end if
+
+            if ((cellaux(1) > m + buff_size) .or. (cellaux(2) > n + buff_size)) then
+                celloutside = .true.
+            end if
+        else
+            if ((cellaux(1) < -buff_size) .or. (cellaux(2) < -buff_size) .or. (cellaux(3) < -buff_size)) then
+                celloutside = .true.
+            end if
+
+            if ((cellaux(1) > m + buff_size) .or. (cellaux(2) > n + buff_size) .or. (cellaux(3) > p + buff_size)) then
+                celloutside = .true.
+            end if
+        end if
+
+    end subroutine s_check_celloutside
+
+    ! !> The purpose of this subroutine is to check if the current cell is outside the physical domain
+    !         !! @param cellaux Tested cell to smear the particle effect in.
+    !         !! @param celloutside If true, then cellaux is outside the computational domain.
+    ! subroutine s_check_celloutside(cellaux, celloutside)
+    !     $:GPU_ROUTINE(function_name='s_check_celloutside',parallelism='[seq]', &
+    !         & cray_inline=True)
+
+    !     integer, dimension(3), intent(inout) :: cellaux
+    !     logical, intent(out) :: celloutside
+
+    !     celloutside = .false.
+
+    !     if (num_dims == 2) then !idwint(3)%beg, idwint(3)%end
+    !         if ((cellaux(1) < idwint(1)%beg) .or. (cellaux(2) < idwint(2)%beg)) then
+    !             celloutside = .true.
+    !         end if
+
+    !         if ((cellaux(1) > idwint(1)%end) .or. (cellaux(2) > idwint(2)%end)) then
+    !             celloutside = .true.
+    !         end if
+    !     else
+    !         if ((cellaux(1) < idwint(1)%beg) .or. (cellaux(2) < idwint(2)%beg) .or. (cellaux(3) < idwint(3)%beg)) then
+    !             celloutside = .true.
+    !         end if
+
+    !         if ((cellaux(1) > idwint(1)%end) .or. (cellaux(2) > idwint(2)%end) .or. (cellaux(3) > idwint(3)%end)) then
+    !             celloutside = .true.
+    !         end if
+    !     end if
+
+    ! end subroutine s_check_celloutside
+
+    !> The purpose of this procedure is to determine if the lagrangian bubble is located in the
+        !!       physical domain. The ghost cells are not part of the physical domain.
+        !! @param pos_part Spatial coordinates of the bubble
+    function particle_in_domain_physical_kernels(pos_part)
+
+        logical :: particle_in_domain_physical_kernels
+        real(wp), dimension(3), intent(in) :: pos_part
+
+        particle_in_domain_physical_kernels = ((pos_part(1) < x_cb(m)) .and. (pos_part(1) >= x_cb(-1)) .and. &
+                                               (pos_part(2) < y_cb(n)) .and. (pos_part(2) >= y_cb(-1)))
+
+        if (p > 0) then
+            particle_in_domain_physical_kernels = (particle_in_domain_physical_kernels .and. (pos_part(3) < z_cb(p)) .and. (pos_part(3) >= z_cb(-1)))
+        end if
+
+    end function particle_in_domain_physical_kernels
 
     !> This subroutine relocates the current cell, if it intersects a symmetric boundary.
             !! @param cell Cell of the current particle
