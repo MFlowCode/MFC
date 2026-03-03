@@ -1,11 +1,10 @@
 !>
-!! @file m_derived_types.f90
+!! @file
 !! @brief Contains module m_derived_types
 
 #:include "macros.fpp"
 
-!> @brief This file contains the definitions of all of the custom-defined
-!!              types used in the pre-process code.
+!> @brief Shared derived types for field data, patch geometry, bubble dynamics, and MPI I/O structures
 module m_derived_types
 
     use m_constants  !< Constants
@@ -180,7 +179,23 @@ module m_derived_types
     type :: t_model
         integer :: ntrs   ! Number of triangles
         type(t_triangle), allocatable :: trs(:) ! Triangles
+
     end type t_model
+
+    type :: t_model_array
+        ! Original CPU-side fields (unchanged)
+        type(t_model), allocatable :: model
+        real(wp), allocatable, dimension(:, :, :) :: boundary_v
+        real(wp), allocatable, dimension(:, :) :: interpolated_boundary_v
+        integer :: boundary_edge_count
+        integer :: total_vertices
+        integer :: interpolate
+
+        ! GPU-friendly flattened arrays
+        integer :: ntrs  ! copy of model%ntrs
+        real(wp), allocatable, dimension(:, :, :) :: trs_v  ! (3, 3, ntrs) - triangle vertices
+        real(wp), allocatable, dimension(:, :) :: trs_n  ! (3, ntrs)    - triangle normals
+    end type t_model_array
 
     !> Derived type adding initial condition (ic) patch parameters as attributes
     !! NOTE: The requirements for the specification of the above parameters
@@ -443,8 +458,11 @@ module m_derived_types
         integer, dimension(3) :: ip_grid !< Top left grid point of IP
         real(wp), dimension(2, 2, 2) :: interp_coeffs !< Interpolation Coefficients of image point
         integer :: ib_patch_id !< ID of the IB Patch the ghost point is part of
+        real(wp) :: levelset
+        real(wp), dimension(1:3) :: levelset_norm
         logical :: slip
         integer, dimension(3) :: DB
+        integer :: x_periodicity, y_periodicity, z_periodicity
     end type ghost_point
 
     !> Species parameters
@@ -493,6 +511,7 @@ module m_derived_types
         character(LEN=pathlen_max) :: input_path !< Path to lag_bubbles.dat
         real(wp) :: epsilonb         !< Standard deviation scaling for the gaussian function
         real(wp) :: charwidth        !< Domain virtual depth (z direction, for 2D simulations)
+        integer :: charNz           !< Number of grid cells in characteristic depth
         real(wp) :: valmaxvoid       !< Maximum void fraction permitted
 
     end type bubbles_lagrange_parameters

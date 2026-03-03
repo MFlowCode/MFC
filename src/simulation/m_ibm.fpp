@@ -1,11 +1,10 @@
 !>
-!! @file m_ibm.fpp
+!! @file
 !! @brief Contains module m_ibm
 
 #:include 'macros.fpp'
 
-!> @brief This module is used to handle all operations related to immersed
-!!              boundary methods (IBMs)
+!> @brief Ghost-node immersed boundary method: locates ghost/image points, computes interpolation coefficients, and corrects the flow state
 module m_ibm
 
     use m_derived_types        !< Definitions of the derived types
@@ -28,6 +27,8 @@ module m_ibm
 
     use m_viscous
 
+    use m_model
+
     implicit none
 
     private :: s_compute_image_points, &
@@ -40,11 +41,8 @@ module m_ibm
  s_ibm_correct_state, &
  s_finalize_ibm_module
 
-    integer, allocatable, dimension(:, :, :) :: patch_id_fp
     type(integer_field), public :: ib_markers
-    type(levelset_field), public :: levelset
-    type(levelset_norm_field), public :: levelset_norm
-    $:GPU_DECLARE(create='[ib_markers,levelset,levelset_norm]')
+    $:GPU_DECLARE(create='[ib_markers]')
 
     type(ghost_point), dimension(:), allocatable :: ghost_points
     type(ghost_point), dimension(:), allocatable :: inner_points
@@ -67,22 +65,14 @@ contains
         if (p > 0) then
             @:ALLOCATE(ib_markers%sf(-buff_size:m+buff_size, &
                 -buff_size:n+buff_size, -buff_size:p+buff_size))
-            @:ALLOCATE(levelset%sf(-buff_size:m+buff_size, &
-                -buff_size:n+buff_size, -buff_size:p+buff_size, 1:num_ibs))
-            @:ALLOCATE(levelset_norm%sf(-buff_size:m+buff_size, &
-                -buff_size:n+buff_size, -buff_size:p+buff_size, 1:num_ibs, 1:3))
         else
             @:ALLOCATE(ib_markers%sf(-buff_size:m+buff_size, &
                 -buff_size:n+buff_size, 0:0))
-            @:ALLOCATE(levelset%sf(-buff_size:m+buff_size, &
-                -buff_size:n+buff_size, 0:0, 1:num_ibs))
-            @:ALLOCATE(levelset_norm%sf(-buff_size:m+buff_size, &
-                -buff_size:n+buff_size, 0:0, 1:num_ibs, 1:3))
         end if
 
+        @:ALLOCATE(models(num_ibs))
+
         @:ACC_SETUP_SFs(ib_markers)
-        @:ACC_SETUP_SFs(levelset)
-        @:ACC_SETUP_SFs(levelset_norm)
 
         $:GPU_ENTER_DATA(copyin='[num_gps,num_inner_gps]')
 
@@ -95,6 +85,8 @@ contains
         integer :: i, j, k
         integer :: max_num_gps, max_num_inner_gps
 
+        call nvtxStartRange("SETUP-IBM-MODULE")
+
         ! do all set up for moving immersed boundaries
         moving_immersed_boundary_flag = .false.
         do i = 1, num_ibs
@@ -103,26 +95,35 @@ contains
                 moving_immersed_boundary_flag = .true.
             end if
             call s_update_ib_rotation_matrix(i)
-            call s_compute_centroid_offset(i)
         end do
-        $:GPU_ENTER_DATA(copyin='[patch_ib]')
+        $:GPU_UPDATE(device='[patch_ib(1:num_ibs)]')
 
-        ! Allocating the patch identities bookkeeping variable
-        allocate (patch_id_fp(0:m, 0:n, 0:p))
+        ! GPU routines require updated cell centers
+        $:GPU_UPDATE(device='[num_ibs, x_cc, y_cc, dx, dy]')
+        if (p /= 0) then
+            $:GPU_UPDATE(device='[z_cc, dz]')
+        end if
+        $:GPU_UPDATE(device='[glb_bounds]')
 
+        ! allocate STL models
+        call s_instantiate_STL_models()
+
+        ! recompute the new ib_patch locations and broadcast them.
+        ib_markers%sf = 0._wp
         $:GPU_UPDATE(device='[ib_markers%sf]')
-        $:GPU_UPDATE(device='[levelset%sf]')
-        $:GPU_UPDATE(device='[levelset_norm%sf]')
-
-        ! Get neighboring IB variables from other processors
-        call s_populate_ib_buffers()
-
+        call s_apply_ib_patches(ib_markers)
         $:GPU_UPDATE(host='[ib_markers%sf]')
+        do i = 1, num_ibs
+            if (patch_ib(i)%moving_ibm /= 0) call s_compute_centroid_offset(i) ! offsets are computed after IB markers are generated
+            $:GPU_UPDATE(device='[patch_ib(i)]')
+        end do
 
         ! find the number of ghost points and set them to be the maximum total across ranks
         call s_find_num_ghost_points(num_gps, num_inner_gps)
         call s_mpi_allreduce_integer_sum(num_gps, max_num_gps)
         call s_mpi_allreduce_integer_sum(num_inner_gps, max_num_inner_gps)
+        max_num_gps = min(max_num_gps, (m + 1)*(n + 1)*(p + 1)/2)
+        max_num_inner_gps = min(max_num_inner_gps, (m + 1)*(n + 1)*(p + 1)/2)
 
         ! set the size of the ghost point arrays to be the amount of points total, plus a factor of 2 buffer
         $:GPU_UPDATE(device='[num_gps, num_inner_gps]')
@@ -130,35 +131,19 @@ contains
         @:ALLOCATE(inner_points(1:int((max_num_gps + max_num_inner_gps) * 2.0)))
 
         $:GPU_ENTER_DATA(copyin='[ghost_points,inner_points]')
-
         call s_find_ghost_points(ghost_points, inner_points)
-        $:GPU_UPDATE(device='[ghost_points, inner_points]')
+        call s_apply_levelset(ghost_points, num_gps)
 
-        call s_compute_image_points(ghost_points, levelset, levelset_norm)
-        $:GPU_UPDATE(device='[ghost_points]')
-
+        call s_compute_image_points(ghost_points)
         call s_compute_interpolation_coeffs(ghost_points)
-        $:GPU_UPDATE(device='[ghost_points]')
+
+        call nvtxEndRange
 
     end subroutine s_ibm_setup
 
-    subroutine s_populate_ib_buffers()
-
-        #:for DIRC, DIRI in [('x', 1), ('y', 2), ('z', 3)]
-            #:for LOCC, LOCI in [('beg', -1), ('end', 1)]
-                if (bc_${DIRC}$%${LOCC}$ >= 0) then
-                    call s_mpi_sendrecv_ib_buffers(ib_markers, ${DIRI}$, ${LOCI}$)
-                end if
-            #:endfor
-        #:endfor
-
-    end subroutine s_populate_ib_buffers
-
     !>  Subroutine that updates the conservative variables at the ghost points
-        !!  @param q_cons_vf Conservative Variables
-        !!  @param q_prim_vf Primitive variables
-        !!  @param pb Internal bubble pressure
-        !!  @param mv Mass of vapor in bubble
+        !!  @param pb_in Internal bubble pressure
+        !!  @param mv_in Mass of vapor in bubble
     subroutine s_ibm_correct_state(q_cons_vf, q_prim_vf, pb_in, mv_in)
 
         type(scalar_field), &
@@ -290,7 +275,7 @@ contains
                     $:GPU_LOOP(parallelism='[seq]')
                     do q = 1, num_fluids
                         ! Se the pressure inside a moving immersed boundary based upon the pressure of the image point. acceleration, and normal vector direction
-                        q_prim_vf(E_idx)%sf(j, k, l) = q_prim_vf(E_idx)%sf(j, k, l) + pres_IP/(1._wp - 2._wp*abs(levelset%sf(j, k, l, patch_id)*alpha_rho_IP(q)/pres_IP)*dot_product(patch_ib(patch_id)%force/patch_ib(patch_id)%mass, levelset_norm%sf(j, k, l, patch_id, :)))
+                        q_prim_vf(E_idx)%sf(j, k, l) = q_prim_vf(E_idx)%sf(j, k, l) + pres_IP/(1._wp - 2._wp*abs(gp%levelset*alpha_rho_IP(q)/pres_IP)*dot_product(patch_ib(patch_id)%force/patch_ib(patch_id)%mass, gp%levelset_norm))
                     end do
                 end if
 
@@ -307,7 +292,7 @@ contains
 
                 ! Calculate velocity of ghost cell
                 if (gp%slip) then
-                    norm(1:3) = levelset_norm%sf(gp%loc(1), gp%loc(2), gp%loc(3), gp%ib_patch_id, 1:3)
+                    norm(1:3) = gp%levelset_norm
                     buf = sqrt(sum(norm**2))
                     norm = norm/buf
                     vel_norm_IP = sum(vel_IP*norm)*norm
@@ -438,14 +423,10 @@ contains
     end subroutine s_ibm_correct_state
 
     !>  Function that computes the image points for each ghost point
-        !!  @param ghost_points Ghost Points
-        !!  @param levelset Closest distance from each grid cell to IB
-        !!  @param levelset_norm Vector pointing in the direction of the closest distance
-    impure subroutine s_compute_image_points(ghost_points_in, levelset_in, levelset_norm_in)
+        !!  @param ghost_points_in Ghost Points
+    impure subroutine s_compute_image_points(ghost_points_in)
 
         type(ghost_point), dimension(num_gps), intent(INOUT) :: ghost_points_in
-        type(levelset_field), intent(IN) :: levelset_in
-        type(levelset_norm_field), intent(IN) :: levelset_norm_in
 
         real(wp) :: dist
         real(wp), dimension(3) :: norm
@@ -460,7 +441,11 @@ contains
         integer :: patch_id !< IB Patch ID
         integer :: dir
         integer :: index
+        logical :: bounds_error
 
+        bounds_error = .false.
+
+        $:GPU_PARALLEL_LOOP(private='[q,gp,i,j,k,physical_loc,patch_id,dist,norm,dim,bound,dir,index,temp_loc,s_cc]', copy='[bounds_error]')
         do q = 1, num_gps
             gp = ghost_points_in(q)
             i = gp%loc(1)
@@ -476,8 +461,8 @@ contains
 
             ! Calculate and store the precise location of the image point
             patch_id = gp%ib_patch_id
-            dist = abs(real(levelset_in%sf(i, j, k, patch_id), kind=wp))
-            norm(:) = levelset_norm_in%sf(i, j, k, patch_id, :)
+            dist = abs(real(gp%levelset, kind=wp))
+            norm(:) = gp%levelset_norm
             ghost_points_in(q)%ip_loc(:) = physical_loc(:) + 2*dist*norm(:)
 
             ! Find the closest grid point to the image point
@@ -508,14 +493,30 @@ contains
                     index = ghost_points_in(q)%loc(dim)
                     temp_loc = ghost_points_in(q)%ip_loc(dim)
                     do while ((temp_loc < s_cc(index) &
-                               .or. temp_loc > s_cc(index + 1)))
+                               .or. temp_loc > s_cc(index + 1)) .and. (.not. bounds_error))
                         index = index + dir
                         if (index < -buff_size .or. index > bound) then
-                            print *, "temp_loc=", temp_loc, " s_cc(index)=", s_cc(index), " s_cc(index+1)=", s_cc(index + 1)
-                            print *, "Increase buff_size further in m_helper_basic (currently set to a minimum of 10)"
-                            error stop "Increase buff_size"
+#if !defined(MFC_OpenACC) && !defined(MFC_OpenMP)
+                            print *, "A required image point is not located in this computational domain."
+                            print *, "Ghost Point is located at :"
+                            if (p == 0) then
+                                print *, [x_cc(i), y_cc(j)]
+                            else
+                                print *, [x_cc(i), y_cc(j), z_cc(k)]
+                            end if
+                            print *, "We are searching in dimension ", dim, " for image point at ", ghost_points_in(q)%ip_loc(:)
+                            print *, "Domain size: "
+                            print *, "x: ", x_cc(-buff_size), " to: ", x_cc(m + buff_size - 1)
+                            print *, "y: ", y_cc(-buff_size), " to: ", y_cc(n + buff_size - 1)
+                            if (p /= 0) print *, "z: ", z_cc(-buff_size), " to: ", z_cc(p + buff_size - 1)
+                            print *, "Image point is located approximately ", (ghost_points_in(q)%loc(dim) - ghost_points_in(q)%ip_loc(dim))/(s_cc(1) - s_cc(0)), " grid cells away"
+                            print *, "Levelset ", dist, " and Norm: ", norm(:)
+                            print *, "A short term fix may include increasing buff_size further in m_helper_basic (currently set to a minimum of 10)"
+#endif
+                            bounds_error = .true.
                         end if
                     end do
+
                     ghost_points_in(q)%ip_grid(dim) = index
                     if (ghost_points_in(q)%DB(dim) == -1) then
                         ghost_points_in(q)%ip_grid(dim) = ghost_points_in(q)%loc(dim) + 1
@@ -525,55 +526,61 @@ contains
                 end if
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        if (bounds_error) error stop "Ghost Point and Image Point on Different Processors. Exiting"
 
     end subroutine s_compute_image_points
 
-    !> Function that finds the number of ghost points, used for allocating
+    !> Subroutine that finds the number of ghost points, used for allocating
     !! memory.
     subroutine s_find_num_ghost_points(num_gps_out, num_inner_gps_out)
 
         integer, intent(out) :: num_gps_out
         integer, intent(out) :: num_inner_gps_out
 
-        integer, dimension(2*gp_layers + 1, 2*gp_layers + 1) &
-            :: subsection_2D
-        integer, dimension(2*gp_layers + 1, 2*gp_layers + 1, 2*gp_layers + 1) &
-            :: subsection_3D
-        integer :: i, j, k!< Iterator variables
+        integer :: i, j, k, ii, jj, kk, gp_layers_z !< Iterator variables
+        integer :: num_gps_local, num_inner_gps_local !< local copies of the gp count to support GPU compute
+        logical :: is_gp
 
-        num_gps_out = 0
-        num_inner_gps_out = 0
+        num_gps_local = 0
+        num_inner_gps_local = 0
+        gp_layers_z = gp_layers
+        if (p == 0) gp_layers_z = 0
 
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,ii,jj,kk,is_gp]', copy='[num_gps_local,num_inner_gps_local]', firstprivate='[gp_layers,gp_layers_z]', collapse=3)
         do i = 0, m
             do j = 0, n
-                if (p == 0) then
-                    if (ib_markers%sf(i, j, 0) /= 0) then
-                        subsection_2D = ib_markers%sf( &
-                                        i - gp_layers:i + gp_layers, &
-                                        j - gp_layers:j + gp_layers, 0)
-                        if (any(subsection_2D == 0)) then
-                            num_gps_out = num_gps_out + 1
+                do k = 0, p
+                    if (ib_markers%sf(i, j, k) /= 0) then
+                        is_gp = .false.
+                        marker_search: do ii = i - gp_layers, i + gp_layers
+                            do jj = j - gp_layers, j + gp_layers
+                                do kk = k - gp_layers_z, k + gp_layers_z
+                                    if (ib_markers%sf(ii, jj, kk) == 0) then
+                                        ! if any neighbors are not in the IB, it is a ghost point
+                                        is_gp = .true.
+                                        exit marker_search
+                                    end if
+                                end do
+                            end do
+                        end do marker_search
+
+                        if (is_gp) then
+                            $:GPU_ATOMIC(atomic='update')
+                            num_gps_local = num_gps_local + 1
                         else
-                            num_inner_gps_out = num_inner_gps_out + 1
+                            $:GPU_ATOMIC(atomic='update')
+                            num_inner_gps_local = num_inner_gps_local + 1
                         end if
                     end if
-                else
-                    do k = 0, p
-                        if (ib_markers%sf(i, j, k) /= 0) then
-                            subsection_3D = ib_markers%sf( &
-                                            i - gp_layers:i + gp_layers, &
-                                            j - gp_layers:j + gp_layers, &
-                                            k - gp_layers:k + gp_layers)
-                            if (any(subsection_3D == 0)) then
-                                num_gps_out = num_gps_out + 1
-                            else
-                                num_inner_gps_out = num_inner_gps_out + 1
-                            end if
-                        end if
-                    end do
-                end if
+                end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        num_gps_out = num_gps_local
+        num_inner_gps_out = num_inner_gps_local
 
     end subroutine s_find_num_ghost_points
 
@@ -582,40 +589,57 @@ contains
 
         type(ghost_point), dimension(num_gps), intent(INOUT) :: ghost_points_in
         type(ghost_point), dimension(num_inner_gps), intent(INOUT) :: inner_points_in
-        integer, dimension(2*gp_layers + 1, 2*gp_layers + 1) &
-            :: subsection_2D
-        integer, dimension(2*gp_layers + 1, 2*gp_layers + 1, 2*gp_layers + 1) &
-            :: subsection_3D
-        integer :: i, j, k !< Iterator variables
-        integer :: count, count_i
-        integer :: patch_id
+        integer :: i, j, k, ii, jj, kk, gp_layers_z !< Iterator variables
+        integer :: xp, yp, zp !< periodicities
+        integer :: count, count_i, local_idx
+        integer :: patch_id, encoded_patch_id
+        logical :: is_gp
 
-        count = 1
-        count_i = 1
+        count = 0
+        count_i = 0
+        gp_layers_z = gp_layers
+        if (p == 0) gp_layers_z = 0
 
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,ii,jj,kk,is_gp,local_idx,patch_id,encoded_patch_id,xp,yp,zp]', copyin='[count,count_i,glb_bounds]', firstprivate='[gp_layers,gp_layers_z]', collapse=3)
         do i = 0, m
             do j = 0, n
-                if (p == 0) then
-                    ! 2D
-                    if (ib_markers%sf(i, j, 0) /= 0) then
-                        subsection_2D = ib_markers%sf( &
-                                        i - gp_layers:i + gp_layers, &
-                                        j - gp_layers:j + gp_layers, 0)
-                        if (any(subsection_2D == 0)) then
-                            ghost_points_in(count)%loc = [i, j, 0]
-                            patch_id = ib_markers%sf(i, j, 0)
-                            ghost_points_in(count)%ib_patch_id = &
-                                patch_id
+                do k = 0, p
+                    if (ib_markers%sf(i, j, k) /= 0) then
+                        is_gp = .false.
+                        marker_search: do ii = i - gp_layers, i + gp_layers
+                            do jj = j - gp_layers, j + gp_layers
+                                do kk = k - gp_layers_z, k + gp_layers_z
+                                    if (ib_markers%sf(ii, jj, kk) == 0) then
+                                        ! if any neighbors are not in the IB, it is a ghost point
+                                        is_gp = .true.
+                                        exit marker_search
+                                    end if
+                                end do
+                            end do
+                        end do marker_search
 
-                            ghost_points_in(count)%slip = patch_ib(patch_id)%slip
-                            ! ghost_points(count)%rank = proc_rank
+                        if (is_gp) then
+                            $:GPU_ATOMIC(atomic='capture')
+                            count = count + 1
+                            local_idx = count
+                            $:END_GPU_ATOMIC_CAPTURE()
+
+                            ghost_points_in(local_idx)%loc = [i, j, k]
+                            encoded_patch_id = ib_markers%sf(i, j, k)
+                            call s_decode_patch_periodicity(encoded_patch_id, patch_id, xp, yp, zp)
+                            ghost_points_in(local_idx)%ib_patch_id = patch_id
+                            ib_markers%sf(i, j, k) = patch_id
+                            ghost_points_in(local_idx)%x_periodicity = xp
+                            ghost_points_in(local_idx)%y_periodicity = yp
+                            ghost_points_in(local_idx)%z_periodicity = zp
+                            ghost_points_in(local_idx)%slip = patch_ib(patch_id)%slip
 
                             if ((x_cc(i) - dx(i)) < glb_bounds(1)%beg) then
                                 ghost_points_in(count)%DB(1) = -1
                             else if ((x_cc(i) + dx(i)) > glb_bounds(1)%end) then
                                 ghost_points_in(count)%DB(1) = 1
                             else
-                                ghost_points_in(count)%DB(1) = 0
+                                ghost_points_in(local_idx)%DB(1) = 0
                             end if
 
                             if ((y_cc(j) - dy(j)) < glb_bounds(2)%beg) then
@@ -623,75 +647,38 @@ contains
                             else if ((y_cc(j) + dy(j)) > glb_bounds(2)%end) then
                                 ghost_points_in(count)%DB(2) = 1
                             else
-                                ghost_points_in(count)%DB(2) = 0
+                                ghost_points_in(local_idx)%DB(2) = 0
                             end if
 
-                            count = count + 1
+                            if (p /= 0) then
+                                if ((z_cc(k) - dz(k)) < glb_bounds(3)%beg) then
+                                    ghost_points_in(local_idx)%DB(3) = -1
+                                else if ((z_cc(k) + dz(k)) > glb_bounds(3)%end) then
+                                    ghost_points_in(local_idx)%DB(3) = 1
+                                else
+                                    ghost_points_in(local_idx)%DB(3) = 0
+                                end if
+                            end if
 
                         else
-                            inner_points_in(count_i)%loc = [i, j, 0]
-                            patch_id = ib_markers%sf(i, j, 0)
-                            inner_points_in(count_i)%ib_patch_id = &
-                                patch_id
-                            inner_points_in(count_i)%slip = patch_ib(patch_id)%slip
+                            $:GPU_ATOMIC(atomic='capture')
                             count_i = count_i + 1
+                            local_idx = count_i
+                            $:END_GPU_ATOMIC_CAPTURE()
+
+                            inner_points_in(local_idx)%loc = [i, j, k]
+                            encoded_patch_id = ib_markers%sf(i, j, k)
+                            call s_decode_patch_periodicity(encoded_patch_id, patch_id, xp, yp, zp)
+                            inner_points_in(local_idx)%ib_patch_id = patch_id
+                            ib_markers%sf(i, j, k) = patch_id
+                            inner_points_in(local_idx)%slip = patch_ib(patch_id)%slip
 
                         end if
                     end if
-                else
-                    ! 3D
-                    do k = 0, p
-                        if (ib_markers%sf(i, j, k) /= 0) then
-                            subsection_3D = ib_markers%sf( &
-                                            i - gp_layers:i + gp_layers, &
-                                            j - gp_layers:j + gp_layers, &
-                                            k - gp_layers:k + gp_layers)
-                            if (any(subsection_3D == 0)) then
-                                ghost_points_in(count)%loc = [i, j, k]
-                                patch_id = ib_markers%sf(i, j, k)
-                                ghost_points_in(count)%ib_patch_id = &
-                                    ib_markers%sf(i, j, k)
-                                ghost_points_in(count)%slip = patch_ib(patch_id)%slip
-
-                                if ((x_cc(i) - dx(i)) < glb_bounds(1)%beg) then
-                                    ghost_points_in(count)%DB(1) = -1
-                                else if ((x_cc(i) + dx(i)) > glb_bounds(1)%end) then
-                                    ghost_points_in(count)%DB(1) = 1
-                                else
-                                    ghost_points_in(count)%DB(1) = 0
-                                end if
-
-                                if ((y_cc(j) - dy(j)) < glb_bounds(2)%beg) then
-                                    ghost_points_in(count)%DB(2) = -1
-                                else if ((y_cc(j) + dy(j)) > glb_bounds(2)%end) then
-                                    ghost_points_in(count)%DB(2) = 1
-                                else
-                                    ghost_points_in(count)%DB(2) = 0
-                                end if
-
-                                if ((z_cc(k) - dz(k)) < glb_bounds(3)%beg) then
-                                    ghost_points_in(count)%DB(3) = -1
-                                else if ((z_cc(k) + dz(k)) > glb_bounds(3)%end) then
-                                    ghost_points_in(count)%DB(3) = 1
-                                else
-                                    ghost_points_in(count)%DB(3) = 0
-                                end if
-
-                                count = count + 1
-                            else
-                                inner_points_in(count_i)%loc = [i, j, k]
-                                patch_id = ib_markers%sf(i, j, k)
-                                inner_points_in(count_i)%ib_patch_id = &
-                                    ib_markers%sf(i, j, k)
-                                inner_points_in(count_i)%slip = patch_ib(patch_id)%slip
-
-                                count_i = count_i + 1
-                            end if
-                        end if
-                    end do
-                end if
+                end do
             end do
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_find_ghost_points
 
@@ -706,51 +693,74 @@ contains
         real(wp) :: buf
         real(wp), dimension(2, 2, 2) :: eta
         type(ghost_point) :: gp
-        integer :: i !< Iterator variables
-        integer :: i1, i2, j1, j2, k1, k2 !< Grid indexes
+        integer :: q, i, j, k, ii, jj, kk !< Grid indexes and iterators
         integer :: patch_id
+        logical is_cell_center
 
-        ! 2D
-        if (p <= 0) then
-            do i = 1, num_gps
-                gp = ghost_points_in(i)
-                ! Get the interpolation points
-                i1 = gp%ip_grid(1); i2 = i1 + 1
-                j1 = gp%ip_grid(2); j2 = j1 + 1
+        $:GPU_PARALLEL_LOOP(private='[q,i,j,k,ii,jj,kk,dist,buf,gp,interp_coeffs,eta,alpha,patch_id,is_cell_center]')
+        do q = 1, num_gps
+            gp = ghost_points_in(q)
+            ! Get the interpolation points
+            i = gp%ip_grid(1)
+            j = gp%ip_grid(2)
+            if (p /= 0) then
+                k = gp%ip_grid(3)
+            else
+                k = 0; 
+            end if
 
-                dist = 0._wp
-                buf = 1._wp
-                dist(1, 1, 1) = sqrt( &
-                                (x_cc(i1) - gp%ip_loc(1))**2 + &
-                                (y_cc(j1) - gp%ip_loc(2))**2)
-                dist(2, 1, 1) = sqrt( &
-                                (x_cc(i2) - gp%ip_loc(1))**2 + &
-                                (y_cc(j1) - gp%ip_loc(2))**2)
-                dist(1, 2, 1) = sqrt( &
-                                (x_cc(i1) - gp%ip_loc(1))**2 + &
-                                (y_cc(j2) - gp%ip_loc(2))**2)
-                dist(2, 2, 1) = sqrt( &
-                                (x_cc(i2) - gp%ip_loc(1))**2 + &
-                                (y_cc(j2) - gp%ip_loc(2))**2)
+            ! get the distance to a cell in each direction
+            dist = 0._wp
+            buf = 1._wp
+            do ii = 0, 1
+                do jj = 0, 1
+                    if (p == 0) then
+                        dist(1 + ii, 1 + jj, 1) = sqrt( &
+                                                  (x_cc(i + ii) - gp%ip_loc(1))**2 + &
+                                                  (y_cc(j + jj) - gp%ip_loc(2))**2)
+                    else
+                        do kk = 0, 1
+                            dist(1 + ii, 1 + jj, 1 + kk) = sqrt( &
+                                                           (x_cc(i + ii) - gp%ip_loc(1))**2 + &
+                                                           (y_cc(j + jj) - gp%ip_loc(2))**2 + &
+                                                           (z_cc(k + kk) - gp%ip_loc(3))**2)
+                        end do
+                    end if
+                end do
+            end do
 
-                interp_coeffs = 0._wp
+            ! check if we are arbitrarily close to a cell center
+            interp_coeffs = 0._wp
+            is_cell_center = .false.
+            check_is_cell_center: do ii = 0, 1
+                do jj = 0, 1
+                    if (dist(ii + 1, jj + 1, 1) <= 1.e-16_wp) then
+                        interp_coeffs(ii + 1, jj + 1, 1) = 1._wp
+                        is_cell_center = .true.
+                        exit check_is_cell_center
+                    else
+                        if (p /= 0) then
+                            if (dist(ii + 1, jj + 1, 2) <= 1.e-16_wp) then
+                                interp_coeffs(ii + 1, jj + 1, 2) = 1._wp
+                                is_cell_center = .true.
+                                exit check_is_cell_center
+                            end if
+                        end if
+                    end if
+                end do
+            end do check_is_cell_center
 
-                if (dist(1, 1, 1) <= 1.e-16_wp) then
-                    interp_coeffs(1, 1, 1) = 1._wp
-                else if (dist(2, 1, 1) <= 1.e-16_wp) then
-                    interp_coeffs(2, 1, 1) = 1._wp
-                else if (dist(1, 2, 1) <= 1.e-16_wp) then
-                    interp_coeffs(1, 2, 1) = 1._wp
-                else if (dist(2, 2, 1) <= 1.e-16_wp) then
-                    interp_coeffs(2, 2, 1) = 1._wp
-                else
+            if (.not. is_cell_center) then
+                ! if we are not arbitrarily close, interpolate
+                alpha = 1._wp
+                patch_id = gp%ib_patch_id
+                if (ib_markers%sf(i, j, k) /= 0) alpha(1, 1, 1) = 0._wp
+                if (ib_markers%sf(i + 1, j, k) /= 0) alpha(2, 1, 1) = 0._wp
+                if (ib_markers%sf(i, j + 1, k) /= 0) alpha(1, 2, 1) = 0._wp
+                if (ib_markers%sf(i + 1, j + 1, k) /= 0) alpha(2, 2, 1) = 0._wp
+
+                if (p == 0) then
                     eta(:, :, 1) = 1._wp/dist(:, :, 1)**2
-                    alpha = 1._wp
-                    patch_id = gp%ib_patch_id
-                    if (ib_markers%sf(i1, j1, 0) /= 0) alpha(1, 1, 1) = 0._wp
-                    if (ib_markers%sf(i2, j1, 0) /= 0) alpha(2, 1, 1) = 0._wp
-                    if (ib_markers%sf(i1, j2, 0) /= 0) alpha(1, 2, 1) = 0._wp
-                    if (ib_markers%sf(i2, j2, 0) /= 0) alpha(2, 2, 1) = 0._wp
                     buf = sum(alpha(:, :, 1)*eta(:, :, 1))
                     if (buf > 0._wp) then
                         interp_coeffs(:, :, 1) = alpha(:, :, 1)*eta(:, :, 1)/buf
@@ -758,82 +768,15 @@ contains
                         buf = sum(eta(:, :, 1))
                         interp_coeffs(:, :, 1) = eta(:, :, 1)/buf
                     end if
-                end if
-
-                ghost_points_in(i)%interp_coeffs = interp_coeffs
-            end do
-
-        else
-            do i = 1, num_gps
-                gp = ghost_points_in(i)
-                ! Get the interpolation points
-                i1 = gp%ip_grid(1); i2 = i1 + 1
-                j1 = gp%ip_grid(2); j2 = j1 + 1
-                k1 = gp%ip_grid(3); k2 = k1 + 1
-
-                ! Get interpolation weights (Chaudhuri et al. 2011, JCP)
-                dist(1, 1, 1) = sqrt( &
-                                (x_cc(i1) - gp%ip_loc(1))**2 + &
-                                (y_cc(j1) - gp%ip_loc(2))**2 + &
-                                (z_cc(k1) - gp%ip_loc(3))**2)
-                dist(2, 1, 1) = sqrt( &
-                                (x_cc(i2) - gp%ip_loc(1))**2 + &
-                                (y_cc(j1) - gp%ip_loc(2))**2 + &
-                                (z_cc(k1) - gp%ip_loc(3))**2)
-                dist(1, 2, 1) = sqrt( &
-                                (x_cc(i1) - gp%ip_loc(1))**2 + &
-                                (y_cc(j2) - gp%ip_loc(2))**2 + &
-                                (z_cc(k1) - gp%ip_loc(3))**2)
-                dist(2, 2, 1) = sqrt( &
-                                (x_cc(i2) - gp%ip_loc(1))**2 + &
-                                (y_cc(j2) - gp%ip_loc(2))**2 + &
-                                (z_cc(k1) - gp%ip_loc(3))**2)
-                dist(1, 1, 2) = sqrt( &
-                                (x_cc(i1) - gp%ip_loc(1))**2 + &
-                                (y_cc(j1) - gp%ip_loc(2))**2 + &
-                                (z_cc(k2) - gp%ip_loc(3))**2)
-                dist(2, 1, 2) = sqrt( &
-                                (x_cc(i2) - gp%ip_loc(1))**2 + &
-                                (y_cc(j1) - gp%ip_loc(2))**2 + &
-                                (z_cc(k2) - gp%ip_loc(3))**2)
-                dist(1, 2, 2) = sqrt( &
-                                (x_cc(i1) - gp%ip_loc(1))**2 + &
-                                (y_cc(j2) - gp%ip_loc(2))**2 + &
-                                (z_cc(k2) - gp%ip_loc(3))**2)
-                dist(2, 2, 2) = sqrt( &
-                                (x_cc(i2) - gp%ip_loc(1))**2 + &
-                                (y_cc(j2) - gp%ip_loc(2))**2 + &
-                                (z_cc(k2) - gp%ip_loc(3))**2)
-                interp_coeffs = 0._wp
-                buf = 1._wp
-                if (dist(1, 1, 1) <= 1.e-16_wp) then
-                    interp_coeffs(1, 1, 1) = 1._wp
-                else if (dist(2, 1, 1) <= 1.e-16_wp) then
-                    interp_coeffs(2, 1, 1) = 1._wp
-                else if (dist(1, 2, 1) <= 1.e-16_wp) then
-                    interp_coeffs(1, 2, 1) = 1._wp
-                else if (dist(2, 2, 1) <= 1.e-16_wp) then
-                    interp_coeffs(2, 2, 1) = 1._wp
-                else if (dist(1, 1, 2) <= 1.e-16_wp) then
-                    interp_coeffs(1, 1, 2) = 1._wp
-                else if (dist(2, 1, 2) <= 1.e-16_wp) then
-                    interp_coeffs(2, 1, 2) = 1._wp
-                else if (dist(1, 2, 2) <= 1.e-16_wp) then
-                    interp_coeffs(1, 2, 2) = 1._wp
-                else if (dist(2, 2, 2) <= 1.e-16_wp) then
-                    interp_coeffs(2, 2, 2) = 1._wp
                 else
+
+                    if (ib_markers%sf(i, j, k + 1) /= 0) alpha(1, 1, 2) = 0._wp
+                    if (ib_markers%sf(i + 1, j, k + 1) /= 0) alpha(2, 1, 2) = 0._wp
+                    if (ib_markers%sf(i, j + 1, k + 1) /= 0) alpha(1, 2, 2) = 0._wp
+                    if (ib_markers%sf(i + 1, j + 1, k + 1) /= 0) alpha(2, 2, 2) = 0._wp
                     eta = 1._wp/dist**2
-                    alpha = 1._wp
-                    if (ib_markers%sf(i1, j1, k1) /= 0) alpha(1, 1, 1) = 0._wp
-                    if (ib_markers%sf(i2, j1, k1) /= 0) alpha(2, 1, 1) = 0._wp
-                    if (ib_markers%sf(i1, j2, k1) /= 0) alpha(1, 2, 1) = 0._wp
-                    if (ib_markers%sf(i2, j2, k1) /= 0) alpha(2, 2, 1) = 0._wp
-                    if (ib_markers%sf(i1, j1, k2) /= 0) alpha(1, 1, 2) = 0._wp
-                    if (ib_markers%sf(i2, j1, k2) /= 0) alpha(2, 1, 2) = 0._wp
-                    if (ib_markers%sf(i1, j2, k2) /= 0) alpha(1, 2, 2) = 0._wp
-                    if (ib_markers%sf(i2, j2, k2) /= 0) alpha(2, 2, 2) = 0._wp
                     buf = sum(alpha*eta)
+
                     if (buf > 0._wp) then
                         interp_coeffs = alpha*eta/buf
                     else
@@ -842,14 +785,32 @@ contains
                     end if
                 end if
 
-                ghost_points_in(i)%interp_coeffs = interp_coeffs
-            end do
-        end if
+            end if
+
+            ghost_points_in(q)%interp_coeffs = interp_coeffs
+        end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_compute_interpolation_coeffs
 
     !> Function that uses the interpolation coefficients and the current state
     !! at the cell centers in order to estimate the state at the image point
+    !! @param gp Ghost point data structure
+    !> @brief Interpolates primitive variables from the fluid domain to a ghost point's image point using bilinear or trilinear interpolation.
+    !! @param alpha_rho_IP Partial density at image point
+    !! @param alpha_IP Volume fraction at image point
+    !! @param pres_IP Pressure at image point
+    !! @param vel_IP Velocity at image point
+    !! @param c_IP Speed of sound at image point
+    !! @param r_IP Bubble radius at image point
+    !! @param v_IP Bubble radial velocity at image point
+    !! @param pb_IP Bubble pressure at image point
+    !! @param mv_IP Bubble vapor mass at image point
+    !! @param nmom_IP Bubble moment at image point
+    !! @param pb_in Internal bubble pressure array
+    !! @param mv_in Mass of vapor in bubble array
+    !! @param presb_IP Bubble node pressure at image point
+    !! @param massv_IP Bubble node vapor mass at image point
     subroutine s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, &
                                          pres_IP, vel_IP, c_IP, r_IP, v_IP, pb_IP, &
                                          mv_IP, nmom_IP, pb_in, mv_in, presb_IP, massv_IP)
@@ -980,18 +941,21 @@ contains
 
     !> Resets the current indexes of immersed boundaries and replaces them after updating
     !> the position of each moving immersed boundary
-    impure subroutine s_update_mib(num_ibs, levelset, levelset_norm)
+    impure subroutine s_update_mib(num_ibs)
 
         integer, intent(in) :: num_ibs
-        type(levelset_field), intent(inout) :: levelset
-        type(levelset_norm_field), intent(inout) :: levelset_norm
 
-        integer :: i, ierr
+        integer :: i, j, k, ierr, z_gp_layers
+
+        call nvtxStartRange("UPDATE-MIBM")
 
         ! Clears the existing immersed boundary indices
-        ib_markers%sf = 0._wp
-        levelset%sf = 0._wp
-        levelset_norm%sf = 0._wp
+        z_gp_layers = 0; if (p /= 0) z_gp_layers = gp_layers + 1
+        $:GPU_PARALLEL_LOOP(private='[i,j,k]')
+        do i = -gp_layers - 1, m + gp_layers + 1; do j = -gp_layers - 1, n + gp_layers + 1; do k = -z_gp_layers, p + z_gp_layers
+                    ib_markers%sf(i, j, k) = 0._wp
+                end do; end do; end do
+        $:END_GPU_PARALLEL_LOOP()
 
         ! recalulcate the rotation matrix based upon the new angles
         do i = 1, num_ibs
@@ -1003,29 +967,27 @@ contains
         $:GPU_UPDATE(device='[patch_ib]')
 
         ! recompute the new ib_patch locations and broadcast them.
-        call s_apply_ib_patches(ib_markers%sf(0:m, 0:n, 0:p), levelset, levelset_norm)
-        call s_populate_ib_buffers() ! transmits the new IB markers via MPI
-        $:GPU_UPDATE(device='[ib_markers%sf]')
-        $:GPU_UPDATE(host='[levelset%sf, levelset_norm%sf]')
+        call nvtxStartRange("APPLY-IB-PATCHES")
+        call s_apply_ib_patches(ib_markers)
+        call nvtxEndRange
 
+        call nvtxStartRange("COMPUTE-GHOST-POINTS")
         ! recalculate the ghost point locations and coefficients
         call s_find_num_ghost_points(num_gps, num_inner_gps)
-        $:GPU_UPDATE(device='[num_gps, num_inner_gps]')
-
         call s_find_ghost_points(ghost_points, inner_points)
-        $:GPU_UPDATE(device='[ghost_points, inner_points]')
+        call nvtxEndRange
 
-        call s_compute_image_points(ghost_points, levelset, levelset_norm)
-        $:GPU_UPDATE(device='[ghost_points]')
-
+        call nvtxStartRange("COMPUTE-IMAGE-POINTS")
+        call s_apply_levelset(ghost_points, num_gps)
+        call s_compute_image_points(ghost_points)
         call s_compute_interpolation_coeffs(ghost_points)
-        $:GPU_UPDATE(device='[ghost_points]')
+        call nvtxEndRange
+
+        call nvtxEndRange
 
     end subroutine s_update_mib
 
-    ! compute the surface integrals of the IB via a volume integraion method described in
-    ! "A coupled IBM/Euler-Lagrange framework for simulating shock-induced particle size segregation"
-    ! by Archana Sridhar and Jesse Capecelatro
+    !> @brief Computes pressure and viscous forces and torques on immersed bodies via a volume integration method.
     subroutine s_compute_ib_forces(q_prim_vf, fluid_pp)
 
         ! real(wp), dimension(idwbuff(1)%beg:idwbuff(1)%end, &
@@ -1044,6 +1006,9 @@ contains
         #:else
             real(wp), dimension(num_fluids) :: dynamic_viscosities
         #:endif
+
+        call nvtxStartRange("COMPUTE-IB-FORCES")
+
         forces = 0._wp
         torques = 0._wp
 
@@ -1174,14 +1139,18 @@ contains
             patch_ib(i)%torque(:) = matmul(patch_ib(i)%rotation_matrix_inverse, torques(i, :)) ! torques must be converted to the local coordinates of the IB
         end do
 
+        call nvtxEndRange
+
     end subroutine s_compute_ib_forces
 
     !> Subroutine to deallocate memory reserved for the IBM module
     impure subroutine s_finalize_ibm_module()
 
         @:DEALLOCATE(ib_markers%sf)
-        @:DEALLOCATE(levelset%sf)
-        @:DEALLOCATE(levelset_norm%sf)
+        if (allocated(airfoil_grid_u)) then
+            @:DEALLOCATE(airfoil_grid_u)
+            @:DEALLOCATE(airfoil_grid_l)
+        end if
 
     end subroutine s_finalize_ibm_module
 
@@ -1243,6 +1212,8 @@ contains
 
     end subroutine s_compute_centroid_offset
 
+    !>  Computes the moment of inertia for an immersed boundary
+        !!  @param ib_marker Immersed boundary marker index
     subroutine s_compute_moment_of_inertia(ib_marker, axis)
 
         real(wp), dimension(3), intent(in) :: axis !< the axis about which we compute the moment. Only required in 3D.
@@ -1316,6 +1287,45 @@ contains
 
     end subroutine s_compute_moment_of_inertia
 
+    !> @brief Checks for periodic boundary conditions in all directions, and if so, moves patch location if it left the domain
+    subroutine s_wrap_periodic_ibs()
+
+        integer :: patch_id
+
+        do patch_id = 1, num_ibs
+            ! check domain wraps in x, y,
+            #:for X, ID in [('x', 1), ('y', 2)]
+                ! check for periodicity
+                if (bc_${X}$%beg == BC_PERIODIC) then
+                    ! check if the boundary has left the domain, and then correct
+                    if (patch_ib(patch_id)%${X}$_centroid < glb_bounds(${ID}$)%beg) then
+                        ! if the boundary exited "left", wrap it back around to the "right"
+                        patch_ib(patch_id)%${X}$_centroid = patch_ib(patch_id)%${X}$_centroid + (glb_bounds(${ID}$)%end - glb_bounds(${ID}$)%beg)
+                    else if (patch_ib(patch_id)%${X}$_centroid > glb_bounds(${ID}$)%end) then
+                        ! if the boundary exited "right", wrap it back around to the "left"
+                        patch_ib(patch_id)%${X}$_centroid = patch_ib(patch_id)%${X}$_centroid - (glb_bounds(${ID}$)%end - glb_bounds(${ID}$)%beg)
+                    end if
+                end if
+            #:endfor
+
+            if (p /= 0) then
+                ! check for periodicity
+                if (bc_z%beg == BC_PERIODIC) then
+                    ! check if the boundary has left the domain, and then correct
+                    if (patch_ib(patch_id)%z_centroid < glb_bounds(3)%beg) then
+                        ! if the boundary exited "left", wrap it back around to the "right"
+                        patch_ib(patch_id)%z_centroid = patch_ib(patch_id)%z_centroid + (glb_bounds(3)%end - glb_bounds(3)%beg)
+                    else if (patch_ib(patch_id)%z_centroid > glb_bounds(3)%end) then
+                        ! if the boundary exited "right", wrap it back around to the "left"
+                        patch_ib(patch_id)%z_centroid = patch_ib(patch_id)%z_centroid - (glb_bounds(3)%end - glb_bounds(3)%beg)
+                    end if
+                end if
+            end if
+        end do
+
+    end subroutine s_wrap_periodic_ibs
+
+    !> @brief Computes the cross product c = a x b of two 3D vectors.
     subroutine s_cross_product(a, b, c)
         $:GPU_ROUTINE(parallelism='[seq]')
 

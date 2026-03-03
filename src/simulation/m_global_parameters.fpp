@@ -1,16 +1,11 @@
 !>
-!! @file m_global_parameters.f90
+!! @file
 !! @brief Contains module m_global_parameters
 
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
-!> @brief The module contains all of the parameters describing the program
-!!              logistics, the computational domain and the simulation algorithm.
-!!              Additionally, for the volume fraction model, physical parameters
-!!              of each of the fluids present in the flow are located here. They
-!!              include stiffened gas equation of state parameters, the Reynolds
-!!              numbers and the Weber numbers.
+!> @brief Global parameters for the computational domain, fluid properties, and simulation algorithm configuration
 module m_global_parameters
 
 #ifdef MFC_MPI
@@ -330,7 +325,7 @@ module m_global_parameters
     ! boundary values.
     !> @{
     real(wp) :: wa_flg
-    !> @{
+    !> @}
 
     $:GPU_DECLARE(create='[wa_flg]')
 
@@ -416,7 +411,7 @@ module m_global_parameters
     !! the maximum allowable number of patches, num_patches_max, may be changed
     !! in the module m_derived_types.f90.
 
-    $:GPU_DECLARE(create='[ib,num_ibs,patch_ib]')
+    $:GPU_DECLARE(create='[ib,num_ibs,patch_ib,Np,airfoil_grid_u,airfoil_grid_l]')
     !> @}
 
     !> @name Bubble modeling
@@ -700,9 +695,9 @@ contains
             #:endfor
         #:endfor
 
-        glb_bounds(1)%beg = dflt_int; glb_bounds(1)%end = dflt_int
-        glb_bounds(2)%beg = dflt_int; glb_bounds(2)%end = dflt_int
-        glb_bounds(3)%beg = dflt_int; glb_bounds(3)%end = dflt_int
+        glb_bounds(1)%beg = dflt_real; glb_bounds(1)%end = dflt_real
+        glb_bounds(2)%beg = dflt_real; glb_bounds(2)%end = dflt_real
+        glb_bounds(3)%beg = dflt_real; glb_bounds(3)%end = dflt_real
 
         ! Fluids physical parameters
         do i = 1, num_fluids_max
@@ -877,6 +872,7 @@ contains
         lag_params%gravity_force = .false.
         lag_params%epsilonb = 1._wp
         lag_params%charwidth = dflt_real
+        lag_params%charNz = dflt_int
         lag_params%valmaxvoid = dflt_real
         lag_params%input_path = 'input/lag_bubbles.dat'
         lag_params%nParticles_glb = dflt_int
@@ -906,6 +902,47 @@ contains
             mhd = .false.
             relativity = .false.
         #:endif
+
+        do i = 1, num_patches_max
+            patch_ib(i)%geometry = dflt_int
+            patch_ib(i)%x_centroid = 0._wp
+            patch_ib(i)%y_centroid = 0._wp
+            patch_ib(i)%z_centroid = 0._wp
+            patch_ib(i)%length_x = dflt_real
+            patch_ib(i)%length_y = dflt_real
+            patch_ib(i)%length_z = dflt_real
+            patch_ib(i)%radius = dflt_real
+            patch_ib(i)%theta = dflt_real
+            patch_ib(i)%c = dflt_real
+            patch_ib(i)%t = dflt_real
+            patch_ib(i)%m = dflt_real
+            patch_ib(i)%p = dflt_real
+            patch_ib(i)%slip = .false.
+
+            ! Proper default values for translating STL models
+            patch_ib(i)%model_scale(:) = 1._wp
+            patch_ib(i)%model_translate(:) = 0._wp
+            patch_ib(i)%model_rotate(:) = 0._wp
+            patch_ib(i)%model_filepath(:) = dflt_char
+            patch_ib(i)%model_spc = num_ray
+            patch_ib(i)%model_threshold = ray_tracing_threshold
+
+            ! Variables to handle moving imersed boundaries, defaulting to no movement
+            patch_ib(i)%moving_ibm = 0
+            patch_ib(i)%vel(:) = 0._wp
+            patch_ib(i)%angles(:) = 0._wp
+            patch_ib(i)%angular_vel(:) = 0._wp
+            patch_ib(i)%mass = dflt_real
+            patch_ib(i)%moment = dflt_real
+            patch_ib(i)%centroid_offset(:) = 0._wp
+
+            ! sets values of a rotation matrix which can be used when calculating rotations
+            patch_ib(i)%rotation_matrix = 0._wp
+            patch_ib(i)%rotation_matrix(1, 1) = 1._wp
+            patch_ib(i)%rotation_matrix(2, 2) = 1._wp
+            patch_ib(i)%rotation_matrix(3, 3) = 1._wp
+            patch_ib(i)%rotation_matrix_inverse = patch_ib(i)%rotation_matrix
+        end do
 
     end subroutine s_assign_default_values_to_user_inputs
 
@@ -1413,6 +1450,8 @@ contains
         allocate (proc_coords(1:num_dims))
         @:ALLOCATE(pcomm_coords(1:num_dims))
 
+        @:ALLOCATE(pcomm_coords(1:num_dims))
+
         if (parallel_io .neqv. .true.) return
 
 #ifdef MFC_MPI
@@ -1448,7 +1487,9 @@ contains
         end if
 
         deallocate (proc_coords)
+
         @:DEALLOCATE(pcomm_coords)
+
         if (parallel_io) then
             deallocate (start_idx)
 

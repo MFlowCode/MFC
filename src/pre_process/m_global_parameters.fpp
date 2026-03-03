@@ -1,12 +1,10 @@
 !>
-!! @file m_global_parameters.f90
+!! @file
 !! @brief Contains module m_global_parameters
 
 #:include 'case.fpp'
 
-!> @brief This module contains all of the parameters characterizing the
-!!              computational domain, simulation algorithm, initial condition
-!!              and the stiffened equation of state.
+!> @brief Defines global parameters for the computational domain, simulation algorithm, and initial conditions
 module m_global_parameters
 
 #ifdef MFC_MPI
@@ -206,10 +204,6 @@ module m_global_parameters
 #ifdef MFC_MPI
 
     type(mpi_io_var), public :: MPI_IO_DATA
-    type(mpi_io_ib_var), public :: MPI_IO_IB_DATA
-    type(mpi_io_airfoil_ib_var), public :: MPI_IO_airfoil_IB_DATA
-    type(mpi_io_levelset_var), public :: MPI_IO_levelset_DATA
-    type(mpi_io_levelset_norm_var), public :: MPI_IO_levelsetnorm_DATA
 
     character(LEN=name_len) :: mpiiofs
     integer :: mpi_info_int !<
@@ -473,12 +467,13 @@ contains
         lag_params%drag_model = dflt_int
         lag_params%epsilonb = 1._wp
         lag_params%charwidth = dflt_real
-        lag_params%valmaxvoid = dflt_real
         lag_params%nParticles_glb = dflt_int
         lag_params%qs_drag_model = dflt_int
         lag_params%stokes_drag = dflt_int
         lag_params%added_mass_model = dflt_int
         lag_params%interpolation_order = dflt_int
+        lag_params%charNz = dflt_int
+        lag_params%valmaxvoid = dflt_real
 
         do i = 1, num_patches_max
             patch_icpp(i)%geometry = dflt_int
@@ -1009,12 +1004,6 @@ contains
                 MPI_IO_DATA%var(i)%sf => null()
             end do
         end if
-
-        if (ib) then
-            allocate (MPI_IO_IB_DATA%var%sf(0:m, 0:n, 0:p))
-            allocate (MPI_IO_levelset_DATA%var%sf(0:m, 0:n, 0:p, 1:num_ibs))
-            allocate (MPI_IO_levelsetnorm_DATA%var%sf(0:m, 0:n, 0:p, 1:num_ibs, 1:3))
-        end if
 #endif
 
         ! Allocating grid variables for the x-direction
@@ -1041,6 +1030,7 @@ contains
 
     end subroutine s_initialize_global_parameters_module
 
+    !> @brief Configures MPI parallel I/O settings and allocates processor coordinate arrays.
     impure subroutine s_initialize_parallel_io
 
 #ifdef MFC_MPI
@@ -1078,6 +1068,7 @@ contains
 
     end subroutine s_initialize_parallel_io
 
+    !> @brief Deallocates all global grid, index, and equation-of-state parameter arrays.
     impure subroutine s_finalize_global_parameters_module
 
         integer :: i

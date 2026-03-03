@@ -1,8 +1,11 @@
-!> energies (6-eqn to 4-eqn) equilibrium through an infinitely fast (algebraic)
-!> procedure.
+!>
+!! @file
+!! @brief Contains module m_phase_change
+
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
+!> @brief Phase transition relaxation solvers for liquid-vapor flows with cavitation and boiling
 module m_phase_change
 
 #ifndef MFC_POST_PROCESS
@@ -288,7 +291,6 @@ contains
         !!  @param MFL flag that tells whether the fluid is gas (0), liquid (1), or a mixture (2)
         !!  @param pS equilibrium pressure at the interface
         !!  @param p_infpT stiffness for the participating fluids under pT-equilibrium
-        !!  @param rM sum of the reacting masses
         !!  @param q_cons_vf Cell-average conservative variables
         !!  @param rhoe mixture energy
         !!  @param TS equilibrium temperature at the interface

@@ -11,9 +11,11 @@ Welcome to the Multi-component Flow Code (MFC) documentation.
 
 ## Reference
 
+- @ref equations "Equations" - Comprehensive equations reference
 - @ref parameters "Case Parameters" - All ~3,400 parameters
 - @ref cli-reference "CLI Reference" - Command line options
 - @ref case_constraints "Case Creator Guide" - Feature compatibility
+- @ref physics_constraints "Physics Constraints" - Mathematical basis for validation rules
 
 ## Examples & Visualization
 
@@ -22,13 +24,22 @@ Welcome to the Multi-component Flow Code (MFC) documentation.
 
 ## Advanced Topics
 
+- @ref architecture "Code Architecture" - How the source code is organized, data flow, and module map
 - @ref expectedPerformance "Performance" - Optimization and benchmarks
 - @ref gpuParallelization "GPU Parallelization" - GPU macro API (developer reference)
 - @ref docker "Containers" - Docker usage
 - @ref troubleshooting "Troubleshooting" - Debugging and common issues
 
+## Development
+
+- @ref contributing "Contributing" - Developer guide and coding standards
+- [API Documentation](../api/index.html) - Source code reference for all three components
+
 ## About
 
 - @ref papers "Papers" - Publications using MFC
-- @ref references "References" - Bibliography
+- \ref citelist "Bibliography" - Cited references
 - @ref authors "Authors" - Contributors
+
+
+<div style='text-align:center; font-size:0.75rem; color:#888; padding:16px 0 0;'>Page last updated: 2026-02-19</div>

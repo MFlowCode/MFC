@@ -1,10 +1,10 @@
 !>
-!! @file m_fftw.f90
+!! @file
 !! @brief Contains module m_fftw
 
 #:include 'macros.fpp'
 
-!> @brief The module contains the subroutines for the FFT routines
+!> @brief Forward and inverse FFT wrappers (FFTW/cuFFT/hipFFT) for azimuthal Fourier filtering in cylindrical geometries
 module m_fftw
     use, intrinsic :: iso_c_binding
 
@@ -52,11 +52,15 @@ module m_fftw
     complex(dp), allocatable, target :: data_fltr_cmplx_gpu(:)
     $:GPU_DECLARE(create='[data_real_gpu,data_cmplx_gpu,data_fltr_cmplx_gpu]')
 
+!> @cond
 #if defined(__PGI)
     integer :: fwd_plan_gpu, bwd_plan_gpu
 #else
+!> @endcond
     type(c_ptr) :: fwd_plan_gpu, bwd_plan_gpu
+!> @cond
 #endif
+!> @endcond
 
     integer, allocatable :: gpu_fft_size(:), iembed(:), oembed(:)
 

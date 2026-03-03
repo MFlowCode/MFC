@@ -1,11 +1,11 @@
+!>
+!! @file
+!! @brief Contains module m_mpi_common
+
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
-!> @brief The module serves as a proxy to the parameters and subroutines
-!!          available in the MPI implementation's MPI module. Specifically,
-!!          the purpose of the proxy is to harness basic MPI commands into
-!!          more complicated procedures as to accomplish the communication
-!!          goals for the simulation.
+!> @brief MPI communication layer: domain decomposition, halo exchange, reductions, and parallel I/O setup
 module m_mpi_common
 
 #ifdef MFC_MPI
@@ -129,15 +129,11 @@ contains
 
     !! @param q_cons_vf Conservative variables
     !! @param ib_markers track if a cell is within the immersed boundary
-    !! @param levelset closest distance from every cell to the IB
-    !! @param levelset_norm normalized vector from every cell to the closest point to the IB
     !! @param beta Eulerian void fraction from lagrangian bubbles
-    impure subroutine s_initialize_mpi_data(q_cons_vf, ib_markers, levelset, levelset_norm, beta)
+    impure subroutine s_initialize_mpi_data(q_cons_vf, ib_markers, beta)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         type(integer_field), optional, intent(in) :: ib_markers
-        type(levelset_field), optional, intent(IN) :: levelset
-        type(levelset_norm_field), optional, intent(IN) :: levelset_norm
         type(scalar_field), intent(in), optional :: beta
 
         integer, dimension(num_dims) :: sizes_glb, sizes_loc
@@ -208,73 +204,13 @@ contains
         end if
 #endif
 
+#ifndef MFC_PRE_PROCESS
         if (present(ib_markers)) then
-
-#ifdef MFC_PRE_PROCESS
-            MPI_IO_IB_DATA%var%sf => ib_markers%sf
-            MPI_IO_levelset_DATA%var%sf => levelset%sf
-            MPI_IO_levelsetnorm_DATA%var%sf => levelset_norm%sf
-#else
             MPI_IO_IB_DATA%var%sf => ib_markers%sf(0:m, 0:n, 0:p)
 
-#ifndef MFC_POST_PROCESS
-            MPI_IO_levelset_DATA%var%sf => levelset%sf(0:m, 0:n, 0:p, 1:num_ibs)
-            MPI_IO_levelsetnorm_DATA%var%sf => levelset_norm%sf(0:m, 0:n, 0:p, 1:num_ibs, 1:3)
-#endif
-
-#endif
             call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, &
                                           MPI_ORDER_FORTRAN, MPI_INTEGER, MPI_IO_IB_DATA%view, ierr)
             call MPI_TYPE_COMMIT(MPI_IO_IB_DATA%view, ierr)
-
-#ifndef MFC_POST_PROCESS
-            call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, &
-                                          MPI_ORDER_FORTRAN, mpi_p, MPI_IO_levelset_DATA%view, ierr)
-            call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, &
-                                          MPI_ORDER_FORTRAN, mpi_p, MPI_IO_levelsetnorm_DATA%view, ierr)
-
-            call MPI_TYPE_COMMIT(MPI_IO_levelset_DATA%view, ierr)
-            call MPI_TYPE_COMMIT(MPI_IO_levelsetnorm_DATA%view, ierr)
-#endif
-        end if
-
-#ifndef MFC_POST_PROCESS
-        if (present(ib_markers)) then
-            do j = 1, num_ibs
-                if (patch_ib(j)%c > 0) then
-
-#ifdef MFC_PRE_PROCESS
-                    allocate (MPI_IO_airfoil_IB_DATA%var(1:2*Np))
-#endif
-
-                    airfoil_glb(1) = 3*Np*num_procs
-                    airfoil_loc(1) = 3*Np
-                    airfoil_start(1) = 3*proc_rank*Np
-
-#ifdef MFC_PRE_PROCESS
-                    do i = 1, Np
-                        MPI_IO_airfoil_IB_DATA%var(i)%x = airfoil_grid_l(i)%x
-                        MPI_IO_airfoil_IB_DATA%var(i)%y = airfoil_grid_l(i)%y
-                    end do
-#endif
-
-                    call MPI_TYPE_CREATE_SUBARRAY(1, airfoil_glb, airfoil_loc, airfoil_start, &
-                                                  MPI_ORDER_FORTRAN, mpi_p, MPI_IO_airfoil_IB_DATA%view(1), ierr)
-                    call MPI_TYPE_COMMIT(MPI_IO_airfoil_IB_DATA%view(1), ierr)
-
-#ifdef MFC_PRE_PROCESS
-                    do i = 1, Np
-                        MPI_IO_airfoil_IB_DATA%var(Np + i)%x = airfoil_grid_u(i)%x
-                        MPI_IO_airfoil_IB_DATA%var(Np + i)%y = airfoil_grid_u(i)%y
-                    end do
-#endif
-                    call MPI_TYPE_CREATE_SUBARRAY(1, airfoil_glb, airfoil_loc, airfoil_start, &
-                                                  MPI_ORDER_FORTRAN, mpi_p, MPI_IO_airfoil_IB_DATA%view(2), ierr)
-                    call MPI_TYPE_COMMIT(MPI_IO_airfoil_IB_DATA%view(2), ierr)
-
-                end if
-            end do
-
         end if
 #endif
 
@@ -333,6 +269,7 @@ contains
 
     end subroutine s_initialize_mpi_data_ds
 
+    !> @brief Gathers variable-length real vectors from all MPI ranks onto the root process.
     impure subroutine s_mpi_gather_data(my_vector, counts, gathered_vector, root)
 
         integer, intent(in) :: counts          ! Array of vector lengths for each process
@@ -365,6 +302,7 @@ contains
 #endif
     end subroutine s_mpi_gather_data
 
+    !> @brief Gathers per-rank time step wall-clock times onto rank 0 for performance reporting.
     impure subroutine mpi_bcast_time_step_values(proc_time, time_avg)
 
         real(wp), dimension(0:num_procs - 1), intent(inout) :: proc_time
@@ -379,6 +317,7 @@ contains
 
     end subroutine mpi_bcast_time_step_values
 
+    !> @brief Prints a case file error with the prohibited condition and message, then aborts execution.
     impure subroutine s_prohibit_abort(condition, message)
         character(len=*), intent(in) :: condition, message
 
@@ -674,6 +613,7 @@ contains
 
     !> The subroutine terminates the MPI execution environment.
         !! @param prnt error message to be printed
+        !! @param code optional exit code
     impure subroutine s_mpi_abort(prnt, code)
 
         character(len=*), intent(in), optional :: prnt
@@ -735,9 +675,12 @@ contains
     !>  The goal of this procedure is to populate the buffers of
         !!      the cell-average conservative variables by communicating
         !!      with the neighboring processors.
-        !!  @param q_cons_vf Cell-average conservative variables
+        !!  @param q_comm Cell-average conservative variables
         !!  @param mpi_dir MPI communication coordinate direction
         !!  @param pbc_loc Processor boundary condition (PBC) location
+        !!  @param nVar Number of variables to communicate
+        !!  @param pb_in Optional internal bubble pressure
+        !!  @param mv_in Optional bubble mass velocity
     subroutine s_mpi_sendrecv_variables_buffers(q_comm, &
                                                 mpi_dir, &
                                                 pbc_loc, &
@@ -1030,9 +973,9 @@ contains
                                         (j + buff_size*((k + 1) + (n + 1)*l))
                                     q_comm(i)%sf(j + unpack_offset, k, l) = real(buff_recv(r), kind=stp)
 #if defined(__INTEL_COMPILER)
-                                    if (ieee_is_nan(q_comm(i)%sf(j, k, l))) then
+                                    if (ieee_is_nan(q_comm(i)%sf(j + unpack_offset, k, l))) then
                                         print *, "Error", j, k, l, i
-                                        error stop "NaN(s) in recv"
+                                        call s_mpi_abort("NaN(s) in recv")
                                     end if
 #endif
                                 end do
@@ -1085,9 +1028,9 @@ contains
                                          ((k + buff_size) + buff_size*l))
                                     q_comm(i)%sf(j, k + unpack_offset, l) = real(buff_recv(r), kind=stp)
 #if defined(__INTEL_COMPILER)
-                                    if (ieee_is_nan(q_comm(i)%sf(j, k, l))) then
+                                    if (ieee_is_nan(q_comm(i)%sf(j, k + unpack_offset, l))) then
                                         print *, "Error", j, k, l, i
-                                        error stop "NaN(s) in recv"
+                                        call s_mpi_abort("NaN(s) in recv")
                                     end if
 #endif
                                 end do
@@ -1144,9 +1087,9 @@ contains
                                           (l + buff_size)))
                                     q_comm(i)%sf(j, k, l + unpack_offset) = real(buff_recv(r), kind=stp)
 #if defined(__INTEL_COMPILER)
-                                    if (ieee_is_nan(q_comm(i)%sf(j, k, l))) then
+                                    if (ieee_is_nan(q_comm(i)%sf(j, k, l + unpack_offset))) then
                                         print *, "Error", j, k, l, i
-                                        error stop "NaN(s) in recv"
+                                        call s_mpi_abort("NaN(s) in recv")
                                     end if
 #endif
                                 end do
@@ -1209,13 +1152,16 @@ contains
     subroutine s_mpi_reduce_beta_variables_buffers(q_comm, &
                                                    mpi_dir, &
                                                    pbc_loc, &
-                                                   nVar)
+                                                   nVar, &
+                                                   kcomp)
 
         type(scalar_field), dimension(1:), intent(inout) :: q_comm
+        type(scalar_field), dimension(1:), intent(inout) :: kcomp
         integer, intent(in) :: mpi_dir, pbc_loc, nVar
 
         integer :: i, j, k, l, r, q !< Generic loop iterators
         integer :: lb_size
+        real(wp) :: y_kahan, t_kahan
 
         integer :: buffer_counts(1:3), buffer_count
 
@@ -1233,12 +1179,16 @@ contains
         call nvtxStartRange("BETA-COMM-PACKBUF")
 
         ! Set bounds for each dimension
-        comm_coords(1)%beg = merge(-mapcells - 1, 0, bc_x%beg >= 0)
-        comm_coords(1)%end = merge(m + mapcells + 1, m, bc_x%end >= 0)
-        comm_coords(2)%beg = merge(-mapcells - 1, 0, bc_y%beg >= 0)
-        comm_coords(2)%end = merge(n + mapcells + 1, n, bc_y%end >= 0)
-        comm_coords(3)%beg = merge(-mapcells - 1, 0, (bc_z%beg >= 0 .and. p > 0))
-        comm_coords(3)%end = merge(p + mapcells + 1, p, (bc_z%end >= 0 .and. p > 0))
+        ! Always include the full buffer range for each existing dimension.
+        ! The Gaussian smearing kernel writes to buffer cells even at physical
+        ! boundaries, and these contributions must be communicated to neighbors
+        ! in other directions via ADD operations.
+        comm_coords(1)%beg = -mapcells - 1
+        comm_coords(1)%end = m + mapcells + 1
+        comm_coords(2)%beg = merge(-mapcells - 1, 0, n > 0)
+        comm_coords(2)%end = merge(n + mapcells + 1, n, n > 0)
+        comm_coords(3)%beg = merge(-mapcells - 1, 0, p > 0)
+        comm_coords(3)%end = merge(p + mapcells + 1, p, p > 0)
 
         ! Compute sizes
         comm_size(1) = comm_coords(1)%end - comm_coords(1)%beg + 1
@@ -1393,7 +1343,7 @@ contains
         #:for mpi_dir in [1, 2, 3]
             if (mpi_dir == ${mpi_dir}$) then
                 #:if mpi_dir == 1
-                    $:GPU_PARALLEL_LOOP(collapse=4,private='[r]',copyin='[replace_buff]')
+                    $:GPU_PARALLEL_LOOP(collapse=4,private='[r,y_kahan,t_kahan]',copyin='[replace_buff]')
                     do l = comm_coords(3)%beg, comm_coords(3)%end
                         do k = comm_coords(2)%beg, comm_coords(2)%end
                             do j = -mapcells - 1, mapcells
@@ -1404,9 +1354,13 @@ contains
                                         (l - comm_coords(3)%beg)))
                                     if (replace_buff) then
                                         q_comm(beta_vars(i))%sf(j + unpack_offset, k, l) = real(buff_recv(r), kind=stp)
+                                        kcomp(beta_vars(i))%sf(j + unpack_offset, k, l) = 0._wp
                                     else
-                                        q_comm(beta_vars(i))%sf(j + unpack_offset, k, l) = &
-                                            q_comm(beta_vars(i))%sf(j + unpack_offset, k, l) + real(buff_recv(r), kind=stp)
+                                        y_kahan = real(buff_recv(r), kind=wp) - kcomp(beta_vars(i))%sf(j + unpack_offset, k, l)
+                                        t_kahan = q_comm(beta_vars(i))%sf(j + unpack_offset, k, l) + y_kahan
+                                        kcomp(beta_vars(i))%sf(j + unpack_offset, k, l) = &
+                                            (t_kahan - q_comm(beta_vars(i))%sf(j + unpack_offset, k, l)) - y_kahan
+                                        q_comm(beta_vars(i))%sf(j + unpack_offset, k, l) = t_kahan
                                     end if
                                 end do
                             end do
@@ -1414,7 +1368,7 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
                 #:elif mpi_dir == 2
-                    $:GPU_PARALLEL_LOOP(collapse=4,private='[r]',copyin='[replace_buff]')
+                    $:GPU_PARALLEL_LOOP(collapse=4,private='[r,y_kahan,t_kahan]',copyin='[replace_buff]')
                     do i = 1, v_size
                         do l = comm_coords(3)%beg, comm_coords(3)%end
                             do k = -mapcells - 1, mapcells
@@ -1425,9 +1379,13 @@ contains
                                         (l - comm_coords(3)%beg)))
                                     if (replace_buff) then
                                         q_comm(beta_vars(i))%sf(j, k + unpack_offset, l) = real(buff_recv(r), kind=stp)
+                                        kcomp(beta_vars(i))%sf(j, k + unpack_offset, l) = 0._wp
                                     else
-                                        q_comm(beta_vars(i))%sf(j, k + unpack_offset, l) = &
-                                            q_comm(beta_vars(i))%sf(j, k + unpack_offset, l) + real(buff_recv(r), kind=stp)
+                                        y_kahan = real(buff_recv(r), kind=wp) - kcomp(beta_vars(i))%sf(j, k + unpack_offset, l)
+                                        t_kahan = q_comm(beta_vars(i))%sf(j, k + unpack_offset, l) + y_kahan
+                                        kcomp(beta_vars(i))%sf(j, k + unpack_offset, l) = &
+                                            (t_kahan - q_comm(beta_vars(i))%sf(j, k + unpack_offset, l)) - y_kahan
+                                        q_comm(beta_vars(i))%sf(j, k + unpack_offset, l) = t_kahan
                                     end if
                                 end do
                             end do
@@ -1435,7 +1393,7 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
                 #:else
-                    $:GPU_PARALLEL_LOOP(collapse=4,private='[r]',copyin='[replace_buff]')
+                    $:GPU_PARALLEL_LOOP(collapse=4,private='[r,y_kahan,t_kahan]',copyin='[replace_buff]')
                     do i = 1, v_size
                         do l = -mapcells - 1, mapcells
                             do k = comm_coords(2)%beg, comm_coords(2)%end
@@ -1446,9 +1404,13 @@ contains
                                         (l + mapcells + 1)))
                                     if (replace_buff) then
                                         q_comm(beta_vars(i))%sf(j, k, l + unpack_offset) = real(buff_recv(r), kind=stp)
+                                        kcomp(beta_vars(i))%sf(j, k, l + unpack_offset) = 0._wp
                                     else
-                                        q_comm(beta_vars(i))%sf(j, k, l + unpack_offset) = &
-                                            q_comm(beta_vars(i))%sf(j, k, l + unpack_offset) + real(buff_recv(r), kind=stp)
+                                        y_kahan = real(buff_recv(r), kind=wp) - kcomp(beta_vars(i))%sf(j, k, l + unpack_offset)
+                                        t_kahan = q_comm(beta_vars(i))%sf(j, k, l + unpack_offset) + y_kahan
+                                        kcomp(beta_vars(i))%sf(j, k, l + unpack_offset) = &
+                                            (t_kahan - q_comm(beta_vars(i))%sf(j, k, l + unpack_offset)) - y_kahan
+                                        q_comm(beta_vars(i))%sf(j, k, l + unpack_offset) = t_kahan
                                     end if
                                 end do
                             end do
@@ -1518,8 +1480,6 @@ contains
 
         if (igr) then
             recon_order = igr_order
-        else
-            recon_order = weno_order
         end if
 
         ! 3D Cartesian Processor Topology

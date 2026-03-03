@@ -25,5 +25,9 @@ from .schema import ParamDef, ParamType
 # IMPORTANT: This import populates REGISTRY with all parameter definitions
 # and freezes it. It must come after REGISTRY is imported and must not be removed.
 from . import definitions  # noqa: F401  pylint: disable=unused-import
+from .definitions import CONSTRAINTS, DEPENDENCIES, get_value_label
 
-__all__ = ['REGISTRY', 'RegistryFrozenError', 'ParamDef', 'ParamType']
+__all__ = [
+    'REGISTRY', 'RegistryFrozenError', 'ParamDef', 'ParamType',
+    'CONSTRAINTS', 'DEPENDENCIES', 'get_value_label',
+]

@@ -1,6 +1,11 @@
 name: 'Test Suite'
 
-on: [push, pull_request, workflow_dispatch]
+on:
+  push:
+    branches: [master]
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -24,7 +29,7 @@ jobs:
 
       - name: Check Formatting
         run: |
-          ./mfc.sh format -j $(nproc)
+          ./mfc.sh format -j "$(nproc)"
           git diff --exit-code || (echo "::error::Code is not formatted. Run './mfc.sh format' locally." && exit 1)
 
       - name: Spell Check
@@ -44,6 +49,9 @@ jobs:
       - name: Lint Source - No Junk Code
         run: |
           ! grep -iR -e '\.\.\.' -e '\-\-\-' -e '===' ./src/*
+
+      - name: Lint Docs
+        run: python3 toolchain/mfc/lint_docs.py
 
   file-changes:
     name: Detect File Changes
@@ -123,113 +131,228 @@ jobs:
         with:
           python-version: '3.14'
 
+      - name: Get system info for cache key
+        id: sys-info
+        run: |
+          {
+            uname -m
+            cat /proc/cpuinfo 2>/dev/null | grep 'model name' | head -1 || sysctl -n machdep.cpu.brand_string 2>/dev/null || true
+            if command -v ifx &>/dev/null; then ifx --version 2>/dev/null | head -1; else ${FC:-gfortran} --version 2>/dev/null | head -1 || true; fi
+            ${CC:-gcc} --version 2>/dev/null | head -1 || true
+          } | (sha256sum 2>/dev/null || shasum -a 256) | cut -c1-16 > /tmp/sys-hash
+          echo "sys-hash=$(cat /tmp/sys-hash)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore Build Cache
+        uses: actions/cache@v4
+        with:
+          path: build
+          key: mfc-build-${{ matrix.os }}-${{ matrix.mpi }}-${{ matrix.debug }}-${{ matrix.precision }}-${{ matrix.intel }}-${{ steps.sys-info.outputs.sys-hash }}-${{ hashFiles('CMakeLists.txt', 'toolchain/dependencies/**', 'toolchain/cmake/**', 'src/**/*.fpp', 'src/**/*.f90') }}
+
       - name: Build
         run:  |
-          /bin/bash mfc.sh test --dry-run -j $(nproc) --${{ matrix.debug }} --${{ matrix.mpi }} --${{ matrix.precision }} 
+          /bin/bash mfc.sh test -v --dry-run -j "$(nproc)" --${{ matrix.debug }} --${{ matrix.mpi }} $PRECISION $TEST_ALL
+        env:
+          TEST_ALL: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
+          PRECISION: ${{ matrix.precision != '' && format('--{0}', matrix.precision) || '' }}
 
       - name: Test
-        run:  |
-          /bin/bash mfc.sh test --max-attempts 3 -j $(nproc) $OPT1 $OPT2
+        run: bash .github/scripts/run-tests-with-retry.sh -v --max-attempts 3 -j "$(nproc)" $TEST_ALL $TEST_PCT
         env:
-          OPT1: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
-          OPT2: ${{ matrix.debug == 'debug' && '-% 20' || '' }}
+          TEST_ALL: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
+          TEST_PCT: ${{ matrix.debug == 'debug' && '-% 20' || '' }}
 
   self:
-    name: "${{ matrix.cluster_name }} (${{ matrix.device }}${{ matrix.interface != 'none' && format('-{0}', matrix.interface) || '' }})"
-    if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true'
+    name: "${{ matrix.cluster_name }} (${{ matrix.device }}${{ matrix.interface != 'none' && format('-{0}', matrix.interface) || '' }}${{ matrix.shard != '' && format(' [{0}]', matrix.shard) || '' }})"
+    if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true' && github.event.pull_request.draft != true
     needs: [lint-gate, file-changes]
     continue-on-error: false
     timeout-minutes: 480
     strategy:
       matrix:
         include:
-          # Phoenix (GT)
-          - lbl: 'gt'
-            lbl_comp: 'gt'
+          # Phoenix (GT) — build+test combined in SLURM job
+          - runner:       'gt'
+            cluster:      'phoenix'
             cluster_name: 'Georgia Tech | Phoenix'
             device: 'gpu'
             interface: 'acc'
-          - lbl: 'gt'
-            lbl_comp: 'gt'
+          - runner:       'gt'
+            cluster:      'phoenix'
             cluster_name: 'Georgia Tech | Phoenix'
             device: 'gpu'
             interface: 'omp'
-          - lbl: 'gt'
-            lbl_comp: 'gt'
+          - runner:       'gt'
+            cluster:      'phoenix'
             cluster_name: 'Georgia Tech | Phoenix'
             device: 'cpu'
             interface: 'none'
-          # Frontier (ORNL)
-          - lbl: 'frontier'
-            lbl_comp: 'frontier'
+          # Frontier (ORNL) — build on login node, GPU tests sharded for batch partition
+          - runner:       'frontier'
+            cluster:      'frontier'
             cluster_name: 'Oak Ridge | Frontier'
             device: 'gpu'
             interface: 'acc'
-          - lbl: 'frontier'
-            lbl_comp: 'frontier'
+            shard: '1/2'
+          - runner:       'frontier'
+            cluster:      'frontier'
+            cluster_name: 'Oak Ridge | Frontier'
+            device: 'gpu'
+            interface: 'acc'
+            shard: '2/2'
+          - runner:       'frontier'
+            cluster:      'frontier'
             cluster_name: 'Oak Ridge | Frontier'
             device: 'gpu'
             interface: 'omp'
-          - lbl: 'frontier'
-            lbl_comp: 'frontier'
+            shard: '1/2'
+          - runner:       'frontier'
+            cluster:      'frontier'
+            cluster_name: 'Oak Ridge | Frontier'
+            device: 'gpu'
+            interface: 'omp'
+            shard: '2/2'
+          - runner:       'frontier'
+            cluster:      'frontier'
             cluster_name: 'Oak Ridge | Frontier'
             device: 'cpu'
             interface: 'none'
-          - lbl: 'frontier'
-            lbl_comp: 'frontier_amd'
+          # Frontier AMD — build on login node, GPU tests sharded for batch partition
+          - runner:       'frontier'
+            cluster:      'frontier_amd'
             cluster_name: 'Oak Ridge | Frontier (AMD)'
             device: 'gpu'
             interface: 'omp'
-          - lbl: 'frontier'
-            lbl_comp: 'frontier_amd'
+            shard: '1/2'
+          - runner:       'frontier'
+            cluster:      'frontier_amd'
+            cluster_name: 'Oak Ridge | Frontier (AMD)'
+            device: 'gpu'
+            interface: 'omp'
+            shard: '2/2'
+          - runner:       'frontier'
+            cluster:      'frontier_amd'
             cluster_name: 'Oak Ridge | Frontier (AMD)'
             device: 'cpu'
             interface: 'none'
     runs-on:
       group:  phoenix
-      labels: ${{ matrix.lbl }}
+      labels: ${{ matrix.runner }}
     env:
-      NODE_OPTIONS: ${{ matrix.lbl == 'gt' && '--max-old-space-size=2048' || '' }}
-      ACTIONS_RUNNER_FORCE_ACTIONS_NODE_VERSION: node16
-      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+      NODE_OPTIONS: ${{ matrix.cluster == 'phoenix' && '--max-old-space-size=2048' || '' }}
     steps:
       - name: Clone
         uses: actions/checkout@v4
-
-      - name: Build & Test
-        if:   matrix.lbl_comp == 'gt'
-        run:  bash .github/workflows/phoenix/submit.sh .github/workflows/phoenix/test.sh ${{ matrix.device }} ${{ matrix.interface }}
+        with:
+          clean: false
 
       - name: Build
-        if:   matrix.lbl_comp == 'frontier'
-        run:  bash .github/workflows/frontier/build.sh ${{ matrix.device }} ${{ matrix.interface }}
+        if:   matrix.cluster != 'phoenix'
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
+        with:
+          max_attempts: 3
+          retry_wait_seconds: 60
+          timeout_minutes: 60
+          command: bash .github/workflows/${{ matrix.cluster }}/build.sh ${{ matrix.device }} ${{ matrix.interface }}
+          on_retry_command: ./mfc.sh clean
 
       - name: Test
-        if:   matrix.lbl_comp == 'frontier'
-        run:  bash .github/workflows/frontier/submit.sh .github/workflows/frontier/test.sh ${{matrix.device}} ${{ matrix.interface }}
+        run:  bash .github/workflows/${{ matrix.cluster }}/submit.sh .github/workflows/${{ matrix.cluster }}/test.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.shard }}
 
-      - name: Build
-        if:   matrix.lbl_comp == 'frontier_amd'
-        run:  bash .github/workflows/frontier_amd/build.sh ${{ matrix.device }} ${{ matrix.interface }}
-
-      - name: Test
-        if:   matrix.lbl_comp == 'frontier_amd'
-        run:  bash .github/workflows/frontier_amd/submit.sh .github/workflows/frontier_amd/test.sh ${{matrix.device}} ${{ matrix.interface }}  
+      - name: Compute Log Slug
+        if:   always()
+        id:   log
+        run:  |
+          SLUG="test-${{ matrix.device }}-${{ matrix.interface }}"
+          SHARD="${{ matrix.shard }}"
+          if [ -n "$SHARD" ]; then
+            SLUG="${SLUG}-$(echo "$SHARD" | sed 's|/|-of-|')"
+          fi
+          echo "slug=${SLUG}" >> "$GITHUB_OUTPUT"
 
       - name: Print Logs
         if:   always()
-        run:  cat test-${{ matrix.device }}-${{ matrix.interface }}.out
+        run:  cat ${{ steps.log.outputs.slug }}.out
 
       - name: Archive Logs
         uses: actions/upload-artifact@v4
-        if:   matrix.lbl_comp == 'frontier'
+        if:   matrix.cluster != 'phoenix'
         with:
-          name: logs-${{ strategy.job-index }}-${{ matrix.device }}-${{ matrix.interface }}
-          path: test-${{ matrix.device }}-${{ matrix.interface }}.out
+          name: logs-${{ strategy.job-index }}-${{ steps.log.outputs.slug }}
+          path: ${{ steps.log.outputs.slug }}.out
+
+  case-optimization:
+    name: "Case Opt | ${{ matrix.cluster_name }} (${{ matrix.device }}-${{ matrix.interface }})"
+    if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true' && github.event.pull_request.draft != true
+    needs: [lint-gate, file-changes]
+    continue-on-error: false
+    timeout-minutes: 480
+    strategy:
+      matrix:
+        include:
+          - runner:       'gt'
+            cluster:      'phoenix'
+            cluster_name: 'Georgia Tech | Phoenix'
+            device: 'gpu'
+            interface: 'acc'
+          - runner:       'gt'
+            cluster:      'phoenix'
+            cluster_name: 'Georgia Tech | Phoenix'
+            device: 'gpu'
+            interface: 'omp'
+          - runner:       'frontier'
+            cluster:      'frontier'
+            cluster_name: 'Oak Ridge | Frontier'
+            device: 'gpu'
+            interface: 'acc'
+          - runner:       'frontier'
+            cluster:      'frontier'
+            cluster_name: 'Oak Ridge | Frontier'
+            device: 'gpu'
+            interface: 'omp'
+          - runner:       'frontier'
+            cluster:      'frontier_amd'
+            cluster_name: 'Oak Ridge | Frontier (AMD)'
+            device: 'gpu'
+            interface: 'omp'
+    runs-on:
+      group:  phoenix
+      labels: ${{ matrix.runner }}
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
+        with:
+          clean: false
+
+      - name: Pre-Build (SLURM)
+        if:   matrix.cluster == 'phoenix'
+        run:  bash .github/workflows/phoenix/submit.sh .github/scripts/prebuild-case-optimization.sh ${{ matrix.device }} ${{ matrix.interface }}
+
+      - name: Pre-Build (login node)
+        if:   matrix.cluster != 'phoenix'
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
+        with:
+          max_attempts: 3
+          retry_wait_seconds: 60
+          timeout_minutes: 120
+          command: bash .github/scripts/prebuild-case-optimization.sh ${{ matrix.cluster }} ${{ matrix.device }} ${{ matrix.interface }}
+          on_retry_command: ./mfc.sh clean
+
+      - name: Run Case-Optimization Tests
+        run:  bash .github/workflows/${{ matrix.cluster }}/submit.sh .github/scripts/run_case_optimization.sh ${{ matrix.device }} ${{ matrix.interface }}
+
+      - name: Print Logs
+        if:   always()
+        run:  |
+          for f in prebuild-case-optimization-${{ matrix.device }}-${{ matrix.interface }}.out \
+                   run-case-optimization-${{ matrix.device }}-${{ matrix.interface }}.out; do
+            [ -f "$f" ] && echo "=== $f ===" && cat "$f"
+          done
 
       - name: Archive Logs
         uses: actions/upload-artifact@v4
-        if:   matrix.lbl_comp == 'frontier_amd'
+        if:   always()
         with:
-          name: logs-${{ strategy.job-index }}-${{ matrix.device }}-${{ matrix.interface }}
-          path: test-${{ matrix.device }}-${{ matrix.interface }}.out
+          name: case-opt-${{ strategy.job-index }}-${{ matrix.cluster }}-${{ matrix.interface }}
+          path: |
+            prebuild-case-optimization-${{ matrix.device }}-${{ matrix.interface }}.out
+            run-case-optimization-${{ matrix.device }}-${{ matrix.interface }}.out

@@ -2,9 +2,10 @@
 #:include 'macros.fpp'
 
 !>
-!! @file m_helper.f90
+!! @file
 !! @brief Contains module m_helper
 
+!> @brief Utility routines for bubble model setup, coordinate transforms, array sampling, and special functions
 module m_helper
 
     use m_derived_types        !< Definitions of the derived types
@@ -50,6 +51,7 @@ contains
         !! @param vftmp is the void fraction
         !! @param Rtmp is the  bubble radii
         !! @param ntmp is the output number bubble density
+        !! @param weights is the quadrature weights
     subroutine s_comp_n_from_prim(vftmp, Rtmp, ntmp, weights)
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: vftmp
@@ -64,6 +66,7 @@ contains
 
     end subroutine s_comp_n_from_prim
 
+    !> @brief Computes the bubble number density from the conservative void fraction and weighted bubble radii.
     subroutine s_comp_n_from_cons(vftmp, nRtmp, ntmp, weights)
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: vftmp
@@ -78,6 +81,7 @@ contains
 
     end subroutine s_comp_n_from_cons
 
+    !> @brief Prints a 2D real array to standard output, optionally dividing each element by a given scalar.
     impure subroutine s_print_2D_array(A, div)
 
         real(wp), dimension(:, :), intent(in) :: A
@@ -281,6 +285,7 @@ contains
 
     end subroutine s_transcoeff
 
+    !> @brief Converts an integer to its trimmed string representation.
     elemental subroutine s_int_to_str(i, res)
 
         integer, intent(in) :: i
@@ -337,6 +342,8 @@ contains
     !! @return The cross product of the two vectors.
     pure function f_cross(a, b) result(c)
 
+        $:GPU_ROUTINE(parallelism='[seq]')
+
         real(wp), dimension(3), intent(in) :: a, b
         real(wp), dimension(3) :: c
 
@@ -359,7 +366,8 @@ contains
     end subroutine s_swap
 
     !> This procedure creates a transformation matrix.
-    !! @param  p Parameters for the transformation.
+    !! @param param Parameters for the transformation.
+    !! @param center Optional center point for the transformation.
     !! @return Transformation matrix.
     function f_create_transform_matrix(param, center) result(out_matrix)
 
@@ -437,6 +445,7 @@ contains
     !> This procedure transforms a triangle by a matrix, one vertex at a time.
     !! @param triangle Triangle to transform.
     !! @param matrix   Transformation matrix.
+    !! @param matrix_n Normal transformation matrix.
     subroutine s_transform_triangle(triangle, matrix, matrix_n)
 
         type(t_triangle), intent(inout) :: triangle
@@ -453,8 +462,9 @@ contains
     end subroutine s_transform_triangle
 
     !> This procedure transforms a model by a matrix, one triangle at a time.
-    !! @param model  Model to transform.
-    !! @param matrix Transformation matrix.
+    !! @param model    Model to transform.
+    !! @param matrix   Transformation matrix.
+    !! @param matrix_n Normal transformation matrix.
     subroutine s_transform_model(model, matrix, matrix_n)
 
         type(t_model), intent(inout) :: model
@@ -509,7 +519,7 @@ contains
     end function f_xor
 
     !> This procedure converts logical to 1 or 0.
-    !! @param perdicate A Logical argument.
+    !! @param predicate A Logical argument.
     !! @return 1 if .true., 0 if .false..
     elemental function f_logical_to_int(predicate) result(int)
 
@@ -668,6 +678,7 @@ contains
 
     end function f_gx
 
+    !> @brief Downsamples conservative variable fields by a factor of 3 in each direction using volume averaging.
     subroutine s_downsample_data(q_cons_vf, q_cons_temp, m_ds, n_ds, p_ds, m_glb_ds, n_glb_ds, p_glb_ds)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf, q_cons_temp
@@ -709,6 +720,7 @@ contains
 
     end subroutine s_downsample_data
 
+    !> @brief Upsamples conservative variable fields from a coarsened grid back to the original resolution using interpolation.
     subroutine s_upsample_data(q_cons_vf, q_cons_temp)
 
         type(scalar_field), intent(inout), dimension(sys_size) :: q_cons_vf, q_cons_temp

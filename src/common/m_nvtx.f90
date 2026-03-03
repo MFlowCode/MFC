@@ -1,3 +1,8 @@
+!>
+!! @file
+!! @brief Contains module m_nvtx
+
+!> @brief NVIDIA NVTX profiling API bindings for GPU performance instrumentation
 module m_nvtx
 
     use iso_c_binding
@@ -53,6 +58,7 @@ module m_nvtx
 
 contains
 
+    !> @brief Pushes a named NVTX range for GPU profiling, optionally with a color based on the given identifier.
     subroutine nvtxStartRange(name, id)
         character(kind=c_char, len=*), intent(IN) :: name
         integer, intent(IN), optional :: id
@@ -73,6 +79,7 @@ contains
 #endif
     end subroutine nvtxStartRange
 
+    !> @brief Pops the current NVTX range to end the GPU profiling region.
     subroutine nvtxEndRange
 #if defined(MFC_GPU) && defined(__PGI)
         call nvtxRangePop

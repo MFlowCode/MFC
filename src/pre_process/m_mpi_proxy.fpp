@@ -1,12 +1,8 @@
 !>
-!! @file m_mpi_proxy.f90
+!! @file
 !! @brief Contains module m_mpi_proxy
 
-!> @brief This module serves as a proxy to the parameters and subroutines
-!!              available in the MPI implementation's MPI module. Specifically,
-!!              the role of the proxy is to harness basic MPI commands into more
-!!              complex procedures as to achieve the required pre-processing
-!!              communication goals.
+!> @brief Broadcasts user inputs and decomposes the domain across MPI ranks for pre-processing
 module m_mpi_proxy
 
 #ifdef MFC_MPI
@@ -63,7 +59,7 @@ contains
             & 'particles_lagrange' ]
             call MPI_BCAST(${VAR}$, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         #:endfor
-        call MPI_BCAST(fluid_rho(1), num_fluids_max, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(fluid_rho(1), num_fluids_max, mpi_p, 0, MPI_COMM_WORLD, ierr)
 
         #:for VAR in [ 'x_domain%beg', 'x_domain%end', 'y_domain%beg',         &
             & 'y_domain%end', 'z_domain%beg', 'z_domain%end', 'a_x', 'a_y',    &
@@ -141,22 +137,6 @@ contains
                 call MPI_BCAST(patch_ib(i)%${VAR}$, size(patch_ib(i)%${VAR}$), mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
         end do
-
-        ! Subgrid bubble parameters
-        if (bubbles_euler .or. bubbles_lagrange) then
-            #:for VAR in [ 'R0ref','p0ref','rho0ref','T0ref', &
-                'ss','pv','vd','mu_l','mu_v','mu_g','gam_v','gam_g', &
-                'M_v','M_g','k_v','k_g','cp_v','cp_g','R_v','R_g']
-                call MPI_BCAST(bub_pp%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-            #:endfor
-        end if
-
-        ! Subgrid particle parameters
-        if (particles_lagrange) then
-            #:for VAR in [ 'rho0ref_particle','cp_particle']
-                call MPI_BCAST(particle_pp%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-            #:endfor
-        end if
 
         ! Variables from input files for hardcoded patches
         call MPI_BCAST(interface_file, len(interface_file), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)

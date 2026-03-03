@@ -34,6 +34,21 @@ def _check_or_write(path: Path, content: str, check_mode: bool) -> bool:
     return True
 
 
+def _constraint_docs(docs_dir: Path) -> list:
+    """Generate constraint documentation files."""
+    from .gen_case_constraints_docs import main as gen_case_constraints
+    from .gen_physics_docs import render as render_physics
+    from .params.ast_analyzer import analyze_case_validator
+
+    validator_path = Path(MFC_ROOT_DIR) / "toolchain" / "mfc" / "case_validator.py"
+    rules = analyze_case_validator(validator_path)["rules"]
+
+    return [
+        (docs_dir / "case_constraints.md", gen_case_constraints(as_string=True)),
+        (docs_dir / "physics_constraints.md", render_physics(rules)),
+    ]
+
+
 def generate():
     """Regenerate completion scripts and optionally JSON schema."""
     from .params.generators.json_schema_gen import generate_json_schema
@@ -52,25 +67,18 @@ def generate():
     completions_dir.mkdir(exist_ok=True)
     docs_dir.mkdir(exist_ok=True)
 
-    # Generate CLI files
-    cli_files = [
+    # Generate all derived files
+    files = [
         (completions_dir / "mfc.bash", generate_bash_completion(MFC_CLI_SCHEMA)),
         (completions_dir / "_mfc", generate_zsh_completion(MFC_CLI_SCHEMA)),
         (docs_dir / "cli-reference.md", generate_cli_reference(MFC_CLI_SCHEMA)),
-    ]
-
-    # Generate parameter files
-    schema = generate_json_schema(include_descriptions=True)
-    schema_content = json.dumps(schema, indent=2)
-    params_content = generate_parameter_docs()
-
-    param_files = [
-        (Path(MFC_ROOT_DIR) / "toolchain" / "mfc-case-schema.json", schema_content),
-        (docs_dir / "parameters.md", params_content),
-    ]
+        (Path(MFC_ROOT_DIR) / "toolchain" / "mfc-case-schema.json",
+         json.dumps(generate_json_schema(include_descriptions=True), indent=2)),
+        (docs_dir / "parameters.md", generate_parameter_docs()),
+    ] + _constraint_docs(docs_dir)
 
     all_ok = True
-    for path, content in cli_files + param_files:
+    for path, content in files:
         if not _check_or_write(path, content, check_mode):
             all_ok = False
 
@@ -79,7 +87,7 @@ def generate():
 
     if not check_mode:
         cons.print()
-        cons.print("[bold]Files regenerated from cli/commands.py and params/definitions.py[/bold]")
+        cons.print("[bold]Files regenerated from cli/commands.py, params/definitions.py, and case_validator.py[/bold]")
 
 
 def _generate_json_schema():

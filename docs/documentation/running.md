@@ -73,6 +73,14 @@ using 4 cores:
 ./mfc.sh run examples/2D_shockbubble/case.py -t simulation post_process -n 4
 ```
 
+- Visualizing post-processed output:
+
+```shell
+./mfc.sh viz examples/2D_shockbubble/ --var pres --step 1000
+```
+
+See @ref visualization "Flow Visualization" for the full set of visualization options.
+
 ---
 
 ## Running on GPUs
@@ -309,8 +317,8 @@ If you want to restart a simulation,
 1. For the Computational Domain Parameters
     - Have the following removed __except__ `m`, `n`, and `p`:
 		- All domain/mesh information
-			- `(xyz)_domain%beg`
-			- `(xyz)_domain%end`
+			- `(xyz)_domain%%beg`
+			- `(xyz)_domain%%end`
 			- `stretch_(xyz)`
 			- `a_(xyz)`
 			- `(xyz)_a`
@@ -334,11 +342,11 @@ If you want to restart a simulation,
 
 3. For Patches
 	- Have all information about old patches (used in the `case.py` file) removed.
-		- `patch_icpp(1)%all variables`
-		- `patch_icpp(2)%all variables`
-		- `patch_icpp(num_patches)%all variables`
+		- `patch_icpp(1)%%all variables`
+		- `patch_icpp(2)%%all variables`
+		- `patch_icpp(num_patches)%%all variables`
 	- Add information about new patches that will be introduced, if any. The parameter num_patches should reflect this addition.
-		- e.g. `patch_icpp(1)%some variables of interest`
+		- e.g. `patch_icpp(1)%%some variables of interest`
 
 4. For Fluid properties
 	- Keep information about the fluid properties
@@ -374,3 +382,6 @@ We have provided an example, `case.py` and `restart_case.py` in `/examples/1D_va
 ./mfc.sh run examples/2D_shockbubble/case.py -e batch \
                -N 2 -n 4 -t simulation -a <redacted> -c summit
 ```
+
+
+<div style='text-align:center; font-size:0.75rem; color:#888; padding:16px 0 0;'>Page last updated: 2026-02-14</div>

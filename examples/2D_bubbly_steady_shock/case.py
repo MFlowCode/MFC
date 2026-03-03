@@ -155,6 +155,7 @@ print(
             "fluid_pp(1)%pi_inf": gam_l * (pi_inf_l) / (gam_l - 1.0),
             # Bubbles
             "bubbles_euler": "T",
+            "nb": nb,
             "bubble_model": 2,
             "polytropic": "T",
             "polydisperse": "F",

@@ -46,21 +46,20 @@ def _run_build_with_progress(command: typing.List[str], target_name: str, stream
     all_stdout = []
     all_stderr = []
 
-    # Start the process (can't use 'with' since process is used in multiple branches)
-    process = subprocess.Popen(  # pylint: disable=consider-using-with
-        cmd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        bufsize=1  # Line buffered
-    )
-
     if streaming:
-        # Streaming mode (-v): print build progress lines as they happen
+        # Streaming mode (-v): merge stderr into stdout to avoid pipe deadlock
+        process = subprocess.Popen(  # pylint: disable=consider-using-with
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1  # Line buffered
+        )
+
         cons.print(f"  [bold blue]Building[/bold blue] [magenta]{target_name}[/magenta] [dim](-v)[/dim]...")
         start_time = time.time()
 
-        # Read stdout and print matching lines
+        # Read merged stdout+stderr and print matching lines
         for line in iter(process.stdout.readline, ''):
             all_stdout.append(line)
             stripped = line.strip()
@@ -95,16 +94,22 @@ def _run_build_with_progress(command: typing.List[str], target_name: str, stream
                         filename = filename[:37] + "..."
                     cons.print(f"  [dim][{percent:>3}%][/dim] {filename}")
 
-        # Read any remaining stderr
-        stderr = process.stderr.read()
-        all_stderr.append(stderr)
         process.wait()
 
         elapsed = time.time() - start_time
         if elapsed > 5:
             cons.print(f"  [dim](build took {elapsed:.1f}s)[/dim]")
 
-        return subprocess.CompletedProcess(cmd, process.returncode, ''.join(all_stdout), ''.join(all_stderr))
+        return subprocess.CompletedProcess(cmd, process.returncode, ''.join(all_stdout), '')
+
+    # Start the process for non-streaming modes
+    process = subprocess.Popen(  # pylint: disable=consider-using-with
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        bufsize=1  # Line buffered
+    )
 
     if not is_tty:
         # Non-interactive, non-streaming: show message with elapsed time
@@ -266,21 +271,16 @@ def _show_build_error(result: subprocess.CompletedProcess, stage: str):
     # Show stdout if available (often contains the actual error for CMake)
     if result.stdout:
         stdout_text = result.stdout if isinstance(result.stdout, str) else result.stdout.decode('utf-8', errors='replace')
-        stdout_lines = stdout_text.strip().split('\n')
-        # Show last 40 lines to capture the relevant error
-        if len(stdout_lines) > 40:
-            stdout_lines = ['... (truncated) ...'] + stdout_lines[-40:]
-        if stdout_lines and stdout_lines != ['']:
-            cons.raw.print(Panel('\n'.join(stdout_lines), title="Output", border_style="yellow"))
+        stdout_text = stdout_text.strip()
+        if stdout_text:
+            cons.raw.print(Panel(stdout_text, title="Output", border_style="yellow"))
 
     # Show stderr if available
     if result.stderr:
         stderr_text = result.stderr if isinstance(result.stderr, str) else result.stderr.decode('utf-8', errors='replace')
-        stderr_lines = stderr_text.strip().split('\n')
-        if len(stderr_lines) > 40:
-            stderr_lines = ['... (truncated) ...'] + stderr_lines[-40:]
-        if stderr_lines and stderr_lines != ['']:
-            cons.raw.print(Panel('\n'.join(stderr_lines), title="Errors", border_style="red"))
+        stderr_text = stderr_text.strip()
+        if stderr_text:
+            cons.raw.print(Panel(stderr_text, title="Errors", border_style="red"))
 
     cons.print()
 

@@ -118,6 +118,37 @@ def dependency_recommendation(
     return f"When {format_param(param)} is set, consider also setting {format_param(recommended_param)}"
 
 
+def dependency_value_error(
+    param: str,
+    condition: Optional[str],
+    required_param: str,
+    expected_values: list,
+    got: Any,
+) -> str:
+    """
+    Create an error for a dependency that requires a specific value.
+
+    Args:
+        param: Parameter that has the dependency
+        condition: Condition string (e.g., "=T", "=3")
+        required_param: Parameter that must have a specific value
+        expected_values: List of acceptable values
+        got: Actual value found
+
+    Returns:
+        Formatted error message.
+    """
+    if condition:
+        return (
+            f"{format_param(param)}{condition} requires {format_param(required_param)} "
+            f"to be one of {expected_values}, got {format_value(got)}"
+        )
+    return (
+        f"{format_param(param)} requires {format_param(required_param)} "
+        f"to be one of {expected_values}, got {format_value(got)}"
+    )
+
+
 def required_error(param: str, context: Optional[str] = None) -> str:
     """
     Create a missing required parameter error message.

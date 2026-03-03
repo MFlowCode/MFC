@@ -174,11 +174,13 @@
 #endif
 #:enddef
 
-#:def END_GPU_ATOMIC()
+#:def END_GPU_ATOMIC_CAPTURE()
+    #:set acc_end_directive = '!$acc end atomic'
+    #:set omp_end_directive = '!$omp end atomic'
 #if defined(MFC_OpenACC)
-!$acc end atomic
+    $:acc_end_directive
 #elif defined(MFC_OpenMP)
-    !$omp end atomic
+    $:omp_end_directive
 #endif
 #:enddef
 

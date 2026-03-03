@@ -1,26 +1,33 @@
 #!/bin/bash
 
+# Ignore SIGHUP to survive login node session drops
+trap '' HUP
+
+# Determine compiler flag from directory name
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cluster_name="$(basename "$SCRIPT_DIR")"
+case "$cluster_name" in
+    frontier)     compiler_flag="f" ;;
+    frontier_amd) compiler_flag="famd" ;;
+    *) echo "ERROR: Unknown cluster '$cluster_name'"; exit 1 ;;
+esac
+
 job_device=$1
 job_interface=$2
 run_bench=$3
-build_opts=""
-if [ "$job_device" = "gpu" ]; then
-  build_opts+="--gpu"
-  if [ "$job_interface" = "acc" ]; then
-      build_opts+=" acc"
-  elif [ "$job_interface" = "omp" ]; then
-      build_opts+=" mp"
-  fi
+source .github/scripts/gpu-opts.sh
+build_opts="$gpu_opts"
+
+. ./mfc.sh load -c $compiler_flag -m $([ "$job_device" = "gpu" ] && echo "g" || echo "c")
+
+# Only set up build cache for test suite, not benchmarks
+if [ "$run_bench" != "bench" ]; then
+    source .github/scripts/setup-build-cache.sh "$cluster_name" "$job_device" "$job_interface"
 fi
 
-. ./mfc.sh load -c f -m g
-
+source .github/scripts/retry-build.sh
 if [ "$run_bench" == "bench" ]; then
-    for dir in benchmarks/*/; do
-        dirname=$(basename "$dir")
-        ./mfc.sh run "$dir/case.py" --case-optimization -j 8 --dry-run $build_opts
-    done
+    retry_build ./mfc.sh build -j 8 $build_opts || exit 1
 else
-    ./mfc.sh test -a --dry-run --rdma-mpi -j 8 $build_opts
+    retry_build ./mfc.sh test -v -a --dry-run $([ "$cluster_name" = "frontier" ] && echo "--rdma-mpi") -j 8 $build_opts || exit 1
 fi
-

@@ -1,5 +1,5 @@
 !>
-!! @file p_main.f90
+!! @file
 !! @brief Contains program p_main
 
 !> @brief The post-process restructures raw unformatted data, outputted by

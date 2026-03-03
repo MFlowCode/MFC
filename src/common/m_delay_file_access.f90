@@ -1,3 +1,8 @@
+!>
+!! @file
+!! @brief Contains module m_delay_file_access
+
+!> @brief Rank-staggered file access delays to prevent I/O contention on parallel file systems
 module m_delay_file_access
     use m_precision_select
     implicit none
@@ -11,6 +16,7 @@ module m_delay_file_access
 
 contains
 
+    !> @brief Introduces a rank-dependent busy-wait delay to stagger parallel file access and reduce I/O contention.
     impure subroutine DelayFileAccess(ProcessRank)
         integer, intent(in) :: ProcessRank
 

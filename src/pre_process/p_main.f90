@@ -1,5 +1,5 @@
 !>
-!! @file p_main.f90
+!! @file
 !! @brief Contains program p_main
 
 !> @brief This program takes care of setting up the initial condition and

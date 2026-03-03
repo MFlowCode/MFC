@@ -1,10 +1,10 @@
 !>
-!! @file m_bubbles_EL.fpp
-!! @brief Contains module m_bubbles_EL
+!! @file
+!! @brief Contains module @ref m_bubbles_el "m_bubbles_EL"
 
 #:include 'macros.fpp'
 
-!> @brief This module is used to to compute the volume-averaged bubble model
+!> @brief Tracks Lagrangian bubbles and couples their dynamics to the Eulerian flow via volume averaging
 module m_bubbles_EL
 
     use m_global_parameters             !< Definitions of the global parameters
@@ -30,6 +30,8 @@ module m_bubbles_EL
     use m_mpi_common
 
     use m_ibm
+
+    use m_finite_differences
 
     implicit none
 
@@ -74,9 +76,10 @@ module m_bubbles_EL
     real(wp) :: Rmax_glb, Rmin_glb       !< Maximum and minimum bubbe size in the local domain
     !< Projection of the lagrangian particles in the Eulerian framework
     type(scalar_field), dimension(:), allocatable :: q_beta
+    type(scalar_field), dimension(:), allocatable :: kahan_comp !< Kahan compensation for q_beta accumulation
     integer :: q_beta_idx                       !< Size of the q_beta vector field
 
-    $:GPU_DECLARE(create='[Rmax_glb,Rmin_glb,q_beta,q_beta_idx]')
+    $:GPU_DECLARE(create='[Rmax_glb,Rmin_glb,q_beta,kahan_comp,q_beta_idx]')
 
     integer, parameter :: LAG_EVOL_ID = 11 ! File id for lag_bubbles_evol_*.dat
     integer, parameter :: LAG_STATS_ID = 12 ! File id for stats_lag_bubbles_*.dat
@@ -133,12 +136,17 @@ contains
         $:GPU_UPDATE(device='[lag_num_ts, q_beta_idx]')
 
         @:ALLOCATE(q_beta(1:q_beta_idx))
+        @:ALLOCATE(kahan_comp(1:q_beta_idx))
 
         do i = 1, q_beta_idx
             @:ALLOCATE(q_beta(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                 idwbuff(2)%beg:idwbuff(2)%end, &
                 idwbuff(3)%beg:idwbuff(3)%end))
             @:ACC_SETUP_SFs(q_beta(i))
+            @:ALLOCATE(kahan_comp(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
+                idwbuff(2)%beg:idwbuff(2)%end, &
+                idwbuff(3)%beg:idwbuff(3)%end))
+            @:ACC_SETUP_SFs(kahan_comp(i))
         end do
 
         ! Allocating space for lagrangian variables
@@ -188,6 +196,34 @@ contains
         end if
         $:GPU_UPDATE(device='[moving_lag_bubbles, lag_pressure_force, &
             & lag_gravity_force, lag_vel_model, lag_drag_model]')
+
+        ! Allocate cell-centered pressure gradient arrays and FD coefficients
+        if (lag_params%vel_model > 0 .and. lag_params%pressure_force) then
+            @:ALLOCATE(grad_p_x(0:m, 0:n, 0:p))
+            @:ALLOCATE(fd_coeff_x_pgrad(-fd_number:fd_number, 0:m))
+            call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x_pgrad, &
+                                                          buff_size, fd_number, fd_order)
+            $:GPU_UPDATE(device='[fd_coeff_x_pgrad]')
+            if (n > 0) then
+                @:ALLOCATE(grad_p_y(0:m, 0:n, 0:p))
+                @:ALLOCATE(fd_coeff_y_pgrad(-fd_number:fd_number, 0:n))
+                call s_compute_finite_difference_coefficients(n, y_cc, fd_coeff_y_pgrad, &
+                                                              buff_size, fd_number, fd_order)
+                $:GPU_UPDATE(device='[fd_coeff_y_pgrad]')
+            end if
+            if (p > 0) then
+                @:ALLOCATE(grad_p_z(0:m, 0:n, 0:p))
+                @:ALLOCATE(fd_coeff_z_pgrad(-fd_number:fd_number, 0:p))
+                call s_compute_finite_difference_coefficients(p, z_cc, fd_coeff_z_pgrad, &
+                                                              buff_size, fd_number, fd_order)
+                $:GPU_UPDATE(device='[fd_coeff_z_pgrad]')
+            end if
+        end if
+
+        ! Allocate cell list arrays for atomic-free Gaussian smearing
+        @:ALLOCATE(cell_list_start(0:m, 0:n, 0:p))
+        @:ALLOCATE(cell_list_count(0:m, 0:n, 0:p))
+        @:ALLOCATE(cell_list_idx(1:lag_params%nBubs_glb))
 
         call s_read_input_bubbles(q_cons_vf, bc_type)
 
@@ -579,10 +615,7 @@ contains
     end subroutine s_restart_bubbles
 
     !>  Contains the bubble dynamics subroutines.
-        !! @param q_cons_vf Conservative variables
         !! @param q_prim_vf Primitive variables
-        !! @param rhs_vf Calculated change of conservative variables
-        !! @param t_step Current time step
         !! @param stage Current stage in the time-stepper algorithm
     subroutine s_compute_bubble_EL_dynamics(q_prim_vf, bc_type, stage)
 #ifdef MFC_OpenMP
@@ -612,10 +645,9 @@ contains
 
         integer :: k, l
 
-        call nvtxStartRange("LAGRANGE-BUBBLE-DYNAMICS")
-
         ! Subgrid p_inf model based on Maeda and Colonius (2018).
         if (lag_params%pressure_corrector) then
+            call nvtxStartRange("LAGRANGE-BUBBLE-PINF-CORRECTION")
             ! Calculate velocity potentials (valid for one bubble per cell)
             $:GPU_PARALLEL_LOOP(private='[k,cell,paux,preterm1,term2,Romega,myR0,myR,myV,myPb,pint,term1_fac]')
             do k = 1, n_el_bubs_loc
@@ -635,8 +667,17 @@ contains
                 end if
             end do
             $:END_GPU_PARALLEL_LOOP()
+            call nvtxEndRange()
         end if
 
+        ! Precompute cell-centered pressure gradients for translational motion
+        if (moving_lag_bubbles .and. lag_pressure_force) then
+            call nvtxStartRange("LAGRANGE-BUBBLE-PRESSURE-GRADIENT")
+            call s_compute_pressure_gradients(q_prim_vf)
+            call nvtxEndRange()
+        end if
+
+        call nvtxStartRange("LAGRANGE-BUBBLE-DYNAMICS")
         ! Radial motion model
         adap_dt_stop_sum = 0
         $:GPU_PARALLEL_LOOP(private='[k,myalpha_rho,myalpha,Re,cell,myVapFlux,preterm1, term2, paux, pint, Romega,term1_fac,myR_m, mygamma_m, myPb, myMass_n, myMass_v,myR, myV, myBeta_c, myBeta_t, myR0, myPbdot, myMvdot,myPinf, aux1,aux2, myCson, myRho,gamma,pi_inf,qv,dmalf, dmntait, dmBtait, dm_bub_adv_src, dm_divu,adap_dt_stop,myPos,myVel]', &
@@ -737,6 +778,7 @@ contains
 
         end do
         $:END_GPU_PARALLEL_LOOP()
+        call nvtxEndRange
 
         if (adap_dt .and. adap_dt_stop_sum > 0) call s_mpi_abort("Adaptive time stepping failed to converge.")
 
@@ -745,8 +787,6 @@ contains
             if (moving_lag_bubbles) call s_enforce_EL_bubbles_boundary_conditions(q_prim_vf)
             call s_smear_voidfraction(bc_type)
         end if
-
-        call nvtxEndRange
 
     end subroutine s_compute_bubble_EL_dynamics
 
@@ -763,8 +803,9 @@ contains
 
         integer :: i, j, k, l
 
+        call nvtxStartRange("LAGRANGE-BUBBLE-EL-SOURCE")
         ! (q / (1 - beta)) * d(beta)/dt source
-        if (p == 0) then
+        if (lag_params%cluster_type >= 4) then
             $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
             do k = idwint(3)%beg, idwint(3)%end
                 do j = idwint(2)%beg, idwint(2)%end
@@ -788,7 +829,7 @@ contains
                         do l = 1, E_idx
                             if (q_beta(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
                                 rhs_vf(l)%sf(i, j, k) = rhs_vf(l)%sf(i, j, k) + &
-                                                        q_cons_vf(l)%sf(i, j, k)/q_beta(1)%sf(i, j, k)* &
+                                                        (q_cons_vf(l)%sf(i, j, k)/q_beta(1)%sf(i, j, k))* &
                                                         q_beta(2)%sf(i, j, k)
                             end if
                         end do
@@ -846,11 +887,11 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
         end do
+        call nvtxEndRange ! LAGRANGE-BUBBLE-EL-SOURCE
 
     end subroutine s_compute_bubbles_EL_source
 
     !>  This procedure computes the speed of sound from a given driving pressure
-        !! @param bub_id Bubble id
         !! @param q_prim_vf Primitive variables
         !! @param pinf Driving pressure
         !! @param cell Bubble cell
@@ -892,21 +933,33 @@ contains
         type(integer_field), dimension(1:num_dims, 1:2), intent(in) :: bc_type
         integer :: i, j, k, l
 
-        call nvtxStartRange("BUBBLES-LAGRANGE-KERNELS")
+        call nvtxStartRange("BUBBLES-LAGRANGE-SMEARING")
         $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
         do i = 1, q_beta_idx
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
                         q_beta(i)%sf(j, k, l) = 0._wp
+                        kahan_comp(i)%sf(j, k, l) = 0._wp
                     end do
                 end do
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
 
+        ! Build cell list before smearing (CPU-side counting sort)
+        call s_build_cell_list(n_el_bubs_loc, mtn_s)
+
         call s_smoothfunction(n_el_bubs_loc, intfc_rad, intfc_vel, &
-                              mtn_s, mtn_pos, q_beta)
+                              mtn_s, mtn_pos, q_beta, kahan_comp)
+
+        call nvtxStartRange("BUBBLES-LAGRANGE-BETA-COMM")
+        if (lag_params%cluster_type >= 4) then
+            call s_populate_beta_buffers(q_beta, bc_type, 3, kahan_comp)
+        else
+            call s_populate_beta_buffers(q_beta, bc_type, 2, kahan_comp)
+        end if
+        call nvtxEndRange
 
         call nvtxStartRange("BUBBLES-LAGRANGE-BETA-COMM")
         if (lag_params%cluster_type >= 4) then
@@ -929,7 +982,7 @@ contains
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
-        call nvtxEndRange ! BUBBLES-LAGRANGE-KERNELS
+        call nvtxEndRange ! BUBBLES-LAGRANGE-SMEARING
 
     end subroutine s_smear_voidfraction
 
@@ -939,6 +992,8 @@ contains
         !! @param ptype 1: p at infinity, 2: averaged P at the bubble location
         !! @param f_pinfl Driving pressure
         !! @param cell Bubble cell
+        !! @param preterm1 Pre-computed term 1
+        !! @param term2 Computed term 2
         !! @param Romega Control volume radius
     subroutine s_get_pinf(bub_id, q_prim_vf, ptype, f_pinfl, cell, preterm1, term2, Romega)
         $:GPU_ROUTINE(function_name='s_get_pinf',parallelism='[seq]', &
@@ -1483,26 +1538,6 @@ contains
                 if (q_prim_vf(advxb)%sf(cell(1), cell(2), cell(3)) < (1._wp - lag_params%valmaxvoid)) then
                     keep_bubble(k) = 0
                 end if
-
-                ! Move bubbles back to surface of IB
-                if (ib) then
-                    cell = fd_number - buff_size
-                    call s_locate_cell(mtn_pos(k, 1:3, 2), cell, mtn_s(k, 1:3, 2))
-
-                    if (ib_markers%sf(cell(1), cell(2), cell(3)) /= 0) then
-                        patch_id = ib_markers%sf(cell(1), cell(2), cell(3))
-
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = 1, num_dims
-                            mtn_pos(k, i, 2) = mtn_pos(k, i, 2) - &
-                                               levelset_norm%sf(cell(1), cell(2), cell(3), patch_id, i) &
-                                               *levelset%sf(cell(1), cell(2), cell(3), patch_id)
-                        end do
-
-                        cell = fd_number - buff_size
-                        call s_locate_cell(mtn_pos(k, 1:3, 2), cell, mtn_s(k, 1:3, 2))
-                    end if
-                end if
             end if
         end do
         $:END_GPU_PARALLEL_LOOP()
@@ -1672,7 +1707,7 @@ contains
         end if
 
         ! 3D
-        if (p > 1) then
+        if (p > 0) then
             particle_in_domain = ((pos_part(1) < x_cb(m + buff_size - fd_number)) .and. &
                                   (pos_part(1) >= x_cb(fd_number - buff_size - 1)) .and. &
                                   (pos_part(2) < y_cb(n + buff_size - fd_number)) .and. &
@@ -1783,7 +1818,40 @@ contains
 
     end subroutine s_gradient_dir
 
-    impure subroutine s_open_lag_bubble_evol
+    !> Subroutine that writes on each time step the changes of the lagrangian bubbles.
+        !!  @param qtime Current time
+    impure subroutine s_write_lag_particles(qtime)
+
+        real(wp), intent(in) :: qtime
+        integer :: k
+
+        character(LEN=path_len + 2*name_len) :: file_loc
+        logical file_exist
+        character(LEN=25) :: FMT
+
+        write (file_loc, '(A,I0,A)') 'lag_bubble_evol_', proc_rank, '.dat'
+        file_loc = trim(case_dir)//'/D/'//trim(file_loc)
+        call my_inquire(trim(file_loc), file_exist)
+
+        if (precision == 1) then
+            FMT = "(A16,A14,8A16)"
+        else
+            FMT = "(A24,A14,8A24)"
+        end if
+
+        if (.not. file_exist) then
+            open (LAG_EVOL_ID, FILE=trim(file_loc), FORM='formatted', position='rewind')
+            write (LAG_EVOL_ID, FMT) 'currentTime', 'particleID', 'x', 'y', 'z', &
+                'coreVaporMass', 'coreVaporConcentration', 'radius', 'interfaceVelocity', &
+                'corePressure'
+        else
+            open (LAG_EVOL_ID, FILE=trim(file_loc), FORM='formatted', position='append')
+        end if
+
+    end subroutine s_write_lag_particles
+
+    !> @Brief Subroutine that opens the file to write the evolution of the lagrangian bubbles on each time step.
+    impure subroutine s_open_lag_bubble_evol()
 
         character(LEN=path_len + 2*name_len) :: file_loc
         logical file_exist
@@ -1876,7 +1944,7 @@ contains
     !>  Subroutine that writes some useful statistics related to the volume fraction
             !!       of the particles (void fraction) in the computatioational domain
             !!       on each time step.
-            !!  @param q_time Current time
+            !!  @param qtime Current time
     impure subroutine s_write_void_evol(qtime)
 
         real(wp), intent(in) :: qtime
@@ -2202,8 +2270,10 @@ contains
 
         do i = 1, q_beta_idx
             @:DEALLOCATE(q_beta(i)%sf)
+            @:DEALLOCATE(kahan_comp(i)%sf)
         end do
         @:DEALLOCATE(q_beta)
+        @:DEALLOCATE(kahan_comp)
 
         !Deallocating space
         @:DEALLOCATE(lag_id)
@@ -2228,6 +2298,25 @@ contains
         @:DEALLOCATE(gas_dmvdt)
         @:DEALLOCATE(mtn_dposdt)
         @:DEALLOCATE(mtn_dveldt)
+
+        ! Deallocate pressure gradient arrays and FD coefficients
+        if (lag_params%vel_model > 0 .and. lag_params%pressure_force) then
+            @:DEALLOCATE(grad_p_x)
+            @:DEALLOCATE(fd_coeff_x_pgrad)
+            if (n > 0) then
+                @:DEALLOCATE(grad_p_y)
+                @:DEALLOCATE(fd_coeff_y_pgrad)
+                if (p > 0) then
+                    @:DEALLOCATE(grad_p_z)
+                    @:DEALLOCATE(fd_coeff_z_pgrad)
+                end if
+            end if
+        end if
+
+        ! Deallocate cell list arrays
+        @:DEALLOCATE(cell_list_start)
+        @:DEALLOCATE(cell_list_count)
+        @:DEALLOCATE(cell_list_idx)
 
     end subroutine s_finalize_lagrangian_solver
 

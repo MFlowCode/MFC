@@ -1,15 +1,11 @@
 !>
-!! @file m_mpi_proxy.f90
+!! @file
 !! @brief Contains module m_mpi_proxy
 
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
-!> @brief The module serves as a proxy to the parameters and subroutines
-!!          available in the MPI implementation's MPI module. Specifically,
-!!          the purpose of the proxy is to harness basic MPI commands into
-!!          more complicated procedures as to accomplish the communication
-!!          goals for the simulation.
+!> @brief MPI halo exchange, domain decomposition, and buffer packing/unpacking for the simulation solver
 module m_mpi_proxy
 
 #ifdef MFC_MPI
@@ -59,6 +55,7 @@ module m_mpi_proxy
 
 contains
 
+    !> @brief Allocates immersed boundary communication buffers for MPI halo exchanges.
     subroutine s_initialize_mpi_proxy_module()
 
 #ifdef MFC_MPI
@@ -98,7 +95,7 @@ contains
         call MPI_Pack_size(1, mpi_p, MPI_COMM_WORLD, real_size, ierr)
         call MPI_Pack_size(1, MPI_INTEGER, MPI_COMM_WORLD, int_size, ierr)
         nReal = 7 + 16*2 + 10*lag_num_ts
-        p_var_size = 20*(nReal*real_size + int_size)
+        p_var_size = nReal*real_size + int_size
         p_buff_size = lag_params%nBubs_glb*p_var_size
         @:ALLOCATE(p_send_buff(0:p_buff_size), p_recv_buff(0:p_buff_size))
         @:ALLOCATE(p_send_ids(nidx(1)%beg:nidx(1)%end, nidx(2)%beg:nidx(2)%end, nidx(3)%beg:nidx(3)%end, 0:lag_params%nBubs_glb))
@@ -221,7 +218,7 @@ contains
             #:endfor
 
             #:for VAR in ['solver_approach', 'cluster_type', 'smooth_type', 'nBubs_glb', 'vel_model', &
-                & 'drag_model']
+                & 'drag_model', 'charNz']
                 call MPI_BCAST(lag_params%${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             #:endfor
 
@@ -253,7 +250,7 @@ contains
 
         #:for VAR in [ 'dt','weno_eps','teno_CT','pref','rhoref','R0ref','Web','Ca', 'sigma', &
             & 'Re_inv', 'poly_sigma', 'palpha_eps', 'ptgalpha_eps', 'pi_fac',    &
-            & 'bc_x%vb1','bc_x%vb2','bc_x%vb3','bc_x%ve1','bc_x%ve2','bc_x%ve2', &
+            & 'bc_x%vb1','bc_x%vb2','bc_x%vb3','bc_x%ve1','bc_x%ve2','bc_x%ve3', &
             & 'bc_y%vb1','bc_y%vb2','bc_y%vb3','bc_y%ve1','bc_y%ve2','bc_y%ve3', &
             & 'bc_z%vb1','bc_z%vb2','bc_z%vb3','bc_z%ve1','bc_z%ve2','bc_z%ve3', &
             & 'bc_x%pres_in','bc_x%pres_out','bc_y%pres_in','bc_y%pres_out', 'bc_z%pres_in','bc_z%pres_out', &
@@ -320,14 +317,17 @@ contains
 
         do i = 1, num_ibs
             #:for VAR in [ 'radius', 'length_x', 'length_y', 'length_z', &
-                & 'x_centroid', 'y_centroid', 'z_centroid', 'c', 'm', 'p', 't', 'theta', 'slip', 'mass']
+                & 'x_centroid', 'y_centroid', 'z_centroid', 'c', 'm', 'p', 't', 'theta', 'slip', 'mass', &
+                & 'model_threshold']
                 call MPI_BCAST(patch_ib(i)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
-            #:for VAR in ['vel', 'angular_vel', 'angles']
+            #:for VAR in ['vel', 'angular_vel', 'angles', 'model_translate', 'model_scale']
                 call MPI_BCAST(patch_ib(i)%${VAR}$, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
             call MPI_BCAST(patch_ib(i)%geometry, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(patch_ib(i)%moving_ibm, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(patch_ib(i)%model_spc, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(patch_ib(i)%model_filepath, len(patch_ib(i)%model_filepath), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
         end do
 
         do j = 1, num_probes_max
@@ -370,6 +370,7 @@ contains
 
     end subroutine s_mpi_bcast_user_inputs
 
+    !> @brief Packs, exchanges, and unpacks immersed boundary marker buffers between neighboring MPI ranks.
     subroutine s_mpi_sendrecv_ib_buffers(ib_markers, mpi_dir, pbc_loc)
 
         type(integer_field), intent(inout) :: ib_markers
@@ -1217,7 +1218,7 @@ contains
         real(wp), dimension(:, :, :) :: pos, posPrev
         integer :: nbubs, dest
         integer :: i, q
-        real :: offset
+        real(wp) :: offset
 
         do i = 1, nbubs
             if (periodic_bc(1)) then
@@ -1271,6 +1272,7 @@ contains
 
     end subroutine s_wrap_particle_positions
 
+    !> @brief Broadcasts random phase numbers from rank 0 to all MPI processes.
     impure subroutine s_mpi_send_random_number(phi_rn, num_freq)
         integer, intent(in) :: num_freq
         real(wp), intent(inout), dimension(1:num_freq) :: phi_rn
@@ -1282,6 +1284,7 @@ contains
 
     end subroutine s_mpi_send_random_number
 
+    !> @brief Deallocates immersed boundary MPI communication buffers.
     subroutine s_finalize_mpi_proxy_module()
 
 #ifdef MFC_MPI
