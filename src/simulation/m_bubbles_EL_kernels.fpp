@@ -358,6 +358,40 @@ contains
 
     end subroutine s_applygaussian
 
+    !> The purpose of this subroutine is to check if the current cell is outside the computational domain or not (including ghost cells).
+            !! @param cellaux Tested cell to smear the bubble effect in.
+            !! @param celloutside If true, then cellaux is outside the computational domain.
+    subroutine s_check_celloutside(cellaux, celloutside)
+        $:GPU_ROUTINE(function_name='s_check_celloutside',parallelism='[seq]', &
+            & cray_inline=True)
+
+        integer, dimension(3), intent(inout) :: cellaux
+        logical, intent(out) :: celloutside
+
+        celloutside = .false.
+
+        if (num_dims == 2) then
+            if ((cellaux(1) < -buff_size) .or. (cellaux(2) < -buff_size)) then
+                celloutside = .true.
+            end if
+            if (cyl_coord .and. y_cc(cellaux(2)) < 0._wp) then
+                celloutside = .true.
+            end if
+            if ((cellaux(2) > n + buff_size) .or. (cellaux(1) > m + buff_size)) then
+                celloutside = .true.
+            end if
+        else
+            if ((cellaux(3) < -buff_size) .or. (cellaux(1) < -buff_size) .or. (cellaux(2) < -buff_size)) then
+                celloutside = .true.
+            end if
+
+            if ((cellaux(3) > p + buff_size) .or. (cellaux(2) > n + buff_size) .or. (cellaux(1) > m + buff_size)) then
+                celloutside = .true.
+            end if
+        end if
+
+    end subroutine s_check_celloutside
+
     !> This subroutine relocates the current cell, if it intersects a symmetric boundary.
             !! @param cell Cell of the current bubble
             !! @param cellaux Cell to map the bubble effect in.

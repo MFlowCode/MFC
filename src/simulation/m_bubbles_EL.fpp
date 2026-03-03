@@ -961,14 +961,6 @@ contains
         end if
         call nvtxEndRange
 
-        call nvtxStartRange("BUBBLES-LAGRANGE-BETA-COMM")
-        if (lag_params%cluster_type >= 4) then
-            call s_populate_beta_buffers(q_beta, bc_type, 3)
-        else
-            call s_populate_beta_buffers(q_beta, bc_type, 2)
-        end if
-        call nvtxEndRange
-
         !Store 1-beta
         $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
         do l = idwbuff(3)%beg, idwbuff(3)%end
