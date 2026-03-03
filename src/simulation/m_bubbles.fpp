@@ -16,7 +16,6 @@ module m_bubbles
     use m_variables_conversion !< State variables type conversion procedures
 
     use m_helper_basic         !< Functions to compare floating point numbers
-    use m_helper_basic
 
     implicit none
 
