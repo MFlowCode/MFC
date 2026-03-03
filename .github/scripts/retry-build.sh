@@ -5,6 +5,22 @@
 # Usage: source .github/scripts/retry-build.sh
 #        retry_build ./mfc.sh build -j 8 --gpu acc
 
+# Try normal cleanup; if it fails, escalate to NFS cache nuke.
+_retry_clean() {
+    local clean_cmd="$1"
+    if eval "$clean_cmd" 2>/dev/null; then
+        return 0
+    fi
+    echo "  Normal cleanup failed."
+    if type _nfs_cache_nuke > /dev/null 2>&1; then
+        echo "  Escalating to NFS cache nuke..."
+        _nfs_cache_nuke
+    else
+        echo "  _nfs_cache_nuke not available, best-effort rm."
+        rm -rf build/staging build/install build/lock.yaml 2>/dev/null || true
+    fi
+}
+
 retry_build() {
     local clean_cmd="${RETRY_CLEAN_CMD:-rm -rf build/staging build/install build/lock.yaml}"
     local validate_cmd="${RETRY_VALIDATE_CMD:-}"
@@ -18,7 +34,7 @@ retry_build() {
                     echo "Post-build validation failed on attempt $attempt."
                     if [ $attempt -lt $max_attempts ]; then
                         echo "Cleaning and retrying in 5s..."
-                        eval "$clean_cmd"
+                        _retry_clean "$clean_cmd"
                         sleep 5
                         attempt=$((attempt + 1))
                         continue
@@ -33,7 +49,7 @@ retry_build() {
         fi
         if [ $attempt -lt $max_attempts ]; then
             echo "Build failed on attempt $attempt. Retrying in 30s..."
-            eval "$clean_cmd"
+            _retry_clean "$clean_cmd"
             sleep 30
         else
             echo "Build failed after $max_attempts attempts."
