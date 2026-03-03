@@ -17,6 +17,8 @@ module m_bubbles
 
     use m_helper_basic         !< Functions to compare floating point numbers
 
+    use m_helper               !< TEMP: exercise coverage pruning in CI
+
     implicit none
 
     real(wp) :: chi_vw  !< Bubble wall properties (Ando 2010)

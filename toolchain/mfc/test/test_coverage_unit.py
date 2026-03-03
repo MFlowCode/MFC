@@ -238,10 +238,12 @@ class TestShouldRunAllTests(unittest.TestCase):
             {"toolchain/mfc/test/cases.py"}
         ) is True
 
-    def test_case_py_triggers_all(self):
+    # TEMP: case.py removed from ALWAYS_RUN_ALL to exercise pruning in CI.
+    # Restore before merge.
+    def test_case_py_does_not_trigger_all(self):
         assert should_run_all_tests(
             {"toolchain/mfc/test/case.py"}
-        ) is True
+        ) is False
 
     def test_definitions_py_triggers_all(self):
         assert should_run_all_tests(
@@ -266,10 +268,12 @@ class TestShouldRunAllTests(unittest.TestCase):
             {"src/common/include/case.fpp"}
         ) is True
 
-    def test_coverage_py_triggers_all(self):
+    # TEMP: coverage.py removed from ALWAYS_RUN_ALL to exercise pruning in CI.
+    # Restore before merge.
+    def test_coverage_py_does_not_trigger_all(self):
         assert should_run_all_tests(
             {"toolchain/mfc/test/coverage.py"}
-        ) is True
+        ) is False
 
     def test_cmake_dir_triggers_all(self):
         assert should_run_all_tests(

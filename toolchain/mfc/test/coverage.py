@@ -40,7 +40,10 @@ COVERAGE_CACHE_PATH = Path(common.MFC_ROOT_DIR) / "toolchain/mfc/test/test_cover
 # Changes to these files trigger the full test suite.
 # CPU coverage cannot tell us about GPU directive changes (macro files), and
 # toolchain files define or change the set of tests themselves.
-# TEMP: stripped to GPU macros only so CI exercises the pruning logic.
+# TEMP: case.py and coverage.py removed so CI exercises pruning on this PR.
+# Restore before merge:
+#   "toolchain/mfc/test/case.py",
+#   "toolchain/mfc/test/coverage.py",
 ALWAYS_RUN_ALL = frozenset([
     "src/common/include/parallel_macros.fpp",
     "src/common/include/acc_macros.fpp",
@@ -49,11 +52,9 @@ ALWAYS_RUN_ALL = frozenset([
     "src/common/include/macros.fpp",
     "src/common/include/case.fpp",
     "toolchain/mfc/test/cases.py",
-    "toolchain/mfc/test/case.py",
     "toolchain/mfc/params/definitions.py",
     "toolchain/mfc/run/input.py",
     "toolchain/mfc/case_validator.py",
-    "toolchain/mfc/test/coverage.py",
 ])
 
 # Directory prefixes: any changed file under these paths triggers full suite.
@@ -360,6 +361,12 @@ def _prepare_test(case, root_dir: str) -> dict:  # pylint: disable=unused-argume
     # post_process reads.  Mirrors the generated case.py logic that normally
     # runs via ./mfc.sh run (see POST_PROCESS_OUTPUT_PARAMS in case.py).
     case.params.update(get_post_process_mods(case.params))
+
+    # Run only one timestep: we only need to know which source files are
+    # *touched*, not verify correctness.  A single step exercises the same
+    # code paths (init, RHS, time-stepper, output) while preventing heavy
+    # 3D tests from timing out under gcov instrumentation (~10x slowdown).
+    case.params['t_step_stop'] = 1
 
     # Adaptive-dt tests: post_process computes n_save = int(t_stop/t_save)+1
     # and iterates over that many save indices.  But with small t_step_stop
