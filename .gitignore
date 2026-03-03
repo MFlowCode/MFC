@@ -15,17 +15,9 @@ src/*/autogen/
 
 .nfs*
 
-MFC.code-workspace
-runit
-stderr.log
-.gitignore
-
 __pycache__
 
 *.egg-info
-
-# Runfiles
-rundir
 
 # Auto-generated version file
 toolchain/mfc/_version.py
