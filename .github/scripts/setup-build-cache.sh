@@ -1,6 +1,6 @@
 #!/bin/bash
 # Sets up a persistent build cache for self-hosted CI runners.
-# Creates a symlink: ./build -> /storage/coda1/d-coc/0/sbryngelson3/.mfc-ci-cache/<key>/build
+# Creates a symlink: ./build -> <cache_root>/<key>/build
 #
 # Each runner gets its own cache keyed by (cluster, device, interface, runner).
 # This avoids cross-runner path issues entirely — CMake's absolute paths are
@@ -13,8 +13,21 @@ _cache_device="${2:?}"
 _cache_interface="${3:-none}"
 _cache_runner="${RUNNER_NAME:?RUNNER_NAME not set}"
 
+# Select cache root based on cluster (each HPC system has its own persistent storage).
+case "$_cache_cluster" in
+    phoenix)
+        _cache_root="/storage/coda1/d-coc/0/sbryngelson3/.mfc-ci-cache" ;;
+    frontier|frontier_amd)
+        _cache_root="/lustre/orion/cfd154/scratch/sbryngelson/.mfc-ci-cache" ;;
+    *)
+        echo "=== Build Cache Setup ==="
+        echo "  No cache root configured for cluster '$_cache_cluster' — skipping."
+        echo "========================="
+        return 0 2>/dev/null || exit 0 ;;
+esac
+
 _cache_key="${_cache_cluster}-${_cache_device}-${_cache_interface}-${_cache_runner}"
-_cache_base="/storage/coda1/d-coc/0/sbryngelson3/.mfc-ci-cache/${_cache_key}/build"
+_cache_base="${_cache_root}/${_cache_key}/build"
 
 # Check if an NFS cache directory is healthy (readable, writable, no stale handles).
 _nfs_cache_healthy() {
