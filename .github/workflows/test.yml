@@ -156,27 +156,7 @@ jobs:
           PRECISION: ${{ matrix.precision != '' && format('--{0}', matrix.precision) || '' }}
 
       - name: Test
-        run: |
-          rm -f tests/failed_uuids.txt
-          TEST_EXIT=0
-          /bin/bash mfc.sh test -v --max-attempts 3 -j "$(nproc)" $TEST_ALL $TEST_PCT || TEST_EXIT=$?
-
-          # Retry only if a small number of tests failed (sporadic failures)
-          if [ -s tests/failed_uuids.txt ]; then
-            NUM_FAILED=$(wc -l < tests/failed_uuids.txt)
-            if [ "$NUM_FAILED" -le 5 ]; then
-              FAILED=$(tr '\n' ' ' < tests/failed_uuids.txt)
-              echo ""
-              echo "=== Retrying $NUM_FAILED failed test(s): $FAILED ==="
-              echo ""
-              /bin/bash mfc.sh test -v --max-attempts 3 -j "$(nproc)" --only $FAILED $TEST_ALL || exit $?
-            else
-              echo "Too many failures ($NUM_FAILED) to retry — likely a real issue."
-              exit 1
-            fi
-          elif [ "$TEST_EXIT" -ne 0 ]; then
-            exit $TEST_EXIT
-          fi
+        run: bash .github/scripts/run-tests-with-retry.sh -v --max-attempts 3 -j "$(nproc)" $TEST_ALL $TEST_PCT
         env:
           TEST_ALL: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
           TEST_PCT: ${{ matrix.debug == 'debug' && '-% 20' || '' }}
@@ -299,3 +279,80 @@ jobs:
         with:
           name: logs-${{ strategy.job-index }}-${{ steps.log.outputs.slug }}
           path: ${{ steps.log.outputs.slug }}.out
+
+  case-optimization:
+    name: "Case Opt | ${{ matrix.cluster_name }} (${{ matrix.device }}-${{ matrix.interface }})"
+    if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true' && github.event.pull_request.draft != true
+    needs: [lint-gate, file-changes]
+    continue-on-error: false
+    timeout-minutes: 480
+    strategy:
+      matrix:
+        include:
+          - runner:       'gt'
+            cluster:      'phoenix'
+            cluster_name: 'Georgia Tech | Phoenix'
+            device: 'gpu'
+            interface: 'acc'
+          - runner:       'gt'
+            cluster:      'phoenix'
+            cluster_name: 'Georgia Tech | Phoenix'
+            device: 'gpu'
+            interface: 'omp'
+          - runner:       'frontier'
+            cluster:      'frontier'
+            cluster_name: 'Oak Ridge | Frontier'
+            device: 'gpu'
+            interface: 'acc'
+          - runner:       'frontier'
+            cluster:      'frontier'
+            cluster_name: 'Oak Ridge | Frontier'
+            device: 'gpu'
+            interface: 'omp'
+          - runner:       'frontier'
+            cluster:      'frontier_amd'
+            cluster_name: 'Oak Ridge | Frontier (AMD)'
+            device: 'gpu'
+            interface: 'omp'
+    runs-on:
+      group:  phoenix
+      labels: ${{ matrix.runner }}
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
+        with:
+          clean: false
+
+      - name: Pre-Build (SLURM)
+        if:   matrix.cluster == 'phoenix'
+        run:  bash .github/workflows/phoenix/submit.sh .github/scripts/prebuild-case-optimization.sh ${{ matrix.device }} ${{ matrix.interface }}
+
+      - name: Pre-Build (login node)
+        if:   matrix.cluster != 'phoenix'
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
+        with:
+          max_attempts: 3
+          retry_wait_seconds: 60
+          timeout_minutes: 120
+          command: bash .github/scripts/prebuild-case-optimization.sh ${{ matrix.cluster }} ${{ matrix.device }} ${{ matrix.interface }}
+          on_retry_command: ./mfc.sh clean
+
+      - name: Run Case-Optimization Tests
+        run:  bash .github/workflows/${{ matrix.cluster }}/submit.sh .github/scripts/run_case_optimization.sh ${{ matrix.device }} ${{ matrix.interface }}
+
+      - name: Print Logs
+        if:   always()
+        run:  |
+          for f in prebuild-case-optimization-${{ matrix.device }}-${{ matrix.interface }}.out \
+                   run-case-optimization-${{ matrix.device }}-${{ matrix.interface }}.out; do
+            [ -f "$f" ] && echo "=== $f ===" && cat "$f"
+          done
+
+      - name: Archive Logs
+        uses: actions/upload-artifact@v4
+        if:   always()
+        with:
+          name: case-opt-${{ strategy.job-index }}-${{ matrix.cluster }}-${{ matrix.interface }}
+          path: |
+            prebuild-case-optimization-${{ matrix.device }}-${{ matrix.interface }}.out
+            run-case-optimization-${{ matrix.device }}-${{ matrix.interface }}.out
