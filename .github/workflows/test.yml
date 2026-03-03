@@ -249,7 +249,7 @@ jobs:
         if:   matrix.cluster != 'phoenix'
         uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
         with:
-          max_attempts: 3
+          max_attempts: 1
           retry_wait_seconds: 60
           timeout_minutes: 60
           command: bash .github/workflows/${{ matrix.cluster }}/build.sh ${{ matrix.device }} ${{ matrix.interface }}
@@ -326,7 +326,7 @@ jobs:
       - name: Pre-Build
         uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
         with:
-          max_attempts: 3
+          max_attempts: 1
           retry_wait_seconds: 60
           timeout_minutes: 120
           command: bash .github/scripts/prebuild-case-optimization.sh ${{ matrix.cluster }} ${{ matrix.device }} ${{ matrix.interface }}

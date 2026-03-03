@@ -21,7 +21,10 @@ esac
 . ./mfc.sh load -c "$flag" -m g
 source .github/scripts/gpu-opts.sh
 
+# Case-optimized GPU builds are memory-intensive (nvfortran/CCE + target offload).
+# Login nodes have per-user cgroup memory limits (e.g., 4GB on Phoenix) that
+# cause OOM kills at higher parallelism.
 for case in benchmarks/*/case.py; do
     echo "=== Pre-building: $case ==="
-    ./mfc.sh build -i "$case" --case-optimization $gpu_opts -j 8
+    ./mfc.sh build -i "$case" --case-optimization $gpu_opts -j 2
 done
