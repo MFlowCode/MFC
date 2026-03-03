@@ -1531,7 +1531,7 @@ contains
                 deallocate (iu_out)
                 return
             end if
-            write (iu_out(i), '(A)') 'mytime F fx fy fz Tau Tau_x Tau_y Tau_z'
+            write (iu_out(i), '(A)') 'mytime fx fy fz Tau_x Tau_y Tau_z'
         end do
 
         do
@@ -1539,8 +1539,8 @@ contains
             if (ios /= 0) exit  ! EOF (<0) or read error (>0)
             if (rec_id >= 1 .and. rec_id <= num_ibs) then
                 write (iu_out(rec_id), '(7(ES24.16E3,1X))') rec_time, &
-                    sqrt(sum(rec_force**2)), rec_force(1), rec_force(2), rec_force(3), &
-                    sqrt(sum(rec_torque**2)), rec_torque(1), rec_torque(2), rec_torque(3)
+                    rec_force(1), rec_force(2), rec_force(3), &
+                    rec_torque(1), rec_torque(2), rec_torque(3)
             end if
         end do
 
