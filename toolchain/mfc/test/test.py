@@ -115,6 +115,15 @@ def __filter(cases_) -> typing.List[TestCase]:
             should_run_all_tests, filter_tests_by_coverage,
         )
 
+        # Example-based tests cover no unique files beyond non-example tests,
+        # so they add no value to coverage-based pruning. Skip them entirely.
+        example_skipped = [c for c in cases if "Example" in c.trace]
+        cases = [c for c in cases if "Example" not in c.trace]
+        skipped_cases += example_skipped
+        if example_skipped:
+            cons.print(f"[dim]Skipped {len(example_skipped)} example tests "
+                       f"(redundant coverage)[/dim]")
+
         cache = load_coverage_cache(common.MFC_ROOT_DIR)
         if cache is None:
             cons.print("[yellow]Coverage cache missing or stale.[/yellow]")
@@ -225,6 +234,9 @@ def test():
 
     if ARG("build_coverage_cache"):
         from .coverage import build_coverage_cache  # pylint: disable=import-outside-toplevel
+        # Exclude example-based tests: they cover no unique files beyond
+        # non-example tests, so building coverage for them is wasted work.
+        cases = [c for c in cases if "Example" not in c.trace]
         all_cases = [b.to_case() for b in cases]
 
         # Build all unique slugs (Chemistry, case-optimization, etc.) so every
