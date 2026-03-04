@@ -193,7 +193,11 @@ def _parse_gcov_json_output(raw_bytes: bytes, root_dir: str) -> set:
                     rel_path = os.path.relpath(os.path.realpath(file_path), real_root)
                 except ValueError:
                     rel_path = file_path
-                result.add(rel_path)
+                # Only keep src/ paths — build/staging/ artifacts from
+                # case-optimized builds are auto-generated and never
+                # appear in PR diffs.
+                if rel_path.startswith("src/"):
+                    result.add(rel_path)
 
     return result
 
