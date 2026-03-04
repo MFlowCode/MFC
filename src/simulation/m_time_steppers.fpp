@@ -536,7 +536,9 @@ contains
         if (adap_dt) call s_adaptive_dt_bubble(1)
 
         do s = 1, nstage
+            print *, s
             call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, s)
+            print *, "Out of RHS"
 
             if (s == 1) then
                 if (run_time_info) then
@@ -636,7 +638,9 @@ contains
                 if (qbmm .and. .not. polytropic) then
                     call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
                 else
+                    print *, "Entering correct state"
                     call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
+                    print *, "Exiting correct state"
                 end if
             end if
 
@@ -805,6 +809,8 @@ contains
         integer :: i
         logical :: forces_computed
 
+        print *, "Enting MIBM subroutine"
+
         call nvtxStartRange("PROPAGATE-IMMERSED-BOUNDARIES")
 
         forces_computed = .false.
@@ -853,6 +859,8 @@ contains
         end do
 
         call s_update_mib(num_ibs)
+
+        print *, "Exiting MIBM subroutine"
 
         call nvtxEndRange
 

@@ -29,6 +29,8 @@ module m_ibm
 
     use m_model
 
+    use m_collisions
+
     implicit none
 
     private :: s_compute_image_points, s_compute_interpolation_coeffs, &
@@ -36,7 +38,7 @@ module m_ibm
                s_find_num_ghost_points
     
     public :: s_initialize_ibm_module, s_ibm_setup, s_ibm_correct_state, &
-              s_finalize_ibm_module, s_cross_product
+              s_finalize_ibm_module
 
     type(integer_field), public :: ib_markers
     $:GPU_DECLARE(create='[ib_markers]')
@@ -72,6 +74,8 @@ contains
         @:ACC_SETUP_SFs(ib_markers)
 
         $:GPU_ENTER_DATA(copyin='[num_gps,num_inner_gps]')
+
+        if (collision_model > 0) call s_initialize_collisions_module()
 
     end subroutine s_initialize_ibm_module
 
@@ -1112,7 +1116,9 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        call s_apply_collision_forces(ghost_points, ib_markers)
+        print *, "Starting"
+        call s_apply_collision_forces(ghost_points, num_gps, ib_markers, forces, torques)
+        print *, "Outside of subroutine"
 
         ! reduce the forces across all MPI ranks
         call s_mpi_allreduce_vectors_sum(forces, forces, num_ibs, 3)
@@ -1138,6 +1144,8 @@ contains
         end do
 
         call nvtxEndRange
+
+        print *, "Exiting IB forces subroutine"
 
     end subroutine s_compute_ib_forces
 

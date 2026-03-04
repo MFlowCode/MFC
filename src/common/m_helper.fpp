@@ -29,6 +29,7 @@ module m_helper
               s_transform_model, &
               s_swap, &
               f_cross, &
+              s_cross_product, &
               f_create_transform_matrix, &
               f_create_bbox, &
               s_print_2D_array, &
