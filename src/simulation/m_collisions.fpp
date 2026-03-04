@@ -75,10 +75,10 @@ contains
     end subroutine s_apply_collision_forces
 
     !> @brief applyies collision forces to IBs assuming a soft-sphere collision model (all IBs are circles or spheres)
-    subroutine s_apply_ib_collision_forces_soft_sphere(collision_lookup, num_considered_collisions)
+    subroutine s_appply_ib_ib_collision_forces_soft_sphere(collision_lookup, num_considered_collisions)
 
         integer, intent(in) :: num_considered_collisions
-        integer, dimension(num_considered_collisions), intent(in) :: collision_lookup
+        integer, dimension(num_considered_collisions, 2), intent(in) :: collision_lookup
 
         integer :: i, pid1, pid2 ! iterators and patch IDs
         real(wp) :: overlap_distance
@@ -120,13 +120,13 @@ contains
                     patch_ib(pid1)%torque = patch_ib(pid1)%torque + torque    
 
                     ! apoply equal and opposite force/torque to second sphere
-                    atch_ib(pid1)%force = patch_ib(pid1)%forces - normal_force - tangental_force
+                    patch_ib(pid1)%force = patch_ib(pid1)%forces - normal_force - tangental_force
                     patch_ib(pid1)%torque = patch_ib(pid1)%torque - torque   
                 end if
             end if
         end do
 
-    end subroutine s_apply_ib_collision_forces_soft_sphere
+    end subroutine s_appply_ib_ib_collision_forces_soft_sphere
 
     !> @brief applyies collision forces to IBs assuming a soft-sphere collision model (all IBs are circles or spheres)
     subroutine s_apply_wall_collision_forces_soft_sphere(wall_overlap_distances)
@@ -134,7 +134,6 @@ contains
         real(wp), dimension(num_ibs, (num_dims*2)), intent(in) :: wall_overlap_distances
 
         integer :: patch_id, i
-        real(wp) :: spring_stiffness, damping_parameter, coefficient_of_friction
         real(wp), dimension(3) :: normal_force, tangental_force, normal_vector, normal_velocity, tangental_vector, collision_location, torque
         real(wp) :: k, eta ! the spring stiffness and damping coefficient for a specific IB
 

@@ -210,6 +210,7 @@ _SIMPLE_DESCS = {
     "collision_model": "Collision model for immersed boundaries (0=none, 1=soft sphere)",
     "coefficient_of_restitution": "Coefficient of restitution for IB collisions",
     "collision_time": "Characteristic collision time for IB collisions",
+    "ib_coefficient_of_friction": "Coefficient of friction for IB collisions",
     "acoustic_source": "Enable acoustic sources",
     # Output
     "parallel_io": "Enable parallel I/O",
@@ -931,6 +932,7 @@ def _load():  # pylint: disable=too-many-locals,too-many-statements
     _r("collision_model", INT, {"ib"})
     _r("coefficient_of_restitution", REAL, {"ib"})
     _r("collision_time", REAL, {"ib"})
+    _r("ib_coefficient_of_friction", REAL, {"ib"})
 
     # --- Probes ---
     for n in ["num_probes", "num_integrals"]:

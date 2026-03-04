@@ -399,6 +399,7 @@ module m_global_parameters
     integer :: collision_model
     real(wp) :: coefficient_of_restitution
     real(wp) :: collision_time
+    real(wp) :: ib_coefficient_of_friction
 
     type(ib_patch_parameters), dimension(num_patches_max) :: patch_ib
     type(vec3_dt), allocatable, dimension(:) :: airfoil_grid_u, airfoil_grid_l
@@ -721,6 +722,7 @@ contains
         collision_model = 0
         coefficient_of_restitution = dflt_real
         collision_time = dflt_real
+        ib_coefficient_of_friction = dflt_real
 
         ! Bubble modeling
         bubbles_euler = .false.

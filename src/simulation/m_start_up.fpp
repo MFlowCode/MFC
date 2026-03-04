@@ -144,7 +144,7 @@ contains
             x_domain, y_domain, z_domain, &
             hypoelasticity, &
             ib, num_ibs, patch_ib, &
-            collision_model, coefficient_of_restitution, collision_time, &
+            collision_model, coefficient_of_restitution, collision_time, ib_coefficient_of_friction, &
             fluid_pp, bub_pp, probe_wrt, prim_vars_wrt, &
             fd_order, probe, num_probes, t_step_old, &
             alt_soundspeed, mixture_err, weno_Re_flux, &
