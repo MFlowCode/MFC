@@ -40,10 +40,6 @@ COVERAGE_CACHE_PATH = Path(common.MFC_ROOT_DIR) / "toolchain/mfc/test/test_cover
 # Changes to these files trigger the full test suite.
 # CPU coverage cannot tell us about GPU directive changes (macro files), and
 # toolchain files define or change the set of tests themselves.
-# TEMP: case.py and coverage.py removed so CI exercises pruning on this PR.
-# Restore before merge:
-#   "toolchain/mfc/test/case.py",
-#   "toolchain/mfc/test/coverage.py",
 ALWAYS_RUN_ALL = frozenset([
     "src/common/include/parallel_macros.fpp",
     "src/common/include/acc_macros.fpp",
@@ -51,7 +47,9 @@ ALWAYS_RUN_ALL = frozenset([
     "src/common/include/shared_parallel_macros.fpp",
     "src/common/include/macros.fpp",
     "src/common/include/case.fpp",
+    "toolchain/mfc/test/case.py",
     "toolchain/mfc/test/cases.py",
+    "toolchain/mfc/test/coverage.py",
     "toolchain/mfc/params/definitions.py",
     "toolchain/mfc/run/input.py",
     "toolchain/mfc/case_validator.py",
