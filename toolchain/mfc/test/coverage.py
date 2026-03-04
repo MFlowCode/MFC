@@ -622,28 +622,31 @@ def get_changed_files(root_dir: str, compare_branch: str = "master") -> Optional
     Uses merge-base (not master tip) so that unrelated master advances don't
     appear as "your changes."
     """
-    # Try local branch first, then origin/ remote ref (CI shallow clones).
-    for ref in [compare_branch, f"origin/{compare_branch}"]:
-        merge_base_result = subprocess.run(
-            ["git", "merge-base", ref, "HEAD"],
+    try:
+        # Try local branch first, then origin/ remote ref (CI shallow clones).
+        for ref in [compare_branch, f"origin/{compare_branch}"]:
+            merge_base_result = subprocess.run(
+                ["git", "merge-base", ref, "HEAD"],
+                capture_output=True, text=True, cwd=root_dir, timeout=30, check=False
+            )
+            if merge_base_result.returncode == 0:
+                break
+        else:
+            return None
+        merge_base = merge_base_result.stdout.strip()
+        if not merge_base:
+            return None
+
+        diff_result = subprocess.run(
+            ["git", "diff", merge_base, "HEAD", "--name-only", "--no-color"],
             capture_output=True, text=True, cwd=root_dir, timeout=30, check=False
         )
-        if merge_base_result.returncode == 0:
-            break
-    else:
-        return None
-    merge_base = merge_base_result.stdout.strip()
-    if not merge_base:
-        return None
+        if diff_result.returncode != 0:
+            return None
 
-    diff_result = subprocess.run(
-        ["git", "diff", merge_base, "HEAD", "--name-only", "--no-color"],
-        capture_output=True, text=True, cwd=root_dir, timeout=30, check=False
-    )
-    if diff_result.returncode != 0:
+        return _parse_diff_files(diff_result.stdout)
+    except (subprocess.TimeoutExpired, OSError):
         return None
-
-    return _parse_diff_files(diff_result.stdout)
 
 
 def should_run_all_tests(changed_files: set) -> bool:

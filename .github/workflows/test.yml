@@ -85,7 +85,7 @@ jobs:
             DIFF=""
           fi
           if echo "$DIFF" | \
-             grep -qP '^\+\s*(use[\s,]+\w|#:include\s|include\s+['"'"'"])'; then
+             grep -qP '^[+-]\s*(use[\s,]+\w|#:include\s|include\s+['"'"'"])'; then
             echo "dep_changed=true" >> "$GITHUB_OUTPUT"
             echo "Fortran dependency change detected — will rebuild coverage cache."
           else

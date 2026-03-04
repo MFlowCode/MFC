@@ -77,7 +77,7 @@ def _filter_only(cases, skipped_cases):
 
 
 # pylint: disable=too-many-branches,too-many-locals,too-many-statements,trailing-whitespace
-def __filter(cases_) -> typing.List[TestCase]:
+def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase]]:
     cases = cases_[:]
     selected_cases = []
     skipped_cases  = []
