@@ -69,13 +69,13 @@ contains
       $:GPU_UPDATE(host='[ghost_points]')
 
       ! get is distance used in the force calculation with each IB and each wall 
-      ! call s_detect_ib_wall_collisions(ghost_points, wall_overlap_distances, num_gps)
-      ! call s_detect_ib_ib_collisions(ghost_points, ib_markers, collision_lookup, num_gps, num_considered_collisions)
+      call s_detect_ib_wall_collisions(ghost_points, wall_overlap_distances, num_gps)
+      call s_detect_ib_ib_collisions(ghost_points, ib_markers, collision_lookup, num_gps, num_considered_collisions)
 
       select case (collision_model)
           case(1) ! soft sphere model
-              ! call s_apply_wall_collision_forces_soft_sphere(wall_overlap_distances, forces, torques)
-              ! call s_appply_ib_ib_collision_forces_soft_sphere(collision_lookup, num_considered_collisions, forces, torques)
+              call s_apply_wall_collision_forces_soft_sphere(wall_overlap_distances, forces, torques)
+              call s_appply_ib_ib_collision_forces_soft_sphere(collision_lookup, num_considered_collisions, forces, torques)
       end select
 
     end subroutine s_apply_collision_forces
@@ -97,8 +97,6 @@ contains
         do i = 1, num_considered_collisions
             pid1 = collision_lookup(i, 1)
             pid2 = collision_lookup(i, 2)
-
-            print *, "Considering Collision: ", pid1, pid2
 
             centroid_1 = [patch_ib(pid1)%x_centroid, patch_ib(pid1)%y_centroid, 0._wp]
             centroid_2 = [patch_ib(pid2)%x_centroid, patch_ib(pid2)%y_centroid, 0._wp]
@@ -222,9 +220,9 @@ contains
 
       do gp_idx = 1, num_gps
           gp_patch_id = gps(gp_idx)%ib_patch_id
-          i = gps(gp_idx)%loc(1)
-          j = gps(gp_idx)%loc(2)
-          k = gps(gp_idx)%loc(3)
+          i = gps(gp_idx)%ip_grid(1)
+          j = gps(gp_idx)%ip_grid(2)
+          k = 0; if (num_dims == 3) k = gps(gp_idx)%ip_grid(3)
           ip_patch_id = ib_markers%sf(i, j, k)
 
           ! Pass 1: Collect all candidate pairs (may contain duplicates)

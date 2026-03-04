@@ -1116,9 +1116,7 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        print *, "Starting"
         call s_apply_collision_forces(ghost_points, num_gps, ib_markers, forces, torques)
-        print *, "Outside of subroutine"
 
         ! reduce the forces across all MPI ranks
         call s_mpi_allreduce_vectors_sum(forces, forces, num_ibs, 3)
@@ -1144,8 +1142,6 @@ contains
         end do
 
         call nvtxEndRange
-
-        print *, "Exiting IB forces subroutine"
 
     end subroutine s_compute_ib_forces
 
