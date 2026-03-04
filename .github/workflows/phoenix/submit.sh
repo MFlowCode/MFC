@@ -77,6 +77,7 @@ echo "Running in $(pwd):"
 job_slug="$job_slug"
 job_device="$2"
 job_interface="$3"
+export GITHUB_EVENT_NAME="$GITHUB_EVENT_NAME"
 
 . ./mfc.sh load -c p -m $2
 

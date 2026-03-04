@@ -85,6 +85,7 @@ job_device="$2"
 job_interface="$3"
 job_shard="$4"
 job_cluster="$cluster_name"
+export GITHUB_EVENT_NAME="$GITHUB_EVENT_NAME"
 
 . ./mfc.sh load -c $compiler_flag -m $([ "$2" = "gpu" ] && echo "g" || echo "c")
 
