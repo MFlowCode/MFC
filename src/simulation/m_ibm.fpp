@@ -31,15 +31,12 @@ module m_ibm
 
     implicit none
 
-    private :: s_compute_image_points, &
-               s_compute_interpolation_coeffs, &
-               s_interpolate_image_point, &
-               s_find_ghost_points, &
+    private :: s_compute_image_points, s_compute_interpolation_coeffs, &
+               s_interpolate_image_point, s_find_ghost_points, &
                s_find_num_ghost_points
-    ; public :: s_initialize_ibm_module, &
- s_ibm_setup, &
- s_ibm_correct_state, &
- s_finalize_ibm_module
+    
+    public :: s_initialize_ibm_module, s_ibm_setup, s_ibm_correct_state, &
+              s_finalize_ibm_module, s_cross_product
 
     type(integer_field), public :: ib_markers
     $:GPU_DECLARE(create='[ib_markers]')
@@ -1115,6 +1112,8 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
+        if (ib_collisions) call s_compute_collisionforces(ghost_points, ib_markers)
+
         ! reduce the forces across all MPI ranks
         call s_mpi_allreduce_vectors_sum(forces, forces, num_ibs, 3)
         call s_mpi_allreduce_vectors_sum(torques, torques, num_ibs, 3)
@@ -1323,16 +1322,5 @@ contains
         end do
 
     end subroutine s_wrap_periodic_ibs
-
-    !> @brief Computes the cross product c = a x b of two 3D vectors.
-    subroutine s_cross_product(a, b, c)
-        $:GPU_ROUTINE(parallelism='[seq]')
-        real(wp), intent(in) :: a(3), b(3)
-        real(wp), intent(out) :: c(3)
-
-        c(1) = a(2)*b(3) - a(3)*b(2)
-        c(2) = a(3)*b(1) - a(1)*b(3)
-        c(3) = a(1)*b(2) - a(2)*b(1)
-    end subroutine s_cross_product
 
 end module m_ibm

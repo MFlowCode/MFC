@@ -207,6 +207,9 @@ _SIMPLE_DESCS = {
     "hyperelasticity": "Enable hyperelastic model",
     "relativity": "Enable special relativity",
     "ib": "Enable immersed boundaries",
+    "ib_collisions": "Enable immersed boundary collisions",
+    "coefficient_of_restitution": "Coefficient of restitution for IB collisions",
+    "collision_time": "Characteristic collision time for IB collisions",
     "acoustic_source": "Enable acoustic sources",
     # Output
     "parallel_io": "Enable parallel I/O",
@@ -726,6 +729,11 @@ DEPENDENCIES = {
             "requires": ["num_ibs"],
         }
     },
+    "ib_collisions": {
+        "when_true": {
+            "requires": ["ib", "coefficient_of_restitution", "collision_time"],
+        }
+    },
     "acoustic_source": {
         "when_true": {
             "requires": ["num_source"],
@@ -920,6 +928,9 @@ def _load():  # pylint: disable=too-many-locals,too-many-statements
     # --- Immersed boundary ---
     _r("num_ibs", INT, {"ib"})
     _r("ib", LOG, {"ib"})
+    _r("ib_collisions", LOG, {"ib"})
+    _r("coefficient_of_restitution", REAL, {"ib"})
+    _r("collision_time", REAL, {"ib"})
 
     # --- Probes ---
     for n in ["num_probes", "num_integrals"]:

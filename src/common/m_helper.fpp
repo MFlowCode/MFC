@@ -343,6 +343,17 @@ contains
         c(3) = a(1)*b(2) - a(2)*b(1)
     end function f_cross
 
+    !> @brief Computes the cross product c = a x b of two 3D vectors.
+    subroutine s_cross_product(a, b, c)
+        $:GPU_ROUTINE(parallelism='[seq]')
+        real(wp), intent(in) :: a(3), b(3)
+        real(wp), intent(out) :: c(3)
+
+        c(1) = a(2)*b(3) - a(3)*b(2)
+        c(2) = a(3)*b(1) - a(1)*b(3)
+        c(3) = a(1)*b(2) - a(2)*b(1)
+    end subroutine s_cross_product
+
     !> This procedure swaps two real numbers.
     !! @param lhs Left-hand side.
     !! @param rhs Right-hand side.
