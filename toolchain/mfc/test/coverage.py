@@ -410,19 +410,6 @@ def _prepare_test(case, root_dir: str) -> dict:  # pylint: disable=unused-argume
     finally:
         cons.raw.file = orig_file
 
-    # Diagnostic: log slug info for first test
-    uuid = case.get_uuid()
-    if uuid == "B7A6CC79":
-        for tgt_name, bp in binaries:
-            slug = bp.split(os.sep)[-3]  # extract slug from path
-            exists = os.path.isfile(bp)
-            cons.print(f"[dim]DIAG {uuid} {tgt_name}: slug={slug} exists={exists} path={bp}[/dim]")
-        # Also show what get_fpp produces
-        for target in [PRE_PROCESS, SIMULATION]:
-            fpp = input_file.get_fpp(target, False)
-            cons.print(f"[dim]DIAG {uuid} {target.name} FPP hash={hash(fpp)} len={len(fpp)}[/dim]")
-        cons.print(f"[dim]DIAG {uuid} cwd={os.getcwd()}[/dim]")
-
     return {
         "uuid":     case.get_uuid(),
         "dir":      test_dir,
@@ -455,9 +442,9 @@ def build_coverage_cache(  # pylint: disable=too-many-locals,too-many-statements
 
     if n_jobs is None:
         n_jobs = max(os.cpu_count() or 1, 1)
-    # Cap Phase 1 parallelism: each test spawns MPI processes (~500MB each),
-    # so too many concurrent tests cause OOM on large nodes.
-    phase1_jobs = min(n_jobs, 32)
+    # Cap test parallelism: each test spawns gcov-instrumented MPI processes
+    # (~2-5 GB each under gcov).  Too many concurrent tests cause OOM.
+    phase1_jobs = min(n_jobs, 16)
     cons.print(f"[bold]Building coverage cache for {len(cases)} tests "
                f"({phase1_jobs} test workers, {n_jobs} gcov workers)...[/bold]")
     cons.print(f"[dim]Using gcov binary: {gcov_bin}[/dim]")

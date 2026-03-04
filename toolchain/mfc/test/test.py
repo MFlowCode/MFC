@@ -245,23 +245,9 @@ def test():
         unique_builds = set()
         for case, code in itertools.product(all_cases, codes):
             slug = code.get_slug(case.to_input_file())
-            # Diagnostic: log slug for test B7A6CC79
-            if case.get_uuid() == "B7A6CC79":
-                cons.print(f"[dim]DIAG build-loop B7A6CC79 {code.name}: slug={slug}[/dim]")
             if slug not in unique_builds:
                 build(code, case.to_input_file())
                 unique_builds.add(slug)
-
-        # Diagnostic: verify binaries exist after unique build loop
-        install_dir = os.path.join(os.getcwd(), "build", "install")
-        cons.print(f"[dim]Unique slugs built: {sorted(unique_builds)}[/dim]")
-        cons.print(f"[dim]install dir ({install_dir}): {sorted(os.listdir(install_dir))}[/dim]")
-        for slug in sorted(unique_builds):
-            bin_dir = os.path.join(install_dir, slug, "bin")
-            if os.path.isdir(bin_dir):
-                cons.print(f"[dim]  {slug}/bin: {sorted(os.listdir(bin_dir))}[/dim]")
-            else:
-                cons.print(f"[yellow]  {slug}/bin: MISSING[/yellow]")
 
         build_coverage_cache(common.MFC_ROOT_DIR, all_cases,
                              n_jobs=int(ARG("jobs")))
