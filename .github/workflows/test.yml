@@ -144,7 +144,7 @@ jobs:
             echo "Coverage cache unchanged."
           else
             git commit -m "Regenerate gcov coverage cache [skip ci]"
-            git push
+            git push origin HEAD:refs/heads/master
           fi
 
   github:

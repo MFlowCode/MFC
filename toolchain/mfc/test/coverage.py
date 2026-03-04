@@ -400,6 +400,7 @@ def _prepare_test(case, root_dir: str) -> dict:  # pylint: disable=unused-argume
     # Suppress console output from get_inp() to avoid 555×4 messages.
     targets = [SYSCHECK, PRE_PROCESS, SIMULATION, POST_PROCESS]
     binaries = []
+    # NOTE: not thread-safe — Phase 1 must remain single-threaded.
     orig_file = cons.raw.file
     cons.raw.file = io.StringIO()
     try:
@@ -677,7 +678,9 @@ def filter_tests_by_coverage(
 
     Conservative behavior:
     - Test not in cache (newly added) -> include it
-    - No changed .fpp files -> skip all tests
+    - No changed .fpp files -> skip all tests (safe because should_run_all_tests()
+      is called first in the workflow, catching toolchain/infra changes via
+      ALWAYS_RUN_ALL before this function is ever reached)
     - Test has incomplete coverage (no simulation files recorded but simulation
       files changed) -> include it (cache build likely failed for this test)
     """
