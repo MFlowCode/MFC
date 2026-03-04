@@ -207,7 +207,7 @@ _SIMPLE_DESCS = {
     "hyperelasticity": "Enable hyperelastic model",
     "relativity": "Enable special relativity",
     "ib": "Enable immersed boundaries",
-    "ib_collisions": "Enable immersed boundary collisions",
+    "collision_model": "Collision model for immersed boundaries (0=none, 1=soft sphere)",
     "coefficient_of_restitution": "Coefficient of restitution for IB collisions",
     "collision_time": "Characteristic collision time for IB collisions",
     "acoustic_source": "Enable acoustic sources",
@@ -729,8 +729,8 @@ DEPENDENCIES = {
             "requires": ["num_ibs"],
         }
     },
-    "ib_collisions": {
-        "when_true": {
+    "collision_model": {
+        "when_set": {
             "requires": ["ib", "coefficient_of_restitution", "collision_time"],
         }
     },
@@ -928,7 +928,7 @@ def _load():  # pylint: disable=too-many-locals,too-many-statements
     # --- Immersed boundary ---
     _r("num_ibs", INT, {"ib"})
     _r("ib", LOG, {"ib"})
-    _r("ib_collisions", LOG, {"ib"})
+    _r("collision_model", INT, {"ib"})
     _r("coefficient_of_restitution", REAL, {"ib"})
     _r("collision_time", REAL, {"ib"})
 

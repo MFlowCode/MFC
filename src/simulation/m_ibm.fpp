@@ -1112,7 +1112,7 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        if (ib_collisions) call s_compute_collisionforces(ghost_points, ib_markers)
+        call s_apply_collision_forces(ghost_points, ib_markers)
 
         ! reduce the forces across all MPI ranks
         call s_mpi_allreduce_vectors_sum(forces, forces, num_ibs, 3)

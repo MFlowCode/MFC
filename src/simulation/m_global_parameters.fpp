@@ -396,7 +396,7 @@ module m_global_parameters
     !> @{
     logical :: ib
     integer :: num_ibs
-    logical :: ib_collisions
+    integer :: collision_model
     real(wp) :: coefficient_of_restitution
     real(wp) :: collision_time
 
@@ -718,7 +718,7 @@ contains
         ! Immersed Boundaries
         ib = .false.
         num_ibs = dflt_int
-        ib_collisions = .false.
+        collision_model = 0
         coefficient_of_restitution = dflt_real
         collision_time = dflt_real
 

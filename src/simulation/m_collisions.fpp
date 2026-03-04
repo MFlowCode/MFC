@@ -43,7 +43,7 @@ contains
 
         real(wp) :: e, m
 
-        e = coeﬃcient_of_restitution
+        e = coefficient_of_restitution
 
         damping_parameter = -2._wp * log(e) / (pi**2 + log(e)**2)
         spring_stiffness = ( collision_time**2 * (pi**2 + log(e)**2) )**-1
