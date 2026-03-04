@@ -239,9 +239,14 @@ def _collect_single_test_coverage(  # pylint: disable=too-many-locals
             gcno_rel = rel[:-5] + ".gcno"
             gcno_src = os.path.join(root_dir, gcno_rel)
             if os.path.isfile(gcno_src):
-                # Copy .gcno alongside .gcda in the test's isolated dir
+                # Copy .gcno alongside .gcda in the test's isolated dir.
+                # Wrap in try/except for NFS TOCTOU races (file may vanish
+                # between isfile() and copy on networked filesystems).
                 gcno_dst = os.path.join(dirpath, fname[:-5] + ".gcno")
-                shutil.copy2(gcno_src, gcno_dst)
+                try:
+                    shutil.copy2(gcno_src, gcno_dst)
+                except OSError:
+                    continue
                 gcno_copies.append(gcno_dst)
 
     if not gcno_copies:
@@ -336,7 +341,7 @@ def _run_single_test_direct(test_info: dict, gcda_dir: str, strip: str) -> tuple
     return uuid, test_gcda, failures
 
 
-def _prepare_test(case, root_dir: str) -> dict:  # pylint: disable=unused-argument
+def _prepare_test(case, root_dir: str) -> dict:  # pylint: disable=unused-argument,too-many-locals
     """
     Prepare a test for direct execution: create directory, generate .inp
     files, and resolve binary paths.  All Python/toolchain overhead happens
@@ -404,6 +409,19 @@ def _prepare_test(case, root_dir: str) -> dict:  # pylint: disable=unused-argume
             binaries.append((target.name, bin_path))
     finally:
         cons.raw.file = orig_file
+
+    # Diagnostic: log slug info for first test
+    uuid = case.get_uuid()
+    if uuid == "B7A6CC79":
+        for tgt_name, bp in binaries:
+            slug = bp.split(os.sep)[-3]  # extract slug from path
+            exists = os.path.isfile(bp)
+            cons.print(f"[dim]DIAG {uuid} {tgt_name}: slug={slug} exists={exists} path={bp}[/dim]")
+        # Also show what get_fpp produces
+        for target in [PRE_PROCESS, SIMULATION]:
+            fpp = input_file.get_fpp(target, False)
+            cons.print(f"[dim]DIAG {uuid} {target.name} FPP hash={hash(fpp)} len={len(fpp)}[/dim]")
+        cons.print(f"[dim]DIAG {uuid} cwd={os.getcwd()}[/dim]")
 
     return {
         "uuid":     case.get_uuid(),
@@ -518,7 +536,12 @@ def build_coverage_cache(  # pylint: disable=too-many-locals,too-many-statements
                 for uuid, test_gcda in test_results.items()
             }
             for future in as_completed(futures):
-                uuid, coverage = future.result()
+                try:
+                    uuid, coverage = future.result()
+                except Exception as exc:  # pylint: disable=broad-except
+                    uuid = futures[future]
+                    cons.print(f"  [yellow]Warning: {uuid} coverage failed: {exc}[/yellow]")
+                    coverage = []
                 cache[uuid] = coverage
                 completed += 1
                 if completed % 50 == 0 or completed == len(cases):
