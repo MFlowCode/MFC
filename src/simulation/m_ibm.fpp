@@ -635,17 +635,17 @@ contains
                             ghost_points_in(local_idx)%slip = patch_ib(patch_id)%slip
 
                             if ((x_cc(i) - dx(i)) < glb_bounds(1)%beg) then
-                                ghost_points_in(count)%DB(1) = -1
+                                ghost_points_in(local_idx)%DB(1) = -1
                             else if ((x_cc(i) + dx(i)) > glb_bounds(1)%end) then
-                                ghost_points_in(count)%DB(1) = 1
+                                ghost_points_in(local_idx)%DB(1) = 1
                             else
                                 ghost_points_in(local_idx)%DB(1) = 0
                             end if
 
                             if ((y_cc(j) - dy(j)) < glb_bounds(2)%beg) then
-                                ghost_points_in(count)%DB(2) = -1
+                                ghost_points_in(local_idx)%DB(2) = -1
                             else if ((y_cc(j) + dy(j)) > glb_bounds(2)%end) then
-                                ghost_points_in(count)%DB(2) = 1
+                                ghost_points_in(local_idx)%DB(2) = 1
                             else
                                 ghost_points_in(local_idx)%DB(2) = 0
                             end if
@@ -1294,33 +1294,21 @@ contains
 
         do patch_id = 1, num_ibs
             ! check domain wraps in x, y,
-            #:for X, ID in [('x', 1), ('y', 2)]
-                ! check for periodicity
-                if (bc_${X}$%beg == BC_PERIODIC) then
-                    ! check if the boundary has left the domain, and then correct
-                    if (patch_ib(patch_id)%${X}$_centroid < glb_bounds(${ID}$)%beg) then
-                        ! if the boundary exited "left", wrap it back around to the "right"
-                        patch_ib(patch_id)%${X}$_centroid = patch_ib(patch_id)%${X}$_centroid + (glb_bounds(${ID}$)%end - glb_bounds(${ID}$)%beg)
-                    else if (patch_ib(patch_id)%${X}$_centroid > glb_bounds(${ID}$)%end) then
-                        ! if the boundary exited "right", wrap it back around to the "left"
-                        patch_ib(patch_id)%${X}$_centroid = patch_ib(patch_id)%${X}$_centroid - (glb_bounds(${ID}$)%end - glb_bounds(${ID}$)%beg)
+            #:for X, ID in [('x', 1), ('y', 2), ('z',3)]
+                if (num_dims >= ${ID}$) then
+                    ! check for periodicity
+                    if (bc_${X}$%beg == BC_PERIODIC) then
+                        ! check if the boundary has left the domain, and then correct
+                        if (patch_ib(patch_id)%${X}$_centroid < glb_bounds(${ID}$)%beg) then
+                            ! if the boundary exited "left", wrap it back around to the "right"
+                            patch_ib(patch_id)%${X}$_centroid = patch_ib(patch_id)%${X}$_centroid + (glb_bounds(${ID}$)%end - glb_bounds(${ID}$)%beg)
+                        else if (patch_ib(patch_id)%${X}$_centroid > glb_bounds(${ID}$)%end) then
+                            ! if the boundary exited "right", wrap it back around to the "left"
+                            patch_ib(patch_id)%${X}$_centroid = patch_ib(patch_id)%${X}$_centroid - (glb_bounds(${ID}$)%end - glb_bounds(${ID}$)%beg)
+                        end if
                     end if
                 end if
             #:endfor
-
-            if (p /= 0) then
-                ! check for periodicity
-                if (bc_z%beg == BC_PERIODIC) then
-                    ! check if the boundary has left the domain, and then correct
-                    if (patch_ib(patch_id)%z_centroid < glb_bounds(3)%beg) then
-                        ! if the boundary exited "left", wrap it back around to the "right"
-                        patch_ib(patch_id)%z_centroid = patch_ib(patch_id)%z_centroid + (glb_bounds(3)%end - glb_bounds(3)%beg)
-                    else if (patch_ib(patch_id)%z_centroid > glb_bounds(3)%end) then
-                        ! if the boundary exited "right", wrap it back around to the "left"
-                        patch_ib(patch_id)%z_centroid = patch_ib(patch_id)%z_centroid - (glb_bounds(3)%end - glb_bounds(3)%beg)
-                    end if
-                end if
-            end if
         end do
 
     end subroutine s_wrap_periodic_ibs

@@ -1232,28 +1232,19 @@ contains
         integer, intent(out), optional :: zp_lower, zp_upper
 
         ! check domain wraps in x, y
-        #:for X in [('x'), ('y')]
-            ! check for periodicity
-            if (bc_${X}$%beg == BC_PERIODIC) then
-                ${X}$p_lower = -1
-                ${X}$p_upper = 1
-            else
-                !if it is not periodic, then both elements are 0
-                ${X}$p_lower = 0
-                ${X}$p_upper = 0
+        #:for X, ID in [('x', 1), ('y', 2), ('z', 3)]
+            if (num_dims >= ${ID}$) then 
+                ! check for periodicity
+                if (bc_${X}$%beg == BC_PERIODIC) then
+                    ${X}$p_lower = -1
+                    ${X}$p_upper = 1
+                else
+                    !if it is not periodic, then both elements are 0
+                    ${X}$p_lower = 0
+                    ${X}$p_upper = 0
+                end if
             end if
         #:endfor
-
-        ! z only if 3D
-        if (present(zp_lower) .and. p /= 0) then
-            if (bc_z%beg == BC_PERIODIC) then
-                zp_lower = -1
-                zp_upper = 1
-            else
-                zp_lower = 0
-                zp_upper = 0
-            end if
-        end if
 
     end subroutine s_get_periodicities
 
