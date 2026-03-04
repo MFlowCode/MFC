@@ -1059,6 +1059,8 @@ contains
         if (ib) MPI_IO_IB_DATA%var%sf => null()
 #endif
 
+        if (allocated(neighbor_ranks)) @:DEALLOCATE(neighbor_ranks)
+
     end subroutine s_finalize_global_parameters_module
 
 end module m_global_parameters

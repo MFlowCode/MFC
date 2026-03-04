@@ -14,7 +14,7 @@
     integer :: l, q, s ! Iterators for reading input files
     integer :: start, end ! Ints to keep track of position in file
 
-    character(len=100000) :: line ! String to store line in ile
+    character(len=100000) :: line ! String to store line in file
     character(len=25) :: value ! String to store value in line
     integer :: NJet ! Number of jets
 
@@ -34,9 +34,9 @@
             call s_mpi_abort("Error: njet.txt file specified for hcid=303 does not exist")
         end if
 
-        allocate (y_th_arr(0:NJet - 1))
-        allocate (z_th_arr(0:NJet - 1))
-        allocate (r_th_arr(0:NJet - 1))
+        @:ALLOCATE (y_th_arr(0:NJet - 1))
+        @:ALLOCATE (z_th_arr(0:NJet - 1))
+        @:ALLOCATE (r_th_arr(0:NJet - 1))
 
         inquire (file="jets.csv", exist=file_exist)
         if (file_exist) then
@@ -80,7 +80,7 @@
     end if
 
     if (patch_icpp(patch_id)%hcid == 304) then
-        allocate (ih(0:n_glb, 0:p_glb))
+        @:ALLOCATE(ih(0:n_glb, 0:p_glb))
 
         if (interface_file == '.') then
             call s_mpi_abort("Error: interface_file must be specified for hcid=304")
@@ -113,7 +113,7 @@
     end if
 
     if (patch_icpp(patch_id)%hcid == 305) then
-        allocate (ih(0:n_glb, 0:0))
+        @:ALLOCATE(ih(0:n_glb, 0:0))
         if (interface_file == '.') then
             call s_mpi_abort("Error: interface_file must be specified for hcid=305")
         else
@@ -301,3 +301,4 @@
     end select
 
 #:enddef
+

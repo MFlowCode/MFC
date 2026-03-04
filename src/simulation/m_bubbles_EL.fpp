@@ -73,11 +73,11 @@ module m_bubbles_EL
 
     $:GPU_DECLARE(create='[lag_num_ts]')
 
-    real(wp) :: Rmax_glb, Rmin_glb       !< Maximum and minimum bubbe size in the local domain
+    real(wp) :: Rmax_glb, Rmin_glb       !< Maximum and minimum bubble size in the local domain
     !< Projection of the lagrangian particles in the Eulerian framework
     type(scalar_field), dimension(:), allocatable :: q_beta
     type(scalar_field), dimension(:), allocatable :: kahan_comp !< Kahan compensation for q_beta accumulation
-    integer :: q_beta_idx                       !< Size of the q_beta vector field
+    integer :: q_beta_idx                                       !< Size of the q_beta vector field
 
     $:GPU_DECLARE(create='[Rmax_glb,Rmin_glb,q_beta,kahan_comp,q_beta_idx]')
 
@@ -618,9 +618,7 @@ contains
         !! @param q_prim_vf Primitive variables
         !! @param stage Current stage in the time-stepper algorithm
     subroutine s_compute_bubble_EL_dynamics(q_prim_vf, bc_type, stage)
-#ifdef MFC_OpenMP
-        !DIR$ OPTIMIZE (-O1)
-#endif
+
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         type(integer_field), dimension(1:num_dims, 1:2), intent(in) :: bc_type
         integer, intent(in) :: stage
@@ -955,9 +953,9 @@ contains
 
         call nvtxStartRange("BUBBLES-LAGRANGE-BETA-COMM")
         if (lag_params%cluster_type >= 4) then
-            call s_populate_beta_buffers(q_beta, bc_type, 3, kahan_comp)
+            call s_populate_beta_buffers(q_beta, bc_type, 3)
         else
-            call s_populate_beta_buffers(q_beta, bc_type, 2, kahan_comp)
+            call s_populate_beta_buffers(q_beta, bc_type, 2)
         end if
         call nvtxEndRange
 
@@ -1197,7 +1195,7 @@ contains
                         cellaux(3) = cell(3) + k - (mapCells + 1)
                         if (p == 0) cellaux(3) = 0
 
-                        !< Obtaining the cell volulme
+                        !< Obtaining the cell volume
                         if (p > 0) then
                             vol = dx(cellaux(1))*dy(cellaux(2))*dz(cellaux(3))
                         else
@@ -1818,7 +1816,7 @@ contains
         integer :: k
 
         character(LEN=path_len + 2*name_len) :: file_loc
-        logical file_exist
+        logical :: file_exist
         character(LEN=25) :: FMT
 
         write (file_loc, '(A,I0,A)') 'lag_bubble_evol_', proc_rank, '.dat'
@@ -1846,7 +1844,7 @@ contains
     impure subroutine s_open_lag_bubble_evol()
 
         character(LEN=path_len + 2*name_len) :: file_loc
-        logical file_exist
+        logical :: file_exist
         character(LEN=25) :: FMT
 
         write (file_loc, '(A,I0,A)') 'lag_bubble_evol_', proc_rank, '.dat'
@@ -1934,7 +1932,7 @@ contains
     end subroutine s_open_void_evol
 
     !>  Subroutine that writes some useful statistics related to the volume fraction
-            !!       of the particles (void fraction) in the computatioational domain
+            !!       of the particles (void fraction) in the computational domain
             !!       on each time step.
             !!  @param qtime Current time
     impure subroutine s_write_void_evol(qtime)
@@ -2290,6 +2288,9 @@ contains
         @:DEALLOCATE(gas_dmvdt)
         @:DEALLOCATE(mtn_dposdt)
         @:DEALLOCATE(mtn_dveldt)
+
+        @:DEALLOCATE(keep_bubble)
+        @:DEALLOCATE(wrap_bubble_loc, wrap_bubble_dir)
 
         ! Deallocate pressure gradient arrays and FD coefficients
         if (lag_params%vel_model > 0 .and. lag_params%pressure_force) then

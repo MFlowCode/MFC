@@ -410,8 +410,8 @@ contains
         !!      the sum, reduced amongst all of the local values.
     subroutine s_mpi_reduce_int_sum(var_loc, sum)
 
-        integer, intent(inout) :: var_loc
-        integer, intent(inout) :: sum
+        integer, intent(in) :: var_loc
+        integer, intent(out) :: sum
 
 #ifdef MFC_MPI
         integer :: ierr !< Generic flag used to identify and report MPI errors
@@ -1152,16 +1152,13 @@ contains
     subroutine s_mpi_reduce_beta_variables_buffers(q_comm, &
                                                    mpi_dir, &
                                                    pbc_loc, &
-                                                   nVar, &
-                                                   kcomp)
+                                                   nVar)
 
         type(scalar_field), dimension(1:), intent(inout) :: q_comm
-        type(scalar_field), dimension(1:), intent(inout) :: kcomp
         integer, intent(in) :: mpi_dir, pbc_loc, nVar
 
         integer :: i, j, k, l, r, q !< Generic loop iterators
         integer :: lb_size
-        real(wp) :: y_kahan, t_kahan
 
         integer :: buffer_counts(1:3), buffer_count
 
@@ -1343,7 +1340,7 @@ contains
         #:for mpi_dir in [1, 2, 3]
             if (mpi_dir == ${mpi_dir}$) then
                 #:if mpi_dir == 1
-                    $:GPU_PARALLEL_LOOP(collapse=4,private='[r,y_kahan,t_kahan]',copyin='[replace_buff]')
+                    $:GPU_PARALLEL_LOOP(collapse=4,private='[r]',copyin='[replace_buff]')
                     do l = comm_coords(3)%beg, comm_coords(3)%end
                         do k = comm_coords(2)%beg, comm_coords(2)%end
                             do j = -mapcells - 1, mapcells
@@ -1354,13 +1351,9 @@ contains
                                         (l - comm_coords(3)%beg)))
                                     if (replace_buff) then
                                         q_comm(beta_vars(i))%sf(j + unpack_offset, k, l) = real(buff_recv(r), kind=stp)
-                                        kcomp(beta_vars(i))%sf(j + unpack_offset, k, l) = 0._wp
                                     else
-                                        y_kahan = real(buff_recv(r), kind=wp) - kcomp(beta_vars(i))%sf(j + unpack_offset, k, l)
-                                        t_kahan = q_comm(beta_vars(i))%sf(j + unpack_offset, k, l) + y_kahan
-                                        kcomp(beta_vars(i))%sf(j + unpack_offset, k, l) = &
-                                            (t_kahan - q_comm(beta_vars(i))%sf(j + unpack_offset, k, l)) - y_kahan
-                                        q_comm(beta_vars(i))%sf(j + unpack_offset, k, l) = t_kahan
+                                        q_comm(beta_vars(i))%sf(j + unpack_offset, k, l) = &
+                                            q_comm(beta_vars(i))%sf(j + unpack_offset, k, l) + real(buff_recv(r), kind=stp)
                                     end if
                                 end do
                             end do
@@ -1368,7 +1361,7 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
                 #:elif mpi_dir == 2
-                    $:GPU_PARALLEL_LOOP(collapse=4,private='[r,y_kahan,t_kahan]',copyin='[replace_buff]')
+                    $:GPU_PARALLEL_LOOP(collapse=4,private='[r]',copyin='[replace_buff]')
                     do i = 1, v_size
                         do l = comm_coords(3)%beg, comm_coords(3)%end
                             do k = -mapcells - 1, mapcells
@@ -1379,13 +1372,9 @@ contains
                                         (l - comm_coords(3)%beg)))
                                     if (replace_buff) then
                                         q_comm(beta_vars(i))%sf(j, k + unpack_offset, l) = real(buff_recv(r), kind=stp)
-                                        kcomp(beta_vars(i))%sf(j, k + unpack_offset, l) = 0._wp
                                     else
-                                        y_kahan = real(buff_recv(r), kind=wp) - kcomp(beta_vars(i))%sf(j, k + unpack_offset, l)
-                                        t_kahan = q_comm(beta_vars(i))%sf(j, k + unpack_offset, l) + y_kahan
-                                        kcomp(beta_vars(i))%sf(j, k + unpack_offset, l) = &
-                                            (t_kahan - q_comm(beta_vars(i))%sf(j, k + unpack_offset, l)) - y_kahan
-                                        q_comm(beta_vars(i))%sf(j, k + unpack_offset, l) = t_kahan
+                                        q_comm(beta_vars(i))%sf(j, k + unpack_offset, l) = &
+                                            q_comm(beta_vars(i))%sf(j, k + unpack_offset, l) + real(buff_recv(r), kind=stp)
                                     end if
                                 end do
                             end do
@@ -1393,7 +1382,7 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
                 #:else
-                    $:GPU_PARALLEL_LOOP(collapse=4,private='[r,y_kahan,t_kahan]',copyin='[replace_buff]')
+                    $:GPU_PARALLEL_LOOP(collapse=4,private='[r]',copyin='[replace_buff]')
                     do i = 1, v_size
                         do l = -mapcells - 1, mapcells
                             do k = comm_coords(2)%beg, comm_coords(2)%end
@@ -1404,13 +1393,9 @@ contains
                                         (l + mapcells + 1)))
                                     if (replace_buff) then
                                         q_comm(beta_vars(i))%sf(j, k, l + unpack_offset) = real(buff_recv(r), kind=stp)
-                                        kcomp(beta_vars(i))%sf(j, k, l + unpack_offset) = 0._wp
                                     else
-                                        y_kahan = real(buff_recv(r), kind=wp) - kcomp(beta_vars(i))%sf(j, k, l + unpack_offset)
-                                        t_kahan = q_comm(beta_vars(i))%sf(j, k, l + unpack_offset) + y_kahan
-                                        kcomp(beta_vars(i))%sf(j, k, l + unpack_offset) = &
-                                            (t_kahan - q_comm(beta_vars(i))%sf(j, k, l + unpack_offset)) - y_kahan
-                                        q_comm(beta_vars(i))%sf(j, k, l + unpack_offset) = t_kahan
+                                        q_comm(beta_vars(i))%sf(j, k, l + unpack_offset) = &
+                                            q_comm(beta_vars(i))%sf(j, k, l + unpack_offset) + real(buff_recv(r), kind=stp)
                                     end if
                                 end do
                             end do

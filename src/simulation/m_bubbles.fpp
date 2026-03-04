@@ -657,10 +657,10 @@ contains
         $:GPU_ROUTINE(function_name='s_initial_substep_h',parallelism='[seq]', &
             & cray_inline=True)
 
-        real(wp), intent(IN) :: fRho, fP, fR, fV, fR0, fpb, fpbdot, alf
-        real(wp), intent(IN) :: fntait, fBtait, f_bub_adv_src, f_divu
-        real(wp), intent(IN) :: fCson
-        real(wp), intent(OUT) :: h
+        real(wp), intent(in) :: fRho, fP, fR, fV, fR0, fpb, fpbdot, alf
+        real(wp), intent(in) :: fntait, fBtait, f_bub_adv_src, f_divu
+        real(wp), intent(in) :: fCson
+        real(wp), intent(out) :: h
 
         real(wp), dimension(2) :: h_size !< Time step size (h0, h1)
         real(wp), dimension(3) :: d_norms !< norms (d_0, d_1, d_2)
@@ -741,12 +741,12 @@ contains
         $:GPU_ROUTINE(function_name='s_advance_substep',parallelism='[seq]', &
             & cray_inline=True)
 
-        real(wp), intent(OUT) :: err
-        real(wp), intent(IN) :: fRho, fP, fR, fV, fR0, fpb, fpbdot, alf
-        real(wp), intent(IN) :: fntait, fBtait, f_bub_adv_src, f_divu, h
-        integer, intent(IN) :: bub_id
-        real(wp), intent(IN) :: fmass_v, fmass_g, fbeta_c, fbeta_t, fCson
-        real(wp), dimension(4), intent(OUT) :: myR_tmp, myV_tmp, myPb_tmp, myMv_tmp
+        real(wp), intent(out) :: err
+        real(wp), intent(in) :: fRho, fP, fR, fV, fR0, fpb, fpbdot, alf
+        real(wp), intent(in) :: fntait, fBtait, f_bub_adv_src, f_divu, h
+        integer, intent(in) :: bub_id
+        real(wp), intent(in) :: fmass_v, fmass_g, fbeta_c, fbeta_t, fCson
+        real(wp), dimension(4), intent(out) :: myR_tmp, myV_tmp, myPb_tmp, myMv_tmp
 
         real(wp), dimension(4) :: myA_tmp, mydPbdt_tmp, mydMvdt_tmp
         real(wp) :: err_R, err_V
@@ -851,10 +851,10 @@ contains
     subroutine s_advance_EL(fR_tmp, fV_tmp, fPb_tmp, fMv_tmp, bub_id, &
                             fmass_g, fbeta_c, fbeta_t, fdPbdt_tmp, advance_EL)
         $:GPU_ROUTINE(parallelism='[seq]')
-        real(wp), intent(IN) :: fR_tmp, fV_tmp, fPb_tmp, fMv_tmp
-        real(wp), intent(IN) :: fmass_g, fbeta_c, fbeta_t
-        integer, intent(IN) :: bub_id
-        real(wp), intent(INOUT) :: fdPbdt_tmp
+        real(wp), intent(in) :: fR_tmp, fV_tmp, fPb_tmp, fMv_tmp
+        real(wp), intent(in) :: fmass_g, fbeta_c, fbeta_t
+        integer, intent(in) :: bub_id
+        real(wp), intent(inout) :: fdPbdt_tmp
         real(wp), intent(out) :: advance_EL
         real(wp) :: fVapFlux, myR_m, mygamma_m
 

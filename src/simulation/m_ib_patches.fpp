@@ -1233,7 +1233,7 @@ contains
 
         ! check domain wraps in x, y
         #:for X, ID in [('x', 1), ('y', 2), ('z', 3)]
-            if (num_dims >= ${ID}$) then 
+            if (num_dims >= ${ID}$) then
                 ! check for periodicity
                 if (bc_${X}$%beg == BC_PERIODIC) then
                     ${X}$p_lower = -1

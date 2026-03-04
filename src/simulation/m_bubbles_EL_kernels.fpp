@@ -661,9 +661,9 @@ contains
             end if
 
             L(1) = ((pos - xi(2))*(pos - xi(3))*(pos - xi(4))*(pos - xi(5)))/ &
-                   ((xi(1) - xi(2))*(xi(1) - xi(3))*(xi(1) - xi(3))*(xi(2) - xi(5)))
+                   ((xi(1) - xi(2))*(xi(1) - xi(3))*(xi(1) - xi(4))*(xi(2) - xi(5)))
             L(2) = ((pos - xi(1))*(pos - xi(3))*(pos - xi(4))*(pos - xi(5)))/ &
-                   ((xi(2) - xi(1))*(xi(2) - xi(3))*(xi(2) - xi(3))*(xi(2) - xi(5)))
+                   ((xi(2) - xi(1))*(xi(2) - xi(3))*(xi(2) - xi(4))*(xi(2) - xi(5)))
             L(3) = ((pos - xi(1))*(pos - xi(2))*(pos - xi(4))*(pos - xi(5)))/ &
                    ((xi(3) - xi(1))*(xi(3) - xi(2))*(xi(3) - xi(4))*(xi(3) - xi(5)))
             L(4) = ((pos - xi(1))*(pos - xi(2))*(pos - xi(3))*(pos - xi(4)))/ &
