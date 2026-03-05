@@ -29,7 +29,7 @@ module m_collisions
 
     implicit none
 
-    private; public :: s_apply_collision_forces, s_initialize_collisions_module;
+    private; public :: s_apply_collision_forces, s_initialize_collisions_module, s_finalize_collisions_module;
 
     ! overlap distances for computing collisions
     integer, allocatable, dimension(:,:) :: collision_lookup
@@ -49,7 +49,7 @@ contains
         spring_stiffness = 1._wp / ( collision_time**2 * (pi**2 + log(e)**2) )
 
         @:ALLOCATE(collision_lookup(num_ibs * (num_ibs-1) / 2, 2))
-        @:ALLOCATE(wall_overlap_distances(num_ibs, (num_dims*2)))
+        @:ALLOCATE(wall_overlap_distances(num_ibs, 6))
 
     end subroutine s_initialize_collisions_module
 
@@ -134,7 +134,7 @@ contains
 
                     ! apoply equal and opposite force/torque to second sphere
                     forces(pid2, 1:3) = forces(pid2, 1:3) - normal_force - tangental_force
-                    torques(pid1, 1:3) = torques(pid1, 1:3) - torque   
+                    torques(pid2, 1:3) = torques(pid2, 1:3) - torque
                 end if
             end if
         end do
@@ -144,7 +144,7 @@ contains
     !> @brief applyies collision forces to IBs assuming a soft-sphere collision model (all IBs are circles or spheres)
     subroutine s_apply_wall_collision_forces_soft_sphere(wall_overlap_distances, forces, torques)
 
-        real(wp), dimension(num_ibs, (num_dims*2)), intent(in) :: wall_overlap_distances
+        real(wp), dimension(num_ibs, 6), intent(in) :: wall_overlap_distances
         real(wp), dimension(num_ibs, 3), intent(inout) :: forces, torques
 
         integer :: patch_id, i
@@ -364,5 +364,12 @@ contains
       #:endif
 
     end function f_local_rank_owns_collision
+
+    subroutine s_finalize_collisions_module()
+
+        @:DEALLOCATE(collision_lookup)
+        @:DEALLOCATE(wall_overlap_distances)
+
+    end subroutine s_finalize_collisions_module
 
 end module m_collisions

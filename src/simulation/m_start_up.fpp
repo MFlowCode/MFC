@@ -1315,6 +1315,7 @@ contains
 
         if (surface_tension) call s_finalize_surface_tension_module()
         if (bodyForces) call s_finalize_body_forces_module()
+        if (ib) call s_finalize_ibm_module()
 
         ! Terminating MPI execution environment
         call s_mpi_finalize()

@@ -1154,6 +1154,8 @@ contains
             @:DEALLOCATE(airfoil_grid_l)
         end if
 
+        if (collision_model > 0) call s_finalize_collisions_module()
+
     end subroutine s_finalize_ibm_module
 
     !> Computes the center of mass for IB patch types where we are unable to determine their center of mass analytically.
