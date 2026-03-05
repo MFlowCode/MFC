@@ -44,17 +44,10 @@ else
 fi
 
 # Select SBATCH params based on job type
-if [ "$job_type" = "bench" ]; then
-    sbatch_account="#SBATCH -A ENG160"
-    sbatch_time="#SBATCH -t 05:59:00"
-    sbatch_partition="#SBATCH -p extended"
-    sbatch_extra=""
-else
-    sbatch_account="#SBATCH -A CFD154"
-    sbatch_time="#SBATCH -t 01:59:00"
-    sbatch_partition="#SBATCH -p batch"
-    sbatch_extra="#SBATCH --qos=normal"
-fi
+sbatch_account="#SBATCH -A CFD154"
+sbatch_time="#SBATCH -t 01:59:00"
+sbatch_partition="#SBATCH -p batch"
+sbatch_extra="#SBATCH --qos=normal"
 
 shard_suffix=""
 if [ -n "$4" ]; then

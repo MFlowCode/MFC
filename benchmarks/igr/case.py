@@ -63,8 +63,8 @@ print(
             "cyl_coord": "F",
             "dt": dt,
             "t_step_start": 0,
-            "t_step_stop": ARGS["steps"] if ARGS["steps"] is not None else int(7 * (5 * size + 5)),
-            "t_step_save": ARGS["steps"] if ARGS["steps"] is not None else int(7 * (5 * size + 5)),
+            "t_step_stop": ARGS["steps"] if ARGS["steps"] is not None else int(2 * (5 * size + 5)),
+            "t_step_save": ARGS["steps"] if ARGS["steps"] is not None else int(2 * (5 * size + 5)),
             # Simulation Algorithm Parameters
             "num_patches": 1,
             "model_eqns": 2,
