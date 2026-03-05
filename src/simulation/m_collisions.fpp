@@ -133,7 +133,6 @@ contains
                     tangental_force = -ib_coefficient_of_friction * norm2(normal_force) * tangental_vector
                     call s_cross_product(normal_vector * patch_ib(pid1)%radius, tangental_force, torque)
 
-                    print *, "Applied: ", normal_force(1), k, eta, spring_stiffness, damping_parameter
                     do l = 1, num_dims
                         ! update the first IB
                         $:GPU_ATOMIC(atomic='update')
@@ -323,7 +322,6 @@ contains
             if (bc_y%beg == BC_SLIP_WALL .or. bc_y%beg == BC_NO_SLIP_WALL) then
                 edge_location = y_cc(j) - abs(gps(gp_idx)%levelset * gps(gp_idx)%levelset_norm(2))
                 if (edge_location < y_domain%beg) then
-                    print *, "Wall Collision"
                     overlap_distance = y_domain%beg - edge_location
                     overlap_distances(patch_id, 3) = max(overlap_distances(patch_id, 3), overlap_distance)
                 end if
