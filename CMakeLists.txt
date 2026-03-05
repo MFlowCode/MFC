@@ -397,6 +397,7 @@ HANDLE_SOURCES(simulation ON)
 HANDLE_SOURCES(post_process ON)
 HANDLE_SOURCES(syscheck OFF)
 
+
 # MFC_SETUP_TARGET: Given a target (herein <target>), this macro creates a new
 # executable <target> with the appropriate sources, compiler definitions, and
 # linked libraries (assuming HANDLE_SOURCES was called on <target>).
@@ -633,6 +634,19 @@ if (MFC_SIMULATION)
     MFC_SETUP_TARGET(TARGET  simulation
                      SOURCES "${simulation_SRCs}"
                      MPI FFTW OpenACC OpenMP)
+    # CCE 19.0.0 IPA workaround: two files trigger IPA crashes:
+    #   m_bubbles_EL: castIsValid assertion (InstCombine/foldIntegerTypedPHI)
+    #   m_phase_change: bring_routine_resident SIGSEGV
+    # Disabling IPA per-file avoids the crashes while preserving IPA for
+    # the rest of simulation (needed for thermochem INLINEALWAYS inlining).
+    # See PR #1286.
+    if (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray" AND MFC_OpenACC)
+        set_source_files_properties(
+            "${CMAKE_BINARY_DIR}/fypp/simulation/m_bubbles_EL.fpp.f90"
+            "${CMAKE_BINARY_DIR}/fypp/simulation/m_phase_change.fpp.f90"
+            PROPERTIES COMPILE_FLAGS "-Oipa0"
+        )
+    endif()
 endif()
 
 if (MFC_POST_PROCESS)

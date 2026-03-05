@@ -63,7 +63,11 @@ contains
 
         integer :: x, y, z, eqn
         real(wp) :: energy, T_in
-        real(wp), dimension(num_species) :: Ys
+        #:if USING_CCE
+            real(wp), dimension(10) :: Ys
+        #:else
+            real(wp), dimension(num_species) :: Ys
+        #:endif
 
         do z = bounds(3)%beg, bounds(3)%end
             do y = bounds(2)%beg, bounds(2)%end
@@ -101,7 +105,11 @@ contains
         type(int_bounds_info), dimension(1:3), intent(in) :: bounds
 
         integer :: x, y, z, i
-        real(wp), dimension(num_species) :: Ys
+        #:if USING_CCE
+            real(wp), dimension(10) :: Ys
+        #:else
+            real(wp), dimension(num_species) :: Ys
+        #:endif
         real(wp) :: mix_mol_weight
 
         do z = bounds(3)%beg, bounds(3)%end
@@ -131,7 +139,7 @@ contains
         integer :: eqn
         real(wp) :: T
         real(wp) :: rho, omega_m
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        #:if (not MFC_CASE_OPTIMIZATION and USING_AMD) or USING_CCE
             real(wp), dimension(10) :: Ys
             real(wp), dimension(10) :: omega
         #:else
@@ -180,7 +188,7 @@ contains
         type(int_bounds_info), intent(in) :: irx, iry, irz
 
         integer, intent(in) :: idir
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+        #:if (not MFC_CASE_OPTIMIZATION and USING_AMD) or USING_CCE
             real(wp), dimension(10) :: Xs_L, Xs_R, Xs_cell, Ys_L, Ys_R, Ys_cell
             real(wp), dimension(10) :: mass_diffusivities_mixavg1, mass_diffusivities_mixavg2
             real(wp), dimension(10) :: mass_diffusivities_mixavg_Cell, dXk_dxi, h_l, h_r, h_k
