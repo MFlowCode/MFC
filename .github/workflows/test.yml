@@ -123,13 +123,13 @@ jobs:
           sudo add-apt-repository "deb https://apt.repos.intel.com/oneapi all main"
           sudo apt-get update
           sudo apt-get install -y intel-oneapi-compiler-fortran intel-oneapi-mpi intel-oneapi-mpi-devel
+          # Export only new/changed env vars from setvars.sh.
+          # `printenv >> $GITHUB_ENV` dumps all vars including shell internals
+          # with special characters that corrupt GITHUB_ENV parsing.
+          printenv | sort > /tmp/env_before
           source /opt/intel/oneapi/setvars.sh
-          printenv >> $GITHUB_ENV
-
-      - name: Set up Python 3.14
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.14'
+          printenv | sort > /tmp/env_after
+          diff /tmp/env_before /tmp/env_after | grep '^>' | sed 's/^> //' >> $GITHUB_ENV
 
       - name: Get system info for cache key
         id: sys-info
