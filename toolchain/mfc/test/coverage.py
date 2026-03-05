@@ -165,6 +165,8 @@ def _parse_gcov_json_output(raw_bytes: bytes, root_dir: str) -> set:
         try:
             text = raw_bytes.decode("utf-8", errors="replace")
         except (UnicodeDecodeError, ValueError):
+            cons.print("[yellow]Warning: gcov output is not valid UTF-8 or gzip — "
+                       "no coverage recorded for this test.[/yellow]")
             return set()
 
     result = set()
@@ -261,7 +263,8 @@ def _collect_single_test_coverage(  # pylint: disable=too-many-locals
         proc = subprocess.run(
             cmd, capture_output=True, cwd=root_dir, timeout=120, check=False
         )
-    except (subprocess.TimeoutExpired, subprocess.SubprocessError, OSError):
+    except (subprocess.TimeoutExpired, subprocess.SubprocessError, OSError) as exc:
+        cons.print(f"[yellow]Warning: gcov failed for {uuid}: {exc}[/yellow]")
         return uuid, []
     finally:
         for g in gcno_copies:
@@ -271,6 +274,8 @@ def _collect_single_test_coverage(  # pylint: disable=too-many-locals
                 pass
 
     if proc.returncode != 0 or not proc.stdout:
+        if proc.returncode != 0:
+            cons.print(f"[yellow]Warning: gcov exited {proc.returncode} for {uuid}[/yellow]")
         return uuid, []
 
     coverage = _parse_gcov_json_output(proc.stdout, root_dir)
@@ -337,7 +342,7 @@ def _run_single_test_direct(test_info: dict, gcda_dir: str, strip: str) -> tuple
                 failures.append((target_name, result.returncode, tail))
         except subprocess.TimeoutExpired:
             failures.append((target_name, "timeout", ""))
-        except Exception as exc:
+        except (subprocess.SubprocessError, OSError) as exc:
             failures.append((target_name, str(exc), ""))
 
     return uuid, test_gcda, failures
@@ -385,7 +390,7 @@ def _prepare_test(case, root_dir: str) -> dict:  # pylint: disable=unused-argume
 
     # Heavy 3D tests: remove vorticity output (omega_wrt + fd_order) for
     # 3D QBMM tests.  Normal test execution never runs post_process (only
-    # PRE_PROCESS + SIMULATION; see test.py line ~469), so post_process on
+    # PRE_PROCESS + SIMULATION, never POST_PROCESS), so post_process on
     # heavy 3D configs is untested.  Vorticity FD computation on large grids
     # with many QBMM variables causes post_process to crash (exit code 2).
     if (int(case.params.get('p', 0)) > 0 and
@@ -397,7 +402,7 @@ def _prepare_test(case, root_dir: str) -> dict:  # pylint: disable=unused-argume
     input_file = case.to_input_file()
 
     # Write .inp files directly (no subprocess, no Mako templates).
-    # Suppress console output from get_inp() to avoid 555×4 messages.
+    # Suppress console output from get_inp() to avoid one message per (test, target) pair.
     targets = [SYSCHECK, PRE_PROCESS, SIMULATION, POST_PROCESS]
     binaries = []
     # NOTE: not thread-safe — Phase 1 must remain single-threaded.
@@ -434,8 +439,9 @@ def build_coverage_cache(  # pylint: disable=too-many-locals,too-many-statements
     directly (no ``./mfc.sh run``, no shell scripts).  Each test's GCOV_PREFIX
     points to an isolated directory so .gcda files don't collide.
 
-    Phase 3 — For each test, copy its .gcda tree into the real build directory,
-    run gcov to collect which .fpp files had coverage, then remove the .gcda files.
+    Phase 3 — For each test, temporarily copy .gcno files from the real build tree
+    into the test's isolated .gcda directory, run gcov to collect which .fpp files
+    had coverage, then remove the .gcno copies.
 
     Requires a prior ``--gcov`` build: ``./mfc.sh build --gcov -j 8``
     """
@@ -455,11 +461,14 @@ def build_coverage_cache(  # pylint: disable=too-many-locals,too-many-statements
     cons.print(f"[dim]GCOV_PREFIX_STRIP={strip}[/dim]")
     cons.print()
 
-    # Phase 1: Prepare all tests (single-threaded, ~30s for 555 tests).
+    # Phase 1: Prepare all tests (single-threaded; scales linearly with test count).
     cons.print("[bold]Phase 1/3: Preparing tests...[/bold]")
     test_infos = []
     for i, case in enumerate(cases):
-        test_infos.append(_prepare_test(case, root_dir))
+        try:
+            test_infos.append(_prepare_test(case, root_dir))
+        except Exception as exc:  # pylint: disable=broad-except
+            cons.print(f"  [yellow]Warning: skipping {case.get_uuid()} — prep failed: {exc}[/yellow]")
         if (i + 1) % 100 == 0 or (i + 1) == len(cases):
             cons.print(f"  [{i+1:3d}/{len(cases):3d}] prepared")
     cons.print()
@@ -476,7 +485,12 @@ def build_coverage_cache(  # pylint: disable=too-many-locals,too-many-statements
                 for info in test_infos
             }
             for i, future in enumerate(as_completed(futures)):
-                uuid, test_gcda, failures = future.result()
+                try:
+                    uuid, test_gcda, failures = future.result()
+                except Exception as exc:  # pylint: disable=broad-except
+                    info = futures[future]
+                    cons.print(f"  [yellow]Warning: {info['uuid']} failed to run: {exc}[/yellow]")
+                    continue
                 test_results[uuid] = test_gcda
                 if failures:
                     all_failures[uuid] = failures
@@ -491,7 +505,7 @@ def build_coverage_cache(  # pylint: disable=too-many-locals,too-many-statements
                 cons.print(f"  [yellow]{uuid}[/yellow]: {fail_str}")
                 for target_name, _rc, tail in fails:
                     if tail:
-                        cons.print(f"    {target_name} output (last 5 lines):")
+                        cons.print(f"    {target_name} output (last 15 lines):")
                         for line in tail.splitlines():
                             cons.print(f"      {line}")
 
@@ -551,7 +565,12 @@ def build_coverage_cache(  # pylint: disable=too-many-locals,too-many-statements
                    f"have coverage data. Cache may be incomplete.[/bold yellow]")
 
     cases_py_path = Path(root_dir) / "toolchain/mfc/test/cases.py"
-    cases_hash = hashlib.sha256(cases_py_path.read_bytes()).hexdigest()
+    try:
+        cases_hash = hashlib.sha256(cases_py_path.read_bytes()).hexdigest()
+    except OSError as exc:
+        raise MFCException(
+            f"Failed to read {cases_py_path} for cache metadata: {exc}"
+        ) from exc
     gcov_version = _get_gcov_version(gcov_bin)
 
     cache["_meta"] = {
@@ -560,8 +579,14 @@ def build_coverage_cache(  # pylint: disable=too-many-locals,too-many-statements
         "gcov_version": gcov_version,
     }
 
-    with gzip.open(COVERAGE_CACHE_PATH, "wt", encoding="utf-8") as f:
-        json.dump(cache, f, indent=2)
+    try:
+        with gzip.open(COVERAGE_CACHE_PATH, "wt", encoding="utf-8") as f:
+            json.dump(cache, f, indent=2)
+    except OSError as exc:
+        raise MFCException(
+            f"Failed to write coverage cache to {COVERAGE_CACHE_PATH}: {exc}\n"
+            "Check disk space and filesystem permissions."
+        ) from exc
 
     cons.print()
     cons.print(f"[bold green]Coverage cache written to {COVERAGE_CACHE_PATH}[/bold green]")
@@ -574,10 +599,19 @@ def _normalize_cache(cache: dict) -> dict:
     Old format: {uuid: {file: [lines], ...}, ...}
     New format: {uuid: [file, ...], ...}
     """
-    return {
-        k: (sorted(v.keys()) if k != "_meta" and isinstance(v, dict) else v)
-        for k, v in cache.items()
-    }
+    result = {}
+    for k, v in cache.items():
+        if k == "_meta":
+            result[k] = v
+        elif isinstance(v, dict):
+            result[k] = sorted(v.keys())
+        elif isinstance(v, list):
+            result[k] = v
+        else:
+            cons.print(f"[yellow]Warning: unexpected cache value type for {k}: "
+                       f"{type(v).__name__} — treating as empty.[/yellow]")
+            result[k] = []
+    return result
 
 
 def load_coverage_cache(root_dir: str) -> Optional[dict]:
@@ -595,6 +629,10 @@ def load_coverage_cache(root_dir: str) -> Optional[dict]:
             cache = json.load(f)
     except (OSError, gzip.BadGzipFile, json.JSONDecodeError, UnicodeDecodeError):
         cons.print("[yellow]Warning: Coverage cache is unreadable or corrupt.[/yellow]")
+        return None
+
+    if not isinstance(cache, dict):
+        cons.print("[yellow]Warning: Coverage cache has unexpected format.[/yellow]")
         return None
 
     cases_py = Path(root_dir) / "toolchain/mfc/test/cases.py"
@@ -678,9 +716,9 @@ def filter_tests_by_coverage(
 
     Conservative behavior:
     - Test not in cache (newly added) -> include it
-    - No changed .fpp files -> skip all tests (safe because should_run_all_tests()
-      is called first in the workflow, catching toolchain/infra changes via
-      ALWAYS_RUN_ALL before this function is ever reached)
+    - No changed .fpp files -> skip all tests (this branch is unreachable from
+      test.py, which handles the no-changed-fpp case before calling this function;
+      retained as a safe fallback for direct callers)
     - Test has incomplete coverage (no simulation files recorded but simulation
       files changed) -> include it (cache build likely failed for this test)
     """

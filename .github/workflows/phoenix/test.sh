@@ -13,7 +13,7 @@ RETRY_VALIDATE_CMD='syscheck_bin=$(find build/install -name syscheck -type f 2>/
     retry_build ./mfc.sh test -v --dry-run -j 8 $build_opts || exit 1
 
 # Use up to 64 parallel test threads on CPU (GNR nodes have 192 cores).
-# Cap at 64 to avoid overwhelming MPI's ORTE daemons with concurrent launches.
+# Cap at 64 to avoid overwhelming OpenMPI daemons and OS process limits with concurrent launches.
 n_test_threads=$(( SLURM_CPUS_ON_NODE > 64 ? 64 : ${SLURM_CPUS_ON_NODE:-8} ))
 
 if [ "$job_device" = "gpu" ]; then

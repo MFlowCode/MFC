@@ -2,7 +2,7 @@
 set -e
 
 # Number of parallel jobs: use SLURM allocation or default to 24.
-# Cap at 64 to avoid overwhelming MPI's ORTE daemons with concurrent launches.
+# Cap at 64 to avoid overwhelming OpenMPI daemons and OS process limits with concurrent launches.
 NJOBS="${SLURM_CPUS_ON_NODE:-24}"
 if [ "$NJOBS" -gt 64 ]; then NJOBS=64; fi
 

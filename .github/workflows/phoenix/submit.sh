@@ -32,14 +32,14 @@ sbatch_cpu_opts="\
 if [ "$job_type" = "bench" ]; then
     sbatch_gpu_opts="\
 #SBATCH -CL40S
-#SBATCH --ntasks-per-node=4       # Number of cores per node required
+#SBATCH --ntasks-per-node=4       # Number of MPI tasks per node required
 #SBATCH -G2\
 "
     sbatch_time="#SBATCH -t 04:00:00"
 else
     sbatch_gpu_opts="\
 #SBATCH -p gpu-v100,gpu-a100,gpu-h100,gpu-l40s
-#SBATCH --ntasks-per-node=4       # Number of cores per node required
+#SBATCH --ntasks-per-node=4       # Number of MPI tasks per node required
 #SBATCH -G2\
 "
     sbatch_time="#SBATCH -t 03:00:00"
