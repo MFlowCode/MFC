@@ -108,6 +108,8 @@ class MFCInputFile(Case):
         # CCE 19.0.0 workaround: pyrometheus generates !DIR$ INLINEALWAYS for Cray+ACC
         # but omits !$acc routine seq, so thermochem routines are not registered as
         # OpenACC device routines. Replace with plain !$acc routine seq (no INLINEALWAYS).
+        # This patch can be removed once pyrometheus upstream correctly emits !$acc routine seq
+        # for Cray+OpenACC (the broken macro originates in pyrometheus's code generator).
         if directive_str == 'acc':
             old_macro = (
                 "#ifdef _CRAYFTN\n#define GPU_ROUTINE(name) !DIR$ INLINEALWAYS name\n"
