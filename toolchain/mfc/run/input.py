@@ -116,11 +116,14 @@ class MFCInputFile(Case):
             new_macro = "#define GPU_ROUTINE(name) !$acc routine seq"
             patched = thermochem_code.replace(old_macro, new_macro)
             if patched == thermochem_code:
-                raise common.MFCException(
-                    "CCE 19.0.0 workaround: pyrometheus output format changed — "
-                    "Cray+ACC GPU_ROUTINE macro patch did not apply. "
-                    "Update the pattern in toolchain/mfc/run/input.py."
-                )
+                if new_macro in thermochem_code:
+                    pass  # pyrometheus already emits the correct form; no patch needed
+                else:
+                    raise common.MFCException(
+                        "CCE 19.0.0 workaround: pyrometheus output format changed — "
+                        "Cray+ACC GPU_ROUTINE macro patch did not apply. "
+                        "Update the pattern in toolchain/mfc/run/input.py."
+                    )
             thermochem_code = patched
 
         common.file_write(

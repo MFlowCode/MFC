@@ -69,6 +69,10 @@ contains
             real(wp), dimension(num_species) :: Ys
         #:endif
 
+        #:if USING_CCE
+            @:PROHIBIT(num_species > 10, "CCE 19.0.0 workaround: num_species must be <= 10 (fixed-size arrays in m_chemistry.fpp)")
+        #:endif
+
         do z = bounds(3)%beg, bounds(3)%end
             do y = bounds(2)%beg, bounds(2)%end
                 do x = bounds(1)%beg, bounds(1)%end
@@ -112,6 +116,10 @@ contains
         #:endif
         real(wp) :: mix_mol_weight
 
+        #:if USING_CCE
+            @:PROHIBIT(num_species > 10, "CCE 19.0.0 workaround: num_species must be <= 10 (fixed-size arrays in m_chemistry.fpp)")
+        #:endif
+
         do z = bounds(3)%beg, bounds(3)%end
             do y = bounds(2)%beg, bounds(2)%end
                 do x = bounds(1)%beg, bounds(1)%end
@@ -145,6 +153,10 @@ contains
         #:else
             real(wp), dimension(num_species) :: Ys
             real(wp), dimension(num_species) :: omega
+        #:endif
+
+        #:if USING_CCE
+            @:PROHIBIT(num_species > 10, "CCE 19.0.0 workaround: num_species must be <= 10 (fixed-size arrays in m_chemistry.fpp)")
         #:endif
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[Ys, omega, eqn, T, rho, omega_m]', copyin='[bounds]')
@@ -209,6 +221,10 @@ contains
 
         integer :: x, y, z, i, n, eqn
         integer, dimension(3) :: offsets
+
+        #:if USING_CCE
+            @:PROHIBIT(num_species > 10, "CCE 19.0.0 workaround: num_species must be <= 10 (fixed-size arrays in m_chemistry.fpp)")
+        #:endif
 
         isc1 = irx; isc2 = iry; isc3 = irz
 
