@@ -90,9 +90,18 @@ class MFCInputFile(Case):
             directive_str = None
 
         # Write the generated Fortran code to the m_thermochem.f90 file with the chosen precision
+        sol = self.get_cantera_solution()
+
+        # CCE 19.0.0 workaround: m_chemistry.fpp uses dimension(10) for local species arrays
+        # on Cray builds to avoid an InstCombine ICE. Warn if the mechanism exceeds this limit.
+        if sol.n_species > 10:
+            cons.print(f"[bold yellow]Warning:[/bold yellow] cantera mechanism has {sol.n_species} species > 10. "
+                       "Cray Fortran (CCE) builds use a hardcoded dimension(10) workaround in "
+                       "m_chemistry.fpp and will overflow on CCE. See PR #1286.")
+
         thermochem_code = pyro.FortranCodeGenerator().generate(
             "m_thermochem",
-            self.get_cantera_solution(),
+            sol,
             pyro.CodeGenerationOptions(scalar_type = real_type, directive_offload = directive_str)
         )
 
@@ -100,11 +109,19 @@ class MFCInputFile(Case):
         # but omits !$acc routine seq, so thermochem routines are not registered as
         # OpenACC device routines. Replace with plain !$acc routine seq (no INLINEALWAYS).
         if directive_str == 'acc':
-            thermochem_code = thermochem_code.replace(
+            old_macro = (
                 "#ifdef _CRAYFTN\n#define GPU_ROUTINE(name) !DIR$ INLINEALWAYS name\n"
-                "#else\n#define GPU_ROUTINE(name) !$acc routine seq\n#endif",
-                "#define GPU_ROUTINE(name) !$acc routine seq"
+                "#else\n#define GPU_ROUTINE(name) !$acc routine seq\n#endif"
             )
+            new_macro = "#define GPU_ROUTINE(name) !$acc routine seq"
+            patched = thermochem_code.replace(old_macro, new_macro)
+            if patched == thermochem_code:
+                raise common.MFCException(
+                    "CCE 19.0.0 workaround: pyrometheus output format changed — "
+                    "Cray+ACC GPU_ROUTINE macro patch did not apply. "
+                    "Update the pattern in toolchain/mfc/run/input.py."
+                )
+            thermochem_code = patched
 
         common.file_write(
             os.path.join(modules_dir, "m_thermochem.f90"),

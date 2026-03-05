@@ -644,7 +644,7 @@ if (MFC_SIMULATION)
         set_source_files_properties(
             "${CMAKE_BINARY_DIR}/fypp/simulation/m_bubbles_EL.fpp.f90"
             "${CMAKE_BINARY_DIR}/fypp/simulation/m_phase_change.fpp.f90"
-            PROPERTIES COMPILE_FLAGS "-Oipa0"
+            PROPERTIES COMPILE_OPTIONS "-Oipa0"
         )
     endif()
 endif()
