@@ -68,6 +68,8 @@
 #else
         $:cray_noinline_directive
 #endif
+## On non-Cray CPU builds (no _CRAYFTN, no MFC_OpenACC, no MFC_OpenMP), nothing is
+## emitted — intentional, since !DIR$ NOINLINE is a Cray-specific directive.
 #elif MFC_OpenACC
         $:acc_directive
 #elif MFC_OpenMP

@@ -92,12 +92,19 @@ class MFCInputFile(Case):
         # Write the generated Fortran code to the m_thermochem.f90 file with the chosen precision
         sol = self.get_cantera_solution()
 
-        # CCE 19.0.0 workaround: m_chemistry.fpp uses dimension(10) for local species arrays
-        # on Cray builds to avoid an InstCombine ICE. Warn if the mechanism exceeds this limit.
-        if sol.n_species > 10:
-            cons.print(f"[bold yellow]Warning:[/bold yellow] cantera mechanism has {sol.n_species} species > 10. "
-                       "Cray Fortran (CCE) builds use a hardcoded dimension(10) workaround in "
-                       "m_chemistry.fpp and will overflow on CCE. See PR #1286.")
+        # CCE 19.0.0 workaround: m_chemistry.fpp uses dimension(CCE_MAX_SPECIES) for local
+        # species arrays on Cray builds to avoid an InstCombine ICE. Must match the Fypp
+        # constant CCE_MAX_SPECIES in src/common/m_chemistry.fpp.
+        CCE_MAX_SPECIES = 10
+        if sol.n_species > CCE_MAX_SPECIES:
+            msg = (f"Cantera mechanism has {sol.n_species} species > {CCE_MAX_SPECIES}. "
+                   f"Cray Fortran (CCE) builds use a hardcoded dimension({CCE_MAX_SPECIES}) "
+                   "workaround in m_chemistry.fpp and will abort at runtime on CCE. See PR #1286.")
+            if directive_str is not None:
+                # GPU builds: hard error — the Fortran PROHIBIT will abort anyway,
+                # so fail early at input generation rather than at the first chemistry call.
+                raise common.MFCException(msg)
+            cons.print(f"[bold yellow]Warning:[/bold yellow] {msg}")
 
         thermochem_code = pyro.FortranCodeGenerator().generate(
             "m_thermochem",
