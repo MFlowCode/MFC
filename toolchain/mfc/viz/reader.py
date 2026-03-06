@@ -16,6 +16,7 @@ import itertools
 import os
 import struct
 import warnings
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Dict, List, Optional, Tuple
@@ -465,7 +466,8 @@ def assemble(case_dir: str, step: int, fmt: str = 'binary',  # pylint: disable=t
     if not ranks:
         raise FileNotFoundError(f"No processor directories found in {case_dir}/binary/")
 
-    proc_data: List[Tuple[int, ProcessorData]] = []
+    # Validate all paths exist before spawning threads so errors are synchronous.
+    rank_paths: List[tuple] = []
     for rank in ranks:
         fpath = os.path.join(case_dir, 'binary', f'p{rank}', f'{step}.dat')
         if not os.path.isfile(fpath):
@@ -473,7 +475,17 @@ def assemble(case_dir: str, step: int, fmt: str = 'binary',  # pylint: disable=t
                 f"Processor file not found: {fpath}. "
                 "Incomplete output (missing rank) would produce incorrect data."
             )
-        pdata = read_binary_file(fpath, var_filter=var)
+        rank_paths.append((rank, fpath))
+
+    def _read_one(rank_fpath):
+        return rank_fpath[0], read_binary_file(rank_fpath[1], var_filter=var)
+
+    n_workers = min(len(rank_paths), 32)
+    with ThreadPoolExecutor(max_workers=n_workers) as pool:
+        results = list(pool.map(_read_one, rank_paths))
+
+    proc_data: List[Tuple[int, ProcessorData]] = []
+    for rank, pdata in results:
         if pdata.m == 0 and pdata.n == 0 and pdata.p == 0:
             warnings.warn(f"Processor p{rank} has zero dimensions, skipping", stacklevel=2)
             continue
