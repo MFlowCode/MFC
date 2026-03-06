@@ -160,6 +160,7 @@ contains
             R_v = bub_pp%R_v; R_g = bub_pp%R_g
             Tw = bub_pp%T0ref
         end if
+
         if (bubbles_lagrange) then
             cp_v = bub_pp%cp_v; cp_g = bub_pp%cp_g
             k_vl = bub_pp%k_v; k_gl = bub_pp%k_g

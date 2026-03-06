@@ -145,8 +145,10 @@ contains
             elliptic_smoothing, elliptic_smoothing_iters, &
             viscous, bubbles_lagrange, num_bc_patches, &
             patch_bc, Bx0, relativity, cont_damage, igr, igr_order, &
-            down_sample, recon_type, muscl_order, hyper_cleaning, &
-            simplex_perturb, simplex_params, fft_wrt
+            down_sample, recon_type, muscl_order, fft_wrt, &
+            fd_order, lag_params, simplex_perturb, simplex_params, &
+            interface_file, normFac, normMag, &
+            g0_ic, p0_ic, hyper_cleaning, hyper_cleaning
 
         ! Inquiring the status of the pre_process.inp file
         file_loc = 'pre_process.inp'

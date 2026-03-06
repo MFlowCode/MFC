@@ -68,8 +68,6 @@ module m_time_steppers
 
     real(wp), allocatable, dimension(:, :, :, :, :) :: rhs_mv
 
-    real(wp), allocatable, dimension(:, :, :) :: max_dt
-
     integer, private :: num_ts !<
     !! Number of time stages in the time-stepping scheme
 
@@ -77,7 +75,7 @@ module m_time_steppers
     real(wp), allocatable, dimension(:, :) :: rk_coef
     integer, private :: num_probe_ts
 
-    $:GPU_DECLARE(create='[q_cons_ts,q_prim_vf,q_T_sf,rhs_vf,q_prim_ts1,q_prim_ts2,rhs_mv,rhs_pb,max_dt,rk_coef,stor,bc_type]')
+    $:GPU_DECLARE(create='[q_cons_ts,q_prim_vf,q_T_sf,rhs_vf,q_prim_ts1,q_prim_ts2,rhs_mv,rhs_pb,rk_coef,stor,bc_type]')
 
 !> @cond
 #if defined(__NVCOMPILER_GPU_UNIFIED_MEM)
@@ -463,10 +461,6 @@ contains
             call s_open_run_time_information_file()
         end if
 
-        if (cfl_dt) then
-            @:ALLOCATE(max_dt(0:m, 0:n, 0:p))
-        end if
-
         ! Allocating arrays to store the bc types
         @:ALLOCATE(bc_type(1:num_dims,1:2))
 
@@ -560,7 +554,7 @@ contains
                 end if
             end if
 
-            if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(stage=s)
+            if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(q_prim_vf, bc_type, stage=s)
             $:GPU_PARALLEL_LOOP(collapse=4)
             do i = 1, sys_size
                 do l = 0, p
@@ -672,7 +666,7 @@ contains
             q_cons_ts(1)%vf, &
             q_T_sf, &
             q_prim_vf, &
-            idwint)
+            idwbuff)
 
         if (bubbles_euler) then
 
@@ -682,16 +676,15 @@ contains
         elseif (bubbles_lagrange) then
 
             call s_populate_variables_buffers(bc_type, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
-            call s_compute_bubble_EL_dynamics(q_prim_vf, stage)
-            call s_transfer_data_to_tmp()
-            call s_smear_voidfraction()
+            call s_compute_bubble_EL_dynamics(q_prim_vf, bc_type, stage)
+
             if (stage == 3) then
                 if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
                 if (lag_params%write_bubbles) then
                     $:GPU_UPDATE(host='[gas_p,gas_mv,intfc_rad,intfc_vel]')
-                    call s_write_lag_particles(mytime)
+                    call s_write_lag_bubble_evol(mytime)
                 end if
-                call s_write_void_evol(mytime)
+                if (lag_params%write_void_evol) call s_write_void_evol(mytime)
             end if
 
         end if
@@ -718,7 +711,7 @@ contains
         real(wp) :: H          !< Cell-avg. enthalpy
         real(wp), dimension(2) :: Re         !< Cell-avg. Reynolds numbers
         type(vector_field) :: gm_alpha_qp
-
+        real(wp) :: max_dt
         real(wp) :: dt_local
         integer :: j, k, l !< Generic loop iterators
 
@@ -730,7 +723,9 @@ contains
                 idwint)
         end if
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H, qv]')
+        dt_local = huge(1.0_wp)
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H, qv]', &
+            & reduction='[[dt_local]]', reductionOp='[min]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -744,14 +739,12 @@ contains
                     call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, H, alpha, vel_sum, 0._wp, c, qv)
 
                     call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, j, k, l)
+
+                    dt_local = min(dt_local, max_dt)
                 end do
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
-
-        #:call GPU_PARALLEL(copyout='[dt_local]', copyin='[max_dt]')
-            dt_local = minval(max_dt)
-        #:endcall GPU_PARALLEL
 
         if (num_procs == 1) then
             dt = dt_local

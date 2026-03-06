@@ -225,7 +225,7 @@ contains
             #:endfor
         end if
 
-        if (int_comp) then
+        if (int_comp .and. v_size >= advxe) then
             call s_interface_compression(vL_rs_vf_x, vL_rs_vf_y, vL_rs_vf_z, &
                                          vR_rs_vf_x, vR_rs_vf_y, vR_rs_vf_z, &
                                          muscl_dir, is1_muscl_d, is2_muscl_d, is3_muscl_d)

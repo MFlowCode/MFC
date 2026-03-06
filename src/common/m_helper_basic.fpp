@@ -114,10 +114,11 @@ contains
 
     subroutine s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, &
                                              igr_order, buff_size, idwint, idwbuff, &
-                                             viscous, bubbles_lagrange, m, n, p, num_dims, igr, ib)
+                                             viscous, bubbles_lagrange, m, n, p, num_dims, &
+                                             igr, ib, fd_number)
 
         integer, intent(in) :: recon_type, weno_polyn, muscl_polyn
-        integer, intent(in) :: m, n, p, num_dims, igr_order
+        integer, intent(in) :: m, n, p, num_dims, igr_order, fd_number
         integer, intent(inout) :: buff_size
         type(int_bounds_info), dimension(3), intent(inout) :: idwint, idwbuff
         logical, intent(in) :: viscous, bubbles_lagrange
@@ -142,7 +143,7 @@ contains
 
         ! Correction for smearing function in the lagrangian subgrid bubble model
         if (bubbles_lagrange) then
-            buff_size = max(buff_size, 6)
+            buff_size = max(buff_size + fd_number, mapCells + 1 + fd_number)
         end if
 
         if (ib) then
