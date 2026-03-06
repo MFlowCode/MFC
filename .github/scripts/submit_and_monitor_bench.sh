@@ -14,6 +14,8 @@ device="$2"
 interface="$3"
 cluster="$4"
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 echo "[$dir] Submitting benchmark for $device-$interface on $cluster..."
 cd "$dir"
 
