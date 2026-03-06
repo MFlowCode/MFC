@@ -1311,7 +1311,7 @@ contains
                                   particle_vel, particle_s, particle_pos, f_p, gSum, q_particles, kahan_comp, linked_list, particle_head)
 
             call nvtxStartRange("PARTICLES-LAGRANGE-BETA-COMM")
-            call s_populate_beta_buffers(q_particles, bc_type, q_particles_idx, kahan_comp)
+            call s_populate_beta_buffers(q_particles, bc_type, q_particles_idx)
             call nvtxEndRange
 
             !Store 1-q_particles(1)
@@ -2512,6 +2512,9 @@ contains
 
         @:DEALLOCATE(force_recv_ids)
         @:DEALLOCATE(force_recv_vals)
+
+        @:DEALLOCATE(keep_bubble)
+        @:DEALLOCATE(wrap_bubble_loc, wrap_bubble_dir)
 
         @:DEALLOCATE(linked_list)
         @:DEALLOCATE(particle_head)

@@ -1,12 +1,17 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 This file was created on 2025-11-02 20:46:10.985808.
 =======
 This file was created on 2026-02-27 18:06:26.641105.
 >>>>>>> devfork/MovingBubblesFresh
+=======
+This file was created on 2026-02-27 18:06:26.641105.
+>>>>>>> devfork/MovingBubblesFresh-clean
 
 mfc.sh:
 
     Invocation: test --generate -o F6A8B601 --no-build
+<<<<<<< HEAD
 <<<<<<< HEAD
     Lock:       mpi=Yes & gpu=Acc & debug=No & gcov=No & unified=No & single=No & fastmath=No
     Git:        4ce9176e70283dc42dd89f2165eadf42dd100142 on MovingBubblesFresh (dirty)
@@ -82,22 +87,32 @@ post_process:
     Lock:       mpi=Yes & gpu=Acc & debug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
     Git:        be93258999d6c58d6eaea313e04159ba612e54a2 on MovingBubblesFresh (dirty)
 >>>>>>> devfork/MovingBubblesFresh
+=======
+    Lock:       mpi=Yes & gpu=Acc & debug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
+    Git:        be93258999d6c58d6eaea313e04159ba612e54a2 on MovingBubblesFresh (dirty)
+>>>>>>> devfork/MovingBubblesFresh-clean
 
 syscheck:
 
     CMake Configuration:
     
 <<<<<<< HEAD
+<<<<<<< HEAD
         CMake v3.25.2 on wingtip-gpu3
     
         C       : NVHPC v23.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvc)
         Fortran : NVHPC v23.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvfortran)
 =======
+=======
+>>>>>>> devfork/MovingBubblesFresh-clean
         CMake v3.30.3 on wingtip-gpu3.cc.gatech.edu
     
         C       : NVHPC v25.11.0 (/fastscratch/bwilfong3/software/hpc_sdk_25_9/Linux_x86_64/25.11/compilers/bin/nvc)
         Fortran : NVHPC v25.11.0 (/fastscratch/bwilfong3/software/hpc_sdk_25_9/Linux_x86_64/25.11/compilers/bin/nvfortran)
+<<<<<<< HEAD
 >>>>>>> devfork/MovingBubblesFresh
+=======
+>>>>>>> devfork/MovingBubblesFresh-clean
     
         PRE_PROCESS   : OFF
         SIMULATION    : OFF
@@ -118,6 +133,7 @@ syscheck:
     Configuration Environment:
     
 <<<<<<< HEAD
+<<<<<<< HEAD
         CC       : /opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvc
         CXX      : /opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvc++
         FC       : /opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvfortran
@@ -126,6 +142,11 @@ syscheck:
         CXX      : /fastscratch/bwilfong3/software/hpc_sdk_25_9/Linux_x86_64/25.11/compilers/bin/nvc++
         FC       : /fastscratch/bwilfong3/software/hpc_sdk_25_9/Linux_x86_64/25.11/compilers/bin/nvfortran
 >>>>>>> devfork/MovingBubblesFresh
+=======
+        CC       : /fastscratch/bwilfong3/software/hpc_sdk_25_9/Linux_x86_64/25.11/compilers/bin/nvc
+        CXX      : /fastscratch/bwilfong3/software/hpc_sdk_25_9/Linux_x86_64/25.11/compilers/bin/nvc++
+        FC       : /fastscratch/bwilfong3/software/hpc_sdk_25_9/Linux_x86_64/25.11/compilers/bin/nvfortran
+>>>>>>> devfork/MovingBubblesFresh-clean
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -135,16 +156,22 @@ simulation:
     CMake Configuration:
     
 <<<<<<< HEAD
+<<<<<<< HEAD
         CMake v3.25.2 on wingtip-gpu3
     
         C       : NVHPC v23.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvc)
         Fortran : NVHPC v23.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvfortran)
 =======
+=======
+>>>>>>> devfork/MovingBubblesFresh-clean
         CMake v3.30.3 on wingtip-gpu3.cc.gatech.edu
     
         C       : NVHPC v25.11.0 (/fastscratch/bwilfong3/software/hpc_sdk_25_9/Linux_x86_64/25.11/compilers/bin/nvc)
         Fortran : NVHPC v25.11.0 (/fastscratch/bwilfong3/software/hpc_sdk_25_9/Linux_x86_64/25.11/compilers/bin/nvfortran)
+<<<<<<< HEAD
 >>>>>>> devfork/MovingBubblesFresh
+=======
+>>>>>>> devfork/MovingBubblesFresh-clean
     
         PRE_PROCESS   : OFF
         SIMULATION    : ON
@@ -165,10 +192,13 @@ simulation:
     Configuration Environment:
     
 <<<<<<< HEAD
+<<<<<<< HEAD
         CC       : /opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvc
         CXX      : /opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvc++
         FC       : /opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvfortran
 =======
+=======
+>>>>>>> devfork/MovingBubblesFresh-clean
         CC       : /fastscratch/bwilfong3/software/hpc_sdk_25_9/Linux_x86_64/25.11/compilers/bin/nvc
         CXX      : /fastscratch/bwilfong3/software/hpc_sdk_25_9/Linux_x86_64/25.11/compilers/bin/nvc++
         FC       : /fastscratch/bwilfong3/software/hpc_sdk_25_9/Linux_x86_64/25.11/compilers/bin/nvfortran
@@ -206,7 +236,10 @@ pre_process:
         CC       : /fastscratch/bwilfong3/software/hpc_sdk_25_9/Linux_x86_64/25.11/compilers/bin/nvc
         CXX      : /fastscratch/bwilfong3/software/hpc_sdk_25_9/Linux_x86_64/25.11/compilers/bin/nvc++
         FC       : /fastscratch/bwilfong3/software/hpc_sdk_25_9/Linux_x86_64/25.11/compilers/bin/nvfortran
+<<<<<<< HEAD
 >>>>>>> devfork/MovingBubblesFresh
+=======
+>>>>>>> devfork/MovingBubblesFresh-clean
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -215,6 +248,7 @@ CPU:
 
     CPU Info:
     From lscpu
+<<<<<<< HEAD
 <<<<<<< HEAD
     Architecture:                       x86_64
     CPU op-mode(s):                     32-bit, 64-bit
@@ -257,6 +291,8 @@ CPU:
     Vulnerability Tsx async abort:      Not affected
     Flags:                              fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc art arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc cpuid aperfmperf pni pclmulqdq dtes64 monitor ds_cpl vmx smx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid dca sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch cpuid_fault epb cat_l3 invpcid_single ssbd mba ibrs ibpb stibp ibrs_enhanced tpr_shadow vnmi flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid cqm rdt_a avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb intel_pt avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local wbnoinvd dtherm ida arat pln pts avx512vbmi umip pku ospke avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg tme avx512_vpopcntdq rdpid md_clear pconfig flush_l1d arch_capabilities
 =======
+=======
+>>>>>>> devfork/MovingBubblesFresh-clean
     Architecture:                         x86_64
     CPU op-mode(s):                       32-bit, 64-bit
     Address sizes:                        52 bits physical, 57 bits virtual
@@ -299,5 +335,8 @@ CPU:
     Vulnerability Srbds:                  Not affected
     Vulnerability Tsx async abort:        Not affected
     Vulnerability Vmscape:                Not affected
+<<<<<<< HEAD
 >>>>>>> devfork/MovingBubblesFresh
+=======
+>>>>>>> devfork/MovingBubblesFresh-clean
 

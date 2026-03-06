@@ -1544,6 +1544,10 @@ contains
         if (p == 0) return; 
         @:DEALLOCATE(z_cb, z_cc, dz)
 
+        if (allocated(neighbor_ranks)) then
+            @:DEALLOCATE(neighbor_ranks)
+        end if
+
     end subroutine s_finalize_global_parameters_module
 
 end module m_global_parameters

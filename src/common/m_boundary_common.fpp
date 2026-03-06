@@ -1202,27 +1202,26 @@ contains
 
     end subroutine s_qbmm_extrapolation
 
-    impure subroutine s_populate_beta_buffers(q_beta, bc_type, nvar, kcomp)
+    impure subroutine s_populate_beta_buffers(q_beta, bc_type, nvar)
 
         type(scalar_field), dimension(:), intent(inout) :: q_beta
         type(integer_field), dimension(1:num_dims, 1:2), intent(in) :: bc_type
         integer, intent(in) :: nvar
-        type(scalar_field), dimension(:), intent(inout) :: kcomp
 
         integer :: k, l
 
         !< x-direction
         if (bc_x%beg >= 0) then
-            call s_mpi_reduce_beta_variables_buffers(q_beta, 1, -1, nvar, kcomp)
+            call s_mpi_reduce_beta_variables_buffers(q_beta, 1, -1, nvar)
         else
             $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
             do l = beta_bc_bounds(3)%beg, beta_bc_bounds(3)%end
                 do k = beta_bc_bounds(2)%beg, beta_bc_bounds(2)%end
                     select case (bc_x%beg)
                     case (BC_PERIODIC)
-                        call s_beta_periodic(q_beta, 1, -1, k, l, nvar, kcomp)
+                        call s_beta_periodic(q_beta, 1, -1, k, l, nvar)
                     case (BC_REFLECTIVE)
-                        call s_beta_reflective(q_beta, 1, -1, k, l, nvar, kcomp)
+                        call s_beta_reflective(q_beta, 1, -1, k, l, nvar)
                     case default
                     end select
                 end do
@@ -1231,16 +1230,16 @@ contains
         end if
 
         if (bc_x%end >= 0) then
-            call s_mpi_reduce_beta_variables_buffers(q_beta, 1, 1, nvar, kcomp)
+            call s_mpi_reduce_beta_variables_buffers(q_beta, 1, 1, nvar)
         else
             $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
             do l = beta_bc_bounds(3)%beg, beta_bc_bounds(3)%end
                 do k = beta_bc_bounds(2)%beg, beta_bc_bounds(2)%end
                     select case (bc_x%end)
                     case (BC_PERIODIC)
-                        call s_beta_periodic(q_beta, 1, 1, k, l, nvar, kcomp)
+                        call s_beta_periodic(q_beta, 1, 1, k, l, nvar)
                     case (BC_REFLECTIVE)
-                        call s_beta_reflective(q_beta, 1, 1, k, l, nvar, kcomp)
+                        call s_beta_reflective(q_beta, 1, 1, k, l, nvar)
                     case default
                     end select
                 end do
@@ -1250,16 +1249,16 @@ contains
 
         !< y-direction
         if (bc_y%beg >= 0) then
-            call s_mpi_reduce_beta_variables_buffers(q_beta, 2, -1, nvar, kcomp)
+            call s_mpi_reduce_beta_variables_buffers(q_beta, 2, -1, nvar)
         else
             $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
             do l = beta_bc_bounds(3)%beg, beta_bc_bounds(3)%end
                 do k = beta_bc_bounds(1)%beg, beta_bc_bounds(1)%end
                     select case (bc_y%beg)
                     case (BC_PERIODIC)
-                        call s_beta_periodic(q_beta, 2, -1, k, l, nvar, kcomp)
+                        call s_beta_periodic(q_beta, 2, -1, k, l, nvar)
                     case (BC_REFLECTIVE)
-                        call s_beta_reflective(q_beta, 2, -1, k, l, nvar, kcomp)
+                        call s_beta_reflective(q_beta, 2, -1, k, l, nvar)
                     case default
                     end select
                 end do
@@ -1268,16 +1267,16 @@ contains
         end if
 
         if (bc_y%end >= 0) then
-            call s_mpi_reduce_beta_variables_buffers(q_beta, 2, 1, nvar, kcomp)
+            call s_mpi_reduce_beta_variables_buffers(q_beta, 2, 1, nvar)
         else
             $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
             do l = beta_bc_bounds(3)%beg, beta_bc_bounds(3)%end
                 do k = beta_bc_bounds(1)%beg, beta_bc_bounds(1)%end
                     select case (bc_y%end)
                     case (BC_PERIODIC)
-                        call s_beta_periodic(q_beta, 2, 1, k, l, nvar, kcomp)
+                        call s_beta_periodic(q_beta, 2, 1, k, l, nvar)
                     case (BC_REFLECTIVE)
-                        call s_beta_reflective(q_beta, 2, 1, k, l, nvar, kcomp)
+                        call s_beta_reflective(q_beta, 2, 1, k, l, nvar)
                     case default
                     end select
                 end do
@@ -1290,16 +1289,16 @@ contains
         #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
             !< z-direction
             if (bc_z%beg >= 0) then
-                call s_mpi_reduce_beta_variables_buffers(q_beta, 3, -1, nvar, kcomp)
+                call s_mpi_reduce_beta_variables_buffers(q_beta, 3, -1, nvar)
             else
                 $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
                 do l = beta_bc_bounds(2)%beg, beta_bc_bounds(2)%end
                     do k = beta_bc_bounds(1)%beg, beta_bc_bounds(1)%end
                         select case (bc_type(3, 1)%sf(k, l, 0))
                         case (BC_PERIODIC)
-                            call s_beta_periodic(q_beta, 3, -1, k, l, nvar, kcomp)
+                            call s_beta_periodic(q_beta, 3, -1, k, l, nvar)
                         case (BC_REFLECTIVE)
-                            call s_beta_reflective(q_beta, 3, -1, k, l, nvar, kcomp)
+                            call s_beta_reflective(q_beta, 3, -1, k, l, nvar)
                         case default
                         end select
                     end do
@@ -1308,16 +1307,16 @@ contains
             end if
 
             if (bc_z%end >= 0) then
-                call s_mpi_reduce_beta_variables_buffers(q_beta, 3, 1, nvar, kcomp)
+                call s_mpi_reduce_beta_variables_buffers(q_beta, 3, 1, nvar)
             else
                 $:GPU_PARALLEL_LOOP(private='[l,k]', collapse=2)
                 do l = beta_bc_bounds(2)%beg, beta_bc_bounds(2)%end
                     do k = beta_bc_bounds(1)%beg, beta_bc_bounds(1)%end
                         select case (bc_type(3, 2)%sf(k, l, 0))
                         case (BC_PERIODIC)
-                            call s_beta_periodic(q_beta, 3, 1, k, l, nvar, kcomp)
+                            call s_beta_periodic(q_beta, 3, 1, k, l, nvar)
                         case (BC_REFLECTIVE)
-                            call s_beta_reflective(q_beta, 3, 1, k, l, nvar, kcomp)
+                            call s_beta_reflective(q_beta, 3, 1, k, l, nvar)
                         case default
                         end select
                     end do
@@ -1328,33 +1327,28 @@ contains
 
     end subroutine s_populate_beta_buffers
 
-    subroutine s_beta_periodic(q_beta, bc_dir, bc_loc, k, l, nvar, kcomp)
+    subroutine s_beta_periodic(q_beta, bc_dir, bc_loc, k, l, nvar)
         $:GPU_ROUTINE(function_name='s_beta_periodic', &
             & parallelism='[seq]', cray_inline=True)
         type(scalar_field), dimension(num_dims + 1), intent(inout) :: q_beta
         integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
         integer, intent(in) :: nvar
-        type(scalar_field), dimension(:), intent(inout) :: kcomp
 
         integer :: j, i
-        real(wp) :: y_kahan, t_kahan
 
         if (bc_dir == 1) then !< x-direction
             if (bc_loc == -1) then !bc_x%beg
                 do i = 1, nvar
                     do j = -mapCells - 1, mapCells
-                        y_kahan = q_beta(beta_vars(i))%sf(m + j + 1, k, l) - kcomp(beta_vars(i))%sf(j, k, l)
-                        t_kahan = q_beta(beta_vars(i))%sf(j, k, l) + y_kahan
-                        kcomp(beta_vars(i))%sf(j, k, l) = (t_kahan - q_beta(beta_vars(i))%sf(j, k, l)) - y_kahan
-                        q_beta(beta_vars(i))%sf(j, k, l) = t_kahan
+                        q_beta(beta_vars(i))%sf(j, k, l) = &
+                            q_beta(beta_vars(i))%sf(j, k, l) + q_beta(beta_vars(i))%sf(m + j + 1, k, l)
                     end do
                 end do
             else !< bc_x%end
                 do i = 1, nvar
                     do j = -mapcells, mapcells + 1
                         q_beta(beta_vars(i))%sf(m + j, k, l) = q_beta(beta_vars(i))%sf(j - 1, k, l)
-                        kcomp(beta_vars(i))%sf(m + j, k, l) = kcomp(beta_vars(i))%sf(j - 1, k, l)
                     end do
                 end do
             end if
@@ -1362,17 +1356,14 @@ contains
             if (bc_loc == -1) then !< bc_y%beg
                 do i = 1, nvar
                     do j = -mapcells - 1, mapcells
-                        y_kahan = q_beta(beta_vars(i))%sf(k, n + j + 1, l) - kcomp(beta_vars(i))%sf(k, j, l)
-                        t_kahan = q_beta(beta_vars(i))%sf(k, j, l) + y_kahan
-                        kcomp(beta_vars(i))%sf(k, j, l) = (t_kahan - q_beta(beta_vars(i))%sf(k, j, l)) - y_kahan
-                        q_beta(beta_vars(i))%sf(k, j, l) = t_kahan
+                        q_beta(beta_vars(i))%sf(k, j, l) = &
+                            q_beta(beta_vars(i))%sf(k, j, l) + q_beta(beta_vars(i))%sf(k, n + j + 1, l)
                     end do
                 end do
             else !< bc_y%end
                 do i = 1, nvar
                     do j = -mapcells, mapcells + 1
                         q_beta(beta_vars(i))%sf(k, n + j, l) = q_beta(beta_vars(i))%sf(k, j - 1, l)
-                        kcomp(beta_vars(i))%sf(k, n + j, l) = kcomp(beta_vars(i))%sf(k, j - 1, l)
                     end do
                 end do
             end if
@@ -1380,17 +1371,14 @@ contains
             if (bc_loc == -1) then !< bc_z%beg
                 do i = 1, nvar
                     do j = -mapcells - 1, mapcells
-                        y_kahan = q_beta(beta_vars(i))%sf(k, l, p + j + 1) - kcomp(beta_vars(i))%sf(k, l, j)
-                        t_kahan = q_beta(beta_vars(i))%sf(k, l, j) + y_kahan
-                        kcomp(beta_vars(i))%sf(k, l, j) = (t_kahan - q_beta(beta_vars(i))%sf(k, l, j)) - y_kahan
-                        q_beta(beta_vars(i))%sf(k, l, j) = t_kahan
+                        q_beta(beta_vars(i))%sf(k, l, j) = &
+                            q_beta(beta_vars(i))%sf(k, l, j) + q_beta(beta_vars(i))%sf(k, l, p + j + 1)
                     end do
                 end do
             else !< bc_z%end
                 do i = 1, nvar
                     do j = -mapcells, mapcells + 1
                         q_beta(beta_vars(i))%sf(k, l, p + j) = q_beta(beta_vars(i))%sf(k, l, j - 1)
-                        kcomp(beta_vars(i))%sf(k, l, p + j) = kcomp(beta_vars(i))%sf(k, l, j - 1)
                     end do
                 end do
             end if
@@ -1456,47 +1444,39 @@ contains
 
     end subroutine s_beta_extrapolation
 
-    subroutine s_beta_reflective(q_beta, bc_dir, bc_loc, k, l, nvar, kcomp)
+    subroutine s_beta_reflective(q_beta, bc_dir, bc_loc, k, l, nvar)
         $:GPU_ROUTINE(function_name='s_beta_reflective', &
             & parallelism='[seq]', cray_inline=True)
         type(scalar_field), dimension(num_dims + 1), intent(inout) :: q_beta
         integer, intent(in) :: bc_dir, bc_loc
         integer, intent(in) :: k, l
         integer, intent(in) :: nvar
-        type(scalar_field), dimension(:), intent(inout) :: kcomp
 
         integer :: j, i
-        real(wp) :: y_kahan, t_kahan
 
         ! Reflective BC for void fraction:
-        !   1) Fold ghost-cell contributions back onto their mirror interior cells (Kahan ADD)
-        !   2) Set ghost cells = mirror of (now-folded) interior values (REPLACE + copy comp)
+        !   1) Fold ghost-cell contributions back onto their mirror interior cells
+        !   2) Set ghost cells = mirror of (now-folded) interior values
 
         if (bc_dir == 1) then !< x-direction
             if (bc_loc == -1) then !< bc_x%beg
                 do i = 1, nvar
                     do j = 1, mapCells + 1
-                        y_kahan = q_beta(beta_vars(i))%sf(-j, k, l) - kcomp(beta_vars(i))%sf(j - 1, k, l)
-                        t_kahan = q_beta(beta_vars(i))%sf(j - 1, k, l) + y_kahan
-                        kcomp(beta_vars(i))%sf(j - 1, k, l) = (t_kahan - q_beta(beta_vars(i))%sf(j - 1, k, l)) - y_kahan
-                        q_beta(beta_vars(i))%sf(j - 1, k, l) = t_kahan
+                        q_beta(beta_vars(i))%sf(j - 1, k, l) = &
+                            q_beta(beta_vars(i))%sf(j - 1, k, l) + q_beta(beta_vars(i))%sf(-j, k, l)
                     end do
                     do j = 1, mapCells + 1
                         q_beta(beta_vars(i))%sf(-j, k, l) = q_beta(beta_vars(i))%sf(j - 1, k, l)
-                        kcomp(beta_vars(i))%sf(-j, k, l) = kcomp(beta_vars(i))%sf(j - 1, k, l)
                     end do
                 end do
             else !< bc_x%end
                 do i = 1, nvar
                     do j = 1, mapCells + 1
-                        y_kahan = q_beta(beta_vars(i))%sf(m + j, k, l) - kcomp(beta_vars(i))%sf(m - (j - 1), k, l)
-                        t_kahan = q_beta(beta_vars(i))%sf(m - (j - 1), k, l) + y_kahan
-                        kcomp(beta_vars(i))%sf(m - (j - 1), k, l) = (t_kahan - q_beta(beta_vars(i))%sf(m - (j - 1), k, l)) - y_kahan
-                        q_beta(beta_vars(i))%sf(m - (j - 1), k, l) = t_kahan
+                        q_beta(beta_vars(i))%sf(m - (j - 1), k, l) = &
+                            q_beta(beta_vars(i))%sf(m - (j - 1), k, l) + q_beta(beta_vars(i))%sf(m + j, k, l)
                     end do
                     do j = 1, mapCells + 1
                         q_beta(beta_vars(i))%sf(m + j, k, l) = q_beta(beta_vars(i))%sf(m - (j - 1), k, l)
-                        kcomp(beta_vars(i))%sf(m + j, k, l) = kcomp(beta_vars(i))%sf(m - (j - 1), k, l)
                     end do
                 end do
             end if
@@ -1504,27 +1484,21 @@ contains
             if (bc_loc == -1) then !< bc_y%beg
                 do i = 1, nvar
                     do j = 1, mapCells + 1
-                        y_kahan = q_beta(beta_vars(i))%sf(k, -j, l) - kcomp(beta_vars(i))%sf(k, j - 1, l)
-                        t_kahan = q_beta(beta_vars(i))%sf(k, j - 1, l) + y_kahan
-                        kcomp(beta_vars(i))%sf(k, j - 1, l) = (t_kahan - q_beta(beta_vars(i))%sf(k, j - 1, l)) - y_kahan
-                        q_beta(beta_vars(i))%sf(k, j - 1, l) = t_kahan
+                        q_beta(beta_vars(i))%sf(k, j - 1, l) = &
+                            q_beta(beta_vars(i))%sf(k, j - 1, l) + q_beta(beta_vars(i))%sf(k, -j, l)
                     end do
                     do j = 1, mapCells + 1
                         q_beta(beta_vars(i))%sf(k, -j, l) = q_beta(beta_vars(i))%sf(k, j - 1, l)
-                        kcomp(beta_vars(i))%sf(k, -j, l) = kcomp(beta_vars(i))%sf(k, j - 1, l)
                     end do
                 end do
             else !< bc_y%end
                 do i = 1, nvar
                     do j = 1, mapCells + 1
-                        y_kahan = q_beta(beta_vars(i))%sf(k, n + j, l) - kcomp(beta_vars(i))%sf(k, n - (j - 1), l)
-                        t_kahan = q_beta(beta_vars(i))%sf(k, n - (j - 1), l) + y_kahan
-                        kcomp(beta_vars(i))%sf(k, n - (j - 1), l) = (t_kahan - q_beta(beta_vars(i))%sf(k, n - (j - 1), l)) - y_kahan
-                        q_beta(beta_vars(i))%sf(k, n - (j - 1), l) = t_kahan
+                        q_beta(beta_vars(i))%sf(k, n - (j - 1), l) = &
+                            q_beta(beta_vars(i))%sf(k, n - (j - 1), l) + q_beta(beta_vars(i))%sf(k, n + j, l)
                     end do
                     do j = 1, mapCells + 1
                         q_beta(beta_vars(i))%sf(k, n + j, l) = q_beta(beta_vars(i))%sf(k, n - (j - 1), l)
-                        kcomp(beta_vars(i))%sf(k, n + j, l) = kcomp(beta_vars(i))%sf(k, n - (j - 1), l)
                     end do
                 end do
             end if
@@ -1532,27 +1506,21 @@ contains
             if (bc_loc == -1) then !< bc_z%beg
                 do i = 1, nvar
                     do j = 1, mapCells + 1
-                        y_kahan = q_beta(beta_vars(i))%sf(k, l, -j) - kcomp(beta_vars(i))%sf(k, l, j - 1)
-                        t_kahan = q_beta(beta_vars(i))%sf(k, l, j - 1) + y_kahan
-                        kcomp(beta_vars(i))%sf(k, l, j - 1) = (t_kahan - q_beta(beta_vars(i))%sf(k, l, j - 1)) - y_kahan
-                        q_beta(beta_vars(i))%sf(k, l, j - 1) = t_kahan
+                        q_beta(beta_vars(i))%sf(k, l, j - 1) = &
+                            q_beta(beta_vars(i))%sf(k, l, j - 1) + q_beta(beta_vars(i))%sf(k, l, -j)
                     end do
                     do j = 1, mapCells + 1
                         q_beta(beta_vars(i))%sf(k, l, -j) = q_beta(beta_vars(i))%sf(k, l, j - 1)
-                        kcomp(beta_vars(i))%sf(k, l, -j) = kcomp(beta_vars(i))%sf(k, l, j - 1)
                     end do
                 end do
             else !< bc_z%end
                 do i = 1, nvar
                     do j = 1, mapCells + 1
-                        y_kahan = q_beta(beta_vars(i))%sf(k, l, p + j) - kcomp(beta_vars(i))%sf(k, l, p - (j - 1))
-                        t_kahan = q_beta(beta_vars(i))%sf(k, l, p - (j - 1)) + y_kahan
-                        kcomp(beta_vars(i))%sf(k, l, p - (j - 1)) = (t_kahan - q_beta(beta_vars(i))%sf(k, l, p - (j - 1))) - y_kahan
-                        q_beta(beta_vars(i))%sf(k, l, p - (j - 1)) = t_kahan
+                        q_beta(beta_vars(i))%sf(k, l, p - (j - 1)) = &
+                            q_beta(beta_vars(i))%sf(k, l, p - (j - 1)) + q_beta(beta_vars(i))%sf(k, l, p + j)
                     end do
                     do j = 1, mapCells + 1
                         q_beta(beta_vars(i))%sf(k, l, p + j) = q_beta(beta_vars(i))%sf(k, l, p - (j - 1))
-                        kcomp(beta_vars(i))%sf(k, l, p + j) = kcomp(beta_vars(i))%sf(k, l, p - (j - 1))
                     end do
                 end do
             end if

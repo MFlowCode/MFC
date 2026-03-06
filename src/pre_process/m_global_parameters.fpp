@@ -982,9 +982,7 @@ contains
         chemxb = species_idx%beg
         chemxe = species_idx%end
 
-        if (lag_params%vel_model /= 0) then
-            fd_number = max(1, fd_order/2)
-        end if
+        if (bubbles_lagrange .or. particles_lagrange) fd_number = max(1, fd_order/2)
 
         call s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, &
                                            igr_order, buff_size, &
@@ -1108,6 +1106,8 @@ contains
         end if
 
 #endif
+
+        if (allocated(neighbor_ranks)) deallocate (neighbor_ranks)
 
     end subroutine s_finalize_global_parameters_module
 
