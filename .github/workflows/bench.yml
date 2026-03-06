@@ -65,7 +65,7 @@ jobs:
     runs-on:
       group: ${{ matrix.group }}
       labels: ${{ matrix.labels }}
-    timeout-minutes: 240
+    timeout-minutes: 480
     steps:
       - name: Clone - PR
         uses: actions/checkout@v4
