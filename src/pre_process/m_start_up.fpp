@@ -660,7 +660,7 @@ contains
             m_MOK = int(m_glb + 1, MPI_OFFSET_KIND)
             n_MOK = int(n_glb + 1, MPI_OFFSET_KIND)
             p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
-            WP_MOK = int(8._wp, MPI_OFFSET_KIND)
+            WP_MOK = int(storage_size(0._stp)/8, MPI_OFFSET_KIND)
             MOK = int(1._wp, MPI_OFFSET_KIND)
             str_MOK = int(name_len, MPI_OFFSET_KIND)
             NVARS_MOK = int(sys_size, MPI_OFFSET_KIND)
@@ -798,7 +798,7 @@ contains
         if (relax) then
             if (proc_rank == 0) then
                 print *, 'initial condition might have been altered due to enforcement of &
-&                pTg-equilirium (relax = "T" activated)'
+&                pTg-equilibrium (relax = "T" activated)'
             end if
 
             call s_infinite_relaxation_k(q_cons_vf)
