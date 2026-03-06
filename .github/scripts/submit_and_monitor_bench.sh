@@ -17,9 +17,13 @@ cluster="$4"
 echo "[$dir] Submitting benchmark for $device-$interface on $cluster..."
 cd "$dir"
 
-# Submit and monitor job (submit.sh auto-detects bench mode from script name)
-bash .github/workflows/$cluster/submit.sh \
-    .github/workflows/$cluster/bench.sh "$device" "$interface"
+# Always use the PR's submit.sh so both master and PR builds benefit from the
+# run_monitored_slurm_job.sh SIGKILL recovery wrapper.  The bench script is
+# still resolved relative to the current directory (master/ or pr/) so the
+# correct branch code is benchmarked.  SLURM_SUBMIT_DIR ensures the job runs
+# in the right directory regardless of which submit.sh is invoked.
+PR_SUBMIT="${SCRIPT_DIR}/../workflows/${cluster}/submit.sh"
+bash "$PR_SUBMIT" .github/workflows/$cluster/bench.sh "$device" "$interface"
 
 # Verify the YAML output file was created
 job_slug="bench-$device-$interface"
