@@ -103,7 +103,7 @@ def prefetch(current_step: int, all_steps: List[int], read_func: Callable) -> No
             if s in _cache or s in _in_flight:
                 continue
             _in_flight.add(s)
-        _get_prefetch_pool().submit(_bg_load, s, read_func)  # s is a key here
+        _get_prefetch_pool().submit(_bg_load, s, read_func)
 
 
 def _bg_load(key: object, read_func: Callable) -> None:

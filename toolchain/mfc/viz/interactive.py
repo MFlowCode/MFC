@@ -21,14 +21,22 @@ import numpy as np
 import plotly.graph_objects as go
 from dash import Dash, Patch, dcc, html, Input, Output, State, callback_context, no_update
 from skimage.measure import marching_cubes as _marching_cubes  # type: ignore[import]  # pylint: disable=no-name-in-module
-from turbojpeg import TurboJPEG as _TurboJPEG  # type: ignore[import]
 
 from mfc.printer import cons
 from . import _step_cache
 from ._step_cache import prefetch_one as _prefetch_one
 
 logger = logging.getLogger(__name__)
-_tj = _TurboJPEG()
+
+# PyTurboJPEG wraps libjpeg-turbo via ctypes. TurboJPEG() opens the native
+# shared library at instantiation time; on HPC clusters where libjpeg-turbo
+# is not in LD_LIBRARY_PATH it raises OSError even if the pip package is
+# installed. Fall back to Pillow in that case.
+try:
+    from turbojpeg import TurboJPEG as _TurboJPEG  # type: ignore[import]
+    _tj = _TurboJPEG()
+except (ImportError, OSError):
+    _tj = None
 
 # ---------------------------------------------------------------------------
 # Fast PNG generation via 256-entry colormap LUT
@@ -98,8 +106,17 @@ def _lut_to_plotly_colorscale(cmap_name: str) -> list:
 
 
 def _encode_jpeg(rgb: np.ndarray) -> bytes:
-    """Encode (h, w, 3) uint8 RGB → JPEG bytes via libjpeg-turbo."""
-    return _tj.encode(rgb, quality=90)
+    """Encode (h, w, 3) uint8 RGB → JPEG bytes.
+
+    Uses libjpeg-turbo when available; falls back to Pillow otherwise.
+    """
+    if _tj is not None:
+        return _tj.encode(rgb, quality=90)
+    from PIL import Image as _PIL  # pylint: disable=import-outside-toplevel
+    import io as _io              # pylint: disable=import-outside-toplevel
+    buf = _io.BytesIO()
+    _PIL.fromarray(rgb, 'RGB').save(buf, format='jpeg', quality=90, optimize=False)
+    return buf.getvalue()
 
 
 def _make_png_source(arr_yx: np.ndarray, cmap_name: str,
@@ -1069,17 +1086,7 @@ input[type=radio] + span, label { color: %(tx)s !important; }
                 _cscale3 = _lut_to_plotly_colorscale(cmap)
                 rng3 = cmax - cmin if cmax > cmin else 1.0
                 patch = Patch()
-                if mode == 'slice':
-                    _sax = slice_axis or 'z'
-                    sliced, _, _, _ = _slice_3d(
-                        raw, _tf, ad.x_cc, ad.y_cc, ad.z_cc,
-                        _sax, float(slice_pos or 0.5),
-                    )
-                    patch['data'][0]['surfacecolor'] = sliced.tolist()
-                    patch['data'][0]['cmin'] = cmin
-                    patch['data'][0]['cmax'] = cmax
-                    patch['data'][0]['colorscale'] = _cscale3
-                elif mode == 'isosurface':
+                if mode == 'isosurface':
                     raw_ds, x_ds3, y_ds3, z_ds3 = _get_ds3(
                         step, selected_var, raw, ad.x_cc, ad.y_cc, ad.z_cc, 500_000,
                     )
