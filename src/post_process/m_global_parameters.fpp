@@ -76,6 +76,8 @@ module m_global_parameters
     !! region, this region is used to store information outside the computational
     !! domain based on the boundary conditions.
 
+    integer, allocatable :: beta_vars(:) !< Indices of variables to communicate for bubble/particle coupling
+
     integer :: t_step_start  !< First time-step directory
     integer :: t_step_stop   !< Last time-step directory
     integer :: t_step_save   !< Interval between consecutive time-step directory
@@ -692,6 +694,16 @@ contains
                 end if
             end if
 
+            ! if (bubbles_lagrange) then
+            !     beta_idx = sys_size + 1
+            !     sys_size = beta_idx
+            ! end if
+
+            ! if (particles_lagrange) then
+            !     beta_idx = sys_size + 1
+            !     sys_size = beta_idx
+            ! end if
+
             if (mhd) then
                 B_idx%beg = sys_size + 1
                 if (n == 0) then
@@ -844,6 +856,14 @@ contains
                 psi_idx = dflt_int
             end if
 
+        end if
+
+        if (bubbles_lagrange) then
+            allocate (beta_vars(1:3))
+            beta_vars(1:3) = [1, 2, 5]
+        elseif (particles_lagrange) then
+            allocate (beta_vars(1:8))
+            beta_vars(1:8) = [1, 2, 3, 4, 5, 6, 7, 8]
         end if
 
         if (chemistry) then

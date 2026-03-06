@@ -70,7 +70,7 @@ module m_global_parameters
 
     real(wp) :: dt !< Size of the time-step
 
-    $:GPU_DECLARE(create='[x_cb,y_cb,z_cb,x_cc,y_cc,z_cc,dx,dy,dz,dt,m,n,p]')
+    $:GPU_DECLARE(create='[x_cb,y_cb,z_cb,x_cc,y_cc,z_cc,dx,dy,dz,dt,m,n,p,glb_bounds]')
 
     !> @name Starting time-step iteration, stopping time-step iteration and the number
     !! of time-step iterations between successive solution backups, respectively
@@ -247,6 +247,10 @@ module m_global_parameters
     $:GPU_DECLARE(create='[pcomm_coords]')
     !! Coordinates for EL particle transfer
 
+    type(bounds_info), allocatable, dimension(:) :: pcomm_coords_ghost
+    $:GPU_DECLARE(create='[pcomm_coords_ghost]')
+    !! Coordinates for EL particle transfer
+
     type(int_bounds_info), dimension(3) :: nidx !< Indices for neighboring processors
 
     integer, allocatable, dimension(:, :, :) :: neighbor_ranks
@@ -347,6 +351,10 @@ module m_global_parameters
     !! to the next time-step.
 
     $:GPU_DECLARE(create='[buff_size]')
+
+    integer, allocatable :: beta_vars(:) !< Indices of variables to communicate for bubble/particle coupling
+
+    $:GPU_DECLARE(create='[beta_vars]')
 
     integer :: shear_num !! Number of shear stress components
     integer, dimension(3) :: shear_indices !<
@@ -491,10 +499,12 @@ module m_global_parameters
     $:GPU_DECLARE(create='[R0ref, p0ref, rho0ref, T0ref, ss, pv, vd, mu_l, mu_v, mu_g, &
         gam_v, gam_g, M_v, M_g, cp_v, cp_g, R_v, R_g]')
 
-    !Solid particle physical parameters
+    !> @}
+
+    !> @name Solid particle physical parameters
+    !> @{
     real(wp) :: cp_particle, rho0ref_particle
     $:GPU_DECLARE(create='[rho0ref_particle, cp_particle]')
-
     !> @}
 
     !> @name Acoustic acoustic_source parameters
@@ -1256,6 +1266,16 @@ contains
 
         ! END: Volume Fraction Model
 
+        if (bubbles_lagrange) then
+            @:ALLOCATE(beta_vars(1:3))
+            beta_vars(1:3) = [1, 2, 5]
+            $:GPU_UPDATE(device='[beta_vars]')
+        elseif (particles_lagrange) then
+            @:ALLOCATE(beta_vars(1:8))
+            beta_vars(1:8) = [1, 2, 3, 4, 5, 6, 7, 8]
+            $:GPU_UPDATE(device='[beta_vars]')
+        end if
+
         if (chemistry) then
             species_idx%beg = sys_size + 1
             species_idx%end = sys_size + num_species
@@ -1326,8 +1346,8 @@ contains
         call s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, &
                                            igr_order, buff_size, &
                                            idwint, idwbuff, viscous, &
-                                           bubbles_lagrange, m, n, p, &
-                                           num_dims, igr, ib, fd_number, particles_lagrange)
+                                           bubbles_lagrange, particles_lagrange, &
+                                           m, n, p, num_dims, igr, ib, fd_number)
         $:GPU_UPDATE(device='[idwint, idwbuff]')
 
         ! Configuring Coordinate Direction Indexes
@@ -1449,8 +1469,7 @@ contains
 
         allocate (proc_coords(1:num_dims))
         @:ALLOCATE(pcomm_coords(1:num_dims))
-
-        @:ALLOCATE(pcomm_coords(1:num_dims))
+        @:ALLOCATE(pcomm_coords_ghost(1:num_dims))
 
         if (parallel_io .neqv. .true.) return
 
@@ -1489,6 +1508,9 @@ contains
         deallocate (proc_coords)
 
         @:DEALLOCATE(pcomm_coords)
+        @:DEALLOCATE(pcomm_coords_ghost)
+
+        @:DEALLOCATE(beta_vars)
 
         if (parallel_io) then
             deallocate (start_idx)

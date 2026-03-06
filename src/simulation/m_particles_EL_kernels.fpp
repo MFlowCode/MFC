@@ -14,6 +14,12 @@ module m_particles_EL_kernels
 
     implicit none
 
+    ! Cell list for particle-to-cell mapping (rebuilt each RK stage before smearing)
+    integer, allocatable, dimension(:, :, :) :: cell_list_start  ! (0:m, 0:n, 0:p)
+    integer, allocatable, dimension(:, :, :) :: cell_list_count  ! (0:m, 0:n, 0:p)
+    integer, allocatable, dimension(:) :: cell_list_idx          ! (1:nParticles_glb) sorted particle indices
+    $:GPU_DECLARE(create='[cell_list_start, cell_list_count, cell_list_idx]')
+
 contains
 
     !> The purpose of this subroutine is to smear the strength of the lagrangian
@@ -24,226 +30,403 @@ contains
             !! @param lbk_pos Spatial coordinates of the particles
             !! @param updatedvar Eulerian variable to be updated
             !! @param lbk_f_p Forces on the particles
-    subroutine s_smoothfunction(nParticles, lbk_rad, lbk_s, lbk_pos, lbk_vel, updatedvar, lbk_f_p, ngh)
+    subroutine s_smoothfunction(nParticles, lbk_rad, lbk_vel, lbk_s, lbk_pos, lbk_f_p, lbk_g_sum, updatedvar, kcomp)
 
         integer, intent(in) :: nParticles
         real(wp), dimension(1:lag_params%nParticles_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_pos, lbk_vel
         real(wp), dimension(1:lag_params%nParticles_glb, 1:2), intent(in) :: lbk_rad
-        type(scalar_field), dimension(:), intent(inout) :: updatedvar
         real(wp), dimension(1:lag_params%nParticles_glb, 1:3), intent(in) :: lbk_f_p
-        integer, intent(in) :: ngh
+        real(wp), dimension(1:lag_params%nParticles_glb), intent(inout) :: lbk_g_sum
+        type(scalar_field), dimension(:), intent(inout) :: updatedvar
+        type(scalar_field), dimension(:), intent(inout) :: kcomp
 
-        call s_gaussian(nParticles, lbk_rad, lbk_s, lbk_pos, lbk_vel, updatedvar, lbk_f_p, ngh)
+        ! call s_gaussian(nParticles, lbk_rad, lbk_s, lbk_pos, lbk_vel, updatedvar, lbk_f_p, ngh)
+        call s_gaussian(nParticles, lbk_rad, lbk_vel, lbk_s, lbk_pos, lbk_f_p, lbk_g_sum, updatedvar, kcomp)
 
     end subroutine s_smoothfunction
 
-    !> The purpose of this procedure contains the algorithm to use the gaussian kernel function to map the effect of the particles.
-    subroutine s_gaussian(nParticles, lbk_rad, lbk_s, lbk_pos, lbk_vel, updatedvar, lbk_f_p, ngh)
+    !> Builds a sorted cell list mapping each interior cell (0:m,0:n,0:p) to its
+    !!      resident particles. Uses a counting-sort on the host (O(nParticles + N_cells)).
+    !!      Must be called before s_gaussian each RK stage.
+    !! @param nParticles Number of lagrangian particles in the current domain
+    !! @param lbk_s Computational coordinates of the particles
+    subroutine s_build_cell_list(nParticles, lbk_s)
+
+        integer, intent(in) :: nParticles
+        real(wp), dimension(1:lag_params%nParticles_glb, 1:3, 1:2), intent(in) :: lbk_s
+
+        integer :: l, ci, cj, ck, idx
+        real(wp), dimension(3) :: s_coord
+
+        ! Bring current particle positions to host
+        $:GPU_UPDATE(host='[lbk_s]')
+
+        ! Pass 1: zero counts and count particles per cell
+        cell_list_count = 0
+        do l = 1, nParticles
+            s_coord(1:3) = lbk_s(l, 1:3, 2)
+            ci = int(s_coord(1))
+            cj = int(s_coord(2))
+            ck = int(s_coord(3))
+            ! Clamp to interior (particle should already be in [0:m,0:n,0:p])
+            ci = max(0, min(ci, m))
+            cj = max(0, min(cj, n))
+            ck = max(0, min(ck, p))
+            cell_list_count(ci, cj, ck) = cell_list_count(ci, cj, ck) + 1
+        end do
+
+        ! Prefix sum to compute start indices (1-based into cell_list_idx)
+        idx = 1
+        do ck = 0, p
+            do cj = 0, n
+                do ci = 0, m
+                    cell_list_start(ci, cj, ck) = idx
+                    idx = idx + cell_list_count(ci, cj, ck)
+                end do
+            end do
+        end do
+
+        ! Pass 2: place particle indices into cell_list_idx
+        ! Temporarily reuse cell_list_count as a running offset
+        cell_list_count = 0
+        do l = 1, nParticles
+            s_coord(1:3) = lbk_s(l, 1:3, 2)
+            ci = int(s_coord(1))
+            cj = int(s_coord(2))
+            ck = int(s_coord(3))
+            ci = max(0, min(ci, m))
+            cj = max(0, min(cj, n))
+            ck = max(0, min(ck, p))
+            cell_list_idx(cell_list_start(ci, cj, ck) + cell_list_count(ci, cj, ck)) = l
+            cell_list_count(ci, cj, ck) = cell_list_count(ci, cj, ck) + 1
+        end do
+
+        ! Send cell list arrays to GPU
+        $:GPU_UPDATE(device='[cell_list_start, cell_list_count, cell_list_idx]')
+
+    end subroutine s_build_cell_list
+
+    !> Cell-centric gaussian smearing using the cell list (no GPU atomics).
+    !!      Each grid cell accumulates contributions from nearby particles looked up
+    !!      via cell_list_start/count/idx.
+    ! nParticles, lbk_rad, lbk_s, lbk_pos, lbk_vel, updatedvar, lbk_f_p)
+    subroutine s_gaussian(nParticles, lbk_rad, lbk_vel, lbk_s, lbk_pos, lbk_f_p, lbk_g_sum, updatedvar, kcomp)
 
         integer, intent(in) :: nParticles
         real(wp), dimension(1:lag_params%nParticles_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_pos, lbk_vel
         real(wp), dimension(1:lag_params%nParticles_glb, 1:2), intent(in) :: lbk_rad
         real(wp), dimension(1:lag_params%nParticles_glb, 1:3), intent(in) :: lbk_f_p
+        real(wp), dimension(1:lag_params%nParticles_glb), intent(inout) :: lbk_g_sum
         type(scalar_field), dimension(:), intent(inout) :: updatedvar
-        integer, intent(in) :: ngh
+        type(scalar_field), dimension(:), intent(inout) :: kcomp
 
-        real(wp), dimension(3) :: center
-        integer, dimension(3) :: cell
-        integer, dimension(3) :: cellaux
-        real(wp) :: stddsv
-
-        real(wp), dimension(3) :: nodecoord
-        real(wp) :: addFun1, addFun2_x, addFun2_y, addFun2_z, addFun_E, func_sum, func_sum_alpha
-        real(wp) :: addFun_alphap_vp_x, addFun_alphap_vp_y, addFun_alphap_vp_z
-        real(wp) :: func, volpart, Vol, Vol_loc, rad
-        real(wp), dimension(3) :: s_coord
-        integer :: l, i, j, k
-        logical :: celloutside
+        real(wp), dimension(3) :: center, nodecoord, s_coord
+        integer, dimension(3) :: cell, cellijk
+        real(wp) :: stddsv, volpart, Vol_loc
+        real(wp) :: strength_vel, strength_vol
+        real(wp) :: func
+        real(wp) :: y_kahan, t_kahan
         real(wp) :: fp_x, fp_y, fp_z, vp_x, vp_y, vp_z
+        integer :: l, i, j, k, di, dj, dk, lb, part_idx
+        integer :: di_beg, di_end, dj_beg, dj_end, dk_beg, dk_end
+        integer :: smear_x_beg, smear_x_end
+        integer :: smear_y_beg, smear_y_end
+        integer :: smear_z_beg, smear_z_end
+        integer :: mapCells_loc
 
-        real(wp) :: rc, r2, r2_alpha, weight, weight_alpha, g, g_alpha, chardist
-        integer :: d
-        integer :: ncx, ncy, ncz, ix, jy, kz
+        mapCells_loc = 1
 
-        d = 2
-        if (num_dims == 3) d = 3
+        smear_x_beg = -mapCells_loc
+        smear_x_end = m + mapCells_loc
+        smear_y_beg = merge(-mapCells_loc, 0, n > 0)
+        smear_y_end = merge(n + mapCells_loc, n, n > 0)
+        smear_z_beg = merge(-mapCells_loc, 0, p > 0)
+        smear_z_end = merge(p + mapCells_loc, p, p > 0)
 
-        $:GPU_PARALLEL_LOOP(private='[nodecoord,l,s_coord,cell,center,volpart,rad,cellaux]', copyin='[d]')
+        $:GPU_PARALLEL_LOOP(private='[l,volpart,s_coord,cell,stddsv,i,j,k,di,dj,dk,di_beg,di_end,dj_beg,dj_end,dk_beg,dk_end,nodecoord,center,cellijk,Vol_loc,func]')
         do l = 1, nParticles
 
-            nodecoord(1:3) = 0
-            center(1:3) = 0._wp
+            lbk_g_sum(l) = 0._wp
+
             volpart = 4._wp/3._wp*pi*lbk_rad(l, 2)**3._wp
             s_coord(1:3) = lbk_s(l, 1:3, 2)
-            center(1:2) = lbk_pos(l, 1:2, 2)
-            rad = lbk_rad(l, 2)
-
-            if (p > 0) center(3) = lbk_pos(l, 3, 2)
-
-            ! if (particle_in_domain_physical_kernels(center)) then
 
             call s_get_cell(s_coord, cell)
 
-            if (num_dims == 2) then
-                Vol = dx(cell(1))*dy(cell(2))*lag_params%charwidth
-                if (cyl_coord) Vol = dx(cell(1))*dy(cell(2))*y_cc(cell(2))*2._wp*pi
-            else
-                Vol = dx(cell(1))*dy(cell(2))*dz(cell(3))
-            end if
-
-            !< Characteristic cell length
-            chardist = max(dx(cell(1)), dy(cell(2)))
-            if (num_dims == 3) chardist = max(dx(cell(1)), dy(cell(2)), dz(cell(3)))
-
-            fp_x = -lbk_f_p(l, 1)
-            fp_y = -lbk_f_p(l, 2)
-            fp_z = -lbk_f_p(l, 3)
-
-            vp_x = lbk_vel(l, 1, 2)
-            vp_y = lbk_vel(l, 2, 2)
-            vp_z = lbk_vel(l, 3, 2)
-
-            sigma = lag_params%epsilonb*chardist
-
-            rc = sigma
-            ncx = min(ngh, max(1, nint(rc/dx(cell(1)))))
-            ncy = min(ngh, max(1, nint(rc/dy(cell(2)))))
-            ncz = 0
-            if (num_dims == 3) ncz = min(ngh, max(1, nint(rc/dz(cell(3)))))
+            call s_compute_stddsv(cell, volpart, stddsv)
 
             i = cell(1)
             j = cell(2)
             k = cell(3)
 
-            func_sum = 0._wp
-            func_sum_alpha = 0._wp
-            $:GPU_LOOP(collapse=3,private='[ix,jy,kz,r2,cellaux]')
-            do ix = i - ncx, i + ncx
-                do jy = j - ncy, j + ncy
-                    do kz = k - ncz, k + ncz
+            di_beg = i - mapCells_loc
+            di_end = i + mapCells_loc
+            dj_beg = j - mapCells_loc
+            dj_end = j + mapCells_loc
+            dk_beg = k - mapCells_loc
+            dk_end = k + mapCells_loc
 
-                        cellaux(1) = ix
-                        cellaux(2) = jy
-                        cellaux(3) = kz
+            $:GPU_LOOP(parallelism='[seq]')
+            do di = di_beg, di_end
+                $:GPU_LOOP(parallelism='[seq]')
+                do dj = dj_beg, dj_end
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do dk = dk_beg, dk_end
 
-                        call s_check_celloutside(cellaux, celloutside)
+                        nodecoord(1) = x_cc(di)
+                        nodecoord(2) = y_cc(dj)
+                        nodecoord(3) = 0._wp
+                        if (p > 0) nodecoord(3) = z_cc(dk)
 
-                        if (.not. celloutside) then
+                        cellijk(1) = di
+                        cellijk(2) = dj
+                        cellijk(3) = dk
 
-                            ! Relocate cells for particles intersecting symmetric boundaries
-                            if (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == BC_REFLECTIVE)) then
-                                call s_shift_cell_symmetric_bc(cellaux, cell)
-                            end if
+                        center(1:2) = lbk_pos(l, 1:2, 2)
+                        center(3) = 0._wp
+                        if (p > 0) center(3) = lbk_pos(l, 3, 2)
 
-                            Vol_loc = dx(cellaux(1))*dy(cellaux(2))
-                            if (num_dims == 3) Vol_loc = Vol_loc*dz(cellaux(3))
-                            r2 = (x_cc(cellaux(1)) - center(1))**2 + (y_cc(cellaux(2)) - center(2))**2
-                            if (num_dims == 3) r2 = r2 + (z_cc(cellaux(3)) - center(3))**2
-                            g = exp(-r2/(2*sigma**2))/(sigma*sqrt(2*pi))**d
-                            func_sum = func_sum + g*Vol_loc
-                        end if
+                        Vol_loc = dx(cellijk(1))*dy(cellijk(2))
+                        if (num_dims == 3) Vol_loc = Vol_loc*dz(cellijk(3))
+
+                        call s_applygaussian(center, cellijk, nodecoord, stddsv, 0._wp, func)
+
+                        lbk_g_sum(l) = lbk_g_sum(l) + func*Vol_loc
                     end do
                 end do
             end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
 
-            $:GPU_LOOP(collapse=3,private='[ix,jy,kz,r2,weight,g]')
-            do ix = i - ncx, i + ncx
-                do jy = j - ncy, j + ncy
-                    do kz = k - ncz, k + ncz
+        $:GPU_PARALLEL_LOOP(collapse=3, &
+            & private='[i,j,k,di,dj,dk,lb,part_idx,center,nodecoord,s_coord,cell,cellijk,stddsv,volpart,strength_vol,fp_x,fp_y,fp_z,vp_x,vp_y,vp_z,func,y_kahan,t_kahan,di_beg,di_end,dj_beg,dj_end,dk_beg,dk_end]', &
+            & copyin='[smear_x_beg,smear_x_end,smear_y_beg,smear_y_end,smear_z_beg,smear_z_end]')
+        do k = smear_z_beg, smear_z_end
+            do j = smear_y_beg, smear_y_end
+                do i = smear_x_beg, smear_x_end
 
-                        cellaux(1) = ix
-                        cellaux(2) = jy
-                        cellaux(3) = kz
+                    cellijk(1) = i
+                    cellijk(2) = j
+                    cellijk(3) = k
 
-                        call s_check_celloutside(cellaux, celloutside)
+                    nodecoord(1) = x_cc(i)
+                    nodecoord(2) = y_cc(j)
+                    nodecoord(3) = 0._wp
+                    if (p > 0) nodecoord(3) = z_cc(k)
 
-                        if (.not. celloutside) then
+                    ! Neighbor cell range clamped to interior [0:m, 0:n, 0:p]
+                    di_beg = max(i - mapCells_loc, 0)
+                    di_end = min(i + mapCells_loc, m)
+                    dj_beg = max(j - mapCells_loc, 0)
+                    dj_end = min(j + mapCells_loc, n)
+                    dk_beg = max(k - mapCells_loc, 0)
+                    dk_end = min(k + mapCells_loc, p)
 
-                            ! Relocate cells for particles intersecting symmetric boundaries
-                            if (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == BC_REFLECTIVE)) then
-                                call s_shift_cell_symmetric_bc(cellaux, cell)
-                            end if
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do dk = dk_beg, dk_end
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do dj = dj_beg, dj_end
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do di = di_beg, di_end
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do lb = cell_list_start(di, dj, dk), &
+                                    cell_list_start(di, dj, dk) + cell_list_count(di, dj, dk) - 1
 
-                            r2 = (x_cc(cellaux(1)) - center(1))**2 + (y_cc(cellaux(2)) - center(2))**2
-                            if (num_dims == 3) r2 = r2 + (z_cc(cellaux(3)) - center(3))**2
-                            g = exp(-r2/(2*sigma**2))/(sigma*sqrt(2*pi))**d
-                            weight = g/func_sum
+                                    part_idx = cell_list_idx(lb)
 
-                            !Update volume fraction field
-                            addFun1 = weight*volpart
-                            $:GPU_ATOMIC(atomic='update')
-                            updatedvar(1)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                                updatedvar(1)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                + real(addFun1, kind=stp)
+                                    ! Particle properties
+                                    volpart = 4._wp/3._wp*pi*lbk_rad(part_idx, 2)**3._wp
+                                    s_coord(1:3) = lbk_s(part_idx, 1:3, 2)
+                                    call s_get_cell(s_coord, cell)
 
-                            if (lag_params%solver_approach == 2) then
+                                    fp_x = -lbk_f_p(part_idx, 1)
+                                    fp_y = -lbk_f_p(part_idx, 2)
+                                    fp_z = -lbk_f_p(part_idx, 3)
 
-                                !Update particle momentum field(x)
-                                addFun_alphap_vp_x = weight*volpart*vp_x
-                                $:GPU_ATOMIC(atomic='update')
-                                updatedvar(2)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                                    updatedvar(2)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                    + real(addFun_alphap_vp_x, kind=stp)
+                                    vp_x = lbk_vel(part_idx, 1, 2)
+                                    vp_y = lbk_vel(part_idx, 2, 2)
+                                    vp_z = lbk_vel(part_idx, 3, 2)
 
-                                !Update particle momentum field(y)
-                                addFun_alphap_vp_y = weight*volpart*vp_y
-                                $:GPU_ATOMIC(atomic='update')
-                                updatedvar(3)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                                    updatedvar(3)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                    + real(addFun_alphap_vp_y, kind=stp)
+                                    call s_compute_stddsv(cell, volpart, stddsv)
 
-                                if (num_dims == 3) then
-                                    !Update particle momentum field(z)
-                                    addFun_alphap_vp_z = weight*volpart*vp_z
-                                    $:GPU_ATOMIC(atomic='update')
-                                    updatedvar(4)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                                        updatedvar(4)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                        + real(addFun_alphap_vp_z, kind=stp)
-                                end if
+                                    strength_vol = volpart
+                                    ! strength_vel = 4._wp*pi*lbk_rad(part_idx, 2)**2._wp*lbk_vel(part_idx, 2)
 
-                                !Update x-momentum source term
-                                addFun2_x = weight*fp_x
-                                $:GPU_ATOMIC(atomic='update')
-                                updatedvar(5)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                                    updatedvar(5)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                    + real(addFun2_x, kind=stp)
+                                    center(1:2) = lbk_pos(part_idx, 1:2, 2)
+                                    center(3) = 0._wp
+                                    if (p > 0) center(3) = lbk_pos(part_idx, 3, 2)
 
-                                !Update y-momentum source term
-                                addFun2_y = weight*fp_y
-                                $:GPU_ATOMIC(atomic='update')
-                                updatedvar(6)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                                    updatedvar(6)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                    + real(addFun2_y, kind=stp)
+                                    call s_applygaussian(center, cellijk, nodecoord, stddsv, 0._wp, func)
 
-                                if (num_dims == 3) then
-                                    !Update z-momentum source term
-                                    addFun2_z = weight*fp_z
-                                    $:GPU_ATOMIC(atomic='update')
-                                    updatedvar(7)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                                        updatedvar(7)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                        + real(addFun2_z, kind=stp)
-                                end if
+                                    func = func/lbk_g_sum(part_idx)
 
-                                !Update energy source term
-                                addFun_E = 0._wp
-                                $:GPU_ATOMIC(atomic='update')
-                                updatedvar(8)%sf(cellaux(1), cellaux(2), cellaux(3)) = &
-                                    updatedvar(8)%sf(cellaux(1), cellaux(2), cellaux(3)) &
-                                    + real(addFun_E, kind=stp)
+                                    ! Kahan summation for void fraction
+                                    y_kahan = real(func*strength_vol, kind=wp) - kcomp(1)%sf(i, j, k)
+                                    t_kahan = updatedvar(1)%sf(i, j, k) + y_kahan
+                                    kcomp(1)%sf(i, j, k) = (t_kahan - updatedvar(1)%sf(i, j, k)) - y_kahan
+                                    updatedvar(1)%sf(i, j, k) = t_kahan
 
-                            end if
-                        end if
+                                    if (lag_params%solver_approach == 2) then
+
+                                        ! Kahan summation for alpha_p vp_x
+                                        y_kahan = real(func*strength_vol*vp_x, kind=wp) - kcomp(2)%sf(i, j, k)
+                                        t_kahan = updatedvar(2)%sf(i, j, k) + y_kahan
+                                        kcomp(2)%sf(i, j, k) = (t_kahan - updatedvar(2)%sf(i, j, k)) - y_kahan
+                                        updatedvar(2)%sf(i, j, k) = t_kahan
+
+                                        ! Kahan summation for alpha_p vp_y
+                                        y_kahan = real(func*strength_vol*vp_y, kind=wp) - kcomp(3)%sf(i, j, k)
+                                        t_kahan = updatedvar(3)%sf(i, j, k) + y_kahan
+                                        kcomp(3)%sf(i, j, k) = (t_kahan - updatedvar(3)%sf(i, j, k)) - y_kahan
+                                        updatedvar(3)%sf(i, j, k) = t_kahan
+
+                                        ! Kahan summation for alpha_p vp_z
+                                        y_kahan = real(func*strength_vol*vp_z, kind=wp) - kcomp(4)%sf(i, j, k)
+                                        t_kahan = updatedvar(4)%sf(i, j, k) + y_kahan
+                                        kcomp(4)%sf(i, j, k) = (t_kahan - updatedvar(4)%sf(i, j, k)) - y_kahan
+                                        updatedvar(4)%sf(i, j, k) = t_kahan
+
+                                        ! Kahan summation for fp_x
+                                        y_kahan = real(func*fp_x, kind=wp) - kcomp(5)%sf(i, j, k)
+                                        t_kahan = updatedvar(5)%sf(i, j, k) + y_kahan
+                                        kcomp(5)%sf(i, j, k) = (t_kahan - updatedvar(5)%sf(i, j, k)) - y_kahan
+                                        updatedvar(5)%sf(i, j, k) = t_kahan
+
+                                        ! Kahan summation for fp_y
+                                        y_kahan = real(func*fp_y, kind=wp) - kcomp(6)%sf(i, j, k)
+                                        t_kahan = updatedvar(6)%sf(i, j, k) + y_kahan
+                                        kcomp(6)%sf(i, j, k) = (t_kahan - updatedvar(6)%sf(i, j, k)) - y_kahan
+                                        updatedvar(6)%sf(i, j, k) = t_kahan
+
+                                        ! Kahan summation for fp_z
+                                        y_kahan = real(func*fp_z, kind=wp) - kcomp(7)%sf(i, j, k)
+                                        t_kahan = updatedvar(7)%sf(i, j, k) + y_kahan
+                                        kcomp(7)%sf(i, j, k) = (t_kahan - updatedvar(7)%sf(i, j, k)) - y_kahan
+                                        updatedvar(7)%sf(i, j, k) = t_kahan
+
+                                        ! Kahan summation for E_source
+                                        y_kahan = real(func*0._wp, kind=wp) - kcomp(8)%sf(i, j, k)
+                                        t_kahan = updatedvar(8)%sf(i, j, k) + y_kahan
+                                        kcomp(8)%sf(i, j, k) = (t_kahan - updatedvar(8)%sf(i, j, k)) - y_kahan
+                                        updatedvar(8)%sf(i, j, k) = t_kahan
+
+                                    end if
+
+                                end do
+                            end do
+                        end do
                     end do
+
                 end do
             end do
-            ! endif
         end do
         $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_gaussian
 
+    !> The purpose of this subroutine is to apply the gaussian kernel function for each particle (Maeda and Colonius, 2018)).
+    subroutine s_applygaussian(center, cellaux, nodecoord, stddsv, strength_idx, func)
+        $:GPU_ROUTINE(function_name='s_applygaussian',parallelism='[seq]', &
+            & cray_inline=True)
+
+        real(wp), dimension(3), intent(in) :: center
+        integer, dimension(3), intent(in) :: cellaux
+        real(wp), dimension(3), intent(in) :: nodecoord
+        real(wp), intent(in) :: stddsv
+        real(wp), intent(in) :: strength_idx
+        real(wp), intent(out) :: func
+        integer :: i
+
+        real(wp) :: distance
+        real(wp) :: theta, dtheta, L2, dzp, Lz2, zc
+        real(wp) :: Nr, Nr_count
+
+        distance = sqrt((center(1) - nodecoord(1))**2._wp + (center(2) - nodecoord(2))**2._wp + (center(3) - nodecoord(3))**2._wp)
+
+        if (num_dims == 3) then
+            !< 3D gaussian function
+            func = exp(-0.5_wp*(distance/stddsv)**2._wp)/(sqrt(2._wp*pi)*stddsv)**3._wp
+        else
+            if (cyl_coord) then
+                !< 2D cylindrical function:
+                ! We smear particles in the azimuthal direction for given r
+                theta = 0._wp
+                Nr = ceiling(2._wp*pi*nodecoord(2)/(y_cb(cellaux(2)) - y_cb(cellaux(2) - 1)))
+                dtheta = 2._wp*pi/Nr
+                L2 = center(2)**2._wp + nodecoord(2)**2._wp - 2._wp*center(2)*nodecoord(2)*cos(theta)
+                distance = sqrt((center(1) - nodecoord(1))**2._wp + L2)
+                ! Factor 2._wp is for symmetry (upper half of the 2D field (+r) is considered)
+                func = dtheta/2._wp/pi*exp(-0.5_wp*(distance/stddsv)**2._wp)/(sqrt(2._wp*pi)*stddsv)**3._wp
+                Nr_count = 0._wp
+                do while (Nr_count < Nr - 1._wp)
+                    Nr_count = Nr_count + 1._wp
+                    theta = Nr_count*dtheta
+                    ! trigonometric relation
+                    L2 = center(2)**2._wp + nodecoord(2)**2._wp - 2._wp*center(2)*nodecoord(2)*cos(theta)
+                    distance = sqrt((center(1) - nodecoord(1))**2._wp + L2)
+                    ! nodecoord(2)*dtheta is the azimuthal width of the cell
+                    func = func + &
+                           dtheta/2._wp/pi*exp(-0.5_wp*(distance/stddsv)**2._wp)/(sqrt(2._wp*pi)*stddsv)**(3._wp*(strength_idx + 1._wp))
+                end do
+            else
+                !< 2D cartesian function: Equation (48) from Madea and Colonius 2018
+                ! We smear particles considering a virtual depth (lag_params%charwidth) with lag_params%charNz cells
+                dzp = (lag_params%charwidth/(lag_params%charNz + 1._wp))
+
+                func = 0._wp
+                do i = 0, lag_params%charNz
+                    zc = (-lag_params%charwidth/2._wp + dzp*(0.5_wp + i)) ! Center of virtual cell i in z-direction
+                    Lz2 = (center(3) - zc)**2._wp
+                    distance = sqrt((center(1) - nodecoord(1))**2._wp + (center(2) - nodecoord(2))**2._wp + Lz2)
+                    func = func + dzp/lag_params%charwidth*exp(-0.5_wp*(distance/stddsv)**2._wp)/(sqrt(2._wp*pi)*stddsv)**3._wp
+                end do
+            end if
+        end if
+
+    end subroutine s_applygaussian
+
+    !> Calculates the standard deviation of the bubble being smeared in the Eulerian framework.
+            !! @param cell Cell where the bubble is located
+            !! @param volpart Volume of the bubble
+            !! @param stddsv Standard deviaton
+    subroutine s_compute_stddsv(cell, volpart, stddsv)
+        $:GPU_ROUTINE(function_name='s_compute_stddsv',parallelism='[seq]', &
+            & cray_inline=True)
+
+        integer, dimension(3), intent(in) :: cell
+        real(wp), intent(in) :: volpart
+        real(wp), intent(out) :: stddsv
+
+        real(wp) :: chardist, charvol
+        real(wp) :: rad
+
+        !< Compute characteristic distance
+        chardist = sqrt(dx(cell(1))*dy(cell(2)))
+        if (p > 0) chardist = (dx(cell(1))*dy(cell(2))*dz(cell(3)))**(1._wp/3._wp)
+
+        !< Compute characteristic volume
+        if (p > 0) then
+            charvol = dx(cell(1))*dy(cell(2))*dz(cell(3))
+        else
+            if (cyl_coord) then
+                charvol = dx(cell(1))*dy(cell(2))*y_cc(cell(2))*2._wp*pi
+            else
+                charvol = dx(cell(1))*dy(cell(2))*lag_params%charwidth
+            end if
+        end if
+
+        !< Compute Standard deviaton
+        if ((volpart/charvol) > 0.5_wp*lag_params%valmaxvoid .or. (lag_params%smooth_type == 1)) then
+            rad = (3._wp*volpart/(4._wp*pi))**(1._wp/3._wp)
+            stddsv = 1._wp*lag_params%epsilonb*max(chardist, rad)
+        else
+            stddsv = 0._wp
+        end if
+
+    end subroutine s_compute_stddsv
+
     !> The purpose of this subroutine is to check if the current cell is outside the computational domain or not (including ghost cells).
-            !! @param cellaux Tested cell to smear the bubble effect in.
+            !! @param cellaux Tested cell to smear the particle effect in.
             !! @param celloutside If true, then cellaux is outside the computational domain.
     subroutine s_check_celloutside(cellaux, celloutside)
         $:GPU_ROUTINE(function_name='s_check_celloutside',parallelism='[seq]', &
@@ -273,93 +456,6 @@ contains
         end if
 
     end subroutine s_check_celloutside
-
-    ! !> The purpose of this subroutine is to check if the current cell is outside the physical domain
-    !         !! @param cellaux Tested cell to smear the particle effect in.
-    !         !! @param celloutside If true, then cellaux is outside the computational domain.
-    ! subroutine s_check_celloutside(cellaux, celloutside)
-    !     $:GPU_ROUTINE(function_name='s_check_celloutside',parallelism='[seq]', &
-    !         & cray_inline=True)
-
-    !     integer, dimension(3), intent(inout) :: cellaux
-    !     logical, intent(out) :: celloutside
-
-    !     celloutside = .false.
-
-    !     if (num_dims == 2) then !idwint(3)%beg, idwint(3)%end
-    !         if ((cellaux(1) < idwint(1)%beg) .or. (cellaux(2) < idwint(2)%beg)) then
-    !             celloutside = .true.
-    !         end if
-
-    !         if ((cellaux(1) > idwint(1)%end) .or. (cellaux(2) > idwint(2)%end)) then
-    !             celloutside = .true.
-    !         end if
-    !     else
-    !         if ((cellaux(1) < idwint(1)%beg) .or. (cellaux(2) < idwint(2)%beg) .or. (cellaux(3) < idwint(3)%beg)) then
-    !             celloutside = .true.
-    !         end if
-
-    !         if ((cellaux(1) > idwint(1)%end) .or. (cellaux(2) > idwint(2)%end) .or. (cellaux(3) > idwint(3)%end)) then
-    !             celloutside = .true.
-    !         end if
-    !     end if
-
-    ! end subroutine s_check_celloutside
-
-    !> The purpose of this procedure is to determine if the lagrangian bubble is located in the
-        !!       physical domain. The ghost cells are not part of the physical domain.
-        !! @param pos_part Spatial coordinates of the bubble
-    function particle_in_domain_physical_kernels(pos_part)
-
-        logical :: particle_in_domain_physical_kernels
-        real(wp), dimension(3), intent(in) :: pos_part
-
-        particle_in_domain_physical_kernels = ((pos_part(1) < x_cb(m)) .and. (pos_part(1) >= x_cb(-1)) .and. &
-                                               (pos_part(2) < y_cb(n)) .and. (pos_part(2) >= y_cb(-1)))
-
-        if (p > 0) then
-            particle_in_domain_physical_kernels = (particle_in_domain_physical_kernels .and. (pos_part(3) < z_cb(p)) .and. (pos_part(3) >= z_cb(-1)))
-        end if
-
-    end function particle_in_domain_physical_kernels
-
-    !> This subroutine relocates the current cell, if it intersects a symmetric boundary.
-            !! @param cell Cell of the current particle
-            !! @param cellaux Cell to map the particle effect in.
-    subroutine s_shift_cell_symmetric_bc(cellaux, cell)
-        $:GPU_ROUTINE(function_name='s_shift_cell_symmetric_bc', &
-            & parallelism='[seq]', cray_inline=True)
-
-        integer, dimension(3), intent(inout) :: cellaux
-        integer, dimension(3), intent(in) :: cell
-
-        ! x-dir
-        if (bc_x%beg == BC_REFLECTIVE .and. (cell(1) <= mapCells - 1)) then
-            cellaux(1) = abs(cellaux(1)) - 1
-        end if
-        if (bc_x%end == BC_REFLECTIVE .and. (cell(1) >= m + 1 - mapCells)) then
-            cellaux(1) = cellaux(1) - (2*(cellaux(1) - m) - 1)
-        end if
-
-        !y-dir
-        if (bc_y%beg == BC_REFLECTIVE .and. (cell(2) <= mapCells - 1)) then
-            cellaux(2) = abs(cellaux(2)) - 1
-        end if
-        if (bc_y%end == BC_REFLECTIVE .and. (cell(2) >= n + 1 - mapCells)) then
-            cellaux(2) = cellaux(2) - (2*(cellaux(2) - n) - 1)
-        end if
-
-        if (p > 0) then
-            !z-dir
-            if (bc_z%beg == BC_REFLECTIVE .and. (cell(3) <= mapCells - 1)) then
-                cellaux(3) = abs(cellaux(3)) - 1
-            end if
-            if (bc_z%end == BC_REFLECTIVE .and. (cell(3) >= p + 1 - mapCells)) then
-                cellaux(3) = cellaux(3) - (2*(cellaux(3) - p) - 1)
-            end if
-        end if
-
-    end subroutine s_shift_cell_symmetric_bc
 
     !> This subroutine transforms the computational coordinates of the particle from
             !!      real type into integer.
@@ -571,11 +667,11 @@ contains
             rmass_add = 0._wp
         end if
 
-        do dir = 1, num_dims
-            if (.not. ieee_is_finite(force(dir))) then
-                force(dir) = 0._wp
-            end if
-        end do
+        ! do dir = 1, num_dims
+        !     if (.not. ieee_is_finite(force(dir))) then
+        !         force(dir) = 0._wp
+        !     end if
+        ! end do
 
     end subroutine s_get_particle_force
 
@@ -605,12 +701,12 @@ contains
         numerator = 0._wp
         denominator = 0._wp
 
-        if (abs(pos(1) - x_cc(i)) <= eps .and. &
-            abs(pos(2) - y_cc(j)) <= eps .and. &
-            abs(pos(3) - z_cc(k)) <= eps) then
-            val = field_vf(field_index)%sf(i, j, k)
-            return
-        end if
+        ! if (abs(pos(1) - x_cc(i)) <= eps .and. &
+        !     abs(pos(2) - y_cc(j)) <= eps .and. &
+        !     abs(pos(3) - z_cc(k)) <= eps) then
+        !     val = field_vf(field_index)%sf(i, j, k)
+        !     return
+        ! end if
 
         ix_count = 0
         do ix = i - npts, i + npts
@@ -637,15 +733,13 @@ contains
 
         val = numerator/denominator
 
-        ! if (num_dims == 3) then
-        !     local_min = minval(field_vf(field_index)%sf(i - npts:i + npts, j - npts:j + npts, k - npts:k + npts))
-        !     local_max = maxval(field_vf(field_index)%sf(i - npts:i + npts, j - npts:j + npts, k - npts:k + npts))
-        ! else
-        !     local_min = minval(field_vf(field_index)%sf(i - npts:i + npts, j - npts:j + npts, k))
-        !     local_max = maxval(field_vf(field_index)%sf(i - npts:i + npts, j - npts:j + npts, k))
-        ! end if
+        if (.not. ieee_is_finite(val)) then
+            val = field_vf(field_index)%sf(i, j, k)
 
-        ! val = max(local_min, min(local_max, val))
+        elseif (abs(val) <= eps) then
+            val = 0._wp
+
+        end if
 
     end function
 
@@ -871,10 +965,10 @@ contains
         if (re <= 45.0_wp) then
             ! Rarefied-dominated regime
             Knp = sqrt(0.5_wp*pi*gamma)*mp/re
-            if (Knp > 0.01) then
+            if (Knp > 0.01_wp) then
                 fKn = 1.0_wp/(1.0_wp + Knp*(2.514_wp + 0.8_wp*exp(-0.55_wp/Knp)))
             else
-                fKn = 1.0_wp/(1.0_wp + Knp*(2.514_wp + 0.8_wp*exp(-0.55_wp/0.01)))
+                fKn = 1.0_wp/(1.0_wp + Knp*(2.514_wp + 0.8_wp*exp(-0.55_wp/0.01_wp)))
 
             end if
             CD1 = (24.0_wp/re)*(1.0_wp + 0.15_wp*re**(0.687_wp))*fKn
@@ -903,7 +997,7 @@ contains
             ! TLJ: coefficients tweaked to get continuous values
             !      on the two branches at the critical points
             if (mp < 1.5_wp) then
-                CM = 1.65_wp + 0.65_wp*tanh(4_wp*mp - 3.4_wp)
+                CM = 1.65_wp + 0.65_wp*tanh(4._wp*mp - 3.4_wp)
             else
                 !CM = 2.18_wp - 0.13_wp*tanh(0.9_wp*mp - 2.7_wp)
                 CM = 2.18_wp - 0.12913149918318745_wp*tanh(0.9_wp*mp - 2.7_wp)
@@ -922,20 +1016,20 @@ contains
                 HM = 0.93967777777777772_wp + 1.0_wp/(3.5_wp + (mp**5))
             end if
 
-            cd_loth = (24.0_wp/re)*(1 + 0.15_wp*(re**(0.687)))*HM + &
-                      0.42_wp*CM/(1 + 42500/re**(1.16*CM) + GM/sqrt(re))
+            cd_loth = (24.0_wp/re)*(1._wp + 0.15_wp*(re**(0.687_wp)))*HM + &
+                      0.42_wp*CM/(1._wp + 42500._wp/re**(1.16_wp*CM) + GM/sqrt(re))
 
         end if
 
-        b1 = 5.81_wp*phi/((1.0 - phi)**2) + &
-             0.48_wp*(phi**(1._wp/3._wp))/((1.0 - phi)**3)
+        b1 = 5.81_wp*phi/((1.0_wp - phi)**2) + &
+             0.48_wp*(phi**(1._wp/3._wp))/((1.0_wp - phi)**3)
 
         b2 = ((1.0_wp - phi)**2)*(phi**3)* &
-             re*(0.95 + 0.61*(phi**3)/((1.0 - phi)*2))
+             re*(0.95_wp + 0.61_wp*(phi**3)/((1.0_wp - phi)*2))
 
         b3 = min(sqrt(20.0_wp*mp), 1.0_wp)* &
-             (5.65*phi - 22.0*(phi**2) + 23.4*(phi**3))* &
-             (1 + tanh((mp - (0.65 - 0.24*phi))/0.35))
+             (5.65_wp*phi - 22.0_wp*(phi**2) + 23.4_wp*(phi**3))* &
+             (1._wp + tanh((mp - (0.65_wp - 0.24_wp*phi))/0.35_wp))
 
         cd = cd_loth/(1.0_wp - phi) + b3 + (24.0_wp/re)*(1.0_wp - phi)*(b1 + b2)
 

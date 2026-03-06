@@ -321,6 +321,8 @@ module m_global_parameters
     !! conditions data to march the solution in the physical computational domain
     !! to the next time-step.
 
+    integer, allocatable :: beta_vars(:) !< Indices of variables to communicate for bubble/particle coupling
+
     logical :: fft_wrt
     logical :: dummy  !< AMDFlang workaround: keep a dummy logical to avoid a compiler case-optimization bug when a parameter+GPU-kernel conditional is false
 
@@ -949,6 +951,14 @@ contains
 
         end if
 
+        if (bubbles_lagrange) then
+            allocate (beta_vars(1:3))
+            beta_vars(1:3) = [1, 2, 5]
+        elseif (particles_lagrange) then
+            allocate (beta_vars(1:8))
+            beta_vars(1:8) = [1, 2, 3, 4, 5, 6, 7, 8]
+        end if
+
         if (chemistry) then
             species_idx%beg = sys_size + 1
             species_idx%end = sys_size + num_species
@@ -979,8 +989,8 @@ contains
         call s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, &
                                            igr_order, buff_size, &
                                            idwint, idwbuff, viscous, &
-                                           bubbles_lagrange, m, n, p, &
-                                           num_dims, igr, ib, fd_number, particles_lagrange)
+                                           bubbles_lagrange, particles_lagrange, &
+                                           m, n, p, num_dims, igr, ib, fd_number)
 
 #ifdef MFC_MPI
 

@@ -57,6 +57,8 @@ contains
         !!      other procedures that are necessary to setup the module.
     impure subroutine s_initialize_mpi_common_module
 
+        integer :: beta_v_size, beta_comm_size_1, beta_comm_size_2, beta_comm_size_3, beta_halo_size
+
 #ifdef MFC_MPI
         ! Allocating buff_send/recv and. Please note that for the sake of
         ! simplicity, both variables are provided sufficient storage to hold
@@ -81,6 +83,28 @@ contains
             end if
         else
             halo_size = -1 + buff_size*(v_size)
+        end if
+
+        if (bubbles_lagrange .or. particles_lagrange) then
+            beta_v_size = size(beta_vars)
+            beta_comm_size_1 = m + 2*mapCells + 3
+            beta_comm_size_2 = merge(n + 2*mapCells + 3, 1, n > 0)
+            beta_comm_size_3 = merge(p + 2*mapCells + 3, 1, p > 0)
+            if (n > 0) then
+                if (p > 0) then
+                    beta_halo_size = 2*(mapCells + 1)*beta_v_size*max( &
+                                     beta_comm_size_2*beta_comm_size_3, &
+                                     beta_comm_size_1*beta_comm_size_3, &
+                                     beta_comm_size_1*beta_comm_size_2) - 1
+                else
+                    beta_halo_size = 2*(mapCells + 1)*beta_v_size*max( &
+                                     beta_comm_size_2, &
+                                     beta_comm_size_1) - 1
+                end if
+            else
+                beta_halo_size = 2*(mapCells + 1)*beta_v_size - 1
+            end if
+            halo_size = max(halo_size, beta_halo_size)
         end if
 
         $:GPU_UPDATE(device='[halo_size, v_size]')

@@ -84,7 +84,7 @@ contains
             end do
         end if
 
-        if (bubbles_lagrange) then
+        if (bubbles_lagrange .or. particles_lagrange) then
             beta_bc_bounds(1)%beg = -mapcells - 1
             beta_bc_bounds(1)%end = m + mapcells + 1
             ! n > 0 always for bubbles_lagrange
@@ -2419,7 +2419,17 @@ contains
                 call s_mpi_allreduce_max(z_cb(p), glb_bounds(3)%end)
             end if
         end if
+#else
+        glb_bounds(1)%beg = x_cb(-1); glb_bounds(1)%end = x_cb(m)
+        if (n > 0) then
+            glb_bounds(2)%beg = y_cb(-1); glb_bounds(2)%end = y_cb(n)
+            if (p > 0) then
+                glb_bounds(3)%beg = z_cb(-1); glb_bounds(3)%end = z_cb(p)
+            end if
+        end if
 #endif
+        $:GPU_UPDATE(device='[glb_bounds]')
+
 #endif
 
 #ifndef MFC_PRE_PROCESS

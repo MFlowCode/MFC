@@ -114,17 +114,16 @@ contains
 
     subroutine s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, &
                                              igr_order, buff_size, idwint, idwbuff, &
-                                             viscous, bubbles_lagrange, m, n, p, num_dims, &
-                                             igr, ib, fd_number, particles_lagrange)
+                                             viscous, bubbles_lagrange, particles_lagrange, &
+                                             m, n, p, num_dims, igr, ib, fd_number)
 
         integer, intent(in) :: recon_type, weno_polyn, muscl_polyn
         integer, intent(in) :: m, n, p, num_dims, igr_order, fd_number
         integer, intent(inout) :: buff_size
         type(int_bounds_info), dimension(3), intent(inout) :: idwint, idwbuff
-        logical, intent(in) :: viscous, bubbles_lagrange
+        logical, intent(in) :: viscous, bubbles_lagrange, particles_lagrange
         logical, intent(in) :: igr
         logical, intent(in) :: ib
-        logical, intent(in), optional :: particles_lagrange
 
         ! Determining the number of cells that are needed in order to store
         ! sufficient boundary conditions data as to iterate the solution in
@@ -148,10 +147,8 @@ contains
         end if
 
         ! Correction for smearing function in the lagrangian subgrid particle model
-        if (present(particles_lagrange)) then
-            if (particles_lagrange) then
-                buff_size = max(buff_size + fd_number, mapCells + 1 + fd_number)
-            end if
+        if (particles_lagrange) then
+            buff_size = max(buff_size + fd_number, mapCells + 1 + fd_number)
         end if
 
         if (ib) then
