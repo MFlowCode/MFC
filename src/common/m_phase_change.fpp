@@ -579,7 +579,8 @@ contains
             InvJac = InvJac/(Jac(1, 1)*Jac(2, 2) - Jac(1, 2)*Jac(2, 1))
 
             ! calculating correction array for Newton's method
-            DeltamP = -1.0_wp*(matmul(InvJac, R2D))
+            DeltamP(1) = -1.0_wp*(InvJac(1, 1)*R2D(1) + InvJac(1, 2)*R2D(2))
+            DeltamP(2) = -1.0_wp*(InvJac(2, 1)*R2D(1) + InvJac(2, 2)*R2D(2))
 
             ! updating two reacting 'masses'. Recall that inert 'masses' do not change during the phase change
             ! liquid
@@ -716,7 +717,7 @@ contains
 
             ! underrelaxation factor
             Om = 1.0e-3_wp
-            do while ((abs(FT) > ptgalpha_eps) .or. (ns == 0))
+            do
                 ! increasing counter
                 ns = ns + 1
 
@@ -737,6 +738,7 @@ contains
                 ! updating saturation temperature
                 TSat = TSat - Om*FT/dFdT
 
+                if (abs(FT) <= ptgalpha_eps) exit
             end do
 
         end if
