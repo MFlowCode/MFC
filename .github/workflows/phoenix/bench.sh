@@ -19,6 +19,8 @@ else
     bench_opts="--mem 1"
 fi
 
+rm -rf build
+
 source .github/scripts/retry-build.sh
 RETRY_CLEAN_CMD="./mfc.sh clean" retry_build ./mfc.sh build -j $n_jobs $build_opts || exit 1
 
