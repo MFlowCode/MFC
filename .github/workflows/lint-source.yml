@@ -55,3 +55,6 @@ jobs:
         ! grep -R '==='   ./benchmarks/**/*.py
         ! grep -R '==='   ./examples/**/*.py
 
+    - name: Fortran/Fypp static analysis
+      run: python3 toolchain/mfc/lint_source.py
+
