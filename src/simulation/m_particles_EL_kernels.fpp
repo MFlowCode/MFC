@@ -30,93 +30,40 @@ contains
             !! @param lbk_pos Spatial coordinates of the particles
             !! @param updatedvar Eulerian variable to be updated
             !! @param lbk_f_p Forces on the particles
-    subroutine s_smoothfunction(nParticles, lbk_rad, lbk_vel, lbk_s, lbk_pos, lbk_f_p, lbk_g_sum, updatedvar, kcomp)
+    subroutine s_smoothfunction(nParticles, lbk_rad, lbk_vel, lbk_s, lbk_pos, lbk_f_p, lbk_g_sum, updatedvar, kcomp, lbk_linked_list, lbk_particle_head)
 
         integer, intent(in) :: nParticles
         real(wp), dimension(1:lag_params%nParticles_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_pos, lbk_vel
         real(wp), dimension(1:lag_params%nParticles_glb, 1:2), intent(in) :: lbk_rad
         real(wp), dimension(1:lag_params%nParticles_glb, 1:3), intent(in) :: lbk_f_p
         real(wp), dimension(1:lag_params%nParticles_glb), intent(inout) :: lbk_g_sum
+
+        integer, dimension(1:lag_params%nParticles_glb), intent(in) :: lbk_linked_list
+        integer, dimension(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end), intent(in) :: lbk_particle_head
+
         type(scalar_field), dimension(:), intent(inout) :: updatedvar
         type(scalar_field), dimension(:), intent(inout) :: kcomp
 
         ! call s_gaussian(nParticles, lbk_rad, lbk_s, lbk_pos, lbk_vel, updatedvar, lbk_f_p, ngh)
-        call s_gaussian(nParticles, lbk_rad, lbk_vel, lbk_s, lbk_pos, lbk_f_p, lbk_g_sum, updatedvar, kcomp)
+        call s_gaussian(nParticles, lbk_rad, lbk_vel, lbk_s, lbk_pos, lbk_f_p, lbk_g_sum, updatedvar, kcomp, lbk_linked_list, lbk_particle_head)
 
     end subroutine s_smoothfunction
-
-    !> Builds a sorted cell list mapping each interior cell (0:m,0:n,0:p) to its
-    !!      resident particles. Uses a counting-sort on the host (O(nParticles + N_cells)).
-    !!      Must be called before s_gaussian each RK stage.
-    !! @param nParticles Number of lagrangian particles in the current domain
-    !! @param lbk_s Computational coordinates of the particles
-    subroutine s_build_cell_list(nParticles, lbk_s)
-
-        integer, intent(in) :: nParticles
-        real(wp), dimension(1:lag_params%nParticles_glb, 1:3, 1:2), intent(in) :: lbk_s
-
-        integer :: l, ci, cj, ck, idx
-        real(wp), dimension(3) :: s_coord
-
-        ! Bring current particle positions to host
-        $:GPU_UPDATE(host='[lbk_s]')
-
-        ! Pass 1: zero counts and count particles per cell
-        cell_list_count = 0
-        do l = 1, nParticles
-            s_coord(1:3) = lbk_s(l, 1:3, 2)
-            ci = int(s_coord(1))
-            cj = int(s_coord(2))
-            ck = int(s_coord(3))
-            ! Clamp to interior (particle should already be in [0:m,0:n,0:p])
-            ci = max(0, min(ci, m))
-            cj = max(0, min(cj, n))
-            ck = max(0, min(ck, p))
-            cell_list_count(ci, cj, ck) = cell_list_count(ci, cj, ck) + 1
-        end do
-
-        ! Prefix sum to compute start indices (1-based into cell_list_idx)
-        idx = 1
-        do ck = 0, p
-            do cj = 0, n
-                do ci = 0, m
-                    cell_list_start(ci, cj, ck) = idx
-                    idx = idx + cell_list_count(ci, cj, ck)
-                end do
-            end do
-        end do
-
-        ! Pass 2: place particle indices into cell_list_idx
-        ! Temporarily reuse cell_list_count as a running offset
-        cell_list_count = 0
-        do l = 1, nParticles
-            s_coord(1:3) = lbk_s(l, 1:3, 2)
-            ci = int(s_coord(1))
-            cj = int(s_coord(2))
-            ck = int(s_coord(3))
-            ci = max(0, min(ci, m))
-            cj = max(0, min(cj, n))
-            ck = max(0, min(ck, p))
-            cell_list_idx(cell_list_start(ci, cj, ck) + cell_list_count(ci, cj, ck)) = l
-            cell_list_count(ci, cj, ck) = cell_list_count(ci, cj, ck) + 1
-        end do
-
-        ! Send cell list arrays to GPU
-        $:GPU_UPDATE(device='[cell_list_start, cell_list_count, cell_list_idx]')
-
-    end subroutine s_build_cell_list
 
     !> Cell-centric gaussian smearing using the cell list (no GPU atomics).
     !!      Each grid cell accumulates contributions from nearby particles looked up
     !!      via cell_list_start/count/idx.
     ! nParticles, lbk_rad, lbk_s, lbk_pos, lbk_vel, updatedvar, lbk_f_p)
-    subroutine s_gaussian(nParticles, lbk_rad, lbk_vel, lbk_s, lbk_pos, lbk_f_p, lbk_g_sum, updatedvar, kcomp)
+    subroutine s_gaussian(nParticles, lbk_rad, lbk_vel, lbk_s, lbk_pos, lbk_f_p, lbk_g_sum, updatedvar, kcomp, lbk_linked_list, lbk_particle_head)
 
         integer, intent(in) :: nParticles
         real(wp), dimension(1:lag_params%nParticles_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_pos, lbk_vel
         real(wp), dimension(1:lag_params%nParticles_glb, 1:2), intent(in) :: lbk_rad
         real(wp), dimension(1:lag_params%nParticles_glb, 1:3), intent(in) :: lbk_f_p
         real(wp), dimension(1:lag_params%nParticles_glb), intent(inout) :: lbk_g_sum
+
+        integer, dimension(1:lag_params%nParticles_glb), intent(in) :: lbk_linked_list
+        integer, dimension(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end), intent(in) :: lbk_particle_head
+
         type(scalar_field), dimension(:), intent(inout) :: updatedvar
         type(scalar_field), dimension(:), intent(inout) :: kcomp
 
@@ -228,11 +175,13 @@ contains
                         do dj = dj_beg, dj_end
                             $:GPU_LOOP(parallelism='[seq]')
                             do di = di_beg, di_end
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do lb = cell_list_start(di, dj, dk), &
-                                    cell_list_start(di, dj, dk) + cell_list_count(di, dj, dk) - 1
 
-                                    part_idx = cell_list_idx(lb)
+                                part_idx = lbk_particle_head(di, dj, dk)
+
+                                do while (part_idx /= -1)
+
+                                    ! do lb = cell_list_start(di, dj, dk), &
+                                    ! cell_list_start(di, dj, dk) + cell_list_count(di, dj, dk) - 1
 
                                     ! Particle properties
                                     volpart = 4._wp/3._wp*pi*lbk_rad(part_idx, 2)**3._wp
@@ -312,6 +261,7 @@ contains
 
                                     end if
 
+                                    part_idx = lbk_linked_list(part_idx)
                                 end do
                             end do
                         end do
