@@ -8,7 +8,7 @@
 PASSTHROUGH=""
 for arg in "$@"; do
     case "$arg" in
-        --test-all|--single|--debug|--gcov) PASSTHROUGH="$PASSTHROUGH $arg" ;;
+        --test-all|--single|--debug|--gcov|--only-changes) PASSTHROUGH="$PASSTHROUGH $arg" ;;
     esac
 done
 

@@ -30,7 +30,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from ..printer import cons
 from .. import common
 from ..common import MFCException
-from ..build import PRE_PROCESS, SIMULATION, POST_PROCESS, SYSCHECK
+from ..build import PRE_PROCESS, SIMULATION, POST_PROCESS
 from .case import (input_bubbles_lagrange, get_post_process_mods,
                     POST_PROCESS_3D_PARAMS)
 
@@ -184,6 +184,11 @@ def _parse_gcov_json_output(raw_bytes: bytes, root_dir: str) -> set:
             data, end_pos = decoder.raw_decode(text, pos)
             pos = end_pos
         except json.JSONDecodeError:
+            remaining = len(text) - pos
+            if remaining > 0:
+                cons.print(f"[yellow]Warning: gcov JSON parse error at offset "
+                           f"{pos} ({remaining} bytes remaining) — partial "
+                           f"coverage recorded for this test.[/yellow]")
             break
 
         for file_entry in data.get("files", []):
@@ -319,9 +324,13 @@ def _run_single_test_direct(test_info: dict, gcda_dir: str, strip: str) -> tuple
     failures = []
     for target_name, bin_path in binaries:
         if not os.path.isfile(bin_path):
-            cons.print(f"[yellow]Warning: binary {target_name} not found "
-                       f"at {bin_path} for test {uuid}[/yellow]")
-            continue
+            # Record missing binary as a failure and stop: downstream targets
+            # depend on outputs from earlier ones (e.g. simulation needs the
+            # grid from pre_process), so running them without a predecessor
+            # produces misleading init-only gcda files.
+            failures.append((target_name, "missing-binary",
+                             f"binary not found: {bin_path}"))
+            break
 
         # Verify .inp file exists before running (diagnostic for transient
         # filesystem issues where the file goes missing between phases).
@@ -329,7 +338,7 @@ def _run_single_test_direct(test_info: dict, gcda_dir: str, strip: str) -> tuple
         if not os.path.isfile(inp_file):
             failures.append((target_name, "missing-inp",
                              f"{inp_file} not found before launch"))
-            continue
+            break
 
         cmd = mpi_cmd + [bin_path]
         try:
@@ -337,13 +346,18 @@ def _run_single_test_direct(test_info: dict, gcda_dir: str, strip: str) -> tuple
                                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                     env=env, cwd=test_dir, timeout=600)
             if result.returncode != 0:
-                # Save last lines of output for debugging.
+                # Save last lines of output for debugging.  Stop here: a
+                # failed pre_process/simulation leaves no valid outputs for
+                # the next target, and running it produces spurious coverage.
                 tail = "\n".join(result.stdout.strip().splitlines()[-15:])
                 failures.append((target_name, result.returncode, tail))
+                break
         except subprocess.TimeoutExpired:
             failures.append((target_name, "timeout", ""))
+            break
         except (subprocess.SubprocessError, OSError) as exc:
             failures.append((target_name, str(exc), ""))
+            break
 
     return uuid, test_gcda, failures
 
@@ -375,9 +389,9 @@ def _prepare_test(case, root_dir: str) -> dict:  # pylint: disable=unused-argume
     case.params.update(get_post_process_mods(case.params))
 
     # Run only one timestep: we only need to know which source files are
-    # *touched*, not verify correctness.  A single step exercises the same
-    # code paths (init, RHS, time-stepper, output) while preventing heavy
-    # 3D tests from timing out under gcov instrumentation (~10x slowdown).
+    # *touched*, not verify correctness.  A single step exercises the key
+    # code paths across all three executables while preventing heavy 3D tests
+    # from timing out under gcov instrumentation (~10x slowdown).
     case.params['t_step_stop'] = 1
 
     # Adaptive-dt tests: post_process computes n_save = int(t_stop/t_save)+1
@@ -403,7 +417,9 @@ def _prepare_test(case, root_dir: str) -> dict:  # pylint: disable=unused-argume
 
     # Write .inp files directly (no subprocess, no Mako templates).
     # Suppress console output from get_inp() to avoid one message per (test, target) pair.
-    targets = [SYSCHECK, PRE_PROCESS, SIMULATION, POST_PROCESS]
+    # Run all three executables to capture coverage across the full pipeline
+    # (pre_process: grid/IC generation; simulation: RHS/time-stepper; post_process: field I/O).
+    targets = [PRE_PROCESS, SIMULATION, POST_PROCESS]
     binaries = []
     # NOTE: not thread-safe — Phase 1 must remain single-threaded.
     orig_file = cons.raw.file
@@ -451,11 +467,12 @@ def build_coverage_cache(  # pylint: disable=too-many-locals,too-many-statements
 
     if n_jobs is None:
         n_jobs = max(os.cpu_count() or 1, 1)
-    # Cap test parallelism: each test spawns gcov-instrumented MPI processes
-    # (~2-5 GB each under gcov).  Too many concurrent tests cause OOM.
-    phase1_jobs = min(n_jobs, 16)
+    # Cap Phase 2 test parallelism: each test spawns gcov-instrumented MPI
+    # processes (~2-5 GB each under gcov).  Too many concurrent tests cause OOM.
+    # Phase 3 gcov workers run at full n_jobs (gcov is lightweight by comparison).
+    phase2_jobs = min(n_jobs, 16)
     cons.print(f"[bold]Building coverage cache for {len(cases)} tests "
-               f"({phase1_jobs} test workers, {n_jobs} gcov workers)...[/bold]")
+               f"({phase2_jobs} test workers, {n_jobs} gcov workers)...[/bold]")
     cons.print(f"[dim]Using gcov binary: {gcov_bin}[/dim]")
     cons.print(f"[dim]Found {len(gcno_files)} .gcno files[/dim]")
     cons.print(f"[dim]GCOV_PREFIX_STRIP={strip}[/dim]")
@@ -479,7 +496,7 @@ def build_coverage_cache(  # pylint: disable=too-many-locals,too-many-statements
         cons.print("[bold]Phase 2/3: Running tests...[/bold]")
         test_results: dict = {}
         all_failures: dict = {}
-        with ThreadPoolExecutor(max_workers=phase1_jobs) as pool:
+        with ThreadPoolExecutor(max_workers=phase2_jobs) as pool:
             futures = {
                 pool.submit(_run_single_test_direct, info, gcda_dir, strip): info
                 for info in test_infos
@@ -494,8 +511,8 @@ def build_coverage_cache(  # pylint: disable=too-many-locals,too-many-statements
                 test_results[uuid] = test_gcda
                 if failures:
                     all_failures[uuid] = failures
-                if (i + 1) % 50 == 0 or (i + 1) == len(cases):
-                    cons.print(f"  [{i+1:3d}/{len(cases):3d}] tests completed")
+                if (i + 1) % 50 == 0 or (i + 1) == len(test_infos):
+                    cons.print(f"  [{i+1:3d}/{len(test_infos):3d}] tests completed")
 
         if all_failures:
             cons.print()
@@ -548,8 +565,8 @@ def build_coverage_cache(  # pylint: disable=too-many-locals,too-many-statements
                     coverage = []
                 cache[uuid] = coverage
                 completed += 1
-                if completed % 50 == 0 or completed == len(cases):
-                    cons.print(f"  [{completed:3d}/{len(cases):3d}] tests processed")
+                if completed % 50 == 0 or completed == len(test_results):
+                    cons.print(f"  [{completed:3d}/{len(test_results):3d}] tests processed")
     finally:
         shutil.rmtree(gcda_dir, ignore_errors=True)
 
@@ -627,8 +644,8 @@ def load_coverage_cache(root_dir: str) -> Optional[dict]:
     try:
         with gzip.open(COVERAGE_CACHE_PATH, "rt", encoding="utf-8") as f:
             cache = json.load(f)
-    except (OSError, gzip.BadGzipFile, json.JSONDecodeError, UnicodeDecodeError):
-        cons.print("[yellow]Warning: Coverage cache is unreadable or corrupt.[/yellow]")
+    except (OSError, gzip.BadGzipFile, json.JSONDecodeError, UnicodeDecodeError) as exc:
+        cons.print(f"[yellow]Warning: Coverage cache is unreadable or corrupt: {exc}[/yellow]")
         return None
 
     if not isinstance(cache, dict):
