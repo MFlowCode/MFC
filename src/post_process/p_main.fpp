@@ -93,6 +93,10 @@ program p_main
     end do
     ! END: Time-Marching Loop
 
+    if (proc_rank == 0 .and. ib_force_wrt) then
+        call s_write_ib_force_files()
+    end if
+
     close (11)
 
     call s_finalize_modules()
