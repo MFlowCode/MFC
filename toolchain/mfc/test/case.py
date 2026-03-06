@@ -5,7 +5,7 @@ from typing import List, Set, Union, Callable, Optional
 from ..      import case, common
 from ..state import ARG
 from ..run   import input
-from ..build import MFCTarget, get_target
+from ..build import MFCTarget, SIMULATION, get_target
 
 Tend = 0.25
 Nt   = 50
@@ -108,11 +108,14 @@ class TestCase(case.Case):
     ppn:          int
     trace:        str
     override_tol: Optional[float] = None
+    restart_check: bool = False
 
-    def __init__(self, trace: str, mods: dict, ppn: int = None, override_tol: float = None) -> None:
+    # pylint: disable=too-many-arguments, too-many-positional-arguments
+    def __init__(self, trace: str, mods: dict, ppn: int = None, override_tol: float = None, restart_check: bool = False) -> None:
         self.trace        = trace
         self.ppn          = ppn or 1
         self.override_tol = override_tol
+        self.restart_check = restart_check
         super().__init__({**BASE_CFG.copy(), **mods})
 
     def run(self, targets: List[Union[str, MFCTarget]], gpus: Set[int]) -> subprocess.CompletedProcess:
@@ -139,6 +142,59 @@ class TestCase(case.Case):
         ]
 
         return common.system(command, print_cmd=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+
+    def run_restart(self, targets, gpus):
+        """Run a restart roundtrip: simulate to midpoint, then restart to end."""
+        # NOTE: This method overrides t_step_save to produce exactly one save
+        # per phase (at the boundary step). Tests using restart_check=True
+        # must not rely on custom t_step_save values, as the straight run's
+        # save points would not match the restart run's.
+        mid_step = (self.params['t_step_start'] + self.params['t_step_stop']) // 2
+        if mid_step <= self.params['t_step_start']:
+            raise common.MFCException(
+                f"run_restart: t_step_stop ({self.params['t_step_stop']}) is too close "
+                f"to t_step_start ({self.params['t_step_start']}) for a restart roundtrip "
+                f"(need t_step_stop - t_step_start >= 2)."
+            )
+        orig = dict(self.params)
+
+        try:
+            self.delete_output()
+
+            # Phase 1: Run to midpoint (generates restart data)
+            self.params = {**orig, 't_step_stop': mid_step,
+                           't_step_save': mid_step - orig['t_step_start']}
+            self.create_directory()
+            result1 = self.run(targets, gpus)
+            if result1.returncode != 0:
+                return result1
+
+            # Keep D/ (has steps 0 and mid_step) and p_all/ (restart data).
+            dirpath = self.get_dirpath()
+            common.delete_directory(os.path.join(dirpath, "silo_hdf5"))
+
+            # Phase 2: Restart simulation from midpoint.  Only the simulation
+            # is run — it reads grid + IC directly from p_all/p0/<mid_step>/.
+            self.params = {**orig, 't_step_start': mid_step,
+                           't_step_save': orig['t_step_stop'] - mid_step}
+            self.create_directory()
+            result2 = self.run([SIMULATION], gpus)
+
+            # Remove intermediate step files from D/ so only step 0 and
+            # t_step_stop remain, matching the straight run's output.
+            if result2.returncode == 0:
+                d_dir = os.path.join(dirpath, "D")
+                mid_tag = f"{mid_step:06d}"
+                for f in glob.glob(os.path.join(d_dir, f"*.{mid_tag}.dat")):
+                    common.delete_file(f)
+
+            return result2
+        finally:
+            self.params = orig
+            try:
+                self.create_directory()
+            except Exception as exc:
+                print(f"Warning: failed to restore test directory: {exc}")
 
     def get_trace(self) -> str:
         return self.trace
@@ -269,6 +325,7 @@ print(json.dumps({{**case, **mods}}))
 
         return 1e8 * tolerance if single else tolerance
 
+# pylint: disable=too-many-instance-attributes
 @dataclasses.dataclass
 class TestCaseBuilder:
     trace:        str
@@ -278,6 +335,7 @@ class TestCaseBuilder:
     ppn:          int
     functor:      Optional[Callable]
     override_tol: Optional[float] = None
+    restart_check: bool = False
 
     def get_uuid(self) -> str:
         return trace_to_uuid(self.trace)
@@ -302,7 +360,7 @@ class TestCaseBuilder:
         if self.functor:
             self.functor(dictionary)
 
-        return TestCase(self.trace, dictionary, self.ppn, self.override_tol)
+        return TestCase(self.trace, dictionary, self.ppn, self.override_tol, self.restart_check)
 
 
 @dataclasses.dataclass
@@ -330,7 +388,7 @@ def define_case_f(trace: str, path: str, args: List[str] = None, ppn: int = None
 
 
 # pylint: disable=too-many-arguments, too-many-positional-arguments
-def define_case_d(stack: CaseGeneratorStack, newTrace: str, newMods: dict, ppn: int = None, functor: Callable = None, override_tol: float = None) -> TestCaseBuilder:
+def define_case_d(stack: CaseGeneratorStack, newTrace: str, newMods: dict, ppn: int = None, functor: Callable = None, override_tol: float = None, restart_check: bool = False) -> TestCaseBuilder:
     mods: dict = {}
 
     for mod in stack.mods:
@@ -346,7 +404,7 @@ def define_case_d(stack: CaseGeneratorStack, newTrace: str, newMods: dict, ppn: 
         if not common.isspace(trace):
             traces.append(trace)
 
-    return TestCaseBuilder(' -> '.join(traces), mods, None, None, ppn or 1, functor, override_tol)
+    return TestCaseBuilder(' -> '.join(traces), mods, None, None, ppn or 1, functor, override_tol, restart_check)
 
 def input_bubbles_lagrange(self):
     if "lagrange_bubblescreen" in self.trace:
