@@ -72,7 +72,8 @@ contains
 
       ! get is distance used in the force calculation with each IB and each wall 
       call s_detect_wall_collisions(ghost_points, wall_overlap_distances, num_gps)
-      call s_detect_ib_collisions(ghost_points, ib_markers, collision_lookup, num_gps, num_considered_collisions)
+      ! call s_detect_ib_collisions(ghost_points, ib_markers, collision_lookup, num_gps, num_considered_collisions)
+      call s_detect_ib_collisions_n2(collision_lookup, num_considered_collisions)
 
       select case (collision_model)
           case(1) ! soft sphere model
@@ -96,6 +97,8 @@ contains
         real(wp) :: k, eta, effective_mass ! the spring stiffness and damping coefficient and mass of a specific interaction
 
         if (num_considered_collisions == 0) return
+
+        print *, "Checking Collisions: ", num_considered_collisions
 
         ! Iterate over all collisions detected
         $:GPU_PARALLEL_LOOP(private='[i,l,pid1,pid2,centroid_1,centroid_2,collision_location,normal_vector,overlap_distance,effective_mass,k,eta,normal_velocity,tangental_vector,normal_force,tangental_force,torque]', copy='[forces, torques]', copyin='[patch_ib,num_considered_collisions]')
@@ -224,7 +227,7 @@ contains
       integer, dimension(num_ibs * (num_ibs-1) / 2, 2), intent(out) :: collision_lookup
       integer, intent(out) :: num_considered_collisions
 
-      integer :: i, j, k, col_idx_1, col_idx_2
+      integer :: i, j, k, l, col_idx_1, col_idx_2
       integer gp_idx, gp_patch_id, ip_patch_id
       integer :: max_pairs, pair_idx, out_idx
       logical :: already_found
@@ -236,27 +239,77 @@ contains
       max_pairs = num_ibs * (num_ibs - 1) / 2
       num_raw = 0
 
-      $:GPU_PARALLEL_LOOP(private='[gp_idx,gp_patch_id,local_num_raw,i,j,k, ip_patch_id]', copy='[raw_pairs,num_raw]')
+      $:GPU_UPDATE(host='[ib_markers%sf]')
+
+      ! $:GPU_PARALLEL_LOOP(private='[gp_idx,gp_patch_id,local_num_raw,i,j,k,l,already_found,ip_patch_id]', copy='[raw_pairs,num_raw]')
       do gp_idx = 1, num_gps
           gp_patch_id = gps(gp_idx)%ib_patch_id
-          i = gps(gp_idx)%ip_grid(1)
-          j = gps(gp_idx)%ip_grid(2)
-          k = 0; if (num_dims == 3) k = gps(gp_idx)%ip_grid(3)
-          ip_patch_id = ib_markers%sf(i, j, k)
+          i = gps(gp_idx)%loc(1)
+          j = gps(gp_idx)%loc(2)
+          k = 0; if (num_dims == 3) k = gps(gp_idx)%loc(3)
 
-          ! Pass 1: Collect all candidate pairs (may contain duplicates)
-          if (gp_patch_id < ip_patch_id) then
-              $:GPU_ATOMIC(atomic='capture')
-              num_raw = num_raw + 1
-              local_num_raw = num_raw
-              $:END_GPU_ATOMIC_CAPTURE()
+          already_found = .false.
 
-              ! Store with smaller ID first for consistent ordering
-              raw_pairs(local_num_raw, 1) = gp_patch_id
-              raw_pairs(local_num_raw, 2) = ip_patch_id
+          ! look in x
+          do l = -1, 1, 2  
+              ip_patch_id = ib_markers%sf(i+l, j, k)
+
+              ! Pass 1: Collect all candidate pairs (may contain duplicates)
+              if (gp_patch_id < ip_patch_id) then
+                  $:GPU_ATOMIC(atomic='capture')
+                  num_raw = num_raw + 1
+                  local_num_raw = num_raw
+                  $:END_GPU_ATOMIC_CAPTURE()
+
+                  ! Store with smaller ID first for consistent ordering
+                  raw_pairs(local_num_raw, 1) = gp_patch_id
+                  raw_pairs(local_num_raw, 2) = ip_patch_id
+                  already_found = .true.
+              end if
+          end do
+
+          ! look in y
+          if (.not. already_found) then
+              do l = -1, 1, 2  
+                  ip_patch_id = ib_markers%sf(i, j+l, k)
+
+                  ! Pass 1: Collect all candidate pairs (may contain duplicates)
+                  if (gp_patch_id < ip_patch_id) then
+                      $:GPU_ATOMIC(atomic='capture')
+                      num_raw = num_raw + 1
+                      local_num_raw = num_raw
+                      $:END_GPU_ATOMIC_CAPTURE()
+
+                      ! Store with smaller ID first for consistent ordering
+                      raw_pairs(local_num_raw, 1) = gp_patch_id
+                      raw_pairs(local_num_raw, 2) = ip_patch_id
+                      already_found = .true.
+                  end if
+              end do
           end if
+
+          ! look in z
+          if (num_dims == 3 .and. (.not. already_found)) then
+              do l = -1, 1, 2  
+                  ip_patch_id = ib_markers%sf(i, j, k+l)
+
+                  ! Pass 1: Collect all candidate pairs (may contain duplicates)
+                  if (gp_patch_id < ip_patch_id) then
+                      $:GPU_ATOMIC(atomic='capture')
+                      num_raw = num_raw + 1
+                      local_num_raw = num_raw
+                      $:END_GPU_ATOMIC_CAPTURE()
+
+                      ! Store with smaller ID first for consistent ordering
+                      raw_pairs(local_num_raw, 1) = gp_patch_id
+                      raw_pairs(local_num_raw, 2) = ip_patch_id
+                      already_found = .true.
+                  end if
+              end do
+          end if
+
       end do
-      $:END_GPU_PARALLEL_LOOP()
+      ! $:END_GPU_PARALLEL_LOOP()
 
       ! Pass 2: Coalesce into unique pairs
       num_considered_collisions = 0
@@ -281,6 +334,44 @@ contains
 
     end subroutine s_detect_ib_collisions
 
+    subroutine s_detect_ib_collisions_n2(collision_lookup, num_considered_collisions)
+
+      integer, dimension(num_ibs * (num_ibs-1) / 2, 2), intent(out) :: collision_lookup
+      integer, intent(out) :: num_considered_collisions
+
+      integer :: pid1, pid2, current_collisions
+      real(wp), dimension(3) :: centroid_1, centroid_2, distance_vec
+
+      num_considered_collisions = 0
+
+      $:GPU_PARALLEL_LOOP(private='[pid1,pid2,centroid_1,centroid_2,distance_vec, current_collisions]', copy='[num_considered_collisions]')
+      do pid1 = 1, num_ibs-1
+        do pid2 = pid1+1, num_ibs
+          centroid_1 = [patch_ib(pid1)%x_centroid, patch_ib(pid1)%y_centroid, 0._wp]
+          centroid_2 = [patch_ib(pid2)%x_centroid, patch_ib(pid2)%y_centroid, 0._wp]
+          if (num_dims == 3) then
+              centroid_1(3) = patch_ib(pid1)%z_centroid
+              centroid_2(3) = patch_ib(pid2)%z_centroid
+          end if
+          distance_vec = centroid_2 - centroid_1
+
+          if (norm2(distance_vec) < patch_ib(pid1)%radius + patch_ib(pid2)%radius) then
+              $:GPU_ATOMIC(atomic='capture')
+              num_considered_collisions = num_considered_collisions + 1
+              current_collisions = num_considered_collisions
+              $:END_GPU_ATOMIC_CAPTURE()
+
+              collision_lookup(current_collisions, 1) = pid1
+              collision_lookup(current_collisions, 2) = pid2
+          end if
+        end do
+      end do
+      $:END_GPU_PARALLEL_LOOP()
+
+      ! $:GPU_UPDATE(device='[collision_lookup]')
+
+    end subroutine s_detect_ib_collisions_n2
+
     !> @brief uses boundary conditions and particle lcoations to check for wall conditions
     subroutine s_detect_wall_collisions(gps, overlap_distances, num_gps)
 
@@ -294,16 +385,11 @@ contains
         overlap_distances = 0._wp
 
         ! iterate over all ghost points to detect the one that is most-overlapping in each direction
-        do gp_idx = 1, num_gps
-            i = gps(gp_idx)%loc(1)
-            j = gps(gp_idx)%loc(2)
-            if (p /= 0) k = gps(gp_idx)%loc(3)
-            patch_id = gps(gp_idx)%ib_patch_id
-
+        do patch_id = 1, num_ibs
             ! check if the boundaries are either of the two conditions we should compute collisions with
             if (bc_x%beg == BC_SLIP_WALL .or. bc_x%beg == BC_NO_SLIP_WALL) then
                 ! get the location of the true IB surface towards the domain boundary
-                edge_location = x_cc(i) - abs(gps(gp_idx)%levelset * gps(gp_idx)%levelset_norm(1))
+                edge_location = patch_ib(patch_id)%x_centroid - patch_ib(patch_id)%radius
                 ! check if that edge actually extends out of the comutational domain
                 if (edge_location < x_domain%beg) then
                     overlap_distance = x_domain%beg - edge_location ! the distance that the IB extends out of the domain
@@ -312,7 +398,7 @@ contains
             end if
 
             if (bc_x%end == BC_SLIP_WALL .or. bc_x%end == BC_NO_SLIP_WALL) then
-                edge_location = x_cc(i) + abs(gps(gp_idx)%levelset * gps(gp_idx)%levelset_norm(1))
+                edge_location = patch_ib(patch_id)%x_centroid + patch_ib(patch_id)%radius
                 if (edge_location > x_domain%end) then
                     overlap_distance = edge_location - x_domain%end
                     overlap_distances(patch_id, 2) = max(overlap_distances(patch_id, 2), overlap_distance)
@@ -320,7 +406,7 @@ contains
             end if
 
             if (bc_y%beg == BC_SLIP_WALL .or. bc_y%beg == BC_NO_SLIP_WALL) then
-                edge_location = y_cc(j) - abs(gps(gp_idx)%levelset * gps(gp_idx)%levelset_norm(2))
+                edge_location = patch_ib(patch_id)%y_centroid - patch_ib(patch_id)%radius
                 if (edge_location < y_domain%beg) then
                     overlap_distance = y_domain%beg - edge_location
                     overlap_distances(patch_id, 3) = max(overlap_distances(patch_id, 3), overlap_distance)
@@ -328,7 +414,7 @@ contains
             end if
 
             if (bc_y%end == BC_SLIP_WALL .or. bc_y%end == BC_NO_SLIP_WALL) then
-                edge_location = y_cc(j) + abs(gps(gp_idx)%levelset * gps(gp_idx)%levelset_norm(2))
+                edge_location = patch_ib(patch_id)%y_centroid + patch_ib(patch_id)%radius
                 if (edge_location > y_domain%end) then
                     overlap_distance = edge_location - y_domain%end
                     overlap_distances(patch_id, 4) = max(overlap_distances(patch_id, 4), overlap_distance)
@@ -337,7 +423,7 @@ contains
 
             if (p > 0) then
                 if (bc_z%beg == BC_SLIP_WALL .or. bc_z%beg == BC_NO_SLIP_WALL) then
-                    edge_location = z_cc(k) - abs(gps(gp_idx)%levelset * gps(gp_idx)%levelset_norm(3))
+                    edge_location = patch_ib(patch_id)%z_centroid - patch_ib(patch_id)%radius
                     if (edge_location < z_domain%beg) then
                         overlap_distance = z_domain%beg - edge_location
                         overlap_distances(patch_id, 5) = max(overlap_distances(patch_id, 5), overlap_distance)
@@ -345,7 +431,7 @@ contains
                 end if
 
                 if (bc_z%end == BC_SLIP_WALL .or. bc_z%end == BC_NO_SLIP_WALL) then
-                    edge_location = z_cc(k) + abs(gps(gp_idx)%levelset * gps(gp_idx)%levelset_norm(3))
+                    edge_location = patch_ib(patch_id)%z_centroid + patch_ib(patch_id)%radius
                     if (edge_location > z_domain%end) then
                         overlap_distance = edge_location - z_domain%end
                         overlap_distances(patch_id, 6) = max(overlap_distances(patch_id, 6), overlap_distance)
