@@ -11,10 +11,12 @@ File layout per processor:
   Records 3..N (vars): varname(50-char) + data((m+1)*(n+1)*(p+1) floats)
 """
 
+import atexit
 import glob
 import itertools
 import os
 import struct
+import threading
 import warnings
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
@@ -25,6 +27,21 @@ import numpy as np
 
 
 NAME_LEN = 50  # Fortran character length for variable names
+
+_READ_POOL: Optional[ThreadPoolExecutor] = None
+_POOL_LOCK = threading.Lock()
+
+
+def _get_pool() -> ThreadPoolExecutor:
+    """Return a persistent module-level thread pool, creating it on first use."""
+    global _READ_POOL  # pylint: disable=global-statement
+    with _POOL_LOCK:
+        if _READ_POOL is None:
+            _READ_POOL = ThreadPoolExecutor(
+                max_workers=32, thread_name_prefix='mfc_binary'
+            )
+            atexit.register(_READ_POOL.shutdown, wait=False)
+        return _READ_POOL
 
 
 @dataclass
@@ -480,9 +497,7 @@ def assemble(case_dir: str, step: int, fmt: str = 'binary',  # pylint: disable=t
     def _read_one(rank_fpath):
         return rank_fpath[0], read_binary_file(rank_fpath[1], var_filter=var)
 
-    n_workers = min(len(rank_paths), 32)
-    with ThreadPoolExecutor(max_workers=n_workers) as pool:
-        results = list(pool.map(_read_one, rank_paths))
+    results = list(_get_pool().map(_read_one, rank_paths))
 
     proc_data: List[Tuple[int, ProcessorData]] = []
     for rank, pdata in results:

@@ -24,7 +24,7 @@ import atexit
 import logging
 import threading
 from concurrent.futures import ThreadPoolExecutor
-from typing import Callable, List
+from typing import Callable, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +34,19 @@ _cache_order: list = []
 _in_flight: set = set()   # steps currently being prefetched
 _lock = threading.Lock()
 
-_prefetch_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix='mfc_prefetch')
-atexit.register(_prefetch_pool.shutdown, wait=False)
+_prefetch_pool: Optional[ThreadPoolExecutor] = None
+_prefetch_pool_lock = threading.Lock()
+
+
+def _get_prefetch_pool() -> ThreadPoolExecutor:
+    """Return the prefetch pool, creating it lazily on first use."""
+    global _prefetch_pool  # pylint: disable=global-statement
+    with _prefetch_pool_lock:
+        if _prefetch_pool is None:
+            _prefetch_pool = ThreadPoolExecutor(
+                max_workers=1, thread_name_prefix='mfc_prefetch')
+            atexit.register(_prefetch_pool.shutdown, wait=False)
+        return _prefetch_pool
 
 
 def load(step: int, read_func: Callable) -> object:
@@ -92,7 +103,7 @@ def prefetch(current_step: int, all_steps: List[int], read_func: Callable) -> No
             if s in _cache or s in _in_flight:
                 continue
             _in_flight.add(s)
-        _prefetch_pool.submit(_bg_load, s, read_func)  # s is a key here
+        _get_prefetch_pool().submit(_bg_load, s, read_func)  # s is a key here
 
 
 def _bg_load(key: object, read_func: Callable) -> None:
@@ -123,7 +134,7 @@ def prefetch_one(key: object, read_func: Callable) -> None:
         if key in _cache or key in _in_flight:
             return
         _in_flight.add(key)
-    _prefetch_pool.submit(_bg_load, key, read_func)
+    _get_prefetch_pool().submit(_bg_load, key, read_func)
 
 
 def seed(step: int, data: object) -> None:

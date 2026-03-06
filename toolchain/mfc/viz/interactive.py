@@ -11,7 +11,7 @@ colormap, log scale, vmin/vmax, and timestep playback.
 import atexit
 import base64
 import concurrent.futures
-import io
+import logging
 import math
 import threading
 import time
@@ -20,15 +20,23 @@ from typing import List, Callable, Optional
 import numpy as np
 import plotly.graph_objects as go
 from dash import Dash, Patch, dcc, html, Input, Output, State, callback_context, no_update
+from skimage.measure import marching_cubes as _marching_cubes  # type: ignore[import]  # pylint: disable=no-name-in-module
+from turbojpeg import TurboJPEG as _TurboJPEG  # type: ignore[import]
 
 from mfc.printer import cons
 from . import _step_cache
 from ._step_cache import prefetch_one as _prefetch_one
 
+logger = logging.getLogger(__name__)
+_tj = _TurboJPEG()
+
 # ---------------------------------------------------------------------------
 # Fast PNG generation via 256-entry colormap LUT
 # ---------------------------------------------------------------------------
 
+# Both caches grow to at most one entry per named colormap (~10 entries max).
+# Concurrent writes are benign: both threads produce identical data for the
+# same colormap name, so no lock is needed.
 _lut_cache: dict = {}    # cmap_name → (256, 3) uint8 LUT
 _cscale_cache: dict = {} # cmap_name → plotly colorscale list
 
@@ -41,9 +49,19 @@ _ds3_lock = threading.Lock()
 _jpeg_cache: dict = {}
 _JPEG_CACHE_MAX = 30
 _jpeg_lock = threading.Lock()
-_jpeg_pool = concurrent.futures.ThreadPoolExecutor(
-    max_workers=1, thread_name_prefix='mfc_jpeg')
-atexit.register(_jpeg_pool.shutdown, wait=False)
+_jpeg_pool: Optional[concurrent.futures.ThreadPoolExecutor] = None
+_jpeg_pool_lock = threading.Lock()
+
+
+def _get_jpeg_pool() -> concurrent.futures.ThreadPoolExecutor:
+    """Return the JPEG prefetch pool, creating it lazily on first use."""
+    global _jpeg_pool  # pylint: disable=global-statement
+    with _jpeg_pool_lock:
+        if _jpeg_pool is None:
+            _jpeg_pool = concurrent.futures.ThreadPoolExecutor(
+                max_workers=1, thread_name_prefix='mfc_jpeg')
+            atexit.register(_jpeg_pool.shutdown, wait=False)
+        return _jpeg_pool
 
 
 def _get_lut(cmap_name: str) -> np.ndarray:
@@ -79,35 +97,9 @@ def _lut_to_plotly_colorscale(cmap_name: str) -> list:
     return result
 
 
-# ---------------------------------------------------------------------------
-# Fast JPEG encoder — uses libjpeg-turbo when available (5-10× faster than
-# Pillow).  Falls back to Pillow silently if turbojpeg is not installed.
-# ---------------------------------------------------------------------------
-try:
-    from turbojpeg import TurboJPEG as _TurboJPEG   # type: ignore[import]
-    _tj = _TurboJPEG()
-
-    def _encode_jpeg(rgb: np.ndarray) -> bytes:
-        """Encode (h, w, 3) uint8 RGB → JPEG bytes via libjpeg-turbo."""
-        return _tj.encode(rgb, quality=90)
-
-except ImportError:
-    def _encode_jpeg(rgb: np.ndarray) -> bytes:  # type: ignore[misc]
-        """Fallback JPEG encoder using Pillow."""
-        from PIL import Image as _PIL  # pylint: disable=import-outside-toplevel
-        buf = io.BytesIO()
-        _PIL.fromarray(rgb, 'RGB').save(buf, format='jpeg', quality=90, optimize=False)
-        return buf.getvalue()
-
-
-# Server-side marching cubes via scikit-image (optional; falls back to a
-# user-visible error message in the status div if not installed).
-try:
-    from skimage.measure import marching_cubes as _marching_cubes  # type: ignore[import]
-    _HAVE_SKIMAGE = True
-except ImportError:
-    _marching_cubes = None  # type: ignore[assignment]
-    _HAVE_SKIMAGE = False
+def _encode_jpeg(rgb: np.ndarray) -> bytes:
+    """Encode (h, w, 3) uint8 RGB → JPEG bytes via libjpeg-turbo."""
+    return _tj.encode(rgb, quality=90)
 
 
 def _make_png_source(arr_yx: np.ndarray, cmap_name: str,
@@ -228,6 +220,9 @@ def _get_ds3(step, var, raw, x_cc, y_cc, z_cc, max_total):  # pylint: disable=to
     with _ds3_lock:
         if key not in _ds3_cache:
             if len(_ds3_cache) >= _DS3_CACHE_MAX:
+                # FIFO eviction: next(iter(dict)) yields the oldest entry by
+                # insertion order, guaranteed in CPython 3.7+ and the language
+                # spec from Python 3.7.
                 _ds3_cache.pop(next(iter(_ds3_cache)))
             _ds3_cache[key] = result
     return result
@@ -287,9 +282,9 @@ def _prefetch_jpeg(step, var, get_ad_fn, cmap, vmin_in, vmax_in, log_bool,  # py
                         _jpeg_cache.pop(next(iter(_jpeg_cache)))
                     _jpeg_cache[key] = src
         except Exception:  # pylint: disable=broad-except
-            pass
+            logger.debug("JPEG prefetch failed for step %s var %s", step, var, exc_info=True)
 
-    _jpeg_pool.submit(_bg)
+    _get_jpeg_pool().submit(_bg)
 
 
 # ---------------------------------------------------------------------------
@@ -505,36 +500,20 @@ def _build_3d(ad, raw, varname, step, mode, cmap,  # pylint: disable=too-many-ar
         # which is 5× finer than the 150K volume budget.
         ilo = cmin + rng * iso_min_frac
         ihi = cmin + rng * max(iso_max_frac, iso_min_frac + 0.01)
-        if _HAVE_SKIMAGE:
-            raw_ds, x_ds, y_ds, z_ds = _get_ds3(step, varname, raw, ad.x_cc, ad.y_cc, ad.z_cc, 500_000)
-            vx, vy, vz, fi, fj, fk, intens = _compute_isomesh(
-                raw_ds, x_ds, y_ds, z_ds, log_fn, ilo, ihi, iso_n,
-            )
-            trace = go.Mesh3d(
-                x=vx, y=vy, z=vz, i=fi, j=fj, k=fk,
-                intensity=intens, intensitymode='vertex',
-                colorscale=cscale, cmin=ilo, cmax=ihi,
-                colorbar=_make_cbar(cbar_title, ilo, ihi), showscale=True,
-                lighting=dict(ambient=0.7, diffuse=0.9, specular=0.3,
-                              roughness=0.5, fresnel=0.2),
-                lightposition=dict(x=1000, y=500, z=500),
-                flatshading=False,
-            )
-        else:
-            # scikit-image not available: fall back to go.Isosurface which
-            # runs marching cubes in the browser (slower but works anywhere).
-            raw_ds, x_ds, y_ds, z_ds = _get_ds3(step, varname, raw, ad.x_cc, ad.y_cc, ad.z_cc, max_total_3d)
-            X3, Y3, Z3 = np.meshgrid(x_ds, y_ds, z_ds, indexing='ij')
-            trace = go.Isosurface(
-                x=X3.ravel().astype(np.float32),
-                y=Y3.ravel().astype(np.float32),
-                z=Z3.ravel().astype(np.float32),
-                value=log_fn(raw_ds).ravel().astype(np.float32),
-                isomin=ilo, isomax=ihi,
-                surface_count=int(iso_n),
-                colorscale=cscale, cmin=ilo, cmax=ihi,
-                colorbar=_make_cbar(cbar_title, ilo, ihi), showscale=True,
-            )
+        raw_ds, x_ds, y_ds, z_ds = _get_ds3(step, varname, raw, ad.x_cc, ad.y_cc, ad.z_cc, 500_000)
+        vx, vy, vz, fi, fj, fk, intens = _compute_isomesh(
+            raw_ds, x_ds, y_ds, z_ds, log_fn, ilo, ihi, iso_n,
+        )
+        trace = go.Mesh3d(
+            x=vx, y=vy, z=vz, i=fi, j=fj, k=fk,
+            intensity=intens, intensitymode='vertex',
+            colorscale=cscale, cmin=ilo, cmax=ihi,
+            colorbar=_make_cbar(cbar_title, ilo, ihi), showscale=True,
+            lighting=dict(ambient=0.7, diffuse=0.9, specular=0.3,
+                          roughness=0.5, fresnel=0.2),
+            lightposition=dict(x=1000, y=500, z=500),
+            flatshading=False,
+        )
         title = f'{varname}  ·  {int(iso_n)} isosurfaces  ·  step {step}'
 
     else:                                                # volume
@@ -1082,7 +1061,7 @@ input[type=radio] + span, label { color: %(tx)s !important; }
                 _trig3
                 and '.' not in _trig3
                 and (
-                    (mode == 'isosurface' and _HAVE_SKIMAGE and _trig3.issubset(_PT_ISO))  or
+                    (mode == 'isosurface' and _trig3.issubset(_PT_ISO))  or
                     (mode == 'volume'     and _trig3.issubset(_PT_VOL))
                 )
             )
