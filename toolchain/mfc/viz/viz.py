@@ -305,6 +305,13 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
             return assemble_silo(case_dir, step, var=None if load_all else varname)
         return assemble(case_dir, step, fmt, var=None if load_all else varname)
 
+    def read_step_one_var(step, var):
+        """Read a single variable for a step — used by interactive mode."""
+        if fmt == 'silo':
+            from .silo_reader import assemble_silo  # pylint: disable=import-outside-toplevel
+            return assemble_silo(case_dir, step, var=var)
+        return assemble(case_dir, step, fmt, var=var)
+
     # Validate variable name / discover available variables
     test_assembled = read_step(requested_steps[0])
     avail = sorted(test_assembled.variables.keys())
@@ -374,7 +381,8 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
         init_var = varname if varname in avail else (avail[0] if avail else None)
         run_interactive(init_var, requested_steps, read_step,
                         port=int(port), host=str(host),
-                        bubble_func=bubble_func)
+                        bubble_func=bubble_func,
+                        read_one_var_func=read_step_one_var)
         return
 
     # --- PNG / MP4 rendering options (not used by TUI or interactive) ---
