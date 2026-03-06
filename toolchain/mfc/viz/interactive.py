@@ -100,6 +100,16 @@ except ImportError:
         return buf.getvalue()
 
 
+# Server-side marching cubes via scikit-image (optional; falls back to a
+# user-visible error message in the status div if not installed).
+try:
+    from skimage.measure import marching_cubes as _marching_cubes  # type: ignore[import]
+    _HAVE_SKIMAGE = True
+except ImportError:
+    _marching_cubes = None  # type: ignore[assignment]
+    _HAVE_SKIMAGE = False
+
+
 def _make_png_source(arr_yx: np.ndarray, cmap_name: str,
                      vmin: float, vmax: float) -> str:
     """Encode a (ny, nx) float array as a colorized base64 JPEG data URI.
@@ -132,8 +142,6 @@ def _compute_isomesh(raw_ds: np.ndarray, x_ds: np.ndarray, y_ds: np.ndarray,  # 
 
     Much faster than go.Isosurface which runs marching cubes in JavaScript.
     """
-    from skimage.measure import marching_cubes  # pylint: disable=import-outside-toplevel
-
     vol = log_fn(raw_ds).astype(np.float64)
     # Replace NaN/inf (e.g. from log of zero/negative values) with a fill
     # value below any isosurface level so those cells produce no triangles.
@@ -153,7 +161,7 @@ def _compute_isomesh(raw_ds: np.ndarray, x_ds: np.ndarray, y_ds: np.ndarray,  # 
 
     for level in levels:
         try:
-            verts, faces, _, _ = marching_cubes(
+            verts, faces, _, _ = _marching_cubes(
                 vol, level=float(level), spacing=spacing,
                 allow_degenerate=False,
             )
@@ -495,22 +503,38 @@ def _build_3d(ad, raw, varname, step, mode, cmap,  # pylint: disable=too-many-ar
         # Plotly's go.Isosurface which runs marching cubes in JavaScript.
         # Targeting 500K cells gives stride=5 on a 901×201×201 grid (181×41×41),
         # which is 5× finer than the 150K volume budget.
-        raw_ds, x_ds, y_ds, z_ds = _get_ds3(step, varname, raw, ad.x_cc, ad.y_cc, ad.z_cc, 500_000)
         ilo = cmin + rng * iso_min_frac
         ihi = cmin + rng * max(iso_max_frac, iso_min_frac + 0.01)
-        vx, vy, vz, fi, fj, fk, intens = _compute_isomesh(
-            raw_ds, x_ds, y_ds, z_ds, log_fn, ilo, ihi, iso_n,
-        )
-        trace = go.Mesh3d(
-            x=vx, y=vy, z=vz, i=fi, j=fj, k=fk,
-            intensity=intens, intensitymode='vertex',
-            colorscale=cscale, cmin=ilo, cmax=ihi,
-            colorbar=_make_cbar(cbar_title, ilo, ihi), showscale=True,
-            lighting=dict(ambient=0.7, diffuse=0.9, specular=0.3,
-                          roughness=0.5, fresnel=0.2),
-            lightposition=dict(x=1000, y=500, z=500),
-            flatshading=False,
-        )
+        if _HAVE_SKIMAGE:
+            raw_ds, x_ds, y_ds, z_ds = _get_ds3(step, varname, raw, ad.x_cc, ad.y_cc, ad.z_cc, 500_000)
+            vx, vy, vz, fi, fj, fk, intens = _compute_isomesh(
+                raw_ds, x_ds, y_ds, z_ds, log_fn, ilo, ihi, iso_n,
+            )
+            trace = go.Mesh3d(
+                x=vx, y=vy, z=vz, i=fi, j=fj, k=fk,
+                intensity=intens, intensitymode='vertex',
+                colorscale=cscale, cmin=ilo, cmax=ihi,
+                colorbar=_make_cbar(cbar_title, ilo, ihi), showscale=True,
+                lighting=dict(ambient=0.7, diffuse=0.9, specular=0.3,
+                              roughness=0.5, fresnel=0.2),
+                lightposition=dict(x=1000, y=500, z=500),
+                flatshading=False,
+            )
+        else:
+            # scikit-image not available: fall back to go.Isosurface which
+            # runs marching cubes in the browser (slower but works anywhere).
+            raw_ds, x_ds, y_ds, z_ds = _get_ds3(step, varname, raw, ad.x_cc, ad.y_cc, ad.z_cc, max_total_3d)
+            X3, Y3, Z3 = np.meshgrid(x_ds, y_ds, z_ds, indexing='ij')
+            trace = go.Isosurface(
+                x=X3.ravel().astype(np.float32),
+                y=Y3.ravel().astype(np.float32),
+                z=Z3.ravel().astype(np.float32),
+                value=log_fn(raw_ds).ravel().astype(np.float32),
+                isomin=ilo, isomax=ihi,
+                surface_count=int(iso_n),
+                colorscale=cscale, cmin=ilo, cmax=ihi,
+                colorbar=_make_cbar(cbar_title, ilo, ihi), showscale=True,
+            )
         title = f'{varname}  ·  {int(iso_n)} isosurfaces  ·  step {step}'
 
     else:                                                # volume
@@ -1058,7 +1082,7 @@ input[type=radio] + span, label { color: %(tx)s !important; }
                 _trig3
                 and '.' not in _trig3
                 and (
-                    (mode == 'isosurface' and _trig3.issubset(_PT_ISO))  or
+                    (mode == 'isosurface' and _HAVE_SKIMAGE and _trig3.issubset(_PT_ISO))  or
                     (mode == 'volume'     and _trig3.issubset(_PT_VOL))
                 )
             )
