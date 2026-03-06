@@ -20,9 +20,8 @@ build_opts="$gpu_opts"
 
 . ./mfc.sh load -c $compiler_flag -m $([ "$job_device" = "gpu" ] && echo "g" || echo "c")
 
-# Only set up build cache for test suite, not benchmarks
 if [ "$run_bench" != "bench" ]; then
-    source .github/scripts/setup-build-cache.sh "$cluster_name" "$job_device" "$job_interface"
+    rm -rf build
 fi
 
 source .github/scripts/retry-build.sh
