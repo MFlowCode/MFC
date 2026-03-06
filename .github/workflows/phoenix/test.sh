@@ -3,8 +3,7 @@
 source .github/scripts/gpu-opts.sh
 build_opts="$gpu_opts"
 
-# Set up persistent build cache
-source .github/scripts/setup-build-cache.sh phoenix "$job_device" "$job_interface"
+rm -rf build
 
 # Build with retry; smoke-test cached binaries to catch architecture mismatches
 # (SIGILL from binaries compiled on a different compute node).
