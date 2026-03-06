@@ -609,6 +609,17 @@ def build_coverage_cache(  # pylint: disable=too-many-locals,too-many-statements
     cons.print(f"[bold green]Coverage cache written to {COVERAGE_CACHE_PATH}[/bold green]")
     cons.print(f"[dim]Cache has {len(cases)} test entries.[/dim]")
 
+    # Clean up test output directories from Phase 1/2 (grid files, restart files,
+    # silo output, etc.).  These live on NFS scratch and can total several GB for
+    # the full test suite.  Leaving them behind creates I/O pressure for subsequent
+    # test jobs that share the same scratch filesystem.
+    cons.print("[dim]Cleaning up test output directories...[/dim]")
+    for case in cases:
+        try:
+            case.delete_output()
+        except OSError:
+            pass  # Best-effort; NFS errors are non-fatal here
+
 
 def _normalize_cache(cache: dict) -> dict:
     """Convert old line-level cache format to file-level if needed.
