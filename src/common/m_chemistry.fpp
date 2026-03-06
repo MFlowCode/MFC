@@ -6,8 +6,8 @@
 #:include 'macros.fpp'
 #:include 'case.fpp'
 
-## CCE 19.0.0 workaround: fixed-size array limit for local species arrays under _CRAYFTN.
-## Must match the Python-side check in toolchain/mfc/run/input.py. See PR #1286.
+#! CCE 19.0.0 workaround: fixed-size array limit for local species arrays under _CRAYFTN.
+#! Must match the Python-side check in toolchain/mfc/run/input.py. See PR #1286.
 #:set CCE_MAX_SPECIES = 10
 
 !> @brief Multi-species chemistry interface for thermodynamic properties, reaction rates, and transport coefficients
