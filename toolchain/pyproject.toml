@@ -52,6 +52,7 @@ dependencies = [
     "textual-plotext>=0.2.0",
     "dash>=2.0",
     "plotly",
+    "scikit-image",
     "tqdm",
 ]
 

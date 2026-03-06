@@ -132,7 +132,7 @@ def _compute_isomesh(raw_ds: np.ndarray, x_ds: np.ndarray, y_ds: np.ndarray,  # 
 
     Much faster than go.Isosurface which runs marching cubes in JavaScript.
     """
-    from skimage.measure import marching_cubes  # pylint: disable=import-outside-toplevel,no-name-in-module
+    from skimage.measure import marching_cubes  # pylint: disable=import-outside-toplevel
 
     vol = log_fn(raw_ds).astype(np.float64)
     # Replace NaN/inf (e.g. from log of zero/negative values) with a fill
