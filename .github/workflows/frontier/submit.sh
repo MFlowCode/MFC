@@ -25,13 +25,6 @@ else
     exit 1
 fi
 
-# Detect job type from submitted script basename
-script_basename="$(basename "$1" .sh)"
-case "$script_basename" in
-    bench*) job_type="bench" ;;
-    *)      job_type="test"  ;;
-esac
-
 if [ "$2" = "cpu" ]; then
     sbatch_device_opts="\
 #SBATCH -n 32                       # Number of cores required"

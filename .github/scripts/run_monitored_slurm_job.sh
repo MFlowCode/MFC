@@ -26,7 +26,7 @@ if [ "$monitor_exit" -ne 0 ]; then
     # Give the SLURM epilog time to finalize if the job just finished
     sleep 30
     final_state=$(sacct -j "$job_id" -n -X -P -o State 2>/dev/null | head -n1 | cut -d'|' -f1 | tr -d ' ' || echo "UNKNOWN")
-    final_exit=$(sacct -j "$job_id" --format=ExitCode --noheader --parsable2 2>/dev/null | head -n1 | tr -d ' ' || echo "")
+    final_exit=$(sacct -j "$job_id" -X --format=ExitCode --noheader --parsable2 2>/dev/null | head -n1 | tr -d ' ' || echo "")
     echo "Final SLURM state=$final_state exit=$final_exit"
     if [ "$final_state" = "COMPLETED" ] && [ "$final_exit" = "0:0" ]; then
         echo "SLURM job $job_id completed successfully despite monitor failure — continuing."
