@@ -635,12 +635,12 @@ if (MFC_SIMULATION)
                      SOURCES "${simulation_SRCs}"
                      MPI FFTW OpenACC OpenMP)
     # CCE 19.0.0 IPA workaround: two files trigger IPA crashes:
-    #   m_bubbles_EL: castIsValid assertion (InstCombine/foldIntegerTypedPHI)
-    #   m_phase_change: bring_routine_resident SIGSEGV
+    #   m_bubbles_EL: castIsValid assertion (InstCombine/foldIntegerTypedPHI) — GPU builds
+    #   m_phase_change: bring_routine_resident SIGSEGV — all Cray builds (incl. CPU-only)
     # Disabling IPA per-file avoids the crashes while preserving IPA for
     # the rest of simulation (needed for thermochem INLINEALWAYS inlining).
     # See PR #1286.
-    if (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray" AND MFC_OpenACC)
+    if (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
         set_source_files_properties(
             "${CMAKE_BINARY_DIR}/fypp/simulation/m_bubbles_EL.fpp.f90"
             "${CMAKE_BINARY_DIR}/fypp/simulation/m_phase_change.fpp.f90"
