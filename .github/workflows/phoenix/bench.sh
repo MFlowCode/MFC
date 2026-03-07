@@ -6,7 +6,7 @@ source .github/scripts/bench-preamble.sh
 # (GNR nodes have 192 cores but nproc is too aggressive for build/bench).
 n_jobs=$(( $(nproc) > 64 ? 64 : $(nproc) ))
 
-tmpbuild=/storage/scratch1/6/sbryngelson3/mytmp_build
+tmpbuild=/storage/project/r-sbryngelson3-0/sbryngelson3/mytmp_build
 currentdir=$tmpbuild/run-$(( RANDOM % 900 ))
 mkdir -p $tmpbuild
 mkdir -p $currentdir
