@@ -2,7 +2,7 @@
 
 source .github/scripts/bench-preamble.sh
 
-tmpbuild=/storage/scratch1/6/sbryngelson3/mytmp_build
+tmpbuild=/storage/project/r-sbryngelson3-0/sbryngelson3/mytmp_build
 currentdir=$tmpbuild/run-$(( RANDOM % 900 ))
 mkdir -p $tmpbuild
 mkdir -p $currentdir
