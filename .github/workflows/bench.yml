@@ -42,14 +42,6 @@ jobs:
             group: phoenix
             labels: gt
             flag: p
-            device: cpu
-            interface: none
-            build_script: ""
-          - cluster: phoenix
-            name: Georgia Tech | Phoenix (NVHPC)
-            group: phoenix
-            labels: gt
-            flag: p
             device: gpu
             interface: acc
             build_script: ""
