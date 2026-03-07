@@ -806,8 +806,6 @@ contains
                                   id, irx, iry, irz, is_hat_L)
             call nvtxEndRange
 
-            ! print *, 'DEBUG 1', flux_gsrc_n(1)%vf(1)%sf(5,5,0)
-
             ! Additional physics and source terms
             ! RHS addition for advection source
             call nvtxStartRange("RHS-ADVECTION-SRC")
@@ -874,14 +872,9 @@ contains
         end do
         ! END: Dimensional Splitting Loop
 
-        ! print *, 'DEBUG 2', flux_gsrc_n(1)%vf(1)%sf(5,5,0)
-        ! print *, 'DEBUG 2', flux_gsrc_n(1)%vf(2)%sf(5,5,0)
-        ! print *, 'DEBUG 2', flux_gsrc_n(2)%vf(1)%sf(5,5,0)
-        ! print *, 'DEBUG 2', flux_gsrc_n(2)%vf(2)%sf(5,5,0)
-
         ! RHS additions for hypoelasticity - moved outside of dimensional splitting as it needs fluxes from multiple directions
         call nvtxStartRange("RHS-HYPOELASTICITY")
-        if (hypoelasticity) call s_compute_hypoelastic_rhs(id, &
+        if (hypoelasticity .and. .not. HLLD_hypo) call s_compute_hypoelastic_rhs(id, &
                                                            q_prim_qp%vf, &
                                                            rhs_vf, &
                                                            flux_gsrc_n(1)%vf, flux_gsrc_n(2)%vf)

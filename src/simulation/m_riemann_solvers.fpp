@@ -660,7 +660,7 @@ contains
                             !        G_R = G_R + alpha_R(i)*Gs(i)
                             !    end do
                             !    ! Elastic contribution to energy if G large enough
-                            !    if ((G_L > 1e-3_wp) .and. (G_R > 1e-3_wp)) then
+                            !    if ((G_L > 1e-3._wp) .and. (G_R > 1e-3._wp)) then
                             !    E_L = E_L + G_L*qL_prim_rs${XYZ}$_vf(j, k, l, xiend + 1)
                             !    E_R = E_R + G_R*qR_prim_rs${XYZ}$_vf(j + 1, k, l, xiend + 1)
                             !    !$acc loop seq
@@ -725,10 +725,10 @@ contains
                                                                          (((4._wp*G_L)/3._wp) + &
                                                                           tau_e_L(dir_idx_tau(1)))/rho_L))
                                 else if (hyperelasticity) then
-                                    s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + (4_wp*G_L/3_wp)/rho_L) &
-                                              , vel_R(dir_idx(1)) - sqrt(c_R*c_R + (4_wp*G_R/3_wp)/rho_R))
-                                    s_R = max(vel_R(dir_idx(1)) + sqrt(c_R*c_R + (4_wp*G_R/3_wp)/rho_R) &
-                                              , vel_L(dir_idx(1)) + sqrt(c_L*c_L + (4_wp*G_L/3_wp)/rho_L))
+                                    s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + (4._wp*G_L/3._wp)/rho_L) &
+                                              , vel_R(dir_idx(1)) - sqrt(c_R*c_R + (4._wp*G_R/3._wp)/rho_R))
+                                    s_R = max(vel_R(dir_idx(1)) + sqrt(c_R*c_R + (4._wp*G_R/3._wp)/rho_R) &
+                                              , vel_L(dir_idx(1)) + sqrt(c_L*c_L + (4._wp*G_L/3._wp)/rho_L))
                                 else
                                     s_L = min(vel_L(dir_idx(1)) - c_L, vel_R(dir_idx(1)) - c_R)
                                     s_R = max(vel_R(dir_idx(1)) + c_R, vel_L(dir_idx(1)) + c_L)
@@ -1481,12 +1481,12 @@ contains
                                     do i = 1, strxe - strxb + 1
                                         ! Elastic contribution to energy if G large enough
                                         if ((G_L > verysmall) .and. (G_R > verysmall)) then
-                                            E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4_wp*G_L)
-                                            E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4_wp*G_R)
+                                            E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
+                                            E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
                                             ! Additional terms in 2D and 3D
                                             if ((i == 2) .or. (i == 4) .or. (i == 5)) then
-                                                E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4_wp*G_L)
-                                                E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4_wp*G_R)
+                                                E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
+                                                E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
                                             end if
                                         end if
                                     end do
@@ -1550,11 +1550,11 @@ contains
                                 if (wave_speeds == 1) then
                                     if (elasticity) then
                                         s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + &
-                                                                           (((4_wp*G_L)/3_wp) + tau_e_L(dir_idx_tau(1)))/rho_L), vel_R(dir_idx(1)) - sqrt(c_R*c_R + &
-                                                                                                                                                          (((4_wp*G_R)/3_wp) + tau_e_R(dir_idx_tau(1)))/rho_R))
+                                                                           (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1)))/rho_L), vel_R(dir_idx(1)) - sqrt(c_R*c_R + &
+                                                                                                                                                          (((4._wp*G_R)/3._wp) + tau_e_R(dir_idx_tau(1)))/rho_R))
                                         s_R = max(vel_R(dir_idx(1)) + sqrt(c_R*c_R + &
-                                                                           (((4_wp*G_R)/3_wp) + tau_e_R(dir_idx_tau(1)))/rho_R), vel_L(dir_idx(1)) + sqrt(c_L*c_L + &
-                                                                                                                                                          (((4_wp*G_L)/3_wp) + tau_e_L(dir_idx_tau(1)))/rho_L))
+                                                                           (((4._wp*G_R)/3._wp) + tau_e_R(dir_idx_tau(1)))/rho_R), vel_L(dir_idx(1)) + sqrt(c_L*c_L + &
+                                                                                                                                                          (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1)))/rho_L))
                                         s_S = (pres_R - tau_e_R(dir_idx_tau(1)) - pres_L + &
                                                tau_e_L(dir_idx_tau(1)) + rho_L*vel_L(idx1)*(s_L - vel_L(idx1)) - &
                                                rho_R*vel_R(idx1)*(s_R - vel_R(idx1)))/(rho_L*(s_L - vel_L(idx1)) - &
@@ -2736,12 +2736,12 @@ contains
                                     do i = 1, strxe - strxb + 1
                                         ! Elastic contribution to energy if G large enough
                                         if ((G_L > verysmall) .and. (G_R > verysmall)) then
-                                            E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4_wp*G_L)
-                                            E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4_wp*G_R)
+                                            E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
+                                            E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
                                             ! Additional terms in 2D and 3D
                                             if ((i == 2) .or. (i == 4) .or. (i == 5)) then
-                                                E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4_wp*G_L)
-                                                E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4_wp*G_R)
+                                                E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
+                                                E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
                                             end if
                                         end if
                                     end do
@@ -2805,11 +2805,11 @@ contains
                                 if (wave_speeds == 1) then
                                     if (elasticity) then
                                         s_L = min(vel_L(dir_idx(1)) - sqrt(c_L*c_L + &
-                                                                           (((4_wp*G_L)/3_wp) + tau_e_L(dir_idx_tau(1)))/rho_L), vel_R(dir_idx(1)) - sqrt(c_R*c_R + &
-                                                                                                                                                          (((4_wp*G_R)/3_wp) + tau_e_R(dir_idx_tau(1)))/rho_R))
+                                                                           (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1)))/rho_L), vel_R(dir_idx(1)) - sqrt(c_R*c_R + &
+                                                                                                                                                          (((4._wp*G_R)/3._wp) + tau_e_R(dir_idx_tau(1)))/rho_R))
                                         s_R = max(vel_R(dir_idx(1)) + sqrt(c_R*c_R + &
-                                                                           (((4_wp*G_R)/3_wp) + tau_e_R(dir_idx_tau(1)))/rho_R), vel_L(dir_idx(1)) + sqrt(c_L*c_L + &
-                                                                                                                                                          (((4_wp*G_L)/3_wp) + tau_e_L(dir_idx_tau(1)))/rho_L))
+                                                                           (((4._wp*G_R)/3._wp) + tau_e_R(dir_idx_tau(1)))/rho_R), vel_L(dir_idx(1)) + sqrt(c_L*c_L + &
+                                                                                                                                                          (((4._wp*G_L)/3._wp) + tau_e_L(dir_idx_tau(1)))/rho_L))
                                         s_S = (pres_R - tau_e_R(dir_idx_tau(1)) - pres_L + &
                                                tau_e_L(dir_idx_tau(1)) + rho_L*vel_L(idx1)*(s_L - vel_L(idx1)) - &
                                                rho_R*vel_R(idx1)*(s_R - vel_R(idx1)))/(rho_L*(s_L - vel_L(idx1)) - &
@@ -3768,6 +3768,8 @@ contains
 
         real(wp), parameter :: ADC_power = 1.0 ! Fixed for now
 
+        real(wp) :: alpha_L_sum, alpha_R_sum
+
         integer :: i, j, k, l
 
         call s_populate_riemann_states_variables_buffers( &
@@ -3790,16 +3792,16 @@ contains
                         if (norm_dir == 1) then ! x-normal
                             ! q_hat_prim_x_vf(x,y,z,i) = q_prim_vf(i)%sf(x_offset,y,z)
                             if (is_hat_L) then
-                                q_hat_prim_x_vf(j,k,l,i) = q_prim_vf(i)%sf(j-1,k,l)
-                            else
                                 q_hat_prim_x_vf(j,k,l,i) = q_prim_vf(i)%sf(j  ,k,l)
+                            else
+                                q_hat_prim_x_vf(j,k,l,i) = q_prim_vf(i)%sf(j+1,k,l)
                             end if
                         elseif (norm_dir == 2) then ! y-normal
                             ! q_hat_prim_y_vf(y,x,z,i) = q_prim_vf(i)%sf(x,y_offset,z)
                             if (is_hat_L) then
-                                q_hat_prim_y_vf(j,k,l,i) = q_prim_vf(i)%sf(k,j-1,l)
-                            else
                                 q_hat_prim_y_vf(j,k,l,i) = q_prim_vf(i)%sf(k,j  ,l)
+                            else
+                                q_hat_prim_y_vf(j,k,l,i) = q_prim_vf(i)%sf(k,j+1,l)
                             end if
                         else ! z-normal not used for now
                             q_hat_prim_z_vf(j,k,l,i) = 0d0
@@ -3853,6 +3855,25 @@ contains
 
                                 alpha_hat(i) = q_hat_prim_${XYZ}$_vf(j, k, l, E_idx + i)
                             end do
+
+                            ! Clamp and renormalize volume fractions when mpp_lim is on (match HLL/HLLC)
+                            alpha_L_sum = 0._wp
+                            alpha_R_sum = 0._wp
+                            if (mpp_lim) then
+                                do i = 1, num_fluids
+                                    alpha_rho_L(i) = max(0._wp, alpha_rho_L(i))
+                                    alpha_L(i) = min(max(0._wp, alpha_L(i)), 1._wp)
+                                    alpha_L_sum = alpha_L_sum + alpha_L(i)
+                                end do
+                                alpha_L = alpha_L/max(alpha_L_sum, sgm_eps)
+
+                                do i = 1, num_fluids
+                                    alpha_rho_R(i) = max(0._wp, alpha_rho_R(i))
+                                    alpha_R(i) = min(max(0._wp, alpha_R(i)), 1._wp)
+                                    alpha_R_sum = alpha_R_sum + alpha_R(i)
+                                end do
+                                alpha_R = alpha_R/max(alpha_R_sum, sgm_eps)
+                            end if
 
                             pres%L = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx)
                             pres%R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx)
@@ -3964,12 +3985,15 @@ contains
 
                             !$acc loop seq
                             do i = 1, strxe - strxb + 1
-                                E%L = E%L + (tau_e_L(i)*tau_e_L(i))/(4_wp*G_L + sgm_eps)
-                                E%R = E%R + (tau_e_R(i)*tau_e_R(i))/(4_wp*G_R + sgm_eps)
-                                ! Shear stress terms in 2D and 3D
-                                if ((i == 2) .or. (i == 4) .or. (i == 5)) then
-                                    E%L = E%L + (tau_e_L(i)*tau_e_L(i))/(4_wp*G_L + sgm_eps)
-                                    E%R = E%R + (tau_e_R(i)*tau_e_R(i))/(4_wp*G_R + sgm_eps)
+                                ! Elastic contribution to energy if G large enough
+                                if ((G_L > verysmall) .and. (G_R > verysmall)) then
+                                    E%L = E%L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
+                                    E%R = E%R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
+                                    ! Shear stress terms in 2D and 3D
+                                    if ((i == 2) .or. (i == 4) .or. (i == 5)) then
+                                        E%L = E%L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
+                                        E%R = E%R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
+                                    end if
                                 end if
                             end do
 
@@ -3981,8 +4005,8 @@ contains
                             call s_compute_speed_of_sound(pres%L, rho%L, gamma%L, pi_inf%L, H%L, alpha_L, vel_rms%L, 0._wp, c%L)
                             call s_compute_speed_of_sound(pres%R, rho%R, gamma%R, pi_inf%R, H%R, alpha_R, vel_rms%R, 0._wp, c%R)
 
-                            S_L = min(u_n_L - sqrt(c%L*c%L + ((4_wp/3_wp)*G_L + tau_nn_L)/rho%L), u_n_R - sqrt(c%R*c%R + ((4_wp/3_wp)*G_R + tau_nn_R)/rho%R))
-                            S_R = max(u_n_R + sqrt(c%R*c%R + ((4_wp/3_wp)*G_R + tau_nn_R)/rho%R), u_n_L + sqrt(c%L*c%L + ((4_wp/3_wp)*G_L + tau_nn_L)/rho%L))
+                            S_L = min(u_n_L - sqrt(c%L*c%L + ((4._wp/3._wp)*G_L + tau_nn_L)/rho%L), u_n_R - sqrt(c%R*c%R + ((4._wp/3._wp)*G_R + tau_nn_R)/rho%R))
+                            S_R = max(u_n_R + sqrt(c%R*c%R + ((4._wp/3._wp)*G_R + tau_nn_R)/rho%R), u_n_L + sqrt(c%L*c%L + ((4._wp/3._wp)*G_L + tau_nn_L)/rho%L))
 
                             ! IMP Assume two-comp and 2D only for now (not 1D and not single-comp)
 
@@ -4035,26 +4059,26 @@ contains
                             A_L = rho%L*(S_L - u_n_L)
                             A_R = rho%R*(S_R - u_n_R)
                             denomA = (A_R - A_L)
-                            if (abs(denomA) < sgm_eps) then
+                            if (abs(denomA) < verysmall) then
                                 print *, "denominator (A_R - A_L) ~ 0"
                                 call exit(4)
                             end if
 
-                            S_M = ((pTot_R - pTot_L) + A_L*u_n_L - A_R*u_n_R) / (A_L - A_R + sgm_eps)
-                            if (.not. (S_L - sgm_eps <= S_M .and. S_M <= S_R + sgm_eps)) then
+                            S_M = ((pTot_R - pTot_L) + A_L*u_n_L - A_R*u_n_R) / (A_L - A_R + verysmall)
+                            if (.not. (S_L - verysmall <= S_M .and. S_M <= S_R + verysmall)) then
                                 print *, "S_M not within [S_L, S_R]"
                                 call exit(5)
                             end if
 
                             pTot_star = pTot_L + A_L*(S_M - u_n_L)
 
-                            rhoL_star = rho%L * (S_L - u_n_L) / (S_L - S_M + sgm_eps)
-                            rhoR_star = rho%R * (S_R - u_n_R) / (S_R - S_M + sgm_eps)
-                            fac_L = (S_L - u_n_L) / (S_L - S_M + sgm_eps)
-                            fac_R = (S_R - u_n_R) / (S_R - S_M + sgm_eps)
+                            rhoL_star = rho%L * (S_L - u_n_L) / (S_L - S_M + verysmall)
+                            rhoR_star = rho%R * (S_R - u_n_R) / (S_R - S_M + verysmall)
+                            fac_L = (S_L - u_n_L) / (S_L - S_M + verysmall)
+                            fac_R = (S_R - u_n_R) / (S_R - S_M + verysmall)
 
                             C_NC = rho_hat*(G_hat + tau_nn_hat)
-                            sqrtC_NC = max(sqrt(max(C_NC, 0._wp)), sgm_eps) ! keeps deminator > 0 but tighter than sqrt(max(C_NC, 0))
+                            sqrtC_NC = sqrt(max(C_NC, verysmall)) ! keeps deminator > 0 but tighter than sqrt(max(C_NC, 0))
 
                             S_Lstar = S_M - sqrtC_NC/rhoL_star
                             S_Rstar = S_M + sqrtC_NC/rhoR_star
@@ -4161,7 +4185,7 @@ contains
                                 if (S_L < 0._wp .and. S_R > 0._wp) then
                                     do i = 1, 10
                                         F_HLL(i) = ( S_R*F_L(i) - S_L*F_R(i) + S_L*S_R*(U_R(i) - U_L(i)) ) &
-                                                   / (S_R - S_L + sgm_eps)
+                                                   / (S_R - S_L + verysmall)
                                     end do
                                 end if
 
@@ -4169,21 +4193,21 @@ contains
                                 Sigma_L   = pTot_L
                                 Sigma_R   = pTot_R
                                 dSigma    = Sigma_R - Sigma_L
-                                Sigma_ref = max( max(abs(Sigma_L), abs(Sigma_R)), sgm_eps )
+                                Sigma_ref = max( max(abs(Sigma_L), abs(Sigma_R)), verysmall )
 
                                 ! Directional fast speeds (normal), matching HLLC-Hypo ADC
-                                a_L_ref = sqrt( max( sgm_eps, c%L*c%L + ((4._wp/3._wp)*G_L + tau_nn_L)/rho%L ) )
-                                a_R_ref = sqrt( max( sgm_eps, c%R*c%R + ((4._wp/3._wp)*G_R + tau_nn_R)/rho%R ) )
-                                a_ref   = max( max(a_L_ref, a_R_ref), sgm_eps )
+                                a_L_ref = sqrt( max( verysmall, c%L*c%L + ((4._wp/3._wp)*G_L + tau_nn_L)/rho%L ) )
+                                a_R_ref = sqrt( max( verysmall, c%R*c%R + ((4._wp/3._wp)*G_R + tau_nn_R)/rho%R ) )
+                                a_ref   = max( max(a_L_ref, a_R_ref), verysmall )
 
                                 ! Tangential jumps
                                 du_t    = u_t_R    - u_t_L
                                 dtau_nt = tau_nt_R - tau_nt_L
 
                                 ! Multi-sensor (same structure as HLLC Hypo ADC)
-                                sensor_ptot = (dSigma*dSigma)      / ( (ADC_kappa*Sigma_ref)**2 + sgm_eps )
-                                sensor_vt   = (du_t*du_t)          / ( (ADC_kappa*a_ref     )**2 + sgm_eps )
-                                sensor_tnt  = (dtau_nt*dtau_nt)    / ( (ADC_kappa*Sigma_ref)**2 + sgm_eps )
+                                sensor_ptot = (dSigma*dSigma)      / ( (ADC_kappa*Sigma_ref)**2 + verysmall )
+                                sensor_vt   = (du_t*du_t)          / ( (ADC_kappa*a_ref    )**2 + verysmall )
+                                sensor_tnt  = (dtau_nt*dtau_nt)    / ( (ADC_kappa*Sigma_ref)**2 + verysmall )
 
                                 sensor_combined = sensor_ptot + sensor_tnt + sensor_vt
 
