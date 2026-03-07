@@ -44,17 +44,10 @@ else
 fi
 
 # Select SBATCH params based on job type
-if [ "$job_type" = "bench" ]; then
-    sbatch_account="#SBATCH -A ENG160"
-    sbatch_time="#SBATCH -t 05:59:00"
-    sbatch_partition="#SBATCH -p extended"
-    sbatch_extra=""
-else
-    sbatch_account="#SBATCH -A CFD154"
-    sbatch_time="#SBATCH -t 01:59:00"
-    sbatch_partition="#SBATCH -p batch"
-    sbatch_extra="#SBATCH --qos=normal"
-fi
+sbatch_account="#SBATCH -A CFD154"
+sbatch_time="#SBATCH -t 01:59:00"
+sbatch_partition="#SBATCH -p batch"
+sbatch_extra="#SBATCH --qos=normal"
 
 shard_suffix=""
 if [ -n "$4" ]; then
@@ -85,6 +78,7 @@ job_device="$2"
 job_interface="$3"
 job_shard="$4"
 job_cluster="$cluster_name"
+export GITHUB_EVENT_NAME="$GITHUB_EVENT_NAME"
 
 . ./mfc.sh load -c $compiler_flag -m $([ "$2" = "gpu" ] && echo "g" || echo "c")
 
@@ -102,5 +96,4 @@ fi
 
 echo "Submitted batch job $job_id"
 
-# Use resilient monitoring instead of sbatch -W
-bash "$SCRIPT_DIR/../../scripts/monitor_slurm_job.sh" "$job_id" "$output_file"
+bash "$SCRIPT_DIR/../../scripts/run_monitored_slurm_job.sh" "$job_id" "$output_file"

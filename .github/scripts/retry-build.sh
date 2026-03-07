@@ -8,7 +8,8 @@
 # Try normal cleanup; if it fails, escalate to cache nuke.
 _retry_clean() {
     local clean_cmd="$1"
-    if eval "$clean_cmd" 2>/dev/null; then
+    # shellcheck disable=SC2086  # word splitting is intentional here
+    if $clean_cmd 2>/dev/null; then
         return 0
     fi
     echo "  Normal cleanup failed."
