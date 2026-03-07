@@ -174,9 +174,9 @@ module m_global_parameters
     logical :: mixture_err     !< Mixture properties correction
     logical :: hypoelasticity  !< hypoelasticity modeling
     logical :: hyperelasticity !< hyperelasticity modeling
-    logical :: int_comp        !< THINC interface compression
+    integer :: int_comp         !< Interface compression: 0=off, 1=THINC, 2=MTHINC
     real(wp) :: ic_eps         !< THINC Epsilon to compress on surface cells
-    real(wp) :: ic_beta        !< THINC Sharpness Parameter
+    real(wp) :: ic_beta        !< THINC/MTHINC Sharpness Parameter
     integer :: hyper_model     !< hyperelasticity solver algorithm
     logical :: elasticity      !< elasticity modeling, true for hyper or hypo
     logical, parameter :: chemistry = .${chemistry}$. !< Chemistry modeling
@@ -624,7 +624,7 @@ contains
         ptgalpha_eps = dflt_real
         hypoelasticity = .false.
         hyperelasticity = .false.
-        int_comp = .false.
+        int_comp = 0
         ic_eps = dflt_ic_eps
         ic_beta = dflt_ic_beta
         elasticity = .false.

@@ -56,6 +56,8 @@ module m_rhs
 
     use m_igr
 
+    use m_thinc
+
     use m_pressure_relaxation
 
     implicit none
@@ -741,6 +743,12 @@ contains
         if (surface_tension) then
             call nvtxStartRange("RHS-SURFACE-TENSION")
             call s_get_capillary(q_prim_qp%vf, bc_type)
+            call nvtxEndRange
+        end if
+
+        if (int_comp == 2 .and. n > 0) then
+            call nvtxStartRange("RHS-MTHINC-NORMALS")
+            call s_compute_mthinc_normals(q_prim_qp%vf)
             call nvtxEndRange
         end if
 
@@ -1922,6 +1930,14 @@ contains
                                        vL_x(:, :, :, iv%beg:iv%end), vL_y(:, :, :, :), vL_z(:, :, :, :), vR_x(:, :, :, iv%beg:iv%end), vR_y(:, :, :, :), vR_z(:, :, :, :), &
                                        recon_dir, &
                                        is1, is2, is3)
+                end if
+
+                if (int_comp > 0 .and. iv%beg <= advxb .and. iv%end >= advxe) then
+                    call s_thinc_compression(q_prim_qp%vf, &
+                                             vL_x, vL_y, vL_z, &
+                                             vR_x, vR_y, vR_z, &
+                                             recon_dir, &
+                                             is1, is2, is3)
                 end if
             end if
         #:endfor

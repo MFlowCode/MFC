@@ -980,8 +980,9 @@ def _load():  # pylint: disable=too-many-locals,too-many-statements
               "old_grid", "old_ic", "mixlayer_vel_profile", "mixlayer_perturb",
               "perturb_flow", "perturb_sph", "pre_stress", "elliptic_smoothing",
               "simplex_perturb", "alt_soundspeed", "mixture_err", "rdma_mpi",
-              "igr_pres_lim", "int_comp", "nv_uvm_out_of_core", "nv_uvm_pref_gpu"]:
+              "igr_pres_lim", "nv_uvm_out_of_core", "nv_uvm_pref_gpu"]:
         _r(n, LOG)
+    _r("int_comp", INT)
     _r("case_dir", STR)
 
     # Body force

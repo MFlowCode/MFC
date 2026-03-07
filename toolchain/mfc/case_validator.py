@@ -427,10 +427,10 @@ class CaseValidator:  # pylint: disable=too-many-public-methods
     def check_muscl(self):
         """Check constraints regarding MUSCL order"""
         recon_type = self.get('recon_type', 1)
-        int_comp = self.get('int_comp', 'F') == 'T'
+        int_comp = self.get('int_comp', 0)
 
-        self.prohibit(int_comp and recon_type != 2,
-                     "int_comp (THINC interface compression) requires recon_type = 2 (MUSCL)")
+        self.prohibit(int_comp not in [0, 1, 2],
+                     "int_comp must be 0 (off), 1 (THINC), or 2 (MTHINC)")
 
         # MUSCL_TYPE = 2
         if recon_type != 2:
