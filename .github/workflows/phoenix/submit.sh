@@ -94,6 +94,5 @@ fi
 
 echo "Submitted batch job $job_id"
 
-# Use resilient monitoring instead of sbatch -W
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-bash "$SCRIPT_DIR/../../scripts/monitor_slurm_job.sh" "$job_id" "$output_file"
+bash "$SCRIPT_DIR/../../scripts/run_monitored_slurm_job.sh" "$job_id" "$output_file"

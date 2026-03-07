@@ -37,30 +37,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - cluster: phoenix
-            name: Georgia Tech | Phoenix (NVHPC)
-            group: phoenix
-            labels: gt
-            flag: p
-            device: cpu
-            interface: none
-            build_script: ""
-          - cluster: phoenix
-            name: Georgia Tech | Phoenix (NVHPC)
-            group: phoenix
-            labels: gt
-            flag: p
-            device: gpu
-            interface: acc
-            build_script: ""
-          - cluster: phoenix
-            name: Georgia Tech | Phoenix (NVHPC)
-            group: phoenix
-            labels: gt
-            flag: p
-            device: gpu
-            interface: omp
-            build_script: ""
+          # Phoenix (NVHPC) — TEMPORARILY DISABLED (QOS job limit / pre-existing SLURM failures)
           - cluster: frontier
             name: Oak Ridge | Frontier (CCE)
             group: phoenix
