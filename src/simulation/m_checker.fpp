@@ -262,7 +262,18 @@ contains
 
     !> Checks constraints on hypoelasticity parameters
     subroutine s_check_inputs_hypoelasticity
-        ! @:PROHIBIT(hypoelasticity .and. riemann_solver /= 1, "hypoelasticity requires HLL Riemann solver (riemann_solver = 1)")
+        @:PROHIBIT(hypoelasticity .and. riemann_solver == 2 .and. p > 0, &
+            "HLLC hypoelasticity currently supports 1D and 2D Cartesian only (p must be 0)")
+        @:PROHIBIT(hypoelasticity .and. riemann_solver == 2 .and. cyl_coord, &
+            "HLLC hypoelasticity does not support cylindrical coordinates")
+        @:PROHIBIT(hypoelasticity .and. riemann_solver == 4 .and. n == 0, &
+            "HLLD hypoelasticity requires 2D (n must be > 0)")
+        @:PROHIBIT(hypoelasticity .and. riemann_solver == 4 .and. p > 0, &
+            "HLLD hypoelasticity currently supports 2D only (p must be 0)")
+        @:PROHIBIT(hypoelasticity .and. riemann_solver == 4 .and. cyl_coord, &
+            "HLLD hypoelasticity does not support cylindrical coordinates")
+        @:PROHIBIT(hypoelasticity .and. riemann_solver == 4 .and. num_fluids /= 2, &
+            "HLLD hypoelasticity currently requires exactly 2 fluid components")
     end subroutine
 
     !> Checks constraints on bubble parameters

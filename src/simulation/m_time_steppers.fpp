@@ -311,7 +311,7 @@ contains
             @:ACC_SETUP_SFs(rhs_vf(i))
         end do
 
-        if (HLLD_hypo) then
+        if (hypo_nc_dual_pass) then
             @:ALLOCATE(rhs_hatL_vf(1:sys_size))
             @:ALLOCATE(rhs_hatR_vf(1:sys_size))
 
@@ -366,7 +366,7 @@ contains
         ! Stage 1 of 1
         call nvtxStartRange("TIMESTEP")
 
-        if (HLLD_hypo) then ! Re-run Riemann solver with right cell-values (_hat_R) to get rhs <- rhs_hat_L + rhs_hat_R
+        if (hypo_nc_dual_pass) then ! Re-run Riemann solver with right cell-values (_hat_R) to get rhs <- rhs_hat_L + rhs_hat_R
             call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_hatL_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, 1, .true.)
             call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_hatR_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, 1, .false.)
 
@@ -493,7 +493,7 @@ contains
 
         call nvtxStartRange("TIMESTEP")
 
-        if (HLLD_hypo) then ! Run Riemann solver twice with left/right cell-values (hatL/R) to get: rhs <- rhs_hat_L + rhs_hat_R
+        if (hypo_nc_dual_pass) then ! Run Riemann solver twice with left/right cell-values (hatL/R) to get: rhs <- rhs_hat_L + rhs_hat_R
             call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_hatL_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, 1, .true.)
             call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_hatR_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, 1, .false.)
 
@@ -596,7 +596,7 @@ contains
 
         ! Stage 2 of 2
 
-        if (HLLD_hypo) then ! Run Riemann solver twice with left/right cell-values (hatL/R) to get: rhs <- rhs_hat_L + rhs_hat_R
+        if (hypo_nc_dual_pass) then ! Run Riemann solver twice with left/right cell-values (hatL/R) to get: rhs <- rhs_hat_L + rhs_hat_R
             call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_hatL_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2, .true.)
             call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_hatR_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2, .false.)
 
@@ -709,7 +709,7 @@ contains
             call nvtxStartRange("TIMESTEP")
         end if
 
-        if (HLLD_hypo) then ! Run Riemann solver twice with left/right cell-values (hatL/R) to get: rhs <- rhs_hat_L + rhs_hat_R
+        if (hypo_nc_dual_pass) then ! Run Riemann solver twice with left/right cell-values (hatL/R) to get: rhs <- rhs_hat_L + rhs_hat_R
             call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_hatL_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, 1, .true.)
             call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_hatR_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step, time_avg, 1, .false.)
 
@@ -812,7 +812,7 @@ contains
 
         ! Stage 2 of 3
 
-        if (HLLD_hypo) then ! Run Riemann solver twice with left/right cell-values (hatL/R) to get: rhs <- rhs_hat_L + rhs_hat_R
+        if (hypo_nc_dual_pass) then ! Run Riemann solver twice with left/right cell-values (hatL/R) to get: rhs <- rhs_hat_L + rhs_hat_R
             call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_hatL_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2, .true.)
             call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_hatR_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 2, .false.)
 
@@ -903,7 +903,7 @@ contains
 
         ! Stage 3 of 3
 
-        if (HLLD_hypo) then ! Run Riemann solver twice with left/right cell-values (hatL/R) to get: rhs <- rhs_hat_L + rhs_hat_R
+        if (hypo_nc_dual_pass) then ! Run Riemann solver twice with left/right cell-values (hatL/R) to get: rhs <- rhs_hat_L + rhs_hat_R
             call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_hatL_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 3, .true.)
             call s_compute_rhs(q_cons_ts(2)%vf, q_T_sf, q_prim_vf, bc_type, rhs_hatR_vf, pb_ts(2)%sf, rhs_pb, mv_ts(2)%sf, rhs_mv, t_step, time_avg, 3, .false.)
 
@@ -1275,7 +1275,7 @@ contains
 
         @:DEALLOCATE(rhs_vf)
 
-        if (HLLD_hypo) then
+        if (hypo_nc_dual_pass) then
             do i = 1, sys_size
                 @:DEALLOCATE(rhs_hatL_vf(i)%sf)
                 @:DEALLOCATE(rhs_hatR_vf(i)%sf)

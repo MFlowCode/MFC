@@ -131,6 +131,9 @@ module m_rhs
     !$acc declare create(flux_n, flux_src_n, flux_gsrc_n)
     !> @}
 
+    type(vector_field), allocatable, dimension(:) :: hypo_iface_vel_n
+    !$acc declare create(hypo_iface_vel_n)
+
     type(vector_field), allocatable, dimension(:) :: qL_prim, qR_prim
     !$acc declare create(qL_prim, qR_prim)
 
@@ -567,6 +570,20 @@ contains
 
         ! END: Allocation/Association of flux_n, flux_src_n, and flux_gsrc_n
 
+        if (hypo_nc_interface) then
+            @:ALLOCATE(hypo_iface_vel_n(1:2))
+            do i = 1, 2
+                @:ALLOCATE(hypo_iface_vel_n(i)%vf(1:2))
+                do l = 1, 2
+                    @:ALLOCATE(hypo_iface_vel_n(i)%vf(l)%sf( &
+                        idwbuff(1)%beg:idwbuff(1)%end, &
+                        idwbuff(2)%beg:idwbuff(2)%end, &
+                        idwbuff(3)%beg:idwbuff(3)%end))
+                end do
+            end do
+            @:ACC_SETUP_VFs(hypo_iface_vel_n(1), hypo_iface_vel_n(2))
+        end if
+
         if (alt_soundspeed) then
             @:ALLOCATE(blkmod1(0:m, 0:n, 0:p), blkmod2(0:m, 0:n, 0:p), alpha1(0:m, 0:n, 0:p), alpha2(0:m, 0:n, 0:p), Kterm(0:m, 0:n, 0:p))
         end if
@@ -806,6 +823,10 @@ contains
                                   id, irx, iry, irz, is_hat_L)
             call nvtxEndRange
 
+            if (hypo_nc_interface) then
+                call s_finalize_hypo_iface_vel(hypo_iface_vel_n(id)%vf, id)
+            end if
+
             ! Additional physics and source terms
             ! RHS addition for advection source
             call nvtxStartRange("RHS-ADVECTION-SRC")
@@ -821,12 +842,12 @@ contains
                                                  is_hat_L)
             call nvtxEndRange
 
-            ! ! RHS additions for hypoelasticity
-            ! call nvtxStartRange("RHS-HYPOELASTICITY")
-            ! if (hypoelasticity) call s_compute_hypoelastic_rhs(id, &
-            !                                                    q_prim_qp%vf, &
-            !                                                    rhs_vf)
-            ! call nvtxEndRange
+            ! RHS additions for hypoelasticity (legacy FD path, inside dim-split loop)
+            if (hypo_nc_finite_diff) then
+                call nvtxStartRange("RHS-HYPOELASTICITY-LEGACY")
+                call s_compute_hypoelastic_rhs_legacy(id, q_prim_qp%vf, rhs_vf)
+                call nvtxEndRange
+            end if
 
             ! RHS additions for viscosity
             if (viscous .or. surface_tension) then
@@ -872,13 +893,14 @@ contains
         end do
         ! END: Dimensional Splitting Loop
 
-        ! RHS additions for hypoelasticity - moved outside of dimensional splitting as it needs fluxes from multiple directions
-        call nvtxStartRange("RHS-HYPOELASTICITY")
-        if (hypoelasticity .and. .not. HLLD_hypo) call s_compute_hypoelastic_rhs(id, &
-                                                           q_prim_qp%vf, &
-                                                           rhs_vf, &
-                                                           flux_gsrc_n(1)%vf, flux_gsrc_n(2)%vf)
-        call nvtxEndRange
+        ! RHS additions for hypoelasticity (interface-consistent path, after all sweeps)
+        if (hypo_nc_interface) then
+            call nvtxStartRange("RHS-HYPOELASTICITY-IFACE")
+            call s_compute_hypoelastic_rhs_iface(q_prim_qp%vf, rhs_vf, &
+                                                  hypo_iface_vel_n(1)%vf, hypo_iface_vel_n(2)%vf)
+            call nvtxEndRange
+        end if
+        ! hypo_nc_dual_pass (HLLD): no external hypo RHS call
 
 
         if (ib) then
@@ -1021,7 +1043,7 @@ contains
                            flux_src_n(idir)%vf, idir, 1, irx, iry, irz)
             end if
 
-            if (.not. HLLD_hypo) then
+            if (.not. hypo_nc_dual_pass) then
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do j = 1, sys_size
                     do q = 0, p
@@ -1079,7 +1101,7 @@ contains
             end if
 
             if (riemann_solver == 1 .or. riemann_solver == 4) then
-                if (.not. HLLD_hypo) then ! HLLD Hypo does all non-conservative terms inside the Riemann solver
+                if (.not. hypo_nc_dual_pass) then ! HLLD Hypo does all non-conservative terms inside the Riemann solver
                     !$acc parallel loop collapse(4) gang vector default(present)
                     do j = advxb, advxe
                         do q = 0, p
@@ -1158,7 +1180,7 @@ contains
                            flux_src_n(idir)%vf, idir, 1, irx, iry, irz)
             end if
 
-            if (.not. HLLD_hypo) then
+            if (.not. hypo_nc_dual_pass) then
                 !$acc parallel loop collapse(4) gang vector default(present)
                 do j = 1, sys_size
                     do l = 0, p
@@ -1250,7 +1272,7 @@ contains
             end if
 
             if (riemann_solver == 1 .or. riemann_solver == 4) then
-                if (.not. HLLD_hypo) then ! HLLD Hypo does all non-conservative terms inside the Riemann solver
+                if (.not. hypo_nc_dual_pass) then ! HLLD Hypo does all non-conservative terms inside the Riemann solver
                     !$acc parallel loop collapse(4) gang vector default(present)
                     do j = advxb, advxe
                         do l = 0, p
@@ -2352,6 +2374,16 @@ contains
         end do
 
         @:DEALLOCATE(flux_n, flux_src_n, flux_gsrc_n)
+
+        if (hypo_nc_interface) then
+            do i = 1, 2
+                do l = 1, 2
+                    @:DEALLOCATE(hypo_iface_vel_n(i)%vf(l)%sf)
+                end do
+                @:DEALLOCATE(hypo_iface_vel_n(i)%vf)
+            end do
+            @:DEALLOCATE(hypo_iface_vel_n)
+        end if
 
         if (viscous .and. cyl_coord) then
             do i = 1, num_dims
