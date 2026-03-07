@@ -559,7 +559,6 @@ contains
             if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(q_prim_vf, bc_type, stage=s)
 
             if (particles_lagrange) then
-                call s_populate_variables_buffers(bc_type, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
                 call s_update_lagrange_particles_tdv_rk(q_prim_vf, bc_type, stage=s)
             end if
 

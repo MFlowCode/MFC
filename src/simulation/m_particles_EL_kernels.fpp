@@ -22,32 +22,95 @@ module m_particles_EL_kernels
 
 contains
 
-    !> The purpose of this subroutine is to smear the strength of the lagrangian
-            !!      particles into the Eulerian framework using a gaussian approach.
-            !! @param nParticles Number of lagrangian particles in the current domain
-            !! @param lbk_rad Radius of the particles
-            !! @param lbk_s Computational coordinates of the particles
-            !! @param lbk_pos Spatial coordinates of the particles
-            !! @param updatedvar Eulerian variable to be updated
-            !! @param lbk_f_p Forces on the particles
-    subroutine s_smoothfunction(nParticles, lbk_rad, lbk_vel, lbk_s, lbk_pos, lbk_f_p, lbk_g_sum, updatedvar, kcomp, lbk_linked_list, lbk_particle_head)
+    ! !> The purpose of this subroutine is to smear the strength of the lagrangian
+    !         !!      particles into the Eulerian framework using a gaussian approach.
+    !         !! @param nParticles Number of lagrangian particles in the current domain
+    !         !! @param lbk_rad Radius of the particles
+    !         !! @param lbk_s Computational coordinates of the particles
+    !         !! @param lbk_pos Spatial coordinates of the particles
+    !         !! @param updatedvar Eulerian variable to be updated
+    !         !! @param lbk_f_p Forces on the particles
+    ! subroutine s_smoothfunction(nParticles, lbk_rad, lbk_vel, lbk_s, lbk_pos, lbk_f_p, lbk_g_sum, updatedvar, kcomp, lbk_linked_list, lbk_particle_head)
 
-        integer, intent(in) :: nParticles
-        real(wp), dimension(1:lag_params%nParticles_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_pos, lbk_vel
-        real(wp), dimension(1:lag_params%nParticles_glb, 1:2), intent(in) :: lbk_rad
-        real(wp), dimension(1:lag_params%nParticles_glb, 1:3), intent(in) :: lbk_f_p
-        real(wp), dimension(1:lag_params%nParticles_glb), intent(inout) :: lbk_g_sum
+    !     integer, intent(in) :: nParticles
+    !     real(wp), dimension(1:lag_params%nParticles_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_pos, lbk_vel
+    !     real(wp), dimension(1:lag_params%nParticles_glb, 1:2), intent(in) :: lbk_rad
+    !     real(wp), dimension(1:lag_params%nParticles_glb, 1:3), intent(in) :: lbk_f_p
+    !     real(wp), dimension(1:lag_params%nParticles_glb), intent(inout) :: lbk_g_sum
 
-        integer, dimension(1:lag_params%nParticles_glb), intent(in) :: lbk_linked_list
-        integer, dimension(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end), intent(in) :: lbk_particle_head
+    !     integer, dimension(1:lag_params%nParticles_glb), intent(in) :: lbk_linked_list
+    !     integer, dimension(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end), intent(in) :: lbk_particle_head
 
-        type(scalar_field), dimension(:), intent(inout) :: updatedvar
-        type(scalar_field), dimension(:), intent(inout) :: kcomp
+    !     type(scalar_field), dimension(:), intent(inout) :: updatedvar
+    !     type(scalar_field), dimension(:), intent(inout) :: kcomp
 
-        ! call s_gaussian(nParticles, lbk_rad, lbk_s, lbk_pos, lbk_vel, updatedvar, lbk_f_p, ngh)
-        call s_gaussian(nParticles, lbk_rad, lbk_vel, lbk_s, lbk_pos, lbk_f_p, lbk_g_sum, updatedvar, kcomp, lbk_linked_list, lbk_particle_head)
+    !     ! call s_gaussian(nParticles, lbk_rad, lbk_s, lbk_pos, lbk_vel, updatedvar, lbk_f_p, ngh)
+    !     call s_gaussian(nParticles, lbk_rad, lbk_vel, lbk_s, lbk_pos, lbk_f_p, lbk_g_sum, updatedvar, kcomp, lbk_linked_list, lbk_particle_head)
 
-    end subroutine s_smoothfunction
+    ! end subroutine s_smoothfunction
+
+    ! !> The purpose of this subroutine is to compute each particles total contribution to the gaussian for proper normalization
+    subroutine s_compute_gaussian_contribution(rad, pos, cell, func_s)
+        $:GPU_ROUTINE(function_name='s_compute_gaussian_contribution',parallelism='[seq]', &
+            & cray_inline=True)
+
+        real(wp), intent(in) :: rad
+        real(wp), intent(in), dimension(3) :: pos
+        integer, intent(in), dimension(3) :: cell
+        real(wp), intent(out) :: func_s
+
+        real(wp) :: volpart, stddsv, Vol_loc, func
+        real(wp), dimension(3) :: nodecoord, center
+
+        integer :: ip, jp, kp, di, dj, dk, di_beg, di_end, dj_beg, dj_end, dk_beg, dk_end, mapCells_loc
+        integer, dimension(3) :: cellijk
+
+        mapCells_loc = 1
+
+        volpart = (4._wp/3._wp)*pi*rad**3._wp
+
+        call s_compute_stddsv(cell, volpart, stddsv)
+
+        ip = cell(1)
+        jp = cell(2)
+        kp = cell(3)
+
+        di_beg = ip - mapCells_loc
+        di_end = ip + mapCells_loc
+        dj_beg = jp - mapCells_loc
+        dj_end = jp + mapCells_loc
+        dk_beg = kp - mapCells_loc
+        dk_end = kp + mapCells_loc
+
+        func_s = 0._wp
+        do dk = dk_beg, dk_end
+            do dj = dj_beg, dj_end
+                do di = di_beg, di_end
+
+                    nodecoord(1) = x_cc(di)
+                    nodecoord(2) = y_cc(dj)
+                    nodecoord(3) = 0._wp
+                    if (p > 0) nodecoord(3) = z_cc(dk)
+
+                    cellijk(1) = di
+                    cellijk(2) = dj
+                    cellijk(3) = dk
+
+                    center(1:2) = pos(1:2)
+                    center(3) = 0._wp
+                    if (p > 0) center(3) = pos(3)
+
+                    Vol_loc = dx(cellijk(1))*dy(cellijk(2))
+                    if (num_dims == 3) Vol_loc = Vol_loc*dz(cellijk(3))
+
+                    call s_applygaussian(center, cellijk, nodecoord, stddsv, 0._wp, func)
+
+                    func_s = func_s + func*Vol_loc
+                end do
+            end do
+        end do
+
+    end subroutine s_compute_gaussian_contribution
 
     !> Cell-centric gaussian smearing using the cell list (no GPU atomics).
     !!      Each grid cell accumulates contributions from nearby particles looked up
@@ -89,61 +152,6 @@ contains
         smear_y_end = merge(n + mapCells_loc, n, n > 0)
         smear_z_beg = merge(-mapCells_loc, 0, p > 0)
         smear_z_end = merge(p + mapCells_loc, p, p > 0)
-
-        $:GPU_PARALLEL_LOOP(private='[l,volpart,s_coord,cell,stddsv,i,j,k,di,dj,dk,di_beg,di_end,dj_beg,dj_end,dk_beg,dk_end,nodecoord,center,cellijk,Vol_loc,func]')
-        do l = 1, nParticles
-
-            lbk_g_sum(l) = 0._wp
-
-            volpart = 4._wp/3._wp*pi*lbk_rad(l, 2)**3._wp
-            s_coord(1:3) = lbk_s(l, 1:3, 2)
-
-            call s_get_cell(s_coord, cell)
-
-            call s_compute_stddsv(cell, volpart, stddsv)
-
-            i = cell(1)
-            j = cell(2)
-            k = cell(3)
-
-            di_beg = i - mapCells_loc
-            di_end = i + mapCells_loc
-            dj_beg = j - mapCells_loc
-            dj_end = j + mapCells_loc
-            dk_beg = k - mapCells_loc
-            dk_end = k + mapCells_loc
-
-            $:GPU_LOOP(parallelism='[seq]')
-            do di = di_beg, di_end
-                $:GPU_LOOP(parallelism='[seq]')
-                do dj = dj_beg, dj_end
-                    $:GPU_LOOP(parallelism='[seq]')
-                    do dk = dk_beg, dk_end
-
-                        nodecoord(1) = x_cc(di)
-                        nodecoord(2) = y_cc(dj)
-                        nodecoord(3) = 0._wp
-                        if (p > 0) nodecoord(3) = z_cc(dk)
-
-                        cellijk(1) = di
-                        cellijk(2) = dj
-                        cellijk(3) = dk
-
-                        center(1:2) = lbk_pos(l, 1:2, 2)
-                        center(3) = 0._wp
-                        if (p > 0) center(3) = lbk_pos(l, 3, 2)
-
-                        Vol_loc = dx(cellijk(1))*dy(cellijk(2))
-                        if (num_dims == 3) Vol_loc = Vol_loc*dz(cellijk(3))
-
-                        call s_applygaussian(center, cellijk, nodecoord, stddsv, 0._wp, func)
-
-                        lbk_g_sum(l) = lbk_g_sum(l) + func*Vol_loc
-                    end do
-                end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
 
         $:GPU_PARALLEL_LOOP(collapse=3, &
             & private='[i,j,k,di,dj,dk,lb,part_idx,center,nodecoord,s_coord,cell,cellijk,stddsv,volpart,strength_vol,fp_x,fp_y,fp_z,vp_x,vp_y,vp_z,func,y_kahan,t_kahan,di_beg,di_end,dj_beg,dj_end,dk_beg,dk_end]', &
@@ -365,13 +373,16 @@ contains
             end if
         end if
 
-        !< Compute Standard deviaton
-        if ((volpart/charvol) > 0.5_wp*lag_params%valmaxvoid .or. (lag_params%smooth_type == 1)) then
-            rad = (3._wp*volpart/(4._wp*pi))**(1._wp/3._wp)
-            stddsv = 1._wp*lag_params%epsilonb*max(chardist, rad)
-        else
-            stddsv = 0._wp
-        end if
+        rad = (3._wp*volpart/(4._wp*pi))**(1._wp/3._wp)
+        stddsv = 1._wp*lag_params%epsilonb*max(chardist, rad)
+
+        ! !< Compute Standard deviaton
+        ! if ((volpart/charvol) > 0.5_wp*lag_params%valmaxvoid .or. (lag_params%smooth_type == 1)) then
+        !     rad = (3._wp*volpart/(4._wp*pi))**(1._wp/3._wp)
+        !     stddsv = 1._wp*lag_params%epsilonb*max(chardist, rad)
+        ! else
+        !     stddsv = 0._wp
+        ! end if
 
     end subroutine s_compute_stddsv
 
@@ -617,11 +628,11 @@ contains
             rmass_add = 0._wp
         end if
 
-        ! do dir = 1, num_dims
-        !     if (.not. ieee_is_finite(force(dir))) then
-        !         force(dir) = 0._wp
-        !     end if
-        ! end do
+        do dir = 1, num_dims
+            if (.not. ieee_is_finite(force(dir))) then
+                force(dir) = 0._wp
+            end if
+        end do
 
     end subroutine s_get_particle_force
 

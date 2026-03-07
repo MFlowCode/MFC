@@ -1510,7 +1510,9 @@ contains
         @:DEALLOCATE(pcomm_coords)
         @:DEALLOCATE(pcomm_coords_ghost)
 
-        @:DEALLOCATE(beta_vars)
+        if (bubbles_lagrange .or. particles_lagrange) then
+            @:DEALLOCATE(beta_vars)
+        end if
 
         if (parallel_io) then
             deallocate (start_idx)
