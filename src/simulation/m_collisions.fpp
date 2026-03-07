@@ -92,7 +92,7 @@ contains
 
         integer :: i, pid1, pid2, l ! iterators and patch IDs
         real(wp) :: overlap_distance
-        real(wp), dimension(3) :: collision_location, normal_vector, centroid_1, centroid_2
+        real(wp), dimension(3) :: normal_vector, centroid_1, centroid_2
         real(wp), dimension(3) :: normal_velocity, tangental_vector, normal_force, tangental_force, torque
         real(wp) :: k, eta, effective_mass ! the spring stiffness and damping coefficient and mass of a specific interaction
 
@@ -101,7 +101,7 @@ contains
         print *, "Checking Collisions: ", num_considered_collisions
 
         ! Iterate over all collisions detected
-        $:GPU_PARALLEL_LOOP(private='[i,l,pid1,pid2,centroid_1,centroid_2,collision_location,normal_vector,overlap_distance,effective_mass,k,eta,normal_velocity,tangental_vector,normal_force,tangental_force,torque]', copy='[forces, torques]', copyin='[patch_ib,num_considered_collisions]')
+        $:GPU_PARALLEL_LOOP(private='[i,l,pid1,pid2,centroid_1,centroid_2,normal_vector,overlap_distance,effective_mass,k,eta,normal_velocity,tangental_vector,normal_force,tangental_force,torque]', copy='[forces, torques]', copyin='[patch_ib,num_considered_collisions]')
         do i = 1, num_considered_collisions
             pid1 = collision_lookup(i, 1)
             pid2 = collision_lookup(i, 2)
@@ -117,8 +117,7 @@ contains
             overlap_distance = patch_ib(pid1)%radius + patch_ib(pid2)%radius - norm2(normal_vector)
             if (overlap_distance > 0._wp) then ! if the two patches are close enough to collide
                 normal_vector = normal_vector / norm2(normal_vector)
-                collision_location = centroid_1 + normal_vector * (patch_ib(pid1)%radius - 0.5_wp*overlap_distance)
-                if (f_local_rank_owns_collision(collision_location)) then
+                if (f_local_rank_owns_collision(centroid_1)) then
 
                     ! compute constants of the collision
                     effective_mass = 1.0_wp / ( (1.0_wp/patch_ib(pid1)%mass) + 1._wp / (patch_ib(pid2)%mass) )
@@ -127,12 +126,12 @@ contains
 
                     ! Get the vectors and velcoities
                     ! TODO :: This should be made more complicated and include rotational velocity at the collision location.
-                    normal_velocity = dot_product(patch_ib(pid2)%vel - patch_ib(pid1)%vel, normal_vector)*normal_vector
-                    tangental_vector = (patch_ib(pid2)%vel - patch_ib(pid1)%vel) - normal_velocity
+                    normal_velocity = dot_product(patch_ib(pid1)%vel - patch_ib(pid2)%vel, normal_vector)*normal_vector
+                    tangental_vector = (patch_ib(pid1)%vel - patch_ib(pid2)%vel) - normal_velocity
                     if (.not. f_approx_equal(norm2(tangental_vector), 0._wp)) tangental_vector = tangental_vector / norm2(tangental_vector)
 
                     ! compute force and torque
-                    normal_force = -k * overlap_distance  * normal_vector - eta * normal_velocity
+                    normal_force = -k * overlap_distance * normal_vector - eta * normal_velocity
                     tangental_force = -ib_coefficient_of_friction * norm2(normal_force) * tangental_vector
                     call s_cross_product(normal_vector * patch_ib(pid1)%radius, tangental_force, torque)
 
@@ -182,15 +181,14 @@ contains
                     case(4) ! y domain top
                         normal_vector = [0._wp, 1._wp, 0._wp]
                     case(5) ! z domain back
-                        normal_vector = [0._wp, 0._wp, 1._wp]
-                    case(6) ! z domain front
                         normal_vector = [0._wp, 0._wp, -1._wp]
+                    case(6) ! z domain front
+                        normal_vector = [0._wp, 0._wp, 1._wp]
                 end select
 
                 ! ensure the local rank owns that collision before proceeding
                 collision_location = [patch_ib(patch_id)%x_centroid, patch_ib(patch_id)%y_centroid, 0._wp]
                 if (num_dims == 3) collision_location(3) = patch_ib(patch_id)%z_centroid
-                collision_location = collision_location + normal_vector * patch_ib(patch_id)%radius
                 if (f_local_rank_owns_collision(collision_location)) then
 
                     k = spring_stiffness * patch_ib(patch_id)%mass
@@ -200,7 +198,7 @@ contains
                     normal_velocity = dot_product(patch_ib(patch_id)%vel, normal_vector)*normal_vector
                     tangental_vector = patch_ib(patch_id)%vel - normal_velocity
                     tangental_vector = tangental_vector / norm2(tangental_vector)
-                    normal_force = -k * wall_overlap_distances(patch_id, i)  * normal_vector - eta * normal_velocity
+                    normal_force = -k * wall_overlap_distances(patch_id, i) * normal_vector - eta * normal_velocity
                     tangental_force = -ib_coefficient_of_friction * norm2(normal_force) * tangental_vector
                     call s_cross_product(normal_vector * patch_ib(patch_id)%radius, tangental_force, torque)
 
@@ -367,8 +365,6 @@ contains
         end do
       end do
       $:END_GPU_PARALLEL_LOOP()
-
-      ! $:GPU_UPDATE(device='[collision_lookup]')
 
     end subroutine s_detect_ib_collisions_n2
 
