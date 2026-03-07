@@ -15,7 +15,7 @@
 !! Reference: B. Xie and F. Xiao, "Toward efficient and accurate interface
 !! capturing on arbitrary hybrid unstructured grids: The THINC method with
 !! quadratic surface representation and Gaussian quadrature,"
-!! J. Comput. Phys., vol. 349, pp. 415-440, 2017.
+!! Journal Computational Physics, vol. 349, pp. 415-440, 2017.
 module m_thinc
 
     use m_derived_types
@@ -33,13 +33,13 @@ module m_thinc
 
     !> 3-point Gauss-Legendre quadrature on [-1/2, 1/2]
     real(wp), parameter :: gq3_pts(3) = [ &
-        -5e-1_wp*0.7745966692414834_wp, &
-         0._wp, &
-         5e-1_wp*0.7745966692414834_wp]
+                           -5e-1_wp*0.7745966692414834_wp, &
+                           0._wp, &
+                           5e-1_wp*0.7745966692414834_wp]
     real(wp), parameter :: gq3_wts(3) = [ &
-        5._wp/18._wp, &
-        8._wp/18._wp, &
-        5._wp/18._wp]
+                           5._wp/18._wp, &
+                           8._wp/18._wp, &
+                           5._wp/18._wp]
     real(wp), parameter :: ln2 = 0.6931471805599453_wp
 
     !> MTHINC precomputed data: unit normal components and interface
@@ -50,10 +50,6 @@ module m_thinc
     $:GPU_DECLARE(create='[mthinc_nhat, mthinc_d]')
 
 contains
-
-    ! ================================================================
-    ! Device-callable helper functions for MTHINC
-    ! ================================================================
 
     !> @brief Stable computation of ln(cosh(x)).
     !! For large |x| the naive formula overflows; uses
@@ -82,7 +78,7 @@ contains
             res = 5e-1_wp*(1._wp + tanh(a))
         else
             res = 5e-1_wp + (f_log_cosh(a + 5e-1_wp*b) &
-                           - f_log_cosh(a - 5e-1_wp*b))/(2._wp*b)
+                             - f_log_cosh(a - 5e-1_wp*b))/(2._wp*b)
         end if
     end function f_thinc_integral_1d
 
@@ -110,7 +106,7 @@ contains
                 do q2 = 1, 3
                     a = beta*(n2*gq3_pts(q1) + n3*gq3_pts(q2) + d)
                     res = res + gq3_wts(q1)*gq3_wts(q2) &
-                              *f_thinc_integral_1d(a, beta*n1)
+                          *f_thinc_integral_1d(a, beta*n1)
                 end do
             end do
         end if
@@ -136,9 +132,9 @@ contains
             do q1 = 1, 3
                 do q2 = 1, 3
                     th = tanh(beta*(n1*gq3_pts(q1) &
-                                  + n2*gq3_pts(q2) + d))
+                                    + n2*gq3_pts(q2) + d))
                     res = res + gq3_wts(q1)*gq3_wts(q2) &
-                              *(1._wp - th*th)
+                          *(1._wp - th*th)
                 end do
             end do
         else
@@ -146,10 +142,10 @@ contains
                 do q2 = 1, 3
                     do q3 = 1, 3
                         th = tanh(beta*(n1*gq3_pts(q1) &
-                                      + n2*gq3_pts(q2) &
-                                      + n3*gq3_pts(q3) + d))
+                                        + n2*gq3_pts(q2) &
+                                        + n3*gq3_pts(q3) + d))
                         res = res + gq3_wts(q1)*gq3_wts(q2) &
-                                  *gq3_wts(q3)*(1._wp - th*th)
+                              *gq3_wts(q3)*(1._wp - th*th)
                     end do
                 end do
             end do
@@ -183,7 +179,7 @@ contains
     !! The face coordinate in face_dir is fixed; remaining directions are
     !! integrated over [-1/2, 1/2] (analytically along one, Gauss for others).
     function f_mthinc_face_average(n1, n2, n3, d, beta, &
-                                    face_dir, face_pos, ndim) result(res)
+                                   face_dir, face_pos, ndim) result(res)
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: n1, n2, n3, d, beta, face_pos
         integer, intent(in) :: face_dir, ndim
@@ -213,16 +209,12 @@ contains
             res = 0._wp
             do q = 1, 3
                 a = beta*(n_face*face_pos &
-                        + n_t0*gq3_pts(q) + d)
+                          + n_t0*gq3_pts(q) + d)
                 res = res + gq3_wts(q) &
-                          *f_thinc_integral_1d(a, beta*n_t1)
+                      *f_thinc_integral_1d(a, beta*n_t1)
             end do
         end if
     end function f_mthinc_face_average
-
-    ! ================================================================
-    ! Module initialization / finalization
-    ! ================================================================
 
     subroutine s_initialize_thinc_module()
 
@@ -238,10 +230,6 @@ contains
         end if
 
     end subroutine s_initialize_thinc_module
-
-    ! ================================================================
-    ! MTHINC normal + interface position precomputation
-    ! ================================================================
 
     !> @brief Compute the unit normal and interface-position parameter d
     !! at each interface cell. The normal is computed in cell-scaled
@@ -285,18 +273,18 @@ contains
                         ! (no division by physical distance — aspect ratio
                         ! is embedded in the normal automatically)
                         nr_x = (v_vf(advxb)%sf(j + 1, k, l) &
-                              - v_vf(advxb)%sf(j - 1, k, l))*5e-1_wp
+                                - v_vf(advxb)%sf(j - 1, k, l))*5e-1_wp
 
                         nr_y = 0._wp
                         if (n > 0) then
                             nr_y = (v_vf(advxb)%sf(j, k + 1, l) &
-                                  - v_vf(advxb)%sf(j, k - 1, l))*5e-1_wp
+                                    - v_vf(advxb)%sf(j, k - 1, l))*5e-1_wp
                         end if
 
                         nr_z = 0._wp
                         if (p > 0) then
                             nr_z = (v_vf(advxb)%sf(j, k, l + 1) &
-                                  - v_vf(advxb)%sf(j, k, l - 1))*5e-1_wp
+                                    - v_vf(advxb)%sf(j, k, l - 1))*5e-1_wp
                         end if
 
                         nmag = sqrt(nr_x*nr_x + nr_y*nr_y + nr_z*nr_z)
@@ -311,8 +299,8 @@ contains
                             mthinc_nhat(3, j, k, l) = nr_z
 
                             mthinc_d(j, k, l) = f_mthinc_solve_d( &
-                                nr_x, nr_y, nr_z, &
-                                ic_beta, real(ac, wp), num_dims)
+                                                nr_x, nr_y, nr_z, &
+                                                ic_beta, real(ac, wp), num_dims)
                         end if
 
                     end if
@@ -323,10 +311,6 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_compute_mthinc_normals
-
-    ! ================================================================
-    ! THINC / MTHINC interface compression
-    ! ================================================================
 
     !> @brief Applies THINC (int_comp=1) or MTHINC (int_comp=2) interface
     !! compression to sharpen volume-fraction reconstructions at material
@@ -385,7 +369,7 @@ contains
                             if (aC >= ic_eps .and. aC <= 1._wp - ic_eps) then
 
                                 if (int_comp == 2 .and. n > 0) then
-                                    ! ---- MTHINC: multi-dimensional face averages ----
+                                    ! MTHINC: multi-dimensional face averages
 
                                     ! Map reshaped (j,k,l) to physical (ix,iy,iz)
                                     #:if REC_DIR == 1
@@ -411,8 +395,8 @@ contains
 
                                         ! Left face (face_pos = -0.5)
                                         aTHINC = f_mthinc_face_average( &
-                                            nh1, nh2, nh3, d_local, ic_beta, &
-                                            ${REC_DIR}$, -5e-1_wp, num_dims)
+                                                 nh1, nh2, nh3, d_local, ic_beta, &
+                                                 ${REC_DIR}$, -5e-1_wp, num_dims)
                                         if (aTHINC < ic_eps) aTHINC = ic_eps
                                         if (aTHINC > 1._wp - ic_eps) aTHINC = 1._wp - ic_eps
                                         vL_rs_vf_${XYZ}$ (j, k, l, contxb) = rho1*aTHINC
@@ -422,8 +406,8 @@ contains
 
                                         ! Right face (face_pos = +0.5)
                                         aTHINC = f_mthinc_face_average( &
-                                            nh1, nh2, nh3, d_local, ic_beta, &
-                                            ${REC_DIR}$, 5e-1_wp, num_dims)
+                                                 nh1, nh2, nh3, d_local, ic_beta, &
+                                                 ${REC_DIR}$, 5e-1_wp, num_dims)
                                         if (aTHINC < ic_eps) aTHINC = ic_eps
                                         if (aTHINC > 1._wp - ic_eps) aTHINC = 1._wp - ic_eps
                                         vR_rs_vf_${XYZ}$ (j, k, l, contxb) = rho1*aTHINC
@@ -434,7 +418,7 @@ contains
                                     end if
 
                                 else
-                                    ! ---- 1D THINC: constant sharpness ----
+                                    ! 1D THINC: constant sharpness
 
                                     moncon = (aCR - aC)*(aC - aCL)
 
