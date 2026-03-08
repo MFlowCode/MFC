@@ -3,7 +3,9 @@
 source .github/scripts/gpu-opts.sh
 build_opts="$gpu_opts"
 
-rm -rf build
+# Set up per-config isolated build directory to prevent lock.yaml races when
+# multiple jobs (cpu, gpu-acc, gpu-omp) run concurrently in the same workspace.
+source .github/scripts/setup-build-cache.sh phoenix "$job_device" "$job_interface"
 
 # Build with retry; smoke-test the freshly built syscheck binary to catch
 # architecture mismatches (SIGILL from binaries compiled on a different compute node).
