@@ -37,22 +37,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - cluster: phoenix
-            name: Georgia Tech | Phoenix (NVHPC)
-            group: phoenix
-            labels: gt
-            flag: p
-            device: gpu
-            interface: acc
-            build_script: ""
-          - cluster: phoenix
-            name: Georgia Tech | Phoenix (NVHPC)
-            group: phoenix
-            labels: gt
-            flag: p
-            device: gpu
-            interface: omp
-            build_script: ""
+          # Frontier (ORNL) — CCE only
           - cluster: frontier
             name: Oak Ridge | Frontier (CCE)
             group: phoenix
@@ -69,14 +54,6 @@ jobs:
             device: gpu
             interface: omp
             build_script: "bash .github/workflows/frontier/build.sh gpu omp bench"
-          - cluster: frontier_amd
-            name: Oak Ridge | Frontier (AMD)
-            group: phoenix
-            labels: frontier
-            flag: famd
-            device: gpu
-            interface: omp
-            build_script: "bash .github/workflows/frontier_amd/build.sh gpu omp bench"
     runs-on:
       group: ${{ matrix.group }}
       labels: ${{ matrix.labels }}

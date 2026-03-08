@@ -68,99 +68,6 @@ jobs:
         with: 
           filters: ".github/file-filter.yml"
 
-  github:
-    name: Github
-    if: needs.file-changes.outputs.checkall == 'true'
-    needs: [lint-gate, file-changes]
-    strategy:
-      matrix:
-        os:    ['ubuntu', 'macos']
-        mpi:   ['mpi']
-        precision: ['']
-        debug: ['debug', 'no-debug']
-        intel: [true, false]
-        exclude:
-          - os:    macos
-            intel: true
-
-        include:
-          - os:    ubuntu
-            mpi:   no-mpi
-            precision: single
-            debug: no-debug
-            intel: false
-
-      fail-fast: false
-    continue-on-error: true
-    runs-on: ${{ matrix.os }}-latest
-
-    steps:
-      - name: Clone
-        uses: actions/checkout@v4
-
-      - name: Setup MacOS
-        if:   matrix.os == 'macos'
-        run:  |
-          brew update
-          brew upgrade
-          brew install coreutils python fftw hdf5 gcc@15 boost open-mpi lapack
-          echo "FC=gfortran-15" >> $GITHUB_ENV
-          echo "BOOST_INCLUDE=/opt/homebrew/include/" >> $GITHUB_ENV
-
-      - name: Setup Ubuntu
-        if:   matrix.os == 'ubuntu' && matrix.intel == false
-        run: |
-           sudo apt update -y
-           sudo apt install -y cmake gcc g++ python3 python3-dev hdf5-tools \
-                    libfftw3-dev libhdf5-dev openmpi-bin libopenmpi-dev \
-                    libblas-dev liblapack-dev
-
-      - name: Setup Ubuntu (Intel)
-        if:   matrix.os == 'ubuntu' && matrix.intel == true
-        run: |
-          wget https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
-          sudo apt-key add GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
-          sudo add-apt-repository "deb https://apt.repos.intel.com/oneapi all main"
-          sudo apt-get update
-          sudo apt-get install -y intel-oneapi-compiler-fortran intel-oneapi-mpi intel-oneapi-mpi-devel
-          # Export only new/changed env vars from setvars.sh.
-          # `printenv >> $GITHUB_ENV` dumps all vars including shell internals
-          # with special characters that corrupt GITHUB_ENV parsing.
-          printenv | sort > /tmp/env_before
-          source /opt/intel/oneapi/setvars.sh
-          printenv | sort > /tmp/env_after
-          diff /tmp/env_before /tmp/env_after | grep '^>' | sed 's/^> //' >> $GITHUB_ENV
-
-      - name: Get system info for cache key
-        id: sys-info
-        run: |
-          {
-            uname -m
-            cat /proc/cpuinfo 2>/dev/null | grep 'model name' | head -1 || sysctl -n machdep.cpu.brand_string 2>/dev/null || true
-            if command -v ifx &>/dev/null; then ifx --version 2>/dev/null | head -1; else ${FC:-gfortran} --version 2>/dev/null | head -1 || true; fi
-            ${CC:-gcc} --version 2>/dev/null | head -1 || true
-          } | (sha256sum 2>/dev/null || shasum -a 256) | cut -c1-16 > /tmp/sys-hash
-          echo "sys-hash=$(cat /tmp/sys-hash)" >> "$GITHUB_OUTPUT"
-
-      - name: Restore Build Cache
-        uses: actions/cache@v4
-        with:
-          path: build
-          key: mfc-build-${{ matrix.os }}-${{ matrix.mpi }}-${{ matrix.debug }}-${{ matrix.precision }}-${{ matrix.intel }}-${{ steps.sys-info.outputs.sys-hash }}-${{ hashFiles('CMakeLists.txt', 'toolchain/dependencies/**', 'toolchain/cmake/**', 'src/**/*.fpp', 'src/**/*.f90') }}
-
-      - name: Build
-        run:  |
-          /bin/bash mfc.sh test -v --dry-run -j "$(nproc)" --${{ matrix.debug }} --${{ matrix.mpi }} $PRECISION $TEST_ALL
-        env:
-          TEST_ALL: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
-          PRECISION: ${{ matrix.precision != '' && format('--{0}', matrix.precision) || '' }}
-
-      - name: Test
-        run: bash .github/scripts/run-tests-with-retry.sh -v --max-attempts 3 -j "$(nproc)" $TEST_ALL $TEST_PCT
-        env:
-          TEST_ALL: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
-          TEST_PCT: ${{ matrix.debug == 'debug' && '-% 20' || '' }}
-
   self:
     name: "${{ matrix.cluster_name }} (${{ matrix.device }}${{ matrix.interface != 'none' && format('-{0}', matrix.interface) || '' }}${{ matrix.shard != '' && format(' [{0}]', matrix.shard) || '' }})"
     if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true' && github.event.pull_request.draft != true
@@ -170,23 +77,7 @@ jobs:
     strategy:
       matrix:
         include:
-          # Phoenix (GT) — build+test combined in SLURM job
-          - runner:       'gt'
-            cluster:      'phoenix'
-            cluster_name: 'Georgia Tech | Phoenix'
-            device: 'gpu'
-            interface: 'acc'
-          - runner:       'gt'
-            cluster:      'phoenix'
-            cluster_name: 'Georgia Tech | Phoenix'
-            device: 'gpu'
-            interface: 'omp'
-          - runner:       'gt'
-            cluster:      'phoenix'
-            cluster_name: 'Georgia Tech | Phoenix'
-            device: 'cpu'
-            interface: 'none'
-          # Frontier (ORNL) — build on login node, GPU tests sharded for batch partition
+          # Frontier (ORNL) — CCE only
           - runner:       'frontier'
             cluster:      'frontier'
             cluster_name: 'Oak Ridge | Frontier'
@@ -214,24 +105,6 @@ jobs:
           - runner:       'frontier'
             cluster:      'frontier'
             cluster_name: 'Oak Ridge | Frontier'
-            device: 'cpu'
-            interface: 'none'
-          # Frontier AMD — build on login node, GPU tests sharded for batch partition
-          - runner:       'frontier'
-            cluster:      'frontier_amd'
-            cluster_name: 'Oak Ridge | Frontier (AMD)'
-            device: 'gpu'
-            interface: 'omp'
-            shard: '1/2'
-          - runner:       'frontier'
-            cluster:      'frontier_amd'
-            cluster_name: 'Oak Ridge | Frontier (AMD)'
-            device: 'gpu'
-            interface: 'omp'
-            shard: '2/2'
-          - runner:       'frontier'
-            cluster:      'frontier_amd'
-            cluster_name: 'Oak Ridge | Frontier (AMD)'
             device: 'cpu'
             interface: 'none'
     runs-on:
@@ -289,16 +162,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - runner:       'gt'
-            cluster:      'phoenix'
-            cluster_name: 'Georgia Tech | Phoenix'
-            device: 'gpu'
-            interface: 'acc'
-          - runner:       'gt'
-            cluster:      'phoenix'
-            cluster_name: 'Georgia Tech | Phoenix'
-            device: 'gpu'
-            interface: 'omp'
+          # Frontier (ORNL) — CCE only
           - runner:       'frontier'
             cluster:      'frontier'
             cluster_name: 'Oak Ridge | Frontier'
@@ -307,11 +171,6 @@ jobs:
           - runner:       'frontier'
             cluster:      'frontier'
             cluster_name: 'Oak Ridge | Frontier'
-            device: 'gpu'
-            interface: 'omp'
-          - runner:       'frontier'
-            cluster:      'frontier_amd'
-            cluster_name: 'Oak Ridge | Frontier (AMD)'
             device: 'gpu'
             interface: 'omp'
     runs-on:

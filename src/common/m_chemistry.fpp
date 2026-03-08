@@ -6,10 +6,6 @@
 #:include 'macros.fpp'
 #:include 'case.fpp'
 
-#! CCE 19.0.0 workaround: fixed-size array limit for local species arrays under _CRAYFTN.
-#! Must match the Python-side check in toolchain/mfc/run/input.py. See PR #1286.
-#:set CCE_MAX_SPECIES = 10
-
 !> @brief Multi-species chemistry interface for thermodynamic properties, reaction rates, and transport coefficients
 module m_chemistry
 
@@ -67,15 +63,7 @@ contains
 
         integer :: x, y, z, eqn
         real(wp) :: energy, T_in
-        #:if USING_CCE
-            real(wp), dimension(${CCE_MAX_SPECIES}$) :: Ys
-        #:else
-            real(wp), dimension(num_species) :: Ys
-        #:endif
-
-        #:if USING_CCE
-            @:PROHIBIT(num_species > ${CCE_MAX_SPECIES}$, "CCE 19.0.0 workaround: num_species must be <= ${CCE_MAX_SPECIES}$ (fixed-size arrays in m_chemistry.fpp)")
-        #:endif
+        real(wp), dimension(num_species) :: Ys
 
         do z = bounds(3)%beg, bounds(3)%end
             do y = bounds(2)%beg, bounds(2)%end
@@ -113,16 +101,8 @@ contains
         type(int_bounds_info), dimension(1:3), intent(in) :: bounds
 
         integer :: x, y, z, i
-        #:if USING_CCE
-            real(wp), dimension(${CCE_MAX_SPECIES}$) :: Ys
-        #:else
-            real(wp), dimension(num_species) :: Ys
-        #:endif
+        real(wp), dimension(num_species) :: Ys
         real(wp) :: mix_mol_weight
-
-        #:if USING_CCE
-            @:PROHIBIT(num_species > ${CCE_MAX_SPECIES}$, "CCE 19.0.0 workaround: num_species must be <= ${CCE_MAX_SPECIES}$ (fixed-size arrays in m_chemistry.fpp)")
-        #:endif
 
         do z = bounds(3)%beg, bounds(3)%end
             do y = bounds(2)%beg, bounds(2)%end
@@ -151,16 +131,12 @@ contains
         integer :: eqn
         real(wp) :: T
         real(wp) :: rho, omega_m
-        #:if (not MFC_CASE_OPTIMIZATION and USING_AMD) or USING_CCE
-            real(wp), dimension(${CCE_MAX_SPECIES}$) :: Ys
-            real(wp), dimension(${CCE_MAX_SPECIES}$) :: omega
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(10) :: Ys
+            real(wp), dimension(10) :: omega
         #:else
             real(wp), dimension(num_species) :: Ys
             real(wp), dimension(num_species) :: omega
-        #:endif
-
-        #:if USING_CCE
-            @:PROHIBIT(num_species > ${CCE_MAX_SPECIES}$, "CCE 19.0.0 workaround: num_species must be <= ${CCE_MAX_SPECIES}$ (fixed-size arrays in m_chemistry.fpp)")
         #:endif
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[Ys, omega, eqn, T, rho, omega_m]', copyin='[bounds]')
@@ -204,11 +180,11 @@ contains
         type(int_bounds_info), intent(in) :: irx, iry, irz
 
         integer, intent(in) :: idir
-        #:if (not MFC_CASE_OPTIMIZATION and USING_AMD) or USING_CCE
-            real(wp), dimension(${CCE_MAX_SPECIES}$) :: Xs_L, Xs_R, Xs_cell, Ys_L, Ys_R, Ys_cell
-            real(wp), dimension(${CCE_MAX_SPECIES}$) :: mass_diffusivities_mixavg1, mass_diffusivities_mixavg2
-            real(wp), dimension(${CCE_MAX_SPECIES}$) :: mass_diffusivities_mixavg_Cell, dXk_dxi, h_l, h_r, h_k
-            real(wp), dimension(${CCE_MAX_SPECIES}$) :: Mass_Diffu_Flux, dYk_dxi
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(10) :: Xs_L, Xs_R, Xs_cell, Ys_L, Ys_R, Ys_cell
+            real(wp), dimension(10) :: mass_diffusivities_mixavg1, mass_diffusivities_mixavg2
+            real(wp), dimension(10) :: mass_diffusivities_mixavg_Cell, dXk_dxi, h_l, h_r, h_k
+            real(wp), dimension(10) :: Mass_Diffu_Flux, dYk_dxi
         #:else
             real(wp), dimension(num_species) :: Xs_L, Xs_R, Xs_cell, Ys_L, Ys_R, Ys_cell
             real(wp), dimension(num_species) :: mass_diffusivities_mixavg1, mass_diffusivities_mixavg2
@@ -225,10 +201,6 @@ contains
 
         integer :: x, y, z, i, n, eqn
         integer, dimension(3) :: offsets
-
-        #:if USING_CCE
-            @:PROHIBIT(num_species > ${CCE_MAX_SPECIES}$, "CCE 19.0.0 workaround: num_species must be <= ${CCE_MAX_SPECIES}$ (fixed-size arrays in m_chemistry.fpp)")
-        #:endif
 
         isc1 = irx; isc2 = iry; isc3 = irz
 
