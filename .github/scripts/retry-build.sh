@@ -7,6 +7,12 @@
 
 _retry_clean() {
     local clean_cmd="$1"
+    local attempt="${2:-1}"
+    if [ "$attempt" -ge 2 ]; then
+        echo "  Attempt $attempt failed — nuking entire build directory for a clean retry."
+        rm -rf build 2>/dev/null || true
+        return 0
+    fi
     if eval "$clean_cmd" 2>/dev/null; then
         return 0
     fi
@@ -26,8 +32,7 @@ retry_build() {
                 if ! eval "$validate_cmd"; then
                     echo "Post-build validation failed on attempt $attempt."
                     if [ $attempt -lt $max_attempts ]; then
-                        echo "Cleaning and retrying in 5s..."
-                        _retry_clean "$clean_cmd"
+                        _retry_clean "$clean_cmd" "$attempt"
                         sleep 5
                         attempt=$((attempt + 1))
                         continue
@@ -41,8 +46,7 @@ retry_build() {
             return 0
         fi
         if [ $attempt -lt $max_attempts ]; then
-            echo "Build failed on attempt $attempt. Retrying in 30s..."
-            _retry_clean "$clean_cmd"
+            _retry_clean "$clean_cmd" "$attempt"
             sleep 30
         else
             echo "Build failed after $max_attempts attempts."
