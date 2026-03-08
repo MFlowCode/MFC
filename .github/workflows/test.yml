@@ -261,7 +261,7 @@ jobs:
       - name: Cancel SLURM Jobs
         if: cancelled()
         run: |
-          find . -name "*.slurm_job_id" | while read f; do
+          find . -name "*.slurm_job_id" | while read -r f; do
             job_id=$(cat "$f")
             echo "Cancelling SLURM job $job_id"
             scancel "$job_id" 2>/dev/null || true
@@ -346,7 +346,7 @@ jobs:
       - name: Cancel SLURM Jobs
         if: cancelled()
         run: |
-          find . -name "*.slurm_job_id" | while read f; do
+          find . -name "*.slurm_job_id" | while read -r f; do
             job_id=$(cat "$f")
             echo "Cancelling SLURM job $job_id"
             scancel "$job_id" 2>/dev/null || true
