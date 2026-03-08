@@ -258,6 +258,15 @@ jobs:
       - name: Test
         run:  bash .github/workflows/${{ matrix.cluster }}/submit.sh .github/workflows/${{ matrix.cluster }}/test.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.shard }}
 
+      - name: Cancel SLURM Jobs
+        if: cancelled()
+        run: |
+          find . -name "*.slurm_job_id" | while read f; do
+            job_id=$(cat "$f")
+            echo "Cancelling SLURM job $job_id"
+            scancel "$job_id" 2>/dev/null || true
+          done
+
       - name: Compute Log Slug
         if:   always()
         id:   log
@@ -339,6 +348,15 @@ jobs:
 
       - name: Run Case-Optimization Tests
         run:  bash .github/workflows/${{ matrix.cluster }}/submit.sh .github/scripts/run_case_optimization.sh ${{ matrix.device }} ${{ matrix.interface }}
+
+      - name: Cancel SLURM Jobs
+        if: cancelled()
+        run: |
+          find . -name "*.slurm_job_id" | while read f; do
+            job_id=$(cat "$f")
+            echo "Cancelling SLURM job $job_id"
+            scancel "$job_id" 2>/dev/null || true
+          done
 
       - name: Print Logs
         if:   always()

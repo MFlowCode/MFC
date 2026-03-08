@@ -125,6 +125,15 @@ jobs:
       - name: Bench (Master v. PR)
         run: bash pr/.github/scripts/run_parallel_benchmarks.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }}
 
+      - name: Cancel SLURM Jobs
+        if: cancelled()
+        run: |
+          find . -name "*.slurm_job_id" | while read f; do
+            job_id=$(cat "$f")
+            echo "Cancelling SLURM job $job_id"
+            scancel "$job_id" 2>/dev/null || true
+          done
+
       - name: Generate & Post Comment
         if: always()
         run: |
