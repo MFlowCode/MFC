@@ -237,20 +237,29 @@ jobs:
       - name: Clone
         uses: actions/checkout@v4
         with:
-          clean: false
+          clean: true
 
       - name: Build
         if:   matrix.cluster != 'phoenix'
         uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
         with:
-          max_attempts: 3
+          max_attempts: 2
           retry_wait_seconds: 60
           timeout_minutes: 60
           command: bash .github/workflows/${{ matrix.cluster }}/build.sh ${{ matrix.device }} ${{ matrix.interface }}
-          on_retry_command: ./mfc.sh clean
+          on_retry_command: rm -rf build
 
       - name: Test
         run:  bash .github/workflows/${{ matrix.cluster }}/submit.sh .github/workflows/${{ matrix.cluster }}/test.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.shard }}
+
+      - name: Cancel SLURM Jobs
+        if: cancelled()
+        run: |
+          find . -name "*.slurm_job_id" | while read -r f; do
+            job_id=$(cat "$f")
+            echo "Cancelling SLURM job $job_id"
+            scancel "$job_id" 2>/dev/null || true
+          done
 
       - name: Compute Log Slug
         if:   always()
@@ -315,7 +324,7 @@ jobs:
       - name: Clone
         uses: actions/checkout@v4
         with:
-          clean: false
+          clean: true
 
       - name: Pre-Build (SLURM)
         if:   matrix.cluster == 'phoenix'
@@ -323,16 +332,19 @@ jobs:
 
       - name: Pre-Build (login node)
         if:   matrix.cluster != 'phoenix'
-        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
-        with:
-          max_attempts: 3
-          retry_wait_seconds: 60
-          timeout_minutes: 120
-          command: bash .github/scripts/prebuild-case-optimization.sh ${{ matrix.cluster }} ${{ matrix.device }} ${{ matrix.interface }}
-          on_retry_command: ./mfc.sh clean
+        run:  bash .github/scripts/prebuild-case-optimization.sh ${{ matrix.cluster }} ${{ matrix.device }} ${{ matrix.interface }}
 
       - name: Run Case-Optimization Tests
         run:  bash .github/workflows/${{ matrix.cluster }}/submit.sh .github/scripts/run_case_optimization.sh ${{ matrix.device }} ${{ matrix.interface }}
+
+      - name: Cancel SLURM Jobs
+        if: cancelled()
+        run: |
+          find . -name "*.slurm_job_id" | while read -r f; do
+            job_id=$(cat "$f")
+            echo "Cancelling SLURM job $job_id"
+            scancel "$job_id" 2>/dev/null || true
+          done
 
       - name: Print Logs
         if:   always()
