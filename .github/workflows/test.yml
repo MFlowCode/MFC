@@ -338,13 +338,7 @@ jobs:
 
       - name: Pre-Build (login node)
         if:   matrix.cluster != 'phoenix'
-        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
-        with:
-          max_attempts: 2
-          retry_wait_seconds: 60
-          timeout_minutes: 120
-          command: bash .github/scripts/prebuild-case-optimization.sh ${{ matrix.cluster }} ${{ matrix.device }} ${{ matrix.interface }}
-          on_retry_command: rm -rf build
+        run:  bash .github/scripts/prebuild-case-optimization.sh ${{ matrix.cluster }} ${{ matrix.device }} ${{ matrix.interface }}
 
       - name: Run Case-Optimization Tests
         run:  bash .github/workflows/${{ matrix.cluster }}/submit.sh .github/scripts/run_case_optimization.sh ${{ matrix.device }} ${{ matrix.interface }}

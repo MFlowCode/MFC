@@ -21,6 +21,8 @@ case "$cluster" in
     *) echo "ERROR: Unknown cluster '$cluster'"; exit 1 ;;
 esac
 
+rm -rf build
+
 . ./mfc.sh load -c "$flag" -m g
 source .github/scripts/gpu-opts.sh
 
