@@ -26,15 +26,20 @@ if [ "$device" = "gpu" ] && [ "$cluster" = "phoenix" ]; then
     echo "Selecting Phoenix GPU partition for benchmark consistency..."
     BENCH_GPU_PARTITION=""
     for part in gpu-h200 gpu-h100 gpu-a100 gpu-l40s gpu-rtx6000 gpu-v100; do
+        # || true: grep -c exits 1 on zero matches (or when sinfo returns no output
+        # for an unknown partition); suppress so set -euo pipefail doesn't abort.
         idle=$(sinfo -p "$part" --noheader -o "%t" 2>/dev/null | grep -cE "^(idle|mix)" || true)
         if [ "${idle:-0}" -gt 0 ]; then
             BENCH_GPU_PARTITION="$part"
+            echo "Selected GPU partition: $BENCH_GPU_PARTITION ($idle idle/mix nodes)"
             break
         fi
     done
-    BENCH_GPU_PARTITION="${BENCH_GPU_PARTITION:-gpu-l40s}"
+    if [ -z "$BENCH_GPU_PARTITION" ]; then
+        echo "WARNING: No idle GPU partition found; falling back to gpu-l40s (may queue)"
+        BENCH_GPU_PARTITION="gpu-l40s"
+    fi
     export BENCH_GPU_PARTITION
-    echo "Selected GPU partition: $BENCH_GPU_PARTITION"
 fi
 
 # Run both jobs with monitoring using dedicated script from PR
@@ -57,6 +62,8 @@ wait "$pr_pid"
 pr_exit=$?
 if [ "$pr_exit" -ne 0 ]; then
   echo "PR job exited with code: $pr_exit"
+  echo "Last 50 lines of PR job log:"
+  tail -n 50 "pr/bench-${device}-${interface}.out" 2>/dev/null || echo "  Could not read PR log"
 else
   echo "PR job completed successfully"
 fi
@@ -65,6 +72,8 @@ wait "$master_pid"
 master_exit=$?
 if [ "$master_exit" -ne 0 ]; then
   echo "Master job exited with code: $master_exit"
+  echo "Last 50 lines of master job log:"
+  tail -n 50 "master/bench-${device}-${interface}.out" 2>/dev/null || echo "  Could not read master log"
 else
   echo "Master job completed successfully"
 fi

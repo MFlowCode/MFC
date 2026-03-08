@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e
+set -euo pipefail
 
 # Ignore SIGHUP to survive login node session drops
 trap '' HUP
@@ -10,7 +10,7 @@ usage() {
 }
 
 if [ ! -z "$1" ]; then
-    sbatch_script_contents=`cat $1`
+    sbatch_script_contents=$(cat "$1")
 else
     usage
     exit 1
@@ -31,6 +31,7 @@ sbatch_cpu_opts="\
 
 if [ "$job_type" = "bench" ]; then
     bench_partition="${BENCH_GPU_PARTITION:-gpu-l40s}"
+    echo "Submitting bench GPU job to partition: $bench_partition (BENCH_GPU_PARTITION=${BENCH_GPU_PARTITION:-<unset, using default>})"
     sbatch_gpu_opts="\
 #SBATCH -p $bench_partition
 #SBATCH --ntasks-per-node=4       # Number of cores per node required
