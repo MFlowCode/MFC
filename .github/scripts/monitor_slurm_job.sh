@@ -62,9 +62,11 @@ get_job_state() {
 }
 
 # Check if a state is terminal (job is done, for better or worse)
+# PREEMPTED is intentionally excluded: with --requeue the job restarts under
+# the same job ID and we must keep monitoring rather than exiting early.
 is_terminal_state() {
   case "$1" in
-    COMPLETED|FAILED|CANCELLED|CANCELLED+|TIMEOUT|OUT_OF_MEMORY|NODE_FAIL|BOOT_FAIL|DEADLINE|PREEMPTED|REVOKED)
+    COMPLETED|FAILED|CANCELLED|CANCELLED+|TIMEOUT|OUT_OF_MEMORY|NODE_FAIL|BOOT_FAIL|DEADLINE|REVOKED)
       return 0 ;;
     *)
       return 1 ;;
@@ -80,7 +82,7 @@ while [ ! -f "$output_file" ]; do
   state=$(get_job_state "$job_id")
 
   case "$state" in
-    PENDING|CONFIGURING)
+    PENDING|CONFIGURING|PREEMPTED)
       unknown_count=0
       sleep 5
       ;;
