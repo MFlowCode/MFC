@@ -274,6 +274,14 @@ contains
             "HLLD hypoelasticity does not support cylindrical coordinates")
         @:PROHIBIT(hypoelasticity .and. riemann_solver == 4 .and. num_fluids /= 2, &
             "HLLD hypoelasticity currently requires exactly 2 fluid components")
+        @:PROHIBIT(hypo_hll_interface_rhs .and. .not. hypoelasticity, &
+            "hypo_hll_interface_rhs requires hypoelasticity = T")
+        @:PROHIBIT(hypo_hll_interface_rhs .and. riemann_solver /= 1, &
+            "hypo_hll_interface_rhs requires HLL Riemann solver (riemann_solver = 1)")
+        @:PROHIBIT(hypo_hll_interface_rhs .and. p > 0, &
+            "HLL interface-consistent hypo RHS supports 1D and 2D only (p must be 0)")
+        @:PROHIBIT(hypo_hll_interface_rhs .and. cyl_coord, &
+            "HLL interface-consistent hypo RHS does not support cylindrical coordinates")
     end subroutine
 
     !> Checks constraints on bubble parameters
@@ -296,7 +304,12 @@ contains
     !> Checks constraints on alternative sound speed parameters (alt_soundspeed)
     subroutine s_check_inputs_alt_soundspeed
         @:PROHIBIT(alt_soundspeed .and. model_eqns /= 2, "5-equation model (model_eqns = 2) is required for alt_soundspeed")
-        @:PROHIBIT(alt_soundspeed .and. riemann_solver /= 2, "alt_soundspeed requires HLLC Riemann solver (riemann_solver = 2)")
+        @:PROHIBIT(alt_soundspeed .and. riemann_solver == 1, &
+            "alt_soundspeed is not supported with HLL (riemann_solver = 1)")
+        @:PROHIBIT(alt_soundspeed .and. riemann_solver == 4 .and. .not. hypoelasticity, &
+            "alt_soundspeed with HLLD requires hypoelasticity = T")
+        @:PROHIBIT(alt_soundspeed .and. riemann_solver == 4 .and. num_fluids /= 2, &
+            "alt_soundspeed with HLLD requires exactly 2 fluid components")
         @:PROHIBIT(alt_soundspeed .and. num_fluids /= 2 .and. num_fluids /= 3)
     end subroutine s_check_inputs_alt_soundspeed
 

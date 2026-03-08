@@ -144,6 +144,7 @@ module m_global_parameters
     logical :: riemann_ADC
     real(wp) :: ADC_kappa
     logical :: hypo_hll_fallback   !< Hypo HLL fallback when degenerate (denom/S_M); .false. = exit, .true. = use HLL (HLLC/HLLD)
+    logical :: hypo_hll_interface_rhs !< When T, HLL hypo uses interface-consistent RHS instead of legacy FD
     logical :: hypo_nc_finite_diff
     logical :: hypo_nc_interface
     logical :: hypo_nc_dual_pass
@@ -183,7 +184,7 @@ module m_global_parameters
         !$acc declare create(num_dims, num_vels, weno_polyn, weno_order, weno_num_stencils, num_fluids, wenojs, mapped_weno, wenoz, teno, wenoz_q, mhd, relativity)
     #:endif
 
-    !$acc declare create(mpp_lim, model_eqns, mixture_err, alt_soundspeed, avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity, hyperelasticity, hyper_model, elasticity, low_Mach, viscous, shear_stress, bulk_stress, cont_damage, hypo_hll_fallback)
+    !$acc declare create(mpp_lim, model_eqns, mixture_err, alt_soundspeed, avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity, hyperelasticity, hyper_model, elasticity, low_Mach, viscous, shear_stress, bulk_stress, cont_damage, hypo_hll_fallback, hypo_hll_interface_rhs)
 
     logical :: relax          !< activate phase change
     integer :: relax_model    !< Relaxation model
@@ -553,6 +554,7 @@ contains
         riemann_ADC = .false.
         ADC_kappa = 1.0
         hypo_hll_fallback = .false.
+        hypo_hll_interface_rhs = .false.
         hypo_nc_finite_diff = .false.
         hypo_nc_interface = .false.
         hypo_nc_dual_pass = .false.
@@ -1192,7 +1194,11 @@ contains
         hypo_nc_dual_pass = .false.
         if (hypoelasticity) then
             if (riemann_solver == 1) then
-                hypo_nc_finite_diff = .true.
+                if (hypo_hll_interface_rhs) then
+                    hypo_nc_interface = .true.
+                else
+                    hypo_nc_finite_diff = .true.
+                end if
             else if (riemann_solver == 2) then
                 hypo_nc_interface = .true.
             else if (riemann_solver == 4) then
@@ -1249,6 +1255,7 @@ contains
 
         !$acc update device(alt_soundspeed, acoustic_source, num_source)
         !$acc update device(dt, sys_size, buff_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles_euler, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, num_vels, mixture_err, grid_geometry, cyl_coord, mp_weno, weno_eps, teno_CT, hyperelasticity, hyper_model, elasticity, xi_idx, B_idx, low_Mach)
+        !$acc update device(hypo_hll_fallback, hypo_hll_interface_rhs)
 
         !$acc update device(Bx0, powell)
 

@@ -364,6 +364,10 @@ contains
         type(riemann_states_vec3) :: b4 ! 4-magnetic field components (spatial: b4x, b4y, b4z)
         type(riemann_states_vec3) :: cm ! Conservative momentum variables
 
+        real(wp) :: rho_HLL_ex, rhou_n_HLL_ex, rhou_t_HLL_ex
+        real(wp) :: u_n_iface, u_t_iface
+        real(wp) :: pTot_L_ex, pTot_R_ex
+
         integer :: i, j, k, l, q !< Generic loop iterators
 
         ! Populating the buffers of the left and right Riemann problem
@@ -396,7 +400,8 @@ contains
                 !$acc Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR,             &
                 !$acc Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2,                     &
                 !$acc c_fast, pres_mag, B, Ga, vdotB, B2, b4, cm,               &
-                !$acc pcorr, zcoef, vel_L_tmp, vel_R_tmp)
+                !$acc pcorr, zcoef, vel_L_tmp, vel_R_tmp, &
+                !$acc rho_HLL_ex, rhou_n_HLL_ex, rhou_t_HLL_ex, u_n_iface, u_t_iface, pTot_L_ex, pTot_R_ex)
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = is1%beg, is1%end
@@ -1001,6 +1006,50 @@ contains
                                                     - rho_R*tau_e_R(i))) &
                                         /(s_M - s_P)
                                 end do
+                            end if
+
+                            ! HLL interface velocity export for interface-consistent hypo RHS
+                            if (hypoelasticity .and. hypo_hll_interface_rhs) then
+                                if (s_L >= 0._wp) then
+                                    u_n_iface = vel_L(dir_idx(1))
+                                    u_t_iface = 0._wp
+                                    if (num_dims > 1) u_t_iface = vel_L(dir_idx(2))
+                                elseif (s_R <= 0._wp) then
+                                    u_n_iface = vel_R(dir_idx(1))
+                                    u_t_iface = 0._wp
+                                    if (num_dims > 1) u_t_iface = vel_R(dir_idx(2))
+                                else
+                                    pTot_L_ex = pres_L - tau_e_L(dir_idx_tau(1))
+                                    pTot_R_ex = pres_R - tau_e_R(dir_idx_tau(1))
+
+                                    rho_HLL_ex = (s_R*rho_R - s_L*rho_L &
+                                                  + rho_L*vel_L(dir_idx(1)) - rho_R*vel_R(dir_idx(1))) &
+                                                 /(s_R - s_L)
+
+                                    rhou_n_HLL_ex = (s_R*rho_R*vel_R(dir_idx(1)) - s_L*rho_L*vel_L(dir_idx(1)) &
+                                                     + (rho_L*vel_L(dir_idx(1))**2 + pTot_L_ex) &
+                                                     - (rho_R*vel_R(dir_idx(1))**2 + pTot_R_ex)) &
+                                                    /(s_R - s_L)
+
+                                    u_n_iface = rhou_n_HLL_ex/(rho_HLL_ex + verysmall)
+
+                                    u_t_iface = 0._wp
+                                    if (num_dims > 1) then
+                                        rhou_t_HLL_ex = (s_R*rho_R*vel_R(dir_idx(2)) - s_L*rho_L*vel_L(dir_idx(2)) &
+                                                         + (rho_L*vel_L(dir_idx(1))*vel_L(dir_idx(2)) - tau_e_L(dir_idx_tau(2))) &
+                                                         - (rho_R*vel_R(dir_idx(1))*vel_R(dir_idx(2)) - tau_e_R(dir_idx_tau(2)))) &
+                                                        /(s_R - s_L)
+                                        u_t_iface = rhou_t_HLL_ex/(rho_HLL_ex + verysmall)
+                                    end if
+                                end if
+
+                                if (dir_idx(1) == 1) then
+                                    hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_n_iface
+                                    hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_t_iface
+                                else
+                                    hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_t_iface
+                                    hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_n_iface
+                                end if
                             end if
 
                             ! Advection
@@ -3825,6 +3874,9 @@ contains
         real(wp), dimension(num_vels) :: vel_hat
         real(wp), dimension(strxe-strxb+1) :: tau_e_hat
 
+        real(wp) :: pres_hat, blkmod1_hat, blkmod2_hat, K_hat
+        real(wp) :: C_hat_1, C_hat_2
+
         real(wp) :: Sigma_L, Sigma_R, dSigma, Sigma_ref
         real(wp) :: a_L_ref, a_R_ref, a_ref
         real(wp) :: du_t, dtau_nt
@@ -3881,7 +3933,8 @@ contains
                 !$acc parallel loop collapse(3) gang vector default(present) &
                 !$acc private(alpha_rho_L, alpha_rho_R, vel, alpha_L, alpha_R, &
                 !$acc rho, pres, E, H_no_mag, gamma, pi_inf, qv, vel_rms, B, c, c_fast, pres_mag, &
-                !$acc U_L, U_R, U_starL, U_starR, U_doubleL, U_doubleR, F_L, F_R, F_starL, F_starR, F_hlld)
+                !$acc U_L, U_R, U_starL, U_starR, U_doubleL, U_doubleR, F_L, F_R, F_starL, F_starR, F_hlld, &
+                !$acc pres_hat, blkmod1_hat, blkmod2_hat, K_hat, C_hat_1, C_hat_2)
                 
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
@@ -4071,6 +4124,17 @@ contains
 
                             ! Two-component 2D only (enforced by checker restrictions)
 
+                            K_hat = 0._wp
+                            if (alt_soundspeed) then
+                                pres_hat = q_hat_prim_${XYZ}$_vf(j, k, l, E_idx)
+                                blkmod1_hat = ((gammas(1) + 1._wp)*pres_hat + pi_infs(1))/gammas(1)
+                                blkmod2_hat = ((gammas(2) + 1._wp)*pres_hat + pi_infs(2))/gammas(2)
+                                K_hat = alpha_hat(1)*alpha_hat(2)*(blkmod2_hat - blkmod1_hat) &
+                                        /(alpha_hat(1)*blkmod2_hat + alpha_hat(2)*blkmod1_hat + verysmall)
+                            end if
+                            C_hat_1 = alpha_hat(1) + K_hat
+                            C_hat_2 = alpha_hat(2) - K_hat
+
                             U_L(1) = alpha_rho_L(1)
                             U_L(2) = alpha_rho_L(2)
                             U_L(3) = rho%L*u_n_L
@@ -4098,8 +4162,8 @@ contains
                             F_L(3) = rho%L*u_n_L*u_n_L + pTot_L
                             F_L(4) = rho%L*u_n_L*u_t_L - tau_nt_L
                             F_L(5) = (E%L + pTot_L)*u_n_L - u_t_L*tau_nt_L
-                            F_L(6) = U_L(6)*u_n_L - alpha_hat(1)*u_n_L
-                            F_L(7) = U_L(7)*u_n_L - alpha_hat(2)*u_n_L
+                            F_L(6) = U_L(6)*u_n_L - C_hat_1*u_n_L
+                            F_L(7) = U_L(7)*u_n_L - C_hat_2*u_n_L
                             F_L(8) = U_L(8)*u_n_L - rho_hat*(4._wp/3._wp*G_hat + tau_nn_hat)*u_n_L
                             F_L(9) = U_L(9)*u_n_L - rho_hat*(G_hat + tau_nn_hat)*u_t_L
                             F_L(10) = U_L(10)*u_n_L + rho_hat*(2._wp/3._wp*G_hat + tau_tt_hat)*u_n_L - 2._wp*rho_hat*tau_nt_hat*u_t_L
@@ -4109,13 +4173,11 @@ contains
                             F_R(3) = rho%R*u_n_R*u_n_R + pTot_R
                             F_R(4) = rho%R*u_n_R*u_t_R - tau_nt_R
                             F_R(5) = (E%R + pTot_R)*u_n_R - u_t_R*tau_nt_R
-                            F_R(6) = U_R(6)*u_n_R - alpha_hat(1)*u_n_R
-                            F_R(7) = U_R(7)*u_n_R - alpha_hat(2)*u_n_R
+                            F_R(6) = U_R(6)*u_n_R - C_hat_1*u_n_R
+                            F_R(7) = U_R(7)*u_n_R - C_hat_2*u_n_R
                             F_R(8) = U_R(8)*u_n_R - rho_hat*(4._wp/3._wp*G_hat + tau_nn_hat)*u_n_R
                             F_R(9) = U_R(9)*u_n_R - rho_hat*(G_hat + tau_nn_hat)*u_t_R
                             F_R(10) = U_R(10)*u_n_R + rho_hat*(2._wp/3._wp*G_hat + tau_tt_hat)*u_n_R - 2._wp*rho_hat*tau_nt_hat*u_t_R
-
-                            ! K div U contribution is not included yet (deferred)
 
                             A_L = rho%L*(S_L - u_n_L)
                             A_R = rho%R*(S_R - u_n_R)
@@ -4183,11 +4245,11 @@ contains
                             tau_nn_R_star = tau_nn_R - (rho_hat*(G_hat*4._wp/3._wp + tau_nn_hat)*(u_n_R - S_M)) &
                                             /(rho%R*(u_n_R - S_R))
 
-                            alpha1_L_star = (alpha_L(1)*(S_L - u_n_L) - alpha_hat(1)*(S_M - u_n_L))/(S_L - S_M)
-                            alpha1_R_star = (alpha_R(1)*(S_R - u_n_R) - alpha_hat(1)*(S_M - u_n_R))/(S_R - S_M)
+                            alpha1_L_star = (alpha_L(1)*(S_L - u_n_L) - C_hat_1*(S_M - u_n_L))/(S_L - S_M)
+                            alpha1_R_star = (alpha_R(1)*(S_R - u_n_R) - C_hat_1*(S_M - u_n_R))/(S_R - S_M)
 
-                            alpha2_L_star = (alpha_L(2)*(S_L - u_n_L) - alpha_hat(2)*(S_M - u_n_L))/(S_L - S_M)
-                            alpha2_R_star = (alpha_R(2)*(S_R - u_n_R) - alpha_hat(2)*(S_M - u_n_R))/(S_R - S_M)
+                            alpha2_L_star = (alpha_L(2)*(S_L - u_n_L) - C_hat_2*(S_M - u_n_L))/(S_L - S_M)
+                            alpha2_R_star = (alpha_R(2)*(S_R - u_n_R) - C_hat_2*(S_M - u_n_R))/(S_R - S_M)
 
                             ! ==================== Compute U ====================
 

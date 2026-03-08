@@ -262,6 +262,7 @@ SIMULATION.update({
     'riemann_solver': ParamType.INT,
     'riemann_ADC': ParamType.LOG,
     'ADC_kappa': ParamType.REAL,
+    'hypo_hll_interface_rhs': ParamType.LOG,
     'wave_speeds': ParamType.INT,
     'avg_state': ParamType.INT,
     'prim_vars_wrt': ParamType.LOG,
