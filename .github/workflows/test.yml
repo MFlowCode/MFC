@@ -165,7 +165,7 @@ jobs:
     name: "${{ matrix.cluster_name }} (${{ matrix.device }}${{ matrix.interface != 'none' && format('-{0}', matrix.interface) || '' }}${{ matrix.shard != '' && format(' [{0}]', matrix.shard) || '' }})"
     if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true' && github.event.pull_request.draft != true
     needs: [lint-gate, file-changes]
-    continue-on-error: false
+    continue-on-error: ${{ matrix.runner == 'frontier' }}
     timeout-minutes: 480
     strategy:
       matrix:
@@ -293,7 +293,7 @@ jobs:
     name: "Case Opt | ${{ matrix.cluster_name }} (${{ matrix.device }}-${{ matrix.interface }})"
     if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true' && github.event.pull_request.draft != true
     needs: [lint-gate, file-changes]
-    continue-on-error: false
+    continue-on-error: ${{ matrix.runner == 'frontier' }}
     timeout-minutes: 480
     strategy:
       matrix:

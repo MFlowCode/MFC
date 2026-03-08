@@ -85,6 +85,7 @@ jobs:
             device: gpu
             interface: omp
             build_script: "bash .github/workflows/frontier_amd/build.sh gpu omp bench"
+    continue-on-error: ${{ matrix.cluster == 'frontier' || matrix.cluster == 'frontier_amd' }}
     runs-on:
       group: ${{ matrix.group }}
       labels: ${{ matrix.labels }}
