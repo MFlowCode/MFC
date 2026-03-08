@@ -106,7 +106,7 @@ jobs:
         if: matrix.build_script != ''
         uses: nick-fields/retry@v3
         with:
-          max_attempts: 3
+          max_attempts: 2
           retry_wait_seconds: 60
           timeout_minutes: 150
           command: |
@@ -118,9 +118,7 @@ jobs:
             wait $pid2; e2=$?
             [ $e1 -eq 0 ] && [ $e2 -eq 0 ]
           on_retry_command: |
-            (cd pr     && ./mfc.sh clean) &
-            (cd master && ./mfc.sh clean) &
-            wait
+            rm -rf pr/build master/build
 
       - name: Bench (Master v. PR)
         run: bash pr/.github/scripts/run_parallel_benchmarks.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }}

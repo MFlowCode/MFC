@@ -1,29 +1,13 @@
 #!/bin/bash
-# Provides retry_build(): 3-attempt loop with configurable cleanup.
-# Set RETRY_CLEAN_CMD to override cleanup (default: rm -rf build/staging build/install build/lock.yaml).
+# Provides retry_build(): 2-attempt loop.
+# On failure of attempt 1, nukes the entire build directory before attempt 2.
 # Set RETRY_VALIDATE_CMD to run a post-build validation; failure triggers a retry.
 # Usage: source .github/scripts/retry-build.sh
 #        retry_build ./mfc.sh build -j 8 --gpu acc
 
-_retry_clean() {
-    local clean_cmd="$1"
-    local attempt="${2:-1}"
-    if [ "$attempt" -ge 2 ]; then
-        echo "  Attempt $attempt failed — nuking entire build directory for a clean retry."
-        rm -rf build 2>/dev/null || true
-        return 0
-    fi
-    if eval "$clean_cmd" 2>/dev/null; then
-        return 0
-    fi
-    echo "  Cleanup failed; falling back to best-effort rm."
-    rm -rf build/staging build/install build/lock.yaml 2>/dev/null || true
-}
-
 retry_build() {
-    local clean_cmd="${RETRY_CLEAN_CMD:-rm -rf build/staging build/install build/lock.yaml}"
     local validate_cmd="${RETRY_VALIDATE_CMD:-}"
-    local max_attempts=3
+    local max_attempts=2
     local attempt=1
     while [ $attempt -le $max_attempts ]; do
         echo "Build attempt $attempt of $max_attempts..."
@@ -32,7 +16,8 @@ retry_build() {
                 if ! eval "$validate_cmd"; then
                     echo "Post-build validation failed on attempt $attempt."
                     if [ $attempt -lt $max_attempts ]; then
-                        _retry_clean "$clean_cmd" "$attempt"
+                        echo "  Nuking build directory before retry..."
+                        rm -rf build 2>/dev/null || true
                         sleep 5
                         attempt=$((attempt + 1))
                         continue
@@ -46,7 +31,8 @@ retry_build() {
             return 0
         fi
         if [ $attempt -lt $max_attempts ]; then
-            _retry_clean "$clean_cmd" "$attempt"
+            echo "  Build failed — nuking build directory before retry..."
+            rm -rf build 2>/dev/null || true
             sleep 30
         else
             echo "Build failed after $max_attempts attempts."
