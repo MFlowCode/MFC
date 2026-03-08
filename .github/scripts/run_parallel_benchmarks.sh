@@ -20,6 +20,23 @@ echo "=========================================="
 echo "Starting parallel benchmark jobs..."
 echo "=========================================="
 
+# For Phoenix GPU benchmarks, select a consistent GPU partition before launching
+# both parallel jobs so PR and master always land on the same GPU type.
+if [ "$device" = "gpu" ] && [ "$cluster" = "phoenix" ]; then
+    echo "Selecting Phoenix GPU partition for benchmark consistency..."
+    BENCH_GPU_PARTITION=""
+    for part in gpu-h200 gpu-h100 gpu-a100 gpu-l40s gpu-rtx6000 gpu-v100; do
+        idle=$(sinfo -p "$part" --noheader -o "%t" 2>/dev/null | grep -cE "^(idle|mix)" || true)
+        if [ "${idle:-0}" -gt 0 ]; then
+            BENCH_GPU_PARTITION="$part"
+            break
+        fi
+    done
+    BENCH_GPU_PARTITION="${BENCH_GPU_PARTITION:-gpu-l40s}"
+    export BENCH_GPU_PARTITION
+    echo "Selected GPU partition: $BENCH_GPU_PARTITION"
+fi
+
 # Run both jobs with monitoring using dedicated script from PR
 # Use stdbuf for line-buffered output and prefix each line for clarity
 (set -o pipefail; stdbuf -oL -eL bash "${SCRIPT_DIR}/submit_and_monitor_bench.sh" pr "$device" "$interface" "$cluster" 2>&1 | while IFS= read -r line; do echo "[PR] $line"; done) &

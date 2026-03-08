@@ -30,8 +30,9 @@ sbatch_cpu_opts="\
 "
 
 if [ "$job_type" = "bench" ]; then
+    bench_partition="${BENCH_GPU_PARTITION:-gpu-l40s}"
     sbatch_gpu_opts="\
-#SBATCH -CL40S
+#SBATCH -p $bench_partition
 #SBATCH --ntasks-per-node=4       # Number of cores per node required
 #SBATCH -G2\
 "
