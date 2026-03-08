@@ -119,6 +119,10 @@ class MFCInputFile(Case):
                         "Cray+ACC GPU_ROUTINE macro patch did not apply. "
                         "Update the pattern in toolchain/mfc/run/input.py."
                     )
+            else:
+                cons.print("[yellow]Warning: Applied CCE 19.0.0 workaround patch to pyrometheus-generated "
+                           "m_thermochem.f90 (replaced _CRAYFTN GPU_ROUTINE macro with !$acc routine seq). "
+                           "Remove this patch once pyrometheus emits correct Cray+ACC directives upstream.[/yellow]")
             thermochem_code = patched
 
         common.file_write(
