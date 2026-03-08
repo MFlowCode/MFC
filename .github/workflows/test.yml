@@ -330,7 +330,7 @@ jobs:
       - name: Clone
         uses: actions/checkout@v4
         with:
-          clean: true
+          clean: false
 
       - name: Pre-Build (SLURM)
         if:   matrix.cluster == 'phoenix'
