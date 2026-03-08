@@ -5,20 +5,13 @@
 # Usage: source .github/scripts/retry-build.sh
 #        retry_build ./mfc.sh build -j 8 --gpu acc
 
-# Try normal cleanup; if it fails, escalate to cache nuke.
 _retry_clean() {
     local clean_cmd="$1"
     if eval "$clean_cmd" 2>/dev/null; then
         return 0
     fi
-    echo "  Normal cleanup failed."
-    if type _cache_nuke > /dev/null 2>&1; then
-        echo "  Escalating to NFS cache nuke..."
-        _cache_nuke
-    else
-        echo "  _cache_nuke not available, best-effort rm."
-        rm -rf build/staging build/install build/lock.yaml 2>/dev/null || true
-    fi
+    echo "  Cleanup failed; falling back to best-effort rm."
+    rm -rf build/staging build/install build/lock.yaml 2>/dev/null || true
 }
 
 retry_build() {
