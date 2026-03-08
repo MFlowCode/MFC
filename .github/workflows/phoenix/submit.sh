@@ -40,7 +40,7 @@ if [ "$job_type" = "bench" ]; then
     sbatch_time="#SBATCH -t 04:00:00"
 else
     sbatch_gpu_opts="\
-#SBATCH -p gpu-v100,gpu-a100,gpu-h100,gpu-l40s
+#SBATCH -p gpu-v100,gpu-a100,gpu-h100,gpu-l40s,gpu-h200
 #SBATCH --ntasks-per-node=4       # Number of cores per node required
 #SBATCH -G2\
 "
