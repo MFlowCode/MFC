@@ -19,4 +19,4 @@ if [ "$job_device" = "gpu" ]; then
     n_test_threads=$((ngpus * 2))
 fi
 
-./mfc.sh test -v --max-attempts 3 -a -j $n_test_threads $device_opts -- -c phoenix
+./mfc.sh test -v --max-attempts 3 -a -j $n_test_threads $device_opts ${build_opts:---no-gpu} -- -c phoenix
