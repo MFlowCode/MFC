@@ -148,16 +148,25 @@ jobs:
       - name: Print Per-Case Logs
         if: always()
         run: |
+          passed=() failed=()
           for out in pr/build/benchmarks/*/*.out master/build/benchmarks/*/*.out; do
             [ -f "$out" ] || continue
-            yaml="${out%.out}.yaml"
-            if [ -f "$yaml" ]; then
-              echo "=== [PASSED] $out ==="
-            else
-              echo "=== [FAILED] $out ==="
-            fi
-            cat "$out"
+            [ -f "${out%.out}.yaml" ] && passed+=("$out") || failed+=("$out")
           done
+
+          echo "=== Per-Case Summary: ${#failed[@]} failed, ${#passed[@]} passed ==="
+          for out in "${failed[@]}"; do echo "  [FAILED] $out"; done
+          for out in "${passed[@]}"; do echo "  [PASSED] $out"; done
+
+          if [ ${#failed[@]} -gt 0 ]; then
+            echo ""
+            echo "=== Failed Case Logs ==="
+            for out in "${failed[@]}"; do
+              echo "--- $out ---"
+              cat "$out"
+              echo ""
+            done
+          fi
 
       # All other runners (non-Phoenix) just run without special env
       - name: Archive Logs (Frontier)

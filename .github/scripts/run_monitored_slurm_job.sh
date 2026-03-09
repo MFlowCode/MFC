@@ -18,10 +18,6 @@ output_file="$2"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Write job ID next to the output file so the workflow cancel step can scancel it
-# if GitHub Actions terminates the runner (SIGKILL cannot be caught by trap).
-echo "$job_id" > "${output_file%.out}.slurm_job_id"
-
 monitor_exit=0
 bash "$SCRIPT_DIR/monitor_slurm_job.sh" "$job_id" "$output_file" || monitor_exit=$?
 
