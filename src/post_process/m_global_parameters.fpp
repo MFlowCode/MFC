@@ -678,11 +678,6 @@ contains
                 end if
             end if
 
-            if (bubbles_lagrange) then
-                beta_idx = sys_size + 1
-                sys_size = beta_idx
-            end if
-
             if (mhd) then
                 B_idx%beg = sys_size + 1
                 if (n == 0) then
@@ -1059,7 +1054,7 @@ contains
         if (ib) MPI_IO_IB_DATA%var%sf => null()
 #endif
 
-        if (allocated(neighbor_ranks)) @:DEALLOCATE(neighbor_ranks)
+        if (allocated(neighbor_ranks)) deallocate(neighbor_ranks)
 
     end subroutine s_finalize_global_parameters_module
 
