@@ -726,7 +726,7 @@ contains
         real(wp) :: dt_local
         integer :: j, k, l !< Generic loop iterators
 
-        if (.not. igr .or. dummy) then
+        if (.not. igr .or. dummy .or. any_non_newtonian) then
             call s_convert_conservative_to_primitive_variables( &
                 q_cons_ts(1)%vf, &
                 q_T_sf, &
@@ -745,12 +745,9 @@ contains
                     end if
 
                     ! For non-Newtonian fluids, compute variable Re based on shear rate
+                    ! Always use q_prim_vf (velocities), not q_cons (momenta)
                     if (any_non_newtonian) then
-                        if (igr) then
-                            call s_compute_re_visc(q_cons_ts(1)%vf, alpha, j, k, l, Re_visc_per_phase)
-                        else
-                            call s_compute_re_visc(q_prim_vf, alpha, j, k, l, Re_visc_per_phase)
-                        end if
+                        call s_compute_re_visc(q_prim_vf, alpha, j, k, l, Re_visc_per_phase)
                         call s_compute_mixture_re(alpha, Re_visc_per_phase, Re)
                     end if
 
