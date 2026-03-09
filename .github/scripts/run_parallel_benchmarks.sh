@@ -36,7 +36,7 @@ if [ "$device" = "gpu" ] && [ "$cluster" = "phoenix" ]; then
         fi
     done
     if [ -z "$BENCH_GPU_PARTITION" ]; then
-        echo "WARNING: No idle GPU partition found; falling back to gpu-l40s (may queue)"
+        echo "WARNING: No idle GPU partition found; falling back to gpu-rtx6000 (may queue)"
         BENCH_GPU_PARTITION="gpu-rtx6000"
     fi
     export BENCH_GPU_PARTITION
