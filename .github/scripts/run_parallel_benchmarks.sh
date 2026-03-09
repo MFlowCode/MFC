@@ -24,6 +24,9 @@ echo "=========================================="
 # both parallel jobs so PR and master always land on the same GPU type.
 if [ "$device" = "gpu" ] && [ "$cluster" = "phoenix" ]; then
     echo "Selecting Phoenix GPU partition for benchmark consistency..."
+    # Prefer older/smaller partitions first (rtx6000, l40s, v100) to leave
+    # large modern nodes (h200, h100, a100) free for production workloads.
+    # rtx6000 has the most nodes and gives the most consistent baselines.
     BENCH_GPU_PARTITION=""
     for part in gpu-rtx6000 gpu-l40s gpu-v100 gpu-h200 gpu-h100 gpu-a100; do
         # || true: grep -c exits 1 on zero matches (or when sinfo returns no output

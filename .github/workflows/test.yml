@@ -155,6 +155,9 @@ jobs:
     name: "${{ matrix.cluster_name }} (${{ matrix.device }}${{ matrix.interface != 'none' && format('-{0}', matrix.interface) || '' }}${{ matrix.shard != '' && format(' [{0}]', matrix.shard) || '' }})"
     if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true' && github.event.pull_request.draft != true
     needs: [lint-gate, file-changes]
+    # Frontier CCE compiler is periodically broken by toolchain updates (e.g.
+    # cpe/25.03 introduced an IPA SIGSEGV in CCE 19.0.0). Allow Frontier to
+    # fail without blocking PR merges; Phoenix remains a hard gate.
     continue-on-error: ${{ matrix.runner == 'frontier' }}
     timeout-minutes: 480
     strategy:
@@ -233,6 +236,8 @@ jobs:
       - name: Clone
         uses: actions/checkout@v4
         with:
+          # clean: false preserves .slurm_job_id files across reruns so
+          # submit-job.sh can detect and cancel stale SLURM jobs on retry.
           clean: false
 
       - name: Build
@@ -294,6 +299,7 @@ jobs:
     name: "Case Opt | ${{ matrix.cluster_name }} (${{ matrix.device }}-${{ matrix.interface }})"
     if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true' && github.event.pull_request.draft != true
     needs: [lint-gate, file-changes]
+    # Frontier is non-blocking for the same reason as the self job above.
     continue-on-error: ${{ matrix.runner == 'frontier' }}
     timeout-minutes: 480
     strategy:

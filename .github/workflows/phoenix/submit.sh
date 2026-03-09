@@ -23,8 +23,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Submit (idempotent — skips resubmission if a live job already exists)
 bash "$SCRIPT_DIR/submit-job.sh" "$@"
 
-# Derive the same job slug and file paths as submit-job.sh
-job_slug="`basename "$1" | sed 's/\.sh$//' | sed 's/[^a-zA-Z0-9]/-/g'`-$2-$3"
+# Derive the same job slug and file paths as submit-job.sh.
+# NOTE: this sed pipeline must stay identical to the one in submit-job.sh —
+# if they diverge the id-file will not be found and the monitor will fail.
+job_slug="$(basename "$1" | sed 's/\.sh$//' | sed 's/[^a-zA-Z0-9]/-/g')-$2-$3"
 output_file="$job_slug.out"
 id_file="${job_slug}.slurm_job_id"
 
