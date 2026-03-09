@@ -39,6 +39,7 @@ contains
         end if
 
         call s_check_inputs_time_stepping
+        call s_check_inputs_non_newtonian
 
     end subroutine s_check_inputs
 
@@ -90,5 +91,31 @@ contains
             "nv_uvm_igr_temps_on_gpu must be in the range [0, 2] for igr_iter_solver == 2")
 #endif
     end subroutine s_check_inputs_nvidia_uvm
+
+    !> Checks constraints on non-Newtonian fluid parameters
+    impure subroutine s_check_inputs_non_newtonian
+        integer :: i
+
+        do i = 1, num_fluids
+            if (fluid_pp(i)%non_newtonian) then
+                @:PROHIBIT(.not. viscous, &
+                    "Non-Newtonian fluid requires viscosity to be enabled")
+                @:PROHIBIT(fluid_pp(i)%K <= 0._wp, &
+                    "Non-Newtonian fluid consistency index K must be > 0")
+                @:PROHIBIT(fluid_pp(i)%nn <= 0._wp, &
+                    "Non-Newtonian fluid flow behavior index nn must be > 0")
+                @:PROHIBIT(fluid_pp(i)%tau0 < 0._wp, &
+                    "Non-Newtonian fluid yield stress tau0 must be >= 0")
+                @:PROHIBIT(fluid_pp(i)%mu_min < 0._wp, &
+                    "Non-Newtonian fluid mu_min must be >= 0")
+                @:PROHIBIT(fluid_pp(i)%mu_max < dflt_real .and. &
+                    fluid_pp(i)%mu_max <= fluid_pp(i)%mu_min, &
+                    "Non-Newtonian fluid mu_max must be > mu_min when set")
+                @:PROHIBIT(fluid_pp(i)%hb_m <= 0._wp, &
+                    "Non-Newtonian Papanastasiou parameter hb_m must be > 0")
+            end if
+        end do
+
+    end subroutine s_check_inputs_non_newtonian
 
 end module m_checker

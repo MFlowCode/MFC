@@ -184,6 +184,7 @@ module m_global_parameters
     logical :: bulk_stress   !< Bulk stresses
     logical :: cont_damage   !< Continuum damage modeling
     logical :: hyper_cleaning !< Hyperbolic cleaning for MHD for divB=0
+    logical :: any_non_newtonian !< True if any fluid is non-Newtonian
     integer :: num_igr_iters !< number of iterations for elliptic solve
     integer :: num_igr_warm_start_iters !< number of warm start iterations for elliptic solve
     real(wp) :: alf_factor  !< alpha factor for IGR
@@ -213,7 +214,7 @@ module m_global_parameters
     $:GPU_DECLARE(create='[mpp_lim,model_eqns,mixture_err,alt_soundspeed]')
     $:GPU_DECLARE(create='[avg_state,mp_weno,weno_eps,teno_CT,hypoelasticity]')
     $:GPU_DECLARE(create='[hyperelasticity,hyper_model,elasticity,low_Mach]')
-    $:GPU_DECLARE(create='[shear_stress,bulk_stress,cont_damage,hyper_cleaning]')
+    $:GPU_DECLARE(create='[shear_stress,bulk_stress,cont_damage,hyper_cleaning,any_non_newtonian]')
 
     logical :: relax          !< activate phase change
     integer :: relax_model    !< Relaxation model
@@ -636,6 +637,7 @@ contains
         bulk_stress = .false.
         cont_damage = .false.
         hyper_cleaning = .false.
+        any_non_newtonian = .false.
         num_igr_iters = dflt_num_igr_iters
         num_igr_warm_start_iters = dflt_num_igr_warm_start_iters
         alf_factor = dflt_alf_factor
@@ -684,6 +686,14 @@ contains
             fluid_pp(i)%qvp = 0._wp
             fluid_pp(i)%Re(:) = dflt_real
             fluid_pp(i)%G = 0._wp
+            fluid_pp(i)%non_newtonian = .false.
+            fluid_pp(i)%tau0 = 0._wp
+            fluid_pp(i)%K = 0._wp
+            fluid_pp(i)%nn = 1._wp
+            fluid_pp(i)%mu_max = dflt_real
+            fluid_pp(i)%mu_min = 0._wp
+            fluid_pp(i)%mu_bulk = 0._wp
+            fluid_pp(i)%hb_m = 1000._wp
         end do
 
         ! Subgrid bubble parameters
@@ -1120,7 +1130,15 @@ contains
 
             Re_size_max = maxval(Re_size)
 
-            $:GPU_UPDATE(device='[Re_size,Re_size_max,shear_stress,bulk_stress]')
+            ! Detect non-Newtonian fluids
+            any_non_newtonian = .false.
+            do i = 1, num_fluids
+                if (fluid_pp(i)%non_newtonian) then
+                    any_non_newtonian = .true.
+                end if
+            end do
+
+            $:GPU_UPDATE(device='[Re_size,Re_size_max,shear_stress,bulk_stress,any_non_newtonian]')
 
             ! Bookkeeping the indexes of any viscous fluids and any pairs of
             ! fluids whose interface will support effects of surface tension
