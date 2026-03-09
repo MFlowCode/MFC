@@ -145,19 +145,7 @@ jobs:
           cat pr/bench-${{ matrix.device }}-${{ matrix.interface }}.* 2>/dev/null || true
           cat master/bench-${{ matrix.device }}-${{ matrix.interface }}.* 2>/dev/null || true
 
-      - name: Print Per-Case Failure Logs
-        if: always()
-        run: |
-          for out in pr/build/benchmarks/*/*.out master/build/benchmarks/*/*.out; do
-            [ -f "$out" ] || continue
-            yaml="${out%.out}.yaml"
-            if [ ! -f "$yaml" ]; then
-              echo "=== [FAILED] $out ==="
-              cat "$out"
-            fi
-          done
-
-      - name: Print Per-Case Success Logs
+      - name: Print Per-Case Logs
         if: always()
         run: |
           for out in pr/build/benchmarks/*/*.out master/build/benchmarks/*/*.out; do
@@ -165,8 +153,10 @@ jobs:
             yaml="${out%.out}.yaml"
             if [ -f "$yaml" ]; then
               echo "=== [PASSED] $out ==="
-              cat "$out"
+            else
+              echo "=== [FAILED] $out ==="
             fi
+            cat "$out"
           done
 
       # All other runners (non-Phoenix) just run without special env

@@ -61,7 +61,7 @@ else
     exit 1
 fi
 
-job_slug="`basename "$1" | sed 's/\.sh$//' | sed 's/[^a-zA-Z0-9]/-/g'`-$2-$3"
+job_slug="$(basename "$1" | sed 's/\.sh$//' | sed 's/[^a-zA-Z0-9]/-/g')-$2-$3"
 output_file="$job_slug.out"
 id_file="${job_slug}.slurm_job_id"
 
@@ -98,7 +98,7 @@ set -e
 set -x
 
 cd "\$SLURM_SUBMIT_DIR"
-echo "Running in $(pwd):"
+echo "Running in \$(pwd):"
 
 job_slug="$job_slug"
 job_device="$2"
