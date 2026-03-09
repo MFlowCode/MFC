@@ -84,7 +84,6 @@ contains
     subroutine s_apply_ib_collision_forces_soft_sphere(num_considered_collisions, forces, torques)
 
         integer, intent(in) :: num_considered_collisions
-        ! integer, dimension(num_considered_collisions, 2), intent(in) :: collision_lookup
         real(wp), dimension(num_ibs, 3), intent(inout) :: forces, torques
 
         integer :: i, encoded_pid1, encoded_pid2, xp1, xp2, yp1, yp2, zp1, zp2, pid1, pid2, l ! iterators and patch IDs
@@ -95,10 +94,10 @@ contains
 
         if (num_considered_collisions == 0) return
 
-        print *, "Checking Collisions: ", num_considered_collisions
+        print *, "Checking Collisions: ", num_considered_collisions, " on rank ", proc_rank
 
         ! Iterate over all collisions detected
-        $:GPU_PARALLEL_LOOP(private='[i,l,encoded_pid1,encoded_pid2,xp1,xp2,yp1,yp2,zp1,zp2,pid1,pid2,centroid_1,centroid_2,normal_vector,overlap_distance,effective_mass,k,eta,normal_velocity,tangental_vector,normal_force,tangental_force,torque]', copy='[forces, torques]', copyin='[num_considered_collisions]')
+        $:GPU_PARALLEL_LOOP(private='[i,l,encoded_pid1,encoded_pid2,xp1,xp2,yp1,yp2,zp1,zp2,pid1,pid2,centroid_1,centroid_2,normal_vector,overlap_distance,effective_mass,k,eta,normal_velocity,tangental_vector,normal_force,tangental_force,torque]', copy='[forces, torques]')
         do i = 1, num_considered_collisions
             encoded_pid1 = collision_lookup(i, 3)
             encoded_pid2 = collision_lookup(i, 4)
@@ -117,7 +116,6 @@ contains
             if (overlap_distance > 0._wp) then ! if the two patches are close enough to collide
                 normal_vector = normal_vector/norm2(normal_vector)
                 if (f_local_rank_owns_collision(centroid_1)) then
-
                     ! compute constants of the collision
                     effective_mass = 1.0_wp/((1.0_wp/patch_ib(pid1)%mass) + (1._wp/(patch_ib(pid2)%mass)))
                     k = spring_stiffness*effective_mass
@@ -243,9 +241,9 @@ contains
             k = 0; if (num_dims == 3) k = gps(gp_idx)%loc(3)
 
             ! search in a cube around the BG for Ib markers belonging to another patch
-            neighbor_search: do ii = i - 1, i + 1, 2
-                do jj = j - 1, j + 1, 2
-                    do kk = k - z_bound, k + z_bound, 2
+            neighbor_search: do ii = i - 1, i + 1
+                do jj = j - 1, j + 1
+                    do kk = k - z_bound, k + z_bound
                         neighbor_patch_id = ib_markers%sf(ii, jj, kk)
 
                         ! If any neighbors are of a different/higher marker value, we consider it for possible collision
