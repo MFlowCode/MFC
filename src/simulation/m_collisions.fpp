@@ -48,8 +48,11 @@ contains
         spring_stiffness = 1._wp/(collision_time**2*(pi**2 + log(e)**2))
         $:GPU_UPDATE(device='[damping_parameter,spring_stiffness]')
 
-        @:ALLOCATE(collision_lookup(num_ibs * (num_ibs-1) / 2, 2))
+        @:ALLOCATE(collision_lookup(num_ibs * (num_ibs-1) / 2, 4))
         @:ALLOCATE(wall_overlap_distances(num_ibs, 6))
+
+        wall_overlap_distances = 0
+        $:GPU_UPDATE(device='[wall_overlap_distances]')
 
     end subroutine s_initialize_collisions_module
 
@@ -69,13 +72,13 @@ contains
         $:GPU_UPDATE(host='[ghost_points]')
 
         ! get is distance used in the force calculation with each IB and each wall
-        call s_detect_wall_collisions(ghost_points, wall_overlap_distances, num_gps)
+        call s_detect_wall_collisions(ghost_points, num_gps)
         call s_detect_ib_collisions(ghost_points, ib_markers, num_gps, num_considered_collisions)
         ! call s_detect_ib_collisions_n2(num_considered_collisions)
 
         select case (collision_model)
         case (1) ! soft sphere model
-            call s_apply_wall_collision_forces_soft_sphere(wall_overlap_distances, forces, torques)
+            call s_apply_wall_collision_forces_soft_sphere(forces, torques)
             call s_apply_ib_collision_forces_soft_sphere(num_considered_collisions, forces, torques)
         end select
 
@@ -88,7 +91,7 @@ contains
         ! integer, dimension(num_considered_collisions, 2), intent(in) :: collision_lookup
         real(wp), dimension(num_ibs, 3), intent(inout) :: forces, torques
 
-        integer :: i, pid1, pid2, l ! iterators and patch IDs
+        integer :: i, encoded_pid1, encoded_pid2, xp1, xp2, yp1, yp2, zp1, zp2, pid1, pid2, l ! iterators and patch IDs
         real(wp) :: overlap_distance
         real(wp), dimension(3) :: normal_vector, centroid_1, centroid_2
         real(wp), dimension(3) :: normal_velocity, tangental_vector, normal_force, tangental_force, torque
@@ -99,16 +102,18 @@ contains
         print *, "Checking Collisions: ", num_considered_collisions
 
         ! Iterate over all collisions detected
-        $:GPU_PARALLEL_LOOP(private='[i,l,pid1,pid2,centroid_1,centroid_2,normal_vector,overlap_distance,effective_mass,k,eta,normal_velocity,tangental_vector,normal_force,tangental_force,torque]', copy='[forces, torques]', copyin='[num_considered_collisions]')
+        $:GPU_PARALLEL_LOOP(private='[i,l,encoded_pid1,encoded_pid2,xp1,xp2,yp1,yp2,zp1,zp2,pid1,pid2,centroid_1,centroid_2,normal_vector,overlap_distance,effective_mass,k,eta,normal_velocity,tangental_vector,normal_force,tangental_force,torque]', copy='[forces, torques]', copyin='[num_considered_collisions]')
         do i = 1, num_considered_collisions
-            pid1 = collision_lookup(i, 1)
-            pid2 = collision_lookup(i, 2)
+            encoded_pid1 = collision_lookup(i, 3)
+            encoded_pid2 = collision_lookup(i, 4)
+            call s_decode_patch_periodicity(encoded_pid1, pid1, xp1, yp1, zp1)
+            call s_decode_patch_periodicity(encoded_pid2, pid2, xp2, yp2, zp2)
 
-            centroid_1 = [patch_ib(pid1)%x_centroid, patch_ib(pid1)%y_centroid, 0._wp]
-            centroid_2 = [patch_ib(pid2)%x_centroid, patch_ib(pid2)%y_centroid, 0._wp]
+            centroid_1 = [patch_ib(pid1)%x_centroid + real(xp1, wp)*(x_domain%end - x_domain%beg), patch_ib(pid1)%y_centroid + real(yp1, wp)*(y_domain%end - y_domain%beg), 0._wp]
+            centroid_2 = [patch_ib(pid2)%x_centroid + real(xp2, wp)*(x_domain%end - x_domain%beg), patch_ib(pid2)%y_centroid + real(yp2, wp)*(y_domain%end - y_domain%beg), 0._wp]
             if (num_dims == 3) then
-                centroid_1(3) = patch_ib(pid1)%z_centroid
-                centroid_2(3) = patch_ib(pid2)%z_centroid
+                centroid_1(3) = patch_ib(pid1)%z_centroid + real(zp1, wp)*(z_domain%end - z_domain%beg)
+                centroid_2(3) = patch_ib(pid2)%z_centroid + real(zp2, wp)*(z_domain%end - z_domain%beg)
             end if
 
             normal_vector = centroid_2 - centroid_1
@@ -154,9 +159,8 @@ contains
     end subroutine s_apply_ib_collision_forces_soft_sphere
 
     !> @brief applies collision forces to IBs assuming a soft-sphere collision model (all IBs are circles or spheres)
-    subroutine s_apply_wall_collision_forces_soft_sphere(wall_overlap_distances, forces, torques)
+    subroutine s_apply_wall_collision_forces_soft_sphere(forces, torques)
 
-        real(wp), dimension(num_ibs, 6), intent(in) :: wall_overlap_distances
         real(wp), dimension(num_ibs, 3), intent(inout) :: forces, torques
 
         integer :: patch_id, i, l
@@ -223,6 +227,7 @@ contains
         integer, intent(out) :: num_considered_collisions
 
         integer :: i, j, k, z_bound, ii, jj, kk
+        integer, dimension(2) :: decoded_pairs
         integer gp_idx, gp_patch_id, neighbor_patch_id
         integer :: pair_idx, out_idx
         logical :: already_found
@@ -270,23 +275,30 @@ contains
         ! Coalesce collisions unique pairs
         num_considered_collisions = 0
         collision_lookup = 0
-        ! for each pair found in the raw collection...
+        ! for each pair found in the raw collection
         do pair_idx = 1, num_raw
             already_found = .false.
-            ! ... check if it is already in the list ...
+
+            ! get the decoded pairs for checking if they exist, using ii,jj,kk as dummy indices
+            call s_decode_patch_periodicity(raw_pairs(pair_idx, 1), decoded_pairs(1), ii, jj, kk)
+            call s_decode_patch_periodicity(raw_pairs(pair_idx, 2), decoded_pairs(2), ii, jj, kk)
+
+            ! check if it is already in the list
             do out_idx = 1, num_considered_collisions
-                if (collision_lookup(out_idx, 1) == raw_pairs(pair_idx, 1) .and. &
-                    collision_lookup(out_idx, 2) == raw_pairs(pair_idx, 2)) then
+                if (collision_lookup(out_idx, 1) == decoded_pairs(1) .and. &
+                    collision_lookup(out_idx, 2) == decoded_pairs(2)) then
                     already_found = .true.
                     exit
                 end if
             end do
 
-            ! ... and if it is not, append it to the list of pairs
+            ! and if it is not, append it to the list of pairs
             if (.not. already_found) then
                 num_considered_collisions = num_considered_collisions + 1
-                collision_lookup(num_considered_collisions, 1) = raw_pairs(pair_idx, 1)
-                collision_lookup(num_considered_collisions, 2) = raw_pairs(pair_idx, 2)
+                collision_lookup(num_considered_collisions, 1) = decoded_pairs(1)
+                collision_lookup(num_considered_collisions, 2) = decoded_pairs(2)
+                collision_lookup(num_considered_collisions, 3) = raw_pairs(pair_idx, 1)
+                collision_lookup(num_considered_collisions, 4) = raw_pairs(pair_idx, 2)
             end if
         end do
         $:GPU_UPDATE(device='[collision_lookup]')
@@ -297,7 +309,7 @@ contains
 
         integer, intent(out) :: num_considered_collisions
 
-        integer :: pid1, pid2, current_collisions
+        integer :: pid1, pid2, encoded_pid1, encoded_pid2, current_collisions
         real(wp), dimension(3) :: centroid_1, centroid_2, distance_vec
 
         num_considered_collisions = 0
@@ -329,74 +341,43 @@ contains
     end subroutine s_detect_ib_collisions_n2
 
     !> @brief uses boundary conditions and particle locations to check for wall conditions
-    subroutine s_detect_wall_collisions(gps, overlap_distances, num_gps)
+    subroutine s_detect_wall_collisions(gps, num_gps)
 
         type(ghost_point), dimension(num_gps), intent(in) :: gps
-        real(wp), dimension(num_ibs, 6), intent(out) :: overlap_distances
         integer, intent(in) :: num_gps
 
         integer :: gp_idx, i, j, k, patch_id
         real(wp) :: edge_location, overlap_distance
 
-        overlap_distances = 0._wp
-
         ! iterate over all ghost points to detect the one that is most-overlapping in each direction
         do patch_id = 1, num_ibs
-            ! check if the boundaries are either of the two conditions we should compute collisions with
-            if (bc_x%beg == BC_SLIP_WALL .or. bc_x%beg == BC_NO_SLIP_WALL) then
-                ! get the location of the true IB surface towards the domain boundary
-                edge_location = patch_ib(patch_id)%x_centroid - patch_ib(patch_id)%radius
-                ! check if that edge actually extends out of the comutational domain
-                if (edge_location < x_domain%beg) then
-                    overlap_distance = x_domain%beg - edge_location ! the distance that the IB extends out of the domain
-                    overlap_distances(patch_id, 1) = max(overlap_distances(patch_id, 1), overlap_distance) ! Save this distance if it is the new maximum distance
-                end if
-            end if
-
-            if (bc_x%end == BC_SLIP_WALL .or. bc_x%end == BC_NO_SLIP_WALL) then
-                edge_location = patch_ib(patch_id)%x_centroid + patch_ib(patch_id)%radius
-                if (edge_location > x_domain%end) then
-                    overlap_distance = edge_location - x_domain%end
-                    overlap_distances(patch_id, 2) = max(overlap_distances(patch_id, 2), overlap_distance)
-                end if
-            end if
-
-            if (bc_y%beg == BC_SLIP_WALL .or. bc_y%beg == BC_NO_SLIP_WALL) then
-                edge_location = patch_ib(patch_id)%y_centroid - patch_ib(patch_id)%radius
-                if (edge_location < y_domain%beg) then
-                    overlap_distance = y_domain%beg - edge_location
-                    overlap_distances(patch_id, 3) = max(overlap_distances(patch_id, 3), overlap_distance)
-                end if
-            end if
-
-            if (bc_y%end == BC_SLIP_WALL .or. bc_y%end == BC_NO_SLIP_WALL) then
-                edge_location = patch_ib(patch_id)%y_centroid + patch_ib(patch_id)%radius
-                if (edge_location > y_domain%end) then
-                    overlap_distance = edge_location - y_domain%end
-                    overlap_distances(patch_id, 4) = max(overlap_distances(patch_id, 4), overlap_distance)
-                end if
-            end if
-
-            if (p > 0) then
-                if (bc_z%beg == BC_SLIP_WALL .or. bc_z%beg == BC_NO_SLIP_WALL) then
-                    edge_location = patch_ib(patch_id)%z_centroid - patch_ib(patch_id)%radius
-                    if (edge_location < z_domain%beg) then
-                        overlap_distance = z_domain%beg - edge_location
-                        overlap_distances(patch_id, 5) = max(overlap_distances(patch_id, 5), overlap_distance)
+            #:for X, IDX in [('x', 1), ('y', 3), ('z', 5)]
+                ! check if the boundaries are either of the two conditions we should compute collisions with
+                if (bc_${X}$%beg == BC_SLIP_WALL .or. bc_${X}$%beg == BC_NO_SLIP_WALL) then
+                    ! get the location of the true IB surface towards the domain boundary
+                    edge_location = patch_ib(patch_id)%${X}$_centroid - patch_ib(patch_id)%radius
+                    ! check if that edge actually extends out of the comutational domain
+                    if (edge_location < ${X}$_domain%beg) then
+                        overlap_distance = ${X}$_domain%beg - edge_location ! the distance that the IB extends out of the domain
+                    else
+                        overlap_distance = 0._wp
                     end if
+                    wall_overlap_distances(patch_id, ${IDX}$) = overlap_distance
                 end if
 
-                if (bc_z%end == BC_SLIP_WALL .or. bc_z%end == BC_NO_SLIP_WALL) then
-                    edge_location = patch_ib(patch_id)%z_centroid + patch_ib(patch_id)%radius
-                    if (edge_location > z_domain%end) then
-                        overlap_distance = edge_location - z_domain%end
-                        overlap_distances(patch_id, 6) = max(overlap_distances(patch_id, 6), overlap_distance)
+                if (bc_${X}$%end == BC_SLIP_WALL .or. bc_${X}$%end == BC_NO_SLIP_WALL) then
+                    edge_location = patch_ib(patch_id)%${X}$_centroid + patch_ib(patch_id)%radius
+                    if (edge_location > ${X}$_domain%end) then
+                        overlap_distance = edge_location - ${X}$_domain%end
+                    else
+                        overlap_distance = 0._wp
                     end if
+                    wall_overlap_distances(patch_id, ${IDX}$+1) = overlap_distance
                 end if
-            end if
+            #:endfor
         end do
 
-        $:GPU_UPDATE(device='[overlap_distances]')
+        $:GPU_UPDATE(device='[wall_overlap_distances]')
 
     end subroutine s_detect_wall_collisions
 
