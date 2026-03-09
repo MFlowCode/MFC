@@ -11,10 +11,6 @@ module m_collisions
 
     use m_global_parameters    !< Definitions of the global parameters
 
-    use m_mpi_proxy            !< Message passing interface (MPI) module proxy
-
-    use m_variables_conversion !< State variables type conversion procedures
-
     use m_helper
 
     use m_helper_basic         !< Functions to compare floating point numbers
@@ -70,11 +66,11 @@ contains
 
         ! TODO :: TEMPORARY UNTIL GPU SUPPORT ENABLED. REMOVE LATER
         $:GPU_UPDATE(host='[ghost_points]')
+        $:GPU_UPDATE(host='[ib_markers%sf]')
 
         ! get is distance used in the force calculation with each IB and each wall
-        call s_detect_wall_collisions(ghost_points, num_gps)
+        call s_detect_wall_collisions()
         call s_detect_ib_collisions(ghost_points, ib_markers, num_gps, num_considered_collisions)
-        ! call s_detect_ib_collisions_n2(num_considered_collisions)
 
         select case (collision_model)
         case (1) ! soft sphere model
@@ -239,8 +235,6 @@ contains
         num_raw = 0
         z_bound = 0; if (num_dims == 3) z_bound = 1
 
-        $:GPU_UPDATE(host='[ib_markers%sf]')
-
         $:GPU_PARALLEL_LOOP(private='[gp_idx,gp_patch_id,neighbor_patch_id,local_num_raw,i,j,k,ii,jj,kk]', copy='[raw_pairs,num_raw]', copyin='[z_bound]')
         do gp_idx = 1, num_gps
             gp_patch_id = gps(gp_idx)%ib_patch_id
@@ -341,10 +335,7 @@ contains
     end subroutine s_detect_ib_collisions_n2
 
     !> @brief uses boundary conditions and particle locations to check for wall conditions
-    subroutine s_detect_wall_collisions(gps, num_gps)
-
-        type(ghost_point), dimension(num_gps), intent(in) :: gps
-        integer, intent(in) :: num_gps
+    subroutine s_detect_wall_collisions()
 
         integer :: gp_idx, i, j, k, patch_id
         real(wp) :: edge_location, overlap_distance
