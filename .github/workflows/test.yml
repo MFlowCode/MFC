@@ -137,16 +137,12 @@ jobs:
           printenv | sort > /tmp/env_after
           diff /tmp/env_before /tmp/env_after | grep '^>' | sed 's/^> //' >> $GITHUB_ENV
 
-      - name: Set up Python 3.14
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.14'
-
       - name: Build
         run:  |
-          /bin/bash mfc.sh test -v --dry-run -j $(nproc) --${{ matrix.debug }} --${{ matrix.mpi }} --${{ matrix.precision }} $TEST_ALL
+          /bin/bash mfc.sh test -v --dry-run -j $(nproc) --${{ matrix.debug }} --${{ matrix.mpi }} $PRECISION $TEST_ALL
         env:
           TEST_ALL: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
+          PRECISION: ${{ matrix.precision != '' && format('--{0}', matrix.precision) || '' }}
 
       - name: Test
         run:  |
@@ -159,7 +155,10 @@ jobs:
     name: "${{ matrix.cluster_name }} (${{ matrix.device }}${{ matrix.interface != 'none' && format('-{0}', matrix.interface) || '' }}${{ matrix.shard != '' && format(' [{0}]', matrix.shard) || '' }})"
     if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true' && github.event.pull_request.draft != true
     needs: [lint-gate, file-changes]
-    continue-on-error: false
+    # Frontier CCE compiler is periodically broken by toolchain updates (e.g.
+    # cpe/25.03 introduced an IPA SIGSEGV in CCE 19.0.0). Allow Frontier to
+    # fail without blocking PR merges; Phoenix remains a hard gate.
+    continue-on-error: ${{ matrix.runner == 'frontier' }}
     timeout-minutes: 480
     strategy:
       matrix:
@@ -237,7 +236,9 @@ jobs:
       - name: Clone
         uses: actions/checkout@v4
         with:
-          clean: true
+          # clean: false preserves .slurm_job_id files across reruns so
+          # submit-job.sh can detect and cancel stale SLURM jobs on retry.
+          clean: false
 
       - name: Build
         if:   matrix.cluster != 'phoenix'
@@ -249,7 +250,18 @@ jobs:
           command: bash .github/workflows/${{ matrix.cluster }}/build.sh ${{ matrix.device }} ${{ matrix.interface }}
           on_retry_command: rm -rf build
 
+      - name: Submit SLURM Test Job
+        if:   matrix.cluster == 'phoenix'
+        run:  bash .github/workflows/phoenix/submit-job.sh .github/workflows/phoenix/test.sh ${{ matrix.device }} ${{ matrix.interface }}
+
+      - name: Monitor SLURM Test Job
+        if:   matrix.cluster == 'phoenix'
+        run: |
+          slug="test-${{ matrix.device }}-${{ matrix.interface }}"
+          bash .github/scripts/run_monitored_slurm_job.sh "$(cat ${slug}.slurm_job_id)" "${slug}.out"
+
       - name: Test
+        if:   matrix.cluster != 'phoenix'
         run:  bash .github/workflows/${{ matrix.cluster }}/submit.sh .github/workflows/${{ matrix.cluster }}/test.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.shard }}
 
       - name: Cancel SLURM Jobs
@@ -287,7 +299,8 @@ jobs:
     name: "Case Opt | ${{ matrix.cluster_name }} (${{ matrix.device }}-${{ matrix.interface }})"
     if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true' && github.event.pull_request.draft != true
     needs: [lint-gate, file-changes]
-    continue-on-error: false
+    # Frontier is non-blocking for the same reason as the self job above.
+    continue-on-error: ${{ matrix.runner == 'frontier' }}
     timeout-minutes: 480
     strategy:
       matrix:
@@ -324,7 +337,7 @@ jobs:
       - name: Clone
         uses: actions/checkout@v4
         with:
-          clean: true
+          clean: false
 
       - name: Pre-Build (SLURM)
         if:   matrix.cluster == 'phoenix'
@@ -334,7 +347,18 @@ jobs:
         if:   matrix.cluster != 'phoenix'
         run:  bash .github/scripts/prebuild-case-optimization.sh ${{ matrix.cluster }} ${{ matrix.device }} ${{ matrix.interface }}
 
+      - name: Submit Case-Optimization Tests
+        if:   matrix.cluster == 'phoenix'
+        run:  bash .github/workflows/phoenix/submit-job.sh .github/scripts/run_case_optimization.sh ${{ matrix.device }} ${{ matrix.interface }}
+
+      - name: Monitor Case-Optimization Tests
+        if:   matrix.cluster == 'phoenix'
+        run: |
+          slug="run-case-optimization-${{ matrix.device }}-${{ matrix.interface }}"
+          bash .github/scripts/run_monitored_slurm_job.sh "$(cat ${slug}.slurm_job_id)" "${slug}.out"
+
       - name: Run Case-Optimization Tests
+        if:   matrix.cluster != 'phoenix'
         run:  bash .github/workflows/${{ matrix.cluster }}/submit.sh .github/scripts/run_case_optimization.sh ${{ matrix.device }} ${{ matrix.interface }}
 
       - name: Cancel SLURM Jobs

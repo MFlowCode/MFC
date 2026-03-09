@@ -20,6 +20,31 @@ echo "=========================================="
 echo "Starting parallel benchmark jobs..."
 echo "=========================================="
 
+# For Phoenix GPU benchmarks, select a consistent GPU partition before launching
+# both parallel jobs so PR and master always land on the same GPU type.
+if [ "$device" = "gpu" ] && [ "$cluster" = "phoenix" ]; then
+    echo "Selecting Phoenix GPU partition for benchmark consistency..."
+    # Prefer older/smaller partitions first (rtx6000, l40s, v100) to leave
+    # large modern nodes (h200, h100, a100) free for production workloads.
+    # rtx6000 has the most nodes and gives the most consistent baselines.
+    BENCH_GPU_PARTITION=""
+    for part in gpu-rtx6000 gpu-l40s gpu-v100 gpu-h200 gpu-h100 gpu-a100; do
+        # || true: grep -c exits 1 on zero matches (or when sinfo returns no output
+        # for an unknown partition); suppress so set -euo pipefail doesn't abort.
+        idle=$(sinfo -p "$part" --noheader -o "%t" 2>/dev/null | grep -cE "^(idle|mix)" || true)
+        if [ "${idle:-0}" -gt 0 ]; then
+            BENCH_GPU_PARTITION="$part"
+            echo "Selected GPU partition: $BENCH_GPU_PARTITION ($idle idle/mix nodes)"
+            break
+        fi
+    done
+    if [ -z "$BENCH_GPU_PARTITION" ]; then
+        echo "WARNING: No idle GPU partition found; falling back to gpu-rtx6000 (may queue)"
+        BENCH_GPU_PARTITION="gpu-rtx6000"
+    fi
+    export BENCH_GPU_PARTITION
+fi
+
 # Run both jobs with monitoring using dedicated script from PR
 # Use stdbuf for line-buffered output and prefix each line for clarity
 (set -o pipefail; stdbuf -oL -eL bash "${SCRIPT_DIR}/submit_and_monitor_bench.sh" pr "$device" "$interface" "$cluster" 2>&1 | while IFS= read -r line; do echo "[PR] $line"; done) &
@@ -40,6 +65,8 @@ wait "$pr_pid"
 pr_exit=$?
 if [ "$pr_exit" -ne 0 ]; then
   echo "PR job exited with code: $pr_exit"
+  echo "Last 50 lines of PR job log:"
+  tail -n 50 "pr/bench-${device}-${interface}.out" 2>/dev/null || echo "  Could not read PR log"
 else
   echo "PR job completed successfully"
 fi
@@ -48,6 +75,8 @@ wait "$master_pid"
 master_exit=$?
 if [ "$master_exit" -ne 0 ]; then
   echo "Master job exited with code: $master_exit"
+  echo "Last 50 lines of master job log:"
+  tail -n 50 "master/bench-${device}-${interface}.out" 2>/dev/null || echo "  Could not read master log"
 else
   echo "Master job completed successfully"
 fi
