@@ -137,16 +137,12 @@ jobs:
           printenv | sort > /tmp/env_after
           diff /tmp/env_before /tmp/env_after | grep '^>' | sed 's/^> //' >> $GITHUB_ENV
 
-      - name: Set up Python 3.14
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.14'
-
       - name: Build
         run:  |
-          /bin/bash mfc.sh test -v --dry-run -j $(nproc) --${{ matrix.debug }} --${{ matrix.mpi }} --${{ matrix.precision }} $TEST_ALL
+          /bin/bash mfc.sh test -v --dry-run -j $(nproc) --${{ matrix.debug }} --${{ matrix.mpi }} $PRECISION $TEST_ALL
         env:
           TEST_ALL: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
+          PRECISION: ${{ matrix.precision != '' && format('--{0}', matrix.precision) || '' }}
 
       - name: Test
         run:  |
