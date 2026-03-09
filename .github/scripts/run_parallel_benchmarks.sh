@@ -25,7 +25,7 @@ echo "=========================================="
 if [ "$device" = "gpu" ] && [ "$cluster" = "phoenix" ]; then
     echo "Selecting Phoenix GPU partition for benchmark consistency..."
     BENCH_GPU_PARTITION=""
-    for part in gpu-h200 gpu-h100 gpu-a100 gpu-l40s gpu-rtx6000 gpu-v100; do
+    for part in gpu-rtx6000 gpu-l40s gpu-v100 gpu-h200 gpu-h100 gpu-a100; do
         # || true: grep -c exits 1 on zero matches (or when sinfo returns no output
         # for an unknown partition); suppress so set -euo pipefail doesn't abort.
         idle=$(sinfo -p "$part" --noheader -o "%t" 2>/dev/null | grep -cE "^(idle|mix)" || true)
@@ -37,7 +37,7 @@ if [ "$device" = "gpu" ] && [ "$cluster" = "phoenix" ]; then
     done
     if [ -z "$BENCH_GPU_PARTITION" ]; then
         echo "WARNING: No idle GPU partition found; falling back to gpu-l40s (may queue)"
-        BENCH_GPU_PARTITION="gpu-l40s"
+        BENCH_GPU_PARTITION="gpu-rtx6000"
     fi
     export BENCH_GPU_PARTITION
 fi
