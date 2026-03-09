@@ -243,7 +243,7 @@ jobs:
       - name: Clone
         uses: actions/checkout@v4
         with:
-          clean: true
+          clean: false
 
       - name: Build
         if:   matrix.cluster != 'phoenix'
@@ -255,7 +255,18 @@ jobs:
           command: bash .github/workflows/${{ matrix.cluster }}/build.sh ${{ matrix.device }} ${{ matrix.interface }}
           on_retry_command: rm -rf build
 
+      - name: Submit SLURM Test Job
+        if:   matrix.cluster == 'phoenix'
+        run:  bash .github/workflows/phoenix/submit-job.sh .github/workflows/phoenix/test.sh ${{ matrix.device }} ${{ matrix.interface }}
+
+      - name: Monitor SLURM Test Job
+        if:   matrix.cluster == 'phoenix'
+        run: |
+          slug="test-${{ matrix.device }}-${{ matrix.interface }}"
+          bash .github/scripts/run_monitored_slurm_job.sh "$(cat ${slug}.slurm_job_id)" "${slug}.out"
+
       - name: Test
+        if:   matrix.cluster != 'phoenix'
         run:  bash .github/workflows/${{ matrix.cluster }}/submit.sh .github/workflows/${{ matrix.cluster }}/test.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.shard }}
 
       - name: Cancel SLURM Jobs
@@ -340,7 +351,18 @@ jobs:
         if:   matrix.cluster != 'phoenix'
         run:  bash .github/scripts/prebuild-case-optimization.sh ${{ matrix.cluster }} ${{ matrix.device }} ${{ matrix.interface }}
 
+      - name: Submit Case-Optimization Tests
+        if:   matrix.cluster == 'phoenix'
+        run:  bash .github/workflows/phoenix/submit-job.sh .github/scripts/run_case_optimization.sh ${{ matrix.device }} ${{ matrix.interface }}
+
+      - name: Monitor Case-Optimization Tests
+        if:   matrix.cluster == 'phoenix'
+        run: |
+          slug="run-case-optimization-${{ matrix.device }}-${{ matrix.interface }}"
+          bash .github/scripts/run_monitored_slurm_job.sh "$(cat ${slug}.slurm_job_id)" "${slug}.out"
+
       - name: Run Case-Optimization Tests
+        if:   matrix.cluster != 'phoenix'
         run:  bash .github/workflows/${{ matrix.cluster }}/submit.sh .github/scripts/run_case_optimization.sh ${{ matrix.device }} ${{ matrix.interface }}
 
       - name: Cancel SLURM Jobs
