@@ -1,17 +1,8 @@
 #!/bin/bash
 
-gpus=`rocm-smi --showid | awk '{print $1}' | grep -Eo '[0-9]+' | uniq | tr '\n' ' '`
-ngpus=`echo "$gpus" | tr -d '[:space:]' | wc -c`
-
-device_opts=""
-if [ "$job_device" = "gpu" ]; then
-    device_opts+="--gpu"
-    if [ "$job_interface" = "acc" ]; then
-        device_opts+=" acc"
-    elif [ "$job_interface" = "omp" ]; then
-        device_opts+=" mp"
-    fi
-fi
+source .github/scripts/detect-gpus.sh
+source .github/scripts/gpu-opts.sh
+device_opts="$gpu_opts"
 
 shard_opts=""
 if [ -n "$job_shard" ]; then
