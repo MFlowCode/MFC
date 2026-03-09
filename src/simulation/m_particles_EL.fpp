@@ -530,8 +530,6 @@ contains
         !Populate temporal variables
         call s_transfer_data_to_tmp_particles()
 
-        ! call s_smear_particle_sources(bc_type, only_linked_list=.false.)
-
         if (save_count == 0) then
             ! Create ./D directory
             if (proc_rank == 0) then
@@ -1004,7 +1002,7 @@ contains
 
         call nvtxStartRange("LAGRANGE-PARTICLE-COLLISIONS")
 
-        $:GPU_PARALLEL_LOOP(private='[k,cell,ip,jp,kp,Rp1,xp1,mp1,vp1,kk,jj,ii,cellaux,q,Rp2,xp2,mp2,vp2,v_rel,Rstar,rpij,rmag,nij,vnij,dij,kappa_n,eta_n,Fnpp_ij,force_vec]',&
+        $:GPU_PARALLEL_LOOP(private='[k,cell,ip,jp,kp,Rp1,xp1,mp1,vp1,kk,jj,ii,cellaux,q,Rp2,xp2,mp2,vp2,v_rel,Rstar,rpij,rmag,nij,vnij,dij,kappa_n,eta_n,Fnpp_ij,force_vec,s_cell]',&
         & copyin='[ksp,nu1,nu2,E1,E2,cor,pidtksp2,Estar,kpz,dt_loc]')
         do k = 1, n_el_particles_loc
 
@@ -1879,8 +1877,6 @@ contains
 
         ! Update void fraction and communicate buffers
         call s_finalize_beta_field(bc_type, only_beta)
-
-        ! call s_smear_particle_sources(bc_type, only_linked_list=.false.)
 
         call nvtxEndRange ! LAG-BC
 
