@@ -65,22 +65,22 @@ job_slug="`basename "$1" | sed 's/\.sh$//' | sed 's/[^a-zA-Z0-9]/-/g'`-$2-$3"
 output_file="$job_slug.out"
 id_file="${job_slug}.slurm_job_id"
 
-# Idempotency: if a live job already exists for this slug, skip resubmission.
-# Only RUNNING/PENDING jobs are reused — a COMPLETED/FAILED job means we should
-# run fresh (e.g. new commit pushed) or the monitor step will verify it separately.
+# On rerun, cancel any existing job for this slug and submit a fresh one.
+# If the job is still live (RUNNING/PENDING), scancel it first as a safety net
+# in case the "Cancel SLURM Jobs" step did not fire (e.g. runner was SIGKILL'd).
 if [ -f "$id_file" ]; then
     existing_id=$(cat "$id_file")
     state=$(sacct -j "$existing_id" -n -X -P -o State 2>/dev/null | head -n1 | cut -d'|' -f1 | tr -d ' ' || true)
     case "${state:-UNKNOWN}" in
         RUNNING|PENDING|REQUEUED|COMPLETING)
-            echo "Reusing existing SLURM job $existing_id (state=$state) — skipping resubmission"
-            exit 0
+            echo "Cancelling stale SLURM job $existing_id (state=$state) before resubmission"
+            scancel "$existing_id" 2>/dev/null || true
             ;;
         *)
-            echo "Stale job $existing_id (state=${state:-UNKNOWN}) — resubmitting"
-            rm -f "$id_file"
+            echo "Stale job $existing_id (state=${state:-UNKNOWN}) — submitting fresh"
             ;;
     esac
+    rm -f "$id_file"
 fi
 
 submit_output=$(sbatch <<EOT
