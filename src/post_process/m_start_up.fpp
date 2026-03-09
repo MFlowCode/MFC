@@ -1149,7 +1149,6 @@ contains
 
         num_dims = 1 + min(1, n) + min(1, p)
 
-#ifdef MFC_MPI
         ! Initialization of the MPI environment
         call s_mpi_initialize()
 
@@ -1167,13 +1166,11 @@ contains
 
         ! Broadcasting the user inputs to all of the processors and performing the
         ! parallel computational domain decomposition. Neither procedure has to be
-        ! carried out if the simulation is in fact not truly executed in parallel.
+        ! carried out if the post-process is in fact not truly executed in parallel.
         call s_mpi_bcast_user_inputs()
         call s_initialize_parallel_io()
         call s_mpi_decompose_computational_domain()
         call s_check_inputs_fft()
-
-#endif
 
     end subroutine s_initialize_mpi_domain
 

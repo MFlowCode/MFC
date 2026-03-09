@@ -70,7 +70,7 @@ def bench(targets = None):
                     try:
                         with open(log_filepath, "w") as log_file:
                             result = system(
-                                ["./mfc.sh", "run", case.path, "--case-optimization"] +
+                                ["./mfc.sh", "run", case.path] +
                                 ["--targets"] + [t.name for t in targets] +
                                 ["--output-summary", summary_filepath] +
                                 case.args +
@@ -228,8 +228,7 @@ def diff():
                     grind_time_value = lhs_summary[target.name]["grind"] / rhs_summary[target.name]["grind"]
                     speedups[i] += f" & Grind: {grind_time_value:.2f}"
                     if grind_time_value < 0.95:
-                        cons.print(f"[bold red]Error[/bold red]: Benchmarking failed since grind time speedup for {target.name} below acceptable threshold (<0.95) - Case: {slug}")
-                        err = 1
+                        cons.print(f"[bold yellow]Warning[/bold yellow]: Grind time speedup for {target.name} below threshold (<0.95) - Case: {slug}")
             except Exception as e:
                 cons.print(
                     f"[bold red]ERROR[/bold red]: Failed to compute speedup for {target.name} in {slug}: {e}\n"

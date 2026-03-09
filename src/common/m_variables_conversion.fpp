@@ -116,7 +116,7 @@ contains
         !! @param pres_mag Magnetic pressure (optional)
     subroutine s_compute_pressure(energy, alf, dyn_p, pi_inf, gamma, rho, qv, rhoYks, pres, T, stress, mom, G, pres_mag)
         $:GPU_ROUTINE(function_name='s_compute_pressure',parallelism='[seq]', &
-            & cray_inline=True)
+            & cray_noinline=True)
 
         real(stp), intent(in) :: energy, alf
         real(wp), intent(in) :: dyn_p
@@ -326,7 +326,7 @@ contains
                                                           alpha_K, alpha_rho_K, Re_K, &
                                                           G_K, G)
         $:GPU_ROUTINE(function_name='s_convert_species_to_mixture_variables_acc', &
-            & parallelism='[seq]', cray_inline=True)
+            & parallelism='[seq]', cray_noinline=True)
 
         real(wp), intent(out) :: rho_K, gamma_K, pi_inf_K, qv_K
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
@@ -852,11 +852,11 @@ contains
                     end if
 
                     if (hypoelasticity) then
+                        if (cont_damage) G_K = G_K*max((1._wp - qK_cons_vf(damage_idx)%sf(j, k, l)), 0._wp)
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = strxb, strxe
                             ! subtracting elastic contribution for pressure calculation
                             if (G_K > verysmall) then
-                                if (cont_damage) G_K = G_K*max((1._wp - qK_cons_vf(damage_idx)%sf(j, k, l)), 0._wp)
                                 qK_prim_vf(E_idx)%sf(j, k, l) = qK_prim_vf(E_idx)%sf(j, k, l) - &
                                                                 ((qK_prim_vf(i)%sf(j, k, l)**2._wp)/(4._wp*G_K))/gamma_K
                                 ! Double for shear stresses
@@ -1123,11 +1123,10 @@ contains
                     end if
 
                     if (hypoelasticity) then
+                        if (cont_damage) G = G*max((1._wp - q_prim_vf(damage_idx)%sf(j, k, l)), 0._wp)
                         do i = strxb, strxe
                             ! adding elastic contribution
                             if (G > verysmall) then
-                                if (cont_damage) G = G*max((1._wp - q_prim_vf(damage_idx)%sf(j, k, l)), 0._wp)
-
                                 q_cons_vf(E_idx)%sf(j, k, l) = q_cons_vf(E_idx)%sf(j, k, l) + &
                                                                (q_prim_vf(i)%sf(j, k, l)**2._wp)/(4._wp*G)
                                 ! Double for shear stresses
@@ -1336,7 +1335,7 @@ contains
     !>  This subroutine computes partial densities and volume fractions
     subroutine s_compute_species_fraction(q_vf, k, l, r, alpha_rho_K, alpha_K)
         $:GPU_ROUTINE(function_name='s_compute_species_fraction', &
-            & parallelism='[seq]', cray_inline=True)
+            & parallelism='[seq]', cray_noinline=True)
         type(scalar_field), dimension(sys_size), intent(in) :: q_vf
         integer, intent(in) :: k, l, r
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
@@ -1481,7 +1480,7 @@ contains
     !> @brief Computes the fast magnetosonic wave speed from the sound speed, density, and magnetic field components.
     subroutine s_compute_fast_magnetosonic_speed(rho, c, B, norm, c_fast, h)
         $:GPU_ROUTINE(function_name='s_compute_fast_magnetosonic_speed', &
-            & parallelism='[seq]', cray_inline=True)
+            & parallelism='[seq]', cray_noinline=True)
 
         real(wp), intent(in) :: B(3), rho, c
         real(wp), intent(in) :: h ! only used for relativity

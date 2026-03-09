@@ -476,6 +476,19 @@ contains
             write (2) q_cons_vf(i)%sf(0:m, 0:n, 0:p); close (2)
         end do
 
+        ! Lagrangian beta (void fraction) written as q_cons_vf(sys_size+1) to
+        ! match the parallel I/O path and allow post_process to read it.
+        if (bubbles_lagrange) then
+            write (file_path, '(A,I0,A)') trim(t_step_dir)//'/q_cons_vf', &
+                sys_size + 1, '.dat'
+
+            open (2, FILE=trim(file_path), &
+                  FORM='unformatted', &
+                  STATUS='new')
+
+            write (2) beta%sf(0:m, 0:n, 0:p); close (2)
+        end if
+
         if (qbmm .and. .not. polytropic) then
             do i = 1, nb
                 do r = 1, nnode
@@ -1064,6 +1077,7 @@ contains
               FORM='unformatted', &
               STATUS='new')
 
+        $:GPU_UPDATE(host='[ib_markers%sf]')
         write (2) ib_markers%sf(0:m, 0:n, 0:p); close (2)
 
     end subroutine
@@ -1081,6 +1095,8 @@ contains
         integer(kind=MPI_OFFSET_kind) :: WP_MOK, var_MOK, MOK
         integer :: ifile, ierr, data_size
         integer, dimension(MPI_STATUS_SIZE) :: status
+
+        $:GPU_UPDATE(host='[ib_markers%sf]')
 
         ! Size of local arrays
         data_size = (m + 1)*(n + 1)*(p + 1)

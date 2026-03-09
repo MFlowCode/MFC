@@ -4,6 +4,7 @@ on:
   push:
     branches: [master]
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 concurrency:
@@ -28,7 +29,7 @@ jobs:
 
       - name: Check Formatting
         run: |
-          ./mfc.sh format -j $(nproc)
+          ./mfc.sh format -j "$(nproc)"
           git diff --exit-code || (echo "::error::Code is not formatted. Run './mfc.sh format' locally." && exit 1)
 
       - name: Spell Check
@@ -128,19 +129,20 @@ jobs:
           sudo add-apt-repository "deb https://apt.repos.intel.com/oneapi all main"
           sudo apt-get update
           sudo apt-get install -y intel-oneapi-compiler-fortran intel-oneapi-mpi intel-oneapi-mpi-devel
+          # Export only new/changed env vars from setvars.sh.
+          # `printenv >> $GITHUB_ENV` dumps all vars including shell internals
+          # with special characters that corrupt GITHUB_ENV parsing.
+          printenv | sort > /tmp/env_before
           source /opt/intel/oneapi/setvars.sh
-          printenv >> $GITHUB_ENV
-
-      - name: Set up Python 3.14
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.14'
+          printenv | sort > /tmp/env_after
+          diff /tmp/env_before /tmp/env_after | grep '^>' | sed 's/^> //' >> $GITHUB_ENV
 
       - name: Build
         run:  |
-          /bin/bash mfc.sh test -v --dry-run -j $(nproc) --${{ matrix.debug }} --${{ matrix.mpi }} --${{ matrix.precision }} $TEST_ALL
+          /bin/bash mfc.sh test -v --dry-run -j $(nproc) --${{ matrix.debug }} --${{ matrix.mpi }} $PRECISION $TEST_ALL
         env:
           TEST_ALL: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
+          PRECISION: ${{ matrix.precision != '' && format('--{0}', matrix.precision) || '' }}
 
       - name: Test
         run:  |
@@ -150,10 +152,13 @@ jobs:
           TEST_PCT: ${{ matrix.debug == 'debug' && '-% 20' || '' }}
 
   self:
-    name: "${{ matrix.cluster_name }} (${{ matrix.device }}${{ matrix.interface != 'none' && format('-{0}', matrix.interface) || '' }})"
+    name: "${{ matrix.cluster_name }} (${{ matrix.device }}${{ matrix.interface != 'none' && format('-{0}', matrix.interface) || '' }}${{ matrix.shard != '' && format(' [{0}]', matrix.shard) || '' }})"
     if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true' && github.event.pull_request.draft != true
     needs: [lint-gate, file-changes]
-    continue-on-error: false
+    # Frontier CCE compiler is periodically broken by toolchain updates (e.g.
+    # cpe/25.03 introduced an IPA SIGSEGV in CCE 19.0.0). Allow Frontier to
+    # fail without blocking PR merges; Phoenix remains a hard gate.
+    continue-on-error: ${{ matrix.runner == 'frontier' }}
     timeout-minutes: 480
     strategy:
       matrix:
@@ -174,7 +179,142 @@ jobs:
             cluster_name: 'Georgia Tech | Phoenix'
             device: 'cpu'
             interface: 'none'
-          # Frontier (ORNL) — build on login node, test via SLURM
+          # Frontier (ORNL) — CCE
+          - runner:       'frontier'
+            cluster:      'frontier'
+            cluster_name: 'Oak Ridge | Frontier'
+            device: 'gpu'
+            interface: 'acc'
+            shard: '1/2'
+          - runner:       'frontier'
+            cluster:      'frontier'
+            cluster_name: 'Oak Ridge | Frontier'
+            device: 'gpu'
+            interface: 'acc'
+            shard: '2/2'
+          - runner:       'frontier'
+            cluster:      'frontier'
+            cluster_name: 'Oak Ridge | Frontier'
+            device: 'gpu'
+            interface: 'omp'
+            shard: '1/2'
+          - runner:       'frontier'
+            cluster:      'frontier'
+            cluster_name: 'Oak Ridge | Frontier'
+            device: 'gpu'
+            interface: 'omp'
+            shard: '2/2'
+          - runner:       'frontier'
+            cluster:      'frontier'
+            cluster_name: 'Oak Ridge | Frontier'
+            device: 'cpu'
+            interface: 'none'
+          # Frontier AMD — build on login node, GPU tests sharded for batch partition
+          - runner:       'frontier'
+            cluster:      'frontier_amd'
+            cluster_name: 'Oak Ridge | Frontier (AMD)'
+            device: 'gpu'
+            interface: 'omp'
+            shard: '1/2'
+          - runner:       'frontier'
+            cluster:      'frontier_amd'
+            cluster_name: 'Oak Ridge | Frontier (AMD)'
+            device: 'gpu'
+            interface: 'omp'
+            shard: '2/2'
+          - runner:       'frontier'
+            cluster:      'frontier_amd'
+            cluster_name: 'Oak Ridge | Frontier (AMD)'
+            device: 'cpu'
+            interface: 'none'
+    runs-on:
+      group:  phoenix
+      labels: ${{ matrix.runner }}
+    env:
+      NODE_OPTIONS: ${{ matrix.cluster == 'phoenix' && '--max-old-space-size=2048' || '' }}
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
+        with:
+          # clean: false preserves .slurm_job_id files across reruns so
+          # submit-job.sh can detect and cancel stale SLURM jobs on retry.
+          clean: false
+
+      - name: Build
+        if:   matrix.cluster != 'phoenix'
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
+        with:
+          max_attempts: 2
+          retry_wait_seconds: 60
+          timeout_minutes: 60
+          command: bash .github/workflows/${{ matrix.cluster }}/build.sh ${{ matrix.device }} ${{ matrix.interface }}
+          on_retry_command: rm -rf build
+
+      - name: Submit SLURM Test Job
+        if:   matrix.cluster == 'phoenix'
+        run:  bash .github/workflows/phoenix/submit-job.sh .github/workflows/phoenix/test.sh ${{ matrix.device }} ${{ matrix.interface }}
+
+      - name: Monitor SLURM Test Job
+        if:   matrix.cluster == 'phoenix'
+        run: |
+          slug="test-${{ matrix.device }}-${{ matrix.interface }}"
+          bash .github/scripts/run_monitored_slurm_job.sh "$(cat ${slug}.slurm_job_id)" "${slug}.out"
+
+      - name: Test
+        if:   matrix.cluster != 'phoenix'
+        run:  bash .github/workflows/${{ matrix.cluster }}/submit.sh .github/workflows/${{ matrix.cluster }}/test.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.shard }}
+
+      - name: Cancel SLURM Jobs
+        if: cancelled()
+        run: |
+          find . -name "*.slurm_job_id" | while read -r f; do
+            job_id=$(cat "$f")
+            echo "Cancelling SLURM job $job_id"
+            scancel "$job_id" 2>/dev/null || true
+          done
+
+      - name: Compute Log Slug
+        if:   always()
+        id:   log
+        run:  |
+          SLUG="test-${{ matrix.device }}-${{ matrix.interface }}"
+          SHARD="${{ matrix.shard }}"
+          if [ -n "$SHARD" ]; then
+            SLUG="${SLUG}-$(echo "$SHARD" | sed 's|/|-of-|')"
+          fi
+          echo "slug=${SLUG}" >> "$GITHUB_OUTPUT"
+
+      - name: Print Logs
+        if:   always()
+        run:  cat ${{ steps.log.outputs.slug }}.out
+
+      - name: Archive Logs
+        uses: actions/upload-artifact@v4
+        if:   matrix.cluster != 'phoenix'
+        with:
+          name: logs-${{ strategy.job-index }}-${{ steps.log.outputs.slug }}
+          path: ${{ steps.log.outputs.slug }}.out
+
+  case-optimization:
+    name: "Case Opt | ${{ matrix.cluster_name }} (${{ matrix.device }}-${{ matrix.interface }})"
+    if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true' && github.event.pull_request.draft != true
+    needs: [lint-gate, file-changes]
+    # Frontier is non-blocking for the same reason as the self job above.
+    continue-on-error: ${{ matrix.runner == 'frontier' }}
+    timeout-minutes: 480
+    strategy:
+      matrix:
+        include:
+          - runner:       'gt'
+            cluster:      'phoenix'
+            cluster_name: 'Georgia Tech | Phoenix'
+            device: 'gpu'
+            interface: 'acc'
+          - runner:       'gt'
+            cluster:      'phoenix'
+            cluster_name: 'Georgia Tech | Phoenix'
+            device: 'gpu'
+            interface: 'omp'
           - runner:       'frontier'
             cluster:      'frontier'
             cluster_name: 'Oak Ridge | Frontier'
@@ -186,48 +326,63 @@ jobs:
             device: 'gpu'
             interface: 'omp'
           - runner:       'frontier'
-            cluster:      'frontier'
-            cluster_name: 'Oak Ridge | Frontier'
-            device: 'cpu'
-            interface: 'none'
-          # Frontier AMD — build on login node, test via SLURM
-          - runner:       'frontier'
             cluster:      'frontier_amd'
             cluster_name: 'Oak Ridge | Frontier (AMD)'
             device: 'gpu'
             interface: 'omp'
-          - runner:       'frontier'
-            cluster:      'frontier_amd'
-            cluster_name: 'Oak Ridge | Frontier (AMD)'
-            device: 'cpu'
-            interface: 'none'
     runs-on:
       group:  phoenix
       labels: ${{ matrix.runner }}
-    env:
-      NODE_OPTIONS: ${{ matrix.cluster == 'phoenix' && '--max-old-space-size=2048' || '' }}
-      ACTIONS_RUNNER_FORCE_ACTIONS_NODE_VERSION: node16
-      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
     steps:
       - name: Clone
         uses: actions/checkout@v4
         with:
           clean: false
 
-      - name: Build
-        if:   matrix.cluster != 'phoenix'
-        run:  bash .github/workflows/${{ matrix.cluster }}/build.sh ${{ matrix.device }} ${{ matrix.interface }}
+      - name: Pre-Build (SLURM)
+        if:   matrix.cluster == 'phoenix'
+        run:  bash .github/workflows/phoenix/submit.sh .github/scripts/prebuild-case-optimization.sh ${{ matrix.device }} ${{ matrix.interface }}
 
-      - name: Test
-        run:  bash .github/workflows/${{ matrix.cluster }}/submit.sh .github/workflows/${{ matrix.cluster }}/test.sh ${{ matrix.device }} ${{ matrix.interface }}
+      - name: Pre-Build (login node)
+        if:   matrix.cluster != 'phoenix'
+        run:  bash .github/scripts/prebuild-case-optimization.sh ${{ matrix.cluster }} ${{ matrix.device }} ${{ matrix.interface }}
+
+      - name: Submit Case-Optimization Tests
+        if:   matrix.cluster == 'phoenix'
+        run:  bash .github/workflows/phoenix/submit-job.sh .github/scripts/run_case_optimization.sh ${{ matrix.device }} ${{ matrix.interface }}
+
+      - name: Monitor Case-Optimization Tests
+        if:   matrix.cluster == 'phoenix'
+        run: |
+          slug="run-case-optimization-${{ matrix.device }}-${{ matrix.interface }}"
+          bash .github/scripts/run_monitored_slurm_job.sh "$(cat ${slug}.slurm_job_id)" "${slug}.out"
+
+      - name: Run Case-Optimization Tests
+        if:   matrix.cluster != 'phoenix'
+        run:  bash .github/workflows/${{ matrix.cluster }}/submit.sh .github/scripts/run_case_optimization.sh ${{ matrix.device }} ${{ matrix.interface }}
+
+      - name: Cancel SLURM Jobs
+        if: cancelled()
+        run: |
+          find . -name "*.slurm_job_id" | while read -r f; do
+            job_id=$(cat "$f")
+            echo "Cancelling SLURM job $job_id"
+            scancel "$job_id" 2>/dev/null || true
+          done
 
       - name: Print Logs
         if:   always()
-        run:  cat test-${{ matrix.device }}-${{ matrix.interface }}.out
+        run:  |
+          for f in prebuild-case-optimization-${{ matrix.device }}-${{ matrix.interface }}.out \
+                   run-case-optimization-${{ matrix.device }}-${{ matrix.interface }}.out; do
+            [ -f "$f" ] && echo "=== $f ===" && cat "$f"
+          done
 
       - name: Archive Logs
         uses: actions/upload-artifact@v4
-        if:   matrix.cluster != 'phoenix'
+        if:   always()
         with:
-          name: logs-${{ strategy.job-index }}-${{ matrix.device }}-${{ matrix.interface }}
-          path: test-${{ matrix.device }}-${{ matrix.interface }}.out
+          name: case-opt-${{ strategy.job-index }}-${{ matrix.cluster }}-${{ matrix.interface }}
+          path: |
+            prebuild-case-optimization-${{ matrix.device }}-${{ matrix.interface }}.out
+            run-case-optimization-${{ matrix.device }}-${{ matrix.interface }}.out
