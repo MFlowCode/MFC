@@ -36,7 +36,7 @@ module m_ibm
     private :: s_compute_image_points, s_compute_interpolation_coeffs, &
                s_interpolate_image_point, s_find_ghost_points, &
                s_find_num_ghost_points
-    
+
     public :: s_initialize_ibm_module, s_ibm_setup, s_ibm_correct_state, &
               s_finalize_ibm_module
 

@@ -29,12 +29,10 @@ module m_collisions
 
     implicit none
 
-    private; public :: s_apply_collision_forces, s_initialize_collisions_module, s_finalize_collisions_module;
-
+    private; public :: s_apply_collision_forces, s_initialize_collisions_module, s_finalize_collisions_module; 
     ! overlap distances for computing collisions
-    integer, allocatable, dimension(:,:) :: collision_lookup
-    real(wp), allocatable, dimension(:,:) :: wall_overlap_distances
-
+    integer, allocatable, dimension(:, :) :: collision_lookup
+    real(wp), allocatable, dimension(:, :) :: wall_overlap_distances
 
     real(wp) :: spring_stiffness, damping_parameter
     $:GPU_DECLARE(create='[spring_stiffness,damping_parameter]')
@@ -46,8 +44,8 @@ contains
         real(wp) :: e
 
         e = coefficient_of_restitution
-        damping_parameter = -2._wp * log(e) / (pi**2 + log(e)**2)
-        spring_stiffness = 1._wp / ( collision_time**2 * (pi**2 + log(e)**2) )
+        damping_parameter = -2._wp*log(e)/(pi**2 + log(e)**2)
+        spring_stiffness = 1._wp/(collision_time**2*(pi**2 + log(e)**2))
         $:GPU_UPDATE(device='[damping_parameter,spring_stiffness]')
 
         @:ALLOCATE(collision_lookup(num_ibs * (num_ibs-1) / 2, 2))
@@ -57,34 +55,34 @@ contains
 
     subroutine s_apply_collision_forces(ghost_points, num_gps, ib_markers, forces, torques)
 
-      type(ghost_point), dimension(:), intent(in) :: ghost_points
-      integer, intent(in) :: num_gps
-      type(integer_field), intent(in) :: ib_markers
-      real(wp), dimension(num_ibs, 3), intent(inout) :: forces, torques
+        type(ghost_point), dimension(:), intent(in) :: ghost_points
+        integer, intent(in) :: num_gps
+        type(integer_field), intent(in) :: ib_markers
+        real(wp), dimension(num_ibs, 3), intent(inout) :: forces, torques
 
-      integer :: num_considered_collisions
+        integer :: num_considered_collisions
 
-      ! return if no collisions
-      if (collision_model == 0) return
+        ! return if no collisions
+        if (collision_model == 0) return
 
-      ! TODO :: TEMPORARY UNTIL GPU SUPPORT ENABLED. REMOVE LATER
-      $:GPU_UPDATE(host='[ghost_points]')
+        ! TODO :: TEMPORARY UNTIL GPU SUPPORT ENABLED. REMOVE LATER
+        $:GPU_UPDATE(host='[ghost_points]')
 
-      ! get is distance used in the force calculation with each IB and each wall 
-      call s_detect_wall_collisions(ghost_points, wall_overlap_distances, num_gps)
-      ! call s_detect_ib_collisions(ghost_points, ib_markers, collision_lookup, num_gps, num_considered_collisions)
-      call s_detect_ib_collisions_n2(num_considered_collisions)
+        ! get is distance used in the force calculation with each IB and each wall
+        call s_detect_wall_collisions(ghost_points, wall_overlap_distances, num_gps)
+        call s_detect_ib_collisions(ghost_points, ib_markers, num_gps, num_considered_collisions)
+        ! call s_detect_ib_collisions_n2(num_considered_collisions)
 
-      select case (collision_model)
-          case(1) ! soft sphere model
-              call s_apply_wall_collision_forces_soft_sphere(wall_overlap_distances, forces, torques)
-              call s_appply_ib_collision_forces_soft_sphere(num_considered_collisions, forces, torques)
-      end select
+        select case (collision_model)
+        case (1) ! soft sphere model
+            call s_apply_wall_collision_forces_soft_sphere(wall_overlap_distances, forces, torques)
+            call s_apply_ib_collision_forces_soft_sphere(num_considered_collisions, forces, torques)
+        end select
 
     end subroutine s_apply_collision_forces
 
-    !> @brief applyies collision forces to IBs assuming a soft-sphere collision model (all IBs are circles or spheres)
-    subroutine s_appply_ib_collision_forces_soft_sphere(num_considered_collisions, forces, torques)
+    !> @brief applies collision forces to IBs assuming a soft-sphere collision model (all IBs are circles or spheres)
+    subroutine s_apply_ib_collision_forces_soft_sphere(num_considered_collisions, forces, torques)
 
         integer, intent(in) :: num_considered_collisions
         ! integer, dimension(num_considered_collisions, 2), intent(in) :: collision_lookup
@@ -108,7 +106,7 @@ contains
 
             centroid_1 = [patch_ib(pid1)%x_centroid, patch_ib(pid1)%y_centroid, 0._wp]
             centroid_2 = [patch_ib(pid2)%x_centroid, patch_ib(pid2)%y_centroid, 0._wp]
-            if (num_dims == 3) then 
+            if (num_dims == 3) then
                 centroid_1(3) = patch_ib(pid1)%z_centroid
                 centroid_2(3) = patch_ib(pid2)%z_centroid
             end if
@@ -116,37 +114,35 @@ contains
             normal_vector = centroid_2 - centroid_1
             overlap_distance = patch_ib(pid1)%radius + patch_ib(pid2)%radius - norm2(normal_vector)
             if (overlap_distance > 0._wp) then ! if the two patches are close enough to collide
-                normal_vector = normal_vector / norm2(normal_vector)
+                normal_vector = normal_vector/norm2(normal_vector)
                 if (f_local_rank_owns_collision(centroid_1)) then
 
                     ! compute constants of the collision
-                    effective_mass = 1.0_wp / ( (1.0_wp/patch_ib(pid1)%mass) + (1._wp / (patch_ib(pid2)%mass)) )
-                    k = spring_stiffness * effective_mass
-                    eta = damping_parameter * sqrt(effective_mass * k)
+                    effective_mass = 1.0_wp/((1.0_wp/patch_ib(pid1)%mass) + (1._wp/(patch_ib(pid2)%mass)))
+                    k = spring_stiffness*effective_mass
+                    eta = damping_parameter*sqrt(effective_mass*k)
 
                     ! Get the vectors and velcoities
                     ! TODO :: This should be made more complicated and include rotational velocity at the collision location.
                     normal_velocity = dot_product(patch_ib(pid1)%vel - patch_ib(pid2)%vel, normal_vector)*normal_vector
                     tangental_vector = (patch_ib(pid1)%vel - patch_ib(pid2)%vel) - normal_velocity
-                    if (.not. f_approx_equal(norm2(tangental_vector), 0._wp)) tangental_vector = tangental_vector / norm2(tangental_vector)
+                    if (.not. f_approx_equal(norm2(tangental_vector), 0._wp)) tangental_vector = tangental_vector/norm2(tangental_vector)
 
                     ! compute force and torque
-                    normal_force = -k * overlap_distance * normal_vector - eta * normal_velocity
-                    tangental_force = -ib_coefficient_of_friction * norm2(normal_force) * tangental_vector
-                    call s_cross_product(normal_vector * patch_ib(pid1)%radius, tangental_force, torque)
+                    normal_force = -k*overlap_distance*normal_vector - eta*normal_velocity
+                    tangental_force = -ib_coefficient_of_friction*norm2(normal_force)*tangental_vector
+                    call s_cross_product(normal_vector*patch_ib(pid1)%radius, tangental_force, torque)
 
                     do l = 1, num_dims
                         ! update the first IB
                         $:GPU_ATOMIC(atomic='update')
-                        forces(pid1, l) = forces(pid1, l) + (normal_force(l) + tangental_force(l))*100._wp
-                        ! forces(pid1, l) = (normal_force(l) + tangental_force(l))
+                        forces(pid1, l) = forces(pid1, l) + (normal_force(l) + tangental_force(l))
                         $:GPU_ATOMIC(atomic='update')
                         torques(pid1, l) = torques(pid1, l) + torque(l)
 
-                        ! apply equal and opposite force/torque to second sphere
+                        ! apply equal and opposite force/torque to second IB
                         $:GPU_ATOMIC(atomic='update')
                         forces(pid2, l) = forces(pid2, l) - (normal_force(l) + tangental_force(l))
-                        ! forces(pid2, l) = -1._wp * (normal_force(l) + tangental_force(l))
                         $:GPU_ATOMIC(atomic='update')
                         torques(pid2, l) = torques(pid2, l) - torque(l)
                     end do
@@ -155,9 +151,9 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-    end subroutine s_appply_ib_collision_forces_soft_sphere
+    end subroutine s_apply_ib_collision_forces_soft_sphere
 
-    !> @brief applyies collision forces to IBs assuming a soft-sphere collision model (all IBs are circles or spheres)
+    !> @brief applies collision forces to IBs assuming a soft-sphere collision model (all IBs are circles or spheres)
     subroutine s_apply_wall_collision_forces_soft_sphere(wall_overlap_distances, forces, torques)
 
         real(wp), dimension(num_ibs, 6), intent(in) :: wall_overlap_distances
@@ -174,18 +170,18 @@ contains
                 if (f_approx_equal(wall_overlap_distances(patch_id, i), 0._wp)) cycle
 
                 select case (i)
-                    case(1) ! x domain left
-                        normal_vector = [-1._wp, 0._wp, 0._wp]
-                    case(2) ! x domain right
-                        normal_vector = [1._wp, 0._wp, 0._wp]
-                    case(3) ! y domain bottom
-                        normal_vector = [0._wp, -1._wp, 0._wp]
-                    case(4) ! y domain top
-                        normal_vector = [0._wp, 1._wp, 0._wp]
-                    case(5) ! z domain back
-                        normal_vector = [0._wp, 0._wp, -1._wp]
-                    case(6) ! z domain front
-                        normal_vector = [0._wp, 0._wp, 1._wp]
+                case (1) ! x domain left
+                    normal_vector = [-1._wp, 0._wp, 0._wp]
+                case (2) ! x domain right
+                    normal_vector = [1._wp, 0._wp, 0._wp]
+                case (3) ! y domain bottom
+                    normal_vector = [0._wp, -1._wp, 0._wp]
+                case (4) ! y domain top
+                    normal_vector = [0._wp, 1._wp, 0._wp]
+                case (5) ! z domain back
+                    normal_vector = [0._wp, 0._wp, -1._wp]
+                case (6) ! z domain front
+                    normal_vector = [0._wp, 0._wp, 1._wp]
                 end select
 
                 ! ensure the local rank owns that collision before proceeding
@@ -193,16 +189,16 @@ contains
                 if (num_dims == 3) collision_location(3) = patch_ib(patch_id)%z_centroid
                 if (f_local_rank_owns_collision(collision_location)) then
 
-                    k = spring_stiffness * patch_ib(patch_id)%mass
-                    eta = damping_parameter * sqrt(patch_ib(patch_id)%mass * k)
+                    k = spring_stiffness*patch_ib(patch_id)%mass
+                    eta = damping_parameter*sqrt(patch_ib(patch_id)%mass*k)
 
                     ! standard soft-sphere collision  with the wall
                     normal_velocity = dot_product(patch_ib(patch_id)%vel, normal_vector)*normal_vector
                     tangental_vector = patch_ib(patch_id)%vel - normal_velocity
-                    if (.not. f_approx_equal(norm2(tangental_vector), 0._wp)) tangental_vector = tangental_vector / norm2(tangental_vector)
-                    normal_force = -k * wall_overlap_distances(patch_id, i) * normal_vector - eta * normal_velocity
-                    tangental_force = -ib_coefficient_of_friction * norm2(normal_force) * tangental_vector
-                    call s_cross_product(normal_vector * patch_ib(patch_id)%radius, tangental_force, torque)
+                    if (.not. f_approx_equal(norm2(tangental_vector), 0._wp)) tangental_vector = tangental_vector/norm2(tangental_vector)
+                    normal_force = -k*wall_overlap_distances(patch_id, i)*normal_vector - eta*normal_velocity
+                    tangental_force = -ib_coefficient_of_friction*norm2(normal_force)*tangental_vector
+                    call s_cross_product(normal_vector*patch_ib(patch_id)%radius, tangental_force, torque)
 
                     do l = 1, num_dims
                         $:GPU_ATOMIC(atomic='update')
@@ -219,158 +215,120 @@ contains
     end subroutine s_apply_wall_collision_forces_soft_sphere
 
     !> uses ghost-point/image-point information to determine if it is possible if two IBs are colliding, effectively an optimized nearest neighbor search
-    subroutine s_detect_ib_collisions(gps, ib_markers, collision_lookup, num_gps, num_considered_collisions)
+    subroutine s_detect_ib_collisions(gps, ib_markers, num_gps, num_considered_collisions)
 
-      type(ghost_point), dimension(num_gps), intent(in) :: gps
-      type(integer_field), intent(in) :: ib_markers
-      integer, intent(in) :: num_gps
-      integer, dimension(num_ibs * (num_ibs-1) / 2, 2), intent(out) :: collision_lookup
-      integer, intent(out) :: num_considered_collisions
+        type(ghost_point), dimension(num_gps), intent(in) :: gps
+        type(integer_field), intent(in) :: ib_markers
+        integer, intent(in) :: num_gps
+        integer, intent(out) :: num_considered_collisions
 
-      integer :: i, j, k, l, col_idx_1, col_idx_2
-      integer gp_idx, gp_patch_id, ip_patch_id
-      integer :: max_pairs, pair_idx, out_idx
-      logical :: already_found
+        integer :: i, j, k, z_bound, ii, jj, kk
+        integer gp_idx, gp_patch_id, neighbor_patch_id
+        integer :: pair_idx, out_idx
+        logical :: already_found
 
-      ! Temporary array to hold all detected pairs (with potential duplicates)
-      integer, dimension(num_gps, 2) :: raw_pairs
-      integer :: num_raw, local_num_raw
+        ! Temporary array to hold all detected pairs (with potential duplicates)
+        integer, dimension(num_gps, 2) :: raw_pairs
+        integer :: num_raw, local_num_raw
 
-      max_pairs = num_ibs * (num_ibs - 1) / 2
-      num_raw = 0
+        num_raw = 0
+        z_bound = 0; if (num_dims == 3) z_bound = 1
 
-      $:GPU_UPDATE(host='[ib_markers%sf]')
+        $:GPU_UPDATE(host='[ib_markers%sf]')
 
-      ! $:GPU_PARALLEL_LOOP(private='[gp_idx,gp_patch_id,local_num_raw,i,j,k,l,already_found,ip_patch_id]', copy='[raw_pairs,num_raw]')
-      do gp_idx = 1, num_gps
-          gp_patch_id = gps(gp_idx)%ib_patch_id
-          i = gps(gp_idx)%loc(1)
-          j = gps(gp_idx)%loc(2)
-          k = 0; if (num_dims == 3) k = gps(gp_idx)%loc(3)
+        $:GPU_PARALLEL_LOOP(private='[gp_idx,gp_patch_id,neighbor_patch_id,local_num_raw,i,j,k,ii,jj,kk]', copy='[raw_pairs,num_raw]', copyin='[z_bound]')
+        do gp_idx = 1, num_gps
+            gp_patch_id = gps(gp_idx)%ib_patch_id
+            i = gps(gp_idx)%loc(1)
+            j = gps(gp_idx)%loc(2)
+            k = 0; if (num_dims == 3) k = gps(gp_idx)%loc(3)
 
-          already_found = .false.
+            ! search in a cube around the BG for Ib markers belonging to another patch
+            neighbor_search: do ii = i - 1, i + 1, 2
+                do jj = j - 1, j + 1, 2
+                    do kk = k - z_bound, k + z_bound, 2
+                        neighbor_patch_id = ib_markers%sf(ii, jj, kk)
 
-          ! look in x
-          do l = -1, 1, 2  
-              ip_patch_id = ib_markers%sf(i+l, j, k)
+                        ! If any neighbors are of a different/higher marker value, we consider it for possible collision
+                        if (gp_patch_id < neighbor_patch_id) then
+                            $:GPU_ATOMIC(atomic='capture')
+                            num_raw = num_raw + 1
+                            local_num_raw = num_raw
+                            $:END_GPU_ATOMIC_CAPTURE()
 
-              ! Pass 1: Collect all candidate pairs (may contain duplicates)
-              if (gp_patch_id < ip_patch_id) then
-                  $:GPU_ATOMIC(atomic='capture')
-                  num_raw = num_raw + 1
-                  local_num_raw = num_raw
-                  $:END_GPU_ATOMIC_CAPTURE()
+                            ! Store with smaller ID first for consistent ordering
+                            raw_pairs(local_num_raw, 1) = gp_patch_id
+                            raw_pairs(local_num_raw, 2) = neighbor_patch_id
+                            exit neighbor_search
+                        end if
+                    end do
+                end do
+            end do neighbor_search
+        end do
+        $:END_GPU_PARALLEL_LOOP()
 
-                  ! Store with smaller ID first for consistent ordering
-                  raw_pairs(local_num_raw, 1) = gp_patch_id
-                  raw_pairs(local_num_raw, 2) = ip_patch_id
-                  already_found = .true.
-              end if
-          end do
+        ! Coalesce collisions unique pairs
+        num_considered_collisions = 0
+        collision_lookup = 0
+        ! for each pair found in the raw collection...
+        do pair_idx = 1, num_raw
+            already_found = .false.
+            ! ... check if it is already in the list ...
+            do out_idx = 1, num_considered_collisions
+                if (collision_lookup(out_idx, 1) == raw_pairs(pair_idx, 1) .and. &
+                    collision_lookup(out_idx, 2) == raw_pairs(pair_idx, 2)) then
+                    already_found = .true.
+                    exit
+                end if
+            end do
 
-          ! look in y
-          if (.not. already_found) then
-              do l = -1, 1, 2  
-                  ip_patch_id = ib_markers%sf(i, j+l, k)
-
-                  ! Pass 1: Collect all candidate pairs (may contain duplicates)
-                  if (gp_patch_id < ip_patch_id) then
-                      $:GPU_ATOMIC(atomic='capture')
-                      num_raw = num_raw + 1
-                      local_num_raw = num_raw
-                      $:END_GPU_ATOMIC_CAPTURE()
-
-                      ! Store with smaller ID first for consistent ordering
-                      raw_pairs(local_num_raw, 1) = gp_patch_id
-                      raw_pairs(local_num_raw, 2) = ip_patch_id
-                      already_found = .true.
-                  end if
-              end do
-          end if
-
-          ! look in z
-          if (num_dims == 3 .and. (.not. already_found)) then
-              do l = -1, 1, 2  
-                  ip_patch_id = ib_markers%sf(i, j, k+l)
-
-                  ! Pass 1: Collect all candidate pairs (may contain duplicates)
-                  if (gp_patch_id < ip_patch_id) then
-                      $:GPU_ATOMIC(atomic='capture')
-                      num_raw = num_raw + 1
-                      local_num_raw = num_raw
-                      $:END_GPU_ATOMIC_CAPTURE()
-
-                      ! Store with smaller ID first for consistent ordering
-                      raw_pairs(local_num_raw, 1) = gp_patch_id
-                      raw_pairs(local_num_raw, 2) = ip_patch_id
-                      already_found = .true.
-                  end if
-              end do
-          end if
-
-      end do
-      ! $:END_GPU_PARALLEL_LOOP()
-
-      ! Pass 2: Coalesce into unique pairs
-      num_considered_collisions = 0
-      collision_lookup = 0
-      do pair_idx = 1, num_raw
-        already_found = .false.
-        do out_idx = 1, num_considered_collisions
-            if (collision_lookup(out_idx, 1) == raw_pairs(pair_idx, 1) .and. &
-                collision_lookup(out_idx, 2) == raw_pairs(pair_idx, 2)) then
-                already_found = .true.
-                exit
+            ! ... and if it is not, append it to the list of pairs
+            if (.not. already_found) then
+                num_considered_collisions = num_considered_collisions + 1
+                collision_lookup(num_considered_collisions, 1) = raw_pairs(pair_idx, 1)
+                collision_lookup(num_considered_collisions, 2) = raw_pairs(pair_idx, 2)
             end if
         end do
-
-        if (.not. already_found) then
-            num_considered_collisions = num_considered_collisions + 1
-            collision_lookup(num_considered_collisions, 1) = raw_pairs(pair_idx, 1)
-            collision_lookup(num_considered_collisions, 2) = raw_pairs(pair_idx, 2)
-        end if
-    end do
-    $:GPU_UPDATE(device='[collision_lookup]')
+        $:GPU_UPDATE(device='[collision_lookup]')
 
     end subroutine s_detect_ib_collisions
 
     subroutine s_detect_ib_collisions_n2(num_considered_collisions)
 
-      ! integer, dimension(num_ibs * (num_ibs-1) / 2, 2), intent(out) :: collision_lookup
-      integer, intent(out) :: num_considered_collisions
+        integer, intent(out) :: num_considered_collisions
 
-      integer :: pid1, pid2, current_collisions
-      real(wp), dimension(3) :: centroid_1, centroid_2, distance_vec
+        integer :: pid1, pid2, current_collisions
+        real(wp), dimension(3) :: centroid_1, centroid_2, distance_vec
 
-      num_considered_collisions = 0
+        num_considered_collisions = 0
 
-      $:GPU_PARALLEL_LOOP(private='[pid1,pid2,centroid_1,centroid_2,distance_vec, current_collisions]', copy='[num_considered_collisions]')
-      do pid1 = 1, num_ibs-1
-        do pid2 = pid1+1, num_ibs
-          centroid_1 = [patch_ib(pid1)%x_centroid, patch_ib(pid1)%y_centroid, 0._wp]
-          centroid_2 = [patch_ib(pid2)%x_centroid, patch_ib(pid2)%y_centroid, 0._wp]
-          if (num_dims == 3) then
-              centroid_1(3) = patch_ib(pid1)%z_centroid
-              centroid_2(3) = patch_ib(pid2)%z_centroid
-          end if
-          distance_vec = centroid_2 - centroid_1
+        $:GPU_PARALLEL_LOOP(private='[pid1,pid2,centroid_1,centroid_2,distance_vec, current_collisions]', copy='[num_considered_collisions]')
+        do pid1 = 1, num_ibs - 1
+            do pid2 = pid1 + 1, num_ibs
+                centroid_1 = [patch_ib(pid1)%x_centroid, patch_ib(pid1)%y_centroid, 0._wp]
+                centroid_2 = [patch_ib(pid2)%x_centroid, patch_ib(pid2)%y_centroid, 0._wp]
+                if (num_dims == 3) then
+                    centroid_1(3) = patch_ib(pid1)%z_centroid
+                    centroid_2(3) = patch_ib(pid2)%z_centroid
+                end if
+                distance_vec = centroid_2 - centroid_1
 
-          if (norm2(distance_vec) < patch_ib(pid1)%radius + patch_ib(pid2)%radius) then
-              $:GPU_ATOMIC(atomic='capture')
-              num_considered_collisions = num_considered_collisions + 1
-              current_collisions = num_considered_collisions
-              $:END_GPU_ATOMIC_CAPTURE()
+                if (norm2(distance_vec) < patch_ib(pid1)%radius + patch_ib(pid2)%radius) then
+                    $:GPU_ATOMIC(atomic='capture')
+                    num_considered_collisions = num_considered_collisions + 1
+                    current_collisions = num_considered_collisions
+                    $:END_GPU_ATOMIC_CAPTURE()
 
-              collision_lookup(current_collisions, 1) = pid1
-              collision_lookup(current_collisions, 2) = pid2
-          end if
+                    collision_lookup(current_collisions, 1) = pid1
+                    collision_lookup(current_collisions, 2) = pid2
+                end if
+            end do
         end do
-      end do
-      $:END_GPU_PARALLEL_LOOP()
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_detect_ib_collisions_n2
 
-    !> @brief uses boundary conditions and particle lcoations to check for wall conditions
+    !> @brief uses boundary conditions and particle locations to check for wall conditions
     subroutine s_detect_wall_collisions(gps, overlap_distances, num_gps)
 
         type(ghost_point), dimension(num_gps), intent(in) :: gps
@@ -450,27 +408,32 @@ contains
         real(wp), dimension(3), intent(in) :: collision_location
         logical :: owns_collision
 
+        real(wp), dimension(3) :: projected_location
+
         #:if defined('MFC_MPI')
             if (num_procs == 1) then
                 owns_collision = .true.
             else
+                projected_location(:) = collision_location(:)
+
                 ! catch the edge case where th collision lies just outside the computational domain
                 #:for X, ID in [('x', 1), ('y', 2), ('z', 3)]
                     if (num_dims >= ${ID}$) then
                         if (bc_${X}$%beg /= BC_PERIODIC) then
-                            if (collision_location(${ID}$) < ${X}$_domain%beg &
-                              .or. ${X}$_domain%end < collision_location(${ID}$)) then
-                                  owns_collision = .true.
-                                  return
-                              end if
+                            ! if it is outside the domain in one direction, project it somewhere inside so at least one rank owns it
+                            if (collision_location(${ID}$) < ${X}$_domain%beg) then
+                                projected_location(${ID}$) = ${X}$_domain%beg
+                            else if (${X}$_domain%end < collision_location(${ID}$)) then
+                                projected_location(${ID}$) = ${X}$_domain%end - 1.0e-10
+                            end if
                         end if
                     end if
                 #:endfor
 
-                ! the object that contains the collision lcoation owns the collisions
-                owns_collision = x_cb(-1) <= collision_location(1) .and. collision_location(1) < x_cb(m)
-                owns_collision = owns_collision .and. y_cb(-1) <= collision_location(2) .and. collision_location(2) < y_cb(n)
-                if (num_dims == 3) owns_collision = owns_collision .and. z_cb(-1) <= collision_location(3) .and. collision_location(3) < z_cb(p)
+                ! the object that contains the collision location owns the collisions
+                owns_collision = x_cb(-1) <= projected_location(1) .and. projected_location(1) < x_cb(m)
+                owns_collision = owns_collision .and. y_cb(-1) <= projected_location(2) .and. projected_location(2) < y_cb(n)
+                if (num_dims == 3) owns_collision = owns_collision .and. z_cb(-1) <= projected_location(3) .and. projected_location(3) < z_cb(p)
             end if
         #:else
             owns_collision = .true.
