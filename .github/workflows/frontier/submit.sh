@@ -25,6 +25,13 @@ else
     exit 1
 fi
 
+# Detect job type from submitted script basename
+script_basename="$(basename "$1" .sh)"
+case "$script_basename" in
+    bench*) job_type="bench" ;;
+    *)      job_type="test"  ;;
+esac
+
 if [ "$2" = "cpu" ]; then
     sbatch_device_opts="\
 #SBATCH -n 32                       # Number of cores required"
@@ -37,10 +44,17 @@ else
 fi
 
 # Select SBATCH params based on job type
-sbatch_account="#SBATCH -A CFD154"
-sbatch_time="#SBATCH -t 01:59:00"
-sbatch_partition="#SBATCH -p batch"
-sbatch_extra="#SBATCH --qos=normal"
+if [ "$job_type" = "bench" ]; then
+    sbatch_account="#SBATCH -A CFD154"
+    sbatch_time="#SBATCH -t 01:59:00"
+    sbatch_partition="#SBATCH -p batch"
+    sbatch_extra="#SBATCH --qos=normal"
+else
+    sbatch_account="#SBATCH -A CFD154"
+    sbatch_time="#SBATCH -t 01:59:00"
+    sbatch_partition="#SBATCH -p batch"
+    sbatch_extra="#SBATCH --qos=normal"
+fi
 
 shard_suffix=""
 if [ -n "$4" ]; then

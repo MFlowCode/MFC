@@ -22,7 +22,7 @@ fi
 rm -rf build
 
 source .github/scripts/retry-build.sh
-retry_build ./mfc.sh build -j $n_jobs $build_opts || exit 1
+RETRY_CLEAN_CMD="./mfc.sh clean" retry_build ./mfc.sh build -j $n_jobs $build_opts || exit 1
 
 ./mfc.sh bench $bench_opts -j $n_jobs -o "$job_slug.yaml" -- -c phoenix-bench $device_opts -n $n_ranks
 
