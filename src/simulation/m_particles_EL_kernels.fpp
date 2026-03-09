@@ -22,33 +22,6 @@ module m_particles_EL_kernels
 
 contains
 
-    ! !> The purpose of this subroutine is to smear the strength of the lagrangian
-    !         !!      particles into the Eulerian framework using a gaussian approach.
-    !         !! @param nParticles Number of lagrangian particles in the current domain
-    !         !! @param lbk_rad Radius of the particles
-    !         !! @param lbk_s Computational coordinates of the particles
-    !         !! @param lbk_pos Spatial coordinates of the particles
-    !         !! @param updatedvar Eulerian variable to be updated
-    !         !! @param lbk_f_p Forces on the particles
-    ! subroutine s_smoothfunction(nParticles, lbk_rad, lbk_vel, lbk_s, lbk_pos, lbk_f_p, lbk_g_sum, updatedvar, kcomp, lbk_linked_list, lbk_particle_head)
-
-    !     integer, intent(in) :: nParticles
-    !     real(wp), dimension(1:lag_params%nParticles_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_pos, lbk_vel
-    !     real(wp), dimension(1:lag_params%nParticles_glb, 1:2), intent(in) :: lbk_rad
-    !     real(wp), dimension(1:lag_params%nParticles_glb, 1:3), intent(in) :: lbk_f_p
-    !     real(wp), dimension(1:lag_params%nParticles_glb), intent(inout) :: lbk_g_sum
-
-    !     integer, dimension(1:lag_params%nParticles_glb), intent(in) :: lbk_linked_list
-    !     integer, dimension(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end), intent(in) :: lbk_particle_head
-
-    !     type(scalar_field), dimension(:), intent(inout) :: updatedvar
-    !     type(scalar_field), dimension(:), intent(inout) :: kcomp
-
-    !     ! call s_gaussian(nParticles, lbk_rad, lbk_s, lbk_pos, lbk_vel, updatedvar, lbk_f_p, ngh)
-    !     call s_gaussian(nParticles, lbk_rad, lbk_vel, lbk_s, lbk_pos, lbk_f_p, lbk_g_sum, updatedvar, kcomp, lbk_linked_list, lbk_particle_head)
-
-    ! end subroutine s_smoothfunction
-
     ! !> The purpose of this subroutine is to compute each particles total contribution to the gaussian for proper normalization
     subroutine s_compute_gaussian_contribution(rad, pos, cell, func_s)
         $:GPU_ROUTINE(function_name='s_compute_gaussian_contribution',parallelism='[seq]', &
@@ -79,8 +52,13 @@ contains
         di_end = ip + mapCells_loc
         dj_beg = jp - mapCells_loc
         dj_end = jp + mapCells_loc
-        dk_beg = kp - mapCells_loc
-        dk_end = kp + mapCells_loc
+        dk_beg = kp
+        dk_end = kp
+
+        if (num_dims == 3) then
+            dk_beg = kp - mapCells_loc
+            dk_end = kp + mapCells_loc
+        end if
 
         func_s = 0._wp
         do dk = dk_beg, dk_end
@@ -101,7 +79,7 @@ contains
                     if (p > 0) center(3) = pos(3)
 
                     Vol_loc = dx(cellijk(1))*dy(cellijk(2))
-                    if (num_dims == 3) Vol_loc = Vol_loc*dz(cellijk(3))
+                    if (num_dims == 3) Vol_loc = dx(cellijk(1))*dy(cellijk(2))*dz(cellijk(3))
 
                     call s_applygaussian(center, cellijk, nodecoord, stddsv, 0._wp, func)
 
@@ -112,175 +90,148 @@ contains
 
     end subroutine s_compute_gaussian_contribution
 
-    !> Cell-centric gaussian smearing using the cell list (no GPU atomics).
-    !!      Each grid cell accumulates contributions from nearby particles looked up
-    !!      via cell_list_start/count/idx.
-    ! nParticles, lbk_rad, lbk_s, lbk_pos, lbk_vel, updatedvar, lbk_f_p)
-    subroutine s_gaussian(nParticles, lbk_rad, lbk_vel, lbk_s, lbk_pos, lbk_f_p, lbk_g_sum, updatedvar, kcomp, lbk_linked_list, lbk_particle_head)
+    !> The purpose of this subroutine is to compute the gaussian smearing of particle volume fraction and source terms with atomic cell updates
+    subroutine s_gaussian_atomic(rad, vel, pos, force_p, gauSum, cell, updatedvar, onlyBeta)
+        $:GPU_ROUTINE(function_name='s_gaussian_atomic',parallelism='[seq]', &
+            & cray_inline=True)
 
-        integer, intent(in) :: nParticles
-        real(wp), dimension(1:lag_params%nParticles_glb, 1:3, 1:2), intent(in) :: lbk_s, lbk_pos, lbk_vel
-        real(wp), dimension(1:lag_params%nParticles_glb, 1:2), intent(in) :: lbk_rad
-        real(wp), dimension(1:lag_params%nParticles_glb, 1:3), intent(in) :: lbk_f_p
-        real(wp), dimension(1:lag_params%nParticles_glb), intent(inout) :: lbk_g_sum
-
-        integer, dimension(1:lag_params%nParticles_glb), intent(in) :: lbk_linked_list
-        integer, dimension(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end), intent(in) :: lbk_particle_head
-
+        real(wp), intent(in) :: rad, gauSum
+        real(wp), intent(in), dimension(3) :: pos, vel, force_p
+        integer, intent(in), dimension(3) :: cell
         type(scalar_field), dimension(:), intent(inout) :: updatedvar
-        type(scalar_field), dimension(:), intent(inout) :: kcomp
 
-        real(wp), dimension(3) :: center, nodecoord, s_coord
-        integer, dimension(3) :: cell, cellijk
-        real(wp) :: stddsv, volpart, Vol_loc
-        real(wp) :: strength_vel, strength_vol
-        real(wp) :: func
-        real(wp) :: y_kahan, t_kahan
+        real(wp) :: volpart, stddsv, Vol_loc, func, weight
         real(wp) :: fp_x, fp_y, fp_z, vp_x, vp_y, vp_z
-        integer :: l, i, j, k, di, dj, dk, lb, part_idx
-        integer :: di_beg, di_end, dj_beg, dj_end, dk_beg, dk_end
-        integer :: smear_x_beg, smear_x_end
-        integer :: smear_y_beg, smear_y_end
-        integer :: smear_z_beg, smear_z_end
-        integer :: mapCells_loc
+        real(wp) :: addFun_alphap, addFun_alphap_vp_x, addFun_alphap_vp_y, addFun_alphap_vp_z
+        real(wp) :: addFun2_x, addFun2_y, addFun2_z, addFun_E
+        real(wp), dimension(3) :: nodecoord, center
+
+        integer :: ip, jp, kp, di, dj, dk, di_beg, di_end, dj_beg, dj_end, dk_beg, dk_end, mapCells_loc
+        integer, dimension(3) :: cellijk
+        logical, intent(in) :: onlyBeta
 
         mapCells_loc = 1
 
-        smear_x_beg = -mapCells_loc
-        smear_x_end = m + mapCells_loc
-        smear_y_beg = merge(-mapCells_loc, 0, n > 0)
-        smear_y_end = merge(n + mapCells_loc, n, n > 0)
-        smear_z_beg = merge(-mapCells_loc, 0, p > 0)
-        smear_z_end = merge(p + mapCells_loc, p, p > 0)
+        volpart = (4._wp/3._wp)*pi*rad**3
 
-        $:GPU_PARALLEL_LOOP(collapse=3, &
-            & private='[i,j,k,di,dj,dk,lb,part_idx,center,nodecoord,s_coord,cell,cellijk,stddsv,volpart,strength_vol,fp_x,fp_y,fp_z,vp_x,vp_y,vp_z,func,y_kahan,t_kahan,di_beg,di_end,dj_beg,dj_end,dk_beg,dk_end]', &
-            & copyin='[smear_x_beg,smear_x_end,smear_y_beg,smear_y_end,smear_z_beg,smear_z_end]')
-        do k = smear_z_beg, smear_z_end
-            do j = smear_y_beg, smear_y_end
-                do i = smear_x_beg, smear_x_end
+        call s_compute_stddsv(cell, volpart, stddsv)
 
-                    cellijk(1) = i
-                    cellijk(2) = j
-                    cellijk(3) = k
+        ip = cell(1)
+        jp = cell(2)
+        kp = cell(3)
 
-                    nodecoord(1) = x_cc(i)
-                    nodecoord(2) = y_cc(j)
+        di_beg = ip - mapCells_loc
+        di_end = ip + mapCells_loc
+        dj_beg = jp - mapCells_loc
+        dj_end = jp + mapCells_loc
+        dk_beg = kp
+        dk_end = kp
+
+        if (num_dims == 3) then
+            dk_beg = kp - mapCells_loc
+            dk_end = kp + mapCells_loc
+        end if
+
+        fp_x = -force_p(1)
+        fp_y = -force_p(2)
+        fp_z = -force_p(3)
+
+        vp_x = vel(1)
+        vp_y = vel(2)
+        vp_z = vel(3)
+
+        center(1:2) = pos(1:2)
+        center(3) = 0._wp
+        if (p > 0) center(3) = pos(3)
+
+        do dk = dk_beg, dk_end
+            do dj = dj_beg, dj_end
+                do di = di_beg, di_end
+
+                    nodecoord(1) = x_cc(di)
+                    nodecoord(2) = y_cc(dj)
                     nodecoord(3) = 0._wp
-                    if (p > 0) nodecoord(3) = z_cc(k)
+                    if (p > 0) nodecoord(3) = z_cc(dk)
 
-                    ! Neighbor cell range clamped to interior [0:m, 0:n, 0:p]
-                    di_beg = max(i - mapCells_loc, 0)
-                    di_end = min(i + mapCells_loc, m)
-                    dj_beg = max(j - mapCells_loc, 0)
-                    dj_end = min(j + mapCells_loc, n)
-                    dk_beg = max(k - mapCells_loc, 0)
-                    dk_end = min(k + mapCells_loc, p)
+                    cellijk(1) = di
+                    cellijk(2) = dj
+                    cellijk(3) = dk
 
-                    $:GPU_LOOP(parallelism='[seq]')
-                    do dk = dk_beg, dk_end
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do dj = dj_beg, dj_end
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do di = di_beg, di_end
+                    Vol_loc = dx(cellijk(1))*dy(cellijk(2))
+                    if (num_dims == 3) Vol_loc = Vol_loc*dz(cellijk(3))
 
-                                part_idx = lbk_particle_head(di, dj, dk)
+                    call s_applygaussian(center, cellijk, nodecoord, stddsv, 0._wp, func)
 
-                                do while (part_idx /= -1)
+                    weight = func/gauSum
 
-                                    ! do lb = cell_list_start(di, dj, dk), &
-                                    ! cell_list_start(di, dj, dk) + cell_list_count(di, dj, dk) - 1
+                    addFun_alphap = weight*volpart
+                    $:GPU_ATOMIC(atomic='update')
+                    updatedvar(1)%sf(cellijk(1), cellijk(2), cellijk(3)) = &
+                        updatedvar(1)%sf(cellijk(1), cellijk(2), cellijk(3)) &
+                        + real(addFun_alphap, kind=stp)
 
-                                    ! Particle properties
-                                    volpart = 4._wp/3._wp*pi*lbk_rad(part_idx, 2)**3._wp
-                                    s_coord(1:3) = lbk_s(part_idx, 1:3, 2)
-                                    call s_get_cell(s_coord, cell)
+                    if (lag_params%solver_approach == 2 .and. .not. onlyBeta) then
 
-                                    fp_x = -lbk_f_p(part_idx, 1)
-                                    fp_y = -lbk_f_p(part_idx, 2)
-                                    fp_z = -lbk_f_p(part_idx, 3)
+                        !Update particle momentum field(x)
+                        addFun_alphap_vp_x = weight*volpart*vp_x
+                        $:GPU_ATOMIC(atomic='update')
+                        updatedvar(2)%sf(cellijk(1), cellijk(2), cellijk(3)) = &
+                            updatedvar(2)%sf(cellijk(1), cellijk(2), cellijk(3)) &
+                            + real(addFun_alphap_vp_x, kind=stp)
 
-                                    vp_x = lbk_vel(part_idx, 1, 2)
-                                    vp_y = lbk_vel(part_idx, 2, 2)
-                                    vp_z = lbk_vel(part_idx, 3, 2)
+                        !Update particle momentum field(y)
+                        addFun_alphap_vp_y = weight*volpart*vp_y
+                        $:GPU_ATOMIC(atomic='update')
+                        updatedvar(3)%sf(cellijk(1), cellijk(2), cellijk(3)) = &
+                            updatedvar(3)%sf(cellijk(1), cellijk(2), cellijk(3)) &
+                            + real(addFun_alphap_vp_y, kind=stp)
 
-                                    call s_compute_stddsv(cell, volpart, stddsv)
+                        if (num_dims == 3) then
+                            !Update particle momentum field(z)
+                            addFun_alphap_vp_z = weight*volpart*vp_z
+                            $:GPU_ATOMIC(atomic='update')
+                            updatedvar(4)%sf(cellijk(1), cellijk(2), cellijk(3)) = &
+                                updatedvar(4)%sf(cellijk(1), cellijk(2), cellijk(3)) &
+                                + real(addFun_alphap_vp_z, kind=stp)
+                        end if
 
-                                    strength_vol = volpart
-                                    ! strength_vel = 4._wp*pi*lbk_rad(part_idx, 2)**2._wp*lbk_vel(part_idx, 2)
+                        !Update x-momentum source term
+                        addFun2_x = weight*fp_x
+                        $:GPU_ATOMIC(atomic='update')
+                        updatedvar(5)%sf(cellijk(1), cellijk(2), cellijk(3)) = &
+                            updatedvar(5)%sf(cellijk(1), cellijk(2), cellijk(3)) &
+                            + real(addFun2_x, kind=stp)
 
-                                    center(1:2) = lbk_pos(part_idx, 1:2, 2)
-                                    center(3) = 0._wp
-                                    if (p > 0) center(3) = lbk_pos(part_idx, 3, 2)
+                        !Update y-momentum source term
+                        addFun2_y = weight*fp_y
+                        $:GPU_ATOMIC(atomic='update')
+                        updatedvar(6)%sf(cellijk(1), cellijk(2), cellijk(3)) = &
+                            updatedvar(6)%sf(cellijk(1), cellijk(2), cellijk(3)) &
+                            + real(addFun2_y, kind=stp)
 
-                                    call s_applygaussian(center, cellijk, nodecoord, stddsv, 0._wp, func)
+                        if (num_dims == 3) then
+                            !Update z-momentum source term
+                            addFun2_z = weight*fp_z
+                            $:GPU_ATOMIC(atomic='update')
+                            updatedvar(7)%sf(cellijk(1), cellijk(2), cellijk(3)) = &
+                                updatedvar(7)%sf(cellijk(1), cellijk(2), cellijk(3)) &
+                                + real(addFun2_z, kind=stp)
+                        end if
 
-                                    func = func/lbk_g_sum(part_idx)
+                        !Update energy source term
+                        addFun_E = 0._wp
+                        $:GPU_ATOMIC(atomic='update')
+                        updatedvar(8)%sf(cellijk(1), cellijk(2), cellijk(3)) = &
+                            updatedvar(8)%sf(cellijk(1), cellijk(2), cellijk(3)) &
+                            + real(addFun_E, kind=stp)
 
-                                    ! Kahan summation for void fraction
-                                    y_kahan = real(func*strength_vol, kind=wp) - kcomp(1)%sf(i, j, k)
-                                    t_kahan = updatedvar(1)%sf(i, j, k) + y_kahan
-                                    kcomp(1)%sf(i, j, k) = (t_kahan - updatedvar(1)%sf(i, j, k)) - y_kahan
-                                    updatedvar(1)%sf(i, j, k) = t_kahan
-
-                                    if (lag_params%solver_approach == 2) then
-
-                                        ! Kahan summation for alpha_p vp_x
-                                        y_kahan = real(func*strength_vol*vp_x, kind=wp) - kcomp(2)%sf(i, j, k)
-                                        t_kahan = updatedvar(2)%sf(i, j, k) + y_kahan
-                                        kcomp(2)%sf(i, j, k) = (t_kahan - updatedvar(2)%sf(i, j, k)) - y_kahan
-                                        updatedvar(2)%sf(i, j, k) = t_kahan
-
-                                        ! Kahan summation for alpha_p vp_y
-                                        y_kahan = real(func*strength_vol*vp_y, kind=wp) - kcomp(3)%sf(i, j, k)
-                                        t_kahan = updatedvar(3)%sf(i, j, k) + y_kahan
-                                        kcomp(3)%sf(i, j, k) = (t_kahan - updatedvar(3)%sf(i, j, k)) - y_kahan
-                                        updatedvar(3)%sf(i, j, k) = t_kahan
-
-                                        ! Kahan summation for alpha_p vp_z
-                                        y_kahan = real(func*strength_vol*vp_z, kind=wp) - kcomp(4)%sf(i, j, k)
-                                        t_kahan = updatedvar(4)%sf(i, j, k) + y_kahan
-                                        kcomp(4)%sf(i, j, k) = (t_kahan - updatedvar(4)%sf(i, j, k)) - y_kahan
-                                        updatedvar(4)%sf(i, j, k) = t_kahan
-
-                                        ! Kahan summation for fp_x
-                                        y_kahan = real(func*fp_x, kind=wp) - kcomp(5)%sf(i, j, k)
-                                        t_kahan = updatedvar(5)%sf(i, j, k) + y_kahan
-                                        kcomp(5)%sf(i, j, k) = (t_kahan - updatedvar(5)%sf(i, j, k)) - y_kahan
-                                        updatedvar(5)%sf(i, j, k) = t_kahan
-
-                                        ! Kahan summation for fp_y
-                                        y_kahan = real(func*fp_y, kind=wp) - kcomp(6)%sf(i, j, k)
-                                        t_kahan = updatedvar(6)%sf(i, j, k) + y_kahan
-                                        kcomp(6)%sf(i, j, k) = (t_kahan - updatedvar(6)%sf(i, j, k)) - y_kahan
-                                        updatedvar(6)%sf(i, j, k) = t_kahan
-
-                                        ! Kahan summation for fp_z
-                                        y_kahan = real(func*fp_z, kind=wp) - kcomp(7)%sf(i, j, k)
-                                        t_kahan = updatedvar(7)%sf(i, j, k) + y_kahan
-                                        kcomp(7)%sf(i, j, k) = (t_kahan - updatedvar(7)%sf(i, j, k)) - y_kahan
-                                        updatedvar(7)%sf(i, j, k) = t_kahan
-
-                                        ! Kahan summation for E_source
-                                        y_kahan = real(func*0._wp, kind=wp) - kcomp(8)%sf(i, j, k)
-                                        t_kahan = updatedvar(8)%sf(i, j, k) + y_kahan
-                                        kcomp(8)%sf(i, j, k) = (t_kahan - updatedvar(8)%sf(i, j, k)) - y_kahan
-                                        updatedvar(8)%sf(i, j, k) = t_kahan
-
-                                    end if
-
-                                    part_idx = lbk_linked_list(part_idx)
-                                end do
-                            end do
-                        end do
-                    end do
+                    end if
 
                 end do
             end do
         end do
-        $:END_GPU_PARALLEL_LOOP()
 
-    end subroutine s_gaussian
+    end subroutine s_gaussian_atomic
 
     !> The purpose of this subroutine is to apply the gaussian kernel function for each particle (Maeda and Colonius, 2018)).
     subroutine s_applygaussian(center, cellaux, nodecoord, stddsv, strength_idx, func)
@@ -343,9 +294,9 @@ contains
 
     end subroutine s_applygaussian
 
-    !> Calculates the standard deviation of the bubble being smeared in the Eulerian framework.
-            !! @param cell Cell where the bubble is located
-            !! @param volpart Volume of the bubble
+    !> Calculates the standard deviation of the particle being smeared in the Eulerian framework.
+            !! @param cell Cell where the particle is located
+            !! @param volpart Volume of the particle
             !! @param stddsv Standard deviaton
     subroutine s_compute_stddsv(cell, volpart, stddsv)
         $:GPU_ROUTINE(function_name='s_compute_stddsv',parallelism='[seq]', &
@@ -375,14 +326,6 @@ contains
 
         rad = (3._wp*volpart/(4._wp*pi))**(1._wp/3._wp)
         stddsv = 1._wp*lag_params%epsilonb*max(chardist, rad)
-
-        ! !< Compute Standard deviaton
-        ! if ((volpart/charvol) > 0.5_wp*lag_params%valmaxvoid .or. (lag_params%smooth_type == 1)) then
-        !     rad = (3._wp*volpart/(4._wp*pi))**(1._wp/3._wp)
-        !     stddsv = 1._wp*lag_params%epsilonb*max(chardist, rad)
-        ! else
-        !     stddsv = 0._wp
-        ! end if
 
     end subroutine s_compute_stddsv
 

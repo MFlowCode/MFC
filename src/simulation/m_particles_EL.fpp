@@ -165,6 +165,11 @@ contains
         integer :: save_count
         real(wp) :: qtime
 
+        real(wp) :: myR, func_sum
+        real(wp), dimension(3) :: myPos, myVel, myForce
+        integer, dimension(3) :: cell
+        logical :: only_beta = .true.
+
         if (cfl_dt) then
             save_count = n_start
             qtime = n_start*t_save
@@ -364,6 +369,29 @@ contains
 
         call s_read_input_particles(q_cons_vf, bc_type)
 
+        call s_reset_cell_vars()
+
+        $:GPU_PARALLEL_LOOP(private='[k,cell,myR,myPos,myVel,myForce,func_sum]',copyin='[only_beta]')
+        do k = 1, n_el_particles_loc
+
+            cell = fd_number - buff_size
+            call s_locate_cell(particle_pos(k, 1:3, 1), cell, particle_s(k, 1:3, 1))
+
+            myR = particle_R0(k)
+            myPos = particle_pos(k, 1:3, 1)
+            myVel = particle_vel(k, 1:3, 1)
+            myForce = f_p(k, :)
+            !Compute the total gaussian contribution for each particle for normalization
+            call s_compute_gaussian_contribution(myR, myPos, cell, func_sum)
+            gSum(k) = func_sum
+
+            call s_gaussian_atomic(myR, myVel, myPos, myForce, func_sum, cell, q_particles, only_beta)
+
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        call s_finalize_beta_field(bc_type, only_beta)
+
         npts = (nWeights_interp - 1)/2
         call s_compute_barycentric_weights(npts) !For interpolation
 
@@ -501,7 +529,8 @@ contains
 
         !Populate temporal variables
         call s_transfer_data_to_tmp_particles()
-        call s_smear_particle_sources(bc_type, only_linked_list=.false.)
+
+        ! call s_smear_particle_sources(bc_type, only_linked_list=.false.)
 
         if (save_count == 0) then
             ! Create ./D directory
@@ -535,7 +564,7 @@ contains
         integer, dimension(3) :: cell
         real(wp), dimension(2) :: Re
         real(wp) :: massflag, heatflag, Re_trans, Im_trans, myR, func_sum
-        real(wp), dimension(3) :: myPos
+        real(wp), dimension(3) :: myPos, myVel
 
         massflag = 0._wp
         heatflag = 0._wp
@@ -584,17 +613,10 @@ contains
 
         ! Initial particle mass
         volparticle = 4._wp/3._wp*pi*particle_R0(part_id)**3 ! volume
-        ! gas_mv(particle_id, 1) = pv*volparticle*(1._wp/(R_v*Tw))*(massflag) ! vapermass
-        particle_mass(part_id) = volparticle*rho0ref_particle !(gas_p(particle_id, 1) - pv*(massflag))*volparticle*(1._wp/(R_n*Tw)) ! gasmass
+        particle_mass(part_id) = volparticle*rho0ref_particle ! mass
         if (particle_mass(part_id) <= 0._wp) then
             call s_mpi_abort("The initial particle mass is negative. Check the initial conditions.")
         end if
-
-        myR = particle_R0(part_id)
-        myPos = particle_pos(part_id, 1:3, 1)
-        !Compute the total gaussian contribution for each particle for normalization
-        call s_compute_gaussian_contribution(myR, myPos, cell, func_sum)
-        gSum(part_id) = func_sum
 
     end subroutine s_add_particles
 
@@ -782,6 +804,7 @@ contains
         integer, dimension(3) :: cell, cellijk
         real(wp) :: myMass, myR, myBeta_c, myBeta_t, myR0, myRe, myVolumeFrac, myGamma, rmass_add, func_sum
         real(wp), dimension(3) :: myVel, myPos, force_vec, s_cell
+        logical :: only_beta = .false.
 
         integer :: k, l, i, j
 
@@ -844,20 +867,17 @@ contains
 
         !> Compute Fluid-Particle Forces (drag/pressure/added mass) and convert to particle acceleration
         $:GPU_PARALLEL_LOOP(private='[k,l,cell,s_cell,myMass,myR,myR0,myPos,myVel,myVolumeFrac,force_vec,rmass_add,func_sum]',&
-        & copyin='[stage, myGamma, myRe]')
+        & copyin='[stage, myGamma, myRe, only_beta]')
         do k = 1, n_el_particles_loc
 
             f_p(k, :) = 0._wp
             p_owner_rank(k) = proc_rank
 
-            ! s_cell = particle_s(k, 1:3, 2)
-            ! cell = int(s_cell(:))
-            ! do i = 1, num_dims
-            !     if (s_cell(i) < 0._wp) cell(i) = cell(i) - 1
-            ! end do
-
-            cell = fd_number - buff_size
-            call s_locate_cell(particle_pos(k, 1:3, 2), cell, particle_s(k, 1:3, 2))
+            s_cell = particle_s(k, 1:3, 2)
+            cell = int(s_cell(:))
+            do i = 1, num_dims
+                if (s_cell(i) < 0._wp) cell(i) = cell(i) - 1
+            end do
 
             ! Current particle state
             myMass = particle_mass(k)
@@ -888,16 +908,16 @@ contains
                 end do
             end if
 
-            !Compute the total gaussian contribution for each particle for normalization
-            call s_compute_gaussian_contribution(myR, myPos, cell, func_sum)
-            gSum(k) = func_sum
+            if (lag_params%solver_approach == 2) then
+                func_sum = gSum(k)
+                call s_gaussian_atomic(myR, myVel, myPos, force_vec, func_sum, cell, q_particles, only_beta)
+            end if
 
         end do
         $:END_GPU_PARALLEL_LOOP()
 
         if (lag_params%solver_approach == 2) then
-            !To fill in q_particles with volume fraction and source term contributions. Only needed if fluid feels particles. Otherwise called after RK update for particles to have updated volume fraction.
-            call s_smear_particle_sources(bc_type, only_linked_list=.false.)
+            call s_finalize_beta_field(bc_type, only_beta)
         end if
 
         call nvtxStartRange("LAGRANGE-PARTICLE-COLLISIONS")
@@ -935,7 +955,7 @@ contains
         integer :: i, k, l, q, ip, jp, kp, ii, jj, kk
         logical :: celloutside
         real(wp) :: pidtksp2, ksp, nu1, nu2, Rp1, Rp2, E1, E2, Estar, cor, rmag, Rstar, dij, eta_n, kappa_n, mp1, mp2, dt_loc
-        real(wp), dimension(3) :: xp1, xp2, vp1, vp2, v_rel, rpij, nij, vnij, Fnpp_ij
+        real(wp), dimension(3) :: xp1, xp2, vp1, vp2, v_rel, rpij, nij, vnij, Fnpp_ij, force_vec
         integer :: kpz
         integer :: total_recv
         integer :: glb_id
@@ -980,11 +1000,11 @@ contains
         Estar = 1._wp/(((1._wp - nu1**2)/E1) + ((1._wp - nu2**2)/E2))
         Estar = (4._wp/3._wp)*Estar
 
-        call s_smear_particle_sources(bc_type, only_linked_list=.true.)
+        call s_reset_linked_list()
 
         call nvtxStartRange("LAGRANGE-PARTICLE-COLLISIONS")
 
-        $:GPU_PARALLEL_LOOP(private='[k,cell,ip,jp,kp,Rp1,xp1,mp1,vp1,kk,jj,ii,cellaux,q,Rp2,xp2,mp2,vp2,v_rel,Rstar,rpij,rmag,nij,vnij,dij,kappa_n,eta_n,Fnpp_ij]',&
+        $:GPU_PARALLEL_LOOP(private='[k,cell,ip,jp,kp,Rp1,xp1,mp1,vp1,kk,jj,ii,cellaux,q,Rp2,xp2,mp2,vp2,v_rel,Rstar,rpij,rmag,nij,vnij,dij,kappa_n,eta_n,Fnpp_ij,force_vec]',&
         & copyin='[ksp,nu1,nu2,E1,E2,cor,pidtksp2,Estar,kpz,dt_loc]')
         do k = 1, n_el_particles_loc
 
@@ -1070,9 +1090,16 @@ contains
 
                             end do
                         end if
+
                     end do
                 end do
             end do
+
+            !>Check each local particle for wall collisions
+
+            call s_compute_wall_collisions(xp1, vp1, Rp1, mp1, Estar, pidtksp2, cor, force_vec)
+            f_p(k, :) = f_p(k, :) + force_vec
+
         end do
         $:END_GPU_PARALLEL_LOOP()
 
@@ -1112,9 +1139,111 @@ contains
 
     end subroutine s_compute_particle_EL_collisions
 
-    !> This subroutine adds ghost particles for collision purposes
-        !! @param dest Destination for the bubble position update
-    impure subroutine s_add_ghost_particles()
+    !> This subroutine checks for particles at solid walls to compute a collision force
+    subroutine s_compute_wall_collisions(pos, vel, rad, mass, Es, pidtksp, core, wcol_force)
+        $:GPU_ROUTINE(function_name='s_compute_wall_collisions',parallelism='[seq]', &
+            & cray_inline=True)
+
+        real(wp), dimension(3), intent(in) :: pos, vel
+        real(wp), intent(in) :: rad, mass, Es, pidtksp, core
+        real(wp), dimension(3), intent(inout) :: wcol_force
+
+        real(wp) :: dij
+
+        wcol_force = 0._wp
+
+        ! Check for particles at solid boundaries
+        if (any(bc_x%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/))) then
+            dij = rad - (pos(1) - x_cb(-1))
+
+            if (dij > 0._wp) then
+                call s_compute_wall_collision_force(dij, vel, rad, mass, Es, pidtksp, core, 1, 1._wp, wcol_force)
+            end if
+        end if
+
+        if (any(bc_x%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/))) then
+
+            dij = rad - (x_cb(m) - pos(1))
+
+            if (dij > 0._wp) then
+                call s_compute_wall_collision_force(dij, vel, rad, mass, Es, pidtksp, core, 1, -1._wp, wcol_force)
+            end if
+        end if
+
+        if (any(bc_y%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/))) then
+
+            dij = rad - (pos(2) - y_cb(-1))
+
+            if (dij > 0._wp) then
+                call s_compute_wall_collision_force(dij, vel, rad, mass, Es, pidtksp, core, 2, 1._wp, wcol_force)
+            end if
+        end if
+
+        if (any(bc_y%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/))) then
+
+            dij = rad - (y_cb(n) - pos(2))
+
+            if (dij > 0._wp) then
+                call s_compute_wall_collision_force(dij, vel, rad, mass, Es, pidtksp, core, 2, -1._wp, wcol_force)
+            end if
+        end if
+
+        if (p > 0) then
+            if (any(bc_z%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/))) then
+
+                dij = rad - (pos(3) - z_cb(-1))
+
+                if (dij > 0._wp) then
+                    call s_compute_wall_collision_force(dij, vel, rad, mass, Es, pidtksp, core, 3, 1._wp, wcol_force)
+                end if
+            end if
+
+            if (any(bc_z%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/))) then
+
+                dij = rad - (z_cb(p) - pos(3))
+
+                if (dij > 0._wp) then
+                    call s_compute_wall_collision_force(dij, vel, rad, mass, Es, pidtksp, core, 3, -1._wp, wcol_force)
+                end if
+            end if
+
+        end if
+
+    end subroutine s_compute_wall_collisions
+
+    !> This subroutine computes the collision force with a solid wall
+    subroutine s_compute_wall_collision_force(dij, vel, rad, mass, Es, pidtksp, core, dir, normal, wcol_force)
+        $:GPU_ROUTINE(function_name='s_compute_wall_collision_force',parallelism='[seq]', &
+            & cray_inline=True)
+
+        real(wp), dimension(3), intent(in) :: vel
+        real(wp), intent(in) :: dij, rad, mass, Es, pidtksp, core, normal
+        integer, intent(in) :: dir
+        real(wp), dimension(3), intent(inout) :: wcol_force
+
+        real(wp), dimension(3) :: nij, v_rel, vnij
+        real(wp) :: kappa_n, eta_n
+
+        ! Normal points away from wall (into domain)
+        nij = 0._wp
+        nij(dir) = normal
+
+        ! Relative velocity (wall has zero velocity)
+        v_rel = vel
+        vnij = dot_product(v_rel, nij)*nij
+
+        ! Wall has infinite mass so use mp1 only
+        kappa_n = min((pidtksp*mass), (Es*sqrt(rad)*sqrt(abs(dij))))
+
+        eta_n = ((-2._wp*sqrt(kappa_n)*log(core))/sqrt((log(core))**2 + pi**2)) &
+                *(1._wp/sqrt(1._wp/mass))
+
+        wcol_force = wcol_force + (kappa_n*dij*nij - eta_n*vnij)
+
+    end subroutine s_compute_wall_collision_force
+
+    !> This subroutine adds temporary ghost particles for collision purposes
+    subroutine s_add_ghost_particles()
 
         integer :: k, i, q
         integer :: patch_id, newBubs
@@ -1255,7 +1384,6 @@ contains
                                                      (q_prim_vf(E_idx)%sf(i, j, k)*udot_gradalpha))
 
                         !> Step 2: Add the drag/pressure/added mass forces to the fluid
-
                         rhs_vf(momxb)%sf(i, j, k) = rhs_vf(momxb)%sf(i, j, k) + q_particles(Smx_id)%sf(i, j, k)*(1._wp/alpha_f)
                         rhs_vf(momxb + 1)%sf(i, j, k) = rhs_vf(momxb + 1)%sf(i, j, k) + q_particles(Smy_id)%sf(i, j, k)*(1._wp/alpha_f)
 
@@ -1281,31 +1409,15 @@ contains
     end subroutine s_compute_particles_EL_source
 
     !>  The purpose of this subroutine is to smear the effect of the particles in the Eulerian framework
-    subroutine s_smear_particle_sources(bc_type, only_linked_list)
+    subroutine s_reset_linked_list()
 
-        type(integer_field), dimension(1:num_dims, 1:2), intent(in) :: bc_type
-        integer :: i, j, k, l, glb_id
-        integer, dimension(3) :: cell
-        logical, intent(in) :: only_linked_list
+        integer :: j, k, l
 
-        $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
-        do i = 1, max(nField_vars, q_particles_idx)  ! outermost is largest of the i-like dims
-            do l = idwbuff(3)%beg, idwbuff(3)%end
-                do k = idwbuff(2)%beg, idwbuff(2)%end
-                    do j = idwbuff(1)%beg, idwbuff(1)%end
-                        ! Zero particle_head once (maybe wrap with i=1 or use separate loop)
-                        if (i == 1) particle_head(j, k, l) = -1
-
-                        if (.not. only_linked_list) then
-                            ! Zero field_vars if i <= nField_vars
-                            if (i <= nField_vars) field_vars(i)%sf(j, k, l) = 0._wp
-                            ! Zero q_particles if i <= q_particles_idx
-                            if (i <= q_particles_idx) then
-                                q_particles(i)%sf(j, k, l) = 0._wp
-                                kahan_comp(i)%sf(j, k, l) = 0._wp
-                            end if
-                        end if
-                    end do
+        $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
+        do l = idwbuff(3)%beg, idwbuff(3)%end
+            do k = idwbuff(2)%beg, idwbuff(2)%end
+                do j = idwbuff(1)%beg, idwbuff(1)%end
+                    particle_head(j, k, l) = -1
                 end do
             end do
         end do
@@ -1313,33 +1425,62 @@ contains
 
         call s_build_linked_list()
 
-        if (.not. only_linked_list) then
+    end subroutine s_reset_linked_list
 
-            call s_gaussian(n_el_particles_loc, particle_rad, &
-                            particle_vel, particle_s, particle_pos, f_p, gSum, q_particles, kahan_comp, linked_list, particle_head)
+    !>  The purpose of this subroutine is to smear the effect of the particles in the Eulerian framework
+    subroutine s_reset_cell_vars()
 
-            call nvtxStartRange("PARTICLES-LAGRANGE-BETA-COMM")
-            call s_populate_beta_buffers(q_particles, bc_type, q_particles_idx)
-            call nvtxEndRange
+        integer :: i, j, k, l
 
-            !Store 1-q_particles(1)
-            $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,l]', collapse=4)
+        do i = 1, max(nField_vars, q_particles_idx)  ! outermost is largest of the i-like dims
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
-                        q_particles(alphaf_id)%sf(j, k, l) = 1._wp - q_particles(alphaf_id)%sf(j, k, l)
-                        ! Limiting void fraction given max value
-                        q_particles(alphaf_id)%sf(j, k, l) = max(q_particles(alphaf_id)%sf(j, k, l), &
-                                                                 1._wp - lag_params%valmaxvoid)
+                        ! Zero field_vars if i <= nField_vars
+                        if (i <= nField_vars) field_vars(i)%sf(j, k, l) = 0._wp
+                        ! Zero q_particles if i <= q_particles_idx
+                        if (i <= q_particles_idx) then
+                            q_particles(i)%sf(j, k, l) = 0._wp
+                            kahan_comp(i)%sf(j, k, l) = 0._wp
+                        end if
                     end do
                 end do
             end do
-            $:END_GPU_PARALLEL_LOOP()
-            call nvtxEndRange
+        end do
+        $:END_GPU_PARALLEL_LOOP()
 
+    end subroutine s_reset_cell_vars
+
+    subroutine s_finalize_beta_field(bc_type, onlyBeta)
+
+        type(integer_field), dimension(1:num_dims, 1:2), intent(in) :: bc_type
+        integer :: j, k, l
+        logical, intent(in) :: onlyBeta
+
+        call nvtxStartRange("PARTICLES-LAGRANGE-BETA-COMM")
+        if (onlyBeta) then
+            call s_populate_beta_buffers(q_particles, bc_type, 1)
+        else
+            call s_populate_beta_buffers(q_particles, bc_type, q_particles_idx)
         end if
+        call nvtxEndRange
 
-    end subroutine s_smear_particle_sources
+        !Store 1-q_particles(1)
+        $:GPU_PARALLEL_LOOP(private='[j,k,l]', collapse=3)
+        do l = idwbuff(3)%beg, idwbuff(3)%end
+            do k = idwbuff(2)%beg, idwbuff(2)%end
+                do j = idwbuff(1)%beg, idwbuff(1)%end
+                    q_particles(alphaf_id)%sf(j, k, l) = 1._wp - q_particles(alphaf_id)%sf(j, k, l)
+                    ! Limiting void fraction given max value
+                    q_particles(alphaf_id)%sf(j, k, l) = max(q_particles(alphaf_id)%sf(j, k, l), &
+                                                             1._wp - lag_params%valmaxvoid)
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_finalize_beta_field
 
     subroutine s_build_linked_list()
         integer :: k, glb_id, i
@@ -1525,7 +1666,8 @@ contains
         integer, dimension(3) :: cell
         logical :: inc_ghost = .false.
         real(wp) :: myR, func_sum
-        real(wp), dimension(3) :: myPos
+        real(wp), dimension(3) :: myPos, myVel, myForce
+        logical :: only_beta = .true.
 
         call nvtxStartRange("LAG-BC")
         call nvtxStartRange("LAG-BC-DEV2HOST")
@@ -1567,13 +1709,13 @@ contains
             ! Relocate particles at solid boundaries and delete particles that leave
             ! buffer regions
             if (any(bc_x%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
-                .and. particle_pos(k, 1, 2) < x_cb(-1) + particle_rad(k, 2)) then
+                .and. particle_pos(k, 1, 2) < x_cb(-1) + 0.5_wp*particle_rad(k, 2)) then
                 particle_pos(k, 1, 2) = x_cb(-1) + particle_rad(k, 2)
                 if (nstage == lag_num_ts) then
                     particle_pos(k, 1, 1) = particle_pos(k, 1, 2)
                 end if
             elseif (any(bc_x%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
-                    .and. particle_pos(k, 1, 2) > x_cb(m) - particle_rad(k, 2)) then
+                    .and. particle_pos(k, 1, 2) > x_cb(m) - 0.5_wp*particle_rad(k, 2)) then
                 particle_pos(k, 1, 2) = x_cb(m) - particle_rad(k, 2)
                 if (nstage == lag_num_ts) then
                     particle_pos(k, 1, 1) = particle_pos(k, 1, 2)
@@ -1593,13 +1735,13 @@ contains
             end if
 
             if (any(bc_y%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
-                .and. particle_pos(k, 2, 2) < y_cb(-1) + particle_rad(k, 2)) then
+                .and. particle_pos(k, 2, 2) < y_cb(-1) + 0.5_wp*particle_rad(k, 2)) then
                 particle_pos(k, 2, 2) = y_cb(-1) + particle_rad(k, 2)
                 if (nstage == lag_num_ts) then
                     particle_pos(k, 2, 1) = particle_pos(k, 2, 2)
                 end if
             else if (any(bc_y%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
-                     .and. particle_pos(k, 2, 2) > y_cb(n) - particle_rad(k, 2)) then
+                     .and. particle_pos(k, 2, 2) > y_cb(n) - 0.5_wp*particle_rad(k, 2)) then
                 particle_pos(k, 2, 2) = y_cb(n) - particle_rad(k, 2)
                 if (nstage == lag_num_ts) then
                     particle_pos(k, 2, 1) = particle_pos(k, 2, 2)
@@ -1620,13 +1762,13 @@ contains
 
             if (p > 0) then
                 if (any(bc_z%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
-                    .and. particle_pos(k, 3, 2) < z_cb(-1) + particle_rad(k, 2)) then
+                    .and. particle_pos(k, 3, 2) < z_cb(-1) + 0.5_wp*particle_rad(k, 2)) then
                     particle_pos(k, 3, 2) = z_cb(-1) + particle_rad(k, 2)
                     if (nstage == lag_num_ts) then
                         particle_pos(k, 3, 1) = particle_pos(k, 3, 2)
                     end if
                 else if (any(bc_z%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) &
-                         .and. particle_pos(k, 3, 2) > z_cb(p) - particle_rad(k, 2)) then
+                         .and. particle_pos(k, 3, 2) > z_cb(p) - 0.5_wp*particle_rad(k, 2)) then
                     particle_pos(k, 3, 2) = z_cb(p) - particle_rad(k, 2)
                     if (nstage == lag_num_ts) then
                         particle_pos(k, 3, 1) = particle_pos(k, 3, 2)
@@ -1715,21 +1857,30 @@ contains
             call nvtxEndRange
         end if
 
-        $:GPU_PARALLEL_LOOP(private='[cell,myR,myPos,func_sum]')
+        call s_reset_cell_vars()
+
+        $:GPU_PARALLEL_LOOP(private='[cell,myR,myPos,myVel,myForce,func_sum]',copyin='[only_beta]')
         do k = 1, n_el_particles_loc
-            cell = fd_number - buff_size
             myR = particle_rad(k, 2)
             myPos = particle_pos(k, 1:3, 2)
+            myVel = particle_vel(k, 1:3, 2)
+            myForce = f_p(k, :)
+
+            cell = fd_number - buff_size
             call s_locate_cell(particle_pos(k, 1:3, 2), cell, particle_s(k, 1:3, 2))
 
             !Compute the total gaussian contribution for each particle for normalization
             call s_compute_gaussian_contribution(myR, myPos, cell, func_sum)
             gSum(k) = func_sum
 
+            call s_gaussian_atomic(myR, myVel, myPos, myForce, func_sum, cell, q_particles, only_beta)
+
         end do
 
         ! Update void fraction and communicate buffers
-        call s_smear_particle_sources(bc_type, only_linked_list=.false.)
+        call s_finalize_beta_field(bc_type, only_beta)
+
+        ! call s_smear_particle_sources(bc_type, only_linked_list=.false.)
 
         call nvtxEndRange ! LAG-BC
 
