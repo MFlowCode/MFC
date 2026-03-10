@@ -1,0 +1,65 @@
+#!/bin/bash
+# Unified test script for all clusters.
+# Runs inside a SLURM job via submit-slurm-job.sh.
+# Expects env vars: $job_device, $job_interface, $job_shard, $job_cluster
+
+set -e
+
+source .github/scripts/gpu-opts.sh
+build_opts="$gpu_opts"
+
+# --- Build (if not pre-built on login node) ---
+# Phoenix builds inside SLURM; Frontier pre-builds via build.sh on the login node.
+if [ ! -d "build" ]; then
+    rm -rf build
+    source .github/scripts/retry-build.sh
+
+    # Phoenix: smoke-test the syscheck binary to catch architecture mismatches
+    # (SIGILL from binaries compiled on a different compute node).
+    validate_cmd=""
+    if [ "$job_cluster" = "phoenix" ]; then
+        validate_cmd='syscheck_bin=$(find build/install -name syscheck -type f 2>/dev/null | head -1); [ -z "$syscheck_bin" ] || "$syscheck_bin" > /dev/null 2>&1'
+    fi
+
+    RETRY_VALIDATE_CMD="$validate_cmd" \
+        retry_build ./mfc.sh test -v --dry-run -j 8 $build_opts || exit 1
+fi
+
+# --- GPU detection and thread count ---
+device_opts=""
+rdma_opts=""
+shard_opts=""
+
+case "$job_cluster" in
+    phoenix)      n_test_threads=8 ;;
+    *)            n_test_threads=32 ;;
+esac
+
+if [ "$job_device" = "gpu" ]; then
+    source .github/scripts/detect-gpus.sh
+
+    case "$job_cluster" in
+        phoenix)
+            device_opts="-g $gpu_ids"
+            n_test_threads=$((ngpus * 2))
+            ;;
+        *)
+            device_opts="$gpu_opts"
+            n_test_threads=$ngpus
+            ;;
+    esac
+
+    # RDMA for Frontier CCE (not frontier_amd)
+    if [ "$job_cluster" = "frontier" ]; then
+        rdma_opts="--rdma-mpi"
+    fi
+else
+    device_opts="--no-gpu"
+fi
+
+# --- Sharding (Frontier only) ---
+if [ -n "${job_shard:-}" ]; then
+    shard_opts="--shard $job_shard"
+fi
+
+./mfc.sh test -v --max-attempts 3 -a -j $n_test_threads $rdma_opts $device_opts $shard_opts -- -c $job_cluster
