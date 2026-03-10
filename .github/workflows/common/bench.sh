@@ -14,7 +14,7 @@ n_jobs=$(( $(nproc) > 64 ? 64 : $(nproc) ))
 # --- Phoenix TMPDIR setup ---
 if [ "$job_cluster" = "phoenix" ]; then
     tmpbuild=/storage/project/r-sbryngelson3-0/sbryngelson3/mytmp_build
-    currentdir=$tmpbuild/run-$(( RANDOM % 900 ))
+    currentdir=$tmpbuild/run-$(( RANDOM % 9000 ))
     mkdir -p $tmpbuild
     mkdir -p $currentdir
     export TMPDIR=$currentdir
