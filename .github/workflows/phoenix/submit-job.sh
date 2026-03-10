@@ -52,7 +52,8 @@ fi
 sbatch_gpu_opts="\
 #SBATCH -p $gpu_partition
 #SBATCH --ntasks-per-node=4       # Number of cores per node required
-#SBATCH -G2\
+#SBATCH -G2
+#SBATCH --exclude=atl1-1-03-002-29-0  # Known bad GPU (cuInit error 999)\
 "
 
 if [ "$2" = "cpu" ]; then
