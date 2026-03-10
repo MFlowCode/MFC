@@ -24,7 +24,8 @@ echo "=========================================="
 # both parallel jobs so PR and master always land on the same GPU type.
 if [ "$device" = "gpu" ] && [ "$cluster" = "phoenix" ]; then
     echo "Selecting Phoenix GPU partition for benchmark consistency..."
-    source "${SCRIPT_DIR}/select-gpu-partition.sh"
+    # Require 2 nodes so both PR and master jobs can run concurrently.
+    GPU_PARTITION_MIN_NODES=2 source "${SCRIPT_DIR}/select-gpu-partition.sh"
     BENCH_GPU_PARTITION="$SELECTED_GPU_PARTITION"
     export BENCH_GPU_PARTITION
 fi

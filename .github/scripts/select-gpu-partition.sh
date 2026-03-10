@@ -5,15 +5,19 @@
 # Priority order prefers smaller/older nodes to leave modern GPUs free
 # for production workloads. Falls back to gpu-rtx6000 if nothing is idle.
 #
+# Optional: set GPU_PARTITION_MIN_NODES before sourcing to require a minimum
+# number of idle/mix nodes (e.g. GPU_PARTITION_MIN_NODES=2 for parallel bench jobs).
+#
 # Usage: source .github/scripts/select-gpu-partition.sh
 
 _GPU_PARTITION_PRIORITY="gpu-rtx6000 gpu-l40s gpu-v100 gpu-h200 gpu-h100 gpu-a100"
 _GPU_PARTITION_FALLBACK="gpu-rtx6000"
+_GPU_PARTITION_MIN_NODES="${GPU_PARTITION_MIN_NODES:-1}"
 
 SELECTED_GPU_PARTITION=""
 for _part in $_GPU_PARTITION_PRIORITY; do
     _idle=$(sinfo -p "$_part" --noheader -o "%t" 2>/dev/null | grep -cE "^(idle|mix)" || true)
-    if [ "${_idle:-0}" -gt 0 ]; then
+    if [ "${_idle:-0}" -ge "$_GPU_PARTITION_MIN_NODES" ]; then
         SELECTED_GPU_PARTITION="$_part"
         echo "Selected GPU partition: $SELECTED_GPU_PARTITION ($_idle idle/mix nodes)"
         break
@@ -26,4 +30,4 @@ if [ -z "$SELECTED_GPU_PARTITION" ]; then
 fi
 
 export SELECTED_GPU_PARTITION
-unset _GPU_PARTITION_PRIORITY _GPU_PARTITION_FALLBACK _part _idle
+unset _GPU_PARTITION_PRIORITY _GPU_PARTITION_FALLBACK _GPU_PARTITION_MIN_NODES _part _idle
