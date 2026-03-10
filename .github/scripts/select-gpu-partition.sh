@@ -11,7 +11,7 @@
 #
 # Usage: source .github/scripts/select-gpu-partition.sh
 
-_GPU_PARTITION_PRIORITY="gpu-l40s gpu-v100 gpu-h200 gpu-h100 gpu-a100"
+_GPU_PARTITION_PRIORITY="gpu-l40s gpu-h200 gpu-h100 gpu-a100 gpu-v100"
 _GPU_PARTITION_FALLBACK="gpu-l40s"
 _GPU_PARTITION_MIN_NODES="${GPU_PARTITION_MIN_NODES:-1}"
 
