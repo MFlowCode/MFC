@@ -18,10 +18,16 @@ if [ "$job_cluster" = "phoenix" ]; then
     mkdir -p $tmpbuild
     mkdir -p $currentdir
     export TMPDIR=$currentdir
+    trap 'rm -rf "$currentdir" || true' EXIT
 fi
 
 # --- Build (if not pre-built on login node) ---
 # Phoenix builds inside SLURM; Frontier pre-builds via build.sh on the login node.
+# Phoenix: always nuke stale builds (heterogeneous compute nodes → ISA mismatch risk).
+if [ "$job_cluster" = "phoenix" ]; then
+    rm -rf build
+fi
+
 if [ ! -d "build" ]; then
     source .github/scripts/retry-build.sh
     retry_build ./mfc.sh build -j $n_jobs $build_opts || exit 1
@@ -41,9 +47,8 @@ else
     ./mfc.sh bench --mem 1 -j $n_jobs -o "$job_slug.yaml" -- -c $bench_cluster $device_opts -n $n_ranks
 fi
 
-# --- Phoenix cleanup ---
+# --- Phoenix cleanup (trap EXIT handles rm -rf "$currentdir") ---
 if [ "$job_cluster" = "phoenix" ]; then
     sleep 10
-    rm -rf "$currentdir" || true
     unset TMPDIR
 fi
