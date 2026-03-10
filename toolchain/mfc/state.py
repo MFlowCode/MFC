@@ -22,7 +22,7 @@ class MFCConfig:
     fastmath: bool = False
 
     def __hash__(self):
-        return hash(tuple(sorted(dataclasses.asdict(self).items())))
+        return hash(tuple(getattr(self, f.name) for f in dataclasses.fields(self)))
 
     @staticmethod
     def from_dict(d: dict):
