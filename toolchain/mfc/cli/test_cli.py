@@ -142,5 +142,42 @@ class TestDocsGenerator(unittest.TestCase):
         self.assertIn("#", output)  # Should contain markdown headers
 
 
+class TestMFCConfigHash(unittest.TestCase):
+    """Test MFCConfig __hash__ / __eq__ contract."""
+
+    def test_equal_configs_same_hash(self):
+        """Equal MFCConfig objects must have the same hash."""
+        from ..state import MFCConfig
+
+        a = MFCConfig()
+        b = MFCConfig()
+        self.assertEqual(a, b)
+        self.assertEqual(hash(a), hash(b))
+
+    def test_different_configs_different_hash(self):
+        """Different MFCConfig objects should (likely) have different hashes."""
+        from ..state import MFCConfig
+
+        a = MFCConfig(debug=False)
+        b = MFCConfig(debug=True)
+        self.assertNotEqual(a, b)
+        self.assertNotEqual(hash(a), hash(b))
+
+    def test_usable_in_set(self):
+        """MFCConfig should be usable in a set."""
+        from ..state import MFCConfig
+
+        s = {MFCConfig(), MFCConfig(debug=True)}
+        self.assertEqual(len(s), 2)
+        self.assertIn(MFCConfig(), s)
+
+    def test_usable_as_dict_key(self):
+        """MFCConfig should be usable as a dict key."""
+        from ..state import MFCConfig
+
+        d = {MFCConfig(): "default", MFCConfig(debug=True): "debug"}
+        self.assertEqual(d[MFCConfig()], "default")
+
+
 if __name__ == "__main__":
     unittest.main()
