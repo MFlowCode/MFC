@@ -3,15 +3,16 @@
 # Sources into caller: exports SELECTED_GPU_PARTITION.
 #
 # Priority order prefers smaller/older nodes to leave modern GPUs free
-# for production workloads. Falls back to gpu-rtx6000 if nothing is idle.
+# for production workloads. Falls back to gpu-l40s if nothing is idle.
+# RTX 6000 nodes are excluded (too slow for the test suite time limit).
 #
 # Optional: set GPU_PARTITION_MIN_NODES before sourcing to require a minimum
 # number of idle/mix nodes (e.g. GPU_PARTITION_MIN_NODES=2 for parallel bench jobs).
 #
 # Usage: source .github/scripts/select-gpu-partition.sh
 
-_GPU_PARTITION_PRIORITY="gpu-rtx6000 gpu-l40s gpu-v100 gpu-h200 gpu-h100 gpu-a100"
-_GPU_PARTITION_FALLBACK="gpu-rtx6000"
+_GPU_PARTITION_PRIORITY="gpu-l40s gpu-v100 gpu-h200 gpu-h100 gpu-a100"
+_GPU_PARTITION_FALLBACK="gpu-l40s"
 _GPU_PARTITION_MIN_NODES="${GPU_PARTITION_MIN_NODES:-1}"
 
 SELECTED_GPU_PARTITION=""
