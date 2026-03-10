@@ -35,22 +35,22 @@ sbatch_cpu_opts="\
 "
 
 if [ "$job_type" = "bench" ]; then
-    bench_partition="${BENCH_GPU_PARTITION:-gpu-rtx6000}"
-    echo "Submitting bench GPU job to partition: $bench_partition (BENCH_GPU_PARTITION=${BENCH_GPU_PARTITION:-<unset, using default>})"
-    sbatch_gpu_opts="\
-#SBATCH -p $bench_partition
-#SBATCH --ntasks-per-node=4       # Number of cores per node required
-#SBATCH -G2\
-"
+    # BENCH_GPU_PARTITION is pre-selected by run_parallel_benchmarks.sh so both
+    # PR and master jobs land on the same GPU type for a fair comparison.
+    gpu_partition="${BENCH_GPU_PARTITION:-gpu-rtx6000}"
+    echo "Submitting bench GPU job to partition: $gpu_partition (BENCH_GPU_PARTITION=${BENCH_GPU_PARTITION:-<unset, using default>})"
     sbatch_time="#SBATCH -t 04:00:00"
 else
-    sbatch_gpu_opts="\
-#SBATCH -p gpu-a100,gpu-h100,gpu-l40s,gpu-h200,gpu-v100
+    source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/select-gpu-partition.sh"
+    gpu_partition="$SELECTED_GPU_PARTITION"
+    sbatch_time="#SBATCH -t 03:00:00"
+fi
+
+sbatch_gpu_opts="\
+#SBATCH -p $gpu_partition
 #SBATCH --ntasks-per-node=4       # Number of cores per node required
 #SBATCH -G2\
 "
-    sbatch_time="#SBATCH -t 03:00:00"
-fi
 
 if [ "$2" = "cpu" ]; then
     sbatch_device_opts="$sbatch_cpu_opts"

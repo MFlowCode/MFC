@@ -24,24 +24,8 @@ echo "=========================================="
 # both parallel jobs so PR and master always land on the same GPU type.
 if [ "$device" = "gpu" ] && [ "$cluster" = "phoenix" ]; then
     echo "Selecting Phoenix GPU partition for benchmark consistency..."
-    # Prefer older/smaller partitions first (rtx6000, l40s, v100) to leave
-    # large modern nodes (h200, h100, a100) free for production workloads.
-    # rtx6000 has the most nodes and gives the most consistent baselines.
-    BENCH_GPU_PARTITION=""
-    for part in gpu-rtx6000 gpu-l40s gpu-v100 gpu-h200 gpu-h100 gpu-a100; do
-        # || true: grep -c exits 1 on zero matches (or when sinfo returns no output
-        # for an unknown partition); suppress so set -euo pipefail doesn't abort.
-        idle=$(sinfo -p "$part" --noheader -o "%t" 2>/dev/null | grep -cE "^(idle|mix)" || true)
-        if [ "${idle:-0}" -gt 0 ]; then
-            BENCH_GPU_PARTITION="$part"
-            echo "Selected GPU partition: $BENCH_GPU_PARTITION ($idle idle/mix nodes)"
-            break
-        fi
-    done
-    if [ -z "$BENCH_GPU_PARTITION" ]; then
-        echo "WARNING: No idle GPU partition found; falling back to gpu-rtx6000 (may queue)"
-        BENCH_GPU_PARTITION="gpu-rtx6000"
-    fi
+    source "${SCRIPT_DIR}/select-gpu-partition.sh"
+    BENCH_GPU_PARTITION="$SELECTED_GPU_PARTITION"
     export BENCH_GPU_PARTITION
 fi
 
