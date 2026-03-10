@@ -42,9 +42,9 @@ fi
 
 # --- Run benchmark ---
 if [ "$job_device" = "gpu" ]; then
-    ./mfc.sh bench --mem 4 -j $n_ranks -o "$job_slug.yaml" -- -c $bench_cluster $device_opts -n $n_ranks
+    ./mfc.sh bench --mem 4 -o "$job_slug.yaml" -- -c $bench_cluster $device_opts -n $n_ranks
 else
-    ./mfc.sh bench --mem 1 -j $n_jobs -o "$job_slug.yaml" -- -c $bench_cluster $device_opts -n $n_ranks
+    ./mfc.sh bench --mem 1 -o "$job_slug.yaml" -- -c $bench_cluster $device_opts -n $n_ranks
 fi
 
 # --- Phoenix cleanup (trap EXIT handles rm -rf "$currentdir") ---
