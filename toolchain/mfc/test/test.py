@@ -157,8 +157,8 @@ def __filter(cases_) -> typing.List[TestCase]:
 
 
 def test():
-    global nFAIL, nPASS, nSKIP, total_test_count  # noqa: PLW0603, PLW0602
-    global errors, failed_tests, test_start_time  # noqa: PLW0603, PLW0602
+    global nFAIL, nPASS, nSKIP, total_test_count  # noqa: PLW0603
+    global errors, failed_tests, test_start_time  # noqa: PLW0603
 
     test_start_time = time.time()  # Start timing
     failed_uuids_path = os.path.join(common.MFC_TEST_DIR, "failed_uuids.txt")
@@ -349,7 +349,7 @@ def _process_silo_file(silo_filepath: str, case: TestCase, out_filepath: str):
 
 
 def _handle_case(case: TestCase, devices: typing.Set[int]):
-    global current_test_number  # noqa: PLW0603, PLW0602
+    global current_test_number  # noqa: PLW0603
     start_time = time.time()
 
     # Set timeout using threading.Timer (works in worker threads)
@@ -459,8 +459,8 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
 
 
 def handle_case(case: TestCase, devices: typing.Set[int]):
-    global nFAIL, nPASS, nSKIP  # noqa: PLW0603, PLW0602
-    global errors, failed_tests  # noqa: PLW0603, PLW0602
+    global nFAIL, nPASS, nSKIP  # noqa: PLW0603
+    global errors, failed_tests  # noqa: PLW0603
 
     # Check if we should abort before processing this case
     if abort_tests.is_set():

@@ -40,7 +40,7 @@ _prefetch_pool_lock = threading.Lock()
 
 def _get_prefetch_pool() -> ThreadPoolExecutor:
     """Return the prefetch pool, creating it lazily on first use."""
-    global _prefetch_pool  # noqa: PLW0603, PLW0602
+    global _prefetch_pool  # noqa: PLW0603
     with _prefetch_pool_lock:
         if _prefetch_pool is None:
             _prefetch_pool = ThreadPoolExecutor(

@@ -13,6 +13,8 @@ ignore = [
     "PLR2004",  # magic-value-comparison
     # Import patterns (project style)
     "PLC0415",  # import-outside-toplevel
+    # Global variable reads (module-level singleton pattern)
+    "PLW0602",  # global-variable-not-assigned
 ]
 
 [lint.per-file-ignores]

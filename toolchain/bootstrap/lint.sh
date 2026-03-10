@@ -14,7 +14,7 @@ done
 
 log "(venv) Auto-fixing safe lint issues with$MAGENTA ruff$COLOR_RESET..."
 
-ruff check --fix toolchain/ examples/*/case.py benchmarks/*/case.py > /dev/null 2>&1 || true
+ruff check --fix toolchain/ examples/*/case.py benchmarks/*/case.py > /dev/null || true
 
 log "(venv) Running$MAGENTA ruff$COLOR_RESET on$MAGENTA MFC$COLOR_RESET's $MAGENTA""toolchain$COLOR_RESET."
 

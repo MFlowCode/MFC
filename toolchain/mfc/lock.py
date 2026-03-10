@@ -18,7 +18,7 @@ data: MFCLockData = None
 
 
 def init():
-    global data  # noqa: PLW0603, PLW0602
+    global data  # noqa: PLW0603
 
     if not os.path.exists(common.MFC_LOCK_FILEPATH):
         config = MFCConfig()
@@ -32,7 +32,7 @@ def init():
 
 
 def load():
-    global data  # noqa: PLW0603, PLW0602
+    global data  # noqa: PLW0603
 
     d = common.file_load_yaml(common.MFC_LOCK_FILEPATH)
 
@@ -51,13 +51,13 @@ build/ directory and run MFC again. (v{d["version"]} -> v{MFC_LOCK_CURRENT_VERSI
 
 
 def write():
-    global data  # noqa: PLW0603, PLW0602
+    global data  # noqa: PLW0603
 
     common.file_dump_yaml(common.MFC_LOCK_FILEPATH, dataclasses.asdict(data))
 
 
 def switch(to: MFCConfig):
-    global data  # noqa: PLW0603, PLW0602
+    global data  # noqa: PLW0603
 
     if to == data.config:
         return

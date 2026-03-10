@@ -187,7 +187,7 @@ _PARAM_PATTERN = None
 
 
 def _get_param_pattern():
-    global _PARAM_PATTERN  # noqa: PLW0603, PLW0602
+    global _PARAM_PATTERN  # noqa: PLW0603
     if _PARAM_PATTERN is None:
         _PARAM_PATTERN = _build_param_name_pattern()
     return _PARAM_PATTERN
@@ -217,7 +217,7 @@ _REVERSE_DEPS = None
 
 
 def _get_reverse_deps():
-    global _REVERSE_DEPS  # noqa: PLW0603, PLW0602
+    global _REVERSE_DEPS  # noqa: PLW0603
     if _REVERSE_DEPS is None:
         _REVERSE_DEPS = _build_reverse_dep_map()
     return _REVERSE_DEPS

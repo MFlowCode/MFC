@@ -199,7 +199,7 @@ _POOL_LOCK = threading.Lock()
 
 def _get_pool() -> ThreadPoolExecutor:
     """Return a module-level thread pool, creating it on first use."""
-    global _READ_POOL  # noqa: PLW0603, PLW0602
+    global _READ_POOL  # noqa: PLW0603
     with _POOL_LOCK:
         if _READ_POOL is None:
             _READ_POOL = ThreadPoolExecutor(

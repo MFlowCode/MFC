@@ -15,7 +15,7 @@ _debug_logger = None
 
 def setup_debug_logging(enabled: bool = False):
     """Setup debug logging for troubleshooting."""
-    global _debug_logger  # noqa: PLW0603, PLW0602
+    global _debug_logger  # noqa: PLW0603
     if enabled:
         logging.basicConfig(level=logging.DEBUG, format="[DEBUG %(asctime)s] %(message)s", datefmt="%H:%M:%S")
         _debug_logger = logging.getLogger("mfc")

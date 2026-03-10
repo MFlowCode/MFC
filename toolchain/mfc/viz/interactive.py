@@ -73,7 +73,7 @@ _mesh3_pool_lock = threading.Lock()
 
 def _get_jpeg_pool() -> concurrent.futures.ThreadPoolExecutor:
     """Return the JPEG prefetch pool, creating it lazily on first use."""
-    global _jpeg_pool  # noqa: PLW0603, PLW0602
+    global _jpeg_pool  # noqa: PLW0603
     with _jpeg_pool_lock:
         if _jpeg_pool is None:
             _jpeg_pool = concurrent.futures.ThreadPoolExecutor(

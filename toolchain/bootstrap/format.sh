@@ -54,7 +54,7 @@ if [[ ${#PATHS[@]} -gt 0 ]]; then
     fi
 
     # Format Python files with ruff (auto-fix lint issues, then format)
-    ruff check --fix $SEARCH_PATHS > /dev/null 2>&1 || true
+    ruff check --fix $SEARCH_PATHS > /dev/null || true
     if ! ruff format $SEARCH_PATHS; then
         error "Formatting Python files failed."
         exit 1
@@ -70,7 +70,7 @@ else
     fi
 
     # Format Python files with ruff (auto-fix lint issues, then format)
-    ruff check --fix toolchain/ examples/ benchmarks/ > /dev/null 2>&1 || true
+    ruff check --fix toolchain/ examples/ benchmarks/ > /dev/null || true
     if ! ruff format toolchain/ examples/ benchmarks/; then
         error "Formatting Python files failed."
         exit 1

@@ -89,7 +89,7 @@ gARG: dict = {"rdma_mpi": False}
 
 
 def ARG(arg: str, dflt=None) -> typing.Any:
-    global gARG  # noqa: PLW0603, PLW0602
+    global gARG  # noqa: PLW0603
     if arg in gARG:
         return gARG[arg]
     if dflt is not None:
@@ -99,10 +99,10 @@ def ARG(arg: str, dflt=None) -> typing.Any:
 
 
 def ARGS() -> dict:
-    global gARG  # noqa: PLW0603, PLW0602
+    global gARG  # noqa: PLW0603
     return gARG
 
 
 def CFG() -> MFCConfig:
-    global gCFG  # noqa: PLW0603, PLW0602
+    global gCFG  # noqa: PLW0603
     return gCFG
