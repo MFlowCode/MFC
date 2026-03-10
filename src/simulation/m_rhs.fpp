@@ -570,7 +570,7 @@ contains
 
         ! END: Allocation/Association of flux_n, flux_src_n, and flux_gsrc_n
 
-        if (hypo_nc_interface) then
+        if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2)) then
             @:ALLOCATE(hypo_iface_vel_n(1:2))
             do i = 1, 2
                 @:ALLOCATE(hypo_iface_vel_n(i)%vf(1:2))
@@ -823,7 +823,7 @@ contains
                                   id, irx, iry, irz, is_hat_L)
             call nvtxEndRange
 
-            if (hypo_nc_interface) then
+            if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2)) then
                 call s_finalize_hypo_iface_vel(hypo_iface_vel_n(id)%vf, id)
             end if
 
@@ -900,7 +900,14 @@ contains
                                                   hypo_iface_vel_n(1)%vf, hypo_iface_vel_n(2)%vf)
             call nvtxEndRange
         end if
-        ! hypo_nc_dual_pass (HLLD): no external hypo RHS call
+        if (hypo_nc_dual_pass .and. grid_geometry == 2 .and. present(is_hat_L)) then
+            if (.not. is_hat_L) then
+                call nvtxStartRange("RHS-HYPOELASTICITY-AXISYM-HLLD")
+                call s_compute_hypoelastic_rhs_axisym_geom_iface(q_prim_qp%vf, rhs_vf, &
+                                                                  hypo_iface_vel_n(1)%vf, hypo_iface_vel_n(2)%vf)
+                call nvtxEndRange
+            end if
+        end if
 
 
         if (ib) then
@@ -1006,6 +1013,7 @@ contains
         logical, intent(in), optional :: is_hat_L
 
         integer :: i, j, k, l, q
+        logical :: add_geom
 
         if (alt_soundspeed) then
             !$acc parallel loop collapse(3) gang vector default(present)
@@ -1256,19 +1264,26 @@ contains
             end if
 
             if (cyl_coord) then
-                !$acc parallel loop collapse(4) gang vector default(present)
-                do j = 1, sys_size
-                    do l = 0, p
-                        do k = 0, n
-                            do q = 0, m
-                                rhs_vf(j)%sf(q, k, l) = &
-                                    rhs_vf(j)%sf(q, k, l) - 5e-1_wp/y_cc(k)* &
-                                    (flux_gsrc_n(2)%vf(j)%sf(q, k - 1, l) &
-                                     + flux_gsrc_n(2)%vf(j)%sf(q, k, l))
+                ! For HLLD dual-pass axisym, apply cylindrical geometry only once (on the R-hat pass)
+                add_geom = .true.
+                if (hypo_nc_dual_pass .and. present(is_hat_L)) then
+                    if (is_hat_L) add_geom = .false.
+                end if
+                if (add_geom) then
+                    !$acc parallel loop collapse(4) gang vector default(present)
+                    do j = 1, sys_size
+                        do l = 0, p
+                            do k = 0, n
+                                do q = 0, m
+                                    rhs_vf(j)%sf(q, k, l) = &
+                                        rhs_vf(j)%sf(q, k, l) - 5e-1_wp/y_cc(k)* &
+                                        (flux_gsrc_n(2)%vf(j)%sf(q, k - 1, l) &
+                                         + flux_gsrc_n(2)%vf(j)%sf(q, k, l))
+                                end do
                             end do
                         end do
                     end do
-                end do
+                end if
             end if
 
             if (riemann_solver == 1 .or. riemann_solver == 4) then
@@ -2375,7 +2390,7 @@ contains
 
         @:DEALLOCATE(flux_n, flux_src_n, flux_gsrc_n)
 
-        if (hypo_nc_interface) then
+        if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2)) then
             do i = 1, 2
                 do l = 1, 2
                     @:DEALLOCATE(hypo_iface_vel_n(i)%vf(l)%sf)

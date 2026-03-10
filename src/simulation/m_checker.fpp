@@ -263,15 +263,15 @@ contains
     !> Checks constraints on hypoelasticity parameters
     subroutine s_check_inputs_hypoelasticity
         @:PROHIBIT(hypoelasticity .and. riemann_solver == 2 .and. p > 0, &
-            "HLLC hypoelasticity currently supports 1D and 2D Cartesian only (p must be 0)")
-        @:PROHIBIT(hypoelasticity .and. riemann_solver == 2 .and. cyl_coord, &
-            "HLLC hypoelasticity does not support cylindrical coordinates")
+            "HLLC hypoelasticity supports Cartesian and 2D axisymmetric only (p must be 0)")
+        @:PROHIBIT(hypoelasticity .and. riemann_solver == 2 .and. cyl_coord .and. p > 0, &
+            "HLLC hypoelasticity supports Cartesian and 2D axisymmetric cylindrical only (p must be 0)")
         @:PROHIBIT(hypoelasticity .and. riemann_solver == 4 .and. n == 0, &
             "HLLD hypoelasticity requires 2D (n must be > 0)")
         @:PROHIBIT(hypoelasticity .and. riemann_solver == 4 .and. p > 0, &
-            "HLLD hypoelasticity currently supports 2D only (p must be 0)")
-        @:PROHIBIT(hypoelasticity .and. riemann_solver == 4 .and. cyl_coord, &
-            "HLLD hypoelasticity does not support cylindrical coordinates")
+            "HLLD hypoelasticity supports 2D Cartesian and 2D axisymmetric only (p must be 0)")
+        @:PROHIBIT(hypoelasticity .and. riemann_solver == 4 .and. cyl_coord .and. p > 0, &
+            "HLLD hypoelasticity supports Cartesian and 2D axisymmetric cylindrical only (p must be 0)")
         @:PROHIBIT(hypoelasticity .and. riemann_solver == 4 .and. num_fluids /= 2, &
             "HLLD hypoelasticity currently requires exactly 2 fluid components")
         @:PROHIBIT(hypo_hll_interface_rhs .and. .not. hypoelasticity, &
@@ -280,8 +280,8 @@ contains
             "hypo_hll_interface_rhs requires HLL Riemann solver (riemann_solver = 1)")
         @:PROHIBIT(hypo_hll_interface_rhs .and. p > 0, &
             "HLL interface-consistent hypo RHS supports 1D and 2D only (p must be 0)")
-        @:PROHIBIT(hypo_hll_interface_rhs .and. cyl_coord, &
-            "HLL interface-consistent hypo RHS does not support cylindrical coordinates")
+        @:PROHIBIT(hypo_hll_interface_rhs .and. cyl_coord .and. p > 0, &
+            "HLL interface-consistent hypo RHS supports Cartesian and 2D axisymmetric only (p must be 0)")
     end subroutine
 
     !> Checks constraints on bubble parameters

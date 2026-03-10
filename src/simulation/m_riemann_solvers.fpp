@@ -1348,7 +1348,9 @@ contains
         real(wp) :: pres_tot_L, pres_tot_R
         real(wp) :: u_n_L, u_n_R, u_t_L, u_t_R
         real(wp) :: tau_nn_L, tau_nn_R, tau_nt_L, tau_nt_R, tau_tt_L, tau_tt_R
-        
+        real(wp) :: tau_qq_L, tau_qq_R
+        real(wp) :: p_face, tau_qq_face
+
         real(wp) :: A_L, A_R, denom_A, denom_L, denom_R
         real(wp) :: fac_L, fac_R
         real(wp) :: rho_L_star, rho_R_star
@@ -1538,8 +1540,9 @@ contains
                                         if ((G_L > verysmall) .and. (G_R > verysmall)) then
                                             E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
                                             E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
-                                            ! Additional terms in 2D and 3D
-                                            if ((i == 2) .or. (i == 4) .or. (i == 5)) then
+                                            ! Shear terms doubled: 2D/2D-axisym i==2 only; 3D i==2,4,5
+                                            if ((n > 0 .and. p == 0 .and. i == 2) .or. &
+                                                (p > 0 .and. (i == 2 .or. i == 4 .or. i == 5))) then
                                                 E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
                                                 E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
                                             end if
@@ -2552,7 +2555,8 @@ contains
                 else
                     ! 5-EQUATION MODEL WITH HLLC
                     !$acc parallel loop collapse(3) gang vector default(present) private(vel_L, vel_R, Re_L, Re_R, &
-                    !$acc rho_avg, h_avg, gamma_avg, alpha_L, alpha_R, s_L, s_R, s_S, vel_avg_rms, pcorr, zcoef,   &
+                    !$acc rho_avg, h_avg, gamma_avg, alpha_L, alpha_R, alpha_rho_L, alpha_rho_R,                    &
+                    !$acc s_L, s_R, s_S, vel_avg_rms, pcorr, zcoef,                                                &
                     !$acc vel_L_tmp, vel_R_tmp, Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR,          &
                     !$acc tau_e_L, tau_e_R, xi_field_L, xi_field_R,                                                &
                     !$acc Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2) copyin(is1,is2,is3)
@@ -2617,6 +2621,13 @@ contains
                                     end if
                                     pres_tot_L = pres_L - tau_nn_L
                                     pres_tot_R = pres_R - tau_nn_R
+                                    if (cyl_coord) then
+                                        tau_qq_L = tau_e_L(strxe - strxb + 1)
+                                        tau_qq_R = tau_e_R(strxe - strxb + 1)
+                                    else
+                                        tau_qq_L = 0._wp
+                                        tau_qq_R = 0._wp
+                                    end if
                                 end if
 
                                 rho_L = 0._wp
@@ -2662,15 +2673,18 @@ contains
 
                                 !$acc loop seq
                                 do i = 1, num_fluids
-                                    rho_L = rho_L + qL_prim_rs${XYZ}$_vf(j, k, l, i)
+                                    alpha_rho_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, i)
+                                    alpha_rho_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
+
+                                    rho_L = rho_L + alpha_rho_L(i)
                                     gamma_L = gamma_L + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)*gammas(i)
                                     pi_inf_L = pi_inf_L + qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + i)*pi_infs(i)
-                                    qv_L = qv_L + qL_prim_rs${XYZ}$_vf(j, k, l, i)*qvs(i)
+                                    qv_L = qv_L + alpha_rho_L(i)*qvs(i)
 
-                                    rho_R = rho_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)
+                                    rho_R = rho_R + alpha_rho_R(i)
                                     gamma_R = gamma_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)*gammas(i)
                                     pi_inf_R = pi_inf_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + i)*pi_infs(i)
-                                    qv_R = qv_R + qR_prim_rs${XYZ}$_vf(j + 1, k, l, i)*qvs(i)
+                                    qv_R = qv_R + alpha_rho_R(i)*qvs(i)
                                 end do
 
                                 if (viscous) then
@@ -2785,8 +2799,9 @@ contains
                                         if ((G_L > verysmall) .and. (G_R > verysmall)) then
                                             E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
                                             E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
-                                            ! Additional terms in 2D and 3D
-                                            if ((i == 2) .or. (i == 4) .or. (i == 5)) then
+                                            ! Shear terms doubled: 2D/2D-axisym i==2 only; 3D i==2,4,5
+                                            if ((n > 0 .and. p == 0 .and. i == 2) .or. &
+                                                (p > 0 .and. (i == 2 .or. i == 4 .or. i == 5))) then
                                                 E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
                                                 E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
                                             end if
@@ -3124,9 +3139,8 @@ contains
                                     end do
                                 end if
 
-                                ! ===== SHADOW ORACLE: direct HLLC hypo (disabled) =====
-                                ! Keep for validation against the xi-based implementation above.
-                                if (.false. .and. hypoelasticity) then
+                                ! ===== Direct HLLC hypo star-state path =====
+                                if (hypoelasticity) then
                                     eps = 1e-12
 
                                     ! Prim to Cons: Find U_L & U_R
@@ -3157,9 +3171,10 @@ contains
                                         U_R(strxb + 1) = rho_R*tau_nt_R
                                         U_R(strxb + 2) = rho_R*tau_tt_R
                                     end if
-
-                                    ! print *, "U_L", U_L
-                                    ! print *, "U_R", U_R
+                                    if (cyl_coord) then
+                                        U_L(strxe) = rho_L*tau_qq_L
+                                        U_R(strxe) = rho_R*tau_qq_R
+                                    end if
 
                                     ! Zero tangential quantities for 1D before star-state computation
                                     if (n == 0) then
@@ -3216,9 +3231,10 @@ contains
                                         U_star_R(strxb + 1) = rho_R_star*tau_nt_star
                                         U_star_R(strxb + 2) = rho_R_star*tau_tt_R
                                     end if
-
-                                    ! print *, "U_L", U_L
-                                    ! print *, "U_R", U_R
+                                    if (cyl_coord) then
+                                        U_star_L(strxe) = rho_L_star*tau_qq_L
+                                        U_star_R(strxe) = rho_R_star*tau_qq_R
+                                    end if
 
                                     ! Find F_L & F_R
                                     do i = 1, num_fluids
@@ -3247,16 +3263,14 @@ contains
                                         F_R(strxb + 1) = rho_R*u_n_R*tau_nt_R
                                         F_R(strxb + 2) = rho_R*u_n_R*tau_tt_R
                                     end if
-
-                                    ! print *, "F_L", F_L
-                                    ! print *, "F_R", F_R
+                                    if (cyl_coord) then
+                                        F_L(strxe) = rho_L*u_n_L*tau_qq_L
+                                        F_R(strxe) = rho_R*u_n_R*tau_qq_R
+                                    end if
 
                                     ! Find F_star_L & F_star_R (array operation)
                                     F_star_L = F_L + S_L * (U_star_L - U_L)
                                     F_star_R = F_R + S_R * (U_star_R - U_R)
-
-                                    ! print *, "F_star_L", F_star_L
-                                    ! print *, "F_star_R", F_star_R
 
                                     ! Find F_HLLC and velocity fluxes based on wave location
                                     if (S_L >= 0d0) then
@@ -3276,8 +3290,6 @@ contains
                                         u_n_HLLC = S_Mid
                                         u_t_HLLC = u_t_star
                                     end if
-
-                                    ! print *, "F_HLLC", F_HLLC
 
                                     ! === ADC BLENDING ===
 
@@ -3318,8 +3330,6 @@ contains
                                         sensor_combined = sensor_ptot + sensor_tnt + sensor_vt
 
                                         phi = exp( - (sensor_combined**ADC_power) )
-
-                                        ! print *, phi, sensor_ptot, sensor_tnt, sensor_vt
 
                                         ! Replace F_HLLC and velocity fluxes with blended fluxes
                                         F_HLLC   = F_HLL   + phi*(F_HLLC   - F_HLL  )
@@ -3366,18 +3376,40 @@ contains
                                     end if
 
                                     flux_rs${XYZ}$_vf(j, k, l, E_idx) = F_HLLC(E_idx)
+                                    if (cyl_coord) then
+                                        flux_rs${XYZ}$_vf(j, k, l, strxe) = F_HLLC(strxe)
+                                    end if
                                 end if
-                                ! ===== END SHADOW ORACLE =====
+                                ! ===== END HLLC hypo star-state path =====
 
                                 ! Geometrical source flux for cylindrical coordinates
                                 #:if (NORM_DIR == 2)
-                                    if (cyl_coord) then
-                                        !Substituting the advective flux into the inviscid geometrical source flux
+                                    if (cyl_coord .and. hypoelasticity) then
+                                        !$acc loop seq
+                                        do i = 1, sys_size
+                                            flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
+                                        end do
+                                        ! Radial momentum gsrc: F_v - p_face + tau_qq_face
+                                        if (s_L >= 0._wp) then
+                                            p_face = pres_L; tau_qq_face = tau_qq_L
+                                        elseif (s_R <= 0._wp) then
+                                            p_face = pres_R; tau_qq_face = tau_qq_R
+                                        elseif (S_Mid >= 0._wp) then
+                                            p_face = pres_tot_star + tau_nn_L; tau_qq_face = tau_qq_L
+                                        else
+                                            p_face = pres_tot_star + tau_nn_R; tau_qq_face = tau_qq_R
+                                        end if
+                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, contxe + idx1) = &
+                                            flux_rs${XYZ}$_vf(j, k, l, contxe + idx1) - p_face + tau_qq_face
+                                        !$acc loop seq
+                                        do i = advxb, advxe
+                                            flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0._wp
+                                        end do
+                                    elseif (cyl_coord) then
                                         !$acc loop seq
                                         do i = 1, E_idx
                                             flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
                                         end do
-                                        ! Recalculating the radial momentum geometric source flux
                                         flux_gsrc_rs${XYZ}$_vf(j, k, l, contxe + idx1) = &
                                             xi_M*(rho_L*(vel_L(idx1)* &
                                                          vel_L(idx1) + &
@@ -3389,7 +3421,6 @@ contains
                                                            s_P*(xi_R*(dir_flg(idx1)*s_S + &
                                                                       (1._wp - dir_flg(idx1))* &
                                                                       vel_R(idx1)) - vel_R(idx1))))
-                                        ! Geometrical source of the void fraction(s) is zero
                                         !$acc loop seq
                                         do i = advxb, advxe
                                             flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0._wp
@@ -3836,9 +3867,9 @@ contains
         real(wp) :: S_L, S_R, s_M, S_Lstar, S_Rstar
         real(wp) :: pTot_L, pTot_R, rhoL_star, rhoR_star
 
-        real(wp), dimension(10) :: U_L, U_R, U_starL, U_starR, U_starstarL, U_starstarR
-        real(wp), dimension(10) :: F_L, F_R, F_starL, F_starR, F_hlld
-        real(wp), dimension(10) :: F_HLL  ! for ADC blending
+        real(wp), dimension(11) :: U_L, U_R, U_starL, U_starR, U_starstarL, U_starstarR
+        real(wp), dimension(11) :: F_L, F_R, F_starL, F_starR, F_hlld
+        real(wp), dimension(11) :: F_HLL  ! for ADC blending
 
         ! HLLD Hypo variables
 
@@ -3846,6 +3877,7 @@ contains
         real(wp) :: A_L, A_R, denomA, fac_L, fac_R
         real(wp) :: u_n_L, u_t_L, u_n_R, u_t_R
         real(wp) :: tau_nn_L, tau_nt_L, tau_tt_L, tau_nn_R, tau_nt_R, tau_tt_R
+        real(wp) :: tau_qq_L, tau_qq_R
 
         real(wp) :: G_L, G_R
         real(wp), dimension(strxe-strxb+1) :: tau_e_L, tau_e_R
@@ -3854,14 +3886,17 @@ contains
         real(wp) :: u_t_star, tau_nt_star
         real(wp) :: tau_nn_L_star, tau_nn_R_star, tau_tt_L_star, tau_tt_R_star
         real(wp) :: tau_tt_L_starstar, tau_tt_R_starstar
+        real(wp) :: tau_qq_L_star, tau_qq_R_star
         real(wp) :: pTot_star
         real(wp) :: E_L_star, E_R_star
         real(wp) :: E_L_starstar, E_R_starstar
+        real(wp) :: p_face, tau_qq_face
+        real(wp) :: u_n_face, u_t_face
 
         real(wp) :: G_hat
         real(wp) :: rho_hat
         real(wp) :: u_n_hat, u_t_hat
-        real(wp) :: tau_nn_hat, tau_nt_hat, tau_tt_hat
+        real(wp) :: tau_nn_hat, tau_nt_hat, tau_tt_hat, tau_qq_hat
         real(wp), dimension(num_fluids) :: alpha_hat, alpha_rho_hat
         real(wp), dimension(num_vels) :: vel_hat
         real(wp), dimension(strxe-strxb+1) :: tau_e_hat
@@ -4053,6 +4088,13 @@ contains
                                     u_t_hat = vel_hat(1)
                                 end if
                             end if
+                            if (cyl_coord) then
+                                tau_qq_L = tau_e_L(strxe - strxb + 1)
+                                tau_qq_R = tau_e_R(strxe - strxb + 1)
+                                tau_qq_hat = tau_e_hat(strxe - strxb + 1)
+                            else
+                                tau_qq_L = 0._wp; tau_qq_R = 0._wp; tau_qq_hat = 0._wp
+                            end if
                             ! Total pressure (replace the usual pressure to define SM)
                             pTot_L = pres%L - tau_nn_L
                             pTot_R = pres%R - tau_nn_R
@@ -4095,8 +4137,9 @@ contains
                                 if ((G_L > verysmall) .and. (G_R > verysmall)) then
                                     E%L = E%L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
                                     E%R = E%R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
-                                    ! Shear stress terms in 2D and 3D
-                                    if ((i == 2) .or. (i == 4) .or. (i == 5)) then
+                                    ! Shear terms doubled: 2D/2D-axisym i==2 only; 3D i==2,4,5
+                                    if ((n > 0 .and. p == 0 .and. i == 2) .or. &
+                                        (p > 0 .and. (i == 2 .or. i == 4 .or. i == 5))) then
                                         E%L = E%L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
                                         E%R = E%R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
                                     end if
@@ -4137,6 +4180,7 @@ contains
                             U_L(8) = rho%L*tau_nn_L
                             U_L(9) = rho%L*tau_nt_L
                             U_L(10) = rho%L*tau_tt_L
+                            U_L(11) = rho%L*tau_qq_L
 
                             U_R(1) = alpha_rho_R(1)
                             U_R(2) = alpha_rho_R(2)
@@ -4148,6 +4192,7 @@ contains
                             U_R(8) = rho%R*tau_nn_R
                             U_R(9) = rho%R*tau_nt_R
                             U_R(10) = rho%R*tau_tt_R
+                            U_R(11) = rho%R*tau_qq_R
 
                             F_L(1) = U_L(1)*u_n_L
                             F_L(2) = U_L(2)*u_n_L
@@ -4159,6 +4204,7 @@ contains
                             F_L(8) = U_L(8)*u_n_L - rho_hat*(4._wp/3._wp*G_hat + tau_nn_hat)*u_n_L
                             F_L(9) = U_L(9)*u_n_L - rho_hat*(G_hat + tau_nn_hat)*u_t_L
                             F_L(10) = U_L(10)*u_n_L + rho_hat*(2._wp/3._wp*G_hat + tau_tt_hat)*u_n_L - 2._wp*rho_hat*tau_nt_hat*u_t_L
+                            F_L(11) = U_L(11)*u_n_L + rho_hat*(2._wp/3._wp*G_hat + tau_qq_hat)*u_n_L
 
                             F_R(1) = U_R(1)*u_n_R
                             F_R(2) = U_R(2)*u_n_R
@@ -4170,6 +4216,7 @@ contains
                             F_R(8) = U_R(8)*u_n_R - rho_hat*(4._wp/3._wp*G_hat + tau_nn_hat)*u_n_R
                             F_R(9) = U_R(9)*u_n_R - rho_hat*(G_hat + tau_nn_hat)*u_t_R
                             F_R(10) = U_R(10)*u_n_R + rho_hat*(2._wp/3._wp*G_hat + tau_tt_hat)*u_n_R - 2._wp*rho_hat*tau_nt_hat*u_t_R
+                            F_R(11) = U_R(11)*u_n_R + rho_hat*(2._wp/3._wp*G_hat + tau_qq_hat)*u_n_R
 
                             A_L = rho%L*(S_L - u_n_L)
                             A_R = rho%R*(S_R - u_n_R)
@@ -4183,7 +4230,7 @@ contains
                                 if (hypo_hll_fallback) then
                                     ! Use HLL (or one-sided) flux
                                     if (S_L < 0._wp .and. S_R > 0._wp) then
-                                        do i = 1, 10
+                                        do i = 1, 11
                                             F_hlld(i) = (S_R*F_L(i) - S_L*F_R(i) + S_L*S_R*(U_R(i) - U_L(i))) &
                                                         /(S_R - S_L + verysmall)
                                         end do
@@ -4224,6 +4271,11 @@ contains
                             tau_tt_R_star = tau_tt_R + (rho_hat*(G_hat*2._wp/3._wp + tau_tt_hat)*(u_n_R - S_M)) &
                                             /(rho%R*(u_n_R - S_R))
 
+                            tau_qq_L_star = tau_qq_L + (rho_hat*(G_hat*2._wp/3._wp + tau_qq_hat)*(u_n_L - S_M)) &
+                                            /(rho%L*(u_n_L - S_L))
+                            tau_qq_R_star = tau_qq_R + (rho_hat*(G_hat*2._wp/3._wp + tau_qq_hat)*(u_n_R - S_M)) &
+                                            /(rho%R*(u_n_R - S_R))
+
                             tau_tt_L_starstar = tau_tt_L_star + 2._wp*rho_hat*tau_nt_hat/sqrtC_NC*(u_t_star - u_t_L)
                             tau_tt_R_starstar = tau_tt_R_star - 2._wp*rho_hat*tau_nt_hat/sqrtC_NC*(u_t_star - u_t_R)
 
@@ -4255,6 +4307,7 @@ contains
                             U_starL(8) = rhoL_star * tau_nn_L_star
                             U_starL(9) = rhoL_star * tau_nt_L
                             U_starL(10) = rhoL_star * tau_tt_L_star
+                            U_starL(11) = rhoL_star * tau_qq_L_star
 
                             U_starR(1) = U_R(1) * fac_R
                             U_starR(2) = U_R(2) * fac_R
@@ -4266,6 +4319,7 @@ contains
                             U_starR(8) = rhoR_star * tau_nn_R_star
                             U_starR(9) = rhoR_star * tau_nt_R
                             U_starR(10) = rhoR_star * tau_tt_R_star
+                            U_starR(11) = rhoR_star * tau_qq_R_star
 
                             U_starstarL(1) = U_L(1) * fac_L
                             U_starstarL(2) = U_L(2) * fac_L
@@ -4277,6 +4331,7 @@ contains
                             U_starstarL(8) = rhoL_star * tau_nn_L_star
                             U_starstarL(9) = rhoL_star * tau_nt_star
                             U_starstarL(10) = rhoL_star * tau_tt_L_starstar
+                            U_starstarL(11) = rhoL_star * tau_qq_L_star
 
                             U_starstarR(1) = U_R(1) * fac_R
                             U_starstarR(2) = U_R(2) * fac_R
@@ -4288,6 +4343,7 @@ contains
                             U_starstarR(8) = rhoR_star * tau_nn_R_star
                             U_starstarR(9) = rhoR_star * tau_nt_star
                             U_starstarR(10) = rhoR_star * tau_tt_R_starstar
+                            U_starstarR(11) = rhoR_star * tau_qq_R_star
 
                             ! ==================== Compute F and select F_HLLD ====================
 
@@ -4315,7 +4371,7 @@ contains
                                 ! Build HLL flux as reference (only in the fan region)
                                 F_HLL = F_hlld
                                 if (S_L < 0._wp .and. S_R > 0._wp) then
-                                    do i = 1, 10
+                                    do i = 1, 11
                                         F_HLL(i) = ( S_R*F_L(i) - S_L*F_R(i) + S_L*S_R*(U_R(i) - U_L(i)) ) &
                                                    / (S_R - S_L + verysmall)
                                     end do
@@ -4346,7 +4402,7 @@ contains
                                 phi = exp( - (sensor_combined**ADC_power) )
 
                                 ! Blend HLLD with HLL based on phi
-                                do i = 1, 10
+                                do i = 1, 11
                                     F_hlld(i) = F_HLL(i) + phi*(F_hlld(i) - F_HLL(i))
                                 end do
 
@@ -4375,6 +4431,58 @@ contains
                                 flux_rs${XYZ}$_vf(j, k, l, strxb    ) = F_hlld(10) ! tau_xx = tau_tt
                                 flux_rs${XYZ}$_vf(j, k, l, strxb + 2) = F_hlld(8 ) ! tau_yy = tau_nn
                             end if
+                            if (cyl_coord) then
+                                flux_rs${XYZ}$_vf(j, k, l, strxe) = F_hlld(11) ! tau_qq
+                            end if
+
+                            ! Export face velocities for axisym hypo source terms
+                            if (grid_geometry == 2) then
+                                if (0._wp <= S_L) then
+                                    u_n_face = u_n_L; u_t_face = u_t_L
+                                elseif (0._wp <= S_Lstar) then
+                                    u_n_face = S_M; u_t_face = u_t_L
+                                elseif (0._wp <= S_M) then
+                                    u_n_face = S_M; u_t_face = u_t_star
+                                elseif (0._wp <= S_Rstar) then
+                                    u_n_face = S_M; u_t_face = u_t_star
+                                elseif (0._wp <= S_R) then
+                                    u_n_face = S_M; u_t_face = u_t_R
+                                else
+                                    u_n_face = u_n_R; u_t_face = u_t_R
+                                end if
+                                if (dir_idx(1) == 1) then
+                                    hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_n_face
+                                    hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_t_face
+                                else
+                                    hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 1) = u_t_face
+                                    hypo_iface_vel_rs${XYZ}$_vf(j, k, l, 2) = u_n_face
+                                end if
+                            end if
+
+                            ! Radial geometric source flux for cylindrical coordinates
+                            #:if (NORM_DIR == 2)
+                                if (cyl_coord) then
+                                    !$acc loop seq
+                                    do i = 1, sys_size
+                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = flux_rs${XYZ}$_vf(j, k, l, i)
+                                    end do
+                                    if (0._wp <= S_L) then
+                                        p_face = pres%L; tau_qq_face = tau_qq_L
+                                    elseif (0._wp <= S_Lstar .or. 0._wp <= S_M) then
+                                        p_face = pTot_star + tau_nn_L_star; tau_qq_face = tau_qq_L_star
+                                    elseif (0._wp <= S_Rstar .or. 0._wp <= S_R) then
+                                        p_face = pTot_star + tau_nn_R_star; tau_qq_face = tau_qq_R_star
+                                    else
+                                        p_face = pres%R; tau_qq_face = tau_qq_R
+                                    end if
+                                    flux_gsrc_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(1)) = &
+                                        flux_rs${XYZ}$_vf(j, k, l, contxe + dir_idx(1)) - p_face + tau_qq_face
+                                    !$acc loop seq
+                                    do i = advxb, advxe
+                                        flux_gsrc_rs${XYZ}$_vf(j, k, l, i) = 0._wp
+                                    end do
+                                end if
+                            #:endif
 
                             flux_src_rs${XYZ}$_vf(j, k, l, advxb) = 0._wp
                         end do
@@ -4445,7 +4553,7 @@ contains
                 is3%beg:is3%end, 1:2))
         end if
 
-        if (hypo_nc_interface) then
+        if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2)) then
             @:ALLOCATE(hypo_iface_vel_rsx_vf(is1%beg:is1%end, &
                 is2%beg:is2%end, &
                 is3%beg:is3%end, 1:2))
@@ -4479,7 +4587,7 @@ contains
                 is3%beg:is3%end, 1:2))
         end if
 
-        if (hypo_nc_interface) then
+        if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2)) then
             @:ALLOCATE(hypo_iface_vel_rsy_vf(is1%beg:is1%end, &
                 is2%beg:is2%end, &
                 is3%beg:is3%end, 1:2))
@@ -4513,7 +4621,7 @@ contains
                 is3%beg:is3%end, 1:2))
         end if
 
-        if (hypo_nc_interface) then
+        if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2)) then
             @:ALLOCATE(hypo_iface_vel_rsz_vf(is1%beg:is1%end, &
                 is2%beg:is2%end, &
                 is3%beg:is3%end, 1:2))
@@ -6274,7 +6382,7 @@ contains
         @:DEALLOCATE(flux_rsx_vf)
         @:DEALLOCATE(flux_src_rsx_vf)
         @:DEALLOCATE(flux_gsrc_rsx_vf)
-        if (hypo_nc_interface) then
+        if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2)) then
             @:DEALLOCATE(hypo_iface_vel_rsx_vf)
         end if
         if (qbmm) then
@@ -6290,7 +6398,7 @@ contains
         @:DEALLOCATE(flux_rsy_vf)
         @:DEALLOCATE(flux_src_rsy_vf)
         @:DEALLOCATE(flux_gsrc_rsy_vf)
-        if (hypo_nc_interface) then
+        if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2)) then
             @:DEALLOCATE(hypo_iface_vel_rsy_vf)
         end if
         if (qbmm) then
@@ -6306,7 +6414,7 @@ contains
         @:DEALLOCATE(flux_rsz_vf)
         @:DEALLOCATE(flux_src_rsz_vf)
         @:DEALLOCATE(flux_gsrc_rsz_vf)
-        if (hypo_nc_interface) then
+        if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2)) then
             @:DEALLOCATE(hypo_iface_vel_rsz_vf)
         end if
         if (qbmm) then

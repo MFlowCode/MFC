@@ -18,6 +18,7 @@ module m_hypoelastic
  s_finalize_hypoelastic_module, &
  s_compute_hypoelastic_rhs_legacy, &
  s_compute_hypoelastic_rhs_iface, &
+ s_compute_hypoelastic_rhs_axisym_geom_iface, &
  s_compute_damage_state
 
     real(wp), allocatable, dimension(:) :: Gs
@@ -367,7 +368,6 @@ contains
     !>  Interface-consistent hypoelastic RHS (Mode 2: HLLC).
         !!  Uses interface velocities from the Riemann solver to compute
         !!  velocity gradients. Called once after all dimensional sweeps.
-        !!  Supports 1D/2D Cartesian only.
         !!  @param q_prim_vf Primitive variables
         !!  @param rhs_vf rhs variables
         !!  @param hypo_iface_vel_x_vf Interface velocities on x-faces: (1)=u, (2)=v
@@ -483,7 +483,69 @@ contains
             end do
         end if
 
+        if (grid_geometry == 2) then
+            call s_compute_hypoelastic_rhs_axisym_geom_iface(q_prim_vf, rhs_vf, &
+                                                             hypo_iface_vel_x_vf, hypo_iface_vel_y_vf)
+        end if
+
     end subroutine s_compute_hypoelastic_rhs_iface
+
+    subroutine s_compute_hypoelastic_rhs_axisym_geom_iface(q_prim_vf, rhs_vf, &
+                                                           hypo_iface_vel_x_vf, hypo_iface_vel_y_vf)
+
+        type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+        type(scalar_field), dimension(:), intent(in)           :: hypo_iface_vel_x_vf
+        type(scalar_field), dimension(:), intent(in)           :: hypo_iface_vel_y_vf
+
+        integer  :: i, k, l, q
+        real(wp) :: rho_K, G_K, v_over_r, divU_axi
+
+        !$acc parallel loop collapse(3) gang vector default(present)
+        do q = 0, p
+            do l = 0, n
+                do k = 0, m
+                    du_dx(k, l, q) = (hypo_iface_vel_x_vf(1)%sf(k, l, q) - &
+                                      hypo_iface_vel_x_vf(1)%sf(k - 1, l, q))/dx(k)
+
+                    dv_dy(k, l, q) = (hypo_iface_vel_y_vf(2)%sf(k, l, q) - &
+                                      hypo_iface_vel_y_vf(2)%sf(k, l - 1, q))/dy(l)
+                end do
+            end do
+        end do
+
+        !$acc parallel loop collapse(3) gang vector default(present) private(rho_K, G_K, v_over_r, divU_axi)
+        do q = 0, p
+            do l = 0, n
+                do k = 0, m
+                    rho_K = 0._wp
+                    G_K   = 0._wp
+                    do i = 1, num_fluids
+                        rho_K = rho_K + q_prim_vf(i)%sf(k, l, q)
+                        G_K   = G_K   + q_prim_vf(advxb - 1 + i)%sf(k, l, q)*Gs(i)
+                    end do
+
+                    if (cont_damage) G_K = G_K*max(1._wp - q_prim_vf(damage_idx)%sf(k, l, q), 0._wp)
+
+                    v_over_r = q_prim_vf(momxb + 1)%sf(k, l, q)/y_cc(l)
+                    divU_axi = du_dx(k, l, q) + dv_dy(k, l, q) + v_over_r
+
+                    rhs_vf(strxb)%sf(k, l, q) = rhs_vf(strxb)%sf(k, l, q) - &
+                        rho_K*v_over_r*(q_prim_vf(strxb)%sf(k, l, q) + 2._wp*G_K/3._wp)
+
+                    rhs_vf(strxb + 1)%sf(k, l, q) = rhs_vf(strxb + 1)%sf(k, l, q) - &
+                        rho_K*v_over_r*q_prim_vf(strxb + 1)%sf(k, l, q)
+
+                    rhs_vf(strxb + 2)%sf(k, l, q) = rhs_vf(strxb + 2)%sf(k, l, q) - &
+                        rho_K*v_over_r*(q_prim_vf(strxb + 2)%sf(k, l, q) + 2._wp*G_K/3._wp)
+
+                    rhs_vf(strxb + 3)%sf(k, l, q) = rhs_vf(strxb + 3)%sf(k, l, q) + rho_K*( &
+                        -(q_prim_vf(strxb + 3)%sf(k, l, q) + 2._wp*G_K/3._wp)*divU_axi &
+                        + 2._wp*(q_prim_vf(strxb + 3)%sf(k, l, q) + G_K)*v_over_r)
+                end do
+            end do
+        end do
+    end subroutine s_compute_hypoelastic_rhs_axisym_geom_iface
 
     subroutine s_finalize_hypoelastic_module()
 

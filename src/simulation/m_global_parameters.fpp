@@ -184,7 +184,7 @@ module m_global_parameters
         !$acc declare create(num_dims, num_vels, weno_polyn, weno_order, weno_num_stencils, num_fluids, wenojs, mapped_weno, wenoz, teno, wenoz_q, mhd, relativity)
     #:endif
 
-    !$acc declare create(mpp_lim, model_eqns, mixture_err, alt_soundspeed, avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity, hyperelasticity, hyper_model, elasticity, low_Mach, viscous, shear_stress, bulk_stress, cont_damage, hypo_hll_fallback, hypo_hll_interface_rhs)
+    !$acc declare create(mpp_lim, model_eqns, mixture_err, alt_soundspeed, avg_state, mp_weno, weno_eps, teno_CT, hypoelasticity, hyperelasticity, hyper_model, elasticity, low_Mach, viscous, shear_stress, bulk_stress, cont_damage, riemann_ADC, ADC_kappa, hypo_hll_fallback, hypo_hll_interface_rhs)
 
     logical :: relax          !< activate phase change
     integer :: relax_model    !< Relaxation model
@@ -1255,7 +1255,7 @@ contains
 
         !$acc update device(alt_soundspeed, acoustic_source, num_source)
         !$acc update device(dt, sys_size, buff_size, pref, rhoref, gamma_idx, pi_inf_idx, E_idx, alf_idx, stress_idx, mpp_lim, bubbles_euler, hypoelasticity, alt_soundspeed, avg_state, num_fluids, model_eqns, num_dims, num_vels, mixture_err, grid_geometry, cyl_coord, mp_weno, weno_eps, teno_CT, hyperelasticity, hyper_model, elasticity, xi_idx, B_idx, low_Mach)
-        !$acc update device(hypo_hll_fallback, hypo_hll_interface_rhs)
+        !$acc update device(riemann_ADC, ADC_kappa, hypo_hll_fallback, hypo_hll_interface_rhs)
 
         !$acc update device(Bx0, powell)
 
