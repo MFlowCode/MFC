@@ -151,6 +151,11 @@ if [ -f "$id_file" ]; then
     rm -f "$id_file"
 fi
 
+# Remove stale output file so the monitor doesn't pick up old content
+# (a previous SLURM job's epilog can write to the .out file after our
+# stale-job check, polluting the new job's output stream).
+rm -f "$output_file"
+
 # --- Module load mode (short form) ---
 module_mode=$([ "$device" = "gpu" ] && echo "g" || echo "c")
 
