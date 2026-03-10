@@ -7,9 +7,9 @@ This helps identify gaps in test coverage before refactoring.
 
 import ast
 import json
-from pathlib import Path
-from typing import Dict, List, Any
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Dict, List
 
 
 @dataclass

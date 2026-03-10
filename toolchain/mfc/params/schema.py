@@ -6,7 +6,7 @@ Provides ParamDef for parameter metadata, constraints, and dependencies.
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Set, Any, Optional, Dict, List
+from typing import Any, Dict, List, Optional, Set
 
 from .errors import constraint_error
 
@@ -40,7 +40,7 @@ class ParamType(Enum):
 
 
 @dataclass
-class ParamDef:  # pylint: disable=too-many-instance-attributes
+class ParamDef:
     """
     Definition of a single MFC parameter.
 

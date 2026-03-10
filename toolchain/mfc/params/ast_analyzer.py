@@ -11,11 +11,10 @@ from __future__ import annotations
 
 import ast
 import re
+from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Set
-from collections import defaultdict
-
 
 # ---------------------------------------------------------------------------
 # Data structures
@@ -56,7 +55,7 @@ def _extract_message(node: ast.AST) -> Optional[str]:
                 # Unparse the expression to get a readable approximation
                 try:
                     parts.append(ast.unparse(value.value))
-                except Exception:  # pylint: disable=broad-except
+                except Exception:
                     parts.append("?")
             else:
                 parts.append("?")
@@ -77,7 +76,7 @@ def _resolve_fstring(node: ast.JoinedStr, subs: Dict[str, str]) -> Optional[str]
             else:
                 try:
                     parts.append(ast.unparse(v.value))
-                except Exception:  # pylint: disable=broad-except
+                except Exception:
                     parts.append("?")
         else:
             parts.append("?")
@@ -106,7 +105,7 @@ def _is_self_get(call: ast.Call) -> bool:
 # AST analysis: methods, call graph, rules
 # ---------------------------------------------------------------------------
 
-class CaseValidatorAnalyzer(ast.NodeVisitor):  # pylint: disable=too-many-instance-attributes
+class CaseValidatorAnalyzer(ast.NodeVisitor):
     """
     Analyzes the CaseValidator class:
 
@@ -187,7 +186,7 @@ class CaseValidatorAnalyzer(ast.NodeVisitor):  # pylint: disable=too-many-instan
         For each if-block, extract guard params from the test condition and add
         them to every rule whose lineno falls within the block's line range.
         """
-        for node in ast.walk(func):  # pylint: disable=too-many-nested-blocks
+        for node in ast.walk(func):
             if not isinstance(node, ast.If):
                 continue
             # Extract params from the if-test condition
@@ -215,7 +214,7 @@ class CaseValidatorAnalyzer(ast.NodeVisitor):  # pylint: disable=too-many-instan
                                 rule.params.append(gp)
                         break
 
-    def _build_local_param_map(self, func: ast.FunctionDef) -> Dict[str, str]:  # pylint: disable=too-many-nested-blocks
+    def _build_local_param_map(self, func: ast.FunctionDef) -> Dict[str, str]:
         """
         Look for assignments like:
             igr = self.get('igr', 'F') == 'T'
@@ -225,7 +224,7 @@ class CaseValidatorAnalyzer(ast.NodeVisitor):  # pylint: disable=too-many-instan
         Uses ast.walk to find assignments at any nesting depth (inside if/for/with blocks).
         """
         m: Dict[str, str] = {}
-        for node in ast.walk(func):  # pylint: disable=too-many-nested-blocks
+        for node in ast.walk(func):
             if isinstance(node, ast.Assign):
                 # Handle both direct calls and comparisons
                 value = node.value
@@ -235,7 +234,7 @@ class CaseValidatorAnalyzer(ast.NodeVisitor):  # pylint: disable=too-many-instan
 
                 if isinstance(value, ast.Call):
                     call = value
-                    if (  # pylint: disable=too-many-boolean-expressions
+                    if (
                         isinstance(call.func, ast.Attribute)
                         and isinstance(call.func.value, ast.Name)
                         and call.func.value.id == "self"
@@ -354,7 +353,7 @@ class CaseValidatorAnalyzer(ast.NodeVisitor):  # pylint: disable=too-many-instan
                         m[target.id] = param_name
         return m
 
-    def _create_loop_rules(self, stmts: list, method_name: str,  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
+    def _create_loop_rules(self, stmts: list, method_name: str,
                             local_map: Dict[str, str], subs: Dict[str, str],
                             loop_guard: Optional[str] = None):
         """Create Rules for self.prohibit()/self.warn() calls found in loop body statements."""
@@ -434,7 +433,7 @@ class CaseValidatorAnalyzer(ast.NodeVisitor):  # pylint: disable=too-many-instan
 
         # detect self.prohibit(<condition>, "<message>") and self.warn(<condition>, "<message>")
         # Skip calls already handled by loop expansion
-        if (  # pylint: disable=too-many-boolean-expressions
+        if (
             isinstance(node.func, ast.Attribute)
             and isinstance(node.func.value, ast.Name)
             and node.func.value.id == "self"
@@ -493,7 +492,7 @@ class CaseValidatorAnalyzer(ast.NodeVisitor):  # pylint: disable=too-many-instan
 
             # direct self.get('param_name')
             if isinstance(node, ast.Call):
-                if (  # pylint: disable=too-many-boolean-expressions
+                if (
                     isinstance(node.func, ast.Attribute)
                     and isinstance(node.func.value, ast.Name)
                     and node.func.value.id == "self"
@@ -518,7 +517,7 @@ def _extract_method_guard(func: ast.FunctionDef, local_param_map: Dict[str, str]
             return
     The guarded variable's param is the trigger for all rules in that method.
     """
-    for stmt in func.body:  # pylint: disable=too-many-nested-blocks
+    for stmt in func.body:
         if not isinstance(stmt, ast.If):
             continue
 
@@ -582,7 +581,7 @@ def _extract_trigger_from_condition(condition: ast.AST, local_param_map: Dict[st
             if node.id in alias_map and alias_map[node.id]:
                 return alias_map[node.id][0]
         if isinstance(node, ast.Call):
-            if (  # pylint: disable=too-many-boolean-expressions
+            if (
                 isinstance(node.func, ast.Attribute)
                 and isinstance(node.func.value, ast.Name)
                 and node.func.value.id == "self"
@@ -646,7 +645,7 @@ def classify_message(msg: str) -> str:
     """
     text = msg.lower()
 
-    if (  # pylint: disable=too-many-boolean-expressions
+    if (
         "not compatible" in text
         or "does not support" in text
         or "cannot be used" in text
@@ -660,7 +659,7 @@ def classify_message(msg: str) -> str:
     ):
         return "incompatibility"
 
-    if (  # pylint: disable=too-many-boolean-expressions
+    if (
         "requires" in text
         or "must be set if" in text
         or "must be specified" in text
@@ -671,7 +670,7 @@ def classify_message(msg: str) -> str:
     ):
         return "requirement"
 
-    if (  # pylint: disable=too-many-boolean-expressions
+    if (
         "must be between" in text
         or "must be positive" in text
         or "must be non-negative" in text

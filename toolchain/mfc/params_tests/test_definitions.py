@@ -5,15 +5,16 @@ Tests parameter definitions, constraints, and dependencies.
 """
 
 import unittest
+
 from ..params import REGISTRY
-from ..params.schema import ParamType
 from ..params.definitions import (
+    CASE_OPT_PARAMS,
     CONSTRAINTS,
     DEPENDENCIES,
-    CASE_OPT_PARAMS,
     _validate_constraint,
     _validate_dependency,
 )
+from ..params.schema import ParamType
 
 
 class TestParameterDefinitions(unittest.TestCase):

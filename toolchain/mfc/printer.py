@@ -1,6 +1,7 @@
 import typing
 
-import rich, rich.console
+import rich
+import rich.console
 
 
 class MFCPrinter:

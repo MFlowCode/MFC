@@ -6,7 +6,6 @@ Opens a dark-themed web UI in your browser (or via SSH tunnel) with live
 controls for slice position, isosurface thresholds, volume opacity,
 colormap, log scale, vmin/vmax, and timestep playback.
 """
-# pylint: disable=use-dict-literal,too-many-lines
 
 import atexit
 import base64
@@ -16,15 +15,16 @@ import math
 import sys
 import threading
 import time
-from typing import List, Callable, Optional
+from typing import Callable, List, Optional
 
 import numpy as np
 import plotly.graph_objects as go
-from dash import Dash, Patch, dcc, html, Input, Output, State, callback_context, no_update
-from skimage.measure import marching_cubes as _marching_cubes  # type: ignore[import]  # pylint: disable=no-name-in-module
-from skimage.measure import find_contours as _find_contours  # type: ignore[import]  # pylint: disable=no-name-in-module
+from dash import Dash, Input, Output, Patch, State, callback_context, dcc, html, no_update
+from skimage.measure import find_contours as _find_contours  # type: ignore[import]
+from skimage.measure import marching_cubes as _marching_cubes  # type: ignore[import]
 
 from mfc.printer import cons
+
 from . import _step_cache
 from ._step_cache import prefetch_one as _prefetch_one
 
@@ -73,7 +73,7 @@ _mesh3_pool_lock = threading.Lock()
 
 def _get_jpeg_pool() -> concurrent.futures.ThreadPoolExecutor:
     """Return the JPEG prefetch pool, creating it lazily on first use."""
-    global _jpeg_pool  # pylint: disable=global-statement
+    global _jpeg_pool  # noqa: PLW0603, PLW0602
     with _jpeg_pool_lock:
         if _jpeg_pool is None:
             _jpeg_pool = concurrent.futures.ThreadPoolExecutor(
@@ -97,10 +97,10 @@ def _get_lut(cmap_name: str) -> np.ndarray:
     """Return a (256, 3) uint8 LUT for the named matplotlib colormap."""
     if cmap_name not in _lut_cache:
         try:
-            import matplotlib as mpl  # pylint: disable=import-outside-toplevel
+            import matplotlib as mpl
             cm = mpl.colormaps.get_cmap(cmap_name)
         except (ImportError, KeyError):
-            import matplotlib.cm as mcm  # pylint: disable=import-outside-toplevel
+            import matplotlib.cm as mcm
             cm = mcm.get_cmap(cmap_name)
         t = np.linspace(0.0, 1.0, 256)
         _lut_cache[cmap_name] = (cm(t)[:, :3] * 255 + 0.5).astype(np.uint8)
@@ -133,8 +133,9 @@ def _encode_jpeg(rgb: np.ndarray) -> bytes:
     """
     if _tj is not None:
         return _tj.encode(rgb, quality=90)
-    from PIL import Image as _PIL  # pylint: disable=import-outside-toplevel
-    import io as _io              # pylint: disable=import-outside-toplevel
+    import io as _io
+
+    from PIL import Image as _PIL
     buf = _io.BytesIO()
     _PIL.fromarray(rgb, 'RGB').save(buf, format='jpeg', quality=90, optimize=False)
     return buf.getvalue()
@@ -161,7 +162,7 @@ def _make_png_source(arr_yx: np.ndarray, cmap_name: str,
     return f"data:image/jpeg;base64,{b64}"
 
 
-def _compute_isomesh(raw_ds: np.ndarray, x_ds: np.ndarray, y_ds: np.ndarray,  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
+def _compute_isomesh(raw_ds: np.ndarray, x_ds: np.ndarray, y_ds: np.ndarray,
                      z_ds: np.ndarray, log_fn, ilo: float, ihi: float,
                      iso_n: int):
     """Server-side marching cubes for *iso_n* levels between *ilo* and *ihi*.
@@ -203,7 +204,9 @@ def _compute_isomesh(raw_ds: np.ndarray, x_ds: np.ndarray, y_ds: np.ndarray,  # 
         verts[:, 0] += float(x_ds[0])
         verts[:, 1] += float(y_ds[0])
         verts[:, 2] += float(z_ds[0])
-        xs.append(verts[:, 0]); ys.append(verts[:, 1]); zs.append(verts[:, 2])
+        xs.append(verts[:, 0])
+        ys.append(verts[:, 1])
+        zs.append(verts[:, 2])
         ii.append(faces[:, 0] + offset)
         jj.append(faces[:, 1] + offset)
         kk.append(faces[:, 2] + offset)
@@ -243,7 +246,7 @@ def _downsample_3d(raw: np.ndarray, x_cc: np.ndarray, y_cc: np.ndarray,
     return raw[::s, ::s, ::s], x_cc[::s], y_cc[::s], z_cc[::s]
 
 
-def _get_ds3(step, var, raw, x_cc, y_cc, z_cc, max_total):  # pylint: disable=too-many-arguments,too-many-positional-arguments
+def _get_ds3(step, var, raw, x_cc, y_cc, z_cc, max_total):
     """Downsampled 3D array with bounded LRU caching.
 
     Avoids re-striding the same large array on every iso threshold / volume
@@ -266,7 +269,7 @@ def _get_ds3(step, var, raw, x_cc, y_cc, z_cc, max_total):  # pylint: disable=to
     return result
 
 
-def _prefetch_jpeg(step, var, get_ad_fn, cmap, vmin_in, vmax_in, log_bool,  # pylint: disable=too-many-arguments,too-many-positional-arguments
+def _prefetch_jpeg(step, var, get_ad_fn, cmap, vmin_in, vmax_in, log_bool,
                    max_nx=1200, max_ny=600):
     """Pre-encode JPEG for *step/var* in a background thread.
 
@@ -280,7 +283,7 @@ def _prefetch_jpeg(step, var, get_ad_fn, cmap, vmin_in, vmax_in, log_bool,  # py
         if key in _jpeg_cache:
             return
 
-    def _bg():  # pylint: disable=too-many-locals
+    def _bg():
         try:
             ad = get_ad_fn(step)
             if var not in ad.variables:
@@ -319,7 +322,7 @@ def _prefetch_jpeg(step, var, get_ad_fn, cmap, vmin_in, vmax_in, log_bool,  # py
                     if len(_jpeg_cache) >= _JPEG_CACHE_MAX:
                         _jpeg_cache.pop(next(iter(_jpeg_cache)))
                     _jpeg_cache[key] = src
-        except Exception:  # pylint: disable=broad-except
+        except Exception:
             logger.debug("JPEG prefetch failed for step %s var %s", step, var, exc_info=True)
 
     _get_jpeg_pool().submit(_bg)
@@ -486,7 +489,7 @@ def _lbl(text):
     })
 
 
-def _slider(sid, lo, hi, step, val, marks=None):  # pylint: disable=too-many-arguments,too-many-positional-arguments
+def _slider(sid, lo, hi, step, val, marks=None):
     return dcc.Slider(
         id=sid, min=lo, max=hi, step=step, value=val,
         marks=marks or {}, updatemode='mouseup',
@@ -539,7 +542,7 @@ def _make_cbar(title_text: str, cmin: float, cmax: float, n: int = 6) -> dict:
     )
 
 
-def _slice_3d(raw, log_fn, x_cc, y_cc, z_cc, slice_axis, slice_pos,  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
+def _slice_3d(raw, log_fn, x_cc, y_cc, z_cc, slice_axis, slice_pos,
               max_pts=(600, 300)):
     """Extract and downsample a 2-D slice from a 3-D array.
 
@@ -568,7 +571,7 @@ def _slice_3d(raw, log_fn, x_cc, y_cc, z_cc, slice_axis, slice_pos,  # pylint: d
     return sliced[::s1, ::s2], c1[::s1], c2[::s2], actual
 
 
-def _build_3d(ad, raw, varname, step, mode, cmap,  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,too-many-branches,too-many-statements,unused-argument
+def _build_3d(ad, raw, varname, step, mode, cmap,
               log_fn, cmin, cmax, cbar_title,
               slice_axis, slice_pos,
               iso_min_frac, iso_max_frac, iso_n, _iso_caps,
@@ -815,7 +818,7 @@ def _compute_contour_traces_3d(data_3d, x_cc, y_cc, z_cc,  # pylint: disable=too
 # Main entry point
 # ---------------------------------------------------------------------------
 
-def run_interactive(  # pylint: disable=too-many-locals,too-many-statements,too-many-arguments,too-many-positional-arguments
+def run_interactive(
         varname: str,
         steps: List[int],
         read_func: Callable,
@@ -1264,7 +1267,7 @@ input[type=radio] + span, label { color: %(tx)s !important; }
         State('playing-st', 'data'),
         prevent_initial_call=True,
     )
-    def _toggle_play(_, __, fps, is_playing):  # pylint: disable=unused-argument
+    def _toggle_play(_, __, fps, is_playing):
         iv = max(int(1000 / max(float(fps or 2), 0.1)), 50)
         trig = (callback_context.triggered or [{}])[0].get('prop_id', '')
         if 'stop-btn' in trig:
@@ -1424,7 +1427,7 @@ input[type=radio] + span, label { color: %(tx)s !important; }
         Input('overlay-vol-nsurf',   'value'),
         State('playing-st',          'data'),
     )
-    def _update(var_sel, step, mode,  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,too-many-branches,too-many-statements
+    def _update(var_sel, step, mode,
                 slice_axis, slice_pos,
                 iso_min_frac, iso_max_frac, iso_n, iso_opacity, iso_caps,
                 vol_opacity, vol_nsurf, vol_min_frac, vol_max_frac,

@@ -5,12 +5,12 @@ Captures validation results from case files for regression testing.
 This allows us to verify that refactoring doesn't change validation behavior.
 """
 
-import json
 import hashlib
+import json
 import subprocess
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Dict, Any, List, Optional
-from dataclasses import dataclass, asdict
+from typing import Any, Dict, List, Optional
 
 from ..case_validator import CaseValidator
 

@@ -1,7 +1,8 @@
-import math, typing
+import math
+import typing
 
-from .pack   import Pack
-from .errors import compute_error, AverageError, Error
+from .errors import AverageError, Error, compute_error
+from .pack import Pack
 
 Tolerance = Error
 
@@ -46,7 +47,6 @@ def _format_error_diagnostics(max_abs_info, max_rel_info) -> str:
     return diagnostic_msg
 
 
-# pylint: disable=too-many-return-statements
 def compare(candidate: Pack, golden: Pack, tol: Tolerance) -> typing.Tuple[Error, str]:
     # Keep track of the average error
     avg_err = AverageError()
@@ -97,7 +97,9 @@ Variable n°{valIndex+1} (1-indexed) in {gFilepath} {msg}:
     return avg_err.get(), None
 
 
-def find_maximum_errors_among_failing(candidate: Pack, golden: Pack, tol: Tolerance) -> typing.Tuple[typing.Optional[typing.Tuple[str, int, float, float, float, float]], typing.Optional[typing.Tuple[str, int, float, float, float, float]]]:
+def find_maximum_errors_among_failing(
+    candidate: Pack, golden: Pack, tol: Tolerance,
+) -> typing.Tuple[typing.Optional[typing.Tuple[str, int, float, float, float, float]], typing.Optional[typing.Tuple[str, int, float, float, float, float]]]:
     """
     Scan all files to find the maximum absolute and relative errors among FAILING variables only.
     A variable fails if is_close(error, tol) returns False.

@@ -25,10 +25,10 @@ After freezing, it is safe to read from multiple threads. Attempts to
 register new parameters after freezing will raise RuntimeError.
 """
 
-from typing import Dict, Set, Mapping, Any
-from types import MappingProxyType
 from collections import defaultdict
 from functools import lru_cache
+from types import MappingProxyType
+from typing import Any, Dict, Mapping, Set
 
 from .schema import ParamDef
 
@@ -179,12 +179,12 @@ class ParamRegistry:
 
 
 @lru_cache(maxsize=1)
-def _get_cached_validator(registry_id: int):  # pylint: disable=unused-argument
+def _get_cached_validator(registry_id: int):
     """Cache the validator at module level (registry is immutable after freeze).
 
     Note: registry_id is used as cache key to invalidate when registry changes.
     """
-    import fastjsonschema  # pylint: disable=import-outside-toplevel
+    import fastjsonschema
     return fastjsonschema.compile(REGISTRY.get_json_schema())
 
 

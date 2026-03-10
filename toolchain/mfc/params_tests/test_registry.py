@@ -3,9 +3,9 @@ Unit tests for params/registry.py module.
 
 Tests registry functionality, freezing, and tag queries.
 """
-# pylint: disable=import-outside-toplevel
 
 import unittest
+
 from ..params.registry import ParamRegistry, RegistryFrozenError
 from ..params.schema import ParamDef, ParamType
 

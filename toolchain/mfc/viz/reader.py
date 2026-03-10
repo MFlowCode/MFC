@@ -25,7 +25,6 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
-
 NAME_LEN = 50  # Fortran character length for variable names
 
 _READ_POOL: Optional[ThreadPoolExecutor] = None
@@ -34,7 +33,7 @@ _POOL_LOCK = threading.Lock()
 
 def _get_pool() -> ThreadPoolExecutor:
     """Return a persistent module-level thread pool, creating it on first use."""
-    global _READ_POOL  # pylint: disable=global-statement
+    global _READ_POOL  # noqa: PLW0603, PLW0602
     with _POOL_LOCK:
         if _READ_POOL is None:
             _READ_POOL = ThreadPoolExecutor(
@@ -121,7 +120,7 @@ def _read_record_endian(f, endian: str) -> bytes:
     return payload
 
 
-def read_binary_file(path: str, var_filter: Optional[str] = None) -> ProcessorData:  # pylint: disable=too-many-locals,too-many-statements
+def read_binary_file(path: str, var_filter: Optional[str] = None) -> ProcessorData:
     """
     Read a single MFC binary post-process file.
 
@@ -347,7 +346,7 @@ def _is_1d(case_dir: str) -> bool:
             and not os.path.isdir(p0))
 
 
-def assemble_from_proc_data(  # pylint: disable=too-many-locals,too-many-statements
+def assemble_from_proc_data(
     proc_data: List[Tuple[int, ProcessorData]],
 ) -> AssembledData:
     """
@@ -454,7 +453,7 @@ def assemble_from_proc_data(  # pylint: disable=too-many-locals,too-many-stateme
     )
 
 
-def assemble(case_dir: str, step: int, fmt: str = 'binary',  # pylint: disable=too-many-locals
+def assemble(case_dir: str, step: int, fmt: str = 'binary',
              var: Optional[str] = None) -> AssembledData:
     """
     Read and assemble multi-processor data for a given timestep.

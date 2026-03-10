@@ -3,17 +3,19 @@ MFC Parameter Search and Discovery Command.
 
 Provides CLI access to search and explore MFC's ~3,300 case parameters.
 """
-# pylint: disable=import-outside-toplevel
 
 import re
-from .state import ARG
+
 from .printer import cons
+from .state import ARG
 
 
 def params():
     """Execute the params command based on CLI arguments."""
-    from .params import REGISTRY
-    from .params import definitions  # noqa: F401  pylint: disable=unused-import
+    from .params import (
+        REGISTRY,
+        definitions,  # noqa: F401
+    )
 
     query = ARG("query")
     type_filter = ARG("param_type")
@@ -46,7 +48,7 @@ def params():
         cons.print("     Use './mfc.sh params -F' to see all feature groups")
 
 
-def _collapse_indexed_params(matches):  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
+def _collapse_indexed_params(matches):
     """
     Collapse indexed parameters into patterns.
 
@@ -300,7 +302,7 @@ def _show_families(registry, limit):
     cons.print("[yellow]Tip:[/yellow] Use './mfc.sh params <family>' to see parameters in a family")
 
 
-def _search_params(registry, query, type_filter, limit, describe=False, search_descriptions=True):  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
+def _search_params(registry, query, type_filter, limit, describe=False, search_descriptions=True):
     """Search for parameters matching a query."""
     from .params.descriptions import get_description
 
@@ -348,7 +350,7 @@ def _search_params(registry, query, type_filter, limit, describe=False, search_d
         cons.print(f"  [dim]... {len(collapsed) - limit} more patterns (use -n {len(collapsed)} to show all)[/dim]")
 
 
-def _show_collapsed_results(collapsed, describe=False):  # pylint: disable=too-many-branches
+def _show_collapsed_results(collapsed, describe=False):
     """Show collapsed search results."""
     from .params.descriptions import get_description, get_pattern_description
 
@@ -390,11 +392,10 @@ def _show_collapsed_results(collapsed, describe=False):  # pylint: disable=too-m
                 name, param, count, range_str = item
                 if count > 1:
                     cons.print(f"  {name:<40} {param.param_type.name:12} {count:>4}  {range_str}")
+                elif has_ranges:
+                    cons.print(f"  {name:<40} {param.param_type.name:12} {count:>4}")
                 else:
-                    if has_ranges:
-                        cons.print(f"  {name:<40} {param.param_type.name:12} {count:>4}")
-                    else:
-                        cons.print(f"  {name:<40} {param.param_type.name:12}")
+                    cons.print(f"  {name:<40} {param.param_type.name:12}")
             else:
                 name, param, count = item
                 if has_ranges:

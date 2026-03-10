@@ -4,14 +4,14 @@ Parameter Inventory Export Tool.
 Exports all MFC parameters with their types and tags to JSON for analysis.
 """
 
-import re
 import json
+import re
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any, Dict
 
-from ..run.case_dicts import ALL
 from ..params import REGISTRY
 from ..params.schema import ParamType
+from ..run.case_dicts import ALL
 
 
 def get_param_type_name(param_type) -> str:

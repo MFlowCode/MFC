@@ -53,14 +53,14 @@ if [[ ${#PATHS[@]} -gt 0 ]]; then
         exit 1
     fi
 
-    # Format Python files
-    if ! find $SEARCH_PATHS -type f 2>/dev/null | grep -E '\.(py)$' \
-            | xargs --no-run-if-empty -L 1 -P ${JOBS:-1} $SHELL toolchain/bootstrap/format_python.sh; then
+    # Format Python files with ruff (auto-fix lint issues, then format)
+    ruff check --fix $SEARCH_PATHS > /dev/null 2>&1 || true
+    if ! ruff format $SEARCH_PATHS; then
         error "Formatting Python files failed."
         exit 1
     fi
 else
-    # Default: format src/, examples/, and benchmarks/
+    # Default: format src/ (Fortran), toolchain/ examples/ benchmarks/ (Python)
 
     # Format Fortran files (.f90, .fpp) in src/
     if ! find src -type f 2>/dev/null | grep -Ev 'autogen' | grep -E '\.(f90|fpp)$' \
@@ -69,17 +69,10 @@ else
         exit 1
     fi
 
-    # Format Python files in examples/
-    if ! find examples -type f 2>/dev/null | grep -E '\.(py)$' \
-            | xargs --no-run-if-empty -L 1 -P ${JOBS:-1} $SHELL toolchain/bootstrap/format_python.sh; then
-        error "Formatting MFC examples failed."
-        exit 1
-    fi
-
-    # Format Python files in benchmarks/
-    if ! find benchmarks -type f 2>/dev/null | grep -E '\.(py)$' \
-            | xargs --no-run-if-empty -L 1 -P ${JOBS:-1} $SHELL toolchain/bootstrap/format_python.sh; then
-        error "Formatting MFC benchmarks failed."
+    # Format Python files with ruff (auto-fix lint issues, then format)
+    ruff check --fix toolchain/ examples/ benchmarks/ > /dev/null 2>&1 || true
+    if ! ruff format toolchain/ examples/ benchmarks/; then
+        error "Formatting Python files failed."
         exit 1
     fi
 fi

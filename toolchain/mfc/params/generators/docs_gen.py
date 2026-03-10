@@ -7,15 +7,15 @@ organized by family with descriptions, types, and constraints.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Tuple
-from collections import defaultdict
 import re
+from collections import defaultdict
+from typing import Any, Dict, List, Tuple
 
-from ..schema import ParamType
-from ..registry import REGISTRY
-from ..descriptions import get_description, get_math_symbol
+from .. import definitions  # noqa: F401
 from ..ast_analyzer import analyze_case_validator, classify_message
-from .. import definitions  # noqa: F401  pylint: disable=unused-import
+from ..descriptions import get_description, get_math_symbol
+from ..registry import REGISTRY
+from ..schema import ParamType
 
 
 def _get_family(name: str) -> str:
@@ -187,7 +187,7 @@ _PARAM_PATTERN = None
 
 
 def _get_param_pattern():
-    global _PARAM_PATTERN  # noqa: PLW0603  pylint: disable=global-statement
+    global _PARAM_PATTERN  # noqa: PLW0603, PLW0602
     if _PARAM_PATTERN is None:
         _PARAM_PATTERN = _build_param_name_pattern()
     return _PARAM_PATTERN
@@ -195,7 +195,7 @@ def _get_param_pattern():
 
 def _build_reverse_dep_map() -> Dict[str, List[Tuple[str, str]]]:
     """Build map from target param -> [(relation, source_param), ...] from DEPENDENCIES."""
-    from ..definitions import DEPENDENCIES  # pylint: disable=import-outside-toplevel
+    from ..definitions import DEPENDENCIES
     reverse: Dict[str, List[Tuple[str, str]]] = {}
     for param, dep in DEPENDENCIES.items():
         if "when_true" in dep:
@@ -217,13 +217,13 @@ _REVERSE_DEPS = None
 
 
 def _get_reverse_deps():
-    global _REVERSE_DEPS  # noqa: PLW0603  pylint: disable=global-statement
+    global _REVERSE_DEPS  # noqa: PLW0603, PLW0602
     if _REVERSE_DEPS is None:
         _REVERSE_DEPS = _build_reverse_dep_map()
     return _REVERSE_DEPS
 
 
-def _format_tag_annotation(param_name: str, param) -> str:  # pylint: disable=too-many-locals
+def _format_tag_annotation(param_name: str, param) -> str:
     """
     Return a short annotation for params with no schema constraints and no AST rules.
 
@@ -270,7 +270,7 @@ def _format_tag_annotation(param_name: str, param) -> str:  # pylint: disable=to
         return param.hint
 
     # 5. Tag-based label (from TAG_DISPLAY_NAMES in definitions.py)
-    from ..definitions import TAG_DISPLAY_NAMES  # pylint: disable=import-outside-toplevel
+    from ..definitions import TAG_DISPLAY_NAMES
     for tag, display_name in TAG_DISPLAY_NAMES.items():
         if tag in param.tags:
             return f"{display_name} parameter"
@@ -278,7 +278,7 @@ def _format_tag_annotation(param_name: str, param) -> str:  # pylint: disable=to
     return ""
 
 
-def _format_validator_rules(param_name: str, by_trigger: Dict[str, list],  # pylint: disable=too-many-locals
+def _format_validator_rules(param_name: str, by_trigger: Dict[str, list],
                             by_param: Dict[str, list] | None = None) -> str:
     """Format AST-extracted validator rules for a parameter's Constraints column.
 
@@ -343,7 +343,7 @@ def _format_validator_rules(param_name: str, by_trigger: Dict[str, list],  # pyl
     return "; ".join(parts)
 
 
-def generate_parameter_docs() -> str:  # pylint: disable=too-many-locals,too-many-statements
+def generate_parameter_docs() -> str:
     """Generate markdown documentation for all parameters."""
     # AST-extract rules from case_validator.py
     analysis = analyze_case_validator()

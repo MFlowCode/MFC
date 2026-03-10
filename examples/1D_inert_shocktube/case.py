@@ -2,8 +2,8 @@
 # References:
 # + https://doi.org/10.1016/j.compfluid.2013.10.014: 4.3. Multi-component inert shock tube
 
-import json
 import argparse
+import json
 
 import cantera as ct
 
@@ -105,8 +105,8 @@ case = {
 
 if args.chemistry:
     for i in range(len(sol_L.Y)):
-        case[f"patch_icpp(1)%Y({i+1})"] = sol_L.Y[i]
-        case[f"patch_icpp(2)%Y({i+1})"] = sol_R.Y[i]
+        case[f"patch_icpp(1)%Y({i + 1})"] = sol_L.Y[i]
+        case[f"patch_icpp(2)%Y({i + 1})"] = sol_R.Y[i]
 
 if __name__ == "__main__":
     print(json.dumps(case))

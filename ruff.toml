@@ -1,0 +1,23 @@
+line-length = 200
+target-version = "py39"
+exclude = ["_version.py"]
+
+[lint]
+select = ["E", "F", "W", "I", "PL"]
+ignore = [
+    # Complexity thresholds (project style)
+    "PLR0911",  # too-many-return-statements
+    "PLR0912",  # too-many-branches
+    "PLR0913",  # too-many-arguments
+    "PLR0915",  # too-many-statements
+    "PLR2004",  # magic-value-comparison
+    # Import patterns (project style)
+    "PLC0415",  # import-outside-toplevel
+]
+
+[lint.per-file-ignores]
+"examples/**/*.py" = ["F401", "F403", "F405", "F811", "F821", "E402", "E722", "E741"]
+"benchmarks/*/case.py" = ["F401", "F403", "F405", "F811", "F821", "E402", "E741"]
+
+[lint.isort]
+known-first-party = ["mfc"]

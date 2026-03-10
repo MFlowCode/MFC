@@ -14,12 +14,10 @@ from __future__ import annotations
 from typing import Callable, List, Optional, Tuple
 
 import numpy as np
-
 from rich.color import Color as RichColor
 from rich.console import Group as RichGroup
 from rich.style import Style
 from rich.text import Text as RichText
-
 from textual import on, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -27,14 +25,20 @@ from textual.containers import Horizontal, Vertical
 from textual.message import Message
 from textual.reactive import reactive
 from textual.widgets import (
-    Digits, Footer, Header, Label, ListItem, ListView, Static,
+    Digits,
+    Footer,
+    Header,
+    Label,
+    ListItem,
+    ListView,
+    Static,
 )
 from textual.worker import get_current_worker
-
 from textual_plotext import PlotextPlot
 
 from mfc.common import MFCException
 from mfc.printer import cons
+
 from . import _step_cache
 
 # Colormaps available via [c] cycling
@@ -64,7 +68,7 @@ _HEADER_ROWS: int = 1
 # Plot widget
 # ---------------------------------------------------------------------------
 
-class MFCPlot(PlotextPlot):  # pylint: disable=too-many-instance-attributes,too-few-public-methods
+class MFCPlot(PlotextPlot):
     """Plotext plot widget.  Caller sets ._x_cc / ._y_cc / ._data / ._ndim /
     ._varname / ._step before calling .refresh()."""
 
@@ -120,7 +124,7 @@ class MFCPlot(PlotextPlot):  # pylint: disable=too-many-instance-attributes,too-
         self._zoom = (0.0, 1.0, 0.0, 1.0)
         self.refresh()
 
-    def _zoom_around(  # pylint: disable=too-many-locals
+    def _zoom_around(
         self, cx_frac: float, cy_frac: float, factor: float
     ) -> None:
         """Zoom by *factor* centred at *(cx_frac, cy_frac)* in [0,1]² of current view."""
@@ -169,7 +173,7 @@ class MFCPlot(PlotextPlot):  # pylint: disable=too-many-instance-attributes,too-
     def on_mouse_scroll_down(self, event) -> None:  # type: ignore[override]
         self._scroll_zoom(event, factor=1.0 / 0.75)
 
-    def on_mouse_up(self, event) -> None:  # pylint: disable=too-many-locals
+    def on_mouse_up(self, event) -> None:
         """Feature 5 — post Clicked message with the data value at the heatmap cell."""
         if event.button != 1:
             return
@@ -188,17 +192,17 @@ class MFCPlot(PlotextPlot):  # pylint: disable=too-many-instance-attributes,too-
         ix_pos = int(np.round(col * (n_ix - 1) / max(self._last_w_map - 1, 1)))
         # Display is y-flipped: row 0 = top = y_max.
         iy_pos = n_iy - 1 - int(np.round(row * (n_iy - 1) / max(self._last_h_plot - 1, 1)))
-        xi = int(self._last_ix[np.clip(ix_pos, 0, n_ix - 1)])  # pylint: disable=unsubscriptable-object
-        yi = int(self._last_iy[np.clip(iy_pos, 0, n_iy - 1)])  # pylint: disable=unsubscriptable-object
+        xi = int(self._last_ix[np.clip(ix_pos, 0, n_ix - 1)])
+        yi = int(self._last_iy[np.clip(iy_pos, 0, n_iy - 1)])
         x_cc = self._x_cc
         y_cc = self._y_cc if self._y_cc is not None else np.array([0.0, 1.0])
         data = self._data
-        x_val = float(x_cc[xi])   # type: ignore[index]  # pylint: disable=unsubscriptable-object
+        x_val = float(x_cc[xi])   # type: ignore[index]
         y_val = float(y_cc[yi])
-        val = float(data[xi, yi])  # type: ignore[index]  # pylint: disable=unsubscriptable-object
+        val = float(data[xi, yi])  # type: ignore[index]
         self.post_message(MFCPlot.Clicked(x_val, y_val, val))
 
-    def render(self):  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
+    def render(self):
         data = self._data
         x_cc = self._x_cc
         self.plt.clear_figure()
@@ -232,8 +236,8 @@ class MFCPlot(PlotextPlot):  # pylint: disable=too-many-instance-attributes,too-
             return super().render()
 
         # 2D: pure-Rich heatmap with vertical colorbar.
-        import matplotlib                     # pylint: disable=import-outside-toplevel
-        import matplotlib.colors as mcolors  # pylint: disable=import-outside-toplevel
+        import matplotlib
+        import matplotlib.colors as mcolors
 
         # Content area = widget size minus 1-char border on each side.
         # Reserve 1 row each for header and footer → h_plot rows for the image.
@@ -247,7 +251,7 @@ class MFCPlot(PlotextPlot):  # pylint: disable=too-many-instance-attributes,too-
 
         # Preserve the physical x/y aspect ratio.
         y_cc_2d = self._y_cc if self._y_cc is not None else np.array([0.0, 1.0])
-        x_extent = max(abs(float(x_cc[-1]) - float(x_cc[0])), 1e-30)  # pylint: disable=unsubscriptable-object
+        x_extent = max(abs(float(x_cc[-1]) - float(x_cc[0])), 1e-30)
         y_extent = max(abs(float(y_cc_2d[-1]) - float(y_cc_2d[0])), 1e-30)
         domain_ratio = float(np.clip(x_extent / y_extent, _ASPECT_MIN, _ASPECT_MAX))
         char_ratio = domain_ratio * _CELL_RATIO
@@ -275,19 +279,19 @@ class MFCPlot(PlotextPlot):  # pylint: disable=too-many-instance-attributes,too-
         self._last_ix = ix
         self._last_iy = iy
 
-        ds = data[np.ix_(ix, iy)]  # pylint: disable=unsubscriptable-object
+        ds = data[np.ix_(ix, iy)]
 
         # Compute which screen cells to stamp with an open-circle glyph.
         bubble_cells: set = set()
         bubbles = self._bubbles
         if bubbles is not None and len(bubbles) > 0:
-            x_phys = x_cc[ix]   # type: ignore[index]  # pylint: disable=unsubscriptable-object
+            x_phys = x_cc[ix]   # type: ignore[index]
             y_phys = y_cc_2d[iy]
             x_min, x_max = float(x_phys[0]),  float(x_phys[-1])
             y_min, y_max = float(y_phys[0]),  float(y_phys[-1])
             x_range = max(abs(x_max - x_min), 1e-30)
             y_range = max(abs(y_max - y_min), 1e-30)
-            for b in bubbles:  # pylint: disable=not-an-iterable
+            for b in bubbles:
                 bx, by, br = float(b[0]), float(b[1]), float(b[3])
                 if bx < x_min - br or bx > x_max + br:
                     continue
@@ -374,8 +378,8 @@ class MFCPlot(PlotextPlot):  # pylint: disable=too-many-instance-attributes,too-
             style="bold"
         )
         # Show the visible coordinate range (reflects zoom when active).
-        x_lo = float(x_cc[ix[0]])   # type: ignore[index]  # pylint: disable=unsubscriptable-object
-        x_hi = float(x_cc[ix[-1]])  # type: ignore[index]  # pylint: disable=unsubscriptable-object
+        x_lo = float(x_cc[ix[0]])   # type: ignore[index]
+        x_hi = float(x_cc[ix[-1]])  # type: ignore[index]
         y_vis = y_cc_2d[iy]
         footer = RichText(
             f" x: [{x_lo:.3f} \u2026 {x_hi:.3f}]"
@@ -389,7 +393,7 @@ class MFCPlot(PlotextPlot):  # pylint: disable=too-many-instance-attributes,too-
 # Main TUI app
 # ---------------------------------------------------------------------------
 
-class MFCTuiApp(App):  # pylint: disable=too-many-instance-attributes
+class MFCTuiApp(App):
     """Textual TUI for MFC post-processed data."""
 
     CSS = """
@@ -451,7 +455,7 @@ class MFCTuiApp(App):  # pylint: disable=too-many-instance-attributes
     log_scale: reactive[bool] = reactive(False, always_update=True)
     playing: reactive[bool] = reactive(False, always_update=True)
 
-    def __init__(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    def __init__(
         self,
         steps: List[int],
         varnames: List[str],
@@ -515,10 +519,9 @@ class MFCTuiApp(App):  # pylint: disable=too-many-instance-attributes
     def watch_playing(self, _old: bool, new: bool) -> None:
         if new:
             self._play_timer = self.set_interval(0.5, self._auto_advance)
-        else:
-            if self._play_timer is not None:
-                self._play_timer.stop()
-                self._play_timer = None
+        elif self._play_timer is not None:
+            self._play_timer.stop()
+            self._play_timer = None
 
     # ------------------------------------------------------------------
     # MFCPlot.Clicked handler — update status bar (Feature 5)
@@ -573,7 +576,7 @@ class MFCTuiApp(App):  # pylint: disable=too-many-instance-attributes
             self._apply_data, assembled, data, step, var, cmap, log, frozen, bubbles,
         )
 
-    def _apply_data(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    def _apply_data(
         self,
         assembled,
         data: Optional[np.ndarray],
@@ -586,20 +589,20 @@ class MFCTuiApp(App):  # pylint: disable=too-many-instance-attributes
     ) -> None:
         """Apply loaded data to the plot widget.  Runs on the main thread."""
         plot = self.query_one("#plot", MFCPlot)
-        plot._x_cc = assembled.x_cc        # pylint: disable=protected-access
-        plot._y_cc = assembled.y_cc        # pylint: disable=protected-access
-        plot._data = data                  # pylint: disable=protected-access
-        plot._ndim = self._ndim            # pylint: disable=protected-access
-        plot._varname = var                # pylint: disable=protected-access
-        plot._step = step                  # pylint: disable=protected-access
-        plot._cmap_name = cmap             # pylint: disable=protected-access
-        plot._log_scale = log              # pylint: disable=protected-access
-        plot._bubbles = bubbles            # pylint: disable=protected-access
+        plot._x_cc = assembled.x_cc
+        plot._y_cc = assembled.y_cc
+        plot._data = data
+        plot._ndim = self._ndim
+        plot._varname = var
+        plot._step = step
+        plot._cmap_name = cmap
+        plot._log_scale = log
+        plot._bubbles = bubbles
         if frozen is not None:
-            plot._vmin, plot._vmax = frozen  # pylint: disable=protected-access
+            plot._vmin, plot._vmax = frozen
         else:
-            plot._vmin = None              # pylint: disable=protected-access
-            plot._vmax = None              # pylint: disable=protected-access
+            plot._vmin = None
+            plot._vmax = None
         plot.refresh()
 
         # Update step counter (Feature 2).
@@ -660,7 +663,7 @@ class MFCTuiApp(App):  # pylint: disable=too-many-instance-attributes
             self._frozen_range = None
         else:
             plot = self.query_one("#plot", MFCPlot)
-            self._frozen_range = (plot._last_vmin, plot._last_vmax)  # pylint: disable=protected-access
+            self._frozen_range = (plot._last_vmin, plot._last_vmax)
         self._push_data()
 
     def action_toggle_play(self) -> None:

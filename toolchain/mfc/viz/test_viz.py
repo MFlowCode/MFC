@@ -5,12 +5,10 @@ Covers step parsing, label formatting, format/timestep discovery,
 data assembly (binary + silo, 1D/2D/3D), and 1D rendering.
 Uses checked-in fixture data generated from minimal MFC runs.
 """
-# pylint: disable=import-outside-toplevel,protected-access
 
 import os
 import tempfile
 import unittest
-
 
 FIXTURES = os.path.join(os.path.dirname(__file__), 'fixtures')
 
@@ -257,6 +255,7 @@ class TestAssembleBinary1DMultiRank(unittest.TestCase):
     def test_grid_is_sorted_and_unique(self):
         """Assembled global grid is strictly increasing with no duplicates."""
         import numpy as np
+
         from .reader import assemble
         data = assemble(FIX_1D_BIN_2RANK, 0, 'binary')
         diffs = np.diff(data.x_cc)
@@ -265,6 +264,7 @@ class TestAssembleBinary1DMultiRank(unittest.TestCase):
     def test_variable_values_match_position(self):
         """pres values (== x_cc position) are placed at the correct global cells."""
         import numpy as np
+
         from .reader import assemble
         data = assemble(FIX_1D_BIN_2RANK, 0, 'binary')
         np.testing.assert_allclose(data.variables['pres'], data.x_cc, atol=1e-10)
@@ -383,9 +383,10 @@ class TestBinarySiloConsistency(unittest.TestCase):
 
     def test_1d_same_grid(self):
         """Binary and silo 1D fixtures have the same grid."""
+        import numpy as np
+
         from .reader import assemble
         from .silo_reader import assemble_silo
-        import numpy as np
         bin_data = assemble(FIX_1D_BIN, 0, 'binary')
         silo_data = assemble_silo(FIX_1D_SILO, 0)
         np.testing.assert_allclose(bin_data.x_cc, silo_data.x_cc, atol=1e-10)
@@ -402,6 +403,7 @@ class TestBinarySiloConsistency(unittest.TestCase):
     def test_1d_same_values(self):
         """Binary and silo 1D fixtures have the same variable values."""
         import numpy as np
+
         from .reader import assemble
         from .silo_reader import assemble_silo
         bin_data = assemble(FIX_1D_BIN, 0, 'binary')
@@ -651,6 +653,7 @@ class TestMultiRankAssembly(unittest.TestCase):
     def _make_proc(self, x_cb, pres):
         """Build a minimal 1D ProcessorData from boundary coordinates."""
         import numpy as np
+
         from .reader import ProcessorData
         return ProcessorData(
             m=len(x_cb) - 1,
@@ -665,6 +668,7 @@ class TestMultiRankAssembly(unittest.TestCase):
     def test_two_rank_1d_dedup(self):
         """Two processors with one overlapping ghost cell assemble correctly."""
         import numpy as np
+
         from .reader import assemble_from_proc_data
         # Domain: 4 cells with centers at 0.125, 0.375, 0.625, 0.875
         # Proc 0 sees cells 0-2 (center 0.625 is ghost from proc 1)
@@ -684,6 +688,7 @@ class TestMultiRankAssembly(unittest.TestCase):
     def test_large_extent_dedup(self):
         """Deduplication works correctly for large-extent domains (>1e6)."""
         import numpy as np
+
         from .reader import assemble_from_proc_data
         # Scale up by 1e7: extent=1e7, decimals = ceil(-log10(1e7)) + 12 = 5
         scale = 1e7
@@ -710,6 +715,7 @@ class TestMultiRankAssembly(unittest.TestCase):
         are >> 10, so distinct cell-centers must not be collapsed.
         """
         import numpy as np
+
         from .reader import assemble_from_proc_data
         scale = 1e13
         p0 = self._make_proc(

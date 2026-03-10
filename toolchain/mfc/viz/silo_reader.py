@@ -135,7 +135,7 @@ def _resolve_path(h5file, path_bytes):
     return np.array(h5file[path])
 
 
-def read_silo_file(  # pylint: disable=too-many-locals
+def read_silo_file(
     path: str,
     var_filter: Optional[str] = None,
     rank_dir: Optional[str] = None,
@@ -199,7 +199,7 @@ _POOL_LOCK = threading.Lock()
 
 def _get_pool() -> ThreadPoolExecutor:
     """Return a module-level thread pool, creating it on first use."""
-    global _READ_POOL  # pylint: disable=global-statement
+    global _READ_POOL  # noqa: PLW0603, PLW0602
     with _POOL_LOCK:
         if _READ_POOL is None:
             _READ_POOL = ThreadPoolExecutor(

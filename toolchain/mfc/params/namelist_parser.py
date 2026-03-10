@@ -13,7 +13,6 @@ import re
 from pathlib import Path
 from typing import Dict, Set
 
-
 # Fallback parameters for when Fortran source files are not available.
 # Generated from the namelist definitions in src/*/m_start_up.fpp.
 # To regenerate: python3 toolchain/mfc/params/namelist_parser.py

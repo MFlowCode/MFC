@@ -1,13 +1,16 @@
-import dataclasses, typing, sys, os, re, math
+import dataclasses
+import math
+import os
+import re
+import sys
+import typing
 from datetime import datetime
 from pathlib import Path
 
-from ..       import common
-from ..run    import input
-from ..build  import get_configured_targets
-from ..state  import CFG
-
-
+from .. import common
+from ..build import get_configured_targets
+from ..run import input
+from ..state import CFG
 
 
 # This class maps to the data contained in one file in D/

@@ -5,8 +5,8 @@ Generates test cases that intentionally violate validator constraints
 to ensure each constraint is properly enforced.
 """
 
-from typing import Dict, Any, List
 from dataclasses import dataclass
+from typing import Any, Dict, List
 
 from ..case_validator import CaseValidator
 

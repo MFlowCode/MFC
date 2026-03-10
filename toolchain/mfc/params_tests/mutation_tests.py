@@ -7,9 +7,9 @@ to verify the validator catches invalid configurations.
 
 import json
 import subprocess
-from pathlib import Path
-from typing import Dict, Any, List, Tuple
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Dict, List, Tuple
 
 from ..case_validator import CaseValidator
 
@@ -271,7 +271,7 @@ def print_mutation_report():
         for r in results["missed_details"][:10]:
             print(f"  {r.case_name}")
             print(f"    {r.param_name}: {r.original_value} -> {r.mutated_value}")
-            print(f"    No validation error raised!")
+            print("    No validation error raised!")
             print()
 
 

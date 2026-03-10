@@ -3,12 +3,13 @@ MFC Parameter Definitions (Compact).
 
 Single file containing all ~3,300 parameter definitions using loops.
 This replaces the definitions/ directory.
-"""  # pylint: disable=too-many-lines
+"""
 
 import re
-from typing import Dict, Any
-from .schema import ParamDef, ParamType
+from typing import Any, Dict
+
 from .registry import REGISTRY
+from .schema import ParamDef, ParamType
 
 # Index limits
 NP, NF, NI, NA, NPR, NB = 10, 10, 1000, 4, 10, 10  # patches, fluids, ibs, acoustic, probes, bc_patches
@@ -465,7 +466,7 @@ _VALID_CONDITION_KEYS = {"requires", "recommends", "requires_value"}
 def _validate_constraint(param_name: str, constraint: Dict[str, Any]) -> None:
     """Validate a constraint dict has valid keys with 'did you mean?' suggestions."""
     # Import here to avoid circular import at module load time
-    from .suggest import invalid_key_error  # pylint: disable=import-outside-toplevel
+    from .suggest import invalid_key_error
 
     invalid_keys = set(constraint.keys()) - _VALID_CONSTRAINT_KEYS
     if invalid_keys:
@@ -501,7 +502,7 @@ def _validate_constraint(param_name: str, constraint: Dict[str, Any]) -> None:
 def _validate_dependency(param_name: str, dependency: Dict[str, Any]) -> None:
     """Validate a dependency dict has valid structure with 'did you mean?' suggestions."""
     # Import here to avoid circular import at module load time
-    from .suggest import invalid_key_error  # pylint: disable=import-outside-toplevel
+    from .suggest import invalid_key_error
 
     invalid_keys = set(dependency.keys()) - _VALID_DEPENDENCY_KEYS
     if invalid_keys:
@@ -808,7 +809,7 @@ DEPENDENCIES = {
     },
 }
 
-def _r(name, ptype, tags=None, desc=None, hint=None, math=None):  # pylint: disable=too-many-arguments,too-many-positional-arguments
+def _r(name, ptype, tags=None, desc=None, hint=None, math=None):
     """Register a parameter with optional feature tags and description."""
     if hint is None:
         hint = _lookup_hint(name)
@@ -831,7 +832,7 @@ def _r(name, ptype, tags=None, desc=None, hint=None, math=None):  # pylint: disa
     ))
 
 
-def _load():  # pylint: disable=too-many-locals,too-many-statements
+def _load():
     """Load all parameter definitions."""
     INT, REAL, LOG, STR = ParamType.INT, ParamType.REAL, ParamType.LOG, ParamType.STR
     A_REAL = ParamType.ANALYTIC_REAL

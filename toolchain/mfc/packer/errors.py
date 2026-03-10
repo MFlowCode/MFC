@@ -1,4 +1,6 @@
-import dataclasses, math
+import dataclasses
+import math
+
 
 @dataclasses.dataclass(repr=False)
 class Error:

@@ -1,5 +1,5 @@
-import math
 import json
+import math
 
 # Numerical setup
 Nx = 99

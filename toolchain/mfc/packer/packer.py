@@ -1,11 +1,13 @@
-import typing, os.path
+import os.path
+import typing
 
+from ..common import MFCException
 from ..printer import cons
 from ..state import ARG, ARGS
-from . import pack as _pack
 from . import errors
+from . import pack as _pack
 from . import tol as packtol
-from ..common import MFCException
+
 
 def load(packpath: str) -> _pack.Pack:
     return _pack.load(packpath)

@@ -7,11 +7,9 @@ Dispatches to reader + renderer based on CLI arguments.
 import os
 import warnings
 
-from mfc.state import ARG
 from mfc.common import MFCException
 from mfc.printer import cons
-
-
+from mfc.state import ARG
 
 _CMAP_POPULAR = (
     'viridis, plasma, inferno, magma, turbo, '
@@ -21,11 +19,11 @@ _CMAP_POPULAR = (
 
 def _validate_cmap(name):
     """Raise a helpful MFCException if *name* is not a known matplotlib colormap."""
-    import matplotlib  # pylint: disable=import-outside-toplevel
+    import matplotlib
     if name in matplotlib.colormaps:
         return
     try:
-        from rapidfuzz import process  # pylint: disable=import-outside-toplevel
+        from rapidfuzz import process
         matches = process.extract(name, list(matplotlib.colormaps), limit=3)
         suggestions = ', '.join(m[0] for m in matches)
         hint = f" Did you mean: {suggestions}?"
@@ -166,11 +164,11 @@ def _parse_steps(step_arg, available_steps):
     return [single], 1
 
 
-def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branches
+def viz():
     """Main viz command dispatcher."""
 
-    from .reader import discover_format, discover_timesteps, assemble, has_lag_bubble_evol, read_lag_bubbles_at_step  # pylint: disable=import-outside-toplevel
-    from .renderer import render_1d, render_1d_tiled, render_2d, render_2d_tiled, render_3d_slice, render_mp4  # pylint: disable=import-outside-toplevel
+    from .reader import assemble, discover_format, discover_timesteps, has_lag_bubble_evol, read_lag_bubbles_at_step
+    from .renderer import render_1d, render_1d_tiled, render_2d, render_2d_tiled, render_3d_slice, render_mp4
 
     case_dir = ARG('input')
     if case_dir is None:
@@ -248,7 +246,7 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
                     f"Available steps: {_steps_hint(steps)}")
 
         if fmt == 'silo':
-            from .silo_reader import assemble_silo  # pylint: disable=import-outside-toplevel
+            from .silo_reader import assemble_silo
             assembled = assemble_silo(case_dir, step)
         else:
             assembled = assemble(case_dir, step, fmt)
@@ -301,14 +299,14 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
 
     def read_step(step):
         if fmt == 'silo':
-            from .silo_reader import assemble_silo  # pylint: disable=import-outside-toplevel
+            from .silo_reader import assemble_silo
             return assemble_silo(case_dir, step, var=None if load_all else varname)
         return assemble(case_dir, step, fmt, var=None if load_all else varname)
 
     def read_step_one_var(step, var):
         """Read a single variable for a step — used by interactive mode."""
         if fmt == 'silo':
-            from .silo_reader import assemble_silo  # pylint: disable=import-outside-toplevel
+            from .silo_reader import assemble_silo
             return assemble_silo(case_dir, step, var=var)
         return assemble(case_dir, step, fmt, var=var)
 
@@ -340,7 +338,7 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
         # to build a useful "available variables" list for the error message.
         if not avail:
             if fmt == 'silo':
-                from .silo_reader import assemble_silo  # pylint: disable=import-outside-toplevel
+                from .silo_reader import assemble_silo
                 _full = assemble_silo(case_dir, requested_steps[0])
             else:
                 _full = assemble(case_dir, requested_steps[0], fmt)
@@ -359,7 +357,7 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
                 "Terminal UI only supports 1D and 2D data. "
                 "Use --interactive for 3D data."
             )
-        from .tui import run_tui  # pylint: disable=import-outside-toplevel
+        from .tui import run_tui
         init_var = varname if varname in avail else (avail[0] if avail else None)
         run_tui(init_var, requested_steps, read_step, ndim=test_assembled.ndim,
                 bubble_func=bubble_func)
@@ -374,7 +372,7 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
         if ignored:
             cons.print(f"[yellow]Warning:[/yellow] {', '.join('--' + f.replace('_', '-') for f in ignored)} "
                        "ignored in --interactive mode (use the UI controls instead).")
-        from .interactive import run_interactive  # pylint: disable=import-outside-toplevel
+        from .interactive import run_interactive
         port = ARG('port')
         host = ARG('host')
         # Default to first available variable if --var was not specified
@@ -445,7 +443,7 @@ def viz():  # pylint: disable=too-many-locals,too-many-statements,too-many-branc
 
     # Single or multiple PNG frames
     try:
-        from tqdm import tqdm  # pylint: disable=import-outside-toplevel
+        from tqdm import tqdm
         step_iter = tqdm(requested_steps, desc='Rendering')
     except ImportError:
         step_iter = requested_steps

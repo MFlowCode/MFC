@@ -3,30 +3,15 @@ Test Safety Net Runner.
 
 Main entry point for building and verifying the parameter validation test suite.
 """
-# pylint: disable=import-outside-toplevel
 
-import sys
-import json
 import argparse
+import json
+import sys
 from pathlib import Path
 
-from .inventory import (
-    export_parameter_inventory,
-    save_inventory,
-    print_inventory_summary
-)
-from .snapshot import (
-    capture_all_examples,
-    save_snapshots,
-    load_snapshots,
-    compare_snapshots,
-    print_comparison_report
-)
-from .coverage import (
-    generate_coverage_report,
-    print_coverage_report,
-    save_coverage_report
-)
+from .coverage import generate_coverage_report, print_coverage_report, save_coverage_report
+from .inventory import export_parameter_inventory, print_inventory_summary, save_inventory
+from .snapshot import capture_all_examples, compare_snapshots, load_snapshots, print_comparison_report, save_snapshots
 
 
 def get_data_dir() -> Path:
@@ -180,7 +165,7 @@ def show_summary():
             inventory = json.load(f)
         print("\nParameter Inventory:")
         print(f"  Total parameters: {inventory['metadata']['total_parameters']}")
-        print(f"  By stage:")
+        print("  By stage:")
         print(f"    Common: {inventory['metadata']['common_count']}")
         print(f"    Pre-process: {inventory['metadata']['pre_process_count']}")
         print(f"    Simulation: {inventory['metadata']['simulation_count']}")

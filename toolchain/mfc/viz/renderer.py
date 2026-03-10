@@ -11,17 +11,16 @@ import os
 import re
 import tempfile
 
+import imageio
+import matplotlib
 import numpy as np
 
-import imageio
-
-import matplotlib
 try:
     matplotlib.use('Agg')
 except ValueError:
     pass
-import matplotlib.pyplot as plt  # pylint: disable=wrong-import-position
-from matplotlib.colors import LogNorm  # pylint: disable=wrong-import-position
+import matplotlib.pyplot as plt  # noqa: E402
+from matplotlib.colors import LogNorm  # noqa: E402
 
 matplotlib.rcParams.update({
     'mathtext.fontset': 'cm',
@@ -83,8 +82,8 @@ def _overlay_bubbles(ax, bubbles, scale: float = 1.0) -> None:
     """
     if bubbles is None or len(bubbles) == 0:
         return
-    from matplotlib.patches import Circle          # pylint: disable=import-outside-toplevel
-    from matplotlib.collections import PatchCollection  # pylint: disable=import-outside-toplevel
+    from matplotlib.collections import PatchCollection
+    from matplotlib.patches import Circle
     circles = [Circle((b[0], b[1]), b[3] * scale) for b in bubbles]
     pc = PatchCollection(circles, facecolors='none', edgecolors='white',
                          linewidths=0.5, alpha=0.8)
@@ -102,7 +101,7 @@ def pretty_label(varname):
     return varname
 
 
-def render_1d(x_cc, data, varname, step, output, **opts):  # pylint: disable=too-many-arguments,too-many-positional-arguments
+def render_1d(x_cc, data, varname, step, output, **opts):
     """Render a 1D line plot and save as PNG."""
     fig, ax = plt.subplots(figsize=opts.get('figsize', (10, 6)))
     label = pretty_label(varname)
@@ -126,7 +125,7 @@ def render_1d(x_cc, data, varname, step, output, **opts):  # pylint: disable=too
     plt.close(fig)
 
 
-def render_1d_tiled(x_cc, variables, step, output, **opts):  # pylint: disable=too-many-locals
+def render_1d_tiled(x_cc, variables, step, output, **opts):
     """Render all 1D variables in a tiled subplot grid and save as PNG."""
     varnames = sorted(variables.keys())
     n = len(varnames)
@@ -184,7 +183,7 @@ def _figsize_for_domain(x_cc, y_cc, base=10):
     return (fig_w, fig_h)
 
 
-def render_2d(x_cc, y_cc, data, varname, step, output, **opts):  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
+def render_2d(x_cc, y_cc, data, varname, step, output, **opts):
     """Render a 2D colormap via pcolormesh and save as PNG."""
     default_size = _figsize_for_domain(x_cc, y_cc)
     fig, ax = plt.subplots(figsize=opts.get('figsize', default_size))
@@ -223,7 +222,7 @@ def render_2d(x_cc, y_cc, data, varname, step, output, **opts):  # pylint: disab
     plt.close(fig)
 
 
-def render_2d_tiled(assembled, step, output, **opts):  # pylint: disable=too-many-locals
+def render_2d_tiled(assembled, step, output, **opts):
     """Render all 2D variables in a tiled subplot grid and save as PNG."""
     varnames = sorted(assembled.variables.keys())
     n = len(varnames)
@@ -277,7 +276,7 @@ def render_2d_tiled(assembled, step, output, **opts):  # pylint: disable=too-man
     plt.close(fig)
 
 
-def render_3d_slice(assembled, varname, step, output, slice_axis='z',  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,too-many-statements,too-many-branches
+def render_3d_slice(assembled, varname, step, output, slice_axis='z',
                     slice_index=None, slice_value=None, **opts):
     """Extract a 2D slice from 3D data and render as a colormap."""
     data_3d = assembled.variables[varname]
@@ -362,7 +361,7 @@ def render_3d_slice(assembled, varname, step, output, slice_axis='z',  # pylint:
     plt.close(fig)
 
 
-def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,too-many-statements,too-many-branches
+def render_mp4(varname, steps, output, fps=10,
                read_func=None, tiled=False, bubble_func=None, **opts):
     """
     Generate an MP4 video by iterating over timesteps.
@@ -440,7 +439,7 @@ def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-argum
             pass
 
     try:
-        from tqdm import tqdm  # pylint: disable=import-outside-toplevel
+        from tqdm import tqdm
         step_iter = tqdm(steps, desc='Rendering frames')
     except ImportError:
         step_iter = steps
@@ -456,7 +455,7 @@ def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-argum
                 try:
                     frame_opts = dict(opts, bubbles=bubble_func(step))
                 except (OSError, ValueError) as exc:
-                    import warnings  # pylint: disable=import-outside-toplevel
+                    import warnings
                     warnings.warn(f"Skipping bubble overlay for step {step}: {exc}", stacklevel=2)
 
             if tiled and assembled.ndim == 1:
@@ -547,8 +546,8 @@ def render_mp4(varname, steps, output, fps=10,  # pylint: disable=too-many-argum
                     imageio.imread(os.path.join(viz_dir, fname))
                 ))
         success = True
-    except Exception as exc:  # pylint: disable=broad-except
-        import warnings  # pylint: disable=import-outside-toplevel
+    except Exception as exc:
+        import warnings
         warnings.warn(f"MP4 encoding error: {exc}", stacklevel=2)
     finally:
         _cleanup()

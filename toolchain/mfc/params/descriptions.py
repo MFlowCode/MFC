@@ -517,7 +517,7 @@ def get_description(param_name: str) -> str:
             return template.format(*match.groups())
 
     # 3. Auto-generated description from registry (set by _auto_describe at registration)
-    from . import REGISTRY  # pylint: disable=import-outside-toplevel
+    from . import REGISTRY
     param = REGISTRY.all_params.get(param_name)
     if param and param.description:
         return param.description
@@ -526,7 +526,7 @@ def get_description(param_name: str) -> str:
     return _infer_from_naming(param_name)
 
 
-def _infer_from_naming(param_name: str) -> str:  # pylint: disable=too-many-return-statements,too-many-branches
+def _infer_from_naming(param_name: str) -> str:
     """Infer description from naming conventions."""
     name = param_name
 
@@ -650,7 +650,7 @@ def get_math_symbol(param_name: str) -> str:
     Looks up the math_symbol field from the parameter registry (single source of truth).
     Symbols are defined via math= in the _r() calls in definitions.py.
     """
-    from . import REGISTRY  # pylint: disable=import-outside-toplevel
+    from . import REGISTRY
     param = REGISTRY.all_params.get(param_name)
     return param.math_symbol if param else ""
 
