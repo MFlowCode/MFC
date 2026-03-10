@@ -42,12 +42,13 @@ echo "Master job started in background (PID: $master_pid)"
 
 echo "Waiting for both jobs to complete..."
 
-# Wait and capture exit codes reliably
+# Wait and capture exit codes reliably.
+# Use `wait ... || exit=$?` to avoid set -e aborting on the first failure
+# (which would orphan the second job).
 pr_exit=0
 master_exit=0
 
-wait "$pr_pid"
-pr_exit=$?
+wait "$pr_pid" || pr_exit=$?
 if [ "$pr_exit" -ne 0 ]; then
   echo "PR job exited with code: $pr_exit"
   echo "Last 50 lines of PR job log:"
@@ -56,8 +57,7 @@ else
   echo "PR job completed successfully"
 fi
 
-wait "$master_pid"
-master_exit=$?
+wait "$master_pid" || master_exit=$?
 if [ "$master_exit" -ne 0 ]; then
   echo "Master job exited with code: $master_exit"
   echo "Last 50 lines of master job log:"
