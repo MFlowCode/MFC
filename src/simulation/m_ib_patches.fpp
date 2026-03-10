@@ -1234,7 +1234,7 @@ contains
         ! check domain wraps in x, y
         #:for X in [('x'), ('y')]
             ! check for periodicity
-            if (bc_${X}$%beg == BC_PERIODIC) then
+            if (ib_bc_${X}$%beg == BC_PERIODIC) then
                 ${X}$p_lower = -1
                 ${X}$p_upper = 1
             else
@@ -1246,7 +1246,7 @@ contains
 
         ! z only if 3D
         if (present(zp_lower) .and. p /= 0) then
-            if (bc_z%beg == BC_PERIODIC) then
+            if (ib_bc_z%beg == BC_PERIODIC) then
                 zp_lower = -1
                 zp_upper = 1
             else

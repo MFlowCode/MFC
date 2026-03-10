@@ -228,6 +228,11 @@ module m_global_parameters
     !> @{
     type(int_bounds_info) :: bc_x, bc_y, bc_z
     !> @}
+    !> @name Original boundary conditions preserved for immersed boundary code
+    !> (bc_x/y/z get overwritten with MPI neighbor ranks during decomposition)
+    !> @{
+    type(int_bounds_info) :: ib_bc_x, ib_bc_y, ib_bc_z
+    !> @}
 #if defined(MFC_OpenACC)
     $:GPU_DECLARE(create='[bc_x%vb1, bc_x%vb2, bc_x%vb3, bc_x%ve1, bc_x%ve2, bc_x%ve3]')
     $:GPU_DECLARE(create='[bc_y%vb1, bc_y%vb2, bc_y%vb3, bc_y%ve1, bc_y%ve2, bc_y%ve3]')
