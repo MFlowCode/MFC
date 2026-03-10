@@ -1300,7 +1300,7 @@ contains
             ! check domain wraps in x, y,
             #:for X in [('x'), ('y')]
                 ! check for periodicity
-                if (bc_${X}$%beg == BC_PERIODIC) then
+                if (ib_bc_${X}$%beg == BC_PERIODIC) then
                     ! check if the boundary has left the domain, and then correct
                     if (patch_ib(patch_id)%${X}$_centroid < ${X}$_domain%beg) then
                         ! if the boundary exited "left", wrap it back around to the "right"
@@ -1314,7 +1314,7 @@ contains
 
             if (p /= 0) then
                 ! check for periodicity
-                if (bc_z%beg == BC_PERIODIC) then
+                if (ib_bc_z%beg == BC_PERIODIC) then
                     ! check if the boundary has left the domain, and then correct
                     if (patch_ib(patch_id)%z_centroid < z_domain%beg) then
                         ! if the boundary exited "left", wrap it back around to the "right"

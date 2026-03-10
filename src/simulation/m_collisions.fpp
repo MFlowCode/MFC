@@ -344,7 +344,7 @@ contains
         do patch_id = 1, num_ibs
             #:for X, IDX in [('x', 1), ('y', 3), ('z', 5)]
                 ! check if the boundaries are either of the two conditions we should compute collisions with
-                if (bc_${X}$%beg == BC_SLIP_WALL .or. bc_${X}$%beg == BC_NO_SLIP_WALL) then
+                if (ib_bc_${X}$%beg == BC_SLIP_WALL .or. ib_bc_${X}$%beg == BC_NO_SLIP_WALL) then
                     ! get the location of the true IB surface towards the domain boundary
                     edge_location = patch_ib(patch_id)%${X}$_centroid - patch_ib(patch_id)%radius
                     ! check if that edge actually extends out of the comutational domain
@@ -356,7 +356,7 @@ contains
                     wall_overlap_distances(patch_id, ${IDX}$) = overlap_distance
                 end if
 
-                if (bc_${X}$%end == BC_SLIP_WALL .or. bc_${X}$%end == BC_NO_SLIP_WALL) then
+                if (ib_bc_${X}$%end == BC_SLIP_WALL .or. ib_bc_${X}$%end == BC_NO_SLIP_WALL) then
                     edge_location = patch_ib(patch_id)%${X}$_centroid + patch_ib(patch_id)%radius
                     if (edge_location > ${X}$_domain%end) then
                         overlap_distance = edge_location - ${X}$_domain%end
@@ -391,7 +391,7 @@ contains
                 ! catch the edge case where th collision lies just outside the computational domain
                 #:for X, ID in [('x', 1), ('y', 2), ('z', 3)]
                     if (num_dims >= ${ID}$) then
-                        if (bc_${X}$%beg /= BC_PERIODIC) then
+                        if (ib_bc_${X}$%beg /= BC_PERIODIC) then
                             ! if it is outside the domain in one direction, project it somewhere inside so at least one rank owns it
                             if (collision_location(${ID}$) < ${X}$_domain%beg) then
                                 projected_location(${ID}$) = ${X}$_domain%beg
