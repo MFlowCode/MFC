@@ -49,7 +49,8 @@ if [ "$job_device" = "gpu" ]; then
             n_test_threads=$((ngpus * 2))
             ;;
         *)
-            device_opts="$gpu_opts"
+            # Frontier: --gpu flag is already in $build_opts; no extra device opts needed
+            device_opts=""
             n_test_threads=$ngpus
             ;;
     esac
