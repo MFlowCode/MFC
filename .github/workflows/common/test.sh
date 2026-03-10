@@ -10,6 +10,16 @@ build_opts="$gpu_opts"
 
 # --- Build (if not pre-built on login node) ---
 # Phoenix builds inside SLURM; Frontier pre-builds via build.sh on the login node.
+# Phoenix: validate an existing build against this node's CPU ISA.
+# A stale build/ from a prior run on a different microarchitecture would SIGILL.
+if [ "$job_cluster" = "phoenix" ] && [ -d "build" ]; then
+    syscheck_bin=$(find build/install -name syscheck -type f 2>/dev/null | head -1)
+    if [ -n "$syscheck_bin" ] && ! "$syscheck_bin" > /dev/null 2>&1; then
+        echo "syscheck failed on existing build — nuking build/"
+        rm -rf build
+    fi
+fi
+
 if [ ! -d "build" ]; then
     source .github/scripts/retry-build.sh
 
