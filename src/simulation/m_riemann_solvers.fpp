@@ -2580,52 +2580,44 @@ contains
                                 pres_L = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx)
                                 pres_R = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx)
 
-                                ! Hypoelasticity (Note: HLLC with Hypo only works for 1D or 2D for now)
-                                
-                                !$acc loop seq
-                                do i = 1, strxe - strxb + 1
-                                    tau_e_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, strxb - 1 + i)
-                                    tau_e_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, strxb - 1 + i)
-                                end do
+                                if (hypoelasticity) then
+                                    !$acc loop seq
+                                    do i = 1, strxe - strxb + 1
+                                        tau_e_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, strxb - 1 + i)
+                                        tau_e_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, strxb - 1 + i)
+                                    end do
 
-                                
-                                if (n == 0) then
-                                    ! Normal stress
-                                    tau_nn_L = tau_e_L(1)
-                                    tau_nn_R = tau_e_R(1)
-                                    ! Normal velocity
-                                    u_n_L = vel_L(1)
-                                    u_n_R = vel_R(1)
-                                else
-                                    ! Shear stress
-                                    tau_nt_L = tau_e_L(2)
-                                    tau_nt_R = tau_e_R(2)
-                                    ! Normal stress
-                                    if (idx1 == 1) then
-                                        ! tau_xx is normal
+                                    if (n == 0) then
                                         tau_nn_L = tau_e_L(1)
                                         tau_nn_R = tau_e_R(1)
-                                        tau_tt_L = tau_e_L(3)
-                                        tau_tt_R = tau_e_R(3)
                                         u_n_L = vel_L(1)
                                         u_n_R = vel_R(1)
-                                        u_t_L = vel_L(2)
-                                        u_t_R = vel_R(2)
                                     else
-                                        ! tau_yy is normal
-                                        tau_nn_L = tau_e_L(3)
-                                        tau_nn_R = tau_e_R(3)
-                                        tau_tt_L = tau_e_L(1)
-                                        tau_tt_R = tau_e_R(1)
-                                        u_n_L = vel_L(2)
-                                        u_n_R = vel_R(2)
-                                        u_t_L = vel_L(1)
-                                        u_t_R = vel_R(1)
+                                        tau_nt_L = tau_e_L(2)
+                                        tau_nt_R = tau_e_R(2)
+                                        if (idx1 == 1) then
+                                            tau_nn_L = tau_e_L(1)
+                                            tau_nn_R = tau_e_R(1)
+                                            tau_tt_L = tau_e_L(3)
+                                            tau_tt_R = tau_e_R(3)
+                                            u_n_L = vel_L(1)
+                                            u_n_R = vel_R(1)
+                                            u_t_L = vel_L(2)
+                                            u_t_R = vel_R(2)
+                                        else
+                                            tau_nn_L = tau_e_L(3)
+                                            tau_nn_R = tau_e_R(3)
+                                            tau_tt_L = tau_e_L(1)
+                                            tau_tt_R = tau_e_R(1)
+                                            u_n_L = vel_L(2)
+                                            u_n_R = vel_R(2)
+                                            u_t_L = vel_L(1)
+                                            u_t_R = vel_R(1)
+                                        end if
                                     end if
+                                    pres_tot_L = pres_L - tau_nn_L
+                                    pres_tot_R = pres_R - tau_nn_R
                                 end if
-                                ! Total pressure (replace the usual pressure to define SM)
-                                pres_tot_L = pres_L - tau_nn_L
-                                pres_tot_R = pres_R - tau_nn_R
 
                                 rho_L = 0._wp
                                 gamma_L = 0._wp
