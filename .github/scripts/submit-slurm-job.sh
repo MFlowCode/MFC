@@ -95,6 +95,7 @@ if [ "$device" = "cpu" ]; then
     esac
 elif [ "$device" = "gpu" ]; then
     # Determine GPU partition
+    gpu_partition="batch"
     if [ "$gpu_partition_dynamic" = "true" ]; then
         # Use pre-selected bench partition if available, otherwise query sinfo
         if [ -n "${BENCH_GPU_PARTITION:-}" ]; then

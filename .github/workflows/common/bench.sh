@@ -23,7 +23,6 @@ fi
 # --- Build (if not pre-built on login node) ---
 # Phoenix builds inside SLURM; Frontier pre-builds via build.sh on the login node.
 if [ ! -d "build" ]; then
-    rm -rf build
     source .github/scripts/retry-build.sh
     retry_build ./mfc.sh build -j $n_jobs $build_opts || exit 1
 fi

@@ -11,7 +11,6 @@ build_opts="$gpu_opts"
 # --- Build (if not pre-built on login node) ---
 # Phoenix builds inside SLURM; Frontier pre-builds via build.sh on the login node.
 if [ ! -d "build" ]; then
-    rm -rf build
     source .github/scripts/retry-build.sh
 
     # Phoenix: smoke-test the syscheck binary to catch architecture mismatches
