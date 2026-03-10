@@ -164,7 +164,7 @@ ${sbatch_device_opts}
 ${sbatch_time}
 #SBATCH --qos=${qos}
 ${extra_sbatch}
-#SBATCH -o${output_file}
+#SBATCH -o ${output_file}
 
 set -e
 set -x
