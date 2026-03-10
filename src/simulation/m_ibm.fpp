@@ -1303,8 +1303,10 @@ contains
                 if (ib_bc_${X}$%beg == BC_PERIODIC) then
                     ! check if the boundary has left the domain, and then correct
                     if (patch_ib(patch_id)%${X}$_centroid < ${X}$_domain%beg) then
+                        print *, "Wrapping from: ", patch_ib(1)%x_centroid
                         ! if the boundary exited "left", wrap it back around to the "right"
                         patch_ib(patch_id)%${X}$_centroid = patch_ib(patch_id)%${X}$_centroid + (${X}$_domain%end - ${X}$_domain%beg)
+                        print *, "Wrapping to: ", patch_ib(1)%x_centroid
                     else if (patch_ib(patch_id)%${X}$_centroid > ${X}$_domain%end) then
                         ! if the boundary exited "right", wrap it back around to the "left"
                         patch_ib(patch_id)%${X}$_centroid = patch_ib(patch_id)%${X}$_centroid - (${X}$_domain%end - ${X}$_domain%beg)

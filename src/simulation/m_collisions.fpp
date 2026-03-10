@@ -94,7 +94,7 @@ contains
 
         if (num_considered_collisions == 0) return
 
-        print *, "Checking Collisions: ", num_considered_collisions, " on rank ", proc_rank
+        ! print *, "Checking Collisions: ", num_considered_collisions, " on rank ", proc_rank
 
         ! Iterate over all collisions detected
         $:GPU_PARALLEL_LOOP(private='[i,l,encoded_pid1,encoded_pid2,xp1,xp2,yp1,yp2,zp1,zp2,pid1,pid2,centroid_1,centroid_2,normal_vector,overlap_distance,effective_mass,k,eta,normal_velocity,tangental_vector,normal_force,tangental_force,torque]', copy='[forces, torques]')
@@ -235,10 +235,10 @@ contains
 
         $:GPU_PARALLEL_LOOP(private='[gp_idx,gp_patch_id,neighbor_patch_id,local_num_raw,i,j,k,ii,jj,kk]', copy='[raw_pairs,num_raw]', copyin='[z_bound]')
         do gp_idx = 1, num_gps
-            gp_patch_id = gps(gp_idx)%ib_patch_id
             i = gps(gp_idx)%loc(1)
             j = gps(gp_idx)%loc(2)
             k = 0; if (num_dims == 3) k = gps(gp_idx)%loc(3)
+            gp_patch_id = ib_markers%sf(i, j, k)
 
             ! search in a cube around the BG for Ib markers belonging to another patch
             neighbor_search: do ii = i - 1, i + 1
@@ -274,6 +274,9 @@ contains
             ! get the decoded pairs for checking if they exist, using ii,jj,kk as dummy indices
             call s_decode_patch_periodicity(raw_pairs(pair_idx, 1), decoded_pairs(1), ii, jj, kk)
             call s_decode_patch_periodicity(raw_pairs(pair_idx, 2), decoded_pairs(2), ii, jj, kk)
+
+            ! skip self-collisions (an IB cannot collide with its own periodic image)
+            if (decoded_pairs(1) == decoded_pairs(2)) cycle
 
             ! check if it is already in the list
             do out_idx = 1, num_considered_collisions
