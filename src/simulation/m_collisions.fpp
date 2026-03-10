@@ -94,7 +94,7 @@ contains
 
         if (num_considered_collisions == 0) return
 
-        ! print *, "Checking Collisions: ", num_considered_collisions, " on rank ", proc_rank
+        print *, "Checking Collisions: ", num_considered_collisions, " on rank ", proc_rank
 
         ! Iterate over all collisions detected
         $:GPU_PARALLEL_LOOP(private='[i,l,encoded_pid1,encoded_pid2,xp1,xp2,yp1,yp2,zp1,zp2,pid1,pid2,centroid_1,centroid_2,normal_vector,overlap_distance,effective_mass,k,eta,normal_velocity,tangental_vector,normal_force,tangental_force,torque]', copy='[forces, torques]')
@@ -129,6 +129,7 @@ contains
 
                     ! compute force and torque
                     normal_force = -k*overlap_distance*normal_vector - eta*normal_velocity
+
                     tangental_force = -ib_coefficient_of_friction*norm2(normal_force)*tangental_vector
                     call s_cross_product(normal_vector*patch_ib(pid1)%radius, tangental_force, torque)
 
@@ -277,6 +278,16 @@ contains
 
             ! skip self-collisions (an IB cannot collide with its own periodic image)
             if (decoded_pairs(1) == decoded_pairs(2)) cycle
+
+            ! need to swap to garuntee the smaller decoded marker value is in index 1 and prevent double-counting
+            if (decoded_pairs(2) < decoded_pairs(1)) then
+                decoded_pairs(1) = decoded_pairs(1) + decoded_pairs(2)
+                decoded_pairs(2) = decoded_pairs(1) - decoded_pairs(2)
+                decoded_pairs(1) = decoded_pairs(1) - decoded_pairs(2)
+                raw_pairs(pair_idx, 1) = raw_pairs(pair_idx, 1) + raw_pairs(pair_idx, 2)
+                raw_pairs(pair_idx, 2) = raw_pairs(pair_idx, 1) - raw_pairs(pair_idx, 2)
+                raw_pairs(pair_idx, 1) = raw_pairs(pair_idx, 1) - raw_pairs(pair_idx, 2)
+            end if
 
             ! check if it is already in the list
             do out_idx = 1, num_considered_collisions

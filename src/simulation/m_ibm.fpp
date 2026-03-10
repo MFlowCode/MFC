@@ -100,9 +100,9 @@ contains
         $:GPU_UPDATE(device='[patch_ib(1:num_ibs)]')
 
         ! GPU routines require updated cell centers
-        $:GPU_UPDATE(device='[num_ibs, x_cc, y_cc, dx, dy, x_domain, y_domain]')
+        $:GPU_UPDATE(device='[num_ibs, x_cc, y_cc, dx, dy, x_domain, y_domain, ib_bc_x, ib_bc_y]')
         if (p /= 0) then
-            $:GPU_UPDATE(device='[z_cc, dz, z_domain]')
+            $:GPU_UPDATE(device='[z_cc, dz, z_domain, ib_bc_z]')
         end if
 
         ! allocate STL models
@@ -163,7 +163,7 @@ contains
         real(wp) :: G_K
         real(wp) :: qv_K
 
-        real(wp) :: pres_IP
+        real(wp) :: pres_IP, pres_denom
         real(wp), dimension(3) :: vel_IP, vel_norm_IP
         real(wp) :: c_IP
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
@@ -220,7 +220,7 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
         if (num_gps > 0) then
-            $:GPU_PARALLEL_LOOP(private='[i,physical_loc,dyn_pres,alpha_rho_IP, alpha_IP,pres_IP,vel_IP,vel_g,vel_norm_IP,r_IP, v_IP,pb_IP,mv_IP,nmom_IP,presb_IP,massv_IP,rho, gamma,pi_inf,Re_K,G_K,Gs,gp,innerp,norm,buf, radial_vector, rotation_velocity, j,k,l,q,qv_K,c_IP,nbub,patch_id]')
+            $:GPU_PARALLEL_LOOP(private='[i,physical_loc,dyn_pres,alpha_rho_IP, alpha_IP,pres_IP,pres_denom,vel_IP,vel_g,vel_norm_IP,r_IP, v_IP,pb_IP,mv_IP,nmom_IP,presb_IP,massv_IP,rho, gamma,pi_inf,Re_K,G_K,Gs,gp,innerp,norm,buf, radial_vector, rotation_velocity, j,k,l,q,qv_K,c_IP,nbub,patch_id]')
             do i = 1, num_gps
 
                 gp = ghost_points(i)
@@ -274,8 +274,9 @@ contains
                     q_prim_vf(E_idx)%sf(j, k, l) = 0._wp
                     $:GPU_LOOP(parallelism='[seq]')
                     do q = 1, num_fluids
-                        ! Se the pressure inside a moving immersed boundary based upon the pressure of the image point. acceleration, and normal vector direction
-                        q_prim_vf(E_idx)%sf(j, k, l) = q_prim_vf(E_idx)%sf(j, k, l) + pres_IP/(1._wp - 2._wp*abs(gp%levelset*alpha_rho_IP(q)/pres_IP)*dot_product(patch_ib(patch_id)%force/patch_ib(patch_id)%mass, gp%levelset_norm))
+                        ! Set the pressure inside a moving immersed boundary based upon the pressure of the image point, acceleration, and normal vector direction
+                        pres_denom = 1._wp - 2._wp*abs(gp%levelset*alpha_rho_IP(q)/pres_IP)*dot_product(patch_ib(patch_id)%force/patch_ib(patch_id)%mass, gp%levelset_norm)
+                        q_prim_vf(E_idx)%sf(j, k, l) = q_prim_vf(E_idx)%sf(j, k, l) + pres_IP/pres_denom
                     end do
                 end if
 
@@ -1303,10 +1304,10 @@ contains
                 if (ib_bc_${X}$%beg == BC_PERIODIC) then
                     ! check if the boundary has left the domain, and then correct
                     if (patch_ib(patch_id)%${X}$_centroid < ${X}$_domain%beg) then
-                        print *, "Wrapping from: ", patch_ib(1)%x_centroid
+                        print *, "Wrapping ${X}$ from: ", patch_ib(patch_id)%${X}$_centroid, patch_id, ${X}$_domain%end, ${X}$_domain%beg
                         ! if the boundary exited "left", wrap it back around to the "right"
                         patch_ib(patch_id)%${X}$_centroid = patch_ib(patch_id)%${X}$_centroid + (${X}$_domain%end - ${X}$_domain%beg)
-                        print *, "Wrapping to: ", patch_ib(1)%x_centroid
+                        print *, "Wrapping ${X}$ to: ", patch_ib(patch_id)%${X}$_centroid
                     else if (patch_ib(patch_id)%${X}$_centroid > ${X}$_domain%end) then
                         ! if the boundary exited "right", wrap it back around to the "left"
                         patch_ib(patch_id)%${X}$_centroid = patch_ib(patch_id)%${X}$_centroid - (${X}$_domain%end - ${X}$_domain%beg)
