@@ -3,7 +3,7 @@
 # Runs inside a SLURM job via submit-slurm-job.sh.
 # Expects env vars: $job_device, $job_interface, $job_slug, $job_cluster
 
-set -e
+set -euo pipefail
 
 source .github/scripts/bench-preamble.sh
 
