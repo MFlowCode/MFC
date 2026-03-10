@@ -1,7 +1,7 @@
 #!/bin/bash
 # Unified SLURM job submission and monitoring for all clusters.
 # Submits a script as a SLURM batch job, then monitors it until completion.
-# Idempotent: cancels stale jobs from previous runs before resubmission.
+# Rerun-safe: cancels stale jobs from previous runs before resubmission.
 #
 # Usage: submit-slurm-job.sh <script.sh> <cpu|gpu> <none|acc|omp> <cluster> [shard]
 

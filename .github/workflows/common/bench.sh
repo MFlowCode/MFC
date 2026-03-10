@@ -8,7 +8,7 @@ set -euo pipefail
 source .github/scripts/bench-preamble.sh
 
 # Cap parallel jobs at 64 to avoid overwhelming MPI daemons on large nodes
-# (GNR nodes have 192 cores but nproc is too aggressive for build/bench).
+# (GNR nodes have 192 cores but nproc is too aggressive for build).
 n_jobs=$(( $(nproc) > 64 ? 64 : $(nproc) ))
 
 # --- Phoenix TMPDIR setup ---

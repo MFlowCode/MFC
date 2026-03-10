@@ -2,8 +2,9 @@
 # Select the best available Phoenix GPU partition using sinfo.
 # Sources into caller: exports SELECTED_GPU_PARTITION.
 #
-# Priority order prefers smaller/older nodes to leave modern GPUs free
-# for production workloads. Falls back to gpu-l40s if nothing is idle.
+# Priority order prefers partitions most likely to have availability.
+# V100 is last due to slower performance near the test time limit.
+# Falls back to gpu-l40s if no partition meets the idle node threshold.
 # RTX 6000 nodes are excluded (too slow for the test suite time limit).
 #
 # Optional: set GPU_PARTITION_MIN_NODES before sourcing to require a minimum
