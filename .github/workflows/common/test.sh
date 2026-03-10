@@ -67,4 +67,4 @@ if [ -n "${job_shard:-}" ]; then
     shard_opts="--shard $job_shard"
 fi
 
-./mfc.sh test -v --max-attempts 3 -a -j $n_test_threads $rdma_opts $device_opts $shard_opts -- -c $job_cluster
+./mfc.sh test -v --max-attempts 3 -a -j $n_test_threads $rdma_opts $device_opts $build_opts $shard_opts -- -c $job_cluster
