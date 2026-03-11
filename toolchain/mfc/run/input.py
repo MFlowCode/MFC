@@ -90,13 +90,44 @@ class MFCInputFile(Case):
             directive_str = None
 
         # Write the generated Fortran code to the m_thermochem.f90 file with the chosen precision
+        sol = self.get_cantera_solution()
+
+        thermochem_code = pyro.FortranCodeGenerator().generate(
+            "m_thermochem",
+            sol,
+            pyro.CodeGenerationOptions(scalar_type = real_type, directive_offload = directive_str)
+        )
+
+        # CCE 19.0.0 workaround: pyrometheus generates !DIR$ INLINEALWAYS for Cray+ACC
+        # but omits !$acc routine seq, so thermochem routines are not registered as
+        # OpenACC device routines. Replace with plain !$acc routine seq (no INLINEALWAYS).
+        # This patch can be removed once pyrometheus upstream correctly emits !$acc routine seq
+        # for Cray+OpenACC (the broken macro originates in pyrometheus's code generator).
+        if directive_str == 'acc':
+            old_macro = (
+                "#ifdef _CRAYFTN\n#define GPU_ROUTINE(name) !DIR$ INLINEALWAYS name\n"
+                "#else\n#define GPU_ROUTINE(name) !$acc routine seq\n#endif"
+            )
+            new_macro = "#define GPU_ROUTINE(name) !$acc routine seq"
+            patched = thermochem_code.replace(old_macro, new_macro)
+            if patched == thermochem_code:
+                if new_macro in thermochem_code:
+                    pass  # pyrometheus already emits the correct form; no patch needed
+                else:
+                    raise common.MFCException(
+                        "CCE 19.0.0 workaround: pyrometheus output format changed — "
+                        "Cray+ACC GPU_ROUTINE macro patch did not apply. "
+                        "Update the pattern in toolchain/mfc/run/input.py."
+                    )
+            else:
+                cons.print("[yellow]Warning: Applied CCE 19.0.0 workaround patch to pyrometheus-generated "
+                           "m_thermochem.f90 (replaced _CRAYFTN GPU_ROUTINE macro with !$acc routine seq). "
+                           "Remove this patch once pyrometheus emits correct Cray+ACC directives upstream.[/yellow]")
+            thermochem_code = patched
+
         common.file_write(
             os.path.join(modules_dir, "m_thermochem.f90"),
-            pyro.FortranCodeGenerator().generate(
-                "m_thermochem",
-                self.get_cantera_solution(),
-                pyro.CodeGenerationOptions(scalar_type = real_type, directive_offload = directive_str)
-            ),
+            thermochem_code,
             True
         )
 
