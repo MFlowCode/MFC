@@ -40,8 +40,8 @@ contains
         real(wp) :: e
 
         e = coefficient_of_restitution
-        damping_parameter = -2._wp*log(e)/(pi**2 + log(e)**2)
-        spring_stiffness = 1._wp/(collision_time**2*(pi**2 + log(e)**2))
+        damping_parameter = -2._wp*log(e)/collision_time
+        spring_stiffness = (pi**2 + log(e)**2)/(collision_time**2)
         $:GPU_UPDATE(device='[damping_parameter,spring_stiffness]')
 
         @:ALLOCATE(collision_lookup(num_ibs * (num_ibs-1) / 2, 4))
@@ -63,10 +63,6 @@ contains
 
         ! return if no collisions
         if (collision_model == 0) return
-
-        ! TODO :: TEMPORARY UNTIL GPU SUPPORT ENABLED. REMOVE LATER
-        $:GPU_UPDATE(host='[ghost_points]')
-        $:GPU_UPDATE(host='[ib_markers%sf]')
 
         ! get is distance used in the force calculation with each IB and each wall
         call s_detect_wall_collisions()
@@ -94,7 +90,7 @@ contains
 
         if (num_considered_collisions == 0) return
 
-        print *, "Checking Collisions: ", num_considered_collisions, " on rank ", proc_rank
+        ! print *, "Checking Collisions: ", num_considered_collisions, " on rank ", proc_rank
 
         ! Iterate over all collisions detected
         $:GPU_PARALLEL_LOOP(private='[i,l,encoded_pid1,encoded_pid2,xp1,xp2,yp1,yp2,zp1,zp2,pid1,pid2,centroid_1,centroid_2,normal_vector,overlap_distance,effective_mass,k,eta,normal_velocity,tangental_vector,normal_force,tangental_force,torque]', copy='[forces, torques]')
@@ -119,7 +115,7 @@ contains
                     ! compute constants of the collision
                     effective_mass = 1.0_wp/((1.0_wp/patch_ib(pid1)%mass) + (1._wp/(patch_ib(pid2)%mass)))
                     k = spring_stiffness*effective_mass
-                    eta = damping_parameter*sqrt(effective_mass*k)
+                    eta = damping_parameter*effective_mass
 
                     ! Get the vectors and velcoities
                     ! TODO :: This should be made more complicated and include rotational velocity at the collision location.
@@ -189,7 +185,7 @@ contains
                 if (f_local_rank_owns_collision(collision_location)) then
 
                     k = spring_stiffness*patch_ib(patch_id)%mass
-                    eta = damping_parameter*sqrt(patch_ib(patch_id)%mass*k)
+                    eta = damping_parameter*patch_ib(patch_id)%mass
 
                     ! standard soft-sphere collision  with the wall
                     normal_velocity = dot_product(patch_ib(patch_id)%vel, normal_vector)*normal_vector
