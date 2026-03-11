@@ -4522,7 +4522,7 @@ contains
                             tau_t1t2_L_starstar = tau_t1t2_L_star &
                                 + rho_hat*(tau_nt2_hat*(u_t_star - u_t_L) + tau_nt_hat*(u_t2_star - u_t2_L))/sqrtC_NC
                             tau_t1t2_R_starstar = tau_t1t2_R_star &
-                                + rho_hat*(tau_nt2_hat*(u_t_star - u_t_R) + tau_nt_hat*(u_t2_star - u_t2_R))/sqrtC_NC
+                                - rho_hat*(tau_nt2_hat*(u_t_star - u_t_R) + tau_nt_hat*(u_t2_star - u_t2_R))/sqrtC_NC
 
                             E_L_star = (E%L*(u_n_L - S_L) + u_n_L*pTot_L - S_M*pTot_star)/(S_M - S_L)
                             E_R_star = (E%R*(u_n_R - S_R) + u_n_R*pTot_R - S_M*pTot_star)/(S_M - S_R)
