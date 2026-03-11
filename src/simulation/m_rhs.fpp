@@ -646,7 +646,7 @@ contains
         integer, intent(in) :: t_step
         real(wp), intent(inout) :: time_avg
         integer, intent(in) :: stage
-        logical, intent(in), optional :: is_hat_L
+        logical, intent(in) :: is_hat_L
 
         real(wp), dimension(0:m, 0:n, 0:p) :: nbub
         real(wp) :: t_start, t_finish
@@ -905,7 +905,7 @@ contains
             call s_compute_hypoelastic_rhs_iface(q_prim_qp%vf, rhs_vf, hypo_iface_vel_n)
             call nvtxEndRange
         end if
-        if (hypo_nc_dual_pass .and. grid_geometry == 2 .and. present(is_hat_L)) then
+        if (hypo_nc_dual_pass .and. grid_geometry == 2) then
             if (.not. is_hat_L) then
                 call nvtxStartRange("RHS-HYPOELASTICITY-AXISYM-HLLD")
                 call s_compute_hypoelastic_rhs_axisym_geom_iface(q_prim_qp%vf, rhs_vf, &
@@ -1015,7 +1015,7 @@ contains
         type(vector_field), intent(inout) :: q_cons_vf
         type(vector_field), intent(inout) :: q_prim_vf
         type(vector_field), intent(inout) :: flux_src_n_vf
-        logical, intent(in), optional :: is_hat_L
+        logical, intent(in) :: is_hat_L
 
         integer :: i, j, k, l, q
         logical :: add_geom
@@ -1073,6 +1073,7 @@ contains
                 ! HLLD Hypo uses dual-pass Riemann solver
                 ! Note: hat_L is at i+1/2 and hat_R is at i-1/2
                 ! So U += dt/dx * (F^R_{i-1/2} - F^L_{i+1/2})
+                !$acc parallel loop collapse(4) gang vector default(present)
                 do j = 1, sys_size
                     do q = 0, p
                         do l = 0, n
@@ -1083,6 +1084,7 @@ contains
                     end do
                 end do
             else ! is_hat_R
+                !$acc parallel loop collapse(4) gang vector default(present)
                 do j = 1, sys_size
                     do q = 0, p
                         do l = 0, n
@@ -1211,6 +1213,7 @@ contains
                 ! HLLD Hypo uses dual-pass Riemann solver
                 ! Note: hat_L is at i+1/2 and hat_R is at i-1/2
                 ! So U += dt/dx * (F^R_{i-1/2} - F^L_{i+1/2})
+                !$acc parallel loop collapse(4) gang vector default(present)
                 do j = 1, sys_size
                     do l = 0, p
                         do k = 0, n
@@ -1221,6 +1224,7 @@ contains
                     end do
                 end do
             else ! is_hat_R
+                !$acc parallel loop collapse(4) gang vector default(present)
                 do j = 1, sys_size
                     do l = 0, p
                         do k = 0, n
@@ -1271,8 +1275,8 @@ contains
             if (cyl_coord) then
                 ! For HLLD dual-pass axisym, apply cylindrical geometry only once (on the R-hat pass)
                 add_geom = .true.
-                if (hypo_nc_dual_pass .and. present(is_hat_L)) then
-                    if (is_hat_L) add_geom = .false.
+                if (hypo_nc_dual_pass .and. is_hat_L) then
+                    add_geom = .false.
                 end if
                 if (add_geom) then
                     !$acc parallel loop collapse(4) gang vector default(present)
@@ -1432,19 +1436,47 @@ contains
                 end do
 
             else ! Cartesian Coordinates
-                !$acc parallel loop collapse(4) gang vector default(present)
-                do j = 1, sys_size
-                    do k = 0, p
-                        do q = 0, n
-                            do l = 0, m
-                                rhs_vf(j)%sf(l, q, k) = &
-                                    rhs_vf(j)%sf(l, q, k) + 1._wp/dz(k)* &
-                                    (flux_n(3)%vf(j)%sf(l, q, k - 1) &
-                                     - flux_n(3)%vf(j)%sf(l, q, k))
+                if (.not. hypo_nc_dual_pass) then
+                    !$acc parallel loop collapse(4) gang vector default(present)
+                    do j = 1, sys_size
+                        do k = 0, p
+                            do q = 0, n
+                                do l = 0, m
+                                    rhs_vf(j)%sf(l, q, k) = &
+                                        rhs_vf(j)%sf(l, q, k) + 1._wp/dz(k)* &
+                                        (flux_n(3)%vf(j)%sf(l, q, k - 1) &
+                                         - flux_n(3)%vf(j)%sf(l, q, k))
+                                end do
                             end do
                         end do
                     end do
-                end do
+                elseif (is_hat_L) then
+                    !$acc parallel loop collapse(4) gang vector default(present)
+                    do j = 1, sys_size
+                        do k = 0, p
+                            do q = 0, n
+                                do l = 0, m
+                                    rhs_vf(j)%sf(l, q, k) = &
+                                        rhs_vf(j)%sf(l, q, k) - 1._wp/dz(k)* &
+                                        flux_n(3)%vf(j)%sf(l, q, k)
+                                end do
+                            end do
+                        end do
+                    end do
+                else ! is_hat_R
+                    !$acc parallel loop collapse(4) gang vector default(present)
+                    do j = 1, sys_size
+                        do k = 0, p
+                            do q = 0, n
+                                do l = 0, m
+                                    rhs_vf(j)%sf(l, q, k) = &
+                                        rhs_vf(j)%sf(l, q, k) + 1._wp/dz(k)* &
+                                        flux_n(3)%vf(j)%sf(l, q, k - 1)
+                                end do
+                            end do
+                        end do
+                    end do
+                end if
             end if
 
             if (model_eqns == 3) then
@@ -1560,20 +1592,22 @@ contains
                 end if
             else
                 if (riemann_solver == 1 .or. riemann_solver == 4) then
-                    !$acc parallel loop collapse(4) gang vector default(present)
-                    do j = advxb, advxe
-                        do k = 0, p
-                            do q = 0, n
-                                do l = 0, m
-                                    rhs_vf(j)%sf(l, q, k) = &
-                                        rhs_vf(j)%sf(l, q, k) + 1._wp/dz(k)* &
-                                        q_prim_vf%vf(contxe + idir)%sf(l, q, k)* &
-                                        (flux_src_n(3)%vf(j)%sf(l, q, k - 1) &
-                                         - flux_src_n(3)%vf(j)%sf(l, q, k))
+                    if (.not. hypo_nc_dual_pass) then ! HLLD Hypo does all non-conservative terms inside the Riemann solver
+                        !$acc parallel loop collapse(4) gang vector default(present)
+                        do j = advxb, advxe
+                            do k = 0, p
+                                do q = 0, n
+                                    do l = 0, m
+                                        rhs_vf(j)%sf(l, q, k) = &
+                                            rhs_vf(j)%sf(l, q, k) + 1._wp/dz(k)* &
+                                            q_prim_vf%vf(contxe + idir)%sf(l, q, k)* &
+                                            (flux_src_n(3)%vf(j)%sf(l, q, k - 1) &
+                                            - flux_src_n(3)%vf(j)%sf(l, q, k))
+                                    end do
                                 end do
                             end do
                         end do
-                    end do
+                    end if
                 else
                     if (alt_soundspeed) then
                         do j = advxb, advxe
@@ -2416,4 +2450,3 @@ contains
     end subroutine s_finalize_rhs_module
 
 end module m_rhs
-
