@@ -262,26 +262,20 @@ contains
 
     !> Checks constraints on hypoelasticity parameters
     subroutine s_check_inputs_hypoelasticity
-        @:PROHIBIT(hypoelasticity .and. riemann_solver == 2 .and. p > 0, &
-            "HLLC hypoelasticity supports Cartesian and 2D axisymmetric only (p must be 0)")
         @:PROHIBIT(hypoelasticity .and. riemann_solver == 2 .and. cyl_coord .and. p > 0, &
-            "HLLC hypoelasticity supports Cartesian and 2D axisymmetric cylindrical only (p must be 0)")
+            "3D cylindrical hypoelastic HLLC is not supported")
         @:PROHIBIT(hypoelasticity .and. riemann_solver == 4 .and. n == 0, &
-            "HLLD hypoelasticity requires 2D (n must be > 0)")
-        @:PROHIBIT(hypoelasticity .and. riemann_solver == 4 .and. p > 0, &
-            "HLLD hypoelasticity supports 2D Cartesian and 2D axisymmetric only (p must be 0)")
+            "HLLD hypoelasticity requires at least 2D (n must be > 0)")
         @:PROHIBIT(hypoelasticity .and. riemann_solver == 4 .and. cyl_coord .and. p > 0, &
-            "HLLD hypoelasticity supports Cartesian and 2D axisymmetric cylindrical only (p must be 0)")
+            "3D cylindrical hypoelastic HLLD is not supported")
         @:PROHIBIT(hypoelasticity .and. riemann_solver == 4 .and. num_fluids /= 2, &
             "HLLD hypoelasticity currently requires exactly 2 fluid components")
         @:PROHIBIT(hypo_hll_interface_rhs .and. .not. hypoelasticity, &
             "hypo_hll_interface_rhs requires hypoelasticity = T")
         @:PROHIBIT(hypo_hll_interface_rhs .and. riemann_solver /= 1, &
             "hypo_hll_interface_rhs requires HLL Riemann solver (riemann_solver = 1)")
-        @:PROHIBIT(hypo_hll_interface_rhs .and. p > 0, &
-            "HLL interface-consistent hypo RHS supports 1D and 2D only (p must be 0)")
         @:PROHIBIT(hypo_hll_interface_rhs .and. cyl_coord .and. p > 0, &
-            "HLL interface-consistent hypo RHS supports Cartesian and 2D axisymmetric only (p must be 0)")
+            "3D cylindrical interface-consistent hypo RHS is not supported")
     end subroutine
 
     !> Checks constraints on bubble parameters

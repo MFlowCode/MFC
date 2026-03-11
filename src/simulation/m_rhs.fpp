@@ -571,17 +571,23 @@ contains
         ! END: Allocation/Association of flux_n, flux_src_n, and flux_gsrc_n
 
         if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2)) then
-            @:ALLOCATE(hypo_iface_vel_n(1:2))
-            do i = 1, 2
-                @:ALLOCATE(hypo_iface_vel_n(i)%vf(1:2))
-                do l = 1, 2
+            @:ALLOCATE(hypo_iface_vel_n(1:num_dims))
+            do i = 1, num_dims
+                @:ALLOCATE(hypo_iface_vel_n(i)%vf(1:num_dims))
+                do l = 1, num_dims
                     @:ALLOCATE(hypo_iface_vel_n(i)%vf(l)%sf( &
                         idwbuff(1)%beg:idwbuff(1)%end, &
                         idwbuff(2)%beg:idwbuff(2)%end, &
                         idwbuff(3)%beg:idwbuff(3)%end))
                 end do
             end do
-            @:ACC_SETUP_VFs(hypo_iface_vel_n(1), hypo_iface_vel_n(2))
+            if (num_dims == 2) then
+                @:ACC_SETUP_VFs(hypo_iface_vel_n(1), hypo_iface_vel_n(2))
+            else if (num_dims == 3) then
+                @:ACC_SETUP_VFs(hypo_iface_vel_n(1), hypo_iface_vel_n(2), hypo_iface_vel_n(3))
+            else
+                @:ACC_SETUP_VFs(hypo_iface_vel_n(1))
+            end if
         end if
 
         if (alt_soundspeed) then
@@ -896,8 +902,7 @@ contains
         ! RHS additions for hypoelasticity (interface-consistent path, after all sweeps)
         if (hypo_nc_interface) then
             call nvtxStartRange("RHS-HYPOELASTICITY-IFACE")
-            call s_compute_hypoelastic_rhs_iface(q_prim_qp%vf, rhs_vf, &
-                                                  hypo_iface_vel_n(1)%vf, hypo_iface_vel_n(2)%vf)
+            call s_compute_hypoelastic_rhs_iface(q_prim_qp%vf, rhs_vf, hypo_iface_vel_n)
             call nvtxEndRange
         end if
         if (hypo_nc_dual_pass .and. grid_geometry == 2 .and. present(is_hat_L)) then
@@ -2391,8 +2396,8 @@ contains
         @:DEALLOCATE(flux_n, flux_src_n, flux_gsrc_n)
 
         if (hypo_nc_interface .or. (hypo_nc_dual_pass .and. grid_geometry == 2)) then
-            do i = 1, 2
-                do l = 1, 2
+            do i = 1, num_dims
+                do l = 1, num_dims
                     @:DEALLOCATE(hypo_iface_vel_n(i)%vf(l)%sf)
                 end do
                 @:DEALLOCATE(hypo_iface_vel_n(i)%vf)
