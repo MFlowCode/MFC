@@ -104,6 +104,16 @@ contains
         !< Generic loop iterators
         integer :: i, j, k, l
 
+#ifdef _CRAYFTN
+#ifdef MFC_OpenACC
+        ! CCE 19 IPA workaround: prevent bring_routine_resident SIGSEGV
+        !DIR$ NOINLINE s_infinite_pt_relaxation_k
+        !DIR$ NOINLINE s_infinite_ptg_relaxation_k
+        !DIR$ NOINLINE s_correct_partial_densities
+        !DIR$ NOINLINE s_TSat
+#endif
+#endif
+
         ! starting equilibrium solver
         $:GPU_PARALLEL_LOOP(collapse=3, private='[i,j,k,l,p_infOV, p_infpT, p_infSL, sk, hk, gk, ek, rhok,pS, pSOV, pSSL, TS, TSOV, TSatOV, TSatSL, TSSL, rhoe, dynE, rhos, rho, rM, m1, m2, MCT, TvF]')
         do j = 0, m
@@ -296,7 +306,7 @@ contains
         !!  @param TS equilibrium temperature at the interface
     subroutine s_infinite_pt_relaxation_k(j, k, l, MFL, pS, p_infpT, q_cons_vf, rhoe, TS)
         $:GPU_ROUTINE(function_name='s_infinite_pt_relaxation_k', &
-            & parallelism='[seq]', cray_inline=True)
+            & parallelism='[seq]', cray_noinline=True)
 
         ! initializing variables
         integer, intent(in) :: j, k, l, MFL
@@ -411,7 +421,7 @@ contains
         !!  @param TS equilibrium temperature at the interface
     subroutine s_infinite_ptg_relaxation_k(j, k, l, pS, p_infpT, rhoe, q_cons_vf, TS)
         $:GPU_ROUTINE(function_name='s_infinite_ptg_relaxation_k', &
-            & parallelism='[seq]', cray_inline=True)
+            & parallelism='[seq]', cray_noinline=True)
 
         integer, intent(in) :: j, k, l
         real(wp), intent(inout) :: pS
@@ -639,7 +649,7 @@ contains
         !!  @param l generic loop iterator for z direction
     subroutine s_correct_partial_densities(MCT, q_cons_vf, rM, j, k, l)
         $:GPU_ROUTINE(function_name='s_correct_partial_densities', &
-            & parallelism='[seq]', cray_inline=True)
+            & parallelism='[seq]', cray_noinline=True)
 
         !> @name variables for the correction of the reacting partial densities
         !> @{
@@ -690,7 +700,7 @@ contains
         !!  @param TSIn equilibrium Temperature
     elemental subroutine s_TSat(pSat, TSat, TSIn)
         $:GPU_ROUTINE(function_name='s_TSat',parallelism='[seq]', &
-            & cray_inline=True)
+            & cray_noinline=True)
 
         real(wp), intent(in) :: pSat
         real(wp), intent(out) :: TSat
@@ -717,7 +727,13 @@ contains
 
             ! underrelaxation factor
             Om = 1.0e-3_wp
-            do
+
+            ! FT must be initialized before the do while condition is evaluated.
+            ! Fortran .or. is not short-circuit: abs(FT) is always evaluated even
+            ! when ns == 0, so FT must have a defined value here.
+            FT = huge(1.0_wp)
+
+            do while ((abs(FT) > ptgalpha_eps) .or. (ns == 0))
                 ! increasing counter
                 ns = ns + 1
 

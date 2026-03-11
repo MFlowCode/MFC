@@ -7,6 +7,8 @@ files in the Doxygen output directory to insert author text.
 Usage: python3 postprocess_citations.py <html_output_dir>
 """
 
+from __future__ import annotations
+
 import re
 import sys
 from pathlib import Path

@@ -5,6 +5,8 @@ Generates markdown documentation for all MFC case parameters,
 organized by family with descriptions, types, and constraints.
 """
 
+from __future__ import annotations
+
 from typing import Any, Dict, List, Tuple
 from collections import defaultdict
 import re
