@@ -98,11 +98,19 @@ jobs:
       - name: Clone
         uses: actions/checkout@v4
 
+      - name: CPU Architecture Hash
+        id:   cpu
+        run: |
+          # Include CPU model in cache key so binaries compiled with -march=native
+          # on one runner aren't reused on a runner with a different ISA (→ SIGILL).
+          arch=$(gcc -march=native -Q --help=target 2>/dev/null | grep -m1 '^\s*-march=' | awk '{print $2}')
+          echo "arch=${arch:-unknown}" >> "$GITHUB_OUTPUT"
+
       - name: Restore Build Cache
         uses: actions/cache@v4
         with:
           path: build
-          key: mfc-build-${{ matrix.os }}-${{ matrix.mpi }}-${{ matrix.debug }}-${{ matrix.precision }}-${{ matrix.intel }}-${{ hashFiles('CMakeLists.txt', 'toolchain/dependencies/**', 'toolchain/cmake/**', 'src/**/*.fpp', 'src/**/*.f90') }}
+          key: mfc-build-${{ matrix.os }}-${{ matrix.mpi }}-${{ matrix.debug }}-${{ matrix.precision }}-${{ matrix.intel }}-${{ steps.cpu.outputs.arch }}-${{ hashFiles('CMakeLists.txt', 'toolchain/dependencies/**', 'toolchain/cmake/**', 'src/**/*.fpp', 'src/**/*.f90') }}
 
       - name: Setup MacOS
         if:   matrix.os == 'macos'
