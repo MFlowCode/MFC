@@ -62,6 +62,8 @@ class MFCConfig:
 
     def __eq__(self, other) -> bool:
         """Check if two MFCConfig objects are equal, field by field."""
+        if not isinstance(other, MFCConfig):
+            return NotImplemented
         for field in dataclasses.fields(self):
             if getattr(self, field.name) != getattr(other, field.name):
                 return False

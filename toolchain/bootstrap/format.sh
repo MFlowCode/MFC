@@ -54,7 +54,10 @@ if [[ ${#PATHS[@]} -gt 0 ]]; then
     fi
 
     # Format Python files with ruff (auto-fix lint issues, then format)
-    ruff check --fix-only $SEARCH_PATHS
+    if ! ruff check --fix-only $SEARCH_PATHS; then
+        error "Auto-fixing Python lint issues failed."
+        exit 1
+    fi
     if ! ruff format $SEARCH_PATHS; then
         error "Formatting Python files failed."
         exit 1
@@ -70,7 +73,10 @@ else
     fi
 
     # Format Python files with ruff (auto-fix lint issues, then format)
-    ruff check --fix-only toolchain/ examples/ benchmarks/
+    if ! ruff check --fix-only toolchain/ examples/ benchmarks/; then
+        error "Auto-fixing Python lint issues failed."
+        exit 1
+    fi
     if ! ruff format toolchain/ examples/ benchmarks/; then
         error "Formatting Python files failed."
         exit 1
