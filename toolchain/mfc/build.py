@@ -1,6 +1,7 @@
 import os, typing, hashlib, dataclasses, subprocess, re, time, sys, threading, queue
 
 from rich.panel import Panel
+from rich.text  import Text
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TimeElapsedColumn, TaskProgressColumn
 
 from .case    import Case
@@ -273,14 +274,14 @@ def _show_build_error(result: subprocess.CompletedProcess, stage: str):
         stdout_text = result.stdout if isinstance(result.stdout, str) else result.stdout.decode('utf-8', errors='replace')
         stdout_text = stdout_text.strip()
         if stdout_text:
-            cons.raw.print(Panel(stdout_text, title="Output", border_style="yellow"))
+            cons.raw.print(Panel(Text(stdout_text), title="Output", border_style="yellow"))
 
     # Show stderr if available
     if result.stderr:
         stderr_text = result.stderr if isinstance(result.stderr, str) else result.stderr.decode('utf-8', errors='replace')
         stderr_text = stderr_text.strip()
         if stderr_text:
-            cons.raw.print(Panel(stderr_text, title="Errors", border_style="red"))
+            cons.raw.print(Panel(Text(stderr_text), title="Errors", border_style="red"))
 
     cons.print()
 
