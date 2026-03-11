@@ -1077,6 +1077,7 @@ contains
               FORM='unformatted', &
               STATUS='new')
 
+        $:GPU_UPDATE(host='[ib_markers%sf]')
         write (2) ib_markers%sf(0:m, 0:n, 0:p); close (2)
 
     end subroutine
@@ -1094,6 +1095,8 @@ contains
         integer(kind=MPI_OFFSET_kind) :: WP_MOK, var_MOK, MOK
         integer :: ifile, ierr, data_size
         integer, dimension(MPI_STATUS_SIZE) :: status
+
+        $:GPU_UPDATE(host='[ib_markers%sf]')
 
         ! Size of local arrays
         data_size = (m + 1)*(n + 1)*(p + 1)

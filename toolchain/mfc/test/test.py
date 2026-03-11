@@ -419,8 +419,8 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
         if err is not None:
             raise MFCException(f"Test {case}: {err}")
 
-        if pack.has_NaNs():
-            raise MFCException(f"Test {case}: NaNs detected in the case.")
+        if pack.has_bad_values():
+            raise MFCException(f"Test {case}: NaN or Inf detected in the case.")
 
         golden_filepath = os.path.join(case.get_dirpath(), "golden.txt")
         if ARG("generate"):

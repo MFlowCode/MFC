@@ -20,6 +20,16 @@ echo "=========================================="
 echo "Starting parallel benchmark jobs..."
 echo "=========================================="
 
+# For Phoenix GPU benchmarks, select a consistent GPU partition before launching
+# both parallel jobs so PR and master always land on the same GPU type.
+if [ "$device" = "gpu" ] && [ "$cluster" = "phoenix" ]; then
+    echo "Selecting Phoenix GPU partition for benchmark consistency..."
+    # Require 2 nodes so both PR and master jobs can run concurrently.
+    GPU_PARTITION_MIN_NODES=2 source "${SCRIPT_DIR}/select-gpu-partition.sh"
+    BENCH_GPU_PARTITION="$SELECTED_GPU_PARTITION"
+    export BENCH_GPU_PARTITION
+fi
+
 # Run both jobs with monitoring using dedicated script from PR
 # Use stdbuf for line-buffered output and prefix each line for clarity
 (set -o pipefail; stdbuf -oL -eL bash "${SCRIPT_DIR}/submit_and_monitor_bench.sh" pr "$device" "$interface" "$cluster" 2>&1 | while IFS= read -r line; do echo "[PR] $line"; done) &
@@ -32,22 +42,26 @@ echo "Master job started in background (PID: $master_pid)"
 
 echo "Waiting for both jobs to complete..."
 
-# Wait and capture exit codes reliably
+# Wait and capture exit codes reliably.
+# Use `wait ... || exit=$?` to avoid set -e aborting on the first failure
+# (which would orphan the second job).
 pr_exit=0
 master_exit=0
 
-wait "$pr_pid"
-pr_exit=$?
+wait "$pr_pid" || pr_exit=$?
 if [ "$pr_exit" -ne 0 ]; then
   echo "PR job exited with code: $pr_exit"
+  echo "Last 50 lines of PR job log:"
+  tail -n 50 "pr/bench-${device}-${interface}.out" 2>/dev/null || echo "  Could not read PR log"
 else
   echo "PR job completed successfully"
 fi
 
-wait "$master_pid"
-master_exit=$?
+wait "$master_pid" || master_exit=$?
 if [ "$master_exit" -ne 0 ]; then
   echo "Master job exited with code: $master_exit"
+  echo "Last 50 lines of master job log:"
+  tail -n 50 "master/bench-${device}-${interface}.out" 2>/dev/null || echo "  Could not read master log"
 else
   echo "Master job completed successfully"
 fi
