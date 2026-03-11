@@ -19,6 +19,8 @@
             "m_bubbles_EE",
             "m_bubbles_EL",
             "m_bubbles_EL_kernels",
+            "m_particles_EL",
+            "m_particles_EL_kernels",
             "m_qbmm",
             "m_hyperelastic",
             "m_hypoelastic",

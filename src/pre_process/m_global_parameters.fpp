@@ -131,6 +131,21 @@ module m_global_parameters
     ! Stands for "InDices With BUFFer".
     type(int_bounds_info) :: idwbuff(1:3)
 
+    integer :: fd_order !<
+    !! The order of the finite-difference (fd) approximations of the first-order
+    !! derivatives that need to be evaluated when the CoM or flow probe data
+    !! files are to be written at each time step
+
+    integer :: fd_number !<
+    !! The finite-difference number is given by MAX(1, fd_order/2). Essentially,
+    !! it is a measure of the half-size of the finite-difference stencil for the
+    !! selected order of accuracy.
+
+    !> @name lagrangian subgrid bubble parameters
+    !> @{!
+    type(bubbles_lagrange_parameters) :: lag_params     !< Lagrange bubbles' parameters
+    !> @}
+
     type(int_bounds_info) :: bc_x, bc_y, bc_z !<
     !! Boundary conditions in the x-, y- and z-coordinate directions
 
@@ -162,6 +177,7 @@ module m_global_parameters
 
     logical :: viscous
     logical :: bubbles_lagrange
+    logical :: particles_lagrange
 
     ! Perturb density of surrounding air so as to break symmetry of grid
     logical :: perturb_flow
@@ -176,6 +192,11 @@ module m_global_parameters
 
     integer, allocatable, dimension(:) :: proc_coords !<
     !! Processor coordinates in MPI_CART_COMM
+
+    type(int_bounds_info), dimension(3) :: nidx
+
+    integer, allocatable, dimension(:, :, :) :: neighbor_ranks
+    !! Neighbor ranks
 
     integer, allocatable, dimension(:) :: start_idx !<
     !! Starting cell-center index of local processor in global grid
@@ -213,6 +234,8 @@ module m_global_parameters
 
     ! Subgrid Bubble Parameters
     type(subgrid_bubble_physical_parameters) :: bub_pp
+
+    type(subgrid_particle_physical_parameters) :: particle_pp
 
     real(wp) :: rhoref, pref !< Reference parameters for Tait EOS
 
@@ -263,6 +286,9 @@ module m_global_parameters
     real(wp) :: R0ref, p0ref, rho0ref, T0ref, ss, pv, vd, mu_l, mu_v, mu_g, &
                 gam_v, gam_g, M_v, M_g, cp_v, cp_g, R_v, R_g
 
+    !Solid particle physical parameters
+    real(wp) :: cp_particle, rho0ref_particle
+
     !> @}
 
     !> @name Surface Tension Modeling
@@ -295,8 +321,14 @@ module m_global_parameters
     !! conditions data to march the solution in the physical computational domain
     !! to the next time-step.
 
+    integer, allocatable :: beta_vars(:) !< Indices of variables to communicate for bubble/particle coupling
+
     logical :: fft_wrt
     logical :: dummy  !< AMDFlang workaround: keep a dummy logical to avoid a compiler case-optimization bug when a parameter+GPU-kernel conditional is false
+
+    ! Variables for hardcoded initial conditions that are read from input files
+    character(LEN=2*path_len) :: interface_file
+    real(wp) :: normFac, normMag, g0_ic, p0_ic
 
 contains
 
@@ -406,6 +438,8 @@ contains
         elliptic_smoothing_iters = dflt_int
         elliptic_smoothing = .false.
 
+        particles_lagrange = .false.
+
         fft_wrt = .false.
         dummy = .false.
 
@@ -421,6 +455,27 @@ contains
 
         ! Initial condition parameters
         num_patches = dflt_int
+
+        fd_order = dflt_int
+        lag_params%cluster_type = dflt_int
+        lag_params%pressure_corrector = .false.
+        lag_params%smooth_type = dflt_int
+        lag_params%heatTransfer_model = .false.
+        lag_params%massTransfer_model = .false.
+        lag_params%write_bubbles = .false.
+        lag_params%write_bubbles_stats = .false.
+        lag_params%nBubs_glb = dflt_int
+        lag_params%vel_model = dflt_int
+        lag_params%drag_model = dflt_int
+        lag_params%epsilonb = 1._wp
+        lag_params%charwidth = dflt_real
+        lag_params%nParticles_glb = dflt_int
+        lag_params%qs_drag_model = dflt_int
+        lag_params%stokes_drag = dflt_int
+        lag_params%added_mass_model = dflt_int
+        lag_params%interpolation_order = dflt_int
+        lag_params%charNz = dflt_int
+        lag_params%valmaxvoid = dflt_real
 
         do i = 1, num_patches_max
             patch_icpp(i)%geometry = dflt_int
@@ -617,6 +672,10 @@ contains
         bub_pp%cp_g = dflt_real; cp_g = dflt_real
         bub_pp%R_v = dflt_real; R_v = dflt_real
         bub_pp%R_g = dflt_real; R_g = dflt_real
+
+        ! Subgrid particle parameters
+        particle_pp%rho0ref_particle = dflt_real
+        particle_pp%cp_particle = dflt_real
 
     end subroutine s_assign_default_values_to_user_inputs
 
@@ -892,6 +951,14 @@ contains
 
         end if
 
+        if (bubbles_lagrange) then
+            allocate (beta_vars(1:3))
+            beta_vars(1:3) = [1, 2, 5]
+        elseif (particles_lagrange) then
+            allocate (beta_vars(1:8))
+            beta_vars(1:8) = [1, 2, 3, 4, 5, 6, 7, 8]
+        end if
+
         if (chemistry) then
             species_idx%beg = sys_size + 1
             species_idx%end = sys_size + num_species
@@ -915,11 +982,13 @@ contains
         chemxb = species_idx%beg
         chemxe = species_idx%end
 
+        if (bubbles_lagrange .or. particles_lagrange) fd_number = max(1, fd_order/2)
+
         call s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, &
                                            igr_order, buff_size, &
                                            idwint, idwbuff, viscous, &
-                                           bubbles_lagrange, m, n, p, &
-                                           num_dims, igr, ib)
+                                           bubbles_lagrange, particles_lagrange, &
+                                           m, n, p, num_dims, igr, ib, fd_number)
 
 #ifdef MFC_MPI
 
@@ -1037,6 +1106,8 @@ contains
         end if
 
 #endif
+
+        if (allocated(neighbor_ranks)) deallocate (neighbor_ranks)
 
     end subroutine s_finalize_global_parameters_module
 

@@ -393,6 +393,12 @@ module m_derived_types
         real(wp) :: R_g   !< gas constant of gas (bubble)
     end type subgrid_bubble_physical_parameters
 
+    !> Derived type annexing the physical parameters required for sub-grid particle models
+    type subgrid_particle_physical_parameters
+        real(wp) :: rho0ref_particle !< reference density
+        real(wp) :: cp_particle !<solid particle specific heat
+    end type subgrid_particle_physical_parameters
+
     type mpi_io_airfoil_ib_var
         integer, dimension(2) :: view
         type(vec3_dt), allocatable, dimension(:) :: var
@@ -487,11 +493,25 @@ module m_derived_types
         integer :: smooth_type              !< Smoothing function. 1: Gaussian, 2:Delta 3x3
         logical :: heatTransfer_model       !< Activate HEAT transfer model at the bubble-liquid interface
         logical :: massTransfer_model       !< Activate MASS transfer model at the bubble-liquid interface
+        logical :: write_void_evol          !< Write files to track evolution of void fraction at each time step
         logical :: write_bubbles            !< Write files to track the bubble evolution each time step
         logical :: write_bubbles_stats      !< Write the maximum and minimum radius of each bubble
         integer :: nBubs_glb                !< Global number of bubbles
+        integer :: nParticles_glb           !< Global number of particles
+        integer :: vel_model                !< Particle velocity model
+        integer :: drag_model               !< Particle drag model
+        logical :: pressure_force           !< Include pressure force translational motion
+        logical :: gravity_force            !< Include gravity force in translational motion
+        integer :: qs_drag_model            !< Particle QS drag model
+        integer :: stokes_drag              !< Particle stokes drag
+        integer :: added_mass_model         !< Particle added mass model
+        integer :: interpolation_order      !< Fluid-to-Particle barycentric interpolation order
+        logical :: collision_force           !< Include collision forces
+
+        character(LEN=pathlen_max) :: input_path !< Path to lag_bubbles.dat
         real(wp) :: epsilonb         !< Standard deviation scaling for the gaussian function
         real(wp) :: charwidth        !< Domain virtual depth (z direction, for 2D simulations)
+        integer :: charNz           !< Number of grid cells in characteristic depth
         real(wp) :: valmaxvoid       !< Maximum void fraction permitted
 
     end type bubbles_lagrange_parameters

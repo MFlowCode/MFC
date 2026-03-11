@@ -116,7 +116,7 @@ contains
             lag_rad_wrt, lag_rvel_wrt, lag_r0_wrt, lag_rmax_wrt, &
             lag_rmin_wrt, lag_dphidt_wrt, lag_pres_wrt, lag_mv_wrt, &
             lag_mg_wrt, lag_betaT_wrt, lag_betaC_wrt, &
-            alpha_rho_e_wrt
+            alpha_rho_e_wrt, particles_lagrange, particle_pp
 
         ! Inquiring the status of the post_process.inp file
         file_loc = 'post_process.inp'
@@ -868,7 +868,7 @@ contains
         end if
 
         ! Adding the lagrangian subgrid variables  to the formatted database file
-        if (bubbles_lagrange) then
+        if (bubbles_lagrange .or. particles_lagrange) then
             !! Void fraction field
             q_sf(:, :, :) = 1._wp - q_cons_vf(beta_idx)%sf( &
                             -offset_x%beg:m + offset_x%end, &
@@ -983,6 +983,9 @@ contains
         call s_initialize_global_parameters_module()
         if (bubbles_euler .or. bubbles_lagrange) then
             call s_initialize_bubbles_model()
+        end if
+        if (particles_lagrange) then
+            call s_initialize_particles_model()
         end if
         if (num_procs > 1) then
             call s_initialize_mpi_proxy_module()
