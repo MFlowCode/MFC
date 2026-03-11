@@ -325,7 +325,7 @@ jobs:
 
       - name: Pre-Build (SLURM)
         if:   matrix.cluster == 'phoenix'
-        run:  bash .github/scripts/submit-slurm-job.sh .github/scripts/prebuild-case-optimization.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }}
+        run:  bash .github/scripts/submit-slurm-job.sh .github/scripts/prebuild-case-optimization.sh cpu ${{ matrix.interface }} ${{ matrix.cluster }}
 
       - name: Pre-Build (login node)
         if:   matrix.cluster != 'phoenix'
