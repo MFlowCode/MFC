@@ -2015,8 +2015,7 @@ contains
         integer(KIND=MPI_OFFSET_KIND) :: disp
         integer :: view
         integer, dimension(2) :: gsizes, lsizes, start_idx_part
-        integer, dimension(num_procs) :: part_order, part_ord_mpi
-        integer, dimension(num_procs) :: proc_bubble_counts
+        integer, allocatable :: proc_bubble_counts(:)
         real(wp), dimension(1:1, 1:lag_io_vars) :: dummy
         dummy = 0._wp
 
@@ -2030,6 +2029,8 @@ contains
         end if
 
         if (.not. parallel_io) return
+
+        allocate (proc_bubble_counts(num_procs))
 
         lsizes(1) = bub_id
         lsizes(2) = lag_io_vars
@@ -2137,6 +2138,8 @@ contains
 
             call MPI_FILE_CLOSE(ifile, ierr)
         end if
+
+        deallocate (proc_bubble_counts)
 
 #endif
 

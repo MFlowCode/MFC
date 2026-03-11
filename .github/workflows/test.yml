@@ -123,40 +123,24 @@ jobs:
           sudo add-apt-repository "deb https://apt.repos.intel.com/oneapi all main"
           sudo apt-get update
           sudo apt-get install -y intel-oneapi-compiler-fortran intel-oneapi-mpi intel-oneapi-mpi-devel
+          # Export only new/changed env vars from setvars.sh.
+          # `printenv >> $GITHUB_ENV` dumps all vars including shell internals
+          # with special characters that corrupt GITHUB_ENV parsing.
+          printenv | sort > /tmp/env_before
           source /opt/intel/oneapi/setvars.sh
-          printenv >> $GITHUB_ENV
-
-      - name: Set up Python 3.14
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.14'
-
-      - name: Get system info for cache key
-        id: sys-info
-        run: |
-          {
-            uname -m
-            cat /proc/cpuinfo 2>/dev/null | grep 'model name' | head -1 || sysctl -n machdep.cpu.brand_string 2>/dev/null || true
-            if command -v ifx &>/dev/null; then ifx --version 2>/dev/null | head -1; else ${FC:-gfortran} --version 2>/dev/null | head -1 || true; fi
-            ${CC:-gcc} --version 2>/dev/null | head -1 || true
-          } | (sha256sum 2>/dev/null || shasum -a 256) | cut -c1-16 > /tmp/sys-hash
-          echo "sys-hash=$(cat /tmp/sys-hash)" >> "$GITHUB_OUTPUT"
-
-      - name: Restore Build Cache
-        uses: actions/cache@v4
-        with:
-          path: build
-          key: mfc-build-${{ matrix.os }}-${{ matrix.mpi }}-${{ matrix.debug }}-${{ matrix.precision }}-${{ matrix.intel }}-${{ steps.sys-info.outputs.sys-hash }}-${{ hashFiles('CMakeLists.txt', 'toolchain/dependencies/**', 'toolchain/cmake/**', 'src/**/*.fpp', 'src/**/*.f90') }}
+          printenv | sort > /tmp/env_after
+          diff /tmp/env_before /tmp/env_after | grep '^>' | sed 's/^> //' >> $GITHUB_ENV
 
       - name: Build
         run:  |
-          /bin/bash mfc.sh test -v --dry-run -j "$(nproc)" --${{ matrix.debug }} --${{ matrix.mpi }} $PRECISION $TEST_ALL
+          /bin/bash mfc.sh test -v --dry-run -j $(nproc) --${{ matrix.debug }} --${{ matrix.mpi }} $PRECISION $TEST_ALL
         env:
           TEST_ALL: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
           PRECISION: ${{ matrix.precision != '' && format('--{0}', matrix.precision) || '' }}
 
       - name: Test
-        run: bash .github/scripts/run-tests-with-retry.sh -v --max-attempts 3 -j "$(nproc)" $TEST_ALL $TEST_PCT
+        run:  |
+          /bin/bash mfc.sh test -v --max-attempts 3 -j $(nproc) $TEST_ALL $TEST_PCT
         env:
           TEST_ALL: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
           TEST_PCT: ${{ matrix.debug == 'debug' && '-% 20' || '' }}
@@ -165,7 +149,10 @@ jobs:
     name: "${{ matrix.cluster_name }} (${{ matrix.device }}${{ matrix.interface != 'none' && format('-{0}', matrix.interface) || '' }}${{ matrix.shard != '' && format(' [{0}]', matrix.shard) || '' }})"
     if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true' && github.event.pull_request.draft != true
     needs: [lint-gate, file-changes]
-    continue-on-error: false
+    # Frontier CCE compiler is periodically broken by toolchain updates (e.g.
+    # cpe/25.03 introduced an IPA SIGSEGV in CCE 19.0.0). Allow Frontier to
+    # fail without blocking PR merges; Phoenix remains a hard gate.
+    continue-on-error: ${{ matrix.runner == 'frontier' }}
     timeout-minutes: 480
     strategy:
       matrix:
@@ -186,7 +173,7 @@ jobs:
             cluster_name: 'Georgia Tech | Phoenix'
             device: 'cpu'
             interface: 'none'
-          # Frontier (ORNL) — build on login node, GPU tests sharded for batch partition
+          # Frontier (ORNL) — CCE
           - runner:       'frontier'
             cluster:      'frontier'
             cluster_name: 'Oak Ridge | Frontier'
@@ -243,20 +230,26 @@ jobs:
       - name: Clone
         uses: actions/checkout@v4
         with:
+          # clean: false preserves .slurm_job_id files across reruns so
+          # submit-slurm-job.sh can detect and cancel stale SLURM jobs on retry.
           clean: false
 
-      - name: Build
+      - name: Build (login node)
         if:   matrix.cluster != 'phoenix'
-        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
-        with:
-          max_attempts: 3
-          retry_wait_seconds: 60
-          timeout_minutes: 60
-          command: bash .github/workflows/${{ matrix.cluster }}/build.sh ${{ matrix.device }} ${{ matrix.interface }}
-          on_retry_command: ./mfc.sh clean
+        timeout-minutes: 60
+        run:  bash .github/workflows/${{ matrix.cluster }}/build.sh ${{ matrix.device }} ${{ matrix.interface }}
 
       - name: Test
-        run:  bash .github/workflows/${{ matrix.cluster }}/submit.sh .github/workflows/${{ matrix.cluster }}/test.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.shard }}
+        run:  bash .github/scripts/submit-slurm-job.sh .github/workflows/common/test.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }} ${{ matrix.shard }}
+
+      - name: Cancel SLURM Jobs
+        if: cancelled()
+        run: |
+          find . -name "*.slurm_job_id" | while read -r f; do
+            job_id=$(cat "$f")
+            echo "Cancelling SLURM job $job_id"
+            scancel "$job_id" 2>/dev/null || true
+          done
 
       - name: Compute Log Slug
         if:   always()
@@ -284,7 +277,8 @@ jobs:
     name: "Case Opt | ${{ matrix.cluster_name }} (${{ matrix.device }}-${{ matrix.interface }})"
     if: github.repository == 'MFlowCode/MFC' && needs.file-changes.outputs.checkall == 'true' && github.event.pull_request.draft != true
     needs: [lint-gate, file-changes]
-    continue-on-error: false
+    # Frontier is non-blocking for the same reason as the self job above.
+    continue-on-error: ${{ matrix.runner == 'frontier' }}
     timeout-minutes: 480
     strategy:
       matrix:
@@ -325,20 +319,23 @@ jobs:
 
       - name: Pre-Build (SLURM)
         if:   matrix.cluster == 'phoenix'
-        run:  bash .github/workflows/phoenix/submit.sh .github/scripts/prebuild-case-optimization.sh ${{ matrix.device }} ${{ matrix.interface }}
+        run:  bash .github/scripts/submit-slurm-job.sh .github/scripts/prebuild-case-optimization.sh cpu ${{ matrix.interface }} ${{ matrix.cluster }}
 
       - name: Pre-Build (login node)
         if:   matrix.cluster != 'phoenix'
-        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
-        with:
-          max_attempts: 3
-          retry_wait_seconds: 60
-          timeout_minutes: 120
-          command: bash .github/scripts/prebuild-case-optimization.sh ${{ matrix.cluster }} ${{ matrix.device }} ${{ matrix.interface }}
-          on_retry_command: ./mfc.sh clean
+        run:  bash .github/scripts/prebuild-case-optimization.sh ${{ matrix.cluster }} ${{ matrix.device }} ${{ matrix.interface }}
 
       - name: Run Case-Optimization Tests
-        run:  bash .github/workflows/${{ matrix.cluster }}/submit.sh .github/scripts/run_case_optimization.sh ${{ matrix.device }} ${{ matrix.interface }}
+        run:  bash .github/scripts/submit-slurm-job.sh .github/scripts/run_case_optimization.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }}
+
+      - name: Cancel SLURM Jobs
+        if: cancelled()
+        run: |
+          find . -name "*.slurm_job_id" | while read -r f; do
+            job_id=$(cat "$f")
+            echo "Cancelling SLURM job $job_id"
+            scancel "$job_id" 2>/dev/null || true
+          done
 
       - name: Print Logs
         if:   always()

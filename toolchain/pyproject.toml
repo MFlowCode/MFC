@@ -52,6 +52,8 @@ dependencies = [
     "textual-plotext>=0.2.0",
     "dash>=2.0",
     "plotly",
+    "PyTurboJPEG<2.0",  # 2.x requires libjpeg-turbo>=3; most systems ship 2.x
+    "scikit-image",
     "tqdm",
 ]
 
