@@ -2938,6 +2938,7 @@ contains
                                     denom_A = A_R - A_L
                                     u_t_star    = (A_R*u_t_R - A_L*u_t_L + (tau_nt_R - tau_nt_L))/(denom_A + sgm_eps)
                                     tau_nt_star = (A_R*tau_nt_R - A_L*tau_nt_L)/(denom_A + sgm_eps)
+                                    pres_tot_star = pres_tot_L + A_L*(s_S - vel_L(idx1))
                                 end if
 
                                 ! MASS FLUX (unchanged for hypo)
@@ -3063,6 +3064,11 @@ contains
                                                 + xi_P*rho_R*tau_tt_R*(vel_R(idx1) + s_P*(xi_R - 1._wp))
                                         end if
                                     end if
+                                    if (cyl_coord) then
+                                        flux_rs${XYZ}$_vf(j, k, l, strxe) = &
+                                            xi_M*rho_L*tau_qq_L*(vel_L(idx1) + s_M*(xi_L - 1._wp)) &
+                                            + xi_P*rho_R*tau_qq_R*(vel_R(idx1) + s_P*(xi_R - 1._wp))
+                                    end if
 
                                     ! Exported interface velocities (explicit fan selection)
                                     if (s_L >= 0._wp) then
@@ -3140,7 +3146,7 @@ contains
                                 end if
 
                                 ! ===== Direct HLLC hypo star-state path =====
-                                if (hypoelasticity) then
+                                if (.false. .and. hypoelasticity) then
                                     eps = 1e-12
 
                                     ! Prim to Cons: Find U_L & U_R
@@ -3394,7 +3400,7 @@ contains
                                             p_face = pres_L; tau_qq_face = tau_qq_L
                                         elseif (s_R <= 0._wp) then
                                             p_face = pres_R; tau_qq_face = tau_qq_R
-                                        elseif (S_Mid >= 0._wp) then
+                                        elseif (s_S >= 0._wp) then
                                             p_face = pres_tot_star + tau_nn_L; tau_qq_face = tau_qq_L
                                         else
                                             p_face = pres_tot_star + tau_nn_R; tau_qq_face = tau_qq_R
@@ -3926,43 +3932,43 @@ contains
         call s_initialize_riemann_solver( &
             q_prim_vf, flux_vf, flux_src_vf, flux_gsrc_vf, norm_dir, ix, iy, iz)
 
-        ! Pick the correct index to shift based on norm_dir
-        ! (unlike qL_prim_rs${XYZ}$_vf which has coordinates already permutated, q_prim_vf is always (x,y,z))
-        do i = 1, sys_size
-            do l = is3%beg, is3%end
-                do k = is2%beg, is2%end
-                    do j = is1%beg, is1%end
-                        ! only 2D for now
-                        if (norm_dir == 1) then ! x-normal
-                            ! q_hat_prim_x_vf(x,y,z,i) = q_prim_vf(i)%sf(x_offset,y,z)
-                            if (is_hat_L) then
-                                q_hat_prim_x_vf(j,k,l,i) = q_prim_vf(i)%sf(j  ,k,l)
-                            else
-                                q_hat_prim_x_vf(j,k,l,i) = q_prim_vf(i)%sf(j+1,k,l)
-                            end if
-                        elseif (norm_dir == 2) then ! y-normal
-                            ! q_hat_prim_y_vf(y,x,z,i) = q_prim_vf(i)%sf(x,y_offset,z)
-                            if (is_hat_L) then
-                                q_hat_prim_y_vf(j,k,l,i) = q_prim_vf(i)%sf(k,j  ,l)
-                            else
-                                q_hat_prim_y_vf(j,k,l,i) = q_prim_vf(i)%sf(k,j+1,l)
-                            end if
-                        else ! z-normal not used for now
-                            q_hat_prim_z_vf(j,k,l,i) = 0d0
-                        end if
-                    end do
-                end do
-            end do
-        end do
-
         #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (norm_dir == ${NORM_DIR}$) then
+
+                ! Fill q_hat_prim with cell-centered primitives at the interface location.
+                !$acc data create(q_hat_prim_${XYZ}$_vf)
+                !$acc parallel loop collapse(4) gang vector default(present)
+                do i = 1, sys_size
+                    do l = is3%beg, is3%end
+                        do k = is2%beg, is2%end
+                            do j = is1%beg, is1%end
+                                #:if NORM_DIR == 1
+                                if (is_hat_L) then
+                                    q_hat_prim_x_vf(j,k,l,i) = q_prim_vf(i)%sf(j  ,k,l)
+                                else
+                                    q_hat_prim_x_vf(j,k,l,i) = q_prim_vf(i)%sf(j+1,k,l)
+                                end if
+                                #:elif NORM_DIR == 2
+                                if (is_hat_L) then
+                                    q_hat_prim_y_vf(j,k,l,i) = q_prim_vf(i)%sf(k,j  ,l)
+                                else
+                                    q_hat_prim_y_vf(j,k,l,i) = q_prim_vf(i)%sf(k,j+1,l)
+                                end if
+                                #:else
+                                q_hat_prim_z_vf(j,k,l,i) = 0d0
+                                #:endif
+                            end do
+                        end do
+                    end do
+                end do
+
                 !$acc parallel loop collapse(3) gang vector default(present) &
                 !$acc private(alpha_rho_L, alpha_rho_R, vel, alpha_L, alpha_R, &
-                !$acc rho, pres, E, H_no_mag, gamma, pi_inf, qv, vel_rms, B, c, c_fast, pres_mag, &
-                !$acc U_L, U_R, U_starL, U_starR, U_doubleL, U_doubleR, F_L, F_R, F_starL, F_starR, F_hlld, &
-                !$acc pres_hat, blkmod1_hat, blkmod2_hat, K_hat, C_hat_1, C_hat_2)
-                
+                !$acc rho, pres, E, H, gamma, pi_inf, qv, vel_rms, c, &
+                !$acc U_L, U_R, U_starL, U_starR, U_starstarL, U_starstarR, &
+                !$acc F_L, F_R, F_starL, F_starR, F_hlld, F_HLL, &
+                !$acc tau_e_L, tau_e_R, tau_e_hat, &
+                !$acc alpha_hat, alpha_rho_hat, vel_hat)
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = is1%beg, is1%end
@@ -4227,26 +4233,16 @@ contains
                             ! Degenerate wave structure: denom ~ 0 or S_M not in [S_L,S_R]
                             if (abs(denomA) < verysmall .or. &
                                 .not. (S_L - verysmall <= S_M .and. S_M <= S_R + verysmall)) then
-                                if (hypo_hll_fallback) then
-                                    ! Use HLL (or one-sided) flux
-                                    if (S_L < 0._wp .and. S_R > 0._wp) then
-                                        do i = 1, 11
-                                            F_hlld(i) = (S_R*F_L(i) - S_L*F_R(i) + S_L*S_R*(U_R(i) - U_L(i))) &
-                                                        /(S_R - S_L + verysmall)
-                                        end do
-                                    elseif (S_L >= 0._wp) then
-                                        F_hlld = F_L
-                                    else
-                                        F_hlld = F_R
-                                    end if
+                                ! HLL (or one-sided) fallback for degenerate wave structure
+                                if (S_L < 0._wp .and. S_R > 0._wp) then
+                                    do i = 1, 11
+                                        F_hlld(i) = (S_R*F_L(i) - S_L*F_R(i) + S_L*S_R*(U_R(i) - U_L(i))) &
+                                                    /(S_R - S_L + verysmall)
+                                    end do
+                                elseif (S_L >= 0._wp) then
+                                    F_hlld = F_L
                                 else
-                                    if (abs(denomA) < verysmall) then
-                                        print *, "Hypo HLLD: denominator (A_R - A_L) ~ 0 at face; set hypo_hll_fallback=T to use HLL fallback"
-                                        call exit(4)
-                                    else
-                                        print *, "Hypo HLLD: S_M not in [S_L, S_R]; set hypo_hll_fallback=T to use HLL fallback"
-                                        call exit(5)
-                                    end if
+                                    F_hlld = F_R
                                 end if
                             else
 
@@ -4489,6 +4485,7 @@ contains
                     end do
                 end do
                 !$acc end parallel loop
+                !$acc end data
             end if
         #:endfor
 
