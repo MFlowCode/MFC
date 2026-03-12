@@ -997,7 +997,7 @@ contains
 
         integer :: gp_id, i, j, k, l, q, ib_idx, fluid_idx
         real(wp), dimension(num_ibs, 3) :: forces, torques
-        real(wp), dimension(1:3, 1:3) :: viscous_stress_div, viscous_stress_div_1, viscous_stress_div_2, viscous_cross_1, viscous_cross_2 ! viscous stress tensor with temp vectors to hold divergence calculations
+        real(wp), dimension(1:3, 1:3) :: viscous_stress_div, viscous_stress_div_1, viscous_stress_div_2 ! viscous stress tensor with temp vectors to hold divergence calculations
         real(wp), dimension(1:3) :: local_force_contribution, radial_vector, local_torque_contribution, vel
         real(wp) :: cell_volume, dx, dy, dz, dynamic_viscosity
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
@@ -1021,7 +1021,7 @@ contains
             end do
         end if
 
-        $:GPU_PARALLEL_LOOP(private='[ib_idx,fluid_idx, radial_vector,local_force_contribution,cell_volume,local_torque_contribution, dynamic_viscosity, viscous_stress_div, viscous_stress_div_1, viscous_stress_div_2, viscous_cross_1, viscous_cross_2, dx, dy, dz]', copy='[forces,torques]', copyin='[ib_markers,patch_ib,dynamic_viscosities]', collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[ib_idx,fluid_idx, radial_vector,local_force_contribution,cell_volume,local_torque_contribution, dynamic_viscosity, viscous_stress_div, viscous_stress_div_1, viscous_stress_div_2, dx, dy, dz]', copy='[forces,torques]', copyin='[ib_markers,patch_ib,dynamic_viscosities]', collapse=3)
         do i = 0, m
             do j = 0, n
                 do k = 0, p
@@ -1051,7 +1051,6 @@ contains
                         end do
 
                         ! get the viscous stress and add its contribution if that is considered
-                        ! TODO :: This is really bad code
                         if (viscous) then
                             ! compute the volume-weighted local dynamic viscosity
                             dynamic_viscosity = 0._wp
@@ -1074,7 +1073,7 @@ contains
                             if (num_dims == 3) then
                                 call s_compute_viscous_stress_tensor(viscous_stress_div_1, q_prim_vf, dynamic_viscosity, i, j, k - 1)
                                 call s_compute_viscous_stress_tensor(viscous_stress_div_2, q_prim_vf, dynamic_viscosity, i, j, k + 1)
-                                viscous_stress_div(3, 1:3) = (viscous_stress_div_2(3, 1:3) - viscous_stress_div_1(3, 1:3))/(2._wp*dz) ! get z derivative of the second-row of viscous stress tensor
+                                viscous_stress_div(3, 1:3) = (viscous_stress_div_2(3, 1:3) - viscous_stress_div_1(3, 1:3))/(2._wp*dz) ! get z derivative of the third-row of viscous stress tensor
                                 local_force_contribution(1:3) = local_force_contribution(1:3) + viscous_stress_div(3, 1:3) ! add the z components of the divergence to the force
                             end if
 
@@ -1082,7 +1081,7 @@ contains
 
                         call s_cross_product(radial_vector, local_force_contribution, local_torque_contribution)
 
-                        ! Update the force values atomically to prevent race conditions
+                        ! Update the force and torque values atomically to prevent race conditions
                         do l = 1, 3
                             $:GPU_ATOMIC(atomic='update')
                             forces(ib_idx, l) = forces(ib_idx, l) + (local_force_contribution(l)*cell_volume)
