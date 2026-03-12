@@ -214,7 +214,7 @@ _SIMPLE_DESCS = {
     "prim_vars_wrt": "Write primitive variables",
     "cons_vars_wrt": "Write conservative variables",
     "run_time_info": "Print runtime info",
-    "ib_force_wrt": "Write IB force/torque data",
+    "ib_state_wrt": "Write IB force/torque data",
     # Misc
     "case_dir": "Case directory path",
     "cantera_file": "Cantera mechanism file",
@@ -933,7 +933,7 @@ def _load():  # pylint: disable=too-many-locals,too-many-statements
     _r("format", INT, {"output"})
     _r("schlieren_alpha", REAL, {"output"})
     for n in ["parallel_io", "file_per_process", "run_time_info", "prim_vars_wrt",
-              "cons_vars_wrt", "fft_wrt", "ib_force_wrt"]:
+              "cons_vars_wrt", "fft_wrt", "ib_state_wrt"]:
         _r(n, LOG, {"output"})
     for n in ["schlieren_wrt", "alpha_rho_wrt", "rho_wrt", "mom_wrt", "vel_wrt",
               "flux_wrt", "E_wrt", "pres_wrt", "alpha_wrt", "kappa_wrt", "gamma_wrt",

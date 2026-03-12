@@ -615,7 +615,7 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 | `alpha_wrt(i)`          | Logical | Add the volume fraction of fluid $i$ to the database	|
 | `gamma_wrt`             | Logical | Add the specific heat ratio function to the database	|
 | `heat_ratio_wrt`        | Logical | Add the specific heat ratio to the database	|
-| `ib_force_wrt`          | Logical | Write IB force & torque datafile at each time step |
+| `ib_state_wrt`          | Logical | Write IB state and loads to a datafile at each time step |
 | `pi_inf_wrt`            | Logical | Add the liquid stiffness function to the database |
 | `pres_inf_wrt`          | Logical | Add the liquid stiffness to the formatted database	 |
 | `c_wrt`                 | Logical | Add the sound speed to the database	 |
@@ -676,7 +676,7 @@ If `file_per_process` is true, then pre_process, simulation, and post_process mu
 
 - `probe_wrt` activates the output of state variables at coordinates specified by `probe(i)%[x;y,z]`.
 
-- `ib_force_wrt` activates the output of data specified by patch_ib(i)%force(:) and patch_ib(i)%torque(:) into a single binary datafile for all IBs at all timesteps. During post_processing, this file is converted into separate force/torque time histories for each IB.
+- `ib_state_wrt` activates the output of data specified by patch_ib(i)%force(:) (and torque, vel, angular_vel, angles, [x,y,z]_centroid) into a single binary datafile for all IBs at all timesteps. During post_processing, this file is converted into separate time histories for each IB.
 
 - `output_partial_domain` activates the output of part of the domain specified by `[x,y,z]_output%%beg` and `[x,y,z]_output%%end`.
 This is useful for large domains where only a portion of the domain is of interest.

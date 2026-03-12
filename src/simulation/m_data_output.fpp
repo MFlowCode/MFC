@@ -37,7 +37,7 @@ module m_data_output
               s_open_run_time_information_file, &
               s_open_com_files, &
               s_open_probe_files, &
-              s_open_ib_force_file, &
+              s_open_ib_state_file, &
               s_write_run_time_information, &
               s_write_data_files, &
               s_write_serial_data_files, &
@@ -45,11 +45,11 @@ module m_data_output
               s_write_ib_data_file, &
               s_write_com_files, &
               s_write_probe_files, &
-              s_write_ib_force_file, &
+              s_write_ib_state_file, &
               s_close_run_time_information_file, &
               s_close_com_files, &
               s_close_probe_files, &
-              s_close_ib_force_file, &
+              s_close_ib_state_file, &
               s_finalize_data_output_module
 
     real(wp), allocatable, dimension(:, :, :) :: icfl_sf  !< ICFL stability criterion
@@ -257,17 +257,17 @@ contains
 
     end subroutine s_open_probe_files
 
-    impure subroutine s_open_ib_force_file
+    impure subroutine s_open_ib_state_file
         character(LEN=path_len + 2*name_len) :: file_loc
 
-        write (file_loc, '(A)') 'ib_force.dat'
+        write (file_loc, '(A)') 'ib_state.dat'
         file_loc = trim(case_dir)//'/D/'//trim(file_loc)
         open (92, FILE=trim(file_loc), &
               FORM='unformatted', &
               ACCESS='stream', &
               STATUS='replace', &
               POSITION='append')
-    end subroutine s_open_ib_force_file
+    end subroutine s_open_ib_state_file
 
     !>  The goal of the procedure is to output to the run-time
         !!      information file the stability criteria extrema in the
@@ -1153,20 +1153,27 @@ contains
 
     end subroutine s_write_ib_data_file
 
-    !> @brief Writes IB force/torque records to D/ib_force.dat on rank 0.
-    impure subroutine s_write_ib_force_file(time_step)
+    !> @brief Writes IB state records to D/ib_state.dat on rank 0.
+    impure subroutine s_write_ib_state_file()
 
-        integer, intent(in) :: time_step
         if (proc_rank == 0) then
             block
                 integer :: i
                 do i = 1, num_ibs
-                    write (92) time_step, mytime, i, patch_ib(i)%force, patch_ib(i)%torque
+                    write (92) mytime, i, &
+                        patch_ib(i)%force, &
+                        patch_ib(i)%torque, &
+                        patch_ib(i)%vel, &
+                        patch_ib(i)%angular_vel, &
+                        patch_ib(i)%angles, &
+                        patch_ib(i)%x_centroid, &
+                        patch_ib(i)%y_centroid, &
+                        patch_ib(i)%z_centroid
                 end do
             end block
         end if
 
-    end subroutine s_write_ib_force_file
+    end subroutine s_write_ib_state_file
 
     !>  This writes a formatted data file where the root processor
     !!      can write out the CoM information
@@ -1937,11 +1944,11 @@ contains
 
     end subroutine s_close_probe_files
 
-    impure subroutine s_close_ib_force_file
+    impure subroutine s_close_ib_state_file
 
         close (92)
 
-    end subroutine s_close_ib_force_file
+    end subroutine s_close_ib_state_file
 
     !>  The computation of parameters, the allocation of memory,
         !!      the association of pointers and/or the execution of any

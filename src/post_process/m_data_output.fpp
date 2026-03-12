@@ -30,7 +30,7 @@ module m_data_output
  s_write_variable_to_formatted_database_file, &
  s_write_lag_bubbles_results_to_text, &
  s_write_lag_bubbles_to_formatted_database_file, &
- s_write_ib_force_files, &
+ s_write_ib_state_files, &
  s_write_intf_data_file, &
  s_write_energy_data_file, &
  s_close_formatted_database_file, &
@@ -1500,17 +1500,19 @@ contains
 
     end subroutine s_write_lag_variable_to_formatted_database_file
 
-    impure subroutine s_write_ib_force_files()
+    impure subroutine s_write_ib_state_files()
 
         character(len=len_trim(case_dir) + 4*name_len) :: in_file, out_file, file_loc
-        integer :: iu_in, ios, i, rec_step, rec_id
+        integer :: iu_in, ios, i, rec_id
         integer, allocatable, dimension(:) :: iu_out
         real(wp) :: rec_time
         real(wp), dimension(3) :: rec_force, rec_torque
+        real(wp), dimension(3) :: rec_vel, rec_angular_vel
+        real(wp), dimension(3) :: rec_angles, rec_centroid
 
         file_loc = trim(case_dir)//'/D'
 
-        in_file = trim(file_loc)//'/ib_force.dat'
+        in_file = trim(file_loc)//'/ib_state.dat'
         open (newunit=iu_in, file=trim(in_file), form='unformatted', access='stream', &
               status='old', action='read', iostat=ios)
         if (ios /= 0) then
@@ -1531,16 +1533,24 @@ contains
                 deallocate (iu_out)
                 return
             end if
-            write (iu_out(i), '(A)') 'mytime fx fy fz Tau_x Tau_y Tau_z'
+            write (iu_out(i), '(A)') &
+                'mytime fx fy fz Tau_x Tau_y Tau_z vx vy vz omega_x omega_y omega_z angle_x angle_y angle_z x_c y_c z_c'
         end do
 
         do
-            read (iu_in, iostat=ios) rec_step, rec_time, rec_id, rec_force, rec_torque
-            if (ios /= 0) exit  ! EOF (<0) or read error (>0)
+            read (iu_in, iostat=ios) rec_time, rec_id, &
+                rec_force, rec_torque, rec_vel, rec_angular_vel, rec_angles, &
+                rec_centroid(1), rec_centroid(2), rec_centroid(3)
+            if (ios /= 0) exit
+
             if (rec_id >= 1 .and. rec_id <= num_ibs) then
-                write (iu_out(rec_id), '(7(ES24.16E3,1X))') rec_time, &
+                write (iu_out(rec_id), '(19(ES24.16E3,1X))') rec_time, &
                     rec_force(1), rec_force(2), rec_force(3), &
-                    rec_torque(1), rec_torque(2), rec_torque(3)
+                    rec_torque(1), rec_torque(2), rec_torque(3), &
+                    rec_vel(1), rec_vel(2), rec_vel(3), &
+                    rec_angular_vel(1), rec_angular_vel(2), rec_angular_vel(3), &
+                    rec_angles(1), rec_angles(2), rec_angles(3), &
+                    rec_centroid(1), rec_centroid(2), rec_centroid(3)
             end if
         end do
 
@@ -1550,7 +1560,7 @@ contains
         end do
         deallocate (iu_out)
 
-    end subroutine s_write_ib_force_files
+    end subroutine s_write_ib_state_files
 
     !> @brief Extract the volume-fraction interface contour from primitive fields and write the coordinates to the interface data file.
     impure subroutine s_write_intf_data_file(q_prim_vf)
