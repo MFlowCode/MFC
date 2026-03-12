@@ -96,7 +96,7 @@ def find_gcov_binary() -> str:
         m = re.search(r'(\d+)\.\d+\.\d+', result.stdout)
         if m:
             major = m.group(1)
-    except Exception:
+    except (OSError, subprocess.SubprocessError):
         pass
 
     # Try versioned binary first (Homebrew macOS), then plain gcov
@@ -119,7 +119,7 @@ def find_gcov_binary() -> str:
                 continue  # Apple's gcov cannot parse GCC-generated .gcda files
             if "GCC" in version_out or "GNU" in version_out:
                 return path
-        except Exception:
+        except (OSError, subprocess.SubprocessError):
             continue
 
     raise MFCException(
@@ -166,7 +166,7 @@ def _parse_gcov_json_output(raw_bytes: bytes, root_dir: str) -> set:
         except (UnicodeDecodeError, ValueError):
             cons.print("[yellow]Warning: gcov output is not valid UTF-8 or gzip — "
                        "no coverage recorded for this test.[/yellow]")
-            return set()
+            return None
 
     result = set()
     real_root = os.path.realpath(root_dir)
@@ -234,9 +234,12 @@ def _collect_single_test_coverage(  # pylint: disable=too-many-locals
     build_subdir = os.path.join(test_gcda, "build")
     if not os.path.isdir(build_subdir):
         # No .gcda files produced — test may not have run or GCOV_PREFIX
-        # was misconfigured.  Return empty list; the sanity check at the end
-        # of build_coverage_cache will catch systemic failures.
-        return uuid, []
+        # was misconfigured.  Return None so the test is omitted from the
+        # cache (conservatively included on future runs).  The sanity check
+        # at the end of build_coverage_cache will catch systemic failures.
+        cons.print(f"[yellow]Warning: No .gcda directory for {uuid} — "
+                   f"GCOV_PREFIX may be misconfigured.[/yellow]")
+        return uuid, None
 
     gcno_copies = []
 
@@ -286,6 +289,10 @@ def _collect_single_test_coverage(  # pylint: disable=too-many-locals
         return uuid, []
 
     coverage = _parse_gcov_json_output(proc.stdout, root_dir)
+    if coverage is None:
+        # Decode failure — return None so the caller omits this test from
+        # the cache (absent entries are conservatively included).
+        return uuid, None
     return uuid, sorted(coverage)
 
 
@@ -370,8 +377,9 @@ def _prepare_test(case, root_dir: str) -> dict:  # pylint: disable=unused-argume
     files, and resolve binary paths.  All Python/toolchain overhead happens
     here (single-threaded) so the parallel phase is pure subprocess calls.
 
-    Operates on a shallow copy of case.params to avoid mutating the
-    original case object.
+    Temporarily sets modified params on the case object (needed by
+    get_dirpath/to_input_file/get_inp), then restores the original
+    params in a finally block so callers can safely reuse the case list.
     """
     try:
         case.delete_output()
@@ -388,6 +396,7 @@ def _prepare_test(case, root_dir: str) -> dict:  # pylint: disable=unused-argume
         except Exception as exc:
             cons.print(f"[yellow]Warning: Failed to generate Lagrange bubble input "
                        f"for {case.get_uuid()}: {exc}[/yellow]")
+            raise
 
     # Work on a copy so we don't permanently mutate the case object.
     params = dict(case.params)
@@ -421,28 +430,35 @@ def _prepare_test(case, root_dir: str) -> dict:  # pylint: disable=unused-argume
         for key in POST_PROCESS_3D_PARAMS:
             params.pop(key, None)
 
+    # Temporarily set mutated params on the case object for get_dirpath(),
+    # to_input_file(), and get_inp().  Always restore the original params
+    # so build_coverage_cache callers can safely reuse the case list.
+    orig_params = case.params
     case.params = params
-    test_dir = case.get_dirpath()
-    input_file = case.to_input_file()
-
-    # Write .inp files directly (no subprocess, no Mako templates).
-    # Suppress console output from get_inp() to avoid one message per (test, target) pair.
-    # Run all three executables to capture coverage across the full pipeline
-    # (pre_process: grid/IC generation; simulation: RHS/time-stepper; post_process: field I/O).
-    targets = [PRE_PROCESS, SIMULATION, POST_PROCESS]
-    binaries = []
-    # NOTE: not thread-safe — Phase 1 must remain single-threaded.
-    orig_file = cons.raw.file
-    cons.raw.file = io.StringIO()
     try:
-        for target in targets:
-            inp_content = case.get_inp(target)
-            common.file_write(os.path.join(test_dir, f"{target.name}.inp"),
-                              inp_content)
-            bin_path = target.get_install_binpath(input_file)
-            binaries.append((target.name, bin_path))
+        test_dir = case.get_dirpath()
+        input_file = case.to_input_file()
+
+        # Write .inp files directly (no subprocess, no Mako templates).
+        # Suppress console output from get_inp() to avoid one message per (test, target) pair.
+        # Run all three executables to capture coverage across the full pipeline
+        # (pre_process: grid/IC generation; simulation: RHS/time-stepper; post_process: field I/O).
+        targets = [PRE_PROCESS, SIMULATION, POST_PROCESS]
+        binaries = []
+        # NOTE: not thread-safe — Phase 1 must remain single-threaded.
+        orig_file = cons.raw.file
+        cons.raw.file = io.StringIO()
+        try:
+            for target in targets:
+                inp_content = case.get_inp(target)
+                common.file_write(os.path.join(test_dir, f"{target.name}.inp"),
+                                  inp_content)
+                bin_path = target.get_install_binpath(input_file)
+                binaries.append((target.name, bin_path))
+        finally:
+            cons.raw.file = orig_file
     finally:
-        cons.raw.file = orig_file
+        case.params = orig_params
 
     return {
         "uuid":     case.get_uuid(),
@@ -574,7 +590,14 @@ def build_coverage_cache(  # pylint: disable=too-many-locals,too-many-statements
                 except Exception as exc:  # pylint: disable=broad-except
                     uuid = futures[future]
                     cons.print(f"  [yellow]Warning: {uuid} coverage failed: {exc}[/yellow]")
-                    coverage = []
+                    # Do NOT store entry — absent entries are conservatively
+                    # included by filter_tests_by_coverage, while [] means
+                    # "covers no files" and would permanently skip the test.
+                    continue
+                if coverage is None:
+                    # Decode or collection failure — omit from cache so the
+                    # test is conservatively included on future runs.
+                    continue
                 cache[uuid] = coverage
                 completed += 1
                 if completed % 50 == 0 or completed == len(test_results):

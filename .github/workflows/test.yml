@@ -97,7 +97,7 @@ jobs:
             DIFF=""
           fi
           if echo "$DIFF" | \
-             grep -qP '^[+-]\s*(use[\s,]+\w|#:include\s|include\s+['"'"'"])'; then
+             grep -qE '^[+-][[:space:]]*(use[[:space:],]+[a-zA-Z_]|#:include[[:space:]]|include[[:space:]]+['"'"'"])'; then
             echo "dep_changed=true" >> "$GITHUB_OUTPUT"
             echo "Fortran dependency change detected — will rebuild coverage cache."
           else
@@ -163,7 +163,7 @@ jobs:
     name: Github
     needs: [lint-gate, file-changes, rebuild-cache]
     if: >-
-      always() &&
+      !cancelled() &&
       needs.lint-gate.result == 'success' &&
       needs.file-changes.result == 'success' &&
       needs.rebuild-cache.result != 'cancelled' &&
@@ -260,7 +260,7 @@ jobs:
     name: "${{ matrix.cluster_name }} (${{ matrix.device }}${{ matrix.interface != 'none' && format('-{0}', matrix.interface) || '' }}${{ matrix.shard != '' && format(' [{0}]', matrix.shard) || '' }})"
     needs: [lint-gate, file-changes, rebuild-cache]
     if: >-
-      always() &&
+      !cancelled() &&
       needs.lint-gate.result == 'success' &&
       needs.file-changes.result == 'success' &&
       needs.rebuild-cache.result != 'cancelled' &&
