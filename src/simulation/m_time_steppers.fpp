@@ -463,9 +463,9 @@ contains
             call s_open_run_time_information_file()
         end if
 
-        ! Opening and writing the header of the ib data file
-        if (proc_rank == 0 .and. ib_force_wrt) then
-            call s_open_ib_force_file()
+        ! Opening and writing the header of the ib state data file
+        if (proc_rank == 0 .and. ib_state_wrt) then
+            call s_open_ib_state_file()
         end if
 
         if (cfl_dt) then
@@ -636,13 +636,13 @@ contains
                 if (moving_immersed_boundary_flag) then
                     call s_propagate_immersed_boundaries(s)
                     ! compute ib forces for fixed immersed boundaries if requested for output
-                else if (ib_force_wrt .and. s == nstage) then
+                else if (ib_state_wrt .and. s == nstage) then
                     call s_compute_ib_forces(q_prim_vf, fluid_pp)
                 end if
 
-                ! Write IB forces to file if requested and at the RK final stage
-                if (ib_force_wrt .and. s == nstage) then
-                    call s_write_ib_force_file(t_step)
+                ! Write IB state to file if requested and at the RK final stage
+                if (ib_state_wrt .and. s == nstage) then
+                    call s_write_ib_state_file()
                 end if
 
                 ! update the ghost fluid properties point values based on IB state
@@ -1070,8 +1070,8 @@ contains
         end if
 
         ! Writing the footer of and closing the IB data file
-        if (proc_rank == 0 .and. ib_force_wrt) then
-            call s_close_ib_force_file()
+        if (proc_rank == 0 .and. ib_state_wrt) then
+            call s_close_ib_state_file()
         end if
 
     end subroutine s_finalize_time_steppers_module

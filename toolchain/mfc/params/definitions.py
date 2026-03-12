@@ -214,7 +214,7 @@ _SIMPLE_DESCS = {
     "prim_vars_wrt": "Write primitive variables",
     "cons_vars_wrt": "Write conservative variables",
     "run_time_info": "Print runtime info",
-    "ib_state_wrt": "Write IB force/torque data",
+    "ib_state_wrt": "Write IB state and load data",
     # Misc
     "case_dir": "Case directory path",
     "cantera_file": "Cantera mechanism file",
