@@ -1043,6 +1043,17 @@ def _load():  # pylint: disable=too-many-locals,too-many-statements
         if i >= 2:
             for j in range(1, i):
                 _r(f"{px}alter_patch({j})", LOG)
+        # 2D modal (geometry 13): Fourier modes and options
+        for j in range(1, 11):
+            _r(f"{px}fourier_cos({j})", REAL)
+            _r(f"{px}fourier_sin({j})", REAL)
+        _r(f"{px}modal_clip_r_to_min", LOG)
+        _r(f"{px}modal_r_min", REAL)
+        _r(f"{px}modal_use_exp_form", LOG)
+        # 3D spherical harmonic (geometry 14): coeffs (l, m), l=0..5, m=-l..l
+        for ll in range(0, 6):
+            for mm in range(-ll, ll + 1):
+                _r(f"{px}sph_har_coeff({ll},{mm})", REAL)
 
     # --- fluid_pp (10 fluids) ---
     for f in range(1, NF + 1):
