@@ -14,25 +14,25 @@ retry_sbatch() {
     local submit_output job_id
 
     while [ $attempt -le $max_attempts ]; do
-        echo "sbatch attempt $attempt of $max_attempts..."
+        echo "sbatch attempt $attempt of $max_attempts..." >&2
         submit_output=$(echo "$script_contents" | sbatch 2>&1) || true
-        job_id=$(echo "$submit_output" | grep -oE '[0-9]+')
+        job_id=$(echo "$submit_output" | grep -oE 'Submitted batch job ([0-9]+)' | grep -oE '[0-9]+$')
         if [ -n "$job_id" ]; then
             echo "$job_id"
             return 0
         fi
-        echo "sbatch failed: $submit_output"
+        echo "sbatch failed: $submit_output" >&2
         if ! echo "$submit_output" | grep -qiE "timed out|connection refused|connection reset|try again|temporarily unavailable"; then
-            echo "Non-transient sbatch failure — not retrying."
+            echo "Non-transient sbatch failure — not retrying." >&2
             return 1
         fi
         if [ $attempt -lt $max_attempts ]; then
-            echo "Transient error — retrying in 30s..."
+            echo "Transient error — retrying in 30s..." >&2
             sleep 30
         fi
         attempt=$((attempt + 1))
     done
 
-    echo "sbatch failed after $max_attempts attempts."
+    echo "sbatch failed after $max_attempts attempts." >&2
     return 1
 }
