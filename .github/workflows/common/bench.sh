@@ -29,7 +29,7 @@ if [ "$job_cluster" = "phoenix" ]; then
     rm -rf build 2>/dev/null || true
 fi
 
-if [ ! -d "build" ]; then
+if [ "$job_cluster" = "phoenix" ] || [ ! -d "build" ]; then
     source .github/scripts/retry-build.sh
     retry_build ./mfc.sh build -j $n_jobs $build_opts || exit 1
 fi

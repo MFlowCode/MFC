@@ -17,7 +17,9 @@ if [ "$job_cluster" = "phoenix" ]; then
     rm -rf build 2>/dev/null || true
 fi
 
-if [ ! -d "build" ]; then
+# Phoenix must always rebuild (heterogeneous compute nodes → ISA mismatch risk),
+# even if rm above left a partial build/ directory behind.
+if [ "$job_cluster" = "phoenix" ] || [ ! -d "build" ]; then
     source .github/scripts/retry-build.sh
 
     # Phoenix: smoke-test the syscheck binary to catch architecture mismatches
