@@ -85,9 +85,10 @@ if [ "$device" = "cpu" ]; then
     case "$cluster" in
         phoenix)
             sbatch_device_opts="\
-#SBATCH -p cpu-small
-#SBATCH --ntasks-per-node=24
-#SBATCH --mem-per-cpu=2G"
+#SBATCH -p cpu-small,cpu-medium,cpu-large
+#SBATCH --ntasks-per-node=12
+#SBATCH --mem-per-cpu=8G
+#SBATCH --exclusive"
             ;;
         frontier|frontier_amd)
             sbatch_device_opts="\
@@ -161,8 +162,9 @@ rm -f "$output_file"
 # --- Module load mode (short form) ---
 module_mode=$([ "$device" = "gpu" ] && echo "g" || echo "c")
 
-# --- Submit ---
-submit_output=$(sbatch <<EOT
+# --- Submit (with retries for transient SLURM errors) ---
+source "${SCRIPT_DIR}/retry-sbatch.sh"
+_sbatch_script=$(cat <<EOT
 #!/bin/bash
 #SBATCH -J ${job_prefix}-${job_slug}
 #SBATCH --account=${account}
@@ -192,10 +194,11 @@ $sbatch_script_contents
 EOT
 )
 
-job_id=$(echo "$submit_output" | grep -oE '[0-9]+')
+job_id=$(retry_sbatch "$_sbatch_script")
+unset _sbatch_script
+
 if [ -z "$job_id" ]; then
-    echo "ERROR: Failed to submit job. sbatch output:"
-    echo "$submit_output"
+    echo "ERROR: Failed to submit job."
     exit 1
 fi
 
