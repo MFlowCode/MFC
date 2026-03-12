@@ -108,6 +108,7 @@ IMPORTANT: Follow this loop for ALL code changes. Do not skip steps.
 YOU MUST run `./mfc.sh precheck` before any commit. This is enforced by pre-commit hooks.
 YOU MUST run tests relevant to your changes before claiming work is done.
 NEVER commit code that does not compile or fails tests.
+NEVER use heredocs for git commit messages. Use simple `git commit -m "message"` instead.
 
 ## Architecture
 
