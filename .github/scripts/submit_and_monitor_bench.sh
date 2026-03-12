@@ -19,13 +19,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 echo "[$dir] Submitting benchmark for $device-$interface on $cluster..."
 cd "$dir"
 
-# Always use the PR's submit.sh so both master and PR builds benefit from the
-# run_monitored_slurm_job.sh SIGKILL recovery wrapper.  The bench script is
-# still resolved relative to the current directory (master/ or pr/) so the
-# correct branch code is benchmarked.  SLURM_SUBMIT_DIR ensures the job runs
-# in the right directory regardless of which submit.sh is invoked.
-PR_SUBMIT="${SCRIPT_DIR}/../workflows/${cluster}/submit.sh"
-bash "$PR_SUBMIT" .github/workflows/$cluster/bench.sh "$device" "$interface"
+# Use the PR's submit-slurm-job.sh and bench script for both master and PR jobs.
+# The bench script must come from the PR tree (master may not have common/bench.sh
+# yet), and the script only orchestrates build+bench — the actual MFC code under
+# test is the cwd's checkout (master/ or pr/).
+PR_BENCH_SCRIPT="$(cd "${SCRIPT_DIR}/../workflows/common" && pwd)/bench.sh"
+bash "${SCRIPT_DIR}/submit-slurm-job.sh" "$PR_BENCH_SCRIPT" "$device" "$interface" "$cluster"
 
 # Verify the YAML output file was created
 job_slug="bench-$device-$interface"
