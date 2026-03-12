@@ -106,3 +106,7 @@ benchmarks/*.png
 
 **isolation_rules/
 **.supercode/
+# CCE stress-test log directories (local testing artifacts)
+cce_*/
+cce_*.log
+run_cce_*.sh

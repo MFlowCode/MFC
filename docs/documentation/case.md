@@ -267,11 +267,11 @@ The number has to be a positive integer.
 - `num_fluids` defines the total number of fluids defined in each of the patches.
 The number has to be a positive integer.
 
-- `patch_icpp(j)%%geometry` defines the type of geometry of $j$-th patch by using an integer from 1 to 13.
+- `patch_icpp(j)%%geometry` defines the type of geometry of $j$-th patch by using an integer from 1 to 21.
 Definition of the patch type for each integer is listed in table [Patch Types](#patch-types).
 
 - `[x,y,z]_centroid`, `length_[x,y,z]`, and/or `radius` are used to uniquely define the geometry of the patch with given type.
-Requisite combinations of the parameters for each type can be found in is listed in table [Patch types](#patch-types).
+Requisite combinations of the parameters for each type are listed in table [Patch types](#patch-types).
 
 - `patch_icpp(j)%%alter_patch(i)` activates alternation of `patch(i)` with `patch(j)`.
 For instance, in a 2D simulation, when a cylindrical `patch(2)` is immersed in a rectangular `patch(1)`:
@@ -347,11 +347,11 @@ Additional details on this specification can be found in [The Naca Airfoil Serie
 
 - Please see [Patch Parameters](#sec-patches) for the descriptions of `model_filepath`, `model_scale`, `model_rotate`, `model_translate`, `model_spc`, and `model_threshold`.
 
-- `moving_ibm` sets the method by which movement will be applied to the immersed boundary. Using 0 will result in no movement. Using 1 will result 1-way coupling where the boundary moves at a constant rate and applied forces to the fluid based upon it's own motion. In 1-way coupling, the fluid does not apply forces back onto the IB.
+- `moving_ibm` sets the method by which movement will be applied to the immersed boundary. Using 0 will result in no movement. Using 1 will result 1-way coupling where the boundary moves at a constant rate and applied forces to the fluid based upon it's own motion. In 1-way coupling, the fluid does not apply forces back onto the IB. Using 2 will result in 2-way coupling, where the boundary pushes on the fluid and the fluid pushes back on the boundary via pressure and viscous forces. If external forces are applied, the boundary will also experience those forces.
 
-- `vel(i)` is the initial linear velocity of the IB in the x, y, z direction for i=1, 2, 3. When `moving_ibm` equals 1, this velocity is constant.
+- `vel(i)` is the initial linear velocity of the IB in the x, y, z direction for i=1, 2, 3. When `moving_ibm` equals 2, this velocity is just the starting speed of the object, which will then accelerate due to external forces. If `moving_ibm` equals 1, then this is constant if it is a number, or can be described analytically with an expression. 
 
-- `angular_vel(i)` is the initial angular velocity of the IB about the x, y, z axes for i=1, 2, 3 in radians per second. When `moving_ibm` equals 1, this angular velocity is constant.
+- `angular_vel(i)` is the initial angular velocity of the IB about the x, y, z axes for i=1, 2, 3 in radians per second. When `moving_ibm` equals 2, this rotation rate is just the starting rate of the object, which will then change due to external torques. If `moving_ibm` equals 1, then this is constant if it is a number, or can be described analytically with an expression. 
 
 ### 5. Fluid Material's {#sec-fluid-materials}
 
@@ -651,7 +651,7 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 
 The table lists formatted database output parameters. The parameters define variables that are outputted from simulation and file types and formats of data as well as options for post-processing.
 
-- `format` specifies the choice of the file format of data file outputted by MFC by an integer of 1 and 2. `format = 1` and `2` correspond to Silo-HDF5 format and binary format, respectively.
+- `format` specifies the choice of the file format of data file outputted by MFC by an integer of 1 and 2. `format = 1` and `2` correspond to Silo-HDF5 format and binary format, respectively. Both formats are supported by `./mfc.sh viz` (see @ref visualization "Flow Visualization"). Silo-HDF5 requires the h5py Python package; binary has no extra dependencies.
 
 - `precision` specifies the choice of the floating-point format of the data file outputted by MFC by an integer of 1 and 2. `precision = 1` and `2` correspond to single-precision and double-precision formats, respectively.
 
@@ -1087,8 +1087,8 @@ This boundary condition can be used for subsonic inflow (`bc_[x,y,z]%[beg,end]` 
 | 10   | Cylinder 		           | 3     | Y      | Requires `[x,y,z]_centroid`, `radius`, and `length_[x,y,z]`. |
 | 11   | Sweep plane 	           | 3     | Y      | Not coordinate-aligned. Requires `x[y,z]_centroid` and `normal(i)`. |
 | 12   | Ellipsoid 		           | 3     | Y      | Requires `[x,y,z]_centroid` and `radii(i)`. |
-| 13   | N/A        	           | N/A   | N/A    | No longer exists. Empty. |
-| 14   | Spherical Harmonic      | 3     | N      | Requires `[x,y,z]_centroid`, `radius`, `epsilon`, `beta` |
+| 13   | 2D modal (Fourier)      | 2     | Y      | Requires `x_centroid`, `y_centroid`, `radius`. Optional: `fourier_cos(n)`, `fourier_sin(n)` (n=1..10), `modal_clip_r_to_min`, `modal_r_min`, `modal_use_exp_form`. |
+| 14   | 3D spherical harmonic   | 3     | Y      | Requires `x_centroid`, `y_centroid`, `z_centroid`, `radius`. Optional: `sph_har_coeff(l,m)` (l=0..5, m=-l..l). |
 | 15   | N/A                     | N/A   | N/A    | No longer exists. Empty.  |
 | 16   | 1D bubble pulse         | 1     | N      | Requires `x_centroid`, `length_x` |
 | 17   | Spiral                  | 2     | N      | Requires `[x,y]_centroid` |
@@ -1101,6 +1101,19 @@ The patch types supported by the MFC are listed in table [Patch Types](#patch-ty
 This includes types exclusive to one-, two-, and three-dimensional problems.
 The patch type number (`#`) corresponds to the input value in `input.py` labeled  `patch_icpp(j)%%geometry` where $j$ is the patch index.
 Each patch requires a different set of parameters, which are also listed in this table.
+
+**Geometry 13: 2D modal (Fourier):**  
+Boundary is at polar angle \f$\theta = \mathrm{atan2}(y - y_{\mathrm{centroid}}, x - x_{\mathrm{centroid}})\f$.
+
+- **Additive form** (default, `modal_use_exp_form` false):  
+  \f$R_{\mathrm{boundary}} = \mathrm{radius} + \sum_n \bigl[ \mathtt{fourier\_cos}(n)\cos(n\theta) + \mathtt{fourier\_sin}(n)\sin(n\theta) \bigr]\f$.  
+  Coefficients are absolute: same units as `radius` (length).  
+  If this formula gives \f$R_{\mathrm{boundary}} < 0\f$ at some \f$\theta\f$, it is clipped to zero.  
+  With `modal_clip_r_to_min` true, if \f$R_{\mathrm{boundary}} <\f$ `modal_r_min` at some \f$\theta\f$, it is clipped to `modal_r_min`.  
+  
+- **Exponential form** (`modal_use_exp_form` true):  
+  \f$R_{\mathrm{boundary}} = \mathrm{radius} \times \exp\bigl( \sum_n [\ldots] \bigr)\f$.  
+  Coefficients are relative (dimensionless); the sum scales the radius.
 
 ### Immersed Boundary Patch Types {#immersed-boundary-patch-types}
 
