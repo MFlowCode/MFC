@@ -11,7 +11,7 @@ retry_sbatch() {
     local script_contents="$1"
     local max_attempts=3
     local attempt=1
-    local submit_output job_id
+    local submit_output job_id last_output=""
 
     while [ $attempt -le $max_attempts ]; do
         echo "sbatch attempt $attempt of $max_attempts..." >&2
@@ -21,6 +21,7 @@ retry_sbatch() {
             echo "$job_id"
             return 0
         fi
+        last_output="$submit_output"
         echo "sbatch failed: $submit_output" >&2
         if ! echo "$submit_output" | grep -qiE "timed out|connection refused|connection reset|try again|temporarily unavailable"; then
             echo "Non-transient sbatch failure — not retrying." >&2
@@ -33,6 +34,6 @@ retry_sbatch() {
         attempt=$((attempt + 1))
     done
 
-    echo "sbatch failed after $max_attempts attempts." >&2
+    echo "sbatch failed after $max_attempts attempts. Last error: $last_output" >&2
     return 1
 }
