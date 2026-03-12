@@ -15,7 +15,7 @@
 !! Reference: B. Xie and F. Xiao, "Toward efficient and accurate interface
 !! capturing on arbitrary hybrid unstructured grids: The THINC method with
 !! quadratic surface representation and Gaussian quadrature,"
-!! Journal Computational Physics, vol. 349, pp. 415-440, 2017.
+!! Journal of Computational Physics, vol. 349, pp. 415-440, 2017.
 module m_thinc
 
     use m_derived_types
@@ -32,14 +32,17 @@ module m_thinc
  s_finalize_thinc_module
 
     !> 3-point Gauss-Legendre quadrature on [-1/2, 1/2]
+    !> Node locations: +-sqrt(3/5)/2, 0
     real(wp), parameter :: gq3_pts(3) = [ &
                            -5e-1_wp*0.7745966692414834_wp, &
                            0._wp, &
                            5e-1_wp*0.7745966692414834_wp]
+    !> Weights: 5/18, 8/18, 5/18
     real(wp), parameter :: gq3_wts(3) = [ &
                            5._wp/18._wp, &
                            8._wp/18._wp, &
                            5._wp/18._wp]
+    !> ln(2)
     real(wp), parameter :: ln2 = 0.6931471805599453_wp
 
     !> MTHINC precomputed data: unit normal components and interface
@@ -65,6 +68,7 @@ contains
         else
             res = ax + log(1._wp + exp(-2._wp*ax)) - ln2
         end if
+
     end function f_log_cosh
 
     !> @brief Analytical 1-D integral of the THINC function:
@@ -74,12 +78,13 @@ contains
         real(wp), intent(in) :: a, b
         real(wp) :: res
 
-        if (abs(b) < 1e-14_wp) then
+        if (abs(b) < verysmall) then
             res = 5e-1_wp*(1._wp + tanh(a))
         else
             res = 5e-1_wp + (f_log_cosh(a + 5e-1_wp*b) &
                              - f_log_cosh(a - 5e-1_wp*b))/(2._wp*b)
         end if
+
     end function f_thinc_integral_1d
 
     !> @brief Volume integral of H(xi) = 0.5*(1 + tanh(beta*(n.xi + d)))
@@ -110,6 +115,7 @@ contains
                 end do
             end do
         end if
+
     end function f_mthinc_volume_integral
 
     !> @brief Derivative dV/dd of the volume integral (for Newton iteration).
@@ -151,6 +157,7 @@ contains
             end do
         end if
         res = 5e-1_wp*beta*res
+
     end function f_mthinc_volume_integral_dd
 
     !> @brief Solve for the interface-position parameter d such that
@@ -172,6 +179,7 @@ contains
             if (abs(dV) < 1e-14_wp) exit
             d = d - residual/dV
         end do
+
     end function f_mthinc_solve_d
 
     !> @brief Face-averaged THINC function at a cell face.
@@ -214,6 +222,7 @@ contains
                       *f_thinc_integral_1d(a, beta*n_t1)
             end do
         end if
+
     end function f_mthinc_face_average
 
     subroutine s_initialize_thinc_module()
@@ -289,7 +298,7 @@ contains
 
                         nmag = sqrt(nr_x*nr_x + nr_y*nr_y + nr_z*nr_z)
 
-                        if (nmag > 1e-14_wp) then
+                        if (nmag > verysmall) then
                             nr_x = nr_x/nmag
                             nr_y = nr_y/nmag
                             nr_z = nr_z/nmag
@@ -313,8 +322,9 @@ contains
     end subroutine s_compute_mthinc_normals
 
     !> @brief Applies THINC (int_comp=1) or MTHINC (int_comp=2) interface
-    !! compression to sharpen volume-fraction reconstructions at material
-    !! interfaces. Called after WENO/MUSCL reconstruction per direction.
+    !! compression to sharpen volume-fraction and density reconstructions
+    !! at material interfaces. Called after WENO/MUSCL reconstruction per
+    !! direction.
     !!
     !! THINC: 1D tanh profile with constant sharpness ic_beta.
     !! MTHINC: Multi-dimensional tanh profile using precomputed unit normal
@@ -338,11 +348,12 @@ contains
         real(wp) :: aCL, aCR, aC, aTHINC, qmin, qmax, A, B, C
         real(wp) :: sgn, moncon, beta_eff
         real(wp) :: nh1, nh2, nh3, d_local, rho1, rho2
+        real(wp) :: rho_b, rho_e
 
         #:for REC_DIR, XYZ, CC_PRI in [(1, 'x', 'x_cc'), (2, 'y', 'y_cc'), (3, 'z', 'z_cc')]
             if (recon_dir == ${REC_DIR}$) then
 
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[j,k,l,ix,iy,iz,aCL,aC,aCR,aTHINC,moncon,sgn,qmin,qmax,A,B,C,beta_eff,nh1,nh2,nh3,d_local,rho1,rho2]')
+                $:GPU_PARALLEL_LOOP(collapse=3,private='[j,k,l,ix,iy,iz,aCL,aC,aCR,aTHINC,moncon,sgn,qmin,qmax,A,B,C,beta_eff,nh1,nh2,nh3,d_local,rho1,rho2,rho_b,rho_e]')
                 do l = is3_d%beg, is3_d%end
                     do k = is2_d%beg, is2_d%end
                         do j = is1_d%beg, is1_d%end
@@ -439,14 +450,16 @@ contains
                                         B = exp(sgn*beta_eff*(2._wp*C - 1._wp))
                                         A = (B/cosh(beta_eff) - 1._wp)/tanh(beta_eff)
 
+                                        ! Save original density ratios before THINC overwrites them
+                                        rho_b = vL_rs_vf_${XYZ}$ (j, k, l, contxb)/vL_rs_vf_${XYZ}$ (j, k, l, advxb)
+                                        rho_e = vL_rs_vf_${XYZ}$ (j, k, l, contxe)/(1._wp - vL_rs_vf_${XYZ}$ (j, k, l, advxb))
+
                                         ! Left reconstruction
                                         aTHINC = qmin + 5e-1_wp*qmax*(1._wp + sgn*A)
                                         if (aTHINC < ic_eps) aTHINC = ic_eps
                                         if (aTHINC > 1._wp - ic_eps) aTHINC = 1._wp - ic_eps
-                                        vL_rs_vf_${XYZ}$ (j, k, l, contxb) = vL_rs_vf_${XYZ}$ (j, k, l, contxb)/ &
-                                                                             vL_rs_vf_${XYZ}$ (j, k, l, advxb)*aTHINC
-                                        vL_rs_vf_${XYZ}$ (j, k, l, contxe) = vL_rs_vf_${XYZ}$ (j, k, l, contxe)/ &
-                                                                             (1._wp - vL_rs_vf_${XYZ}$ (j, k, l, advxb))*(1._wp - aTHINC)
+                                        vL_rs_vf_${XYZ}$ (j, k, l, contxb) = rho_b*aTHINC
+                                        vL_rs_vf_${XYZ}$ (j, k, l, contxe) = rho_e*(1._wp - aTHINC)
                                         vL_rs_vf_${XYZ}$ (j, k, l, advxb) = aTHINC
                                         vL_rs_vf_${XYZ}$ (j, k, l, advxe) = 1._wp - aTHINC
 
@@ -454,10 +467,8 @@ contains
                                         aTHINC = qmin + 5e-1_wp*qmax*(1._wp + sgn*(tanh(beta_eff) + A)/(1._wp + A*tanh(beta_eff)))
                                         if (aTHINC < ic_eps) aTHINC = ic_eps
                                         if (aTHINC > 1._wp - ic_eps) aTHINC = 1._wp - ic_eps
-                                        vR_rs_vf_${XYZ}$ (j, k, l, contxb) = vL_rs_vf_${XYZ}$ (j, k, l, contxb)/ &
-                                                                             vL_rs_vf_${XYZ}$ (j, k, l, advxb)*aTHINC
-                                        vR_rs_vf_${XYZ}$ (j, k, l, contxe) = vL_rs_vf_${XYZ}$ (j, k, l, contxe)/ &
-                                                                             (1._wp - vL_rs_vf_${XYZ}$ (j, k, l, advxb))*(1._wp - aTHINC)
+                                        vR_rs_vf_${XYZ}$ (j, k, l, contxb) = rho_b*aTHINC
+                                        vR_rs_vf_${XYZ}$ (j, k, l, contxe) = rho_e*(1._wp - aTHINC)
                                         vR_rs_vf_${XYZ}$ (j, k, l, advxb) = aTHINC
                                         vR_rs_vf_${XYZ}$ (j, k, l, advxe) = 1._wp - aTHINC
 

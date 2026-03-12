@@ -747,7 +747,7 @@ contains
         end if
 
         if (int_comp == 2 .and. n > 0) then
-            call nvtxStartRange("RHS-MTHINC-NORMALS")
+            call nvtxStartRange("RHS-COMPRESSION-NORMALS")
             call s_compute_mthinc_normals(q_prim_qp%vf)
             call nvtxEndRange
         end if
@@ -788,7 +788,7 @@ contains
             if ((.not. igr) .or. dummy) then! Finite volume solve
 
                 ! Reconstructing Primitive/Conservative Variables
-                call nvtxStartRange("RHS-WENO")
+                call nvtxStartRange("RHS-RECONSTRUCTION")
 
                 if (.not. surface_tension) then
                     if (all(Re_size == 0)) then
@@ -1933,14 +1933,19 @@ contains
                 end if
 
                 if (int_comp > 0 .and. iv%beg <= advxb .and. iv%end >= advxe) then
+                    ! Only run interface compression when the volume fractions are
+                    ! in the reconstructed variables
+                    call nvtxStartRange("RHS-RECONSTRUCTION-COMPRESSION")
                     call s_thinc_compression(q_prim_qp%vf, &
                                              vL_x, vL_y, vL_z, &
                                              vR_x, vR_y, vR_z, &
                                              recon_dir, &
                                              is1, is2, is3)
+                    call nvtxEndRange()
                 end if
             end if
         #:endfor
+
     end subroutine s_reconstruct_cell_boundary_values
 
     !> @brief Performs first-order (piecewise constant) reconstruction of left and right cell-boundary values.
