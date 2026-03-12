@@ -25,11 +25,13 @@ fi
 # Phoenix builds inside SLURM; Frontier pre-builds via build.sh on the login node.
 # Phoenix: always nuke stale builds (heterogeneous compute nodes → ISA mismatch risk).
 if [ "$job_cluster" = "phoenix" ]; then
-    # Suppress stale NFS file handle errors — those files are inaccessible anyway.
-    rm -rf build 2>/dev/null || true
+    # Rename instead of rm: mv is a metadata-only op that succeeds even with stale
+    # NFS file handles. Delete the old tree in the background (best-effort).
+    mv build build.stale.$$ 2>/dev/null || true
+    rm -rf build.stale.* 2>/dev/null & disown
 fi
 
-if [ "$job_cluster" = "phoenix" ] || [ ! -d "build" ]; then
+if [ ! -d "build" ]; then
     source .github/scripts/retry-build.sh
     retry_build ./mfc.sh build -j $n_jobs $build_opts || exit 1
 fi
