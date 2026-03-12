@@ -20,6 +20,7 @@ build_opts="$gpu_opts"
 
 . ./mfc.sh load -c $compiler_flag -m $([ "$job_device" = "gpu" ] && echo "g" || echo "c")
 
+# Suppress stale NFS file handle errors — those files are inaccessible anyway.
 rm -rf build 2>/dev/null || true
 
 source .github/scripts/retry-build.sh
