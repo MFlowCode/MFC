@@ -15,7 +15,7 @@ retry_sbatch() {
 
     while [ $attempt -le $max_attempts ]; do
         echo "sbatch attempt $attempt of $max_attempts..." >&2
-        submit_output=$(echo "$script_contents" | sbatch 2>&1) || true
+        submit_output=$(printf '%s\n' "$script_contents" | sbatch 2>&1) || true
         job_id=$(echo "$submit_output" | grep -oE 'Submitted batch job ([0-9]+)' | grep -oE '[0-9]+$')
         if [ -n "$job_id" ]; then
             echo "$job_id"
