@@ -22,7 +22,7 @@ case "$cluster" in
     *) echo "ERROR: Unknown cluster '$cluster'"; exit 1 ;;
 esac
 
-rm -rf build
+rm -rf build 2>/dev/null || true
 
 . ./mfc.sh load -c "$flag" -m g
 

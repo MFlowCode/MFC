@@ -20,7 +20,7 @@ build_opts="$gpu_opts"
 
 . ./mfc.sh load -c $compiler_flag -m $([ "$job_device" = "gpu" ] && echo "g" || echo "c")
 
-rm -rf build
+rm -rf build 2>/dev/null || true
 
 source .github/scripts/retry-build.sh
 if [ "$run_bench" == "bench" ]; then

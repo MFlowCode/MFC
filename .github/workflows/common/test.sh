@@ -13,7 +13,8 @@ build_opts="$gpu_opts"
 # Phoenix builds inside SLURM on heterogeneous compute nodes — always start fresh
 # to avoid SIGILL from stale binaries compiled on a different microarchitecture.
 if [ "$job_cluster" = "phoenix" ]; then
-    rm -rf build
+    # Suppress stale NFS file handle errors — those files are inaccessible anyway.
+    rm -rf build 2>/dev/null || true
 fi
 
 if [ ! -d "build" ]; then
