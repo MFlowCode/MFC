@@ -495,6 +495,18 @@ def _try_create_plotter() -> pv.Plotter:
     return pl
 
 
+def _can_dlopen(names) -> bool:
+    """Return True if any of the given shared library names can be loaded."""
+    import ctypes  # pylint: disable=import-outside-toplevel
+    for name in names:
+        try:
+            ctypes.cdll.LoadLibrary(name)
+            return True
+        except OSError:
+            continue
+    return False
+
+
 def _restore_env(key, saved):
     """Restore or remove an environment variable."""
     if saved is not None:
@@ -503,16 +515,18 @@ def _restore_env(key, saved):
         os.environ.pop(key, None)
 
 
-def _pv_ensure_plotter() -> pv.Plotter:  # pylint: disable=too-many-branches
+def _pv_ensure_plotter() -> pv.Plotter:
     """Return the persistent plotter, creating it lazily on first use.
 
     MUST be called on the dedicated _pv_thread — GL contexts are
     thread-bound and cannot be shared across threads.
 
-    Tries multiple VTK rendering backends in order:
-      1. OSMesa  — software renderer, no display/GPU needed
-      2. EGL     — GPU headless rendering, no display needed
-      3. Xvfb+GLX — virtual X11 framebuffer + hardware GLX
+    Tries multiple VTK rendering backends in order, but only attempts
+    a backend if its required shared library is present (VTK segfaults
+    rather than raising if a library is missing):
+      1. EGL     — GPU headless, needs libEGL.so
+      2. OSMesa  — software renderer, needs libOSMesa.so
+      3. Xvfb+GLX — virtual X11 framebuffer, needs Xvfb
     """
     global _pv_plotter, _pv_backend_name  # pylint: disable=global-statement
     if _pv_plotter is not None:
@@ -521,30 +535,39 @@ def _pv_ensure_plotter() -> pv.Plotter:  # pylint: disable=too-many-branches
     saved_display = os.environ.get('DISPLAY')
     saved_vtk_win = os.environ.get('VTK_DEFAULT_OPENGL_WINDOW')
     errors = []
+    has_egl = _can_dlopen(['libEGL.so.1', 'libEGL.so'])
+    has_osmesa = _can_dlopen(['libOSMesa.so.8', 'libOSMesa.so.6',
+                              'libOSMesa.so'])
 
-    # --- 1. OSMesa (software, no display needed) ---
-    try:
-        os.environ['VTK_DEFAULT_OPENGL_WINDOW'] = 'vtkOSOpenGLRenderWindow'
-        os.environ.pop('DISPLAY', None)
-        _pv_plotter = _try_create_plotter()
-        _pv_backend_name = 'OSMesa'
-        logger.info('PyVista: using OSMesa backend')
-        return _pv_plotter
-    except Exception as exc:  # pylint: disable=broad-except
-        errors.append(f'OSMesa: {exc}')
-        logger.info('PyVista OSMesa failed: %s', exc)
+    # --- 1. EGL (GPU headless, no display needed) ---
+    if has_egl:
+        try:
+            os.environ['VTK_DEFAULT_OPENGL_WINDOW'] = 'vtkEGLRenderWindow'
+            os.environ.pop('DISPLAY', None)
+            _pv_plotter = _try_create_plotter()
+            _pv_backend_name = 'EGL'
+            logger.info('PyVista: using EGL backend')
+            return _pv_plotter
+        except Exception as exc:  # pylint: disable=broad-except
+            errors.append(f'EGL: {exc}')
+            logger.info('PyVista EGL failed: %s', exc)
+    else:
+        errors.append('EGL: libEGL.so not found')
 
-    # --- 2. EGL (GPU headless, no display needed) ---
-    try:
-        os.environ['VTK_DEFAULT_OPENGL_WINDOW'] = 'vtkEGLRenderWindow'
-        os.environ.pop('DISPLAY', None)
-        _pv_plotter = _try_create_plotter()
-        _pv_backend_name = 'EGL'
-        logger.info('PyVista: using EGL backend')
-        return _pv_plotter
-    except Exception as exc:  # pylint: disable=broad-except
-        errors.append(f'EGL: {exc}')
-        logger.info('PyVista EGL failed: %s', exc)
+    # --- 2. OSMesa (software, no display needed) ---
+    if has_osmesa:
+        try:
+            os.environ['VTK_DEFAULT_OPENGL_WINDOW'] = 'vtkOSOpenGLRenderWindow'
+            os.environ.pop('DISPLAY', None)
+            _pv_plotter = _try_create_plotter()
+            _pv_backend_name = 'OSMesa'
+            logger.info('PyVista: using OSMesa backend')
+            return _pv_plotter
+        except Exception as exc:  # pylint: disable=broad-except
+            errors.append(f'OSMesa: {exc}')
+            logger.info('PyVista OSMesa failed: %s', exc)
+    else:
+        errors.append('OSMesa: libOSMesa.so not found')
 
     # --- 3. Xvfb + GLX ---
     try:
