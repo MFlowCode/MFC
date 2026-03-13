@@ -524,14 +524,17 @@ def _restore_env(key, saved):
         os.environ.pop(key, None)
 
 
-def _try_linux_headless(saved_vtk_win, errors):
-    """Try Linux-specific headless backends: EGL, OSMesa, Xvfb+GLX.
+def _try_headless(saved_vtk_win, errors):
+    """Try headless backends: EGL, OSMesa, Xvfb+GLX.
 
     Returns (plotter, backend_name) on success or (None, None) on failure.
+    EGL and Xvfb are Linux-only; OSMesa works on macOS too (brew install mesa).
     """
-    has_egl = _can_dlopen(['libEGL.so.1', 'libEGL.so'])
-    has_osmesa = _can_dlopen(['libOSMesa.so.8', 'libOSMesa.so.6',
-                              'libOSMesa.so'])
+    _is_linux = sys.platform == 'linux'
+    _osmesa_names = (['libOSMesa.so.8', 'libOSMesa.so.6', 'libOSMesa.so']
+                     if _is_linux else ['libOSMesa.dylib', 'libOSMesa.8.dylib'])
+    has_egl = _is_linux and _can_dlopen(['libEGL.so.1', 'libEGL.so'])
+    has_osmesa = _can_dlopen(_osmesa_names)
 
     # EGL (GPU headless, no display needed)
     if has_egl:
@@ -556,17 +559,18 @@ def _try_linux_headless(saved_vtk_win, errors):
             errors.append(f'OSMesa: {exc}')
             logger.info('PyVista OSMesa failed: %s', exc)
     else:
-        errors.append('OSMesa: libOSMesa.so not found')
+        errors.append('OSMesa: libOSMesa not found')
 
-    # Xvfb + GLX
-    try:
-        _restore_env('VTK_DEFAULT_OPENGL_WINDOW', saved_vtk_win)
-        if not _start_xvfb():
-            raise RuntimeError('Xvfb not available')
-        return _try_create_plotter(), 'Xvfb+GLX'
-    except Exception as exc:  # pylint: disable=broad-except
-        errors.append(f'Xvfb: {exc}')
-        logger.info('PyVista Xvfb failed: %s', exc)
+    # Xvfb + GLX (Linux only)
+    if _is_linux:
+        try:
+            _restore_env('VTK_DEFAULT_OPENGL_WINDOW', saved_vtk_win)
+            if not _start_xvfb():
+                raise RuntimeError('Xvfb not available')
+            return _try_create_plotter(), 'Xvfb+GLX'
+        except Exception as exc:  # pylint: disable=broad-except
+            errors.append(f'Xvfb: {exc}')
+            logger.info('PyVista Xvfb failed: %s', exc)
 
     return None, None
 
@@ -578,8 +582,9 @@ def _pv_ensure_plotter() -> pv.Plotter:
     thread-bound and cannot be shared across threads.
 
     Backend cascade:
-      1. Native (macOS Cocoa / Linux GLX with existing DISPLAY)
-      2. Linux-only: EGL → OSMesa → Xvfb+GLX
+      - Linux with DISPLAY: native GLX first, then headless fallbacks
+      - Linux headless: EGL → OSMesa → Xvfb+GLX
+      - macOS: OSMesa only (Cocoa crashes from non-main thread)
     """
     global _pv_plotter, _pv_backend_name  # pylint: disable=global-statement
     if _pv_plotter is not None:
@@ -589,25 +594,26 @@ def _pv_ensure_plotter() -> pv.Plotter:
     saved_vtk_win = os.environ.get('VTK_DEFAULT_OPENGL_WINDOW')
     errors = []
 
-    # --- 1. Native/default backend (macOS Cocoa, or Linux with DISPLAY) ---
-    if sys.platform != 'linux' or saved_display:
+    # --- 1. Native GLX (Linux with existing DISPLAY only) ---
+    # macOS Cocoa is skipped: it requires NSWindow on the main thread
+    # but Dash callbacks (and our render thread) run on worker threads.
+    if sys.platform == 'linux' and saved_display:
         try:
             _restore_env('VTK_DEFAULT_OPENGL_WINDOW', saved_vtk_win)
             _pv_plotter = _try_create_plotter()
-            _pv_backend_name = 'Cocoa' if sys.platform == 'darwin' else 'GLX'
-            logger.info('PyVista: using %s backend', _pv_backend_name)
+            _pv_backend_name = 'GLX'
+            logger.info('PyVista: using GLX backend')
             return _pv_plotter
         except Exception as exc:  # pylint: disable=broad-except
-            errors.append(f'native: {exc}')
-            logger.info('PyVista native backend failed: %s', exc)
+            errors.append(f'GLX: {exc}')
+            logger.info('PyVista GLX failed: %s', exc)
 
-    # --- 2. Linux headless backends ---
-    if sys.platform == 'linux':
-        pl, name = _try_linux_headless(saved_vtk_win, errors)
-        if pl is not None:
-            _pv_plotter, _pv_backend_name = pl, name
-            logger.info('PyVista: using %s backend', name)
-            return _pv_plotter
+    # --- 2. Headless backends (EGL/OSMesa on Linux, OSMesa on macOS) ---
+    pl, name = _try_headless(saved_vtk_win, errors)
+    if pl is not None:
+        _pv_plotter, _pv_backend_name = pl, name
+        logger.info('PyVista: using %s backend', name)
+        return _pv_plotter
 
     # --- All backends failed ---
     _restore_env('DISPLAY', saved_display)
@@ -1684,7 +1690,10 @@ input[type=radio] + span, label { color: %(tx)s !important; }
                        'server-side 3D rendering enabled.[/dim]')
         else:
             _hint = ''
-            if sys.platform == 'linux':
+            if sys.platform == 'darwin':
+                _hint = ('\n    For fast 3D on macOS: '
+                         'brew install mesa')
+            elif sys.platform == 'linux':
                 _hint = (
                     '\n    For fast headless 3D, install one of:\n'
                     '      libOSMesa: sudo apt install libosmesa6-dev  '
