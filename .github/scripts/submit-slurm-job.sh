@@ -87,8 +87,7 @@ if [ "$device" = "cpu" ]; then
             sbatch_device_opts="\
 #SBATCH -p cpu-small,cpu-medium,cpu-large
 #SBATCH --ntasks-per-node=12
-#SBATCH --mem-per-cpu=8G
-#SBATCH --exclusive"
+#SBATCH --mem-per-cpu=8G"
             ;;
         frontier|frontier_amd)
             sbatch_device_opts="\
