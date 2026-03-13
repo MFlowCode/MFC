@@ -197,11 +197,6 @@ EOT
 job_id=$(retry_sbatch "$_sbatch_script")
 unset _sbatch_script
 
-if [ -z "$job_id" ]; then
-    echo "ERROR: Failed to submit job."
-    exit 1
-fi
-
 echo "Submitted batch job $job_id"
 echo "$job_id" > "$id_file"
 echo "Job ID written to $id_file"
