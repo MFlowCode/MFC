@@ -641,8 +641,8 @@ contains
                 r2_mag = sqrt(dot_product(r2, r2))
                 r3_mag = sqrt(dot_product(r3, r3))
 
-                ! Skip degenerate triangles (zero-area or query
-                ! point coincident with a vertex).
+                ! Skip if query point is coincident with a vertex
+                ! (magnitudes are zero/subnormal).
                 if (r1_mag*r2_mag*r3_mag < tiny(1.0_wp)) cycle
 
                 ! tan(Omega/2) = numerator / denominator
@@ -659,8 +659,8 @@ contains
                 fraction = fraction + atan2(numerator, denominator)
             end do
 
-            ! Winding number = total solid angle / (4*pi)
-            ! Each triangle contributes 2*atan2, so sum / (2*pi)
+            ! Each atan2 returns Omega/2 per triangle; divide
+            ! by 2*pi to get winding number = sum(Omega)/(4*pi).
             fraction = fraction/(2.0_wp*acos(-1.0_wp))
         end if
 
@@ -692,9 +692,9 @@ contains
         h = f_cross(ray%d, edge2)
         a = dot_product(edge1, h)
 
-        ! Ray nearly parallel to triangle plane; threshold matches
-        ! the original implementation and is safe for wp precision.
-        if (abs(a) < 1e-7_wp) return
+        ! Ray nearly parallel to triangle plane. In single precision
+        ! builds epsilon(1.0) ~ 1.2e-7, so use 10*epsilon as a floor.
+        if (abs(a) < max(1e-7_wp, 10.0_wp*epsilon(1.0_wp))) return
 
         f = 1.0_wp/a
         s = ray%o - triangle%v(1, :)
