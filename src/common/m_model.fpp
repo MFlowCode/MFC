@@ -641,6 +641,10 @@ contains
                 r2_mag = sqrt(dot_product(r2, r2))
                 r3_mag = sqrt(dot_product(r3, r3))
 
+                ! Skip degenerate triangles (zero-area or query
+                ! point coincident with a vertex).
+                if (r1_mag*r2_mag*r3_mag < tiny(1.0_wp)) cycle
+
                 ! tan(Omega/2) = numerator / denominator
                 ! numerator = scalar triple product r1 . (r2 x r3)
                 numerator = r1(1)*(r2(2)*r3(3) - r2(3)*r3(2)) &
@@ -652,8 +656,6 @@ contains
                               + dot_product(r2, r3)*r1_mag &
                               + dot_product(r3, r1)*r2_mag
 
-                ! atan2(0,0) = 0 per IEEE 754, so degenerate
-                ! triangles contribute nothing.
                 fraction = fraction + atan2(numerator, denominator)
             end do
 
@@ -690,6 +692,8 @@ contains
         h = f_cross(ray%d, edge2)
         a = dot_product(edge1, h)
 
+        ! Ray nearly parallel to triangle plane; threshold matches
+        ! the original implementation and is safe for wp precision.
         if (abs(a) < 1e-7_wp) return
 
         f = 1.0_wp/a
