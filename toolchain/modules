@@ -70,7 +70,7 @@ o-gpu nvhpc cuda/12.3.0 cmake/3.26.3
 o-gpu CC=nvc CXX=nvc++ FC=nvfortran
 
 dai     NCSA DeltaAI
-dai-all python cmake nvhpc-openmpi3/24.3 cuda
+dai-all python cmake nvidia/25.5
 dai-all CC=nvc CXX=nvc++ FC=nvfortran
 dai-gpu MFC_CUDA_CC=89,90
 
