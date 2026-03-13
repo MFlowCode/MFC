@@ -440,6 +440,10 @@ _PV_AVAILABLE = sys.platform != 'darwin'
 # Persistent plotter — owned exclusively by _pv_thread.
 _pv_plotter: Optional[pv.Plotter] = None
 _pv_step_key: Optional[tuple] = None  # (step, var, mode, ...) currently loaded
+# Module-level kill switch: once set, _pv_render raises immediately without
+# submitting to the thread pool.  This prevents in-flight callbacks from
+# queueing behind a hung render thread.
+_pv_disabled = threading.Event()
 
 # Dedicated render thread: a single-worker pool that owns the EGL context.
 _pv_thread: Optional[concurrent.futures.ThreadPoolExecutor] = None
@@ -486,18 +490,36 @@ def _pv_ensure_plotter() -> pv.Plotter:
     return _pv_plotter
 
 
+def _pv_probe_job():
+    """Run on the dedicated thread: init plotter + render a tiny test mesh."""
+    pl = _pv_ensure_plotter()
+    # Render a small cube to verify the full pipeline (not just init)
+    grid = pv.ImageData()
+    grid.dimensions = (3, 3, 3)
+    grid.point_data['t'] = np.arange(27, dtype=np.float64)
+    pl.clear()
+    pl.set_background('#181825')
+    pl.add_mesh(grid, scalars='t', cmap='viridis', show_scalar_bar=False)
+    pl.render()
+    img = pl.screenshot(return_img=True)
+    pl.clear()
+    if img is None or img.size == 0:
+        raise RuntimeError('PyVista probe render returned empty image')
+    return True
+
+
 def _pv_probe() -> bool:
     """Test whether PyVista off-screen rendering works on this system.
 
-    Submits a minimal render job to the dedicated render thread.
-    Returns True if a valid image is produced, False otherwise.
+    Submits a full render job (init + mesh + screenshot) to the dedicated
+    render thread.  Returns True if a valid image is produced, False otherwise.
     """
     if not _PV_AVAILABLE:
         return False
     try:
         pool = _get_pv_thread()
-        fut = pool.submit(_pv_ensure_plotter)
-        fut.result(timeout=30)
+        fut = pool.submit(_pv_probe_job)
+        fut.result(timeout=15)
         return True
     except Exception as exc:  # pylint: disable=broad-except
         logger.info('PyVista probe failed: %s', exc)
@@ -661,6 +683,8 @@ def _pv_render(raw, x_cc, y_cc, z_cc, mode, cmap, log_fn,  # pylint: disable=too
     context is always accessed from the same thread.  Raises on failure so
     callers can fall back to the Plotly path.
     """
+    if _pv_disabled.is_set():
+        raise RuntimeError('PyVista disabled')
     pool = _get_pv_thread()
     fut = pool.submit(
         _pv_render_on_thread,
@@ -677,7 +701,7 @@ def _pv_render(raw, x_cc, y_cc, z_cc, mode, cmap, log_fn,  # pylint: disable=too
         overlay_vol_min, overlay_vol_max,
         overlay_vol_opacity, overlay_vol_nsurf,
     )
-    return fut.result(timeout=60)
+    return fut.result(timeout=10)
 
 
 # ---------------------------------------------------------------------------
@@ -1879,9 +1903,12 @@ input[type=radio] + span, label { color: %(tx)s !important; }
                 # PyVista rendering failed — disable for the rest of the
                 # session and fall through to the Plotly WebGL path.
                 _pv_ok[0] = False
-                logger.warning('PyVista render failed, falling back to '
-                               'Plotly: %s', _pv_exc)
+                _pv_disabled.set()  # kill switch for concurrent callbacks
+                cons.print(
+                    '[dim][yellow]PyVista render failed, falling back to '
+                    f'Plotly:[/yellow] {_pv_exc}[/dim]')
                 pv_src = None
+                _t_prep = time.perf_counter()  # reset so Plotly timing is clean
 
             if pv_src is not None:
                 _t_pv = time.perf_counter()
