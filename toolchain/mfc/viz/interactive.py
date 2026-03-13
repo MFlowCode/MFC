@@ -508,6 +508,34 @@ def _pv_probe_job():
     return True
 
 
+def _vtk_backend_hint() -> str:
+    """Return an actionable hint about the VTK rendering backend."""
+    try:
+        import vtk as _v  # pylint: disable=import-outside-toplevel
+        has_osmesa = hasattr(_v, 'vtkOSOpenGLRenderWindow')
+        has_egl = hasattr(_v, 'vtkEGLRenderWindow')
+        has_x11 = hasattr(_v, 'vtkXOpenGLRenderWindow')
+        ver = _v.vtkVersion.GetVTKVersion()  # pylint: disable=no-member
+        parts = [f'VTK {ver}']
+        if has_egl:
+            parts.append('backend=EGL')
+        if has_osmesa:
+            parts.append('backend=OSMesa')
+        if has_x11:
+            parts.append('backend=X11')
+        backend = ', '.join(parts)
+        if has_egl and not has_osmesa:
+            return (
+                f'{backend}\n'
+                '    VTK is using EGL which requires GPU display drivers.\n'
+                '    For headless rendering, install the OSMesa build:\n'
+                '      pip install vtk-osmesa\n'
+                '    (this replaces vtk — they are mutually exclusive)')
+        return backend
+    except Exception:  # pylint: disable=broad-except
+        return 'VTK not importable'
+
+
 def _pv_probe() -> bool:
     """Test whether PyVista off-screen rendering works on this system.
 
@@ -1546,8 +1574,12 @@ input[type=radio] + span, label { color: %(tx)s !important; }
             cons.print('[dim][green]PyVista OK[/green] — '
                        'server-side 3D rendering enabled.[/dim]')
         else:
-            cons.print('[dim][yellow]PyVista probe failed[/yellow] — '
-                       'falling back to Plotly WebGL for 3D playback.[/dim]')
+            hint = _vtk_backend_hint()
+            cons.print(
+                f'[yellow]PyVista probe failed[/yellow] — '
+                f'3D playback will use Plotly WebGL (slower).\n'
+                f'    {hint}'
+            )
 
     @app.callback(
         Output('step-sl', 'value'),
