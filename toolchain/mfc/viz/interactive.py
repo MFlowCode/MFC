@@ -61,6 +61,14 @@ _jpeg_lock = threading.Lock()
 _jpeg_pool: Optional[concurrent.futures.ThreadPoolExecutor] = None
 _jpeg_pool_lock = threading.Lock()
 
+# 3D mesh prefetch cache: key → (vx, vy, vz, fi, fj, fk, intens) or volume data
+_mesh3_cache: dict = {}
+_MESH3_CACHE_MAX = 20
+_mesh3_lock = threading.Lock()
+_mesh3_in_flight: set = set()
+_mesh3_pool: Optional[concurrent.futures.ThreadPoolExecutor] = None
+_mesh3_pool_lock = threading.Lock()
+
 
 def _get_jpeg_pool() -> concurrent.futures.ThreadPoolExecutor:
     """Return the JPEG prefetch pool, creating it lazily on first use."""
@@ -71,6 +79,17 @@ def _get_jpeg_pool() -> concurrent.futures.ThreadPoolExecutor:
                 max_workers=1, thread_name_prefix='mfc_jpeg')
             atexit.register(_jpeg_pool.shutdown, wait=False)
         return _jpeg_pool
+
+
+def _get_mesh3_pool() -> concurrent.futures.ThreadPoolExecutor:
+    """Return the 3D mesh prefetch pool, creating it lazily on first use."""
+    global _mesh3_pool  # pylint: disable=global-statement
+    with _mesh3_pool_lock:
+        if _mesh3_pool is None:
+            _mesh3_pool = concurrent.futures.ThreadPoolExecutor(
+                max_workers=2, thread_name_prefix='mfc_mesh3')
+            atexit.register(_mesh3_pool.shutdown, wait=False)
+        return _mesh3_pool
 
 
 def _get_lut(cmap_name: str) -> np.ndarray:
@@ -305,6 +324,94 @@ def _prefetch_jpeg(step, var, get_ad_fn, cmap, vmin_in, vmax_in, log_bool,  # py
     _get_jpeg_pool().submit(_bg)
 
 
+def _prefetch_3d_mesh(step, var, get_ad_fn, mode, log_bool,  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,too-many-statements
+                      vmin_in, vmax_in,
+                      iso_min_frac, iso_max_frac, iso_n,
+                      vol_min_frac, vol_max_frac):
+    """Pre-compute 3D isomesh or volume data for *step* in a background thread.
+
+    Caches the result so the next playback frame can skip marching cubes.
+    No-ops if already cached or in-flight.
+    """
+    key = (step, var, mode, log_bool, vmin_in, vmax_in,
+           iso_min_frac, iso_max_frac, iso_n,
+           vol_min_frac, vol_max_frac)
+    with _mesh3_lock:
+        if key in _mesh3_cache or key in _mesh3_in_flight:
+            return
+        _mesh3_in_flight.add(key)
+
+    def _bg():  # pylint: disable=too-many-locals
+        try:
+            ad = get_ad_fn(step)
+            if var not in ad.variables:
+                return
+            raw = ad.variables[var]
+            # Compute range
+            if raw.size > 200_000:
+                _sr = max(1, math.ceil((raw.size / 200_000) ** (1.0 / raw.ndim)))
+                _slc = tuple(slice(None, None, _sr) for _ in range(raw.ndim))
+                _rr = raw[_slc]
+            else:
+                _rr = raw
+            if vmin_in is not None:
+                vmin = float(vmin_in)
+            else:
+                _safe = _rr[_rr > 0] if log_bool and np.any(_rr > 0) else _rr
+                vmin = float(np.nanmin(_safe))
+            vmax = float(vmax_in) if vmax_in is not None else float(np.nanmax(_rr))
+            if vmax <= vmin:
+                vmax = vmin + 1e-10
+            if log_bool:
+                def _tf(arr):
+                    return np.where(arr > 0, np.log10(np.maximum(arr, 1e-300)), np.nan)
+                cmin = float(np.log10(max(vmin, 1e-300)))
+                cmax = float(np.log10(max(vmax, 1e-300)))
+            else:
+                def _tf(arr): return arr
+                cmin, cmax = vmin, vmax
+            rng = cmax - cmin if cmax > cmin else 1.0
+
+            if mode == 'isosurface':
+                raw_ds, x_ds, y_ds, z_ds = _get_ds3(
+                    step, var, raw, ad.x_cc, ad.y_cc, ad.z_cc, 500_000)
+                ilo = cmin + rng * float(iso_min_frac)
+                ihi = cmin + rng * max(float(iso_max_frac), float(iso_min_frac) + 0.01)
+                result = _compute_isomesh(
+                    raw_ds, x_ds, y_ds, z_ds, _tf, ilo, ihi, int(iso_n))
+            else:  # volume
+                raw_ds, _, _, _ = _get_ds3(
+                    step, var, raw, ad.x_cc, ad.y_cc, ad.z_cc, 150_000)
+                vf = _tf(raw_ds).ravel().astype(np.float32)
+                vlo = cmin + rng * float(vol_min_frac)
+                vhi = cmin + rng * max(float(vol_max_frac), float(vol_min_frac) + 0.01)
+                result = (vf, vlo, vhi, cmin, cmax)
+
+            with _mesh3_lock:
+                if key not in _mesh3_cache:
+                    if len(_mesh3_cache) >= _MESH3_CACHE_MAX:
+                        _mesh3_cache.pop(next(iter(_mesh3_cache)))
+                    _mesh3_cache[key] = result
+        except Exception:  # pylint: disable=broad-except
+            logger.debug("3D mesh prefetch failed for step %s var %s", step, var, exc_info=True)
+        finally:
+            with _mesh3_lock:
+                _mesh3_in_flight.discard(key)
+
+    _get_mesh3_pool().submit(_bg)
+
+
+def _get_cached_3d_mesh(step, var, mode, log_bool, vmin_in, vmax_in,  # pylint: disable=too-many-arguments,too-many-positional-arguments
+                        iso_min_frac, iso_max_frac, iso_n,
+                        vol_min_frac, vol_max_frac):
+    """Return cached 3D mesh result or None if not yet computed."""
+    key = (step, var, mode, log_bool, vmin_in, vmax_in,
+           iso_min_frac, iso_max_frac, iso_n,
+           vol_min_frac, vol_max_frac)
+    with _mesh3_lock:
+        return _mesh3_cache.get(key)
+
+
 # ---------------------------------------------------------------------------
 # Colormaps available in the picker
 # ---------------------------------------------------------------------------
@@ -455,6 +562,7 @@ def _build_3d(ad, raw, varname, step, mode, cmap,  # pylint: disable=too-many-ar
               iso_min_frac, iso_max_frac, iso_n, _iso_caps,
               vol_opacity, vol_nsurf, vol_min_frac, vol_max_frac,
               iso_solid_color=None, iso_opacity=1.0,
+              cached_mesh=None,
               max_total_3d: int = 150_000):
     """Return (trace, title) for a 3D assembled dataset.
 
@@ -518,10 +626,13 @@ def _build_3d(ad, raw, varname, step, mode, cmap,  # pylint: disable=too-many-ar
         # which is 5× finer than the 150K volume budget.
         ilo = cmin + rng * iso_min_frac
         ihi = cmin + rng * max(iso_max_frac, iso_min_frac + 0.01)
-        raw_ds, x_ds, y_ds, z_ds = _get_ds3(step, varname, raw, ad.x_cc, ad.y_cc, ad.z_cc, 500_000)
-        vx, vy, vz, fi, fj, fk, intens = _compute_isomesh(
-            raw_ds, x_ds, y_ds, z_ds, log_fn, ilo, ihi, iso_n,
-        )
+        if cached_mesh is not None:
+            vx, vy, vz, fi, fj, fk, intens = cached_mesh
+        else:
+            raw_ds, x_ds, y_ds, z_ds = _get_ds3(step, varname, raw, ad.x_cc, ad.y_cc, ad.z_cc, 500_000)
+            vx, vy, vz, fi, fj, fk, intens = _compute_isomesh(
+                raw_ds, x_ds, y_ds, z_ds, log_fn, ilo, ihi, iso_n,
+            )
         _iso_op = float(iso_opacity) if iso_opacity is not None else 1.0
         if iso_solid_color:
             # Use a uniform-intensity + single-color colorscale so that the
@@ -1087,6 +1198,11 @@ input[type=radio] + span, label { color: %(tx)s !important; }
     # Callbacks
     # ------------------------------------------------------------------
 
+    # Playback flag — set by _toggle_play, read by _update.
+    # Avoids adding State('playing-st') to _update (which triggers Dash 4
+    # initial-call serialization issues).
+    _is_playing = [False]
+
     @app.callback(
         Output('play-iv', 'disabled'),
         Output('play-iv', 'interval'),
@@ -1102,13 +1218,23 @@ input[type=radio] + span, label { color: %(tx)s !important; }
         iv = max(int(1000 / max(float(fps or 2), 0.1)), 50)
         trig = (callback_context.triggered or [{}])[0].get('prop_id', '')
         if 'stop-btn' in trig:
+            _is_playing[0] = False
             return True, iv, False, '▶  Play'
         if 'play-btn' in trig:
             playing = not is_playing
+            _is_playing[0] = playing
             return not playing, iv, playing, ('⏸  Pause' if playing else '▶  Play')
         return not is_playing, iv, is_playing, no_update  # fps-only change
 
-    # Playback advances the slider position
+    # Playback advances the slider position.
+    # _last_update_t rate-limits advances so the browser has time to render
+    # each frame before the next is sent.  Without this, the dcc.Interval
+    # fires faster than the browser can process, causing frame skipping.
+    # _min_frame_gap adapts to actual render time: measured as the wall-clock
+    # time between the start of _update and the next _advance_step call.
+    _last_update_t = [0.0]
+    _min_frame_gap = [0.3]
+
     @app.callback(
         Output('step-sl', 'value'),
         Input('play-iv', 'n_intervals'),
@@ -1117,6 +1243,10 @@ input[type=radio] + span, label { color: %(tx)s !important; }
         prevent_initial_call=True,
     )
     def _advance_step(_, current_idx, loop_val):
+        now = time.perf_counter()
+        if now - _last_update_t[0] < _min_frame_gap[0]:
+            return no_update
+        _last_update_t[0] = now
         idx = int(current_idx or 0)
         nxt = idx + 1
         if nxt >= len(steps):
@@ -1267,15 +1397,18 @@ input[type=radio] + span, label { color: %(tx)s !important; }
         log = bool(log_chk and 'log' in log_chk)
         cmap = cmap or 'viridis'
 
-        # Eagerly pre-load the next 2 steps in the background so that
+        # Eagerly pre-load the next steps in the background so that
         # navigation feels instant after the structure cache is warm.
         # prefetch_one is a no-op if the key is already cached or in-flight.
         # For 2D, also pre-encode the JPEG at the current colormap / range
         # settings so the next step callback can skip encoding entirely.
+        # For 3D, pre-compute isomesh or volume data so playback is instant.
+        # Pre-load 4 steps ahead for 3D (marching cubes takes longer), 2 for 2D.
+        _pf_depth = 4 if (ad.ndim == 3 and mode in ('isosurface', 'volume')) else 2
         if read_one_var_func is not None:
             try:
                 _idx = steps.index(step)
-                for _ns in steps[_idx + 1: _idx + 3]:
+                for _ns in steps[_idx + 1: _idx + 1 + _pf_depth]:
                     _nk = (_ns, selected_var)
                     _prefetch_one(_nk, lambda k=_nk: read_one_var_func(k[0], k[1]))
                     if ad.ndim == 2:
@@ -1286,18 +1419,40 @@ input[type=radio] + span, label { color: %(tx)s !important; }
                                 (s, sv), lambda k: read_one_var_func(k[0], k[1])),
                             cmap, vmin_in, vmax_in, log,
                         )
+                    elif ad.ndim == 3 and mode in ('isosurface', 'volume'):
+                        _sv = selected_var
+                        _prefetch_3d_mesh(
+                            _ns, _sv,
+                            lambda s, sv=_sv: _step_cache.load(
+                                (s, sv), lambda k: read_one_var_func(k[0], k[1])),
+                            mode, log, vmin_in, vmax_in,
+                            float(iso_min_frac or 0.2), float(iso_max_frac or 0.8),
+                            int(iso_n or 3),
+                            float(vol_min_frac or 0.0), float(vol_max_frac or 1.0),
+
+                        )
             except (ValueError, IndexError):
                 pass
         else:
             try:
                 _idx = steps.index(step)
-                for _ns in steps[_idx + 1: _idx + 3]:
+                for _ns in steps[_idx + 1: _idx + 1 + _pf_depth]:
                     _prefetch_one(_ns, read_func)
                     if ad.ndim == 2:
                         _prefetch_jpeg(
                             _ns, selected_var,
                             lambda s: _step_cache.load(s, read_func),
                             cmap, vmin_in, vmax_in, log,
+                        )
+                    elif ad.ndim == 3 and mode in ('isosurface', 'volume'):
+                        _prefetch_3d_mesh(
+                            _ns, selected_var,
+                            lambda s: _step_cache.load(s, read_func),
+                            mode, log, vmin_in, vmax_in,
+                            float(iso_min_frac or 0.2), float(iso_max_frac or 0.8),
+                            int(iso_n or 3),
+                            float(vol_min_frac or 0.0), float(vol_max_frac or 1.0),
+
                         )
             except (ValueError, IndexError):
                 pass
@@ -1379,35 +1534,60 @@ input[type=radio] + span, label { color: %(tx)s !important; }
                 _cscale3 = _lut_to_plotly_colorscale(cmap)
                 rng3 = cmax - cmin if cmax > cmin else 1.0
                 patch = Patch()
+                _cache_hit = False
                 if mode == 'isosurface':
-                    raw_ds, x_ds3, y_ds3, z_ds3 = _get_ds3(
-                        step, selected_var, raw, ad.x_cc, ad.y_cc, ad.z_cc, 500_000,
-                    )
                     ilo = cmin + rng3 * float(iso_min_frac or 0.2)
                     ihi = cmin + rng3 * max(float(iso_max_frac or 0.8), ilo + 0.01)
-                    vx, vy, vz, fi, fj, fk, intens = _compute_isomesh(
-                        raw_ds, x_ds3, y_ds3, z_ds3, _tf, ilo, ihi,
+                    # Try pre-computed mesh first, fall back to computing now
+                    _cached = _get_cached_3d_mesh(
+                        step, selected_var, mode, log,
+                        vmin_in, vmax_in,
+                        float(iso_min_frac or 0.2), float(iso_max_frac or 0.8),
                         int(iso_n or 3),
+                        float(vol_min_frac or 0.0), float(vol_max_frac or 1.0),
                     )
-                    patch['data'][0]['x'] = vx.tolist()
-                    patch['data'][0]['y'] = vy.tolist()
-                    patch['data'][0]['z'] = vz.tolist()
-                    patch['data'][0]['i'] = fi.tolist()
-                    patch['data'][0]['j'] = fj.tolist()
-                    patch['data'][0]['k'] = fk.tolist()
-                    patch['data'][0]['intensity'] = intens.tolist()
+                    if _cached is not None:
+                        vx, vy, vz, fi, fj, fk, intens = _cached
+                        _cache_hit = True
+                    else:
+                        raw_ds, x_ds3, y_ds3, z_ds3 = _get_ds3(
+                            step, selected_var, raw, ad.x_cc, ad.y_cc, ad.z_cc, 500_000,
+                        )
+                        vx, vy, vz, fi, fj, fk, intens = _compute_isomesh(
+                            raw_ds, x_ds3, y_ds3, z_ds3, _tf, ilo, ihi,
+                            int(iso_n or 3),
+                        )
+                    patch['data'][0]['x'] = vx
+                    patch['data'][0]['y'] = vy
+                    patch['data'][0]['z'] = vz
+                    patch['data'][0]['i'] = fi
+                    patch['data'][0]['j'] = fj
+                    patch['data'][0]['k'] = fk
+                    patch['data'][0]['intensity'] = intens
                     patch['data'][0]['cmin'] = ilo
                     patch['data'][0]['cmax'] = ihi
                     patch['data'][0]['colorscale'] = _cscale3
                     patch['data'][0]['opacity'] = float(iso_opacity or 1.0)
                 else:  # volume
-                    raw_ds, _, _, _ = _get_ds3(
-                        step, selected_var, raw, ad.x_cc, ad.y_cc, ad.z_cc, 150_000,
+                    # Try pre-computed volume data first
+                    _cached = _get_cached_3d_mesh(
+                        step, selected_var, mode, log,
+                        vmin_in, vmax_in,
+                        float(iso_min_frac or 0.2), float(iso_max_frac or 0.8),
+                        int(iso_n or 3),
+                        float(vol_min_frac or 0.0), float(vol_max_frac or 1.0),
                     )
-                    vf = _tf(raw_ds).ravel()
-                    vlo = cmin + rng3 * float(vol_min_frac or 0.0)
-                    vhi = cmin + rng3 * max(float(vol_max_frac or 1.0), vlo + 0.01)
-                    patch['data'][0]['value'] = vf.tolist()
+                    if _cached is not None:
+                        vf, vlo, vhi, _, _ = _cached
+                        _cache_hit = True
+                    else:
+                        raw_ds, _, _, _ = _get_ds3(
+                            step, selected_var, raw, ad.x_cc, ad.y_cc, ad.z_cc, 150_000,
+                        )
+                        vf = _tf(raw_ds).ravel()
+                        vlo = cmin + rng3 * float(vol_min_frac or 0.0)
+                        vhi = cmin + rng3 * max(float(vol_max_frac or 1.0), vlo + 0.01)
+                    patch['data'][0]['value'] = vf
                     patch['data'][0]['isomin'] = vlo
                     patch['data'][0]['isomax'] = vhi
                     patch['data'][0]['opacity'] = float(vol_opacity or 0.1)
@@ -1422,7 +1602,7 @@ input[type=radio] + span, label { color: %(tx)s !important; }
                     f'[dim]viz timing  step={step}  shape={raw.shape}'
                     f'  load={_t_load-_t0:.3f}s'
                     f'  prep={_t_prep-_t_load:.3f}s'
-                    f'  patch={_t_trace-_t_prep:.3f}s [PATCH-3D]'
+                    f'  patch={_t_trace-_t_prep:.3f}s [PATCH-3D{"·HIT" if _cache_hit else ""}]'
                     f'  total={_t_trace-_t0:.3f}s[/dim]'
                 )
                 status = html.Div([
@@ -1434,11 +1614,25 @@ input[type=radio] + span, label { color: %(tx)s !important; }
                     html.Span('  max ', style={'color': _MUTED}),
                     html.Span(f'{dmax3:.4g}', style={'color': _RED}),
                 ])
+                _now = time.perf_counter()
+                _last_update_t[0] = _now
+                # Patch path: browser overhead is low (no figure rebuild).
+                _server_s = _now - _t0
+                _min_frame_gap[0] = max(0.3, min(2.0, _server_s + 0.25))
                 return patch, status
 
-            # Full 3D render
+            # Full 3D render — check mesh prefetch cache for isosurface mode
             _iso_solid = (iso_solid_color or '#89b4fa') if (
                 iso_solid_chk and 'solid' in iso_solid_chk) else None
+            _cached_primary = None
+            if mode == 'isosurface':
+                _cached_primary = _get_cached_3d_mesh(
+                    step, selected_var, mode, log,
+                    vmin_in, vmax_in,
+                    float(iso_min_frac or 0.2), float(iso_max_frac or 0.8),
+                    int(iso_n or 3),
+                    float(vol_min_frac or 0.0), float(vol_max_frac or 1.0),
+                )
             trace, title = _build_3d(
                 ad, raw, selected_var, step, mode, cmap, _tf, cmin, cmax, cbar_title,
                 slice_axis or 'z', float(slice_pos or 0.5),
@@ -1448,6 +1642,7 @@ input[type=radio] + span, label { color: %(tx)s !important; }
                 float(vol_min_frac or 0.0), float(vol_max_frac or 1.0),
                 iso_solid_color=_iso_solid,
                 iso_opacity=float(iso_opacity or 1.0),
+                cached_mesh=_cached_primary,
             )
             fig.add_trace(trace)
             # Bubble overlay for 3D
@@ -1698,6 +1893,7 @@ input[type=radio] + span, label { color: %(tx)s !important; }
                     html.Span('  max ', style={'color': _MUTED}),
                     html.Span(f'{dmax:.4g}', style={'color': _RED}),
                 ])
+                _last_update_t[0] = time.perf_counter()
                 return patch, status
 
             # Full render: initial load or structural change (colormap, variable,
@@ -1836,6 +2032,13 @@ input[type=radio] + span, label { color: %(tx)s !important; }
         ])
 
 
+        _now = time.perf_counter()
+        _last_update_t[0] = _now
+        # Full render is heavier browser-side than a patch — add extra headroom
+        # so the browser has time to rebuild the WebGL scene before the next
+        # frame is sent.  For 3D with overlays this can take 1–2s.
+        _server_s = _now - _t0
+        _min_frame_gap[0] = max(0.8, min(3.0, _server_s + 0.7))
         return fig, status
 
     # ------------------------------------------------------------------
