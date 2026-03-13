@@ -437,6 +437,10 @@ def _get_cached_3d_mesh(step, var, mode, log_bool, vmin_in, vmax_in,  # pylint: 
 # threads (GL contexts are thread-bound).
 _PV_AVAILABLE = sys.platform == 'linux'
 
+
+class _StaleRenderError(Exception):
+    """Raised when a queued PyVista render is superseded by a newer request."""
+
 # Persistent plotter — owned exclusively by _pv_thread.
 _pv_plotter: Optional[pv.Plotter] = None
 _pv_step_key: Optional[tuple] = None  # (step, var, mode, ...) currently loaded
@@ -654,7 +658,7 @@ def _pv_render_on_thread(gen, raw, x_cc, y_cc, z_cc, mode, cmap, log_fn,  # pyli
     # Skip stale queued jobs — a newer request has already been submitted.
     with _pv_gen_lock:
         if gen != _pv_generation:
-            raise RuntimeError(f'Stale render (gen {gen} < {_pv_generation})')
+            raise _StaleRenderError(f'gen {gen} < {_pv_generation}')
 
     rng = cmax - cmin if cmax > cmin else 1.0
     mesh_key = (step, varname, mode, id(raw),
@@ -1970,7 +1974,7 @@ input[type=radio] + span, label { color: %(tx)s !important; }
         # ----------------------------------------------------------------------
         _use_pv = (
             _pv_ok[0]
-            and bool(playing_st)
+            and (_is_playing[0] or bool(playing_st))
             and ad.ndim == 3
             and mode in ('isosurface', 'volume')
         )
@@ -2029,6 +2033,10 @@ input[type=radio] + span, label { color: %(tx)s !important; }
                     overlay_vol_opacity=float(overlay_vol_opacity or 0.1),
                     overlay_vol_nsurf=int(overlay_vol_nsurf or 15),
                 )
+            except _StaleRenderError:
+                # Harmless: a newer frame superseded this one.  Just
+                # return no_update so Dash keeps the current display.
+                return no_update, no_update, no_update, no_update, no_update
             except Exception as _pv_exc:  # pylint: disable=broad-except
                 # PyVista rendering failed — disable for the rest of the
                 # session and fall through to the Plotly WebGL path.
