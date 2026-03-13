@@ -13,6 +13,7 @@ import base64
 import concurrent.futures
 import logging
 import math
+import os
 import sys
 import threading
 import time
@@ -438,15 +439,23 @@ def _pv_init() -> None:
 
     Called once during show() setup.  Skipped on macOS where VTK's Cocoa
     backend crashes when rendering from non-main threads.
+
+    Temporarily removes DISPLAY so VTK does not try to connect to an
+    X server (common on HPC nodes with SSH X-forwarding).
     """
     global _pv_plotter  # pylint: disable=global-statement
     if not _PV_AVAILABLE:
         return
-    pl = pv.Plotter(off_screen=True, window_size=(800, 600),
-                    lighting='three lights')
-    pl.set_background('#181825')
-    pl.render()  # warm up — ensures the render window is fully initialized
-    _pv_plotter = pl
+    saved = os.environ.pop('DISPLAY', None)
+    try:
+        pl = pv.Plotter(off_screen=True, window_size=(800, 600),
+                        lighting='three lights')
+        pl.set_background('#181825')
+        pl.render()  # warm up — ensures the render window is fully initialized
+        _pv_plotter = pl
+    finally:
+        if saved is not None:
+            os.environ['DISPLAY'] = saved
 
 
 def _pv_render(raw, x_cc, y_cc, z_cc, mode, cmap, log_fn,  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,too-many-branches,too-many-statements
