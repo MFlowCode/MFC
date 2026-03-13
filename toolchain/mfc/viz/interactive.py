@@ -1309,7 +1309,7 @@ input[type=radio] + span, label { color: %(tx)s !important; }
         mode_opts = [{'label': '  Heatmap', 'value': 'heatmap'}]
     else:
         mode_opts = [{'label': '  Line', 'value': 'line'}]
-    default_mode = mode_opts[0]['value']
+    default_mode = 'isosurface' if ndim == 3 else mode_opts[0]['value']
 
     # ------------------------------------------------------------------
     # Sidebar layout
@@ -1821,7 +1821,7 @@ input[type=radio] + span, label { color: %(tx)s !important; }
                 overlay_iso_byval,
                 overlay_vol_min, overlay_vol_max, overlay_vol_opacity,
                 overlay_vol_nsurf,
-                playing_st):
+                playing_st):  # pylint: disable=unused-argument
 
         _t0 = time.perf_counter()
         _GRAPH_SHOW = {'height': '100vh', 'display': 'block'}
@@ -1968,13 +1968,13 @@ input[type=radio] + span, label { color: %(tx)s !important; }
         _t_prep = time.perf_counter()
 
         # ----------------------------------------------------------------------
-        # PyVista server-side rendering for 3D during playback.
+        # PyVista server-side rendering for 3D isosurface / volume.
         # Renders to a JPEG displayed via html.Img — bypasses Plotly WebGL
-        # entirely, giving ~50-100ms full mesh swap and ~5ms camera re-renders.
+        # entirely, giving ~0.5-2s renders for large meshes vs 4-6s Plotly.
+        # Active whenever PyVista is available, not just during playback.
         # ----------------------------------------------------------------------
         _use_pv = (
             _pv_ok[0]
-            and (_is_playing[0] or bool(playing_st))
             and ad.ndim == 3
             and mode in ('isosurface', 'volume')
         )
