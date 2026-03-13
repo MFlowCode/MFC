@@ -1328,7 +1328,7 @@ input[type=radio] + span, label { color: %(tx)s !important; }
         mode_opts = [{'label': '  Heatmap', 'value': 'heatmap'}]
     else:
         mode_opts = [{'label': '  Line', 'value': 'line'}]
-    default_mode = 'isosurface' if ndim == 3 else mode_opts[0]['value']
+    default_mode = mode_opts[0]['value']
 
     # ------------------------------------------------------------------
     # Sidebar layout
@@ -1994,13 +1994,15 @@ input[type=radio] + span, label { color: %(tx)s !important; }
         _t_prep = time.perf_counter()
 
         # ----------------------------------------------------------------------
-        # PyVista server-side rendering for 3D isosurface / volume.
+        # PyVista server-side rendering for 3D during playback.
         # Renders to a JPEG displayed via html.Img — bypasses Plotly WebGL
         # entirely, giving ~0.5-2s renders for large meshes vs 4-6s Plotly.
-        # Active whenever PyVista is available, not just during playback.
+        # Only active during playback; static views use Plotly for better
+        # visual quality (semi-transparent isosurfaces, interactive rotation).
         # ----------------------------------------------------------------------
         _use_pv = (
             _pv_ok[0]
+            and _is_playing[0]
             and ad.ndim == 3
             and mode in ('isosurface', 'volume')
         )
