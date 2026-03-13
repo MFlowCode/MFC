@@ -37,3 +37,4 @@ retry_sbatch() {
     echo "sbatch failed after $max_attempts attempts. Last error: $last_output" >&2
     return 1
 }
+

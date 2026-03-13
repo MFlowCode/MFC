@@ -23,7 +23,7 @@ case "$cluster" in
 esac
 
 mv build build.stale.$$ 2>/dev/null || true
-rm -rf build.stale.* 2>/dev/null & disown
+rm -rf "build.stale.$$" 2>/dev/null & disown
 
 . ./mfc.sh load -c "$flag" -m g
 

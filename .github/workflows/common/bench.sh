@@ -28,7 +28,7 @@ if [ "$job_cluster" = "phoenix" ]; then
     # Rename instead of rm: mv is a metadata-only op that succeeds even with stale
     # NFS file handles. Delete the old tree in the background (best-effort).
     mv build build.stale.$$ 2>/dev/null || true
-    rm -rf build.stale.* 2>/dev/null & disown
+    rm -rf "build.stale.$$" 2>/dev/null & disown
 fi
 
 if [ ! -d "build" ]; then
