@@ -8,6 +8,8 @@
 #        clean_build
 
 clean_build() {
+    # Clean up leftover stale directories from previous runs before adding a new one.
+    rm -rf build.stale.* 2>/dev/null || true
     mv build "build.stale.$$" 2>/dev/null || true
     rm -rf "build.stale.$$" 2>/dev/null & disown
 }
