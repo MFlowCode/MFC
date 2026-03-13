@@ -23,7 +23,7 @@ retry_sbatch() {
         fi
         last_output="$submit_output"
         echo "sbatch failed: $submit_output" >&2
-        if ! echo "$submit_output" | grep -qiE "timed out|connection refused|connection reset|try again|temporarily unavailable"; then
+        if ! echo "$submit_output" | grep -qiE "timed out|connection refused|connection reset|temporarily unavailable"; then
             echo "Non-transient sbatch failure — not retrying." >&2
             return 1
         fi
