@@ -13,10 +13,8 @@ build_opts="$gpu_opts"
 # Phoenix builds inside SLURM on heterogeneous compute nodes — always start fresh
 # to avoid SIGILL from stale binaries compiled on a different microarchitecture.
 if [ "$job_cluster" = "phoenix" ]; then
-    # Rename instead of rm: mv is a metadata-only op that succeeds even with stale
-    # NFS file handles. Delete the old tree in the background (best-effort).
-    mv build build.stale.$$ 2>/dev/null || true
-    rm -rf "build.stale.$$" 2>/dev/null & disown
+    source .github/scripts/clean-build.sh
+    clean_build
 fi
 
 if [ ! -d "build" ]; then

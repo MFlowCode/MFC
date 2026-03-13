@@ -20,8 +20,8 @@ build_opts="$gpu_opts"
 
 . ./mfc.sh load -c $compiler_flag -m $([ "$job_device" = "gpu" ] && echo "g" || echo "c")
 
-mv build build.stale.$$ 2>/dev/null || true
-rm -rf "build.stale.$$" 2>/dev/null & disown
+source .github/scripts/clean-build.sh
+clean_build
 
 source .github/scripts/retry-build.sh
 if [ "$run_bench" == "bench" ]; then
