@@ -8,6 +8,8 @@ maps them to parameters and stages, and emits Markdown to stdout.
 Also generates case design playbook from curated working examples.
 """  # pylint: disable=too-many-lines
 
+from __future__ import annotations
+
 import json
 import sys
 import subprocess
