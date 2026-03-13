@@ -695,38 +695,44 @@ def _pv_render_on_thread(gen, raw, x_cc, y_cc, z_cc, mode, cmap, log_fn,  # pyli
         ds_raw, ds_x, ds_y, ds_z = _downsample_3d(
             raw, x_cc, y_cc, z_cc, 500_000)
 
-        nx, ny, nz = ds_raw.shape
-        grid = pv.ImageData()
-        grid.dimensions = (nx, ny, nz)
-        grid.origin = (float(ds_x[0]), float(ds_y[0]), float(ds_z[0]))
-        if nx > 1:
-            grid.spacing = (
-                float(ds_x[-1] - ds_x[0]) / max(nx - 1, 1),
-                float(ds_y[-1] - ds_y[0]) / max(ny - 1, 1),
-                float(ds_z[-1] - ds_z[0]) / max(nz - 1, 1),
-            )
-        scalar = log_fn(ds_raw).astype(np.float64)
-        scalar = np.where(np.isfinite(scalar), scalar, np.nan)
-        grid.point_data['scalar'] = scalar.flatten(order='F')
-
         if mode == 'isosurface':
             ilo = cmin + rng * iso_min_frac
             ihi = cmin + rng * max(iso_max_frac, iso_min_frac + 0.01)
-            levels = np.linspace(ilo, ihi, max(int(iso_n), 1)).tolist()
-            try:
-                iso = grid.contour(levels, scalars='scalar')
-                if iso.n_points > 0:
-                    pl.add_mesh(iso, scalars='scalar', cmap=cmap,
-                                clim=[ilo, ihi],
-                                smooth_shading=True, opacity=1.0,
-                                show_scalar_bar=True,
-                                scalar_bar_args=dict(
-                                    title=varname, color='#cdd6f4',
-                                    label_font_size=10, title_font_size=12))
-            except Exception:  # pylint: disable=broad-except
-                pass
+            vx, vy, vz, fi, fj, fk, intens = _compute_isomesh(
+                ds_raw, ds_x, ds_y, ds_z, log_fn, ilo, ihi, iso_n)
+            if len(vx) > 3:
+                points = np.column_stack([vx, vy, vz])
+                n_faces = len(fi)
+                faces = np.empty(n_faces * 4, dtype=np.int32)
+                faces[0::4] = 3
+                faces[1::4] = fi
+                faces[2::4] = fj
+                faces[3::4] = fk
+                mesh = pv.PolyData(points, faces)
+                mesh.point_data['intensity'] = intens
+                pl.add_mesh(mesh, scalars='intensity', cmap=cmap,
+                            clim=[ilo, ihi],
+                            smooth_shading=True, opacity=1.0,
+                            lighting=True, specular=0.3,
+                            show_scalar_bar=True,
+                            scalar_bar_args=dict(
+                                title=varname, color='#cdd6f4',
+                                label_font_size=10, title_font_size=12))
 
         elif mode == 'volume':
+            nx, ny, nz = ds_raw.shape
+            grid = pv.ImageData()
+            grid.dimensions = (nx, ny, nz)
+            grid.origin = (float(ds_x[0]), float(ds_y[0]), float(ds_z[0]))
+            if nx > 1:
+                grid.spacing = (
+                    float(ds_x[-1] - ds_x[0]) / max(nx - 1, 1),
+                    float(ds_y[-1] - ds_y[0]) / max(ny - 1, 1),
+                    float(ds_z[-1] - ds_z[0]) / max(nz - 1, 1),
+                )
+            scalar = log_fn(ds_raw).astype(np.float64)
+            scalar = np.where(np.isfinite(scalar), scalar, np.nan)
+            grid.point_data['scalar'] = scalar.flatten(order='F')
             vlo = cmin + rng * vol_min_frac
             vhi = cmin + rng * max(vol_max_frac, vol_min_frac + 0.01)
             grid_vol = grid.threshold([vlo, vhi], scalars='scalar')
@@ -742,19 +748,8 @@ def _pv_render_on_thread(gen, raw, x_cc, y_cc, z_cc, mode, cmap, log_fn,  # pyli
         if overlay_raw is not None:
             ov_ds, ov_x, ov_y, ov_z = _downsample_3d(
                 overlay_raw, overlay_x, overlay_y, overlay_z, 500_000)
-            o_nx, o_ny, o_nz = ov_ds.shape
-            ov_grid = pv.ImageData()
-            ov_grid.dimensions = (o_nx, o_ny, o_nz)
-            ov_grid.origin = (float(ov_x[0]), float(ov_y[0]), float(ov_z[0]))
-            if o_nx > 1:
-                ov_grid.spacing = (
-                    float(ov_x[-1] - ov_x[0]) / max(o_nx - 1, 1),
-                    float(ov_y[-1] - ov_y[0]) / max(o_ny - 1, 1),
-                    float(ov_z[-1] - ov_z[0]) / max(o_nz - 1, 1),
-                )
             ov_scalar = log_fn(ov_ds).astype(np.float64)
             ov_scalar = np.where(np.isfinite(ov_scalar), ov_scalar, np.nan)
-            ov_grid.point_data['scalar'] = ov_scalar.flatten(order='F')
             ov_vmin = float(np.nanmin(ov_scalar))
             ov_vmax = float(np.nanmax(ov_scalar))
             ov_rng = ov_vmax - ov_vmin if ov_vmax > ov_vmin else 1.0
@@ -763,18 +758,35 @@ def _pv_render_on_thread(gen, raw, x_cc, y_cc, z_cc, mode, cmap, log_fn,  # pyli
                 ov_lo = ov_vmin + ov_rng * overlay_iso_min
                 ov_hi = ov_vmin + ov_rng * max(overlay_iso_max,
                                                 overlay_iso_min + 0.01)
-                ov_lvls = np.linspace(ov_lo, ov_hi,
-                                      max(int(overlay_nlevels), 1)).tolist()
-                try:
-                    ov_iso = ov_grid.contour(ov_lvls, scalars='scalar')
-                    if ov_iso.n_points > 0:
-                        pl.add_mesh(ov_iso, color=overlay_color,
-                                    opacity=float(overlay_opacity),
-                                    smooth_shading=True,
-                                    show_scalar_bar=False)
-                except Exception:  # pylint: disable=broad-except
-                    pass
+                ovx, ovy, ovz, ofi, ofj, ofk, _ = _compute_isomesh(
+                    ov_ds, ov_x, ov_y, ov_z, log_fn,
+                    ov_lo, ov_hi, overlay_nlevels)
+                if len(ovx) > 3:
+                    ov_pts = np.column_stack([ovx, ovy, ovz])
+                    n_ov = len(ofi)
+                    ov_faces = np.empty(n_ov * 4, dtype=np.int32)
+                    ov_faces[0::4] = 3
+                    ov_faces[1::4] = ofi
+                    ov_faces[2::4] = ofj
+                    ov_faces[3::4] = ofk
+                    ov_mesh = pv.PolyData(ov_pts, ov_faces)
+                    pl.add_mesh(ov_mesh, color=overlay_color,
+                                opacity=float(overlay_opacity),
+                                smooth_shading=True,
+                                show_scalar_bar=False)
             else:
+                o_nx, o_ny, o_nz = ov_ds.shape
+                ov_grid = pv.ImageData()
+                ov_grid.dimensions = (o_nx, o_ny, o_nz)
+                ov_grid.origin = (float(ov_x[0]), float(ov_y[0]),
+                                  float(ov_z[0]))
+                if o_nx > 1:
+                    ov_grid.spacing = (
+                        float(ov_x[-1] - ov_x[0]) / max(o_nx - 1, 1),
+                        float(ov_y[-1] - ov_y[0]) / max(o_ny - 1, 1),
+                        float(ov_z[-1] - ov_z[0]) / max(o_nz - 1, 1),
+                    )
+                ov_grid.point_data['scalar'] = ov_scalar.flatten(order='F')
                 ov_vlo = ov_vmin + ov_rng * overlay_vol_min
                 ov_vhi = ov_vmin + ov_rng * max(overlay_vol_max,
                                                  overlay_vol_min + 0.01)
