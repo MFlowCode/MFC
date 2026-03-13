@@ -32,6 +32,14 @@ from ._step_cache import prefetch_one as _prefetch_one
 
 pv.OFF_SCREEN = True
 
+# Suppress VTK's internal error/warning output (e.g. EGL failures) so it
+# doesn't flood stderr.  We handle failures at the Python level instead.
+try:
+    import vtk as _vtk  # type: ignore[import]
+    _vtk.vtkOutputWindow.GetInstance().SetGlobalWarningDisplay(0)  # pylint: disable=no-member
+except Exception:  # pylint: disable=broad-except
+    pass
+
 logger = logging.getLogger(__name__)
 
 # PyTurboJPEG wraps libjpeg-turbo via ctypes. TurboJPEG() opens the native
@@ -424,28 +432,39 @@ def _get_cached_3d_mesh(step, var, mode, log_bool, vmin_in, vmax_in,  # pylint: 
 # VTK's Cocoa backend (macOS) requires ALL OpenGL operations on the main
 # thread.  Dash callbacks run in worker threads, so PyVista server-side
 # rendering is only available on Linux/other platforms where VTK uses
-# GLX or EGL backends that are thread-safe.
+# EGL backends.  All PyVista calls are funnelled through a single
+# dedicated thread (_pv_thread) so the EGL context is never accessed
+# from multiple threads (EGL contexts are thread-bound).
 _PV_AVAILABLE = sys.platform != 'darwin'
 
-# Persistent plotter — reused across frames to avoid context creation overhead.
-# Only the mesh data is swapped on timestep changes; camera re-renders are ~5ms.
+# Persistent plotter — owned exclusively by _pv_thread.
 _pv_plotter: Optional[pv.Plotter] = None
-_pv_lock = threading.Lock()
 _pv_step_key: Optional[tuple] = None  # (step, var, mode, ...) currently loaded
+
+# Dedicated render thread: a single-worker pool that owns the EGL context.
+_pv_thread: Optional[concurrent.futures.ThreadPoolExecutor] = None
+_pv_thread_lock = threading.Lock()
+
+
+def _get_pv_thread() -> concurrent.futures.ThreadPoolExecutor:
+    """Return the dedicated PyVista render thread, creating it on first use."""
+    global _pv_thread  # pylint: disable=global-statement
+    with _pv_thread_lock:
+        if _pv_thread is None:
+            _pv_thread = concurrent.futures.ThreadPoolExecutor(
+                max_workers=1, thread_name_prefix='mfc_pv')
+            atexit.register(_pv_thread.shutdown, wait=False)
+        return _pv_thread
 
 
 def _pv_ensure_plotter() -> pv.Plotter:
     """Return the persistent plotter, creating it lazily on first use.
 
-    The plotter MUST be created on the same thread that will call
-    .render() — EGL / GLX contexts are thread-bound.  Since Dash
-    callbacks run in worker threads, we create the plotter on the first
-    callback that needs it (not on the main thread).
+    MUST be called on the dedicated _pv_thread — EGL/GLX contexts are
+    thread-bound and cannot be shared across threads.
 
     Temporarily removes DISPLAY so VTK does not try to connect to an
     X server (common on HPC nodes with SSH X-forwarding).
-
-    Caller must hold _pv_lock.
     """
     global _pv_plotter  # pylint: disable=global-statement
     if _pv_plotter is not None:
@@ -456,6 +475,10 @@ def _pv_ensure_plotter() -> pv.Plotter:
                         lighting='three lights')
         pl.set_background('#181825')
         pl.render()  # warm up — ensures the render window is fully initialized
+        # Verify the render actually produced pixels (catches broken EGL)
+        img = pl.screenshot(return_img=True)
+        if img is None or img.size == 0:
+            raise RuntimeError('PyVista screenshot returned empty image')
         _pv_plotter = pl
     finally:
         if saved is not None:
@@ -463,7 +486,163 @@ def _pv_ensure_plotter() -> pv.Plotter:
     return _pv_plotter
 
 
-def _pv_render(raw, x_cc, y_cc, z_cc, mode, cmap, log_fn,  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,too-many-branches,too-many-statements
+def _pv_probe() -> bool:
+    """Test whether PyVista off-screen rendering works on this system.
+
+    Submits a minimal render job to the dedicated render thread.
+    Returns True if a valid image is produced, False otherwise.
+    """
+    if not _PV_AVAILABLE:
+        return False
+    try:
+        pool = _get_pv_thread()
+        fut = pool.submit(_pv_ensure_plotter)
+        fut.result(timeout=30)
+        return True
+    except Exception as exc:  # pylint: disable=broad-except
+        logger.info('PyVista probe failed: %s', exc)
+        return False
+
+
+def _pv_render_on_thread(raw, x_cc, y_cc, z_cc, mode, cmap, log_fn,  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,too-many-branches,too-many-statements
+                         cmin, cmax,
+                         iso_min_frac, iso_max_frac, iso_n,
+                         vol_min_frac, vol_max_frac,
+                         camera, step, varname,
+                         overlay_raw, overlay_x, overlay_y,
+                         overlay_z, overlay_mode,
+                         overlay_iso_min, overlay_iso_max,
+                         overlay_nlevels, overlay_color,
+                         overlay_opacity,
+                         overlay_vol_min, overlay_vol_max,
+                         overlay_vol_opacity, overlay_vol_nsurf):  # pylint: disable=unused-argument
+    """Inner render — runs exclusively on the dedicated _pv_thread."""
+    global _pv_step_key  # pylint: disable=global-statement
+
+    rng = cmax - cmin if cmax > cmin else 1.0
+    mesh_key = (step, varname, mode, id(raw),
+                iso_min_frac, iso_max_frac, iso_n,
+                vol_min_frac, vol_max_frac,
+                overlay_raw is not None)
+
+    pl = _pv_ensure_plotter()
+    need_rebuild = _pv_step_key != mesh_key
+
+    if need_rebuild:
+        pl.clear()
+        pl.set_background('#181825')
+
+        ds_raw, ds_x, ds_y, ds_z = _downsample_3d(
+            raw, x_cc, y_cc, z_cc, 500_000)
+
+        nx, ny, nz = ds_raw.shape
+        grid = pv.ImageData()
+        grid.dimensions = (nx, ny, nz)
+        grid.origin = (float(ds_x[0]), float(ds_y[0]), float(ds_z[0]))
+        if nx > 1:
+            grid.spacing = (
+                float(ds_x[-1] - ds_x[0]) / max(nx - 1, 1),
+                float(ds_y[-1] - ds_y[0]) / max(ny - 1, 1),
+                float(ds_z[-1] - ds_z[0]) / max(nz - 1, 1),
+            )
+        scalar = log_fn(ds_raw).astype(np.float64)
+        scalar = np.where(np.isfinite(scalar), scalar, np.nan)
+        grid.point_data['scalar'] = scalar.flatten(order='F')
+
+        if mode == 'isosurface':
+            ilo = cmin + rng * iso_min_frac
+            ihi = cmin + rng * max(iso_max_frac, iso_min_frac + 0.01)
+            levels = np.linspace(ilo, ihi, max(int(iso_n), 1)).tolist()
+            try:
+                iso = grid.contour(levels, scalars='scalar')
+                if iso.n_points > 0:
+                    pl.add_mesh(iso, scalars='scalar', cmap=cmap,
+                                clim=[ilo, ihi],
+                                smooth_shading=True, opacity=1.0,
+                                show_scalar_bar=True,
+                                scalar_bar_args=dict(
+                                    title=varname, color='#cdd6f4',
+                                    label_font_size=10, title_font_size=12))
+            except Exception:  # pylint: disable=broad-except
+                pass
+
+        elif mode == 'volume':
+            vlo = cmin + rng * vol_min_frac
+            vhi = cmin + rng * max(vol_max_frac, vol_min_frac + 0.01)
+            grid_vol = grid.threshold([vlo, vhi], scalars='scalar')
+            if grid_vol.n_points > 0:
+                pl.add_volume(grid_vol, scalars='scalar', cmap=cmap,
+                              clim=[cmin, cmax],
+                              opacity='sigmoid',
+                              show_scalar_bar=True,
+                              scalar_bar_args=dict(
+                                  title=varname, color='#cdd6f4',
+                                  label_font_size=10, title_font_size=12))
+
+        if overlay_raw is not None:
+            ov_ds, ov_x, ov_y, ov_z = _downsample_3d(
+                overlay_raw, overlay_x, overlay_y, overlay_z, 500_000)
+            o_nx, o_ny, o_nz = ov_ds.shape
+            ov_grid = pv.ImageData()
+            ov_grid.dimensions = (o_nx, o_ny, o_nz)
+            ov_grid.origin = (float(ov_x[0]), float(ov_y[0]), float(ov_z[0]))
+            if o_nx > 1:
+                ov_grid.spacing = (
+                    float(ov_x[-1] - ov_x[0]) / max(o_nx - 1, 1),
+                    float(ov_y[-1] - ov_y[0]) / max(o_ny - 1, 1),
+                    float(ov_z[-1] - ov_z[0]) / max(o_nz - 1, 1),
+                )
+            ov_scalar = log_fn(ov_ds).astype(np.float64)
+            ov_scalar = np.where(np.isfinite(ov_scalar), ov_scalar, np.nan)
+            ov_grid.point_data['scalar'] = ov_scalar.flatten(order='F')
+            ov_vmin = float(np.nanmin(ov_scalar))
+            ov_vmax = float(np.nanmax(ov_scalar))
+            ov_rng = ov_vmax - ov_vmin if ov_vmax > ov_vmin else 1.0
+
+            if overlay_mode == 'isosurface':
+                ov_lo = ov_vmin + ov_rng * overlay_iso_min
+                ov_hi = ov_vmin + ov_rng * max(overlay_iso_max,
+                                                overlay_iso_min + 0.01)
+                ov_lvls = np.linspace(ov_lo, ov_hi,
+                                      max(int(overlay_nlevels), 1)).tolist()
+                try:
+                    ov_iso = ov_grid.contour(ov_lvls, scalars='scalar')
+                    if ov_iso.n_points > 0:
+                        pl.add_mesh(ov_iso, color=overlay_color,
+                                    opacity=float(overlay_opacity),
+                                    smooth_shading=True,
+                                    show_scalar_bar=False)
+                except Exception:  # pylint: disable=broad-except
+                    pass
+            else:
+                ov_vlo = ov_vmin + ov_rng * overlay_vol_min
+                ov_vhi = ov_vmin + ov_rng * max(overlay_vol_max,
+                                                 overlay_vol_min + 0.01)
+                ov_vol = ov_grid.threshold([ov_vlo, ov_vhi],
+                                           scalars='scalar')
+                if ov_vol.n_points > 0:
+                    pl.add_volume(ov_vol, scalars='scalar', cmap=cmap,
+                                  clim=[ov_vmin, ov_vmax],
+                                  opacity='sigmoid',
+                                  show_scalar_bar=False)
+
+        _pv_step_key = mesh_key
+
+    if camera and 'position' in camera:
+        pl.camera.position = camera['position']
+        pl.camera.focal_point = camera['focal_point']
+        pl.camera.up = camera['view_up']
+    elif need_rebuild:
+        pl.camera_position = 'iso'
+
+    pl.render()
+    img = pl.screenshot(return_img=True)
+
+    b64 = base64.b64encode(_encode_jpeg(img)).decode()
+    return f"data:image/jpeg;base64,{b64}"
+
+
+def _pv_render(raw, x_cc, y_cc, z_cc, mode, cmap, log_fn,  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
                cmin, cmax,
                iso_min_frac, iso_max_frac, iso_n,
                vol_opacity, vol_nsurf, vol_min_frac, vol_max_frac,  # pylint: disable=unused-argument
@@ -478,144 +657,27 @@ def _pv_render(raw, x_cc, y_cc, z_cc, mode, cmap, log_fn,  # pylint: disable=too
                width=800, height=600):  # pylint: disable=unused-argument
     """Render a 3D scene with PyVista and return a JPEG base64 data URI.
 
-    Reuses the persistent off-screen plotter (pre-created on the main thread
-    by _pv_init_main_thread).  Mesh data is swapped via .clear() + .add_mesh()
-    on timestep changes; camera-only re-renders are ~5ms.
-
-    *camera* is a dict with 'position', 'focal_point', 'view_up' lists,
-    or None for the default isometric view.
+    Submits the render job to the dedicated _pv_thread so that the EGL/GLX
+    context is always accessed from the same thread.  Raises on failure so
+    callers can fall back to the Plotly path.
     """
-    global _pv_step_key  # pylint: disable=global-statement
-
-    rng = cmax - cmin if cmax > cmin else 1.0
-    # Build a key that identifies the current mesh configuration
-    mesh_key = (step, varname, mode, id(raw),
-                iso_min_frac, iso_max_frac, iso_n,
-                vol_min_frac, vol_max_frac,
-                overlay_raw is not None)
-
-    with _pv_lock:
-        pl = _pv_ensure_plotter()
-        need_rebuild = _pv_step_key != mesh_key
-
-        if need_rebuild:
-            pl.clear()
-            pl.set_background('#181825')
-
-            # Downsample for rendering speed
-            ds_raw, ds_x, ds_y, ds_z = _downsample_3d(
-                raw, x_cc, y_cc, z_cc, 500_000)
-
-            # Build PyVista grid
-            nx, ny, nz = ds_raw.shape
-            grid = pv.ImageData()
-            grid.dimensions = (nx, ny, nz)
-            grid.origin = (float(ds_x[0]), float(ds_y[0]), float(ds_z[0]))
-            if nx > 1:
-                grid.spacing = (
-                    float(ds_x[-1] - ds_x[0]) / max(nx - 1, 1),
-                    float(ds_y[-1] - ds_y[0]) / max(ny - 1, 1),
-                    float(ds_z[-1] - ds_z[0]) / max(nz - 1, 1),
-                )
-            scalar = log_fn(ds_raw).astype(np.float64)
-            scalar = np.where(np.isfinite(scalar), scalar, np.nan)
-            grid.point_data['scalar'] = scalar.flatten(order='F')
-
-            if mode == 'isosurface':
-                ilo = cmin + rng * iso_min_frac
-                ihi = cmin + rng * max(iso_max_frac, iso_min_frac + 0.01)
-                levels = np.linspace(ilo, ihi, max(int(iso_n), 1)).tolist()
-                try:
-                    iso = grid.contour(levels, scalars='scalar')
-                    if iso.n_points > 0:
-                        pl.add_mesh(iso, scalars='scalar', cmap=cmap,
-                                    clim=[ilo, ihi],
-                                    smooth_shading=True, opacity=1.0,
-                                    show_scalar_bar=True,
-                                    scalar_bar_args=dict(
-                                        title=varname, color='#cdd6f4',
-                                        label_font_size=10, title_font_size=12))
-                except Exception:  # pylint: disable=broad-except
-                    pass
-
-            elif mode == 'volume':
-                vlo = cmin + rng * vol_min_frac
-                vhi = cmin + rng * max(vol_max_frac, vol_min_frac + 0.01)
-                # Clamp grid to isomin/isomax range
-                grid_vol = grid.threshold([vlo, vhi], scalars='scalar')
-                if grid_vol.n_points > 0:
-                    pl.add_volume(grid_vol, scalars='scalar', cmap=cmap,
-                                  clim=[cmin, cmax],
-                                  opacity='sigmoid',
-                                  show_scalar_bar=True,
-                                  scalar_bar_args=dict(
-                                      title=varname, color='#cdd6f4',
-                                      label_font_size=10, title_font_size=12))
-
-            # Overlay
-            if overlay_raw is not None:
-                ov_ds, ov_x, ov_y, ov_z = _downsample_3d(
-                    overlay_raw, overlay_x, overlay_y, overlay_z, 500_000)
-                o_nx, o_ny, o_nz = ov_ds.shape
-                ov_grid = pv.ImageData()
-                ov_grid.dimensions = (o_nx, o_ny, o_nz)
-                ov_grid.origin = (float(ov_x[0]), float(ov_y[0]), float(ov_z[0]))
-                if o_nx > 1:
-                    ov_grid.spacing = (
-                        float(ov_x[-1] - ov_x[0]) / max(o_nx - 1, 1),
-                        float(ov_y[-1] - ov_y[0]) / max(o_ny - 1, 1),
-                        float(ov_z[-1] - ov_z[0]) / max(o_nz - 1, 1),
-                    )
-                ov_scalar = log_fn(ov_ds).astype(np.float64)
-                ov_scalar = np.where(np.isfinite(ov_scalar), ov_scalar, np.nan)
-                ov_grid.point_data['scalar'] = ov_scalar.flatten(order='F')
-                ov_vmin = float(np.nanmin(ov_scalar))
-                ov_vmax = float(np.nanmax(ov_scalar))
-                ov_rng = ov_vmax - ov_vmin if ov_vmax > ov_vmin else 1.0
-
-                if overlay_mode == 'isosurface':
-                    ov_lo = ov_vmin + ov_rng * overlay_iso_min
-                    ov_hi = ov_vmin + ov_rng * max(overlay_iso_max,
-                                                    overlay_iso_min + 0.01)
-                    ov_lvls = np.linspace(ov_lo, ov_hi,
-                                          max(int(overlay_nlevels), 1)).tolist()
-                    try:
-                        ov_iso = ov_grid.contour(ov_lvls, scalars='scalar')
-                        if ov_iso.n_points > 0:
-                            pl.add_mesh(ov_iso, color=overlay_color,
-                                        opacity=float(overlay_opacity),
-                                        smooth_shading=True,
-                                        show_scalar_bar=False)
-                    except Exception:  # pylint: disable=broad-except
-                        pass
-                else:
-                    ov_vlo = ov_vmin + ov_rng * overlay_vol_min
-                    ov_vhi = ov_vmin + ov_rng * max(overlay_vol_max,
-                                                     overlay_vol_min + 0.01)
-                    ov_vol = ov_grid.threshold([ov_vlo, ov_vhi],
-                                               scalars='scalar')
-                    if ov_vol.n_points > 0:
-                        pl.add_volume(ov_vol, scalars='scalar', cmap=cmap,
-                                      clim=[ov_vmin, ov_vmax],
-                                      opacity='sigmoid',
-                                      show_scalar_bar=False)
-
-            _pv_step_key = mesh_key
-
-        # Apply camera
-        if camera and 'position' in camera:
-            pl.camera.position = camera['position']
-            pl.camera.focal_point = camera['focal_point']
-            pl.camera.up = camera['view_up']
-        elif need_rebuild:
-            pl.camera_position = 'iso'
-
-        pl.render()
-        img = pl.screenshot(return_img=True)
-
-    # JPEG encode (reuse existing fast path)
-    b64 = base64.b64encode(_encode_jpeg(img)).decode()
-    return f"data:image/jpeg;base64,{b64}"
+    pool = _get_pv_thread()
+    fut = pool.submit(
+        _pv_render_on_thread,
+        raw, x_cc, y_cc, z_cc, mode, cmap, log_fn,
+        cmin, cmax,
+        iso_min_frac, iso_max_frac, iso_n,
+        vol_min_frac, vol_max_frac,
+        camera, step, varname,
+        overlay_raw, overlay_x, overlay_y,
+        overlay_z, overlay_mode,
+        overlay_iso_min, overlay_iso_max,
+        overlay_nlevels, overlay_color,
+        overlay_opacity,
+        overlay_vol_min, overlay_vol_max,
+        overlay_vol_opacity, overlay_vol_nsurf,
+    )
+    return fut.result(timeout=60)
 
 
 # ---------------------------------------------------------------------------
@@ -1450,6 +1512,18 @@ input[type=radio] + span, label { color: %(tx)s !important; }
     # time between the start of _update and the next _advance_step call.
     _last_update_t = [0.0]
     _min_frame_gap = [0.3]
+    # PyVista availability — probed once at startup, disabled on failure.
+    # Mutable list so callbacks can flip it off on runtime errors.
+    _pv_ok = [False]
+    if _PV_AVAILABLE and ndim == 3:
+        cons.print('[dim]Probing PyVista off-screen rendering...[/dim]')
+        _pv_ok[0] = _pv_probe()
+        if _pv_ok[0]:
+            cons.print('[dim][green]PyVista OK[/green] — '
+                       'server-side 3D rendering enabled.[/dim]')
+        else:
+            cons.print('[dim][yellow]PyVista probe failed[/yellow] — '
+                       'falling back to Plotly WebGL for 3D playback.[/dim]')
 
     @app.callback(
         Output('step-sl', 'value'),
@@ -1741,7 +1815,7 @@ input[type=radio] + span, label { color: %(tx)s !important; }
         # entirely, giving ~50-100ms full mesh swap and ~5ms camera re-renders.
         # ----------------------------------------------------------------------
         _use_pv = (
-            _PV_AVAILABLE
+            _pv_ok[0]
             and bool(playing_st)
             and ad.ndim == 3
             and mode in ('isosurface', 'volume')
@@ -1777,53 +1851,63 @@ input[type=radio] + span, label { color: %(tx)s !important; }
                     except (OSError, ValueError, EOFError):
                         pass
 
-            pv_src = _pv_render(
-                raw, ad.x_cc, ad.y_cc, ad.z_cc,
-                mode, cmap, _tf, cmin, cmax,
-                float(iso_min_frac or 0.2), float(iso_max_frac or 0.8),
-                int(iso_n or 3),
-                float(vol_opacity or 0.1), int(vol_nsurf or 15),
-                float(vol_min_frac or 0.0), float(vol_max_frac or 1.0),
-                None,  # camera — use default iso view
-                step, selected_var,
-                overlay_raw=_ov_raw_pv,
-                overlay_x=_ov_x_pv, overlay_y=_ov_y_pv,
-                overlay_z=_ov_z_pv,
-                overlay_mode=overlay_mode_sel or 'isosurface',
-                overlay_iso_min=float(overlay_iso_min or 0.2),
-                overlay_iso_max=float(overlay_iso_max or 0.8),
-                overlay_nlevels=int(overlay_nlevels or 3),
-                overlay_color=overlay_color or 'white',
-                overlay_opacity=float(overlay_iso_opacity or 0.6),
-                overlay_vol_min=float(overlay_vol_min or 0.0),
-                overlay_vol_max=float(overlay_vol_max or 1.0),
-                overlay_vol_opacity=float(overlay_vol_opacity or 0.1),
-                overlay_vol_nsurf=int(overlay_vol_nsurf or 15),
-            )
-            _t_pv = time.perf_counter()
-            dmin_pv = float(np.nanmin(_raw_range))
-            dmax_pv = float(np.nanmax(_raw_range))
-            cons.print(
-                f'[dim]viz timing  step={step}  shape={raw.shape}'
-                f'  load={_t_load-_t0:.3f}s'
-                f'  prep={_t_prep-_t_load:.3f}s'
-                f'  pyvista={_t_pv-_t_prep:.3f}s'
-                f'  total={_t_pv-_t0:.3f}s [PV-3D][/dim]'
-            )
-            status_pv = html.Div([
-                html.Span(f'step {step}', style={'color': _YELLOW}),
-                html.Span(f'  ·  shape {raw.shape}', style={'color': _MUTED}),
-                html.Br(),
-                html.Span('min ', style={'color': _MUTED}),
-                html.Span(f'{dmin_pv:.4g}', style={'color': _BLUE}),
-                html.Span('  max ', style={'color': _MUTED}),
-                html.Span(f'{dmax_pv:.4g}', style={'color': _RED}),
-            ])
-            _now_pv = time.perf_counter()
-            _last_update_t[0] = _now_pv
-            _server_pv = _now_pv - _t0
-            _min_frame_gap[0] = max(0.15, min(1.0, _server_pv + 0.05))
-            return no_update, status_pv, pv_src, _PV_SHOW, _GRAPH_HIDE
+            try:
+                pv_src = _pv_render(
+                    raw, ad.x_cc, ad.y_cc, ad.z_cc,
+                    mode, cmap, _tf, cmin, cmax,
+                    float(iso_min_frac or 0.2), float(iso_max_frac or 0.8),
+                    int(iso_n or 3),
+                    float(vol_opacity or 0.1), int(vol_nsurf or 15),
+                    float(vol_min_frac or 0.0), float(vol_max_frac or 1.0),
+                    None,  # camera — use default iso view
+                    step, selected_var,
+                    overlay_raw=_ov_raw_pv,
+                    overlay_x=_ov_x_pv, overlay_y=_ov_y_pv,
+                    overlay_z=_ov_z_pv,
+                    overlay_mode=overlay_mode_sel or 'isosurface',
+                    overlay_iso_min=float(overlay_iso_min or 0.2),
+                    overlay_iso_max=float(overlay_iso_max or 0.8),
+                    overlay_nlevels=int(overlay_nlevels or 3),
+                    overlay_color=overlay_color or 'white',
+                    overlay_opacity=float(overlay_iso_opacity or 0.6),
+                    overlay_vol_min=float(overlay_vol_min or 0.0),
+                    overlay_vol_max=float(overlay_vol_max or 1.0),
+                    overlay_vol_opacity=float(overlay_vol_opacity or 0.1),
+                    overlay_vol_nsurf=int(overlay_vol_nsurf or 15),
+                )
+            except Exception as _pv_exc:  # pylint: disable=broad-except
+                # PyVista rendering failed — disable for the rest of the
+                # session and fall through to the Plotly WebGL path.
+                _pv_ok[0] = False
+                logger.warning('PyVista render failed, falling back to '
+                               'Plotly: %s', _pv_exc)
+                pv_src = None
+
+            if pv_src is not None:
+                _t_pv = time.perf_counter()
+                dmin_pv = float(np.nanmin(_raw_range))
+                dmax_pv = float(np.nanmax(_raw_range))
+                cons.print(
+                    f'[dim]viz timing  step={step}  shape={raw.shape}'
+                    f'  load={_t_load-_t0:.3f}s'
+                    f'  prep={_t_prep-_t_load:.3f}s'
+                    f'  pyvista={_t_pv-_t_prep:.3f}s'
+                    f'  total={_t_pv-_t0:.3f}s [PV-3D][/dim]'
+                )
+                status_pv = html.Div([
+                    html.Span(f'step {step}', style={'color': _YELLOW}),
+                    html.Span(f'  ·  shape {raw.shape}', style={'color': _MUTED}),
+                    html.Br(),
+                    html.Span('min ', style={'color': _MUTED}),
+                    html.Span(f'{dmin_pv:.4g}', style={'color': _BLUE}),
+                    html.Span('  max ', style={'color': _MUTED}),
+                    html.Span(f'{dmax_pv:.4g}', style={'color': _RED}),
+                ])
+                _now_pv = time.perf_counter()
+                _last_update_t[0] = _now_pv
+                _server_pv = _now_pv - _t0
+                _min_frame_gap[0] = max(0.15, min(1.0, _server_pv + 0.05))
+                return no_update, status_pv, pv_src, _PV_SHOW, _GRAPH_HIDE
 
         fig = go.Figure()
         title = ''
@@ -2381,10 +2465,7 @@ input[type=radio] + span, label { color: %(tx)s !important; }
             f'[dim]  If you see [bold]Address already in use[/bold], free the port with:[/dim]\n'
             f'  [bold]lsof -ti :{port} | xargs kill[/bold]'
         )
-    # PyVista plotter is created lazily on the first callback thread that
-    # needs it (EGL/GLX contexts are thread-bound).  Print a note on macOS
-    # where PyVista is disabled due to Cocoa threading limitations.
-    if ndim == 3 and not _PV_AVAILABLE:
+    if ndim == 3 and not _pv_ok[0] and not _PV_AVAILABLE:
         cons.print(
             '[dim][yellow]Note:[/yellow] PyVista server-side rendering '
             'is not available on macOS (VTK Cocoa threading limitation). '
