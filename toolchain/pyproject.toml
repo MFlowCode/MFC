@@ -54,6 +54,7 @@ dependencies = [
     "plotly",
     "PyTurboJPEG<2.0",  # 2.x requires libjpeg-turbo>=3; most systems ship 2.x
     "scikit-image",
+    "pyvista",
     "tqdm",
 ]
 
