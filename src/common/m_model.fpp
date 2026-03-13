@@ -619,7 +619,6 @@ contains
                         nHits = 0
                         do q = 1, ntrs
                             tri%v(:, :) = gpu_trs_v(:, :, q, pid)
-                            tri%n(1:3) = gpu_trs_n(1:3, q, pid)
                             nHits = nHits + f_intersects_triangle(ray, tri)
                         end do
                         ! if the ray intersected an odd number of times, we must be inside
@@ -638,11 +637,13 @@ contains
 
     end function f_model_is_inside_flat
 
-    ! From https://www.scratchapixel.com/lessons/3e-basic-rendering/ray-tracing-rendering-a-triangle/ray-triangle-intersection-geometric-solution.html
-    !> This procedure checks if a ray intersects a triangle.
+    !> This procedure checks if a ray intersects a triangle using the
+    !! Moller-Trumbore algorithm (barycentric coordinates). Unlike the
+    !! previous cross-product sign test, this is vertex winding-order
+    !! independent.
     !! @param ray      Ray.
     !! @param triangle Triangle.
-    !! @return         True if the ray intersects the triangle, false otherwise.
+    !! @return         1 if the ray intersects the triangle, 0 otherwise.
     function f_intersects_triangle(ray, triangle) result(intersects)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -652,46 +653,32 @@ contains
 
         integer :: intersects
 
-        real(wp) :: N(3), P(3), C(3), edge(3), vp(3)
-        real(wp) :: d, t, NdotRayDirection
+        real(wp) :: edge1(3), edge2(3), h(3), s(3), q(3)
+        real(wp) :: a, f, u, v, t
 
         intersects = 0
 
-        N(1:3) = triangle%n(1:3)
-        NdotRayDirection = dot_product(N(1:3), ray%d(1:3))
-        if (abs(NdotRayDirection) < 0.0000001_wp) then
-            return
-        end if
+        edge1 = triangle%v(2, :) - triangle%v(1, :)
+        edge2 = triangle%v(3, :) - triangle%v(1, :)
+        h = f_cross(ray%d, edge2)
+        a = dot_product(edge1, h)
 
-        d = -sum(N(:)*triangle%v(1, :))
-        t = -(sum(N(:)*ray%o(:)) + d)/NdotRayDirection
-        if (t < 0) then
-            return
-        end if
+        if (abs(a) < 1e-7_wp) return
 
-        P = ray%o + t*ray%d
-        edge = triangle%v(2, :) - triangle%v(1, :)
-        vp = P - triangle%v(1, :)
-        C = f_cross(edge, vp)
-        if (sum(N(:)*C(:)) < 0) then
-            return
-        end if
+        f = 1.0_wp/a
+        s = ray%o - triangle%v(1, :)
+        u = f*dot_product(s, h)
 
-        edge = triangle%v(3, :) - triangle%v(2, :)
-        vp = P - triangle%v(2, :)
-        C = f_cross(edge, vp)
-        if (sum(N(:)*C(:)) < 0) then
-            return
-        end if
+        if (u < 0.0_wp .or. u > 1.0_wp) return
 
-        edge = triangle%v(1, :) - triangle%v(3, :)
-        vp = P - triangle%v(3, :)
-        C = f_cross(edge, vp)
-        if (sum(N(:)*C(:)) < 0) then
-            return
-        end if
+        q = f_cross(s, edge1)
+        v = f*dot_product(ray%d, q)
 
-        intersects = 1
+        if (v < 0.0_wp .or. u + v > 1.0_wp) return
+
+        t = f*dot_product(edge2, q)
+
+        if (t > 0.0_wp) intersects = 1
 
     end function f_intersects_triangle
 
