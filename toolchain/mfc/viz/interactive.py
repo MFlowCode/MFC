@@ -435,7 +435,7 @@ def _get_cached_3d_mesh(step, var, mode, log_bool, vmin_in, vmax_in,  # pylint: 
 # All PyVista calls are funnelled through a single dedicated thread
 # (_pv_thread) so the OpenGL context is never accessed from multiple
 # threads (GL contexts are thread-bound).
-_PV_AVAILABLE = sys.platform == 'linux'
+_PV_AVAILABLE = sys.platform in ('linux', 'darwin')
 
 
 class _StaleRenderError(Exception):
@@ -524,18 +524,62 @@ def _restore_env(key, saved):
         os.environ.pop(key, None)
 
 
+def _try_linux_headless(saved_vtk_win, errors):
+    """Try Linux-specific headless backends: EGL, OSMesa, Xvfb+GLX.
+
+    Returns (plotter, backend_name) on success or (None, None) on failure.
+    """
+    has_egl = _can_dlopen(['libEGL.so.1', 'libEGL.so'])
+    has_osmesa = _can_dlopen(['libOSMesa.so.8', 'libOSMesa.so.6',
+                              'libOSMesa.so'])
+
+    # EGL (GPU headless, no display needed)
+    if has_egl:
+        try:
+            os.environ['VTK_DEFAULT_OPENGL_WINDOW'] = 'vtkEGLRenderWindow'
+            os.environ.pop('DISPLAY', None)
+            return _try_create_plotter(), 'EGL'
+        except Exception as exc:  # pylint: disable=broad-except
+            errors.append(f'EGL: {exc}')
+            logger.info('PyVista EGL failed: %s', exc)
+    else:
+        errors.append('EGL: libEGL.so not found')
+
+    # OSMesa (software, no display needed)
+    if has_osmesa:
+        try:
+            os.environ['VTK_DEFAULT_OPENGL_WINDOW'] = \
+                'vtkOSOpenGLRenderWindow'
+            os.environ.pop('DISPLAY', None)
+            return _try_create_plotter(), 'OSMesa'
+        except Exception as exc:  # pylint: disable=broad-except
+            errors.append(f'OSMesa: {exc}')
+            logger.info('PyVista OSMesa failed: %s', exc)
+    else:
+        errors.append('OSMesa: libOSMesa.so not found')
+
+    # Xvfb + GLX
+    try:
+        _restore_env('VTK_DEFAULT_OPENGL_WINDOW', saved_vtk_win)
+        if not _start_xvfb():
+            raise RuntimeError('Xvfb not available')
+        return _try_create_plotter(), 'Xvfb+GLX'
+    except Exception as exc:  # pylint: disable=broad-except
+        errors.append(f'Xvfb: {exc}')
+        logger.info('PyVista Xvfb failed: %s', exc)
+
+    return None, None
+
+
 def _pv_ensure_plotter() -> pv.Plotter:
     """Return the persistent plotter, creating it lazily on first use.
 
     MUST be called on the dedicated _pv_thread — GL contexts are
     thread-bound and cannot be shared across threads.
 
-    Tries multiple VTK rendering backends in order, but only attempts
-    a backend if its required shared library is present (VTK segfaults
-    rather than raising if a library is missing):
-      1. EGL     — GPU headless, needs libEGL.so
-      2. OSMesa  — software renderer, needs libOSMesa.so
-      3. Xvfb+GLX — virtual X11 framebuffer, needs Xvfb
+    Backend cascade:
+      1. Native (macOS Cocoa / Linux GLX with existing DISPLAY)
+      2. Linux-only: EGL → OSMesa → Xvfb+GLX
     """
     global _pv_plotter, _pv_backend_name  # pylint: disable=global-statement
     if _pv_plotter is not None:
@@ -544,63 +588,32 @@ def _pv_ensure_plotter() -> pv.Plotter:
     saved_display = os.environ.get('DISPLAY')
     saved_vtk_win = os.environ.get('VTK_DEFAULT_OPENGL_WINDOW')
     errors = []
-    has_egl = _can_dlopen(['libEGL.so.1', 'libEGL.so'])
-    has_osmesa = _can_dlopen(['libOSMesa.so.8', 'libOSMesa.so.6',
-                              'libOSMesa.so'])
 
-    # --- 1. EGL (GPU headless, no display needed) ---
-    if has_egl:
+    # --- 1. Native/default backend (macOS Cocoa, or Linux with DISPLAY) ---
+    if sys.platform != 'linux' or saved_display:
         try:
-            os.environ['VTK_DEFAULT_OPENGL_WINDOW'] = 'vtkEGLRenderWindow'
-            os.environ.pop('DISPLAY', None)
+            _restore_env('VTK_DEFAULT_OPENGL_WINDOW', saved_vtk_win)
             _pv_plotter = _try_create_plotter()
-            _pv_backend_name = 'EGL'
-            logger.info('PyVista: using EGL backend')
+            _pv_backend_name = 'Cocoa' if sys.platform == 'darwin' else 'GLX'
+            logger.info('PyVista: using %s backend', _pv_backend_name)
             return _pv_plotter
         except Exception as exc:  # pylint: disable=broad-except
-            errors.append(f'EGL: {exc}')
-            logger.info('PyVista EGL failed: %s', exc)
-    else:
-        errors.append('EGL: libEGL.so not found')
+            errors.append(f'native: {exc}')
+            logger.info('PyVista native backend failed: %s', exc)
 
-    # --- 2. OSMesa (software, no display needed) ---
-    if has_osmesa:
-        try:
-            os.environ['VTK_DEFAULT_OPENGL_WINDOW'] = 'vtkOSOpenGLRenderWindow'
-            os.environ.pop('DISPLAY', None)
-            _pv_plotter = _try_create_plotter()
-            _pv_backend_name = 'OSMesa'
-            logger.info('PyVista: using OSMesa backend')
+    # --- 2. Linux headless backends ---
+    if sys.platform == 'linux':
+        pl, name = _try_linux_headless(saved_vtk_win, errors)
+        if pl is not None:
+            _pv_plotter, _pv_backend_name = pl, name
+            logger.info('PyVista: using %s backend', name)
             return _pv_plotter
-        except Exception as exc:  # pylint: disable=broad-except
-            errors.append(f'OSMesa: {exc}')
-            logger.info('PyVista OSMesa failed: %s', exc)
-    else:
-        errors.append('OSMesa: libOSMesa.so not found')
-
-    # --- 3. Xvfb + GLX ---
-    try:
-        _restore_env('VTK_DEFAULT_OPENGL_WINDOW', saved_vtk_win)
-        if saved_display:
-            os.environ['DISPLAY'] = saved_display
-        elif not _start_xvfb():
-            raise RuntimeError('No DISPLAY and Xvfb not available')
-        _pv_plotter = _try_create_plotter()
-        _pv_backend_name = 'Xvfb+GLX' if not saved_display else 'GLX'
-        logger.info('PyVista: using %s backend', _pv_backend_name)
-        return _pv_plotter
-    except Exception as exc:  # pylint: disable=broad-except
-        errors.append(f'GLX/Xvfb: {exc}')
-        logger.info('PyVista GLX/Xvfb failed: %s', exc)
 
     # --- All backends failed ---
     _restore_env('DISPLAY', saved_display)
     _restore_env('VTK_DEFAULT_OPENGL_WINDOW', saved_vtk_win)
     msg = ('PyVista: all rendering backends failed:\n  '
-           + '\n  '.join(errors)
-           + '\nInstall one of: libOSMesa (mesa-libOSMesa / '
-           'libosmesa6), Xvfb (xvfb / xorg-x11-server-Xvfb), '
-           'or EGL GPU drivers.')
+           + '\n  '.join(errors))
     raise RuntimeError(msg)
 
 
@@ -1670,17 +1683,21 @@ input[type=radio] + span, label { color: %(tx)s !important; }
             cons.print(f'[dim][green]PyVista OK ({backend})[/green] — '
                        'server-side 3D rendering enabled.[/dim]')
         else:
+            _hint = ''
+            if sys.platform == 'linux':
+                _hint = (
+                    '\n    For fast headless 3D, install one of:\n'
+                    '      libOSMesa: sudo apt install libosmesa6-dev  '
+                    '(Debian/Ubuntu)\n'
+                    '                 sudo yum install mesa-libOSMesa-devel'
+                    '  (RHEL/CentOS)\n'
+                    '      Xvfb:     sudo apt install xvfb  '
+                    '(Debian/Ubuntu)\n'
+                    '                 sudo yum install '
+                    'xorg-x11-server-Xvfb  (RHEL/CentOS)')
             cons.print(
                 '[yellow]PyVista probe failed[/yellow] — '
-                '3D playback will use Plotly (slower).\n'
-                '    For fast headless 3D, install one of:\n'
-                '      libOSMesa: sudo apt install libosmesa6-dev  '
-                '(Debian/Ubuntu)\n'
-                '                 sudo yum install mesa-libOSMesa-devel'
-                '  (RHEL/CentOS)\n'
-                '      Xvfb:     sudo apt install xvfb  (Debian/Ubuntu)\n'
-                '                 sudo yum install xorg-x11-server-Xvfb'
-                '  (RHEL/CentOS)'
+                '3D will use Plotly (slower).' + _hint
             )
 
     @app.callback(
