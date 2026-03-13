@@ -434,18 +434,22 @@ _pv_lock = threading.Lock()
 _pv_step_key: Optional[tuple] = None  # (step, var, mode, ...) currently loaded
 
 
-def _pv_init() -> None:
-    """Create the persistent PyVista plotter.
+def _pv_ensure_plotter() -> pv.Plotter:
+    """Return the persistent plotter, creating it lazily on first use.
 
-    Called once during show() setup.  Skipped on macOS where VTK's Cocoa
-    backend crashes when rendering from non-main threads.
+    The plotter MUST be created on the same thread that will call
+    .render() — EGL / GLX contexts are thread-bound.  Since Dash
+    callbacks run in worker threads, we create the plotter on the first
+    callback that needs it (not on the main thread).
 
     Temporarily removes DISPLAY so VTK does not try to connect to an
     X server (common on HPC nodes with SSH X-forwarding).
+
+    Caller must hold _pv_lock.
     """
     global _pv_plotter  # pylint: disable=global-statement
-    if not _PV_AVAILABLE:
-        return
+    if _pv_plotter is not None:
+        return _pv_plotter
     saved = os.environ.pop('DISPLAY', None)
     try:
         pl = pv.Plotter(off_screen=True, window_size=(800, 600),
@@ -456,6 +460,7 @@ def _pv_init() -> None:
     finally:
         if saved is not None:
             os.environ['DISPLAY'] = saved
+    return _pv_plotter
 
 
 def _pv_render(raw, x_cc, y_cc, z_cc, mode, cmap, log_fn,  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,too-many-branches,too-many-statements
@@ -490,10 +495,7 @@ def _pv_render(raw, x_cc, y_cc, z_cc, mode, cmap, log_fn,  # pylint: disable=too
                 overlay_raw is not None)
 
     with _pv_lock:
-        pl = _pv_plotter
-        if pl is None:
-            raise RuntimeError('_pv_init_main_thread() was not called')
-
+        pl = _pv_ensure_plotter()
         need_rebuild = _pv_step_key != mesh_key
 
         if need_rebuild:
@@ -2379,16 +2381,15 @@ input[type=radio] + span, label { color: %(tx)s !important; }
             f'[dim]  If you see [bold]Address already in use[/bold], free the port with:[/dim]\n'
             f'  [bold]lsof -ti :{port} | xargs kill[/bold]'
         )
-    # Pre-initialize PyVista plotter for server-side 3D rendering during
-    # playback.  Skipped on macOS (VTK Cocoa backend crashes from threads).
-    if ndim == 3:
-        _pv_init()
-        if not _PV_AVAILABLE:
-            cons.print(
-                '[dim][yellow]Note:[/yellow] PyVista server-side rendering '
-                'is not available on macOS (VTK Cocoa threading limitation). '
-                '3D playback uses the Plotly WebGL path instead.[/dim]'
-            )
+    # PyVista plotter is created lazily on the first callback thread that
+    # needs it (EGL/GLX contexts are thread-bound).  Print a note on macOS
+    # where PyVista is disabled due to Cocoa threading limitations.
+    if ndim == 3 and not _PV_AVAILABLE:
+        cons.print(
+            '[dim][yellow]Note:[/yellow] PyVista server-side rendering '
+            'is not available on macOS (VTK Cocoa threading limitation). '
+            '3D playback uses the Plotly WebGL path instead.[/dim]'
+        )
 
     cons.print('[dim]\nCtrl+C to stop.[/dim]\n')
     app.run(debug=False, port=port, host=host)
