@@ -585,10 +585,11 @@ contains
 
     !> This procedure determines if a point is inside a surface using
     !! the generalized winding number (Jacobson et al., SIGGRAPH 2013).
-    !! The winding number is the sum of signed solid angles subtended
-    !! by each triangle, normalized by 4*pi. Returns ~1.0 inside,
+    !! In 3D, sums the solid angle subtended by each triangle (Van
+    !! Oosterom-Strackee formula). In 2D (p==0), sums the signed
+    !! angle subtended by each boundary edge. Returns ~1.0 inside,
     !! ~0.0 outside. Unlike ray casting, this is robust to small
-    !! triangles and vertex winding order.
+    !! triangles/edges and vertex winding order.
     !! @param ntrs     Number of triangles in the model.
     !! @param pid      Patch ID of this model.
     !! @param point    Point to test.
@@ -606,40 +607,60 @@ contains
         real(wp) :: r1(3), r2(3), r3(3)
         real(wp) :: r1_mag, r2_mag, r3_mag
         real(wp) :: numerator, denominator
+        real(wp) :: d1(2), d2(2)
         integer :: q
 
         fraction = 0.0_wp
 
-        do q = 1, ntrs
-            r1 = gpu_trs_v(1, :, q, pid) - point
-            r2 = gpu_trs_v(2, :, q, pid) - point
-            r3 = gpu_trs_v(3, :, q, pid) - point
+        if (p == 0) then
+            ! 2D winding number: sum signed angles subtended by
+            ! each boundary edge at the query point.
+            do q = 1, gpu_boundary_edge_count(pid)
+                d1(1) = gpu_boundary_v(q, 1, 1, pid) - point(1)
+                d1(2) = gpu_boundary_v(q, 1, 2, pid) - point(2)
+                d2(1) = gpu_boundary_v(q, 2, 1, pid) - point(1)
+                d2(2) = gpu_boundary_v(q, 2, 2, pid) - point(2)
 
-            r1_mag = sqrt(dot_product(r1, r1))
-            r2_mag = sqrt(dot_product(r2, r2))
-            r3_mag = sqrt(dot_product(r3, r3))
+                ! Signed angle = atan2(d1 x d2, d1 . d2)
+                fraction = fraction + atan2( &
+                           d1(1)*d2(2) - d1(2)*d2(1), &
+                           d1(1)*d2(1) + d1(2)*d2(2))
+            end do
 
-            ! Van Oosterom-Strackee formula:
-            ! tan(Omega/2) = numerator / denominator
-            ! numerator = scalar triple product r1 . (r2 x r3)
-            numerator = r1(1)*(r2(2)*r3(3) - r2(3)*r3(2)) &
-                        + r1(2)*(r2(3)*r3(1) - r2(1)*r3(3)) &
-                        + r1(3)*(r2(1)*r3(2) - r2(2)*r3(1))
+            ! 2D winding number = total angle / (2*pi)
+            fraction = fraction/(2.0_wp*acos(-1.0_wp))
+        else
+            ! 3D winding number: sum solid angles via Van
+            ! Oosterom-Strackee formula.
+            do q = 1, ntrs
+                r1 = gpu_trs_v(1, :, q, pid) - point
+                r2 = gpu_trs_v(2, :, q, pid) - point
+                r3 = gpu_trs_v(3, :, q, pid) - point
 
-            denominator = r1_mag*r2_mag*r3_mag &
-                          + dot_product(r1, r2)*r3_mag &
-                          + dot_product(r2, r3)*r1_mag &
-                          + dot_product(r3, r1)*r2_mag
+                r1_mag = sqrt(dot_product(r1, r1))
+                r2_mag = sqrt(dot_product(r2, r2))
+                r3_mag = sqrt(dot_product(r3, r3))
 
-            ! Solid angle = 2 * atan2(num, den).
-            ! atan2(0,0) = 0 per IEEE 754, so degenerate triangles
-            ! contribute nothing without special casing.
-            fraction = fraction + atan2(numerator, denominator)
-        end do
+                ! tan(Omega/2) = numerator / denominator
+                ! numerator = scalar triple product r1 . (r2 x r3)
+                numerator = r1(1)*(r2(2)*r3(3) - r2(3)*r3(2)) &
+                            + r1(2)*(r2(3)*r3(1) - r2(1)*r3(3)) &
+                            + r1(3)*(r2(1)*r3(2) - r2(2)*r3(1))
 
-        ! Winding number = total solid angle / (4 * pi)
-        ! Each triangle contributes 2*atan2, so sum / (2*pi)
-        fraction = fraction/(2.0_wp*acos(-1.0_wp))
+                denominator = r1_mag*r2_mag*r3_mag &
+                              + dot_product(r1, r2)*r3_mag &
+                              + dot_product(r2, r3)*r1_mag &
+                              + dot_product(r3, r1)*r2_mag
+
+                ! atan2(0,0) = 0 per IEEE 754, so degenerate
+                ! triangles contribute nothing.
+                fraction = fraction + atan2(numerator, denominator)
+            end do
+
+            ! Winding number = total solid angle / (4*pi)
+            ! Each triangle contributes 2*atan2, so sum / (2*pi)
+            fraction = fraction/(2.0_wp*acos(-1.0_wp))
+        end if
 
     end function f_model_is_inside_flat
 
