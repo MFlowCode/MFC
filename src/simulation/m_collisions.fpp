@@ -85,7 +85,7 @@ contains
         integer :: i, encoded_pid1, encoded_pid2, xp1, xp2, yp1, yp2, zp1, zp2, pid1, pid2, l ! iterators and patch IDs
         real(wp) :: overlap_distance
         real(wp), dimension(3) :: normal_vector, centroid_1, centroid_2
-        real(wp), dimension(3) :: normal_velocity, tangental_vector, normal_force, tangental_force, torque
+        real(wp), dimension(3) :: normal_velocity, tangental_vector, normal_force, tangental_force, torque, radial_vector, rotation_velocity, vel1, vel2
         real(wp) :: k, eta, effective_mass ! the spring stiffness and damping coefficient and mass of a specific interaction
 
         if (num_considered_collisions == 0) return
@@ -93,7 +93,7 @@ contains
         ! print *, "Checking Collisions: ", num_considered_collisions, " on rank ", proc_rank
 
         ! Iterate over all collisions detected
-        $:GPU_PARALLEL_LOOP(private='[i,l,encoded_pid1,encoded_pid2,xp1,xp2,yp1,yp2,zp1,zp2,pid1,pid2,centroid_1,centroid_2,normal_vector,overlap_distance,effective_mass,k,eta,normal_velocity,tangental_vector,normal_force,tangental_force,torque]', copy='[forces, torques]')
+        $:GPU_PARALLEL_LOOP(private='[i,l,encoded_pid1,encoded_pid2,xp1,xp2,yp1,yp2,zp1,zp2,pid1,pid2,centroid_1,centroid_2,normal_vector,overlap_distance,effective_mass,k,eta,normal_velocity,tangental_vector,normal_force,tangental_force,torque,radial_vector,rotation_velocity,vel1,vel2]', copy='[forces, torques]')
         do i = 1, num_considered_collisions
             encoded_pid1 = collision_lookup(i, 3)
             encoded_pid2 = collision_lookup(i, 4)
@@ -118,14 +118,19 @@ contains
                     eta = damping_parameter*effective_mass
 
                     ! Get the vectors and velcoities
-                    ! TODO :: This should be made more complicated and include rotational velocity at the collision location.
-                    normal_velocity = dot_product(patch_ib(pid1)%vel - patch_ib(pid2)%vel, normal_vector)*normal_vector
-                    tangental_vector = (patch_ib(pid1)%vel - patch_ib(pid2)%vel) - normal_velocity
+                    radial_vector = normal_vector * (patch_ib(pid1)%radius - 0.5_wp*overlap_distance)
+                    call s_cross_product(patch_ib(pid1)%angular_vel, radial_vector, rotation_velocity)
+                    vel1 = patch_ib(pid1)%vel + rotation_velocity
+                    radial_vector = normal_vector * -1.0_wp * (patch_ib(pid2)%radius - 0.5_wp*overlap_distance)
+                    call s_cross_product(patch_ib(pid2)%angular_vel, radial_vector, rotation_velocity)
+                    vel2 = patch_ib(pid2)%vel + rotation_velocity
+
+                    normal_velocity = dot_product(vel1 - vel2, normal_vector)*normal_vector
+                    tangental_vector = (vel1 - vel2) - normal_velocity
                     if (.not. f_approx_equal(norm2(tangental_vector), 0._wp)) tangental_vector = tangental_vector/norm2(tangental_vector)
 
                     ! compute force and torque
                     normal_force = -k*overlap_distance*normal_vector - eta*normal_velocity
-
                     tangental_force = -ib_coefficient_of_friction*norm2(normal_force)*tangental_vector
                     call s_cross_product(normal_vector*patch_ib(pid1)%radius, tangental_force, torque)
 
@@ -140,7 +145,7 @@ contains
                         $:GPU_ATOMIC(atomic='update')
                         forces(pid2, l) = forces(pid2, l) - (normal_force(l) + tangental_force(l))
                         $:GPU_ATOMIC(atomic='update')
-                        torques(pid2, l) = torques(pid2, l) - torque(l)
+                        torques(pid2, l) = torques(pid2, l) - torque(l) * patch_ib(pid2)%radius / patch_ib(pid1)%radius
                     end do
                 end if
             end if
@@ -155,10 +160,10 @@ contains
         real(wp), dimension(num_ibs, 3), intent(inout) :: forces, torques
 
         integer :: patch_id, i, l
-        real(wp), dimension(3) :: normal_force, tangental_force, normal_vector, normal_velocity, tangental_vector, collision_location, torque
+        real(wp), dimension(3) :: normal_force, tangental_force, normal_vector, normal_velocity, tangental_vector, collision_location, torque, radial_vector, rotation_velocity, velocity
         real(wp) :: k, eta ! the spring stiffness and damping coefficient for a specific IB
 
-        $:GPU_PARALLEL_LOOP(private='[patch_id,i,l,collision_location,normal_vector,k,eta,normal_velocity,tangental_vector,normal_force,tangental_force,torque]', copy='[forces, torques]', collapse=2)
+        $:GPU_PARALLEL_LOOP(private='[patch_id,i,l,collision_location,normal_vector,k,eta,normal_velocity,tangental_vector,normal_force,tangental_force,torque,radial_vector,rotation_velocity,velocity]', copy='[forces, torques]', collapse=2)
         do patch_id = 1, num_ibs
             do i = 1, num_dims*2
                 ! only compute force contributions if there was an overlap
@@ -187,9 +192,15 @@ contains
                     k = spring_stiffness*patch_ib(patch_id)%mass
                     eta = damping_parameter*patch_ib(patch_id)%mass
 
+                    ! get the vector that points from the centroid to the point of collision
+                    radial_vector = normal_vector * (patch_ib(patch_id)%radius - wall_overlap_distances(patch_id, i))
+                    ! convert the angular velocity to linear velocity
+                    call s_cross_product(patch_ib(patch_id)%angular_vel, radial_vector, rotation_velocity)
+                    velocity = patch_ib(patch_id)%vel + rotation_velocity
+
                     ! standard soft-sphere collision  with the wall
-                    normal_velocity = dot_product(patch_ib(patch_id)%vel, normal_vector)*normal_vector
-                    tangental_vector = patch_ib(patch_id)%vel - normal_velocity
+                    normal_velocity = dot_product(velocity, normal_vector)*normal_vector
+                    tangental_vector = velocity - normal_velocity
                     if (.not. f_approx_equal(norm2(tangental_vector), 0._wp)) tangental_vector = tangental_vector/norm2(tangental_vector)
                     normal_force = -k*wall_overlap_distances(patch_id, i)*normal_vector - eta*normal_velocity
                     tangental_force = -ib_coefficient_of_friction*norm2(normal_force)*tangental_vector

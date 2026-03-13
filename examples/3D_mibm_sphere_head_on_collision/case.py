@@ -1,14 +1,28 @@
 import json
 import math
 
+# This case file is based on verification cases run in
+# "Analytical solution for the problem of frictional-elastic collisions
+# of spherical particles using the linear model"
+# by Francesco Paolo Di Maio and Alberto Di Renzo
+
+# This can be used to check collision rebound angles to recreate 
+# figure 4 of that  paper
+
 Mu = 1.84e-05
 gam_a = 1.4
 
 # lead-up-properties
-lead_distance = 0.1
-velocity = 1.0
-dt = 0.5e-3
-collision_time = 20. * dt
+velocity = 3.9
+dt = 5.0e-6
+collision_time = 200. * dt
+
+# parerticle properties
+radius = 5e-3
+collision_angle_degrees = 60.
+collision_anlge_radians = collision_angle_degrees * math.pi / 180.
+domain_size = 3. * radius
+lead_distance = 0.02 * radius
 
 # simulation runs long enough to collide and travel about lead distance away again
 simulation_time = 2. * (lead_distance / velocity) + collision_time
@@ -16,29 +30,21 @@ num_time_steps = int(simulation_time / dt)
 num_saves = 10
 t_step_save = int(num_time_steps / num_saves)
 
-# parerticle properties
-radius = 1.0
-collision_angle_degrees = 45.
-collision_anlge_radians = collision_angle_degrees * math.pi / 180.
-collision_point_y = radius * math.sin(collision_anlge_radians)
-collision_point_x = radius * math.cos(collision_anlge_radians)
-domain_size = 5. * radius
-
 # Configuring case dictionary
 print(json.dumps({
       # Logistics
         "run_time_info": "T",
         # Computational Domain Parameters
-        "x_domain%beg": -0.5 * domain_size,
-        "x_domain%end": 0.5 * domain_size,
-        "y_domain%beg": -0.5 * domain_size,
-        "y_domain%end": 0.5 * domain_size,
-        "z_domain%beg": -0.5 * domain_size,
-        "z_domain%end": 0.5 * domain_size,
+        "x_domain%beg": 0.,
+        "x_domain%end":  domain_size,
+        "y_domain%beg": 0.,
+        "y_domain%end": domain_size,
+        "z_domain%beg": 0.,
+        "z_domain%end": domain_size,
         "cyl_coord": "F",
-        "m": 100,
-        "n": 100,
-        "p": 100,
+        "m": 60,
+        "n": 60,
+        "p": 60,
         "dt": dt,
         "t_step_start": 0,
         "t_step_stop": num_time_steps,
@@ -68,13 +74,13 @@ print(json.dumps({
         # We use ghost-cell
         "bc_x%beg": -3,
         "bc_x%end": -3,
-        "bc_y%beg": -3,
-        "bc_y%end": -3,
+        "bc_y%beg": -15,
+        "bc_y%end": -15,
         "bc_z%beg": -3,
         "bc_z%end": -3,
         # Set IB to True and add 1 patch
         "ib": "T",
-        "num_ibs": 2,
+        "num_ibs": 1,
         # Formatted Database Files Structure Parameters
         "format": 1,
         "precision": 2,
@@ -84,12 +90,12 @@ print(json.dumps({
         # Patch: Constant Tube filled with air
         # Specify the cylindrical air tube grid geometry
         "patch_icpp(1)%geometry": 9,
-        "patch_icpp(1)%x_centroid": 0.0,
-        "patch_icpp(1)%y_centroid": 0.0,
-        "patch_icpp(1)%z_centroid": 0.0,
-        "patch_icpp(1)%length_x": 0.5 * domain_size,
-        "patch_icpp(1)%length_y": 0.5 * domain_size,
-        "patch_icpp(1)%length_z": 0.5 * domain_size,
+        "patch_icpp(1)%x_centroid": 0.5 * domain_size,
+        "patch_icpp(1)%y_centroid": 0.5 * domain_size,
+        "patch_icpp(1)%z_centroid": 0.5 * domain_size,
+        "patch_icpp(1)%length_x": domain_size,
+        "patch_icpp(1)%length_y": domain_size,
+        "patch_icpp(1)%length_z": domain_size,
         # Specify the patch primitive variables
         "patch_icpp(1)%vel(1)": 0.0e00,
         "patch_icpp(1)%vel(2)": 0.0e00,
@@ -97,28 +103,20 @@ print(json.dumps({
         "patch_icpp(1)%pres": 1.0e00,
         "patch_icpp(1)%alpha_rho(1)": 1.0e00,
         "patch_icpp(1)%alpha(1)": 1.0e00,
-        # Patch: Cylinder Immersed Boundary
+        # Patch: Sphere Immersed Boundary
         "patch_ib(1)%geometry": 8,
-        "patch_ib(1)%x_centroid": 2. * collision_point_x + lead_distance,
-        "patch_ib(1)%y_centroid": 2. * collision_point_y,
+        "patch_ib(1)%x_centroid": -1. * lead_distance * math.sin(collision_anlge_radians), # get a lead up distance to the collision
+        "patch_ib(1)%y_centroid": radius + lead_distance * math.sin(collision_anlge_radians),
         "patch_ib(1)%z_centroid": 0.0,
         "patch_ib(1)%radius": radius,
         "patch_ib(1)%slip": "F",
-        "patch_ib(1)%mass": 100.0,
-        "patch_ib(1)%vel(1)": -1.0,
-        "patch_ib(1)%moving_ibm": 2,
-        # Patch 2
-        "patch_ib(2)%geometry": 8,
-        "patch_ib(2)%x_centroid": 0.0,
-        "patch_ib(2)%y_centroid": 0.0,
-        "patch_ib(2)%z_centroid": 0.0,
-        "patch_ib(2)%radius": radius,
-        "patch_ib(2)%slip": "F",
-        "patch_ib(2)%mass": 100.0,
-        "patch_ib(2)%moving_ibm": 2,
-        # Collisions!
+        "patch_ib(1)%mass": 1.0e6, # arbitrarily high mass to ignore fluid
+        "patch_ib(1)%vel(1)": velocity * math.sin(collision_anlge_radians),
+        "patch_ib(1)%vel(2)": -velocity * math.cos(collision_anlge_radians),
+        "patch_ib(1)%moving_ibm": 2
+        # Collisions
         "collision_model": 1,
-        "ib_coefficient_of_friction": 0.0988,
+        "ib_coefficient_of_friction": 0.092,
         "collision_time": collision_time,
         "coefficient_of_restitution": 0.98,
         # Fluids Physical Parameters
