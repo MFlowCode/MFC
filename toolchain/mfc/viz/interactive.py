@@ -448,8 +448,8 @@ _pv_disabled = threading.Event()
 # Dedicated render thread: a single-worker pool that owns the GL context.
 _pv_thread: Optional[concurrent.futures.ThreadPoolExecutor] = None
 _pv_thread_lock = threading.Lock()
-# Whether Xvfb was started by us (so we can note it in messages).
-_xvfb_started = False
+# Name of the VTK backend that succeeded (for log messages).
+_pv_backend_name: Optional[str] = None
 
 
 def _get_pv_thread() -> concurrent.futures.ThreadPoolExecutor:
@@ -465,9 +465,8 @@ def _get_pv_thread() -> concurrent.futures.ThreadPoolExecutor:
 
 def _start_xvfb() -> bool:
     """Start Xvfb virtual framebuffer if available. Returns True on success."""
-    global _xvfb_started  # pylint: disable=global-statement
-    if os.name != 'posix' or _xvfb_started:
-        return _xvfb_started
+    if os.name != 'posix':
+        return False
     if os.system('which Xvfb > /dev/null 2>&1') != 0:
         return False
     display = ':99'
@@ -477,35 +476,100 @@ def _start_xvfb() -> bool:
         return False
     os.environ['DISPLAY'] = display
     time.sleep(1)  # give Xvfb time to start
-    _xvfb_started = True
     return True
 
 
-def _pv_ensure_plotter() -> pv.Plotter:
-    """Return the persistent plotter, creating it lazily on first use.
-
-    MUST be called on the dedicated _pv_thread — GL contexts are
-    thread-bound and cannot be shared across threads.
-
-    On headless Linux, starts Xvfb if no DISPLAY is set and Xvfb is
-    available.  This gives VTK's GLX backend a virtual framebuffer to
-    render into.
-    """
-    global _pv_plotter  # pylint: disable=global-statement
-    if _pv_plotter is not None:
-        return _pv_plotter
-    # On headless Linux: start Xvfb so VTK's GLX backend has a display.
-    if not os.environ.get('DISPLAY'):
-        _start_xvfb()
+def _try_create_plotter() -> pv.Plotter:
+    """Create a plotter and verify it produces a valid screenshot."""
     pl = pv.Plotter(off_screen=True, window_size=(800, 600),
                     lighting='three lights')
     pl.set_background('#181825')
     pl.render()
     img = pl.screenshot(return_img=True)
     if img is None or img.size == 0:
+        try:
+            pl.close()
+        except Exception:  # pylint: disable=broad-except
+            pass
         raise RuntimeError('PyVista screenshot returned empty image')
-    _pv_plotter = pl
-    return _pv_plotter
+    return pl
+
+
+def _restore_env(key, saved):
+    """Restore or remove an environment variable."""
+    if saved is not None:
+        os.environ[key] = saved
+    else:
+        os.environ.pop(key, None)
+
+
+def _pv_ensure_plotter() -> pv.Plotter:  # pylint: disable=too-many-branches
+    """Return the persistent plotter, creating it lazily on first use.
+
+    MUST be called on the dedicated _pv_thread — GL contexts are
+    thread-bound and cannot be shared across threads.
+
+    Tries multiple VTK rendering backends in order:
+      1. OSMesa  — software renderer, no display/GPU needed
+      2. EGL     — GPU headless rendering, no display needed
+      3. Xvfb+GLX — virtual X11 framebuffer + hardware GLX
+    """
+    global _pv_plotter, _pv_backend_name  # pylint: disable=global-statement
+    if _pv_plotter is not None:
+        return _pv_plotter
+
+    saved_display = os.environ.get('DISPLAY')
+    saved_vtk_win = os.environ.get('VTK_DEFAULT_OPENGL_WINDOW')
+    errors = []
+
+    # --- 1. OSMesa (software, no display needed) ---
+    try:
+        os.environ['VTK_DEFAULT_OPENGL_WINDOW'] = 'vtkOSOpenGLRenderWindow'
+        os.environ.pop('DISPLAY', None)
+        _pv_plotter = _try_create_plotter()
+        _pv_backend_name = 'OSMesa'
+        logger.info('PyVista: using OSMesa backend')
+        return _pv_plotter
+    except Exception as exc:  # pylint: disable=broad-except
+        errors.append(f'OSMesa: {exc}')
+        logger.info('PyVista OSMesa failed: %s', exc)
+
+    # --- 2. EGL (GPU headless, no display needed) ---
+    try:
+        os.environ['VTK_DEFAULT_OPENGL_WINDOW'] = 'vtkEGLRenderWindow'
+        os.environ.pop('DISPLAY', None)
+        _pv_plotter = _try_create_plotter()
+        _pv_backend_name = 'EGL'
+        logger.info('PyVista: using EGL backend')
+        return _pv_plotter
+    except Exception as exc:  # pylint: disable=broad-except
+        errors.append(f'EGL: {exc}')
+        logger.info('PyVista EGL failed: %s', exc)
+
+    # --- 3. Xvfb + GLX ---
+    try:
+        _restore_env('VTK_DEFAULT_OPENGL_WINDOW', saved_vtk_win)
+        if saved_display:
+            os.environ['DISPLAY'] = saved_display
+        elif not _start_xvfb():
+            raise RuntimeError('No DISPLAY and Xvfb not available')
+        _pv_plotter = _try_create_plotter()
+        _pv_backend_name = 'Xvfb+GLX' if not saved_display else 'GLX'
+        logger.info('PyVista: using %s backend', _pv_backend_name)
+        return _pv_plotter
+    except Exception as exc:  # pylint: disable=broad-except
+        errors.append(f'GLX/Xvfb: {exc}')
+        logger.info('PyVista GLX/Xvfb failed: %s', exc)
+
+    # --- All backends failed ---
+    _restore_env('DISPLAY', saved_display)
+    _restore_env('VTK_DEFAULT_OPENGL_WINDOW', saved_vtk_win)
+    msg = ('PyVista: all rendering backends failed:\n  '
+           + '\n  '.join(errors)
+           + '\nInstall one of: libOSMesa (mesa-libOSMesa / '
+           'libosmesa6), Xvfb (xvfb / xorg-x11-server-Xvfb), '
+           'or EGL GPU drivers.')
+    raise RuntimeError(msg)
 
 
 def _pv_probe_job():
@@ -1561,16 +1625,21 @@ input[type=radio] + span, label { color: %(tx)s !important; }
         cons.print('[dim]Probing PyVista off-screen rendering...[/dim]')
         _pv_ok[0] = _pv_probe()
         if _pv_ok[0]:
-            via = 'Xvfb' if _xvfb_started else 'native'
-            cons.print(f'[dim][green]PyVista OK ({via})[/green] — '
+            backend = _pv_backend_name or 'unknown'
+            cons.print(f'[dim][green]PyVista OK ({backend})[/green] — '
                        'server-side 3D rendering enabled.[/dim]')
         else:
             cons.print(
                 '[yellow]PyVista probe failed[/yellow] — '
                 '3D playback will use Plotly (slower).\n'
-                '    Install Xvfb for fast headless 3D:\n'
-                '      sudo apt install xvfb  (Debian/Ubuntu)\n'
-                '      sudo yum install xorg-x11-server-Xvfb  (RHEL/CentOS)'
+                '    For fast headless 3D, install one of:\n'
+                '      libOSMesa: sudo apt install libosmesa6-dev  '
+                '(Debian/Ubuntu)\n'
+                '                 sudo yum install mesa-libOSMesa-devel'
+                '  (RHEL/CentOS)\n'
+                '      Xvfb:     sudo apt install xvfb  (Debian/Ubuntu)\n'
+                '                 sudo yum install xorg-x11-server-Xvfb'
+                '  (RHEL/CentOS)'
             )
 
     @app.callback(
