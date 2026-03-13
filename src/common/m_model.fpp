@@ -583,11 +583,16 @@ contains
 
     end function f_model_is_inside
 
-    !> This procedure, given a cell center will determine if a point exists instide a surface
-    !! @param ntrs     Number of triangles in the model
-    !! @param pid      Patch ID od this model
+    !> This procedure determines if a point is inside a surface using
+    !! the generalized winding number (Jacobson et al., SIGGRAPH 2013).
+    !! The winding number is the sum of signed solid angles subtended
+    !! by each triangle, normalized by 4*pi. Returns ~1.0 inside,
+    !! ~0.0 outside. Unlike ray casting, this is robust to small
+    !! triangles and vertex winding order.
+    !! @param ntrs     Number of triangles in the model.
+    !! @param pid      Patch ID of this model.
     !! @param point    Point to test.
-    !! @return fraction The perfentage of candidate rays cast indicate that we are inside the model
+    !! @return fraction Winding number (~1.0 inside, ~0.0 outside).
     function f_model_is_inside_flat(ntrs, pid, point) result(fraction)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -597,43 +602,44 @@ contains
         real(wp), dimension(1:3), intent(in) :: point
 
         real(wp) :: fraction
-        type(t_ray) :: ray
-        type(t_triangle) :: tri
-        integer :: i, j, k, q, nInOrOut, nHits
 
-        ! cast 26 rays from the point and count the number at leave the boundary
-        nInOrOut = 0
-        do i = -1, 1
-            do j = -1, 1
-                do k = -1, 1
-                    if (i /= 0 .or. j /= 0 .or. k /= 0) then
-                        ! We cannot get inersections if the ray is exactly in line with triangle plane
-                        if (p == 0 .and. k == 0) cycle
+        real(wp) :: r1(3), r2(3), r3(3)
+        real(wp) :: r1_mag, r2_mag, r3_mag
+        real(wp) :: numerator, denominator
+        integer :: q
 
-                        ! generate the ray
-                        ray%o = point
-                        ray%d(:) = [real(i, wp), real(j, wp), real(k, wp)]
-                        ray%d = ray%d/sqrt(real(abs(i) + abs(j) + abs(k), wp))
+        fraction = 0.0_wp
 
-                        ! count the number of intersections
-                        nHits = 0
-                        do q = 1, ntrs
-                            tri%v(:, :) = gpu_trs_v(:, :, q, pid)
-                            nHits = nHits + f_intersects_triangle(ray, tri)
-                        end do
-                        ! if the ray intersected an odd number of times, we must be inside
-                        nInOrOut = nInOrOut + mod(nHits, 2)
-                    end if
-                end do
-            end do
+        do q = 1, ntrs
+            r1 = gpu_trs_v(1, :, q, pid) - point
+            r2 = gpu_trs_v(2, :, q, pid) - point
+            r3 = gpu_trs_v(3, :, q, pid) - point
+
+            r1_mag = sqrt(dot_product(r1, r1))
+            r2_mag = sqrt(dot_product(r2, r2))
+            r3_mag = sqrt(dot_product(r3, r3))
+
+            ! Van Oosterom-Strackee formula:
+            ! tan(Omega/2) = numerator / denominator
+            ! numerator = scalar triple product r1 . (r2 x r3)
+            numerator = r1(1)*(r2(2)*r3(3) - r2(3)*r3(2)) &
+                        + r1(2)*(r2(3)*r3(1) - r2(1)*r3(3)) &
+                        + r1(3)*(r2(1)*r3(2) - r2(2)*r3(1))
+
+            denominator = r1_mag*r2_mag*r3_mag &
+                          + dot_product(r1, r2)*r3_mag &
+                          + dot_product(r2, r3)*r1_mag &
+                          + dot_product(r3, r1)*r2_mag
+
+            ! Solid angle = 2 * atan2(num, den).
+            ! atan2(0,0) = 0 per IEEE 754, so degenerate triangles
+            ! contribute nothing without special casing.
+            fraction = fraction + atan2(numerator, denominator)
         end do
 
-        if (p == 0) then
-            ! in 2D, we skipped 8 rays
-            fraction = real(nInOrOut)/18._wp
-        else
-            fraction = real(nInOrOut)/26._wp
-        end if
+        ! Winding number = total solid angle / (4 * pi)
+        ! Each triangle contributes 2*atan2, so sum / (2*pi)
+        fraction = fraction/(2.0_wp*acos(-1.0_wp))
 
     end function f_model_is_inside_flat
 
