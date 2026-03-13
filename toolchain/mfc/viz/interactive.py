@@ -431,11 +431,11 @@ def _get_cached_3d_mesh(step, var, mode, log_bool, vmin_in, vmax_in,  # pylint: 
 
 # VTK's Cocoa backend (macOS) requires ALL OpenGL operations on the main
 # thread.  Dash callbacks run in worker threads, so PyVista server-side
-# rendering is only available on Linux/other platforms where VTK uses
-# EGL backends.  All PyVista calls are funnelled through a single
-# dedicated thread (_pv_thread) so the EGL context is never accessed
-# from multiple threads (EGL contexts are thread-bound).
-_PV_AVAILABLE = sys.platform != 'darwin'
+# rendering is only available on Linux where VTK uses GLX or OSMesa.
+# All PyVista calls are funnelled through a single dedicated thread
+# (_pv_thread) so the OpenGL context is never accessed from multiple
+# threads (GL contexts are thread-bound).
+_PV_AVAILABLE = sys.platform == 'linux'
 
 # Persistent plotter — owned exclusively by _pv_thread.
 _pv_plotter: Optional[pv.Plotter] = None
@@ -445,9 +445,11 @@ _pv_step_key: Optional[tuple] = None  # (step, var, mode, ...) currently loaded
 # queueing behind a hung render thread.
 _pv_disabled = threading.Event()
 
-# Dedicated render thread: a single-worker pool that owns the EGL context.
+# Dedicated render thread: a single-worker pool that owns the GL context.
 _pv_thread: Optional[concurrent.futures.ThreadPoolExecutor] = None
 _pv_thread_lock = threading.Lock()
+# Whether Xvfb was started by us (so we can note it in messages).
+_xvfb_started = False
 
 
 def _get_pv_thread() -> concurrent.futures.ThreadPoolExecutor:
@@ -461,39 +463,54 @@ def _get_pv_thread() -> concurrent.futures.ThreadPoolExecutor:
         return _pv_thread
 
 
+def _start_xvfb() -> bool:
+    """Start Xvfb virtual framebuffer if available. Returns True on success."""
+    global _xvfb_started  # pylint: disable=global-statement
+    if os.name != 'posix' or _xvfb_started:
+        return _xvfb_started
+    if os.system('which Xvfb > /dev/null 2>&1') != 0:
+        return False
+    display = ':99'
+    ret = os.system(f'Xvfb {display} -screen 0 800x600x24 '
+                    '> /dev/null 2>&1 &')
+    if ret != 0:
+        return False
+    os.environ['DISPLAY'] = display
+    time.sleep(1)  # give Xvfb time to start
+    _xvfb_started = True
+    return True
+
+
 def _pv_ensure_plotter() -> pv.Plotter:
     """Return the persistent plotter, creating it lazily on first use.
 
-    MUST be called on the dedicated _pv_thread — EGL/GLX contexts are
+    MUST be called on the dedicated _pv_thread — GL contexts are
     thread-bound and cannot be shared across threads.
 
-    Temporarily removes DISPLAY so VTK does not try to connect to an
-    X server (common on HPC nodes with SSH X-forwarding).
+    On headless Linux, starts Xvfb if no DISPLAY is set and Xvfb is
+    available.  This gives VTK's GLX backend a virtual framebuffer to
+    render into.
     """
     global _pv_plotter  # pylint: disable=global-statement
     if _pv_plotter is not None:
         return _pv_plotter
-    saved = os.environ.pop('DISPLAY', None)
-    try:
-        pl = pv.Plotter(off_screen=True, window_size=(800, 600),
-                        lighting='three lights')
-        pl.set_background('#181825')
-        pl.render()  # warm up — ensures the render window is fully initialized
-        # Verify the render actually produced pixels (catches broken EGL)
-        img = pl.screenshot(return_img=True)
-        if img is None or img.size == 0:
-            raise RuntimeError('PyVista screenshot returned empty image')
-        _pv_plotter = pl
-    finally:
-        if saved is not None:
-            os.environ['DISPLAY'] = saved
+    # On headless Linux: start Xvfb so VTK's GLX backend has a display.
+    if not os.environ.get('DISPLAY'):
+        _start_xvfb()
+    pl = pv.Plotter(off_screen=True, window_size=(800, 600),
+                    lighting='three lights')
+    pl.set_background('#181825')
+    pl.render()
+    img = pl.screenshot(return_img=True)
+    if img is None or img.size == 0:
+        raise RuntimeError('PyVista screenshot returned empty image')
+    _pv_plotter = pl
     return _pv_plotter
 
 
 def _pv_probe_job():
     """Run on the dedicated thread: init plotter + render a tiny test mesh."""
     pl = _pv_ensure_plotter()
-    # Render a small cube to verify the full pipeline (not just init)
     grid = pv.ImageData()
     grid.dimensions = (3, 3, 3)
     grid.point_data['t'] = np.arange(27, dtype=np.float64)
@@ -508,39 +525,12 @@ def _pv_probe_job():
     return True
 
 
-def _vtk_backend_hint() -> str:
-    """Return an actionable hint about the VTK rendering backend."""
-    try:
-        import vtk as _v  # pylint: disable=import-outside-toplevel
-        has_osmesa = hasattr(_v, 'vtkOSOpenGLRenderWindow')
-        has_egl = hasattr(_v, 'vtkEGLRenderWindow')
-        has_x11 = hasattr(_v, 'vtkXOpenGLRenderWindow')
-        ver = _v.vtkVersion.GetVTKVersion()  # pylint: disable=no-member
-        parts = [f'VTK {ver}']
-        if has_egl:
-            parts.append('backend=EGL')
-        if has_osmesa:
-            parts.append('backend=OSMesa')
-        if has_x11:
-            parts.append('backend=X11')
-        backend = ', '.join(parts)
-        if has_egl and not has_osmesa:
-            return (
-                f'{backend}\n'
-                '    VTK is using EGL which requires GPU display drivers.\n'
-                '    For headless rendering, install the OSMesa build:\n'
-                '      pip install vtk-osmesa\n'
-                '    (this replaces vtk — they are mutually exclusive)')
-        return backend
-    except Exception:  # pylint: disable=broad-except
-        return 'VTK not importable'
-
-
 def _pv_probe() -> bool:
     """Test whether PyVista off-screen rendering works on this system.
 
     Submits a full render job (init + mesh + screenshot) to the dedicated
-    render thread.  Returns True if a valid image is produced, False otherwise.
+    render thread.  On headless Linux, automatically starts Xvfb if needed.
+    Returns True if a valid image is produced, False otherwise.
     """
     if not _PV_AVAILABLE:
         return False
@@ -1571,14 +1561,16 @@ input[type=radio] + span, label { color: %(tx)s !important; }
         cons.print('[dim]Probing PyVista off-screen rendering...[/dim]')
         _pv_ok[0] = _pv_probe()
         if _pv_ok[0]:
-            cons.print('[dim][green]PyVista OK[/green] — '
+            via = 'Xvfb' if _xvfb_started else 'native'
+            cons.print(f'[dim][green]PyVista OK ({via})[/green] — '
                        'server-side 3D rendering enabled.[/dim]')
         else:
-            hint = _vtk_backend_hint()
             cons.print(
-                f'[yellow]PyVista probe failed[/yellow] — '
-                f'3D playback will use Plotly WebGL (slower).\n'
-                f'    {hint}'
+                '[yellow]PyVista probe failed[/yellow] — '
+                '3D playback will use Plotly (slower).\n'
+                '    Install Xvfb for fast headless 3D:\n'
+                '      sudo apt install xvfb  (Debian/Ubuntu)\n'
+                '      sudo yum install xorg-x11-server-Xvfb  (RHEL/CentOS)'
             )
 
     @app.callback(
