@@ -450,6 +450,11 @@ _pv_thread: Optional[concurrent.futures.ThreadPoolExecutor] = None
 _pv_thread_lock = threading.Lock()
 # Name of the VTK backend that succeeded (for log messages).
 _pv_backend_name: Optional[str] = None
+# Generation counter: incremented on each _pv_render call.  The render
+# thread checks this before doing expensive work so that stale queued
+# jobs (from rapid playback) are skipped.
+_pv_generation = 0
+_pv_gen_lock = threading.Lock()
 
 
 def _get_pv_thread() -> concurrent.futures.ThreadPoolExecutor:
@@ -631,7 +636,7 @@ def _pv_probe() -> bool:
         return False
 
 
-def _pv_render_on_thread(raw, x_cc, y_cc, z_cc, mode, cmap, log_fn,  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,too-many-branches,too-many-statements
+def _pv_render_on_thread(gen, raw, x_cc, y_cc, z_cc, mode, cmap, log_fn,  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,too-many-branches,too-many-statements
                          cmin, cmax,
                          iso_min_frac, iso_max_frac, iso_n,
                          vol_min_frac, vol_max_frac,
@@ -645,6 +650,11 @@ def _pv_render_on_thread(raw, x_cc, y_cc, z_cc, mode, cmap, log_fn,  # pylint: d
                          overlay_vol_opacity, overlay_vol_nsurf):  # pylint: disable=unused-argument
     """Inner render — runs exclusively on the dedicated _pv_thread."""
     global _pv_step_key  # pylint: disable=global-statement
+
+    # Skip stale queued jobs — a newer request has already been submitted.
+    with _pv_gen_lock:
+        if gen != _pv_generation:
+            raise RuntimeError(f'Stale render (gen {gen} < {_pv_generation})')
 
     rng = cmax - cmin if cmax > cmin else 1.0
     mesh_key = (step, varname, mode, id(raw),
@@ -790,10 +800,14 @@ def _pv_render(raw, x_cc, y_cc, z_cc, mode, cmap, log_fn,  # pylint: disable=too
     """
     if _pv_disabled.is_set():
         raise RuntimeError('PyVista disabled')
+    global _pv_generation  # pylint: disable=global-statement
+    with _pv_gen_lock:
+        _pv_generation += 1
+        gen = _pv_generation
     pool = _get_pv_thread()
     fut = pool.submit(
         _pv_render_on_thread,
-        raw, x_cc, y_cc, z_cc, mode, cmap, log_fn,
+        gen, raw, x_cc, y_cc, z_cc, mode, cmap, log_fn,
         cmin, cmax,
         iso_min_frac, iso_max_frac, iso_n,
         vol_min_frac, vol_max_frac,
@@ -2077,6 +2091,7 @@ input[type=radio] + span, label { color: %(tx)s !important; }
             _do_patch_3d = (
                 _trig3
                 and '.' not in _trig3
+                and not _use_pv  # PyVista handles its own fast path
                 and not (_has_overlay_3d and mode in ('isosurface', 'volume'))
                 and (
                     (mode == 'isosurface' and _trig3.issubset(_PT_ISO))  or
