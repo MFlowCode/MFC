@@ -25,7 +25,8 @@ fi
 # Phoenix builds inside SLURM; Frontier pre-builds via build.sh on the login node.
 # Phoenix: always nuke stale builds (heterogeneous compute nodes → ISA mismatch risk).
 if [ "$job_cluster" = "phoenix" ]; then
-    rm -rf build
+    source .github/scripts/clean-build.sh
+    clean_build
 fi
 
 if [ ! -d "build" ]; then
