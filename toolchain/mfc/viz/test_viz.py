@@ -12,6 +12,11 @@ import unittest
 
 FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures")
 
+# Rendering tests import matplotlib and are slow (~8s).  Skip them during
+# pre-commit (MFC_SKIP_RENDER_TESTS=1) and run the full suite in CI only.
+_SKIP_RENDER = os.environ.get("MFC_SKIP_RENDER_TESTS", "") == "1"
+_SKIP_RENDER_MSG = "MFC_SKIP_RENDER_TESTS=1 — skipping rendering tests"
+
 # Fixture paths for each dimension + format
 FIX_1D_BIN = os.path.join(FIXTURES, "1d_binary")
 FIX_1D_SILO = os.path.join(FIXTURES, "1d_silo")
@@ -135,6 +140,7 @@ class TestParseSteps(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 
+@unittest.skipIf(_SKIP_RENDER, _SKIP_RENDER_MSG)
 class TestPrettyLabel(unittest.TestCase):
     """Test pretty_label() LaTeX label generation."""
 
@@ -461,6 +467,7 @@ class TestBinarySiloConsistency(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 
+@unittest.skipIf(_SKIP_RENDER, _SKIP_RENDER_MSG)
 class TestRender1D(unittest.TestCase):
     """Smoke test: render 1D plots from fixture data."""
 
@@ -495,6 +502,7 @@ class TestRender1D(unittest.TestCase):
             os.unlink(out)
 
 
+@unittest.skipIf(_SKIP_RENDER, _SKIP_RENDER_MSG)
 class TestRender2D(unittest.TestCase):
     """Smoke test: render a 2D PNG from fixture data."""
 
@@ -514,6 +522,7 @@ class TestRender2D(unittest.TestCase):
             os.unlink(out)
 
 
+@unittest.skipIf(_SKIP_RENDER, _SKIP_RENDER_MSG)
 class TestRender3DSlice(unittest.TestCase):
     """Smoke test: render a 3D slice PNG from fixture data."""
 
@@ -661,6 +670,7 @@ class TestTuiCache(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 
+@unittest.skipIf(_SKIP_RENDER, _SKIP_RENDER_MSG)
 class TestRenderLogScale(unittest.TestCase):
     """Smoke test: log scale option produces valid PNG output."""
 
@@ -789,6 +799,7 @@ class TestMultiRankAssembly(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 
+@unittest.skipIf(_SKIP_RENDER, _SKIP_RENDER_MSG)
 class TestRender2DTiled(unittest.TestCase):
     """Smoke test: render_2d_tiled produces a valid PNG from 2D fixture data."""
 
@@ -813,6 +824,7 @@ class TestRender2DTiled(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 
+@unittest.skipIf(_SKIP_RENDER, _SKIP_RENDER_MSG)
 class TestRender3DSliceAxes(unittest.TestCase):
     """Test render_3d_slice with non-default slice axes and selectors."""
 
@@ -856,6 +868,7 @@ class TestRender3DSliceAxes(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 
+@unittest.skipIf(_SKIP_RENDER, _SKIP_RENDER_MSG)
 class TestRenderMp4(unittest.TestCase):
     """Smoke test: render_mp4 exercises frame rendering and returns a bool."""
 
