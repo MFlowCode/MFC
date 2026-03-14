@@ -4710,6 +4710,17 @@ contains
                                 else
                                     F_hlld(1:ncomp) = F_R(1:ncomp)
                                 end if
+                                ! Initialize star-state variables to safe fallback values so
+                                ! subsequent face-state and axisymmetric source logic never
+                                ! reads uninitialized memory regardless of wave configuration.
+                                pTot_star     = 5e-1_wp*(pTot_L + pTot_R)
+                                S_Lstar       = S_L
+                                S_Rstar       = S_R
+                                u_t_star      = 5e-1_wp*(u_t_L + u_t_R)
+                                tau_nn_L_star = tau_nn_L
+                                tau_nn_R_star = tau_nn_R
+                                tau_qq_L_star = tau_qq_L
+                                tau_qq_R_star = tau_qq_R
                             else
 
                             pTot_star = pTot_L + A_L*(S_M - u_n_L)

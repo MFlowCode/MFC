@@ -572,18 +572,19 @@ contains
 
         if (grid_geometry == 2) then
             call s_compute_hypoelastic_rhs_axisym_geom_iface(q_prim_vf, rhs_vf, &
-                                                             hypo_iface_vel_n(1)%vf, hypo_iface_vel_n(2)%vf)
+                                                             hypo_iface_vel_n(1)%vf, hypo_iface_vel_n(2)%vf, 1.0_wp)
         end if
 
     end subroutine s_compute_hypoelastic_rhs_iface
 
     subroutine s_compute_hypoelastic_rhs_axisym_geom_iface(q_prim_vf, rhs_vf, &
-                                                           hypo_iface_vel_x_vf, hypo_iface_vel_y_vf)
+                                                           hypo_iface_vel_x_vf, hypo_iface_vel_y_vf, weight)
 
         type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         type(scalar_field), dimension(:), intent(in)           :: hypo_iface_vel_x_vf
         type(scalar_field), dimension(:), intent(in)           :: hypo_iface_vel_y_vf
+        real(wp), intent(in)                                   :: weight
 
         integer  :: i, k, l, q
         real(wp) :: rho_K, G_K, v_over_r, divU_axi
@@ -618,15 +619,15 @@ contains
                     divU_axi = du_dx(k, l, q) + dv_dy(k, l, q) + v_over_r
 
                     rhs_vf(strxb)%sf(k, l, q) = rhs_vf(strxb)%sf(k, l, q) - &
-                        rho_K*v_over_r*(q_prim_vf(strxb)%sf(k, l, q) + 2._wp*G_K/3._wp)
+                        weight*rho_K*v_over_r*(q_prim_vf(strxb)%sf(k, l, q) + 2._wp*G_K/3._wp)
 
                     rhs_vf(strxb + 1)%sf(k, l, q) = rhs_vf(strxb + 1)%sf(k, l, q) - &
-                        rho_K*v_over_r*q_prim_vf(strxb + 1)%sf(k, l, q)
+                        weight*rho_K*v_over_r*q_prim_vf(strxb + 1)%sf(k, l, q)
 
                     rhs_vf(strxb + 2)%sf(k, l, q) = rhs_vf(strxb + 2)%sf(k, l, q) - &
-                        rho_K*v_over_r*(q_prim_vf(strxb + 2)%sf(k, l, q) + 2._wp*G_K/3._wp)
+                        weight*rho_K*v_over_r*(q_prim_vf(strxb + 2)%sf(k, l, q) + 2._wp*G_K/3._wp)
 
-                    rhs_vf(strxb + 3)%sf(k, l, q) = rhs_vf(strxb + 3)%sf(k, l, q) + rho_K*( &
+                    rhs_vf(strxb + 3)%sf(k, l, q) = rhs_vf(strxb + 3)%sf(k, l, q) + weight*rho_K*( &
                         -(q_prim_vf(strxb + 3)%sf(k, l, q) + 2._wp*G_K/3._wp)*divU_axi &
                         + 2._wp*(q_prim_vf(strxb + 3)%sf(k, l, q) + G_K)*v_over_r)
                 end do
