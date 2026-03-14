@@ -5,15 +5,14 @@ import os
 
 
 def main():
-    parser = argparse.ArgumentParser(prog="indenter.py", description="Adjust indentation of OpenACC directives in a Fortran file")
-    parser.add_argument("filepath", metavar="input_file", type=str, help="File to format")
-    args = vars(parser.parse_args())
+    parser = argparse.ArgumentParser(prog="indenter.py", description="Adjust indentation of OpenACC directives in Fortran files")
+    parser.add_argument("filepaths", metavar="input_file", type=str, nargs="+", help="Files to format")
+    args = parser.parse_args()
 
-    filepath = args["filepath"]
-
-    temp_filepath = f"{filepath}.new"
-    adjust_indentation(filepath, temp_filepath)
-    os.replace(temp_filepath, filepath)
+    for filepath in args.filepaths:
+        temp_filepath = f"{filepath}.new"
+        adjust_indentation(filepath, temp_filepath)
+        os.replace(temp_filepath, filepath)
 
 
 BLOCK_STARTERS = ("if", "do", "#:if", "#:else", "#ifdef", "#else")
