@@ -15,6 +15,7 @@ module m_constants
     real(wp), parameter :: small_alf = 1.e-11_wp                !< Small alf tolerance
     real(wp), parameter :: pi = 3.141592653589793_wp !< Pi
     real(wp), parameter :: verysmall = 1.e-12_wp              !< Very small number
+    real(wp), parameter :: small_radius = 1.e-32_wp           !< Radius cutoff to avoid division by zero for 3D spherical harmonic patch (geometry 14)
 
     integer, parameter :: num_stcls_min = 5                       !< Minimum # of stencils
     integer, parameter :: path_len = 400                          !< Maximum path length
@@ -25,6 +26,8 @@ module m_constants
     integer, parameter :: num_probes_max = 10                     !< Maximum number of flow probes in the simulation
     integer, parameter :: num_patches_max = 1000
     integer, parameter :: num_bc_patches_max = 10
+    integer, parameter :: max_2d_fourier_modes = 10 !< Max Fourier mode index for 2D modal patch (geometry 13)
+    integer, parameter :: max_sph_harm_degree = 5   !< Max degree L for 3D spherical harmonic patch (geometry 14)
     integer, parameter :: pathlen_max = 400
     integer, parameter :: nnode = 4    !< Number of QBMM nodes
     integer, parameter :: dflt_num_igr_iters = 2 !< number of iterations for IGR elliptic solve
@@ -44,7 +47,7 @@ module m_constants
     ! Interface Compression
     real(wp), parameter :: dflt_ic_eps = 1e-4_wp !< Ensure compression is only applied to surface cells in THINC
     real(wp), parameter :: dflt_ic_beta = 1.6_wp !< Sharpness parameter's default value used in THINC
-    integer, parameter :: moncon_cutoff = 1e-8_wp !< Monotonicity constraint's limiter to prevent extremas in THINC
+    real(wp), parameter :: moncon_cutoff = 1e-8_wp !< Monotonicity constraint's limiter to prevent extremas in THINC
 
     ! Chemistry
     real(wp), parameter :: dflt_T_guess = 1200._wp ! Default guess for temperature (when a previous value is not available)
