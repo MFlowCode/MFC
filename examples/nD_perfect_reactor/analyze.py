@@ -15,48 +15,51 @@ by the MFC toolchain.
 MFC writes species as Y_{name} (e.g. Y_OH) and density as alpha_rho1.
 Run `./mfc.sh viz . --list-vars` to verify variable names in your output.
 """
-from case import dt, Tend, SAVE_COUNT, sol
-from mfc.viz import assemble_silo, discover_timesteps
-from tqdm import tqdm
-import cantera as ct
-import matplotlib.pyplot as plt
+
 import sys
 
+import cantera as ct
 import matplotlib
-matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from case import SAVE_COUNT, Tend, dt, sol
+from tqdm import tqdm
+
+from mfc.viz import assemble_silo, discover_timesteps
+
+matplotlib.use("Agg")
 
 
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
-CASE_DIR = '.'
-Y_MAJORS = {'H', 'O', 'OH', 'HO2'}
-Y_MINORS = {'H2O', 'H2O2'}
+CASE_DIR = "."
+Y_MAJORS = {"H", "O", "OH", "HO2"}
+Y_MINORS = {"H2O", "H2O2"}
 Y_VARS = Y_MAJORS | Y_MINORS
-oh_idx = sol.species_index('OH')
-skinner_induction_time = 0.052e-3   # Skinner & Ringrose (1965)
+oh_idx = sol.species_index("OH")
+skinner_induction_time = 0.052e-3  # Skinner & Ringrose (1965)
 
 
 # ---------------------------------------------------------------------------
 # Load MFC output
 # ---------------------------------------------------------------------------
-steps = discover_timesteps(CASE_DIR, 'silo')
+steps = discover_timesteps(CASE_DIR, "silo")
 if not steps:
-    sys.exit('No silo timesteps found — did you run post_process?')
+    sys.exit("No silo timesteps found — did you run post_process?")
 
 mfc_times = []
 mfc_rhos = []
 mfc_Ys = {y: [] for y in Y_VARS}
 
-for step in tqdm(steps, desc='Loading MFC output'):
+for step in tqdm(steps, desc="Loading MFC output"):
     assembled = assemble_silo(CASE_DIR, step)
     # Perfectly stirred reactor: spatially uniform — take the midpoint cell.
     mid = assembled.x_cc.size // 2
     mfc_times.append(step * dt)
     # alpha_rho1 = partial density of fluid 1; equals total density for single-fluid cases.
-    mfc_rhos.append(float(assembled.variables['alpha_rho1'][mid]))
+    mfc_rhos.append(float(assembled.variables["alpha_rho1"][mid]))
     for y in Y_VARS:
-        mfc_Ys[y].append(float(assembled.variables[f'Y_{y}'][mid]))
+        mfc_Ys[y].append(float(assembled.variables[f"Y_{y}"][mid]))
 
 # ---------------------------------------------------------------------------
 # Cantera 0-D reference
@@ -96,38 +99,35 @@ def find_induction_time(ts, Ys_OH, rhos):
 
 
 ct_induction = find_induction_time(ct_ts, [Y[oh_idx] for Y in ct_Ys], ct_rhos)
-mfc_induction = find_induction_time(mfc_times, mfc_Ys['OH'], mfc_rhos)
+mfc_induction = find_induction_time(mfc_times, mfc_Ys["OH"], mfc_rhos)
 
-print('Induction Times ([OH] >= 1e-6 mol/m^3):')
-print(f'  Skinner et al.: {skinner_induction_time:.3e} s')
-print(f'  Cantera:        {ct_induction:.3e} s'
-      if ct_induction is not None else '  Cantera:        not reached')
-print(f'  (Che)MFC:       {mfc_induction:.3e} s'
-      if mfc_induction is not None else '  (Che)MFC:       not reached')
+print("Induction Times ([OH] >= 1e-6 mol/m^3):")
+print(f"  Skinner et al.: {skinner_induction_time:.3e} s")
+print(f"  Cantera:        {ct_induction:.3e} s" if ct_induction is not None else "  Cantera:        not reached")
+print(f"  (Che)MFC:       {mfc_induction:.3e} s" if mfc_induction is not None else "  (Che)MFC:       not reached")
 
 # ---------------------------------------------------------------------------
 # Plot
 # ---------------------------------------------------------------------------
 fig, axes = plt.subplots(1, 2, figsize=(12, 6))
-_colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+_colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
 _color = {y: _colors[i % len(_colors)] for i, y in enumerate(sorted(Y_VARS))}
 
 for ax, group in zip(axes, [sorted(Y_MAJORS), sorted(Y_MINORS)]):
     for y in group:
-        ax.plot(mfc_times, mfc_Ys[y], color=_color[y], label=f'${y}$')
-        ax.plot(ct_ts, [Y[sol.species_index(y)] for Y in ct_Ys],
-                linestyle=':', color=_color[y], alpha=0.6, label=f'{y} (Cantera)')
-    ax.set_xlabel('Time (s)')
-    ax.set_ylabel('$Y_k$')
-    ax.set_xscale('log')
-    ax.set_yscale('log')
-    ax.legend(title='Species', ncol=2)
+        ax.plot(mfc_times, mfc_Ys[y], color=_color[y], label=f"${y}$")
+        ax.plot(ct_ts, [Y[sol.species_index(y)] for Y in ct_Ys], linestyle=":", color=_color[y], alpha=0.6, label=f"{y} (Cantera)")
+    ax.set_xlabel("Time (s)")
+    ax.set_ylabel("$Y_k$")
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.legend(title="Species", ncol=2)
 
 # Mark induction times on both panels
 induction_lines = [
-    (skinner_induction_time, 'r', '-',  'Skinner et al.'),
-    (mfc_induction,          'b', '-.', '(Che)MFC'),
-    (ct_induction,           'g', ':',  'Cantera'),
+    (skinner_induction_time, "r", "-", "Skinner et al."),
+    (mfc_induction, "b", "-.", "(Che)MFC"),
+    (ct_induction, "g", ":", "Cantera"),
 ]
 for ax in axes:
     for t, c, ls, _ in induction_lines:
@@ -135,14 +135,13 @@ for ax in axes:
             ax.axvline(t, color=c, linestyle=ls)
 
 axes[0].legend(
-    handles=[plt.Line2D([0], [0], color=c, linestyle=ls)
-             for t, c, ls, _lbl in induction_lines if t is not None],
+    handles=[plt.Line2D([0], [0], color=c, linestyle=ls) for t, c, ls, _lbl in induction_lines if t is not None],
     labels=[lbl for t, _c, _ls, lbl in induction_lines if t is not None],
-    title='Induction Times',
-    loc='lower right',
+    title="Induction Times",
+    loc="lower right",
 )
 
 plt.tight_layout()
-plt.savefig('plots.png', dpi=300)
+plt.savefig("plots.png", dpi=300)
 plt.close()
-print('Saved: plots.png')
+print("Saved: plots.png")
