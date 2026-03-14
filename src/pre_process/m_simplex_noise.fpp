@@ -205,8 +205,8 @@ contains
         x2 = x0 - 1._wp + 2._wp*G2
         y2 = y0 - 1._wp + 2._wp*G2
 
-        ii = mod(i, 255)
-        jj = mod(j, 255)
+        ii = iand(i, 255)
+        jj = iand(j, 255)
 
         gi0 = mod(p_vec(ii + p_vec(jj)), 10) + 1
         gi1 = mod(p_vec(ii + i1 + p_vec(jj + j1)), 10) + 1
