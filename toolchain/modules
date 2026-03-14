@@ -78,7 +78,7 @@ pa-cpu cmake/3.20.0
 pa-all PYTHONPATH=""
 
 dai     NCSA DeltaAI
-dai-all python cmake nvhpc-openmpi3/24.3 cuda
+dai-all python cmake nvidia/25.5
 dai-all CC=nvc CXX=nvc++ FC=nvfortran
 dai-gpu MFC_CUDA_CC=89,90
 
