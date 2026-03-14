@@ -639,8 +639,8 @@ CONSTRAINTS = {
 
     # Bubbles
     "bubble_model": {
-        "choices": [1, 2, 3],
-        "value_labels": {1: "Gilmore", 2: "Keller-Miksis", 3: "Rayleigh-Plesset"},
+        "choices": [0, 1, 2, 3],
+        "value_labels": {0: "Particle", 1: "Gilmore", 2: "Keller-Miksis", 3: "Rayleigh-Plesset"},
     },
 
     # Output
@@ -898,6 +898,10 @@ def _load():  # pylint: disable=too-many-locals,too-many-statements
     for n in ["polytropic", "bubbles_euler", "polydisperse", "qbmm", "bubbles_lagrange"]:
         _r(n, LOG, {"bubbles"})
 
+    # --- Particles ---
+    for n in ["particles_lagrange"]:
+        _r(n, LOG, {"particles"})
+
     # --- Viscosity ---
     _r("viscous", LOG, {"viscosity"})
 
@@ -992,6 +996,13 @@ def _load():  # pylint: disable=too-many-locals,too-many-statements
         _r(f"p_{d}", REAL, math=r"\f$\phi_" + d + r"\f$")
         _r(f"bf_{d}", LOG)
 
+    # Interfacial flow inputs
+    _r("normMag", REAL)
+    _r("p0_ic", REAL)
+    _r("g0_ic", REAL)
+    _r("normFac", REAL)
+    _r("interface_file", STR)
+
     # ==========================================================================
     # INDEXED PARAMETERS
     # ==========================================================================
@@ -1083,6 +1094,10 @@ def _load():  # pylint: disable=too-many-locals,too-many-statements
                    ("R_v", r"\f$R_v\f$"), ("R_g", r"\f$R_g\f$")]:
         _r(f"bub_pp%{a}", REAL, {"bubbles"}, math=sym)
 
+    # --- particle_pp (particle properties) ---
+    for a in ["rho0ref_particle", "cp_particle"]:
+        _r(f"particle_pp%{a}", REAL, {"particles"})
+
     # --- patch_ib (10 immersed boundaries) ---
     for i in range(1, NI + 1):
         px = f"patch_ib({i})%"
@@ -1171,12 +1186,23 @@ def _load():  # pylint: disable=too-many-locals,too-many-statements
 
     # --- lag_params (Lagrangian bubbles) ---
     for a in ["heatTransfer_model", "massTransfer_model", "pressure_corrector",
-              "write_bubbles", "write_bubbles_stats"]:
+              "write_bubbles", "write_bubbles_stats", "pressure_force", "gravity_force",
+              "write_void_evol" ]:
         _r(f"lag_params%{a}", LOG, {"bubbles"})
-    for a in ["solver_approach", "cluster_type", "smooth_type", "nBubs_glb"]:
+    for a in ["solver_approach", "cluster_type", "smooth_type", "nBubs_glb", "drag_model",
+              "vel_model", "charNz"]:
         _r(f"lag_params%{a}", INT, {"bubbles"})
     for a in ["epsilonb", "valmaxvoid", "charwidth", "c0", "rho0", "T0", "x0", "Thost"]:
         _r(f"lag_params%{a}", REAL, {"bubbles"})
+    _r(f"lag_params%input_path", STR, {"bubbles"})
+
+    # --- lag_params (Lagrangian particles) ---
+    for a in ["nParticles_glb", "stokes_drag", "qs_drag_model", "added_mass_model",
+              "interpolation_order"]:
+        _r(f"lag_params%{a}", INT, {'particles'})
+
+    for a in ["collision_force"]:
+        _r(f"lag_params%{a}", LOG, {'particles'})
 
     # --- chem_params ---
     for a in ["diffusion", "reactions"]:

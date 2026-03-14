@@ -41,7 +41,8 @@ module m_helper
               f_cut_on, &
               f_cut_off, &
               s_downsample_data, &
-              s_upsample_data
+              s_upsample_data, &
+              s_initialize_particles_model
 
 contains
 
@@ -110,6 +111,13 @@ contains
 
     end subroutine s_print_2D_array
 
+    impure subroutine s_initialize_particles_model()
+
+        rho0ref_particle = particle_pp%rho0ref_particle
+        cp_particle = particle_pp%cp_particle
+
+    end subroutine s_initialize_particles_model
+
     !>
           !! bubbles_euler + polytropic
           !! bubbles_euler + non-polytropic
@@ -159,6 +167,7 @@ contains
             R_v = bub_pp%R_v; R_g = bub_pp%R_g
             Tw = bub_pp%T0ref
         end if
+
         if (bubbles_lagrange) then
             cp_v = bub_pp%cp_v; cp_g = bub_pp%cp_g
             k_vl = bub_pp%k_v; k_gl = bub_pp%k_g

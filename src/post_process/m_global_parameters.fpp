@@ -76,6 +76,8 @@ module m_global_parameters
     !! region, this region is used to store information outside the computational
     !! domain based on the boundary conditions.
 
+    integer, allocatable :: beta_vars(:) !< Indices of variables to communicate for bubble/particle coupling
+
     integer :: t_step_start  !< First time-step directory
     integer :: t_step_stop   !< Last time-step directory
     integer :: t_step_save   !< Interval between consecutive time-step directory
@@ -177,6 +179,11 @@ module m_global_parameters
     integer, allocatable, dimension(:) :: proc_coords !<
     !! Processor coordinates in MPI_CART_COMM
 
+    type(int_bounds_info), dimension(3) :: nidx
+
+    integer, allocatable, dimension(:, :, :) :: neighbor_ranks
+    !! Neighbor processor ranks
+
     integer, allocatable, dimension(:) :: start_idx !<
     !! Starting cell-center index of local processor in global grid
 
@@ -205,6 +212,9 @@ module m_global_parameters
 
     ! Subgrid Bubble Parameters
     type(subgrid_bubble_physical_parameters) :: bub_pp
+
+    ! Subgrid Particle Parameters
+    type(subgrid_particle_physical_parameters) :: particle_pp
 
     real(wp), allocatable, dimension(:) :: adv !< Advection variables
 
@@ -328,6 +338,11 @@ module m_global_parameters
     integer :: nmom
     !> @}
 
+    !> @name Particle modeling variables and parameters
+    !> @{
+    real(wp) :: cp_particle, rho0ref_particle
+    !> @}
+
     !> @name surface tension coefficient
     !> @{
 
@@ -350,6 +365,7 @@ module m_global_parameters
     !> @name Lagrangian bubbles
     !> @{
     logical :: bubbles_lagrange
+    logical :: particles_lagrange
     !> @}
 
     real(wp) :: Bx0 !< Constant magnetic field in the x-direction (1D)
@@ -458,6 +474,10 @@ contains
         bub_pp%R_v = dflt_real; R_v = dflt_real
         bub_pp%R_g = dflt_real; R_g = dflt_real
 
+        ! Subgrid particle parameters
+        particle_pp%rho0ref_particle = dflt_real
+        particle_pp%cp_particle = dflt_real
+
         ! Formatted database file(s) structure parameters
         format = dflt_int
 
@@ -536,6 +556,7 @@ contains
 
         ! Lagrangian bubbles modeling
         bubbles_lagrange = .false.
+        particles_lagrange = .false.
 
         ! IBM
         num_ibs = dflt_int
@@ -673,10 +694,15 @@ contains
                 end if
             end if
 
-            if (bubbles_lagrange) then
-                beta_idx = sys_size + 1
-                sys_size = beta_idx
-            end if
+            ! if (bubbles_lagrange) then
+            !     beta_idx = sys_size + 1
+            !     sys_size = beta_idx
+            ! end if
+
+            ! if (particles_lagrange) then
+            !     beta_idx = sys_size + 1
+            !     sys_size = beta_idx
+            ! end if
 
             if (mhd) then
                 B_idx%beg = sys_size + 1
@@ -806,6 +832,16 @@ contains
                 sys_size = c_idx
             end if
 
+            if (bubbles_lagrange) then
+                beta_idx = sys_size + 1
+                sys_size = beta_idx
+            end if
+
+            if (particles_lagrange) then
+                beta_idx = sys_size + 1
+                sys_size = beta_idx
+            end if
+
             if (cont_damage) then
                 damage_idx = sys_size + 1
                 sys_size = damage_idx
@@ -820,6 +856,14 @@ contains
                 psi_idx = dflt_int
             end if
 
+        end if
+
+        if (bubbles_lagrange) then
+            allocate (beta_vars(1:3))
+            beta_vars(1:3) = [1, 2, 5]
+        elseif (particles_lagrange) then
+            allocate (beta_vars(1:8))
+            beta_vars(1:8) = [1, 2, 3, 4, 5, 6, 7, 8]
         end if
 
         if (chemistry) then
@@ -1048,6 +1092,8 @@ contains
 
         if (ib) MPI_IO_IB_DATA%var%sf => null()
 #endif
+
+        if (allocated(neighbor_ranks)) deallocate (neighbor_ranks)
 
     end subroutine s_finalize_global_parameters_module
 
