@@ -13,6 +13,7 @@ import base64
 import concurrent.futures
 import logging
 import math
+import sys
 import threading
 import time
 from typing import List, Callable, Optional
@@ -21,6 +22,7 @@ import numpy as np
 import plotly.graph_objects as go
 from dash import Dash, Patch, dcc, html, Input, Output, State, callback_context, no_update
 from skimage.measure import marching_cubes as _marching_cubes  # type: ignore[import]  # pylint: disable=no-name-in-module
+from skimage.measure import find_contours as _find_contours  # type: ignore[import]  # pylint: disable=no-name-in-module
 
 from mfc.printer import cons
 from . import _step_cache
@@ -60,6 +62,14 @@ _jpeg_lock = threading.Lock()
 _jpeg_pool: Optional[concurrent.futures.ThreadPoolExecutor] = None
 _jpeg_pool_lock = threading.Lock()
 
+# 3D mesh prefetch cache: key → (vx, vy, vz, fi, fj, fk, intens) or volume data
+_mesh3_cache: dict = {}
+_MESH3_CACHE_MAX = 40
+_mesh3_lock = threading.Lock()
+_mesh3_in_flight: set = set()
+_mesh3_pool: Optional[concurrent.futures.ThreadPoolExecutor] = None
+_mesh3_pool_lock = threading.Lock()
+
 
 def _get_jpeg_pool() -> concurrent.futures.ThreadPoolExecutor:
     """Return the JPEG prefetch pool, creating it lazily on first use."""
@@ -70,6 +80,17 @@ def _get_jpeg_pool() -> concurrent.futures.ThreadPoolExecutor:
                 max_workers=1, thread_name_prefix='mfc_jpeg')
             atexit.register(_jpeg_pool.shutdown, wait=False)
         return _jpeg_pool
+
+
+def _get_mesh3_pool() -> concurrent.futures.ThreadPoolExecutor:
+    """Return the 3D mesh prefetch pool, creating it lazily on first use."""
+    global _mesh3_pool  # pylint: disable=global-statement
+    with _mesh3_pool_lock:
+        if _mesh3_pool is None:
+            _mesh3_pool = concurrent.futures.ThreadPoolExecutor(
+                max_workers=3, thread_name_prefix='mfc_mesh3')
+            atexit.register(_mesh3_pool.shutdown, wait=False)
+        return _mesh3_pool
 
 
 def _get_lut(cmap_name: str) -> np.ndarray:
@@ -304,6 +325,105 @@ def _prefetch_jpeg(step, var, get_ad_fn, cmap, vmin_in, vmax_in, log_bool,  # py
     _get_jpeg_pool().submit(_bg)
 
 
+def _prefetch_3d_mesh(step, var, get_ad_fn, mode, log_bool,  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,too-many-statements
+                      vmin_in, vmax_in,
+                      iso_min_frac, iso_max_frac, iso_n,
+                      vol_min_frac, vol_max_frac):
+    """Pre-compute 3D isomesh or volume data for *step* in a background thread.
+
+    Caches the result so the next playback frame can skip marching cubes.
+    No-ops if already cached or in-flight.
+
+    NOTE: uses a 50K cell budget (vs 500K for interactive).  This is
+    intentional — faster prefetch keeps the cache ahead of playback.
+    On pause the first render serves the coarse mesh instantly; the next
+    callback recomputes at full 500K resolution.  The cache key omits
+    the budget so the coarse entry is replaced on the full-res recompute.
+    """
+    key = (step, var, mode, log_bool, vmin_in, vmax_in,
+           iso_min_frac, iso_max_frac, iso_n,
+           vol_min_frac, vol_max_frac)
+    with _mesh3_lock:
+        if key in _mesh3_cache or key in _mesh3_in_flight:
+            return
+        _mesh3_in_flight.add(key)
+
+    def _bg():  # pylint: disable=too-many-locals
+        try:
+            ad = get_ad_fn(step)
+            if var not in ad.variables:
+                return
+            raw = ad.variables[var]
+            # Compute range
+            if raw.size > 200_000:
+                _sr = max(1, math.ceil((raw.size / 200_000) ** (1.0 / raw.ndim)))
+                _slc = tuple(slice(None, None, _sr) for _ in range(raw.ndim))
+                _rr = raw[_slc]
+            else:
+                _rr = raw
+            if vmin_in is not None:
+                vmin = float(vmin_in)
+            else:
+                _safe = _rr[_rr > 0] if log_bool and np.any(_rr > 0) else _rr
+                vmin = float(np.nanmin(_safe))
+            vmax = float(vmax_in) if vmax_in is not None else float(np.nanmax(_rr))
+            if vmax <= vmin:
+                vmax = vmin + 1e-10
+            if log_bool:
+                def _tf(arr):
+                    return np.where(arr > 0, np.log10(np.maximum(arr, 1e-300)), np.nan)
+                cmin = float(np.log10(max(vmin, 1e-300)))
+                cmax = float(np.log10(max(vmax, 1e-300)))
+            else:
+                def _tf(arr): return arr
+                cmin, cmax = vmin, vmax
+            rng = cmax - cmin if cmax > cmin else 1.0
+
+            if mode == 'isosurface':
+                raw_ds, x_ds, y_ds, z_ds = _get_ds3(
+                    step, var, raw, ad.x_cc, ad.y_cc, ad.z_cc, 50_000)
+                ilo = cmin + rng * float(iso_min_frac)
+                ihi = cmin + rng * max(float(iso_max_frac), float(iso_min_frac) + 0.01)
+                result = _compute_isomesh(
+                    raw_ds, x_ds, y_ds, z_ds, _tf, ilo, ihi, int(iso_n))
+            else:  # volume
+                raw_ds, _, _, _ = _get_ds3(
+                    step, var, raw, ad.x_cc, ad.y_cc, ad.z_cc, 150_000)
+                vf = _tf(raw_ds).ravel().astype(np.float32)
+                vlo = cmin + rng * float(vol_min_frac)
+                vhi = cmin + rng * max(float(vol_max_frac), float(vol_min_frac) + 0.01)
+                result = (vf, vlo, vhi, cmin, cmax)
+
+            with _mesh3_lock:
+                if key not in _mesh3_cache:
+                    if len(_mesh3_cache) >= _MESH3_CACHE_MAX:
+                        _mesh3_cache.pop(next(iter(_mesh3_cache)))
+                    _mesh3_cache[key] = result
+        except Exception:  # pylint: disable=broad-except
+            logger.debug("3D mesh prefetch failed for step %s var %s", step, var, exc_info=True)
+        finally:
+            with _mesh3_lock:
+                _mesh3_in_flight.discard(key)
+
+    _get_mesh3_pool().submit(_bg)
+
+
+def _get_cached_3d_mesh(step, var, mode, log_bool, vmin_in, vmax_in,  # pylint: disable=too-many-arguments,too-many-positional-arguments
+                        iso_min_frac, iso_max_frac, iso_n,
+                        vol_min_frac, vol_max_frac):
+    """Return cached 3D mesh result or None if not yet computed."""
+    key = (step, var, mode, log_bool, vmin_in, vmax_in,
+           iso_min_frac, iso_max_frac, iso_n,
+           vol_min_frac, vol_max_frac)
+    with _mesh3_lock:
+        return _mesh3_cache.get(key)
+
+
+# ---------------------------------------------------------------------------
+
+# (PyVista code removed — server-side rendering uses kaleido on Linux)
+
+
 # ---------------------------------------------------------------------------
 # Colormaps available in the picker
 # ---------------------------------------------------------------------------
@@ -370,7 +490,6 @@ def _slider(sid, lo, hi, step, val, marks=None):  # pylint: disable=too-many-arg
     return dcc.Slider(
         id=sid, min=lo, max=hi, step=step, value=val,
         marks=marks or {}, updatemode='mouseup',
-        tooltip={'placement': 'bottom', 'always_visible': True},
     )
 
 
@@ -454,6 +573,8 @@ def _build_3d(ad, raw, varname, step, mode, cmap,  # pylint: disable=too-many-ar
               slice_axis, slice_pos,
               iso_min_frac, iso_max_frac, iso_n, _iso_caps,
               vol_opacity, vol_nsurf, vol_min_frac, vol_max_frac,
+              iso_solid_color=None, iso_opacity=1.0,
+              cached_mesh=None,
               max_total_3d: int = 150_000):
     """Return (trace, title) for a 3D assembled dataset.
 
@@ -517,20 +638,44 @@ def _build_3d(ad, raw, varname, step, mode, cmap,  # pylint: disable=too-many-ar
         # which is 5× finer than the 150K volume budget.
         ilo = cmin + rng * iso_min_frac
         ihi = cmin + rng * max(iso_max_frac, iso_min_frac + 0.01)
-        raw_ds, x_ds, y_ds, z_ds = _get_ds3(step, varname, raw, ad.x_cc, ad.y_cc, ad.z_cc, 500_000)
-        vx, vy, vz, fi, fj, fk, intens = _compute_isomesh(
-            raw_ds, x_ds, y_ds, z_ds, log_fn, ilo, ihi, iso_n,
-        )
-        trace = go.Mesh3d(
-            x=vx, y=vy, z=vz, i=fi, j=fj, k=fk,
-            intensity=intens, intensitymode='vertex',
-            colorscale=cscale, cmin=ilo, cmax=ihi,
-            colorbar=_make_cbar(cbar_title, ilo, ihi), showscale=True,
-            lighting=dict(ambient=0.7, diffuse=0.9, specular=0.3,
-                          roughness=0.5, fresnel=0.2),
-            lightposition=dict(x=1000, y=500, z=500),
-            flatshading=False,
-        )
+        if cached_mesh is not None:
+            vx, vy, vz, fi, fj, fk, intens = cached_mesh
+        else:
+            _iso_budget = max_total_3d  # allow caller to reduce for playback
+            raw_ds, x_ds, y_ds, z_ds = _get_ds3(step, varname, raw, ad.x_cc, ad.y_cc, ad.z_cc, _iso_budget)
+            vx, vy, vz, fi, fj, fk, intens = _compute_isomesh(
+                raw_ds, x_ds, y_ds, z_ds, log_fn, ilo, ihi, iso_n,
+            )
+        _iso_op = float(iso_opacity) if iso_opacity is not None else 1.0
+        if iso_solid_color:
+            # Use a uniform-intensity + single-color colorscale so that the
+            # mesh rendering path is the same as the variable-colored one
+            # (Plotly's Mesh3d `color` prop is unreliable for overriding the
+            # default colorscale behavior).
+            _solid_cs = [[0, iso_solid_color], [1, iso_solid_color]]
+            trace = go.Mesh3d(
+                x=vx, y=vy, z=vz, i=fi, j=fj, k=fk,
+                intensity=np.zeros(len(vx), dtype=np.float32),
+                intensitymode='vertex',
+                colorscale=_solid_cs, cmin=0, cmax=1,
+                showscale=False, opacity=_iso_op,
+                lighting=dict(ambient=0.7, diffuse=0.9, specular=0.3,
+                              roughness=0.5, fresnel=0.2),
+                lightposition=dict(x=1000, y=500, z=500),
+                flatshading=False,
+            )
+        else:
+            trace = go.Mesh3d(
+                x=vx, y=vy, z=vz, i=fi, j=fj, k=fk,
+                intensity=intens, intensitymode='vertex',
+                colorscale=cscale, cmin=ilo, cmax=ihi,
+                colorbar=_make_cbar(cbar_title, ilo, ihi), showscale=True,
+                opacity=_iso_op,
+                lighting=dict(ambient=0.7, diffuse=0.9, specular=0.3,
+                              roughness=0.5, fresnel=0.2),
+                lightposition=dict(x=1000, y=500, z=500),
+                flatshading=False,
+            )
         title = f'{varname}  ·  {int(iso_n)} isosurfaces  ·  step {step}'
 
     else:                                                # volume
@@ -551,6 +696,119 @@ def _build_3d(ad, raw, varname, step, mode, cmap,  # pylint: disable=too-many-ar
         title = f'{varname}  ·  volume  ·  step {step}'
 
     return trace, title
+
+
+# ---------------------------------------------------------------------------
+# Kaleido server-side Plotly rendering (fast playback for 3D)
+# ---------------------------------------------------------------------------
+
+def _kaleido_available() -> bool:
+    """Return True if plotly's kaleido engine can export images."""
+    try:
+        import kaleido  # pylint: disable=import-outside-toplevel,unused-import
+        return True
+    except ImportError:
+        return False
+
+_KALEIDO_OK: Optional[bool] = None  # lazy probe
+
+
+def _kaleido_render(fig: go.Figure, width: int = 1280,  # pylint: disable=too-many-arguments,too-many-positional-arguments
+                    height: int = 960) -> str:
+    """Render a Plotly figure to a JPEG base64 data URI via kaleido.
+
+    Returns a ``data:image/jpeg;base64,...`` string suitable for an
+    ``html.Img`` ``src`` attribute.
+    """
+    img_bytes = fig.to_image(format='jpeg', width=width, height=height,
+                             scale=1, engine='kaleido')
+    b64 = base64.b64encode(img_bytes).decode()
+    return f"data:image/jpeg;base64,{b64}"
+
+
+# ---------------------------------------------------------------------------
+# Contour overlay helpers
+# ---------------------------------------------------------------------------
+
+def _interp_indices(indices, coords):
+    """Map fractional array indices to physical coordinates via linear interp."""
+    cl = np.clip(indices, 0, len(coords) - 1)
+    fl = np.floor(cl).astype(int)
+    frac = cl - fl
+    ce = np.minimum(fl + 1, len(coords) - 1)
+    return coords[fl] * (1 - frac) + coords[ce] * frac
+
+
+def _compute_contour_traces(data_2d, x_cc, y_cc, nlevels, color, lw):  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    """Compute isocontour lines on a 2D array via skimage.find_contours.
+
+    Returns a list of go.Scatter traces (one per contour segment) that can be
+    added on top of a heatmap figure.  Coordinates are mapped from array
+    indices to physical space using *x_cc* and *y_cc*.
+    """
+    vmin_c, vmax_c = float(np.nanmin(data_2d)), float(np.nanmax(data_2d))
+    if vmax_c <= vmin_c:
+        return []
+    levels = np.linspace(vmin_c, vmax_c, nlevels + 2)[1:-1]  # exclude endpoints
+    traces = []
+    for level in levels:
+        contours = _find_contours(data_2d, level)
+        for contour in contours:
+            # contour is (N, 2) in row/col index space
+            px = _interp_indices(contour[:, 0], x_cc)
+            py = _interp_indices(contour[:, 1], y_cc)
+            traces.append(go.Scatter(
+                x=px, y=py, mode='lines',
+                line=dict(color=color, width=lw),
+                showlegend=False, hoverinfo='skip',
+            ))
+    return traces
+
+
+def _compute_contour_traces_3d(data_3d, x_cc, y_cc, z_cc,  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
+                                slice_axis, slice_pos,
+                                nlevels, color, lw):
+    """Compute isocontour lines on a 3D slice, returned as Scatter3d traces."""
+    axis_coords = {'x': x_cc, 'y': y_cc, 'z': z_cc}
+    coords = axis_coords[slice_axis]
+    coord_val = coords[0] + (coords[-1] - coords[0]) * slice_pos
+    idx = int(np.clip(np.argmin(np.abs(coords - coord_val)), 0, len(coords) - 1))
+    actual = float(coords[idx])
+
+    if slice_axis == 'x':
+        sliced = data_3d[idx, :, :]   # (ny, nz)
+        c1, c2 = y_cc, z_cc
+    elif slice_axis == 'y':
+        sliced = data_3d[:, idx, :]   # (nx, nz)
+        c1, c2 = x_cc, z_cc
+    else:
+        sliced = data_3d[:, :, idx]   # (nx, ny)
+        c1, c2 = x_cc, y_cc
+
+    vmin_c, vmax_c = float(np.nanmin(sliced)), float(np.nanmax(sliced))
+    if vmax_c <= vmin_c:
+        return []
+    levels = np.linspace(vmin_c, vmax_c, nlevels + 2)[1:-1]
+    traces = []
+    for level in levels:
+        contours = _find_contours(sliced, level)
+        for contour in contours:
+            p1 = _interp_indices(contour[:, 0], c1)
+            p2 = _interp_indices(contour[:, 1], c2)
+            n = len(p1)
+            const = np.full(n, actual, dtype=np.float32)
+            if slice_axis == 'x':
+                sx, sy, sz = const, p1, p2
+            elif slice_axis == 'y':
+                sx, sy, sz = p1, const, p2
+            else:
+                sx, sy, sz = p1, p2, const
+            traces.append(go.Scatter3d(
+                x=sx, y=sy, z=sz, mode='lines',
+                line=dict(color=color, width=lw * 2),  # thicker in 3D
+                showlegend=False, hoverinfo='skip',
+            ))
+    return traces
 
 
 # ---------------------------------------------------------------------------
@@ -588,13 +846,13 @@ def run_interactive(  # pylint: disable=too-many-locals,too-many-statements,too-
     _dark_css = """
 * { color-scheme: dark; }
 /* Dropdowns — target by known IDs + universal child selectors */
-#var-sel *, #step-sel *, #cmap-sel *,
-#var-sel > div, #step-sel > div, #cmap-sel > div {
+#var-sel *, #cmap-sel *, #overlay-var-sel *, #overlay-color-sel *, #iso-solid-color *, #overlay-mode-sel *,
+#var-sel > div, #cmap-sel > div, #overlay-var-sel > div, #overlay-color-sel > div, #iso-solid-color > div, #overlay-mode-sel > div {
     background-color: %(bg)s !important;
     color: %(tx)s !important;
     border-color: %(bd)s !important;
 }
-#var-sel input, #step-sel input, #cmap-sel input {
+#var-sel input, #cmap-sel input, #overlay-var-sel input, #overlay-color-sel input, #iso-solid-color input, #overlay-mode-sel input {
     background-color: %(bg)s !important;
     color: %(tx)s !important;
 }
@@ -612,12 +870,6 @@ input[type=number]::-webkit-outer-spin-button {
     margin: 0;
 }
 input[type=number] { -moz-appearance: textfield; }
-/* Slider tooltip bubble */
-.rc-slider-tooltip-inner {
-    background-color: %(tx)s !important;
-    color: #11111b !important;
-    border: none !important;
-}
 .rc-slider-mark-text { color: %(tx)s !important; }
 .rc-slider-rail { background-color: %(bd)s !important; }
 .rc-slider-track { background-color: %(ac)s !important; }
@@ -670,7 +922,6 @@ input[type=radio] + span, label { color: %(tx)s !important; }
     if varname not in all_varnames:
         varname = all_varnames[0] if all_varnames else varname
 
-    step_opts = [{'label': str(s), 'value': s} for s in steps]
     var_opts  = [{'label': v, 'value': v} for v in all_varnames]
     cmap_opts = [{'label': c, 'value': c} for c in _CMAPS]
 
@@ -711,11 +962,22 @@ input[type=radio] + span, label { color: %(tx)s !important; }
 
         # ── Timestep ──────────────────────────────────────────────────
         _section('Timestep',
-            dcc.Dropdown(
-                id='step-sel', options=step_opts, value=steps[0], clearable=False,
-                style={'fontSize': '12px', 'backgroundColor': _OVER,
-                       'border': f'1px solid {_BORDER}'},
+            dcc.Slider(
+                id='step-sl',
+                min=0, max=len(steps) - 1, step=1, value=0,
+                marks={i: {'label': str(s), 'style': {'fontSize': '9px', 'color': _MUTED}}
+                       for i, s in enumerate(steps)}
+                      if len(steps) <= 10
+                      else {0: {'label': str(steps[0]), 'style': {'fontSize': '9px', 'color': _MUTED}},
+                            len(steps) - 1: {'label': str(steps[-1]), 'style': {'fontSize': '9px', 'color': _MUTED}}},
+                updatemode='mouseup',
             ),
+            html.Div(id='step-label', style={
+                'fontSize': '11px', 'color': _YELLOW, 'textAlign': 'center',
+                'marginTop': '2px',
+            }),
+            # Hidden store that holds the actual step value (not the index)
+            dcc.Store(id='step-sel', data=steps[0]),
             html.Div([
                 _btn('play-btn', '▶  Play', _GREEN),
                 html.Div(style={'width': '6px'}),
@@ -770,11 +1032,38 @@ input[type=radio] + span, label { color: %(tx)s !important; }
                 _lbl('Number of isosurfaces'),
                 _slider('iso-n', 1, 10, 1, 3,
                         marks={1: '1', 3: '3', 5: '5', 10: '10'}),
+                _lbl('Opacity'),
+                _slider('iso-opacity', 0.05, 1.0, 0.05, 1.0,
+                        marks={0.05: '0', 0.5: '0.5', 1.0: '1'}),
                 dcc.Checklist(
                     id='iso-caps',
                     options=[{'label': '  Show end-caps', 'value': 'caps'}], value=[],
                     style={'fontSize': '12px', 'color': _SUB, 'marginTop': '6px'},
                 ),
+                dcc.Checklist(
+                    id='iso-solid-chk',
+                    options=[{'label': '  Solid color', 'value': 'solid'}], value=[],
+                    style={'fontSize': '12px', 'color': _SUB, 'marginTop': '6px'},
+                ),
+                html.Div(id='ctrl-iso-solid-color', style={'display': 'none'}, children=[
+                    _lbl('Surface color'),
+                    dcc.Dropdown(
+                        id='iso-solid-color',
+                        options=[
+                            {'label': 'white',  'value': 'white'},
+                            {'label': 'gray',   'value': '#6c7086'},
+                            {'label': 'red',    'value': '#f38ba8'},
+                            {'label': 'cyan',   'value': '#94e2d5'},
+                            {'label': 'yellow', 'value': '#f9e2af'},
+                            {'label': 'green',  'value': '#a6e3a1'},
+                            {'label': 'blue',   'value': '#89b4fa'},
+                            {'label': 'mauve',  'value': '#cba6f7'},
+                        ],
+                        value='#89b4fa', clearable=False,
+                        style={'fontSize': '12px', 'backgroundColor': _OVER,
+                               'border': f'1px solid {_BORDER}'},
+                    ),
+                ]),
             ),
         ]),
 
@@ -823,6 +1112,93 @@ input[type=radio] + span, label { color: %(tx)s !important; }
             }),
         ),
 
+        # ── Overlay ───────────────────────────────────────────────────
+        html.Div(id='ctrl-overlay', children=[
+            _section('Overlay',
+                _lbl('Variable'),
+                dcc.Dropdown(
+                    id='overlay-var-sel',
+                    options=[{'label': 'None', 'value': '__none__'}] + var_opts,
+                    value='__none__', clearable=False,
+                    style={'fontSize': '12px', 'backgroundColor': _OVER,
+                           'border': f'1px solid {_BORDER}'},
+                ),
+                _lbl('Levels'),
+                _slider('overlay-nlevels', 1, 20, 1, 5,
+                        marks={1: '1', 5: '5', 10: '10', 20: '20'}),
+                _lbl('Color'),
+                dcc.Dropdown(
+                    id='overlay-color-sel',
+                    options=[
+                        {'label': 'white',  'value': 'white'},
+                        {'label': 'black',  'value': 'black'},
+                        {'label': 'red',    'value': '#f38ba8'},
+                        {'label': 'cyan',   'value': '#94e2d5'},
+                        {'label': 'yellow', 'value': '#f9e2af'},
+                        {'label': 'green',  'value': '#a6e3a1'},
+                        {'label': 'blue',   'value': '#89b4fa'},
+                        {'label': 'mauve',  'value': '#cba6f7'},
+                    ],
+                    value='white', clearable=False,
+                    style={'fontSize': '12px', 'backgroundColor': _OVER,
+                           'border': f'1px solid {_BORDER}'},
+                ),
+                # Contour-specific: line width (hidden in isosurface/volume mode)
+                html.Div(id='ctrl-overlay-contour', children=[
+                    _lbl('Line width'),
+                    _slider('overlay-lw', 0.5, 3.0, 0.5, 1.0,
+                            marks={0.5: '0.5', 1.0: '1', 2.0: '2', 3.0: '3'}),
+                ]),
+                # Overlay mode selector for 3D isosurface/volume modes
+                html.Div(id='ctrl-overlay-mode', style={'display': 'none'}, children=[
+                    _lbl('Overlay type'),
+                    dcc.Dropdown(
+                        id='overlay-mode-sel',
+                        options=[
+                            {'label': 'Isosurface', 'value': 'isosurface'},
+                            {'label': 'Isovolume',  'value': 'volume'},
+                        ],
+                        value='isosurface', clearable=False,
+                        style={'fontSize': '12px', 'backgroundColor': _OVER,
+                               'border': f'1px solid {_BORDER}'},
+                    ),
+                ]),
+                # Isosurface overlay controls
+                html.Div(id='ctrl-overlay-iso', style={'display': 'none'}, children=[
+                    _lbl('Min threshold (fraction of range)'),
+                    _slider('overlay-iso-min', 0.0, 1.0, 0.01, 0.2,
+                            marks={0: '0', 0.5: '0.5', 1: '1'}),
+                    _lbl('Max threshold (fraction of range)'),
+                    _slider('overlay-iso-max', 0.0, 1.0, 0.01, 0.8,
+                            marks={0: '0', 0.5: '0.5', 1: '1'}),
+                    _lbl('Opacity'),
+                    _slider('overlay-iso-opacity', 0.05, 1.0, 0.05, 0.6,
+                            marks={0.05: '0', 0.5: '0.5', 1.0: '1'}),
+                    dcc.Checklist(
+                        id='overlay-iso-byval',
+                        options=[{'label': '  Color by value', 'value': 'byval'}],
+                        value=[],
+                        style={'fontSize': '12px', 'color': _SUB, 'marginTop': '6px'},
+                    ),
+                ]),
+                # Isovolume overlay controls
+                html.Div(id='ctrl-overlay-vol', style={'display': 'none'}, children=[
+                    _lbl('Min threshold (fraction of range)'),
+                    _slider('overlay-vol-min', 0.0, 1.0, 0.01, 0.0,
+                            marks={0: '0', 0.5: '0.5', 1: '1'}),
+                    _lbl('Max threshold (fraction of range)'),
+                    _slider('overlay-vol-max', 0.0, 1.0, 0.01, 1.0,
+                            marks={0: '0', 0.5: '0.5', 1: '1'}),
+                    _lbl('Opacity per shell'),
+                    _slider('overlay-vol-opacity', 0.01, 0.5, 0.01, 0.1,
+                            marks={0.01: '0', 0.25: '.25', 0.5: '.5'}),
+                    _lbl('Number of shells'),
+                    _slider('overlay-vol-nsurf', 3, 30, 1, 15,
+                            marks={3: '3', 15: '15', 30: '30'}),
+                ]),
+            ),
+        ], style={'display': 'block' if ndim >= 2 else 'none'}),
+
         # ── Status ────────────────────────────────────────────────────
         html.Div(id='status-bar', style={
             'marginTop': 'auto', 'paddingTop': '12px',
@@ -850,7 +1226,16 @@ input[type=radio] + span, label { color: %(tx)s !important; }
                     'toImageButtonOptions': {'format': 'png', 'scale': 2},
                 },
             ),
-        ], style={'flex': '1', 'overflow': 'hidden', 'backgroundColor': _BG}),
+            html.Img(
+                id='srv-img',
+                style={
+                    'display': 'none', 'width': '100%', 'height': '100vh',
+                    'objectFit': 'contain', 'backgroundColor': _BG,
+                    'cursor': 'grab',
+                },
+            ),
+        ], style={'flex': '1', 'overflow': 'hidden', 'backgroundColor': _BG,
+                  'position': 'relative'}),
 
         dcc.Interval(id='play-iv', interval=500, n_intervals=0, disabled=True),
         dcc.Store(id='playing-st', data=False),
@@ -862,6 +1247,11 @@ input[type=radio] + span, label { color: %(tx)s !important; }
     # ------------------------------------------------------------------
     # Callbacks
     # ------------------------------------------------------------------
+
+    # Playback flag — set by _toggle_play, read by _update.
+    # Avoids adding State('playing-st') to _update (which triggers Dash 4
+    # initial-call serialization issues).
+    _is_playing = [False]
 
     @app.callback(
         Output('play-iv', 'disabled'),
@@ -878,42 +1268,111 @@ input[type=radio] + span, label { color: %(tx)s !important; }
         iv = max(int(1000 / max(float(fps or 2), 0.1)), 50)
         trig = (callback_context.triggered or [{}])[0].get('prop_id', '')
         if 'stop-btn' in trig:
+            _is_playing[0] = False
             return True, iv, False, '▶  Play'
         if 'play-btn' in trig:
             playing = not is_playing
+            _is_playing[0] = playing
             return not playing, iv, playing, ('⏸  Pause' if playing else '▶  Play')
         return not is_playing, iv, is_playing, no_update  # fps-only change
 
+    # Playback advances the slider position.
+    # _last_update_t rate-limits advances so the browser has time to render
+    # each frame before the next is sent.  Without this, the dcc.Interval
+    # fires faster than the browser can process, causing frame skipping.
+    # _min_frame_gap adapts to actual render time: measured as the wall-clock
+    # time between the start of _update and the next _advance_step call.
+    _last_update_t = [0.0]
+    _min_frame_gap = [0.3]
+    # Kaleido availability — probed once at startup for fast 3D playback.
+    global _KALEIDO_OK  # pylint: disable=global-statement
+    if ndim == 3:
+        _KALEIDO_OK = _kaleido_available()
+        if _KALEIDO_OK:
+            cons.print('[dim][green]Kaleido OK[/green] — '
+                       'server-side 3D rendering enabled for playback.[/dim]')
+        else:
+            cons.print(
+                '[yellow]Kaleido not found[/yellow] — '
+                '3D playback will use Plotly (slower).\n'
+                '    Install: pip install kaleido'
+            )
+
     @app.callback(
-        Output('step-sel', 'value'),
+        Output('step-sl', 'value'),
         Input('play-iv', 'n_intervals'),
-        State('step-sel', 'value'),
+        State('step-sl', 'value'),
         State('loop-chk', 'value'),
         prevent_initial_call=True,
     )
-    def _advance_step(_, current, loop_val):
-        try:
-            idx = steps.index(current)
-        except ValueError:
-            idx = 0
+    def _advance_step(_, current_idx, loop_val):
+        now = time.perf_counter()
+        if now - _last_update_t[0] < _min_frame_gap[0]:
+            return no_update
+        _last_update_t[0] = now
+        idx = int(current_idx or 0)
         nxt = idx + 1
         if nxt >= len(steps):
-            return steps[0] if ('loop' in (loop_val or [])) else no_update
-        return steps[nxt]
+            return 0 if ('loop' in (loop_val or [])) else no_update
+        return nxt
+
+    # Slider index → actual step value + label
+    @app.callback(
+        Output('step-sel', 'data'),
+        Output('step-label', 'children'),
+        Input('step-sl', 'value'),
+    )
+    def _sync_step(sl_idx):
+        idx = int(sl_idx) if sl_idx is not None else 0
+        idx = max(0, min(idx, len(steps) - 1))
+        return steps[idx], f'step {steps[idx]}'
 
     @app.callback(
-        Output('ctrl-slice', 'style'),
-        Output('ctrl-iso',   'style'),
-        Output('ctrl-vol',   'style'),
+        Output('ctrl-slice',           'style'),
+        Output('ctrl-iso',             'style'),
+        Output('ctrl-vol',             'style'),
+        Output('ctrl-overlay',         'style'),
+        Output('ctrl-overlay-contour', 'style'),
+        Output('ctrl-overlay-mode',    'style'),
         Input('mode-sel', 'value'),
     )
     def _toggle_controls(mode):
         show, hide = {'display': 'block'}, {'display': 'none'}
+        overlay_ok = mode in ('heatmap', 'slice', 'isosurface', 'volume') and ndim >= 2
+        is_3d_surf = mode in ('isosurface', 'volume')
         return (
             show if mode == 'slice'      else hide,
             show if mode == 'isosurface' else hide,
             show if mode == 'volume'     else hide,
+            show if overlay_ok           else hide,
+            show if not is_3d_surf       else hide,   # contour line controls
+            show if is_3d_surf           else hide,   # overlay type selector
         )
+
+    @app.callback(
+        Output('ctrl-overlay-iso', 'style'),
+        Output('ctrl-overlay-vol', 'style'),
+        Input('mode-sel', 'value'),
+        Input('overlay-mode-sel', 'value'),
+    )
+    def _toggle_overlay_subs(mode, ov_mode):
+        show, hide = {'display': 'block'}, {'display': 'none'}
+        is_3d_surf = mode in ('isosurface', 'volume')
+        if not is_3d_surf:
+            return hide, hide
+        ov = ov_mode or 'isosurface'
+        return (
+            show if ov == 'isosurface' else hide,
+            show if ov == 'volume'     else hide,
+        )
+
+    @app.callback(
+        Output('ctrl-iso-solid-color', 'style'),
+        Input('iso-solid-chk', 'value'),
+    )
+    def _toggle_iso_solid(chk):
+        show, hide = {'display': 'block'}, {'display': 'none'}
+        return show if chk and 'solid' in chk else hide
 
     @app.callback(
         Output('vmin-inp', 'value'),
@@ -927,14 +1386,18 @@ input[type=radio] + span, label { color: %(tx)s !important; }
     @app.callback(
         Output('viz-graph',  'figure'),
         Output('status-bar', 'children'),
+        Output('srv-img',     'src'),
+        Output('srv-img',     'style'),
+        Output('viz-graph',  'style'),
         Input('var-sel',     'value'),
-        Input('step-sel',    'value'),
+        Input('step-sel',    'data'),
         Input('mode-sel',    'value'),
         Input('slice-axis',  'value'),
         Input('slice-pos',   'value'),
         Input('iso-min',     'value'),
         Input('iso-max',     'value'),
         Input('iso-n',       'value'),
+        Input('iso-opacity', 'value'),
         Input('iso-caps',    'value'),
         Input('vol-opacity', 'value'),
         Input('vol-nsurf',   'value'),
@@ -944,14 +1407,48 @@ input[type=radio] + span, label { color: %(tx)s !important; }
         Input('log-chk',     'value'),
         Input('vmin-inp',    'value'),
         Input('vmax-inp',    'value'),
+        Input('iso-solid-chk',     'value'),
+        Input('iso-solid-color',   'value'),
+        Input('overlay-var-sel',   'value'),
+        Input('overlay-nlevels',   'value'),
+        Input('overlay-color-sel', 'value'),
+        Input('overlay-lw',        'value'),
+        Input('overlay-mode-sel',      'value'),
+        Input('overlay-iso-min',     'value'),
+        Input('overlay-iso-max',     'value'),
+        Input('overlay-iso-opacity', 'value'),
+        Input('overlay-iso-byval',   'value'),
+        Input('overlay-vol-min',     'value'),
+        Input('overlay-vol-max',     'value'),
+        Input('overlay-vol-opacity', 'value'),
+        Input('overlay-vol-nsurf',   'value'),
+        State('playing-st',          'data'),
     )
     def _update(var_sel, step, mode,  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,too-many-branches,too-many-statements
                 slice_axis, slice_pos,
-                iso_min_frac, iso_max_frac, iso_n, iso_caps,
+                iso_min_frac, iso_max_frac, iso_n, iso_opacity, iso_caps,
                 vol_opacity, vol_nsurf, vol_min_frac, vol_max_frac,
-                cmap, log_chk, vmin_in, vmax_in):
+                cmap, log_chk, vmin_in, vmax_in,
+                iso_solid_chk, iso_solid_color,
+                overlay_var, overlay_nlevels, overlay_color, overlay_lw,
+                overlay_mode_sel,
+                overlay_iso_min, overlay_iso_max, overlay_iso_opacity,
+                overlay_iso_byval,
+                overlay_vol_min, overlay_vol_max, overlay_vol_opacity,
+                overlay_vol_nsurf,
+                playing_st):  # pylint: disable=unused-argument
 
         _t0 = time.perf_counter()
+        _GRAPH_SHOW = {'height': '100vh', 'display': 'block'}
+        _GRAPH_HIDE = {'height': '100vh', 'display': 'none'}
+        _SRV_SHOW = {
+            'display': 'block', 'width': '100%', 'height': '100vh',
+            'objectFit': 'contain', 'backgroundColor': _BG, 'cursor': 'grab',
+        }
+        _SRV_HIDE = {
+            'display': 'none', 'width': '100%', 'height': '100vh',
+            'objectFit': 'contain', 'backgroundColor': _BG, 'cursor': 'grab',
+        }
         selected_var = var_sel or varname
 
         # When the variable selector is the trigger, ignore any stale manual
@@ -970,23 +1467,36 @@ input[type=radio] + span, label { color: %(tx)s !important; }
             else:
                 ad = _load(step, read_func)
         except (OSError, ValueError, EOFError) as exc:
-            return no_update, [html.Span(f' Error loading step {step}: {exc}',
-                                         style={'color': _RED})]
+            return (no_update,
+                    [html.Span(f' Error loading step {step}: {exc}',
+                               style={'color': _RED})],
+                    no_update, no_update, no_update)
         _t_load = time.perf_counter()
 
         # Resolve log/cmap early — needed by the prefetch JPEG encoder below.
         log = bool(log_chk and 'log' in log_chk)
         cmap = cmap or 'viridis'
 
-        # Eagerly pre-load the next 2 steps in the background so that
+        # Eagerly pre-load the next steps in the background so that
         # navigation feels instant after the structure cache is warm.
         # prefetch_one is a no-op if the key is already cached or in-flight.
         # For 2D, also pre-encode the JPEG at the current colormap / range
         # settings so the next step callback can skip encoding entirely.
+        # For 3D, pre-compute isomesh or volume data so playback is instant.
+        # During playback, prefetch aggressively (disk I/O is the bottleneck
+        # for large 3D datasets — 3-6s per step).  With 3 workers and 15
+        # steps ahead, the cache stays ~45s ahead of playback.
+        _playing = _is_playing[0]
+        if _playing:
+            _pf_depth = 15
+        elif ad.ndim == 3 and mode in ('isosurface', 'volume'):
+            _pf_depth = 4
+        else:
+            _pf_depth = 2
         if read_one_var_func is not None:
             try:
                 _idx = steps.index(step)
-                for _ns in steps[_idx + 1: _idx + 3]:
+                for _ns in steps[_idx + 1: _idx + 1 + _pf_depth]:
                     _nk = (_ns, selected_var)
                     _prefetch_one(_nk, lambda k=_nk: read_one_var_func(k[0], k[1]))
                     if ad.ndim == 2:
@@ -997,12 +1507,24 @@ input[type=radio] + span, label { color: %(tx)s !important; }
                                 (s, sv), lambda k: read_one_var_func(k[0], k[1])),
                             cmap, vmin_in, vmax_in, log,
                         )
+                    elif ad.ndim == 3 and mode in ('isosurface', 'volume'):
+                        _sv = selected_var
+                        _prefetch_3d_mesh(
+                            _ns, _sv,
+                            lambda s, sv=_sv: _step_cache.load(
+                                (s, sv), lambda k: read_one_var_func(k[0], k[1])),
+                            mode, log, vmin_in, vmax_in,
+                            float(iso_min_frac or 0.2), float(iso_max_frac or 0.8),
+                            int(iso_n or 3),
+                            float(vol_min_frac or 0.0), float(vol_max_frac or 1.0),
+
+                        )
             except (ValueError, IndexError):
                 pass
         else:
             try:
                 _idx = steps.index(step)
-                for _ns in steps[_idx + 1: _idx + 3]:
+                for _ns in steps[_idx + 1: _idx + 1 + _pf_depth]:
                     _prefetch_one(_ns, read_func)
                     if ad.ndim == 2:
                         _prefetch_jpeg(
@@ -1010,14 +1532,26 @@ input[type=radio] + span, label { color: %(tx)s !important; }
                             lambda s: _step_cache.load(s, read_func),
                             cmap, vmin_in, vmax_in, log,
                         )
+                    elif ad.ndim == 3 and mode in ('isosurface', 'volume'):
+                        _prefetch_3d_mesh(
+                            _ns, selected_var,
+                            lambda s: _step_cache.load(s, read_func),
+                            mode, log, vmin_in, vmax_in,
+                            float(iso_min_frac or 0.2), float(iso_max_frac or 0.8),
+                            int(iso_n or 3),
+                            float(vol_min_frac or 0.0), float(vol_max_frac or 1.0),
+
+                        )
             except (ValueError, IndexError):
                 pass
 
         if selected_var not in ad.variables:
             avail = ', '.join(sorted(ad.variables))
-            return no_update, [html.Span(
-                f' Variable {selected_var!r} not in step {step} '
-                f'(available: {avail})', style={'color': _RED})]
+            return (no_update,
+                    [html.Span(
+                        f' Variable {selected_var!r} not in step {step} '
+                        f'(available: {avail})', style={'color': _RED})],
+                    no_update, no_update, no_update)
         raw = ad.variables[selected_var]
 
         # Color range — subsample large arrays for speed (nanmin/nanmax on
@@ -1055,6 +1589,123 @@ input[type=radio] + span, label { color: %(tx)s !important; }
             cbar_title = selected_var
 
         _t_prep = time.perf_counter()
+
+        # ----------------------------------------------------------------------
+        # Kaleido server-side rendering for 3D during playback (Linux only).
+        # Builds the exact same Plotly figure as the interactive path but
+        # renders it to JPEG on the server via kaleido, bypassing the
+        # JSON serialization → SSH → browser WebGL round-trip.
+        # Only active during playback; static views use Plotly for
+        # interactive rotation and hover.
+        # ----------------------------------------------------------------------
+        global _KALEIDO_OK  # pylint: disable=global-statement
+        if _KALEIDO_OK is None:
+            _KALEIDO_OK = _kaleido_available()
+        _use_kaleido = (
+            _KALEIDO_OK
+            and sys.platform == 'linux'  # only over SSH; local macOS Plotly is faster
+            and _is_playing[0]
+            and ad.ndim == 3
+            and mode in ('isosurface', 'volume')
+        )
+        if _use_kaleido:
+            try:
+                _kfig = go.Figure()
+                _iso_solid_k = (iso_solid_color or '#89b4fa') if (
+                    iso_solid_chk and 'solid' in iso_solid_chk) else None
+                _cached_k = _get_cached_3d_mesh(
+                    step, selected_var, mode, log,
+                    vmin_in, vmax_in,
+                    float(iso_min_frac or 0.2), float(iso_max_frac or 0.8),
+                    int(iso_n or 3),
+                    float(vol_min_frac or 0.0), float(vol_max_frac or 1.0),
+                ) if mode == 'isosurface' else None
+                _ktrace, _ktitle = _build_3d(
+                    ad, raw, selected_var, step, mode, cmap,
+                    _tf, cmin, cmax, cbar_title,
+                    slice_axis or 'z', float(slice_pos or 0.5),
+                    float(iso_min_frac or 0.2), float(iso_max_frac or 0.8),
+                    int(iso_n or 3),
+                    bool(iso_caps and 'caps' in iso_caps),
+                    float(vol_opacity or 0.1), int(vol_nsurf or 15),
+                    float(vol_min_frac or 0.0), float(vol_max_frac or 1.0),
+                    iso_solid_color=_iso_solid_k,
+                    iso_opacity=float(iso_opacity or 1.0),
+                    cached_mesh=_cached_k,
+                )
+                _kfig.add_trace(_ktrace)
+                # Scene layout — same as interactive path
+                _kdx = float(ad.x_cc[-1] - ad.x_cc[0]) if len(ad.x_cc) > 1 else 1.0
+                _kdy = float(ad.y_cc[-1] - ad.y_cc[0]) if len(ad.y_cc) > 1 else 1.0
+                _kdz = float(ad.z_cc[-1] - ad.z_cc[0]) if len(ad.z_cc) > 1 else 1.0
+                _kmax = max(_kdx, _kdy, _kdz, 1e-30)
+                _kfig.update_layout(
+                    scene=dict(
+                        xaxis=dict(title='x',
+                                   range=[float(ad.x_cc[0]), float(ad.x_cc[-1])],
+                                   autorange=False,
+                                   backgroundcolor=_SURF, gridcolor=_OVER,
+                                   color=_TEXT),
+                        yaxis=dict(title='y',
+                                   range=[float(ad.y_cc[0]), float(ad.y_cc[-1])],
+                                   autorange=False,
+                                   backgroundcolor=_SURF, gridcolor=_OVER,
+                                   color=_TEXT),
+                        zaxis=dict(title='z',
+                                   range=[float(ad.z_cc[0]), float(ad.z_cc[-1])],
+                                   autorange=False,
+                                   backgroundcolor=_SURF, gridcolor=_OVER,
+                                   color=_TEXT),
+                        bgcolor=_BG,
+                        aspectmode='manual',
+                        aspectratio=dict(x=_kdx/_kmax, y=_kdy/_kmax,
+                                         z=_kdz/_kmax),
+                    ),
+                    title=dict(text=_ktitle,
+                               font=dict(color=_TEXT, size=13,
+                                         family='monospace')),
+                    paper_bgcolor=_BG,
+                    font=dict(color=_TEXT, family='monospace'),
+                    margin=dict(l=0, r=130, t=36, b=0),
+                )
+                _t_fig = time.perf_counter()
+                kal_src = _kaleido_render(_kfig)
+                _t_kal = time.perf_counter()
+            except Exception as _kal_exc:  # pylint: disable=broad-except
+                _KALEIDO_OK = False
+                cons.print(
+                    '[dim][yellow]Kaleido render failed, falling back to '
+                    f'Plotly:[/yellow] {_kal_exc}[/dim]')
+                kal_src = None
+                _t_prep = time.perf_counter()
+
+            if kal_src is not None:
+                dmin_k = float(np.nanmin(_raw_range))
+                dmax_k = float(np.nanmax(_raw_range))
+                cons.print(
+                    f'[dim]viz timing  step={step}  shape={raw.shape}'
+                    f'  load={_t_load-_t0:.3f}s'
+                    f'  prep={_t_prep-_t_load:.3f}s'
+                    f'  figure={_t_fig-_t_prep:.3f}s'
+                    f'  kaleido={_t_kal-_t_fig:.3f}s'
+                    f'  total={_t_kal-_t0:.3f}s [KALEIDO][/dim]'
+                )
+                status_k = html.Div([
+                    html.Span(f'step {step}', style={'color': _YELLOW}),
+                    html.Span(f'  ·  shape {raw.shape}',
+                              style={'color': _MUTED}),
+                    html.Br(),
+                    html.Span('min ', style={'color': _MUTED}),
+                    html.Span(f'{dmin_k:.4g}', style={'color': _BLUE}),
+                    html.Span('  max ', style={'color': _MUTED}),
+                    html.Span(f'{dmax_k:.4g}', style={'color': _RED}),
+                ])
+                _now_k = time.perf_counter()
+                _last_update_t[0] = _now_k
+                _server_k = _now_k - _t0
+                _min_frame_gap[0] = max(0.15, min(1.5, _server_k + 0.05))
+                return no_update, status_k, kal_src, _SRV_SHOW, _GRAPH_HIDE
+
         fig = go.Figure()
         title = ''
 
@@ -1066,54 +1717,91 @@ input[type=radio] + span, label { color: %(tx)s !important; }
             # Colormap, variable, mode, and axis changes always trigger a full
             # render because they require new coordinate arrays or trace types.
             # ------------------------------------------------------------------
+            _has_overlay_3d = overlay_var and overlay_var != '__none__'
             _trig3 = {t.get('prop_id', '') for t in (callback_context.triggered or [])}
-            _PT_BASE = {'step-sel.value', 'vmin-inp.value', 'vmax-inp.value'}
+            _PT_BASE = {'step-sel.data', 'vmin-inp.value', 'vmax-inp.value'}
             _PT_ISO  = _PT_BASE | {'iso-min.value', 'iso-max.value',
-                                   'iso-n.value', 'iso-caps.value'}
+                                   'iso-n.value', 'iso-caps.value',
+                                   'iso-opacity.value'}
             _PT_VOL  = _PT_BASE | {'vol-min.value', 'vol-max.value',
                                    'vol-opacity.value', 'vol-nsurf.value'}
             # Slice mode always does a full render — Plotly does not reliably
             # re-render go.Surface when surfacecolor is updated via Patch().
+            # Overlay forces full render (adds extra traces).
+            # During playback, force the patch path for iso/volume — other
+            # Dash triggers (stores, sliders) fire alongside the step change
+            # and would cause _trig3 to fail the subset check, falling through
+            # to the expensive full-render path.
             _do_patch_3d = (
                 _trig3
                 and '.' not in _trig3
+                and not _use_kaleido  # kaleido handles its own fast path
+                and not (_has_overlay_3d and mode in ('isosurface', 'volume'))
                 and (
-                    (mode == 'isosurface' and _trig3.issubset(_PT_ISO))  or
-                    (mode == 'volume'     and _trig3.issubset(_PT_VOL))
+                    (_playing and mode in ('isosurface', 'volume'))
+                    or (mode == 'isosurface' and _trig3.issubset(_PT_ISO))
+                    or (mode == 'volume'     and _trig3.issubset(_PT_VOL))
                 )
             )
             if _do_patch_3d:
                 _cscale3 = _lut_to_plotly_colorscale(cmap)
                 rng3 = cmax - cmin if cmax > cmin else 1.0
                 patch = Patch()
+                _cache_hit = False
                 if mode == 'isosurface':
-                    raw_ds, x_ds3, y_ds3, z_ds3 = _get_ds3(
-                        step, selected_var, raw, ad.x_cc, ad.y_cc, ad.z_cc, 500_000,
-                    )
                     ilo = cmin + rng3 * float(iso_min_frac or 0.2)
                     ihi = cmin + rng3 * max(float(iso_max_frac or 0.8), ilo + 0.01)
-                    vx, vy, vz, fi, fj, fk, intens = _compute_isomesh(
-                        raw_ds, x_ds3, y_ds3, z_ds3, _tf, ilo, ihi,
+                    # Try pre-computed mesh first, fall back to computing now
+                    _cached = _get_cached_3d_mesh(
+                        step, selected_var, mode, log,
+                        vmin_in, vmax_in,
+                        float(iso_min_frac or 0.2), float(iso_max_frac or 0.8),
                         int(iso_n or 3),
+                        float(vol_min_frac or 0.0), float(vol_max_frac or 1.0),
                     )
-                    patch['data'][0]['x'] = vx.tolist()
-                    patch['data'][0]['y'] = vy.tolist()
-                    patch['data'][0]['z'] = vz.tolist()
-                    patch['data'][0]['i'] = fi.tolist()
-                    patch['data'][0]['j'] = fj.tolist()
-                    patch['data'][0]['k'] = fk.tolist()
-                    patch['data'][0]['intensity'] = intens.tolist()
+                    if _cached is not None:
+                        vx, vy, vz, fi, fj, fk, intens = _cached
+                        _cache_hit = True
+                    else:
+                        _pb = 50_000 if _playing else 500_000
+                        raw_ds, x_ds3, y_ds3, z_ds3 = _get_ds3(
+                            step, selected_var, raw, ad.x_cc, ad.y_cc, ad.z_cc, _pb,
+                        )
+                        vx, vy, vz, fi, fj, fk, intens = _compute_isomesh(
+                            raw_ds, x_ds3, y_ds3, z_ds3, _tf, ilo, ihi,
+                            int(iso_n or 3),
+                        )
+                    patch['data'][0]['x'] = vx
+                    patch['data'][0]['y'] = vy
+                    patch['data'][0]['z'] = vz
+                    patch['data'][0]['i'] = fi
+                    patch['data'][0]['j'] = fj
+                    patch['data'][0]['k'] = fk
+                    patch['data'][0]['intensity'] = intens
                     patch['data'][0]['cmin'] = ilo
                     patch['data'][0]['cmax'] = ihi
                     patch['data'][0]['colorscale'] = _cscale3
+                    patch['data'][0]['opacity'] = float(iso_opacity or 1.0)
                 else:  # volume
-                    raw_ds, _, _, _ = _get_ds3(
-                        step, selected_var, raw, ad.x_cc, ad.y_cc, ad.z_cc, 150_000,
+                    # Try pre-computed volume data first
+                    _cached = _get_cached_3d_mesh(
+                        step, selected_var, mode, log,
+                        vmin_in, vmax_in,
+                        float(iso_min_frac or 0.2), float(iso_max_frac or 0.8),
+                        int(iso_n or 3),
+                        float(vol_min_frac or 0.0), float(vol_max_frac or 1.0),
                     )
-                    vf = _tf(raw_ds).ravel()
-                    vlo = cmin + rng3 * float(vol_min_frac or 0.0)
-                    vhi = cmin + rng3 * max(float(vol_max_frac or 1.0), vlo + 0.01)
-                    patch['data'][0]['value'] = vf.tolist()
+                    if _cached is not None:
+                        vf, vlo, vhi, _, _ = _cached
+                        _cache_hit = True
+                    else:
+                        raw_ds, _, _, _ = _get_ds3(
+                            step, selected_var, raw, ad.x_cc, ad.y_cc, ad.z_cc, 150_000,
+                        )
+                        vf = _tf(raw_ds).ravel()
+                        vlo = cmin + rng3 * float(vol_min_frac or 0.0)
+                        vhi = cmin + rng3 * max(float(vol_max_frac or 1.0), vlo + 0.01)
+                    patch['data'][0]['value'] = vf
                     patch['data'][0]['isomin'] = vlo
                     patch['data'][0]['isomax'] = vhi
                     patch['data'][0]['opacity'] = float(vol_opacity or 0.1)
@@ -1128,7 +1816,7 @@ input[type=radio] + span, label { color: %(tx)s !important; }
                     f'[dim]viz timing  step={step}  shape={raw.shape}'
                     f'  load={_t_load-_t0:.3f}s'
                     f'  prep={_t_prep-_t_load:.3f}s'
-                    f'  patch={_t_trace-_t_prep:.3f}s [PATCH-3D]'
+                    f'  patch={_t_trace-_t_prep:.3f}s [PATCH-3D{"·HIT" if _cache_hit else ""}]'
                     f'  total={_t_trace-_t0:.3f}s[/dim]'
                 )
                 status = html.Div([
@@ -1140,9 +1828,28 @@ input[type=radio] + span, label { color: %(tx)s !important; }
                     html.Span('  max ', style={'color': _MUTED}),
                     html.Span(f'{dmax3:.4g}', style={'color': _RED}),
                 ])
-                return patch, status
+                _now = time.perf_counter()
+                _last_update_t[0] = _now
+                # Patch path: browser overhead is low (no figure rebuild).
+                _server_s = _now - _t0
+                _min_frame_gap[0] = max(0.3, min(2.0, _server_s + 0.25))
+                return patch, status, no_update, _SRV_HIDE, _GRAPH_SHOW
 
-            # Full 3D render
+            # Full 3D render — check mesh prefetch cache for isosurface mode
+            _iso_solid = (iso_solid_color or '#89b4fa') if (
+                iso_solid_chk and 'solid' in iso_solid_chk) else None
+            _cached_primary = None
+            if mode == 'isosurface':
+                _cached_primary = _get_cached_3d_mesh(
+                    step, selected_var, mode, log,
+                    vmin_in, vmax_in,
+                    float(iso_min_frac or 0.2), float(iso_max_frac or 0.8),
+                    int(iso_n or 3),
+                    float(vol_min_frac or 0.0), float(vol_max_frac or 1.0),
+                )
+            # During playback, use a smaller cell budget for faster marching
+            # cubes (~1s instead of ~4.5s).  Full resolution when paused.
+            _iso_3d_budget = 50_000 if _playing else 500_000
             trace, title = _build_3d(
                 ad, raw, selected_var, step, mode, cmap, _tf, cmin, cmax, cbar_title,
                 slice_axis or 'z', float(slice_pos or 0.5),
@@ -1150,6 +1857,10 @@ input[type=radio] + span, label { color: %(tx)s !important; }
                 int(iso_n or 3), bool(iso_caps and 'caps' in iso_caps),
                 float(vol_opacity or 0.1), int(vol_nsurf or 15),
                 float(vol_min_frac or 0.0), float(vol_max_frac or 1.0),
+                iso_solid_color=_iso_solid,
+                iso_opacity=float(iso_opacity or 1.0),
+                cached_mesh=_cached_primary,
+                max_total_3d=_iso_3d_budget,
             )
             fig.add_trace(trace)
             # Bubble overlay for 3D
@@ -1176,6 +1887,121 @@ input[type=radio] + span, label { color: %(tx)s !important; }
                             ))
                 except (OSError, ValueError):
                     pass  # bubble overlay is best-effort; skip on read errors
+            # Overlay for 3D: contour lines (slice), isosurface, or isovolume
+            _has_overlay = overlay_var and overlay_var != '__none__'
+            if _has_overlay and mode in ('slice', 'isosurface', 'volume'):
+                _ov_3d_raw = None
+                _ov_3d_ad = ad
+                if overlay_var in ad.variables:
+                    _ov_3d_raw = ad.variables[overlay_var]
+                elif read_one_var_func is not None:
+                    try:
+                        _ov_3d_ad = _load((step, overlay_var),
+                                          lambda k: read_one_var_func(k[0], k[1]))
+                        if overlay_var in _ov_3d_ad.variables:
+                            _ov_3d_raw = _ov_3d_ad.variables[overlay_var]
+                    except (OSError, ValueError, EOFError):
+                        pass
+                else:
+                    try:
+                        _ov_3d_ad = _load(step, read_func)
+                        if overlay_var in _ov_3d_ad.variables:
+                            _ov_3d_raw = _ov_3d_ad.variables[overlay_var]
+                    except (OSError, ValueError, EOFError):
+                        pass
+                if _ov_3d_raw is not None and mode == 'slice':
+                    _ov3_traces = _compute_contour_traces_3d(
+                        _ov_3d_raw, _ov_3d_ad.x_cc, _ov_3d_ad.y_cc, _ov_3d_ad.z_cc,
+                        slice_axis or 'z', float(slice_pos or 0.5),
+                        int(overlay_nlevels or 5),
+                        overlay_color or 'white',
+                        float(overlay_lw or 1.0),
+                    )
+                    for _ct in _ov3_traces:
+                        fig.add_trace(_ct)
+                elif _ov_3d_raw is not None and mode in ('isosurface', 'volume'):
+                    _ov_type = overlay_mode_sel or 'isosurface'
+                    # Compute range in transformed space so thresholds match
+                    # what _compute_isomesh sees after applying _tf internally.
+                    _ov_tf = _tf(_ov_3d_raw)
+                    _ov_vmin = float(np.nanmin(_ov_tf))
+                    _ov_vmax = float(np.nanmax(_ov_tf))
+                    _ov_rng = _ov_vmax - _ov_vmin if _ov_vmax > _ov_vmin else 1.0
+                    if _ov_type == 'isosurface':
+                        # Overlay isosurfaces of the second variable
+                        _ov_min_f = float(overlay_iso_min or 0.2)
+                        _ov_max_f = float(overlay_iso_max or 0.8)
+                        _ov_ilo = _ov_vmin + _ov_rng * _ov_min_f
+                        _ov_ihi = _ov_vmin + _ov_rng * max(_ov_max_f, _ov_min_f + 0.01)
+                        _ov_ds, _ox, _oy, _oz = _get_ds3(
+                            step, overlay_var, _ov_3d_raw,
+                            _ov_3d_ad.x_cc, _ov_3d_ad.y_cc, _ov_3d_ad.z_cc,
+                            500_000,
+                        )
+                        _ov_vx, _ov_vy, _ov_vz, _ov_fi, _ov_fj, _ov_fk, _ov_int = \
+                            _compute_isomesh(
+                                _ov_ds, _ox, _oy, _oz,
+                                _tf, _ov_ilo, _ov_ihi,
+                                int(overlay_nlevels or 3),
+                            )
+                        _ov_byval = overlay_iso_byval and 'byval' in overlay_iso_byval
+                        _ov_op = float(overlay_iso_opacity or 0.6)
+                        if _ov_byval:
+                            _ov_cscale = _lut_to_plotly_colorscale(cmap)
+                            fig.add_trace(go.Mesh3d(
+                                x=_ov_vx, y=_ov_vy, z=_ov_vz,
+                                i=_ov_fi, j=_ov_fj, k=_ov_fk,
+                                intensity=_ov_int, intensitymode='vertex',
+                                colorscale=_ov_cscale, cmin=_ov_ilo, cmax=_ov_ihi,
+                                colorbar=_make_cbar(overlay_var, _ov_ilo, _ov_ihi),
+                                showscale=True, opacity=_ov_op,
+                                lighting=dict(ambient=0.7, diffuse=0.9, specular=0.3,
+                                              roughness=0.5, fresnel=0.2),
+                                lightposition=dict(x=1000, y=500, z=500),
+                                flatshading=False,
+                            ))
+                        else:
+                            _ov_solid_cs = [[0, overlay_color or 'white'],
+                                            [1, overlay_color or 'white']]
+                            fig.add_trace(go.Mesh3d(
+                                x=_ov_vx, y=_ov_vy, z=_ov_vz,
+                                i=_ov_fi, j=_ov_fj, k=_ov_fk,
+                                intensity=np.zeros(len(_ov_vx), dtype=np.float32),
+                                intensitymode='vertex',
+                                colorscale=_ov_solid_cs, cmin=0, cmax=1,
+                                showscale=False, opacity=_ov_op,
+                                lighting=dict(ambient=0.7, diffuse=0.9, specular=0.3,
+                                              roughness=0.5, fresnel=0.2),
+                                lightposition=dict(x=1000, y=500, z=500),
+                                flatshading=False,
+                            ))
+                    else:
+                        # Overlay isovolume of the second variable
+                        _ov_vlo_f = float(overlay_vol_min or 0.0)
+                        _ov_vhi_f = float(overlay_vol_max or 1.0)
+                        _ov_vlo = _ov_vmin + _ov_rng * _ov_vlo_f
+                        _ov_vhi = _ov_vmin + _ov_rng * max(_ov_vhi_f, _ov_vlo_f + 0.01)
+                        _ov_ds, _ox, _oy, _oz = _get_ds3(
+                            step, overlay_var, _ov_3d_raw,
+                            _ov_3d_ad.x_cc, _ov_3d_ad.y_cc, _ov_3d_ad.z_cc,
+                            150_000,
+                        )
+                        _ov_X, _ov_Y, _ov_Z = np.meshgrid(
+                            _ox, _oy, _oz, indexing='ij')
+                        _ov_vf = _tf(_ov_ds.ravel()).astype(np.float32)
+                        _ov_vol_op = float(overlay_vol_opacity or 0.1)
+                        _ov_vol_ns = int(overlay_vol_nsurf or 15)
+                        _ov_cscale = _lut_to_plotly_colorscale(cmap)
+                        fig.add_trace(go.Volume(
+                            x=_ov_X.ravel().astype(np.float32),
+                            y=_ov_Y.ravel().astype(np.float32),
+                            z=_ov_Z.ravel().astype(np.float32),
+                            value=_ov_vf,
+                            isomin=_ov_vlo, isomax=_ov_vhi,
+                            opacity=_ov_vol_op, surface_count=_ov_vol_ns,
+                            colorscale=_ov_cscale, cmin=_ov_vmin, cmax=_ov_vmax,
+                            colorbar=_make_cbar(overlay_var, _ov_vmin, _ov_vmax),
+                        ))
             # Compute aspect ratio from domain extents so slices (which
             # have a constant coordinate on one axis) don't collapse that axis.
             dx = float(ad.x_cc[-1] - ad.x_cc[0]) if len(ad.x_cc) > 1 else 1.0
@@ -1220,12 +2046,16 @@ input[type=radio] + span, label { color: %(tx)s !important; }
             # rebuilding the full Plotly figure.  Dash merges the diff with
             # the existing browser figure and Plotly only re-draws the image,
             # saving ~100–200 ms of browser-side figure reconstruction per step.
+            # Disabled when contour overlay is active — contour traces change
+            # with step and are hard to patch surgically.
+            _has_overlay = overlay_var and overlay_var != '__none__'
             _trig = {t.get('prop_id', '') for t in (callback_context.triggered or [])}
-            _PATCH_OK = {'step-sel.value', 'vmin-inp.value', 'vmax-inp.value'}
+            _PATCH_OK = {'step-sel.data', 'vmin-inp.value', 'vmax-inp.value'}
             _do_patch = (
                 _trig                          # not initial render (empty set)
                 and '.' not in _trig           # not Dash synthetic init trigger
                 and _trig.issubset(_PATCH_OK)  # only step/range changed
+                and not _has_overlay           # no contour overlay active
             )
             if _do_patch:
                 # Check pre-encode cache first (populated by background prefetch)
@@ -1284,7 +2114,8 @@ input[type=radio] + span, label { color: %(tx)s !important; }
                     html.Span('  max ', style={'color': _MUTED}),
                     html.Span(f'{dmax:.4g}', style={'color': _RED}),
                 ])
-                return patch, status
+                _last_update_t[0] = time.perf_counter()
+                return patch, status, no_update, _SRV_HIDE, _GRAPH_SHOW
 
             # Full render: initial load or structural change (colormap, variable,
             # log scale, etc.)
@@ -1343,6 +2174,40 @@ input[type=radio] + span, label { color: %(tx)s !important; }
                 except (OSError, ValueError):
                     pass  # bubble overlay is best-effort; skip on read errors
 
+            # Contour overlay for 2D
+            if _has_overlay and overlay_var in ad.variables:
+                _ov_raw = ad.variables[overlay_var]
+                # If loaded via single-var mode, we need to load the overlay
+                # variable separately.
+                _ov_traces = _compute_contour_traces(
+                    _ov_raw, ad.x_cc, ad.y_cc,
+                    int(overlay_nlevels or 5),
+                    overlay_color or 'white',
+                    float(overlay_lw or 1.0),
+                )
+                for _ct in _ov_traces:
+                    fig.add_trace(_ct)
+            elif _has_overlay and overlay_var not in ad.variables:
+                # Single-var loading mode: overlay var needs a separate load
+                try:
+                    if read_one_var_func is not None:
+                        _ov_ad = _load((step, overlay_var),
+                                       lambda k: read_one_var_func(k[0], k[1]))
+                    else:
+                        _ov_ad = _load(step, read_func)
+                    if overlay_var in _ov_ad.variables:
+                        _ov_raw = _ov_ad.variables[overlay_var]
+                        _ov_traces = _compute_contour_traces(
+                            _ov_raw, _ov_ad.x_cc, _ov_ad.y_cc,
+                            int(overlay_nlevels or 5),
+                            overlay_color or 'white',
+                            float(overlay_lw or 1.0),
+                        )
+                        for _ct in _ov_traces:
+                            fig.add_trace(_ct)
+                except (OSError, ValueError, EOFError):
+                    pass  # contour overlay is best-effort
+
         else:                            # 1D
             plot_y = _tf(raw) if log else raw
             fig.add_trace(go.Scatter(
@@ -1388,7 +2253,14 @@ input[type=radio] + span, label { color: %(tx)s !important; }
         ])
 
 
-        return fig, status
+        _now = time.perf_counter()
+        _last_update_t[0] = _now
+        # Full render is heavier browser-side than a patch — add extra headroom
+        # so the browser has time to rebuild the WebGL scene before the next
+        # frame is sent.  For 3D with overlays this can take 1–2s.
+        _server_s = _now - _t0
+        _min_frame_gap[0] = max(0.8, min(3.0, _server_s + 0.7))
+        return fig, status, no_update, _SRV_HIDE, _GRAPH_SHOW
 
     # ------------------------------------------------------------------
     cons.print(f'\n[bold green]Interactive viz server:[/bold green] '
@@ -1404,5 +2276,12 @@ input[type=radio] + span, label { color: %(tx)s !important; }
             f'[dim]  If you see [bold]Address already in use[/bold], free the port with:[/dim]\n'
             f'  [bold]lsof -ti :{port} | xargs kill[/bold]'
         )
+    if ndim == 3 and not _KALEIDO_OK:
+        cons.print(
+            '[dim][yellow]Note:[/yellow] Kaleido is not available. '
+            '3D playback will use Plotly WebGL (slower over SSH).\n'
+            '    Install: pip install kaleido[/dim]'
+        )
+
     cons.print('[dim]\nCtrl+C to stop.[/dim]\n')
     app.run(debug=False, port=port, host=host)
