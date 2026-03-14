@@ -119,12 +119,14 @@ contains
         call s_find_num_ghost_points(num_gps)
         if (moving_immersed_boundary_flag) then
             call s_mpi_allreduce_integer_sum(num_gps, max_num_gps)
-            num_gps = min(max_num_gps*2, (m + 1)*(n + 1)*(p + 1))
+            max_num_gps = min(max_num_gps*2, (m + 1)*(n + 1)*(p + 1))
+        else
+            max_num_gps = num_gps
         end if
 
         ! set the size of the ghost point arrays to be the amount of points total, plus a factor of 2 buffer
         $:GPU_UPDATE(device='[num_gps]')
-        @:ALLOCATE(ghost_points(1:num_gps))
+        @:ALLOCATE(ghost_points(1:max_num_gps))
 
         $:GPU_ENTER_DATA(copyin='[ghost_points]')
         call s_find_ghost_points(ghost_points)
