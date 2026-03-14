@@ -100,9 +100,9 @@ def _print_changes_report(differences: dict, verbose: bool):
     print("\n" + "=" * 70)
     print("VALIDATION CHANGED!")
     print("=" * 70)
-    if differences['changed_validation']:
+    if differences["changed_validation"]:
         print(f"  {len(differences['changed_validation'])} cases have different validation results")
-    if differences['removed_cases']:
+    if differences["removed_cases"]:
         print(f"  {len(differences['removed_cases'])} cases were removed")
     print("\nIf this is expected, run 'build' to update the safety net.")
 
@@ -138,7 +138,7 @@ def verify_safety_net(verbose: bool = True) -> bool:
     if verbose:
         print_comparison_report(differences)
 
-    has_changes = bool(differences['changed_validation'] or differences['removed_cases'])
+    has_changes = bool(differences["changed_validation"] or differences["removed_cases"])
     if has_changes:
         _print_changes_report(differences, verbose)
         return False
@@ -194,7 +194,7 @@ def show_summary():
         print(f"  Total constraints: {coverage['summary']['total_constraints']}")
         print(f"  Check methods: {coverage['summary']['total_check_methods']}")
         print("  Top methods by constraint count:")
-        for method, count in coverage['summary']['methods_with_most_constraints'][:5]:
+        for method, count in coverage["summary"]["methods_with_most_constraints"][:5]:
             print(f"    {method}: {count}")
     else:
         print("\nConstraint Coverage: NOT FOUND")
@@ -202,20 +202,9 @@ def show_summary():
 
 def main():
     """Main entry point for command-line usage."""
-    parser = argparse.ArgumentParser(
-        description="Parameter Validation Test Safety Net"
-    )
-    parser.add_argument(
-        "command",
-        choices=["build", "verify", "summary", "inventory", "coverage",
-                 "negative", "mutation"],
-        help="Command to run"
-    )
-    parser.add_argument(
-        "-q", "--quiet",
-        action="store_true",
-        help="Reduce output verbosity"
-    )
+    parser = argparse.ArgumentParser(description="Parameter Validation Test Safety Net")
+    parser.add_argument("command", choices=["build", "verify", "summary", "inventory", "coverage", "negative", "mutation"], help="Command to run")
+    parser.add_argument("-q", "--quiet", action="store_true", help="Reduce output verbosity")
 
     args = parser.parse_args()
     verbose = not args.quiet
@@ -233,9 +222,11 @@ def main():
         print_coverage_report()
     elif args.command == "negative":
         from .negative_tests import print_test_report
+
         print_test_report()
     elif args.command == "mutation":
         from .mutation_tests import print_mutation_report
+
         print_mutation_report()
 
 

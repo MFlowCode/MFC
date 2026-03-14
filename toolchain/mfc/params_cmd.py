@@ -59,9 +59,9 @@ def _collapse_indexed_params(matches):
     """
     # Patterns for different index positions
     # Pattern 1: prefix(N)%suffix or prefix(N)%suffix(M)
-    prefix_pattern = re.compile(r'^([^(]+)\((\d+)\)%(.+)$')
+    prefix_pattern = re.compile(r"^([^(]+)\((\d+)\)%(.+)$")
     # Pattern 2: name(N) or name(N, M) at end
-    suffix_pattern = re.compile(r'^(.+)\((\d+)(?:,\s*(\d+))?\)$')
+    suffix_pattern = re.compile(r"^(.+)\((\d+)(?:,\s*(\d+))?\)$")
 
     # Two-level grouping: first by base pattern (with indices replaced), then collect indices
     groups = {}  # normalized_pattern -> {indices: [...], param_type, stages, pattern_type}
@@ -94,10 +94,10 @@ def _collapse_indexed_params(matches):
 
             if base_pattern not in groups:
                 groups[base_pattern] = {
-                    'indices': [],
-                    'param_type': param.param_type,
-                                    }
-            groups[base_pattern]['indices'].append((indices_key, param))
+                    "indices": [],
+                    "param_type": param.param_type,
+                }
+            groups[base_pattern]["indices"].append((indices_key, param))
             continue
 
         # Try suffix-only pattern: name(N) or name(N, M)
@@ -116,26 +116,26 @@ def _collapse_indexed_params(matches):
 
             if base_pattern not in groups:
                 groups[base_pattern] = {
-                    'indices': [],
-                    'param_type': param.param_type,
-                                    }
-            groups[base_pattern]['indices'].append((indices_key, param))
+                    "indices": [],
+                    "param_type": param.param_type,
+                }
+            groups[base_pattern]["indices"].append((indices_key, param))
             continue
 
         # No index pattern - add as-is
         if name not in groups:
             groups[name] = {
-                'indices': [(None, param)],
-                'param_type': param.param_type,
-                            }
+                "indices": [(None, param)],
+                "param_type": param.param_type,
+            }
         else:
-            groups[name]['indices'].append((None, param))
+            groups[name]["indices"].append((None, param))
 
     # Build collapsed results
     collapsed = []
 
     for pattern, data in sorted(groups.items()):
-        indices = data['indices']
+        indices = data["indices"]
         param = indices[0][1]  # Get param from first entry
         count = len(indices)
 
@@ -148,11 +148,11 @@ def _collapse_indexed_params(matches):
             # Reconstruct the actual name
             actual_name = pattern
             if idx_tuple[0] is not None:
-                actual_name = actual_name.replace('(N)', f'({idx_tuple[0]})', 1)
+                actual_name = actual_name.replace("(N)", f"({idx_tuple[0]})", 1)
             if idx_tuple[1] is not None:
-                actual_name = actual_name.replace('(M)', f'({idx_tuple[1]})', 1)
+                actual_name = actual_name.replace("(M)", f"({idx_tuple[1]})", 1)
             if idx_tuple[2] is not None:
-                actual_name = actual_name.replace('(K)', f'({idx_tuple[2]})', 1)
+                actual_name = actual_name.replace("(K)", f"({idx_tuple[2]})", 1)
             collapsed.append((actual_name, param, 1))
         else:
             # Multiple indices - build range string
@@ -213,7 +213,7 @@ def _show_feature_groups(registry):
     cons.print("  Use './mfc.sh params --feature <name>' to see parameters for a feature.")
     cons.print()
     cons.print(f"  {'Feature':<20} {'Description'}")
-    cons.print(f"  {'-'*20} {'-'*50}")
+    cons.print(f"  {'-' * 20} {'-' * 50}")
 
     # Get all tags from registry and show with descriptions
     all_tags = registry.get_all_tags()
@@ -290,7 +290,7 @@ def _show_families(registry, limit):
     cons.print("[bold]Parameter Families[/bold]")
     cons.print()
     cons.print(f"  {'Family':<40} {'Count':>6}")
-    cons.print(f"  {'-'*40} {'-'*6}")
+    cons.print(f"  {'-' * 40} {'-' * 6}")
 
     for prefix, count in sorted_families[:limit]:
         cons.print(f"  {prefix:<40} {count:>6}")
@@ -382,10 +382,10 @@ def _show_collapsed_results(collapsed, describe=False):
         # Compact table mode
         if has_ranges:
             cons.print(f"  {'Parameter':<40} {'Type':12} {'#':>4}  {'Index Range'}")
-            cons.print(f"  {'-'*40} {'-'*12} {'-'*4}  {'-'*15}")
+            cons.print(f"  {'-' * 40} {'-' * 12} {'-' * 4}  {'-' * 15}")
         else:
             cons.print(f"  {'Parameter':<40} {'Type':12}")
-            cons.print(f"  {'-'*40} {'-'*12}")
+            cons.print(f"  {'-' * 40} {'-' * 12}")
 
         for item in collapsed:
             if len(item) == 4:
@@ -407,6 +407,7 @@ def _show_collapsed_results(collapsed, describe=False):
 def _suggest_alternatives(registry, query):
     """Suggest similar parameter names."""
     import difflib
+
     all_names = list(registry.all_params.keys())
     suggestions = difflib.get_close_matches(query, all_names, n=5, cutoff=0.5)
 

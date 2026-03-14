@@ -27,6 +27,11 @@ from .registry import REGISTRY, RegistryFrozenError
 from .schema import ParamDef, ParamType
 
 __all__ = [
-    'REGISTRY', 'RegistryFrozenError', 'ParamDef', 'ParamType',
-    'CONSTRAINTS', 'DEPENDENCIES', 'get_value_label',
+    "REGISTRY",
+    "RegistryFrozenError",
+    "ParamDef",
+    "ParamType",
+    "CONSTRAINTS",
+    "DEPENDENCIES",
+    "get_value_label",
 ]

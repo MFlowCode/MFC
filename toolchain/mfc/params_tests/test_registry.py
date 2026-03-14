@@ -28,10 +28,7 @@ class TestParamRegistry(unittest.TestCase):
         reg.register(ParamDef(name="test", param_type=ParamType.INT, tags={"mhd"}))
         reg.register(ParamDef(name="test", param_type=ParamType.INT, tags={"physics"}))
 
-        self.assertEqual(
-            reg.all_params["test"].tags,
-            {"mhd", "physics"}
-        )
+        self.assertEqual(reg.all_params["test"].tags, {"mhd", "physics"})
 
     def test_register_type_mismatch_raises(self):
         """Registering same param with different type should raise."""
@@ -111,11 +108,13 @@ class TestGlobalRegistry(unittest.TestCase):
     def test_global_registry_is_frozen(self):
         """Global REGISTRY should be frozen after import."""
         from ..params import REGISTRY
+
         self.assertTrue(REGISTRY.is_frozen)
 
     def test_global_registry_has_params(self):
         """Global REGISTRY should have parameters loaded."""
         from ..params import REGISTRY
+
         self.assertGreater(len(REGISTRY.all_params), 3500)
 
     def test_global_registry_cannot_be_modified(self):
@@ -123,9 +122,7 @@ class TestGlobalRegistry(unittest.TestCase):
         from ..params import REGISTRY
 
         with self.assertRaises(RegistryFrozenError):
-            REGISTRY.register(
-                ParamDef(name="injected", param_type=ParamType.INT)
-            )
+            REGISTRY.register(ParamDef(name="injected", param_type=ParamType.INT))
 
 
 if __name__ == "__main__":

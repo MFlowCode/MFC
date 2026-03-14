@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 CACHE_MAX: int = 40
 _cache: dict = {}
 _cache_order: list = []
-_in_flight: set = set()   # steps currently being prefetched
+_in_flight: set = set()  # steps currently being prefetched
 _lock = threading.Lock()
 
 _prefetch_pool: Optional[ThreadPoolExecutor] = None
@@ -43,8 +43,7 @@ def _get_prefetch_pool() -> ThreadPoolExecutor:
     global _prefetch_pool  # noqa: PLW0603
     with _prefetch_pool_lock:
         if _prefetch_pool is None:
-            _prefetch_pool = ThreadPoolExecutor(
-                max_workers=3, thread_name_prefix='mfc_prefetch')
+            _prefetch_pool = ThreadPoolExecutor(max_workers=3, thread_name_prefix="mfc_prefetch")
             atexit.register(_prefetch_pool.shutdown, wait=False)
         return _prefetch_pool
 

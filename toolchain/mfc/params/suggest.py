@@ -17,6 +17,7 @@ from typing import Iterable, List
 # Import rapidfuzz - falls back gracefully if not installed
 try:
     from rapidfuzz import fuzz, process
+
     RAPIDFUZZ_AVAILABLE = True
 except ImportError:
     RAPIDFUZZ_AVAILABLE = False

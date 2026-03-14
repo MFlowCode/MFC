@@ -9,6 +9,7 @@ Supports 1D line plots and 2D heatmaps only.
 
 Requires: textual>=0.43, textual-plotext, plotext
 """
+
 from __future__ import annotations
 
 from typing import Callable, List, Optional, Tuple
@@ -43,8 +44,15 @@ from . import _step_cache
 
 # Colormaps available via [c] cycling
 _CMAPS: List[str] = [
-    'viridis', 'plasma', 'inferno', 'magma', 'cividis',
-    'coolwarm', 'RdBu_r', 'seismic', 'gray',
+    "viridis",
+    "plasma",
+    "inferno",
+    "magma",
+    "cividis",
+    "coolwarm",
+    "RdBu_r",
+    "seismic",
+    "gray",
 ]
 
 _load = _step_cache.load
@@ -68,6 +76,7 @@ _HEADER_ROWS: int = 1
 # Plot widget
 # ---------------------------------------------------------------------------
 
+
 class MFCPlot(PlotextPlot):
     """Plotext plot widget.  Caller sets ._x_cc / ._y_cc / ._data / ._ndim /
     ._varname / ._step before calling .refresh()."""
@@ -78,6 +87,7 @@ class MFCPlot(PlotextPlot):
 
     class Clicked(Message):
         """Posted when the user clicks a heatmap cell (Feature 5)."""
+
         def __init__(self, x_val: float, y_val: float, val: float) -> None:
             self.x_val = x_val
             self.y_val = y_val
@@ -124,9 +134,7 @@ class MFCPlot(PlotextPlot):
         self._zoom = (0.0, 1.0, 0.0, 1.0)
         self.refresh()
 
-    def _zoom_around(
-        self, cx_frac: float, cy_frac: float, factor: float
-    ) -> None:
+    def _zoom_around(self, cx_frac: float, cy_frac: float, factor: float) -> None:
         """Zoom by *factor* centred at *(cx_frac, cy_frac)* in [0,1]² of current view."""
         x0, x1, y0, y1 = self._zoom
         x_span = x1 - x0
@@ -197,7 +205,7 @@ class MFCPlot(PlotextPlot):
         x_cc = self._x_cc
         y_cc = self._y_cc if self._y_cc is not None else np.array([0.0, 1.0])
         data = self._data
-        x_val = float(x_cc[xi])   # type: ignore[index]
+        x_val = float(x_cc[xi])  # type: ignore[index]
         y_val = float(y_cc[yi])
         val = float(data[xi, yi])  # type: ignore[index]
         self.post_message(MFCPlot.Clicked(x_val, y_val, val))
@@ -258,11 +266,11 @@ class MFCPlot(PlotextPlot):
 
         w_ideal = int(round(h_plot_avail * char_ratio))
         if w_ideal <= w_map_avail:
-            w_map  = max(w_ideal, 4)
+            w_map = max(w_ideal, 4)
             h_plot = h_plot_avail
         else:
             h_plot = max(int(round(w_map_avail / char_ratio)), 4)
-            w_map  = w_map_avail
+            w_map = w_map_avail
 
         # Apply zoom window to data index ranges (Feature 6).
         x0_f, x1_f, y0_f, y1_f = self._zoom
@@ -285,10 +293,10 @@ class MFCPlot(PlotextPlot):
         bubble_cells: set = set()
         bubbles = self._bubbles
         if bubbles is not None and len(bubbles) > 0:
-            x_phys = x_cc[ix]   # type: ignore[index]
+            x_phys = x_cc[ix]  # type: ignore[index]
             y_phys = y_cc_2d[iy]
-            x_min, x_max = float(x_phys[0]),  float(x_phys[-1])
-            y_min, y_max = float(y_phys[0]),  float(y_phys[-1])
+            x_min, x_max = float(x_phys[0]), float(x_phys[-1])
+            y_min, y_max = float(y_phys[0]), float(y_phys[-1])
             x_range = max(abs(x_max - x_min), 1e-30)
             y_range = max(abs(y_max - y_min), 1e-30)
             for b in bubbles:
@@ -372,26 +380,19 @@ class MFCPlot(PlotextPlot):
         log_tag = "  [log]" if log_active else ("  [log n/a]" if self._log_scale else "")
         frozen_tag = "  [frozen]" if self._vmin is not None else ""
         zoomed_tag = "  [zoom]" if self._zoom != (0.0, 1.0, 0.0, 1.0) else ""
-        header = RichText(
-            f" {self._varname}  (step {self._step})"
-            f"   [{vmin:.3g}, {vmax:.3g}]{log_tag}{frozen_tag}{zoomed_tag}",
-            style="bold"
-        )
+        header = RichText(f" {self._varname}  (step {self._step})   [{vmin:.3g}, {vmax:.3g}]{log_tag}{frozen_tag}{zoomed_tag}", style="bold")
         # Show the visible coordinate range (reflects zoom when active).
-        x_lo = float(x_cc[ix[0]])   # type: ignore[index]
+        x_lo = float(x_cc[ix[0]])  # type: ignore[index]
         x_hi = float(x_cc[ix[-1]])  # type: ignore[index]
         y_vis = y_cc_2d[iy]
-        footer = RichText(
-            f" x: [{x_lo:.3f} \u2026 {x_hi:.3f}]"
-            f"   y: [{float(y_vis[0]):.3f} \u2026 {float(y_vis[-1]):.3f}]",
-            style="dim"
-        )
+        footer = RichText(f" x: [{x_lo:.3f} \u2026 {x_hi:.3f}]   y: [{float(y_vis[0]):.3f} \u2026 {float(y_vis[-1]):.3f}]", style="dim")
         return RichGroup(header, *lines, footer)
 
 
 # ---------------------------------------------------------------------------
 # Main TUI app
 # ---------------------------------------------------------------------------
+
 
 class MFCTuiApp(App):
     """Textual TUI for MFC post-processed data."""
@@ -529,9 +530,7 @@ class MFCTuiApp(App):
 
     def on_mfcplot_clicked(self, event: MFCPlot.Clicked) -> None:
         """Receive the heatmap click message and update the status bar."""
-        self._click_info = (
-            f"  │  x={event.x_val:.4f}  y={event.y_val:.4f}  val={event.val:.6g}"
-        )
+        self._click_info = f"  │  x={event.x_val:.4f}  y={event.y_val:.4f}  val={event.val:.6g}"
         self.query_one("#status", Static).update(self._status_text())
 
     # ------------------------------------------------------------------
@@ -573,7 +572,15 @@ class MFCTuiApp(App):
                 pass  # bubble overlay is best-effort; skip on read errors
 
         self.call_from_thread(
-            self._apply_data, assembled, data, step, var, cmap, log, frozen, bubbles,
+            self._apply_data,
+            assembled,
+            data,
+            step,
+            var,
+            cmap,
+            log,
+            frozen,
+            bubbles,
         )
 
     def _apply_data(
@@ -625,13 +632,7 @@ class MFCTuiApp(App):
         if self.playing:
             flags.append("▶")
         flag_str = ("  " + "  ".join(flags)) if flags else ""
-        return (
-            f" step {step}  [{self.step_idx + 1}/{total}]"
-            f"  var: {self.var_name}"
-            f"  cmap: {self.cmap_name}"
-            f"{flag_str}"
-            f"{self._click_info}"
-        )
+        return f" step {step}  [{self.step_idx + 1}/{total}]  var: {self.var_name}  cmap: {self.cmap_name}{flag_str}{self._click_info}"
 
     # ------------------------------------------------------------------
     # Actions
@@ -681,6 +682,7 @@ class MFCTuiApp(App):
 # Public entry point
 # ---------------------------------------------------------------------------
 
+
 def run_tui(
     init_var: Optional[str],
     steps: List[int],
@@ -690,10 +692,7 @@ def run_tui(
 ) -> None:
     """Launch the Textual TUI for MFC visualization (1D/2D only)."""
     if ndim not in (1, 2):
-        raise MFCException(
-            f"Terminal UI only supports 1D and 2D data (got ndim={ndim}). "
-            "Use --interactive for 3D data."
-        )
+        raise MFCException(f"Terminal UI only supports 1D and 2D data (got ndim={ndim}). Use --interactive for 3D data.")
 
     # Preload first step to discover variables
     first = _load(steps[0], read_func)
@@ -703,14 +702,8 @@ def run_tui(
     if init_var not in varnames:
         init_var = varnames[0]
 
-    cons.print(
-        f"[bold]Launching TUI[/bold] — {len(steps)} step(s), "
-        f"{len(varnames)} variable(s)"
-    )
-    cons.print(
-        "[dim]  ,/. or ←/→  step  •  space play  •  l log  •  f freeze"
-        "  •  c cmap  •  ↑↓ var  •  scroll zoom  •  r reset zoom  •  click value  •  q quit[/dim]"
-    )
+    cons.print(f"[bold]Launching TUI[/bold] — {len(steps)} step(s), {len(varnames)} variable(s)")
+    cons.print("[dim]  ,/. or ←/→  step  •  space play  •  l log  •  f freeze  •  c cmap  •  ↑↓ var  •  scroll zoom  •  r reset zoom  •  click value  •  q quit[/dim]")
 
     _step_cache.seed(steps[0], first)
 

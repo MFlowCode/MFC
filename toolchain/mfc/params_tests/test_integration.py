@@ -20,10 +20,7 @@ class TestParamTypeJsonSchema(unittest.TestCase):
             schema = param_type.json_schema
             self.assertIsInstance(schema, dict)
             # Schema must have either "type" or "enum" key
-            self.assertTrue(
-                "type" in schema or "enum" in schema,
-                f"{param_type.name} schema has neither 'type' nor 'enum'"
-            )
+            self.assertTrue("type" in schema or "enum" in schema, f"{param_type.name} schema has neither 'type' nor 'enum'")
 
     def test_int_schema(self):
         """INT should map to integer JSON schema."""
@@ -222,10 +219,7 @@ class TestValidatorIntegration(unittest.TestCase):
 
         validator_log_params = _get_logical_params_from_registry()
 
-        registry_log_params = {
-            name for name, p in REGISTRY.all_params.items()
-            if p.param_type == ParamType.LOG
-        }
+        registry_log_params = {name for name, p in REGISTRY.all_params.items() if p.param_type == ParamType.LOG}
 
         self.assertEqual(validator_log_params, registry_log_params)
 

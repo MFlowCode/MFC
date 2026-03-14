@@ -35,7 +35,6 @@ DESCRIPTIONS = {
     "loops_x": "Number of times to apply grid stretching in x",
     "loops_y": "Number of times to apply grid stretching in y",
     "loops_z": "Number of times to apply grid stretching in z",
-
     # Time stepping
     "dt": "Time step size",
     "t_step_start": "Starting time step index",
@@ -52,7 +51,6 @@ DESCRIPTIONS = {
     "adap_dt": "Enable adaptive time stepping",
     "adap_dt_tol": "Tolerance for adaptive time stepping",
     "adap_dt_max_iters": "Maximum iterations for adaptive time stepping",
-
     # Model equations
     "model_eqns": "Model equations",
     "num_fluids": "Number of fluid components",
@@ -60,7 +58,6 @@ DESCRIPTIONS = {
     "mpp_lim": "Enable mixture pressure positivity limiter",
     "mixture_err": "Enable mixture error checking",
     "alt_soundspeed": "Use alternative sound speed formulation",
-
     # WENO reconstruction
     "weno_order": "Order of WENO reconstruction",
     "weno_eps": "WENO epsilon parameter for smoothness",
@@ -73,18 +70,15 @@ DESCRIPTIONS = {
     "weno_Re_flux": "Enable WENO for viscous fluxes",
     "weno_avg": "Enable WENO averaging",
     "null_weights": "Allow null WENO weights",
-
     # MUSCL reconstruction
     "recon_type": "Reconstruction type",
     "muscl_order": "Order of MUSCL reconstruction",
     "muscl_lim": "MUSCL limiter type",
-
     # Riemann solver
     "riemann_solver": "Riemann solver",
     "wave_speeds": "Wave speed estimates",
     "avg_state": "Average state for Riemann solver",
     "low_Mach": "Low Mach number correction",
-
     # Boundary conditions
     "bc_x%beg": "Boundary condition at x-begin (-1=periodic, -2=reflective, -3=symmetric, etc.)",
     "bc_x%end": "Boundary condition at x-end",
@@ -93,7 +87,6 @@ DESCRIPTIONS = {
     "bc_z%beg": "Boundary condition at z-begin",
     "bc_z%end": "Boundary condition at z-end",
     "num_bc_patches": "Number of boundary condition patches",
-
     # Physics models
     "bubbles_euler": "Enable Euler-Euler bubble model",
     "bubbles_lagrange": "Enable Lagrangian bubble tracking",
@@ -116,7 +109,6 @@ DESCRIPTIONS = {
     "hyper_cleaning_speed": "Wave speed for hyperbolic divergence cleaning",
     "hyper_cleaning_tau": "Damping time constant for hyperbolic divergence cleaning",
     "relativity": "Enable special relativity",
-
     # Output
     "run_time_info": "Output run-time information",
     "prim_vars_wrt": "Write primitive variables",
@@ -138,22 +130,17 @@ DESCRIPTIONS = {
     "c_wrt": "Write sound speed field",
     "omega_wrt": "Write vorticity field",
     "cf_wrt": "Write color function field",
-
     # Immersed boundaries
     "ib": "Enable immersed boundary method",
     "num_ibs": "Number of immersed boundary patches",
-
     # Acoustic sources
     "acoustic_source": "Enable acoustic source terms",
     "num_source": "Number of acoustic sources",
-
     # Probes and integrals
     "num_probes": "Number of probe points",
     "num_integrals": "Number of integral regions",
-
     # MPI/GPU
     "rdma_mpi": "Enable RDMA for MPI communication (GPUs)",
-
     # Misc
     "case_dir": "Case directory path",
     "cantera_file": "Cantera mechanism file for chemistry",
@@ -161,7 +148,6 @@ DESCRIPTIONS = {
     "old_ic": "Use initial conditions from previous simulation",
     "t_step_old": "Time step to restart from",
     "fd_order": "Finite difference order for gradients",
-
     # Additional simple params
     "thermal": "Thermal model selection",
     "relax_model": "Relaxation model type",
@@ -293,7 +279,6 @@ PATTERNS = [
     (r"patch_icpp\((\d+)\)%modal_r_min", "Min r when clipping for 2D modal patch {0}"),
     (r"patch_icpp\((\d+)\)%modal_use_exp_form", "Use exp form for 2D modal patch {0}"),
     (r"patch_icpp\((\d+)\)%sph_har_coeff\((\d+),(-?\d+)\)", "Spherical harmonic coeff (l={1}, m={2}) for patch {0}"),
-
     # fluid_pp patterns
     (r"fluid_pp\((\d+)\)%gamma", "Specific heat ratio for fluid {0}"),
     (r"fluid_pp\((\d+)\)%pi_inf", "Stiffness pressure for fluid {0}"),
@@ -311,7 +296,6 @@ PATTERNS = [
     (r"fluid_pp\((\d+)\)%k_v", "Thermal conductivity of vapor phase for fluid {0}"),
     (r"fluid_pp\((\d+)\)%cp_v", "Specific heat capacity (const. pressure) of vapor for fluid {0}"),
     (r"fluid_pp\((\d+)\)%D_v", "Vapor mass diffusivity for fluid {0}"),
-
     # patch_ib patterns
     (r"patch_ib\((\d+)\)%geometry", "Geometry type for immersed boundary {0}"),
     (r"patch_ib\((\d+)\)%x_centroid", "X-coordinate of centroid for IB patch {0}"),
@@ -338,7 +322,6 @@ PATTERNS = [
     (r"patch_ib\((\d+)\)%model_translate\((\d+)\)", "Model translation component {1} for IB patch {0}"),
     (r"patch_ib\((\d+)\)%model_scale\((\d+)\)", "Model scale component {1} for IB patch {0}"),
     (r"patch_ib\((\d+)\)%model_rotate\((\d+)\)", "Model rotation component {1} for IB patch {0}"),
-
     # bc patterns
     (r"bc_([xyz])%vel_in\((\d+)\)", "Inlet velocity component {1} at {0}-boundary"),
     (r"bc_([xyz])%vel_out\((\d+)\)", "Outlet velocity component {1} at {0}-boundary"),
@@ -351,7 +334,6 @@ PATTERNS = [
     (r"bc_([xyz])%grcbc_in", "Enable GRCBC at {0}-inlet"),
     (r"bc_([xyz])%grcbc_out", "Enable GRCBC at {0}-outlet"),
     (r"bc_([xyz])%grcbc_vel_out", "Enable GRCBC velocity at {0}-outlet"),
-
     # patch_bc patterns
     (r"patch_bc\((\d+)\)%geometry", "Geometry type for BC patch {0}"),
     (r"patch_bc\((\d+)\)%type", "BC type for patch {0}"),
@@ -360,7 +342,6 @@ PATTERNS = [
     (r"patch_bc\((\d+)\)%centroid\((\d+)\)", "Centroid component {1} for BC patch {0}"),
     (r"patch_bc\((\d+)\)%length\((\d+)\)", "Length component {1} for BC patch {0}"),
     (r"patch_bc\((\d+)\)%radius", "Radius for BC patch {0}"),
-
     # acoustic patterns
     (r"acoustic\((\d+)\)%loc\((\d+)\)", "Location component {1} for acoustic source {0}"),
     (r"acoustic\((\d+)\)%mag", "Magnitude for acoustic source {0}"),
@@ -386,12 +367,10 @@ PATTERNS = [
     (r"acoustic\((\d+)\)%bb_num_freq", "Number of broadband frequencies for source {0}"),
     (r"acoustic\((\d+)\)%bb_bandwidth", "Broadband bandwidth for acoustic source {0}"),
     (r"acoustic\((\d+)\)%bb_lowest_freq", "Lowest broadband frequency for source {0}"),
-
     # probe patterns
     (r"probe\((\d+)\)%x", "X-coordinate of probe {0}"),
     (r"probe\((\d+)\)%y", "Y-coordinate of probe {0}"),
     (r"probe\((\d+)\)%z", "Z-coordinate of probe {0}"),
-
     # integral patterns
     (r"integral\((\d+)\)%xmin", "X-min of integral region {0}"),
     (r"integral\((\d+)\)%xmax", "X-max of integral region {0}"),
@@ -399,7 +378,6 @@ PATTERNS = [
     (r"integral\((\d+)\)%ymax", "Y-max of integral region {0}"),
     (r"integral\((\d+)\)%zmin", "Z-min of integral region {0}"),
     (r"integral\((\d+)\)%zmax", "Z-max of integral region {0}"),
-
     # bub_pp patterns
     (r"bub_pp%R0ref", "Reference bubble radius"),
     (r"bub_pp%p0ref", "Reference pressure for bubbles"),
@@ -422,7 +400,6 @@ PATTERNS = [
     (r"bub_pp%R_v", "Gas constant of host in vapor state"),
     (r"bub_pp%R_g", "Gas constant of gas (bubble)"),
     (r"bub_pp%(\w+)", "Bubble parameter: {0}"),
-
     # Output array patterns
     (r"schlieren_alpha\((\d+)\)", "Schlieren coefficient for fluid {0}"),
     (r"alpha_rho_wrt\((\d+)\)", "Write partial density for fluid {0}"),
@@ -434,7 +411,6 @@ PATTERNS = [
     (r"flux_wrt\((\d+)\)", "Write flux component {0}"),
     (r"omega_wrt\((\d+)\)", "Write vorticity component {0}"),
     (r"chem_wrt_Y\((\d+)\)", "Write mass fraction of species {0}"),
-
     # Lagrangian output patterns - specific fields first
     (r"lag_pos_wrt", "Write Lagrangian bubble position"),
     (r"lag_pos_prev_wrt", "Write Lagrangian bubble previous position"),
@@ -454,11 +430,9 @@ PATTERNS = [
     (r"lag_id_wrt", "Write Lagrangian bubble ID"),
     (r"lag_txt_wrt", "Write Lagrangian data to text files"),
     (r"lag_(\w+)_wrt", "Write Lagrangian {0} field"),
-
     # Body force patterns
     (r"([kgwp])_([xyz])", "Body force parameter {0} in {1}-direction"),
     (r"bf_([xyz])", "Enable body force in {0}-direction"),
-
     # simplex patterns
     (r"simplex_params%perturb_dens\((\d+)\)", "Enable density perturbation for fluid {0}"),
     (r"simplex_params%perturb_dens_freq\((\d+)\)", "Density perturbation frequency for fluid {0}"),
@@ -468,7 +442,6 @@ PATTERNS = [
     (r"simplex_params%perturb_vel_freq\((\d+)\)", "Velocity perturbation frequency for direction {0}"),
     (r"simplex_params%perturb_vel_scale\((\d+)\)", "Velocity perturbation scale for direction {0}"),
     (r"simplex_params%perturb_vel_offset\((\d+),(\d+)\)", "Velocity perturbation offset ({1}) for direction {0}"),
-
     # lag_params patterns - specific fields first
     (r"lag_params%solver_approach", "Lagrangian solver approach (1=one-way, 2=two-way coupling)"),
     (r"lag_params%cluster_type", "Cluster model for pressure at infinity"),
@@ -488,14 +461,12 @@ PATTERNS = [
     (r"lag_params%rho0", "Initial density"),
     (r"lag_params%x0", "Initial bubble position"),
     (r"lag_params%(\w+)", "Lagrangian tracking parameter: {0}"),
-
     # chem_params patterns - specific fields first
     (r"chem_params%diffusion", "Enable species diffusion for chemistry"),
     (r"chem_params%reactions", "Enable chemical reactions"),
     (r"chem_params%gamma_method", "Gamma calculation method (1=formulation, 2=cp/cv ratio)"),
     (r"chem_params%transport_model", "Transport model selection for chemistry"),
     (r"chem_params%(\w+)", "Chemistry parameter: {0}"),
-
     # fluid_rho patterns
     (r"fluid_rho\((\d+)\)", "Reference density for fluid {0}"),
 ]
@@ -518,6 +489,7 @@ def get_description(param_name: str) -> str:
 
     # 3. Auto-generated description from registry (set by _auto_describe at registration)
     from . import REGISTRY
+
     param = REGISTRY.all_params.get(param_name)
     if param and param.description:
         return param.description
@@ -651,6 +623,7 @@ def get_math_symbol(param_name: str) -> str:
     Symbols are defined via math= in the _r() calls in definitions.py.
     """
     from . import REGISTRY
+
     param = REGISTRY.all_params.get(param_name)
     return param.math_symbol if param else ""
 

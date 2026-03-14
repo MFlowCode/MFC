@@ -123,9 +123,15 @@ def _check_condition(
             else:
                 got = params[req_param]
                 if got not in expected_vals:
-                    errors.append(dependency_value_error(
-                        name, condition_label, req_param, expected_vals, got,
-                    ))
+                    errors.append(
+                        dependency_value_error(
+                            name,
+                            condition_label,
+                            req_param,
+                            expected_vals,
+                            got,
+                        )
+                    )
 
 
 def check_dependencies(params: Dict[str, Any]) -> Tuple[List[str], List[str]]:
@@ -163,7 +169,12 @@ def check_dependencies(params: Dict[str, Any]) -> Tuple[List[str], List[str]]:
             for trigger_val, condition in deps["when_value"].items():
                 if value == trigger_val:
                     _check_condition(
-                        name, condition, f"={trigger_val}", params, errors, warnings,
+                        name,
+                        condition,
+                        f"={trigger_val}",
+                        params,
+                        errors,
+                        warnings,
                     )
 
     return errors, warnings

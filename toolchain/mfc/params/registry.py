@@ -96,10 +96,7 @@ class ParamRegistry:
                 a different type (type mismatch is not allowed).
         """
         if self._frozen:
-            raise RegistryFrozenError(
-                f"Cannot register '{param.name}': registry is frozen. "
-                "All parameters must be registered during module initialization."
-            )
+            raise RegistryFrozenError(f"Cannot register '{param.name}': registry is frozen. All parameters must be registered during module initialization.")
 
         if param.name in self._params:
             existing = self._params[param.name]
@@ -156,16 +153,9 @@ class ParamRegistry:
         Returns:
             JSON schema dict compatible with fastjsonschema.
         """
-        properties = {
-            name: param.param_type.json_schema
-            for name, param in self.all_params.items()
-        }
+        properties = {name: param.param_type.json_schema for name, param in self.all_params.items()}
 
-        return {
-            "type": "object",
-            "properties": properties,
-            "additionalProperties": False
-        }
+        return {"type": "object", "properties": properties, "additionalProperties": False}
 
     def get_validator(self):
         """
@@ -185,6 +175,7 @@ def _get_cached_validator(registry_id: int):
     Note: registry_id is used as cache key to invalidate when registry changes.
     """
     import fastjsonschema
+
     return fastjsonschema.compile(REGISTRY.get_json_schema())
 
 
