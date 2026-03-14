@@ -234,6 +234,9 @@ jobs:
           # submit-slurm-job.sh can detect and cancel stale SLURM jobs on retry.
           clean: false
 
+      - name: Clean stale output files
+        run:  rm -f *.out
+
       - name: Build (login node)
         if:   matrix.cluster != 'phoenix'
         timeout-minutes: 60
@@ -316,6 +319,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           clean: false
+
+      - name: Clean stale output files
+        run:  rm -f *.out
 
       - name: Pre-Build (SLURM)
         if:   matrix.cluster == 'phoenix'
