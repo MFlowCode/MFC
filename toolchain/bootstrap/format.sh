@@ -84,9 +84,12 @@ if [[ -n "$FORTRAN_FILES" ]]; then
     echo "$FORTRAN_FILES" | while read -r f; do echo "> $f"; done
 fi
 
-# Format Python files with ruff (auto-fix lint issues, then format)
+# Apply safe auto-fixes (import sorting, etc.) before formatting.
+# --fix-only exits 0 even when unfixable violations remain — those are
+# caught later by `ruff check` in lint.sh.  This only errors if ruff
+# itself fails to run.
 if ! ruff check --fix-only $PYTHON_DIRS; then
-    error "Auto-fixing Python lint issues failed."
+    error "ruff failed to run. Check your ruff installation."
     exit 1
 fi
 if ! ruff format $PYTHON_DIRS; then

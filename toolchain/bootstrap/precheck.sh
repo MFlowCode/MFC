@@ -103,13 +103,17 @@ PID_LINT=$!
 
 # Source lint (fast grep checks — run inline)
 SOURCE_FAILED=0
+SOURCE_MSGS=""
 if grep -qiR '!\$acc\|!\$omp' --exclude="parallel_macros.fpp" --exclude="acc_macros.fpp" --exclude="omp_macros.fpp" --exclude="shared_parallel_macros.fpp" --exclude="syscheck.fpp" ./src/* 2>/dev/null; then
+    SOURCE_MSGS+="Found raw OpenACC/OpenMP directives. Use macros instead.\n"
     SOURCE_FAILED=1
 fi
 if grep -qiR 'double_precision\|dsqrt\|dexp\|dlog\|dble\|dabs\|double\ precision\|real(8)\|real(4)\|dprod\|dmin\|dmax\|dfloat\|dreal\|dcos\|dsin\|dtan\|dsign\|dtanh\|dsinh\|dcosh\|d0' --exclude-dir=syscheck --exclude="*nvtx*" --exclude="*precision_select*" ./src/* 2>/dev/null; then
+    SOURCE_MSGS+="Found double precision intrinsics. Use generic intrinsics.\n"
     SOURCE_FAILED=1
 fi
 if grep -qiR -e '\.\.\.' -e '\-\-\-' -e '===' ./src/* 2>/dev/null; then
+    SOURCE_MSGS+="Found junk code patterns (..., ---, ===) in source.\n"
     SOURCE_FAILED=1
 fi
 
@@ -161,7 +165,9 @@ log "[$CYAN 4/5$COLOR_RESET] Running$MAGENTA source lint$COLOR_RESET checks..."
 if [ $SOURCE_FAILED -eq 0 ]; then
     ok "Source lint passed."
 else
-    error "Source lint failed."
+    echo -e "$SOURCE_MSGS" | while read -r msg; do
+        [ -n "$msg" ] && error "$msg"
+    done
     FAILED=1
 fi
 
