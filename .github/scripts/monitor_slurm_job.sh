@@ -52,6 +52,15 @@ get_job_state() {
   # Fallback to sacct (works for completed/historical jobs)
   if command -v sacct >/dev/null 2>&1; then
     state=$(sacct -j "$jid" -n -X -P -o State 2>/dev/null | head -n1 | cut -d'|' -f1 || true)
+    # When a job is preempted+requeued, sacct -X reports PREEMPTED for the
+    # original attempt while the requeued run may have completed.  Check all
+    # records (without -X) for a terminal state that supersedes PREEMPTED.
+    if [ "$state" = "PREEMPTED" ]; then
+      requeue_state=$(sacct -j "$jid" -n -P -o State 2>/dev/null | grep -v PREEMPTED | head -n1 | cut -d'|' -f1 || true)
+      if [ -n "$requeue_state" ]; then
+        state="$requeue_state"
+      fi
+    fi
     if [ -n "$state" ]; then
       echo "$state"
       return
