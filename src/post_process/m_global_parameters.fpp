@@ -177,6 +177,11 @@ module m_global_parameters
     integer, allocatable, dimension(:) :: proc_coords !<
     !! Processor coordinates in MPI_CART_COMM
 
+    type(int_bounds_info), dimension(3) :: nidx
+
+    integer, allocatable, dimension(:, :, :) :: neighbor_ranks
+    !! Neighbor processor ranks
+
     integer, allocatable, dimension(:) :: start_idx !<
     !! Starting cell-center index of local processor in global grid
 
@@ -673,11 +678,6 @@ contains
                 end if
             end if
 
-            if (bubbles_lagrange) then
-                beta_idx = sys_size + 1
-                sys_size = beta_idx
-            end if
-
             if (mhd) then
                 B_idx%beg = sys_size + 1
                 if (n == 0) then
@@ -804,6 +804,11 @@ contains
             if (surface_tension) then
                 c_idx = sys_size + 1
                 sys_size = c_idx
+            end if
+
+            if (bubbles_lagrange) then
+                beta_idx = sys_size + 1
+                sys_size = beta_idx
             end if
 
             if (cont_damage) then
@@ -1048,6 +1053,8 @@ contains
 
         if (ib) MPI_IO_IB_DATA%var%sf => null()
 #endif
+
+        if (allocated(neighbor_ranks)) deallocate(neighbor_ranks)
 
     end subroutine s_finalize_global_parameters_module
 

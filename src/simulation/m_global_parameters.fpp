@@ -54,26 +54,23 @@ module m_global_parameters
 
     !> @name Cell-boundary (CB) locations in the x-, y- and z-directions, respectively
     !> @{
-
     real(wp), target, allocatable, dimension(:) :: x_cb, y_cb, z_cb
+    type(bounds_info), dimension(3) :: glb_bounds !<
     !> @}
 
     !> @name Cell-center (CC) locations in the x-, y- and z-directions, respectively
     !> @{
-
     real(wp), target, allocatable, dimension(:) :: x_cc, y_cc, z_cc
     !> @}
-    !type(bounds_info) :: x_domain, y_domain, z_domain !<
-    !! Locations of the domain bounds in the x-, y- and z-coordinate directions
+
     !> @name Cell-width distributions in the x-, y- and z-directions, respectively
     !> @{
-
     real(wp), target, allocatable, dimension(:) :: dx, dy, dz
     !> @}
 
     real(wp) :: dt !< Size of the time-step
 
-    $:GPU_DECLARE(create='[x_cb,y_cb,z_cb,x_cc,y_cc,z_cc,dx,dy,dz,dt,m,n,p]')
+    $:GPU_DECLARE(create='[x_cb,y_cb,z_cb,x_cc,y_cc,z_cc,dx,dy,dz,dt,m,n,p,glb_bounds]')
 
     !> @name Starting time-step iteration, stopping time-step iteration and the number
     !! of time-step iterations between successive solution backups, respectively
@@ -224,6 +221,8 @@ module m_global_parameters
 
     integer :: num_bc_patches
     logical :: bc_io
+    logical, dimension(3) :: periodic_bc
+
     !> @name Boundary conditions (BC) in the x-, y- and z-directions, respectively
     !> @{
     type(int_bounds_info) :: bc_x, bc_y, bc_z
@@ -235,10 +234,6 @@ module m_global_parameters
 #elif defined(MFC_OpenMP)
     $:GPU_DECLARE(create='[bc_x, bc_y, bc_z]')
 #endif
-    type(bounds_info) :: x_domain, y_domain, z_domain
-    $:GPU_DECLARE(create='[x_domain, y_domain, z_domain]')
-    real(wp) :: x_a, y_a, z_a
-    real(wp) :: x_b, y_b, z_b
 
     logical :: parallel_io !< Format of the data files
     logical :: file_per_process !< shared file or not when using parallel io
@@ -248,6 +243,15 @@ module m_global_parameters
 
     integer, allocatable, dimension(:) :: proc_coords !<
     !! Processor coordinates in MPI_CART_COMM
+
+    type(bounds_info), allocatable, dimension(:) :: pcomm_coords
+    $:GPU_DECLARE(create='[pcomm_coords]')
+    !! Coordinates for EL particle transfer
+
+    type(int_bounds_info), dimension(3) :: nidx !< Indices for neighboring processors
+
+    integer, allocatable, dimension(:, :, :) :: neighbor_ranks
+    !! Neighbor ranks
 
     integer, allocatable, dimension(:) :: start_idx !<
     !! Starting cell-center index of local processor in global grid
@@ -533,7 +537,14 @@ module m_global_parameters
     !> @{!
     logical :: bubbles_lagrange                         !< Lagrangian subgrid bubble model switch
     type(bubbles_lagrange_parameters) :: lag_params     !< Lagrange bubbles' parameters
-    $:GPU_DECLARE(create='[bubbles_lagrange,lag_params]')
+    integer :: n_el_bubs_loc, n_el_bubs_glb             !< Number of Lagrangian bubbles (local and global)
+    logical :: moving_lag_bubbles
+    logical :: lag_pressure_force
+    logical :: lag_gravity_force
+    integer :: lag_vel_model, lag_drag_model
+    $:GPU_DECLARE(create='[bubbles_lagrange,lag_params,n_el_bubs_loc,n_el_bubs_glb]')
+    $:GPU_DECLARE(create='[moving_lag_bubbles, lag_vel_model, lag_drag_model]')
+    $:GPU_DECLARE(create='[lag_pressure_force,lag_gravity_force]')
     !> @}
 
     real(wp) :: Bx0 !< Constant magnetic field in the x-direction (1D)
@@ -659,6 +670,7 @@ contains
 
         num_bc_patches = 0
         bc_io = .false.
+        periodic_bc = .false.
 
         bc_x%beg = dflt_int; bc_x%end = dflt_int
         bc_y%beg = dflt_int; bc_y%end = dflt_int
@@ -671,9 +683,9 @@ contains
             #:endfor
         #:endfor
 
-        x_domain%beg = dflt_real; x_domain%end = dflt_real
-        y_domain%beg = dflt_real; y_domain%end = dflt_real
-        z_domain%beg = dflt_real; z_domain%end = dflt_real
+        glb_bounds(1)%beg = dflt_real; glb_bounds(1)%end = dflt_real
+        glb_bounds(2)%beg = dflt_real; glb_bounds(2)%end = dflt_real
+        glb_bounds(3)%beg = dflt_real; glb_bounds(3)%end = dflt_real
 
         ! Fluids physical parameters
         do i = 1, num_fluids_max
@@ -701,8 +713,8 @@ contains
         bub_pp%gam_g = dflt_real; gam_g = dflt_real
         bub_pp%M_v = dflt_real; M_v = dflt_real
         bub_pp%M_g = dflt_real; M_g = dflt_real
-        bub_pp%k_v = dflt_real; 
-        bub_pp%k_g = dflt_real; 
+        bub_pp%k_v = dflt_real;
+        bub_pp%k_g = dflt_real;
         bub_pp%cp_v = dflt_real; cp_v = dflt_real
         bub_pp%cp_g = dflt_real; cp_g = dflt_real
         bub_pp%R_v = dflt_real; R_v = dflt_real
@@ -836,10 +848,19 @@ contains
         lag_params%massTransfer_model = .false.
         lag_params%write_bubbles = .false.
         lag_params%write_bubbles_stats = .false.
+        lag_params%write_void_evol = .false.
         lag_params%nBubs_glb = dflt_int
+        lag_params%vel_model = dflt_int
+        lag_params%drag_model = dflt_int
+        lag_params%pressure_force = .true.
+        lag_params%gravity_force = .false.
         lag_params%epsilonb = 1._wp
         lag_params%charwidth = dflt_real
+        lag_params%charNz = dflt_int
         lag_params%valmaxvoid = dflt_real
+        lag_params%input_path = 'input/lag_bubbles.dat'
+        moving_lag_bubbles = .false.
+        lag_vel_model = dflt_int
 
         ! Continuum damage model
         tau_star = dflt_real
@@ -1260,23 +1281,18 @@ contains
         if (ib) allocate (MPI_IO_IB_DATA%var%sf(0:m, 0:n, 0:p))
         Np = 0
 
-        if (elasticity) then
-            fd_number = max(1, fd_order/2)
-        end if
-
+        if (elasticity) fd_number = max(1, fd_order/2)
         if (mhd) then ! TODO merge with above; waiting for hyperelasticity PR
             fd_number = max(1, fd_order/2)
         end if
-
-        if (probe_wrt) then
-            fd_number = max(1, fd_order/2)
-        end if
+        if (probe_wrt) fd_number = max(1, fd_order/2)
+        if (bubbles_lagrange) fd_number = max(1, fd_order/2)
 
         call s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, &
                                            igr_order, buff_size, &
                                            idwint, idwbuff, viscous, &
                                            bubbles_lagrange, m, n, p, &
-                                           num_dims, igr, ib)
+                                           num_dims, igr, ib, fd_number)
         $:GPU_UPDATE(device='[idwint, idwbuff]')
 
         ! Configuring Coordinate Direction Indexes
@@ -1361,7 +1377,7 @@ contains
         @:PREFER_GPU(x_cc)
         @:PREFER_GPU(dx)
 
-        if (n == 0) return; 
+        if (n == 0) return;
         @:ALLOCATE(y_cb(-1 - buff_size:n + buff_size))
         @:ALLOCATE(y_cc(-buff_size:n + buff_size))
         @:ALLOCATE(dy(-buff_size:n + buff_size))
@@ -1369,7 +1385,7 @@ contains
         @:PREFER_GPU(y_cc)
         @:PREFER_GPU(dy)
 
-        if (p == 0) return; 
+        if (p == 0) return;
         @:ALLOCATE(z_cb(-1 - buff_size:p + buff_size))
         @:ALLOCATE(z_cc(-buff_size:p + buff_size))
         @:ALLOCATE(dz(-buff_size:p + buff_size))
@@ -1397,6 +1413,8 @@ contains
         #:endif
 
         allocate (proc_coords(1:num_dims))
+
+        @:ALLOCATE(pcomm_coords(1:num_dims))
 
         if (parallel_io .neqv. .true.) return
 
@@ -1433,6 +1451,9 @@ contains
         end if
 
         deallocate (proc_coords)
+
+        @:DEALLOCATE(pcomm_coords)
+
         if (parallel_io) then
             deallocate (start_idx)
 
@@ -1455,11 +1476,15 @@ contains
         ! Deallocating grid variables for the x-, y- and z-directions
         @:DEALLOCATE(x_cb, x_cc, dx)
 
-        if (n == 0) return; 
+        if (n == 0) return;
         @:DEALLOCATE(y_cb, y_cc, dy)
 
-        if (p == 0) return; 
+        if (p == 0) return;
         @:DEALLOCATE(z_cb, z_cc, dz)
+
+        if (allocated(neighbor_ranks)) then
+            @:DEALLOCATE(neighbor_ranks)
+        end if
 
     end subroutine s_finalize_global_parameters_module
 
