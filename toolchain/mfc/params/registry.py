@@ -25,6 +25,7 @@ After freezing, it is safe to read from multiple threads. Attempts to
 register new parameters after freezing will raise RuntimeError.
 """
 
+import re
 from collections import defaultdict
 from functools import lru_cache
 from types import MappingProxyType
@@ -150,12 +151,35 @@ class ParamRegistry:
         """
         Generate JSON schema for case file validation.
 
+        Indexed parameter families (e.g., patch_ib(1)%radius through
+        patch_ib(1000)%radius) are collapsed into patternProperties
+        regexes to keep the schema small (~500 entries vs ~40,000).
+
         Returns:
             JSON schema dict compatible with fastjsonschema.
         """
-        properties = {name: param.param_type.json_schema for name, param in self.all_params.items()}
+        properties = {}
+        pattern_props = {}
 
-        return {"type": "object", "properties": properties, "additionalProperties": False}
+        for name, param in self.all_params.items():
+            if "(" not in name:
+                # Scalar param — explicit property
+                properties[name] = param.param_type.json_schema
+            else:
+                # Indexed param — collapse into pattern
+                # Replace digit sequences inside parens: (1) -> (\d+)
+                pattern = re.sub(r"\(\d+\)", "__IDX__", name)
+                pattern = re.escape(pattern).replace("__IDX__", r"\(\d+\)")
+                pattern = f"^{pattern}$"
+                if pattern not in pattern_props:
+                    pattern_props[pattern] = param.param_type.json_schema
+
+        return {
+            "type": "object",
+            "properties": properties,
+            "patternProperties": pattern_props,
+            "additionalProperties": False,
+        }
 
     def get_validator(self):
         """

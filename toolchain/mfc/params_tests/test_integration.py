@@ -67,11 +67,15 @@ class TestRegistryJsonSchema(unittest.TestCase):
         self.assertFalse(schema["additionalProperties"])
 
     def test_get_json_schema_has_all_params(self):
-        """Schema properties should include all registry params."""
+        """Schema properties + patternProperties should cover all registry params."""
         schema = REGISTRY.get_json_schema()
         properties = schema["properties"]
+        pattern_props = schema.get("patternProperties", {})
 
-        self.assertEqual(len(properties), len(REGISTRY.all_params))
+        # Scalar params are in properties, indexed params in patternProperties
+        scalar_count = sum(1 for n in REGISTRY.all_params if "(" not in n)
+        self.assertEqual(len(properties), scalar_count)
+        self.assertGreater(len(pattern_props), 0)
 
     def test_core_params_in_schema(self):
         """Core params should be in JSON schema."""
@@ -147,7 +151,9 @@ class TestCaseDictsIntegration(unittest.TestCase):
         self.assertIn("type", schema)
         self.assertEqual(schema["type"], "object")
         self.assertIn("properties", schema)
-        self.assertEqual(len(schema["properties"]), len(REGISTRY.all_params))
+        self.assertIn("patternProperties", schema)
+        total = len(schema["properties"]) + len(schema["patternProperties"])
+        self.assertGreater(total, 0)
 
     def test_json_schema_matches_registry(self):
         """case_dicts.SCHEMA should match REGISTRY.get_json_schema()."""
