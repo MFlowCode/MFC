@@ -19,15 +19,15 @@ where G = rho * g_x is the effective pressure gradient.
 import json
 import math
 
-# === Channel geometry (square domain) ===
+# -- Channel geometry (square domain) --
 L = 1.0  # Channel length (streamwise, x)
 H = 1.0  # Channel height (wall-normal, y)
 
-# === Grid resolution ===
+# -- Grid resolution --
 Nx = 24  # Cells in x (streamwise, minimal — periodic)
 Ny = 81  # Cells in y (wall-normal)
 
-# === Fluid properties ===
+# -- Fluid properties --
 rho = 1.0  # Density
 p0 = 1e5  # Reference pressure (high for low Mach)
 gamma = 1.4  # Ratio of specific heats
@@ -38,11 +38,11 @@ dx = L / (Nx + 1)
 cfl = 0.3
 dt = cfl * dx / c
 
-# === Body force (pressure gradient substitute) ===
+# -- Body force (pressure gradient substitute) --
 # G = rho * g_x acts as dp/dx driving force
 g_x = 0.5
 
-# === HB non-Newtonian model parameters ===
+# -- HB non-Newtonian model parameters --
 tau0 = 0.0  # Yield stress (set 0 for power-law)
 K = 0.1  # Consistency index
 nn = 2.0  # Flow behavior index (< 1 = shear-thinning)
@@ -54,7 +54,7 @@ mu_bulk = 0.0  # Bulk viscosity
 # Reference Re based on consistency index (used as baseline)
 Re_ref = 1.0 / K  # = 100
 
-# === Time control ===
+# -- Time control --
 t_end = 10.0  # End time (allow flow to reach steady state)
 t_save = 5.0  # Save interval
 
