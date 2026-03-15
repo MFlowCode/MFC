@@ -45,15 +45,13 @@ module m_ibm
     $:GPU_DECLARE(create='[ib_markers]')
 
     type(ghost_point), dimension(:), allocatable :: ghost_points
-    type(ghost_point), dimension(:), allocatable :: inner_points
-    $:GPU_DECLARE(create='[ghost_points,inner_points]')
+    $:GPU_DECLARE(create='[ghost_points]')
 
     integer :: num_gps !< Number of ghost points
-    integer :: num_inner_gps !< Number of ghost points
 #if defined(MFC_OpenACC)
-    $:GPU_DECLARE(create='[gp_layers,num_gps,num_inner_gps]')
+    $:GPU_DECLARE(create='[gp_layers,num_gps]')
 #elif defined(MFC_OpenMP)
-    $:GPU_DECLARE(create='[num_gps,num_inner_gps]')
+    $:GPU_DECLARE(create='[num_gps]')
 #endif
     logical :: moving_immersed_boundary_flag
 
@@ -74,7 +72,7 @@ contains
 
         @:ACC_SETUP_SFs(ib_markers)
 
-        $:GPU_ENTER_DATA(copyin='[num_gps,num_inner_gps]')
+        $:GPU_ENTER_DATA(copyin='[num_gps]')
 
     end subroutine s_initialize_ibm_module
 
@@ -83,7 +81,7 @@ contains
     impure subroutine s_ibm_setup()
 
         integer :: i, j, k
-        integer :: max_num_gps, max_num_inner_gps
+        integer :: max_num_gps
 
         call nvtxStartRange("SETUP-IBM-MODULE")
 
@@ -118,19 +116,20 @@ contains
         end do
 
         ! find the number of ghost points and set them to be the maximum total across ranks
-        call s_find_num_ghost_points(num_gps, num_inner_gps)
-        call s_mpi_allreduce_integer_sum(num_gps, max_num_gps)
-        call s_mpi_allreduce_integer_sum(num_inner_gps, max_num_inner_gps)
-        max_num_gps = min(max_num_gps, (m + 1)*(n + 1)*(p + 1)/2)
-        max_num_inner_gps = min(max_num_inner_gps, (m + 1)*(n + 1)*(p + 1)/2)
+        call s_find_num_ghost_points(num_gps)
+        if (moving_immersed_boundary_flag) then
+            call s_mpi_allreduce_integer_sum(num_gps, max_num_gps)
+            max_num_gps = min(max_num_gps*2, (m + 1)*(n + 1)*(p + 1))
+        else
+            max_num_gps = num_gps
+        end if
 
         ! set the size of the ghost point arrays to be the amount of points total, plus a factor of 2 buffer
-        $:GPU_UPDATE(device='[num_gps, num_inner_gps]')
-        @:ALLOCATE(ghost_points(1:int((max_num_gps + max_num_inner_gps) * 2.0)))
-        @:ALLOCATE(inner_points(1:int((max_num_gps + max_num_inner_gps) * 2.0)))
+        $:GPU_UPDATE(device='[num_gps]')
+        @:ALLOCATE(ghost_points(1:max_num_gps))
 
-        $:GPU_ENTER_DATA(copyin='[ghost_points,inner_points]')
-        call s_find_ghost_points(ghost_points, inner_points)
+        $:GPU_ENTER_DATA(copyin='[ghost_points]')
+        call s_find_ghost_points(ghost_points)
         call s_apply_levelset(ghost_points, num_gps)
 
         call s_compute_image_points(ghost_points)
@@ -401,24 +400,6 @@ contains
             $:END_GPU_PARALLEL_LOOP()
         end if
 
-        !Correct the state of the inner points in IBs
-        if (num_inner_gps > 0) then
-            $:GPU_PARALLEL_LOOP(private='[i,physical_loc,dyn_pres,alpha_rho_IP, alpha_IP,vel_g,rho,gamma,pi_inf,Re_K,innerp,j,k,l,q]')
-            do i = 1, num_inner_gps
-
-                innerp = inner_points(i)
-                j = innerp%loc(1)
-                k = innerp%loc(2)
-                l = innerp%loc(3)
-
-                $:GPU_LOOP(parallelism='[seq]')
-                do q = momxb, momxe
-                    q_cons_vf(q)%sf(j, k, l) = 0._wp
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        end if
-
     end subroutine s_ibm_correct_state
 
     !>  Function that computes the image points for each ghost point
@@ -533,21 +514,19 @@ contains
 
     !> Subroutine that finds the number of ghost points, used for allocating
     !! memory.
-    subroutine s_find_num_ghost_points(num_gps_out, num_inner_gps_out)
+    subroutine s_find_num_ghost_points(num_gps_out)
 
         integer, intent(out) :: num_gps_out
-        integer, intent(out) :: num_inner_gps_out
 
         integer :: i, j, k, ii, jj, kk, gp_layers_z !< Iterator variables
-        integer :: num_gps_local, num_inner_gps_local !< local copies of the gp count to support GPU compute
+        integer :: num_gps_local !< local copies of the gp count to support GPU compute
         logical :: is_gp
 
         num_gps_local = 0
-        num_inner_gps_local = 0
         gp_layers_z = gp_layers
         if (p == 0) gp_layers_z = 0
 
-        $:GPU_PARALLEL_LOOP(private='[i,j,k,ii,jj,kk,is_gp]', copy='[num_gps_local,num_inner_gps_local]', firstprivate='[gp_layers,gp_layers_z]', collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[i,j,k,ii,jj,kk,is_gp]', copy='[num_gps_local]', firstprivate='[gp_layers,gp_layers_z]', collapse=3)
         do i = 0, m
             do j = 0, n
                 do k = 0, p
@@ -568,9 +547,6 @@ contains
                         if (is_gp) then
                             $:GPU_ATOMIC(atomic='update')
                             num_gps_local = num_gps_local + 1
-                        else
-                            $:GPU_ATOMIC(atomic='update')
-                            num_inner_gps_local = num_inner_gps_local + 1
                         end if
                     end if
                 end do
@@ -579,15 +555,13 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
         num_gps_out = num_gps_local
-        num_inner_gps_out = num_inner_gps_local
 
     end subroutine s_find_num_ghost_points
 
     !> Function that finds the ghost points
-    subroutine s_find_ghost_points(ghost_points_in, inner_points_in)
+    subroutine s_find_ghost_points(ghost_points_in)
 
         type(ghost_point), dimension(num_gps), intent(INOUT) :: ghost_points_in
-        type(ghost_point), dimension(num_inner_gps), intent(INOUT) :: inner_points_in
         integer :: i, j, k, ii, jj, kk, gp_layers_z !< Iterator variables
         integer :: xp, yp, zp !< periodicities
         integer :: count, count_i, local_idx
@@ -658,20 +632,6 @@ contains
                                     ghost_points_in(local_idx)%DB(3) = 0
                                 end if
                             end if
-
-                        else
-                            $:GPU_ATOMIC(atomic='capture')
-                            count_i = count_i + 1
-                            local_idx = count_i
-                            $:END_GPU_ATOMIC_CAPTURE()
-
-                            inner_points_in(local_idx)%loc = [i, j, k]
-                            encoded_patch_id = ib_markers%sf(i, j, k)
-                            call s_decode_patch_periodicity(encoded_patch_id, patch_id, xp, yp, zp)
-                            inner_points_in(local_idx)%ib_patch_id = patch_id
-                            ib_markers%sf(i, j, k) = patch_id
-                            inner_points_in(local_idx)%slip = patch_ib(patch_id)%slip
-
                         end if
                     end if
                 end do
@@ -972,8 +932,8 @@ contains
 
         call nvtxStartRange("COMPUTE-GHOST-POINTS")
         ! recalculate the ghost point locations and coefficients
-        call s_find_num_ghost_points(num_gps, num_inner_gps)
-        call s_find_ghost_points(ghost_points, inner_points)
+        call s_find_num_ghost_points(num_gps)
+        call s_find_ghost_points(ghost_points)
         call nvtxEndRange
 
         call nvtxStartRange("COMPUTE-IMAGE-POINTS")
