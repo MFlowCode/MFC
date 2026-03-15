@@ -92,7 +92,7 @@ find_node() {
 start_runner() {
     local node="$1" dir="$2"
     timeout 15 ssh $SSH_OPTS "$node" \
-        "setsid nohup $dir/run.sh >> $dir/runner.log 2>&1 < /dev/null &" \
+        "cd $dir && setsid nohup ./run.sh >> runner.log 2>&1 < /dev/null &" \
         </dev/null 2>/dev/null || true
     sleep 3
     [ -n "$(find_pids "$node" "$dir")" ]
