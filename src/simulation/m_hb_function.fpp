@@ -59,7 +59,7 @@ contains
     !! @param D_yz Shear strain rate 0.5*(dv/dz + dw/dy)
     !! @return Shear rate magnitude
     pure function f_compute_shear_rate_from_components( &
-                                                        D_xx, D_yy, D_zz, D_xy, D_xz, D_yz) result(shear_rate)
+        D_xx, D_yy, D_zz, D_xy, D_xz, D_yz) result(shear_rate)
         $:GPU_ROUTINE(parallelism='[seq]')
 
         real(wp), intent(in) :: D_xx, D_yy, D_zz, D_xy, D_xz, D_yz

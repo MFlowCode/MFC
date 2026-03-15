@@ -36,7 +36,7 @@ contains
     !! @param D_xz Output: 0.5*(du/dz + dw/dx)
     !! @param D_yz Output: 0.5*(dv/dz + dw/dy)
     pure subroutine s_compute_velocity_gradients_at_cell( &
-                                                          q_prim_vf, j, k, l, D_xx, D_yy, D_zz, D_xy, D_xz, D_yz)
+        q_prim_vf, j, k, l, D_xx, D_yy, D_zz, D_xy, D_xz, D_yz)
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
@@ -125,24 +125,24 @@ contains
             if (j - 1 >= j_lo .and. j + 1 <= j_hi .and. &
                 k - 1 >= k_lo .and. k + 1 <= k_hi) then
                 D_xy = 0.5_wp*( &
-                    (q_prim_vf(momxb)%sf(j, k + 1, l) - &
-                     q_prim_vf(momxb)%sf(j, k - 1, l))/ &
-                    (y_cc(k + 1) - y_cc(k - 1)) + &
-                    (q_prim_vf(momxb + 1)%sf(j + 1, k, l) - &
-                     q_prim_vf(momxb + 1)%sf(j - 1, k, l))/ &
-                    (x_cc(j + 1) - x_cc(j - 1)))
+                       (q_prim_vf(momxb)%sf(j, k + 1, l) - &
+                        q_prim_vf(momxb)%sf(j, k - 1, l))/ &
+                       (y_cc(k + 1) - y_cc(k - 1)) + &
+                       (q_prim_vf(momxb + 1)%sf(j + 1, k, l) - &
+                        q_prim_vf(momxb + 1)%sf(j - 1, k, l))/ &
+                       (x_cc(j + 1) - x_cc(j - 1)))
             else
                 D_xy = 0._wp
                 if (k - 1 >= k_lo .and. k + 1 <= k_hi) then
                     D_xy = 0.5_wp*(q_prim_vf(momxb)%sf(j, k + 1, l) - &
-                                    q_prim_vf(momxb)%sf(j, k - 1, l))/ &
-                                   (y_cc(k + 1) - y_cc(k - 1))
+                                   q_prim_vf(momxb)%sf(j, k - 1, l))/ &
+                           (y_cc(k + 1) - y_cc(k - 1))
                 end if
                 if (j - 1 >= j_lo .and. j + 1 <= j_hi) then
                     D_xy = D_xy + 0.5_wp* &
-                        (q_prim_vf(momxb + 1)%sf(j + 1, k, l) - &
-                         q_prim_vf(momxb + 1)%sf(j - 1, k, l))/ &
-                        (x_cc(j + 1) - x_cc(j - 1))
+                           (q_prim_vf(momxb + 1)%sf(j + 1, k, l) - &
+                            q_prim_vf(momxb + 1)%sf(j - 1, k, l))/ &
+                           (x_cc(j + 1) - x_cc(j - 1))
                 end if
             end if
         else
@@ -154,12 +154,12 @@ contains
             if (j - 1 >= j_lo .and. j + 1 <= j_hi .and. &
                 l - 1 >= l_lo .and. l + 1 <= l_hi) then
                 D_xz = 0.5_wp*( &
-                    (q_prim_vf(momxb)%sf(j, k, l + 1) - &
-                     q_prim_vf(momxb)%sf(j, k, l - 1))/ &
-                    (z_cc(l + 1) - z_cc(l - 1)) + &
-                    (q_prim_vf(momxb + 2)%sf(j + 1, k, l) - &
-                     q_prim_vf(momxb + 2)%sf(j - 1, k, l))/ &
-                    (x_cc(j + 1) - x_cc(j - 1)))
+                       (q_prim_vf(momxb)%sf(j, k, l + 1) - &
+                        q_prim_vf(momxb)%sf(j, k, l - 1))/ &
+                       (z_cc(l + 1) - z_cc(l - 1)) + &
+                       (q_prim_vf(momxb + 2)%sf(j + 1, k, l) - &
+                        q_prim_vf(momxb + 2)%sf(j - 1, k, l))/ &
+                       (x_cc(j + 1) - x_cc(j - 1)))
             else
                 D_xz = 0._wp
             end if
@@ -172,12 +172,12 @@ contains
             if (k - 1 >= k_lo .and. k + 1 <= k_hi .and. &
                 l - 1 >= l_lo .and. l + 1 <= l_hi) then
                 D_yz = 0.5_wp*( &
-                    (q_prim_vf(momxb + 1)%sf(j, k, l + 1) - &
-                     q_prim_vf(momxb + 1)%sf(j, k, l - 1))/ &
-                    (z_cc(l + 1) - z_cc(l - 1)) + &
-                    (q_prim_vf(momxb + 2)%sf(j, k + 1, l) - &
-                     q_prim_vf(momxb + 2)%sf(j, k - 1, l))/ &
-                    (y_cc(k + 1) - y_cc(k - 1)))
+                       (q_prim_vf(momxb + 1)%sf(j, k, l + 1) - &
+                        q_prim_vf(momxb + 1)%sf(j, k, l - 1))/ &
+                       (z_cc(l + 1) - z_cc(l - 1)) + &
+                       (q_prim_vf(momxb + 2)%sf(j, k + 1, l) - &
+                        q_prim_vf(momxb + 2)%sf(j, k - 1, l))/ &
+                       (y_cc(k + 1) - y_cc(k - 1)))
             else
                 D_yz = 0._wp
             end if
@@ -239,16 +239,16 @@ contains
                 if (n > 0) then
                     D_yy = grad_y_vf(2)%sf(j, k, l)
                     D_xy = 0.5_wp*(grad_y_vf(1)%sf(j, k, l) + &
-                                    grad_x_vf(2)%sf(j, k, l))
+                                   grad_x_vf(2)%sf(j, k, l))
                 else
                     D_yy = 0._wp; D_xy = 0._wp
                 end if
                 if (p > 0) then
                     D_zz = grad_z_vf(3)%sf(j, k, l)
                     D_xz = 0.5_wp*(grad_z_vf(1)%sf(j, k, l) + &
-                                    grad_x_vf(3)%sf(j, k, l))
+                                   grad_x_vf(3)%sf(j, k, l))
                     D_yz = 0.5_wp*(grad_z_vf(2)%sf(j, k, l) + &
-                                    grad_y_vf(3)%sf(j, k, l))
+                                   grad_y_vf(3)%sf(j, k, l))
                 else
                     D_zz = 0._wp; D_xz = 0._wp; D_yz = 0._wp
                 end if
@@ -260,7 +260,7 @@ contains
 
             ! Compute shear rate
             shear_rate = f_compute_shear_rate_from_components( &
-                D_xx, D_yy, D_zz, D_xy, D_xz, D_yz)
+                         D_xx, D_yy, D_zz, D_xy, D_xz, D_yz)
 
             ! For each phase, compute Re_visc
             $:GPU_LOOP(parallelism='[seq]')
@@ -268,10 +268,10 @@ contains
                 if (fluid_pp(q)%non_newtonian) then
                     ! Non-Newtonian: compute shear mu from HB model
                     mu_fluid = f_compute_hb_viscosity( &
-                        fluid_pp(q)%tau0, fluid_pp(q)%K, &
-                        fluid_pp(q)%nn, fluid_pp(q)%mu_min, &
-                        fluid_pp(q)%mu_max, shear_rate, &
-                        fluid_pp(q)%hb_m)
+                               fluid_pp(q)%tau0, fluid_pp(q)%K, &
+                               fluid_pp(q)%nn, fluid_pp(q)%mu_min, &
+                               fluid_pp(q)%mu_max, shear_rate, &
+                               fluid_pp(q)%hb_m)
                     Re_visc_per_phase(q, 1) = 1._wp/mu_fluid
                     ! Bulk viscosity
                     if (fluid_pp(q)%mu_bulk > 0._wp) then

@@ -1018,10 +1018,10 @@ contains
                 if (fluid_pp(fluid_idx)%non_newtonian) then
                     ! Non-Newtonian: compute reference viscosity at gdot = 1
                     dynamic_viscosities(fluid_idx) = f_compute_hb_viscosity( &
-                        fluid_pp(fluid_idx)%tau0, fluid_pp(fluid_idx)%K, &
-                        fluid_pp(fluid_idx)%nn, fluid_pp(fluid_idx)%mu_min, &
-                        fluid_pp(fluid_idx)%mu_max, 1._wp, &
-                        fluid_pp(fluid_idx)%hb_m)
+                                                     fluid_pp(fluid_idx)%tau0, fluid_pp(fluid_idx)%K, &
+                                                     fluid_pp(fluid_idx)%nn, fluid_pp(fluid_idx)%mu_min, &
+                                                     fluid_pp(fluid_idx)%mu_max, 1._wp, &
+                                                     fluid_pp(fluid_idx)%hb_m)
                 else if (fluid_pp(fluid_idx)%Re(1) /= 0._wp) then
                     dynamic_viscosities(fluid_idx) = 1._wp/fluid_pp(fluid_idx)%Re(1)
                 else

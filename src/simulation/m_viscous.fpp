@@ -164,9 +164,9 @@ contains
 
                                 if (viscous) then
                                     call s_compute_re_visc(q_prim_vf, &
-                                        alpha_visc, j, k, l, &
-                                        Re_visc_nn, grad_x_vf, &
-                                        grad_y_vf, grad_z_vf)
+                                                           alpha_visc, j, k, l, &
+                                                           Re_visc_nn, grad_x_vf, &
+                                                           grad_y_vf, grad_z_vf)
                                     call s_compute_mixture_re(alpha_visc, Re_visc_nn, Re_visc)
                                 end if
                             end if
@@ -265,9 +265,9 @@ contains
 
                                 if (viscous) then
                                     call s_compute_re_visc(q_prim_vf, &
-                                        alpha_visc, j, k, l, &
-                                        Re_visc_nn, grad_x_vf, &
-                                        grad_y_vf, grad_z_vf)
+                                                           alpha_visc, j, k, l, &
+                                                           Re_visc_nn, grad_x_vf, &
+                                                           grad_y_vf, grad_z_vf)
                                     call s_compute_mixture_re(alpha_visc, Re_visc_nn, Re_visc)
                                 end if
                             end if
@@ -363,9 +363,9 @@ contains
 
                                 if (viscous) then
                                     call s_compute_re_visc(q_prim_vf, &
-                                        alpha_visc, j, k, l, &
-                                        Re_visc_nn, grad_x_vf, &
-                                        grad_y_vf, grad_z_vf)
+                                                           alpha_visc, j, k, l, &
+                                                           Re_visc_nn, grad_x_vf, &
+                                                           grad_y_vf, grad_z_vf)
                                     call s_compute_mixture_re(alpha_visc, Re_visc_nn, Re_visc)
                                 end if
                             end if
@@ -463,9 +463,9 @@ contains
 
                                 if (viscous) then
                                     call s_compute_re_visc(q_prim_vf, &
-                                        alpha_visc, j, k, l, &
-                                        Re_visc_nn, grad_x_vf, &
-                                        grad_y_vf, grad_z_vf)
+                                                           alpha_visc, j, k, l, &
+                                                           Re_visc_nn, grad_x_vf, &
+                                                           grad_y_vf, grad_z_vf)
                                     call s_compute_mixture_re(alpha_visc, Re_visc_nn, Re_visc)
                                 end if
                             end if
