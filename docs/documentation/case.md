@@ -366,6 +366,14 @@ Additional details on this specification can be found in [The Naca Airfoil Serie
 | `qvp`  ** | Real   | Stiffened-gas parameter $q'$ of fluid.         |
 | `sigma`   | Real   | Surface tension coefficient                    |
 | `G`       | Real   | Shear modulus of solid.                        |
+| `non_newtonian` | Logical | Enable non-Newtonian (Herschel-Bulkley) viscosity. See @ref sec-non-newtonian. |
+| `tau0`    | Real   | Yield stress \f$\tau_0\f$ (Herschel-Bulkley).  |
+| `K`       | Real   | Consistency index \f$K\f$ (Herschel-Bulkley).  |
+| `nn`      | Real   | Flow behavior index \f$n\f$ (Herschel-Bulkley).|
+| `hb_m`    | Real   | Papanastasiou regularization parameter \f$m\f$. |
+| `mu_min`  | Real   | Minimum viscosity clamp.                       |
+| `mu_max`  | Real   | Maximum viscosity clamp.                       |
+| `mu_bulk` | Real   | Bulk viscosity (non-Newtonian).                |
 
 Fluid material's parameters. All parameters except for sigma should be prepended with `fluid_pp(i)` where $i$ is the fluid index.
 
@@ -382,6 +390,38 @@ The parameters define material's property of compressible fluids that are used i
 
 When these parameters are undefined, fluids are treated as inviscid.
 Details of implementation of viscosity in MFC can be found in \cite Coralic15.
+
+#### Non-Newtonian Viscosity (Herschel-Bulkley) {#sec-non-newtonian}
+
+MFC supports non-Newtonian viscosity via the Herschel-Bulkley model with Papanastasiou regularization.
+Enable it per-fluid by setting ``fluid_pp(i)%%non_newtonian = 'T'`` (requires ``viscous = 'T'``).
+
+The effective viscosity is:
+
+\f[ \mu(\dot\gamma) = \frac{\tau_0}{\dot\gamma}\bigl(1 - e^{-m\,\dot\gamma}\bigr) + K\,\dot\gamma^{\,n-1} \f]
+
+where \f$\dot\gamma = \sqrt{2\,D_{ij}\,D_{ij}}\f$ is the shear rate computed from the strain-rate tensor.
+
+| Parameter | Type | Description |
+| ---: | :---: | :--- |
+| ``non_newtonian`` | Logical | Enable non-Newtonian viscosity for this fluid |
+| ``tau0``   | Real | Yield stress \f$\tau_0\f$. Set to 0 for a power-law fluid |
+| ``K``      | Real | Consistency index \f$K\f$ (must be > 0) |
+| ``nn``     | Real | Flow behavior index \f$n\f$: shear-thinning (\f$n<1\f$), Newtonian (\f$n=1\f$), shear-thickening (\f$n>1\f$) |
+| ``hb_m``   | Real | Papanastasiou regularization parameter \f$m\f$. Higher values approximate the true yield stress more closely (typical: 1000--10000) |
+| ``mu_min`` | Real | Minimum viscosity clamp (must be >= 0) |
+| ``mu_max`` | Real | Maximum viscosity clamp (must be > ``mu_min``) |
+| ``mu_bulk``| Real | Bulk viscosity for non-Newtonian fluids (optional, default 0 = inviscid bulk) |
+
+All parameters are prepended with ``fluid_pp(i)%%``.
+
+**Special cases:**
+- \f$\tau_0 = 0\f$: reduces to power-law model \f$\mu = K\,\dot\gamma^{\,n-1}\f$.
+- \f$n = 1,\, \tau_0 = 0\f$: reduces to Newtonian with \f$\mu = K\f$.
+- \f$n = 1,\, \tau_0 > 0\f$: reduces to Bingham plastic.
+
+> **Note:** When ``non_newtonian = 'T'``, the ``Re(1)``/``Re(2)`` parameters are ignored for that fluid.
+> The viscosity is computed from the Herschel-Bulkley model instead.
 
 - `fluid_pp(i)%%cv`, `fluid_pp(i)%%qv`, and `fluid_pp(i)%%qvp` define $c_v$, $q$, and $q'$ as parameters of $i$-th fluid that are used in stiffened gas equation of state.
 

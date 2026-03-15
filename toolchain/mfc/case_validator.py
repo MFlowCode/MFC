@@ -146,10 +146,19 @@ PHYSICS_DOCS = {
         "explanation": "Reynolds numbers must be positive. Not supported with model_eqns = 1.",
     },
     "check_non_newtonian": {
-        "title": "Non-Newtonian Viscosity",
-        "category": "Numerical Schemes",
-        "math": r"\mu = \frac{\tau_0}{\dot\gamma}(1 - e^{-m\dot\gamma}) + K\dot\gamma^{n-1}",
-        "explanation": ("Herschel-Bulkley non-Newtonian viscosity model. Requires viscous=T, K > 0, nn > 0, tau0 >= 0, mu_min >= 0, mu_max > mu_min, hb_m > 0."),
+        "title": "Non-Newtonian Viscosity (Herschel-Bulkley)",
+        "category": "Physics Models",
+        "math": r"\mu(\dot\gamma) = \frac{\tau_0}{\dot\gamma}(1 - e^{-m\dot\gamma}) + K\dot\gamma^{n-1}",
+        "explanation": (
+            "Herschel-Bulkley model with Papanastasiou regularization for "
+            "non-Newtonian viscosity. The yield stress tau0 introduces a "
+            "threshold below which the fluid resists deformation; the "
+            "Papanastasiou parameter m smooths the transition (higher m = "
+            "sharper yield). K is the consistency index, nn the flow behavior "
+            "index (nn < 1: shear-thinning, nn = 1: Bingham, nn > 1: "
+            "shear-thickening). Viscosity is clamped to [mu_min, mu_max] for "
+            "numerical stability. Requires viscous = T."
+        ),
     },
     # --- Feature Compatibility ---
     "check_mhd": {
