@@ -199,18 +199,16 @@ contains
                     patch_id = ib_markers%sf(j, k, l)
                     if (patch_id /= 0) then
                         q_prim_vf(E_idx)%sf(j, k, l) = 1._wp
-                        if (patch_ib(patch_id)%moving_ibm > 0) then
-                            rho = 0._wp
-                            do i = 1, num_fluids
-                                rho = rho + q_prim_vf(contxb + i - 1)%sf(j, k, l)
-                            end do
+                        rho = 0._wp
+                        do i = 1, num_fluids
+                            rho = rho + q_prim_vf(contxb + i - 1)%sf(j, k, l)
+                        end do
 
-                            ! Sets the momentum
-                            do i = 1, num_dims
-                                q_cons_vf(momxb + i - 1)%sf(j, k, l) = patch_ib(patch_id)%vel(i)*rho
-                                q_prim_vf(momxb + i - 1)%sf(j, k, l) = patch_ib(patch_id)%vel(i)
-                            end do
-                        end if
+                        ! Sets the momentum
+                        do i = 1, num_dims
+                            q_cons_vf(momxb + i - 1)%sf(j, k, l) = patch_ib(patch_id)%vel(i)*rho
+                            q_prim_vf(momxb + i - 1)%sf(j, k, l) = patch_ib(patch_id)%vel(i)
+                        end do
                     end if
                 end do
             end do
