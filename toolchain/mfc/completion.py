@@ -9,9 +9,8 @@ import os
 import shutil
 from pathlib import Path
 
-from .printer import cons
 from .common import MFC_ROOT_DIR
-
+from .printer import cons
 
 # Installation directory (user-local, independent of MFC clone location)
 COMPLETION_INSTALL_DIR = Path.home() / ".local" / "share" / "mfc" / "completions"
@@ -173,7 +172,7 @@ def show_status():
         else:
             cons.print("  [dim]✗ Zsh completion not installed[/dim]")
     else:
-        cons.print(f"  [dim]✗ Not installed[/dim]")
+        cons.print("  [dim]✗ Not installed[/dim]")
 
     cons.print()
 
@@ -191,7 +190,6 @@ def show_status():
 
 def completion():
     """Main entry point for completion command."""
-    # pylint: disable=import-outside-toplevel
     from .state import ARG
 
     action = ARG("completion_action")

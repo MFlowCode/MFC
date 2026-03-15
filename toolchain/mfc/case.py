@@ -1,27 +1,39 @@
-# pylint: disable=import-outside-toplevel
-import re, json, math, copy, dataclasses, difflib, fastjsonschema
+import copy
+import dataclasses
+import difflib
+import json
+import math
+import re
+
+import fastjsonschema
 
 from . import common
 from .printer import cons
-
+from .run import case_dicts
 from .state import ARG
-from .run   import case_dicts
 
 
 def _suggest_similar_params(unknown_key: str, valid_keys: list, n: int = 3) -> list:
     """Find similar parameter names for typo suggestions."""
     return difflib.get_close_matches(unknown_key, valid_keys, n=n, cutoff=0.6)
 
+
 QPVF_IDX_VARS = {
-    'alpha_rho': 'contxb', 'vel'  : 'momxb',         'pres': 'E_idx', 
-    'alpha':     'advxb',  'tau_e': 'stress_idx%beg', 'Y':   'chemxb',
-    'cf_val': 'c_idx', 'Bx': 'B_idx%beg', 'By': 'B_idx%end-1', 'Bz': 'B_idx%end',
+    "alpha_rho": "contxb",
+    "vel": "momxb",
+    "pres": "E_idx",
+    "alpha": "advxb",
+    "tau_e": "stress_idx%beg",
+    "Y": "chemxb",
+    "cf_val": "c_idx",
+    "Bx": "B_idx%beg",
+    "By": "B_idx%end-1",
+    "Bz": "B_idx%end",
 }
 
-MIBM_ANALYTIC_VARS = [
-    'vel(1)', 'vel(2)', 'vel(3)', 'angular_vel(1)', 'angular_vel(2)', 'angular_vel(3)'
-]
+MIBM_ANALYTIC_VARS = ["vel(1)", "vel(2)", "vel(3)", "angular_vel(1)", "angular_vel(2)", "angular_vel(3)"]
 # "B_idx%end - 1" not "B_idx%beg + 1" must be used because 1D does not have Bx
+
 
 @dataclasses.dataclass(init=False)
 class Case:
@@ -36,14 +48,15 @@ class Case:
     def get_cell_count(self) -> int:
         return math.prod([max(1, int(self.params.get(dir, 0))) for dir in ["m", "n", "p"]])
 
-    def has_parameter(self, key: str)-> bool:
+    def has_parameter(self, key: str) -> bool:
         return key in self.params.keys()
 
     def gen_json_dict_str(self) -> str:
         return json.dumps(self.params, indent=4)
 
     def get_inp(self, _target) -> str:
-        from . import build  # pylint: disable=import-outside-toplevel
+        from . import build
+
         target = build.get_target(_target)
 
         cons.print(f"Generating [magenta]{target.name}.inp[/magenta]:")
@@ -74,17 +87,17 @@ class Case:
                 hint = f" Did you mean: {', '.join(suggestions)}?" if suggestions else ""
                 raise common.MFCException(f"Unknown parameter '{key}'.{hint}")
 
-        cons.print(f"[yellow]INFO:[/yellow] Forwarded {len(self.params)-len(ignored)}/{len(self.params)} parameters.")
+        cons.print(f"[yellow]INFO:[/yellow] Forwarded {len(self.params) - len(ignored)}/{len(self.params)} parameters.")
         cons.unindent()
 
         return f"&user_inputs\n{dict_str}&end/\n"
 
     def validate_params(self, origin_txt: str = None):
-        '''Validates parameters read from case file:
+        """Validates parameters read from case file:
         1. Type checking via JSON schema
         2. Constraint validation (valid values, ranges)
         3. Dependency checking (required/recommended params)
-        '''
+        """
         # Type checking
         try:
             case_dicts.get_validator()(self.params)
@@ -115,37 +128,36 @@ class Case:
         return 1 + min(int(self.params.get("n", 0)), 1) + min(int(self.params.get("p", 0)), 1)
 
     def __is_ic_analytical(self, key: str, val: str) -> bool:
-        '''Is this initial condition analytical?
-        More precisely, is this an arbitrary expression or a string representing a number?'''
+        """Is this initial condition analytical?
+        More precisely, is this an arbitrary expression or a string representing a number?"""
         if common.is_number(val) or not isinstance(val, str):
             return False
 
         for array in QPVF_IDX_VARS:
-            if re.match(fr'^patch_icpp\([0-9]+\)%{array}', key):
+            if re.match(rf"^patch_icpp\([0-9]+\)%{array}", key):
                 return True
 
         return False
 
     def __is_mib_analytical(self, key: str, val: str) -> bool:
-        '''Is this initial condition analytical?
-        More precisely, is this an arbitrary expression or a string representing a number?'''
+        """Is this initial condition analytical?
+        More precisely, is this an arbitrary expression or a string representing a number?"""
         if common.is_number(val) or not isinstance(val, str):
             return False
 
         for variable in MIBM_ANALYTIC_VARS:
-            if re.match(fr'^patch_ib\([0-9]+\)%{re.escape(variable)}', key):
+            if re.match(rf"^patch_ib\([0-9]+\)%{re.escape(variable)}", key):
                 return True
 
         return False
 
-    # pylint: disable=too-many-locals
     def __get_analytic_ic_fpp(self, print: bool) -> str:
         # generates the content of an FFP file that will hold the functions for
         # some initial condition
         DATA = {
-            1: {'ptypes': [1, 15, 16],                         'sf_idx': 'i, 0, 0'},
-            2: {'ptypes': [2,  3,  4,  5,  6,  7, 17, 18, 21], 'sf_idx': 'i, j, 0'},
-            3: {'ptypes': [8,  9, 10, 11, 12, 13, 14, 19, 21], 'sf_idx': 'i, j, k'}
+            1: {"ptypes": [1, 15, 16], "sf_idx": "i, 0, 0"},
+            2: {"ptypes": [2, 3, 4, 5, 6, 7, 13, 17, 18, 21], "sf_idx": "i, j, 0"},
+            3: {"ptypes": [8, 9, 10, 11, 12, 14, 19, 21], "sf_idx": "i, j, k"},
         }[self.__get_ndims()]
 
         patches = {}
@@ -156,7 +168,7 @@ class Case:
             if not self.__is_ic_analytical(key, val):
                 continue
 
-            patch_id = re.search(r'[0-9]+', key).group(0)
+            patch_id = re.search(r"[0-9]+", key).group(0)
 
             if patch_id not in patches:
                 patches[patch_id] = []
@@ -170,22 +182,28 @@ class Case:
         for pid, items in patches.items():
             ptype = self.params[f"patch_icpp({pid})%geometry"]
 
-            if ptype not in DATA['ptypes']:
+            if ptype not in DATA["ptypes"]:
                 raise common.MFCException(f"Patch #{pid} of type {ptype} cannot be analytically defined.")
 
             # function that defines how we will replace variable names with
             # values from the case file
             def rhs_replace(match):
                 return {
-                    'x': 'x_cc(i)', 'y': 'y_cc(j)', 'z': 'z_cc(k)',
-
-                    'xc': f'patch_icpp({pid})%x_centroid', 'yc': f'patch_icpp({pid})%y_centroid', 'zc': f'patch_icpp({pid})%z_centroid',
-                    'lx': f'patch_icpp({pid})%length_x',   'ly': f'patch_icpp({pid})%length_y',   'lz': f'patch_icpp({pid})%length_z',
-
-                    'r':     f'patch_icpp({pid})%radius',  'eps':   f'patch_icpp({pid})%epsilon', 'beta':  f'patch_icpp({pid})%beta',
-                    'tau_e': f'patch_icpp({pid})%tau_e',   'radii': f'patch_icpp({pid})%radii',
-
-                    'e' : f'{math.e}',
+                    "x": "x_cc(i)",
+                    "y": "y_cc(j)",
+                    "z": "z_cc(k)",
+                    "xc": f"patch_icpp({pid})%x_centroid",
+                    "yc": f"patch_icpp({pid})%y_centroid",
+                    "zc": f"patch_icpp({pid})%z_centroid",
+                    "lx": f"patch_icpp({pid})%length_x",
+                    "ly": f"patch_icpp({pid})%length_y",
+                    "lz": f"patch_icpp({pid})%length_z",
+                    "r": f"patch_icpp({pid})%radius",
+                    "eps": f"patch_icpp({pid})%epsilon",
+                    "beta": f"patch_icpp({pid})%beta",
+                    "tau_e": f"patch_icpp({pid})%tau_e",
+                    "radii": f"patch_icpp({pid})%radii",
+                    "e": f"{math.e}",
                 }.get(match.group(), match.group())
 
             lines = []
@@ -195,11 +213,11 @@ class Case:
                 if print:
                     cons.print(f"* Codegen: {attribute} = {expr}")
 
-                varname  = re.findall(r"[a-zA-Z][a-zA-Z0-9_]*", attribute)[1]
+                varname = re.findall(r"[a-zA-Z][a-zA-Z0-9_]*", attribute)[1]
                 qpvf_idx = QPVF_IDX_VARS[varname][:]
 
                 if len(re.findall(r"[0-9]+", attribute)) == 2:
-                    idx = int(re.findall(r'[0-9]+', attribute)[1]) - 1
+                    idx = int(re.findall(r"[0-9]+", attribute)[1]) - 1
                     qpvf_idx = f"{qpvf_idx} + {idx}"
 
                 lhs = f"q_prim_vf({qpvf_idx})%sf({DATA['sf_idx']})"
@@ -212,7 +230,7 @@ class Case:
             # new lines as a fully concatenated string with fortran syntax
             srcs.append(f"""\
     if (patch_id == {pid}) then
-{f'{chr(10)}'.join(lines)}
+{f"{chr(10)}".join(lines)}
     end if\
 """)
 
@@ -222,7 +240,7 @@ class Case:
 ! expressions that are evaluated at runtime from the input file.
 
 #:def analytical()
-{f'{chr(10)}{chr(10)}'.join(srcs)}
+{f"{chr(10)}{chr(10)}".join(srcs)}
 #:enddef
 """
         return content
@@ -237,7 +255,7 @@ class Case:
             if not self.__is_mib_analytical(key, val):
                 continue
 
-            patch_id = re.search(r'[0-9]+', key).group(0)
+            patch_id = re.search(r"[0-9]+", key).group(0)
 
             if patch_id not in ib_patches:
                 ib_patches[patch_id] = []
@@ -249,17 +267,16 @@ class Case:
         # for each analytical patch that is required to be added, generate
         # the string that contains that function.
         for pid, items in ib_patches.items():
-
             # function that defines how we will replace variable names with
             # values from the case file
             def rhs_replace(match):
                 return {
-                    'x': 'x_cc(i)', 'y': 'y_cc(j)', 'z': 'z_cc(k)',
-                    't': 'mytime',
-
-                    'r':     f'patch_ib({pid})%radius',
-
-                    'e' : f'{math.e}',
+                    "x": "x_cc(i)",
+                    "y": "y_cc(j)",
+                    "z": "z_cc(k)",
+                    "t": "mytime",
+                    "r": f"patch_ib({pid})%radius",
+                    "e": f"{math.e}",
                 }.get(match.group(), match.group())
 
             lines = []
@@ -279,7 +296,7 @@ class Case:
             # new lines as a fully concatenated string with fortran syntax
             srcs.append(f"""\
     if (i == {pid}) then
-{f'{chr(10)}'.join(lines)}
+{f"{chr(10)}".join(lines)}
     end if\
 """)
 
@@ -288,7 +305,7 @@ class Case:
 ! parameterize the velocity and rotation rate of a moving IB.
 
 #:def mib_analytical()
-{f'{chr(10)}{chr(10)}'.join(srcs)}
+{f"{chr(10)}{chr(10)}".join(srcs)}
 #:enddef
 """
         return content
@@ -307,11 +324,11 @@ class Case:
             elif bubble_model == 3:
                 nterms = 7
 
-            mapped_weno = 1 if self.params.get("mapped_weno", 'F') == 'T' else 0
-            wenoz  = 1 if self.params.get("wenoz", 'F') == 'T' else 0
-            teno   = 1 if self.params.get("teno", 'F') == 'T' else 0
+            mapped_weno = 1 if self.params.get("mapped_weno", "F") == "T" else 0
+            wenoz = 1 if self.params.get("wenoz", "F") == "T" else 0
+            teno = 1 if self.params.get("teno", "F") == "T" else 0
             wenojs = 0 if (mapped_weno or wenoz or teno) else 1
-            igr = 1 if self.params.get("igr", 'F') == 'T' else 0
+            igr = 1 if self.params.get("igr", "F") == "T" else 0
 
             recon_type = self.params.get("recon_type", 1)
 
@@ -322,7 +339,7 @@ class Case:
             else:
                 weno_polyn = 1
 
-            if self.params.get("igr", "F") == 'T':
+            if self.params.get("igr", "F") == "T":
                 weno_order = 5
                 weno_polyn = 3
 
@@ -332,16 +349,16 @@ class Case:
                 weno_num_stencils = weno_polyn
 
             num_dims = 1 + min(int(self.params.get("n", 0)), 1) + min(int(self.params.get("p", 0)), 1)
-            if self.params.get("mhd", 'F') == 'T':
+            if self.params.get("mhd", "F") == "T":
                 num_vels = 3
             else:
                 num_vels = num_dims
 
-            mhd = 1 if self.params.get("mhd", 'F') == 'T' else 0
-            relativity = 1 if self.params.get("relativity", 'F') == 'T' else 0
-            viscous = 1 if self.params.get("viscous", 'F') == 'T' else 0
-            igr = 1 if self.params.get("igr", 'F') == 'T' else 0
-            igr_pres_lim = 1 if self.params.get("igr_pres_lim", 'F') == 'T' else 0
+            mhd = 1 if self.params.get("mhd", "F") == "T" else 0
+            relativity = 1 if self.params.get("relativity", "F") == "T" else 0
+            viscous = 1 if self.params.get("viscous", "F") == "T" else 0
+            igr = 1 if self.params.get("igr", "F") == "T" else 0
+            igr_pres_lim = 1 if self.params.get("igr_pres_lim", "F") == "T" else 0
 
             # Throw error if wenoz_q is required but not set
             out = f"""\
@@ -380,25 +397,24 @@ class Case:
         # We need to also include the pre_processing includes so that common subroutines have access to the @:analytical function
         return out + f"\n{self.__get_pre_fpp(print)}"
 
-
     def __get_pre_fpp(self, print: bool) -> str:
         out = self.__get_analytic_ic_fpp(print)
         return out
 
-    def get_fpp(self, target, print = True) -> str:
-        from . import build  # pylint: disable=import-outside-toplevel
+    def get_fpp(self, target, print=True) -> str:
+        from . import build
 
         def _prepend() -> str:
             return f"""\
-#:set chemistry             = {self.params.get("chemistry", 'F') == 'T'}
+#:set chemistry             = {self.params.get("chemistry", "F") == "T"}
 """
 
         def _default(_) -> str:
             return "! This file is purposefully empty."
 
         result = {
-            "pre_process"      : self.__get_pre_fpp,
-            "simulation"  : self.__get_sim_fpp,
+            "pre_process": self.__get_pre_fpp,
+            "simulation": self.__get_sim_fpp,
         }.get(build.get_target(target).name, _default)(print)
 
         return _prepend() + result
