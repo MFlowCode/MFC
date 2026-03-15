@@ -235,9 +235,9 @@ contains
                     dycdxc = (2*ma/(1 - pa)**2)*(pa - xa)
                 end if
 
-                yt = (5._wp*ta)*(0.2969_wp*xa**0.5_wp - 0.126_wp*xa - 0.3516_wp*xa**2._wp + 0.2843_wp*xa**3 - 0.1015_wp*xa**4)
+                yt = (5.0d0*ta)*(0.2969_wp*xa**0.5_wp - 0.126_wp*xa - 0.3516_wp*xa**2._wp + 0.2843_wp*xa**3 - 0.1015_wp*xa**4)
                 sin_c = dycdxc/(1 + dycdxc**2)**0.5_wp
-                cos_c = 1/(1 + dycdxc**2)**0.5_wp
+                cos_c = 1.0d0/(1 + dycdxc**2)**0.5_wp
 
                 xu = xa - yt*sin_c
                 yu = yc + yt*cos_c
