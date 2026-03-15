@@ -102,7 +102,7 @@ contains
 
         #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
             if (shear_stress) then    ! Shear stresses
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[i,j,k,l,rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum ,alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[i,j,k,l,q,rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum, alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
                 do l = is3_viscous%beg, is3_viscous%end
                     do k = -1, 1
                         do j = is1_viscous%beg, is1_viscous%end
@@ -212,7 +212,7 @@ contains
 
         #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
             if (bulk_stress) then    ! Bulk stresses
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[i,j,k,l,rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum ,alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[i,j,k,l,q,rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum, alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
                 do l = is3_viscous%beg, is3_viscous%end
                     do k = -1, 1
                         do j = is1_viscous%beg, is1_viscous%end
@@ -319,7 +319,7 @@ contains
         #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
 
             if (shear_stress) then    ! Shear stresses
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[i,j,k,l,q,rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum, alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
                 do l = is3_viscous%beg, is3_viscous%end
                     do k = -1, 1
                         do j = is1_viscous%beg, is1_viscous%end
@@ -428,7 +428,7 @@ contains
             end if
 
             if (bulk_stress) then    ! Bulk stresses
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[i,j,k,l,q,rho_visc, gamma_visc, pi_inf_visc, alpha_visc_sum, alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
                 do l = is3_viscous%beg, is3_viscous%end
                     do k = -1, 1
                         do j = is1_viscous%beg, is1_viscous%end
@@ -1564,12 +1564,12 @@ contains
         real(wp) :: divergence
         integer :: l, q ! iterators
 
-        ! zero the viscous stress, collection of velocity diriviatives, and spacial finite differences
+        ! zero the viscous stress, collection of velocity derivatives, and spatial finite differences
         viscous_stress_tensor = 0._wp
         velocity_gradient_tensor = 0._wp
         dx = 0._wp
 
-        ! get the change in x used in the finite difference equaiont
+        ! get the change in x used in the finite difference equation
         dx(1) = 0.5_wp*(x_cc(i + 1) - x_cc(i - 1))
         dx(2) = 0.5_wp*(y_cc(j + 1) - y_cc(j - 1))
         if (num_dims == 3) then
