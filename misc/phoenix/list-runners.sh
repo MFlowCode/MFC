@@ -1,15 +1,8 @@
 #!/bin/bash
-# List all registered GitHub Actions runners, showing which node each is on,
-# whether it's busy, its memory usage, and whether slurm is in PATH.
+# List all Phoenix runners, combining GitHub API status with login-node process info.
 #
-# Output columns:
-#   Name       — GitHub runner name (from .runner config)
-#   Node       — login node it's running on, or "offline"
-#   Status     — idle, BUSY (has Worker process), or OFFLINE
-#   Slurm      — ok or MISSING (can't submit SLURM jobs)
-#   RSS        — memory usage in MB
-#   Pool       — GitHub runner group/pool
-#   Directory  — filesystem path
+# Shows both what GitHub thinks (online/offline/busy) and the actual process
+# state on the login nodes (which node, slurm PATH, memory).
 #
 # Usage: bash list-runners.sh
 
@@ -17,48 +10,59 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/config.sh"
 
-discover_runners
+printf "%-25s %-8s %-22s %-8s %6s  %s\n" \
+    "NAME" "GITHUB" "NODE" "SLURM" "RSS" "DIRECTORY"
+printf "%s\n" "$(printf '%.0s-' {1..100})"
 
-# Header
-printf "%-25s %-22s %-8s %-8s %5s  %-10s %s\n" \
-    "NAME" "NODE" "STATUS" "SLURM" "RSS" "POOL" "DIRECTORY"
-printf "%s\n" "$(printf '%.0s-' {1..120})"
+# Get GitHub API status for all Phoenix runners
+declare -A gh_status gh_busy
+while read -r id name status busy; do
+    gh_status[$name]="$status"
+    gh_busy[$name]="$busy"
+done <<< "$(gh_list_runners)"
 
-for i in "${!RUNNER_DIRS[@]}"; do
-    dir="${RUNNER_DIRS[$i]}"
-    name="${RUNNER_NAMES[$i]}"
-    pool="${RUNNER_POOLS[$i]}"
+# Walk local runner directories and cross-reference
+for dir in $(find_runner_dirs); do
+    name=$(get_runner_name "$dir")
+    [ -z "$name" ] && continue
 
-    node=$(find_runner_node "$dir")
+    # GitHub status
+    api_status="${gh_status[$name]:-unknown}"
+    api_busy="${gh_busy[$name]:-false}"
+    if [ "$api_busy" = "true" ]; then
+        gh_col="BUSY"
+    else
+        gh_col="$api_status"
+    fi
 
+    # Node status
+    node=$(find_node "$dir")
     if [ "$node" = "offline" ]; then
-        printf "%-25s %-22s %-8s %-8s %5s  %-10s %s\n" \
-            "$name" "—" "OFFLINE" "—" "—" "$pool" "$dir"
+        printf "%-25s %-8s %-22s %-8s %6s  %s\n" \
+            "$name" "$gh_col" "—" "—" "—" "$dir"
         continue
     fi
 
-    # Get all info in one SSH call to reduce latency
+    # Process details (one SSH call)
     info=$(ssh -o ConnectTimeout=5 "$node" '
-        pid=""
         for p in $(ps aux | grep Runner.Listener | grep -v grep | awk "{print \$2}"); do
             cwd=$(readlink -f /proc/$p/cwd 2>/dev/null || true)
-            [ "$cwd" = "'"$dir"'" ] && pid=$p && break
+            if [ "$cwd" = "'"$dir"'" ]; then
+                slurm=$(cat /proc/$p/environ 2>/dev/null | tr "\0" "\n" | grep -c /opt/slurm || echo 0)
+                [ "$slurm" -gt 0 ] && s="ok" || s="MISSING"
+                rss=$(ps -p $p -o rss= 2>/dev/null | awk "{printf \"%.0f\", \$1/1024}" || echo "?")
+                echo "$s $rss"
+                exit
+            fi
         done
-        [ -z "$pid" ] && echo "? ? ? ?" && exit
-        worker=$(ps aux | grep Runner.Worker | grep "'"$dir"'" | grep -v grep | head -1 || true)
-        [ -n "$worker" ] && status="BUSY" || status="idle"
-        has_slurm=$(cat /proc/$pid/environ 2>/dev/null | tr "\0" "\n" | grep -c /opt/slurm || echo 0)
-        [ "$has_slurm" -gt 0 ] && slurm="ok" || slurm="MISSING"
-        rss=$(ps -p $pid -o rss= 2>/dev/null | awk "{printf \"%.0f\", \$1/1024}" || echo "?")
-        echo "$pid $status $slurm $rss"
-    ' 2>/dev/null || echo "? ? ? ?")
-    read -r pid status slurm rss <<< "$info"
+        echo "? ?"
+    ' 2>/dev/null || echo "? ?")
+    read -r slurm rss <<< "$info"
 
-    printf "%-25s %-22s %-8s %-8s %5s  %-10s %s\n" \
-        "$name" "$node" "$status" "$slurm" "${rss}MB" "$pool" "$dir"
+    printf "%-25s %-8s %-22s %-8s %5sMB  %s\n" \
+        "$name" "$gh_col" "$node" "$slurm" "$rss" "$dir"
 done
 
-# Per-node summary
 echo ""
 echo "=== Per-node memory ==="
 for node in "${NODES[@]}"; do

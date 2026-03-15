@@ -1,49 +1,49 @@
 #!/bin/bash
-# Automatically rebalance GitHub Actions runners across Phoenix login nodes.
+# Automatically rebalance Phoenix runners across login nodes.
 #
-# Computes the optimal distribution (equal runners per node), determines
-# which runners need to move, and executes the moves.  Prefers to move
-# idle runners over busy ones.
-#
-# Each Phoenix login node has a 4 GB per-user cgroup memory limit.
-# Target: ~3-4 runners per node to leave headroom for CI work.
+# Discovers all runner directories, checks which node each is on,
+# computes the optimal distribution, and moves runners to balance.
+# Prefers moving idle runners over busy ones. Also places offline runners.
 #
 # Usage: bash rebalance-runners.sh              # dry run
-#        APPLY=1 bash rebalance-runners.sh      # execute moves
+#        APPLY=1 bash rebalance-runners.sh      # execute
 #        APPLY=1 FORCE=1 bash rebalance-runners.sh  # move busy runners too
 
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/config.sh"
 
-discover_runners
+# Discover runners
+declare -a dirs=() names=()
+for dir in $(find_runner_dirs); do
+    name=$(get_runner_name "$dir")
+    [ -z "$name" ] && continue
+    dirs+=("$dir")
+    names+=("$name")
+done
+
 num_nodes=${#NODES[@]}
-num_runners=${#RUNNER_DIRS[@]}
-target_per_node=$(( num_runners / num_nodes ))
+num_runners=${#dirs[@]}
+target=$(( num_runners / num_nodes ))
 remainder=$(( num_runners % num_nodes ))
 
 echo "=== Current state ==="
 echo "Runners: $num_runners across $num_nodes nodes"
-echo "Target:  $target_per_node per node (+1 on first $remainder nodes)"
+echo "Target:  $target per node (+1 on first $remainder nodes)"
 echo ""
 
-# Build current assignment: node -> list of runner indices
+# Map runners to nodes
 declare -A node_runners  # node -> space-separated indices
-declare -A runner_node   # index -> node
-declare -A runner_busy   # index -> 1 if busy
+declare -A runner_node runner_busy
 
-for node in "${NODES[@]}"; do
-    node_runners[$node]=""
-done
+for node in "${NODES[@]}"; do node_runners[$node]=""; done
 
-for i in "${!RUNNER_DIRS[@]}"; do
-    dir="${RUNNER_DIRS[$i]}"
-    node=$(find_runner_node "$dir")
+for i in "${!dirs[@]}"; do
+    node=$(find_node "${dirs[$i]}")
     runner_node[$i]="$node"
-
     if [ "$node" != "offline" ]; then
         node_runners[$node]="${node_runners[$node]:-} $i"
-        worker=$(ssh -o ConnectTimeout=5 "$node" "ps aux | grep Runner.Worker | grep '$dir' | grep -v grep" 2>/dev/null || true)
+        worker=$(ssh -o ConnectTimeout=5 "$node" "ps aux | grep Runner.Worker | grep '${dirs[$i]}' | grep -v grep" 2>/dev/null || true)
         [ -n "$worker" ] && runner_busy[$i]=1 || runner_busy[$i]=0
     else
         runner_busy[$i]=0
@@ -55,176 +55,115 @@ for node in "${NODES[@]}"; do
     indices=(${node_runners[$node]:-})
     echo "$node: ${#indices[@]} runners"
     for i in "${indices[@]}"; do
-        busy_marker=""
-        [ "${runner_busy[$i]:-0}" = "1" ] && busy_marker=" (BUSY)"
-        echo "  ${RUNNER_NAMES[$i]}$busy_marker"
+        busy=""
+        [ "${runner_busy[$i]:-0}" = "1" ] && busy=" (BUSY)"
+        echo "  ${names[$i]}$busy"
     done
 done
 
-# Find offline runners
 offline=()
-for i in "${!RUNNER_DIRS[@]}"; do
+for i in "${!dirs[@]}"; do
     [ "${runner_node[$i]}" = "offline" ] && offline+=("$i")
 done
 if [ ${#offline[@]} -gt 0 ]; then
     echo ""
-    echo "OFFLINE runners:"
-    for i in "${offline[@]}"; do
-        echo "  ${RUNNER_NAMES[$i]} (${RUNNER_DIRS[$i]})"
-    done
+    echo "OFFLINE:"
+    for i in "${offline[@]}"; do echo "  ${names[$i]}"; done
 fi
-
 echo ""
 
-# Compute target per node
+# Compute targets
 declare -A node_target
 n=0
 for node in "${NODES[@]}"; do
-    node_target[$node]=$target_per_node
-    if [ $n -lt $remainder ]; then
-        node_target[$node]=$(( target_per_node + 1 ))
-    fi
+    node_target[$node]=$target
+    [ $n -lt $remainder ] && node_target[$node]=$(( target + 1 ))
     n=$((n + 1))
 done
 
-# Determine moves needed
-# Phase 1: identify overloaded nodes and runners to move away
-moves=()  # "source_node dest_node runner_index"
-
-# Collect runners to move from overloaded nodes (prefer idle runners)
-to_place=()  # indices of runners that need a new home
+# Plan moves: collect runners from overloaded nodes (idle first)
+to_place=()
 for node in "${NODES[@]}"; do
     indices=(${node_runners[$node]:-})
     excess=$(( ${#indices[@]} - ${node_target[$node]} ))
-    if [ $excess -le 0 ]; then
-        continue
-    fi
-    # Sort: move idle runners first, then busy
-    idle_here=()
-    busy_here=()
+    [ $excess -le 0 ] && continue
+    idle=() busy=()
     for i in "${indices[@]}"; do
-        if [ "${runner_busy[$i]:-0}" = "1" ]; then
-            busy_here+=("$i")
-        else
-            idle_here+=("$i")
-        fi
+        [ "${runner_busy[$i]:-0}" = "1" ] && busy+=("$i") || idle+=("$i")
     done
-    # Pick from idle first
     moved=0
-    for i in "${idle_here[@]}"; do
-        [ $moved -ge $excess ] && break
-        to_place+=("$node $i")
-        moved=$((moved + 1))
-    done
-    for i in "${busy_here[@]}"; do
+    for i in "${idle[@]}" "${busy[@]}"; do
         [ $moved -ge $excess ] && break
         to_place+=("$node $i")
         moved=$((moved + 1))
     done
 done
 
-# Phase 2: assign runners to underloaded nodes
-# Also place offline runners
-for i in "${offline[@]}"; do
-    to_place+=("offline $i")
-done
+# Add offline runners
+for i in "${offline[@]}"; do to_place+=("offline $i"); done
 
+# Assign to underloaded nodes
+moves=()
 for entry in "${to_place[@]}"; do
-    read -r src_node runner_idx <<< "$entry"
-    # Find the most underloaded node
-    best_node=""
-    best_deficit=-999
+    read -r src idx <<< "$entry"
+    best="" best_deficit=-999
     for node in "${NODES[@]}"; do
-        current=(${node_runners[$node]:-})
-        deficit=$(( ${node_target[$node]} - ${#current[@]} ))
-        if [ $deficit -gt $best_deficit ]; then
-            best_deficit=$deficit
-            best_node=$node
-        fi
+        cur=(${node_runners[$node]:-})
+        deficit=$(( ${node_target[$node]} - ${#cur[@]} ))
+        [ $deficit -gt $best_deficit ] && best_deficit=$deficit && best=$node
     done
-
-    if [ -z "$best_node" ] || [ "$best_deficit" -le 0 ]; then
-        echo "WARNING: No underloaded node for ${RUNNER_NAMES[$runner_idx]}, skipping"
-        continue
-    fi
-
-    moves+=("$src_node $best_node $runner_idx")
+    [ -z "$best" ] || [ "$best_deficit" -le 0 ] && continue
+    moves+=("$src $best $idx")
     # Update bookkeeping
-    if [ "$src_node" != "offline" ]; then
-        # Remove from source
-        new_list=""
-        for idx in ${node_runners[$src_node]}; do
-            [ "$idx" != "$runner_idx" ] && new_list="$new_list $idx"
-        done
-        node_runners[$src_node]="$new_list"
+    if [ "$src" != "offline" ]; then
+        new=""
+        for j in ${node_runners[$src]}; do [ "$j" != "$idx" ] && new="$new $j"; done
+        node_runners[$src]="$new"
     fi
-    node_runners[$best_node]="${node_runners[$best_node]:-} $runner_idx"
+    node_runners[$best]="${node_runners[$best]:-} $idx"
 done
 
 if [ ${#moves[@]} -eq 0 ]; then
-    echo "Already balanced — no moves needed."
+    echo "Already balanced."
     exit 0
 fi
 
-# Show plan
 echo "=== Planned moves ==="
 has_busy=false
 for move in "${moves[@]}"; do
     read -r src dst idx <<< "$move"
-    busy_marker=""
-    if [ "${runner_busy[$idx]:-0}" = "1" ]; then
-        busy_marker=" (BUSY!)"
-        has_busy=true
-    fi
-    echo "  ${RUNNER_NAMES[$idx]}: $src -> $dst$busy_marker"
+    busy=""
+    [ "${runner_busy[$idx]:-0}" = "1" ] && busy=" (BUSY!)" && has_busy=true
+    echo "  ${names[$idx]}: $src -> $dst$busy"
 done
-
 echo ""
-echo "=== Target distribution ==="
+echo "=== Target ==="
 for node in "${NODES[@]}"; do
-    indices=(${node_runners[$node]:-})
-    echo "  $node: ${#indices[@]} runners"
+    cur=(${node_runners[$node]:-})
+    echo "  $node: ${#cur[@]} runners"
 done
 
-if [ "$has_busy" = true ] && [ "${FORCE:-0}" != "1" ]; then
-    echo ""
-    echo "Some runners to move have active jobs. Set FORCE=1 to move them."
-    exit 1
-fi
+[ "$has_busy" = true ] && [ "${FORCE:-0}" != "1" ] && echo "" && echo "Set FORCE=1 to move busy runners." && exit 1
+[ "${APPLY:-0}" != "1" ] && echo "" && echo "Dry run — set APPLY=1 to execute." && exit 0
 
-if [ "${APPLY:-0}" != "1" ]; then
-    echo ""
-    echo "Dry run — set APPLY=1 to execute. Add FORCE=1 to move busy runners."
-    exit 0
-fi
-
-# Execute
 echo ""
-echo "=== Executing moves ==="
+echo "=== Executing ==="
 for move in "${moves[@]}"; do
     read -r src dst idx <<< "$move"
-    dir="${RUNNER_DIRS[$idx]}"
-    name="${RUNNER_NAMES[$idx]}"
-    echo "Moving $name: $src -> $dst"
-
-    if [ "$src" != "offline" ]; then
-        stop_runner "$src" "$dir"
-    fi
-
-    if start_runner "$dst" "$dir"; then
-        pid=$(ssh -o ConnectTimeout=5 "$dst" "pgrep -f 'Runner.Listener.*$dir' | head -1" 2>/dev/null || true)
-        if [ -n "$pid" ] && check_slurm_path "$dst" "$pid"; then
-            echo "  OK: PID $pid on $dst, slurm in PATH"
-        elif [ -n "$pid" ]; then
-            echo "  WARNING: PID $pid on $dst but slurm MISSING from PATH"
+    echo "Moving ${names[$idx]}: $src -> $dst"
+    [ "$src" != "offline" ] && stop_runner "$src" "${dirs[$idx]}"
+    if start_runner "$dst" "${dirs[$idx]}"; then
+        pids=$(find_pids "$dst" "${dirs[$idx]}")
+        pid=${pids%% *}
+        if has_slurm "$dst" "$pid"; then
+            echo "  OK: PID $pid, slurm in PATH"
         else
-            echo "  ERROR: Process not found after start"
+            echo "  WARNING: slurm MISSING"
         fi
     else
-        echo "  ERROR: Failed to start on $dst"
+        echo "  ERROR: Failed to start"
     fi
 done
 
 echo ""
-echo "=== Final state ==="
-bash "$SCRIPT_DIR/list-runners.sh"
+bash "$SCRIPT_DIR/check-runners.sh"

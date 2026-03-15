@@ -1,51 +1,46 @@
 #!/bin/bash
-# Create and register a new GitHub Actions runner for Phoenix.
+# Create and register a new GitHub Actions runner on Phoenix.
 #
-# Downloads the runner binary, configures it with a registration token,
-# and starts it on the specified login node with proper PATH.
+# Downloads the runner binary, registers with MFlowCode org, and starts
+# on the specified login node. Uses config.sh for org/group/label defaults.
 #
-# Prerequisites:
-#   - gh CLI authenticated with admin access to the target org
-#   - The parent directory must exist and be on shared storage
+# Prerequisites: gh CLI with admin:org scope (gh auth refresh -s admin:org)
 #
-# Usage: bash create-runner.sh <runner-name> <node> <parent-dir> [org] [runner-group]
+# Usage: bash create-runner.sh <runner-name> <node> [parent-dir]
 #
 # Examples:
-#   bash create-runner.sh phoenix-11 login-phoenix-gnr-2 /storage/scratch1/6/sbryngelson3/mfc-runners
-#   bash create-runner.sh phoenix-12 login-phoenix-gnr-3 /storage/project/.../mfc-runners-2 MFlowCode phoenix
+#   bash create-runner.sh phoenix-11 login-phoenix-gnr-2
+#   bash create-runner.sh phoenix-12 login-phoenix-gnr-3 /storage/project/.../mfc-runners-2
 
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/config.sh"
 
-if [ $# -lt 3 ]; then
-    echo "Usage: $0 <runner-name> <node> <parent-dir> [org] [runner-group]"
+if [ $# -lt 2 ]; then
+    echo "Usage: $0 <runner-name> <node> [parent-dir]"
     echo ""
-    echo "  runner-name   Name for the runner (e.g. phoenix-11)"
-    echo "  node          Login node to run on (e.g. login-phoenix-gnr-2)"
-    echo "  parent-dir    Parent directory for the runner installation"
-    echo "  org           GitHub org (default: MFlowCode)"
-    echo "  runner-group  Runner group/pool (default: phoenix)"
+    echo "  runner-name  Name for the runner (e.g. phoenix-11)"
+    echo "  node         Login node (${NODES[*]})"
+    echo "  parent-dir   Parent directory (default: ${RUNNER_PARENT_DIRS[0]})"
     exit 1
 fi
 
 runner_name="$1"
 node="$2"
-parent_dir="$3"
-org="${4:-MFlowCode}"
-runner_group="${5:-phoenix}"
+parent_dir="${3:-${RUNNER_PARENT_DIRS[0]}}"
 
-# Determine next available runner directory
+# Determine next available runner directory number
 existing=$(ls -d "$parent_dir"/actions-runner-* 2>/dev/null | sed 's/.*actions-runner-//' | sort -n | tail -1)
 next_num=$(( ${existing:-0} + 1 ))
 runner_dir="$parent_dir/actions-runner-$next_num"
 
-echo "=== Creating runner ==="
+echo "=== Creating Phoenix runner ==="
 echo "  Name:      $runner_name"
 echo "  Node:      $node"
 echo "  Directory: $runner_dir"
-echo "  Org:       $org"
-echo "  Group:     $runner_group"
+echo "  Org:       $ORG"
+echo "  Group:     $RUNNER_GROUP"
+echo "  Label:     $RUNNER_LABEL"
 echo ""
 
 if [ -d "$runner_dir" ]; then
@@ -53,58 +48,52 @@ if [ -d "$runner_dir" ]; then
     exit 1
 fi
 
-# Get registration token
-echo "Getting registration token from GitHub..."
-token=$(gh api "orgs/$org/actions/runners/registration-token" --jq .token 2>/dev/null)
+# Registration token
+echo "Getting registration token..."
+token=$(gh_registration_token)
 if [ -z "$token" ]; then
-    echo "ERROR: Failed to get registration token. Check 'gh auth status' and org admin permissions."
+    echo "ERROR: Failed to get token. Run: gh auth refresh -h github.com -s admin:org"
     exit 1
 fi
-echo "  Token acquired."
 
-# Get latest runner version
-echo "Downloading runner..."
-latest_version=$(gh api repos/actions/runner/releases/latest --jq .tag_name 2>/dev/null | sed 's/^v//')
-if [ -z "$latest_version" ]; then
-    echo "ERROR: Failed to determine latest runner version."
-    exit 1
-fi
-runner_url="https://github.com/actions/runner/releases/download/v${latest_version}/actions-runner-linux-x64-${latest_version}.tar.gz"
-echo "  Version: $latest_version"
+# Download runner
+echo "Downloading latest runner binary..."
+version=$(gh_latest_runner_version)
+url="https://github.com/actions/runner/releases/download/v${version}/actions-runner-linux-x64-${version}.tar.gz"
+echo "  Version: $version"
 
 mkdir -p "$runner_dir"
 cd "$runner_dir"
-
-curl -sL "$runner_url" | tar xz
-echo "  Downloaded and extracted."
+curl -sL "$url" | tar xz
+echo "  Extracted."
 
 # Configure
-echo "Configuring runner..."
+echo "Configuring..."
 ./config.sh \
-    --url "https://github.com/$org" \
+    --url "https://github.com/$ORG" \
     --token "$token" \
     --name "$runner_name" \
-    --runnergroup "$runner_group" \
-    --labels "gt" \
+    --runnergroup "$RUNNER_GROUP" \
+    --labels "$RUNNER_LABEL" \
     --work "_work" \
     --unattended \
     --replace
 echo "  Configured."
 
-# Start on the target node
-echo "Starting runner on $node..."
+# Start
+echo "Starting on $node..."
 if start_runner "$node" "$runner_dir"; then
-    pid=$(ssh -o ConnectTimeout=5 "$node" "pgrep -f 'Runner.Listener.*$runner_dir'" 2>/dev/null || true)
-    if check_slurm_path "$node" "$pid"; then
-        echo "  OK: Running as PID $pid on $node, slurm in PATH"
+    pids=$(find_pids "$node" "$runner_dir")
+    pid=${pids%% *}
+    if has_slurm "$node" "$pid"; then
+        echo "  OK: PID $pid, slurm in PATH"
     else
-        echo "  WARNING: Running as PID $pid but slurm NOT in PATH"
+        echo "  WARNING: PID $pid but slurm MISSING from PATH"
     fi
 else
-    echo "  ERROR: Failed to start. Try manually:"
-    echo "  ssh $node 'cd $runner_dir && setsid bash -lc \"nohup ./run.sh >> runner-nohup.log 2>&1 &\"'"
+    echo "  ERROR: Failed to start."
+    echo "  Try: ssh $node 'cd $runner_dir && setsid bash -lc \"nohup ./run.sh >> runner-nohup.log 2>&1 &\"'"
 fi
 
 echo ""
-echo "Runner $runner_name created at $runner_dir"
-echo "Verify with: bash $SCRIPT_DIR/list-runners.sh"
+echo "Created $runner_name at $runner_dir"
