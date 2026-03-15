@@ -40,12 +40,6 @@ class Pack:
     def set(self, entry: PackEntry):
         self.entries[entry.filepath] = entry
 
-    def has_NaNs(self) -> bool:
-        """Return True if any entry contains NaN values."""
-        import math
-
-        return any(math.isnan(d) for e in self.entries.values() for d in e.doubles)
-
     def remove(self, filepath_or_entry: typing.Union[str, PackEntry]):
         if isinstance(filepath_or_entry, str):
             del self.entries[filepath_or_entry]

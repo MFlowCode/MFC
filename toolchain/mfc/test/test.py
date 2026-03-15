@@ -445,8 +445,8 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
             if restart_err is not None:
                 raise MFCException(f"Test {case}: Restart pack error: {restart_err}")
 
-            if restart_pack.has_NaNs():
-                raise MFCException(f"Test {case}: NaNs detected in restarted output.")
+            if restart_pack.has_bad_values():
+                raise MFCException(f"Test {case}: NaN or Inf detected in restarted output.")
 
             _, restart_msg = packtol.compare(restart_pack, straight_pack, packtol.Tolerance(tol, tol))
             if restart_msg is not None:
