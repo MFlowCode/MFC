@@ -18,6 +18,21 @@ if [ ${#TARGET_NODES[@]} -eq 0 ]; then
     exit 1
 fi
 
+# Pre-download the runner tarball once before spawning parallel make-runner.sh
+# instances. Without this, all instances race to download the same file
+# concurrently and corrupt it. The tmp+mv ensures an atomic final placement.
+RUNNER_VERSION="${RUNNER_VERSION:-$(gh_latest_runner_version 2>/dev/null || echo "2.332.0")}"
+TARBALL="actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz"
+if [ ! -f "${SHARED_DIR}/${TARBALL}" ]; then
+    echo "==> Downloading runner v${RUNNER_VERSION}..."
+    tmp="${SHARED_DIR}/${TARBALL}.tmp.$$"
+    curl -fsSL \
+        "https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/${TARBALL}" \
+        -o "$tmp"
+    mv "$tmp" "${SHARED_DIR}/${TARBALL}"
+fi
+export RUNNER_VERSION
+
 for i in "${!TARGET_NODES[@]}"; do
     NODE="${TARGET_NODES[$i]}"
     NUM=$((START_NUM + i))

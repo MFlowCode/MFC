@@ -24,9 +24,11 @@ echo "==> Setting up runner: ${RUNNER_NAME} on ${TARGET_NODE}"
 # --- Download tarball once to shared dir ---
 if [ ! -f "${SHARED_DIR}/${TARBALL}" ]; then
     echo "==> Downloading runner v${RUNNER_VERSION}..."
+    tmp="${SHARED_DIR}/${TARBALL}.tmp.$$"
     curl -fsSL \
         "https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/${TARBALL}" \
-        -o "${SHARED_DIR}/${TARBALL}"
+        -o "$tmp"
+    mv "$tmp" "${SHARED_DIR}/${TARBALL}"
 fi
 
 # --- Extract (filesystem is shared across all nodes) ---

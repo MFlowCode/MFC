@@ -15,12 +15,12 @@ source "$SCRIPT_DIR/config.sh"
 
 # Discover runners
 declare -a dirs=() names=()
-for dir in $(find_runner_dirs); do
+while IFS= read -r dir; do
     name=$(get_runner_name "$dir")
     [ -z "$name" ] && continue
     dirs+=("$dir")
     names+=("$name")
-done
+done < <(find_runner_dirs)
 
 num_nodes=${#NODES[@]}
 num_runners=${#dirs[@]}

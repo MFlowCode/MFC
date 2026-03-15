@@ -22,7 +22,6 @@ if [ -z "$prs" ]; then
     exit 0
 fi
 
-rerun_count=0
 for pr in $prs; do
     title=$(gh pr view --repo "$REPO" "$pr" --json title --jq .title)
     branch=$(gh pr view --repo "$REPO" "$pr" --json headRefName --jq .headRefName)
@@ -35,21 +34,21 @@ for pr in $prs; do
     if [ -n "$failed_runs" ]; then
         echo ""
         echo "=== PR #$pr: $title ==="
-        echo "$failed_runs" | while read -r run_id run_name; do
-            # Check which jobs failed
+        while read -r run_id run_name; do
+            # Check which jobs failed; skip if run has expired or been deleted
             failed_jobs=$(gh run view --repo "$REPO" "$run_id" \
-                --json jobs --jq '.jobs[] | select(.conclusion == "failure" or .conclusion == "cancelled") | .name')
+                --json jobs --jq '.jobs[] | select(.conclusion == "failure" or .conclusion == "cancelled") | .name' \
+                2>/dev/null) || { echo "  WARNING: could not fetch jobs for run $run_id, skipping"; continue; }
             echo "  Run $run_id ($run_name):"
-            echo "$failed_jobs" | while read -r job; do
+            while read -r job; do
                 echo "    - $job"
-            done
+            done <<< "$failed_jobs"
 
             if [ "${APPLY:-0}" = "1" ]; then
                 echo "  Rerunning failed jobs..."
                 gh run rerun --repo "$REPO" "$run_id" --failed || echo "  WARNING: rerun failed (may already be rerunning)"
-                rerun_count=$((rerun_count + 1))
             fi
-        done
+        done < <(echo "$failed_runs")
     fi
 done
 
@@ -60,13 +59,13 @@ master_failed=$(gh run list --repo "$REPO" --branch master --limit 5 \
     --json databaseId,status,conclusion,name \
     --jq '.[] | select(.conclusion == "failure") | "\(.databaseId) \(.name)"')
 if [ -n "$master_failed" ]; then
-    echo "$master_failed" | while read -r run_id run_name; do
+    while read -r run_id run_name; do
         echo "  Run $run_id ($run_name)"
         if [ "${APPLY:-0}" = "1" ]; then
             echo "  Rerunning failed jobs..."
             gh run rerun --repo "$REPO" "$run_id" --failed || echo "  WARNING: rerun failed"
         fi
-    done
+    done < <(echo "$master_failed")
 else
     echo "  All passing"
 fi

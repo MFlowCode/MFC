@@ -15,7 +15,7 @@ source "$SCRIPT_DIR/config.sh"
 echo "=== Discovering runners ==="
 declare -a restart_list=()
 
-for dir in $(find_runner_dirs); do
+while IFS= read -r dir; do
     name=$(get_runner_name "$dir")
     [ -z "$name" ] && continue
     node=$(find_node "$dir")
@@ -37,7 +37,7 @@ for dir in $(find_runner_dirs); do
     fi
 
     restart_list+=("$node $dir $name")
-done
+done < <(find_runner_dirs)
 
 if [ ${#restart_list[@]} -eq 0 ]; then
     echo "Nothing to restart."

@@ -54,7 +54,7 @@ done < <(gh_list_runners)
 printf "%-25s %-8s %-14s %s\n" "NAME" "GITHUB" "NODE" "RSS"
 printf "%s\n" "$(printf '%.0s-' {1..60})"
 
-for dir in $(find_runner_dirs); do
+while IFS= read -r dir; do
     name=$(get_runner_name "$dir")
     [ -z "$name" ] && continue
 
@@ -86,4 +86,4 @@ for dir in $(find_runner_dirs); do
     fi
 
     printf "%-25s %-8s %-14s %sMB\n" "$name" "$gh_col" "$node_col" "$rss"
-done
+done < <(find_runner_dirs)

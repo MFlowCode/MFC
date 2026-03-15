@@ -28,6 +28,7 @@ for node in "${NODES[@]}"; do
     ' 2>/dev/null || echo "  (unreachable)"
 
     rss=$(ssh -o ConnectTimeout=5 "$node" "ps -u \$(whoami) -o rss= 2>/dev/null | awk '{sum+=\$1} END {printf \"%.0f\", sum/1024}'" 2>/dev/null || echo "?")
+    [[ "$rss" =~ ^[0-9]+$ ]] || rss=0
     echo "  --- Total: ${rss} MB / ${CGROUP_LIMIT} MB ($(( CGROUP_LIMIT - rss )) MB free) ---"
     echo ""
 done

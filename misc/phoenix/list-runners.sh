@@ -22,7 +22,7 @@ while read -r id name status busy; do
 done <<< "$(gh_list_runners)"
 
 # Walk local runner directories and cross-reference
-for dir in $(find_runner_dirs); do
+while IFS= read -r dir; do
     name=$(get_runner_name "$dir")
     [ -z "$name" ] && continue
 
@@ -61,12 +61,13 @@ for dir in $(find_runner_dirs); do
 
     printf "%-25s %-8s %-22s %-8s %5sMB  %s\n" \
         "$name" "$gh_col" "$node" "$slurm" "$rss" "$dir"
-done
+done < <(find_runner_dirs)
 
 echo ""
 echo "=== Per-node memory ==="
 for node in "${NODES[@]}"; do
     count=$(ssh -o ConnectTimeout=5 "$node" "ps aux | grep Runner.Listener | grep -v grep | wc -l" 2>/dev/null || echo 0)
     rss=$(ssh -o ConnectTimeout=5 "$node" "ps -u \$(whoami) -o rss= 2>/dev/null | awk '{sum+=\$1} END {printf \"%.0f\", sum/1024}'" 2>/dev/null || echo "?")
+    [[ "$rss" =~ ^[0-9]+$ ]] || rss=0
     echo "  $node: $count runners, ${rss} MB / ${CGROUP_LIMIT} MB ($(( CGROUP_LIMIT - rss )) MB free)"
 done
