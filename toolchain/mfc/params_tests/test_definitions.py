@@ -5,15 +5,16 @@ Tests parameter definitions, constraints, and dependencies.
 """
 
 import unittest
+
 from ..params import REGISTRY
-from ..params.schema import ParamType
 from ..params.definitions import (
+    CASE_OPT_PARAMS,
     CONSTRAINTS,
     DEPENDENCIES,
-    CASE_OPT_PARAMS,
     _validate_constraint,
     _validate_dependency,
 )
+from ..params.schema import ParamType
 
 
 class TestParameterDefinitions(unittest.TestCase):
@@ -28,19 +29,13 @@ class TestParameterDefinitions(unittest.TestCase):
     def test_all_params_have_valid_type(self):
         """Every parameter should have a valid ParamType."""
         for name, param in REGISTRY.all_params.items():
-            self.assertIsInstance(
-                param.param_type, ParamType,
-                f"Parameter '{name}' has invalid type"
-            )
+            self.assertIsInstance(param.param_type, ParamType, f"Parameter '{name}' has invalid type")
 
     def test_core_params_exist(self):
         """Core parameters m, n, p, model_eqns should exist."""
         core_params = ["m", "n", "p", "model_eqns", "num_fluids"]
         for param_name in core_params:
-            self.assertIn(
-                param_name, REGISTRY.all_params,
-                f"Core parameter '{param_name}' not found"
-            )
+            self.assertIn(param_name, REGISTRY.all_params, f"Core parameter '{param_name}' not found")
 
     def test_domain_params_exist(self):
         """Domain parameters should exist for all directions."""
@@ -95,12 +90,15 @@ class TestDependencyValidation(unittest.TestCase):
 
     def test_valid_when_true_dependency(self):
         """Valid when_true dependency should pass."""
-        _validate_dependency("test", {
-            "when_true": {
-                "requires": ["other_param"],
-                "recommends": ["another_param"],
-            }
-        })
+        _validate_dependency(
+            "test",
+            {
+                "when_true": {
+                    "requires": ["other_param"],
+                    "recommends": ["another_param"],
+                }
+            },
+        )
 
     def test_invalid_top_level_key_raises(self):
         """Invalid top-level dependency key should raise."""
@@ -112,9 +110,12 @@ class TestDependencyValidation(unittest.TestCase):
     def test_invalid_condition_key_raises(self):
         """Invalid condition key should raise."""
         with self.assertRaises(ValueError) as ctx:
-            _validate_dependency("test", {
-                "when_true": {"reqires": ["foo"]}  # Typo for requires
-            })
+            _validate_dependency(
+                "test",
+                {
+                    "when_true": {"reqires": ["foo"]}  # Typo for requires
+                },
+            )
 
         self.assertIn("reqires", str(ctx.exception))
         # Verify "did you mean?" suggestion is provided
@@ -123,9 +124,7 @@ class TestDependencyValidation(unittest.TestCase):
     def test_requires_must_be_list(self):
         """requires value must be a list."""
         with self.assertRaises(ValueError):
-            _validate_dependency("test", {
-                "when_true": {"requires": "not a list"}
-            })
+            _validate_dependency("test", {"when_true": {"requires": "not a list"}})
 
     def test_all_defined_dependencies_are_valid(self):
         """All dependencies in DEPENDENCIES dict should be valid."""
@@ -142,19 +141,13 @@ class TestCaseOptimizationParams(unittest.TestCase):
     def test_case_opt_params_exist_in_registry(self):
         """All CASE_OPT_PARAMS should exist in registry."""
         for param_name in CASE_OPT_PARAMS:
-            self.assertIn(
-                param_name, REGISTRY.all_params,
-                f"Case opt param '{param_name}' not in registry"
-            )
+            self.assertIn(param_name, REGISTRY.all_params, f"Case opt param '{param_name}' not in registry")
 
     def test_case_opt_params_have_flag_set(self):
         """Params in CASE_OPT_PARAMS should have case_optimization=True."""
         for param_name in CASE_OPT_PARAMS:
             param = REGISTRY.all_params[param_name]
-            self.assertTrue(
-                param.case_optimization,
-                f"Parameter '{param_name}' should have case_optimization=True"
-            )
+            self.assertTrue(param.case_optimization, f"Parameter '{param_name}' should have case_optimization=True")
 
 
 class TestParameterCounts(unittest.TestCase):
@@ -168,10 +161,7 @@ class TestParameterCounts(unittest.TestCase):
 
     def test_log_params_count(self):
         """Should have many LOG type parameters."""
-        log_count = sum(
-            1 for p in REGISTRY.all_params.values()
-            if p.param_type == ParamType.LOG
-        )
+        log_count = sum(1 for p in REGISTRY.all_params.values() if p.param_type == ParamType.LOG)
         self.assertGreater(log_count, 300, "Too few LOG parameters")
 
     def test_tagged_params_exist(self):

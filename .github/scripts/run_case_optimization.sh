@@ -44,7 +44,7 @@ for case in "${benchmarks[@]}"; do
     rm -rf "$case_dir/D" "$case_dir/p_all" "$case_dir/restart_data"
 
     # Build + run with --case-optimization, small grid, 10 timesteps
-    if ./mfc.sh run "$case" --case-optimization $gpu_opts -n "$ngpus" -j "$(nproc)" -- --gbpp 1 --steps 10; then
+    if ./mfc.sh run "$case" --case-optimization $gpu_opts -n "$ngpus" -j 8 -- --gbpp 1 --steps 10; then
         # Validate output
         if build/venv/bin/python3 .github/scripts/check_case_optimization_output.py "$case_dir"; then
             echo "PASS: $case_name"

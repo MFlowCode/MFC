@@ -1,14 +1,17 @@
-import typing, os.path
+import os.path
+import typing
 
+from ..common import MFCException
 from ..printer import cons
 from ..state import ARG, ARGS
-from . import pack as _pack
 from . import errors
+from . import pack as _pack
 from . import tol as packtol
-from ..common import MFCException
+
 
 def load(packpath: str) -> _pack.Pack:
     return _pack.load(packpath)
+
 
 def pack(casepath: str, packpath: str = None) -> typing.Tuple[_pack.Pack, str]:
     if packpath is None:
@@ -23,6 +26,7 @@ def pack(casepath: str, packpath: str = None) -> typing.Tuple[_pack.Pack, str]:
 
     return p, None
 
+
 def compare(lhs: str = None, rhs: str = None, tol: packtol.Tolerance = None) -> typing.Tuple[errors.Error, str]:
     if isinstance(lhs, str):
         lhs = load(lhs)
@@ -30,6 +34,7 @@ def compare(lhs: str = None, rhs: str = None, tol: packtol.Tolerance = None) -> 
         rhs = load(rhs)
 
     return packtol.compare(lhs, rhs, tol)
+
 
 def packer():
     if ARG("packer") == "pack":
@@ -41,10 +46,7 @@ def packer():
         if err is not None:
             raise MFCException(err)
     elif ARG("packer") == "compare":
-        cons.print(
-            f"Comparing [magenta]{os.path.relpath(ARG('input1'))}[/magenta] to "
-            f"[magenta]{os.path.relpath(ARG('input2'))}[/magenta]:"
-        )
+        cons.print(f"Comparing [magenta]{os.path.relpath(ARG('input1'))}[/magenta] to [magenta]{os.path.relpath(ARG('input2'))}[/magenta]:")
 
         cons.indent()
         cons.print()

@@ -9,11 +9,17 @@ cleanup() {
   if [ -n "${tail_pid:-}" ]; then
     kill "${tail_pid}" 2>/dev/null || true
   fi
-  # Cancel the SLURM job if the monitor is exiting due to an error
-  # (e.g., the CI runner is being killed). Don't cancel on success.
+  # Cancel the SLURM job only if it is still active in the scheduler.
+  # If the job already left the queue (squeue returns empty), it has finished
+  # and run_monitored_slurm_job.sh will recover via sacct — don't cancel it.
   if [ "${monitor_success:-0}" -ne 1 ] && [ -n "${job_id:-}" ]; then
-    echo "Monitor exiting abnormally — cancelling SLURM job $job_id"
-    scancel "$job_id" 2>/dev/null || true
+    active_state=$(squeue -j "$job_id" -h -o '%T' 2>/dev/null | head -n1 | tr -d ' ' || echo "")
+    if [ -n "$active_state" ]; then
+      echo "Monitor exiting abnormally — cancelling SLURM job $job_id (state: $active_state)"
+      scancel "$job_id" 2>/dev/null || true
+    else
+      echo "Monitor exiting abnormally — SLURM job $job_id already left queue, not cancelling"
+    fi
   fi
 }
 trap cleanup EXIT
@@ -46,6 +52,15 @@ get_job_state() {
   # Fallback to sacct (works for completed/historical jobs)
   if command -v sacct >/dev/null 2>&1; then
     state=$(sacct -j "$jid" -n -X -P -o State 2>/dev/null | head -n1 | cut -d'|' -f1 || true)
+    # When a job is preempted+requeued, sacct -X reports PREEMPTED for the
+    # original attempt while the requeued run may have completed.  Check all
+    # records (without -X) for a terminal state that supersedes PREEMPTED.
+    if [ "$state" = "PREEMPTED" ]; then
+      requeue_state=$(sacct -j "$jid" -n -P -o State 2>/dev/null | grep -v PREEMPTED | head -n1 | cut -d'|' -f1 || true)
+      if [ -n "$requeue_state" ]; then
+        state="$requeue_state"
+      fi
+    fi
     if [ -n "$state" ]; then
       echo "$state"
       return
@@ -56,9 +71,11 @@ get_job_state() {
 }
 
 # Check if a state is terminal (job is done, for better or worse)
+# PREEMPTED is intentionally excluded: with --requeue the job restarts under
+# the same job ID and we must keep monitoring rather than exiting early.
 is_terminal_state() {
   case "$1" in
-    COMPLETED|FAILED|CANCELLED|CANCELLED+|TIMEOUT|OUT_OF_MEMORY|NODE_FAIL|BOOT_FAIL|DEADLINE|PREEMPTED|REVOKED)
+    COMPLETED|FAILED|CANCELLED|CANCELLED+|TIMEOUT|OUT_OF_MEMORY|NODE_FAIL|BOOT_FAIL|DEADLINE|REVOKED)
       return 0 ;;
     *)
       return 1 ;;
@@ -74,7 +91,7 @@ while [ ! -f "$output_file" ]; do
   state=$(get_job_state "$job_id")
 
   case "$state" in
-    PENDING|CONFIGURING)
+    PENDING|CONFIGURING|PREEMPTED)
       unknown_count=0
       sleep 5
       ;;

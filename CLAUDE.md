@@ -41,7 +41,7 @@ All commands run from the repo root via `./mfc.sh`.
 # Verification (pre-commit CI checks)
 ./mfc.sh precheck -j 8                     # Run all 5 lint checks (same as CI gate)
 ./mfc.sh format -j 8                       # Auto-format Fortran (.fpp/.f90) + Python
-./mfc.sh lint                              # Pylint + Python unit tests
+./mfc.sh lint                              # Ruff lint + Python unit tests
 ./mfc.sh spelling                          # Spell check
 
 # Module loading (HPC clusters only — must use `source`)

@@ -7,9 +7,9 @@ to verify the validator catches invalid configurations.
 
 import json
 import subprocess
-from pathlib import Path
-from typing import Dict, Any, List, Tuple
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Dict, List, Tuple
 
 from ..case_validator import CaseValidator
 
@@ -17,6 +17,7 @@ from ..case_validator import CaseValidator
 @dataclass
 class MutationResult:
     """Result of a mutation test."""
+
     case_name: str
     param_name: str
     original_value: Any
@@ -41,47 +42,37 @@ MUTATIONS = {
     "weno_order": [0, 2, 4, 6, 8],
     "time_stepper": [0, 6, -1],
     "riemann_solver": [0, 10, -1],
-
     # === BOOLEAN PARAMETERS (Fortran logicals) ===
     "bubbles_euler": ["X", "yes", "1"],
     "mpp_lim": ["X", "yes"],
     "cyl_coord": ["X", "maybe"],
-
     # === BOUNDARY CONDITIONS ===
     "bc_x%beg": [None, 100, -100],
     "bc_x%end": [None, 100, -100],
     "bc_y%beg": [100, -100],
     "bc_y%end": [100, -100],
-
     # === DOMAIN PARAMETERS ===
     "x_domain%beg": [None],
     "x_domain%end": [None],
-
     # === PHYSICS: THERMODYNAMICS ===
     # gamma must be > 1 for physical gases (gamma = Cp/Cv)
     # In MFC, fluid_pp(i)%gamma stores 1/(gamma-1), so it must be > 0
     "fluid_pp(1)%gamma": [0, -1, -0.5],
-
     # pi_inf (stiffness) must be >= 0 for stiffened gas EOS
     "fluid_pp(1)%pi_inf": [-1, -1e6],
-
     # === PHYSICS: PATCH INITIAL CONDITIONS ===
     # Pressure must be positive
     "patch_icpp(1)%pres": [0, -1, -1e5],
-
     # Density (alpha_rho) must be non-negative (0 allowed for vacuum)
     "patch_icpp(1)%alpha_rho(1)": [-1, -1000],
-
     # Volume fraction must be in [0, 1]
     "patch_icpp(1)%alpha(1)": [-0.1, 1.5, 2.0],
-
     # === PHYSICS: GEOMETRY ===
     # Patch dimensions must be positive
     "patch_icpp(1)%length_x": [0, -1, -10],
     "patch_icpp(1)%length_y": [0, -1],
     "patch_icpp(1)%length_z": [0, -1],
     "patch_icpp(1)%radius": [0, -1],
-
     # === PHYSICS: BUBBLES ===
     # Bubble radius must be positive
     "patch_icpp(1)%r0": [0, -1],
@@ -100,18 +91,15 @@ MUTATIONS = {
     # Global bubble reference values
     "rhoref": [0, -1, -1000],
     "pref": [0, -1, -1e5],
-
     # === PHYSICS: ACOUSTICS ===
     # Frequency/wavelength must be positive
     "acoustic(1)%frequency": [0, -1],
     "acoustic(1)%wavelength": [0, -1],
     "acoustic(1)%gauss_sigma_time": [0, -1],
     "acoustic(1)%gauss_sigma_dist": [0, -1],
-
     # === NUMERICS ===
     # CFL target should be in (0, 1]
     "cfl_target": [-0.1, 0, 1.5, 2.0],
-
     # WENO epsilon must be positive (small regularization)
     "weno_eps": [0, -1e-6],
 }
@@ -119,21 +107,13 @@ MUTATIONS = {
 
 def load_example_case(case_path: Path) -> Dict[str, Any]:
     """Load parameters from an example case file."""
-    result = subprocess.run(
-        ["python3", str(case_path)],
-        capture_output=True,
-        text=True,
-        cwd=case_path.parent,
-        timeout=30,
-        check=False
-    )
+    result = subprocess.run(["python3", str(case_path)], capture_output=True, text=True, cwd=case_path.parent, timeout=30, check=False)
     if result.returncode != 0:
         return None
     return json.loads(result.stdout.strip())
 
 
-def run_mutation(params: Dict[str, Any], param_name: str,
-                 mutated_value: Any) -> Tuple[bool, List[str]]:
+def run_mutation(params: Dict[str, Any], param_name: str, mutated_value: Any) -> Tuple[bool, List[str]]:
     """Apply mutation and check if validator catches it."""
     mutated_params = params.copy()
 
@@ -180,14 +160,16 @@ def run_mutations_on_case(case_name: str, params: Dict[str, Any]) -> List[Mutati
 
             caught, errors = run_mutation(params, param_name, mutated_value)
 
-            results.append(MutationResult(
-                case_name=case_name,
-                param_name=param_name,
-                original_value=original,
-                mutated_value=mutated_value,
-                validator_caught=caught,
-                errors=errors[:3]  # Limit for memory
-            ))
+            results.append(
+                MutationResult(
+                    case_name=case_name,
+                    param_name=param_name,
+                    original_value=original,
+                    mutated_value=mutated_value,
+                    validator_caught=caught,
+                    errors=errors[:3],  # Limit for memory
+                )
+            )
 
     return results
 
@@ -257,8 +239,7 @@ def print_mutation_report():
     print("\n" + "-" * 70)
     print("BY PARAMETER:")
     print("-" * 70)
-    for param, data in sorted(results["by_param"].items(),
-                               key=lambda x: -x[1]["missed"]):
+    for param, data in sorted(results["by_param"].items(), key=lambda x: -x[1]["missed"]):
         total = data["caught"] + data["missed"]
         rate = data["caught"] / total * 100 if total > 0 else 0
         status = "OK" if data["missed"] == 0 else "GAPS"
@@ -271,7 +252,7 @@ def print_mutation_report():
         for r in results["missed_details"][:10]:
             print(f"  {r.case_name}")
             print(f"    {r.param_name}: {r.original_value} -> {r.mutated_value}")
-            print(f"    No validation error raised!")
+            print("    No validation error raised!")
             print()
 
 
