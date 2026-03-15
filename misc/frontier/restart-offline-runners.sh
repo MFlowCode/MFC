@@ -1,58 +1,76 @@
 #!/usr/bin/env bash
 # Restart all offline frontier runners.
-# Queries GitHub for offline runners, then SSHes to each runner's node
-# and restarts run.sh in the background. All restarts happen in parallel.
+#
+# Queries GitHub for offline frontier runners, locates each via CWD-based
+# process discovery, stops any stale processes, then restarts in parallel.
+# Falls back to runner.node for the target node if the runner is truly offline.
+#
+# Usage: bash restart-offline-runners.sh
 set -euo pipefail
 
-SSH_OPTS="-o StrictHostKeyChecking=no -o ConnectTimeout=30 -o ServerAliveInterval=10 -o ServerAliveCountMax=3"
-SHARED_DIR="/lustre/orion/cfd154/proj-shared/runners"
-ORG="MFlowCode"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/config.sh"
 
 echo "==> Checking for offline frontier runners..."
-OFFLINE=$(gh api orgs/${ORG}/actions/runners \
-    --jq '.runners[] | select(.name | startswith("frontier")) | select(.status == "offline") | .name')
 
-if [ -z "${OFFLINE}" ]; then
+# Collect offline runner names from GitHub API
+mapfile -t OFFLINE_NAMES < <(
+    gh_list_runners | while read -r id name status busy; do
+        [ "$status" = "offline" ] && echo "$name"
+    done
+)
+
+if [ ${#OFFLINE_NAMES[@]} -eq 0 ]; then
     echo "==> All frontier runners are online. Nothing to do."
     exit 0
 fi
 
-echo "==> Offline runners: $(echo ${OFFLINE} | tr '\n' ' ')"
+echo "==> Offline runners: ${OFFLINE_NAMES[*]}"
 
-for RUNNER_NAME in ${OFFLINE}; do
-    RUNNER_DIR="${SHARED_DIR}/${RUNNER_NAME}"
-    NODE_FILE="${RUNNER_DIR}/runner.node"
+restart_one() {
+    local runner_name="$1"
+    local dir="${SHARED_DIR}/${runner_name}"
 
-    if [ ! -d "${RUNNER_DIR}" ]; then
-        echo "WARN: No directory for ${RUNNER_NAME}, skipping."
-        continue
+    if [ ! -d "$dir" ]; then
+        echo "WARN: No directory for ${runner_name}, skipping."
+        return
     fi
 
-    if [ ! -f "${NODE_FILE}" ]; then
-        echo "WARN: No runner.node file for ${RUNNER_NAME}, skipping."
-        continue
+    # Check if it's actually already running somewhere (GitHub may lag)
+    local actual_node
+    actual_node=$(find_node "$dir")
+
+    if [ "$actual_node" != "offline" ]; then
+        echo "==> ${runner_name} appears running on ${actual_node} (GitHub may lag) — stopping first..."
+        stop_runner "$actual_node" "$dir"
     fi
 
-    TARGET_NODE=$(cat "${NODE_FILE}")
-    CURRENT_NODE=$(hostname -s)
-
-    echo "==> Restarting ${RUNNER_NAME} on ${TARGET_NODE}..."
-    if [ "${TARGET_NODE}" = "${CURRENT_NODE}" ]; then
-        nohup "${RUNNER_DIR}/run.sh" >> "${RUNNER_DIR}/runner.log" 2>&1 < /dev/null &
-        echo $! > "${RUNNER_DIR}/runner.pid"
-        echo "    PID: $(cat ${RUNNER_DIR}/runner.pid)"
+    # Determine target node from runner.node fallback
+    local target_node
+    if [ -f "${dir}/runner.node" ]; then
+        target_node=$(cat "${dir}/runner.node")
     else
-        (
-            PID=$(ssh ${SSH_OPTS} "${TARGET_NODE}" \
-                "nohup ${RUNNER_DIR}/run.sh >> ${RUNNER_DIR}/runner.log 2>&1 < /dev/null & echo \$!")
-            echo "${PID}" > "${RUNNER_DIR}/runner.pid"
-            echo "    ${RUNNER_NAME} PID: ${PID}"
-        ) &
+        echo "WARN: No runner.node for ${runner_name}, skipping."
+        return
     fi
+
+    echo "==> Starting ${runner_name} on ${target_node}..."
+    if start_runner "$target_node" "$dir"; then
+        echo "    ${runner_name}: started on ${target_node}."
+    else
+        echo "    ${runner_name}: ERROR — failed to start on ${target_node}." >&2
+    fi
+}
+
+# Restart all offline runners in parallel
+for name in "${OFFLINE_NAMES[@]}"; do
+    restart_one "$name" &
 done
 
 wait
-echo "==> Done. Waiting 5s for runners to register..."
-sleep 5
-gh api orgs/${ORG}/actions/runners \
-    --jq '.runners[] | select(.name | startswith("frontier")) | {name, status}'
+
+echo ""
+echo "==> Final status:"
+gh_list_runners | while read -r id name status busy; do
+    printf "  %-30s %s\n" "$name" "$status"
+done
