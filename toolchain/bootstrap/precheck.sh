@@ -101,6 +101,16 @@ PID_SPELL=$!
 ) &
 PID_LINT=$!
 
+# Fortran/Fypp static analysis
+(
+    if python3 toolchain/mfc/lint_source.py > /dev/null 2>&1; then
+        echo "0" > "$TMPDIR_PC/fortran_exit"
+    else
+        echo "1" > "$TMPDIR_PC/fortran_exit"
+    fi
+) &
+PID_FORTRAN=$!
+
 # Source lint (fast grep checks — run inline)
 SOURCE_FAILED=0
 SOURCE_MSGS=""
@@ -127,7 +137,7 @@ fi
 
 FAILED=0
 
-log "[$CYAN 1/5$COLOR_RESET] Checking$MAGENTA formatting$COLOR_RESET..."
+log "[$CYAN 1/6$COLOR_RESET] Checking$MAGENTA formatting$COLOR_RESET..."
 if [ "$FORMAT_OK" = "1" ]; then
     error "Formatting check failed to run."
     FAILED=1
@@ -142,7 +152,7 @@ else
 fi
 
 wait $PID_SPELL
-log "[$CYAN 2/5$COLOR_RESET] Running$MAGENTA spell check$COLOR_RESET..."
+log "[$CYAN 2/6$COLOR_RESET] Running$MAGENTA spell check$COLOR_RESET..."
 SPELL_RC=$(cat "$TMPDIR_PC/spell_exit" 2>/dev/null || echo "1")
 if [ "$SPELL_RC" = "0" ]; then
     ok "Spell check passed."
@@ -152,7 +162,7 @@ else
 fi
 
 wait $PID_LINT
-log "[$CYAN 3/5$COLOR_RESET] Running$MAGENTA toolchain lint$COLOR_RESET..."
+log "[$CYAN 3/6$COLOR_RESET] Running$MAGENTA toolchain lint$COLOR_RESET..."
 LINT_RC=$(cat "$TMPDIR_PC/lint_exit" 2>/dev/null || echo "1")
 if [ "$LINT_RC" = "0" ]; then
     ok "Toolchain lint passed."
@@ -161,7 +171,7 @@ else
     FAILED=1
 fi
 
-log "[$CYAN 4/5$COLOR_RESET] Running$MAGENTA source lint$COLOR_RESET checks..."
+log "[$CYAN 4/6$COLOR_RESET] Running$MAGENTA source lint$COLOR_RESET checks..."
 if [ $SOURCE_FAILED -eq 0 ]; then
     ok "Source lint passed."
 else
@@ -171,7 +181,17 @@ else
     FAILED=1
 fi
 
-log "[$CYAN 5/5$COLOR_RESET] Checking$MAGENTA doc references$COLOR_RESET..."
+wait $PID_FORTRAN
+log "[$CYAN 5/6$COLOR_RESET] Running$MAGENTA Fortran/Fypp analysis$COLOR_RESET..."
+FORTRAN_RC=$(cat "$TMPDIR_PC/fortran_exit" 2>/dev/null || echo "1")
+if [ "$FORTRAN_RC" = "0" ]; then
+    ok "Fortran/Fypp analysis passed."
+else
+    error "Fortran/Fypp analysis failed. Run$MAGENTA python3 toolchain/mfc/lint_source.py$COLOR_RESET for details."
+    FAILED=1
+fi
+
+log "[$CYAN 6/6$COLOR_RESET] Checking$MAGENTA doc references$COLOR_RESET..."
 if [ $DOC_FAILED -eq 0 ]; then
     ok "Doc references are valid."
 else
