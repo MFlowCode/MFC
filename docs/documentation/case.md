@@ -425,7 +425,7 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `mp_weno`                  | Logical | Monotonicity preserving WENO |
 | `muscl_order`              | Integer | MUSCL order [1,2] |
 | `muscl_lim`                | Integer | MUSCL Slope Limiter: [1] minmod; [2] monotonized central; [3] Van Albada; [4] Van Leer; [5] SUPERBEE |
-| `int_comp`                 | Logical | THINC Interface Compression |
+| `int_comp`                 | Integer | Interface Compression [1] THINC [2] MTHINC |
 | `ic_eps`                   | Real    | Interface compression threshold (default: 1e-4) |
 | `ic_beta`                  | Real    | Interface compression sharpness parameter (default: 1.6) |
 | `riemann_solver`           | Integer | Riemann solver algorithm: [1] HLL*; [2] HLLC; [3] Exact*; [4] HLLD	(only for MHD) |
@@ -519,7 +519,7 @@ It is recommended to set `weno_eps` to $10^{-6}$ for WENO-JS, and to $10^{-40}$ 
 - `muscl_lim` specifies the slope limiter that is used in 2nd order MUSCL Reconstruction by an integer from 1 through 5.
 `muscl_lim = 1`, `2`, `3`, `4`, and `5` correspond to minmod, monotonized central, Van Albada, Van Leer, and SUPERBEE, respectively.
 
-- `int_comp` activates interface compression using THINC used in MUSCL Reconstruction, with control parameters (`ic_eps`, and `ic_beta`).
+- `int_comp` activates interface compression using [1] THINC or [2] MTHINC used in variable reconstruction, with control parameters (`ic_eps`, and `ic_beta`).
 
 - `riemann_solver` specifies the choice of the Riemann solver that is used in simulation by an integer from 1 through 4.
 `riemann_solver = 1`, `2`, and `3` correspond to HLL, HLLC, and Exact Riemann solver, respectively (\cite Toro09).

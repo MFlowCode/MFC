@@ -258,6 +258,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     def alter_weno(dimInfo):
         for weno_order in [3, 5, 7]:
             stack.push(f"weno_order={weno_order}", {"weno_order": weno_order})
+
+            if weno_order == 5 and "y" in dimInfo[0]:  # Only test weno_order = 5 with 2D and 3D
+                for int_comp in [1, 2]:
+                    cases.append(define_case_d(stack, f"int_comp={int_comp}", {"int_comp": int_comp}))
+
             for mapped_weno, wenoz, teno, mp_weno in itertools.product("FT", repeat=4):
                 if sum(var == "T" for var in [mapped_weno, wenoz, teno, mp_weno]) > 1:
                     continue
@@ -303,10 +308,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             stack.push(f"muscl_order={muscl_order}", {"muscl_order": muscl_order, "recon_type": 2, "weno_order": 0})
 
             if muscl_order == 1:
-                for int_comp in ["T", "F"]:
+                for int_comp in [0, 1, 2]:
                     cases.append(define_case_d(stack, f"int_comp={int_comp}", {"int_comp": int_comp}))
             elif muscl_order == 2:
-                for int_comp in ["T", "F"]:
+                for int_comp in [0, 1, 2]:
                     stack.push(f"int_comp={int_comp}", {"int_comp": int_comp})
                     cases.append(define_case_d(stack, "muscl_lim=1", {"muscl_lim": 1}))
                     stack.pop()

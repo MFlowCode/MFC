@@ -22,6 +22,7 @@ module m_start_up
                                !! schemes for spatial reconstruction of variables
 
     use m_muscl                !< Monotonic Upstream-centered (MUSCL)
+    use m_thinc                !< THINC/MTHINC interface compression
                                !! schemes for convservation laws
 
     use m_riemann_solvers      !< Exact and approximate Riemann problem solvers
@@ -1117,6 +1118,7 @@ contains
             elseif (recon_type == MUSCL_TYPE) then
                 call s_initialize_muscl_module()
             end if
+            if (int_comp > 0) call s_initialize_thinc_module()
             call s_initialize_cbc_module()
             call s_initialize_riemann_solvers_module()
         end if
@@ -1300,6 +1302,7 @@ contains
             elseif (recon_type == MUSCL_TYPE) then
                 call s_finalize_muscl_module()
             end if
+            if (int_comp > 0) call s_finalize_thinc_module()
         end if
         call s_finalize_variables_conversion_module()
         if (grid_geometry == 3) call s_finalize_fftw_module
