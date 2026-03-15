@@ -708,7 +708,9 @@ contains
                 do i = il, ir
 
                     if (grid_geometry == 3) then
-                        ! TODO :: This does not work and is not covered by any tests. This should be fixed
+                        ! BUG: s_convert_cylindrical_to_cartesian_coord writes to module-level
+                        ! cart_y/cart_z, causing a race condition inside GPU_PARALLEL_LOOP.
+                        ! Needs refactoring to return values via arguments instead.
                         call s_convert_cylindrical_to_cartesian_coord(y_cc(j), z_cc(k))
                     else
                         cart_y = y_cc(j)
