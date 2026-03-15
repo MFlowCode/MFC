@@ -236,6 +236,7 @@ module m_global_parameters
     $:GPU_DECLARE(create='[bc_x, bc_y, bc_z]')
 #endif
     type(bounds_info) :: x_domain, y_domain, z_domain
+    $:GPU_DECLARE(create='[x_domain, y_domain, z_domain]')
     real(wp) :: x_a, y_a, z_a
     real(wp) :: x_b, y_b, z_b
 
@@ -814,8 +815,8 @@ contains
             integral(i)%xmax = dflt_real
             integral(i)%ymin = dflt_real
             integral(i)%ymax = dflt_real
-            integral(i)%ymin = dflt_real
-            integral(i)%ymax = dflt_real
+            integral(i)%zmin = dflt_real
+            integral(i)%zmax = dflt_real
         end do
 
         ! GRCBC flags

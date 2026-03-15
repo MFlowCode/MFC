@@ -4,14 +4,14 @@ Parameter Inventory Export Tool.
 Exports all MFC parameters with their types and tags to JSON for analysis.
 """
 
-import re
 import json
+import re
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any, Dict
 
-from ..run.case_dicts import ALL
 from ..params import REGISTRY
 from ..params.schema import ParamType
+from ..run.case_dicts import ALL
 
 
 def get_param_type_name(param_type) -> str:
@@ -59,8 +59,8 @@ def export_parameter_inventory() -> Dict[str, Any]:
         # Detect pattern-based parameters
         if "(" in param_name:
             # Extract pattern (e.g., "patch_icpp(1)%x_centroid" -> "patch_icpp({id})%x_centroid")
-            param_pattern = re.sub(r'\((\d+)\)', r'({id})', param_name)
-            param_pattern = re.sub(r'\((\d+),\s*(\d+)\)', r'({id1}, {id2})', param_pattern)
+            param_pattern = re.sub(r"\((\d+)\)", r"({id})", param_name)
+            param_pattern = re.sub(r"\((\d+),\s*(\d+)\)", r"({id1}, {id2})", param_pattern)
             param_info["pattern"] = param_pattern
 
         inventory["parameters"][param_name] = param_info
@@ -86,15 +86,11 @@ def export_parameter_patterns() -> Dict[str, Any]:
             continue
 
         # Normalize the pattern
-        normalized = re.sub(r'\((\d+)\)', r'({N})', param_name)
-        normalized = re.sub(r'\((\d+),\s*(\d+)\)', r'({N}, {M})', normalized)
+        normalized = re.sub(r"\((\d+)\)", r"({N})", param_name)
+        normalized = re.sub(r"\((\d+),\s*(\d+)\)", r"({N}, {M})", normalized)
 
         if normalized not in patterns:
-            patterns[normalized] = {
-                "examples": [],
-                "type": get_param_type_name(param_type),
-                "count": 0
-            }
+            patterns[normalized] = {"examples": [], "type": get_param_type_name(param_type), "count": 0}
         patterns[normalized]["examples"].append(param_name)
         patterns[normalized]["count"] += 1
 
@@ -113,7 +109,7 @@ def save_inventory(output_path: Path = None):
     inventory = export_parameter_inventory()
     inventory["patterns"] = export_parameter_patterns()
 
-    with open(output_path, 'w', encoding='utf-8') as f:
+    with open(output_path, "w", encoding="utf-8") as f:
         json.dump(inventory, f, indent=2)
 
     return output_path

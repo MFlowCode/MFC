@@ -183,12 +183,18 @@ module m_derived_types
     end type t_model
 
     type :: t_model_array
+        ! Original CPU-side fields (unchanged)
         type(t_model), allocatable :: model
         real(wp), allocatable, dimension(:, :, :) :: boundary_v
         real(wp), allocatable, dimension(:, :) :: interpolated_boundary_v
         integer :: boundary_edge_count
         integer :: total_vertices
-        logical :: interpolate
+        integer :: interpolate
+
+        ! GPU-friendly flattened arrays
+        integer :: ntrs  ! copy of model%ntrs
+        real(wp), allocatable, dimension(:, :, :) :: trs_v  ! (3, 3, ntrs) - triangle vertices
+        real(wp), allocatable, dimension(:, :) :: trs_n  ! (3, ntrs)    - triangle normals
     end type t_model_array
 
     !> Derived type adding initial condition (ic) patch parameters as attributes
@@ -216,9 +222,18 @@ module m_derived_types
         !! domain of influence.
 
         real(wp), dimension(2:9) :: a !<
-        !! The parameters needed for the spherical harmonic patch
+        !! Used by hardcoded IC and as temporary variables.
 
         logical :: non_axis_sym
+
+        ! Geometry 13 (2D modal Fourier): fourier_cos(n), fourier_sin(n) for mode n
+        real(wp), dimension(1:max_2d_fourier_modes) :: fourier_cos, fourier_sin
+        logical :: modal_clip_r_to_min !< When true, clip boundary radius: R(theta) = max(R(theta), modal_r_min) (Non-exp form only)
+        real(wp) :: modal_r_min        !< Minimum boundary radius when modal_clip_r_to_min is true (Non-exp form only)
+        logical :: modal_use_exp_form  !< When true, boundary = radius*exp(Fourier series)
+
+        ! Geometry 14 (3D spherical harmonic): sph_har_coeff(l,m) for real Y_lm
+        real(wp), dimension(0:max_sph_harm_degree, -max_sph_harm_degree:max_sph_harm_degree) :: sph_har_coeff
 
         real(wp), dimension(3) :: normal !<
         !! Normal vector indicating the orientation of the patch. It is specified
@@ -450,6 +465,7 @@ module m_derived_types
         real(wp), dimension(1:3) :: levelset_norm
         logical :: slip
         integer, dimension(3) :: DB
+        integer :: x_periodicity, y_periodicity, z_periodicity
     end type ghost_point
 
     !> Species parameters

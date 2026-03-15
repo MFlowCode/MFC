@@ -27,8 +27,12 @@ Typical usage:
     3. Physics validation (via case_validator.py)
 """
 
-from typing import Dict, Any, List, Optional, Tuple
-from .registry import REGISTRY
+from typing import Any, Dict, List, Optional, Tuple
+
+# Note: definitions is imported by params/__init__.py to populate REGISTRY.
+# This redundant import ensures REGISTRY is populated even if this module
+# is imported directly (e.g., during testing).
+from . import definitions  # noqa: F401
 from .errors import (
     dependency_error,
     dependency_recommendation,
@@ -36,11 +40,8 @@ from .errors import (
     format_error_list,
     unknown_param_error,
 )
+from .registry import REGISTRY
 from .suggest import suggest_parameter
-# Note: definitions is imported by params/__init__.py to populate REGISTRY.
-# This redundant import ensures REGISTRY is populated even if this module
-# is imported directly (e.g., during testing).
-from . import definitions  # noqa: F401  pylint: disable=unused-import
 
 
 def check_unknown_params(params: Dict[str, Any]) -> List[str]:
@@ -96,7 +97,7 @@ def validate_constraints(params: Dict[str, Any]) -> List[str]:
     return errors
 
 
-def _check_condition(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+def _check_condition(
     name: str,
     condition: Dict[str, Any],
     condition_label: Optional[str],
@@ -122,12 +123,18 @@ def _check_condition(  # pylint: disable=too-many-arguments,too-many-positional-
             else:
                 got = params[req_param]
                 if got not in expected_vals:
-                    errors.append(dependency_value_error(
-                        name, condition_label, req_param, expected_vals, got,
-                    ))
+                    errors.append(
+                        dependency_value_error(
+                            name,
+                            condition_label,
+                            req_param,
+                            expected_vals,
+                            got,
+                        )
+                    )
 
 
-def check_dependencies(params: Dict[str, Any]) -> Tuple[List[str], List[str]]:  # pylint: disable=too-many-branches
+def check_dependencies(params: Dict[str, Any]) -> Tuple[List[str], List[str]]:
     """
     Check parameter dependencies.
 
@@ -162,7 +169,12 @@ def check_dependencies(params: Dict[str, Any]) -> Tuple[List[str], List[str]]:  
             for trigger_val, condition in deps["when_value"].items():
                 if value == trigger_val:
                     _check_condition(
-                        name, condition, f"={trigger_val}", params, errors, warnings,
+                        name,
+                        condition,
+                        f"={trigger_val}",
+                        params,
+                        errors,
+                        warnings,
                     )
 
     return errors, warnings
