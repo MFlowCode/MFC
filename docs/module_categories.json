@@ -14,6 +14,8 @@
         "category": "Physics Models",
         "modules": [
             "m_viscous",
+            "m_re_visc",
+            "m_hb_function",
             "m_surface_tension",
             "m_bubbles",
             "m_bubbles_EE",

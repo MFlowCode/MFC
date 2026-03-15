@@ -98,12 +98,6 @@ jobs:
       - name: Clone
         uses: actions/checkout@v4
 
-      - name: Restore Build Cache
-        uses: actions/cache@v4
-        with:
-          path: build
-          key: mfc-build-${{ matrix.os }}-${{ matrix.mpi }}-${{ matrix.debug }}-${{ matrix.precision }}-${{ matrix.intel }}-${{ hashFiles('CMakeLists.txt', 'toolchain/dependencies/**', 'toolchain/cmake/**', 'src/**/*.fpp', 'src/**/*.f90') }}
-
       - name: Setup MacOS
         if:   matrix.os == 'macos'
         run:  |
@@ -237,32 +231,19 @@ jobs:
         uses: actions/checkout@v4
         with:
           # clean: false preserves .slurm_job_id files across reruns so
-          # submit-job.sh can detect and cancel stale SLURM jobs on retry.
+          # submit-slurm-job.sh can detect and cancel stale SLURM jobs on retry.
           clean: false
 
-      - name: Build
+      - name: Clean stale output files
+        run:  rm -f *.out
+
+      - name: Build (login node)
         if:   matrix.cluster != 'phoenix'
-        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
-        with:
-          max_attempts: 2
-          retry_wait_seconds: 60
-          timeout_minutes: 60
-          command: bash .github/workflows/${{ matrix.cluster }}/build.sh ${{ matrix.device }} ${{ matrix.interface }}
-          on_retry_command: rm -rf build
-
-      - name: Submit SLURM Test Job
-        if:   matrix.cluster == 'phoenix'
-        run:  bash .github/workflows/phoenix/submit-job.sh .github/workflows/phoenix/test.sh ${{ matrix.device }} ${{ matrix.interface }}
-
-      - name: Monitor SLURM Test Job
-        if:   matrix.cluster == 'phoenix'
-        run: |
-          slug="test-${{ matrix.device }}-${{ matrix.interface }}"
-          bash .github/scripts/run_monitored_slurm_job.sh "$(cat ${slug}.slurm_job_id)" "${slug}.out"
+        timeout-minutes: 60
+        run:  bash .github/workflows/${{ matrix.cluster }}/build.sh ${{ matrix.device }} ${{ matrix.interface }}
 
       - name: Test
-        if:   matrix.cluster != 'phoenix'
-        run:  bash .github/workflows/${{ matrix.cluster }}/submit.sh .github/workflows/${{ matrix.cluster }}/test.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.shard }}
+        run:  bash .github/scripts/submit-slurm-job.sh .github/workflows/common/test.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }} ${{ matrix.shard }}
 
       - name: Cancel SLURM Jobs
         if: cancelled()
@@ -339,27 +320,19 @@ jobs:
         with:
           clean: false
 
+      - name: Clean stale output files
+        run:  rm -f *.out
+
       - name: Pre-Build (SLURM)
         if:   matrix.cluster == 'phoenix'
-        run:  bash .github/workflows/phoenix/submit.sh .github/scripts/prebuild-case-optimization.sh ${{ matrix.device }} ${{ matrix.interface }}
+        run:  bash .github/scripts/submit-slurm-job.sh .github/scripts/prebuild-case-optimization.sh cpu ${{ matrix.interface }} ${{ matrix.cluster }}
 
       - name: Pre-Build (login node)
         if:   matrix.cluster != 'phoenix'
         run:  bash .github/scripts/prebuild-case-optimization.sh ${{ matrix.cluster }} ${{ matrix.device }} ${{ matrix.interface }}
 
-      - name: Submit Case-Optimization Tests
-        if:   matrix.cluster == 'phoenix'
-        run:  bash .github/workflows/phoenix/submit-job.sh .github/scripts/run_case_optimization.sh ${{ matrix.device }} ${{ matrix.interface }}
-
-      - name: Monitor Case-Optimization Tests
-        if:   matrix.cluster == 'phoenix'
-        run: |
-          slug="run-case-optimization-${{ matrix.device }}-${{ matrix.interface }}"
-          bash .github/scripts/run_monitored_slurm_job.sh "$(cat ${slug}.slurm_job_id)" "${slug}.out"
-
       - name: Run Case-Optimization Tests
-        if:   matrix.cluster != 'phoenix'
-        run:  bash .github/workflows/${{ matrix.cluster }}/submit.sh .github/scripts/run_case_optimization.sh ${{ matrix.device }} ${{ matrix.interface }}
+        run:  bash .github/scripts/submit-slurm-job.sh .github/scripts/run_case_optimization.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }}
 
       - name: Cancel SLURM Jobs
         if: cancelled()

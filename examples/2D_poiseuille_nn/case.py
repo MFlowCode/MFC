@@ -15,21 +15,22 @@ For Newtonian Poiseuille validation, set tau0=0, nn=1, K=mu.
 The analytical solution is: u(y) = (G/(2*mu)) * y * (H - y)
 where G = rho * g_x is the effective pressure gradient.
 """
+
 import json
 import math
 
 # === Channel geometry (square domain) ===
-L = 1.0         # Channel length (streamwise, x)
-H = 1.0         # Channel height (wall-normal, y)
+L = 1.0  # Channel length (streamwise, x)
+H = 1.0  # Channel height (wall-normal, y)
 
 # === Grid resolution ===
-Nx = 24         # Cells in x (streamwise, minimal — periodic)
-Ny = 81         # Cells in y (wall-normal)
+Nx = 24  # Cells in x (streamwise, minimal — periodic)
+Ny = 81  # Cells in y (wall-normal)
 
 # === Fluid properties ===
-rho = 1.0       # Density
-p0 = 1e5        # Reference pressure (high for low Mach)
-gamma = 1.4     # Ratio of specific heats
+rho = 1.0  # Density
+p0 = 1e5  # Reference pressure (high for low Mach)
+gamma = 1.4  # Ratio of specific heats
 
 # Sound speed and CFL
 c = math.sqrt(gamma * p0 / rho)
@@ -42,20 +43,20 @@ dt = cfl * dx / c
 g_x = 0.5
 
 # === HB non-Newtonian model parameters ===
-tau0 = 0.0          # Yield stress (set 0 for power-law)
-K = 0.1            # Consistency index
-nn = 2.0          # Flow behavior index (< 1 = shear-thinning)
-hb_m = 1000.0       # Papanastasiou regularization parameter
-mu_min = 1e-4       # Minimum viscosity bound
-mu_max = 10.0       # Maximum viscosity bound
-mu_bulk = 0.0       # Bulk viscosity
+tau0 = 0.0  # Yield stress (set 0 for power-law)
+K = 0.1  # Consistency index
+nn = 2.0  # Flow behavior index (< 1 = shear-thinning)
+hb_m = 1000.0  # Papanastasiou regularization parameter
+mu_min = 1e-4  # Minimum viscosity bound
+mu_max = 10.0  # Maximum viscosity bound
+mu_bulk = 0.0  # Bulk viscosity
 
 # Reference Re based on consistency index (used as baseline)
-Re_ref = 1.0 / K    # = 100
+Re_ref = 1.0 / K  # = 100
 
 # === Time control ===
-t_end = 10.0        # End time (allow flow to reach steady state)
-t_save = 5.0        # Save interval
+t_end = 10.0  # End time (allow flow to reach steady state)
+t_save = 5.0  # Save interval
 
 eps = 1e-6
 

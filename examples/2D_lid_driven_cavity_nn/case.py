@@ -9,17 +9,18 @@ Re_gen = rho * U^(2-n) * L^n / K = 1 * 1^0.5 * 1^1.5 / 0.0002 = 5000
 
 Mesh stretching: cosh-based clustering near all 4 walls (x_a, x_b, y_a, y_b).
 """
+
 import json
 
 eps = 1e-6
 
 # HB model parameters
-tau0 = 0.0          # Yield stress (set to 0 for power-law fluid)
-K = 0.0002          # Consistency index (Re=5000: K = 1/5000)
-nn = 1.5            # Flow behavior index (shear-thickening)
-mu_min = 0.00002    # K * gdot_min^(n-1) = 0.0002 * (0.01)^0.5
-mu_max = 0.0632     # K * gdot_max^(n-1) = 0.0002 * (1e5)^0.5
-hb_m = 1000.0       # Papanastasiou regularization parameter
+tau0 = 0.0  # Yield stress (set to 0 for power-law fluid)
+K = 0.0002  # Consistency index (Re=5000: K = 1/5000)
+nn = 1.5  # Flow behavior index (shear-thickening)
+mu_min = 0.00002  # K * gdot_min^(n-1) = 0.0002 * (0.01)^0.5
+mu_max = 0.0632  # K * gdot_max^(n-1) = 0.0002 * (1e5)^0.5
+hb_m = 1000.0  # Papanastasiou regularization parameter
 mu_bulk = 0.0
 
 lid_velocity = 1.0  # Lid velocity (m/s)

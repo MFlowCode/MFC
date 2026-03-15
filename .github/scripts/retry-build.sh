@@ -1,13 +1,16 @@
 #!/bin/bash
 # Provides retry_build(): 2-attempt loop.
 # On failure of attempt 1, nukes the entire build directory before attempt 2.
-# Set RETRY_VALIDATE_CMD to run a post-build validation; failure triggers a retry.
+# If RETRY_VALIDATE_CMD is set, runs it after a successful build; a non-zero
+# exit triggers the same nuke-and-retry, catching e.g. SIGILL from binaries
+# compiled on a different CPU architecture.
 # Usage: source .github/scripts/retry-build.sh
 #        retry_build ./mfc.sh build -j 8 --gpu acc
+#        RETRY_VALIDATE_CMD='./syscheck' retry_build ./mfc.sh build -j 8
 
 retry_build() {
-    local validate_cmd="${RETRY_VALIDATE_CMD:-}"
     local max_attempts=2
+    local validate_cmd="${RETRY_VALIDATE_CMD:-}"
     local attempt=1
     while [ $attempt -le $max_attempts ]; do
         echo "Build attempt $attempt of $max_attempts..."

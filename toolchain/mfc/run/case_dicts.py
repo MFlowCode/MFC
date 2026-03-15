@@ -12,38 +12,44 @@ Exports:
     get_validator(): Returns compiled JSON schema validator
     get_input_dict_keys(): Get parameter keys for a target
 """
-# pylint: disable=import-outside-toplevel
 
 import re
+
 from ..state import ARG
+
 
 def _load_all_params():
     """Load all parameters as {name: ParamType} dict."""
     from ..params import REGISTRY
+
     return {name: param.param_type for name, param in REGISTRY.all_params.items()}
 
 
 def _load_case_optimization_params():
     """Get params that can be hard-coded for GPU optimization."""
     from ..params import REGISTRY
+
     return [name for name, param in REGISTRY.all_params.items() if param.case_optimization]
 
 
 def _build_schema():
     """Build JSON schema from registry."""
     from ..params import REGISTRY
+
     return REGISTRY.get_json_schema()
 
 
 def _get_validator_func():
     """Get the cached validator from registry."""
     from ..params import REGISTRY
+
     return REGISTRY.get_validator()
 
 
 def _get_target_params():
     """Get valid params for each target by parsing Fortran namelists."""
     from ..params.namelist_parser import get_target_params
+
     return get_target_params()
 
 
@@ -79,7 +85,7 @@ def _is_param_valid_for_target(param_name: str, target_name: str) -> bool:
     # e.g., "patch_icpp(1)%geometry" -> "patch_icpp"
     # e.g., "fluid_pp(2)%gamma" -> "fluid_pp"
     # e.g., "acoustic(1)%loc(1)" -> "acoustic"
-    match = re.match(r'^([a-zA-Z_][a-zA-Z0-9_]*)', param_name)
+    match = re.match(r"^([a-zA-Z_][a-zA-Z0-9_]*)", param_name)
     if match:
         base_name = match.group(1)
         return base_name in target_params

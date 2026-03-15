@@ -131,7 +131,7 @@ contains
             end do
 
             y_cb = y_cb*length
-            y_cc(0:m) = (y_cb(0:n) + y_cb(-1:n - 1))/2._wp
+            y_cc(0:n) = (y_cb(0:n) + y_cb(-1:n - 1))/2._wp
 
             dy = minval(y_cb(0:n) - y_cb(-1:n - 1))
 
@@ -168,7 +168,7 @@ contains
             end do
 
             z_cb = z_cb*length
-            z_cc(0:m) = (z_cb(0:p) + z_cb(-1:p - 1))/2._wp
+            z_cc(0:p) = (z_cb(0:p) + z_cb(-1:p - 1))/2._wp
 
             dz = minval(z_cb(0:p) - z_cb(-1:p - 1))
 
