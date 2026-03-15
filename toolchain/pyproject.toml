@@ -23,9 +23,8 @@ dependencies = [
 
     # Code Health
     "typos",
-    "pylint",
+    "ruff",
     "fprettify",
-    "autopep8",   # Python formatter (black has issues with Python 3.12.5)
     "ansi2txt",
 
     # Profiling

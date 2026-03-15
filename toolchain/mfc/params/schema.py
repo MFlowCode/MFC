@@ -6,13 +6,14 @@ Provides ParamDef for parameter metadata, constraints, and dependencies.
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Set, Any, Optional, Dict, List
+from typing import Any, Dict, List, Optional, Set
 
 from .errors import constraint_error
 
 
 class ParamType(Enum):
     """Parameter types matching MFC's Fortran types with JSON schema support."""
+
     INT = "int"
     REAL = "real"
     LOG = "log"
@@ -40,7 +41,7 @@ class ParamType(Enum):
 
 
 @dataclass
-class ParamDef:  # pylint: disable=too-many-instance-attributes
+class ParamDef:
     """
     Definition of a single MFC parameter.
 
@@ -53,6 +54,7 @@ class ParamDef:  # pylint: disable=too-many-instance-attributes
         dependencies: Related params (requires, recommends)
         tags: Feature tags for grouping (e.g., "mhd", "bubbles", "weno")
     """
+
     name: str
     param_type: ParamType
     description: str = ""
@@ -92,12 +94,8 @@ class ParamDef:  # pylint: disable=too-many-instance-attributes
         # Check numeric range constraints (only for numeric values, not analytic strings)
         if isinstance(value, (int, float)):
             if "min" in self.constraints and value < self.constraints["min"]:
-                errors.append(
-                    constraint_error(self.name, "min", self.constraints["min"], value)
-                )
+                errors.append(constraint_error(self.name, "min", self.constraints["min"], value))
             if "max" in self.constraints and value > self.constraints["max"]:
-                errors.append(
-                    constraint_error(self.name, "max", self.constraints["max"], value)
-                )
+                errors.append(constraint_error(self.name, "max", self.constraints["max"], value))
 
         return errors
