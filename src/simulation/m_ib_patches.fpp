@@ -215,7 +215,7 @@ contains
             @:ALLOCATE(airfoil_grid_u(1:Np))
             @:ALLOCATE(airfoil_grid_l(1:Np))
 
-            ! TODO :: The below instantiations are already handles by the loop below
+            ! Leading edge point (index 1): airfoil starts at origin
             airfoil_grid_u(1)%x = 0._wp
             airfoil_grid_u(1)%y = 0._wp
 
@@ -223,7 +223,6 @@ contains
             airfoil_grid_l(1)%y = 0._wp
 
             do i = 1, Np1 + Np2 - 1
-                ! TODO :: This allocated the upper and lower airfoil arrays, and does not need to be performed each time the IB markers are updated. Place this as a separate subroutine.
                 if (i <= Np1) then
                     xc = i*(pa*ca_in/Np1)
                     xa = xc/ca_in
