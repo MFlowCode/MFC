@@ -7,21 +7,21 @@ organized by family with descriptions, types, and constraints.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Tuple
-from collections import defaultdict
 import re
+from collections import defaultdict
+from typing import Any, Dict, List, Tuple
 
-from ..schema import ParamType
-from ..registry import REGISTRY
-from ..descriptions import get_description, get_math_symbol
+from .. import definitions  # noqa: F401
 from ..ast_analyzer import analyze_case_validator, classify_message
-from .. import definitions  # noqa: F401  pylint: disable=unused-import
+from ..descriptions import get_description, get_math_symbol
+from ..registry import REGISTRY
+from ..schema import ParamType
 
 
 def _get_family(name: str) -> str:
     """Extract family name from parameter (e.g., 'patch_icpp' from 'patch_icpp(1)%vel(1)')."""
     # Handle indexed parameters
-    match = re.match(r'^([a-zA-Z_]+)', name)
+    match = re.match(r"^([a-zA-Z_]+)", name)
     if match:
         base = match.group(1)
         if name.startswith(f"{base}(") or name.startswith(f"{base}%"):
@@ -31,19 +31,19 @@ def _get_family(name: str) -> str:
 
 def _escape_percent(s: str) -> str:
     """Escape % for Doxygen (% is a special character, use %% to get literal %)."""
-    return s.replace('%', '%%')
+    return s.replace("%", "%%")
 
 
 def _parse_paren_content(name: str, start: int) -> Tuple[str, int]:
     """Parse content within parentheses, return (content, end_index) or ('', -1) if invalid."""
     j = start + 1
     paren_content = []
-    while j < len(name) and name[j] != ')':
+    while j < len(name) and name[j] != ")":
         paren_content.append(name[j])
         j += 1
     if j < len(name):
-        return ''.join(paren_content), j
-    return '', -1
+        return "".join(paren_content), j
+    return "", -1
 
 
 def _collapse_indices(name: str) -> str:
@@ -55,13 +55,13 @@ def _collapse_indices(name: str) -> str:
         simplex_params%perturb_dens_offset(1, 2) -> simplex_params%perturb_dens_offset(N, M)
         bc_x%vel_in(1) -> bc_x%vel_in(N)
     """
-    placeholders = ['N', 'M', 'K', 'L', 'P', 'Q']
+    placeholders = ["N", "M", "K", "L", "P", "Q"]
     placeholder_idx = 0
     result = []
     i = 0
 
     while i < len(name):
-        if name[i] != '(':
+        if name[i] != "(":
             result.append(name[i])
             i += 1
             continue
@@ -74,7 +74,7 @@ def _collapse_indices(name: str) -> str:
             continue
 
         # Check if content is numeric indices (possibly comma-separated)
-        parts = [p.strip() for p in content.split(',')]
+        parts = [p.strip() for p in content.split(",")]
         if not all(p.isdigit() for p in parts):
             result.append(name[i])
             i += 1
@@ -83,13 +83,13 @@ def _collapse_indices(name: str) -> str:
         # Replace each index with a placeholder
         new_parts = []
         for _ in parts:
-            ph = placeholders[placeholder_idx] if placeholder_idx < len(placeholders) else '?'
+            ph = placeholders[placeholder_idx] if placeholder_idx < len(placeholders) else "?"
             new_parts.append(ph)
             placeholder_idx += 1
-        result.append('(' + ', '.join(new_parts) + ')')
+        result.append("(" + ", ".join(new_parts) + ")")
         i = end_idx + 1
 
-    return ''.join(result)
+    return "".join(result)
 
 
 def _type_to_str(param_type: ParamType) -> str:
@@ -114,8 +114,7 @@ def _format_constraints(param) -> str:
     if "choices" in c:
         labels = c.get("value_labels", {})
         if labels:
-            items = [f"{v}={labels[v]}" if v in labels else str(v)
-                     for v in c["choices"]]
+            items = [f"{v}={labels[v]}" if v in labels else str(v) for v in c["choices"]]
             parts.append(", ".join(items))
         else:
             parts.append(f"Values: {c['choices']}")
@@ -136,15 +135,15 @@ def _build_param_name_pattern():
     all_names = sorted(REGISTRY.all_params.keys(), key=len, reverse=True)
     # Only include names >= 2 chars to avoid false positives with single-letter params
     # and names that are simple identifiers (no % or parens, which need escaping)
-    safe_names = [n for n in all_names if len(n) >= 2 and re.match(r'^[a-zA-Z_]\w*$', n)]
+    safe_names = [n for n in all_names if len(n) >= 2 and re.match(r"^[a-zA-Z_]\w*$", n)]
     if not safe_names:
         return None
-    pattern = r'\b(' + '|'.join(re.escape(n) for n in safe_names) + r')\b'
+    pattern = r"\b(" + "|".join(re.escape(n) for n in safe_names) + r")\b"
     return re.compile(pattern)
 
 
 # Matches compound param names like bub_pp%mu_g, fluid_pp(1)%Re(1), x_output%beg
-_COMPOUND_NAME_RE = re.compile(r'\b\w+(?:\([^)]*\))?(?:%\w+(?:\([^)]*\))?)+')
+_COMPOUND_NAME_RE = re.compile(r"\b\w+(?:\([^)]*\))?(?:%\w+(?:\([^)]*\))?)+")
 
 
 def _backtick_params(msg: str, pattern) -> str:
@@ -156,30 +155,30 @@ def _backtick_params(msg: str, pattern) -> str:
     3. Snake_case identifiers not in registry (e.g. cluster_type, smooth_type)
     """
     # 1. Wrap compound names (word%word patterns) — must come first
-    msg = _COMPOUND_NAME_RE.sub(lambda m: f'`{m.group(0)}`', msg)
+    msg = _COMPOUND_NAME_RE.sub(lambda m: f"`{m.group(0)}`", msg)
 
     # 2. Wrap known simple param names, only outside existing backtick spans
     if pattern is not None:
-        parts = msg.split('`')
+        parts = msg.split("`")
         for i in range(0, len(parts), 2):
-            parts[i] = pattern.sub(r'`\1`', parts[i])
-        msg = '`'.join(parts)
+            parts[i] = pattern.sub(r"`\1`", parts[i])
+        msg = "`".join(parts)
 
     # 3. Wrap remaining snake_case identifiers (at least one underscore)
-    parts = msg.split('`')
+    parts = msg.split("`")
     for i in range(0, len(parts), 2):
-        parts[i] = re.sub(r'\b([a-z]\w*_\w+)\b', r'`\1`', parts[i])
-    msg = '`'.join(parts)
+        parts[i] = re.sub(r"\b([a-z]\w*_\w+)\b", r"`\1`", parts[i])
+    msg = "`".join(parts)
 
     return msg
 
 
 def _escape_pct_outside_backticks(text: str) -> str:
     """Escape % as %% for Doxygen, but not inside backtick code spans."""
-    parts = text.split('`')
+    parts = text.split("`")
     for i in range(0, len(parts), 2):
-        parts[i] = parts[i].replace('%', '%%')
-    return '`'.join(parts)
+        parts[i] = parts[i].replace("%", "%%")
+    return "`".join(parts)
 
 
 # Lazily initialized at module level on first use
@@ -187,7 +186,7 @@ _PARAM_PATTERN = None
 
 
 def _get_param_pattern():
-    global _PARAM_PATTERN  # noqa: PLW0603  pylint: disable=global-statement
+    global _PARAM_PATTERN  # noqa: PLW0603
     if _PARAM_PATTERN is None:
         _PARAM_PATTERN = _build_param_name_pattern()
     return _PARAM_PATTERN
@@ -195,7 +194,8 @@ def _get_param_pattern():
 
 def _build_reverse_dep_map() -> Dict[str, List[Tuple[str, str]]]:
     """Build map from target param -> [(relation, source_param), ...] from DEPENDENCIES."""
-    from ..definitions import DEPENDENCIES  # pylint: disable=import-outside-toplevel
+    from ..definitions import DEPENDENCIES
+
     reverse: Dict[str, List[Tuple[str, str]]] = {}
     for param, dep in DEPENDENCIES.items():
         if "when_true" in dep:
@@ -217,13 +217,13 @@ _REVERSE_DEPS = None
 
 
 def _get_reverse_deps():
-    global _REVERSE_DEPS  # noqa: PLW0603  pylint: disable=global-statement
+    global _REVERSE_DEPS  # noqa: PLW0603
     if _REVERSE_DEPS is None:
         _REVERSE_DEPS = _build_reverse_dep_map()
     return _REVERSE_DEPS
 
 
-def _format_tag_annotation(param_name: str, param) -> str:  # pylint: disable=too-many-locals
+def _format_tag_annotation(param_name: str, param) -> str:
     """
     Return a short annotation for params with no schema constraints and no AST rules.
 
@@ -261,8 +261,7 @@ def _format_tag_annotation(param_name: str, param) -> str:  # pylint: disable=to
         entries = reverse[param_name]
         parts = []
         for relation, source in entries[:2]:
-            parts.append(f"Required by `{source}`" if relation == "required by"
-                         else f"Recommended for `{source}`")
+            parts.append(f"Required by `{source}`" if relation == "required by" else f"Recommended for `{source}`")
         return "; ".join(parts)
 
     # 4. ParamDef hint (data-driven from definitions.py)
@@ -270,7 +269,8 @@ def _format_tag_annotation(param_name: str, param) -> str:  # pylint: disable=to
         return param.hint
 
     # 5. Tag-based label (from TAG_DISPLAY_NAMES in definitions.py)
-    from ..definitions import TAG_DISPLAY_NAMES  # pylint: disable=import-outside-toplevel
+    from ..definitions import TAG_DISPLAY_NAMES
+
     for tag, display_name in TAG_DISPLAY_NAMES.items():
         if tag in param.tags:
             return f"{display_name} parameter"
@@ -278,8 +278,7 @@ def _format_tag_annotation(param_name: str, param) -> str:  # pylint: disable=to
     return ""
 
 
-def _format_validator_rules(param_name: str, by_trigger: Dict[str, list],  # pylint: disable=too-many-locals
-                            by_param: Dict[str, list] | None = None) -> str:
+def _format_validator_rules(param_name: str, by_trigger: Dict[str, list], by_param: Dict[str, list] | None = None) -> str:
     """Format AST-extracted validator rules for a parameter's Constraints column.
 
     Gets rules where this param is the trigger.  Falls back to by_param
@@ -343,7 +342,7 @@ def _format_validator_rules(param_name: str, by_trigger: Dict[str, list],  # pyl
     return "; ".join(parts)
 
 
-def generate_parameter_docs() -> str:  # pylint: disable=too-many-locals,too-many-statements
+def generate_parameter_docs() -> str:
     """Generate markdown documentation for all parameters."""
     # AST-extract rules from case_validator.py
     analysis = analyze_case_validator()
@@ -376,10 +375,7 @@ def generate_parameter_docs() -> str:  # pylint: disable=too-many-locals,too-man
         families[family].append((name, param))
 
     # Sort families by size (largest first), but put "general" last
-    sorted_families = sorted(
-        families.items(),
-        key=lambda x: (x[0] == "general", -len(x[1]), x[0])
-    )
+    sorted_families = sorted(families.items(), key=lambda x: (x[0] == "general", -len(x[1]), x[0]))
 
     # Table of contents
     lines.append("| Family | Count | Description |")
@@ -544,26 +540,28 @@ def generate_parameter_docs() -> str:  # pylint: disable=too-many-locals,too-man
         lines.append("")
 
     # Add footer
-    lines.extend([
-        "## CLI Reference",
-        "",
-        "Search parameters using the CLI:",
-        "",
-        "```bash",
-        "# Search for parameters",
-        "./mfc.sh params weno",
-        "",
-        "# Show parameter descriptions",
-        "./mfc.sh params weno -d",
-        "",
-        "# List all families",
-        "./mfc.sh params -f",
-        "",
-        "# Filter by type",
-        "./mfc.sh params -t real weno",
-        "```",
-        "",
-    ])
+    lines.extend(
+        [
+            "## CLI Reference",
+            "",
+            "Search parameters using the CLI:",
+            "",
+            "```bash",
+            "# Search for parameters",
+            "./mfc.sh params weno",
+            "",
+            "# Show parameter descriptions",
+            "./mfc.sh params weno -d",
+            "",
+            "# List all families",
+            "./mfc.sh params -f",
+            "",
+            "# Filter by type",
+            "./mfc.sh params -t real weno",
+            "```",
+            "",
+        ]
+    )
 
     return "\n".join(lines)
 
@@ -575,6 +573,6 @@ def write_parameter_docs(output_path: str) -> int:
         Number of parameters documented
     """
     content = generate_parameter_docs()
-    with open(output_path, 'w') as f:
+    with open(output_path, "w") as f:
         f.write(content)
     return len(REGISTRY.all_params)

@@ -3,8 +3,8 @@
 # Dependencies and Logistics
 # Command to navigate between directories
 
-import math
 import json
+import math
 
 myeps = 1.4 / 150.0
 

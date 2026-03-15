@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Minimal 3D acoustic case with geometry 14 (spherical harmonic surface)."""
-import math
+
 import json
+import math
 
 L = 8.0
 N = 50

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-import math
 import json
+import math
 
 # Single bubble collapse
 # Description: A planar acoustic wave interacts with a single bubble
