@@ -59,14 +59,18 @@ jobs:
               REVIEW_MODE="incremental"
             elif [[ "${{ github.event.action }}" == "labeled" && "${{ github.event.label.name }}" == "claude-full-review" ]]; then
               REVIEW_MODE="full"
+            else
+              REVIEW_MODE="full"
             fi
           elif [[ "${{ github.event_name }}" == "issue_comment" ]]; then
             PR_NUMBER="${{ github.event.issue.number }}"
             REVIEW_MODE="full"
+          else
+            REVIEW_MODE="full"
           fi
 
           echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
-          echo "review_mode=$REVIEW_MODE" >> "$GITHUB_OUTPUT"
+          echo "review_mode=${REVIEW_MODE:-full}" >> "$GITHUB_OUTPUT"
 
       - name: Run Claude Code Review
         uses: anthropics/claude-code-action@v1
