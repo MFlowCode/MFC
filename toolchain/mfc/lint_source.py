@@ -36,7 +36,7 @@ def _check_single_fypp_list(full_line: str, rel: Path, start_line: int) -> list[
     if not 0 <= bracket_start < bracket_end:
         return errors
 
-    list_content = full_line[bracket_start + 1:bracket_end]
+    list_content = full_line[bracket_start + 1 : bracket_end]
     list_content = list_content.replace("&", "")
 
     # Extract single- or double-quoted entries
@@ -45,13 +45,7 @@ def _check_single_fypp_list(full_line: str, rel: Path, start_line: int) -> list[
     seen: dict[str, int] = {}
     for pos, entry in enumerate(entries, 1):
         if entry in seen:
-            errors.append(
-                f"  {rel}:{start_line} Fypp list has duplicate"
-                f" entry '{entry}' (positions {seen[entry]}"
-                f" and {pos})."
-                " Fix: one copy is likely a typo for a"
-                " different variable"
-            )
+            errors.append(f"  {rel}:{start_line} Fypp list has duplicate entry '{entry}' (positions {seen[entry]} and {pos}). Fix: one copy is likely a typo for a different variable")
         else:
             seen[entry] = pos
 
@@ -105,19 +99,11 @@ def check_duplicate_lines(repo_root: Path) -> list[str]:
         prev_stripped = ""
         for i, line in enumerate(lines):
             stripped = line.strip()
-            if (
-                stripped == prev_stripped
-                and len(stripped) >= MIN_DUP_LINE_LEN
-                and not _is_comment_or_blank(stripped)
-            ):
+            if stripped == prev_stripped and len(stripped) >= MIN_DUP_LINE_LEN and not _is_comment_or_blank(stripped):
                 display = stripped[:72]
                 if len(stripped) > 72:
                     display += "..."
-                errors.append(
-                    f"  {rel}:{i + 1} identical to previous line:"
-                    f" '{display}'."
-                    " Fix: check for accidental copy-paste"
-                )
+                errors.append(f"  {rel}:{i + 1} identical to previous line: '{display}'. Fix: check for accidental copy-paste")
             prev_stripped = stripped
 
     return errors
@@ -143,11 +129,7 @@ def check_hardcoded_byte_size(repo_root: Path) -> list[str]:
             if _is_comment_or_blank(stripped):
                 continue
             if byte_re.search(stripped.split("!")[0]):
-                errors.append(
-                    f"  {rel}:{i + 1} hard-codes 8-byte real size."
-                    " Fix: use 'storage_size(0._stp)/8' instead of"
-                    " '8._wp'"
-                )
+                errors.append(f"  {rel}:{i + 1} hard-codes 8-byte real size. Fix: use 'storage_size(0._stp)/8' instead of '8._wp'")
 
     return errors
 
