@@ -11,6 +11,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/config.sh"
 
+echo "==> Syncing runner node locations..."
+sync_runner_nodes
+
 echo "==> Checking for offline frontier runners..."
 
 # Collect offline runner names from GitHub API

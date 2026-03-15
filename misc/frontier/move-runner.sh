@@ -34,6 +34,10 @@ if [ "$valid" -eq 0 ]; then
     exit 1
 fi
 
+# --- Sync runner.node files before acting ---
+echo "==> Syncing runner node locations..."
+sync_runner_nodes
+
 # --- Find current node ---
 echo "==> Locating ${RUNNER_NAME}..."
 current_node=$(find_node "$RUNNER_DIR")

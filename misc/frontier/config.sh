@@ -114,3 +114,35 @@ stop_runner() {
     done
     sleep 1
 }
+
+# Sweep all nodes in parallel and update runner.node for any runner
+# found running on a different node than recorded. Called at the top of
+# every primary script to ensure runner.node always reflects reality,
+# even if a runner was manually restarted on a different node.
+sync_runner_nodes() {
+    local tmpdir
+    tmpdir=$(mktemp -d)
+    trap 'rm -rf "$tmpdir"' RETURN
+
+    for node in "${NODES[@]}"; do
+        (
+            ssh $SSH_OPTS "$node" '
+                for p in $(ps aux | grep Runner.Listener | grep -v grep | awk "{print \$2}"); do
+                    cwd=$(readlink -f /proc/$p/cwd 2>/dev/null || true)
+                    [ -n "$cwd" ] && echo "'"$node"' $cwd"
+                done
+            ' 2>/dev/null | grep -E '^[a-z0-9]+ /'
+        ) > "$tmpdir/$node" &
+    done
+    wait
+
+    while IFS=' ' read -r node dir; do
+        [ -f "$dir/runner.node" ] || continue
+        local recorded
+        recorded=$(cat "$dir/runner.node" 2>/dev/null || echo "")
+        if [ "$node" != "$recorded" ]; then
+            echo "==> $(basename "$dir"): runner.node updated $recorded -> $node"
+            echo "$node" > "$dir/runner.node"
+        fi
+    done < <(cat "$tmpdir"/*)
+}
