@@ -4,17 +4,17 @@ Generate completion scripts and documentation from CLI schema.
 This module regenerates all derived files from the single source of truth
 in cli/commands.py. Run `./mfc.sh generate` after modifying commands.
 """
-# pylint: disable=import-outside-toplevel
 
 import json
+import sys
 from pathlib import Path
 
-from .printer import cons
-from .common import MFC_ROOT_DIR
-from .state import ARG
 from .cli.commands import MFC_CLI_SCHEMA
 from .cli.completion_gen import generate_bash_completion, generate_zsh_completion
 from .cli.docs_gen import generate_cli_reference
+from .common import MFC_ROOT_DIR
+from .printer import cons
+from .state import ARG
 
 
 def _check_or_write(path: Path, content: str, check_mode: bool) -> bool:
@@ -51,8 +51,8 @@ def _constraint_docs(docs_dir: Path) -> list:
 
 def generate():
     """Regenerate completion scripts and optionally JSON schema."""
-    from .params.generators.json_schema_gen import generate_json_schema
     from .params.generators.docs_gen import generate_parameter_docs
+    from .params.generators.json_schema_gen import generate_json_schema
 
     check_mode = ARG("check")
     json_schema_mode = ARG("json_schema")
@@ -72,8 +72,7 @@ def generate():
         (completions_dir / "mfc.bash", generate_bash_completion(MFC_CLI_SCHEMA)),
         (completions_dir / "_mfc", generate_zsh_completion(MFC_CLI_SCHEMA)),
         (docs_dir / "cli-reference.md", generate_cli_reference(MFC_CLI_SCHEMA)),
-        (Path(MFC_ROOT_DIR) / "toolchain" / "mfc-case-schema.json",
-         json.dumps(generate_json_schema(include_descriptions=True), indent=2)),
+        (Path(MFC_ROOT_DIR) / "toolchain" / "mfc-case-schema.json", json.dumps(generate_json_schema(include_descriptions=True), indent=2)),
         (docs_dir / "parameters.md", generate_parameter_docs()),
     ] + _constraint_docs(docs_dir)
 
@@ -83,7 +82,7 @@ def generate():
             all_ok = False
 
     if not all_ok:
-        exit(1)
+        sys.exit(1)
 
     if not check_mode:
         cons.print()
@@ -92,14 +91,14 @@ def generate():
 
 def _generate_json_schema():
     """Generate JSON Schema and parameter documentation (standalone mode)."""
-    from .params.generators.json_schema_gen import generate_json_schema, get_schema_stats
-    from .params.generators.docs_gen import generate_parameter_docs
     from .ide import update_vscode_settings
+    from .params.generators.docs_gen import generate_parameter_docs
+    from .params.generators.json_schema_gen import generate_json_schema, get_schema_stats
 
     # Generate JSON Schema
     schema = generate_json_schema(include_descriptions=True)
     schema_path = Path(MFC_ROOT_DIR) / "toolchain" / "mfc-case-schema.json"
-    with open(schema_path, 'w') as f:
+    with open(schema_path, "w") as f:
         json.dump(schema, f, indent=2)
 
     # Generate parameter documentation
@@ -114,7 +113,7 @@ def _generate_json_schema():
     cons.print(f"[green]Generated[/green] {schema_path}")
     cons.print(f"[green]Generated[/green] {docs_path}")
     cons.print()
-    cons.print(f"[bold]Parameter Statistics:[/bold]")
+    cons.print("[bold]Parameter Statistics:[/bold]")
     cons.print(f"  Total parameters: {stats['total_params']}")
     cons.print(f"  With constraints: {stats['with_constraints']}")
     cons.print(f"  With descriptions: {stats['with_descriptions']}")

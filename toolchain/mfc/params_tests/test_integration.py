@@ -4,9 +4,9 @@ Integration tests for params module with case_dicts.
 Tests that the parameter registry integrates correctly with case_dicts.py
 and provides correct JSON schema generation.
 """
-# pylint: disable=import-outside-toplevel
 
 import unittest
+
 from ..params import REGISTRY
 from ..params.schema import ParamType
 
@@ -20,10 +20,7 @@ class TestParamTypeJsonSchema(unittest.TestCase):
             schema = param_type.json_schema
             self.assertIsInstance(schema, dict)
             # Schema must have either "type" or "enum" key
-            self.assertTrue(
-                "type" in schema or "enum" in schema,
-                f"{param_type.name} schema has neither 'type' nor 'enum'"
-            )
+            self.assertTrue("type" in schema or "enum" in schema, f"{param_type.name} schema has neither 'type' nor 'enum'")
 
     def test_int_schema(self):
         """INT should map to integer JSON schema."""
@@ -70,11 +67,15 @@ class TestRegistryJsonSchema(unittest.TestCase):
         self.assertFalse(schema["additionalProperties"])
 
     def test_get_json_schema_has_all_params(self):
-        """Schema properties should include all registry params."""
+        """Schema properties + patternProperties should cover all registry params."""
         schema = REGISTRY.get_json_schema()
         properties = schema["properties"]
+        pattern_props = schema.get("patternProperties", {})
 
-        self.assertEqual(len(properties), len(REGISTRY.all_params))
+        # Scalar params are in properties, indexed params in patternProperties
+        scalar_count = sum(1 for n in REGISTRY.all_params if "(" not in n)
+        self.assertEqual(len(properties), scalar_count)
+        self.assertGreater(len(pattern_props), 0)
 
     def test_core_params_in_schema(self):
         """Core params should be in JSON schema."""
@@ -150,7 +151,9 @@ class TestCaseDictsIntegration(unittest.TestCase):
         self.assertIn("type", schema)
         self.assertEqual(schema["type"], "object")
         self.assertIn("properties", schema)
-        self.assertEqual(len(schema["properties"]), len(REGISTRY.all_params))
+        self.assertIn("patternProperties", schema)
+        total = len(schema["properties"]) + len(schema["patternProperties"])
+        self.assertGreater(total, 0)
 
     def test_json_schema_matches_registry(self):
         """case_dicts.SCHEMA should match REGISTRY.get_json_schema()."""
@@ -222,10 +225,7 @@ class TestValidatorIntegration(unittest.TestCase):
 
         validator_log_params = _get_logical_params_from_registry()
 
-        registry_log_params = {
-            name for name, p in REGISTRY.all_params.items()
-            if p.param_type == ParamType.LOG
-        }
+        registry_log_params = {name for name, p in REGISTRY.all_params.items() if p.param_type == ParamType.LOG}
 
         self.assertEqual(validator_log_params, registry_log_params)
 

@@ -1,7 +1,7 @@
-import re
-import os
 import csv
 import glob
+import os
+import re
 import statistics
 from dataclasses import dataclass, fields
 

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Minimal 2D acoustic case with geometry 13 (2D modal Fourier shape). Additive form."""
-import math
+
 import json
+import math
 
 Nx, Ny = 64, 64
 Lx, Ly = 8.0, 8.0
