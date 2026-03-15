@@ -23,6 +23,7 @@ from unittest.mock import patch
 # We patch the module-level imports that require the full toolchain.
 # ---------------------------------------------------------------------------
 
+
 # Create minimal stubs for toolchain modules so coverage.py can be imported
 # without the full MFC toolchain being on sys.path.
 def _make_stub(name):
@@ -73,7 +74,10 @@ _case_stub = sys.modules.get("toolchain.mfc.test.case", _make_stub("toolchain.mf
 _case_stub.input_bubbles_lagrange = lambda case: None
 _case_stub.get_post_process_mods = lambda params: {}
 _case_stub.POST_PROCESS_3D_PARAMS = {
-    'fd_order': 1, 'omega_wrt(1)': 'T', 'omega_wrt(2)': 'T', 'omega_wrt(3)': 'T',
+    "fd_order": 1,
+    "omega_wrt(1)": "T",
+    "omega_wrt(2)": "T",
+    "omega_wrt(3)": "T",
 }
 
 # Load coverage.py by injecting stubs into sys.modules so relative imports resolve.
@@ -81,23 +85,22 @@ _COVERAGE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cover
 
 sys.modules.pop("toolchain.mfc.test.coverage", None)  # reset if already loaded
 
-_spec = importlib.util.spec_from_file_location(
-    "toolchain.mfc.test.coverage",
-    _COVERAGE_PATH,
-    submodule_search_locations=[]
-)
+_spec = importlib.util.spec_from_file_location("toolchain.mfc.test.coverage", _COVERAGE_PATH, submodule_search_locations=[])
 _coverage_mod = importlib.util.module_from_spec(_spec)
 _coverage_mod.__package__ = "toolchain.mfc.test"
 
 sys.modules["toolchain.mfc.test"] = types.ModuleType("toolchain.mfc.test")
 sys.modules["toolchain.mfc.test"].__package__ = "toolchain.mfc.test"
 
-with patch.dict("sys.modules", {
-    "toolchain.mfc.printer":   _printer_stub,
-    "toolchain.mfc.common":    _common_stub,
-    "toolchain.mfc.build":     _build_stub,
-    "toolchain.mfc.test.case": _case_stub,
-}):
+with patch.dict(
+    "sys.modules",
+    {
+        "toolchain.mfc.printer": _printer_stub,
+        "toolchain.mfc.common": _common_stub,
+        "toolchain.mfc.build": _build_stub,
+        "toolchain.mfc.test.case": _case_stub,
+    },
+):
     try:
         _spec.loader.exec_module(_coverage_mod)
     except ImportError:
@@ -127,17 +130,17 @@ except AttributeError:
         _src = _f.read()
 
     _src = (
-        _src
-        .replace("from ..printer import cons", "cons = _globals['cons']")
+        _src.replace("from ..printer import cons", "cons = _globals['cons']")
         .replace("from .. import common", "")
         .replace("from ..common import MFCException", "MFCException = _globals['MFCException']")
         .replace("from ..build import PRE_PROCESS, SIMULATION, POST_PROCESS", "")
-        .replace("from .case import (input_bubbles_lagrange, get_post_process_mods,\n"
-                 "                    POST_PROCESS_3D_PARAMS)",
-                 "input_bubbles_lagrange = lambda case: None\n"
-                 "get_post_process_mods = lambda params: {}\n"
-                 "POST_PROCESS_3D_PARAMS = {'fd_order': 1, 'omega_wrt(1)': 'T', "
-                 "'omega_wrt(2)': 'T', 'omega_wrt(3)': 'T'}")
+        .replace(
+            "from .case import (input_bubbles_lagrange, get_post_process_mods,\n                    POST_PROCESS_3D_PARAMS)",
+            "input_bubbles_lagrange = lambda case: None\n"
+            "get_post_process_mods = lambda params: {}\n"
+            "POST_PROCESS_3D_PARAMS = {'fd_order': 1, 'omega_wrt(1)': 'T', "
+            "'omega_wrt(2)': 'T', 'omega_wrt(3)': 'T'}",
+        )
     )
     exec(compile(_src, _COVERAGE_PATH, "exec"), _globals)  # noqa: S102
 
@@ -154,6 +157,7 @@ except AttributeError:
 # Helper: minimal fake test case
 # ---------------------------------------------------------------------------
 
+
 class FakeCase:
     """Minimal stand-in for TestCase — only get_uuid() is needed."""
 
@@ -168,8 +172,8 @@ class FakeCase:
 # Group 1: _parse_diff_files — git diff --name-only parsing
 # ===========================================================================
 
-class TestParseDiffFiles(unittest.TestCase):
 
+class TestParseDiffFiles(unittest.TestCase):
     def test_parse_single_file(self):
         result = _parse_diff_files("src/simulation/m_rhs.fpp\n")
         assert result == {"src/simulation/m_rhs.fpp"}
@@ -204,102 +208,77 @@ class TestParseDiffFiles(unittest.TestCase):
 # Group 2: should_run_all_tests — ALWAYS_RUN_ALL detection
 # ===========================================================================
 
-class TestShouldRunAllTests(unittest.TestCase):
 
+class TestShouldRunAllTests(unittest.TestCase):
     def test_parallel_macros_triggers_all(self):
-        assert should_run_all_tests(
-            {"src/common/include/parallel_macros.fpp"}
-        ) is True
+        assert should_run_all_tests({"src/common/include/parallel_macros.fpp"}) is True
 
     def test_acc_macros_triggers_all(self):
-        assert should_run_all_tests(
-            {"src/common/include/acc_macros.fpp"}
-        ) is True
+        assert should_run_all_tests({"src/common/include/acc_macros.fpp"}) is True
 
     def test_omp_macros_triggers_all(self):
-        assert should_run_all_tests(
-            {"src/common/include/omp_macros.fpp"}
-        ) is True
+        assert should_run_all_tests({"src/common/include/omp_macros.fpp"}) is True
 
     def test_shared_parallel_macros_triggers_all(self):
-        assert should_run_all_tests(
-            {"src/common/include/shared_parallel_macros.fpp"}
-        ) is True
+        assert should_run_all_tests({"src/common/include/shared_parallel_macros.fpp"}) is True
 
     def test_macros_fpp_triggers_all(self):
-        assert should_run_all_tests(
-            {"src/common/include/macros.fpp"}
-        ) is True
+        assert should_run_all_tests({"src/common/include/macros.fpp"}) is True
 
     def test_cases_py_triggers_all(self):
-        assert should_run_all_tests(
-            {"toolchain/mfc/test/cases.py"}
-        ) is True
+        assert should_run_all_tests({"toolchain/mfc/test/cases.py"}) is True
 
     def test_case_py_triggers_all(self):
-        assert should_run_all_tests(
-            {"toolchain/mfc/test/case.py"}
-        ) is True
+        assert should_run_all_tests({"toolchain/mfc/test/case.py"}) is True
 
     def test_definitions_py_triggers_all(self):
-        assert should_run_all_tests(
-            {"toolchain/mfc/params/definitions.py"}
-        ) is True
+        assert should_run_all_tests({"toolchain/mfc/params/definitions.py"}) is True
 
     def test_input_py_triggers_all(self):
-        assert should_run_all_tests(
-            {"toolchain/mfc/run/input.py"}
-        ) is True
+        assert should_run_all_tests({"toolchain/mfc/run/input.py"}) is True
 
     def test_case_validator_triggers_all(self):
-        assert should_run_all_tests(
-            {"toolchain/mfc/case_validator.py"}
-        ) is True
+        assert should_run_all_tests({"toolchain/mfc/case_validator.py"}) is True
 
     def test_cmakelists_does_not_trigger_all(self):
         assert should_run_all_tests({"CMakeLists.txt"}) is False
 
     def test_case_fpp_triggers_all(self):
-        assert should_run_all_tests(
-            {"src/common/include/case.fpp"}
-        ) is True
+        assert should_run_all_tests({"src/common/include/case.fpp"}) is True
 
     def test_coverage_py_triggers_all(self):
-        assert should_run_all_tests(
-            {"toolchain/mfc/test/coverage.py"}
-        ) is True
+        assert should_run_all_tests({"toolchain/mfc/test/coverage.py"}) is True
 
     def test_cmake_dir_triggers_all(self):
-        assert should_run_all_tests(
-            {"toolchain/cmake/FindFFTW.cmake"}
-        ) is True
+        assert should_run_all_tests({"toolchain/cmake/FindFFTW.cmake"}) is True
 
     def test_cmake_subdir_triggers_all(self):
-        assert should_run_all_tests(
-            {"toolchain/cmake/some/nested/file.cmake"}
-        ) is True
+        assert should_run_all_tests({"toolchain/cmake/some/nested/file.cmake"}) is True
 
     def test_simulation_module_does_not_trigger_all(self):
-        assert should_run_all_tests(
-            {"src/simulation/m_rhs.fpp"}
-        ) is False
+        assert should_run_all_tests({"src/simulation/m_rhs.fpp"}) is False
 
     def test_empty_set_does_not_trigger_all(self):
         assert should_run_all_tests(set()) is False
 
     def test_mixed_one_trigger_fires_all(self):
-        assert should_run_all_tests({
-            "src/simulation/m_rhs.fpp",
-            "src/common/include/macros.fpp",
-        }) is True
+        assert (
+            should_run_all_tests(
+                {
+                    "src/simulation/m_rhs.fpp",
+                    "src/common/include/macros.fpp",
+                }
+            )
+            is True
+        )
 
 
 # ===========================================================================
 # Group 3: filter_tests_by_coverage — core file-level selection logic
 # ===========================================================================
 
-class TestFilterTestsByCoverage(unittest.TestCase):
 
+class TestFilterTestsByCoverage(unittest.TestCase):
     def test_file_overlap_includes_test(self):
         cache = {"AAAA0001": ["src/simulation/m_rhs.fpp", "src/simulation/m_weno.fpp"]}
         changed = {"src/simulation/m_rhs.fpp"}
@@ -394,14 +373,14 @@ class TestFilterTestsByCoverage(unittest.TestCase):
         """Test with no simulation coverage but simulation file changed -> include."""
         cache = {
             "GOOD_T": ["src/simulation/m_rhs.fpp", "src/pre_process/m_start_up.fpp"],
-            "BAD_T":  ["src/pre_process/m_start_up.fpp", "src/common/m_helper.fpp"],
+            "BAD_T": ["src/pre_process/m_start_up.fpp", "src/common/m_helper.fpp"],
         }
         changed = {"src/simulation/m_rhs.fpp"}
         cases = [FakeCase("GOOD_T"), FakeCase("BAD_T")]
         to_run, skipped = filter_tests_by_coverage(cases, cache, changed)
         uuids_run = {c.get_uuid() for c in to_run}
         assert "GOOD_T" in uuids_run  # direct file overlap
-        assert "BAD_T" in uuids_run   # no sim coverage -> conservative include
+        assert "BAD_T" in uuids_run  # no sim coverage -> conservative include
         assert len(skipped) == 0
 
     def test_incomplete_coverage_not_triggered_by_preprocess(self):
@@ -419,8 +398,8 @@ class TestFilterTestsByCoverage(unittest.TestCase):
 # Group 4: Corner cases from design discussion
 # ===========================================================================
 
-class TestDesignCornerCases(unittest.TestCase):
 
+class TestDesignCornerCases(unittest.TestCase):
     def test_gpu_ifdef_file_still_triggers_if_covered(self):
         """
         GPU-specific code lives in the same .fpp file as CPU code.
@@ -478,8 +457,8 @@ class TestDesignCornerCases(unittest.TestCase):
 # Group 5: _parse_gcov_json_output — gcov JSON parsing (file-level)
 # ===========================================================================
 
-class TestParseGcovJsonOutput(unittest.TestCase):
 
+class TestParseGcovJsonOutput(unittest.TestCase):
     def _make_gcov_json(self, files_data: list) -> bytes:
         """Build a fake gzip-compressed gcov JSON blob."""
         data = {
@@ -490,40 +469,50 @@ class TestParseGcovJsonOutput(unittest.TestCase):
         return gzip.compress(json.dumps(data).encode())
 
     def test_returns_set_of_covered_fpp_files(self):
-        compressed = self._make_gcov_json([{
-            "file": "/repo/src/simulation/m_rhs.fpp",
-            "lines": [
-                {"line_number": 45, "count": 3},
-                {"line_number": 46, "count": 0},
-                {"line_number": 47, "count": 1},
-            ],
-        }])
+        compressed = self._make_gcov_json(
+            [
+                {
+                    "file": "/repo/src/simulation/m_rhs.fpp",
+                    "lines": [
+                        {"line_number": 45, "count": 3},
+                        {"line_number": 46, "count": 0},
+                        {"line_number": 47, "count": 1},
+                    ],
+                }
+            ]
+        )
         result = _parse_gcov_json_output(compressed, "/repo")
         assert result == {"src/simulation/m_rhs.fpp"}
 
     def test_ignores_file_with_zero_coverage(self):
-        compressed = self._make_gcov_json([{
-            "file": "/repo/src/simulation/m_rhs.fpp",
-            "lines": [
-                {"line_number": 10, "count": 0},
-                {"line_number": 11, "count": 0},
-            ],
-        }])
+        compressed = self._make_gcov_json(
+            [
+                {
+                    "file": "/repo/src/simulation/m_rhs.fpp",
+                    "lines": [
+                        {"line_number": 10, "count": 0},
+                        {"line_number": 11, "count": 0},
+                    ],
+                }
+            ]
+        )
         result = _parse_gcov_json_output(compressed, "/repo")
         assert result == set()
 
     def test_ignores_f90_files(self):
         """Generated .f90 files must not appear in coverage output."""
-        compressed = self._make_gcov_json([
-            {
-                "file": "/repo/build/fypp/simulation/m_rhs.fpp.f90",
-                "lines": [{"line_number": 10, "count": 5}],
-            },
-            {
-                "file": "/repo/src/simulation/m_rhs.fpp",
-                "lines": [{"line_number": 45, "count": 1}],
-            },
-        ])
+        compressed = self._make_gcov_json(
+            [
+                {
+                    "file": "/repo/build/fypp/simulation/m_rhs.fpp.f90",
+                    "lines": [{"line_number": 10, "count": 5}],
+                },
+                {
+                    "file": "/repo/src/simulation/m_rhs.fpp",
+                    "lines": [{"line_number": 45, "count": 1}],
+                },
+            ]
+        )
         result = _parse_gcov_json_output(compressed, "/repo")
         assert result == {"src/simulation/m_rhs.fpp"}
 
@@ -532,10 +521,12 @@ class TestParseGcovJsonOutput(unittest.TestCase):
         data = {
             "format_version": "1",
             "gcc_version": "12.3.0",
-            "files": [{
-                "file": "/repo/src/simulation/m_rhs.fpp",
-                "lines": [{"line_number": 45, "count": 3}],
-            }],
+            "files": [
+                {
+                    "file": "/repo/src/simulation/m_rhs.fpp",
+                    "lines": [{"line_number": 45, "count": 3}],
+                }
+            ],
         }
         raw = json.dumps(data).encode()
         result = _parse_gcov_json_output(raw, "/repo")
@@ -551,57 +542,75 @@ class TestParseGcovJsonOutput(unittest.TestCase):
         assert result == set()
 
     def test_multiple_fpp_files(self):
-        compressed = self._make_gcov_json([
-            {
-                "file": "/repo/src/simulation/m_rhs.fpp",
-                "lines": [{"line_number": 45, "count": 1}],
-            },
-            {
-                "file": "/repo/src/simulation/m_weno.fpp",
-                "lines": [{"line_number": 200, "count": 2}],
-            },
-        ])
+        compressed = self._make_gcov_json(
+            [
+                {
+                    "file": "/repo/src/simulation/m_rhs.fpp",
+                    "lines": [{"line_number": 45, "count": 1}],
+                },
+                {
+                    "file": "/repo/src/simulation/m_weno.fpp",
+                    "lines": [{"line_number": 200, "count": 2}],
+                },
+            ]
+        )
         result = _parse_gcov_json_output(compressed, "/repo")
         assert result == {"src/simulation/m_rhs.fpp", "src/simulation/m_weno.fpp"}
 
     def test_concatenated_json_from_batched_gcov(self):
         """Batched gcov calls produce concatenated JSON objects (gcov 12)."""
-        obj1 = json.dumps({
-            "format_version": "1",
-            "gcc_version": "12.3.0",
-            "files": [{
-                "file": "/repo/src/simulation/m_rhs.fpp",
-                "lines": [{"line_number": 45, "count": 3}],
-            }],
-        })
-        obj2 = json.dumps({
-            "format_version": "1",
-            "gcc_version": "12.3.0",
-            "files": [{
-                "file": "/repo/src/simulation/m_weno.fpp",
-                "lines": [{"line_number": 10, "count": 1}],
-            }],
-        })
+        obj1 = json.dumps(
+            {
+                "format_version": "1",
+                "gcc_version": "12.3.0",
+                "files": [
+                    {
+                        "file": "/repo/src/simulation/m_rhs.fpp",
+                        "lines": [{"line_number": 45, "count": 3}],
+                    }
+                ],
+            }
+        )
+        obj2 = json.dumps(
+            {
+                "format_version": "1",
+                "gcc_version": "12.3.0",
+                "files": [
+                    {
+                        "file": "/repo/src/simulation/m_weno.fpp",
+                        "lines": [{"line_number": 10, "count": 1}],
+                    }
+                ],
+            }
+        )
         raw = (obj1 + "\n" + obj2).encode()
         result = _parse_gcov_json_output(raw, "/repo")
         assert result == {"src/simulation/m_rhs.fpp", "src/simulation/m_weno.fpp"}
 
     def test_concatenated_json_skips_zero_coverage(self):
         """Batched gcov: files with zero coverage are excluded."""
-        obj1 = json.dumps({
-            "format_version": "1",
-            "files": [{
-                "file": "/repo/src/simulation/m_rhs.fpp",
-                "lines": [{"line_number": 45, "count": 3}],
-            }],
-        })
-        obj2 = json.dumps({
-            "format_version": "1",
-            "files": [{
-                "file": "/repo/src/simulation/m_weno.fpp",
-                "lines": [{"line_number": 10, "count": 0}],
-            }],
-        })
+        obj1 = json.dumps(
+            {
+                "format_version": "1",
+                "files": [
+                    {
+                        "file": "/repo/src/simulation/m_rhs.fpp",
+                        "lines": [{"line_number": 45, "count": 3}],
+                    }
+                ],
+            }
+        )
+        obj2 = json.dumps(
+            {
+                "format_version": "1",
+                "files": [
+                    {
+                        "file": "/repo/src/simulation/m_weno.fpp",
+                        "lines": [{"line_number": 10, "count": 0}],
+                    }
+                ],
+            }
+        )
         raw = (obj1 + "\n" + obj2).encode()
         result = _parse_gcov_json_output(raw, "/repo")
         assert result == {"src/simulation/m_rhs.fpp"}
@@ -611,8 +620,8 @@ class TestParseGcovJsonOutput(unittest.TestCase):
 # Group 6: _normalize_cache — old format conversion
 # ===========================================================================
 
-class TestNormalizeCache(unittest.TestCase):
 
+class TestNormalizeCache(unittest.TestCase):
     def test_converts_old_line_level_format(self):
         """Old format {uuid: {file: [lines]}} -> new format {uuid: [files]}."""
         old_cache = {
@@ -651,8 +660,8 @@ class TestNormalizeCache(unittest.TestCase):
 # Group 7: Cache path format
 # ===========================================================================
 
-class TestCachePath(unittest.TestCase):
 
+class TestCachePath(unittest.TestCase):
     def test_cache_path_is_gzipped(self):
         """Cache file must use .json.gz so it can be committed to the repo."""
         assert str(COVERAGE_CACHE_PATH).endswith(".json.gz")

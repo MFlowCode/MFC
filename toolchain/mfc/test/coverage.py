@@ -12,64 +12,59 @@ Workflow:
     ./mfc.sh test --only-changes -j 8                 # fast: run only affected tests
 """
 
+import datetime
+import gzip
+import hashlib
 import io
+import json
 import os
 import re
-import json
-import gzip
 import shutil
-import hashlib
-import tempfile
 import subprocess
-import datetime
+import tempfile
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Optional
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from ..printer import cons
 from .. import common
+from ..build import POST_PROCESS, PRE_PROCESS, SIMULATION
 from ..common import MFCException
-from ..build import PRE_PROCESS, SIMULATION, POST_PROCESS
-from .case import (input_bubbles_lagrange, get_post_process_mods,
-                    POST_PROCESS_3D_PARAMS)
-
+from ..printer import cons
+from .case import POST_PROCESS_3D_PARAMS, get_post_process_mods, input_bubbles_lagrange
 
 COVERAGE_CACHE_PATH = Path(common.MFC_ROOT_DIR) / "toolchain/mfc/test/test_coverage_cache.json.gz"
 
 # Changes to these files trigger the full test suite.
 # CPU coverage cannot tell us about GPU directive changes (macro files), and
 # toolchain files define or change the set of tests themselves.
-ALWAYS_RUN_ALL = frozenset([
-    "src/common/include/parallel_macros.fpp",
-    "src/common/include/acc_macros.fpp",
-    "src/common/include/omp_macros.fpp",
-    "src/common/include/shared_parallel_macros.fpp",
-    "src/common/include/macros.fpp",
-    "src/common/include/case.fpp",
-    "toolchain/mfc/test/case.py",
-    "toolchain/mfc/test/cases.py",
-    "toolchain/mfc/test/coverage.py",
-    "toolchain/mfc/params/definitions.py",
-    "toolchain/mfc/run/input.py",
-    "toolchain/mfc/case_validator.py",
-])
+ALWAYS_RUN_ALL = frozenset(
+    [
+        "src/common/include/parallel_macros.fpp",
+        "src/common/include/acc_macros.fpp",
+        "src/common/include/omp_macros.fpp",
+        "src/common/include/shared_parallel_macros.fpp",
+        "src/common/include/macros.fpp",
+        "src/common/include/case.fpp",
+        "toolchain/mfc/test/case.py",
+        "toolchain/mfc/test/cases.py",
+        "toolchain/mfc/test/coverage.py",
+        "toolchain/mfc/params/definitions.py",
+        "toolchain/mfc/run/input.py",
+        "toolchain/mfc/case_validator.py",
+    ]
+)
 
 # Directory prefixes: any changed file under these paths triggers full suite.
 # Note: src/simulation/include/ (.fpp files like inline_riemann.fpp) is NOT
 # listed here — Fypp line markers (--line-marker-format=gfortran5) correctly
 # attribute included file paths, so gcov coverage tracks them accurately.
-ALWAYS_RUN_ALL_PREFIXES = (
-    "toolchain/cmake/",
-)
+ALWAYS_RUN_ALL_PREFIXES = ("toolchain/cmake/",)
 
 
 def _get_gcov_version(gcov_binary: str) -> str:
     """Return the version string from gcov --version."""
     try:
-        result = subprocess.run(
-            [gcov_binary, "--version"],
-            capture_output=True, text=True, timeout=10, check=False
-        )
+        result = subprocess.run([gcov_binary, "--version"], capture_output=True, text=True, timeout=10, check=False)
         for line in result.stdout.splitlines():
             if line.strip():
                 return line.strip()
@@ -89,11 +84,8 @@ def find_gcov_binary() -> str:
     # Determine gfortran major version
     major = None
     try:
-        result = subprocess.run(
-            ["gfortran", "--version"],
-            capture_output=True, text=True, timeout=10, check=False
-        )
-        m = re.search(r'(\d+)\.\d+\.\d+', result.stdout)
+        result = subprocess.run(["gfortran", "--version"], capture_output=True, text=True, timeout=10, check=False)
+        m = re.search(r"(\d+)\.\d+\.\d+", result.stdout)
         if m:
             major = m.group(1)
     except (OSError, subprocess.SubprocessError):
@@ -110,10 +102,7 @@ def find_gcov_binary() -> str:
         if path is None:
             continue
         try:
-            result = subprocess.run(
-                [path, "--version"],
-                capture_output=True, text=True, timeout=10, check=False
-            )
+            result = subprocess.run([path, "--version"], capture_output=True, text=True, timeout=10, check=False)
             version_out = result.stdout
             if "Apple LLVM" in version_out or "Apple clang" in version_out:
                 continue  # Apple's gcov cannot parse GCC-generated .gcda files
@@ -137,17 +126,10 @@ def find_gcno_files(root_dir: str) -> list:
     Raises if none found (indicates build was not done with --gcov).
     """
     build_dir = Path(root_dir) / "build"
-    gcno_files = [
-        p for p in build_dir.rglob("*.gcno")
-        if "venv" not in p.parts
-    ]
+    gcno_files = [p for p in build_dir.rglob("*.gcno") if "venv" not in p.parts]
     if not gcno_files:
-        raise MFCException(
-            "No .gcno files found. Build with --gcov instrumentation first:\n"
-            "  ./mfc.sh build --gcov -j 8"
-        )
+        raise MFCException("No .gcno files found. Build with --gcov instrumentation first:\n  ./mfc.sh build --gcov -j 8")
     return gcno_files
-
 
 
 def _parse_gcov_json_output(raw_bytes: bytes, root_dir: str) -> set:
@@ -164,8 +146,7 @@ def _parse_gcov_json_output(raw_bytes: bytes, root_dir: str) -> set:
         try:
             text = raw_bytes.decode("utf-8", errors="replace")
         except (UnicodeDecodeError, ValueError):
-            cons.print("[yellow]Warning: gcov output is not valid UTF-8 or gzip — "
-                       "no coverage recorded for this test.[/yellow]")
+            cons.print("[yellow]Warning: gcov output is not valid UTF-8 or gzip — no coverage recorded for this test.[/yellow]")
             return None
 
     result = set()
@@ -185,9 +166,7 @@ def _parse_gcov_json_output(raw_bytes: bytes, root_dir: str) -> set:
         except json.JSONDecodeError:
             remaining = len(text) - pos
             if remaining > 0:
-                cons.print(f"[yellow]Warning: gcov JSON parse error at offset "
-                           f"{pos} ({remaining} bytes remaining) — partial "
-                           f"coverage recorded for this test.[/yellow]")
+                cons.print(f"[yellow]Warning: gcov JSON parse error at offset {pos} ({remaining} bytes remaining) — partial coverage recorded for this test.[/yellow]")
             break
 
         for file_entry in data.get("files", []):
@@ -221,7 +200,10 @@ def _compute_gcov_prefix_strip(root_dir: str) -> str:
 
 
 def _collect_single_test_coverage(  # pylint: disable=too-many-locals
-    uuid: str, test_gcda: str, root_dir: str, gcov_bin: str,
+    uuid: str,
+    test_gcda: str,
+    root_dir: str,
+    gcov_bin: str,
 ) -> tuple:
     """
     Collect file-level coverage for a single test, fully self-contained.
@@ -237,8 +219,7 @@ def _collect_single_test_coverage(  # pylint: disable=too-many-locals
         # was misconfigured.  Return None so the test is omitted from the
         # cache (conservatively included on future runs).  The sanity check
         # at the end of build_coverage_cache will catch systemic failures.
-        cons.print(f"[yellow]Warning: No .gcda directory for {uuid} — "
-                   f"GCOV_PREFIX may be misconfigured.[/yellow]")
+        cons.print(f"[yellow]Warning: No .gcda directory for {uuid} — GCOV_PREFIX may be misconfigured.[/yellow]")
         return uuid, None
 
     gcno_copies = []
@@ -270,9 +251,7 @@ def _collect_single_test_coverage(  # pylint: disable=too-many-locals
     # Run from root_dir so source path resolution works correctly.
     cmd = [gcov_bin, "--json-format", "--stdout"] + gcno_copies
     try:
-        proc = subprocess.run(
-            cmd, capture_output=True, cwd=root_dir, timeout=120, check=False
-        )
+        proc = subprocess.run(cmd, capture_output=True, cwd=root_dir, timeout=120, check=False)
     except (subprocess.TimeoutExpired, subprocess.SubprocessError, OSError) as exc:
         cons.print(f"[yellow]Warning: gcov failed for {uuid}: {exc}[/yellow]")
         return uuid, []
@@ -323,12 +302,7 @@ def _run_single_test_direct(test_info: dict, gcda_dir: str, strip: str) -> tuple
     elif shutil.which("srun"):
         mpi_cmd = ["srun", "--ntasks", str(ppn)]
     else:
-        raise MFCException(
-            "No MPI launcher found (mpirun or srun). "
-            "MFC binaries require an MPI launcher.\n"
-            "  On Ubuntu: sudo apt install openmpi-bin\n"
-            "  On macOS:  brew install open-mpi"
-        )
+        raise MFCException("No MPI launcher found (mpirun or srun). MFC binaries require an MPI launcher.\n  On Ubuntu: sudo apt install openmpi-bin\n  On macOS:  brew install open-mpi")
 
     failures = []
     for target_name, bin_path in binaries:
@@ -337,23 +311,19 @@ def _run_single_test_direct(test_info: dict, gcda_dir: str, strip: str) -> tuple
             # depend on outputs from earlier ones (e.g. simulation needs the
             # grid from pre_process), so running them without a predecessor
             # produces misleading init-only gcda files.
-            failures.append((target_name, "missing-binary",
-                             f"binary not found: {bin_path}"))
+            failures.append((target_name, "missing-binary", f"binary not found: {bin_path}"))
             break
 
         # Verify .inp file exists before running (diagnostic for transient
         # filesystem issues where the file goes missing between phases).
         inp_file = os.path.join(test_dir, f"{target_name}.inp")
         if not os.path.isfile(inp_file):
-            failures.append((target_name, "missing-inp",
-                             f"{inp_file} not found before launch"))
+            failures.append((target_name, "missing-inp", f"{inp_file} not found before launch"))
             break
 
         cmd = mpi_cmd + [bin_path]
         try:
-            result = subprocess.run(cmd, check=False, text=True,
-                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                    env=env, cwd=test_dir, timeout=600)
+            result = subprocess.run(cmd, check=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env, cwd=test_dir, timeout=600)
             if result.returncode != 0:
                 # Save last lines of output for debugging.  Stop here: a
                 # failed pre_process/simulation leaves no valid outputs for
@@ -385,17 +355,15 @@ def _prepare_test(case, root_dir: str) -> dict:  # pylint: disable=unused-argume
         case.delete_output()
         case.create_directory()
     except OSError as exc:
-        cons.print(f"[yellow]Warning: Failed to prepare test directory for "
-                   f"{case.get_uuid()}: {exc}[/yellow]")
+        cons.print(f"[yellow]Warning: Failed to prepare test directory for {case.get_uuid()}: {exc}[/yellow]")
         raise
 
     # Lagrange bubble tests need input files generated before running.
-    if case.params.get("bubbles_lagrange", 'F') == 'T':
+    if case.params.get("bubbles_lagrange", "F") == "T":
         try:
             input_bubbles_lagrange(case)
         except Exception as exc:
-            cons.print(f"[yellow]Warning: Failed to generate Lagrange bubble input "
-                       f"for {case.get_uuid()}: {exc}[/yellow]")
+            cons.print(f"[yellow]Warning: Failed to generate Lagrange bubble input for {case.get_uuid()}: {exc}[/yellow]")
             raise
 
     # Work on a copy so we don't permanently mutate the case object.
@@ -410,23 +378,22 @@ def _prepare_test(case, root_dir: str) -> dict:  # pylint: disable=unused-argume
     # *touched*, not verify correctness.  A single step exercises the key
     # code paths across all three executables while preventing heavy 3D tests
     # from timing out under gcov instrumentation (~10x slowdown).
-    params['t_step_stop'] = 1
+    params["t_step_stop"] = 1
 
     # Adaptive-dt tests: post_process computes n_save = int(t_stop/t_save)+1
     # and iterates over that many save indices.  But with small t_step_stop
     # the simulation produces far fewer saves.  Clamp t_stop so post_process
     # only reads saves that actually exist.
-    if params.get('cfl_adap_dt', 'F') == 'T':
-        t_save = float(params.get('t_save', 1.0))
-        params['t_stop'] = t_save  # n_save = 2: indices 0 and 1
+    if params.get("cfl_adap_dt", "F") == "T":
+        t_save = float(params.get("t_save", 1.0))
+        params["t_stop"] = t_save  # n_save = 2: indices 0 and 1
 
     # Heavy 3D tests: remove vorticity output (omega_wrt + fd_order) for
     # 3D QBMM tests.  Normal test execution never runs post_process (only
     # PRE_PROCESS + SIMULATION, never POST_PROCESS), so post_process on
     # heavy 3D configs is untested.  Vorticity FD computation on large grids
     # with many QBMM variables causes post_process to crash (exit code 2).
-    if (int(params.get('p', 0)) > 0 and
-            params.get('qbmm', 'F') == 'T'):
+    if int(params.get("p", 0)) > 0 and params.get("qbmm", "F") == "T":
         for key in POST_PROCESS_3D_PARAMS:
             params.pop(key, None)
 
@@ -451,8 +418,7 @@ def _prepare_test(case, root_dir: str) -> dict:  # pylint: disable=unused-argume
         try:
             for target in targets:
                 inp_content = case.get_inp(target)
-                common.file_write(os.path.join(test_dir, f"{target.name}.inp"),
-                                  inp_content)
+                common.file_write(os.path.join(test_dir, f"{target.name}.inp"), inp_content)
                 bin_path = target.get_install_binpath(input_file)
                 binaries.append((target.name, bin_path))
         finally:
@@ -461,15 +427,17 @@ def _prepare_test(case, root_dir: str) -> dict:  # pylint: disable=unused-argume
         case.params = orig_params
 
     return {
-        "uuid":     case.get_uuid(),
-        "dir":      test_dir,
+        "uuid": case.get_uuid(),
+        "dir": test_dir,
         "binaries": binaries,
-        "ppn":      getattr(case, 'ppn', 1),
+        "ppn": getattr(case, "ppn", 1),
     }
 
 
 def build_coverage_cache(  # pylint: disable=too-many-locals,too-many-statements
-    root_dir: str, cases: list, n_jobs: int = None,
+    root_dir: str,
+    cases: list,
+    n_jobs: int = None,
 ) -> None:
     """
     Build the file-level coverage cache by running tests in parallel.
@@ -499,8 +467,7 @@ def build_coverage_cache(  # pylint: disable=too-many-locals,too-many-statements
     # processes (~2-5 GB each under gcov).  Too many concurrent tests cause OOM.
     # Phase 3 gcov workers run at full n_jobs (gcov is lightweight by comparison).
     phase2_jobs = min(n_jobs, 16)
-    cons.print(f"[bold]Building coverage cache for {len(cases)} tests "
-               f"({phase2_jobs} test workers, {n_jobs} gcov workers)...[/bold]")
+    cons.print(f"[bold]Building coverage cache for {len(cases)} tests ({phase2_jobs} test workers, {n_jobs} gcov workers)...[/bold]")
     cons.print(f"[dim]Using gcov binary: {gcov_bin}[/dim]")
     cons.print(f"[dim]Found {len(gcno_files)} .gcno files[/dim]")
     cons.print(f"[dim]GCOV_PREFIX_STRIP={strip}[/dim]")
@@ -515,7 +482,7 @@ def build_coverage_cache(  # pylint: disable=too-many-locals,too-many-statements
         except Exception as exc:  # pylint: disable=broad-except
             cons.print(f"  [yellow]Warning: skipping {case.get_uuid()} — prep failed: {exc}[/yellow]")
         if (i + 1) % 100 == 0 or (i + 1) == len(cases):
-            cons.print(f"  [{i+1:3d}/{len(cases):3d}] prepared")
+            cons.print(f"  [{i + 1:3d}/{len(cases):3d}] prepared")
     cons.print()
 
     gcda_dir = tempfile.mkdtemp(prefix="mfc_gcov_")
@@ -525,10 +492,7 @@ def build_coverage_cache(  # pylint: disable=too-many-locals,too-many-statements
         test_results: dict = {}
         all_failures: dict = {}
         with ThreadPoolExecutor(max_workers=phase2_jobs) as pool:
-            futures = {
-                pool.submit(_run_single_test_direct, info, gcda_dir, strip): info
-                for info in test_infos
-            }
+            futures = {pool.submit(_run_single_test_direct, info, gcda_dir, strip): info for info in test_infos}
             for i, future in enumerate(as_completed(futures)):
                 try:
                     uuid, test_gcda, failures = future.result()
@@ -540,7 +504,7 @@ def build_coverage_cache(  # pylint: disable=too-many-locals,too-many-statements
                 if failures:
                     all_failures[uuid] = failures
                 if (i + 1) % 50 == 0 or (i + 1) == len(test_infos):
-                    cons.print(f"  [{i+1:3d}/{len(test_infos):3d}] tests completed")
+                    cons.print(f"  [{i + 1:3d}/{len(test_infos):3d}] tests completed")
 
         if all_failures:
             cons.print()
@@ -560,15 +524,10 @@ def build_coverage_cache(  # pylint: disable=too-many-locals,too-many-statements
             sample_gcda = test_results[sample_uuid]
             sample_build = os.path.join(sample_gcda, "build")
             if os.path.isdir(sample_build):
-                gcda_count = sum(
-                    1 for _, _, fns in os.walk(sample_build)
-                    for f in fns if f.endswith(".gcda")
-                )
-                cons.print(f"[dim]Sample test {sample_uuid}: "
-                           f"{gcda_count} .gcda files in {sample_build}[/dim]")
+                gcda_count = sum(1 for _, _, fns in os.walk(sample_build) for f in fns if f.endswith(".gcda"))
+                cons.print(f"[dim]Sample test {sample_uuid}: {gcda_count} .gcda files in {sample_build}[/dim]")
             else:
-                cons.print(f"[yellow]Sample test {sample_uuid}: "
-                           f"no build/ dir in {sample_gcda}[/yellow]")
+                cons.print(f"[yellow]Sample test {sample_uuid}: no build/ dir in {sample_gcda}[/yellow]")
 
         # Phase 3: Collect gcov coverage from each test's isolated .gcda directory.
         # .gcno files are temporarily copied alongside .gcda files, then removed.
@@ -580,7 +539,10 @@ def build_coverage_cache(  # pylint: disable=too-many-locals,too-many-statements
             futures = {
                 pool.submit(
                     _collect_single_test_coverage,
-                    uuid, test_gcda, root_dir, gcov_bin,
+                    uuid,
+                    test_gcda,
+                    root_dir,
+                    gcov_bin,
                 ): uuid
                 for uuid, test_gcda in test_results.items()
             }
@@ -606,27 +568,20 @@ def build_coverage_cache(  # pylint: disable=too-many-locals,too-many-statements
         try:
             shutil.rmtree(gcda_dir)
         except OSError as exc:
-            cons.print(f"[yellow]Warning: Failed to clean up temp directory "
-                       f"{gcda_dir}: {exc}[/yellow]")
+            cons.print(f"[yellow]Warning: Failed to clean up temp directory {gcda_dir}: {exc}[/yellow]")
 
     # Sanity check: at least some tests should have non-empty coverage.
     tests_with_coverage = sum(1 for v in cache.values() if v)
     if tests_with_coverage == 0:
-        raise MFCException(
-            "Coverage cache build produced zero coverage for all tests. "
-            "Check that the build was done with --gcov and gcov is working correctly."
-        )
+        raise MFCException("Coverage cache build produced zero coverage for all tests. Check that the build was done with --gcov and gcov is working correctly.")
     if tests_with_coverage < len(cases) // 2:
-        cons.print(f"[bold yellow]Warning: Only {tests_with_coverage}/{len(cases)} tests "
-                   f"have coverage data. Cache may be incomplete.[/bold yellow]")
+        cons.print(f"[bold yellow]Warning: Only {tests_with_coverage}/{len(cases)} tests have coverage data. Cache may be incomplete.[/bold yellow]")
 
     cases_py_path = Path(root_dir) / "toolchain/mfc/test/cases.py"
     try:
         cases_hash = hashlib.sha256(cases_py_path.read_bytes()).hexdigest()
     except OSError as exc:
-        raise MFCException(
-            f"Failed to read {cases_py_path} for cache metadata: {exc}"
-        ) from exc
+        raise MFCException(f"Failed to read {cases_py_path} for cache metadata: {exc}") from exc
     gcov_version = _get_gcov_version(gcov_bin)
 
     cache["_meta"] = {
@@ -639,10 +594,7 @@ def build_coverage_cache(  # pylint: disable=too-many-locals,too-many-statements
         with gzip.open(COVERAGE_CACHE_PATH, "wt", encoding="utf-8") as f:
             json.dump(cache, f, indent=2)
     except OSError as exc:
-        raise MFCException(
-            f"Failed to write coverage cache to {COVERAGE_CACHE_PATH}: {exc}\n"
-            "Check disk space and filesystem permissions."
-        ) from exc
+        raise MFCException(f"Failed to write coverage cache to {COVERAGE_CACHE_PATH}: {exc}\nCheck disk space and filesystem permissions.") from exc
 
     cons.print()
     cons.print(f"[bold green]Coverage cache written to {COVERAGE_CACHE_PATH}[/bold green]")
@@ -675,8 +627,7 @@ def _normalize_cache(cache: dict) -> dict:
         elif isinstance(v, list):
             result[k] = v
         else:
-            cons.print(f"[yellow]Warning: unexpected cache value type for {k}: "
-                       f"{type(v).__name__} — treating as empty.[/yellow]")
+            cons.print(f"[yellow]Warning: unexpected cache value type for {k}: {type(v).__name__} — treating as empty.[/yellow]")
             result[k] = []
     return result
 
@@ -735,10 +686,7 @@ def get_changed_files(root_dir: str, compare_branch: str = "master") -> Optional
     try:
         # Try local branch first, then origin/ remote ref (CI shallow clones).
         for ref in [compare_branch, f"origin/{compare_branch}"]:
-            merge_base_result = subprocess.run(
-                ["git", "merge-base", ref, "HEAD"],
-                capture_output=True, text=True, cwd=root_dir, timeout=30, check=False
-            )
+            merge_base_result = subprocess.run(["git", "merge-base", ref, "HEAD"], capture_output=True, text=True, cwd=root_dir, timeout=30, check=False)
             if merge_base_result.returncode == 0:
                 break
         else:
@@ -747,10 +695,7 @@ def get_changed_files(root_dir: str, compare_branch: str = "master") -> Optional
         if not merge_base:
             return None
 
-        diff_result = subprocess.run(
-            ["git", "diff", merge_base, "HEAD", "--name-only", "--no-color"],
-            capture_output=True, text=True, cwd=root_dir, timeout=30, check=False
-        )
+        diff_result = subprocess.run(["git", "diff", merge_base, "HEAD", "--name-only", "--no-color"], capture_output=True, text=True, cwd=root_dir, timeout=30, check=False)
         if diff_result.returncode != 0:
             return None
 
@@ -773,9 +718,7 @@ def should_run_all_tests(changed_files: set) -> bool:
     return any(f.startswith(ALWAYS_RUN_ALL_PREFIXES) for f in changed_files)
 
 
-def filter_tests_by_coverage(
-    cases: list, coverage_cache: dict, changed_files: set
-) -> tuple:
+def filter_tests_by_coverage(cases: list, coverage_cache: dict, changed_files: set) -> tuple:
     """
     Filter test cases to only those whose covered files overlap with changed files.
 
@@ -825,10 +768,8 @@ def filter_tests_by_coverage(
             skipped.append(case)
 
     if n_not_in_cache:
-        cons.print(f"[dim]  {n_not_in_cache} test(s) included conservatively "
-                   f"(not in cache)[/dim]")
+        cons.print(f"[dim]  {n_not_in_cache} test(s) included conservatively (not in cache)[/dim]")
     if n_no_sim_coverage:
-        cons.print(f"[dim]  {n_no_sim_coverage} test(s) included conservatively "
-                   f"(missing sim coverage)[/dim]")
+        cons.print(f"[dim]  {n_no_sim_coverage} test(s) included conservatively (missing sim coverage)[/dim]")
 
     return to_run, skipped

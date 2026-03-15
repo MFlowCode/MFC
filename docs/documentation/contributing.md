@@ -715,14 +715,15 @@ Every push to a PR triggers CI. Understanding the pipeline helps you fix failure
 
 ### Lint Gate (runs first, blocks all other jobs)
 
-All four checks must pass before any builds start:
+All five checks must pass before any builds start:
 
 1. **Formatting** — `./mfc.sh format` (auto-handled by pre-commit hook)
 2. **Spelling** — `./mfc.sh spelling`
-3. **Toolchain lint** — `./mfc.sh lint` (Python code quality)
+3. **Toolchain lint** — `./mfc.sh lint` (ruff + Python unit tests)
 4. **Source lint** — checks for:
    - Raw `!$acc` or `!$omp` directives (must use Fypp GPU macros)
    - Double-precision intrinsics (`dsqrt`, `dexp`, `dble`, etc.)
+5. **Doc references** — validates documentation cross-references
 
 ### Build and Test Matrix
 
