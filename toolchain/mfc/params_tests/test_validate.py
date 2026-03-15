@@ -5,14 +5,15 @@ Tests constraint validation, dependency checking, and error formatting.
 """
 
 import unittest
+
+from ..params.suggest import RAPIDFUZZ_AVAILABLE
 from ..params.validate import (
-    validate_constraints,
     check_dependencies,
     check_unknown_params,
-    validate_case,
     format_validation_results,
+    validate_case,
+    validate_constraints,
 )
-from ..params.suggest import RAPIDFUZZ_AVAILABLE
 
 
 class TestValidateConstraints(unittest.TestCase):

@@ -1,6 +1,6 @@
 #!/usr/bin/env python2
-import math
 import json
+import math
 
 # x0      = 10.E-06
 x0 = 1.0

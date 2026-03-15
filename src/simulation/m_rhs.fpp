@@ -1010,13 +1010,12 @@ contains
             $:END_GPU_PARALLEL_LOOP()
         end if
 
-        ! Additional Physics and Source Temrs
+        ! Additional Physics and Source Terms
         ! Additions for acoustic_source
         if (acoustic_source) then
             call nvtxStartRange("RHS-ACOUSTIC-SRC")
             call s_acoustic_src_calculations(q_cons_qp%vf(1:sys_size), &
                                              q_prim_qp%vf(1:sys_size), &
-                                             t_step, &
                                              rhs_vf)
             call nvtxEndRange
         end if
@@ -1058,7 +1057,7 @@ contains
 
         if (cont_damage) call s_compute_damage_state(q_cons_qp%vf, rhs_vf)
 
-        ! END: Additional pphysics and source terms
+        ! END: Additional physics and source terms
 
         if (run_time_info .or. probe_wrt .or. ib .or. bubbles_lagrange) then
             if (.not. igr .or. dummy) then

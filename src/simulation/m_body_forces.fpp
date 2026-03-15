@@ -72,7 +72,7 @@ contains
 
     !> This subroutine calculates the mixture density at each cell
     !! center
-    !! param q_cons_vf Conservative variable
+    !! @param q_cons_vf Conservative variables
     subroutine s_compute_mixture_density(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
