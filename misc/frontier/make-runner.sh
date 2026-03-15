@@ -9,7 +9,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/config.sh"
 
-RUNNER_VERSION="2.332.0"
+RUNNER_VERSION="${RUNNER_VERSION:-$(gh_latest_runner_version 2>/dev/null || echo "2.332.0")}"
 
 RUNNER_NUM="${1:?Usage: $0 <runner-number> [login-node]}"
 TARGET_NODE="${2:-$(hostname -s)}"
@@ -18,6 +18,7 @@ TARBALL="actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz"
 RUNNER_NAME="frontier-${RUNNER_NUM}"
 RUNNER_DIR="${SHARED_DIR}/${RUNNER_NAME}"
 
+echo "==> Using runner version ${RUNNER_VERSION}"
 echo "==> Setting up runner: ${RUNNER_NAME} on ${TARGET_NODE}"
 
 # --- Download tarball once to shared dir ---

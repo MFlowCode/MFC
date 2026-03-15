@@ -36,29 +36,49 @@ restart_one() {
         return
     fi
 
-    # Check if it's actually already running somewhere (GitHub may lag)
-    local actual_node
-    actual_node=$(find_node "$dir")
-
-    if [ "$actual_node" != "offline" ]; then
-        echo "==> ${runner_name} appears running on ${actual_node} (GitHub may lag) — stopping first..."
-        stop_runner "$actual_node" "$dir"
-    fi
-
-    # Determine target node from runner.node fallback
-    local target_node
+    # Determine the recorded node from runner.node
+    local recorded_node target_node
     if [ -f "${dir}/runner.node" ]; then
-        target_node=$(cat "${dir}/runner.node")
+        recorded_node=$(cat "${dir}/runner.node")
     else
         echo "WARN: No runner.node for ${runner_name}, skipping."
         return
     fi
 
+    # Check if the runner is actually already running somewhere (GitHub may lag)
+    local actual_node
+    actual_node=$(find_node "$dir")
+
+    if [ "$actual_node" != "offline" ]; then
+        # Self-healing: if the runner is on a different node than runner.node records,
+        # update runner.node to reflect reality before stopping and restarting.
+        if [ "$actual_node" != "$recorded_node" ]; then
+            echo "==> ${runner_name}: found on ${actual_node}, runner.node says ${recorded_node} — updating runner.node."
+            echo "$actual_node" > "${dir}/runner.node"
+            recorded_node="$actual_node"
+        fi
+        echo "==> ${runner_name} appears running on ${actual_node} (GitHub may lag) — stopping first..."
+        stop_runner "$actual_node" "$dir"
+        # Restart where it was actually running
+        target_node="$actual_node"
+    else
+        # Runner is truly offline; fall back to the last known node
+        target_node="$recorded_node"
+    fi
+
     echo "==> Starting ${runner_name} on ${target_node}..."
     if start_runner "$target_node" "$dir"; then
+        echo "$target_node" > "${dir}/runner.node"
         echo "    ${runner_name}: started on ${target_node}."
     else
-        echo "    ${runner_name}: ERROR — failed to start on ${target_node}." >&2
+        echo "    First start attempt failed. Retrying in 5 seconds..."
+        sleep 5
+        if start_runner "$target_node" "$dir"; then
+            echo "$target_node" > "${dir}/runner.node"
+            echo "    ${runner_name}: started on ${target_node}."
+        else
+            echo "    ${runner_name}: ERROR — failed to start on ${target_node} after retry." >&2
+        fi
     fi
 }
 
