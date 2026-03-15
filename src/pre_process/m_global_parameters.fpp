@@ -598,6 +598,14 @@ contains
             fluid_pp(i)%qv = 0._wp
             fluid_pp(i)%qvp = 0._wp
             fluid_pp(i)%G = 0._wp
+            fluid_pp(i)%non_newtonian = .false.
+            fluid_pp(i)%tau0 = 0._wp
+            fluid_pp(i)%K = 0._wp
+            fluid_pp(i)%nn = 1._wp
+            fluid_pp(i)%mu_max = dflt_real
+            fluid_pp(i)%mu_min = 0._wp
+            fluid_pp(i)%mu_bulk = 0._wp
+            fluid_pp(i)%hb_m = 1000._wp
         end do
 
         Bx0 = dflt_real

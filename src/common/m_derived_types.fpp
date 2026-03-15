@@ -376,6 +376,14 @@ module m_derived_types
         real(wp) :: qv      !< reference energy per unit mass for SGEOS, q (see Le Metayer (2004))
         real(wp) :: qvp     !< reference entropy per unit mass for SGEOS, q' (see Le Metayer (2004))
         real(wp) :: G
+        logical :: non_newtonian  !< Non-Newtonian fluid flag
+        real(wp) :: tau0          !< Yield stress (Herschel-Bulkley model)
+        real(wp) :: K             !< Consistency index (Herschel-Bulkley model)
+        real(wp) :: nn            !< Flow behavior index (Herschel-Bulkley model)
+        real(wp) :: mu_max        !< Maximum viscosity limit (shear)
+        real(wp) :: mu_min        !< Minimum viscosity limit (shear)
+        real(wp) :: mu_bulk       !< Bulk viscosity for non-Newtonian fluids
+        real(wp) :: hb_m          !< Papanastasiou regularization parameter
     end type physical_parameters
 
     !> Derived type annexing the physical parameters required for sub-grid bubble models

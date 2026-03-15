@@ -28,6 +28,8 @@ module m_riemann_solvers
 
     use m_chemistry
 
+    use m_re_visc              !< Dynamic Re_visc (Newtonian/non-Newtonian)
+
     use m_thermochem, only: &
         gas_constant, get_mixture_molecular_weight, &
         get_mixture_specific_heat_cv_mass, get_mixture_energy_mass, &
@@ -100,8 +102,8 @@ module m_riemann_solvers
     real(wp), allocatable, dimension(:) :: Gs_rs
     $:GPU_DECLARE(create='[Gs_rs]')
 
-    real(wp), allocatable, dimension(:, :) :: Res_gs
-    $:GPU_DECLARE(create='[Res_gs]')
+    ! Note: Static Res_gs array removed - s_compute_re_visc handles
+    ! both Newtonian and non-Newtonian cases dynamically
 
 contains
 
@@ -316,6 +318,12 @@ contains
         real(wp) :: G_L, G_R
         real(wp), dimension(2) :: Re_L, Re_R
         real(wp), dimension(3) :: xi_field_L, xi_field_R
+        ! Non-Newtonian per-phase Re arrays
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3, 2) :: Re_visc_per_phase_L, Re_visc_per_phase_R
+        #:else
+            real(wp), dimension(num_fluids, 2) :: Re_visc_per_phase_L, Re_visc_per_phase_R
+        #:endif
 
         real(wp) :: rho_avg
         real(wp) :: H_avg
@@ -361,7 +369,7 @@ contains
         #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
 
             if (norm_dir == ${NORM_DIR}$) then
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[i,j,k,l,q,alpha_rho_L,alpha_rho_R,vel_L,vel_R,alpha_L,alpha_R,tau_e_L,tau_e_R,Re_L,Re_R,s_L,s_R,s_S,Ys_L,Ys_R,xi_field_L, xi_field_R, Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, c_fast, pres_mag, B, Ga, vdotB, B2, b4, cm, pcorr, zcoef, vel_L_tmp, vel_R_tmp, rho_L, rho_R, pres_L, pres_R, E_L, E_R, H_L, H_R, Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi, T_L, T_R, Y_L, Y_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Gamm_L, Gamm_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, qv_avg, c_L, c_R, G_L, G_R, rho_avg, H_avg, c_avg, gamma_avg, ptilde_L, ptilde_R, vel_L_rms, vel_R_rms, vel_avg_rms, Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, flux_tau_L, flux_tau_R]', copyin='[norm_dir]')
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[i,j,k,l,q,alpha_rho_L,alpha_rho_R,vel_L,vel_R,alpha_L,alpha_R,tau_e_L,tau_e_R,Re_L,Re_R,s_L,s_R,s_S,Ys_L,Ys_R,xi_field_L, xi_field_R, Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, c_fast, pres_mag, B, Ga, vdotB, B2, b4, cm, pcorr, zcoef, vel_L_tmp, vel_R_tmp, rho_L, rho_R, pres_L, pres_R, E_L, E_R, H_L, H_R, Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi, T_L, T_R, Y_L, Y_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Gamm_L, Gamm_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, qv_avg, c_L, c_R, G_L, G_R, rho_avg, H_avg, c_avg, gamma_avg, ptilde_L, ptilde_R, vel_L_rms, vel_R_rms, vel_avg_rms, Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, flux_tau_L, flux_tau_R, Re_visc_per_phase_L, Re_visc_per_phase_R]', copyin='[norm_dir]')
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = is1%beg, is1%end
@@ -453,25 +461,27 @@ contains
                             end do
 
                             if (viscous) then
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do i = 1, 2
-                                    Re_L(i) = dflt_real
-                                    Re_R(i) = dflt_real
-
-                                    if (Re_size(i) > 0) Re_L(i) = 0._wp
-                                    if (Re_size(i) > 0) Re_R(i) = 0._wp
-
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do q = 1, Re_size(i)
-                                        Re_L(i) = alpha_L(Re_idx(i, q))/Res_gs(i, q) &
-                                                  + Re_L(i)
-                                        Re_R(i) = alpha_R(Re_idx(i, q))/Res_gs(i, q) &
-                                                  + Re_R(i)
-                                    end do
-
-                                    Re_L(i) = 1._wp/max(Re_L(i), sgm_eps)
-                                    Re_R(i) = 1._wp/max(Re_R(i), sgm_eps)
-                                end do
+                                ! Map rotated (j,k,l) to physical (x,y,z) indices
+                                #:if NORM_DIR == 1
+                                    call s_compute_re_visc(q_prim_vf, &
+                                                           alpha_L, j, k, l, Re_visc_per_phase_L)
+                                    call s_compute_re_visc(q_prim_vf, &
+                                                           alpha_R, j + 1, k, l, Re_visc_per_phase_R)
+                                #:elif NORM_DIR == 2
+                                    call s_compute_re_visc(q_prim_vf, &
+                                                           alpha_L, k, j, l, Re_visc_per_phase_L)
+                                    call s_compute_re_visc(q_prim_vf, &
+                                                           alpha_R, k, j + 1, l, Re_visc_per_phase_R)
+                                #:else
+                                    call s_compute_re_visc(q_prim_vf, &
+                                                           alpha_L, l, k, j, Re_visc_per_phase_L)
+                                    call s_compute_re_visc(q_prim_vf, &
+                                                           alpha_R, l, k, j + 1, Re_visc_per_phase_R)
+                                #:endif
+                                call s_compute_mixture_re( &
+                                    alpha_L, Re_visc_per_phase_L, Re_L)
+                                call s_compute_mixture_re( &
+                                    alpha_R, Re_visc_per_phase_R, Re_R)
                             end if
 
                             if (chemistry) then
@@ -1112,6 +1122,12 @@ contains
         real(wp) :: G_L, G_R
         real(wp), dimension(2) :: Re_L, Re_R
         real(wp), dimension(3) :: xi_field_L, xi_field_R
+        ! Non-Newtonian per-phase Re arrays
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3, 2) :: Re_visc_per_phase_L, Re_visc_per_phase_R
+        #:else
+            real(wp), dimension(num_fluids, 2) :: Re_visc_per_phase_L, Re_visc_per_phase_R
+        #:endif
 
         real(wp) :: rho_avg
         real(wp) :: H_avg
@@ -1157,7 +1173,7 @@ contains
         #:for NORM_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
 
             if (norm_dir == ${NORM_DIR}$) then
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[i,j,k,l, q, alpha_rho_L,alpha_rho_R,vel_L,vel_R,alpha_L,alpha_R,tau_e_L,tau_e_R,G_L,G_R,Re_L,Re_R,rho_avg,h_avg,gamma_avg,s_L,s_R,s_S,Ys_L,Ys_R,xi_field_L,xi_field_R,Cp_iL,Cp_iR,Xs_L,Xs_R,Gamma_iL,Gamma_iR,Yi_avg,Phi_avg,h_iL,h_iR,h_avg_2,c_fast,pres_mag,B,Ga,vdotB,B2,b4,cm,pcorr,zcoef,vel_grad_L,vel_grad_R,idx_right_phys,vel_L_rms,vel_R_rms,vel_avg_rms,vel_L_tmp,vel_R_tmp,Ms_L,Ms_R,pres_SL,pres_SR,alpha_L_sum,alpha_R_sum,c_avg,pres_L,pres_R,rho_L,rho_R,gamma_L,gamma_R,pi_inf_L,pi_inf_R,qv_L,qv_R,c_L,c_R,E_L,E_R,H_L,H_R,ptilde_L,ptilde_R,s_M,s_P,xi_M,xi_P,Cp_avg,Cv_avg,T_avg,eps,c_sum_Yi_Phi,Cp_L,Cp_R,Cv_L,Cv_R,R_gas_L,R_gas_R,MW_L,MW_R,T_L,T_R,Y_L,Y_R]')
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[i,j,k,l, q, alpha_rho_L,alpha_rho_R,vel_L,vel_R,alpha_L,alpha_R,tau_e_L,tau_e_R,G_L,G_R,Re_L,Re_R,rho_avg,h_avg,gamma_avg,s_L,s_R,s_S,Ys_L,Ys_R,xi_field_L,xi_field_R,Cp_iL,Cp_iR,Xs_L,Xs_R,Gamma_iL,Gamma_iR,Yi_avg,Phi_avg,h_iL,h_iR,h_avg_2,c_fast,pres_mag,B,Ga,vdotB,B2,b4,cm,pcorr,zcoef,vel_grad_L,vel_grad_R,idx_right_phys,vel_L_rms,vel_R_rms,vel_avg_rms,vel_L_tmp,vel_R_tmp,Ms_L,Ms_R,pres_SL,pres_SR,alpha_L_sum,alpha_R_sum,c_avg,pres_L,pres_R,rho_L,rho_R,gamma_L,gamma_R,pi_inf_L,pi_inf_R,qv_L,qv_R,c_L,c_R,E_L,E_R,H_L,H_R,ptilde_L,ptilde_R,s_M,s_P,xi_M,xi_P,Cp_avg,Cv_avg,T_avg,eps,c_sum_Yi_Phi,Cp_L,Cp_R,Cv_L,Cv_R,R_gas_L,R_gas_R,MW_L,MW_R,T_L,T_R,Y_L,Y_R, Re_visc_per_phase_L, Re_visc_per_phase_R]')
                 do l = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         do j = is1%beg, is1%end
@@ -1249,25 +1265,27 @@ contains
                             end do
 
                             if (viscous) then
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do i = 1, 2
-                                    Re_L(i) = dflt_real
-                                    Re_R(i) = dflt_real
-
-                                    if (Re_size(i) > 0) Re_L(i) = 0._wp
-                                    if (Re_size(i) > 0) Re_R(i) = 0._wp
-
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do q = 1, Re_size(i)
-                                        Re_L(i) = alpha_L(Re_idx(i, q))/Res_gs(i, q) &
-                                                  + Re_L(i)
-                                        Re_R(i) = alpha_R(Re_idx(i, q))/Res_gs(i, q) &
-                                                  + Re_R(i)
-                                    end do
-
-                                    Re_L(i) = 1._wp/max(Re_L(i), sgm_eps)
-                                    Re_R(i) = 1._wp/max(Re_R(i), sgm_eps)
-                                end do
+                                ! Map rotated (j,k,l) to physical (x,y,z) indices
+                                #:if NORM_DIR == 1
+                                    call s_compute_re_visc(q_prim_vf, &
+                                                           alpha_L, j, k, l, Re_visc_per_phase_L)
+                                    call s_compute_re_visc(q_prim_vf, &
+                                                           alpha_R, j + 1, k, l, Re_visc_per_phase_R)
+                                #:elif NORM_DIR == 2
+                                    call s_compute_re_visc(q_prim_vf, &
+                                                           alpha_L, k, j, l, Re_visc_per_phase_L)
+                                    call s_compute_re_visc(q_prim_vf, &
+                                                           alpha_R, k, j + 1, l, Re_visc_per_phase_R)
+                                #:else
+                                    call s_compute_re_visc(q_prim_vf, &
+                                                           alpha_L, l, k, j, Re_visc_per_phase_L)
+                                    call s_compute_re_visc(q_prim_vf, &
+                                                           alpha_R, l, k, j + 1, Re_visc_per_phase_R)
+                                #:endif
+                                call s_compute_mixture_re( &
+                                    alpha_L, Re_visc_per_phase_L, Re_L)
+                                call s_compute_mixture_re( &
+                                    alpha_R, Re_visc_per_phase_R, Re_R)
                             end if
 
                             if (chemistry) then
@@ -1689,7 +1707,7 @@ contains
         #:endfor
 
         if (viscous .or. dummy) then
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[i,j,k,l, idx_right_phys, vel_grad_L, vel_grad_R, alpha_L, alpha_R, vel_L, vel_R, Re_L, Re_R]', copyin='[norm_dir]')
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[i,j,k,l, idx_right_phys, vel_grad_L, vel_grad_R, alpha_L, alpha_R, vel_L, vel_R, Re_L, Re_R, Re_visc_per_phase_L, Re_visc_per_phase_R]', copyin='[norm_dir]')
             do l = isz%beg, isz%end
                 do k = isy%beg, isy%end
                     do j = isx%beg, isx%end
@@ -1735,25 +1753,14 @@ contains
                             end do
                         end if
 
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = 1, 2
-                            Re_L(i) = dflt_real
-                            Re_R(i) = dflt_real
-
-                            if (Re_size(i) > 0) Re_L(i) = 0._wp
-                            if (Re_size(i) > 0) Re_R(i) = 0._wp
-
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do q = 1, Re_size(i)
-                                Re_L(i) = alpha_L(Re_idx(i, q))/Res_gs(i, q) &
-                                          + Re_L(i)
-                                Re_R(i) = alpha_R(Re_idx(i, q))/Res_gs(i, q) &
-                                          + Re_R(i)
-                            end do
-
-                            Re_L(i) = 1._wp/max(Re_L(i), sgm_eps)
-                            Re_R(i) = 1._wp/max(Re_R(i), sgm_eps)
-                        end do
+                        call s_compute_re_visc(q_prim_vf, &
+                                               alpha_L, j, k, l, Re_visc_per_phase_L)
+                        call s_compute_re_visc(q_prim_vf, &
+                                               alpha_R, idx_right_phys(1), idx_right_phys(2), idx_right_phys(3), Re_visc_per_phase_R)
+                        call s_compute_mixture_re( &
+                            alpha_L, Re_visc_per_phase_L, Re_L)
+                        call s_compute_mixture_re( &
+                            alpha_R, Re_visc_per_phase_R, Re_R)
 
                         if (shear_stress) then
 
@@ -2016,6 +2023,12 @@ contains
         real(wp) :: qv_L, qv_R
         real(wp) :: c_L, c_R
         real(wp), dimension(2) :: Re_L, Re_R
+        ! Non-Newtonian per-phase Re arrays
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3, 2) :: Re_visc_per_phase_L, Re_visc_per_phase_R
+        #:else
+            real(wp), dimension(num_fluids, 2) :: Re_visc_per_phase_L, Re_visc_per_phase_R
+        #:endif
 
         real(wp) :: rho_avg
         real(wp) :: H_avg
@@ -2088,7 +2101,7 @@ contains
                 ! 6-EQUATION MODEL WITH HLLC
                 if (model_eqns == 3) then
                     !ME3
-                    $:GPU_PARALLEL_LOOP(collapse=3, private='[i,j,k,l, q, vel_L, vel_R, Re_L, Re_R, alpha_L, alpha_R, Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, tau_e_L, tau_e_R, flux_ene_e, xi_field_L, xi_field_R, pcorr, zcoef, rho_L, rho_R, pres_L, pres_R, E_L, E_R, H_L, H_R, Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi, T_L, T_R, Y_L, Y_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Gamm_L, Gamm_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, qv_avg, c_L, c_R, G_L, G_R, rho_avg, H_avg, c_avg, gamma_avg, ptilde_L, ptilde_R, vel_L_rms, vel_R_rms, vel_avg_rms, vel_L_tmp, vel_R_tmp, Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, rho_Star, E_Star, p_Star, p_K_Star, vel_K_star, s_L, s_R, s_M, s_P, s_S, xi_M, xi_P, xi_L, xi_R, xi_MP, xi_PP]')
+                    $:GPU_PARALLEL_LOOP(collapse=3, private='[i,j,k,l, q, vel_L, vel_R, Re_L, Re_R, alpha_L, alpha_R, Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, Yi_avg, Phi_avg, h_iL, h_iR, h_avg_2, tau_e_L, tau_e_R, flux_ene_e, xi_field_L, xi_field_R, pcorr, zcoef, rho_L, rho_R, pres_L, pres_R, E_L, E_R, H_L, H_R, Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi, T_L, T_R, Y_L, Y_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Gamm_L, Gamm_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, qv_avg, c_L, c_R, G_L, G_R, rho_avg, H_avg, c_avg, gamma_avg, ptilde_L, ptilde_R, vel_L_rms, vel_R_rms, vel_avg_rms, vel_L_tmp, vel_R_tmp, Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, rho_Star, E_Star, p_Star, p_K_Star, vel_K_star, s_L, s_R, s_M, s_P, s_S, xi_M, xi_P, xi_L, xi_R, xi_MP, xi_PP, Re_visc_per_phase_L, Re_visc_per_phase_R]')
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -2163,22 +2176,27 @@ contains
                                 end do
 
                                 if (viscous) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, 2
-                                        Re_L(i) = dflt_real
-                                        Re_R(i) = dflt_real
-                                        if (Re_size(i) > 0) Re_L(i) = 0._wp
-                                        if (Re_size(i) > 0) Re_R(i) = 0._wp
-                                        $:GPU_LOOP(parallelism='[seq]')
-                                        do q = 1, Re_size(i)
-                                            Re_L(i) = qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + Re_idx(i, q))/Res_gs(i, q) &
-                                                      + Re_L(i)
-                                            Re_R(i) = qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + Re_idx(i, q))/Res_gs(i, q) &
-                                                      + Re_R(i)
-                                        end do
-                                        Re_L(i) = 1._wp/max(Re_L(i), sgm_eps)
-                                        Re_R(i) = 1._wp/max(Re_R(i), sgm_eps)
-                                    end do
+                                    ! Map rotated (j,k,l) to physical (x,y,z) indices
+                                    #:if NORM_DIR == 1
+                                        call s_compute_re_visc(q_prim_vf, &
+                                                               alpha_L, j, k, l, Re_visc_per_phase_L)
+                                        call s_compute_re_visc(q_prim_vf, &
+                                                               alpha_R, j + 1, k, l, Re_visc_per_phase_R)
+                                    #:elif NORM_DIR == 2
+                                        call s_compute_re_visc(q_prim_vf, &
+                                                               alpha_L, k, j, l, Re_visc_per_phase_L)
+                                        call s_compute_re_visc(q_prim_vf, &
+                                                               alpha_R, k, j + 1, l, Re_visc_per_phase_R)
+                                    #:else
+                                        call s_compute_re_visc(q_prim_vf, &
+                                                               alpha_L, l, k, j, Re_visc_per_phase_L)
+                                        call s_compute_re_visc(q_prim_vf, &
+                                                               alpha_R, l, k, j + 1, Re_visc_per_phase_R)
+                                    #:endif
+                                    call s_compute_mixture_re( &
+                                        alpha_L, Re_visc_per_phase_L, Re_L)
+                                    call s_compute_mixture_re( &
+                                        alpha_R, Re_visc_per_phase_R, Re_R)
                                 end if
 
                                 E_L = gamma_L*pres_L + pi_inf_L + 5.e-1_wp*rho_L*vel_L_rms + qv_L
@@ -2496,7 +2514,7 @@ contains
 
                 elseif (model_eqns == 4) then
                     !ME4
-                    $:GPU_PARALLEL_LOOP(collapse=3, private='[i, q, alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, nbub_L, nbub_R, rho_L, rho_R, pres_L, pres_R, E_L, E_R, H_L, H_R, Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi, T_L, T_R, Y_L, Y_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Gamm_L, Gamm_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, qv_avg,c_L, c_R, G_L, G_R, rho_avg, H_avg, c_avg, gamma_avg, ptilde_L, ptilde_R, vel_L_rms, vel_R_rms, vel_avg_rms, vel_L_tmp, vel_R_tmp, Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, rho_Star, E_Star, p_Star, p_K_Star, vel_K_star, s_L, s_R, s_M, s_P, s_S, xi_M, xi_P, xi_L, xi_R, xi_MP, xi_PP]')
+                    $:GPU_PARALLEL_LOOP(collapse=3, private='[i, q, alpha_rho_L, alpha_rho_R, vel_L, vel_R, alpha_L, alpha_R, nbub_L, nbub_R, rho_L, rho_R, pres_L, pres_R, E_L, E_R, H_L, H_R, Cp_avg, Cv_avg, T_avg, eps, c_sum_Yi_Phi, T_L, T_R, Y_L, Y_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Gamm_L, Gamm_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, qv_avg,c_L, c_R, G_L, G_R, rho_avg, H_avg, c_avg, gamma_avg, ptilde_L, ptilde_R, vel_L_rms, vel_R_rms, vel_avg_rms, vel_L_tmp, vel_R_tmp, Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, rho_Star, E_Star, p_Star, p_K_Star, vel_K_star, s_L, s_R, s_M, s_P, s_S, xi_M, xi_P, xi_L, xi_R, xi_MP, xi_PP, Re_visc_per_phase_L, Re_visc_per_phase_R]')
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -2740,7 +2758,7 @@ contains
                     $:END_GPU_PARALLEL_LOOP()
 
                 elseif (model_eqns == 2 .and. bubbles_euler) then
-                    $:GPU_PARALLEL_LOOP(collapse=3, private='[i, q, R0_L, R0_R, V0_L, V0_R, P0_L, P0_R, pbw_L, pbw_R, vel_L, vel_R, rho_avg, alpha_L, alpha_R, h_avg, gamma_avg, Re_L, Re_R, pcorr, zcoef, rho_L, rho_R, pres_L, pres_R, E_L, E_R, H_L, H_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, qv_avg, c_L, c_R, c_avg, vel_L_rms, vel_R_rms, vel_avg_rms, vel_L_tmp, vel_R_tmp, Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, s_L, s_R, s_M, s_P, s_S, xi_M, xi_P, xi_L, xi_R, xi_MP, xi_PP, nbub_L, nbub_R, PbwR3Lbar, PbwR3Rbar, R3Lbar, R3Rbar, R3V2Lbar, R3V2Rbar]')
+                    $:GPU_PARALLEL_LOOP(collapse=3, private='[i, q, R0_L, R0_R, V0_L, V0_R, P0_L, P0_R, pbw_L, pbw_R, vel_L, vel_R, rho_avg, alpha_L, alpha_R, h_avg, gamma_avg, Re_L, Re_R, pcorr, zcoef, rho_L, rho_R, pres_L, pres_R, E_L, E_R, H_L, H_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, qv_avg, c_L, c_R, c_avg, vel_L_rms, vel_R_rms, vel_avg_rms, vel_L_tmp, vel_R_tmp, Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, s_L, s_R, s_M, s_P, s_S, xi_M, xi_P, xi_L, xi_R, xi_MP, xi_PP, nbub_L, nbub_R, PbwR3Lbar, PbwR3Rbar, R3Lbar, R3Rbar, R3V2Lbar, R3V2Rbar, Re_visc_per_phase_L, Re_visc_per_phase_R]')
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -2805,26 +2823,27 @@ contains
 
                                 if (viscous) then
                                     if (num_fluids == 1) then ! Need to consider case with num_fluids >= 2
-                                        $:GPU_LOOP(parallelism='[seq]')
-                                        do i = 1, 2
-                                            Re_L(i) = dflt_real
-                                            Re_R(i) = dflt_real
-
-                                            if (Re_size(i) > 0) Re_L(i) = 0._wp
-                                            if (Re_size(i) > 0) Re_R(i) = 0._wp
-
-                                            $:GPU_LOOP(parallelism='[seq]')
-                                            do q = 1, Re_size(i)
-                                                Re_L(i) = (1._wp - qL_prim_rs${XYZ}$_vf(j, k, l, E_idx + Re_idx(i, q)))/Res_gs(i, q) &
-                                                          + Re_L(i)
-                                                Re_R(i) = (1._wp - qR_prim_rs${XYZ}$_vf(j + 1, k, l, E_idx + Re_idx(i, q)))/Res_gs(i, q) &
-                                                          + Re_R(i)
-                                            end do
-
-                                            Re_L(i) = 1._wp/max(Re_L(i), sgm_eps)
-                                            Re_R(i) = 1._wp/max(Re_R(i), sgm_eps)
-
-                                        end do
+                                        ! Map rotated (j,k,l) to physical (x,y,z) indices
+                                        #:if NORM_DIR == 1
+                                            call s_compute_re_visc(q_prim_vf, &
+                                                                   alpha_L, j, k, l, Re_visc_per_phase_L)
+                                            call s_compute_re_visc(q_prim_vf, &
+                                                                   alpha_R, j + 1, k, l, Re_visc_per_phase_R)
+                                        #:elif NORM_DIR == 2
+                                            call s_compute_re_visc(q_prim_vf, &
+                                                                   alpha_L, k, j, l, Re_visc_per_phase_L)
+                                            call s_compute_re_visc(q_prim_vf, &
+                                                                   alpha_R, k, j + 1, l, Re_visc_per_phase_R)
+                                        #:else
+                                            call s_compute_re_visc(q_prim_vf, &
+                                                                   alpha_L, l, k, j, Re_visc_per_phase_L)
+                                            call s_compute_re_visc(q_prim_vf, &
+                                                                   alpha_R, l, k, j + 1, Re_visc_per_phase_R)
+                                        #:endif
+                                        call s_compute_mixture_re( &
+                                            alpha_L, Re_visc_per_phase_L, Re_L)
+                                        call s_compute_mixture_re( &
+                                            alpha_R, Re_visc_per_phase_R, Re_R)
                                     end if
                                 end if
 
@@ -3176,7 +3195,7 @@ contains
                     $:END_GPU_PARALLEL_LOOP()
                 else
                     ! 5-EQUATION MODEL WITH HLLC
-                    $:GPU_PARALLEL_LOOP(collapse=3, private='[Re_max, i, q, T_L, T_R, vel_L_rms, vel_R_rms, pres_L, pres_R, rho_L, gamma_L, pi_inf_L, qv_L, rho_R, gamma_R, pi_inf_R, qv_R, alpha_L_sum, alpha_R_sum, E_L, E_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Gamm_L, Gamm_R, Y_L, Y_R, H_L, H_R, qv_avg, rho_avg, gamma_avg, H_avg, c_L, c_R, c_avg, s_P, s_M, xi_P, xi_M, xi_L, xi_R, Ms_L, Ms_R, pres_SL, pres_SR, vel_L, vel_R, Re_L, Re_R, alpha_L, alpha_R, s_L, s_R, s_S, vel_avg_rms, pcorr, zcoef, vel_L_tmp, vel_R_tmp, Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, tau_e_L, tau_e_R, xi_field_L, xi_field_R, Yi_avg,Phi_avg, h_iL, h_iR, h_avg_2, G_L, G_R]', copyin='[is1, is2, is3]')
+                    $:GPU_PARALLEL_LOOP(collapse=3, private='[Re_max, i, q, T_L, T_R, vel_L_rms, vel_R_rms, pres_L, pres_R, rho_L, gamma_L, pi_inf_L, qv_L, rho_R, gamma_R, pi_inf_R, qv_R, alpha_L_sum, alpha_R_sum, E_L, E_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Gamm_L, Gamm_R, Y_L, Y_R, H_L, H_R, qv_avg, rho_avg, gamma_avg, H_avg, c_L, c_R, c_avg, s_P, s_M, xi_P, xi_M, xi_L, xi_R, Ms_L, Ms_R, pres_SL, pres_SR, vel_L, vel_R, Re_L, Re_R, alpha_L, alpha_R, s_L, s_R, s_S, vel_avg_rms, pcorr, zcoef, vel_L_tmp, vel_R_tmp, Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, tau_e_L, tau_e_R, xi_field_L, xi_field_R, Yi_avg,Phi_avg, h_iL, h_iR, h_avg_2, G_L, G_R, Re_visc_per_phase_L, Re_visc_per_phase_R]', copyin='[is1, is2, is3]')
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
@@ -3243,22 +3262,27 @@ contains
                                 if (Re_size(2) > 0) Re_max = 2
 
                                 if (viscous) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, Re_max
-                                        Re_L(i) = 0._wp
-                                        Re_R(i) = 0._wp
-
-                                        $:GPU_LOOP(parallelism='[seq]')
-                                        do q = 1, Re_size(i)
-                                            Re_L(i) = alpha_L(Re_idx(i, q))/Res_gs(i, q) &
-                                                      + Re_L(i)
-                                            Re_R(i) = alpha_R(Re_idx(i, q))/Res_gs(i, q) &
-                                                      + Re_R(i)
-                                        end do
-
-                                        Re_L(i) = 1._wp/max(Re_L(i), sgm_eps)
-                                        Re_R(i) = 1._wp/max(Re_R(i), sgm_eps)
-                                    end do
+                                    ! Map rotated (j,k,l) to physical (x,y,z) indices
+                                    #:if NORM_DIR == 1
+                                        call s_compute_re_visc(q_prim_vf, &
+                                                               alpha_L, j, k, l, Re_visc_per_phase_L)
+                                        call s_compute_re_visc(q_prim_vf, &
+                                                               alpha_R, j + 1, k, l, Re_visc_per_phase_R)
+                                    #:elif NORM_DIR == 2
+                                        call s_compute_re_visc(q_prim_vf, &
+                                                               alpha_L, k, j, l, Re_visc_per_phase_L)
+                                        call s_compute_re_visc(q_prim_vf, &
+                                                               alpha_R, k, j + 1, l, Re_visc_per_phase_R)
+                                    #:else
+                                        call s_compute_re_visc(q_prim_vf, &
+                                                               alpha_L, l, k, j, Re_visc_per_phase_L)
+                                        call s_compute_re_visc(q_prim_vf, &
+                                                               alpha_R, l, k, j + 1, Re_visc_per_phase_R)
+                                    #:endif
+                                    call s_compute_mixture_re( &
+                                        alpha_L, Re_visc_per_phase_L, Re_L)
+                                    call s_compute_mixture_re( &
+                                        alpha_R, Re_visc_per_phase_R, Re_R)
                                 end if
 
                                 if (chemistry) then
@@ -3974,16 +3998,7 @@ contains
         $:GPU_UPDATE(device='[Gs_rs]')
 
         if (viscous) then
-            @:ALLOCATE(Res_gs(1:2, 1:Re_size_max))
-        end if
-
-        if (viscous) then
-            do i = 1, 2
-                do j = 1, Re_size(i)
-                    Res_gs(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
-                end do
-            end do
-            $:GPU_UPDATE(device='[Res_gs,Re_idx,Re_size]')
+            $:GPU_UPDATE(device='[Re_idx,Re_size]')
         end if
 
         $:GPU_ENTER_DATA(copyin='[is1,is2,is3,isx,isy,isz]')

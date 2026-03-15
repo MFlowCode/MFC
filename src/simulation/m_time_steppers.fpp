@@ -44,6 +44,8 @@ module m_time_steppers
 
     use m_derived_variables
 
+    use m_re_visc              !< Non-Newtonian viscosity computations
+
     implicit none
 
     type(vector_field), allocatable, dimension(:) :: q_cons_ts !<
@@ -705,9 +707,11 @@ contains
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: vel        !< Cell-avg. velocity
             real(wp), dimension(3) :: alpha      !< Cell-avg. volume fraction
+            real(wp), dimension(3, 2) :: Re_visc_per_phase  !< Per-phase Re_visc
         #:else
             real(wp), dimension(num_vels) :: vel        !< Cell-avg. velocity
             real(wp), dimension(num_fluids) :: alpha      !< Cell-avg. volume fraction
+            real(wp), dimension(num_fluids, 2) :: Re_visc_per_phase  !< Per-phase Re_visc
         #:endif
         real(wp) :: vel_sum    !< Cell-avg. velocity sum
         real(wp) :: pres       !< Cell-avg. pressure
@@ -722,7 +726,7 @@ contains
         real(wp) :: dt_local
         integer :: j, k, l !< Generic loop iterators
 
-        if (.not. igr .or. dummy) then
+        if (.not. igr .or. dummy .or. any_non_newtonian) then
             call s_convert_conservative_to_primitive_variables( &
                 q_cons_ts(1)%vf, &
                 q_T_sf, &
@@ -730,7 +734,7 @@ contains
                 idwint)
         end if
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re, rho, vel_sum, pres, gamma, pi_inf, c, H, qv]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, Re, Re_visc_per_phase, rho, vel_sum, pres, gamma, pi_inf, c, H, qv]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -738,6 +742,13 @@ contains
                         call s_compute_enthalpy(q_cons_ts(1)%vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, j, k, l)
                     else
                         call s_compute_enthalpy(q_prim_vf, pres, rho, gamma, pi_inf, Re, H, alpha, vel, vel_sum, qv, j, k, l)
+                    end if
+
+                    ! For non-Newtonian fluids, compute variable Re based on shear rate
+                    ! Always use q_prim_vf (velocities), not q_cons (momenta)
+                    if (any_non_newtonian) then
+                        call s_compute_re_visc(q_prim_vf, alpha, j, k, l, Re_visc_per_phase)
+                        call s_compute_mixture_re(alpha, Re_visc_per_phase, Re)
                     end if
 
                     ! Compute mixture sound speed

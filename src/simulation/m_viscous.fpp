@@ -20,6 +20,8 @@ module m_viscous
 
     use m_finite_differences
 
+    use m_re_visc
+
     private; public s_get_viscous, &
  s_compute_viscous_stress_cylindrical_boundary, &
  s_initialize_viscous_module, &
@@ -31,24 +33,15 @@ module m_viscous
     type(int_bounds_info) :: is1_viscous, is2_viscous, is3_viscous
     $:GPU_DECLARE(create='[is1_viscous,is2_viscous,is3_viscous,iv]')
 
-    real(wp), allocatable, dimension(:, :) :: Res_viscous
-    $:GPU_DECLARE(create='[Res_viscous]')
+    ! Note: Static Res_viscous array removed - s_compute_re_visc handles
+    ! both Newtonian and non-Newtonian cases dynamically
 
 contains
 
     !> @brief Allocates and populates the viscous Reynolds number arrays and transfers data to the GPU.
     impure subroutine s_initialize_viscous_module
 
-        integer :: i, j !< generic loop iterators
-
-        @:ALLOCATE(Res_viscous(1:2, 1:Re_size_max))
-
-        do i = 1, 2
-            do j = 1, Re_size(i)
-                Res_viscous(i, j) = fluid_pp(Re_idx(i, j))%Re(i)
-            end do
-        end do
-        $:GPU_UPDATE(device='[Res_viscous,Re_idx,Re_size]')
+        $:GPU_UPDATE(device='[Re_idx,Re_size]')
         $:GPU_ENTER_DATA(copyin='[is1_viscous,is2_viscous,is3_viscous,iv]')
 
     end subroutine s_initialize_viscous_module
@@ -76,9 +69,11 @@ contains
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: alpha_visc, alpha_rho_visc
             real(wp), dimension(3, 3) :: tau_Re
+            real(wp), dimension(3, 2) :: Re_visc_nn
         #:else
             real(wp), dimension(num_fluids) :: alpha_visc, alpha_rho_visc
             real(wp), dimension(num_dims, num_dims) :: tau_Re
+            real(wp), dimension(num_fluids, 2) :: Re_visc_nn
         #:endif
 
         integer :: i, j, k, l, q !< Generic loop iterator
@@ -168,20 +163,11 @@ contains
                                 end do
 
                                 if (viscous) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, 2
-                                        Re_visc(i) = dflt_real
-
-                                        if (Re_size(i) > 0) Re_visc(i) = 0._wp
-                                        $:GPU_LOOP(parallelism='[seq]')
-                                        do q = 1, Re_size(i)
-                                            Re_visc(i) = alpha_visc(Re_idx(i, q))/Res_viscous(i, q) &
-                                                         + Re_visc(i)
-                                        end do
-
-                                        Re_visc(i) = 1._wp/max(Re_visc(i), sgm_eps)
-
-                                    end do
+                                    call s_compute_re_visc(q_prim_vf, &
+                                                           alpha_visc, j, k, l, &
+                                                           Re_visc_nn, grad_x_vf, &
+                                                           grad_y_vf, grad_z_vf)
+                                    call s_compute_mixture_re(alpha_visc, Re_visc_nn, Re_visc)
                                 end if
                             end if
 
@@ -278,20 +264,11 @@ contains
                                 end do
 
                                 if (viscous) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, 2
-                                        Re_visc(i) = dflt_real
-
-                                        if (Re_size(i) > 0) Re_visc(i) = 0._wp
-                                        $:GPU_LOOP(parallelism='[seq]')
-                                        do q = 1, Re_size(i)
-                                            Re_visc(i) = alpha_visc(Re_idx(i, q))/Res_viscous(i, q) &
-                                                         + Re_visc(i)
-                                        end do
-
-                                        Re_visc(i) = 1._wp/max(Re_visc(i), sgm_eps)
-
-                                    end do
+                                    call s_compute_re_visc(q_prim_vf, &
+                                                           alpha_visc, j, k, l, &
+                                                           Re_visc_nn, grad_x_vf, &
+                                                           grad_y_vf, grad_z_vf)
+                                    call s_compute_mixture_re(alpha_visc, Re_visc_nn, Re_visc)
                                 end if
                             end if
 
@@ -385,20 +362,11 @@ contains
                                 end do
 
                                 if (viscous) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, 2
-                                        Re_visc(i) = dflt_real
-
-                                        if (Re_size(i) > 0) Re_visc(i) = 0._wp
-                                        $:GPU_LOOP(parallelism='[seq]')
-                                        do q = 1, Re_size(i)
-                                            Re_visc(i) = alpha_visc(Re_idx(i, q))/Res_viscous(i, q) &
-                                                         + Re_visc(i)
-                                        end do
-
-                                        Re_visc(i) = 1._wp/max(Re_visc(i), sgm_eps)
-
-                                    end do
+                                    call s_compute_re_visc(q_prim_vf, &
+                                                           alpha_visc, j, k, l, &
+                                                           Re_visc_nn, grad_x_vf, &
+                                                           grad_y_vf, grad_z_vf)
+                                    call s_compute_mixture_re(alpha_visc, Re_visc_nn, Re_visc)
                                 end if
                             end if
 
@@ -494,20 +462,11 @@ contains
                                 end do
 
                                 if (viscous) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, 2
-                                        Re_visc(i) = dflt_real
-
-                                        if (Re_size(i) > 0) Re_visc(i) = 0._wp
-                                        $:GPU_LOOP(parallelism='[seq]')
-                                        do q = 1, Re_size(i)
-                                            Re_visc(i) = alpha_visc(Re_idx(i, q))/Res_viscous(i, q) &
-                                                         + Re_visc(i)
-                                        end do
-
-                                        Re_visc(i) = 1._wp/max(Re_visc(i), sgm_eps)
-
-                                    end do
+                                    call s_compute_re_visc(q_prim_vf, &
+                                                           alpha_visc, j, k, l, &
+                                                           Re_visc_nn, grad_x_vf, &
+                                                           grad_y_vf, grad_z_vf)
+                                    call s_compute_mixture_re(alpha_visc, Re_visc_nn, Re_visc)
                                 end if
                             end if
 
@@ -1612,10 +1571,7 @@ contains
 
     end subroutine s_compute_viscous_stress_tensor
 
-    !> @brief Deallocates the viscous Reynolds number arrays.
     impure subroutine s_finalize_viscous_module()
-
-        @:DEALLOCATE(Res_viscous)
 
     end subroutine s_finalize_viscous_module
 

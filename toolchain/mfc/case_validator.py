@@ -145,6 +145,21 @@ PHYSICS_DOCS = {
         "math": r"\mathrm{Re}_1 > 0, \quad \mathrm{Re}_2 > 0",
         "explanation": "Reynolds numbers must be positive. Not supported with model_eqns = 1.",
     },
+    "check_non_newtonian": {
+        "title": "Non-Newtonian Viscosity (Herschel-Bulkley)",
+        "category": "Physics Models",
+        "math": r"\mu(\dot\gamma) = \frac{\tau_0}{\dot\gamma}(1 - e^{-m\dot\gamma}) + K\dot\gamma^{n-1}",
+        "explanation": (
+            "Herschel-Bulkley model with Papanastasiou regularization for "
+            "non-Newtonian viscosity. The yield stress tau0 introduces a "
+            "threshold below which the fluid resists deformation; the "
+            "Papanastasiou parameter m smooths the transition (higher m = "
+            "sharper yield). K is the consistency index, nn the flow behavior "
+            "index (nn < 1: shear-thinning, nn = 1: Bingham, nn > 1: "
+            "shear-thickening). Viscosity is clamped to [mu_min, mu_max] for "
+            "numerical stability. Requires viscous = T."
+        ),
+    },
     # --- Feature Compatibility ---
     "check_mhd": {
         "title": "Magnetohydrodynamics (MHD)",
@@ -825,6 +840,32 @@ class CaseValidator:
 
             # Check Re(1) requirement
             self.prohibit(Re1 is None and viscous, f"viscous is set to true, but fluid_pp({i})%Re(1) is not specified")
+
+    def check_non_newtonian(self):
+        """Checks constraints on non-Newtonian fluid parameters"""
+        viscous = self.get("viscous", "F") == "T"
+        num_fluids = self.get("num_fluids", 1)
+
+        for i in range(1, num_fluids + 1):
+            nn_flag = self.get(f"fluid_pp({i})%non_newtonian", "F") == "T"
+            if not nn_flag:
+                continue
+
+            self.prohibit(not viscous, f"fluid_pp({i})%non_newtonian requires viscous = T")
+
+            K = self.get(f"fluid_pp({i})%K")
+            nn = self.get(f"fluid_pp({i})%nn")
+            tau0 = self.get(f"fluid_pp({i})%tau0")
+            mu_min = self.get(f"fluid_pp({i})%mu_min")
+            mu_max = self.get(f"fluid_pp({i})%mu_max")
+            hb_m = self.get(f"fluid_pp({i})%hb_m")
+
+            self.prohibit(K is not None and K <= 0, f"fluid_pp({i})%K (consistency index) must be > 0")
+            self.prohibit(nn is not None and nn <= 0, f"fluid_pp({i})%nn (flow behavior index) must be > 0")
+            self.prohibit(tau0 is not None and tau0 < 0, f"fluid_pp({i})%tau0 (yield stress) must be >= 0")
+            self.prohibit(mu_min is not None and mu_min < 0, f"fluid_pp({i})%mu_min must be >= 0")
+            self.prohibit(mu_max is not None and mu_min is not None and mu_max <= mu_min, f"fluid_pp({i})%mu_max must be > mu_min")
+            self.prohibit(hb_m is not None and hb_m <= 0, f"fluid_pp({i})%hb_m (Papanastasiou parameter) must be > 0")
 
     def check_mhd_simulation(self):
         """Checks MHD constraints specific to simulation"""
