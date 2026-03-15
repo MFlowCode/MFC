@@ -22,7 +22,8 @@ case "$cluster" in
     *) echo "ERROR: Unknown cluster '$cluster'"; exit 1 ;;
 esac
 
-rm -rf build
+source .github/scripts/clean-build.sh
+clean_build
 
 . ./mfc.sh load -c "$flag" -m g
 
